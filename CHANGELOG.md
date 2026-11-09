@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.47.0 · 9 November 2026
+
+Your agents in a Telegram chat: start sessions, read their replies and answer what they ask, from any phone.
+
+- **Settings → Telegram** connects a bot of your own, made with @BotFather in a minute. Only the chats you link with
+  a one-time code can use it, and the app asks Telegram for messages itself, so it needs no address on the internet.
+- **A message starts a session**, or goes on with the one the chat is in; the reply comes back when the agent is done,
+  formatted, with "typing…" while it works.
+- **What an agent asks** comes with buttons when Yes or No answers it, and with Notices from every session on, every
+  session that finishes, fails or needs you says so in your chat.
+- **Commands**: /new, /sessions to go on with another, /stop and /status.
+
 ## 0.46.0 · 9 November 2026
 
 Smoother while agents work: a session's page keeps up with a reply as it comes, and a message never goes twice.
