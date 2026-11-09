@@ -1,0 +1,35 @@
+name: Something is wrong
+description: Hydor does something it should not, or not what the guide says.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead, in your own words. Say what you saw rather than a guess at the cause.
+    validations:
+      required: true
+  - type: textarea
+    id: again
+    attributes:
+      label: How to make it happen again
+      placeholder: "1. …\n2. …"
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings → General → Release notes shows it (or `curl localhost:8790/api/health`).
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How you run it
+      options: [Mac app, Windows app, Linux app, Docker, Service from install.sh, From a git clone]
+    validations:
+      required: true
+  - type: textarea
+    id: printed
+    attributes:
+      label: What the server printed about it, if anything
+      render: shell

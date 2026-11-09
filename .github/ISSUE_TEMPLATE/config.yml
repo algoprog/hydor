@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The user guide
+    url: https://github.com/algoprog/hydor/tree/main/docs/guide
+    about: How to use each part of Hydor (the app shows it under Help).

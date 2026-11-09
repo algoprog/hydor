@@ -18,7 +18,9 @@ npm run typecheck
 
 The app's capabilities (search, the browser, memory, the guide…) each live in `server/<name>/` and
 `web/src/features/<name>/`. Each capability's tests are a script beside it (`*-test.ts`), built and run with a
-scratch data folder:
+scratch data folder. `npm test` runs every one that needs nothing beyond a checkout, a few at a time (pull requests run
+it on GitHub too); `npm test -- memory guide/` runs those whose path has those words, and `npm test -- --all` those
+that need a display, another system or the network as well. One by hand:
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
@@ -162,7 +164,7 @@ What users can see and do is described in several places, which change with the 
 the user guide in [docs/guide](guide/) (the app shows it under Help, the search box finds its sections, and
 agents read it to answer questions and to change things in the app), this folder's documents and the README,
 the search box's catalog (`shared/find-catalog.ts`, then `npm run find:vectors`), translations
-(`npm run i18n:extract`), and the release notes. [CLAUDE.md](../CLAUDE.md) says how; `server/guide/guide-test.ts`
+(`npm run i18n:extract`), and the release notes. [AGENTS.md](../AGENTS.md) says how; `server/guide/guide-test.ts`
 fails when the guide no longer matches the app (a link that points nowhere, a Settings section or an API route
 it does not describe, a picture that is missing). The guide's pictures (`docs/guide/images`) come from a demo copy
 of the app with made-up data: `scripts/guide-shots` takes them again when a page they show changes.
