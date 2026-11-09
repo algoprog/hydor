@@ -14,7 +14,7 @@ import { CONSOLE_ID } from '../agents/acp.ts';
 import type { Deps, Feature, SpawnAdditions } from '../features/types.ts';
 import { kick, warmMeaning, watchNotes } from './embed.ts';
 import { noteChanges } from './extract.ts';
-import { memoryInstructions } from './inject.ts';
+import { memoryInstructions, memoryParts } from './inject.ts';
 import { memoryRoutes } from './routes.ts';
 import { expireDue, keepBlock, keptBlock, learnOn, memoryOn, sessionMemoryOn, setCursor, sweep, tidyOn } from './store.ts';
 import { helperAsk, tidy, tidyDue, titlesFor, untitled } from './tidy.ts';
@@ -97,11 +97,16 @@ export const memory: Feature = {
     if (!memoryOn(d.db) || s.extra.memory === false) return own;
     // Custom reads its memory with its first turn, and again once its conversation is condensed (context below).
     if (s.agent === 'acp' && s.acpAgent === CONSOLE_ID) return own;
-    const text = await blockFor(d, s.key, 'full', 0, async () => {
-      const query = s.prompt?.trim() || (s.resume ? await lastAsk(d, s.key) : undefined);
-      return memoryInstructions(d.db, { cwd: s.cwd, key: s.key, session: s.resume, query });
-    });
-    return { ...own, instructions: [text] };
+    // A session that began before memory came in two parts goes on with the block it began with.
+    const before = s.resume && s.key ? keptBlock(d.db, s.key, 'full', 0) : null;
+    if (before != null) return { ...own, instructions: [before] };
+    // In the instructions, what is the same for every session of the place (and again for this one when it goes on
+    // within the hour), so the provider's cache of them holds from one session to the next; what bears on the request,
+    // and this session's own notes when it goes on, come with the first message, once.
+    const query = s.prompt?.trim() || (s.resume ? await lastAsk(d, s.key) : undefined);
+    const parts = await memoryParts(d.db, { cwd: s.cwd, key: s.key, session: s.resume, query });
+    const stable = await blockFor(d, s.key, 'stable', 0, async () => parts.stable);
+    return { ...own, instructions: [stable], ...(parts.request ? { notes: [parts.request] } : {}) };
   },
   async context(s, d) {
     // A confidential session reads memory and keeps nothing in it (server/confidential).

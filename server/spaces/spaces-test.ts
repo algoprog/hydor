@@ -98,11 +98,12 @@ test('a session in a space is told what it is, where its files go, and its guide
   assert.match(text, /\(Receipts and the yearly return\)/);
   assert.ok(text.includes(a.folder));
   assert.match(text, /# Agent Guidelines\n[\s\S]*## For the project “Taxes 2026”\nAmounts in EUR/);
-  assert.doesNotMatch(text, /In its folder now/, 'an empty folder says nothing');
+  assert.doesNotMatch(text, /now \(the last changed first/, 'what its folder holds is not in the instructions');
+  assert.equal(add.notes.length, 0, 'an empty folder says nothing');
   assert.deepEqual((await spawnAdditions({ agent: 'claude', key: 'claude:x', cwd: tmp, runId: 'r', resume: false, extra: {} })).instructions, []);
 });
 
-test('a new session in a space is told what its folder holds: the last changed first, folders marked, hidden files left out', async () => {
+test('a new session in a space is told what its folder holds, with its first message: the last changed first, folders marked, hidden files left out', async () => {
   const [a] = spaceViews(db);
   fs.writeFileSync(path.join(a.folder, 'notes.md'), 'x');
   fs.mkdirSync(path.join(a.folder, 'Receipts'));
@@ -110,14 +111,16 @@ test('a new session in a space is told what its folder holds: the last changed f
   const old = Date.now() / 1000 - 3600;
   fs.utimesSync(path.join(a.folder, 'notes.md'), old, old);
   fs.writeFileSync(path.join(a.folder, 'contract.pdf'), 'x');
-  const text = (await spawnAdditions({ agent: 'codex', key: 'codex:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } })).instructions.join('\n');
-  const line = /In its folder now \(.*?\): (.*)\. Open those/.exec(text)?.[1] ?? '';
+  const added = await spawnAdditions({ agent: 'codex', key: 'codex:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } });
+  assert.doesNotMatch(added.instructions.join('\n'), /now \(the last changed first/, 'not in the instructions, which stay the same from one session to the next');
+  const text = added.notes.join('\n');
+  const line = /In the folder of the project "Taxes 2026" now \(.*?\): (.*)\. Open those/.exec(text)?.[1] ?? '';
   assert.ok(line.startsWith('contract.pdf, ') || line.startsWith('Receipts/, '), line);
   assert.ok(line.endsWith('notes.md'), line);
   assert.ok(line.includes('Receipts/'), line);
   assert.ok(!line.includes('.secret'), line);
   for (let i = 0; i < 45; i++) fs.writeFileSync(path.join(a.folder, `f${i}.txt`), 'x');
-  const more = (await spawnAdditions({ agent: 'codex', key: 'codex:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } })).instructions.join('\n');
+  const more = (await spawnAdditions({ agent: 'codex', key: 'codex:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } })).notes.join('\n');
   assert.match(more, / … and 8 more\. Open those/);
   for (const n of fs.readdirSync(a.folder)) fs.rmSync(path.join(a.folder, n), { recursive: true });
 });

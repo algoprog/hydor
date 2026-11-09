@@ -295,20 +295,22 @@ await test("Custom's instructions: the routing rule, the triggered skill's text,
 
 console.log('skills that fit');
 
-await test('a new session hears the skills that fit its first message, once, as each agent loads them', async () => {
+await test('a new session hears the skills that fit its first message, once, with it, as each agent loads them', async () => {
   const base = { cwd: root, runId: 'r', resume: false, extra: {} };
   const docker = 'Set up a Dockerfile and a compose file for my node app';
-  const said = (await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker }, deps))?.instructions?.join('\n') ?? '';
+  const started = await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker }, deps);
+  assert.equal(started?.instructions, undefined, 'not in the instructions: they stay the same from one session to the next');
+  const said = started?.notes?.join('\n') ?? '';
   assert.match(said, /^Skills that fit this task, found by its first message: when one does, load it with the Skill tool before you start, and follow it; if none does, carry on\./);
   assert.match(said, /\n- docker: Use when/);
   assert.doesNotMatch(said, /SKILL\.md/, 'Claude Code loads them by name');
-  const codex = (await skillpack.spawn!({ ...base, agent: 'codex', prompt: docker }, deps))?.instructions?.join('\n') ?? '';
+  const codex = (await skillpack.spawn!({ ...base, agent: 'codex', prompt: docker }, deps))?.notes?.join('\n') ?? '';
   assert.match(codex, /read its SKILL\.md before you start/);
   assert.ok(codex.includes(path.join(viewSkills(), 'docker', 'SKILL.md')), 'with the file to read');
   for (const prompt of ['thanks!', 'What is the capital of Australia and how many people live there?', 'Fix the typo in the README heading', undefined])
-    assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt }, deps))?.instructions, undefined, String(prompt));
-  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', resume: true, prompt: docker }, deps))?.instructions, undefined, 'not for a session that goes on');
-  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker, extra: { app: { run: 'x' } } }, deps))?.instructions, undefined, 'not for an app’s run');
+    assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt }, deps))?.notes, undefined, String(prompt));
+  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', resume: true, prompt: docker }, deps))?.notes, undefined, 'not for a session that goes on');
+  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker, extra: { app: { run: 'x' } } }, deps))?.notes, undefined, 'not for an app’s run');
   // Custom: in the instructions made for each of its turns, from its first message.
   const key = 'acp:fit';
   await skillpack.spawn!({ ...base, agent: 'acp', acpAgent: 'console', key, prompt: 'Help me prepare for my job interview at a bank next week' }, deps);
@@ -317,7 +319,7 @@ await test('a new session hears the skills that fit its first message, once, as 
   assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack' })).json().suggest, true, 'on unless turned off');
   await app.inject({ method: 'PUT', url: '/api/skillpack/settings', payload: { suggest: false } });
   assert.equal((await app.inject({ method: 'GET', url: '/api/skillpack' })).json().suggest, false);
-  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker }, deps))?.instructions, undefined);
+  assert.equal((await skillpack.spawn!({ ...base, agent: 'claude', prompt: docker }, deps))?.notes, undefined);
   await app.inject({ method: 'PUT', url: '/api/skillpack/settings', payload: { suggest: true } });
 });
 

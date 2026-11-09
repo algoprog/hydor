@@ -82,8 +82,12 @@ export type McpServerSpec =
 
 /** What a starting agent gets from the capabilities. */
 export interface SpawnAdditions {
-  /** Added to the agent's own instructions. */
+  /** Added to the agent's own instructions. Keep them the same from one session to the next where they can be (what
+   * bears on one request alone goes in `notes`), so the provider's cache of them holds across sessions. */
   instructions?: string[];
+  /** With the first message after the agent starts, once, ahead of it in a <system-reminder>: what bears on that
+   * request alone (memory's notes for it, the skills that fit it, what the project's folder holds now). */
+  notes?: string[];
   mcpServers?: Record<string, McpServerSpec>;
   env?: Record<string, string>;
   /** More arguments for the agent's command (Claude Code: --plugin-dir). */

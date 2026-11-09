@@ -8,7 +8,7 @@ A project keeps one piece of work together: its sessions, a folder for its files
 
 A project is one piece of work with everything that belongs to it, like Projects in ChatGPT or Claude. A tax return, a thesis, a garden, a website: each can be a project. On the start page you pick a project by its name instead of a folder, and every session you start in it:
 
-- **works in the project's folder**. The agent is told that this folder holds the project's files, what is in it now (the last changed first), and to keep what it makes for the project there. It also works with the other folders the project works with, where they are: Claude Code works in them as in its own folder, and other agents are told where they are;
+- **works in the project's folder**. The agent is told that this folder holds the project's files and to keep what it makes for the project there, and with your first message what is in it now (the last changed first). It also works with the other folders the project works with, where they are: Claude Code works in them as in its own folder, and other agents are told where they are;
 - **follows the project's guidelines**: what every agent in the project should know, such as who the work is for, how to work and what to keep in mind (see [Agent Guidelines](/guide/guidelines));
 - **gets the project's own skills** with your skill library: written methods for how its work is done, which agents load when a task calls for them (see [Give a project skills of its own](#give-a-project-skills-of-its-own));
 - **starts as the project's agent**, when the project has one (see [Agents](/guide/agents));

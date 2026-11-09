@@ -473,9 +473,10 @@ export const skillpack: Feature = {
     if (!view) return undefined;
     if (s.agent === 'claude' && !(await claudeTakesPlugins())) return undefined;
     const switches = where ? spaceSwitches(d.db, where.space.id) : {};
-    // The skills that fit the first message, once, in what the agent starts with (Custom's, in its context).
+    // The skills that fit the first message, once, with it (Custom's, in its context): its instructions stay the same
+    // from one session to the next, so the provider's cache of them holds.
     const fit = await fitLines(s, d, view, switches).catch((e) => (warnOnce(e), null));
-    const said = fit ? { instructions: [fit] } : {};
+    const said = fit ? { notes: [fit] } : {};
     // Claude Code: the view is a plugin for this session only, and its own skills as the project switches them
     // (settings given on the command line come before the user's own). Codex: an extra folder of skills, and
     // its own skills as the project switches them, in its thread's settings (on top of the user's).
@@ -498,7 +499,7 @@ export const skillpack: Feature = {
     // Other ACP agents (Gemini CLI, OpenCode…) have no skills of their own: the list, to read when one fits.
     if (s.agent === 'acp') {
       const index = skillIndex(view);
-      return index || fit ? { instructions: [...(index ? [index] : []), ...(fit ? [fit] : [])] } : undefined;
+      return index || fit ? { ...(index ? { instructions: [index] } : {}), ...said } : undefined;
     }
     return undefined;
   },

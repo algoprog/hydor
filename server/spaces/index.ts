@@ -235,6 +235,13 @@ export function folderGlance(dir: string): string | null {
   return named.join(', ') + (list.length > GLANCE ? ` … and ${list.length - GLANCE} more` : '');
 }
 
+/**
+ * What a space's folder holds now, for the first message of a session in it (SpawnAdditions.notes): it changes as files
+ * do, so it stays out of the instructions, which are the same from one session to the next.
+ */
+export const folderNote = (s: Space, glance: string) =>
+  `In the folder of the project "${s.name}" now (the last changed first; the user adds files to the project there): ${glance}. Open those the task needs.`;
+
 /** "a, b and c". */
 const and = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : (xs[0] ?? ''));
 
@@ -381,6 +388,11 @@ export const spaces: Feature = {
     // Its skills reach the agent with the library's (server/skillpack): here it is told they are there, but for any it switched off.
     const switches = spaceSwitches(d.db, sp.id);
     const skills = [...new Set([sp, ...members].flatMap((m) => skillsOf(m.id).map((k) => k.name)))].filter((n) => switches[n] !== false);
-    return { instructions: [spaceInstructions(sp, members, folderGlance(sp.folder), skills)], ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}) };
+    const glance = folderGlance(sp.folder);
+    return {
+      instructions: [spaceInstructions(sp, members, null, skills)],
+      ...(glance ? { notes: [folderNote(sp, glance)] } : {}),
+      ...(dirs.length ? { args: dirs.flatMap((f) => ['--add-dir', f]) } : {}),
+    };
   },
 };
