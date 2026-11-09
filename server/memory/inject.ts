@@ -6,7 +6,7 @@
 // 4. from the bigger places, the notes and topics that bear on the request: a top-k by hybrid search (words by
 //    BM25 and meaning by the embedding model, fused by rank: search.ts), each standing out enough from the rest
 //    for this request to count. Fewer than k when fewer bear on it: nothing is given just to fill the room. With
-//    search by meaning on, this waits a few seconds for the model when it is not running;
+//    search by meaning on, this waits only for a model about to be up (embed.ts), else finds them by words alone;
 // 5. for the bigger places, an index of the rest, a title each (the tidy-up writes them): what is kept and how
 //    to find it, so an agent knows when to look something up (recall).
 // k is Settings → Memory's "Notes each agent starts with". Notes a summary given sums up are left out of the

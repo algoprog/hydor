@@ -13,7 +13,7 @@ import Database from 'better-sqlite3';
 import { runHead } from '../../shared/automations.ts';
 import type { MemoryBasis, MemoryEntry, MemoryNoteData } from '../../shared/memory.ts';
 import type { TimelineItem, ToolInfo } from '../../shared/types.ts';
-import { kvSet, openDb } from '../db.ts';
+import { kvGet, kvSet, openDb } from '../db.ts';
 import type { Deps, RunCtx, SpawnAdditions } from '../features/types.ts';
 import { memory as memoryFeature } from './index.ts';
 import { availableMemory } from '../models/machine.ts';
@@ -437,7 +437,7 @@ test('a session’s memory block stays the same while it works: for Custom until
   store.clearAll(db);
 });
 
-test('a request’s vector waits for the model at the start, and is asked once', async () => {
+test('a request’s vector: at once from a loaded model and asked once; a model not running keeps no start waiting', async () => {
   setEmbedderForTests(null);
   assert.equal(await requestVector(db, 'which tea does the user like'), null, 'off: none');
   useFakeEmbedder();
@@ -446,6 +446,16 @@ test('a request’s vector waits for the model at the start, and is asked once',
   const b = await requestVector(db, 'which tea does the user like');
   assert.ok(a && a === b);
   assert.equal(fakeCalls.length, before + 1, 'the second from memory');
+  // On, but its model not running (here not even set up): none at once, and the skills asking next get none at once too.
+  setEmbedderForTests(null);
+  const was = kvGet(db, 'memory.meaning');
+  kvSet(db, 'memory.meaning', '1');
+  const t0 = Date.now();
+  assert.equal(await requestVector(db, 'which coffee does the user like'), null);
+  assert.equal(await requestVector(db, 'which coffee does the user like'), null);
+  assert.ok(Date.now() - t0 < 500, `no wait (${Date.now() - t0} ms)`);
+  if (was === undefined) db.prepare("delete from kv where k = 'memory.meaning'").run();
+  else kvSet(db, 'memory.meaning', was);
 });
 
 test('the user’s profile: its block, written by the user and by agents within its words, refused when stale or unsafe', async () => {

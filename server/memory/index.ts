@@ -12,7 +12,7 @@
 import type { Agent } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import type { Deps, Feature, SpawnAdditions } from '../features/types.ts';
-import { kick, watchNotes } from './embed.ts';
+import { kick, warmMeaning, watchNotes } from './embed.ts';
 import { noteChanges } from './extract.ts';
 import { memoryInstructions } from './inject.ts';
 import { memoryRoutes } from './routes.ts';
@@ -122,6 +122,19 @@ export const memory: Feature = {
     watchNotes(d.db);
     startTranscriptVectors(d.db);
     void kick(d.db).catch((e) => console.warn(`[memory] search by meaning: ${(e as Error).message}`));
+    // A scheduled task due within the minute (not a watcher's look): search by meaning's model starts now, so the notes
+    // and skills its first message gets are found by meaning too (a start waits only for a model about to be up: embed.ts).
+    const dueSoon = setInterval(() => {
+      try {
+        if (!memoryOn(d.db)) return;
+        const now = Date.now();
+        const rows = d.db.prepare('select schedule from tasks where enabled = 1 and next_at between ? and ?').all(now - 30_000, now + 45_000) as { schedule: string }[];
+        if (rows.some((r) => (JSON.parse(r.schedule) as { kind?: string }).kind !== 'watch')) warmMeaning(d.db);
+      } catch {
+        // No tasks table yet, or a schedule that does not read: nothing to start for.
+      }
+    }, 20_000);
+    dueSoon.unref?.();
     const daily = () => {
       try {
         sweep(d.db);
