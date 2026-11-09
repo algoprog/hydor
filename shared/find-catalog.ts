@@ -72,6 +72,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Terminal suggestions', 'autocomplete completion shell commands', 'Grey completions after the cursor in terminals'],
   ['general', 'Resume after usage limits', 'limit reset continue automatically plan', 'Continues a session a minute after a plan’s limit resets'],
   ['general', 'Delete inactive sessions', 'delete old sessions clean up retention history keep conversations inactive year months', 'Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept'],
+  ['general', 'Limit each session', 'memory cpu processors cores cap limit ram resources cgroup systemd oom heavy session', 'The most memory and processors one session’s programs may use', 'Limit each session'],
   ['general', 'Start when this computer starts', 'boot startup login service autostart systemd', 'Starts the app when the computer starts'],
   ['general', 'Update automatically', 'updates upgrade auto update new version restart install', 'Installs new versions by itself: the desktop apps as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while'],
   ['general', 'Take the tour', 'tour help guide onboarding welcome', 'See what each part of the app does', 'Welcome tour'],

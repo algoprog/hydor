@@ -23,7 +23,15 @@ export interface RunMeta {
   createdAt: number;
   cwd: string;
   opts: Record<string, unknown>;
+  /** The systemd scope it runs in, with the limits it holds (Settings → General → Limit each session). */
+  scope?: string;
+  limits?: { memoryMb?: number; cpus?: number };
 }
+
+type Wrapped = { cmd: string; args: string[]; env?: NodeJS.ProcessEnv; scope?: string; limits?: RunMeta['limits'] };
+/** Wraps the command that starts a runner (the sessions' limits, server/resources.ts); set once when the server starts. */
+let wrap: ((runId: string, cmd: string, args: string[]) => Wrapped) | null = null;
+export const setRunnerWrap = (f: typeof wrap) => (wrap = f);
 
 export interface ExitInfo {
   code: number | null;
@@ -69,9 +77,26 @@ export class Runner extends EventEmitter {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     fs.writeFileSync(path.join(dir, 'spec.json'), JSON.stringify(spec), { mode: 0o600 });
-    fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta), { mode: 0o600 });
     const runnerJs = path.join(APP_ROOT, 'dist/server/runner.js');
-    const p = spawn(process.execPath, [runnerJs, dir], { detached: true, stdio: 'ignore', cwd: dir, windowsHide: true });
+    const plain: Wrapped = { cmd: process.execPath, args: [runnerJs, dir] };
+    const w = wrap?.(meta.runId, plain.cmd, plain.args) ?? plain;
+    if (w.scope) Object.assign(meta, { scope: w.scope, limits: w.limits });
+    fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta), { mode: 0o600 });
+    const go = (c: Wrapped) => spawn(c.cmd, c.args, { detached: true, stdio: 'ignore', cwd: dir, windowsHide: true, ...(c.env ? { env: c.env } : {}) });
+    const began = Date.now();
+    const p = go(w);
+    if (w.scope) {
+      // systemd-run that could not make the scope (its manager gone since): the runner starts as it always did.
+      const plainAgain = () => {
+        if (Date.now() - began > 5000 || fs.existsSync(path.join(dir, 'state.json'))) return;
+        delete meta.scope;
+        delete meta.limits;
+        fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta), { mode: 0o600 });
+        go(plain).unref();
+      };
+      p.once('error', plainAgain);
+      p.once('exit', (code) => code !== 0 && plainAgain());
+    }
     p.unref();
     return new Runner(dir, meta);
   }
@@ -104,6 +129,11 @@ export class Runner extends EventEmitter {
     } catch {
       return null;
     }
+  }
+
+  /** The runner's process id, once it has started. */
+  runnerPid(): number | null {
+    return this.readJson<{ runnerPid: number }>('state.json')?.runnerPid ?? null;
   }
 
   /** True while the runner process (and so the agent) is still running. */

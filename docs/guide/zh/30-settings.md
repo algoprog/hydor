@@ -22,6 +22,7 @@
 - [**终端建议**](/settings?s=general&find=Terminal%20suggestions)：终端中光标后的灰色补全建议。
 - [**用量限制解除后继续**](/settings?s=general&find=Resume%20after%20usage%20limits)：在套餐额度重置一分钟后继续会话。
 - [**删除不活跃的会话**](/settings?s=general&find=Delete%20inactive%20sessions)：删除一年（或你选择的时长）无人使用的会话；在此之前，每个对话都会保留。
+- [**限制每个会话**](/settings?s=general&find=Limit%20each%20session)：一个会话的程序最多可用的内存和处理器。
 - [**开机时启动**](/settings?s=general&find=Start%20when%20this%20computer%20starts)：电脑启动时自动启动本应用。
 - [**自动更新**](/settings?s=general&find=Update%20automatically)：自动安装新版本：桌面应用在新版本一发布时安装，并提前一分钟告诉你；从 git 安装的副本则在你一段时间没有使用时安装。
 - [**开始导览**](/settings?s=general&find=Take%20the%20tour)：了解应用各部分的作用。
@@ -223,6 +224,7 @@
 - [**备注**](/settings?s=memory&find=Notes)：所有已保存的笔记，按位置分类。
 - [**添加笔记**](/settings?s=memory&find=Add%20a%20note)：写一条笔记让智能体记住，关于你或某个项目。
 - [**已删除的笔记**](/settings?s=memory&find=Deleted%20notes)：最近 30 天内删除的笔记，可以恢复。
+- [**导入…**](/settings?s=memory&find=Bring%20in%E2%80%A6)：把其他助手对你的了解变成笔记：Claude Code、Codex、Hermes、OpenClaw，或 ChatGPT、Claude 的导出文件。
 - [**导出**](/settings?s=memory&find=Export)：把所有笔记导出为便于阅读的 Markdown，或含更改历史的 JSON。
 - [**全部清除…**](/settings?s=memory&find=Clear%20all%E2%80%A6)：删除所有笔记及其历史记录。
 
