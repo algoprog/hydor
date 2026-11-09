@@ -28,6 +28,9 @@ ExecStart=${process.execPath} ${path.join(root, 'dist/server/index.js')}
 Restart=on-failure
 # Live agents run in their own processes and must outlive restarts of the web server.
 KillMode=process
+# Those processes and what agents start share the service: one of them running out of memory is ended alone, and the
+# app goes on (by default the service manager stops the whole service then, the app with it).
+OOMPolicy=continue
 
 [Install]
 WantedBy=default.target

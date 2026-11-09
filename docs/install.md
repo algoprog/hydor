@@ -226,7 +226,9 @@ node dist/server/cli.js service install     # put it back
 ```
 
 Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/hydor.env`, one
-`NAME=value` per line. Restarting the service never interrupts a running agent: the server reconnects to it.
+`NAME=value` per line. Restarting the service never interrupts a running agent: the server reconnects to it. A program an
+agent started that runs out of memory is ended alone, and the app goes on (`OOMPolicy=continue`; a service installed
+before 0.45.0 gets it from `node dist/server/cli.js service install`).
 
 **Start when this computer starts** (Settings → General) is on by default: the service starts at boot, even
 before anyone logs in, and comes back if it stops. A copy started by hand (`npm start`) from a git clone

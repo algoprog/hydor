@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,44 +29,132 @@ const dropped = (k: string) => !KEEP.has(k) && (DROP.has(k) || DROP_PREFIX.some(
 
 let cached: Record<string, string> | null = null;
 
+/** What `bash -lic` gave last time, kept in the data folder (only you can read it) with the startup files it read. */
+const SAVED = () => path.join(config.dataDir, 'login-env.json');
+/** A week at most, and new as soon as one of the shell's startup files changes. */
+const SAVED_MS = 7 * 24 * 3600_000;
+const STARTUP = () => ['.bash_profile', '.bash_login', '.profile', '.bashrc'].map((f) => path.join(os.homedir(), f)).concat(['/etc/profile', '/etc/bash.bashrc', '/etc/environment']);
+const stamp = () =>
+  STARTUP()
+    .map((f) => {
+      try {
+        return `${f}@${fs.statSync(f).mtimeMs}`;
+      } catch {
+        return `${f}@-`;
+      }
+    })
+    .join('|');
+
 /**
- * The user's login-shell environment (what a terminal or VS Code would give the agents),
- * captured once from a clean `bash -lic`. Falls back to this process's env.
+ * The user's login-shell environment (what a terminal or VS Code would give the agents), from a clean `bash -lic`.
+ * Reading it takes a second or two (more with conda and completions), which the server once spent at every start
+ * before it answered anything: now the one read last time is used at once when the shell's startup files have not
+ * changed since, and read again a few seconds later in the background, for what changes without them (an ssh-agent's
+ * socket). Falls back to this process's env.
  */
 export function agentBaseEnv(): Record<string, string> {
   if (cached) return cached;
   if (WIN) return (cached = windowsEnv());
+  const saved = savedEnv();
+  if (saved) {
+    cached = finish(saved);
+    const later = setTimeout(() => void readAgain(), 3000);
+    later.unref?.();
+    return cached;
+  }
+  const res = spawnSync(shellCommand()[0], shellCommand().slice(1), { encoding: 'buffer', timeout: 15_000, cwd: os.homedir(), stdio: ['ignore', 'pipe', 'ignore'] });
+  const read = parse(res.status, res.stdout?.toString('utf8') ?? '');
+  if (read) save(read);
+  return (cached = finish(read ?? ownEnv()));
+}
+
+const MARKER = '__HYDOR_ENV__';
+
+function shellCommand(): string[] {
   const user = os.userInfo();
   const shell = fs.existsSync('/bin/bash') ? '/bin/bash' : user.shell || '/bin/sh';
-  const marker = '__HYDOR_ENV__';
-  const res = spawnSync(
+  return [
     '/usr/bin/env',
-    [
-      '-i',
-      `HOME=${user.homedir}`,
-      `USER=${user.username}`,
-      `LOGNAME=${user.username}`,
-      `SHELL=${user.shell || shell}`,
-      'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      'TERM=dumb',
-      `LANG=${process.env.LANG || 'C.UTF-8'}`,
-      shell,
-      '-lic',
-      `printf '%s\\0' ${marker}; env -0`,
-    ],
-    { encoding: 'buffer', timeout: 15_000, cwd: user.homedir, stdio: ['ignore', 'pipe', 'ignore'] },
-  );
-  const out = res.stdout?.toString('utf8') ?? '';
-  const at = out.indexOf(marker + '\0');
+    '-i',
+    `HOME=${user.homedir}`,
+    `USER=${user.username}`,
+    `LOGNAME=${user.username}`,
+    `SHELL=${user.shell || shell}`,
+    'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    'TERM=dumb',
+    `LANG=${process.env.LANG || 'C.UTF-8'}`,
+    shell,
+    '-lic',
+    `printf '%s\\0' ${MARKER}; env -0`,
+  ];
+}
+
+/** The variables a login shell printed, or null when it failed. */
+function parse(status: number | null, out: string): Record<string, string> | null {
+  const at = out.indexOf(MARKER + '\0');
+  if (status !== 0 || at < 0) return null;
   const env: Record<string, string> = {};
-  if (res.status === 0 && at >= 0) {
-    for (const kv of out.slice(at + marker.length + 1).split('\0')) {
-      const i = kv.indexOf('=');
-      if (i > 0) env[kv.slice(0, i)] = kv.slice(i + 1);
-    }
-  } else {
-    for (const [k, v] of Object.entries(process.env)) if (v != null) env[k] = v;
+  for (const kv of out.slice(at + MARKER.length + 1).split('\0')) {
+    const i = kv.indexOf('=');
+    if (i > 0) env[kv.slice(0, i)] = kv.slice(i + 1);
   }
+  return env;
+}
+
+const ownEnv = () => Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => e[1] != null));
+
+function savedEnv(): Record<string, string> | null {
+  try {
+    const s = JSON.parse(fs.readFileSync(SAVED(), 'utf8')) as { at?: number; stamp?: string; env?: Record<string, string> };
+    if (s.stamp === stamp() && typeof s.at === 'number' && Date.now() - s.at < SAVED_MS && s.env && typeof s.env === 'object') return s.env;
+  } catch {
+    // None yet, or unreadable: read the shell.
+  }
+  return null;
+}
+
+function save(env: Record<string, string>) {
+  try {
+    fs.mkdirSync(config.dataDir, { recursive: true });
+    const tmp = `${SAVED()}.${process.pid}`;
+    fs.writeFileSync(tmp, JSON.stringify({ at: Date.now(), stamp: stamp(), env }), { mode: 0o600 });
+    fs.renameSync(tmp, SAVED());
+  } catch {
+    // A data folder that cannot be written: the shell is read at each start, as before.
+  }
+}
+
+/** The shell read again in the background; what agents start with from then on. */
+function readAgain(): Promise<void> {
+  return new Promise((resolve) => {
+    const cmd = shellCommand();
+    let out = '';
+    let child: ReturnType<typeof spawn>;
+    try {
+      child = spawn(cmd[0], cmd.slice(1), { cwd: os.homedir(), stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      return resolve();
+    }
+    const kill = setTimeout(() => child.kill('SIGKILL'), 15_000);
+    kill.unref?.();
+    child.stdout!.setEncoding('utf8').on('data', (d: string) => (out += d));
+    child.on('error', () => (clearTimeout(kill), resolve()));
+    child.on('close', (code) => {
+      clearTimeout(kill);
+      const read = parse(code, out);
+      if (read) {
+        save(read);
+        cached = finish(read);
+      }
+      resolve();
+    });
+  });
+}
+
+/** What the agents get from a login shell's variables: those of this process left out, the app's own added. */
+function finish(read: Record<string, string>): Record<string, string> {
+  const user = os.userInfo();
+  const env = { ...read };
   for (const k of Object.keys(env)) {
     if (dropped(k)) delete env[k];
   }
@@ -82,7 +170,6 @@ export function agentBaseEnv(): Record<string, string> {
   if (!env.DBUS_SESSION_BUS_ADDRESS && fs.existsSync(`${runtime}/bus`)) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${runtime}/bus`;
   env.TERM = 'xterm-256color';
   env.COLORTERM = 'truecolor';
-  cached = env;
   return env;
 }
 

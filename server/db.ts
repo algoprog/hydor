@@ -135,12 +135,15 @@ create trigger if not exists chunk_ad after delete on chunk_text begin
 end;
 `;
 
-export function openDb(file = paths.db): DB {
+export function openDb(file = paths.db, o: { cacheMb?: number } = {}): DB {
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('busy_timeout = 10000');
   db.pragma('foreign_keys = ON');
+  // Pages kept by SQLite itself, 64 MB for the server (2 MB by default): on a computer short of memory the system drops
+  // the files it read first, so the pages read most stay here rather than coming back from disk on each request.
+  db.pragma(`cache_size = ${-1024 * (o.cacheMb ?? 64)}`);
   db.exec(SCHEMA);
   // Columns added since the table was first created.
   const cols = new Set((db.prepare('pragma table_info(sessions)').all() as { name: string }[]).map((c) => c.name));

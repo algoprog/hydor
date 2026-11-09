@@ -24,7 +24,8 @@ interface Opts {
 }
 
 const opts = workerData as Opts;
-const db = openDb(opts.dbPath);
+// Its own connection, beside the server's: a smaller cache, as it writes what it reads once.
+const db = openDb(opts.dbPath, { cacheMb: 16 });
 const port = parentPort!;
 
 interface FileRef {
