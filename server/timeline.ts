@@ -203,9 +203,11 @@ export class Timeline extends EventEmitter {
     if (found && found !== file) this.setPath(found);
   }
 
+  /** What changed since the last time; `initial` while the transcript is first read (the server's own listeners hear
+   * it, pages fetch what they show of it themselves). */
   private flush() {
     const changed = this.parser.takeDirty();
-    if (changed.length) this.emit('items', changed);
+    if (changed.length) this.emit('items', changed, !this.loaded);
   }
 
   get total(): number {

@@ -670,8 +670,9 @@ export class SessionManager extends EventEmitter {
     this.timelines.set(key, tl);
     const t = tl;
     let lastGoal = 'null';
-    t.on('items', (items: TimelineItem[]) => {
-      this.emit('items', key, items, t.total, false);
+    t.on('items', (items: TimelineItem[], initial = false) => {
+      // `initial`: what the transcript held when first read, which pages fetch their own part of (server/index.ts).
+      this.emit('items', key, items, t.total, false, initial);
       const goal = JSON.stringify(t.goal() ?? null);
       if (goal !== lastGoal) {
         lastGoal = goal;

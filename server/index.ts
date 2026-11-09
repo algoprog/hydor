@@ -1467,9 +1467,11 @@ function toSubscribers(key: string, e: ServerEvent) {
 }
 
 sessions.on('sessions', (upsert: SessionSummary[], remove: string[]) => broadcast({ t: 'sessions', upsert, remove }));
-sessions.on('items', (key: string, items: TimelineItem[], total: number, reset: boolean) =>
-  toSubscribers(key, { t: 'items', key, items: items.map(previewItem), total, reset }),
-);
+// Not what a transcript held when first read: a page fetches its own part of that, and one already open was sent all of
+// it (10 MB at once for a long session).
+sessions.on('items', (key: string, items: TimelineItem[], total: number, reset: boolean, initial?: boolean) => {
+  if (!initial) toSubscribers(key, { t: 'items', key, items: items.map(previewItem), total, reset });
+});
 sessions.on('live', (key: string, live, overlay) => toSubscribers(key, { t: 'live', key, live, overlay }));
 sessions.on('usage', (u) => {
   broadcast({ t: 'usage', ...u });
