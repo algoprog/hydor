@@ -200,7 +200,7 @@ Custom keeps each conversation on disk, so it carries on after the app restarts.
 
 ## What Custom costs
 
-- Models through OpenRouter: OpenRouter reports what each call cost, and the session's spending uses that.
+- Models through OpenRouter: OpenRouter reports what each call cost, and the session's spending uses that. Claude models there are asked to keep the conversation in their cache, as the others do on their own, so each step reads it back for about a tenth of the price; and the tools Custom is offered change at most once in a session (the tools for commands running in the background stay once one has run), so that cache holds.
 - Models on this computer (Ollama, vLLM): nothing.
 - Other endpoints: the tokens are priced like the other agents' (see [Usage, limits and costs](/guide/usage)).
 

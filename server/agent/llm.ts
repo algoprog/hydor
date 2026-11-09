@@ -84,7 +84,11 @@ export async function chat(
     extra?: Record<string, unknown>;
   },
 ): Promise<Reply> {
-  const extra = plain.has(m.id) ? {} : (o.extra ?? {});
+  // Claude through OpenRouter keeps a cache of the conversation only when asked (OpenAI, DeepSeek and Gemini do on their
+  // own): asked with each request, the next one reads it back, sooner and at a tenth of the price. A server that refuses
+  // it gets requests without it, as for any option (plain).
+  const cached = m.provider === 'openrouter' && /^~?anthropic\//.test(m.model) ? { cache_control: { type: 'ephemeral' } } : {};
+  const extra = plain.has(m.id) ? {} : { ...cached, ...(o.extra ?? {}) };
   const body: Record<string, unknown> = {
     model: m.model,
     messages: o.messages,

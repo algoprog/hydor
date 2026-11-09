@@ -319,10 +319,15 @@ test('chat() reads what a call cost and the tokens read from cache', async () =>
   const port = (srv.address() as { port: number }).port;
   const m: AgentModel = { id: 'openrouter/x/y', label: 'Y', provider: 'openrouter', baseUrl: `http://127.0.0.1:${port}`, model: 'x/y', tools: 'native' };
   const r = await chat(m, { messages: [{ role: 'user', content: 'hello' }], signal: AbortSignal.timeout(5000), onText: () => {}, onReasoning: () => {} });
-  srv.close();
   assert.equal(r.text, 'hi');
   assert.deepEqual(r.usage, { prompt: 1200, completion: 30, cached: 1000, cost: 0.0042 });
   assert.deepEqual(asked.usage, { include: true });
+  assert.equal(asked.cache_control, undefined, 'a model that caches on its own is not asked to');
+  // Claude through OpenRouter caches only when asked.
+  const claude: AgentModel = { ...m, id: 'openrouter/anthropic/claude-test', model: 'anthropic/claude-test' };
+  await chat(claude, { messages: [{ role: 'user', content: 'hello' }], signal: AbortSignal.timeout(5000), onText: () => {}, onReasoning: () => {} });
+  srv.close();
+  assert.deepEqual(asked.cache_control, { type: 'ephemeral' });
 });
 
 test('OpenRouter automatically supplies catalog rates and missing stream costs without manual prices', async () => {
