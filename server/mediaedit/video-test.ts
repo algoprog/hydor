@@ -705,7 +705,9 @@ if (ff) {
     ok((await finished(a.job)).status === 'stopped', 'one being made stopped, nothing saved');
     await req('DELETE', `/api/mediaedit/video/${b.job}`);
     await finished(b.job);
-    ok(!fs.readdirSync(tmp).some((n) => n.startsWith('long (edited)')) && fs.readdirSync(path.join(config.dataDir, 'mediaedit', 'tmp')).length === 0, 'no file left of them, their folders gone');
+    // A stopped job's folder goes a moment after it says so (later still on a busy computer).
+    const gone = () => !fs.readdirSync(tmp).some((n) => n.startsWith('long (edited)')) && fs.readdirSync(path.join(config.dataDir, 'mediaedit', 'tmp')).length === 0;
+    ok(await until(async () => gone(), 10_000), 'no file left of them, their folders gone');
   }
 
   // What is refused, in words a person can act on.
