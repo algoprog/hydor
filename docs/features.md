@@ -126,8 +126,9 @@ agents that speak ACP and take MCP servers.
   when you say something lasting, you edit it in Settings, and past its length (1,000 words unless changed) the
   helper model shortens it. Each agent starts, once, with the notes that bear on what you asked, at most 10 unless changed: a
   top-k by hybrid search, by words (BM25) and by meaning (on unless you turn it off; it sets itself up once), with
-  LightOn's mDenseOn model on your own computer (on a GPU, an NVIDIA one or a Mac's own, or on the CPU in about 1.5 GB,
-  only while needed), each counting only when it stands out from the rest for that request; a place with few notes
+  LightOn's mDenseOn model on your own computer (in 8 bits through ONNX Runtime on the CPU: a 340 MB download, about
+  1 GB of memory and a second or two to start, only while needed), each counting only when it stands out from the rest
+  for that request; a place with few notes
   whole; and an index of the rest by title, to look up. Nothing fills the room, and only what agents looked up weighs
   in ranking. Claude Code and Codex get the notes for the request with the first message, their instructions the same
   for every session of a project until its notes change, so the provider's cache of them holds from one session to

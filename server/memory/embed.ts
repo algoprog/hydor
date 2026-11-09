@@ -1,20 +1,20 @@
 // Search by meaning: a Python worker (embed_worker.py) runs the embedding model, lightonai/mDenseOn, on this
-// computer: on a GPU in fp16 when there is one (an NVIDIA GPU with room, or a Mac's own, Apple silicon's, through
-// Metal), else on the CPU, and on the CPU too when the GPU fails its first try, saying why (Settings can keep it on
-// the CPU, to leave the GPUs to other work). It is on unless Settings → Memory turns it off (or, never set there, HYDOR_EMBED=off),
-// so memory, the Library and the rest are searched by words and meaning together. It sets up a private
-// environment in the data folder once (PyTorch, its CPU build when there is no NVIDIA GPU, and Transformers): on
-// its own a minute after the app first starts, at once when someone turns it on; the model downloads on first
-// start (1.2 GB).
-// On an NVIDIA GPU the worker stays loaded. On a CPU, and on a Mac's GPU (which shares the computer's memory), it
-// starts when needed, only when enough memory is free, and quits after a few idle minutes, so a computer with 8 GB
-// is never short. Until it answers, memory is
-// searched by words alone, and notes get their vectors in the background once it does.
+// computer's CPU through ONNX Runtime, in its 8-bit build (algoprog/mDenseOn-ONNX: 310 MB, about 1 GB once loaded, a
+// second or two to start). It is on unless Settings → Memory turns it off (or, never set there, HYDOR_EMBED=off), so
+// memory, the Library and the rest are searched by words and meaning together. It sets itself up once: a private Python
+// environment in the data folder with ONNX Runtime, Hugging Face's tokenizer and NumPy (about 100 MB; an older one with
+// PyTorch is replaced), then the model's files, each checked against its SHA-256, into a cache beside Hugging Face's;
+// on its own a minute after the app first starts, at once when someone turns it on. The worker starts when needed, only
+// when enough memory is free, and quits after a few idle minutes, so a computer with 8 GB is never short. Until it
+// answers, memory is searched by words alone, and notes get their vectors in the background once it does.
 import { spawn, type ChildProcess } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { MeaningHeld, MeaningState } from '../../shared/memory.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
@@ -24,24 +24,33 @@ import { onEntriesChanged } from './store.ts';
 import { DIM, MODEL, missingVectors, setVectors, vectorCounts } from './vectors.ts';
 
 export type Kind = 'query' | 'document';
-export type MeaningDevice = 'auto' | 'cpu';
 
 const dir = () => path.join(config.dataDir, 'memory');
 const venv = () => path.join(dir(), 'venv');
-/** The Python that runs the worker: one given (HYDOR_EMBED_PYTHON, with PyTorch and Transformers), else the private one. */
+/** The Python that runs the worker: one given (HYDOR_EMBED_PYTHON, with ONNX Runtime, tokenizers and NumPy), else the private one. */
 const python = () => process.env.HYDOR_EMBED_PYTHON || path.join(venv(), ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
-/** What the environment holds: another list means setting it up again. */
-const PACKAGES = 'torch transformers>=5.6,<6';
+/** What the environment holds: another list means setting it up again (an environment with PyTorch, from before, is replaced). */
+const PACKAGES = 'onnxruntime>=1.23 tokenizers>=0.20 numpy';
 const WORKER = path.join(APP_ROOT, 'server/memory/embed_worker.py');
-/** Free memory needed to start the worker: on the CPU (measured: 1.4 GB once loaded, 2.4 GB at most while loading,
- * half of that the model's file, which the system can drop), or with a GPU (its weights go to the GPU). */
-const NEED_CPU_MB = 2560;
-const NEED_GPU_MB = 1536;
-/** Free disk needed to set up: PyTorch's CPU build or its CUDA one, with the model. */
-const DISK_CPU_GB = 3;
-const DISK_GPU_GB = 9;
-/** On a CPU, the worker quits after this long without work. */
-const IDLE_CPU_MS = 5 * 60_000;
+
+/**
+ * The model's files, from its repository on Hugging Face at a fixed revision, each with its size and SHA-256: lightonai/mDenseOn
+ * exported to ONNX (exactly: cosine 1.000000 to PyTorch in float32), its layers' weights and word table in 8 bits.
+ */
+export const MODEL_REPO = 'algoprog/mDenseOn-ONNX';
+export const MODEL_REVISION = '8a1e5c530bd2c19f8fe94a01bf0dfcc373081db7';
+export const MODEL_FILES: ModelFile[] = [
+  { from: 'onnx/model_q8.onnx', name: 'model_q8.onnx', bytes: 323_365_939, sha256: '1497725b22a972db3df43eadf0c4227849a4b5ff2493e1bf3a1b667cf4965cdd' },
+  { from: 'tokenizer.json', name: 'tokenizer.json', bytes: 34_363_287, sha256: 'a086e6a7efb90bbab8e379a63f3463fb13e6256ebec3343c1f1612cab693935b' },
+  { from: 'tokenizer_config.json', name: 'tokenizer_config.json', bytes: 662, sha256: '469d2116d060fdd319728c3e5ba42697daab30568dc751b49b11fbd86ebb3a60' },
+];
+const MODEL_MB = Math.round(MODEL_FILES.reduce((n, f) => n + f.bytes, 0) / 2 ** 20);
+/** Free memory needed to start the worker (measured: about 0.55 GB loaded, 1.04 GB at most with long texts). */
+const NEED_MB = 1536;
+/** Free disk needed to set up: the environment (about 100 MB) and the model. */
+const DISK_GB = 1;
+/** The worker quits after this long without work. */
+const IDLE_MS = 5 * 60_000;
 
 /** Turned on or off in Settings → Memory; never set there, on unless HYDOR_EMBED=off (a test's or a demo's app). */
 const meaningChosen = (db: DB): boolean | null => {
@@ -49,11 +58,8 @@ const meaningChosen = (db: DB): boolean | null => {
   return v === '1' ? true : v === '0' ? false : null;
 };
 export const meaningOn = (db: DB) => meaningChosen(db) ?? process.env.HYDOR_EMBED !== 'off';
-export const meaningDevice = (db: DB): MeaningDevice => (kvGet(db, 'memory.meaning.device') === 'cpu' ? 'cpu' : 'auto');
-const hasNvidia = () => fs.existsSync('/proc/driver/nvidia/version');
-/** A Mac with Apple silicon, whose own GPU the model runs on. */
-const appleSilicon = () => process.platform === 'darwin' && process.arch === 'arm64';
-const envReady = () => (process.env.HYDOR_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
+const packagesReady = () => (process.env.HYDOR_EMBED_PYTHON ? fs.existsSync(python()) : fs.existsSync(python()) && readText(path.join(venv(), '.packages')) === PACKAGES);
+const envReady = () => packagesReady() && modelReady();
 
 function readText(f: string): string | null {
   try {
@@ -72,21 +78,25 @@ function freeDiskGb(p: string): number {
   }
 }
 
-/** Where the model is kept: Hugging Face's cache, in the data folder inside a container (so it lasts). */
-function hfHome(): string | undefined {
-  if (process.env.HF_HOME) return process.env.HF_HOME;
-  return fs.existsSync('/.dockerenv') ? path.join(dir(), 'hf') : undefined;
+/**
+ * Where the model's files are kept: HYDOR_EMBED_MODEL_DIR, else a cache of the user's beside Hugging Face's (so the app's
+ * other data folders, a test's or a second copy's, share one download), in the data folder inside a container (so it lasts).
+ */
+export function modelDir(): string {
+  if (process.env.HYDOR_EMBED_MODEL_DIR) return process.env.HYDOR_EMBED_MODEL_DIR;
+  const folder = `mDenseOn-ONNX-${MODEL_REVISION.slice(0, 12)}`;
+  if (fs.existsSync('/.dockerenv')) return path.join(dir(), 'model', folder);
+  const cache =
+    process.platform === 'win32'
+      ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'hydor', 'cache')
+      : process.platform === 'darwin'
+        ? path.join(os.homedir(), 'Library', 'Caches', 'hydor')
+        : path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'hydor');
+  return path.join(cache, folder);
 }
 
-function modelCached(): boolean {
-  const hub = process.env.HF_HUB_CACHE ?? path.join(hfHome() ?? path.join(os.homedir(), '.cache', 'huggingface'), 'hub');
-  const snaps = path.join(hub, `models--${MODEL.replace('/', '--')}`, 'snapshots');
-  try {
-    return fs.readdirSync(snaps).some((s) => fs.existsSync(path.join(snaps, s, 'model.safetensors')));
-  } catch {
-    return false;
-  }
-}
+/** The model's files are all there, as downloaded and checked (a mark written last says so). */
+const modelReady = () => readText(path.join(modelDir(), '.complete')) === MODEL_REVISION && MODEL_FILES.every((f) => fs.existsSync(path.join(modelDir(), f.name)));
 
 // ---- the worker ---------------------------------------------------------------------------------
 
@@ -99,11 +109,7 @@ interface Pending {
 interface Worker {
   proc: ChildProcess;
   ready: boolean;
-  device?: string;
-  name?: string;
   rss?: number;
-  /** Why it runs on the CPU though a GPU was there: the GPU failed its first try. */
-  fallback?: string;
   pending: Map<number, Pending>;
   seq: number;
   idle?: NodeJS.Timeout;
@@ -115,7 +121,6 @@ let starting: Promise<Worker | null> | null = null;
 let loadStarted = 0;
 let status: MeaningState['status'] = 'off';
 let detail: string | undefined;
-let lastDevice: string | undefined;
 let settingUp: Promise<void> | null = null;
 const crashes: number[] = [];
 const stderrTail: string[] = [];
@@ -128,15 +133,10 @@ export const setEmbedderForTests = (fn: typeof stub) => {
   asking.clear();
 };
 
-function workerEnv(db: DB): NodeJS.ProcessEnv {
-  const keep = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'XDG_CACHE_HOME', 'HF_HUB_CACHE', 'HF_TOKEN', 'CUDA_VISIBLE_DEVICES', 'HYDOR_EMBED_THREADS'];
+function workerEnv(): NodeJS.ProcessEnv {
+  const keep = ['PATH', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TMPDIR', 'SYSTEMROOT', 'HYDOR_EMBED_THREADS'];
   const env: NodeJS.ProcessEnv = Object.fromEntries(keep.filter((k) => process.env[k] != null).map((k) => [k, process.env[k]]));
-  Object.assign(env, { PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1', HF_HUB_DISABLE_PROGRESS_BARS: '1', TOKENIZERS_PARALLELISM: 'false', TRANSFORMERS_VERBOSITY: 'error' });
-  const home = hfHome();
-  if (home) env.HF_HOME = home;
-  if (meaningDevice(db) === 'cpu') env.HYDOR_EMBED_DEVICE = 'cpu';
-  else if (process.env.HYDOR_EMBED_DEVICE) env.HYDOR_EMBED_DEVICE = process.env.HYDOR_EMBED_DEVICE;
-  return env;
+  return Object.assign(env, { PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1', HYDOR_EMBED_MODEL_DIR: modelDir() });
 }
 
 /** Too little memory was free the last time the worker was wanted: how much, and how much it needs (MB). */
@@ -148,8 +148,7 @@ function ensureWorker(db: DB): Promise<Worker | null> {
   if (starting) return starting;
   if (!meaningOn(db) || !envReady() || status === 'failed') return Promise.resolve(null);
   starting = (async () => {
-    const cpu = meaningDevice(db) === 'cpu' || !hasNvidia();
-    const need = cpu ? NEED_CPU_MB : NEED_GPU_MB;
+    const need = NEED_MB;
     const free = (await availableMemory()) / 2 ** 20;
     if (free < need) {
       short = { free, need };
@@ -167,14 +166,13 @@ function ensureWorker(db: DB): Promise<Worker | null> {
 /** Starts the worker, which answers once its model is loaded (downloaded the first time); null when it could not. */
 function startWorker(db: DB): Promise<Worker | null> {
   return new Promise<Worker | null>((resolve) => {
-    const first = !modelCached();
     status = 'starting';
-    detail = first ? 'Downloading the model (1.2 GB, once)' : 'Loading the model';
-    const proc = spawn(python(), ['-I', WORKER], { stdio: ['pipe', 'pipe', 'pipe'], env: workerEnv(db) });
+    detail = 'Loading the model';
+    const proc = spawn(python(), ['-I', WORKER], { stdio: ['pipe', 'pipe', 'pipe'], env: workerEnv() });
     const w: Worker = { proc, ready: false, pending: new Map(), seq: 0 };
     worker = w;
     const began = (loadStarted = Date.now());
-    const giveUp = setTimeout(() => (fail(w, 'The model took too long to load'), resolve(null)), first ? 30 * 60_000 : 5 * 60_000);
+    const giveUp = setTimeout(() => (fail(w, 'The model took too long to load'), resolve(null)), 3 * 60_000);
     proc.stderr!.on('data', (b: Buffer) => {
       for (const l of b.toString().split('\n')) if (l.trim()) stderrTail.push(l.trim().slice(0, 300));
       stderrTail.splice(0, Math.max(0, stderrTail.length - 20));
@@ -188,16 +186,15 @@ function startWorker(db: DB): Promise<Worker | null> {
       }
       if (m.ready) {
         clearTimeout(giveUp);
-        // How long a load takes here (a download's first excepted), for the next one's estimate.
-        if (!first) kvSet(db, LOAD_MS_KEY, String(Date.now() - began));
+        // How long a load takes here, for the next one's estimate.
+        kvSet(db, LOAD_MS_KEY, String(Date.now() - began));
         if (loadStarted === began) loadStarted = 0;
-        Object.assign(w, { ready: true, device: m.device, name: m.name, rss: m.rss, fallback: typeof m.fallback === 'string' ? m.fallback : undefined });
-        lastDevice = m.name;
+        Object.assign(w, { ready: true, rss: m.rss });
         status = 'ready';
         detail = undefined;
         idleLater(w);
         resolve(w);
-      } else if (m.status === 'loading' && !first) detail = 'Loading the model';
+      } else if (m.status === 'loading') detail = 'Loading the model';
       else if (m.id != null) {
         const p = w.pending.get(m.id);
         if (!p) return;
@@ -246,16 +243,15 @@ function fail(w: Worker, why: string | null, wasReady = false) {
   } else detail = why;
 }
 
-/** On a CPU the worker quits when it has had nothing to do for a while. */
+/** The worker quits when it has had nothing to do for a while. */
 function idleLater(w: Worker) {
   clearTimeout(w.idle);
-  if (w.device?.startsWith('cuda')) return;
   w.idle = setTimeout(() => {
     if (w.pending.size) return idleLater(w);
     if (worker === w) worker = null;
     w.proc.stdin?.end();
     setTimeout(() => w.proc.kill('SIGTERM'), 5000).unref();
-  }, IDLE_CPU_MS);
+  }, IDLE_MS);
   w.idle.unref?.();
 }
 
@@ -306,7 +302,7 @@ export const meaningReady = () => !!stub || !!worker?.ready;
 
 /**
  * How long what an agent starts with waits for the model, at most, and only when it is already loading and should be up
- * by then. Loading takes seconds on a CPU (12 s on a busy machine), which no one should wait for at the start of a
+ * by then. Loading takes a second or two (more on a busy machine), which no one should wait for at the start of a
  * session: a model not running is started for what comes next, and this request's notes and skills are found by their
  * words. The start page asks for the model as someone begins a message (warmMeaning), and a scheduled task due soon
  * has it started first, so it is usually up.
@@ -322,7 +318,7 @@ const asking = new Map<string, Promise<Float32Array | null>>();
 function readyIn(db: DB): number {
   if (stub || worker?.ready) return 0;
   if (!worker || !loadStarted) return Infinity;
-  const took = Number(kvGet(db, LOAD_MS_KEY)) || 12_000;
+  const took = Number(kvGet(db, LOAD_MS_KEY)) || 4000;
   return Math.max(0, loadStarted + took - Date.now());
 }
 
@@ -480,7 +476,74 @@ function systemPython(): string | null {
   return which('python3');
 }
 
-/** Makes the private environment with PyTorch and Transformers (once; again when the list changes). */
+export interface ModelFile {
+  /** Its path in the repository. */
+  from: string;
+  /** Its name in the model's folder. */
+  name: string;
+  bytes: number;
+  sha256: string;
+}
+
+/** A file's address on Hugging Face (or the mirror HF_ENDPOINT names), at the model's fixed revision. */
+const fileUrl = (from: string) => `${(process.env.HF_ENDPOINT || 'https://huggingface.co').replace(/\/+$/, '')}/${MODEL_REPO}/resolve/${MODEL_REVISION}/${from}`;
+
+async function sha256Of(file: string): Promise<string> {
+  const h = crypto.createHash('sha256');
+  await pipeline(fs.createReadStream(file), h);
+  return h.digest('hex');
+}
+
+/**
+ * Downloads the files that are not in `to` yet, each into a part file first (a download cut short goes on from where it
+ * stopped), checked against its SHA-256 before it takes its name; `mark` is written last, to say they are complete.
+ * `progress` hears the bytes there are of all of them.
+ */
+export async function downloadFiles(to: string, files: ModelFile[], o: { url: (from: string) => string; mark: string; progress?: (done: number, total: number) => void }) {
+  fs.mkdirSync(to, { recursive: true });
+  const total = files.reduce((n, f) => n + f.bytes, 0);
+  let done = files.filter((f) => fs.existsSync(path.join(to, f.name))).reduce((n, f) => n + f.bytes, 0);
+  for (const f of files) {
+    const dest = path.join(to, f.name);
+    if (fs.existsSync(dest)) continue;
+    const part = `${dest}.part`;
+    let have = fs.existsSync(part) ? fs.statSync(part).size : 0;
+    if (have >= f.bytes) fs.rmSync(part, { force: true }), (have = 0);
+    const res = await fetch(o.url(f.from), { headers: have ? { Range: `bytes=${have}-` } : {}, redirect: 'follow', signal: AbortSignal.timeout(60 * 60_000) });
+    if (!res.ok || !res.body) throw new Error(`The model could not be downloaded (${f.from}: HTTP ${res.status})`);
+    // A server that sends the whole file again: start it over.
+    if (have && res.status !== 206) have = 0;
+    done += have;
+    o.progress?.(done, total);
+    const count = new Transform({
+      transform(chunk: Buffer, _e, next) {
+        done += chunk.length;
+        o.progress?.(done, total);
+        next(null, chunk);
+      },
+    });
+    await pipeline(Readable.fromWeb(res.body as never), count, fs.createWriteStream(part, { flags: have ? 'a' : 'w' }));
+    if ((await sha256Of(part)) !== f.sha256) {
+      fs.rmSync(part, { force: true });
+      throw new Error(`The model's ${f.name} did not arrive whole (its checksum differs): try again`);
+    }
+    fs.renameSync(part, dest);
+  }
+  fs.writeFileSync(path.join(to, '.complete'), o.mark);
+}
+
+/** The model's files, from its repository, into its folder. */
+const downloadModel = () =>
+  downloadFiles(modelDir(), MODEL_FILES, {
+    url: fileUrl,
+    mark: MODEL_REVISION,
+    progress: (done, total) => (detail = done >= total ? 'Checking the model' : `Downloading the model: ${Math.round(done / 2 ** 20)} of ${Math.round(total / 2 ** 20)} MB, once`),
+  });
+
+/**
+ * Makes the private environment with ONNX Runtime, tokenizers and NumPy (once; again when the list changes: one with
+ * PyTorch, from before, is removed first), then downloads the model.
+ */
 function setup(db: DB): Promise<void> {
   if (settingUp) return settingUp;
   settingUp = (async () => {
@@ -488,28 +551,37 @@ function setup(db: DB): Promise<void> {
     detail = 'Getting ready';
     try {
       fs.mkdirSync(dir(), { recursive: true });
-      const gpu = hasNvidia() && meaningDevice(db) === 'auto';
-      const disk = freeDiskGb(dir());
-      if (disk < (gpu ? DISK_GPU_GB : DISK_CPU_GB)) throw new Error(`Not enough disk space: ${disk.toFixed(1)} GB free, setting up needs about ${gpu ? DISK_GPU_GB : DISK_CPU_GB} GB.`);
-      const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
-      if (uv) {
-        // (On a Mac, a Python of uv's own: Apple's stand-in asks to install its developer tools. PyTorch's CPU index
-        // has the very same Mac builds as PyPI, which run on the Mac's GPU through Metal.)
-        const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
-        if (!fs.existsSync(python())) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10', venv()], 'Making a private Python environment');
-        await run(uv, ['pip', 'install', '--quiet', '--python', python(), `--torch-backend=${gpu ? 'auto' : 'cpu'}`, 'torch', 'transformers>=5.6,<6'], `Installing PyTorch${gpu || process.platform === 'darwin' ? '' : ' (CPU build)'} and Transformers: a few minutes`);
-      } else {
-        // Windows: python.exe from python.org, else its py launcher.
-        const sys = systemPython();
-        if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or: winget install Python.Python.3.12).');
-        if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or Homebrew: brew install python).');
-        if (!sys) throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
-        if (!fs.existsSync(python())) await run(sys, ['-c', 'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 'Checking Python (3.10 or newer)');
-        if (!fs.existsSync(python())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment');
-        await run(python(), ['-m', 'pip', 'install', '--quiet', 'torch', ...(gpu ? [] : ['--index-url', 'https://download.pytorch.org/whl/cpu'])], `Installing PyTorch${gpu || process.platform === 'darwin' ? '' : ' (CPU build)'}: a few minutes`);
-        await run(python(), ['-m', 'pip', 'install', '--quiet', 'transformers>=5.6,<6'], 'Installing Transformers');
+      // What an older version set up: PyTorch's environment (gigabytes) and, in a container, its copy of the model.
+      if (!process.env.HYDOR_EMBED_PYTHON && fs.existsSync(venv()) && readText(path.join(venv(), '.packages')) !== PACKAGES) {
+        detail = 'Removing the environment an older version made';
+        fs.rmSync(venv(), { recursive: true, force: true });
       }
-      fs.writeFileSync(path.join(venv(), '.packages'), PACKAGES);
+      fs.rmSync(path.join(dir(), 'hf'), { recursive: true, force: true });
+      const disk = freeDiskGb(dir());
+      if (!packagesReady() && disk < DISK_GB) throw new Error(`Not enough disk space: ${disk.toFixed(1)} GB free, setting up needs about ${DISK_GB} GB.`);
+      if (!packagesReady()) {
+        const uv = which('uv', [path.join(os.homedir(), '.local/bin/uv'), path.join(os.homedir(), '.cargo/bin/uv')]);
+        if (uv) {
+          // (On a Mac, a Python of uv's own: Apple's stand-in asks to install its developer tools.)
+          const own = process.platform === 'darwin' ? ['--python-preference', 'only-managed'] : [];
+          if (!fs.existsSync(python())) await run(uv, ['venv', '--quiet', ...own, '--python', '>=3.10', venv()], 'Making a private Python environment');
+          await run(uv, ['pip', 'install', '--quiet', '--python', python(), ...PACKAGES.split(' ')], 'Installing ONNX Runtime and the tokenizer');
+        } else {
+          // Windows: python.exe from python.org, else its py launcher.
+          const sys = systemPython();
+          if (!sys && process.platform === 'win32') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or: winget install Python.Python.3.12).');
+          if (!sys && process.platform === 'darwin') throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (python.org, or Homebrew: brew install python).');
+          if (!sys) throw new Error('Python 3 is not installed on this computer, and search by meaning needs it (Debian/Ubuntu: sudo apt install python3 python3-venv).');
+          if (!fs.existsSync(python())) await run(sys, ['-c', 'import sys, venv; sys.exit(0 if sys.version_info >= (3, 10) else 1)'], 'Checking Python (3.10 or newer)');
+          if (!fs.existsSync(python())) await run(sys, ['-m', 'venv', venv()], 'Making a private Python environment');
+          await run(python(), ['-m', 'pip', 'install', '--quiet', ...PACKAGES.split(' ')], 'Installing ONNX Runtime and the tokenizer');
+        }
+        if (!process.env.HYDOR_EMBED_PYTHON) fs.writeFileSync(path.join(venv(), '.packages'), PACKAGES);
+      }
+      if (!modelReady()) {
+        if (freeDiskGb(path.dirname(modelDir())) < MODEL_MB / 1024 + 0.2) throw new Error(`Not enough disk space for the model (${MODEL_MB} MB).`);
+        await downloadModel();
+      }
       status = 'ready';
       detail = undefined;
     } catch (e) {
@@ -541,7 +613,6 @@ export async function kick(db: DB, o: { now?: boolean } = {}) {
   if (!envReady()) await setup(db);
   if (!envReady()) return;
   if (status !== 'failed') status = 'ready';
-  if (hasNvidia() && meaningDevice(db) === 'auto') await ensureWorker(db);
   scheduleBackfill(db, 0);
 }
 
@@ -552,12 +623,8 @@ function stopWorker() {
   fail(w, null);
 }
 
-/** Turns search by meaning on or off, or moves it (CPU only, or the best place). */
-export function setMeaning(db: DB, p: { on?: boolean; device?: MeaningDevice; retry?: boolean }) {
-  if (p.device && p.device !== meaningDevice(db)) {
-    kvSet(db, 'memory.meaning.device', p.device);
-    stopWorker();
-  }
+/** Turns search by meaning on or off, or tries again after it failed. */
+export function setMeaning(db: DB, p: { on?: boolean; retry?: boolean }) {
   if (typeof p.on === 'boolean') {
     kvSet(db, 'memory.meaning', p.on ? '1' : '0');
     if (!p.on) {
@@ -582,20 +649,13 @@ export function meaningState(db: DB): MeaningState {
   const on = meaningOn(db);
   const s: MeaningState['status'] = !on ? 'off' : status === 'off' ? (envReady() ? 'ready' : 'setting-up') : status;
   let d = detail;
-  if (on && s === 'ready' && !d)
-    d = worker?.ready
-      ? `Loaded on ${worker.name ?? worker.device}${worker.fallback ? ` (the GPU failed its first try: ${worker.fallback})` : ''}`
-      : meaningDevice(db) !== 'cpu' && appleSilicon()
-        ? 'Starts on this Mac’s GPU when needed, and stops after a few idle minutes'
-        : meaningDevice(db) === 'cpu' || !hasNvidia()
-          ? 'Starts on the CPU when needed, and stops after a few idle minutes'
-          : 'Loads when needed';
-  return { on, status: s, detail: d, model: MODEL, where: meaningDevice(db), device: worker?.name ?? lastDevice, ...counted.v };
+  if (on && s === 'ready' && !d) d = worker?.ready ? 'Loaded' : 'Starts when needed, and stops after a few idle minutes';
+  return { on, status: s, detail: d, model: MODEL, ...counted.v };
 }
 
 /**
  * Why search by meaning cannot make vectors now, for what waits on them (a knowledge base's passages): it is setting
- * itself up, its model is starting (downloading the first time), too little memory is free, or it stopped. Nothing when
+ * itself up (downloading its model the first time), its model is starting, too little memory is free, or it stopped. Nothing when
  * it can (or it is off).
  */
 export function meaningHeld(db: DB): MeaningHeld | undefined {

@@ -16,7 +16,9 @@ $P -I $S/embed.py $O $D fp16                           # calibration texts and t
 $P -I $S/quant.py $O                                   # quantizers fitted on the calibration set, scored on the benchmarks
 $P -I $S/make_codebook.py $O server/memory/codebook.ts
 $P -I $S/texts.py $O $D /tmp/memeval/work && $P -I $S/hybrid.py $O /tmp/memeval/work    # words and meaning fused
-$P -I $S/worker_check.py <python with torch> server/memory/embed_worker.py $O $D       # the app's worker, on the CPU
+HYDOR_EMBED_MODEL_DIR=<the model's folder> $P -I $S/worker_check.py <python with onnxruntime> server/memory/embed_worker.py $O $D   # the app's worker
+$P -I $S/onnx_export.py /tmp/memeval/model.onnx                                       # the worker's model: the export (needs onnx, onnxscript, onnxruntime)
+$P -I $S/onnx_quantize.py /tmp/memeval/model.onnx /tmp/memeval/model_q8.onnx          # and its 8-bit build
 ```
 
 Run the CPU-heavy steps inside a memory cap on a shared machine
@@ -54,20 +56,36 @@ in full precision, as in the app.
 - Levels fitted on each benchmark's own documents did no better than the calibration set's (mean −0.21 without
   renormalizing), so the fixed codebook generalizes.
 
-## fp16 on a GPU, float32 on a CPU
+## The worker: ONNX Runtime, in 8 bits
 
-On a CPU the worker runs the model's body in float32 and keeps its 256k-word table in fp16. Its vectors match the
-GPU's fp16 ones at cosine ≥ 0.99999 (mean 1.00000) on 400 documents and 400 queries of SciFact and NFCorpus,
-so loading the model in fp16 loses nothing.
+Since 0.49.0 the app's worker runs [algoprog/mDenseOn-ONNX](https://huggingface.co/algoprog/mDenseOn-ONNX): the model
+exported to ONNX (`onnx_export.py`: exactly, cosine 1.000000 to PyTorch in float32 at 5 to 512 tokens, alone and in
+batches), then its 88 weight matrices in 8 bits through ONNX Runtime's `MatMulNBits` (blocks of 32, symmetric) and its
+256k-word table as int8 rows with a scale each (`onnx_quantize.py`), the arithmetic in float32. With Hugging Face's
+tokenizer (the same ids as Transformers'), ONNX Runtime and NumPy, and no PyTorch:
 
-The app's worker on a CPU (PyTorch's CPU build, about 1 GB installed; 4 threads):
+| | PyTorch (until 0.48), CPU | ONNX Runtime, 8 bits, CPU |
+|---|---|---|
+| Installed | about 1 GB (5 GB with CUDA), and the model 1.2 GB | about 150 MB, and the model 340 MB |
+| Start, model cached | 3.2–3.4 s (16 s on a busy machine) | about 1 s |
+| Memory once loaded | 1.43 GB (2.4 GB at most while loading) | 0.55 GB, 1.04 GB at most with long texts |
+| A query | 20–23 ms | 31–38 ms |
+| A 512-token text | about 0.3 s | 0.2 s |
 
-| | |
-|---|---|
-| Start, model cached | 3.2–3.4 s |
-| Memory once loaded | 1.43 GB (2.4 GB at most while loading; about half of that is the model's file, which the system can drop) |
-| A query or a short note | 20–23 ms |
-| A long abstract (~300 tokens) | about 0.3 s |
+(4 threads; the 8-bit times from a fresh process with the files in the page cache.)
+
+nDCG@10 on the whole of SciFact and NFCorpus, with the float32 export as the reference (95% bootstrap intervals):
+
+| | SciFact | NFCorpus |
+|---|---|---|
+| float32 (= PyTorch float32) | 74.35 | 37.40 |
+| PyTorch as the worker ran it (word table fp16) | +0.00 | +0.08 [−0.02, +0.20] |
+| 8 bits | −0.10 [−0.40, +0.09] | +0.19 [+0.01, +0.40] |
+| Notes embedded by the PyTorch worker, queries in 8 bits | +0.20 [−0.03, +0.51] | +0.20 [+0.03, +0.40] |
+
+The 8-bit vectors are within cosine 0.998 of the PyTorch worker's (mean 0.9995), so notes and messages embedded before
+stay as they are: the vectors keep their model name, and nothing is embedded again. The GPU paths went with PyTorch:
+on a CPU the 8-bit model starts faster than PyTorch did on a GPU, and it never takes a graphics card from other work.
 
 ## Words and meaning together
 

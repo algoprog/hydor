@@ -94,7 +94,7 @@ vectors again before you commit:
 npm run find:vectors   # embeds only the texts without a vector yet, on the CPU; commit shipped-vectors.json
 ```
 
-It needs a Python with PyTorch and Transformers 5.6+: the app's own one once search by meaning is turned on
+It needs a Python with ONNX Runtime 1.23+, tokenizers and NumPy: the app's own one once search by meaning is turned on
 in Settings → Memory, or `HYDOR_EMBED_PYTHON=/path/to/python`. `server/find/find-test.ts` fails while a
 shipped text has no vector, or the catalog no longer matches the Settings pages:
 
