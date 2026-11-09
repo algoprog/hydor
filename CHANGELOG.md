@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.45.0 · 9 November 2026
+
+Faster from the first moment: sessions start without waiting, the app loads in a fraction of the time, and long
+replies no longer slow the page.
+
+- **Sessions start at once**: a new session no longer waits for the model that finds notes by meaning (it waited up to
+  8 seconds, often twice, and on a busy computer then used words anyway). The model starts as you begin writing a
+  message, and shortly before a scheduled task runs.
+- **Quicker, cheaper first replies**: every session of a project starts with the same instructions, so the model's
+  provider reuses what it kept of them from one session to the next. What bears on your request alone (the notes for
+  it, the skills that fit, what the project's folder holds now) comes with your first message.
+- **The app loads faster**: the sign-in screen no longer waits for the whole app, and the app comes in fewer pieces,
+  most of which a new version leaves in the browser's cache. On a phone's slow connection the sign-in screen shows in
+  about a second (it took 7) and the start page in about 4 (it took 8).
+- **Long replies stay smooth**: a reply still coming is drawn block by block, so it no longer slows the page as it
+  grows, and code in it is highlighted once it is whole instead of flashing with every few words.
+- **No more stalls**: opening Git, and memory's daily upkeep, no longer hold the whole app for seconds.
+- **Restarts in a moment**: the app stops within two seconds even with a phone's connection or an agent's request
+  still open, starts a second or two sooner, and stays up when a program an agent started runs out of memory.
+- **Custom**: Claude models through OpenRouter keep the conversation in their cache, and Custom's tools change at most
+  once in a session, so each step costs less.
+
 ## 0.44.1 · 8 November 2026
 
 Memory upkeep no longer waits for the night: it runs about once a day, whenever the app is on.
