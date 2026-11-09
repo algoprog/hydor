@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.50.0 · 9 November 2026
+
+What each session's programs use, and limits that keep one session from taking over the computer.
+
+- **System → Monitor → Sessions** lists each running session with what its programs use (its agent and everything it
+  runs: commands, servers it started), the most memory first; a click opens the session.
+- **A session's Info** shows the same for that session, and the limits it runs under.
+- **Settings → General → Limit each session** sets the most memory (2 to 16 GB) and processors (1 to 8) each session
+  started from then on may use (on Linux). Over its memory, the program that asked for more is stopped, not the app or
+  another session, and the session's Info says so.
+
 ## 0.49.0 · 9 November 2026
 
 Search by meaning without PyTorch, and where each turn's time and money went.
