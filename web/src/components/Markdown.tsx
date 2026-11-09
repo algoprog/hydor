@@ -4,6 +4,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { normalizeMath } from './markdown-math';
+import { streamBlocks } from './stream-blocks';
 import { Check, Copy, FileText } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
@@ -74,21 +75,49 @@ export function BarButton({ label, onClick, children }: { label: string; onClick
   );
 }
 
-/** Code, highlighted; `bare`: without its own frame and header (inside a block that has them: a diagram's code). */
-export const CodeBlock = memo(function CodeBlock({ code, lang, maxHeight = 520, className, bare }: { code: string; lang?: string | null; maxHeight?: number; className?: string; bare?: boolean }) {
-  const [html, setHtml] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+/** Code highlighted lately, by its language and text: a block drawn again (a reply's finished part) has it at once. */
+const highlighted = new Map<string, string>();
+
+/**
+ * Code, highlighted; `bare`: without its own frame and header (inside a block that has them: a diagram's code).
+ * `arriving`: a reply's block still coming, shown as it is until it is whole, then highlighted once (it was highlighted
+ * afresh with every few words, flashing plain between, which took the page whole seconds on a long block).
+ */
+export const CodeBlock = memo(function CodeBlock({
+  code,
+  lang,
+  maxHeight = 520,
+  className,
+  bare,
+  arriving,
+}: {
+  code: string;
+  lang?: string | null;
+  maxHeight?: number;
+  className?: string;
+  bare?: boolean;
+  arriving?: boolean;
+}) {
   const text = code.replace(/\n$/, '');
+  const key = `${lang ?? ''}\n${text}`;
+  const [shown, setShown] = useState<{ key: string; html: string } | null>(null);
+  const html = arriving ? null : (highlighted.get(key) ?? (shown?.key === key ? shown.html : null));
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
+    if (arriving || highlighted.has(key)) return;
     let alive = true;
-    setHtml(null);
     highlight(text, lang ?? null)
-      .then((h) => alive && setHtml(h))
+      .then((h) => {
+        if (!h) return;
+        if (text.length <= 50_000) highlighted.set(key, h);
+        if (highlighted.size > 300) highlighted.delete(highlighted.keys().next().value!);
+        if (alive) setShown({ key, html: h });
+      })
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [text, lang]);
+  }, [key, arriving]);
   const lines = useMemo(() => text.split('\n').length, [text]);
   const tall = lines > 28;
   return (
@@ -301,7 +330,7 @@ function Pre({ node }: { node?: any }) {
     const done = !md.streaming || fenceClosed(md.src, node?.position);
     return <Suspense fallback={<CodeBlock code={text} lang={lang} />}>{kind === 'mermaid' ? <MermaidBlock code={text} done={done} /> : <HtmlBlock code={text} done={done} />}</Suspense>;
   }
-  return <CodeBlock code={text} lang={lang} />;
+  return <CodeBlock code={text} lang={lang} arriving={md.streaming && !fenceClosed(md.src, node?.position)} />;
 }
 
 /**
@@ -542,6 +571,19 @@ function useChemistry(text: string) {
   }, [need]);
 }
 
+/** One top-level block of a reply still coming (streamBlocks), drawn again only when its own words change. */
+const MdBlock = memo(function MdBlock({ text, last, base, remark, rehype, comps }: { text: string; last: boolean; base: Omit<MdInfo, 'src'>; remark: any[]; rehype: any[]; comps: Components }) {
+  // Its own text is what its fences are read against; a finished block is whole.
+  const info = useMemo<MdInfo>(() => ({ ...base, src: text, streaming: base.streaming && last }), [base, text, last]);
+  return (
+    <MdCtx.Provider value={info}>
+      <ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={comps} urlTransform={urlTransform}>
+        {text}
+      </ReactMarkdown>
+    </MdCtx.Provider>
+  );
+});
+
 /**
  * `resolveImage` maps an image source to a URL that may load here, or null to show it as a link
  * (this page's policy blocks other sites' images). `rehypeExtra` runs first (documents and notebooks:
@@ -596,7 +638,10 @@ export const Markdown = memo(function Markdown({
     return streaming ? holdOpenMaths(t) : t;
   }, [text, notebook, streaming]);
   useChemistry(src);
-  const info = useMemo<MdInfo>(() => ({ src, streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline }), [src, streaming, rich, sessionKey, cwd, offline]);
+  const base = useMemo<Omit<MdInfo, 'src'>>(() => ({ streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline }), [streaming, rich, sessionKey, cwd, offline]);
+  const info = useMemo<MdInfo>(() => ({ ...base, src }), [base, src]);
+  // While it comes, block by block (a document's headings are numbered across the whole of it: it is read whole).
+  const blocks = useMemo(() => (streaming && !baseDir && !app ? streamBlocks(src) : null), [src, streaming, baseDir, app]);
   const comps = useMemo<Components>(() => {
     const base: Components = {
       ...components,
@@ -628,12 +673,18 @@ export const Markdown = memo(function Markdown({
     () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [[rehypeHeadingIds, { ids: headingIds }]] : [])],
     [rehypeExtra, streaming, baseDir, app, headingIds],
   );
+  // A finished block's words are all there: none arrives to fade in.
+  const rehypeWhole = useMemo(() => [...(rehypeExtra ?? []), ...rehypePlugins], [rehypeExtra]);
   return (
     <MdCtx.Provider value={info}>
       <div className={cx('md', className)}>
-        <ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={comps} urlTransform={urlTransform}>
-          {src}
-        </ReactMarkdown>
+        {blocks ? (
+          blocks.map((b, i) => <MdBlock key={i} text={b} last={i === blocks.length - 1} base={base} remark={remark} rehype={i === blocks.length - 1 ? rehype : rehypeWhole} comps={comps} />)
+        ) : (
+          <ReactMarkdown remarkPlugins={remark} rehypePlugins={rehype} components={comps} urlTransform={urlTransform}>
+            {src}
+          </ReactMarkdown>
+        )}
         {children}
       </div>
     </MdCtx.Provider>
