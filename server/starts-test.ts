@@ -114,6 +114,27 @@ test('different starts make different sessions, and none without an id is kept',
   assert.equal(kept.n, 0);
 });
 
+test('a message sent again with its id goes once, whether the first is still going or went; a failed one can be sent again', async () => {
+  const proto = SessionManager.prototype as any;
+  const m: any = { sends: new Map() };
+  const sendOnce: SessionManager['sendOnce'] = proto.sendOnce.bind(m);
+  let sent = 0;
+  const send = async () => {
+    await new Promise((r) => setTimeout(r, 5));
+    sent++;
+  };
+  await Promise.all([sendOnce('send-same0001', send), sendOnce('send-same0001', send)]);
+  await sendOnce('send-same0001', send);
+  assert.equal(sent, 1, 'once');
+  await sendOnce('send-other001', send);
+  await sendOnce(undefined, send);
+  await sendOnce(undefined, send);
+  assert.equal(sent, 4, 'other ids and none each go');
+  await assert.rejects(sendOnce('send-failed01', () => Promise.reject(new Error('cap reached'))), /cap reached/);
+  await sendOnce('send-failed01', send);
+  assert.equal(sent, 5, 'a failed one goes when sent again');
+});
+
 for (const [name, fn] of tests) {
   try {
     await fn();

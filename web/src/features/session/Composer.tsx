@@ -3,7 +3,7 @@ import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, P
 import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
-import { enc, post } from '../../lib/api';
+import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
 import { openSession } from '../../lib/nav';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
@@ -278,6 +278,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   };
 
   /** `opposite`: Ctrl/Cmd+Enter, which steers instead of queueing (or the other way round). */
+  // The id a message goes with: the same each time it is sent again (its answer lost on the way, or Send pressed again
+  // after an error), so the server sends it once; a new one once it went, or once what is sent changes.
+  const sending = useRef<{ what: string; id: string } | null>(null);
   const send = async (opposite = false) => {
     const t = text.trim();
     if (move) return handOff(t);
@@ -287,8 +290,21 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     setBusy(true);
     // The message shows these pictures the moment it does, not once the agent has written it down (lib/attachments.ts).
     const went = sendingPictures(key, t, atts, queue);
+    const what = `${takeover ? 'takeover' : queue ? 'queue' : 'message'}\u0000${t}\u0000${atts.map((a) => `${a.id}:${a.name}`).join('|')}`;
+    if (sending.current?.what !== what) sending.current = { what, id: `send-${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}` };
+    const sendId = sending.current.id;
     try {
-      await post(`/api/sessions/${enc(key)}/${takeover ? 'takeover' : queue ? 'queue' : 'message'}`, { text: t, ...attachmentPayload(atts) });
+      // An answer lost on the way is asked for again, with the same id: the message goes once.
+      for (let tries = 0; ; tries++) {
+        try {
+          await post(`/api/sessions/${enc(key)}/${takeover ? 'takeover' : queue ? 'queue' : 'message'}`, { text: t, ...attachmentPayload(atts), sendId });
+          break;
+        } catch (e) {
+          if (!lostOnTheWay(e) || tries >= 2) throw e;
+          await new Promise((r) => setTimeout(r, 1500 * (tries + 1)));
+        }
+      }
+      sending.current = null;
       went(true);
       window.dispatchEvent(new Event('wa:follow'));
       // Also when the page was left while it went.
