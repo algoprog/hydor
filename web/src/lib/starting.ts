@@ -10,9 +10,23 @@ import type { Agent, LiveOverlay, LiveState, SessionSummary } from '@shared/type
 import { api, enc, lostOnTheWay, post } from './api';
 import { sendingPictures, type Attachment } from './attachments';
 import { keepStartDraft, startDraft, type StartDraft } from './drafts';
-import { machineBase } from './machine';
+import { machineBase, viaLink } from './machine';
 import { go, sessionPath } from './nav';
 import { toast, useLive, useSessions, useTimeline } from './store';
+
+let warmedAt = 0;
+
+/**
+ * Someone is writing a message that may start a session, or wake one that stopped: the model search by meaning uses
+ * starts on the server now, since it takes seconds to load, so the session gets the notes and skills that fit the
+ * message by meaning as well as by words (the server never keeps a start waiting for it). At most once a minute;
+ * nothing from someone's link.
+ */
+export function warmMemory() {
+  if (viaLink || Date.now() - warmedAt < 60_000) return;
+  warmedAt = Date.now();
+  post('/api/memory/warm').catch(() => {});
+}
 
 export interface Starting {
   id: string;

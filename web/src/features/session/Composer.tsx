@@ -4,6 +4,7 @@ import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
 import { enc, post } from '../../lib/api';
+import { warmMemory } from '../../lib/starting';
 import { openSession } from '../../lib/nav';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
@@ -405,6 +406,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
             data-1p-ignore=""
             data-lpignore="true"
             data-form-type="other"
+            onFocus={() => !running && warmMemory()}
             onChange={(e) => {
               setText(e.target.value);
               setRecall(-1);

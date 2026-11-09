@@ -111,6 +111,8 @@ interface Worker {
 
 let worker: Worker | null = null;
 let starting: Promise<Worker | null> | null = null;
+/** When the model began loading (0: it is not loading), for how soon it can answer (readyIn). */
+let loadStarted = 0;
 let status: MeaningState['status'] = 'off';
 let detail: string | undefined;
 let lastDevice: string | undefined;
@@ -123,6 +125,7 @@ let stub: ((texts: string[], kind: Kind) => Promise<Float32Array[]>) | null = nu
 export const setEmbedderForTests = (fn: typeof stub) => {
   stub = fn;
   asked.clear();
+  asking.clear();
 };
 
 function workerEnv(db: DB): NodeJS.ProcessEnv {
@@ -170,6 +173,7 @@ function startWorker(db: DB): Promise<Worker | null> {
     const proc = spawn(python(), ['-I', WORKER], { stdio: ['pipe', 'pipe', 'pipe'], env: workerEnv(db) });
     const w: Worker = { proc, ready: false, pending: new Map(), seq: 0 };
     worker = w;
+    const began = (loadStarted = Date.now());
     const giveUp = setTimeout(() => (fail(w, 'The model took too long to load'), resolve(null)), first ? 30 * 60_000 : 5 * 60_000);
     proc.stderr!.on('data', (b: Buffer) => {
       for (const l of b.toString().split('\n')) if (l.trim()) stderrTail.push(l.trim().slice(0, 300));
@@ -184,6 +188,9 @@ function startWorker(db: DB): Promise<Worker | null> {
       }
       if (m.ready) {
         clearTimeout(giveUp);
+        // How long a load takes here (a download's first excepted), for the next one's estimate.
+        if (!first) kvSet(db, LOAD_MS_KEY, String(Date.now() - began));
+        if (loadStarted === began) loadStarted = 0;
         Object.assign(w, { ready: true, device: m.device, name: m.name, rss: m.rss, fallback: typeof m.fallback === 'string' ? m.fallback : undefined });
         lastDevice = m.name;
         status = 'ready';
@@ -225,7 +232,7 @@ function fail(w: Worker, why: string | null, wasReady = false) {
   for (const p of w.pending.values()) clearTimeout(p.timer), p.reject(new Error(why ?? 'The model stopped'));
   w.pending.clear();
   clearTimeout(w.idle);
-  if (worker === w) worker = null;
+  if (worker === w) (worker = null), (loadStarted = 0);
   try {
     w.proc.kill('SIGTERM');
   } catch {}
@@ -297,34 +304,84 @@ export async function queryVector(db: DB, text: string, o: { wait?: boolean; tim
 /** Search by meaning can answer without starting anything (stand-in included). */
 export const meaningReady = () => !!stub || !!worker?.ready;
 
-/** How long what an agent starts with waits for the model to start, at most (a few seconds on a CPU). */
-export const START_WAIT_MS = 8000;
-const asked = new Map<string, { at: number; v: Float32Array }>();
+/**
+ * How long what an agent starts with waits for the model, at most, and only when it is already loading and should be up
+ * by then. Loading takes seconds on a CPU (12 s on a busy machine), which no one should wait for at the start of a
+ * session: a model not running is started for what comes next, and this request's notes and skills are found by their
+ * words. The start page asks for the model as someone begins a message (warmMeaning), and a scheduled task due soon
+ * has it started first, so it is usually up.
+ */
+export const START_WAIT_MS = 1500;
+/** Where the last load's length is kept (ms), for how soon a loading model can answer. */
+const LOAD_MS_KEY = 'memory.meaning.loadMs';
+/** A request's vector, or none when the model could not give it then (kept less long, so a later start asks again). */
+const asked = new Map<string, { at: number; v: Float32Array | null }>();
+const asking = new Map<string, Promise<Float32Array | null>>();
+
+/** How soon the model can answer (ms): 0 when it is loaded, by the last load's length while it loads, Infinity when it is not loading. */
+function readyIn(db: DB): number {
+  if (stub || worker?.ready) return 0;
+  if (!worker || !loadStarted) return Infinity;
+  const took = Number(kvGet(db, LOAD_MS_KEY)) || 12_000;
+  return Math.max(0, loadStarted + took - Date.now());
+}
+
+function keepVector(t: string, v: Float32Array | null) {
+  asked.delete(t);
+  asked.set(t, { at: Date.now(), v });
+  if (asked.size > 20) asked.delete(asked.keys().next().value!);
+}
 
 /**
- * A request's vector, for what an agent starts with (the notes and skills that fit it). With search by meaning on and
- * the model not running, this waits a little for it to start rather than finding by words alone (the model goes on
- * starting for what comes next); null when it is off, or not up in time. The same request again within a minute is
- * answered from memory, so its notes and its skills share one.
+ * A request's vector, for what an agent starts with (the notes and skills that fit it): at once when the model is
+ * loaded, after a short wait when it is about to be (START_WAIT_MS), else null and the model starts for what comes
+ * next. Null too when search by meaning is off. The same request again soon is answered from memory, a vector for a
+ * minute and none for 15 s, so its notes and its skills share one and the second never waits again.
  */
 export async function requestVector(db: DB, text: string, waitMs = START_WAIT_MS): Promise<Float32Array | null> {
   const t = text.trim().slice(0, 2000);
   if (!t || (!stub && !meaningOn(db))) return null;
-  const now = Date.now();
   const hit = asked.get(t);
-  if (hit && now - hit.at < 60_000) return hit.v;
-  let timer: NodeJS.Timeout | undefined;
-  const late = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), waitMs);
-    timer.unref?.();
-  });
-  const v = await Promise.race([queryVector(db, t, { wait: true, timeoutMs: waitMs }).catch(() => null), late]);
-  clearTimeout(timer);
-  if (v) {
-    asked.set(t, { at: now, v });
-    if (asked.size > 20) asked.delete(asked.keys().next().value!);
+  if (hit && Date.now() - hit.at < (hit.v ? 60_000 : 15_000)) return hit.v;
+  const going = asking.get(t);
+  if (going) return going;
+  const soon = readyIn(db);
+  if (soon > waitMs) {
+    void ensureWorker(db);
+    keepVector(t, null);
+    return null;
   }
-  return v;
+  // Loaded, or nearly: the vector itself takes tens of milliseconds, more behind a batch of notes being embedded.
+  const budget = soon + 3000;
+  const p = (async () => {
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), budget);
+      timer.unref?.();
+    });
+    const v = await Promise.race([queryVector(db, t, { wait: true, timeoutMs: budget }).catch(() => null), late]);
+    clearTimeout(timer);
+    keepVector(t, v);
+    return v;
+  })().finally(() => asking.delete(t));
+  asking.set(t, p);
+  return p;
+}
+
+/**
+ * Someone is about to ask something (the start page's message box has their attention), or a scheduled task is due:
+ * the model starts now, when enough memory is free, so it answers by the time the session starts; one already loaded
+ * stays loaded a while longer. True when it is loaded now.
+ */
+export function warmMeaning(db: DB): boolean {
+  if (stub) return true;
+  if (!meaningOn(db)) return false;
+  if (worker?.ready) {
+    idleLater(worker);
+    return true;
+  }
+  void ensureWorker(db);
+  return false;
 }
 
 // ---- vectors for the notes ----------------------------------------------------------------------

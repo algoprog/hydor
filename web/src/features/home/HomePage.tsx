@@ -13,7 +13,7 @@ import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, re
 import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
 import { openSession } from '../../lib/nav';
-import { startSession } from '../../lib/starting';
+import { startSession, warmMemory } from '../../lib/starting';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
 import { toast, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
@@ -410,9 +410,11 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
           autoComplete="off"
           data-1p-ignore=""
           data-lpignore="true"
+          onFocus={warmMemory}
           onChange={(e) => {
             setText(e.target.value);
             menu.update();
+            warmMemory();
           }}
           onClick={menu.update}
           onKeyUp={(e) => (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') && menu.update()}

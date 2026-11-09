@@ -8,7 +8,7 @@ import { isUserProfile, PROFILE_WORDS_MAX, PROFILE_WORDS_MIN, scopeName, TOP_K_M
 import { HttpError } from '../auth.ts';
 import type { Deps } from '../features/types.ts';
 import { getNote, updateNote } from '../notes.ts';
-import { meaningState, setMeaning, type MeaningDevice } from './embed.ts';
+import { meaningState, setMeaning, warmMeaning, type MeaningDevice } from './embed.ts';
 import { fitProfile, helperText, profileFit, saveProfile, userProfile } from './profile.ts';
 import { findNotes } from './search.ts';
 import { secretIn } from './secrets.ts';
@@ -300,6 +300,9 @@ export function memoryRoutes(d: Deps) {
     const id = idOf((req.params as { id: string }).id);
     return { entries: labelled(d, entries(db, { ids: childrenOf(db, id), status: 'all', limit: 500 })) };
   });
+
+  /** Someone is writing a message that may start a session: search by meaning's model starts, so its notes are found by meaning too. */
+  app.post('/api/memory/warm', async () => ({ ready: memoryOn(db) && warmMeaning(db) }));
 
   /** Tidies up now (in the background; the state says when it is done). */
   app.post('/api/memory/tidy', async () => {
