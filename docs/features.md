@@ -131,7 +131,8 @@ agents that speak ACP and take MCP servers.
   whole; and an index of the rest by title, to look up. Nothing fills the room, and only what agents looked up weighs
   in ranking. Claude Code and Codex get the notes for the request with the first message, their instructions the same
   for every session of a project until its notes change, so the provider's cache of them holds from one session to
-  the next; Custom keeps its block until it condenses, so its provider's cache holds. The model starts as you begin a
+  the next; Custom keeps its block until it condenses, asks Claude models on OpenRouter to cache the conversation, and
+  changes its tools at most once in a session, so its provider's cache holds. The model starts as you begin a
   message, and a session never waits for it. About once a day the helper
   model tidies memory up: it merges notes that say the same thing, titles them, and when there are more than fit,
   sums related ones up in topics and, for a project, a short profile; and it learns from the day's conversations

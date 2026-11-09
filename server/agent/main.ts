@@ -487,6 +487,13 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
     const fam = familyOf(m);
     const textMode = m.tools === 'text' || s.textTools.includes(m.id);
     const small = m.provider !== 'openrouter' && w <= 33_000;
+    // The background tools stay offered once something has run there: the tools (and the instructions that name them)
+    // then change once in a session, not each time a command starts or ends, so the provider's cache of the
+    // conversation holds.
+    if (runningOf(s.id).length > 0 && !['bash_output', 'bash_kill'].every((n) => s.activeTools?.includes(n))) {
+      s.activeTools = [...new Set([...(s.activeTools ?? []), 'bash_output', 'bash_kill'])];
+      save(s);
+    }
     // What the model is offered: Codex's patch for the families trained on it, the background tools once
     // something runs there, fewer tools for a small model, and a catalog when there are many.
     const shown = all.filter(
