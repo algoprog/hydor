@@ -437,6 +437,27 @@ test('a session’s memory block stays the same while it works: for Custom until
   store.clearAll(db);
 });
 
+test('Claude Code, Codex and ACP agents: the same memory in their instructions whatever the request, what bears on it with the first message', async () => {
+  useFakeEmbedder();
+  const d = { db, broadcast() {}, sessions: { timeline: async () => ({ parser: { items: [] }, readMore: async () => {} }) } } as unknown as Deps;
+  // A place with more than a few notes: an index in the instructions, the notes for each request apart.
+  add(R, 'Payments use Stripe webhooks in server/pay.ts.');
+  add(R, 'Refunds go through the Stripe dashboard only.');
+  for (let i = 0; i < 40; i++) add(R, `Filler note ${i}: the catalogue pages list products by season, with photos taken in the studio on Fridays.`);
+  await backfill(db);
+  const start = (key: string, prompt: string) => memoryFeature.spawn!({ agent: 'claude', key, cwd: repo, runId: 'r', resume: false, extra: {}, prompt }, d) as Promise<SpawnAdditions>;
+  const a = await start('claude:split-a', 'how do the stripe webhooks work');
+  const b = await start('claude:split-b', 'where do the refunds go');
+  assert.equal(a.instructions![0], b.instructions![0], 'the same instructions for both: the provider’s cache of them holds');
+  assert.match(a.instructions![0], /^# Memory from earlier sessions\n/);
+  assert.match(a.instructions![0], /Also kept here \(recall finds them\):/);
+  assert.match(a.notes![0], /^From memory \(see Memory from earlier sessions in your instructions\), the notes that bear most on this:/);
+  assert.ok(a.notes![0].includes('Payments use Stripe webhooks in server/pay.ts.'), a.notes![0]);
+  assert.ok(b.notes![0].includes('Refunds go through the Stripe dashboard only.'), b.notes![0]);
+  assert.equal((await start('claude:split-c', 'thanks')).notes, undefined, 'nothing bears on a word or two');
+  store.clearAll(db);
+});
+
 test('a request’s vector: at once from a loaded model and asked once; a model not running keeps no start waiting', async () => {
   setEmbedderForTests(null);
   assert.equal(await requestVector(db, 'which tea does the user like'), null, 'off: none');

@@ -197,6 +197,8 @@ interface Live {
   account?: string;
   /** For an ACP agent: which one (Custom's id is "console"). */
   acpAgent?: string;
+  /** What the capabilities have for the first message after the agent started (SpawnAdditions.notes), until it goes. */
+  firstNotes?: string;
 }
 
 /** Lists saved attachments at the end of a message; the agent opens them by path. */
@@ -207,12 +209,22 @@ function withFiles(text: string, files: string[]): string {
 
 /**
  * What the capabilities have for the agent with this message (the user changed a page), ahead of it in a
- * <system-reminder>, which the conversation does not show. A command ("/goal …") goes as it is.
+ * <system-reminder>, which the conversation does not show; `first`, what they had for the first message after the
+ * agent started (memory's notes for the request, the skills that fit it), once. `said` null: nothing of this message
+ * (a conversation handed over). A command ("/goal …") goes as it is.
  */
-async function withNotes(key: string, text: string, said = text): Promise<string> {
+async function withNotes(key: string, text: string, said: string | null = text, first = ''): Promise<string> {
   if (text.trimStart().startsWith('/')) return text;
-  const notes = await messageNotes(key, said);
+  const notes = [first, said === null ? '' : await messageNotes(key, said)].filter((t) => t.trim()).join('\n\n');
   return notes ? `<system-reminder>\n${notes}\n</system-reminder>\n\n${text}` : text;
+}
+
+/** The notes a started agent has for its first message, given once: a command leaves them for the next. */
+function takeFirst(l: Live, text: string): string {
+  if (!l.firstNotes || text.trimStart().startsWith('/')) return '';
+  const f = l.firstNotes;
+  l.firstNotes = undefined;
+  return f;
 }
 
 /** What models take as pictures, by a file's extension. */
@@ -890,7 +902,7 @@ export class SessionManager extends EventEmitter {
       const runner = await Runner.start(meta, claudeSpec(o, env));
       const adapter = new ClaudeLive(runner, o);
       await runner.connect();
-      const l: Live = { key: meta.key!, agent, cwd, adapter, runner, account };
+      const l: Live = { key: meta.key!, agent, cwd, adapter, runner, account, firstNotes: add.notes.join('\n\n') || undefined };
       this.attach(l);
       try {
         await adapter.initialize();
@@ -921,7 +933,7 @@ export class SessionManager extends EventEmitter {
     meta.opts = { ...o, account, threadId: adapter.sessionId, forkFrom: undefined, forkLastTurn: undefined };
     runner.meta = meta;
     runner.saveMeta();
-    const l: Live = { key: meta.key, agent, cwd, adapter, runner, account };
+    const l: Live = { key: meta.key, agent, cwd, adapter, runner, account, firstNotes: add.notes.join('\n\n') || undefined };
     this.attach(l);
     return l;
   }
@@ -947,7 +959,7 @@ export class SessionManager extends EventEmitter {
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });
     const adapter = new AcpLive(runner, o);
     await runner.connect();
-    const l: Live = { key: meta.key!, agent: 'acp', cwd, adapter, runner, acpAgent: def.id };
+    const l: Live = { key: meta.key!, agent: 'acp', cwd, adapter, runner, acpAgent: def.id, firstNotes: add.notes.join('\n\n') || undefined };
     this.attach(l);
     try {
       await adapter.boot(!!opts.resume);
@@ -1046,7 +1058,7 @@ export class SessionManager extends EventEmitter {
       await this.snapshot(l.key);
       // What the capabilities have to say of the request (an app that does it); not of a conversation handed over.
       const said = splitHandoff(o.prompt ?? '') ? '' : (o.prompt?.trim() ?? '');
-      await l.adapter.sendMessage(said ? await withNotes(l.key, prompt, said) : prompt, this.saveImages(images));
+      await l.adapter.sendMessage(await withNotes(l.key, prompt, said || null, takeFirst(l, prompt)), this.saveImages(images));
     }
     this.queueSummary(l.key);
     return l.key;
@@ -1238,7 +1250,7 @@ export class SessionManager extends EventEmitter {
     if (cfg.account) this.db.prepare('update app_sessions set account = ? where key = ?').run(cfg.account, l.key);
     if (from.agent === 'acp') this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(CONSOLE_ID, l.key);
     if (extra) setSessionExtra(this.db, l.key, extra);
-    await l.adapter.sendMessage(withFiles(o.prompt.trim(), this.saveFiles(o.files ?? [])), this.saveImages(o.images ?? []));
+    await l.adapter.sendMessage(await withNotes(l.key, withFiles(o.prompt.trim(), this.saveFiles(o.files ?? [])), null, takeFirst(l, o.prompt)), this.saveImages(o.images ?? []));
     this.queueSummary(l.key);
     return l.key;
   }
@@ -1705,7 +1717,8 @@ export class SessionManager extends EventEmitter {
     });
     if (!this.lives.has(key)) await this.start(key);
     await this.snapshot(key);
-    await this.live(key).adapter.sendMessage(await withNotes(key, withFiles(m.text, m.files), m.text), images);
+    const l = this.live(key);
+    await l.adapter.sendMessage(await withNotes(key, withFiles(m.text, m.files), m.text, takeFirst(l, m.text)), images);
     this.touchApp(key);
   }
 
@@ -1835,7 +1848,7 @@ export class SessionManager extends EventEmitter {
     this.userStopped.delete(key);
     l.adapter.limitStopped = false;
     this.emit('resumeCancelled', key);
-    await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text), this.saveImages(images));
+    await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text, takeFirst(l, text)), this.saveImages(images));
     this.touchApp(key);
   }
 

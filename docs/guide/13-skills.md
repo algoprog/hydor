@@ -318,7 +318,7 @@ A proposal waits in three places, and an answer in any one of them shows everywh
 
 ## Skills that fit a new session
 
-When a session starts with a message, its agent also hears which skills fit that message, if any clearly do: up to three, each with what it is for, and how that agent loads one (Claude Code with its Skill tool, Codex and other agents by reading its SKILL.md, Custom with its skill tool). The agent loads the one that fits before it starts, or carries on when none does. It hears this once, in the instructions it starts with, not with every message.
+When a session starts with a message, its agent also hears which skills fit that message, if any clearly do: up to three, each with what it is for, and how that agent loads one (Claude Code with its Skill tool, Codex and other agents by reading its SKILL.md, Custom with its skill tool). The agent loads the one that fits before it starts, or carries on when none does. It hears this once, with your first message, not with every message (Custom, in the instructions it works with).
 
 The skills are found the way memory finds notes (see [What an agent starts with](/guide/memory#what-an-agent-starts-with)): by their words, a skill's name counting most, then its keywords and what it is for; and, with search by meaning on in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning), by what they mean, so a request in other words, or in another language, still finds its skill. Only clear matches count: by words, at least two of yours and well ahead of the rest; by meaning, the closest skill alone, when it is alike enough. Common words of a request, such as "help", "need" or "after", don't count toward a match. Small talk, short replies and requests that no skill fits get none.
 
