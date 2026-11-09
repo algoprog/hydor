@@ -36,6 +36,15 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Sound**](/settings?s=notifications&find=Sound): A short chime with each notice while the app is open.
 - [**Send a test**](/settings?s=notifications&find=Send%20a%20test): Send a notice to this device now.
 
+### Telegram
+
+[Settings → Telegram](/settings?s=telegram): talk to your agents from a Telegram chat: start sessions, get their replies, answer what they ask. More in [Phones, other machines and sharing](/guide/devices).
+
+- [**Bot**](/settings?s=telegram&find=Bot): The Telegram bot your chats talk to, made with @BotFather.
+- [**Link a chat**](/settings?s=telegram&find=Link%20a%20chat): Lets a Telegram chat use your agents, with a code that works once.
+- [**New sessions use**](/settings?s=telegram&find=New%20sessions%20use): The agent a message from Telegram starts when its chat is in no session.
+- [**Notices from every session**](/settings?s=telegram&find=Notices%20from%20every%20session): Every session’s notices in your Telegram chats, not only those of the sessions a chat started.
+
 ### Password
 
 [Settings → Password](/settings?s=security): the password for this app, and signing out. More in [Look, language and updates](/guide/app).

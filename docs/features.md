@@ -947,6 +947,11 @@ programs shows each program's version and what is out, with Check now, Update no
   (notify_user) for what cannot wait. A plain yes-or-no approval has Approve and Deny right on the notification
   (where the browser shows buttons), and the Inbox lists everything waiting on you across sessions, scheduled
   tasks and machines, with approvals, questions and forms answered right there.
+- Telegram (Settings → Telegram): a bot of your own, made with @BotFather, that only the chats you link with a one-time
+  code can use. A message starts a session or goes on with the chat's own, its reply comes back when the turn ends
+  (formatted, in up to ten messages when long, "typing…" while it works), a yes-or-no question comes with buttons
+  that answer it, /new, /sessions, /stop and /status steer it, and every session's notices can come too. The app
+  asks Telegram for messages itself, so it needs no address on the internet.
 
 ## Shipping the work
 - Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its

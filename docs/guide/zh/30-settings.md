@@ -36,6 +36,15 @@
 - [**声音**](/settings?s=notifications&find=Sound)：应用打开时，每条通知都会响起简短的提示音。
 - [**发送测试**](/settings?s=notifications&find=Send%20a%20test)：现在向这台设备发送一条通知。
 
+### Telegram
+
+[设置 → Telegram](/settings?s=telegram)：在 Telegram 聊天中与你的智能体对话：开始会话、接收它们的回复、回答它们的提问。详见[手机、其他机器和分享](/guide/devices)。
+
+- [**机器人**](/settings?s=telegram&find=Bot)：你的聊天与之对话的 Telegram 机器人，用 @BotFather 创建。
+- [**关联聊天**](/settings?s=telegram&find=Link%20a%20chat)：用一个只能使用一次的代码，让一个 Telegram 聊天使用你的智能体。
+- [**新会话使用**](/settings?s=telegram&find=New%20sessions%20use)：当聊天不在任何会话中时，来自 Telegram 的消息所启动的智能体。
+- [**来自所有会话的通知**](/settings?s=telegram&find=Notices%20from%20every%20session)：在你的 Telegram 聊天中接收每个会话的通知，而不只是由聊天开始的会话的通知。
+
 ### 密码
 
 [设置 → 密码](/settings?s=security)：此应用的密码，以及退出登录。详见[外观、语言和更新](/guide/app)。

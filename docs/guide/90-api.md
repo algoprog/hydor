@@ -701,6 +701,13 @@ Settings → Agents → Plugins. A plugin is a folder in the Agent Plugins 1.0 f
 
 - `POST /api/push/test` — sends a test notification ("Notifications work on this device.") to every device that turned on Notify this device; it shows on the devices where the app is not in view. No body. Returns: `{ sent: number — how many devices it reached }` (0: no device has notifications on).
 
+## Telegram
+
+- `GET /api/telegram` — Settings → Telegram: whether a bot is connected and how it is doing, its name, the linked chats, the options, and a code to link a chat while one is out. Returns: `{ connected: boolean, state: "off"|"running"|"error", error?: string, bot?: { username, name }, chats: [{ id: number, name, at }], notify: boolean — every session's notices to the chats, agent: "claude"|"codex" — what a message from a chat in no session starts, pairing?: { code, link?: string — t.me link that sends the code, until } }`.
+- `PUT /api/telegram` — changes the options; with `token`, connects a bot (checked with Telegram first; the user pastes it in Settings, agents leave it out). Body: `{ token?: string|null — the bot's token from @BotFather (null removes the bot and unlinks every chat), notify?: boolean, agent?: "claude"|"codex" }`. Returns: the same object as GET.
+- `POST /api/telegram/pair` — a code that links the chat that sends it to the bot, once, within ten minutes (400 without a bot). No body. Returns: the same object as GET, with `pairing`.
+- `DELETE /api/telegram/chats/:id` — unlinks a chat: it can no longer use the agents. Returns: the same object as GET.
+
 ## Agents and their programs
 
 - `GET /api/clients` — the agents' programs on this computer, and keeping them up to date. Returns: `{ clients: [{ id: "claude"|"codex"|"gemini"|"opencode"|"qwen"|"auggie", name, source: "yours"|"app"|"bundled"|"missing", version? — the one the sessions run, path?, installing?, latest? — a newer version out, failed? — a newer version that did not work here (the sessions keep version), yours?: { version?, path } — your own copy when the sessions run another (Codex: the one your terminal runs) }], updates: { auto: boolean — Update automatically, checkedAt? — when it last looked, error? — why that lookup failed, running?: "check"|"update", current? — the program it is updating, last?: { at, auto: boolean — it ran by itself, items: [{ id, name, yours?: boolean, from?, to?, ok: boolean, error?, kept? — the version kept in use because to did not work }] } } }`.
