@@ -23,6 +23,7 @@ import {
   FolderGit2,
   History,
   Hourglass,
+  Import,
   Layers,
   MessageSquare,
   MoreHorizontal,
@@ -45,6 +46,7 @@ import { ago, tildify } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { go, sessionPath } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
+import { BringIn } from './BringIn';
 import { ChangeBadge, EntryEditor } from './parts';
 import { folderName, placeName, SOURCE, useMemory, useMemoryState } from './state';
 import { LOCALE } from '../../i18n/locale';
@@ -932,6 +934,7 @@ function Notes() {
   const [q, setQ] = useState('');
   const [list, setList] = useState<{ entries: MemoryListEntry[]; searched: boolean } | null>(null);
   const [adding, setAdding] = useState(false);
+  const [bringing, setBringing] = useState(false);
   const [confirm, confirmNode] = useConfirm();
   const query = view === 'stale' ? '' : q.trim();
   // Only the latest request's answer shows (an earlier one can arrive after it).
@@ -1109,6 +1112,13 @@ function Notes() {
         ) : !list.entries.length ? (
           <Empty icon={<Brain size={20} />} title={query ? 'No notes match' : view === 'deleted' ? 'Nothing deleted' : view === 'stale' ? 'Every note was needed lately' : 'Nothing kept yet'}>
             {!query && main && 'Notes show up here when you ask an agent to remember something, or it learns something lasting about you or a project.'}
+            {!query && view === 'all' && !total && (
+              <div className="mt-3">
+                <Button size="sm" variant="secondary" icon={<Import size={14} />} onClick={() => setBringing(true)}>
+                  Bring in from other assistants
+                </Button>
+              </div>
+            )}
           </Empty>
         ) : (
           <div className="space-y-4">
@@ -1124,6 +1134,9 @@ function Notes() {
               Deleted notes
             </Button>
             <span className="flex-1" />
+            <Button size="sm" variant="ghost" icon={<Import size={14} />} onClick={() => setBringing(true)}>
+              Bring in…
+            </Button>
             <ExportMenu />
             <Button size="sm" variant="ghost" icon={<Eraser size={14} />} disabled={!total} onClick={() => void clear()} className="-mr-2 !text-err">
               Clear all…
@@ -1131,6 +1144,7 @@ function Notes() {
           </div>
         )}
       </div>
+      <BringIn open={bringing} onClose={() => setBringing(false)} />
       {confirmNode}
     </section>
   );

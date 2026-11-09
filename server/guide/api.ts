@@ -44,6 +44,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/budget\//, 'refuse', 'Spending caps are the user’s to set: the session’s menu → Spending cap, or Options on the start page.'],
   ['W', /^\/api\/sessions\/[^/]+\/(takeover|seen|queue)/, 'refuse', 'That is for the session’s own page.'],
   ['W', /^\/api\/sites$/, 'refuse', 'Publish with your publish_site tool: the user confirms on its card.'],
+  ['PUT', /^\/api\/memory\/bring-in\/file$/, 'refuse', 'An export comes from the user’s own browser: they add it with Bring in… in Settings → Memory.'],
   ['W', /^\/api\/me\/language$/, 'refuse', 'The language is set on each device: PUT /device with { language }.'],
   ['W', /^\/api\/(push\/(subscribe|unsubscribe)|me\/timezone|find\/usage|tour|voice\/(transcribe|command|cancel))$/, 'refuse', 'That is for the app’s pages themselves.'],
   // A slideshow's narration sounds and its phone remote are the editor's and the slideshow's own.

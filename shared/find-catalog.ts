@@ -191,6 +191,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Notes', 'memory notes remembered facts export json markdown', 'Every note kept, by place', 'Memory notes'],
   ['memory', 'Add a note', 'remember new note write fact tell agents', 'Write a note for agents to remember, about you or a project', 'Add a memory note'],
   ['memory', 'Deleted notes', 'trash bin restore undelete recover erase', 'Notes deleted in the last 30 days, to restore', 'Deleted memory notes'],
+  ['memory', 'Bring in…', 'import migrate switch transfer claude code codex chatgpt claude.ai hermes openclaw export memories history chats', 'Notes from what other assistants know about you: Claude Code, Codex, Hermes, OpenClaw, or a ChatGPT or Claude export', 'Bring in memory from other assistants'],
   ['memory', 'Export', 'download backup save copy json markdown', 'Every note as Markdown to read, or as JSON with histories', 'Export memory notes'],
   ['memory', 'Clear all…', 'delete erase wipe forget everything', 'Deletes every note and its history', 'Clear all memory'],
   // Capabilities › Child sessions

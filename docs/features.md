@@ -142,6 +142,12 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed (each place its three
   newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
+  Bring in… there brings what other assistants know into memory, as notes you pick from: Claude Code's memory files
+  (each project's, and CLAUDE.md), Codex's memories and AGENTS.md, Hermes's and OpenClaw's MEMORY.md and USER.md,
+  and the export ChatGPT or Claude emails you (Claude's memory, ChatGPT's custom instructions, and what you wrote in
+  your chats, newest first). The helper model reads them a part at a time against the notes memory has, leaves out
+  what it says already (also in other words), secrets and text that would steer agents, puts a project's notes in
+  its folder when that is on this computer, and proposes lines for your profile; nothing is added until you pick.
   Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
   background).
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
