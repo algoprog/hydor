@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.49.0 · 9 November 2026
+
+Search by meaning without PyTorch, and where each turn's time and money went.
+
+- **Search by meaning sets up small and starts fast**: its model now runs in 8 bits through ONNX Runtime, about 500 MB
+  to set up instead of 2 GB or more, ready in about a second and in about 1 GB of memory, and it finds the same notes.
+  An older setup with PyTorch is replaced by itself, freeing its gigabytes; what was found by meaning before stays.
+- **It runs on the processor**: Settings → Memory no longer asks where it runs, and the graphics card is left to other
+  work.
+- **A turn's time and cost**: the tokens beside a finished turn open where its time went (the model, commands, files,
+  the web, waiting for you, the rest), how soon its first reply came, its tokens by kind with the cache's share, and
+  what it cost and what the cache saved.
+- **Bring in** is found by the search box in Chinese and Greek too.
+
 ## 0.48.0 · 9 November 2026
 
 Memory that starts with what other assistants already know about you, picked by you.
