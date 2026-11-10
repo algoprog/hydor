@@ -22,11 +22,11 @@ function WindowRow({ w }: { w: UsageWindow }) {
       <div className="mb-1.5 flex items-baseline gap-2">
         <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{w.label}</span>
         {critical && <AlertTriangle size={13} className="shrink-0 self-center text-[var(--status-critical)]" aria-label="Nearly used up" />}
-        <span className="text-[15px] font-semibold">{pct(w.usedPercent)}</span>
-        <span className="text-[12px] text-fg-3">used</span>
+        <span className="shrink-0 text-[15px] font-semibold">{pct(w.usedPercent)}</span>
+        <span className="shrink-0 text-[12px] text-fg-3">used</span>
       </div>
       <Meter percent={w.usedPercent} />
-      <div className="mt-1 flex justify-between text-[11.5px] text-fg-3">
+      <div className="mt-1 flex justify-between gap-3 text-[11.5px] text-fg-3">
         <span>{left == null ? '' : `${pct(left)} left`}</span>
         <span title={w.resetsAt ? new Date(w.resetsAt).toLocaleString(LOCALE) : ''}>{w.resetsAt ? `resets ${untilText(w.resetsAt)}` : ''}</span>
       </div>
@@ -36,11 +36,11 @@ function WindowRow({ w }: { w: UsageWindow }) {
 
 function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | 'codex'; account?: AgentAccount }) {
   return (
-    <section className="rounded-2xl border border-line bg-panel p-5">
+    <section className="min-w-0 rounded-2xl border border-line bg-panel p-4 sm:p-5">
       <header className="mb-3 flex items-center gap-2.5">
         <AgentIcon agent={agent} size={20} />
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold">
+          <div className="truncate text-[15px] font-semibold">
             {agentName(agent)}
             {account && <span className="font-normal text-fg-3"> · {account.name}</span>}
           </div>
@@ -49,7 +49,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
             {u?.account?.plan && <span> · {u.account.plan}</span>}
           </div>
         </div>
-        {u && <span className="text-[12px] text-fg-3">{ago(u.fetchedAt)}</span>}
+        {u && <span className="shrink-0 text-[12px] text-fg-3">{ago(u.fetchedAt)}</span>}
       </header>
       {!u ? (
         <div className="flex justify-center py-6 text-fg-3">
@@ -176,8 +176,8 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'limits' ? (
-          <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">
-            <div className="grid gap-4 md:grid-cols-2">
+          <div className="mx-auto max-w-[1040px] px-3 py-4 sm:px-6 sm:py-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Card u={claude} agent="claude" />
               <Card u={codex} agent="codex" />
               {added.map((a) => (

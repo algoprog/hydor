@@ -252,14 +252,14 @@ export function ResetList({ u, account }: { u: AgentUsage; account?: string }) {
           {rc.items.map((r) => {
             const soon = !!r.expiresAt && r.expiresAt - Date.now() < 24 * 3600_000;
             return (
-              <div key={r.id} className="flex items-center gap-3 px-3 py-2">
+              <div key={r.id} className="flex items-center gap-3 px-3 py-2.5">
                 <RotateCcw size={14} className="shrink-0 text-fg-3" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px]">
+                  <span className="block text-[13px] leading-snug [overflow-wrap:anywhere]">
                     {r.title}
                     {r.left && r.left > 1 ? <span className="text-fg-3"> · {r.left} left</span> : null}
                   </span>
-                  <span className="block truncate text-[11.5px] text-fg-3" title={[r.detail, r.note].filter(Boolean).join(' · ') || undefined}>
+                  <span className="mt-0.5 block text-[11.5px] leading-snug text-fg-3 [overflow-wrap:anywhere]" title={[r.detail, r.note].filter(Boolean).join(' · ') || undefined}>
                     {r.expiresAt ? <span className={cx(soon && 'text-warn')}>Expires {untilText(r.expiresAt)}</span> : 'Does not expire'}
                     {r.note ? ` · ${r.note}` : ''}
                     {r.note && r.usableAt && r.usableAt > Date.now()
