@@ -26,7 +26,7 @@ What each can do in the app:
 On the start page (`/`), the row under the message box says who does the work.
 
 1. Click **Runs on**. The list shows **Claude Code** ("Anthropic · Claude plan or API key"), **Codex** ("OpenAI · ChatGPT plan or API key"), **Custom** ("Any model: OpenRouter, Ollama, vLLM") and every agent you added in Settings → More agents ("ACP agent · " and its command). At the bottom, **Models for Custom** opens Settings → Models, and **Add or manage agents** opens Settings → More agents.
-2. Click **Model** and pick one. The list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
+2. Click **Model** and pick one. **Automatic**, at the top and picked to start with, lets the tiers choose: Best, or Max for a hard problem (see [Tiers: a model for each kind of job](#tiers-a-model-for-each-kind-of-job)). Under it the list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
 3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
 
 The start page remembers what you picked, per agent, on every device: next time it opens with the same agent, model, effort and permissions.
@@ -52,9 +52,16 @@ The model menu only lists the session's own agent's models; a confidential sessi
 
 ## Tiers: a model for each kind of job
 
-Agents pick models by tier instead of by name: **Quick** for clear jobs whose result can be checked, **Standard** for most work, **Best** for hard, open-ended problems. An agent can think with a tier, and it gives each helper it starts a tier for its part (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
+Agents pick models by tier instead of by name: **Quick** for small, very clear jobs whose result can be checked, **Standard** for clear tasks of medium size, **Best** for a session's main agent, which plans, leads helpers and checks their work, and **Max** for the hardest problems. Most of a job is clear parts that a cheaper model does well, so a session costs less this way without the result getting worse: the strongest model in the room still plans the work and checks it.
 
-[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program, in a table with a column for **Claude Code**, **Codex** and **Custom**: a model and, for Claude Code and Codex, an effort. To start, Quick is Haiku, Standard is Sonnet and Best is Opus for Claude Code; Codex uses its default model with low, medium and high effort; Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). **Back to the defaults** puts them back.
+On the start page, **Model** opens on **Automatic**: the session starts on Best, or on Max when your request reads as a hard problem (a proof, a bug nobody can find the cause of, a design whose constraints pull against each other). The helper model sizes the request up while the agent starts, so nothing waits for it, and a line in the conversation says so when Max was picked, with why. The main agent then hands clear parts to helpers on Standard and Quick, and may move itself to Max when a problem proves harder than it looked (the conversation says that too). Pick a model by name instead and the session thinks with that one; its helpers still get tiers. An agent of yours can think with one tier instead (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
+
+[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program, in a table with a column for **Claude Code**, **Codex** and **Custom**: a model and, for Claude Code and Codex, an effort. To start, Quick is Haiku, Standard is Sonnet, Best is Opus and Max is the newest Fable for Claude Code; for Codex, Standard is Terra, Best is Sol and Max is Astra, with Terra at low effort for Quick (on a plan without them, the nearest it offers); Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). A tier you leave alone follows its program's newest model of that kind. **Back to the defaults** puts them back.
+
+Two switches under the table say how sessions use the tiers:
+
+- **Lead with helpers** (on to start): a session's main agent is told to plan, hand clear parts to helpers on cheaper tiers and check their work, and a helper asked for with no tier gets Standard. Off, agents work alone unless they choose otherwise, and the start page has no Automatic.
+- **Max for hard problems** (on to start): Automatic starts a hard problem on Max, and a main agent may move itself there. Off, Automatic always starts on Best.
 
 ## Agent programs install and update themselves
 
@@ -376,3 +383,4 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Make the helper model one that sees images."
 - "Stop the vLLM model that's running, to free the graphics card."
 - "Use all my Claude accounts: when one hits its limit, carry on with another."
+- "Which model does each tier use for Claude Code and Codex? Make Max mean Opus for Claude Code."

@@ -46,8 +46,12 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
   older Custom processes kept across an update queue corrections until the turn ends.
 - **Answers you can use**: replies show maths, diagrams and pictures, and more than a hundred answer UIs (comparison
   tables, charts, maps, recipes, forecasts, itineraries, quizzes, calculators) that agents fill in as they answer.
+- **The right model for each part of a job**: a session's main agent plans, leads and checks on a strong model, and
+  hands the clear parts to helpers on cheaper ones, so the work costs less without getting worse. Four tiers (Quick,
+  Standard, Best and Max) name a model for each program; Automatic starts a session on Best, or on Max when the
+  request reads as a hard problem, and a helper whose result fails a check runs again a tier up.
 - **Agents of your own**: say what one should do and it is drafted for you; each works everywhere or in some projects,
-  on its own schedules, thinks with a model tier (Quick, Standard or Best, stepping up when a cheap try falls short),
+  on its own schedules, thinks with a model tier (stepping up when a cheap try falls short),
   hands parts of its work to other agents, hands back checked results to files, the Library, webhooks or
   notifications, can keep one conversation with an inbox, and keeps to a monthly budget. A new project can get one
   fitted to it, in your language.

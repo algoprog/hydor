@@ -68,12 +68,13 @@ agents that speak ACP and take MCP servers.
   the helper model: its instructions, tools, tier and a schedule, read as sentences whose underlined words change it in
   place; **All settings** has every setting; Claude Code's agent files import. An agent works everywhere or only in
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
-  listed on its page); thinks with a tier, Quick, Standard or Best, whose model Settings → Models → Tiers sets for
+  listed on its page); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
-  agents: plain helpers on a tier the lead picks (never above the highest its agent allows) or named agents with their
-  own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's; steps up:
-  a helper on a tier whose reply fails a quick check by the helper model (or that stops with an error) runs again a
-  tier up, the lead told why, and a scheduled run that fails goes again a tier up, unless the agent turns it off; hands
+  agents: plain helpers on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
+  with their own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's;
+  steps up: a helper on a tier whose reply fails a quick check by the helper model (or that stops with an error) runs
+  again a tier up, as far as Best, the lead told why, and a scheduled run that fails goes again a tier up, unless the
+  agent turns it off; hands
   back results: the fields of each (an app's answer fields: text, numbers, dates, links, lists, tables), checked by its
   hand_back tool, sent to a file in its folder (Markdown or JSON, with {date}, {time} and {agent} in the name), a page
   in the Library, an https webhook (signed with a vault key, to the hosts it allows) and a notification, and listed on
@@ -278,6 +279,17 @@ agents that speak ACP and take MCP servers.
   whichever agent is working; Codex's own servers ask the same way.
 - **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their
   results back, each a line in its conversation that opens to the reply; they show under it in the sidebar.
+- **Tiers and the team** (Settings → Models → Tiers): four tiers name a model and an effort for Claude Code, Codex
+  and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
+  agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers
+  (Haiku, Sonnet, Opus and Fable; Terra, Sol and Astra, with Terra at low effort for Quick). The start page's Model
+  opens on Automatic: the session starts on Best, or on Max when the helper model reads the request as a hard problem
+  (sized up while the agent starts; a line in the conversation says why). The main agent is told to lead: it plans,
+  hands clear parts to helpers on Standard and Quick (a helper asked for with no tier gets Standard, and none thinks
+  with a tier above its lead's), checks what comes back, and may move itself to Max with step_up_session when a problem
+  proves harder than it looked. Claude Code's own Agent tool is told the same models. Two switches turn the team and
+  Max for hard problems off. `scripts/tier-bench` measures what the team costs and how its results compare on your own
+  setup.
 - **Deep research**: one switch under Options. The agent plans the searches a question needs, sends researchers
   (child sessions) after each part, digs into what they leave open, has the key claims checked against two
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many
