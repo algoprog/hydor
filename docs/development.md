@@ -26,6 +26,16 @@ that need a display, another system or the network as well. One by hand:
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
+The terminal client (`hydor`, `server/tui/`) is a client of the same API and event socket as the web app, started
+from `server/cli.ts` (`bin/hydor.mjs` runs it). `server/tui/tui-test.ts` checks its parts (arguments, widths and
+wrapping, Markdown, each step's line, approvals, the input line's keys), `hydor run` against a small fake server
+(streamed events, helpers, `--json`, the exit codes, a socket that drops), and the chat itself in a pseudo-terminal
+(node-pty, its screen read back through a headless xterm):
+
+```bash
+OUTDIR=dist/dev node scripts/build-server.mjs server/tui/tui-test.ts && DATA_DIR=/tmp/hydor-test-tui node dist/dev/tui-test.js
+```
+
 Built-in skills are folders in `skills/` (a SKILL.md each, with `category:` for its group on the Skills page);
 `server/skillpack/tests.ts` checks them. Built-in plugins are folders in `plugins/`, in the Agent Plugins 1.0
 format (`plugin.json`, `skills/`, `mcp.json`) with the app's own extension, `com.naget.agent`, for what they need.

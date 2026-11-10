@@ -73,6 +73,9 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
 - **Work that runs by itself**: scheduled tasks, watchers, webhooks, and goals an agent keeps working on.
 - **Around the agents**: a terminal, files, Git, usage and limits (under System), several machines, and one search box
   (`Ctrl+K`).
+- **In your terminal too**: the `hydor` command talks to an agent in the terminal (approvals by key, helpers, queued
+  messages), runs one request from a script (`hydor run`, with JSON out and exit codes), and lists and looks after
+  sessions, models, tiers, agents, tasks and usage, on this computer or another.
 - **Your choice of permissions**: Custom's Auto mode checks risky steps and can sandbox commands; Full access
   runs tools and commands without approval prompts or the command sandbox, with your computer account's permissions.
 - **Private when it must be**: confidential sessions on local models only, and a vault of keys agents use without
@@ -112,6 +115,14 @@ git clone https://github.com/algoprog/hydor && cd hydor
 
 Open the setup link, choose a password, and a short tour sets up the plans or models you want to use. To reach it from
 your phone, put HTTPS in front of it: see [remote access](docs/remote-access.md).
+
+The installer also links the `hydor` command, to use Hydor from a terminal:
+
+```bash
+hydor "add a --json flag to the export command"   # talk to an agent in this folder
+git diff | hydor run "review this change"          # one request from a script: the reply on stdout
+hydor sessions                                     # what each session is doing
+```
 
 ## Documentation
 

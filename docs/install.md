@@ -239,6 +239,19 @@ own, its `systemctl enable` does.
 If you missed the setup link, `node dist/server/cli.js setup-token` prints the token, to use as
 `/setup?token=<token>`.
 
+## The hydor command
+
+The installer links `hydor` into `~/.local/bin` when that folder is on your PATH (it says so; otherwise run
+`bin/hydor.mjs` in Hydor's folder, or link it yourself), and the Docker image has it in `/usr/local/bin`
+(`docker exec -it hydor hydor`). It is Hydor in a terminal: `hydor` talks to an agent in the folder you are in,
+`hydor run "…"` runs one request for a script, and `hydor help` lists the rest. The [guide](guide/27-terminal.md)
+says how it works.
+
+The maintenance commands on this page work under the same name: `hydor service status`, `hydor setup-token`,
+`hydor update`, `hydor app …` are `node dist/server/cli.js …` written short; both keep working. When nothing answers
+on this computer, `hydor` starts the server in the background (its output goes to `logs/terminal-server.log` in the
+data folder) and leaves it running; `hydor serve` runs it in the foreground instead, as `npm start` does.
+
 ## Apps from the command line
 
 With Hydor running, the `app` commands work on your apps through its API, with a key of their own

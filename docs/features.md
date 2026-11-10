@@ -1060,6 +1060,36 @@ programs shows each program's version and what is out, with Check now, Update no
   Guidelines and the CLAUDE.md / AGENTS.md instruction files.
 - An MCP server of its own, so an agent elsewhere can list, read, start and steer sessions here.
 
+## In a terminal
+- The `hydor` command: a conversation with an agent in the terminal's own history (no full-screen mode, so it scrolls,
+  copies, and works over SSH and in tmux). Your messages, the agent's text as it streams with its Markdown drawn for a
+  terminal (headings, lists, quotes, tables aligned when they fit, links with their address, code never re-wrapped),
+  each step on one line with what matters of its result (lines added and removed, the time a command took, its exit
+  code and the first line of its error), thoughts as one line (`--thinking` for all of them, `-v` for each step's
+  output), helpers starting and finishing (Claude Code's own helpers in the background too, while they work and as they end),
+  tier notes, and each turn's end (time, cost, model, helpers). Only a few
+  lines at the bottom change while the agent works: the text being written, the step under way, the helpers at work,
+  a spinner with the time, and the input line; nothing printed above them ever changes. Widths follow the terminal,
+  wide characters and emoji included, and are redrawn on a resize.
+- Approvals answered with a key (`y`, `n`, a choice's number) or denied with your own words; questions with numbered
+  choices, several picks or your own answer; forms field by field, files by their path. Messages sent while the agent
+  works are queued, as in the app. An input line of its own: history (the last 500), several lines (Alt+Enter, Ctrl+J
+  or a `\` before Enter), pastes whole, word moves and deletes, and Tab for commands, `@` files and model names.
+  Commands for a new session, another session, the model, effort and mode, your agents, helpers, tiers, usage and
+  cost; any other `/command` goes to the agent. `hydor -c` carries on the folder's latest session, `hydor resume` any.
+- `hydor run` for scripts: one request, followed until the work is done (helpers' replies, Claude Code's own helpers in
+  the background, and the turns they wake included; a dev server left running does not hold it up), the reply on stdout, progress on stderr, `--json` (the reply, cost, tokens, turns, helpers) or
+  `--stream-json` (each change as it happens), `--timeout`, and exit codes for done, failed (a usage limit named),
+  bad usage, an answer needed, a time-out and Ctrl+C. A message can be piped in.
+- Commands for the rest: sessions (what each is doing), a session's conversation, a message to one, stopping one,
+  models, tiers (shown and changed), your agents, scheduled tasks (and running one now), plan usage, the server's
+  status, the app's address, and running the server in the foreground; each with `--json`. Options pick the program,
+  model (Automatic too), effort, mode, one of your agents, the folder, a worktree, a spending cap and memory; what is
+  not given comes from the start page's last picks.
+- It starts this computer's Hydor when nothing answers and leaves it running; another computer's is reached with its
+  address and an access token (`--server`, `--token`, or `HYDOR_URL` and `HYDOR_TOKEN`). The installer links it into
+  `~/.local/bin`, and the Docker image has it.
+
 ## Everywhere
 - Desktop apps for Mac (macOS 12+, Apple silicon or Intel), Windows (10 and 11, x64) and Linux (x64 and ARM: a .deb
   for Ubuntu and Debian, an AppImage for the others): the server and Node.js in one app (and tmux on a Mac and on
