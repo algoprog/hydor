@@ -1882,8 +1882,8 @@ export class SessionManager extends EventEmitter {
     await this.switchBeforeSend(key).catch(() => {});
     if (!this.lives.has(key)) await this.start(key);
     const l = this.live(key);
-    // ACP agents take one message at a time: one sent mid-turn waits in the queue.
-    if (l.agent === 'acp' && ['working', 'waiting', 'starting'].includes(l.adapter.state.status)) return this.enqueue(key, text, images, files);
+    // Custom accepts follow-ups between steps; other ACP agents take only one prompt at a time.
+    if (l.agent === 'acp' && (l.adapter.state.status === 'starting' || (!this.isCustom(key) && ['working', 'waiting'].includes(l.adapter.state.status)))) return this.enqueue(key, text, images, files);
     await this.snapshot(key);
     this.limitHits.delete(key);
     this.userStopped.delete(key);

@@ -108,6 +108,8 @@ interface Session {
   mcpDefs: any[];
   mcp?: Promise<McpClient[]>;
   abort?: AbortController;
+  /** Follow-ups accepted during a turn, consumed only between complete model/tool steps. */
+  inbox?: { prompt: any[]; id?: string }[];
   /** The skills' folders, read without asking (their reference files). */
   skillDirs?: string[];
   /** Files read or written in this run (write_file asks to read an unknown file first). */
@@ -454,6 +456,19 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   }
   s.messages.push({ role: 'user', content: await promptContent(s, m, blocks, app.now, ac.signal) });
   save(s);
+  const receive = async () => {
+    let received = false;
+    while (s.inbox?.length) {
+      const next = s.inbox.shift()!;
+      const content = await promptContent(s, m, next.prompt, app.now, ac.signal);
+      endTurn(s, s.turnId);
+      s.turnId = next.id;
+      s.messages.push({ role: 'user', content });
+      received = true;
+      save(s);
+    }
+    return received;
+  };
   const clients = s.mcp ? await Promise.race([s.mcp, new Promise<McpClient[]>((r) => setTimeout(() => r([]), 15_000))]) : [];
   const project = projectOf(s.cwd);
   const conf = await confidentialSession();
@@ -478,6 +493,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   let system: { key: string; text: string } | undefined;
   for (let step = 1; ; step++) {
     if (ac.signal.aborted) return 'cancelled';
+    await receive();
     if (step > MAX_STEPS) {
       say(s.id, 'agent_message_chunk', `\n\n(Stopped after ${MAX_STEPS} steps.)`);
       return 'max_turn_requests';
@@ -584,6 +600,8 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
       });
     save(s);
     if (!calls.length) {
+      // A follow-up received during the final reply needs another model step, not a second turn.
+      if (await receive()) continue;
       // A call written in a form or to a tool Console does not have: say so, so the model can fix it.
       if (/<tool_call>|<\|tool_call_start\|>|<function=|<invoke |<\|tool_calls_section_begin\|>|<｜tool▁calls▁begin｜>|\[TOOL_CALLS\]|(^|\n)\s*\[\s*[A-Za-z_][\w.]*\s*\(/.test(reply.text) && misfires++ < 2) {
         const names = o.visible.map((t) => t.name);
@@ -792,6 +810,14 @@ async function handle(m: any): Promise<unknown> {
         s.abort = undefined;
         save(s);
       }
+    }
+    case '_hydor/message': {
+      const s = sessions.get(p.sessionId);
+      if (!s) throw new Error('No such session');
+      if (!s.abort || s.abort.signal.aborted) return { accepted: false };
+      (s.inbox ??= []).push({ prompt: p.prompt ?? [], id: typeof p.promptId === 'string' ? p.promptId : undefined });
+      save(s);
+      return { accepted: true };
     }
     default:
       throw Object.assign(new Error(`${m.method} is not supported`), { code: -32601 });
