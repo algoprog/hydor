@@ -16,7 +16,7 @@ Click **System** in the sidebar's tools, or go to [System](/system). A row of ta
 - **Monitor** ([open it](/system/monitor)): how busy the computer is (see [Watch this computer in Monitor](#watch-this-computer-in-monitor)).
 - **Experiments** ([open it](/system/experiments)): jobs that wait for a free GPU, run on their own and are kept as records (see [Experiments](/guide/experiments)).
 
-On a phone the tabs scroll sideways under the title. A tab's own buttons (Git's **Add**, Preview's refresh) sit at the right of the title.
+On a phone the title names the part you are in (**System / Monitor**): tap it for all of System's parts, four to a row, and tap one to go there. A tab's own buttons (Git's **Add**, Preview's refresh) sit at the right of the title.
 
 ## The overview
 
@@ -707,7 +707,7 @@ Below, in more detail:
 
 - **CPU**: a chart, every core's load, and the temperature when known.
 - **Memory**: a chart, RAM used with cache and buffers, swap, and how much is available.
-- One card per **GPU**: use, graphics memory, power against its limit, temperature, fan, performance state and clock speed.
+- One card per **GPU**: use, graphics memory, power against its limit, temperature, fan, performance state and clock speed (on a phone, without its chart).
 - **Network**: download and upload, and each network connection.
 - **Storage**: reads and writes, and every disk with its free space, filesystem and how full it is.
 - **Sensors**: temperatures, red from 85 °C.

@@ -48,7 +48,7 @@ function Card({ icon, title, count, to, children, actions }: { icon: ReactNode; 
 
 function Item({ icon, title, sub, right, onClick }: { icon: ReactNode; title: ReactNode; sub?: ReactNode; right?: ReactNode; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-bg-1">
+    <button type="button" onClick={onClick} className="flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-bg-1 active:bg-bg-1">
       <span className="flex w-5 shrink-0 justify-center text-fg-3">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13.5px] text-fg">{title}</span>
@@ -154,7 +154,7 @@ function FilesCard() {
           { icon: <Clock size={13} />, label: 'Recent files', to: '/files?place=recent' },
           { icon: <Trash2 size={13} />, label: 'Trash', to: '/files?place=trash' },
         ].map((x) => (
-          <button key={x.label} type="button" onClick={() => go(x.to)} className="inline-flex h-7 items-center gap-1.5 rounded-full bg-bg-2 px-2.5 text-[12px] text-fg-2 hover:bg-bg-3 hover:text-fg">
+          <button key={x.label} type="button" onClick={() => go(x.to)} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-bg-2 px-3 text-[12.5px] text-fg-2 hover:bg-bg-3 hover:text-fg">
             {x.icon}
             {x.label}
           </button>
@@ -294,8 +294,9 @@ function PreviewCard() {
         servers.slice(0, 5).map((s) => (
           <Item
             key={s.port}
-            icon={<span className="tnum font-mono text-[10.5px]">:{s.port}</span>}
+            icon={<MonitorSmartphone size={14} />}
             title={<span translate="no">{s.title || s.project || s.program}</span>}
+            right={<span className="tnum font-mono">:{s.port}</span>}
             sub={<span translate="no">{[s.framework, s.cwd].filter(Boolean).join(' · ') || s.command}</span>}
             onClick={() => go(`/preview?port=${s.port}`)}
           />
