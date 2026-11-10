@@ -22224,5 +22224,7 @@
 "The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its helpers get Standard and Quick":"快速、标准、最佳和最高在每个程序中对应的模型：会话由最佳或最高档位主导，它的助手使用标准和快速档位",
 "The strongest: the hardest problems (stubborn bugs, proofs, designs with many constraints)":"最强：最难的问题（顽固的缺陷、证明、约束众多的设计）",
 "tiers quick standard best max cheaper cheap strong strongest model per job helpers subagents haiku sonnet opus fable terra sol astra effort automatic":"档位 快速 标准 最佳 最高 更便宜 便宜 强 最强 按任务选模型 助手 子智能体 haiku sonnet opus fable terra sol astra 投入 自动 tiers",
-"agents::Max":"最高"
+"agents::Max":"最高",
+"Hydor in a terminal":"在终端里使用 Hydor",
+"Talk to agents and run requests from a terminal: the hydor command":"在终端里与智能体对话并运行请求：hydor 命令"
 }
