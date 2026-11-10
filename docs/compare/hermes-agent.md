@@ -6,7 +6,7 @@ Like Hermes Agent? Keep it: it runs inside Hydor as one of its agents, and you g
 
 | | Hydor | Hermes Agent |
 |---|---|---|
-| **Runs the official Claude Code and Codex on your own plans, and shows the sessions you started in VS Code or a terminal** | ✓ | Partial: Claude Code only, through a bundled skill [3] |
+| **Runs the official Claude Code and Codex on your own plans, and shows the sessions you started in VS Code or a terminal** | ✓ | Partial: hands coding to the Claude Code CLI through a bundled skill [3] |
 | **Runs other agents inside it**: Hermes Agent, pi, OpenClaw, Gemini CLI, OpenCode, Goose and more | ✓ | Partial: hands coding to Claude Code [3] |
 | **One memory that every agent shares**, found by meaning and checked against your conversations each day | ✓ | Partial: two small files per profile, MEMORY.md (2,200 characters) and USER.md (1,375) by default, and search over past sessions [1] |
 | **On your phone**: installs as an app with notifications, and you approve or deny from the notification | ✓ | Partial: chat apps [3] |
