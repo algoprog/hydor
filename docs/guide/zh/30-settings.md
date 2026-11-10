@@ -87,17 +87,17 @@
 
 - [**你的账户**](/settings?s=accounts&find=Your%20accounts)：会话使用的 Claude Code 和 Codex 登录，以及你添加的更多账户。
 - [**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：用量耗尽的会话会换另一个账户继续。
-- [**达到限额时使用 API 额度**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)：When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key。
+- [**达到限额时使用 API 额度**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)：当每个 Claude Code 账户都达到限额时，会话改用 Anthropic API 密钥计费继续运行。
 - [**智能体程序**](/settings?s=accounts&find=Agent%20programs)：已安装哪些智能体程序，以及安装其他程序。
 - [**自动更新**](/settings?s=accounts&find=Update%20automatically)：让 Claude Code、Codex 和其他智能体程序保持最新版本。
 
 ### 更多智能体
 
-[设置 → 更多智能体](/settings?s=agents)：Gemini CLI、OpenCode、Qwen Code、Goose 以及其他支持 ACP 的智能体。详见[智能体、账户和模型](/guide/agents-models)。
+[设置 → 更多智能体](/settings?s=agents)：Gemini CLI、OpenCode、Qwen Code、Goose、Hermes Agent、Pi 以及其他支持 ACP 的智能体。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**你的智能体**](/settings?s=agents&find=Your%20agents)：显示在 Claude Code 和 Codex 旁边的智能体。
 - [**添加你自己的**](/settings?s=agents&find=Add%20your%20own)：任何支持 ACP 的智能体（通过其命令）。
-- [**支持 ACP 的智能体**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、OpenCode、Qwen Code 和 Goose，可随时添加。
+- [**支持 ACP 的智能体**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、OpenCode、Qwen Code、Goose、Hermes Agent 和 Pi，可随时添加。
 
 ### 模型
 
