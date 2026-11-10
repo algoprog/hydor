@@ -3,6 +3,33 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.54.0 · 10 November 2026
+
+Keep the agent you use and bring it into Hydor: Hermes Agent, Pi and OpenClaw run here, what other agents know comes
+over, and Discord and Slack join Telegram.
+
+- **Hermes Agent, Pi and OpenClaw** join the agents that speak ACP, in Settings → Agents → More agents. Pick one as a
+  session's agent and follow it here, answer its approvals from your phone, and it gets your guidelines, memory and
+  skills like the others. Pi installs by itself with its ACP adapter; Hermes and OpenClaw show their own install
+  command. Hermes also gets the app's tools; Pi does not yet. Pi's commands show their output, and Hermes's replies no
+  longer start with blank lines.
+- **Bring in from other agents**: Settings → Memory → Bring in reads pi and Atomic Agent too, beside Claude Code,
+  Codex, Hermes and OpenClaw, and offers the skills you made in Hermes, OpenClaw, pi and Atomic Agent. You see each one
+  first; those you pick are copied into your own skills. A skill with a name you already have is left alone, and keys
+  and sign-in files never come over.
+- **The setup tour** asks "Coming from another agent?" when it finds one of them on this computer, and opens Bring in.
+- **Chat apps**: Discord and Slack join Telegram in one section, Settings → App → **Chat apps**. Each is a bot or app of
+  your own that only chats linked with a one-time code can use: a message starts a session or carries on the chat's
+  own, the reply comes back when the turn ends, yes-or-no questions come with buttons, and /new, /sessions, /stop and
+  /status steer it. None needs an address on the internet.
+- **A helper is judged by its answer to the job it was given**: a later reply of its own, to a message, no longer
+  sends the whole job round again a tier up.
+- **Naget Search turned off hears nothing from the app**, not even the daily request for its categories.
+- **What leaves your computer**: a new page lists every connection Hydor itself makes, host by host, with how to turn
+  each one off. Hydor has no telemetry.
+- **Compared with other agents**: honest pages on Hermes Agent, pi, Atomic Agent and OpenClaw, each with its sources
+  and what it does better; a README that says what Hydor is in one sentence; a security policy and a code of conduct.
+
 ## 0.53.0 · 10 November 2026
 
 Claude Code sessions can carry on with your API credit when every account is at its usage limit.
