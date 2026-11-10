@@ -22,14 +22,21 @@ import { LineSplitter } from './runner/frames.ts';
 export const CLIENTS_DIR = path.join(config.dataDir, 'clients');
 export const CLIENTS_BIN = path.join(CLIENTS_DIR, 'node_modules', '.bin');
 
-/** The npm package of each program the app can install, by the command it runs as; `update`: how your own install updates itself. */
-export const PACKAGES: Record<string, { pkg: string; name: string; update?: string[] }> = {
+/**
+ * The npm package of each program the app can install, by the command it runs as; `update`: how your own install updates
+ * itself; `with`: programs it needs (installed beside it when not on the PATH); `ignoreScripts`: installed without running
+ * the package's install scripts (npm --ignore-scripts); `hidden`: kept current but not listed in Settings.
+ */
+export const PACKAGES: Record<string, { pkg: string; name: string; update?: string[]; with?: string[]; ignoreScripts?: boolean; hidden?: boolean }> = {
   claude: { pkg: '@anthropic-ai/claude-code', name: 'Claude Code', update: ['update'] },
   codex: { pkg: '@openai/codex', name: 'Codex', update: ['update'] },
   gemini: { pkg: '@google/gemini-cli', name: 'Gemini CLI' },
   opencode: { pkg: 'opencode-ai', name: 'OpenCode', update: ['upgrade'] },
   qwen: { pkg: '@qwen-code/qwen-code', name: 'Qwen Code' },
   auggie: { pkg: '@augmentcode/auggie', name: 'Auggie' },
+  // Pi speaks no ACP: the pi-acp adapter runs it, so both are installed (pi itself stays current as its own entry).
+  'pi-acp': { pkg: 'pi-acp', name: 'Pi', with: ['pi'], ignoreScripts: true },
+  pi: { pkg: '@earendil-works/pi-coding-agent', name: 'Pi (the agent itself)', ignoreScripts: true, hidden: true },
 };
 
 const HOUR = 3600_000;
@@ -121,7 +128,11 @@ export function install(cmd: string, version = 'latest'): Promise<string> {
   const job = (async () => {
     fs.mkdirSync(CLIENTS_DIR, { recursive: true });
     if (!fs.existsSync(path.join(CLIENTS_DIR, 'package.json'))) fs.writeFileSync(path.join(CLIENTS_DIR, 'package.json'), '{ "private": true }\n');
-    const r = await npm(['install', '--prefix', CLIENTS_DIR, `${p.pkg}@${version}`, '--no-audit', '--no-fund', '--loglevel=error'], 15 * 60_000);
+    // What it needs and the machine lacks goes in with it, in one npm run.
+    const needs = (p.with ?? []).filter((c) => PACKAGES[c] && !onPath(c) && !managedBin(c)).map((c) => PACKAGES[c]);
+    const specs = [`${p.pkg}@${version}`, ...needs.map((n) => `${n.pkg}@latest`)];
+    const quiet = p.ignoreScripts || needs.some((n) => n.ignoreScripts) ? ['--ignore-scripts'] : [];
+    const r = await npm(['install', '--prefix', CLIENTS_DIR, ...specs, ...quiet, '--no-audit', '--no-fund', '--loglevel=error'], 15 * 60_000);
     const bin = managedBin(cmd);
     if (!r.ok || !bin) throw new HttpError(500, `Could not install ${p.name}: ${r.out.split('\n').slice(-3).join(' ').slice(0, 300)}`);
     return bin;
@@ -142,6 +153,16 @@ export async function ensureCommand(cmd: string): Promise<string | null> {
   const found = onPath(cmd) ?? managedBin(cmd);
   if (found || !PACKAGES[cmd]) return found;
   return install(cmd);
+}
+
+/**
+ * Extra environment for an ACP agent's program: the Pi adapter starts `pi`, which is the app's own copy when none is on the
+ * PATH (PI_ACP_PI_COMMAND).
+ */
+export function acpEnvFor(cmd: string, env: Record<string, string>): Record<string, string> {
+  if (cmd !== 'pi-acp' || env.PI_ACP_PI_COMMAND) return {};
+  const pi = onPath('pi') ? null : managedBin('pi');
+  return pi ? { PI_ACP_PI_COMMAND: pi } : {};
 }
 
 /** The Codex the app runs when nothing newer is installed: the one it came with (config.ts). */
@@ -256,6 +277,12 @@ export function works(cmd: string, bin: string): Promise<string | null> {
         if (m.id === 2) return m.error ? `it could not list its models: ${String(m.error.message ?? '').slice(0, 200)}` : Array.isArray(m.result?.data) || 'it did not list its models';
       },
     );
+  // The Pi adapter has no --version: it answers ACP's initialize.
+  if (cmd === 'pi-acp')
+    return talk(bin, [], agentBaseEnv(), { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: 1, clientCapabilities: {} } }, (m) => {
+      if (m.id !== 1) return;
+      return m.error ? `it answered with an error: ${String(m.error.message ?? '').slice(0, 200)}` : m.result?.protocolVersion != null || 'it did not answer the ACP handshake';
+    });
   return run(bin, ['--version'], 30_000, agentBaseEnv()).then((r) => (r.ok && VERSION.test(r.out) ? null : `it did not start: ${tail(r.out)}`));
 }
 
@@ -521,7 +548,9 @@ export async function clients(): Promise<ClientInfo[]> {
   const latest = kvJson<{ latest?: Record<string, string> }>('clients.latest', {}).latest ?? {};
   const bad = kvJson<Bad>('clients.bad', {});
   return Promise.all(
-    Object.entries(PACKAGES).map(async ([cmd, p]): Promise<ClientInfo> => {
+    Object.entries(PACKAGES)
+      .filter(([, p]) => !p.hidden)
+      .map(async ([cmd, p]): Promise<ClientInfo> => {
       const bin = sessionsCopy(cmd);
       const mine = managedVersion(cmd);
       const bundled = cmd === 'codex' ? bundledCodex() : null;

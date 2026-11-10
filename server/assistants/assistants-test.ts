@@ -254,6 +254,88 @@ test('another ACP agent: the instructions go with the first message of each ACP 
   assert.deepEqual(prompts(customRunner)[0], ['Hi']);
 });
 
+test('an ACP agent that takes MCP servers only as commands gets the app’s servers through a bridge; one that refuses them is asked again without', async () => {
+  const def = { id: 'hermes', name: 'Hermes Agent', command: 'hermes', args: ['acp'] };
+  const add: any = { instructions: [], env: {}, notes: [], mcpServers: { files: { type: 'http', url: 'http://127.0.0.1:1/files', headers: { Authorization: 'Bearer x' } }, tools: { command: 'tool-server', args: ['--stdio'] } } };
+  const sent = (r: FakeAcpRunner) => r.calls.find((c) => c.method === 'session/new')!.params.mcpServers as any[];
+  // No HTTP in its handshake: every server goes as a command, the app's own through the bridge.
+  const plain = new FakeAcpRunner();
+  const a = new AcpLive(plain as any, { cwd: tmp, id: 'acp-bridge', def, transcript: path.join(tmp, 'acp-bridge.jsonl'), pageServer: 'http://127.0.0.1:1/mcp/run/r', add });
+  await a.boot(false);
+  const servers = sent(plain);
+  assert.deepEqual(servers.map((x) => x.name), ['files', 'tools', 'hydor']);
+  assert.ok(servers.every((x) => !x.type && x.command), 'commands only');
+  assert.match(servers[2].args[0], /mcpbridge\.js$/);
+  assert.equal(servers[2].args[1], 'http://127.0.0.1:1/mcp/run/r');
+  assert.deepEqual(servers[0].env, [{ name: 'HYDOR_MCP_HEADERS', value: JSON.stringify({ Authorization: 'Bearer x' }) }], 'headers travel in the environment');
+  assert.deepEqual(servers[1], { name: 'tools', command: 'tool-server', args: ['--stdio'], env: [] });
+  // HTTP in its handshake: by address, as before.
+  class HttpRunner extends FakeAcpRunner {
+    override writeLine(o: any) {
+      if (o.method === 'initialize') {
+        this.calls.push({ method: o.method, params: o.params });
+        return setImmediate(() => this.emit('line', JSON.stringify({ jsonrpc: '2.0', id: o.id, result: { protocolVersion: 1, agentCapabilities: { mcpCapabilities: { http: true } } } }), false));
+      }
+      super.writeLine(o);
+    }
+  }
+  const web = new HttpRunner();
+  await new AcpLive(web as any, { cwd: tmp, id: 'acp-http', def, transcript: path.join(tmp, 'acp-http.jsonl'), pageServer: 'http://127.0.0.1:1/mcp/run/r', add }).boot(false);
+  assert.deepEqual(sent(web).map((x) => [x.type, x.name]), [['http', 'files'], [undefined, 'tools'], ['http', 'hydor']]);
+  // OpenClaw's bridge refuses MCP servers: asked again with none, and the transcript says so.
+  class Refuses extends FakeAcpRunner {
+    override writeLine(o: any) {
+      if (o.method === 'session/new' && o.params.mcpServers.length) {
+        this.calls.push({ method: o.method, params: o.params });
+        return setImmediate(() => this.emit('line', JSON.stringify({ jsonrpc: '2.0', id: o.id, error: { code: -32603, message: 'ACP bridge mode does not support per-session MCP servers.' } }), false));
+      }
+      super.writeLine(o);
+    }
+  }
+  const refusing = new Refuses();
+  const transcript = path.join(tmp, 'acp-refuse.jsonl');
+  const r = new AcpLive(refusing as any, { cwd: tmp, id: 'acp-refuse', def: { ...def, id: 'openclaw', name: 'OpenClaw' }, transcript, pageServer: 'http://127.0.0.1:1/mcp/run/r', add });
+  await r.boot(false);
+  const opened = refusing.calls.filter((c) => c.method === 'session/new');
+  assert.equal(opened.length, 2);
+  assert.deepEqual(opened[1].params.mcpServers, []);
+  assert.match(fs.readFileSync(transcript, 'utf8'), /OpenClaw does not take MCP servers from the app/);
+  assert.equal(r.state.status, 'idle', 'and the session is open');
+});
+
+test('permission requests become approval cards: Hermes’s five options, Pi’s dialogs without their plumbing', async () => {
+  const runner = new FakeAcpRunner();
+  const lv = new AcpLive(runner as any, { cwd: tmp, id: 'acp-perm', def: { id: 'pi', name: 'Pi', command: 'pi-acp', args: [] }, transcript: path.join(tmp, 'acp-perm.jsonl') });
+  await lv.boot(false);
+  const ask = (id: number, params: object) => runner.emit('line', JSON.stringify({ jsonrpc: '2.0', id, method: 'session/request_permission', params: { sessionId: 'acp-1', ...params } }), false);
+  ask(7, {
+    toolCall: { toolCallId: 'pi-ui-1', title: 'Dangerous command: rm -rf x\nAllow?', kind: 'other', rawInput: { method: 'select', title: 'Dangerous command: rm -rf x', options: ['Yes', 'No'] } },
+    options: [
+      { optionId: 'choice-0', name: 'Yes', kind: 'allow_once' },
+      { optionId: 'choice-1', name: 'No', kind: 'allow_once' },
+    ],
+  });
+  ask(8, {
+    toolCall: { toolCallId: 'perm-check-1', title: 'delete in root path: rm -rf x', kind: 'execute', rawInput: { command: 'rm -rf x' } },
+    options: [
+      { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+      { optionId: 'allow_session', name: 'Allow for session', kind: 'allow_always' },
+      { optionId: 'deny', name: 'Deny', kind: 'reject_once' },
+    ],
+  });
+  const cards = [...lv.approvals.values()];
+  assert.equal(lv.state.status, 'waiting');
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].detail, '', 'a dialog’s title says it all');
+  assert.deepEqual(cards[0].options.map((o) => o.style), ['primary', 'danger'], 'a plain No is not a primary button');
+  assert.equal(cards[1].kind, 'command');
+  assert.equal(cards[1].detail, 'rm -rf x');
+  assert.deepEqual(cards[1].options.map((o) => o.id), ['allow_once', 'allow_session', 'deny']);
+  await lv.answer('8', { decision: 'deny' });
+  await lv.answer('7', { decision: 'choice-0' });
+  assert.equal(lv.approvals.size, 0);
+});
+
 test('Custom accepts a follow-up while prompting without ending the running turn', async () => {
   class BusyRunner extends FakeAcpRunner {
     promptId?: string;

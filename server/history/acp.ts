@@ -84,10 +84,13 @@ export function acpText(content: unknown): string {
     else if (c.type === 'content') out.push(acpText(c.content));
     else if (c.type === 'resource' && typeof c.resource?.text === 'string') out.push(c.resource.text);
     else if (c.type === 'resource_link' && c.uri) out.push(String(c.name ?? c.uri));
-    else if (c.type === 'terminal' && c.terminalId) out.push(`[terminal ${c.terminalId}]`);
+    // A terminal the agent runs itself (Pi's, through pi-acp) has no text here: its output comes in the update's _meta (terminalOutput).
   }
   return out.join('\n');
 }
+
+/** The output an agent that runs its own terminal reports in an update's `_meta.terminal_output` (Zed's extension, which pi-acp uses). */
+const terminalOutput = (u: Json): string => (typeof u?._meta?.terminal_output?.data === 'string' ? u._meta.terminal_output.data : '');
 
 /** File changes in a tool call's content: ACP sends whole old and new texts per file. */
 function acpDiffs(content: unknown): FileChange[] {
@@ -294,15 +297,18 @@ export class AcpParser {
             return;
           }
         }
+        // A message starts at its first word: Hermes puts blank lines before what it says after a tool call.
+        const first = text.trimStart();
+        if (!first) return;
         const id = `${kind === 'assistant' ? 'a' : 'th'}${this.seq++}`;
         this.open = { kind, id };
         if (kind === 'assistant') {
           this.stats.assistantMessages++;
           this.act?.bump(ts, 'messages');
-          this.chunk('assistant', text, ts);
+          this.chunk('assistant', first, ts);
           // A Custom reply can be forked from: up to the end of its turn.
-          this.upsert({ kind: 'assistant', id, seq: 0, ts, text, turn, entry: this.summary.acpAgent === 'console' ? turn : undefined });
-        } else this.upsert({ kind: 'thinking', id, seq: 0, ts, text, turn });
+          this.upsert({ kind: 'assistant', id, seq: 0, ts, text: first, turn, entry: this.summary.acpAgent === 'console' ? turn : undefined });
+        } else this.upsert({ kind: 'thinking', id, seq: 0, ts, text: first, turn });
         return;
       }
       case 'user_message_chunk': {
@@ -317,7 +323,7 @@ export class AcpParser {
         const id = String(u.toolCallId ?? `t${this.seq++}`);
         const category = KIND[u.kind] ?? 'other';
         const files = acpDiffs(u.content);
-        const out = clip(acpText(u.content), MAX_OUTPUT);
+        const out = clip(acpText(u.content) || terminalOutput(u), MAX_OUTPUT);
         // Custom calls the app's own tools "hydor: web_search" ("naget-agent: …" before the rename): their full name lets their views show.
         const own = /^(?:hydor|naget-agent): (\w+)$/.exec(String(u.title ?? ''));
         const tool: ToolInfo = {
@@ -348,7 +354,9 @@ export class AcpParser {
         const prev = this.get(id) as ToolItem | undefined;
         if (!prev) return;
         const files = u.content ? acpDiffs(u.content) : [];
-        const text = u.content ? acpText(u.content) : '';
+        // Terminal output arrives in pieces to append (Zed's extension); other output replaces what was shown.
+        const piece = terminalOutput(u);
+        const text = (u.content ? acpText(u.content) : '') || (piece ? (prev.tool.output ?? '') + piece : '');
         const out = text ? clip(text, MAX_OUTPUT) : null;
         const tool: ToolInfo = {
           ...prev.tool,

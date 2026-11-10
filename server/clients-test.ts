@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clientUpdates, clientUpdatesRunning, lookup, newer, pickTag, setClientAutoUpdate, startClientUpdates, updateOwn, versionOf, watchClients, works } from './clients.ts';
+import { acpEnvFor, clients, clientUpdates, clientUpdatesRunning, CLIENTS_BIN, lookup, newer, PACKAGES, pickTag, setClientAutoUpdate, startClientUpdates, updateOwn, versionOf, watchClients, works } from './clients.ts';
 import { config } from './config.ts';
 import { kvGet, openDb } from './db.ts';
 
@@ -69,6 +69,11 @@ const codexNoModels = path.join(tmp, 'codex-no-models');
 script(codexNoModels, [`IFS= read -r a; echo '{"id":1,"result":{}}'`, 'IFS= read -r b', `IFS= read -r c; echo '{"id":2,"error":{"code":-32601,"message":"no such method"}}'`, 'IFS= read -r d'].join('\n'));
 const gemini = path.join(tmp, 'gemini');
 script(gemini, 'echo 0.66.0');
+// The Pi adapter has no --version: it answers ACP's initialize.
+const piAcp = path.join(tmp, 'pi-acp');
+script(piAcp, `IFS= read -r line; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentInfo":{"name":"pi-acp"}}}'; IFS= read -r rest`);
+const piAcpBroken = path.join(tmp, 'pi-acp-broken');
+script(piAcpBroken, `IFS= read -r line; echo '{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"cannot start pi"}}'; IFS= read -r rest`);
 
 const main = async () => {
   // The checks.
@@ -81,6 +86,23 @@ const main = async () => {
   assert.match((await works('gemini', '/bin/false')) ?? '', /did not start/);
   assert.match((await works('claude', path.join(tmp, 'nowhere'))) ?? '', /did not start/);
   assert.equal(await versionOf(link), '1.0.0');
+  assert.equal(await works('pi-acp', piAcp), null, 'the Pi adapter answers the ACP handshake');
+  assert.match((await works('pi-acp', piAcpBroken)) ?? '', /cannot start pi/);
+  assert.match((await works('pi-acp', '/bin/false')) ?? '', /stopped before answering|did not start/);
+
+  // Pi: the adapter and the agent itself, both installed without running their install scripts; the agent stays current as an entry of its own, out of Settings' list.
+  assert.deepEqual(PACKAGES['pi-acp'], { pkg: 'pi-acp', name: 'Pi', with: ['pi'], ignoreScripts: true });
+  assert.equal(PACKAGES.pi.pkg, '@earendil-works/pi-coding-agent');
+  assert.ok(PACKAGES.pi.ignoreScripts && PACKAGES.pi.hidden);
+  const listed = (await clients()).map((c) => c.id);
+  assert.ok(listed.includes('pi-acp') && !listed.includes('pi'), 'Pi is one row in Settings');
+  assert.deepEqual(acpEnvFor('gemini', {}), {}, 'only the Pi adapter is given a pi to run');
+  assert.deepEqual(acpEnvFor('pi-acp', { PI_ACP_PI_COMMAND: '/mine/pi' }), {}, 'one you named stays');
+  // With the app’s own pi and none on the PATH, the adapter is pointed at it.
+  fs.mkdirSync(CLIENTS_BIN, { recursive: true });
+  fs.writeFileSync(path.join(CLIENTS_BIN, 'pi'), '#!/bin/sh\n', { mode: 0o755 });
+  const own = acpEnvFor('pi-acp', {});
+  assert.ok(Object.keys(own).length === 0 || own.PI_ACP_PI_COMMAND === path.join(CLIENTS_BIN, 'pi'), 'the app’s copy (or yours, when you have one on the PATH)');
 
   // Your own Claude Code updates to a version that does not start: the sessions keep the one before.
   const bad: Record<string, string> = {};
