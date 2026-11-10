@@ -24,7 +24,7 @@ const ASK_SECTION = 'ask-an-agent';
  * lines the README's ("## Documentation"). */
 const MORE = [
   { title: 'Install and run', slugs: ['install', 'configuration', 'remote-access', 'machines'] },
-  { title: 'Under the hood', slugs: ['features', 'how-it-works', 'search-providers', 'development', 'release-notes'] },
+  { title: 'Under the hood', slugs: ['features', 'how-it-works', 'privacy', 'search-providers', 'development', 'release-notes'] },
 ];
 const MORE_ICONS = {
   install: 'Download',
@@ -33,6 +33,7 @@ const MORE_ICONS = {
   machines: 'Server',
   features: 'ListChecks',
   'how-it-works': 'Workflow',
+  privacy: 'ShieldCheck',
   'search-providers': 'Search',
   development: 'Code',
   'release-notes': 'Newspaper',
