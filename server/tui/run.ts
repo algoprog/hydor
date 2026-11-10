@@ -1,6 +1,6 @@
 // `hydor run`: one request, no questions asked. It starts a session with the message, follows it until the work is
-// done (its turn ended, no helper works or still owes its reply, nothing works in the background, its own or a
-// helper's, and nothing waits in its queue: a lead that ended its turn to wait for helpers or background tasks is woken
+// done (its turn ended, no helper works or still owes its reply, none of Claude Code's own helpers works in the
+// background, its own or a helper's, and nothing waits in its queue: a lead that ended its turn to wait for them is woken
 // by their replies or their ends, so the turn after them is waited for), prints the agent's last
 // reply, and ends. Progress goes to stderr as short lines when that is a terminal. An approval or a question with
 // nobody to answer stops it (exit 3); --json prints one object at the end, --stream-json a line per event.
@@ -197,7 +197,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
     const stopAll = async () => {
       await conn.api('POST', `/api/sessions/${enc(key)}/interrupt`, {}).catch(() => {});
       await Promise.all(view.helpersWorking().map((h) => conn.api('POST', `/api/sessions/${enc(h.key)}/interrupt`, {}).catch(() => {})));
-      // What works in the background would wake the agent again later: stopped too.
+      // Its helpers in the background would wake the agent again later: stopped too (a dev server left running is not).
       await Promise.all(view.background().map(({ key, task }) => conn.api('POST', `/api/sessions/${enc(key)}/tasks/${encodeURIComponent(task.id)}/stop`, {}).catch(() => {})));
     };
     const timer = o.timeout

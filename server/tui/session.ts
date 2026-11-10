@@ -288,15 +288,16 @@ export class SessionView extends EventEmitter {
   }
 
   /**
-   * What works in the background now (Claude Code's own background agents and commands): the session's, then each
-   * helper's. The agent ended its turn with them running and is woken as each one ends, so the work is not done.
+   * The helpers at work in the background now (Claude Code's own, kind "local_agent"): the session's, then each
+   * helper's. The agent ended its turn with them running and is woken as each one ends, so the work is not done. A
+   * command left running in the background ("local_bash", such as a dev server) may never end: it does not count.
    */
   background(): { key: string; task: BackgroundTask }[] {
     const out: { key: string; task: BackgroundTask }[] = [];
-    for (const t of this.live?.backgroundTasks ?? []) if (t.status === 'running') out.push({ key: this.key, task: t });
+    for (const t of this.live?.backgroundTasks ?? []) if (backgroundHelper(t)) out.push({ key: this.key, task: t });
     for (const h of this.helpers.values()) {
       if (h.replaced) continue;
-      for (const t of h.summary?.live?.backgroundTasks ?? []) if (t.status === 'running') out.push({ key: h.key, task: t });
+      for (const t of h.summary?.live?.backgroundTasks ?? []) if (backgroundHelper(t)) out.push({ key: h.key, task: t });
     }
     return out;
   }
@@ -321,6 +322,9 @@ export class SessionView extends EventEmitter {
     }
   }
 }
+
+/** A helper of Claude Code's own at work in the background (not a command left running there). */
+export const backgroundHelper = (t: BackgroundTask) => (t.kind ?? '').includes('agent') && t.status === 'running';
 
 /** A notice that a task in the background ended ("Background task completed: Check the docs"): how, and what it was. */
 export function backgroundEnd(text: string): { status: string; what: string } | null {
