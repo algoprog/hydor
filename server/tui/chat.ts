@@ -310,9 +310,11 @@ export class Chat {
     const look = { ...this.look, width: this.screen.columns };
     const { p, width } = look;
     const height = this.screen.rows;
-    const rows: string[] = [''];
     const view = this.view;
     const frame = SPIN[this.frame];
+    // A blank row after the conversation, unless the work under way goes on from its last steps.
+    const first = this.pending[0];
+    const rows: string[] = view && first && (first.kind === 'tool' || first.kind === 'thinking') && this.printer.afterSteps() ? [] : [''];
     // What is under way.
     if (view && this.pending.length) {
       const live: string[] = [];

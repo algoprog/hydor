@@ -466,6 +466,11 @@ export class Printer {
     return { lines: out, pending };
   }
 
+  /** Whether the last lines printed were steps (the region's steps then follow them with no blank line). */
+  afterSteps(): boolean {
+    return this.last === 'step';
+  }
+
   /** What is left of a streaming text for the region (its unfinished end). */
   rest(it: TimelineItem): string {
     if (it.kind !== 'assistant') return '';
