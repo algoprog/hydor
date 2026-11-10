@@ -21,7 +21,8 @@ measurements say.*
 - **Automatic** is the start page's model until another is picked (`model: "auto"` in `POST /api/sessions`). The
   session starts on Best. While its agent starts, the helper model reads the request and says whether it is a hard
   problem (`server/assistants/auto.ts`); if so the session is on Max before its first message goes, and a line in the
-  conversation says why. A start never waits more than ten seconds for that answer, and reads silence as "not hard".
+  conversation says why. A start never waits more than ten seconds for that answer, and reads silence as "not hard":
+  the session is on Best then, and only the server's log says that the helper model was not there to ask (`[auto]`).
 - **The main agent leads** (`server/children/team.ts`): it is told what each tier is for and what each costs beside
   it, to sort the work before it starts, to hand the doing to helpers and keep the deciding, and that it answers for
   what comes back. A helper asked for with no tier gets Standard; none thinks with a tier above its lead's.
