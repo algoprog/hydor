@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.51.1 · 10 November 2026
+
+System fits a phone, and follow-ups wait safely after an update.
+
+- **System on a phone**: the title says which part you are in (System / Monitor); tap it to see all eight parts,
+  four to a row, instead of tabs that ran off the edge of the screen.
+- **Overview** rows are easier to tap, and Preview's ports sit at the right instead of over the names.
+- **Monitor** on a phone: the computer's details wrap neatly, each graphics card shows its numbers without a
+  chart, and network and disk chart labels are no longer cut off.
+- A follow-up sent to a Custom session that was already running before an app update now waits in the queue
+  until the turn ends, instead of getting lost.
+
 ## 0.51.0 · 9 November 2026
 
 Full access that means full access, reliable Custom follow-ups, and clearer account limits.
