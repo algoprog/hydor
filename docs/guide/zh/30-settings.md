@@ -37,14 +37,18 @@
 - [**声音**](/settings?s=notifications&find=Sound)：应用打开时，每条通知都会响起简短的提示音。
 - [**发送测试**](/settings?s=notifications&find=Send%20a%20test)：现在向这台设备发送一条通知。
 
-### Telegram
+### 聊天应用
 
-[设置 → Telegram](/settings?s=telegram)：在 Telegram 聊天中与你的智能体对话：开始会话、接收它们的回复、回答它们的提问。详见[手机、其他机器和分享](/guide/devices)。
+[设置 → 聊天应用](/settings?s=chat)：在 Telegram、Discord 或 Slack 中与你的智能体对话：开始会话、收到回复、回答它们的提问。详见[手机、其他机器和分享](/guide/devices)。
 
-- [**机器人**](/settings?s=telegram&find=Bot)：你的聊天与之对话的 Telegram 机器人，用 @BotFather 创建。
-- [**关联聊天**](/settings?s=telegram&find=Link%20a%20chat)：用一个只能使用一次的代码，让一个 Telegram 聊天使用你的智能体。
-- [**新会话使用**](/settings?s=telegram&find=New%20sessions%20use)：当聊天不在任何会话中时，来自 Telegram 的消息所启动的智能体。
-- [**来自所有会话的通知**](/settings?s=telegram&find=Notices%20from%20every%20session)：在你的 Telegram 聊天中接收每个会话的通知，而不只是由聊天开始的会话的通知。
+- [**Telegram**](/settings?s=chat&find=Telegram)：你自己的 Telegram 机器人，用 @BotFather 创建，你的聊天通过它与智能体对话。
+- [**Discord**](/settings?s=chat&find=Discord)：你自己的 Discord 机器人，在开发者门户中创建，你的聊天通过它与智能体对话。
+- [**Slack**](/settings?s=chat&find=Slack)：你自己的 Slack 应用，由清单创建，你的聊天通过它与智能体对话。
+- [**关联聊天**](/settings?s=chat&find=Link%20a%20chat)：用只能使用一次的代码，让 Telegram、Discord 或 Slack 聊天使用你的智能体。
+- [**把机器人添加到服务器**](/settings?s=chat&find=Add%20the%20bot%20to%20a%20server)：把你的 Discord 机器人连同它所需权限添加到你的服务器的链接。
+- [**复制清单**](/settings?s=chat&find=Copy%20manifest)：Slack 应用的清单，包含 Socket Mode 及其所需的权限范围，创建应用时粘贴。
+- [**新会话使用**](/settings?s=chat&find=New%20sessions%20use)：聊天不在任何会话中时，聊天发来的消息会开始的智能体。
+- [**来自所有会话的通知**](/settings?s=chat&find=Notices%20from%20every%20session)：所有会话的通知都发到你的聊天，而不只是由聊天开始的会话。
 
 ### 密码
 

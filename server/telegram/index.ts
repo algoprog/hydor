@@ -1,4 +1,4 @@
-// Telegram (Settings → Telegram): your agents in a chat. A bot you make with @BotFather, its token kept in the vault
+// Telegram (Settings → Chat apps → Telegram): your agents in a chat. A bot you make with @BotFather, its token kept in the vault
 // (TELEGRAM_BOT_TOKEN), which only the Telegram accounts you linked with a one-time code may use. A message goes on
 // with the session the chat is in, or starts one (in a task folder of its own, as the start page does); the agent's
 // reply comes back when its turn ends; what it asks comes with buttons that answer it; and the other sessions'
@@ -212,7 +212,7 @@ async function link(d: Deps, token: string, m: TgMessage, text: string) {
   if (pairing && code.length === 8 && ++pairing.misses >= 10) pairing = null;
   if (toldAway.has(m.chat.id)) return;
   toldAway.add(m.chat.id);
-  await say(token, m.chat.id, 'This bot is someone’s own Hydor. To use it, link this chat in Hydor: Settings → Telegram → Link a chat.');
+  await say(token, m.chat.id, 'This bot is someone’s own Hydor. To use it, link this chat in Hydor: Settings → Chat apps → Telegram → Link a chat.');
 }
 
 // ---- a chat speaking ------------------------------------------------------------------------------
@@ -489,7 +489,7 @@ export const telegram: Feature = {
           throw new HttpError(400, `Telegram did not take that token: ${(e as Error).message}`);
         }
         const before = readSecret(db, TOKEN_NAME)?.value;
-        saveSecret(db, { name: TOKEN_NAME, value: token, domains: ['api.telegram.org'], note: `The Telegram bot @${me.username ?? ''} (Settings → Telegram)` });
+        saveSecret(db, { name: TOKEN_NAME, value: token, domains: ['api.telegram.org'], note: `The Telegram bot @${me.username ?? ''} (Settings → Chat apps → Telegram)` });
         // Another bot: the chats linked to the old one link again, and its place in Telegram's queue starts over.
         if (before && before !== token) setChats(db, []);
         if (before !== token) kvSet(db, 'telegram.offset', '0');
