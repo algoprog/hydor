@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.51.0 · 9 November 2026
+
+Full access that means full access, reliable Custom follow-ups, and clearer account limits.
+
+- **Custom's Full access runs without approval prompts or the command sandbox**, including administrator commands
+  and changes outside the session folder. It uses your computer account's permissions; it does not grant rights
+  your account lacks. Auto mode keeps its checks and optional sandbox, and confidential sessions keep their
+  network restrictions.
+- **Custom follow-ups and Send now work during running turns**: queued messages reach the agent without losing
+  the conversation or interrupting the wrong turn.
+- **Claude plan names stay current**, including added accounts and accounts with running sessions. Usage shows
+  the provider's display name, such as Claude Ultra, instead of an internal plan name, and refreshes it automatically.
+- **Limit resets explain what blocks them**: a reset held back by another usage limit says which limit and when
+  it becomes usable; a reset that has not started yet says when it starts.
+
 ## 0.50.0 · 9 November 2026
 
 What each session's programs use, and limits that keep one session from taking over the computer.
