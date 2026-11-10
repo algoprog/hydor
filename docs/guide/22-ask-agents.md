@@ -91,7 +91,7 @@ What a session's permissions allow decides how much the cards ask:
 - **Plan** (and Codex's **Read only**): the agent can read the app's settings and answer questions, but changes nothing. It tells you what it would change.
 - **Ask**, **Accept edits**, **Auto** and the like: changes ask on a card, as above.
 - **Bypass** (Claude Code) and **Full access** (Codex): no cards; the agent makes the changes you ask for. A form still shows when the agent needs details.
-- Custom's **Full access**: only the changes that ask every time show a card.
+- Custom's **Full access**: no approval cards, including for changes that normally ask every time. A form still shows when details are needed.
 
 ## Settings kept on each device
 

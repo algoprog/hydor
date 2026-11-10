@@ -381,7 +381,7 @@ test('app_api: no from the user changes nothing, and says what they said', async
   await app.close();
 });
 
-test('app_api: Plan mode only reads; full access asks nothing; Custom’s full access asks only what asks every time', async () => {
+test('app_api: Plan mode only reads; full access asks nothing, including Custom', async () => {
   forgetAllowed();
   const app = await testApp();
   const plan = session('plan', () => ({ decision: 'accept' }));
@@ -398,7 +398,7 @@ test('app_api: Plan mode only reads; full access asks nothing; Custom’s full a
   await appApi({ method: 'PUT', path: '/api/search/settings', body: { results: 7 } }, ctxOf(app, custom, 'acp', 'console'));
   assert.equal(custom.cards.length, 0);
   await appApi({ method: 'DELETE', path: '/api/projects/sp1' }, ctxOf(app, custom, 'acp', 'console'));
-  assert.equal(custom.cards.length, 1);
+  assert.equal(custom.cards.length, 0);
   await app.close();
 });
 

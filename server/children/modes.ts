@@ -7,8 +7,6 @@ const PLAN = 0;
 const ASK = 1;
 const EDITS = 2;
 const AUTO = 3;
-/** Custom's Full access still asks before risky commands. */
-const FULL = 4;
 /** Never asks at all. */
 const BYPASS = 5;
 
@@ -16,7 +14,7 @@ const LEVELS: Record<string, Record<string, number>> = {
   claude: { plan: PLAN, default: ASK, acceptEdits: EDITS, auto: AUTO, bypassPermissions: BYPASS },
   // Codex has no "edits": Auto also runs commands (in its sandbox) without asking.
   codex: { plan: PLAN, 'read-only': ASK, auto: AUTO, 'auto-review': AUTO, full: BYPASS },
-  custom: { plan: PLAN, ask: ASK, edits: EDITS, auto: AUTO, full: FULL },
+  custom: { plan: PLAN, ask: ASK, edits: EDITS, auto: AUTO, full: BYPASS },
 };
 
 /** Whose mode names a session uses: claude, codex, custom; null for another ACP agent (its modes are its own). */

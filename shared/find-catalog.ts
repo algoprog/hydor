@@ -222,7 +222,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
-  ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Commands run in a sandbox'],
+  ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
   ['custom', 'Goals', 'goals rounds autonomous long running', 'How many rounds a goal may run'],
 ];
 

@@ -25,7 +25,7 @@ async function mayRun(ctx: RunCtx, title: string, detail: string): Promise<strin
   if (ctx.step || allowedHere.has(ctx.key) || onCallSession(ctx.deps.db, ctx.key)) return null;
   const mode = modeOf(ctx);
   if (mode === 'read-only') return 'This session only reads (Plan mode, or read-only): tell the user what you would run instead, or ask them to switch the mode.';
-  if (mode === 'full' || mode === 'custom-full') return null;
+  if (mode === 'full') return null;
   const adapter = ctx.deps.sessions.adapterByRun(ctx.runId);
   if (!adapter) return 'Nobody can allow it now (the session is not running in the app). Ask the user in your reply.';
   const card: ApprovalRequest = {

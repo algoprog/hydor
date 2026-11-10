@@ -39,7 +39,7 @@ function CustomSettings() {
       </Section>
       <Section
         title="Sandbox for commands"
-        sub="In Auto and Full access modes, commands can change files only in the session’s folder and /tmp. They can still use the network."
+        sub="In Auto mode, commands can change files only in the session’s folder and /tmp. Full access runs without this sandbox or approval prompts."
         actions={<Switch on={st.sandbox} onChange={(on) => void save({ sandbox: on })} label="Sandbox for commands" disabled={!st.bwrap} />}
       >
         <p className="text-[12.5px] leading-relaxed text-fg-3">

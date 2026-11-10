@@ -175,8 +175,8 @@ test('modes: the parent’s, never freer (plan < ask < edits < auto < full)', ()
   assert.equal(childMode({ family: 'claude', mode: 'acceptEdits' }, 'codex'), 'read-only');
   assert.equal(childMode({ family: 'custom', mode: 'auto' }, 'claude'), 'auto');
   assert.equal(childMode({ family: 'custom', mode: 'auto' }, 'codex'), 'auto');
-  // Custom's Full access still asks before risky commands: freer than Auto, not as free as never asking.
-  assert.equal(childMode({ family: 'custom', mode: 'full' }, 'claude'), 'auto');
+  // Full access is equally free across Custom, Claude Code and Codex.
+  assert.equal(childMode({ family: 'custom', mode: 'full' }, 'claude'), 'bypassPermissions');
   assert.equal(childMode({ family: 'claude', mode: 'bypassPermissions' }, 'custom'), 'full');
   assert.equal(childMode({ family: 'codex', mode: 'full' }, 'codex'), 'full');
   assert.equal(childMode({ family: 'claude', mode: 'plan' }, 'codex'), 'plan');

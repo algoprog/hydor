@@ -273,7 +273,7 @@
 [设置 → Custom](/settings?s=custom)：自动模式、命令沙盒，以及目标的运行时长。详见[Custom，应用自己的智能体](/guide/custom)。
 
 - [**自动模式**](/settings?s=custom&find=Auto%20mode)：Custom 会自行批准安全的步骤。
-- [**命令沙盒**](/settings?s=custom&find=Sandbox%20for%20commands)：命令在沙盒中运行。
+- [**命令沙盒**](/settings?s=custom&find=Sandbox%20for%20commands)：自动模式的命令在沙盒中运行；完全访问不使用沙盒。
 - [**目标**](/settings?s=custom&find=Goals)：一个目标最多可运行的轮数。
 
 ## 问问智能体

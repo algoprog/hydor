@@ -97,10 +97,10 @@ Inside Docker, Codex's own sandbox cannot start, so **Full access** is the defau
 | Ask (its default) | Asks before editing files and before running commands; looking around runs freely |
 | Accept edits | Edits files in the folder freely, asks before running commands |
 | Auto | Routine steps go ahead; a quick check asks you about risky ones |
-| Full access | Asks only before risky commands (sudo, deleting outside the folder, running a download…) |
+| Full access | Runs tools and commands without approval prompts or the command sandbox, using your computer account's permissions |
 | Plan | Reads and plans only: no edits, no commands |
 
-In every mode Custom asks you before risky commands. In Ask, Accept edits and Plan it also asks before it reads or changes files outside the folder, or files that hold keys or passwords; in Auto, the quick check judges those first. See [Custom, the app's own agent](/guide/custom).
+Outside Full access, Custom asks you before risky commands. In Ask, Accept edits and Plan it also asks before it reads or changes files outside the folder, or files that hold keys or passwords; in Auto, the quick check judges those first. See [Custom, the app's own agent](/guide/custom).
 
 **Other ACP agents** offer their own modes, listed once the agent has run.
 

@@ -20,7 +20,7 @@ export const MODES = [
   { id: 'ask', name: 'Ask', description: 'Asks before editing files and before running commands; looking around runs freely' },
   { id: 'edits', name: 'Accept edits', description: 'Edits files in the folder freely, asks before running commands' },
   { id: 'auto', name: 'Auto', description: 'Routine steps go ahead; a quick check asks you about risky ones' },
-  { id: 'full', name: 'Full access', description: 'Asks only before risky commands (sudo, deleting outside the folder, running a download…)' },
+  { id: 'full', name: 'Full access', description: 'Runs tools and commands without approval or the command sandbox; uses your computer account’s permissions' },
   { id: 'plan', name: 'Plan', description: 'Reads and plans only: no edits, no commands' },
 ] as const;
 export type Mode = (typeof MODES)[number]['id'];
@@ -29,7 +29,7 @@ const MODE_TEXT: Record<Mode, string> = {
   ask: 'The user approves each file change and command before it runs (commands that only look around, like ls or git status, run without asking). Files outside the folder, and files with keys or passwords, ask too.',
   edits: 'File changes in the folder go ahead; the user approves each command (except ones that only look around) and anything outside the folder.',
   auto: 'Auto mode: a quick check lets routine file changes and commands go ahead and asks the user about risky ones. A step it stops comes back with the reason: change course then, never retry the same step.',
-  full: 'File changes and commands go ahead without asking, except risky ones (sudo, deleting outside the folder, running a download), which the user approves.',
+  full: 'Full access: tools, file changes and commands go ahead without approval, including sudo and changes outside the folder. Commands run without the command sandbox, using the computer account’s permissions. Confidential sessions still keep their network restrictions.',
   plan: 'Plan mode: read and search only (no edits, no commands). Finish with a clear, numbered plan for the user to approve.',
 };
 

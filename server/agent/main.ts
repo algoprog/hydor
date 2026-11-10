@@ -209,8 +209,8 @@ function mcpTools(clients: McpClient[]): Tool[] {
   );
 }
 
-async function ask(s: Session, callId: string, r: Ask): Promise<boolean> {
-  const v = decide(r, { mode: s.mode, allow: s.allow, cwd: s.cwd, readable: [dirOf(s), ...(s.skillDirs ?? [])] });
+async function ask(s: Session, callId: string, r: Ask, force = false): Promise<boolean> {
+  const v = decide(r, { mode: s.mode, allow: s.allow, cwd: s.cwd, readable: [dirOf(s), ...(s.skillDirs ?? [])], requireApproval: force });
   if (v.ok) return true;
   // Auto: a reviewer lets routine steps through, stops harmful ones (the model hears why) and asks about the
   // rest. A risky step goes to the user straight away.
@@ -700,7 +700,7 @@ async function execute(s: Session, p: Prepared, guard: Guard, base: Omit<ToolCtx
   const open = conf && tool.name === 'bash' && !shell;
   const ctx: ToolCtx = {
     ...base,
-    ask: (r) => ask(s, c.id, open && r.kind === 'execute' ? { ...r, risk: r.risk ?? 'may use the network, which this computer can’t cut commands off from in a confidential session' } : r),
+    ask: (r) => ask(s, c.id, open && r.kind === 'execute' ? { ...r, risk: r.risk ?? 'may use the network, which this computer can’t cut commands off from in a confidential session' } : r, open && r.kind === 'execute'),
     update: (content) => update(s.id, { sessionUpdate: 'tool_call_update', toolCallId: c.id, content }),
     plan: (entries) => {
       s.plan = entries.map((e) => ({ content: e.content, status: e.status }));
