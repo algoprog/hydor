@@ -213,7 +213,7 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
         : `Give each child the lowest tier that can do its part well: ${orList(offered.map((t) => TIER_FOR[t]))}.${team ? ` With no tier a child gets ${tierLabel(clampTier('standard', top)).toLowerCase()}.` : ''} A child never thinks with a tier above ${tierLabel(top).toLowerCase()}.`,
       local
         ? ''
-        : 'A child on a tier whose reply does not pass a quick check runs again one tier up by itself (never above the highest allowed); step_up_child does that when you judge a result not good enough.',
+        : 'A child on a tier whose reply to its brief does not pass a quick check runs again one tier up by itself (never above the highest allowed); its later replies, to your messages, are not checked. step_up_child does that when you judge a result not good enough.',
       agents.length
         ? `You can also hand a part to one of the user's agents, by its name in as; it works with its own instructions, tools and tier: ${agents
             .slice(0, 40)
@@ -639,6 +639,11 @@ async function stepUpCheck(d: Deps, key: string, turn: Turn, startedAt = 0): Pro
   if (turn.status === 'interrupted' || capReached(d.db, key)) return null;
   const parent = parentOf(d.db, key);
   if (parent && findAssistant(d.db, sessionExtra(d.db, parent).assistant)?.stepUp === false) return null;
+  // Only the turn that answers the brief is checked against it: a later turn answers a message (its lead's or the
+  // user's: open the page, one more fix), and judging that by the whole brief would run all the work again.
+  const judged = sessionExtra(d.db, key).stepJudged;
+  if (judged && judged !== turn.prompt?.id) return null;
+  if (!judged && turn.prompt?.id) setSessionExtra(d.db, key, { stepJudged: turn.prompt.id });
   if (turn.status === 'failed' || (turn.error && !turn.reply)) return { next, why: `it stopped with an error (${firstLine(turn.error ?? 'failed', 140)})` };
   if (!turn.reply.trim()) return { next, why: 'it wrote no reply' };
   const why = await judge(d, x.brief, turn.reply);
