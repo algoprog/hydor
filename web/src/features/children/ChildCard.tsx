@@ -34,7 +34,11 @@ export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey:
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">
             <span className="min-w-0 truncate text-[13.5px] font-medium text-fg">{s?.title ?? d.title}</span>
-            {d.tier && <span className="shrink-0 rounded-full bg-accent-soft px-1.5 text-[11px] text-fg-2">{tierLabel(d.tier)}</span>}
+            {d.tier && (
+              <span data-i18n="agents" className="shrink-0 rounded-full bg-accent-soft px-1.5 text-[11px] text-fg-2">
+                {tierLabel(d.tier)}
+              </span>
+            )}
             {d.as ? (
               <span translate="no" className="shrink-0 text-[11.5px] text-fg-3">
                 {d.as}
