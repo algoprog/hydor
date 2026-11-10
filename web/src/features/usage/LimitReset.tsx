@@ -259,9 +259,12 @@ export function ResetList({ u, account }: { u: AgentUsage; account?: string }) {
                     {r.title}
                     {r.left && r.left > 1 ? <span className="text-fg-3"> · {r.left} left</span> : null}
                   </span>
-                  <span className="block truncate text-[11.5px] text-fg-3" title={r.detail}>
+                  <span className="block truncate text-[11.5px] text-fg-3" title={[r.detail, r.note].filter(Boolean).join(' · ') || undefined}>
                     {r.expiresAt ? <span className={cx(soon && 'text-warn')}>Expires {untilText(r.expiresAt)}</span> : 'Does not expire'}
                     {r.note ? ` · ${r.note}` : ''}
+                    {r.note && r.usableAt && r.usableAt > Date.now()
+                      ? ` (usable ${untilText(r.usableAt)}, ${new Date(r.usableAt).toLocaleString(LOCALE, { weekday: 'short', hour: 'numeric', minute: '2-digit' })})`
+                      : ''}
                   </span>
                 </span>
                 <Button size="sm" variant={u.limited ? 'primary' : 'secondary'} disabled={!r.usableNow || reset.busy} onClick={() => reset.use(r)}>

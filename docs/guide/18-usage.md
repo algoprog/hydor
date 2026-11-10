@@ -74,7 +74,7 @@ With more than one account for the agent, [**Switch accounts at a limit**](/sett
 
 Some plans give you limit resets: Codex reset credits and Claude reset grants. Using one clears the plan's usage limits now instead of waiting for them to reset.
 
-Each card lists them under **Limit resets**, with how many you have. Each reset shows its name (and how many uses are left on it), "Expires in …" (in warning colour when less than a day away) or "Does not expire", and notes such as "Works once you hit a limit" or "Not usable yet". When there are none: "No limit resets right now", with when the next one comes, if the plan says.
+Each card lists them under **Limit resets**, with how many you have. Each reset shows its name (and how many uses are left on it), "Expires in …" (in warning colour when less than a day away) or "Does not expire", and notes such as "Works once you hit a limit" or "Not usable yet". A reset another limit holds back says which, and when it lifts: "Blocked while your weekly limit is used up (usable in …)". Some Claude resets clear only part of your allowance, so they cannot be used while your weekly limit is used up; they become usable once it resets. When there are none: "No limit resets right now", with when the next one comes, if the plan says.
 
 1. Click **Use** next to a reset, or **Use a reset** on a limit notice (it takes the first reset in the list that works now).
 2. Read the confirmation. It says which reset it uses, when that expires, and how many will be left. If you aren't at a limit, it warns you ("You are not at a limit right now").

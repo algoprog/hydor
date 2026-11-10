@@ -80,6 +80,19 @@ async function call(method: 'GET' | 'POST', url: string, tok: string, body?: Jso
 
 const when = (v: unknown) => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? Date.parse(v) : undefined);
 
+/** The plan's limits by the usage read's keys, for saying which one holds a reset back. */
+const LIMITS: Record<string, string> = { five_hour: 'session', seven_day: 'weekly', seven_day_opus: 'weekly Opus', seven_day_sonnet: 'weekly Sonnet' };
+
+/** Why a grant cannot be used now, and when the limit holding it back lifts. */
+function holdUp(g: Json, json: Json): { note: string; usableAt?: number } {
+  if (g.use_requires_limit) return { note: 'Works once you hit a limit' };
+  const blocking: string[] = Array.isArray(g.blocking) ? g.blocking.map(String) : [];
+  const key = blocking[0] ?? String(g.unavailable_reason ?? '').match(/^blocked_(.+)$/)?.[1];
+  if (key) return { note: `Blocked while your ${LIMITS[key] ?? key.replace(/_/g, ' ')} limit is used up`, usableAt: when(json[key]?.resets_at) };
+  const starts = when(g.starts_at);
+  return { note: 'Not usable yet', usableAt: starts && starts > Date.now() ? starts : undefined };
+}
+
 export interface ClaudeResets {
   items: LimitReset[];
   available: number;
@@ -104,7 +117,7 @@ export async function claudeResets(renew: () => Promise<unknown>, dir?: string):
       left: g.resets_left,
       expiresAt: when(g.ends_at),
       usableNow: !!g.usable_now,
-      note: g.usable_now ? undefined : g.use_requires_limit ? 'Works once you hit a limit' : 'Not usable yet',
+      ...(g.usable_now ? {} : holdUp(g, json)),
     });
   }
   const jt: Json = json.juniper_tide ?? {};

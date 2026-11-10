@@ -612,7 +612,10 @@ export interface LimitReset {
   left?: number;
   /** Some only work once a limit is hit. */
   usableNow: boolean;
+  /** Why it cannot be used now. */
   note?: string;
+  /** When the limit holding it back lifts. */
+  usableAt?: number;
 }
 
 export interface LimitResetResult {
