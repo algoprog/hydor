@@ -43,6 +43,8 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
 - Listens on localhost only unless you change `HOST`.
 - Access tokens for other machines are stored as hashes. The tokens this machine holds for others never reach
   the browser; its server adds them when it forwards your requests.
+- No telemetry, analytics or crash reports, and the web app loads nothing from other sites. [What leaves your
+  computer](privacy.md) lists every connection the app makes, what it sends and how to turn it off.
 
 ## Disclaimer
 
