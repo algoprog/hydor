@@ -34,6 +34,9 @@
   "author": "Hydor Devs",
   "license": "Apache-2.0",
   "type": "module",
+  "bin": {
+    "hydor": "bin/hydor.mjs"
+  },
   "engines": {
     "node": ">=22.12"
   },
