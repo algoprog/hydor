@@ -1,9 +1,11 @@
 // Settings → Memory → Bring in: what other assistants know about you, as notes here (server/memory/bringin). Pick
-// what was found on this computer (Claude Code, Codex, Hermes, OpenClaw) and exports from ChatGPT or Claude; the
-// helper model reads them and proposes notes and lines for your profile; you pick what to keep. The reading goes on
-// with the dialog closed, and opening it again shows where it is.
+// what was found on this computer (Claude Code, Codex, Hermes, OpenClaw, pi, Atomic Agent) and exports from ChatGPT or
+// Claude; the helper model reads them and proposes notes and lines for your profile; you pick what to keep. The reading
+// goes on with the dialog closed, and opening it again shows where it is. Beside it: the skills you made in Hermes,
+// OpenClaw, pi and Atomic Agent, listed first and copied into your own skills when you pick them.
+// Also opened by the setup tour's "Coming from another agent?" step (features/tour).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FileArchive, Import, Laptop, Trash2, TriangleAlert } from 'lucide-react';
+import { FileArchive, Import, Laptop, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import { Button, cx, Dialog, IconButton, Throbber } from '../../components/ui';
 import { api, del, post } from '../../lib/api';
 import { tildify } from '../../lib/format';
@@ -46,6 +48,21 @@ interface Job {
   sources: string[];
   notes: Proposal[];
   profile?: { added: string[] };
+}
+interface FoundSkill {
+  id: string;
+  source: string;
+  where?: string;
+  name: string;
+  description: string;
+  files: number;
+  left: string[];
+  skip?: string;
+}
+interface SkillResult {
+  name: string;
+  status: 'copied' | 'skipped';
+  reason?: string;
 }
 interface BringInState {
   sources: Source[];
@@ -109,6 +126,7 @@ function fileDetail(f: ExportFile): string {
 
 /** What was found of an assistant, in a sentence of its own for each case. */
 function sourceDetail(s: Source): string {
+  if (s.id === 'atomic') return 'Its memory store: what it knows about you, its notes, lessons and procedures';
   const files = `${s.memory} memory file${s.memory === 1 ? '' : 's'}`;
   if (!s.memory) return `Your ${s.own}`;
   if (s.projects > 1)
@@ -120,6 +138,71 @@ function Check({ on, onChange, label }: { on: boolean; onChange: (on: boolean) =
   return <input type="checkbox" aria-label={label} checked={on} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 shrink-0 accent-[var(--accent)]" />;
 }
 
+/** The skills found in Hermes, OpenClaw, pi and Atomic Agent: what would be copied into your own skills, then the button. */
+function SkillsFound({ skills, off, setOff, busy, onCopy }: { skills: FoundSkill[]; off: Set<string>; setOff: (f: (o: Set<string>) => Set<string>) => void; busy: boolean; onCopy: (ids: string[]) => void }) {
+  const offered = skills.filter((k) => !k.skip);
+  const chosen = offered.filter((k) => !off.has(k.id));
+  const left = skills.filter((k) => k.skip);
+  const toggle = (id: string, on: boolean) =>
+    setOff((o) => {
+      const n = new Set(o);
+      if (on) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const place = (k: FoundSkill) => [k.source, k.where].filter(Boolean).join(' · ');
+  return (
+    <div>
+      <div className="pb-1.5 text-[12px] font-medium text-fg-3">Skills you made there</div>
+      {offered.length > 0 && (
+        <div className="divide-y divide-line rounded-xl border border-line">
+          {offered.map((k) => (
+            <label key={k.id} className="flex cursor-pointer items-start gap-2.5 px-3 py-2.5">
+              <Check on={!off.has(k.id)} onChange={(v) => toggle(k.id, v)} label={k.name} />
+              <Sparkles size={15} className="mt-0.5 shrink-0 text-fg-3" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13.5px] text-fg" translate="no">
+                  {k.name}
+                </span>
+                <span className="line-clamp-2 text-[12.5px] leading-snug text-fg-3" translate="no">
+                  {k.description}
+                </span>
+                <span className="mt-0.5 block text-[12px] text-fg-3">
+                  <span translate="no">{place(k)}</span>
+                  {k.left.length ? ` · ${k.left.length} file${k.left.length === 1 ? '' : 's'} left out: keys, sign-ins or too big` : ''}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+      {left.length > 0 && (
+        <details className="mt-2 text-[12.5px] text-fg-3">
+          <summary className="cursor-pointer select-none">{`${left.length} not offered`}</summary>
+          <ul className="mt-1.5 space-y-1">
+            {left.map((k) => (
+              <li key={k.id} className="leading-snug">
+                <span className="text-fg-2" translate="no">
+                  {k.name}
+                </span>
+                <span translate="no">{` (${place(k)})`}</span>
+                {': '}
+                {k.skip}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div className="mt-2 flex items-center gap-3">
+        <Button size="sm" variant="secondary" disabled={busy || !chosen.length} onClick={() => onCopy(chosen.map((k) => k.id))}>
+          {chosen.length ? `Copy ${chosen.length} skill${chosen.length === 1 ? '' : 's'}` : 'Copy skills'}
+        </Button>
+        <span className="min-w-0 flex-1 text-[12px] leading-snug text-fg-3">Copied into your own skills, with their files. Nothing is changed in the other app.</span>
+      </div>
+    </div>
+  );
+}
+
 export function BringIn({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [st, setSt] = useState<BringInState | null>(null);
   const [off, setOff] = useState<Set<string>>(new Set());
@@ -128,6 +211,28 @@ export function BringIn({ open, onClose }: { open: boolean; onClose: () => void 
   const [profile, setProfile] = useState(true);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const [skills, setSkills] = useState<FoundSkill[] | null>(null);
+  const [skillsOff, setSkillsOff] = useState<Set<string>>(new Set());
+  const [copying, setCopying] = useState(false);
+  const loadSkills = () =>
+    api<{ skills: FoundSkill[] }>('/api/memory/bring-in/skills')
+      .then((r) => setSkills(r.skills))
+      .catch(toastError);
+  useEffect(() => {
+    if (open) loadSkills();
+  }, [open]);
+  const copySkills = (ids: string[]) => {
+    setCopying(true);
+    post<{ results: SkillResult[]; skills: FoundSkill[] }>('/api/memory/bring-in/skills', { ids })
+      .then((r) => {
+        setSkills(r.skills);
+        const n = r.results.filter((x) => x.status === 'copied').length;
+        const rest = r.results.length - n;
+        toast(n ? (rest ? `Copied ${n} skill${n === 1 ? '' : 's'}; ${rest} left out` : `Copied ${n} skill${n === 1 ? '' : 's'} to your skills`) : 'No skill was copied', n ? 'ok' : undefined);
+      })
+      .catch(toastError)
+      .finally(() => setCopying(false));
+  };
   const load = () => api<BringInState>('/api/memory/bring-in').then(setSt).catch(toastError);
   useEffect(() => {
     if (open) load();
@@ -323,7 +428,7 @@ export function BringIn({ open, onClose }: { open: boolean; onClose: () => void 
   } else {
     body = (
       <div className="space-y-4">
-        <p className="text-[13px] leading-relaxed text-fg-2">What other assistants know about you and your projects, as notes here. The helper model reads it, and nothing is added until you pick.</p>
+        <p className="text-[13px] leading-relaxed text-fg-2">What other assistants know about you and your projects, as notes here, and the skills you made in them. Nothing is added until you pick.</p>
         {failed && (
           <div className="flex items-start gap-2 rounded-xl bg-err/10 px-3 py-2 text-[12.5px] leading-snug text-err">
             <TriangleAlert size={14} className="mt-0.5 shrink-0" />
@@ -346,9 +451,10 @@ export function BringIn({ open, onClose }: { open: boolean; onClose: () => void 
               ))}
             </div>
           ) : (
-            <p className="text-[12.5px] leading-snug text-fg-3">Nothing from Claude Code, Codex, Hermes or OpenClaw here.</p>
+            <p className="text-[12.5px] leading-snug text-fg-3">Nothing from Claude Code, Codex, Hermes, OpenClaw, pi or Atomic Agent here.</p>
           )}
         </div>
+        {skills && skills.length > 0 && <SkillsFound skills={skills} off={skillsOff} setOff={setSkillsOff} busy={copying} onCopy={copySkills} />}
         <div>
           <div className="pb-1.5 text-[12px] font-medium text-fg-3">From an export</div>
           {(st.files.length > 0 || sending) && (

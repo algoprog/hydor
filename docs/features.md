@@ -147,12 +147,16 @@ agents that speak ACP and take MCP servers.
   newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
   Bring in… there brings what other assistants know into memory, as notes you pick from: Claude Code's memory files
-  (each project's, and CLAUDE.md), Codex's memories and AGENTS.md, Hermes's and OpenClaw's MEMORY.md and USER.md,
-  and the export ChatGPT or Claude emails you (Claude's memory, ChatGPT's custom instructions, and what you wrote in
+  (each project's, and CLAUDE.md), Codex's memories and AGENTS.md, Hermes's (each profile's) and OpenClaw's MEMORY.md
+  and USER.md, pi's AGENTS.md and SYSTEM.md (how you like to work), Atomic Agent's memory store (read from a copy:
+  profile facts, notes, lessons, procedures), and the export ChatGPT or Claude emails you (Claude's memory, ChatGPT's custom instructions, and what you wrote in
   your chats, newest first). The helper model reads them a part at a time against the notes memory has, leaves out
   what it says already (also in other words), secrets and text that would steer agents, puts a project's notes in
   its folder when that is on this computer, and proposes lines for your profile; nothing is added until you pick.
-  Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
+  The same dialog lists the skills you made in Hermes (every profile), OpenClaw, pi and Atomic Agent, each with its
+  name, description and source, as the preview: the ones you pick are copied, with their files, into your own skills.
+  Keys and sign-in files are never copied, a skill's folder is capped (200 files, 512 KB each, 2 MB in all), and a
+  skill whose name your skills have already is left out with a note. MCP servers are not brought over. Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
   background).
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
@@ -748,7 +752,7 @@ agents that speak ACP and take MCP servers.
   planning, data, design and pictures, coding, AI models, this app), yours, those your plugins bring, Claude
   Code's and Codex's own, and each project's own. A search, a row of filters and a switch on every skill, for
   every session (a project can switch any skill the other way for its own sessions, and the row says so: "Off in
-  Thesis"); write your own for every agent or for one, change a built-in one (your version takes its place),
+  Thesis"); write your own for every agent or for one, copy the ones you made in Hermes, OpenClaw, pi or Atomic Agent (Memory → Bring in…), change a built-in one (your version takes its place),
   remove and bring back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
   for the project alone. Other ACP agents get the list of skills to read when one fits. A new session's agent
   hears which skills fit its first message, found by words and by meaning, when any clearly do.
@@ -1142,7 +1146,9 @@ programs shows each program's version and what is out, with Check now, Update no
   music, voices and videos, or a model suggested for this computer installed with one click. Beside each page,
   streams flow from what you picked into a pool around the Ω; small dots show the steps, over a sea whose waves
   drift gently. Then it shows you around as the app builds itself up, a ring of water lighting each part as it is
-  explained, with first tasks to put in the message box. Help shows it again.
+  explained, with first tasks to put in the message box. When the folder of Hermes, OpenClaw, pi, Atomic Agent,
+  Claude Code or Codex is on this computer, one more page, "Coming from another agent?", names what it found and opens
+  Bring in over the tour. Help shows it again.
 - After the tour, tips introduce the rest of the app as you come to it: the first time a part is on screen (the
   inbox, a session's menu and details, the queue, a goal, the browser's panel, a spending cap, the Git, Library,
   Apps and Projects pages, Settings → Memory…), a small card beside it says what it is for, with Learn more for the
