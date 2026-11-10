@@ -817,7 +817,15 @@ app.post('/api/clients/:id/install', async (req) => {
 const models = new ModelManager((state) => broadcast({ t: 'models', state }));
 setHelperModels(models);
 // One-off questions to Claude or Codex go to the next signed-in account when one is at its limit, as sessions do (unless switching is off).
-setOneShotAccounts((agent) => (autoSwitchOn(db) ? accountPool(db, agent) : [undefined]).map((id) => accountEnv(db, agent, id)));
+// An account known to be at a limit now is asked last, so a question does not first wait for its refusal.
+const atLimit = (agent: 'claude' | 'codex', id: string | undefined) => {
+  const lim = sessions.controlFor(agent, id).lastUsage?.limited;
+  return !!lim && (lim.resetsAt == null || lim.resetsAt > Date.now());
+};
+setOneShotAccounts((agent) => {
+  const pool = autoSwitchOn(db) ? accountPool(db, agent) : [undefined];
+  return [...pool.filter((id) => !atLimit(agent, id)), ...pool.filter((id) => atLimit(agent, id))].map((id) => accountEnv(db, agent, id));
+});
 // Each session started from now on runs within the limits set in Settings → General (server/resources.ts).
 setRunnerWrap((runId, cmd, args) => {
   const limits = limitsOf(db);

@@ -1,7 +1,8 @@
 // Tiers: models picked by the job rather than by name. Quick for small, very clear jobs, Standard for clear tasks of
 // medium size, Best for a session's main agent (it plans, leads helpers and checks their work) and Max for the hardest
 // problems. Settings → Models → Tiers names each tier's model (and effort) for each agent program; until one is
-// changed it is the newest model of its family the program offers (Haiku, Sonnet, Opus and Fable for Claude Code).
+// changed it is the newest model of its family the program offers (Haiku, Sonnet, Opus and Fable for Claude Code;
+// Luna, Terra, Sol and Astra for Codex).
 // A session started on Automatic thinks with Best, or with Max when its request reads as a hard problem, and hands
 // clear parts to helpers on Standard and Quick: the team. An agent of the user's thinks with one tier, or with
 // Automatic, and a lead gives each helper it starts one, never above its own.
@@ -98,12 +99,19 @@ function newestOf(models: KnownModel[], fam: string): KnownModel | undefined {
 
 // ---- what each tier means until it is changed ----------------------------------------------------
 
-/** Each tier's families for a program, the one wanted first: the newest model of the first family the program offers. */
+/**
+ * Each tier's families for a program, the one wanted first: the newest model of the first family the program offers.
+ * Quick is each maker's small model (Haiku, Luna), Standard its middle one (Sonnet, Terra), Best its main one (Opus,
+ * Sol), Max its strongest (Fable, Astra); a plan without one takes the nearest it has.
+ */
 const FAMILIES: Record<'claude' | 'codex', Record<Tier, string[]>> = {
-  claude: { quick: ['haiku'], standard: ['sonnet'], best: ['opus'], max: ['fable', 'opus'] },
-  // Three models for four tiers: small jobs go to the Standard model at low effort.
-  codex: { quick: ['terra', 'luna'], standard: ['terra', 'luna'], best: ['sol', 'terra'], max: ['astra', 'sol', 'terra'] },
+  claude: { quick: ['haiku', 'sonnet'], standard: ['sonnet', 'haiku'], best: ['opus', 'sonnet'], max: ['fable', 'opus', 'sonnet'] },
+  codex: { quick: ['luna', 'terra'], standard: ['terra', 'luna'], best: ['sol', 'terra', 'luna'], max: ['astra', 'sol', 'terra', 'luna'] },
 };
+
+/** Codex's effort for a tier on a model of its own, and where tiers share a model (a plan with few), which then differ by effort alone. */
+const OWN_EFFORT: Record<Tier, string> = { quick: 'medium', standard: 'medium', best: 'high', max: 'high' };
+const SHARED_EFFORT: Record<Tier, string> = { quick: 'low', standard: 'medium', best: 'high', max: 'xhigh' };
 
 /** Before a program has said which models it offers: Claude Code's own names for its families; Codex's default model at each effort. */
 const UNSEEN: TierMap = {
@@ -123,23 +131,27 @@ const samePick = (a?: TierPick, b?: TierPick) => (a?.model ?? '') === (b?.model 
 
 /**
  * What each tier means until it is changed, from the models each program offers (`seen`; none yet: its own names):
- * Claude Code's Haiku, Sonnet, Opus and newest Fable; Codex's Terra (at low effort for Quick), Sol and Astra, or the
- * nearest it offers, with more effort where two tiers share a model; nothing for Custom (its models are the user's).
+ * Claude Code's Haiku, Sonnet, Opus and newest Fable; Codex's Luna, Terra, Sol and Astra, or the nearest it offers,
+ * told apart by effort where tiers share a model; nothing for Custom (its models are the user's).
  */
 export function defaultTiers(seen: Partial<Record<TierProgram, KnownModel[]>> = {}): TierMap {
   const out: TierMap = { claude: { ...UNSEEN.claude }, codex: { ...UNSEEN.codex }, console: { ...UNSEEN.console } };
   for (const p of ['claude', 'codex'] as const) {
     const models = seen[p];
     if (!models?.length) continue;
+    const pick = {} as Record<Tier, string | undefined>;
     for (const t of TIERS) {
       let m: KnownModel | undefined;
       for (const fam of FAMILIES[p][t.id]) if ((m = newestOf(models, fam))) break;
-      // A family the program does not offer leaves the pick as it is before it is seen (Codex: its default model).
-      const effort = UNSEEN[p][t.id].effort;
-      out[p][t.id] = m ? { model: m.value, ...(effort ? { effort } : {}) } : { ...UNSEEN[p][t.id] };
+      pick[t.id] = m?.value;
     }
-    // Codex: Max on its own model needs no more effort than Best.
-    if (p === 'codex' && out.codex.max.model && out.codex.max.model !== out.codex.best.model) out.codex.max = { ...out.codex.max, effort: 'high' };
+    for (const t of TIERS) {
+      const model = pick[t.id];
+      // None of its families is offered: as before the program was seen (Codex: its default model, at the tier's effort).
+      if (!model) out[p][t.id] = { ...UNSEEN[p][t.id] };
+      else if (p === 'claude') out[p][t.id] = { model };
+      else out[p][t.id] = { model, effort: (TIERS.filter((x) => pick[x.id] === model).length > 1 ? SHARED_EFFORT : OWN_EFFORT)[t.id] };
+    }
   }
   return out;
 }
