@@ -25,6 +25,7 @@ import {
   Settings,
   Smartphone,
   Sparkles,
+  SquareTerminal,
   Telescope,
   FlaskConical,
   GraduationCap,
@@ -79,6 +80,7 @@ const LOOKS: Record<string, TopicLook> = {
   custom: { icon: Bot, group: 'setup', blurb: 'The app’s own agent, for any model, local ones too' },
   usage: { icon: Gauge, group: 'setup', blurb: 'What you used, your limits and what it costs' },
   'files-git': { icon: MonitorCog, group: 'setup', blurb: 'This computer: files, Git, a terminal, previews and its monitor' },
+  terminal: { icon: SquareTerminal, group: 'setup', blurb: 'Talk to agents and run requests from a terminal: the hydor command' },
   settings: { icon: Settings, group: 'setup', blurb: 'Every option in Settings, one by one' },
   api: { icon: Braces, group: 'more', blurb: 'The app’s endpoints, for scripts and agents' },
 };
