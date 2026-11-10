@@ -97,11 +97,11 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### More agents
 
-[Settings → More agents](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP. More in [Agents, accounts and models](/guide/agents-models).
+[Settings → More agents](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent, Pi and other agents that speak ACP. More in [Agents, accounts and models](/guide/agents-models).
 
 - [**Your agents**](/settings?s=agents&find=Your%20agents): Agents that show next to Claude Code and Codex.
 - [**Add your own**](/settings?s=agents&find=Add%20your%20own): Any agent that speaks ACP, by its command.
-- [**Agents that speak ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code and Goose, ready to add.
+- [**Agents that speak ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent and Pi, ready to add.
 
 ### Models
 

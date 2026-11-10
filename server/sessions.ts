@@ -34,7 +34,7 @@ import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
 import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
-import { ensureClaude, ensureCommand } from './clients.ts';
+import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
 import { customGoal } from './custom/goal.ts';
 import { titleFor } from './titles.ts';
@@ -1003,7 +1003,7 @@ export class SessionManager extends EventEmitter {
     // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
     if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
     const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model });
-    Object.assign(env, add.env);
+    Object.assign(env, add.env, acpEnvFor(def.command, env));
     const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });

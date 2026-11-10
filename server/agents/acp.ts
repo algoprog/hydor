@@ -34,7 +34,16 @@ export const ACP_PRESETS: AcpAgentDef[] = [
   { id: 'goose', name: 'Goose', command: 'goose', args: ['acp'], hint: 'block.github.io/goose' },
   { id: 'kimi', name: 'Kimi CLI', command: 'kimi', args: ['--acp'], hint: 'github.com/MoonshotAI/kimi-cli' },
   { id: 'auggie', name: 'Auggie', command: 'auggie', args: ['--acp'], hint: 'npm install -g @augmentcode/auggie' },
+  // Hermes Agent (Nous Research) speaks ACP itself; its installer is a shell script, so the app only shows the command.
+  { id: 'hermes', name: 'Hermes Agent', command: 'hermes', args: ['acp'], hint: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash' },
+  // Pi has no ACP of its own: pi-acp (installed by the app with pi itself) runs it.
+  { id: 'pi', name: 'Pi', command: 'pi-acp', args: [], hint: 'npm install -g @earendil-works/pi-coding-agent pi-acp' },
+  // OpenClaw's ACP bridge talks to its Gateway, which has to be set up (openclaw onboard) and running.
+  { id: 'openclaw', name: 'OpenClaw', command: 'openclaw', args: ['acp'], hint: 'curl -fsSL https://openclaw.ai/install.sh | bash' },
 ];
+
+/** Where an agent's own sign-in is, when its ACP command is not it (Pi's adapter is pi-acp; Hermes signs in with its model setup). */
+const SIGN_IN: Record<string, string> = { pi: 'pi (then /login)', hermes: 'hermes model' };
 
 // ---- the list of agents ---------------------------------------------------------------------------
 
@@ -210,29 +219,45 @@ export class AcpLive extends LiveAdapter {
     // The app's own server and the capabilities' servers: by address for agents that take HTTP, else commands.
     const http = !!this.caps.mcpCapabilities?.http;
     const pairs = (o?: Record<string, string>) => Object.entries(o ?? {}).map(([name, value]) => ({ name, value }));
+    // An agent that takes servers only as commands (stdio is the one every ACP agent must take) gets the HTTP ones through a bridge.
+    const bridged = (name: string, url: string, headers?: Record<string, string>) => ({
+      name,
+      command: process.execPath,
+      args: [path.join(APP_ROOT, 'dist/server/mcpbridge.js'), url],
+      env: pairs(headers && Object.keys(headers).length ? { HYDOR_MCP_HEADERS: JSON.stringify(headers) } : {}),
+    });
     const mcpServers: unknown[] = Object.entries(this.o.add?.mcpServers ?? {}).flatMap(([name, d]): unknown[] =>
-      d.type === 'http' ? (http ? [{ type: 'http', name, url: d.url, headers: pairs(d.headers) }] : []) : [{ name, command: d.command, args: d.args ?? [], env: pairs(d.env) }],
+      d.type === 'http' ? (http ? [{ type: 'http', name, url: d.url, headers: pairs(d.headers) }] : [bridged(name, d.url, d.headers)]) : [{ name, command: d.command, args: d.args ?? [], env: pairs(d.env) }],
     );
-    if (this.o.pageServer && http) mcpServers.push({ type: 'http', name: PAGE_SERVER, url: this.o.pageServer, headers: [] });
+    if (this.o.pageServer) mcpServers.push(http ? { type: 'http', name: PAGE_SERVER, url: this.o.pageServer, headers: [] } : bridged(PAGE_SERVER, this.o.pageServer));
     const auth = (e: unknown) => {
       const m = (e as Error).message;
       // Signing in happens in the agent's own CLI (in a terminal), once.
       if (/auth/i.test(m) || (e as { code?: number }).code === -32000)
-        throw new HttpError(401, `${this.o.def.name} is not signed in. Run ${this.o.def.command} once in a terminal and sign in there, then try again.`);
+        throw new HttpError(401, `${this.o.def.name} is not signed in. Run ${SIGN_IN[this.o.def.id] ?? this.o.def.command} once in a terminal and sign in there, then try again.`);
       throw e;
     };
+    // An agent that refuses MCP servers in the session's request (OpenClaw's bridge does) is asked again without them.
+    let noted = false;
+    const open = (method: string, params: Json) =>
+      this.rpc.call(method, { ...params, mcpServers }, 120_000).catch((e: Error) => {
+        if (!mcpServers.length || !/mcp/i.test(e.message)) throw e;
+        if (!noted) this.record({ t: 'note', text: `${this.o.def.name} does not take MCP servers from the app: its own tools only.` });
+        noted = true;
+        return this.rpc.call(method, { ...params, mcpServers: [] }, 120_000);
+      });
     if (resume && this.acpSession && this.caps.loadSession) {
       // The agent replays the conversation as updates: the transcript has it already.
       this.loading = true;
       try {
-        const r = await this.rpc.call('session/load', { sessionId: this.acpSession, cwd: this.o.cwd, mcpServers }, 120_000).catch(auth);
+        const r = await open('session/load', { sessionId: this.acpSession, cwd: this.o.cwd }).catch(auth);
         this.offers(r);
       } finally {
         this.loading = false;
       }
     } else {
       if (resume && this.acpSession) this.record({ t: 'note', text: `${this.o.def.name} cannot reopen earlier sessions: it starts afresh here, without the conversation above.` });
-      const r = await this.rpc.call('session/new', { cwd: this.o.cwd, mcpServers }, 120_000).catch(auth);
+      const r = await open('session/new', { cwd: this.o.cwd }).catch(auth);
       this.acpSession = String(r?.sessionId ?? '');
       if (!this.acpSession) throw new Error('The agent did not open a session');
       this.record({ t: 'session', acpSession: this.acpSession });
@@ -369,7 +394,13 @@ export class AcpLive extends LiveAdapter {
         const id = String(m.id);
         const options: Json[] = Array.isArray(p.options) ? p.options : [];
         this.permissions.set(id, { rpcId: m.id, options });
-        const detail = tc.rawInput?.command ? (Array.isArray(tc.rawInput.command) ? tc.rawInput.command.join(' ') : String(tc.rawInput.command)) : acpText(tc.content) || (tc.rawInput ? JSON.stringify(tc.rawInput, null, 2) : '');
+        // A question from one of Pi's extensions (a select or confirm dialog) says it all in its title; its raw input is only the dialog's plumbing.
+        const dialog = ['select', 'confirm', 'input', 'editor'].includes(String(tc.rawInput?.method));
+        const detail = tc.rawInput?.command
+          ? Array.isArray(tc.rawInput.command)
+            ? tc.rawInput.command.join(' ')
+            : String(tc.rawInput.command)
+          : acpText(tc.content) || (dialog ? String(tc.rawInput.message ?? '') : tc.rawInput ? JSON.stringify(tc.rawInput, null, 2) : '');
         this.approvals.set(id, {
           id,
           itemId: tc.toolCallId,
@@ -377,7 +408,7 @@ export class AcpLive extends LiveAdapter {
           title: String(tc.title ?? 'The agent asks to go ahead'),
           detail: detail.slice(0, 4000),
           options: options.map(
-            (o): ApprovalOption => ({ id: String(o.optionId), label: String(o.name ?? o.optionId), style: String(o.kind).startsWith('reject') ? 'danger' : o.kind === 'allow_once' ? 'primary' : 'default' }),
+            (o): ApprovalOption => ({ id: String(o.optionId), label: String(o.name ?? o.optionId), style: String(o.kind).startsWith('reject') || /^(no|deny|decline|cancel|reject)\b/i.test(String(o.name ?? '')) ? 'danger' : o.kind === 'allow_once' ? 'primary' : 'default' }),
           ),
           createdAt: Date.now(),
         });

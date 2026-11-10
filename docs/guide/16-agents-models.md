@@ -1,6 +1,6 @@
 # Agents, accounts and models
 
-Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI or OpenCode. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
+Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI, OpenCode, Hermes Agent or Pi. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
 
 ![Picking the agent on the start page: Claude Code, Codex or Custom](images/agents-models.webp)
 
@@ -11,7 +11,7 @@ An agent is the program that does the work in a session: it reads your message, 
 - **Claude Code** (Anthropic). Runs on your Claude plan, or bills an Anthropic API account. Its models are Anthropic's (Opus, Sonnet, Haiku). It has its own usage limits, which the [Usage page](/usage) shows.
 - **Codex** (OpenAI). Runs on your ChatGPT plan. Its models are OpenAI's. It has usage limits too, shown on the Usage page. Codex comes with the app.
 - **Custom**, the app's own agent. It runs any model you add in [Settings → Agents → Models](/settings?s=models): models through OpenRouter, models on this computer (with Ollama or vLLM), or any OpenAI-compatible endpoint. Use it for open models, cheaper models, or models that never leave your computer. See [Custom, the app's own agent](/guide/custom).
-- **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once in its own program and uses its own models.
+- **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent, Pi, OpenClaw, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once in its own program and uses its own models.
 
 What each can do in the app:
 
@@ -67,7 +67,7 @@ Two switches under the table say how sessions use the tiers:
 
 Claude Code, Codex, Gemini CLI and the others are programs on this computer. You don't have to install them by hand.
 
-Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and scroll to **Agent programs**. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code and Auggie, each with the version the sessions run and where it comes from:
+Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and scroll to **Agent programs**. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie and Pi, each with the version the sessions run and where it comes from:
 
 - **your own install**: you installed it yourself.
 - **installed by the app**: the app installed it in its own folder.
@@ -78,7 +78,7 @@ A row also says "… is out" when a newer version is out. Codex's row adds "your
 
 A missing program also installs by itself the first time it is needed: Claude Code when you sign in to it or start a Claude Code session, an ACP agent when you add it in Settings → More agents or start a session with it. The app installs them with npm into its own folder, so you need no administrator rights.
 
-Goose and Kimi CLI aren't in this list: install them yourself (Settings → More agents shows where to get them).
+Goose, Kimi CLI, Hermes Agent and OpenClaw aren't in this list: install them yourself (Settings → More agents shows where to get them). Pi installs in two parts, its ACP adapter and Pi itself; the list shows one row for both.
 
 ## Keep the agent programs up to date
 
@@ -86,7 +86,7 @@ With [**Update automatically**](/settings?s=accounts&find=Update%20automatically
 
 - The copies the app installed update with npm, in its own folder. Codex switches to a copy newer than the one the app came with.
 - Your own installs update with their own updater: `claude update` for Claude Code, `codex update` for Codex (the one your terminal runs), `opencode upgrade` for OpenCode.
-- Gemini CLI, Qwen Code or Auggie that you installed with `npm install -g` update with npm, when your user may write to that folder. Anything installed another way is left for you to update the way you installed it.
+- Gemini CLI, Qwen Code, Auggie or Pi that you installed with `npm install -g` update with npm, when your user may write to that folder. Anything installed another way is left for you to update the way you installed it.
 - Claude Code follows its own release line: the stable one when its settings say `"autoUpdatesChannel": "stable"`, else the latest.
 - If you turned Claude Code's own updates off with `DISABLE_AUTOUPDATER=1` (the Docker image does), the app doesn't update your Claude Code by itself either. **Update now** still does.
 
@@ -185,12 +185,12 @@ What happens then:
 Open [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP).
 
 - **Your agents** ("They show next to Claude Code and Codex when you start a session") lists Custom first, then the agents you added. Each shows a check when its program is installed here.
-- **Agents that speak ACP** ("Install one, sign in once in its own CLI, then add it here") lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie. A row with a cross isn't installed yet, and says how to get it.
+- **Agents that speak ACP** ("Install one, sign in once in its own CLI, then add it here") lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent, Pi and OpenClaw. A row with a cross isn't installed yet, and says how to get it.
 
 To add one:
 
 1. Click **Add** next to it. The button stands out when the program is already installed.
-2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie), it installs it now, in the background. Goose and Kimi CLI you install yourself, from the address in their row.
+2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie, Pi), it installs it now, in the background. Goose, Kimi CLI, Hermes Agent and OpenClaw you install yourself, with the command or address in their row.
 3. Sign in once in the agent's own program: open the [Terminal](/terminal), run its command (for example `gemini`) and follow its sign-in. If you skip this, a session tells you: "Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again."
 
 The agent now shows in the start page's **Runs on** list.
@@ -211,6 +211,14 @@ Any program that speaks ACP can run here.
 
 The command must start the agent in ACP mode, talking over its standard input and output.
 
+### Hermes Agent, Pi and OpenClaw
+
+Three agents that people run in their own terminals work here too, each with something to know:
+
+- **Hermes Agent** (Nous Research). Install it with its own command, `curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash` (or from hermes-agent.nousresearch.com): the app doesn't run a script from the web for you. Then run `hermes model` once in the [Terminal](/terminal) to sign in and pick its model. The app starts it as `hermes acp`. Hermes keeps its own sessions and memory in its own folder (`~/.hermes`), and starts a helper of its own in the background that stops by itself when it has been idle a while. Its approval cards offer **Allow once**, **Allow for session**, **Allow always**, **Deny** and **Deny always**, and the app's tools reach it too.
+- **Pi**. Pi doesn't speak ACP itself, so the app installs the adapter `pi-acp` together with Pi, both with npm in its own folder (without running their install scripts). A Pi you installed yourself is used when it's on the PATH. Run `pi` once in the Terminal and use `/login` to sign in, or give it a model of your own in its `models.json`. Pi doesn't ask permission by itself: you only get approval cards from its extensions that ask. The app's guidelines, memory notes and skills reach Pi with the first message, but the app's tools (pages, search…) don't: the adapter doesn't pass them on.
+- **OpenClaw**. `openclaw acp` connects to your OpenClaw Gateway, so set OpenClaw up first (`openclaw onboard`) and keep its Gateway running. Install it with `curl -fsSL https://openclaw.ai/install.sh | bash`. Its bridge refuses MCP servers, so the app's tools don't reach it; the session says so when it starts.
+
 ### What ACP agents can and can't do here
 
 The app opens a session in the folder you pick, shows the agent's messages and steps, and asks you whenever the agent asks for permission. Some things work differently from Claude Code and Codex:
@@ -219,6 +227,7 @@ The app opens a session in the folder you pick, shows the agent's messages and s
 - An agent that can't reopen earlier sessions starts afresh when you continue an old one, without the conversation above it. The session says so.
 - Pictures you attach reach it only if it accepts images.
 - Goals, forks and hand-offs aren't available (Custom has goals and forks).
+- The app's tools (pages, search, memory…) reach an agent as an MCP server: by address when the agent accepts that, otherwise through a small program the app starts for it. An agent that takes none of them (Pi, OpenClaw) works with its own tools alone, but still gets the guidelines, memory notes and skills.
 
 ## Where Custom's models come from
 
@@ -395,6 +404,7 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Which agent programs are installed here? Install Gemini CLI."
 - "Are Claude Code and Codex up to date? Update them now."
 - "Add OpenCode to my agents."
+- "Add Hermes Agent and Pi to my agents, and tell me what I still have to install."
 - "Find a model on Hugging Face that runs well on this computer and sees images, check it, and install the best size."
 - "Add the newest DeepSeek model from OpenRouter to my models." (once your OpenRouter key is set)
 - "Make the helper model one that sees images."
