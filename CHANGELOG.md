@@ -30,6 +30,10 @@ over, and Discord and Slack join Telegram.
 - **Hydor vs other agents**: pages on Hermes Agent, pi, Atomic Agent and OpenClaw (hydor.app/compare) showing what
   Hydor gives you that they don't, and how to bring each one along, with sources; a README that says what Hydor is in
   one sentence; a security policy and a code of conduct.
+- **The desktop apps open on the app, not an empty window**: opened after starting without one (at login, or after
+  updating themselves with the window closed), from the Dock, Finder, the menu bar or a notification, the window
+  stayed empty until you quit the app and opened it again. A page that cannot load while the app's server starts
+  again now shows the logo, then comes back by itself.
 
 ## 0.53.0 · 10 November 2026
 

@@ -353,6 +353,13 @@ function serverEnv(extra) {
 let server = null;
 let serverUrl = null;
 let setupToken = null;
+/** Where in the app the window goes once its server answers: a page that did not load meanwhile (the logo shows). */
+let awaited = null;
+let awaitTimer = null;
+/** Where the app opens: its start, or the page to choose a password while there is none. */
+const home = () => (setupToken ? `/setup?token=${encodeURIComponent(setupToken)}` : '/');
+/** The server stopped for good, and the window says why (showProblem), until it starts again (Try again). */
+let gaveUp = false;
 let quitting = false;
 let installing = false;
 /** Recent quick exits, for backing off and for giving up on a new version. */
@@ -388,6 +395,7 @@ function logFd() {
 
 function startServer() {
   if (server || quitting) return;
+  gaveUp = false;
   const extra = {};
   if (updateError) extra.HYDOR_UPDATE_ERROR = JSON.stringify(updateError);
   updateError = null;
@@ -452,10 +460,13 @@ function onMessage(m) {
     setupToken = m.setupToken || null;
     failures = 0;
     if (verifying) confirmUpdate();
-    const at = setupToken ? `/setup?token=${encodeURIComponent(setupToken)}` : '/';
-    // The window shows the app now (it may be hidden: it loads all the same). The page reconnects by itself
-    // after later restarts. Opened at login, the window stays closed, unless the password is still to choose.
-    if (win && (first || win.webContents.getURL().startsWith('data:'))) void win.loadURL(serverUrl + at);
+    // The window shows the app now (it may be hidden: it loads all the same), or the page that did not load while the
+    // server was away. The page reconnects by itself after later restarts. Opened at login, the window stays closed,
+    // unless the password is still to choose.
+    const at = awaited ?? home();
+    const wanted = awaited !== null;
+    awaited = null;
+    if (win && (first || wanted || win.webContents.getURL().startsWith('data:'))) void win.loadURL(serverUrl + at);
     else if (!win && first && setupToken) openWindow(at);
     rebuildTray();
     // Copies of versions before this one, once nothing runs from them.
@@ -921,13 +932,51 @@ function openWindow(at) {
       e.preventDefault();
       if (/^https?:/.test(url)) void shell.openExternal(url);
     });
+    // A page of the app that did not load (its server did not answer, as while it starts again): the logo rather than
+    // an empty window, then that page once the server answers (onMessage). -3 is a load another one took over from.
+    win.webContents.on('did-fail-load', (_e, code, what, url, mainFrame) => {
+      if (!mainFrame || code === -3 || code >= 0 || !sameOrigin(url)) return;
+      trace('page did not load', code, what, url.split('?')[0]);
+      if (gaveUp) return showProblem();
+      const u = new URL(url);
+      awaited = u.pathname + u.search + u.hash;
+      void win?.loadURL(bootPage());
+      awaitServer();
+    });
+    // For desktop/scripts/launch-test.mjs: what the window shows.
+    win.webContents.on('did-navigate', (_e, url) => trace('page shown', url.startsWith('data:') ? 'data:' : url.split('?')[0]));
   }
-  if (at !== undefined && serverUrl) void win.loadURL(serverUrl + at);
-  else if (!serverUrl && !win.webContents.getURL()) void win.loadURL(bootPage());
+  // The app, where asked; else, in a window that shows nothing yet (made just now, as when the app started without
+  // one: at login, or after it updated itself with its window closed) or only the logo of a page that did not load,
+  // at its start or that page. Before the server first answers, the logo until it does (onMessage); once it has
+  // stopped for good, what showProblem says.
+  const empty = !win.webContents.getURL();
+  if (serverUrl && !gaveUp && (at !== undefined || empty || awaited !== null)) {
+    const to = at ?? awaited ?? home();
+    awaited = null;
+    void win.loadURL(serverUrl + to);
+  } else if (empty) void win.loadURL(bootPage());
   app.dock?.show();
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
+}
+
+/**
+ * While the logo stands in for a page that did not load: that page as soon as the server answers, should it be up
+ * already (the load broke off another way, as when the computer slept) rather than starting again (onMessage).
+ */
+function awaitServer(wait = 2000) {
+  clearTimeout(awaitTimer);
+  awaitTimer = setTimeout(async () => {
+    if (awaited === null || gaveUp || !serverUrl) return;
+    const up = await fetch(`${serverUrl}/api/health`).then((r) => r.ok, () => false);
+    if (!win || awaited === null || gaveUp) return;
+    if (!up) return awaitServer(Math.min(30_000, wait * 2));
+    const at = awaited;
+    awaited = null;
+    void win.loadURL(serverUrl + at);
+  }, wait);
 }
 
 /** The server would not start (or this version could not be set up): say so, with the end of its log. */
@@ -936,6 +985,9 @@ function showProblem(why) {
   try {
     tail = fs.readFileSync(LOG, 'utf8').split('\n').slice(-25).join('\n');
   } catch {}
+  // This page stays until Try again, rather than the app's while its server is not there to answer.
+  gaveUp = true;
+  awaited = null;
   openWindow();
   void win.loadURL(
     page(

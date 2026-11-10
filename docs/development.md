@@ -149,7 +149,7 @@ npm ci && npm run build              # at the top of the repository
 desktop/scripts/stage.sh             # the server with its production packages, Node.js (and tmux), in desktop/build/
 cd desktop && npm ci && scripts/dist.sh   # desktop/dist/: the .dmg and .zip, the installer, or the AppImage and .deb
 node scripts/smoke.mjs dist/mac-arm64/Hydor.app   # its server starts (dist/mac/, dist/win-unpacked, dist/linux-unpacked)
-node scripts/launch-test.mjs dist/linux-unpacked/hydor   # the app opens and starts its server
+node scripts/launch-test.mjs dist/linux-unpacked/hydor   # it opens without its window, starts its server, and shows the app when opened again
 npm start                            # or: the app around this repository's own build, to work on main.cjs
 ```
 

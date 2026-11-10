@@ -1,10 +1,12 @@
 // Opens the packed app as you would at login (without its window), and checks that it starts its server: on Windows
-// and from an AppImage, from the copy of this version it makes first. Then it quits the app (and on macOS and Linux
-// checks that the server stopped with it).
+// and from an AppImage, from the copy of this version it makes first. Then it opens the app again, as from the Dock or
+// the menu bar, and checks that its window shows the app. Then it quits the app (and on macOS and Linux checks that the
+// server stopped with it).
 //   node desktop/scripts/launch-test.mjs <the app's program>
 //     dist/mac-arm64/Hydor.app/Contents/MacOS/Hydor, dist/win-unpacked/Hydor.exe, the installed Hydor.exe,
 //     dist/linux-unpacked/hydor or dist/Hydor-<version>-x86_64.AppImage (Linux runs it with xvfb-run)
 import { execFileSync, spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +32,13 @@ const env = { ...process.env, PORT: String(port), DATA_DIR: path.join(tmp, 'data
 if (WIN) Object.assign(env, { LOCALAPPDATA: path.join(home, 'Local') });
 else if (!MAC) Object.assign(env, { HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: path.join(home, '.local/share'), XDG_CACHE_HOME: path.join(home, '.cache'), APPIMAGE_EXTRACT_AND_RUN: '1' });
 for (const d of WIN ? [env.LOCALAPPDATA] : []) fs.mkdirSync(d, { recursive: true });
+// A password, as everyone who uses the app has one (server/auth.ts): without one, the app opens its window at once to
+// choose it, rather than staying in the menu bar.
+fs.mkdirSync(env.DATA_DIR);
+const salt = crypto.randomBytes(16);
+const SCRYPT = { N: 1 << 15, r: 8, p: 1, keylen: 64 };
+const hash = crypto.scryptSync('launch-test-password', salt, SCRYPT.keylen, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p, maxmem: 256 << 20 });
+fs.writeFileSync(path.join(env.DATA_DIR, 'auth.json'), JSON.stringify({ v: 1, salt: salt.toString('base64'), hash: hash.toString('base64'), ...SCRYPT, createdAt: Date.now() }), { mode: 0o600 });
 
 // Linux: on a screen of its own; without the kernel's sandbox where the runner has none to give (an AppImage
 // decides that itself).
@@ -90,6 +99,24 @@ else {
       console.error(`No copy of this version in ${runtimes} (${copies.join(', ') || 'empty'})`);
     } else console.log(`It runs its server from ${path.join(runtimes, copy)}`);
   }
+}
+
+// Opened again while it runs without its window (started at login, or after it updated itself with its window closed),
+// as from the Dock, Finder or the menu bar: the window it opens shows the app, not an empty page.
+if (health && ready) {
+  const from = traced().length;
+  const shown = () => traced().slice(from).split('\n').some((l) => l.endsWith(` page shown ${base}/`));
+  // A second copy hands over to the one running and quits.
+  const again = MAC || WIN ? spawn(program, [], { env, stdio: 'ignore' }) : spawn('xvfb-run', ['-a', program, ...(APPIMAGE ? [] : ['--no-sandbox'])], { env, stdio: 'ignore' });
+  again.on('error', (e) => console.error(`Could not open the app again: ${e.message}`));
+  for (let i = 0; i < 120 && !shown(); i++) await new Promise((r) => setTimeout(r, 500));
+  if (shown()) console.log('Opened again, its window shows the app.');
+  else {
+    ok = false;
+    console.error(`Opened again, its window did not show the app.\n---- what the app did\n${traced()}`);
+  }
+  if (again.exitCode === null) again.kill();
+  again.unref();
 }
 
 // Quit: a Mac app and a Linux one on SIGTERM, as at logout; Windows' with its whole tree.
