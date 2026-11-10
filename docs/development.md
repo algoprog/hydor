@@ -36,6 +36,13 @@ wrapping, Markdown, each step's line, approvals, the input line's keys), `hydor 
 OUTDIR=dist/dev node scripts/build-server.mjs server/tui/tui-test.ts && DATA_DIR=/tmp/hydor-test-tui node dist/dev/tui-test.js
 ```
 
+Tiers and the team (`shared/tiers.ts`, `server/assistants/tiers.ts` and `auto.ts`, `server/children/team.ts`) have
+their checks in `server/assistants/agents-test.ts` and `server/children/children-test.ts`. Whether a led session
+does the work as well as one agent alone, and what each costs, is a question for real agents, not for a test:
+`scripts/tier-bench` asks it on your own models (coding tasks with hidden checkers, a scratch copy of the app, a
+runner and a report; its README says how, and `docs/plans/tiers-and-the-team.md` has the first numbers). It uses
+your plan, so nothing runs it by itself.
+
 Built-in skills are folders in `skills/` (a SKILL.md each, with `category:` for its group on the Skills page);
 `server/skillpack/tests.ts` checks them. Built-in plugins are folders in `plugins/`, in the Agent Plugins 1.0
 format (`plugin.json`, `skills/`, `mcp.json`) with the app's own extension, `com.naget.agent`, for what they need.
