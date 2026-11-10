@@ -207,9 +207,10 @@ export class Chat {
       this.printer = new Printer(this.look);
       const lines = [...this.headerLines(), this.look.p.bold(s?.title || '(untitled)'), ''];
       lines.push(...historyLines(view.items, view.notes, this.look, { turns: 3 }));
+      // What comes next brings its own blank line.
+      while (lines[lines.length - 1] === '') lines.pop();
       this.write(lines);
       this.printer.skipAll(view);
-      // Cards already waiting show again below.
     }
     this.holding = false;
     this.update();
