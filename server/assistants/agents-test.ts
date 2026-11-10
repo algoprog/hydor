@@ -10,14 +10,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { inScope, mayAsk } from '../../shared/assistants.ts';
 import type { SessionExtra } from '../../shared/features.ts';
-import { clampTier, cleanTiers, DEFAULT_TIERS, tierProgram } from '../../shared/tiers.ts';
+import { AUTO_MODEL, clampTier, defaultTiers, lowerTier, nextTier, sameModel, tierOfModel, tierProgram, type KnownModel } from '../../shared/tiers.ts';
+import { kvGet, kvSet } from '../db.ts';
 import { openDb } from '../db.ts';
 import type { Scheduler } from '../scheduler.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { BUILTINS } from './builtins.ts';
 import { activity, agentSessions, agentStart, monthSpend, monthStart } from './rules.ts';
 import { cleanAssistant, findAssistant, removeAssistant, saveAssistant } from './store.ts';
-import { setTiers, tierPick, tiersOf } from './tiers.ts';
+import { modelName, noteModels, seenModels, setTeam, setTiers, teamOf, tierDefaults, tierOf, tierPick, tiersOf } from './tiers.ts';
+import { autoPlan, sizeUp, tierNote } from './auto.ts';
 import { enoughToGoOn, fromTemplate, kindOf, makeProjectAgent, scanFolder, templateOf } from './projectAgent.ts';
 import { createSpace, spaceById } from '../spaces/index.ts';
 import { EventEmitter } from 'node:events';
@@ -97,23 +99,173 @@ test('who may hand work to whom: built-in agents (or none) any; yours only those
 
 // ---- tiers ---------------------------------------------------------------------------------------------
 
-test('tiers: the defaults until set, each program its own; Custom’s none; other ACP agents have no tiers', () => {
-  assert.deepEqual(tiersOf(db), DEFAULT_TIERS);
+/** What Claude Code and Codex list (November 2026): the names its tiers' defaults are read from. */
+const CLAUDE_MODELS: KnownModel[] = [
+  { value: 'default', label: 'Default (recommended)', resolved: 'claude-opus-5-5', isDefault: true },
+  { value: 'opus', label: 'Opus 5.5', resolved: 'claude-opus-5-5' },
+  { value: 'claude-fable-5-2', label: 'Fable 5.2', resolved: 'claude-fable-5-2' },
+  { value: 'sonnet', label: 'Sonnet 5.5', resolved: 'claude-sonnet-5-5' },
+  { value: 'haiku', label: 'Haiku 5.5', resolved: 'claude-haiku-5-5' },
+  { value: 'fable', label: 'Fable 5.1', resolved: 'claude-fable-5-1' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', resolved: 'claude-haiku-4-5-20251001' },
+  { value: 'claude-sonnet-5', label: 'Sonnet 5', resolved: 'claude-sonnet-5' },
+  { value: 'claude-opus-5', label: 'Opus 5', resolved: 'claude-opus-5' },
+  { value: 'claude-opus-4-8', label: 'Opus 4.8', resolved: 'claude-opus-4-8' },
+];
+const CODEX_FULL: KnownModel[] = [
+  { value: 'gpt-6.1-sol', label: 'GPT-6.1-Sol', isDefault: true },
+  { value: 'gpt-6.2-astra', label: 'GPT-6.2-Astra' },
+  { value: 'gpt-6-terra', label: 'GPT-6-Terra' },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6-Terra' },
+  { value: 'gpt-6-luna', label: 'GPT-6-Luna' },
+];
+const CODEX_FREE: KnownModel[] = [
+  { value: 'gpt-6-luna', label: 'GPT-6-Luna', isDefault: true },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6-Terra' },
+  { value: 'gpt-5.6-luna', label: 'GPT-5.6-Luna' },
+];
+
+test('tiers: four of them, each program its own; before a program lists its models, its own names', () => {
+  assert.deepEqual(tiersOf(db), defaultTiers());
   assert.deepEqual(tierPick(db, 'quick', 'claude'), { model: 'haiku' });
+  assert.deepEqual(tierPick(db, 'max', 'claude'), { model: 'fable' });
   assert.deepEqual(tierPick(db, 'best', 'codex'), { effort: 'high' });
   assert.deepEqual(tierPick(db, 'standard', 'acp', 'console'), {});
+  assert.deepEqual(tierPick(db, 'max', 'acp', 'console'), {});
   assert.equal(tierPick(db, 'standard', 'acp', 'gemini'), null);
   assert.equal(tierProgram('acp', 'gemini'), null);
-  setTiers(db, { claude: { best: { model: 'opus', effort: 'max' } }, console: { quick: { model: 'ollama/qwen3' } }, junk: { quick: { model: 'x' } } });
+  assert.equal(nextTier('standard'), 'best');
+  assert.equal(nextTier('best'), 'max');
+  assert.equal(nextTier('max'), undefined);
+  assert.equal(clampTier('max', 'standard'), 'standard');
+  assert.equal(clampTier('quick', 'standard'), 'quick');
+  assert.equal(clampTier('best'), 'best');
+  assert.equal(lowerTier('max', 'best'), 'best');
+  assert.equal(lowerTier(undefined, 'quick'), 'quick');
+});
+
+test('tiers follow the models a program offers: the newest of each family, Fable for Max, Terra, Sol and Astra for Codex', () => {
+  const d = defaultTiers({ claude: CLAUDE_MODELS, codex: CODEX_FULL });
+  assert.deepEqual(d.claude, { quick: { model: 'haiku' }, standard: { model: 'sonnet' }, best: { model: 'opus' }, max: { model: 'claude-fable-5-2' } });
+  // Three models for four tiers: small jobs go to Terra at low effort.
+  assert.deepEqual(d.codex, {
+    quick: { model: 'gpt-6-terra', effort: 'low' },
+    standard: { model: 'gpt-6-terra', effort: 'medium' },
+    best: { model: 'gpt-6.1-sol', effort: 'high' },
+    max: { model: 'gpt-6.2-astra', effort: 'high' },
+  });
+  // A plan without Sol and Astra: the nearest it has, with more effort where tiers share a model.
+  const free = defaultTiers({ codex: CODEX_FREE }).codex;
+  assert.deepEqual(free, {
+    quick: { model: 'gpt-5.6-terra', effort: 'low' },
+    standard: { model: 'gpt-5.6-terra', effort: 'medium' },
+    best: { model: 'gpt-5.6-terra', effort: 'high' },
+    max: { model: 'gpt-5.6-terra', effort: 'xhigh' },
+  });
+  // Families nobody has heard of: the program's own default model, at each effort.
+  assert.deepEqual(defaultTiers({ codex: [{ value: 'o9', label: 'o9' }] }).codex.best, { effort: 'high' });
+  // A plan without Fable: Opus leads the hardest problems too.
+  assert.deepEqual(defaultTiers({ claude: CLAUDE_MODELS.filter((m) => !/fable/i.test(m.label)) }).claude.max, { model: 'opus' });
+});
+
+test('the models a program lists are remembered, and the tiers nobody changed move with them', () => {
+  noteModels(db, 'claude', CLAUDE_MODELS as any);
+  noteModels(db, 'codex', CODEX_FULL as any);
+  noteModels(db, 'codex', []);
+  assert.equal(seenModels(db).codex?.length, CODEX_FULL.length, 'a program that listed nothing changes nothing');
+  assert.deepEqual(tierPick(db, 'max', 'claude'), { model: 'claude-fable-5-2' });
+  assert.deepEqual(tierPick(db, 'best', 'codex'), { model: 'gpt-6.1-sol', effort: 'high' });
+  assert.equal(modelName(db, 'claude', undefined, 'claude-fable-5-2'), 'Fable 5.2');
+  assert.equal(modelName(db, 'claude', undefined, 'opus'), 'Opus 5.5');
+  assert.equal(modelName(db, 'claude', undefined, 'made-up'), 'made-up');
+  // Only what was changed is kept: the rest still follows the defaults.
+  setTiers(db, { ...tiersOf(db), claude: { ...tiersOf(db).claude, best: { model: 'opus', effort: 'max' } }, console: { ...tiersOf(db).console, quick: { model: 'ollama/qwen3' } }, junk: { quick: { model: 'x' } } });
+  assert.deepEqual(JSON.parse(kvGet(db, 'models.tiers')!), { v: 2, picks: { claude: { best: { model: 'opus', effort: 'max' } }, console: { quick: { model: 'ollama/qwen3' } } } });
   assert.deepEqual(tierPick(db, 'best', 'claude'), { model: 'opus', effort: 'max' });
   assert.deepEqual(tierPick(db, 'quick', 'claude'), { model: 'haiku' });
   assert.deepEqual(tierPick(db, 'quick', 'acp', 'console'), { model: 'ollama/qwen3' });
-  // A tier set to nothing keeps the program's default model.
-  assert.deepEqual(cleanTiers({ claude: { quick: { model: '  ' } } }).claude.quick, {});
-  assert.equal(clampTier('best', 'standard'), 'standard');
-  assert.equal(clampTier('quick', 'standard'), 'quick');
-  assert.equal(clampTier('best'), 'best');
+  // A newer Fable arrives: Max follows it, the pick that was changed stays.
+  noteModels(db, 'claude', [...CLAUDE_MODELS, { value: 'claude-fable-5-3', label: 'Fable 5.3', resolved: 'claude-fable-5-3' }] as any);
+  assert.deepEqual(tierPick(db, 'max', 'claude'), { model: 'claude-fable-5-3' });
+  assert.deepEqual(tierPick(db, 'best', 'claude'), { model: 'opus', effort: 'max' });
+  noteModels(db, 'claude', CLAUDE_MODELS as any);
+  // A tier set to nothing keeps the program's default model; back to the defaults keeps nothing.
+  setTiers(db, { claude: { quick: { model: '  ' } } });
+  assert.deepEqual(tierPick(db, 'quick', 'claude'), {});
+  assert.deepEqual(tiersOf(db).claude.best, { model: 'opus' });
+  setTiers(db, tierDefaults(db));
+  assert.deepEqual(JSON.parse(kvGet(db, 'models.tiers')!), { v: 2, picks: {} });
+  // A table kept before there were four tiers had every pick written out: those nobody changed follow the defaults now.
+  kvSet(db, 'models.tiers', JSON.stringify({ claude: { quick: { model: 'haiku' }, standard: { model: 'sonnet' }, best: { model: 'opus', effort: 'high' } }, codex: { quick: { effort: 'low' }, standard: { effort: 'medium' }, best: { effort: 'high' } }, console: { quick: {}, standard: { model: 'ollama/qwen3' }, best: {} } }));
+  assert.deepEqual(tiersOf(db).codex.best, { model: 'gpt-6.1-sol', effort: 'high' });
+  assert.deepEqual(tiersOf(db).claude.best, { model: 'opus', effort: 'high' });
+  assert.deepEqual(tiersOf(db).claude.max, { model: 'claude-fable-5-2' });
+  assert.deepEqual(tiersOf(db).console.standard, { model: 'ollama/qwen3' });
   setTiers(db, null);
+});
+
+test('the tier a model is: by its name or what it stands for, else by its family; none for a model the tiers do not know', () => {
+  assert.equal(sameModel(CLAUDE_MODELS, 'opus', 'claude-opus-5-5[1m]'), true);
+  assert.equal(sameModel(CLAUDE_MODELS, undefined, 'opus'), true, 'no model is the program’s default');
+  assert.equal(sameModel(CLAUDE_MODELS, 'claude-opus-5', 'claude-opus-5-5'), false);
+  assert.equal(sameModel(CLAUDE_MODELS, 'claude-haiku-4-5', 'claude-haiku-4-5-20251001'), true);
+  const picks = tiersOf(db).claude;
+  assert.equal(tierOfModel(picks, CLAUDE_MODELS, 'claude-fable-5-2'), 'max');
+  assert.equal(tierOfModel(picks, CLAUDE_MODELS, undefined), 'best');
+  assert.equal(tierOfModel(picks, CLAUDE_MODELS, 'claude-sonnet-5-5'), 'standard');
+  assert.equal(tierOfModel(picks, CLAUDE_MODELS, 'claude-opus-4-8'), 'best', 'an older Opus is Best where Best is Opus');
+  assert.equal(tierOfModel(picks, CLAUDE_MODELS, 'fable'), 'max', 'so is an older Fable Max');
+  assert.equal(tierOfModel(picks, CLAUDE_MODELS, 'mystery-1'), undefined);
+  assert.equal(tierOf(db, { agent: 'claude', model: 'haiku' }), 'quick');
+  assert.equal(tierOf(db, { agent: 'acp', acpAgent: 'gemini', model: 'x' }), undefined);
+  // Codex's free plan: one model for every tier, told apart by effort (the highest when none is given).
+  const free = defaultTiers({ codex: CODEX_FREE }).codex;
+  assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-5.6-terra', 'medium'), 'standard');
+  assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-5.6-terra'), 'max');
+  assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-6-luna'), undefined);
+});
+
+test('the team: on with Max for hard problems until changed; a change keeps the rest', () => {
+  assert.deepEqual(teamOf(db), { on: true, hard: true });
+  assert.deepEqual(setTeam(db, { hard: false, junk: 1 }), { on: true, hard: false });
+  assert.deepEqual(setTeam(db, { on: false }), { on: false, hard: false });
+  assert.deepEqual(setTeam(db, { on: true, hard: true }), { on: true, hard: true });
+});
+
+test('Automatic: Best’s model, and Max’s once the helper model reads the request as a hard problem', async () => {
+  assert.equal(AUTO_MODEL, 'auto');
+  const asked: string[] = [];
+  const hard = (async (_db: unknown, q: { prompt: string; system: string }) => (asked.push(q.prompt), { hard: true, why: 'a proof  of a new bound' })) as any;
+  const easy = (async () => ({ hard: false, why: 'a lookup' })) as any;
+  const broken = (async () => Promise.reject(new Error('the helper is away'))) as any;
+  // Sizing up: only what the helper calls hard, in its words; never for two words, never an error.
+  assert.equal(await sizeUp(db, 'Prove that this bound is tight for all n', hard), 'a proof of a new bound');
+  assert.match(asked[0], /^<request>\nProve that this bound is tight for all n\n<\/request>$/);
+  assert.equal(await sizeUp(db, 'What is the capital of France?', easy), null);
+  assert.equal(await sizeUp(db, 'hello there', hard), null);
+  assert.equal(await sizeUp(db, 'Prove that this bound is tight', broken), null);
+  // The plan: Best now; Max when it is hard.
+  const plan = autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n' }, hard)!;
+  assert.deepEqual({ tier: plan.tier, model: plan.model, effort: plan.effort }, { tier: 'best', model: 'opus', effort: undefined });
+  assert.deepEqual(await plan.hard, { model: 'claude-fable-5-2', why: 'a proof of a new bound' });
+  assert.equal(await autoPlan(db, { agent: 'claude', prompt: 'Rename the helper function in utils' }, easy)!.hard, null);
+  const codex = autoPlan(db, { agent: 'codex', prompt: 'Find the cause of this deadlock nobody understands' }, hard)!;
+  assert.deepEqual({ model: codex.model, effort: codex.effort }, { model: 'gpt-6.1-sol', effort: 'high' });
+  assert.deepEqual(await codex.hard, { model: 'gpt-6.2-astra', effort: 'high', why: 'a proof of a new bound' });
+  // Never sized up: no request, a child, a confidential session, an app's run, a question on Help, Max turned off, a Max that is Best.
+  const n = asked.length;
+  for (const extra of [{ parent: 'claude:p' }, { confidential: true as const }, { app: { run: 'r1' } }, { help: true }])
+    assert.equal(autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n', extra }, hard)!.hard, null);
+  assert.equal(autoPlan(db, { agent: 'claude', prompt: '  ' }, hard)!.hard, null);
+  setTeam(db, { hard: false });
+  assert.equal(autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n' }, hard)!.hard, null);
+  setTeam(db, { hard: true });
+  assert.equal(autoPlan(db, { agent: 'acp', acpAgent: 'console', prompt: 'Prove that this bound is tight for all n' }, hard)!.hard, null, 'Custom before its tiers are set');
+  assert.equal(asked.length, n, 'and the helper model is not asked');
+  assert.equal(autoPlan(db, { agent: 'acp', acpAgent: 'gemini', prompt: 'x y z' }, hard), null, 'a program without tiers');
+  // What the conversation says of it.
+  assert.deepEqual(tierNote(db, { agent: 'claude', event: 'auto', tier: 'max', model: 'claude-fable-5-2', why: 'a proof' }), { event: 'auto', tier: 'max', label: 'Fable 5.2', why: 'a proof' });
+  assert.deepEqual(tierNote(db, { agent: 'acp', acpAgent: 'console', event: 'stepUp', tier: 'max' }), { event: 'stepUp', tier: 'max', label: 'Max' });
 });
 
 // ---- starting a session as an agent --------------------------------------------------------------------
@@ -122,7 +274,9 @@ test('a session started as an agent: its tier’s model when none was picked; th
   const scout = saveAssistant(db, { name: 'Scout', instructions: 'Find papers.', tier: 'quick' });
   assert.deepEqual(agentStart(db, { agent: 'claude', extra: { assistant: scout.id } }), { agent: 'claude', model: 'haiku', extra: { assistant: scout.id } });
   assert.equal(agentStart(db, { agent: 'claude', model: 'opus', extra: { assistant: scout.id } }).model, 'opus');
-  assert.deepEqual(agentStart(db, { agent: 'codex', extra: { assistant: scout.id } }), { agent: 'codex', effort: 'low', extra: { assistant: scout.id } });
+  assert.deepEqual(agentStart(db, { agent: 'codex', extra: { assistant: scout.id } }), { agent: 'codex', model: 'gpt-6-terra', effort: 'low', extra: { assistant: scout.id } });
+  // An effort picked for the session stays; the tier's model still applies.
+  assert.deepEqual(agentStart(db, { agent: 'codex', effort: 'high', extra: { assistant: scout.id } }), { agent: 'codex', model: 'gpt-6-terra', effort: 'high', extra: { assistant: scout.id } });
   // No tier, or no such agent: as it was.
   const plain = { agent: 'claude' as const, extra: { assistant: 'researcher' } };
   assert.equal(agentStart(db, plain), plain);

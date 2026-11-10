@@ -18,7 +18,7 @@ import type { TurnInfo } from './features/types.ts';
 import { costOf } from './prices.ts';
 import type { SessionManager } from './sessions.ts';
 import { localNow, userTimezone } from './userPrefs.ts';
-import { nextTier, type Tier } from '../shared/tiers.ts';
+import { nextTier, tierRank, type Tier } from '../shared/tiers.ts';
 import { findAssistant } from './assistants/store.ts';
 import { tierPick } from './assistants/tiers.ts';
 import { deliveryId, passesFilter, verifySignature, type HookCall } from './automations/hooks.ts';
@@ -857,7 +857,7 @@ export class Scheduler extends EventEmitter {
 
   /**
    * Whether a finished run goes again one tier up: it ran as an agent that thinks with a tier (its task names no model of
-   * its own), it failed or stopped with an error, its agent steps up, and there is a tier above (two steps at most).
+   * its own), it failed or stopped with an error, its agent steps up, and there is a tier above, no higher than Best.
    */
   private stepUpOf(r: RunRow, status: RunStatus): Tier | null {
     if (!r.task_id || r.trigger === 'test' || (status !== 'failed' && status !== 'error') || !r.input) return null;
@@ -871,7 +871,9 @@ export class Scheduler extends EventEmitter {
     const a = findAssistant(this.db, parse<TaskExtra>(row.extra)?.assistant);
     if (!a?.tier || a.stepUp === false || a.standing) return null;
     const now = this.runTier.get(r.id) ?? a.tier;
-    return nextTier(now) ?? null;
+    // By itself a run goes no higher than Best: Max is for a person to pick.
+    const next = nextTier(now);
+    return next && tierRank(next) <= tierRank('best') ? next : null;
   }
 
   /** What a session has cost so far, in dollars (the agent's own figure, else from its tokens). */

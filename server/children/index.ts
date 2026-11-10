@@ -2,7 +2,9 @@
 // its models, Claude Code, Codex or another ACP agent) that works on it in parallel. When the child's turn
 // ends, its reply comes back to the parent as a message and the parent goes on. One level only, a few
 // at a time, never in a freer mode than the parent, and within a share of the parent's spending cap.
-// It is all tools on the app's own MCP server, so any agent can delegate to any other.
+// It is all tools on the app's own MCP server, so any agent can delegate to any other. Each child gets a tier for
+// its part, never above its parent's own (Standard when none is asked for, in a team): the parent leads, the
+// helpers do the well-defined parts for less (team.ts says what the parent is told).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,9 +26,10 @@ import { childKeys, parentOf } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
-import { clampTier, isTier, nextTier, tierLabel, tierRank, type Tier } from '../../shared/tiers.ts';
+import { clampTier, isTier, lowerTier, nextTier, tierLabel, tierProgram, tierRank, TIERS, type Tier } from '../../shared/tiers.ts';
 import { allAssistants, findAssistant } from '../assistants/store.ts';
-import { tierPick } from '../assistants/tiers.ts';
+import { modelName, teamOf, tierPick } from '../assistants/tiers.ts';
+import { leadTier, stepUpSelf, teamNote } from './team.ts';
 import { sendToInbox } from '../assistants/inbox.ts';
 
 export { childKeys, parentOf } from './family.ts';
@@ -170,14 +173,31 @@ const firstLine = (s: string, n: number) => {
 
 // ---- the tools -----------------------------------------------------------------------------------
 
+/** The highest tier a session's helpers may have: never above its own, nor above what the agent it works as allows. */
+function ceilingOf(d: Deps, ctx: { key: string; agent: Agent; acpAgent?: string }, lead: Assistant | null): Tier {
+  return lowerTier(leadTier(d, ctx), lead?.helperMax)!;
+}
+
+const orList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`);
+
+/** What each tier is for, as a lead reads it when it picks one for a child. */
+const TIER_FOR: Record<Tier, string> = {
+  quick: 'quick (the cheapest: a small, very clear job whose result can be checked, such as a targeted edit in files you name, pulling out facts, sorting, formatting or a short summary)',
+  standard: 'standard (a clear task of medium size: a change you have spelled out, tests, research on a set question, a draft to an outline)',
+  best: 'best (a hard, open-ended part that stands on its own)',
+  max: 'max (only the hardest part of a hard problem)',
+};
+
 /**
  * `local`: the parent is confidential, so its children run on Custom with a model on this computer (server/confidential).
- * `named`: the user's agents it may hand work to (by name, with their own instructions, tools and tier); `max`: the
- * highest tier the agent it works as lets its helpers have.
+ * `named`: the user's agents it may hand work to (by name, with their own instructions, tools and tier); `top`: the
+ * highest tier its helpers may have (its own, or lower when the agent it works as says so); `team`: a child asked for
+ * with no tier gets Standard.
  */
-function startTool(d: Deps, max: number, local = false, named: Assistant[] = [], top?: Tier): RunTool {
+function startTool(d: Deps, max: number, local = false, named: Assistant[] = [], top: Tier = 'best', team = false): RunTool {
   const models = customModels().filter((m) => !local || m.local);
   const agents = local ? [] : named;
+  const offered = TIERS.map((t) => t.id).filter((t) => tierRank(t) <= tierRank(top));
   return {
     name: 'start_child_session',
     description: [
@@ -187,10 +207,10 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
         : 'It can run another agent or model of this app: a cheaper or local model for bulk work, Claude Code or Codex for a hard part.',
       'It starts at once and returns its key; when its turn ends, its reply comes back to you as a message, and you go on from there.',
       'The child sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
-      `Use it for independent pieces that take a while, not for small steps. A child cannot start children; at most ${max} of yours run at once.`,
+      `Use it for parts that can be handed over whole, not for single steps you can take yourself. A child cannot start children; at most ${max} of yours run at once.`,
       local
         ? ''
-        : `Give each child a tier that fits its part: quick (the cheapest: clear jobs whose result can be checked, such as pulling out facts, translating, sorting, formatting or short summaries), standard (most work) or best (hard, open-ended parts).${top ? ` The agent you work as lets helpers go no higher than ${tierLabel(top).toLowerCase()}.` : ''}`,
+        : `Give each child the lowest tier that can do its part well: ${orList(offered.map((t) => TIER_FOR[t]))}.${team ? ` With no tier a child gets ${tierLabel(clampTier('standard', top)).toLowerCase()}.` : ''} A child never thinks with a tier above ${tierLabel(top).toLowerCase()}.`,
       local
         ? ''
         : 'A child on a tier whose reply does not pass a quick check runs again one tier up by itself (never above the highest allowed); step_up_child does that when you judge a result not good enough.',
@@ -221,8 +241,8 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
           : {
               tier: {
                 type: 'string',
-                enum: ['quick', 'standard', 'best'],
-                description: 'The tier for its part: quick for clear, checkable work; standard for most; best for hard, open-ended parts. Used when no model is named; a named agent keeps its own.',
+                enum: offered,
+                description: `The tier for its part: quick for a small, very clear job; standard for a clear task of medium size${tierRank(top) >= tierRank('best') ? '; best for a hard part that stands on its own' : ''}. Used when no model is named; a named agent keeps its own.`,
               },
             }),
         ...(agents.length ? { as: { type: 'string', description: `One of the user's agents to hand this part to, by name: ${agents.map((a) => a.name).join(', ')}.` } } : {}),
@@ -239,7 +259,7 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
 /** What a child on a tier keeps, to run again one tier up when it fails a check (or its lead asks). */
 interface StepUp {
   tier: Tier;
-  /** The highest tier its lead's agent allows. */
+  /** The highest tier its lead may give a helper: its own, or lower when the agent it works as says so. */
   max: Tier;
   brief: string;
   agent?: string;
@@ -299,8 +319,13 @@ async function startChild(
   let modelArg = String(a.model ?? '').trim();
   // A named agent on its own program keeps its own model, unless it thinks with a tier.
   if (!modelArg && named && !String(a.agent ?? '').trim() && named.model && !named.tier && !o.tierOverride) modelArg = named.model;
-  // The tier: a named agent's own; else the one asked for, never above what the lead's agent allows (that, when none is asked for).
-  const asked = isTier(a.tier) ? clampTier(a.tier, leadAgent?.helperMax) : leadAgent?.helperMax;
+  // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
+  const role = roleOf(d.db, ctx);
+  // The tier: a named agent's own; else the one asked for, never above the lead's own tier nor what its agent allows. With none
+  // asked for: Standard in a team (the lead leads, helpers do the clear parts for less), else the highest its agent allows.
+  const ceiling = ceilingOf(d, ctx, leadAgent);
+  const unasked = teamOf(d.db).on && role?.role !== 'lead' && !local ? clampTier('standard', ceiling) : leadAgent?.helperMax;
+  const asked = isTier(a.tier) ? clampTier(a.tier, ceiling) : unasked;
   const tier: Tier | undefined = o.tierOverride ?? (named ? named.tier : modelArg ? undefined : asked);
   let tierEffort: string | undefined;
   if (tier && !modelArg) {
@@ -311,8 +336,6 @@ async function startChild(
     tierEffort = pick?.effort;
   }
   const target = pickAgent(d, ctx, agentArg, modelArg);
-  // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
-  const role = roleOf(d.db, ctx);
   const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
   // A campaign's members each change their part on a branch of their own.
   const worktree = !!a.worktree || (role?.role === 'lead' && role.mode === 'campaign');
@@ -335,8 +358,7 @@ async function startChild(
   const fam = modeFamily(target.agent, target.acpAgent);
   const mode = namedMode && (!parentMode || modeLevel(fam, namedMode) < modeLevel(fam, parentMode)) ? namedMode : parentMode;
   const title = firstLine(String(a.title ?? '') || brief, 70);
-  // A child on a tier below the highest its lead allows can run again one tier up when it fails a check.
-  const ceiling: Tier = leadAgent?.helperMax ?? 'best';
+  // A child on a tier below the highest its lead allows can run again one tier up: by itself when it fails a check (as far as Best), or when its lead asks.
   const stepRec: StepUp | undefined =
     tier && !local && tierRank(tier) < tierRank(ceiling)
       ? { tier, max: ceiling, brief: (o.baseBrief ?? brief).slice(0, 20_000), ...(agentArg ? { agent: agentArg } : {}), ...(named ? { as: named.id } : {}), cwd, ...(worktree ? { worktree } : {}), title }
@@ -595,15 +617,16 @@ async function judge(d: Deps, brief: string, reply: string): Promise<string> {
 }
 
 /**
- * Whether a child's turn calls for running it again one tier up: it was started on a tier below the highest allowed, its
- * lead's agent steps up, and its turn stopped with an error, wrote nothing, or does not do its brief (the helper model's
- * check). Never for a turn someone stopped, nor once its spending cap is reached.
+ * Whether a child's turn calls for running it again one tier up: it was started on a tier below the highest allowed (and
+ * below Best), its lead's agent steps up, and its turn stopped with an error, wrote nothing, or does not do its brief (the
+ * helper model's check). Never for a turn someone stopped, nor once its spending cap is reached.
  */
 async function stepUpCheck(d: Deps, key: string, turn: Turn): Promise<{ next: Tier; why: string } | null> {
   const x = sessionExtra(d.db, key).stepUp as StepUp | undefined;
   if (!x || !isTier(x.tier)) return null;
   const next = nextTier(x.tier);
-  if (!next || tierRank(next) > tierRank(x.max)) return null;
+  // By itself a helper goes no higher than Best: Max is for its lead to ask for.
+  if (!next || tierRank(next) > tierRank(lowerTier(x.max, 'best')!)) return null;
   if (turn.status === 'interrupted' || capReached(d.db, key)) return null;
   const parent = parentOf(d.db, key);
   if (parent && findAssistant(d.db, sessionExtra(d.db, parent).assistant)?.stepUp === false) return null;
@@ -631,7 +654,7 @@ async function stepUpChild(d: Deps, parent: string, key: string, tier: Tier, why
 const STEP_UP: RunTool = {
   name: 'step_up_child',
   description:
-    'Run a child session’s brief again one tier up when its result was not good enough: a new child on the next tier (never above the highest your agent allows) gets the same brief and why the first one fell short. Only for a child started on a tier that has finished its turn.',
+    'Run a child session’s brief again one tier up when its result was not good enough: a new child on the next tier (never above your own, nor the highest your agent allows) gets the same brief and why the first one fell short. Only for a child started on a tier that has finished its turn.',
   inputSchema: {
     type: 'object',
     properties: { key: { type: 'string', description: 'The child’s key.' }, why: { type: 'string', description: 'What was wrong with its result, for the new child.' } },
@@ -642,11 +665,34 @@ const STEP_UP: RunTool = {
     const key = String(a.key ?? '');
     if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your child sessions.');
     const x = sessionExtra(d.db, key).stepUp as StepUp | undefined;
-    if (!x) throw new Error('It was started without a tier, or on the highest your agent allows: do the part yourself, or start a child with another model.');
+    if (!x) throw new Error('It was started without a tier, or on the highest a helper of yours may have: do the part yourself, or start a child with another model.');
     if (busy(d.sessions.summary(key))) throw new Error('It is still working: wait for its reply, or message_child it.');
     const next = nextTier(x.tier);
-    if (!next || tierRank(next) > tierRank(x.max)) throw new Error(`It is on ${tierLabel(x.tier)}, the highest your agent allows.`);
+    if (!next || tierRank(next) > tierRank(x.max)) throw new Error(`It is on ${tierLabel(x.tier)}, the highest a helper of yours may have.`);
     return stepUpChild(d, ctx.key, key, next, String(a.why ?? '').trim() || 'its result was not good enough');
+  },
+};
+
+/** The session's own step up: it carries on with Max's model when its problem proves harder than it looked. */
+const STEP_UP_SELF: RunTool = {
+  name: 'step_up_session',
+  description:
+    'Carry on with the strongest model (the Max tier) when the problem proves harder than it looked: a fix that has failed twice, a cause you cannot find, constraints that pull against each other, a proof. You keep the whole conversation and go on from where you are. Say why in a line: the user sees it. Not for work that is merely long: hand that to helpers.',
+  inputSchema: { type: 'object', properties: { why: { type: 'string', description: 'What makes the problem hard, in a line.' } }, required: ['why'] },
+  async run(a, ctx) {
+    const d = ctx.deps;
+    if (parentOf(d.db, ctx.key)) throw new Error('A child session cannot step itself up: say in your reply that this part needs a stronger model.');
+    const can = stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: sessionExtra(d.db, ctx.key).assistant });
+    if ('no' in can) throw new Error(can.no);
+    const why = firstLine(String(a.why ?? ''), 200) || 'the problem is harder than it looked';
+    await d.sessions.moveToTier(ctx.key, 'max', can.max, { event: 'stepUp', why });
+    const name = modelName(d.db, ctx.agent, ctx.acpAgent, can.max.model) || 'the Max tier';
+    // Codex takes a new model with its next turn: it ends this one, and is woken at once to carry on.
+    if (ctx.agent === 'codex') {
+      await tell(d, ctx.key, `[You now think with ${name}. Carry on with the task from where you stopped.]`);
+      return `From your next turn you think with ${name}. End this turn now with one line on where you are: you are woken at once to carry on.`;
+    }
+    return `You now think with ${name}. Carry on from where you are.`;
   },
 };
 
@@ -656,14 +702,23 @@ export const children: Feature = {
   id: 'children',
 
   tools(ctx) {
+    const d = ctx.deps;
     // A child gets none: one level only.
-    if (parentOf(ctx.deps.db, ctx.key) || roleOf(ctx.deps.db, ctx)?.role === 'member') return [];
-    const lead = findAssistant(ctx.deps.db, sessionExtra(ctx.deps.db, ctx.key).assistant);
-    return [startTool(ctx.deps, maxFor(ctx.deps.db, ctx), confidentialRun(ctx), namedFor(ctx.deps, ctx.key), lead?.helperMax), LIST, MESSAGE, STEP_UP];
+    if (parentOf(d.db, ctx.key) || roleOf(d.db, ctx)?.role === 'member') return [];
+    const x = sessionExtra(d.db, ctx.key);
+    const lead = findAssistant(d.db, x.assistant);
+    const local = confidentialRun(ctx);
+    const start = startTool(d, maxFor(d.db, ctx), local, namedFor(d, ctx.key), ceilingOf(d, ctx, lead), teamOf(d.db).on && roleOf(d.db, ctx)?.role !== 'lead');
+    // Its own step up to Max, where Max is another model than Best and its agent names no tier of its own.
+    const self = !local && tierProgram(ctx.agent, ctx.acpAgent) && !('no' in stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: x.assistant }));
+    return [start, LIST, MESSAGE, STEP_UP, ...(self ? [STEP_UP_SELF] : [])];
   },
 
-  spawn(s) {
-    return s.extra?.parent ? { instructions: [CHILD_INSTRUCTIONS] } : undefined;
+  spawn(s, d) {
+    if (s.extra?.parent) return { instructions: [CHILD_INSTRUCTIONS] };
+    // The main agent of a session leads helpers on cheaper tiers (Settings → Models → Tiers).
+    const team = teamNote(d, s);
+    return team ? { instructions: [team] } : undefined;
   },
 
   turnEnd(t, d) {
