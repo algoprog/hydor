@@ -350,8 +350,10 @@ export function chatApp(spec: ChatAppSpec) {
    */
   function routes(d: Deps, o: { view(): object; connect(body: Record<string, unknown>): Promise<'connected' | undefined> }) {
     const { app, db } = d;
-    app.get(`/api/${id}`, async () => o.view());
-    app.put(`/api/${id}`, async (req) => {
+    // The routes are /api/discord and /api/slack (docs/guide/90-api.md lists each): built from the id, so written once.
+    const base = '/api/' + id;
+    app.get(base, async () => o.view());
+    app.put(base, async (req) => {
       const b = (req.body ?? {}) as Record<string, unknown>;
       const did = await o.connect(b);
       if (typeof b.notify === 'boolean') kvSet(db, key('notify'), b.notify ? '1' : '0');
@@ -360,12 +362,12 @@ export function chatApp(spec: ChatAppSpec) {
       if (did === 'connected') await new Promise((r) => setTimeout(r, 300));
       return o.view();
     });
-    app.post(`/api/${id}/pair`, async () => {
+    app.post(`${base}/pair`, async () => {
       if (!spec.connected(d)) throw new HttpError(400, `Connect ${label} first`);
       startPairing();
       return o.view();
     });
-    app.delete(`/api/${id}/chats/:id`, async (req) => {
+    app.delete(`${base}/chats/:id`, async (req) => {
       const chat = String((req.params as { id: string }).id);
       setLinked(
         db,
