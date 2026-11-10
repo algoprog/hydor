@@ -239,4 +239,3 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
   return CODES[r.status];
 }
 
-export { ApiError };

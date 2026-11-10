@@ -205,7 +205,7 @@ export class Chat {
     if (history) {
       // Another session: printed from its history on, by a printer of its own.
       this.printer = new Printer(this.look);
-      const lines = [...this.headerLines(), p(this.look).bold(s?.title || '(untitled)'), ''];
+      const lines = [...this.headerLines(), this.look.p.bold(s?.title || '(untitled)'), ''];
       lines.push(...historyLines(view.items, view.notes, this.look, { turns: 3 }));
       this.write(lines);
       this.printer.skipAll(view);
@@ -422,8 +422,14 @@ export class Chat {
     if (k.name !== 'tab') this.completions = [];
     if (k.name !== 'ctrl-c') this.quitArmed = 0;
     const empty = !this.editor.text;
-    // Single keys that answer what waits, while nothing is typed.
-    if (k.name === 'text' && empty && k.text.length === 1 && this.singleKey(k.text)) return;
+    // Keys that answer what waits, while nothing is typed: one at a time, even when several come in one read
+    // (quick typing, a slow link); the first that is not one starts the line.
+    if (k.name === 'text' && empty) {
+      let i = 0;
+      while (i < k.text.length && !this.editor.text && this.singleKey(k.text[i])) i++;
+      if (i === k.text.length) return;
+      if (i > 0) k = { name: 'text', text: k.text.slice(i) };
+    }
     switch (k.name) {
       case 'ctrl-c':
         return this.ctrlC();
@@ -894,6 +900,7 @@ export class Chat {
     let from = ed.cursor;
     let cands: string[] = [];
     let m: RegExpExecArray | null;
+    let files = false;
     if ((m = /^\/(\S*)$/.exec(before))) {
       word = `/${m[1]}`;
       from = 0;
@@ -905,6 +912,7 @@ export class Chat {
     } else if ((m = /(?:^|\s)@(\S*)$/.exec(before))) {
       word = m[1];
       from = ed.cursor - word.length;
+      files = true;
       cands = await this.pathCandidates(word);
     } else return;
     cands = [...new Set(cands)];
@@ -918,7 +926,8 @@ export class Chat {
     let common = cands[0];
     for (const c of cands) while (!c.startsWith(common)) common = common.slice(0, -1);
     if (common.length > word.length) ed.replaceBefore(from, common);
-    this.completions = cands.slice(0, 40).map((c) => c.replace(/^.*\/(?=[^/]+\/?$)/, ''));
+    // Files by their names only; commands and models as they are.
+    this.completions = cands.slice(0, 40).map((c) => (files ? c.replace(/^.*\/(?=[^/]+\/?$)/, '') : c));
     this.render();
   }
 
@@ -966,7 +975,6 @@ function choicesOf(f: AppField): string[] {
   return [];
 }
 
-const p = (look: Look) => look.p;
 
 /** /help: the commands and the keys, wrapped to the width. */
 function helpLines(look: Look): string[] {
@@ -1016,4 +1024,3 @@ export async function chatCommand(conn: Conn, o: Opts, boot: Boot, message?: str
   return chat.run(key, message ?? (words || undefined));
 }
 
-export { p as paintOf };

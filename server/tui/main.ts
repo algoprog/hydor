@@ -2,7 +2,7 @@
 // arguments, reaches the server (starting this computer's when nothing answers), and runs the chat, a run, or one of
 // the listing commands. Exit codes: 0 done, 1 failed or refused, 2 bad usage, 3 an answer is needed (run), 124 timed
 // out, 130 interrupted.
-import { parseArgv, USAGE, UsageError, COMMANDS, type Opts } from './args.ts';
+import { parseArgv, USAGE, UsageError, type Opts } from './args.ts';
 import { ApiError, connect, type Conn } from './client.ts';
 import { listCommand } from './commands.ts';
 import type { Look } from './lines.ts';
@@ -63,4 +63,3 @@ export async function tuiCommand(argv: string[]): Promise<number> {
   }
 }
 
-export { COMMANDS };

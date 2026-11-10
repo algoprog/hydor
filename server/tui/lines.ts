@@ -228,7 +228,7 @@ export function userLines(item: Extract<TimelineItem, { kind: 'user' }>, look: L
   if (child) return child;
   if (item.peer) return wrap(p.dim(`✉ From ${item.peer.name ?? 'another session'}: ${item.text.trim()}`), look.width, { first: INDENT, indent: `${INDENT}  ` }).slice(0, 4);
   if (item.meta === 'note' || item.meta === 'command-output') return wrap(p.dim(item.text.trim()), look.width, { first: INDENT, indent: INDENT }).slice(0, 4);
-  return promptLines(item.text, look, item.meta === 'queued' && false);
+  return promptLines(item.text, look);
 }
 
 /** A notice: dim, or in the colour of a warning or an error. */
@@ -341,7 +341,6 @@ export function approvalBody(a: ApprovalRequest, optionId: string, o: { message?
 export function approvalNeedsApp(a: ApprovalRequest): string {
   if (a.signature) return 'It is about a signature';
   if (a.app?.secrets?.length) return 'It needs a key for an app';
-  if (a.form?.fields.some((f) => f.type === 'file')) return '';
   return '';
 }
 
@@ -384,5 +383,3 @@ export function runningLine(item: ToolItem, look: Look, frame: string, now = Dat
   return stepLines(item, { ...look, verbose: false }, { frame, now })[0];
 }
 
-/** A turn's cost and its helpers': for the turn's end line. */
-export const turnCost = (t: TurnItem, helpers: number[]) => (t.costUsd ?? 0) + helpers.reduce((a, b) => a + b, 0);
