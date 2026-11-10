@@ -227,7 +227,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Notes**](/settings?s=memory&find=Notes): Every note kept, by place.
 - [**Add a note**](/settings?s=memory&find=Add%20a%20note): Write a note for agents to remember, about you or a project.
 - [**Deleted notes**](/settings?s=memory&find=Deleted%20notes): Notes deleted in the last 30 days, to restore.
-- [**Bring in…**](/settings?s=memory&find=Bring%20in%E2%80%A6): Notes from what other assistants know about you: Claude Code, Codex, Hermes, OpenClaw, or a ChatGPT or Claude export.
+- [**Bring in…**](/settings?s=memory&find=Bring%20in%E2%80%A6): Notes from what other assistants know about you, and the skills you made in them: Claude Code, Codex, Hermes, OpenClaw, pi, Atomic Agent, or a ChatGPT or Claude export.
 - [**Export**](/settings?s=memory&find=Export): Every note as Markdown to read, or as JSON with histories.
 - [**Clear all…**](/settings?s=memory&find=Clear%20all%E2%80%A6): Deletes every note and its history.
 
