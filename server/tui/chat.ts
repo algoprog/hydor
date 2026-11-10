@@ -16,7 +16,7 @@ import { enc, type Conn } from './client.ts';
 import { conversationLines, openBrowser, resolveKey, sessionLines, shortKey, statusWord, tierLines, usageLines, whyNoReply } from './commands.ts';
 import { KeyReader, layout, LineEditor, type Key } from './editor.ts';
 import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, choiceLine, INDENT, isDeny, itemLines, modelLabel, runningLine, stepLines, textLines, tierName, type Look } from './lines.ts';
-import { busy, historyLines, Printer, SessionView } from './session.ts';
+import { backgroundEnd, busy, historyLines, Printer, SessionView } from './session.ts';
 import { Screen, suspend, takeTerminal } from './screen.ts';
 import { catalogOf, findAssistant, modeFor, modeLabel, newStartId, planStart, programName, startBody, tiersOf, type Boot, type Plan, type TiersState } from './start.ts';
 import { colorWanted, elapsed, makePaint, money, tildify, truncate, wrap } from './term.ts';
@@ -36,7 +36,7 @@ const SLASH: { name: string; args?: string; what: string }[] = [
   { name: 'tiers', what: 'which model each tier means' },
   { name: 'usage', what: 'plan usage and limits' },
   { name: 'cost', what: 'what this session and its helpers cost' },
-  { name: 'stop', what: 'stop the turn' },
+  { name: 'stop', what: 'stop the turn, and what works in the background' },
   { name: 'rename', args: '<title>', what: 'rename the session' },
   { name: 'open', what: 'its address in the web app' },
   { name: 'quit', what: 'leave (the session goes on in the app)' },
@@ -293,7 +293,7 @@ export class Chat {
   }
 
   private tickSpinner() {
-    const on = !this.plain && (this.working() || !!this.view?.helpersWorking().length);
+    const on = !this.plain && (this.working() || !!this.view?.helpersWorking().length || !!this.view?.background().length);
     if (on && !this.spinner) {
       this.spinner = setInterval(() => {
         this.frame = (this.frame + 1) % SPIN.length;
@@ -335,6 +335,8 @@ export class Chat {
     if (view) {
       const helpers = view.helpersWorking();
       if (helpers.length) rows.push(truncate(`${INDENT}${p.accent('◆')} ${p.dim(`${helpers.length === 1 ? '1 helper works' : `${helpers.length} helpers work`}: ${helpers.map((h) => h.note.title).join(' · ')}`)}`, width));
+      const bg = view.background();
+      if (bg.length) rows.push(truncate(`${INDENT}${p.accent('◆')} ${p.dim(backgroundWords(bg))}`, width));
     }
     rows.push(...this.cardRows(look));
     for (const q of (view?.summary?.queue ?? []).slice(0, 3)) rows.push(truncate(`${INDENT}${p.dim(`⧗ queued: ${q.text.replace(/\s+/g, ' ')}`)}`, width));
@@ -347,6 +349,7 @@ export class Chat {
       const left = waiting ? `${p.yellow('◌')} ${p.yellow(word)}` : `${p.accent(frame)} ${word}`;
       rows.push(truncate(`${left}${p.dim(`${since ? ` · ${elapsed(since)}` : ''} · esc to stop`)}`, width));
     } else if (view?.helpersWorking().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('Helpers at work: their replies wake the agent')}`, width));
+    else if (view?.background().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('At work in the background: each one that ends wakes the agent · /stop stops them')}`, width));
     if (this.notice && this.notice.until > Date.now()) rows.push(truncate(`${INDENT}${this.notice.text}`, width));
     if (this.completions.length) rows.push(...wrap(p.dim(this.completions.join('  ')), width - 1, { first: INDENT, indent: INDENT }).slice(0, 3));
     const placeholder = this.placeholder();
@@ -604,11 +607,16 @@ export class Chat {
     if (this.view && busy(this.view.live)) void this.stopTurn();
   }
 
-  private async stopTurn() {
-    if (!this.view) return;
+  /** Stops the turn; with `background`, what works in the background too (the session's and its helpers'). */
+  private async stopTurn(background = false) {
+    const view = this.view;
+    if (!view) return;
+    const tasks = background ? view.background() : [];
     try {
-      await this.conn.api('POST', `/api/sessions/${enc(this.view.key)}/interrupt`, {});
-      this.flash(this.look.p.dim('Stopping its turn…'), 2000);
+      if (busy(view.live)) await this.conn.api('POST', `/api/sessions/${enc(view.key)}/interrupt`, {});
+      await Promise.all(tasks.map(({ key, task }) => this.conn.api('POST', `/api/sessions/${enc(key)}/tasks/${encodeURIComponent(task.id)}/stop`, {})));
+      if (busy(view.live) || tasks.length) this.flash(this.look.p.dim(tasks.length ? 'Stopping it, and what works in the background…' : 'Stopping its turn…'), 2000);
+      else this.flash(this.look.p.dim('Nothing is working'), 2000);
     } catch (e) {
       this.flash(this.look.p.red((e as Error).message));
     }
@@ -798,7 +806,7 @@ export class Chat {
           return this.say(...lines.map((l) => `${INDENT}${l}`));
         }
         case 'stop':
-          return this.stopTurn();
+          return this.stopTurn(true);
         case 'rename':
           if (!key) return this.flash(p.yellow('No session to rename yet'));
           if (!arg) return this.flash(p.yellow('Give the title: /rename <title>'));
@@ -877,7 +885,15 @@ export class Chat {
     const { p } = this.look;
     const view = this.view;
     const hs = view ? [...view.helpers.values()] : [];
-    if (!hs.length) return this.say(p.dim(`${INDENT}No helpers in this session.`));
+    // What works in the background (Claude Code's own agents and commands): those running, then those that ended.
+    const running = view?.background() ?? [];
+    const ended = (view?.items ?? []).flatMap((i) => (i.kind === 'system' ? [backgroundEnd(i.text)].filter((x) => !!x) : [])) as { status: string; what: string }[];
+    const bgLines = [
+      ...running.map(({ key, task }) => truncate(`${INDENT}${p.accent('·')}  ${p.accent('Running')}  ${task.description}${p.dim(` · in the background${key !== view!.key ? ` of ${view!.helpers.get(key)?.note.title ?? 'a helper'}` : ''}${task.startedAt ? ` · ${elapsed(task.startedAt)}` : ''}`)}`, this.look.width)),
+      ...ended.map((e) => truncate(`${INDENT}${p.dim('·')}  ${e.status === 'completed' ? p.green('Finished') : e.status === 'failed' ? p.red('Failed') : p.yellow(e.status === 'killed' ? 'Stopped' : e.status[0].toUpperCase() + e.status.slice(1))}  ${e.what.split('\n')[0]}${p.dim(' · in the background')}`, this.look.width)),
+    ];
+    if (!hs.length && !bgLines.length) return this.say(p.dim(`${INDENT}No helpers in this session.`));
+    if (!hs.length) return this.say(...bgLines);
     if (arg) {
       const h = hs[Number(arg) - 1] ?? hs.find((x) => x.key === arg || x.note.title.toLowerCase().startsWith(arg.toLowerCase()));
       if (!h) return this.flash(p.yellow(`No helper ${arg}: /helpers lists them`));
@@ -889,7 +905,7 @@ export class Chat {
       const state = s ? statusWord(s, p) || p.dim(h.replaced ? 'Stepped up' : 'Done') : p.dim('…');
       return truncate(`${INDENT}${p.accent(String(i + 1))}  ${state}  ${h.note.title}${p.dim(` · ${[h.note.label, h.note.tier ? tierName(h.note.tier) : '', money(s?.stats.costUsd)].filter(Boolean).join(' · ')}`)}`, this.look.width);
     });
-    this.say(...lines, p.dim(`${INDENT}/helpers <n> shows one’s conversation`));
+    this.say(...lines, ...bgLines, p.dim(`${INDENT}/helpers <n> shows one’s conversation`));
   }
 
   // ---- completion ----------------------------------------------------------------------------------------------
@@ -967,6 +983,14 @@ export class Chat {
       }, 500);
     });
   }
+}
+
+/** What works in the background, in a line: "At work in the background: Check the docs", "2 helpers at work in the background: …". */
+function backgroundWords(list: { task: { description: string; kind?: string; startedAt?: number } }[]): string {
+  const agents = list.every((x) => !/bash|shell|command|monitor/i.test(x.task.kind ?? ''));
+  const what = list.map((x) => x.task.description.replace(/\s+/g, ' ')).join(' · ');
+  if (list.length === 1) return `At work in the background: ${what}${list[0].task.startedAt ? ` · ${elapsed(list[0].task.startedAt)}` : ''}`;
+  return `${list.length} ${agents ? 'helpers' : 'tasks'} at work in the background: ${what}`;
 }
 
 /** A form field's choices: a choice's options, or Yes and No. */

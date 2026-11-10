@@ -24,7 +24,7 @@ What you see stays in the terminal's own history, so you can scroll back and cop
 - **The agent's text** as it comes, with its headings, lists, quotes, tables, links (the address after the words) and code (never re-wrapped, so what you copy runs).
 - **Each step** on one line: what it read, searched, edited (with the lines added and removed), ran (with the time it took, and its exit code when it failed, with the first line of the error under it).
 - **Thoughts** as one dim line, such as "Thought for 8 s". Start with `--thinking` to see them in full, and with `-v` to see the first lines of each step's output.
-- **Helpers**: "Helper started" when the agent hands part of its work to a [child session](/guide/research#let-an-agent-hand-work-to-child-sessions), and "Helper finished" (or stopped, or failed) when its reply comes back. `/helpers` lists them with what each is doing and what it cost.
+- **Helpers**: "Helper started" when the agent hands part of its work to a [child session](/guide/research#let-an-agent-hand-work-to-child-sessions), and "Helper finished" (or stopped, or failed) when its reply comes back. Claude Code can also run its own helpers and commands in the background and end its turn while they work: the bottom lines say what is at work in the background, "Finished in the background" shows as each one ends, and the agent carries on by itself. `/helpers` lists them all with what each is doing (and what a helper cost).
 - **The end of each turn**: how long it took, what it cost, the model, and how many helpers worked.
 
 At the bottom, a few lines change while the agent works: the text still being written, the step under way, the helpers at work, a spinner with the time so far, and your input line. Press Esc or Ctrl+C to stop the turn.
@@ -63,9 +63,9 @@ Type them in the input line:
 - `/sessions`: pick another session to carry on.
 - `/model`, `/effort`, `/mode`: change the model, how hard it thinks, and what it may do without asking. Without a name, each shows a numbered list to pick from.
 - `/agent`: work as one of [your agents](/guide/agents), from the next message on.
-- `/helpers`: the helpers, what each is doing and what it cost; `/helpers 2` shows the second one's conversation.
+- `/helpers`: the helpers and what works in the background, what each is doing (and what a helper cost); `/helpers 2` shows the second helper's conversation.
 - `/tiers`, `/usage`, `/cost`: which model each tier means, your plans' usage and limits, and what this session and its helpers cost.
-- `/stop`, `/rename`, `/open`, `/quit`: stop the turn, rename the session, show its address in the app, leave.
+- `/stop`, `/rename`, `/open`, `/quit`: stop the turn and what works in the background, rename the session, show its address in the app, leave.
 
 Any other `/command` goes to the agent as it is, for the program's own commands and skills.
 
@@ -89,7 +89,7 @@ What you leave out comes from what the app's start page picked last, then from t
 
 ## One request from a script
 
-`hydor run "…"` (or `hydor -p "…"`) starts a session with your message, follows it until the work is done, prints the agent's last reply, and ends. Done means the turn ended, no helper is still working or still owes its reply, and nothing waits in the queue: an agent that ends its turn to wait for its helpers is woken by their replies, and the run waits for that turn too. With nothing after it, it reads the message from what is piped in: `git diff | hydor run "review this change"`.
+`hydor run "…"` (or `hydor -p "…"`) starts a session with your message, follows it until the work is done, prints the agent's last reply, and ends. Done means the turn ended, no helper is still working or still owes its reply, nothing works in the background (the agent's or a helper's), and nothing waits in the queue: an agent that ends its turn to wait for its helpers, or for what it runs in the background, is woken by their replies or their ends, and the run waits for that turn too. On `--timeout` or Ctrl+C, what works in the background is stopped with the turn. With nothing after it, it reads the message from what is piped in: `git diff | hydor run "review this change"`.
 
 - On a terminal, short lines on the side say what happens (each step, helpers starting and finishing); `-q` turns them off.
 - Nobody is there to answer, so an approval or a question stops the run, says what it was asked, and the session waits for you in the app or with `hydor resume`. With `--mode full` (or `-y`) the agent asks nothing.

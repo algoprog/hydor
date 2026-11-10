@@ -21,7 +21,7 @@ import type { ApprovalRequest, LiveOverlay, LiveState, SessionSummary, TimelineI
 import { parseArgv, UsageError } from './args.ts';
 import type { Conn } from './client.ts';
 import { KeyReader, layout, LineEditor } from './editor.ts';
-import { approvalBody, approvalKeys, childReplyLines, foldedLine, modelLabel, noteLines, stepLines, turnLines, type Look } from './lines.ts';
+import { approvalBody, approvalKeys, childReplyLines, foldedLine, itemLines, modelLabel, noteLines, stepLines, turnLines, type Look } from './lines.ts';
 import { chunksOf, finishedLength, renderMarkdown } from './markdown.ts';
 import { historyLines, lastReply, Printer, SessionView } from './session.ts';
 import { modeFor } from './start.ts';
@@ -310,6 +310,9 @@ test('the input laid out: rows a column short of the width, the cursor’s row a
 
 // ---- the printer --------------------------------------------------------------------------------------------------
 
+/** An item's lines as one string, without colour, 80 columns. */
+const itemLinesOf = (it: TimelineItem) => itemLines(it, look(80)).join('\n');
+
 /** A session view without a server, its state set by hand. */
 function viewOf(items: TimelineItem[], overlay: Partial<LiveOverlay> = {}, notes: SessionNote[] = []): SessionView {
   const v = new SessionView({} as Conn, 'claude:x');
@@ -352,6 +355,23 @@ test('the printer: each final item once, in order; what is under way held for th
   const bg = tool({ name: 'Bash', category: 'command', title: 'npm run dev', status: 'running', background: true }, { id: 'bg' });
   const p2 = new Printer(look(60), { brief: true });
   assert.match(p2.take(viewOf([bg])).lines.join('\n'), /in the background/);
+});
+
+test('settled: not while the session or a helper has a task running in the background', () => {
+  const v = viewOf([{ kind: 'user', id: 'u', seq: 0, text: 'go' }, { kind: 'turn', id: 't', seq: 0, status: 'completed' }]);
+  v.live = { status: 'idle', startedAt: 0, pendingApprovals: 0, backgroundTasks: [{ id: 'b', description: 'Check the docs', status: 'running' }] };
+  assert.equal(v.settled(), false);
+  v.live = { ...v.live, backgroundTasks: [] };
+  assert.equal(v.settled(), true);
+  const child: ChildNote = { child: 'claude:c', agent: 'claude', label: 'L', title: 'T', brief: '', cwd: '/', startedAt: 0 };
+  const idle = { status: 'idle' as const, startedAt: 0, pendingApprovals: 0 };
+  v.helpers.set('claude:c', { key: 'claude:c', note: child, turns: 1, replies: 1, summary: { key: 'claude:c', agent: 'claude', id: 'c', title: 'T', stats: {} as SessionSummary['stats'], live: { ...idle, backgroundTasks: [{ id: 'x', description: 'Run the tests', status: 'running' }] } } });
+  assert.equal(v.settled(), false, 'a helper’s task in the background');
+  assert.deepEqual(v.background().map((b) => [b.key, b.task.description]), [['claude:c', 'Run the tests']]);
+  // Its end woke the agent: the turn before it is not the last one.
+  v.items.push({ kind: 'system', id: 's', seq: 2, level: 'info', text: 'Background task completed: Check the docs' });
+  assert.equal(v.lastTurn(), undefined);
+  assert.equal(itemLinesOf(v.items[2]), '  ◆ Finished in the background: Check the docs');
 });
 
 test('history: turns folded to a line each (each step with -v), with the reply and the end', () => {
@@ -475,6 +495,23 @@ async function play(f: Fake, text: string) {
     setLive(f, { status: 'waiting', pendingApprovals: 1 }, { approvals: [form] });
     f.answers.push({ id: form.id, body: await new Promise<any>((r) => (f.waitAnswer = r)) });
     setLive(f, { status: 'working', pendingApprovals: 0 });
+  }
+  if (/work in the background/.test(text)) {
+    // Claude Code's own Agent tool in the background: the turn ends with it running, and its end wakes the lead.
+    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A helper is running; I’ll review it as it comes back.' });
+    push(f, turnEnd());
+    setLive(f, { status: 'idle', backgroundTasks: [{ id: 'bg1', description: 'Check the docs', kind: 'local_agent', status: 'running', startedAt: Date.now() }] });
+    await sleep(1800);
+    // It ends: its notice, a moment with nothing running and the lead idle, then the turn it wakes.
+    push(f, { kind: 'system', id: `bg${Math.random()}`, seq: 0, ts: Date.now(), level: 'info', text: 'Background task completed: Check the docs' });
+    setLive(f, { status: 'idle', backgroundTasks: [] });
+    await sleep(700);
+    setLive(f, { status: 'working', turnStartedAt: Date.now() });
+    await sleep(150);
+    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'The docs check out.' });
+    push(f, turnEnd());
+    setLive(f, { status: 'idle' });
+    return;
   }
   if (/approve/.test(text)) {
     const a: ApprovalRequest = { ...APPROVAL, createdAt: Date.now() };
@@ -712,6 +749,16 @@ test('run: a turn that ends with nothing in it (a usage limit) fails, and says w
   assert.match(j.error, /^Claude Code is at its usage limit \(Weekly · all models\): it lifts in 2h 59m|^Claude Code is at its usage limit \(Weekly · all models\): it lifts in 3h 0m/);
 });
 
+test('run: a turn that ends with a task in the background waits for the turn its end wakes', async () => {
+  const r = await hydor(['run', '--json', 'work in the background']);
+  assert.equal(r.code, 0, r.err);
+  const j = JSON.parse(r.out);
+  assert.equal(j.status, 'done');
+  assert.equal(j.reply, 'The docs check out.', 'not the reply while it was running');
+  assert.equal(j.turns, 2);
+  assert.ok(j.durationMs >= 2400, String(j.durationMs));
+});
+
 test('run: a socket that drops and comes back misses nothing', async () => {
   const r = await hydor(['run', '--stream-json', 'drop the line']);
   assert.equal(r.code, 0, r.err);
@@ -888,6 +935,14 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   assert.deepEqual(f.answers[0].body, { decision: 'answer', answers: { color: 'Blue', size: 'S, L', name: 'Rex' } });
   assert.deepEqual(f.answers[1].body, { decision: 'accept', answers: {}, form: { city: 'Lisbon', when: 'Tomorrow', pets: 'No' } });
   await c.until(/✓ 900 ms/);
+  // A task in the background: shown while it runs, its end a line, then the turn it wakes; /helpers lists it.
+  c.p.write('work in the background\r');
+  await c.until(/◆ At work in the background: Check the docs/);
+  await c.until(/each one that ends wakes the agent/);
+  await c.until(/◆ Finished in the background: Check the docs/);
+  await c.until(/The docs check out\./);
+  c.p.write('/helpers\r');
+  await c.until(/Finished {2}Check the docs · in the background/);
   // A turn that runs until stopped: Esc stops it, a resize meanwhile draws the region again at the new width.
   c.p.write('be slow\r');
   await c.until(/Working · \d+ s · esc to stop/);

@@ -6,7 +6,7 @@
 import { EventEmitter } from 'node:events';
 import { childReplyOf, type ChildNote } from '../../shared/children.ts';
 import type { SessionNote } from '../../shared/features.ts';
-import type { LiveOverlay, LiveState, ServerEvent, SessionSummary, TimelineItem, TimelinePage, ToolItem, TurnItem } from '../../shared/types.ts';
+import type { BackgroundTask, LiveOverlay, LiveState, ServerEvent, SessionSummary, TimelineItem, TimelinePage, ToolItem, TurnItem } from '../../shared/types.ts';
 import { enc, type Conn } from './client.ts';
 import { finishedLength } from './markdown.ts';
 import { foldedLine, INDENT, itemLines, noteLines, promptLines, textLines, turnLines, type Look } from './lines.ts';
@@ -287,19 +287,45 @@ export class SessionView extends EventEmitter {
     return this.summary?.queueHeld ? 0 : (this.summary?.queue?.length ?? 0);
   }
 
-  /** Whether the work is done: its turn ended, no helper works or owes a reply, and nothing waits in its queue. */
-  settled(): boolean {
-    return !busy(this.live) && !this.helpersWorking().length && !this.helpersOwed().length && !this.queued();
+  /**
+   * What works in the background now (Claude Code's own background agents and commands): the session's, then each
+   * helper's. The agent ended its turn with them running and is woken as each one ends, so the work is not done.
+   */
+  background(): { key: string; task: BackgroundTask }[] {
+    const out: { key: string; task: BackgroundTask }[] = [];
+    for (const t of this.live?.backgroundTasks ?? []) if (t.status === 'running') out.push({ key: this.key, task: t });
+    for (const h of this.helpers.values()) {
+      if (h.replaced) continue;
+      for (const t of h.summary?.live?.backgroundTasks ?? []) if (t.status === 'running') out.push({ key: h.key, task: t });
+    }
+    return out;
   }
 
-  /** The end of the latest turn, when it has ended (no message, yours or a helper's, came after it). */
+  /**
+   * Whether the work is done: its turn ended, no helper works or owes a reply, nothing works in the background (its
+   * own or a helper's), and nothing waits in its queue.
+   */
+  settled(): boolean {
+    return !busy(this.live) && !this.helpersWorking().length && !this.helpersOwed().length && !this.background().length && !this.queued();
+  }
+
+  /**
+   * The end of the latest turn, when it has ended: no message (yours or a helper's) came after it, nor the end of a
+   * task in the background (which wakes the agent for another turn).
+   */
   lastTurn(): TurnItem | undefined {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i];
       if (it.kind === 'turn') return it;
-      if (it.kind === 'user') return undefined;
+      if (it.kind === 'user' || (it.kind === 'system' && backgroundEnd(it.text))) return undefined;
     }
   }
+}
+
+/** A notice that a task in the background ended ("Background task completed: Check the docs"): how, and what it was. */
+export function backgroundEnd(text: string): { status: string; what: string } | null {
+  const m = /^Background task (\w+): ([\s\S]*)$/.exec(text.trim());
+  return m ? { status: m[1], what: m[2].trim() } : null;
 }
 
 /** The agent's last reply: its text after its last step in the latest turn (several texts in a row, together). */
@@ -507,8 +533,9 @@ export function historyLines(items: TimelineItem[], notes: SessionNote[], look: 
     // The reply: the texts after the last step.
     let a = t.length;
     while (a > 0 && (t[a - 1].kind === 'turn' || t[a - 1].kind === 'system')) a--;
+    // What opened it: your message, a helper's reply, or a task in the background that ended and woke the agent.
     let u = 0;
-    while (u < t.length && t[u].kind === 'user') u++;
+    while (u < t.length && (t[u].kind === 'user' || (t[u].kind === 'system' && !!backgroundEnd((t[u] as { text: string }).text)))) u++;
     let r = a;
     while (r > u && (t[r - 1].kind === 'assistant' || t[r - 1].kind === 'thinking')) r--;
     const lead = t.slice(0, u);
