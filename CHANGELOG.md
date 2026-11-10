@@ -3,6 +3,14 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.51.2 · 10 November 2026
+
+Usage fits a phone.
+
+- **System → Usage on a phone**: the plan cards stay within the screen, so every limit's percentage and reset time
+  shows; long limit-reset names wrap instead of being cut off.
+- System's header on a phone is one line shorter: the subtitle that was cut off is gone.
+
 ## 0.51.1 · 10 November 2026
 
 System fits a phone, and follow-ups wait safely after an update.
