@@ -95,6 +95,20 @@ test('the guide: every topic has its title, a summary and sections; the API topi
   for (const id of ['start', 'sessions', 'guidelines', 'projects', 'ask-agents', 'settings', 'api']) assert.ok(byId.has(id), `a topic "${id}"`);
 });
 
+test('the guide’s index (docs/guide/README.md) lists every topic once and links to files that exist', () => {
+  const dir = path.join(APP_ROOT, 'docs', 'guide');
+  const index = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
+  const files = fs.readdirSync(dir).filter((f) => /^\d+-[a-z0-9-]+\.md$/.test(f));
+  const linked = [...index.matchAll(/^- \[[^\]]+\]\((\d+-[a-z0-9-]+\.md)\)/gm)].map((m) => m[1]);
+  for (const f of linked) assert.ok(files.includes(f), `docs/guide/README.md links to ${f}, which is not in docs/guide`);
+  for (const f of files) assert.ok(linked.includes(f), `docs/guide/README.md does not list ${f}`);
+  assert.equal(new Set(linked).size, linked.length, 'docs/guide/README.md lists a topic twice');
+  for (const f of linked) {
+    const title = /^# (.+)$/m.exec(fs.readFileSync(path.join(dir, f), 'utf8'))?.[1];
+    assert.ok(index.includes(`[${title}](${f})`), `docs/guide/README.md names ${f} other than by its title, "${title}"`);
+  }
+});
+
 test('the guide’s links land: other topics and their sections, Settings sections, the app’s pages', () => {
   const sections = new Set(SECTIONS.map(([id]) => id));
   const pages = /^\/(?:$|\?|s\/|guide|settings|projects|knowledge|apps|agents|answers|pages|library|media|inbox|usage|stats|arena|system|files|search|git|terminal|preview|review\/)/;
