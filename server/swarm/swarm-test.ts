@@ -139,8 +139,7 @@ test('roles: a lead, its members, and everyone else; noted by run before the set
 test('tools: the lead starts members (at most the swarm’s size) and has the board; a member the board only', () => {
   assert.deepEqual(toolsOf(LEAD), ['start_child_session', 'child_sessions', 'message_child', 'step_up_child', 'swarm_post', 'swarm_read', 'swarm_stop']);
   assert.match(children.tools!(ctxOf(LEAD)).find((t) => t.name === 'start_child_session')!.description, /at most 5 of yours run at once/);
-  // A session on its own may step itself up to Max too; a swarm's lead picked its model for a hard problem already.
-  assert.deepEqual(toolsOf('claude:solo'), ['start_child_session', 'child_sessions', 'message_child', 'step_up_child', 'step_up_session']);
+  assert.deepEqual(toolsOf('claude:solo'), ['start_child_session', 'child_sessions', 'message_child', 'step_up_child']);
 });
 
 let A = '';

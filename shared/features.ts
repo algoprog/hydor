@@ -26,6 +26,8 @@ export interface SessionExtra {
   guidelines?: string;
   /** Confidential: models on this computer only, nothing sent out, commands without network (shared/confidential.ts). Set when it starts, never removed. */
   confidential?: true;
+  /** It started on Automatic (shared/tiers.ts): the tiers picked its model, and its agent may move it to the Max tier's when a problem proves hard. Not set when a model was picked for it by name. */
+  auto?: true;
   /** Pages: what it was asked to make from the gallery or Turn it into (shared/content-asks.ts, checked by makeOf), told to its agent in full. */
   make?: MakeExtra;
   /** Any other capability's settings, under its own name. */

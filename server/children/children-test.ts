@@ -445,6 +445,13 @@ test('in a team a child asked for with no tier gets Standard; with the team off,
   assert.equal(sessions.created.at(-1)!.model, undefined);
   assert.doesNotMatch(tool(k, 'start_child_session').description, /With no tier/);
   setTeam(db, { on: true });
+  // A tier that says nothing for the child's program is no tier: Custom before its tiers are set runs its lead's model, with nothing to step up to.
+  const custom = 'acp:team-custom';
+  sessions.add(custom, { agent: 'acp', acpAgent: 'console', model: 'ollama/llama3', live: 'working', mode: 'edits', title: 'Custom lead', items: [user('Sort the files')] });
+  await call(custom, 'start_child_session', { brief: 'Sort the lines of every file in data/.' });
+  assert.equal(sessions.created.at(-1)!.model, 'ollama/llama3');
+  assert.equal((notesOf(db, custom, 'child').at(-1)!.data as ChildNote).tier, undefined);
+  assert.equal(sessionExtra(db, newest()).stepUp, undefined);
 });
 
 test('a helper never thinks with a tier above its lead’s own: Sonnet leads Standard at most, Max may hand out max', async () => {
@@ -482,7 +489,7 @@ test('a helper never thinks with a tier above its lead’s own: Sonnet leads Sta
 });
 
 test('what a session’s main agent is told: to lead helpers on cheaper tiers, in the same words each time', () => {
-  const told = spawnOf({})!.instructions;
+  const told = spawnOf({ extra: { auto: true } })!.instructions;
   assert.equal(told.length, 1);
   assert.match(told[0], /^# Working with helpers\nYou are this session’s main agent/);
   assert.match(told[0], /- A helper on standard: /);
@@ -493,7 +500,9 @@ test('what a session’s main agent is told: to lead helpers on cheaper tiers, i
   assert.match(told[0], /call step_up_session/);
   assert.equal(told[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' }, stepUp: true }));
   // The same for a lead on Opus, on Max, and on a model the tiers do not know.
-  for (const model of ['opus', 'fable', 'mystery-9']) assert.deepEqual(spawnOf({ model })!.instructions, told, model);
+  for (const model of ['opus', 'fable', 'mystery-9']) assert.deepEqual(spawnOf({ model, extra: { auto: true } })!.instructions, told, model);
+  // A session whose model was picked by name leads helpers too, but stays on its model: no word of stepping up.
+  assert.equal(spawnOf({ model: 'opus' })!.instructions[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' } }));
   // Codex has no Agent tool of its own; before it lists its models its tiers differ by effort alone.
   const codex = spawnOf({ agent: 'codex' })!.instructions[0];
   assert.doesNotMatch(codex, /Agent tool/);
@@ -519,28 +528,36 @@ test('what a session’s main agent is told: to lead helpers on cheaper tiers, i
   setTeam(db, { on: false });
   assert.equal(spawnOf({}), undefined);
   setTeam(db, { on: true, hard: false });
-  assert.doesNotMatch(spawnOf({})!.instructions[0], /step_up_session/);
+  assert.doesNotMatch(spawnOf({ extra: { auto: true } })!.instructions[0], /step_up_session/);
   setTeam(db, { hard: true });
   // An agent of the user's that names its own tier stays on it: no step up for it.
   const fixed = saveAssistant(db, { name: 'Fixed tier', instructions: 'Work.', tier: 'best' });
-  assert.doesNotMatch(spawnOf({ extra: { assistant: fixed.id } })!.instructions[0], /step_up_session/);
+  assert.doesNotMatch(spawnOf({ extra: { assistant: fixed.id, auto: true } })!.instructions[0], /step_up_session/);
 });
 
-test('step_up_session: the main agent carries on with Max when its problem proves hard; not twice, not when turned off', async () => {
-  const k = leadOn('e', 'opus');
+test('step_up_session: on Automatic the main agent carries on with Max when its problem proves hard; not twice, not when turned off', async () => {
+  // A session whose model was picked by name stays on it.
+  assert.equal(children.tools!(ctxOf(leadOn('e0', 'opus'))).some((t) => t.name === 'step_up_session'), false);
+  /** A lead that started on Automatic. */
+  const autoOn = (n: string, model: string, agent: Agent = 'claude') => {
+    const key = leadOn(n, model, agent);
+    setSessionExtra(db, key, { auto: true });
+    return key;
+  };
+  const k = autoOn('e', 'opus');
   assert.ok(children.tools!(ctxOf(k)).some((t) => t.name === 'step_up_session'));
   const out = await call(k, 'step_up_session', { why: 'the deadlock survives two fixes' });
   assert.match(out, /^You now think with fable\. Carry on from where you are\.$/);
   assert.deepEqual(sessions.moved.at(-1), { key: k, tier: 'max', pick: { model: 'fable' }, why: { event: 'stepUp', why: 'the deadlock survives two fixes' } });
   // On Max now: the tool is gone, and a call that still comes says so.
   assert.equal(children.tools!(ctxOf(k)).some((t) => t.name === 'step_up_session'), false);
-  const again = leadOn('f', 'opus');
+  const again = autoOn('f', 'opus');
   const stale = tool(again, 'step_up_session');
   sessions.all.get(again)!.model = 'fable';
   await assert.rejects(stale.run({ why: 'x' }, ctxOf(again)), /strongest model already/);
   // Codex takes a new model with its next turn: it is told to end this one, and is woken to carry on.
   setTiers(db, { codex: { best: { model: 'gpt-6.1-sol', effort: 'high' }, max: { model: 'gpt-6.2-astra', effort: 'high' } } });
-  const cx = leadOn('g', 'gpt-6.1-sol', 'codex');
+  const cx = autoOn('g', 'gpt-6.1-sol', 'codex');
   const n = sessions.delivered.length;
   assert.match(await call(cx, 'step_up_session', { why: 'no cause found' }), /From your next turn you think with gpt-6\.2-astra\. End this turn now/);
   assert.match(sessions.delivered[n].text, /^\[You now think with gpt-6\.2-astra\. Carry on with the task from where you stopped\.\]$/);
@@ -549,15 +566,15 @@ test('step_up_session: the main agent carries on with Max when its problem prove
   // Not offered: to a child, to an agent with a tier of its own, with Max for hard problems off, or where Max is Best.
   assert.equal(children.tools!(ctxOf('acp:child1')).length, 0);
   const fixed = saveAssistant(db, { name: 'Fixed tier 2', instructions: 'Work.', tier: 'best' });
-  const own = leadOn('h', 'opus');
+  const own = autoOn('h', 'opus');
   setSessionExtra(db, own, { assistant: fixed.id });
   assert.equal(children.tools!(ctxOf(own)).some((t) => t.name === 'step_up_session'), false);
   setTeam(db, { hard: false });
-  const off = leadOn('i', 'opus');
+  const off = autoOn('i', 'opus');
   assert.equal(children.tools!(ctxOf(off)).some((t) => t.name === 'step_up_session'), false);
   setTeam(db, { hard: true });
   setTiers(db, { claude: { max: { model: 'opus' } } });
-  assert.equal(children.tools!(ctxOf(leadOn('j', 'opus'))).some((t) => t.name === 'step_up_session'), false);
+  assert.equal(children.tools!(ctxOf(autoOn('j', 'opus'))).some((t) => t.name === 'step_up_session'), false);
   setTiers(db, null);
 });
 

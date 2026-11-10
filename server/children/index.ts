@@ -326,7 +326,7 @@ async function startChild(
   const ceiling = ceilingOf(d, ctx, leadAgent);
   const unasked = teamOf(d.db).on && role?.role !== 'lead' && !local ? clampTier('standard', ceiling) : leadAgent?.helperMax;
   const asked = isTier(a.tier) ? clampTier(a.tier, ceiling) : unasked;
-  const tier: Tier | undefined = o.tierOverride ?? (named ? named.tier : modelArg ? undefined : asked);
+  let tier: Tier | undefined = o.tierOverride ?? (named ? named.tier : modelArg ? undefined : asked);
   let tierEffort: string | undefined;
   if (tier && !modelArg) {
     const prog = programOf(ctx, agentArg, modelArg, models);
@@ -334,6 +334,9 @@ async function startChild(
     // Custom's tier names one of its models; one that is gone is passed over.
     if (pick?.model && (prog.acpAgent !== CONSOLE_ID || findModel(models, pick.model))) modelArg = pick.model;
     tierEffort = pick?.effort;
+    // A tier that says nothing for the child's program (Custom before its tiers are set, another ACP agent) is no tier:
+    // the child runs as it would have, with no tier to its name and none to step up to.
+    if (!pick?.model && !pick?.effort && !o.tierOverride) tier = undefined;
   }
   const target = pickAgent(d, ctx, agentArg, modelArg);
   const lead = role?.role === 'lead' ? d.sessions.summary(ctx.key) : null;
@@ -682,7 +685,8 @@ const STEP_UP_SELF: RunTool = {
   async run(a, ctx) {
     const d = ctx.deps;
     if (parentOf(d.db, ctx.key)) throw new Error('A child session cannot step itself up: say in your reply that this part needs a stronger model.');
-    const can = stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: sessionExtra(d.db, ctx.key).assistant });
+    const own = sessionExtra(d.db, ctx.key);
+    const can = stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: own.assistant, auto: own.auto });
     if ('no' in can) throw new Error(can.no);
     const why = firstLine(String(a.why ?? ''), 200) || 'the problem is harder than it looked';
     await d.sessions.moveToTier(ctx.key, 'max', can.max, { event: 'stepUp', why });
@@ -711,8 +715,8 @@ export const children: Feature = {
     // A swarm's lead picked its model for a hard problem already, and its members think with it.
     const swarm = roleOf(d.db, ctx)?.role === 'lead';
     const start = startTool(d, maxFor(d.db, ctx), local, namedFor(d, ctx.key), ceilingOf(d, ctx, lead), teamOf(d.db).on && !swarm);
-    // Its own step up to Max, where Max is another model than Best and its agent names no tier of its own.
-    const self = !local && !swarm && tierProgram(ctx.agent, ctx.acpAgent) && !('no' in stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: x.assistant }));
+    // Its own step up to Max: for a session on Automatic, where Max is another model than Best and its agent names no tier of its own.
+    const self = !local && !swarm && tierProgram(ctx.agent, ctx.acpAgent) && !('no' in stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: x.assistant, auto: x.auto }));
     return [start, LIST, MESSAGE, STEP_UP, ...(self ? [STEP_UP_SELF] : [])];
   },
 

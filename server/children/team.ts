@@ -29,10 +29,10 @@ function nativeName(d: Deps, pick: TierPick): string | undefined {
 export function teamInstructions(o: { native?: { standard?: string; quick?: string }; stepUp?: boolean } = {}): string {
   const lines = [
     '# Working with helpers',
-    'You are this session’s main agent: you work out what is asked, plan, decide, and answer for the result. Helpers are cheaper models that take well-defined parts of the work for a fraction of what you cost. Hand over what can be handed over whole, and keep your own effort for what needs you.',
+    'You are this session’s main agent: you work out what is asked, plan, decide, and answer for the result. Helpers are cheaper models that take well-defined parts of the work: one on quick costs a small fraction of what you do, one on standard clearly less than you. Hand over what can be handed over whole, to the cheapest tier that will do it well, and keep your own effort for what needs you.',
     '- Yours: understanding the request, the plan and its decisions, the hard reasoning (a stubborn bug, a design with trade-offs), putting the parts together, checking the result, and the answer. Also anything small: what you can finish in a few steps is quicker done than briefed.',
-    '- A helper on standard: a clear part of medium size, such as a change you have spelled out (what, where, how to check it), tests for behaviour you have described, research on a set question, a draft to your outline.',
-    '- A helper on quick: a small, very clear job, such as a targeted edit in files you name, the same mechanical change across many files, facts pulled out of documents, converting or formatting.',
+    '- A helper on quick: a job so clear that little can go wrong and its result can be checked, such as a targeted edit in files you name, the same mechanical change across many files, a function or a module to an exact specification, tests for cases you list, facts pulled out of documents, converting or formatting.',
+    '- A helper on standard: a clear part of medium size that still takes judgement along the way, such as a change you have described but not spelled out line by line, a feature in code it must first read, research on a set question, a draft to your outline. It has to be worth a brief: a part of a few minutes’ work is yours or a quick helper’s.',
     '- A hard part that stands on its own can go to a helper on best; the hardest thinking stays with you.',
     '- Decide the design before you hand a part over, and write a brief that stands alone (the helper sees nothing of this conversation): the goal, the files and facts it needs, exact names, what not to touch, how to check the result, what to report. A helper left to guess costs more than it saves.',
     '- Start parts that do not depend on each other together with start_child_session, then end your turn: each reply comes back to you as a message. What depends on a part waits for it.',
@@ -68,14 +68,16 @@ export function leadTier(d: Deps, s: { agent: Agent; acpAgent?: string; key?: st
 }
 
 /**
- * Whether a session may step itself up to Max (step_up_session): Max for hard problems is on, its program's Max is a
- * model (or an effort) other than what it thinks with, it is on a lower tier, and the agent it works as does not name
- * a tier of its own. Why not, in words, when it may not.
+ * Whether a session may step itself up to Max (step_up_session): it started on Automatic (`auto`), Max for hard problems
+ * is on, its program's Max is a model (or an effort) other than what it thinks with, it is on a lower tier, and the
+ * agent it works as does not name a tier of its own. Why not, in words, when it may not.
  */
-export function stepUpSelf(d: Deps, s: { agent: Agent; acpAgent?: string; key?: string; model?: string; assistant?: unknown }): { max: TierPick } | { no: string } {
+export function stepUpSelf(d: Deps, s: { agent: Agent; acpAgent?: string; key?: string; model?: string; assistant?: unknown; auto?: unknown }): { max: TierPick } | { no: string } {
   const p = tierProgram(s.agent, s.acpAgent);
   if (!p) return { no: 'This agent keeps its own model: there are no tiers for it.' };
   if (!teamOf(d.db).hard) return { no: 'Stepping up to Max is turned off (Settings → Models → Tiers).' };
+  // A model the user picked by name stays: only a session whose model the tiers picked moves by itself.
+  if (s.auto !== true) return { no: 'This session’s model was picked for it by name, so it stays on it.' };
   const a = findAssistant(d.db, s.assistant);
   if (a?.tier) return { no: `${a.name} thinks with one tier by its own settings, and stays on it.` };
   const picks = tiersOf(d.db)[p];
@@ -102,7 +104,7 @@ export function teamNote(d: Deps, s: SpawnInfo): string | null {
   const cheaper = (['standard', 'quick'] as const).filter((t) => (picks[t].model || picks[t].effort) && !samePick(picks[t], picks[own]));
   if (!cheaper.length) return null;
   const native = s.agent === 'claude' ? { standard: nativeName(d, picks.standard), quick: nativeName(d, picks.quick) } : undefined;
-  // Told of stepping up whatever it thinks with now (one already on Max too): the same words from one session to the next.
-  const stepUp = teamOf(d.db).hard && !findAssistant(d.db, x.assistant)?.tier && !!(picks.max.model || picks.max.effort) && !samePick(picks.max, picks.best);
+  // A session on Automatic is told of stepping up whatever it thinks with now (one already on Max too): the same words from one such session to the next.
+  const stepUp = x.auto === true && teamOf(d.db).hard && !findAssistant(d.db, x.assistant)?.tier && !!(picks.max.model || picks.max.effort) && !samePick(picks.max, picks.best);
   return teamInstructions({ native, stepUp });
 }
