@@ -133,6 +133,11 @@ class Sessions extends EventEmitter {
   enqueue(key: string, text: string) {
     this.queued.push({ key, text });
   }
+  /** Sessions whose last turn their plan's usage limit stopped. */
+  limited = new Set<string>();
+  stoppedAtLimit(key: string) {
+    return this.limited.has(key);
+  }
   /** A session moved to a tier's model (its own step up). */
   moved: { key: string; tier: string; pick: { model?: string; effort?: string }; why: { event: string; why?: string } }[] = [];
   async moveToTier(key: string, tier: string, pick: { model?: string; effort?: string }, why: { event: string; why?: string }) {
@@ -492,8 +497,9 @@ test('what a session’s main agent is told: to lead helpers on cheaper tiers, i
   const told = spawnOf({ extra: { auto: true } })!.instructions;
   assert.equal(told.length, 1);
   assert.match(told[0], /^# Working with helpers\nYou are this session’s main agent/);
-  assert.match(told[0], /- A helper on standard: /);
-  assert.match(told[0], /- A helper on quick: /);
+  assert.match(told[0], /^- Once you know what is to be done, hand the doing over: write the brief, not the work\./m);
+  assert.match(told[0], /^- quick, for a job specified so exactly/m);
+  assert.match(told[0], /^- standard, for a clear part/m);
   assert.match(told[0], /You answer for what helpers hand back/);
   // Claude Code's own Agent tool gets the tiers' models by its names for them; it may step itself up.
   assert.match(told[0], /Your own Agent tool .* Give it model "sonnet" for a standard part and model "haiku" for a quick one/);
@@ -694,6 +700,27 @@ test('stepping up: an error steps up without asking; a reply that passes goes ba
   await reportTurn(deps, { key: c, startedAt: Date.now() - 1000, external: false });
   assert.equal(sessions.created.length, m);
   verdict = '{"pass": true, "why": "it does the job"}';
+});
+
+test('a helper its plan’s usage limit stopped is not run again a tier up: another account takes it over, or it waits', async () => {
+  const k = leadKey('s6');
+  await call(k, 'start_child_session', { brief: 'Write the six tasks.', tier: 'standard', title: 'Tasks' });
+  const a = newest();
+  // The session manager saw the limit end its turn.
+  sessions.limited.add(a);
+  finish(a, '', 'failed');
+  const n = sessions.created.length;
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n);
+  sessions.limited.delete(a);
+  // Or the turn's own error says so (read back after a restart).
+  await call(k, 'start_child_session', { brief: 'Write the six tasks again.', tier: 'quick', title: 'Tasks 2' });
+  const b = newest();
+  sessions.all.get(b)!.items.push(said('Half done.'), { kind: 'turn', id: 'lim-1', seq: 9999, status: 'failed' } as TimelineItem, { kind: 'system', id: 'lim-2', seq: 10000, level: 'error', text: 'You’ve hit your session limit · resets 9am (UTC)' } as TimelineItem);
+  sessions.all.get(b)!.live = 'idle';
+  const m = sessions.created.length;
+  await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, m);
 });
 
 test('step_up_child: the lead runs a finished helper’s brief again one tier up, saying why', async () => {

@@ -575,6 +575,7 @@ export class SessionManager extends EventEmitter {
       // over now, or it continues by itself after the reset, as you asked.
       // Only the turn's own limit error proves interruption: an account can reach 100% as work finishes.
       const hit = this.limitHits.delete(s.key);
+      if (hit) this.limitEnds.set(s.key, now);
       if ((st === 'idle' || st === 'error') && busy(prev.status) && s.agent !== 'acp' && this.onLimited && !this.resumeLookup?.(s.key)) {
         const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
         const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
@@ -1407,6 +1408,18 @@ export class SessionManager extends EventEmitter {
 
   /** Sessions moving to another account right now. */
   private switching = new Set<string>();
+  /** When each session's turn last ended at its plan's usage limit. */
+  private limitEnds = new Map<string, number>();
+
+  /**
+   * Whether a session's turn that began at `since` (or later) was stopped by its plan's usage limit, not by the work:
+   * another account takes it over, or it waits for the reset, so it is no failure of its own (a helper is not run
+   * again a tier up for it, nor a scheduled run).
+   */
+  stoppedAtLimit(key: string, since = 0): boolean {
+    return (this.limitEnds.get(key) ?? -1) >= since || this.limitHits.has(key) || this.lives.get(key)?.adapter.limitStopped === true;
+  }
+
   /** Sessions whose running turn stopped on the plan's usage limit, as the agent said. */
   private limitHits = new Set<string>();
   /** Sessions you stopped yourself, until your next message: they never continue by themselves after a limit. */

@@ -868,6 +868,8 @@ export class Scheduler extends EventEmitter {
       return null;
     }
     if (row.model || row.target || row.app) return null;
+    // A run its plan's usage limit stopped is no failure of the tier.
+    if (r.key && this.sessions.stoppedAtLimit(r.key, r.started_at ?? 0)) return null;
     const a = findAssistant(this.db, parse<TaskExtra>(row.extra)?.assistant);
     if (!a?.tier || a.stepUp === false || a.standing) return null;
     const now = this.runTier.get(r.id) ?? a.tier;

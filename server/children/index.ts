@@ -570,7 +570,7 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
   if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return;
   // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest).
-  const up = await stepUpCheck(d, t.key, turn);
+  const up = await stepUpCheck(d, t.key, turn, t.startedAt);
   if (up) {
     try {
       await tell(d, parent, await stepUpChild(d, parent, t.key, up.next, up.why));
@@ -599,6 +599,9 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
 
 // ---- stepping up ---------------------------------------------------------------------------------
 
+/** What an agent's program says when its plan's usage ran out, should the session manager not have seen it (a turn read back after a restart). */
+const LIMIT = /\b(hit|reached) (your|its|the)\b.{0,24}\blimit\b|\busage limit\b/i;
+
 const JUDGE = [
   'You check the work an AI helper did for the agent that gave it the job. Answer with one JSON object and nothing else:',
   '{"pass": true or false, "why": "one short sentence"}. Fail it only when its reply plainly does not do the job: it says it could',
@@ -622,11 +625,14 @@ async function judge(d: Deps, brief: string, reply: string): Promise<string> {
 /**
  * Whether a child's turn calls for running it again one tier up: it was started on a tier below the highest allowed (and
  * below Best), its lead's agent steps up, and its turn stopped with an error, wrote nothing, or does not do its brief (the
- * helper model's check). Never for a turn someone stopped, nor once its spending cap is reached.
+ * helper model's check). Never for a turn someone stopped or its plan's usage limit did, nor once its spending cap is
+ * reached.
  */
-async function stepUpCheck(d: Deps, key: string, turn: Turn): Promise<{ next: Tier; why: string } | null> {
+async function stepUpCheck(d: Deps, key: string, turn: Turn, startedAt = 0): Promise<{ next: Tier; why: string } | null> {
   const x = sessionExtra(d.db, key).stepUp as StepUp | undefined;
   if (!x || !isTier(x.tier)) return null;
+  // A turn its plan's usage limit stopped is no failure of the tier: another account takes it over, or it waits for the reset.
+  if (d.sessions.stoppedAtLimit?.(key, startedAt) || LIMIT.test(turn.error ?? '')) return null;
   const next = nextTier(x.tier);
   // By itself a helper goes no higher than Best: Max is for its lead to ask for.
   if (!next || tierRank(next) > tierRank(lowerTier(x.max, 'best')!)) return null;
