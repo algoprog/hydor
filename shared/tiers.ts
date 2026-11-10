@@ -215,7 +215,7 @@ export const lowerTier = (a?: Tier, b?: Tier): Tier | undefined => (!a ? b : !b 
 // ---- which tier a model is ------------------------------------------------------------------------
 
 /** A model's name as its program resolves it ("opus" → claude-opus-5-5; a live session's "claude-opus-5-5[1m]" too), in lower case. */
-function resolvedName(models: KnownModel[], model: string | undefined): string {
+export function resolvedName(models: KnownModel[], model: string | undefined): string {
   const v = (model ?? '').toLowerCase().replace(/\[1m\]$/, '');
   const named = models.filter((m) => m.value !== 'default');
   const hit = !v || v === 'default' ? (models.find((m) => m.isDefault) ?? models[0]) : (named.find((m) => m.value.toLowerCase() === v) ?? named.find((m) => m.resolved?.toLowerCase() === v));
