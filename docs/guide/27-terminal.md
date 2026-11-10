@@ -113,7 +113,7 @@ It ends with an exit code a script can check:
 - `hydor show 6f1e2a3b`: a session's conversation.
 - `hydor send 6f1e2a3b "…"`: a message to a session, queued when it is working. `hydor stop 6f1e2a3b` stops its turn.
 - `hydor models` (or `hydor models claude`): the models each program offers, their efforts, and its modes.
-- `hydor tiers`: which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means for each program. `hydor tiers set claude best opus --effort high` changes one, `hydor tiers reset` puts them back.
+- `hydor tiers`: which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means for each program, and how sessions use them. `hydor tiers set claude best opus --effort high` changes one, `hydor tiers reset` puts them back; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with helpers** and **Max for hard problems** (`on` turns them back on).
 - `hydor agents`: your agents, the built-in ones first.
 - `hydor tasks`: your [scheduled tasks](/guide/tasks); `hydor tasks run <id>` runs one now.
 - `hydor usage`: each plan's usage and limits, and when they reset.
@@ -130,7 +130,7 @@ Make an access token on that computer (in its [Settings → App → Machines](/s
 hydor --server https://hydor.example.com --token acm_… sessions
 ```
 
-or set `HYDOR_URL` and `HYDOR_TOKEN` once. Folders are that computer's: a session starts in its default folder unless you give `--cwd` with a folder there. On this computer, the command makes a token of its own the first time, which [Settings → App → Machines](/settings?s=machines&find=Access%20from%20other%20machines) lists as "This computer's command line".
+or set `HYDOR_URL` and `HYDOR_TOKEN` once. Folders are that computer's: a session starts in its default folder unless you give `--cwd` with a folder there (an address on this computer itself, such as `http://localhost:8790`, keeps the folder you are in). On this computer, the command makes a token of its own the first time, which [Settings → App → Machines](/settings?s=machines&find=Access%20from%20other%20machines) lists as "This computer's command line".
 
 ## Colours and pipes
 

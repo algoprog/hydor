@@ -12,7 +12,7 @@ import type { Assistant } from '../../shared/assistants.ts';
 import type { AppField } from '../../shared/apps.ts';
 import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import type { Opts } from './args.ts';
-import { enc, type Conn } from './client.ts';
+import { enc, spentOf, type Conn } from './client.ts';
 import { conversationLines, openBrowser, resolveKey, sessionLines, shortKey, statusWord, tierLines, usageLines, whyNoReply } from './commands.ts';
 import { KeyReader, layout, LineEditor, type Key } from './editor.ts';
 import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, choiceLine, INDENT, isDeny, itemLines, modelLabel, runningLine, stepLines, textLines, tierName, type Look } from './lines.ts';
@@ -798,9 +798,11 @@ export class Chat {
         case 'cost': {
           if (!view) return this.say(p.dim('Nothing spent yet: no session.'));
           await view.refresh();
-          const own = view.summary?.stats.costUsd ?? 0;
           const hs = [...view.helpers.values()];
-          const theirs = hs.reduce((a, h) => a + (h.summary?.stats.costUsd ?? 0), 0);
+          // As the server adds it up (tokens at their price until the agent's own figure lands); an older server: the sessions' own figures.
+          const spent = await spentOf(this.conn, view.key);
+          const own = spent ? spent.ownUsd : (view.summary?.stats.costUsd ?? 0);
+          const theirs = spent ? spent.childrenUsd : hs.reduce((a, h) => a + (h.summary?.stats.costUsd ?? 0), 0);
           const lines = [`This session: ${money(own) || '$0.00'}`];
           if (hs.length) lines.push(`Its ${hs.length === 1 ? 'helper' : `${hs.length} helpers`}: ${money(theirs) || '$0.00'}`, `Together: ${money(own + theirs) || '$0.00'}`);
           return this.say(...lines.map((l) => `${INDENT}${l}`));
