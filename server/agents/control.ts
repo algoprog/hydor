@@ -443,10 +443,12 @@ export class ClaudeControl extends EventEmitter {
     const fetchedAt = Date.now();
     try {
       let raw = fromLive ? await fromLive().catch(() => null) : null;
-      if (!raw) {
+      // Live usage carries an internal plan id (for example "max"); initialize supplies
+      // its display name. Load it even when a running session can give us fresh usage.
+      if (!raw || !this.initCache || Date.now() - this.initCache.at > 60 * 60_000) {
         const { init, usage } = await this.probe();
         if (init) this.initCache = { at: Date.now(), init };
-        raw = usage;
+        raw ??= usage;
       }
       if (!raw && this.probeError) throw new Error(`Claude Code did not start: ${this.probeError}`);
       if (!raw) throw new Error('Claude Code did not report usage (signed out?)');
