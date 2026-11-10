@@ -257,7 +257,7 @@ An agent set to a tier starts on that tier's model for the program it runs on, u
 
 **Helpers it starts, never above** caps the tiers of the helpers an agent starts: asked for a higher one, a helper gets this one. A helper never thinks with a tier above the one its lead thinks with either. A model named outright is used as named.
 
-**Step up when a check fails** (on unless you turn it off): a helper the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, as far as Best and never above the highest the agent allows. The lead hears that it did and why, and the new helper is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a helper up itself when it finds the result not good enough.
+**Step up when a check fails** (on unless you turn it off): a helper the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, as far as Best and never above the highest the agent allows. Only its reply to the brief is checked: a later reply, to a message from its lead or from you, never sends the whole job round again. The lead hears that it did and why, and the new helper is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a helper up itself when it finds the result not good enough.
 
 ## Agents that hand work to other agents
 

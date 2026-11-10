@@ -78,7 +78,7 @@ In the parent's conversation, the reply shows as one line: "Reply from", the chi
 
 - A reply longer than about 4,000 characters arrives as a short summary written by the helper model ([Agents, accounts and models](/guide/agents-models)); the parent can still read it whole.
 - If a child stops with an error, or is stopped before it finishes, the parent is told that too.
-- A child started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, as far as Best and never above the highest its lead allows; the parent is told it happened and why. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a child up itself when it finds its result not good enough.
+- A child started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, as far as Best and never above the highest its lead allows; the parent is told it happened and why. Only the reply to its brief is checked, not its later replies to messages. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a child up itself when it finds its result not good enough.
 - The parent can check on its children at any time (what each is doing, its agent and model, what it has spent, the start of its latest reply) and send one of them more to do.
 - Replies from turns that ended while the app was stopped are passed on when it starts again.
 

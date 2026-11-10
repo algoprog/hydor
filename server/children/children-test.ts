@@ -717,6 +717,22 @@ test('stepping up: an error steps up without asking; a reply that passes goes ba
   verdict = '{"pass": true, "why": "it does the job"}';
 });
 
+test('only the reply to the brief is checked: a later turn, answering a message, never runs the whole job again', async () => {
+  const k = leadKey('s9');
+  await call(k, 'start_child_session', { brief: 'Write the comparison pages.', tier: 'standard', title: 'Pages' });
+  const a = newest();
+  finish(a, 'Done: four pages, each with its sources.');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  const n = sessions.created.length;
+  // Asked afterwards to open one in a browser, it says only that: judged by the whole brief it would fail.
+  verdict = '{"pass": false, "why": "it only opened a page"}';
+  finish(a, 'I opened the overview in the browser and it loads.');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.equal(sessions.created.length, n, 'no helper started again');
+  assert.match(sessions.delivered.at(-1)!.text, /it loads\.$/);
+  verdict = '{"pass": true, "why": "it does the job"}';
+});
+
 test('a helper its plan’s usage limit stopped is not run again a tier up: another account takes it over, or it waits', async () => {
   const k = leadKey('s6');
   await call(k, 'start_child_session', { brief: 'Write the six tasks.', tier: 'standard', title: 'Tasks' });

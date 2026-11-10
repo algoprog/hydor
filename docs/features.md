@@ -74,8 +74,8 @@ agents that speak ACP and take MCP servers.
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
   agents: plain helpers on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
   with their own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's;
-  steps up: a helper on a tier whose reply fails a quick check by the helper model (or that stops with an error) runs
-  again a tier up, as far as Best, the lead told why, and a scheduled run that fails goes again a tier up, unless the
+  steps up: a helper on a tier whose reply to its brief fails a quick check by the helper model (or that stops with an
+  error) runs again a tier up (its later replies, to messages, are not checked), as far as Best, the lead told why, and a scheduled run that fails goes again a tier up, unless the
   agent turns it off; hands
   back results: the fields of each (an app's answer fields: text, numbers, dates, links, lists, tables), checked by its
   hand_back tool, sent to a file in its folder (Markdown or JSON, with {date}, {time} and {agent} in the name), a page
