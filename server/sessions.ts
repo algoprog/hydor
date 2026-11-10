@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec } from './agents/claude.ts';
+import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
 import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
 import type { ApprovalAnswer, ImageInput, LiveAdapter, LiveConfig, ModelCall } from './agents/live.ts';
@@ -1780,9 +1781,25 @@ export class SessionManager extends EventEmitter {
 
   /** Sends one queued message right away: into the running turn if there is one. */
   async sendQueuedNow(key: string, id: string) {
+    this.loadQueues();
+    const pos = this.queues.get(key)?.findIndex((m) => m.id === id) ?? -1;
+    const held = this.held.has(key);
     const m = this.take(key, id);
     if (!m) throw new HttpError(404, 'That message already went out');
-    await this.deliver(key, m);
+    try {
+      await this.deliver(key, m);
+    } catch (e) {
+      // A rejected send must not lose the queued message or its attachments.
+      const q = this.queues.get(key) ?? [];
+      q.splice(Math.max(0, pos), 0, m);
+      this.queues.set(key, q);
+      if (held) this.held.add(key);
+      this.db.prepare('insert into queued (id, key, text, images, files, created_at) values (?, ?, ?, ?, ?, ?)').run(m.id, key, m.text, JSON.stringify(m.images), JSON.stringify(m.files), m.at);
+      this.reorderQueued(key, q.map((m) => m.id));
+      // Custom processes survive app updates: older ones cannot accept a live correction yet.
+      if (!this.isCustom(key) || !(e instanceof RpcError) || e.code !== -32601 || !e.message.includes('_hydor/message')) throw e;
+      if (!held) this.dispatchQueued(key);
+    }
   }
 
   /**
@@ -1889,7 +1906,14 @@ export class SessionManager extends EventEmitter {
     this.userStopped.delete(key);
     l.adapter.limitStopped = false;
     this.emit('resumeCancelled', key);
-    await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text, takeFirst(l, text)), this.saveImages(images));
+    try {
+      await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text, takeFirst(l, text)), this.saveImages(images));
+    } catch (e) {
+      // A Custom process started before the update may not know _hydor/message. Keep the user's
+      // original message and attachments in the persistent queue, without stopping its running turn.
+      if (this.isCustom(key) && e instanceof RpcError && e.code === -32601 && e.message.includes('_hydor/message')) return this.enqueue(key, text, images, files);
+      throw e;
+    }
     this.touchApp(key);
   }
 

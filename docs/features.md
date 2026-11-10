@@ -954,7 +954,8 @@ programs shows each program's version and what is out, with Check now, Update no
 - Approve or deny commands and edits, approve plans, and answer the agent's questions from cards in the page.
 - Message the agent while it works: your note joins the running turn, or waits in a queue you can reorder and
   edit, attachments included. Custom picks up follow-ups (including a queued message's Send now) at the next
-  model step, after running tools finish. Quote any part of a reply, or of your own
+  model step, after running tools finish. An older Custom process kept across an app update queues the
+  correction until the turn ends instead. Quote any part of a reply, or of your own
   messages, into your next message.
 - Notifications when a session finishes, fails or needs you: in the app, as a system notification, or as a push
   notification on your phone with the app closed; agents and apps' steps can also send you one themselves

@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openDb } from './db.ts';
 import { SessionManager } from './sessions.ts';
+import { RpcError } from './agents/rpc.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -133,6 +134,59 @@ test('a message sent again with its id goes once, whether the first is still goi
   await assert.rejects(sendOnce('send-failed01', () => Promise.reject(new Error('cap reached'))), /cap reached/);
   await sendOnce('send-failed01', send);
   assert.equal(sent, 5, 'a failed one goes when sent again');
+});
+
+test('a Custom process from before the update queues unsupported follow-ups with attachments', async () => {
+  const proto = SessionManager.prototype as any;
+  const key = 'acp:old-custom';
+  const images = [{ mediaType: 'image/png', data: 'aW1hZ2U=' }];
+  const files = [{ name: 'notes.txt', data: 'bm90ZXM=' }];
+  const queued: unknown[][] = [];
+  let error = new RpcError('_hydor/message is not supported', -32601);
+  const live = { agent: 'acp', adapter: { state: { status: 'working' }, sendMessage: async () => { throw error; } } };
+  const m: any = {
+    lives: new Map([[key, live]]), live: () => live, isCustom: () => true,
+    switchBeforeSend: async () => {}, snapshot: async () => {}, limitHits: new Map(), userStopped: new Set(),
+    emit: () => {}, saveFiles: () => [], saveImages: (v: unknown) => v,
+    enqueue: (...args: unknown[]) => queued.push(args), touchApp: () => {},
+  };
+  await proto.send.call(m, key, '/follow-up', images, files);
+  assert.deepEqual(queued, [[key, '/follow-up', images, files]]);
+  assert.equal(live.adapter.state.status, 'working');
+  error = new RpcError('The agent stopped', -32603);
+  await assert.rejects(proto.send.call(m, key, '/other', [], []), /The agent stopped/);
+  assert.equal(queued.length, 1, 'unrelated failures are not silently queued');
+});
+
+test('Send now keeps an unsupported Custom follow-up in the persistent queue', async () => {
+  const proto = SessionManager.prototype as any;
+  const key = 'acp:old-queued';
+  const m: any = {
+    db, queues: new Map(), held: new Set(), queuesLoaded: true,
+    lives: new Map([[key, { adapter: { state: { status: 'working' } } }]]),
+    queueSummary: () => {}, saveImages: () => [], saveFiles: () => [], isCustom: () => true,
+    take: proto.take, loadQueues: proto.loadQueues, reorderQueued: proto.reorderQueued, dispatchQueued: proto.dispatchQueued,
+    deliver: async () => { throw new RpcError('_hydor/message is not supported', -32601); },
+  };
+  proto.enqueue.call(m, key, 'Keep this correction');
+  const original = m.queues.get(key)[0];
+  await proto.sendQueuedNow.call(m, key, original.id);
+  assert.deepEqual(m.queues.get(key), [original]);
+  assert.equal((db.prepare('select text from queued where id = ?').get(original.id) as any).text, original.text);
+  // An unrelated failure still reaches the caller, but keeps the message, order and held state.
+  proto.enqueue.call(m, key, 'Second correction');
+  const second = m.queues.get(key)[1];
+  m.held.add(key);
+  m.deliver = async () => { throw new Error('Connection lost'); };
+  await assert.rejects(proto.sendQueuedNow.call(m, key, original.id), /Connection lost/);
+  assert.deepEqual(m.queues.get(key), [original, second]);
+  assert.ok(m.held.has(key));
+  assert.deepEqual((db.prepare('select id from queued where key = ? order by pos').all(key) as any[]).map((m) => m.id), [original.id, second.id]);
+  // Once the old turn ends, the queued correction can be sent normally, exactly once.
+  m.deliver = async () => {};
+  await proto.sendQueuedNow.call(m, key, original.id);
+  assert.deepEqual(m.queues.get(key), [second]);
+  assert.equal(db.prepare('select id from queued where id = ?').get(original.id), undefined);
 });
 
 for (const [name, fn] of tests) {
