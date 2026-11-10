@@ -209,7 +209,7 @@ class FakeAcpRunner extends EventEmitter {
   writeLine(o: any) {
     if (o.id == null || !o.method) return;
     this.calls.push({ method: o.method, params: o.params });
-    const result = o.method === 'initialize' ? { protocolVersion: 1, agentCapabilities: {} } : o.method === 'session/new' ? { sessionId: `acp-${++acpSessions}` } : o.method === 'session/prompt' ? { stopReason: 'end_turn' } : {};
+    const result = o.method === 'initialize' ? { protocolVersion: 1, agentCapabilities: {} } : o.method === 'session/new' ? { sessionId: `acp-${++acpSessions}` } : o.method === 'session/prompt' ? { stopReason: 'end_turn' } : o.method === '_hydor/message' ? { accepted: true } : {};
     setImmediate(() => this.emit('line', JSON.stringify({ jsonrpc: '2.0', id: o.id, result }), false));
   }
 }
@@ -252,6 +252,36 @@ test('another ACP agent: the instructions go with the first message of each ACP 
   await own.boot(false);
   await turn(own, 'Hi');
   assert.deepEqual(prompts(customRunner)[0], ['Hi']);
+});
+
+test('Custom accepts a follow-up while prompting without ending the running turn', async () => {
+  class BusyRunner extends FakeAcpRunner {
+    promptId?: string;
+    override writeLine(o: any) {
+      if (o.method === 'session/prompt') {
+        this.promptId = o.id;
+        this.calls.push({ method: o.method, params: o.params });
+      } else super.writeLine(o);
+    }
+  }
+  const runner = new BusyRunner();
+  const transcript = path.join(tmp, 'acp-follow.jsonl');
+  const lv = new AcpLive(runner as any, { cwd: tmp, id: 'follow', def: { id: 'console', name: 'Custom', command: '', args: [] }, transcript });
+  await lv.boot(false);
+  await lv.sendMessage('First task', []);
+  try {
+    await lv.sendMessage('Use this correction', [{ mediaType: 'image/png', data: 'aW1hZ2U=' }]);
+    assert.equal(lv.state.status, 'working');
+    assert.equal(runner.calls.filter((c) => c.method === 'session/prompt').length, 1);
+    const follow = runner.calls.find((c) => c.method === '_hydor/message');
+    assert.ok(follow);
+    assert.equal(follow.params.prompt[0].text, 'Use this correction');
+    const records = fs.readFileSync(transcript, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.deepEqual(records.filter((l) => l.t === 'prompt').map((l) => l.text), ['First task', 'Use this correction']);
+    assert.ok(!records.some((l) => l.t === 'end'));
+  } finally {
+    runner.emit('line', JSON.stringify({ id: runner.promptId, result: { stopReason: 'end_turn' } }), false);
+  }
 });
 
 // ---- .claude/agents files ---------------------------------------------------------------------------
@@ -621,6 +651,10 @@ test('Custom offers the model only the tools its assistant allows (a real run of
   if (!fs.existsSync(agentJs)) throw new Error(`${agentJs} is missing: npm run build:server first`);
   let offered: string[] | null = null;
   let allowed: string[] | null = ['read'];
+  let holdReply: ((release: () => void) => void) | undefined;
+  let lastMessages: any[] = [];
+  let nextDelta: any;
+  let holdTool: ((release: () => void) => void) | undefined;
   const servers: Record<string, (b: any) => unknown> = {
     hydor: mcpHandler(['show_html', 'web_search', 'read_page', 'remember']),
     notion: mcpHandler(['search_pages']),
@@ -638,13 +672,31 @@ test('Custom offers the model only the tools its assistant allows (a real run of
       if (mcp && servers[mcp[1]]) {
         const body = JSON.parse(raw || '{}');
         if (body.id == null) return res.writeHead(202).end();
-        return json(200, { jsonrpc: '2.0', id: body.id, result: servers[mcp[1]](body) });
+        const reply = () => json(200, { jsonrpc: '2.0', id: body.id, result: servers[mcp[1]](body) });
+        if (body.method === 'tools/call' && holdTool) {
+          const hold = holdTool;
+          holdTool = undefined;
+          return hold(reply);
+        }
+        return reply();
       }
       if (url === '/v1/chat/completions') {
-        offered = (JSON.parse(raw).tools ?? []).map((t: any) => t.function.name);
-        res.writeHead(200, { 'content-type': 'text/event-stream' });
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Done.' }, finish_reason: 'stop' }] })}\n\n`);
-        return res.end('data: [DONE]\n\n');
+        const body = JSON.parse(raw);
+        offered = (body.tools ?? []).map((t: any) => t.function.name);
+        lastMessages = body.messages;
+        const delta = nextDelta ?? { content: 'Done.' };
+        nextDelta = undefined;
+        const reply = () => {
+          res.writeHead(200, { 'content-type': 'text/event-stream' });
+          res.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: delta.tool_calls ? 'tool_calls' : 'stop' }] })}\n\n`);
+          res.end('data: [DONE]\n\n');
+        };
+        if (holdReply) {
+          const hold = holdReply;
+          holdReply = undefined;
+          return hold(reply);
+        }
+        return reply();
       }
       json(404, {});
     });
@@ -703,6 +755,39 @@ test('Custom offers the model only the tools its assistant allows (a real run of
     await prompt('Web and other tools.');
     assert.ok(offered!.includes('web_fetch') && offered!.includes('web_search') && offered!.includes('mcp__mine__do_thing'));
     assert.ok(!offered!.includes('bash') && !offered!.includes('write_file'));
+    // A correction sent during a final answer is included in the next model step, in the same turn.
+    const held = new Promise<() => void>((resolve) => { holdReply = resolve; });
+    const running = call('session/prompt', { sessionId, prompt: [{ type: 'text', text: 'Initial request' }], _meta: { promptId: 'initial' } });
+    const release = await held;
+    try {
+      assert.deepEqual(await call('_hydor/message', { sessionId, prompt: [{ type: 'text', text: 'Correction while working' }], promptId: 'correction' }), { accepted: true });
+      assert.deepEqual(await call('_hydor/message', { sessionId, prompt: [{ type: 'text', text: 'One more detail' }], promptId: 'detail' }), { accepted: true });
+    } finally {
+      release();
+    }
+    assert.equal((await running).stopReason, 'end_turn');
+    const contents = lastMessages.map((m: any) => m.content);
+    assert.ok(contents.some((c) => typeof c === 'string' && c.includes('Correction while working')));
+    assert.ok(contents.some((c) => typeof c === 'string' && c.includes('One more detail')));
+    const state = JSON.parse(fs.readFileSync(path.join(tmp, 'custom-state', `${sessionId}.json`), 'utf8'));
+    assert.deepEqual(state.turnLog.ends.slice(-3).map((e: any) => e.id), ['initial', 'correction', 'detail']);
+    assert.deepEqual(await call('_hydor/message', { sessionId, prompt: [] }), { accepted: false }, 'an idle agent asks the adapter to start a normal turn');
+    // A follow-up during a tool must not split the assistant/tool-result pair or cancel the tool.
+    nextDelta = { tool_calls: [{ index: 0, id: 'slow-tool', type: 'function', function: { name: 'remember', arguments: '{}' } }] };
+    const toolHeld = new Promise<() => void>((resolve) => { holdTool = resolve; });
+    const toolTurn = prompt('Run a tool');
+    const releaseTool = await toolHeld;
+    try {
+      assert.deepEqual(await call('_hydor/message', { sessionId, prompt: [{ type: 'text', text: 'Correction during tool' }], promptId: 'tool-correction' }), { accepted: true });
+    } finally {
+      releaseTool();
+    }
+    assert.equal((await toolTurn).stopReason, 'end_turn');
+    const toolAt = lastMessages.findIndex((m) => m.tool_calls?.some((c: any) => c.id === 'slow-tool'));
+    assert.ok(toolAt >= 0);
+    assert.equal(lastMessages[toolAt + 1].role, 'tool');
+    assert.equal(lastMessages[toolAt + 1].tool_call_id, 'slow-tool');
+    assert.match(lastMessages[toolAt + 2].content, /Correction during tool/);
   } finally {
     p.kill();
     srv.close();

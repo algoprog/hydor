@@ -257,7 +257,7 @@ You can type while a turn runs. What Enter does then is set by **Sending while a
 - **Join the turn** (the default): Enter adds your message to the turn in progress, so the agent takes it into account right away. Ctrl+Enter (⌘Enter on a Mac) puts it in the queue instead.
 - **Wait for it**: Enter puts your message in the queue, to go out when the turn ends. Ctrl+Enter adds it to the turn instead.
 
-The message box says which: "Send a follow-up into the running turn" or "Queue a message for when this turn ends". On a touch screen the send button does what Enter would. Custom and the other ACP agents take one message at a time, so a message sent while they work always waits in the queue. In Claude Code, a message that went in while the agent worked shows "sent while working" under it.
+The message box says which: "Send a follow-up into the running turn" or "Queue a message for when this turn ends". On a touch screen the send button does what Enter would. Custom picks up follow-ups at the next model step, after any running tools finish; **Send now** does the same for a queued message. Other ACP agents take one message at a time, so a message sent while they work always waits in the queue. In Claude Code, a message that went in while the agent worked shows "sent while working" under it.
 
 ## Manage the queue
 
@@ -460,6 +460,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Give the session 'Fix upload' the goal: npm test passes and uploads of 2 GB work."
 - "Fork the release-notes session and try a shorter version."
 - "Switch the session 'Data cleanup' to Accept edits and send it: carry on with the next file."
+- "Send this correction into my running Custom session without waiting for the turn to end."
 - "What does the rotating ring on Stop mean?"
 - "Explain how a heat pump works, with a diagram of the cycle and a picture of one."
 - "Compare the three e-readers in a table and pick one for me."
