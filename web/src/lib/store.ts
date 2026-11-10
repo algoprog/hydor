@@ -300,19 +300,21 @@ export const useUsage = create<{
 export const useAppSettings = create<{
   autoResume: boolean | null;
   autoSwitch: boolean | null;
+  apiCredit: boolean | null;
   loaded: boolean;
   load: () => Promise<void>;
-  set: (p: { autoResume?: boolean; autoSwitch?: boolean }) => void;
+  set: (p: { autoResume?: boolean; autoSwitch?: boolean; apiCredit?: boolean }) => void;
 }>((set, get) => ({
   autoResume: null,
   autoSwitch: null,
+  apiCredit: null,
   loaded: false,
   load: async () => {
     if (get().loaded) return;
     set({ loaded: true });
     try {
-      const r = await api<{ autoResume: boolean; autoSwitch: boolean }>('/api/app-settings');
-      set({ autoResume: r.autoResume, autoSwitch: r.autoSwitch });
+      const r = await api<{ autoResume: boolean; autoSwitch: boolean; apiCredit?: boolean }>('/api/app-settings');
+      set({ autoResume: r.autoResume, autoSwitch: r.autoSwitch, apiCredit: !!r.apiCredit });
     } catch {
       set({ loaded: false });
     }

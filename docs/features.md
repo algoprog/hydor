@@ -55,6 +55,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   shows its own usage and limits. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage moves, with its history, to another account with usage left and carries on, and the app's own quick
   questions (the helper model, apps' model steps) go to the next signed-in account too.
+  With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an
+  account when every account is at its limit, and go back to the plan once it has usage again.
 
 ## Help with anything
 

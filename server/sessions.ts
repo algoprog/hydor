@@ -32,7 +32,7 @@ import { addNote, dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountById, accountEnv, accountOfPath, accountPool, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -205,6 +205,8 @@ interface Live {
   acpAgent?: string;
   /** What the capabilities have for the first message after the agent started (SpawnAdditions.notes), until it goes. */
   firstNotes?: string;
+  /** A Claude session billed to its account's API credit (an Anthropic API key), every account being at its limit. */
+  apiCredit?: boolean;
 }
 
 /** Lists saved attachments at the end of a message; the agent opens them by path. */
@@ -365,7 +367,7 @@ export class SessionManager extends EventEmitter {
         runner.cleanup();
         continue;
       }
-      this.attach({ key: k, agent: meta.agent, cwd: meta.cwd, adapter, runner, account: opts.account || undefined });
+      this.attach({ key: k, agent: meta.agent, cwd: meta.cwd, adapter, runner, account: opts.account || undefined, apiCredit: !!opts.apiCredit || undefined });
       if (adapter instanceof AcpLive) adapter.restored();
       console.log(`[restore] reattached ${k} (${adapter.state.status})`);
     }
@@ -424,6 +426,7 @@ export class SessionManager extends EventEmitter {
       worktree: parseJson<WorktreeInfo>(r.worktree),
       pr: parseJson<PullRequestInfo>(r.pr),
       account: r.account ?? accountOfPath(this.db, r.path) ?? undefined,
+      apiCredit: live?.apiCredit || undefined,
       acpAgent: r.acp_agent ?? undefined,
       extra: r.extra ? parseExtra(r.extra) : undefined,
       acpName: r.acp_agent ? (acpAgents(this.db).find((a) => a.id === r.acp_agent)?.name ?? r.acp_agent) : undefined,
@@ -585,6 +588,8 @@ export class SessionManager extends EventEmitter {
           else if (kvGet(this.db, 'auto_resume') === '1') this.resumeAfterLimit(s.key, resetsAt).catch(() => {});
         }
       }
+      // A session on API credit goes back to a plan once one has usage again.
+      if (st === 'idle' && busy(prev.status) && this.lives.get(s.key)?.apiCredit) this.leaveCredit(s.key).catch(() => {});
       // The capabilities hear of every ended turn (memory notes, spending, automations), once its last lines are in.
       if ((st === 'idle' || st === 'error') && busy(prev.status)) {
         const t = { key: s.key, agent: s.agent, cwd: s.cwd, status: st, startedAt: prev.turnStart, endedAt: now, external: !!s.external };
@@ -932,7 +937,10 @@ export class SessionManager extends EventEmitter {
     const acct = accountEnv(this.db, agent, opts.account);
     const account = opts.account || undefined;
     // Claude Code keeps a copy of each file it edits, per message, so "Edit from here" can put them back.
-    const env = agent === 'claude' ? { ...agentBaseEnv(), ...acct, CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1' } : { ...agentBaseEnv(), ...acct };
+    const env: Record<string, string> = agent === 'claude' ? { ...agentBaseEnv(), ...acct, CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1' } : { ...agentBaseEnv(), ...acct };
+    // Every account at its limit and Use API credit on: Claude Code bills this run to the account's API key.
+    const credit = agent === 'claude' ? await this.creditKey(account) : null;
+    if (credit) env.ANTHROPIC_API_KEY = credit;
     const runId = crypto.randomBytes(6).toString('hex');
     if (agent === 'claude') {
       const sessionId = opts.sessionId ?? crypto.randomUUID();
@@ -940,11 +948,11 @@ export class SessionManager extends EventEmitter {
       const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt, model: opts.model });
       Object.assign(env, add.env);
       const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
-      const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account } };
+      const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account, apiCredit: !!credit || undefined } };
       const runner = await Runner.start(meta, claudeSpec(o, env));
       const adapter = new ClaudeLive(runner, o);
       await runner.connect();
-      const l: Live = { key: meta.key!, agent, cwd, adapter, runner, account, firstNotes: add.notes.join('\n\n') || undefined };
+      const l: Live = { key: meta.key!, agent, cwd, adapter, runner, account, firstNotes: add.notes.join('\n\n') || undefined, apiCredit: !!credit || undefined };
       this.attach(l);
       try {
         await adapter.initialize();
@@ -1412,6 +1420,10 @@ export class SessionManager extends EventEmitter {
       const from = this.accountOf(key);
       const to = await this.freeAccount(agent, from);
       if (!to) {
+        if (agent === 'claude' && (await this.toCredit(key))) {
+          await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit and no other account has usage left, so this session now runs on API credit. Continue where you left off.`);
+          return;
+        }
         if (kvGet(this.db, 'auto_resume') === '1') await this.resumeAfterLimit(key, resetsAt);
         return;
       }
@@ -1486,7 +1498,62 @@ export class SessionManager extends EventEmitter {
     const from = this.accountOf(key);
     if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
     const to = await this.freeAccount(agent, from);
-    return to ? this.carryOver(key, from, to.id) : false;
+    if (to) return this.carryOver(key, from, to.id);
+    if (agent === 'claude') await this.toCredit(key);
+    return false;
+  }
+
+  /**
+   * The API key a Claude run as this account bills to: with Use API credit on, when the account is at its plan's
+   * limit and no other has usage left (Switch accounts at a limit on), its own key, else another account's. Null
+   * otherwise: a usage that could not be read never moves work onto API billing.
+   */
+  private async creditKey(account: string | undefined): Promise<string | null> {
+    if (!apiCreditOn(this.db)) return null;
+    const pool = autoSwitchOn(this.db) ? accountPool(this.db, 'claude') : [undefined];
+    const keys = [account, ...pool.filter((id) => id !== account)].map((id) => apiKeyOf(this.db, id));
+    if (!keys.some(Boolean)) return null;
+    const own = await this.usageOf('claude', account);
+    if (!own?.ok || !SessionManager.usedUp(own)) return null;
+    if (autoSwitchOn(this.db) && (await this.freeAccount('claude', account))) return null;
+    return keys.find(Boolean) ?? null;
+  }
+
+  /**
+   * Moves a Claude session at its limit onto API credit when that is how it would run now: its agent process
+   * stops, and the next message starts it again billed to the API key. True when it did.
+   */
+  private async toCredit(key: string): Promise<boolean> {
+    // Already on it: a limit now is the API's own (credit used up), and nothing changes.
+    if (this.external.get(key) || this.lives.get(key)?.apiCredit) return false;
+    if (!(await this.creditKey(this.accountOf(key)))) return false;
+    await this.stopAndWait(key);
+    const s = this.summary(key);
+    this.emit('toast', { level: 'info', text: `${s?.title ?? 'A session'}: every Claude account is at its usage limit, so it continues on API credit` });
+    return true;
+  }
+
+  /**
+   * After a turn of a session on API credit: once a plan has usage again, it leaves the API key (its own account
+   * first, else another with usage left); its process stops and the next message starts it on the plan.
+   */
+  private async leaveCredit(key: string) {
+    const l = this.lives.get(key);
+    if (!l?.apiCredit || this.switching.has(key)) return;
+    this.switching.add(key);
+    try {
+      const from = this.accountOf(key);
+      const own = await this.usageOf('claude', from, 600_000);
+      if (own?.ok && !SessionManager.usedUp(own)) {
+        if (this.lives.get(key) === l && l.adapter.state.status === 'idle') await this.stopAndWait(key);
+        return;
+      }
+      if (!autoSwitchOn(this.db)) return;
+      const to = await this.freeAccount('claude', from);
+      if (to && this.lives.get(key) === l && l.adapter.state.status === 'idle') await this.carryOver(key, from, to.id);
+    } finally {
+      this.switching.delete(key);
+    }
   }
 
   /** Moves the session to the account, says so, and brings a Codex goal along. True when that goal continues it by itself. */
@@ -2264,7 +2331,7 @@ export class SessionManager extends EventEmitter {
   /** Usage from a running Claude session of the account, when there is one (avoids a probe process). */
   liveClaudeUsage(account?: string): (() => Promise<any>) | undefined {
     for (const l of this.lives.values()) {
-      if (l.adapter instanceof ClaudeLive && (l.account ?? undefined) === (account || undefined) && l.adapter.state.status !== 'starting' && !l.adapter.exited) {
+      if (l.adapter instanceof ClaudeLive && !l.apiCredit && (l.account ?? undefined) === (account || undefined) && l.adapter.state.status !== 'starting' && !l.adapter.exited) {
         const a = l.adapter;
         return () => a.usage();
       }

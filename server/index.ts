@@ -45,7 +45,7 @@ import { clients as agentClients, clientUpdates, ensureCommand, install as insta
 import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, installUpdateNow, laterUpdate, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
-import { accountEnv, accountPool, addAccount, addedAccounts, autoSwitchOn, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
+import { accountById, accountEnv, accountPool, addAccount, addedAccounts, apiCreditOn, autoSwitchOn, hasApiKey, setApiKey, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
@@ -647,12 +647,13 @@ app.delete('/api/sessions/:key/resume-at', async (req) => {
   return { ok: true };
 });
 /** App-wide switches kept on the server (they act while no browser is open). */
-const appSettings = () => ({ autoResume: kvGet(db, 'auto_resume') === '1', autoSwitch: autoSwitchOn(db) });
+const appSettings = () => ({ autoResume: kvGet(db, 'auto_resume') === '1', autoSwitch: autoSwitchOn(db), apiCredit: apiCreditOn(db) });
 app.get('/api/app-settings', async () => appSettings());
 app.put('/api/app-settings', async (req) => {
   const b = (req.body ?? {}) as any;
   if (typeof b.autoResume === 'boolean') kvSet(db, 'auto_resume', b.autoResume ? '1' : '0');
   if (typeof b.autoSwitch === 'boolean') kvSet(db, 'auto_switch', b.autoSwitch ? '1' : '0');
+  if (typeof b.apiCredit === 'boolean') kvSet(db, 'api_credit', b.apiCredit ? '1' : '0');
   return appSettings();
 });
 // A webhook task's address, /hooks/<secret>, is served by the automations (server/automations/hooks.ts).
@@ -1002,7 +1003,30 @@ app.get('/api/accounts', async () => {
     codex.account(),
     Promise.all(addedAccounts(db).map(async (a) => ({ ...a, status: await sessions.controlFor(a.agent, a.id).account() }))),
   ]);
-  return { claude: c, codex: x, extra };
+  // Which Claude accounts have an API key for API credit ("main": the CLI's own sign-in).
+  const apiKeys: Record<string, boolean> = { main: hasApiKey(db, undefined) };
+  for (const a of extra) if (a.agent === 'claude') apiKeys[a.id] = hasApiKey(db, a.id);
+  return { claude: c, codex: x, extra, apiKeys };
+});
+
+/** A Claude account's Anthropic API key, the API credit its sessions use when every account is at its limit (Settings → Accounts). */
+app.put('/api/accounts/claude/api-keys/:account', async (req) => {
+  const id = (req.params as { account: string }).account;
+  const acct = id === 'main' ? undefined : accountById(db, id);
+  if (id !== 'main' && acct?.agent !== 'claude') throw new HttpError(404, 'No such Claude Code account');
+  const key = String((req.body as { key?: string })?.key ?? '').trim();
+  if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key)) throw new HttpError(400, 'That is not an Anthropic API key (they start with sk-ant-)');
+  const r = await fetch('https://api.anthropic.com/v1/models?limit=1', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+  if (r && (r.status === 401 || r.status === 403)) throw new HttpError(400, 'Anthropic refused that key');
+  setApiKey(db, acct?.id, key, acct?.name ?? 'your main sign-in');
+  broadcastAccounts();
+  return { ok: true, checked: !!r?.ok };
+});
+app.delete('/api/accounts/claude/api-keys/:account', async (req) => {
+  const id = (req.params as { account: string }).account;
+  setApiKey(db, id === 'main' ? undefined : id, null, '');
+  broadcastAccounts();
+  return { ok: true };
 });
 
 /** Another account for an agent: its own folder, signed in on its own. */

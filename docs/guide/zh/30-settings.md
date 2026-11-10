@@ -87,6 +87,7 @@
 
 - [**你的账户**](/settings?s=accounts&find=Your%20accounts)：会话使用的 Claude Code 和 Codex 登录，以及你添加的更多账户。
 - [**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：用量耗尽的会话会换另一个账户继续。
+- [**达到限额时使用 API 额度**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)：When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key。
 - [**智能体程序**](/settings?s=accounts&find=Agent%20programs)：已安装哪些智能体程序，以及安装其他程序。
 - [**自动更新**](/settings?s=accounts&find=Update%20automatically)：让 Claude Code、Codex 和其他智能体程序保持最新版本。
 

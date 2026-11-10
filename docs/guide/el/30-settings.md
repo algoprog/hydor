@@ -87,6 +87,7 @@
 
 - [**Οι λογαριασμοί σας**](/settings?s=accounts&find=Your%20accounts): Οι συνδέσεις του Claude Code και του Codex που χρησιμοποιούν οι συνεδρίες, και όσοι λογαριασμοί προσθέσετε.
 - [**Αλλαγή λογαριασμού στο όριο**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): Μια συνεδρία που εξαντλεί τη χρήση της συνεχίζει με άλλον λογαριασμό.
+- [**Χρήση πίστωσης API στο όριο**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key.
 - [**Προγράμματα πρακτόρων**](/settings?s=accounts&find=Agent%20programs): Ποια προγράμματα πρακτόρων είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων.
 - [**Αυτόματη ενημέρωση**](/settings?s=accounts&find=Update%20automatically): Κρατά το Claude Code, το Codex και τα άλλα προγράμματα πρακτόρων στη νεότερη έκδοσή τους.
 

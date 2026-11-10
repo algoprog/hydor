@@ -101,6 +101,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Agents › Accounts
   ['accounts', 'Your accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
   ['accounts', 'Switch accounts at a limit', 'auto switch rotate use all accounts usage limit continue other account', 'A session that runs out of usage carries on with another account'],
+  ['accounts', 'Use API credit at a limit', 'api credit key anthropic billing console usage limit every claude account carry on pay', 'When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key'],
   ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie version', 'Which agent programs are installed, and installing the others'],
   ['accounts', 'Update automatically', 'update upgrade newest latest version claude code codex gemini opencode agent programs daily', 'Keeps Claude Code, Codex and the other agent programs at their newest version', 'Update agent programs automatically'],
   // Agents › More agents

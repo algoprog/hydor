@@ -11,6 +11,7 @@ import { HttpError } from './auth.ts';
 import { agentRoots, config } from './config.ts';
 import { kvGet, kvSet, type DB } from './db.ts';
 import { claudeTranscriptPath, findClaudeTranscript } from './timeline.ts';
+import { deleteSecret, readSecret, saveSecret, secretView } from './connections/vault.ts';
 
 interface Stored {
   id: string;
@@ -105,6 +106,39 @@ export function autoSwitchOn(db: DB): boolean {
   return kvGet(db, 'auto_switch') !== '0';
 }
 
+/** Use API credit at a limit: off until you turn it on. */
+export function apiCreditOn(db: DB): boolean {
+  return kvGet(db, 'api_credit') === '1';
+}
+
+/**
+ * The vault key that holds a Claude account's Anthropic API key, the API credit its sessions bill to when
+ * every account is at its limit (undefined: the CLI's own account).
+ */
+export const apiKeyName = (id: string | undefined) => (id ? `CLAUDE_API_KEY_${id.replace(/[^A-Za-z0-9]/g, '_').toUpperCase()}` : 'CLAUDE_API_KEY');
+
+export function hasApiKey(db: DB, id: string | undefined): boolean {
+  try {
+    return !!secretView(db, apiKeyName(id));
+  } catch {
+    return false;
+  }
+}
+
+export function apiKeyOf(db: DB, id: string | undefined): string | null {
+  try {
+    return readSecret(db, apiKeyName(id))?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps a Claude account's API key in the vault (an empty one removes it). */
+export function setApiKey(db: DB, id: string | undefined, key: string | null, label: string) {
+  if (!key) return deleteSecret(db, apiKeyName(id));
+  saveSecret(db, { name: apiKeyName(id), value: key, domains: ['api.anthropic.com'], note: `API credit for the Claude Code account ${label}, used when every account is at its usage limit` });
+}
+
 export function accountPool(db: DB, agent: Agent): (string | undefined)[] {
   return [undefined, ...stored(db).filter((a) => a.agent === agent).map((a) => a.id)];
 }
@@ -171,6 +205,9 @@ export function renameAccount(db: DB, id: string, name: string) {
 
 /** Forgets an account; `wipe` also deletes its folder: its sign-in and the history of its sessions. */
 export function removeAccount(db: DB, id: string, wipe: boolean) {
+  try {
+    deleteSecret(db, apiKeyName(id));
+  } catch {}
   const a = accountById(db, id);
   if (!a) return;
   save(

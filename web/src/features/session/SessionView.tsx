@@ -14,7 +14,7 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { modelLabel, useCatalog } from '../../components/AgentPickers';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
+import { Badge, Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
 import { Composer, handoffName } from './Composer';
 import { SessionCtx, ToolRow } from './items';
@@ -138,7 +138,12 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
             )}
             {s.pr && <PrBadge pr={s.pr} onClick={() => setPrOpen(true)} />}
             {!mobile && model && <span className="shrink-0">· {modelLabel(cat, model)}</span>}
-            {accountName && <span className="flex shrink-0 items-center gap-1">· <UserRound size={12} /> {accountName}</span>}
+            {accountName && <span className="flex shrink-0 items-center gap-1">· <UserRound size={12} /> <span translate="no">{accountName}</span></span>}
+            {s.apiCredit && (
+              <span className="shrink-0" title="Billed to the account's Anthropic API key: every Claude account is at its usage limit">
+                <Badge tone="warn">API credit</Badge>
+              </span>
+            )}
           </div>
         </div>
         {action}
