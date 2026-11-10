@@ -1,10 +1,11 @@
 // A bridge for agents that take MCP servers only as commands (Hermes Agent, Goose…, whose ACP handshake does not offer
 // HTTP): it speaks MCP's stdio transport (one JSON message per line) and forwards each message to the app's MCP server
-// at the address in its first argument. Headers (a token, say) come in HYDOR_MCP_HEADERS as JSON. Built as
+// at the address in HYDOR_MCP_URL (in the environment, not on the command line: the address carries the run's token).
+// Headers (a token, say) come in HYDOR_MCP_HEADERS as JSON. Built as
 // dist/server/mcpbridge.js; the session starts it as the agent's MCP server (server/agents/acp.ts).
 import readline from 'node:readline';
 
-const url = process.argv[2];
+const url = process.env.HYDOR_MCP_URL ?? process.argv[2];
 if (!/^https?:\/\//.test(url ?? '')) {
   process.stderr.write('hydor MCP bridge: give it the address of the MCP server\n');
   process.exit(2);

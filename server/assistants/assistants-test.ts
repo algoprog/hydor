@@ -266,8 +266,11 @@ test('an ACP agent that takes MCP servers only as commands gets the app’s serv
   assert.deepEqual(servers.map((x) => x.name), ['files', 'tools', 'hydor']);
   assert.ok(servers.every((x) => !x.type && x.command), 'commands only');
   assert.match(servers[2].args[0], /mcpbridge\.js$/);
-  assert.equal(servers[2].args[1], 'http://127.0.0.1:1/mcp/run/r');
-  assert.deepEqual(servers[0].env, [{ name: 'HYDOR_MCP_HEADERS', value: JSON.stringify({ Authorization: 'Bearer x' }) }], 'headers travel in the environment');
+  // The address carries the run's token: in the environment, never on a command line anyone can list.
+  assert.equal(servers[2].args.length, 1, 'no address among the arguments');
+  assert.ok(!servers.some((x) => x.args?.some((v: string) => v.includes('/mcp/run/'))), 'the run token is on no command line');
+  assert.deepEqual(servers[2].env, [{ name: 'HYDOR_MCP_URL', value: 'http://127.0.0.1:1/mcp/run/r' }]);
+  assert.deepEqual(servers[0].env, [{ name: 'HYDOR_MCP_URL', value: 'http://127.0.0.1:1/files' }, { name: 'HYDOR_MCP_HEADERS', value: JSON.stringify({ Authorization: 'Bearer x' }) }], 'address and headers travel in the environment');
   assert.deepEqual(servers[1], { name: 'tools', command: 'tool-server', args: ['--stdio'], env: [] });
   // HTTP in its handshake: by address, as before.
   class HttpRunner extends FakeAcpRunner {

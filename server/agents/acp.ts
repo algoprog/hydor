@@ -220,11 +220,13 @@ export class AcpLive extends LiveAdapter {
     const http = !!this.caps.mcpCapabilities?.http;
     const pairs = (o?: Record<string, string>) => Object.entries(o ?? {}).map(([name, value]) => ({ name, value }));
     // An agent that takes servers only as commands (stdio is the one every ACP agent must take) gets the HTTP ones through a bridge.
+    // The address goes in the bridge's environment, never on its command line, which anyone on the computer can list:
+    // the app's own carries the run's token.
     const bridged = (name: string, url: string, headers?: Record<string, string>) => ({
       name,
       command: process.execPath,
-      args: [path.join(APP_ROOT, 'dist/server/mcpbridge.js'), url],
-      env: pairs(headers && Object.keys(headers).length ? { HYDOR_MCP_HEADERS: JSON.stringify(headers) } : {}),
+      args: [path.join(APP_ROOT, 'dist/server/mcpbridge.js')],
+      env: pairs({ HYDOR_MCP_URL: url, ...(headers && Object.keys(headers).length ? { HYDOR_MCP_HEADERS: JSON.stringify(headers) } : {}) }),
     });
     const mcpServers: unknown[] = Object.entries(this.o.add?.mcpServers ?? {}).flatMap(([name, d]): unknown[] =>
       d.type === 'http' ? (http ? [{ type: 'http', name, url: d.url, headers: pairs(d.headers) }] : [bridged(name, d.url, d.headers)]) : [{ name, command: d.command, args: d.args ?? [], env: pairs(d.env) }],
