@@ -260,9 +260,10 @@ Paths use `/` as the separator; nothing treats a leading `.` specially. Reading 
 - `?` is exactly one character other than `/`.
 - `[abc]` is exactly one of the listed characters, and `[a-z]` a range (a `-` that is first or last in the brackets is
   just a hyphen; ranges are written low to high). `[!abc]` is exactly one character that is not listed and is not `/`.
-  A class is `[`, an optional `!`, one or more characters other than `]`, and `]`; if the text at a `[` does not have
-  that shape (`[` with no `]`, `[]`, `[!]`), the `[` is an ordinary character. Inside a class, every character other
-  than the range hyphen is itself (`*`, `?`, `\`, `^`, `[` mean nothing special).
+  A class is `[`, then a `!` if the next character is `!` (so that `!` is always the negation sign), then one or more
+  characters other than `]`, then `]`. If the text at a `[` does not have that shape (`[` with no `]`, `[]`, `[!]`),
+  the `[` is an ordinary character. Inside a class, every character other than the range hyphen is itself (`*`, `?`,
+  `\`, `^`, `[` mean nothing special).
 - `{a,b,c}` is any one of the alternatives, which are split at the commas and are plain text (every character in them is
   itself, `*` too; an alternative may be empty: `{,x}`). The group ends at the first `}` after the `{`, braces do not
   nest. A `{` with no `}` after it, and a `}` outside a group, are ordinary characters.
@@ -314,15 +315,17 @@ so does a `diff` that is not an array (`TypeError` is fine, it is an `Error`).
 ### `parseIni(text)` → `{ section: { key: value } }`
 
 `text` that is not a string → `TypeError`. The result is a plain object of sections, each a plain object of keys with
-string values. Split `text` at every `"\n"`; line numbers start at 1. Each line has its surrounding whitespace removed
-first (so a CRLF ending does no harm), then the first of these that fits applies:
+string values. Names are only names: a section called `constructor` or a key called `toString` is as good as any other.
+Split `text` at every `"\n"`; line numbers start at 1. Each line has its surrounding whitespace removed first (so a
+CRLF ending does no harm), then the first of these that fits applies:
 
 1. Empty: ignored.
 2. Starts with `;` or `#`: a comment, ignored.
-3. A section header: starts with `[` and ends with `]`, and between them (whitespace around it removed) is a name of one
-   or more characters that has no `[` or `]` in it: `[server]`, `[ my app ]` (the name is `my app`). Later keys belong to
-   that section. A section exists in the result from its header on, even with no keys. A header for a section already
-   seen continues that section.
+3. Starts with `[`: a section header. It must end with `]`, and between the brackets (whitespace around it removed) must
+   be a name of one or more characters that has no `[` or `]` in it: `[server]`, `[ my app ]` (the name is `my app`).
+   A line that starts with `[` and is not such a header is an error; it is never read as a key line, even if it
+   has an `=`. Later keys belong to the section. A section exists in the result from its header on, even with no keys.
+   A header for a section already seen continues that section.
 4. A key line: has an `=`. The key is what is before the first `=`, the value what is after it, each with surrounding
    whitespace removed. The key must not be empty. Keys that come before any header belong to the section named `""`,
    which exists in the result only if it has at least one key. A key that is already in the section gets the new value.
@@ -335,7 +338,8 @@ first (so a CRLF ending does no harm), then the first of these that fits applies
      is `b ; c`. Quotes and backslashes that are not at the start of the value mean nothing special, and a value may
      contain `=`.
 
-Any other line (no `=`, a header that fails rule 3 such as `[]`, `[a`, `[a]b`, `[a[b]`, an empty key, a bad quoted value)
+Any other line (no `=`, a line starting with `[` that is no header such as `[]`, `[a`, `[a]b`, `[a] = x`, `[a[b]`, an
+empty key, a bad quoted value)
 throws a `SyntaxError` whose message contains the text `line N` with the 1-based number `N` of that line (the first
 error found).
 

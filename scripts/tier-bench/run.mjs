@@ -65,6 +65,20 @@ const save = () => fs.writeFileSync(out, JSON.stringify(results, null, 1));
 /** A session's child sessions: the cards in its conversation. */
 const childrenOf = async (key) => (await api('GET', `/api/sessions/${enc(key)}/notes`)).notes.filter((n) => n.kind === 'child').map((n) => n.data);
 
+/** How many times each run's agents asked for an answer (each was declined). */
+const asked = new Map();
+
+/** Declines whatever a session waits on, with a word on why; how many cards that was. */
+async function decline(key) {
+  const snap = await api('GET', `/api/sessions/${enc(key)}`).catch(() => ({}));
+  let n = 0;
+  for (const a of snap.overlay?.approvals ?? []) {
+    await api('POST', `/api/sessions/${enc(key)}/approvals/${enc(a.id)}`, { decision: 'deny', message: 'Nobody is here to answer in this run: go on without it.' }).catch(() => {});
+    n++;
+  }
+  return n;
+}
+
 /** Waits until a session and its children have finished: nothing working, nothing in the background, nothing queued, for a little while. */
 async function finished(key, since) {
   let quiet = 0;
@@ -73,6 +87,8 @@ async function finished(key, since) {
     if (Date.now() - since > LIMIT_MS) return 'timeout';
     const s = (await api('GET', `/api/sessions/${enc(key)}`)).summary;
     const kids = await Promise.all((await childrenOf(key)).map((k) => api('GET', `/api/sessions/${enc(k.child)}`).then((r) => r.summary, () => null)));
+    // Nobody is here to answer: what an agent asks (its program's own guard on a command, a question) is declined, and it goes on.
+    for (const x of [s, ...kids]) if (x?.live?.status === 'waiting') asked.set(key, (asked.get(key) ?? 0) + (await decline(x.key)));
     // A turn may end with helpers still at work in the background (Claude Code's own): their agent is woken as each ends.
     const atWork = (x) => BUSY.has(x?.live?.status) || (x?.live?.backgroundTasks ?? []).some((t) => (t.kind ?? '').includes('agent') && t.status === 'running') || (x?.queue?.length ?? 0) > 0;
     const busy = atWork(s) || kids.some(atWork);
@@ -170,6 +186,7 @@ async function run(task, way, rep) {
     rec.ms = Date.now() - t0;
     if (rec.end === 'timeout') await api('POST', `/api/sessions/${enc(key)}/interrupt`).catch(() => {});
     rec.model = (await api('GET', `/api/sessions/${enc(key)}`)).summary?.live?.model ?? null;
+    rec.asked = asked.get(key) ?? 0;
     Object.assign(rec, await collect(key));
   } catch (e) {
     rec.end = 'failed';
