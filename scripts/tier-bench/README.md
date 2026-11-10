@@ -52,6 +52,14 @@ not run again; `--repeat 3` runs each three times (the table shows means), `--ta
 
 When you are done, stop `serve.mjs` and remove `/tmp/hydor-bench`: it holds the copied token.
 
+## Recorded runs
+
+`results/2026-11-10/` holds the runs behind `docs/plans/tiers-and-the-team.md`, one run a line (Claude Code with
+Haiku 5.5, Sonnet 5.5, Opus 5.5 and Fable 5.2): `ordinary.json` (the seven ordinary tasks, every way), `hard.json`
+(the two hard ones) and `earlier-wordings.json` (the team's runs under earlier wordings of the lead's instructions,
+which the means leave out). `node scripts/tier-bench/report.mjs scripts/tier-bench/results/2026-11-10/ordinary.json`
+shows one as a table. Keep a new measurement beside them, in a folder named by its date.
+
 ## Reading the table
 
 Checks are the share of the hidden checker's cases a run passed. Cost is what the tokens would cost at API prices
