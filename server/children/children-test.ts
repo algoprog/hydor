@@ -24,7 +24,7 @@ import type { CreateOpts } from '../sessions.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { saveAssistant } from '../assistants/store.ts';
 import { setTeam, setTiers } from '../assistants/tiers.ts';
-import { teamInstructions } from './team.ts';
+import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
@@ -497,12 +497,16 @@ test('what a session’s main agent is told: to lead helpers on cheaper tiers, i
   const told = spawnOf({ extra: { auto: true } })!.instructions;
   assert.equal(told.length, 1);
   assert.match(told[0], /^# Working with helpers\nYou are this session’s main agent/);
-  assert.match(told[0], /^- Once you know what is to be done, hand the doing over: write the brief, not the work\./m);
+  assert.match(told[0], /^- Sort the work before you start on it/m);
+  assert.match(told[0], /^- Hand over the doing, keep the deciding\./m);
   assert.match(told[0], /^- quick, for a job specified so exactly/m);
   assert.match(told[0], /^- standard, for a clear part/m);
   assert.match(told[0], /You answer for what helpers hand back/);
+  // With no prices known, what helpers cost is said in words alone.
+  assert.match(told[0], /one on quick costs a small fraction of what you do, one on standard clearly less than you\./);
   // Claude Code's own Agent tool gets the tiers' models by its names for them; it may step itself up.
-  assert.match(told[0], /Your own Agent tool .* Give it model "sonnet" for a standard part and model "haiku" for a quick one/);
+  assert.match(told[0], /Your own Agent tool, for a part of a few minutes: .* each with model "haiku" for a quick part and model "sonnet" for a standard one \(with no model it runs on yours and saves nothing\)/);
+  assert.match(told[0], /start_child_session, for a long part/);
   assert.match(told[0], /call step_up_session/);
   assert.equal(told[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' }, stepUp: true }));
   // The same for a lead on Opus, on Max, and on a model the tiers do not know.
@@ -512,10 +516,21 @@ test('what a session’s main agent is told: to lead helpers on cheaper tiers, i
   // Codex has no Agent tool of its own; before it lists its models its tiers differ by effort alone.
   const codex = spawnOf({ agent: 'codex' })!.instructions[0];
   assert.doesNotMatch(codex, /Agent tool/);
-  assert.match(codex, /start_child_session/);
+  assert.match(codex, /^- Start parts that do not depend on each other together with start_child_session, then end your turn/m);
+  // What a helper costs beside its lead, from the prices: a fortieth, a half, nothing for a model on this computer.
+  assert.equal(costWords(0.025), 'about 1/40 of what you do');
+  assert.equal(costWords(0.0125), 'about 1/80 of what you do');
+  assert.equal(costWords(0.1), 'about 1/10 of what you do');
+  assert.equal(costWords(0.25), 'about a quarter of what you do');
+  assert.equal(costWords(0.5), 'about half of what you do');
+  assert.equal(costWords(1), 'about what you do');
+  assert.equal(costWords(0), 'nothing');
+  setPriceOverrides(db, { 'test-model': { input: 10, output: 30 }, opus: { input: 4, output: 20 }, sonnet: { input: 2, output: 10 }, haiku: { input: 0.1, output: 0.5 } });
+  assert.match(spawnOf({ model: 'opus' })!.instructions[0], /one on quick costs about 1\/40 of what you do, one on standard about half of what you do\./);
+  setPriceOverrides(db, { 'test-model': { input: 10, output: 30 } });
   // A Quick model that Claude Code's Agent tool has no name for is left out of that line.
   setTiers(db, { claude: { quick: { model: 'claude-3-mini' } } });
-  assert.match(spawnOf({})!.instructions[0], /Give it model "sonnet" for a standard part; with none/);
+  assert.match(spawnOf({})!.instructions[0], /each with model "sonnet" for a standard one \(with no model/);
   setTiers(db, null);
   // Not told: a main agent on a cheaper tier itself, a swarm's lead, an app's run, a question on Help, a confidential
   // session, a program without tiers, Custom before its tiers are set, and the team turned off.

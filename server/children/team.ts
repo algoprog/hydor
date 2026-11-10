@@ -2,7 +2,8 @@
 // Max for a hard problem) and hands well-defined parts to helpers on cheaper tiers, so most of the work costs less
 // while the judgement stays with the strongest model in the room. Settings → Models → Tiers turns it off.
 import { swarmMode } from '../../shared/swarm.ts';
-import { modelFamily, tierProgram, tierRank, type Tier, type TierPick } from '../../shared/tiers.ts';
+import { modelFamily, resolvedName, tierProgram, tierRank, type Tier, type TierPick } from '../../shared/tiers.ts';
+import { rateFor } from '../prices.ts';
 import type { Agent } from '../../shared/types.ts';
 import type { Deps, SpawnInfo } from '../features/types.ts';
 import { seenModels, teamOf, tierOf, tiersOf } from '../assistants/tiers.ts';
@@ -21,30 +22,46 @@ function nativeName(d: Deps, pick: TierPick): string | undefined {
   return NATIVE.find((n) => words.includes(n));
 }
 
+/** What a helper on a tier costs beside its lead, in words ("about 1/40 of what you do"); `r`: its price over the lead's. */
+export function costWords(r: number): string {
+  if (r <= 0) return 'nothing';
+  if (r >= 0.85) return 'about what you do';
+  if (r >= 0.6) return 'about two thirds of what you do';
+  if (r >= 0.4) return 'about half of what you do';
+  if (r >= 0.29) return 'about a third of what you do';
+  if (r >= 0.22) return 'about a quarter of what you do';
+  const n = Math.round(1 / r);
+  return `about 1/${n > 12 ? Math.round(n / 5) * 5 : n} of what you do`;
+}
+
 /**
  * What the main agent of a session is told about leading helpers. `native`: Claude Code's names for the Standard and
- * Quick models, for its own Agent tool; `stepUp`: it may step itself up to Max (step_up_session). The same words from
- * one session to the next, so the provider's cache of the instructions holds.
+ * Quick models, for its own Agent tool; `stepUp`: it may step itself up to Max (step_up_session); `costs`: what a
+ * helper on each tier costs beside the lead, when both prices are known (costWords). The same words for every session
+ * on one model, so the provider's cache of the instructions holds.
  */
-export function teamInstructions(o: { native?: { standard?: string; quick?: string }; stepUp?: boolean } = {}): string {
+export function teamInstructions(o: { native?: { standard?: string; quick?: string }; stepUp?: boolean; costs?: { quick?: string; standard?: string } } = {}): string {
+  const { standard, quick } = o.native ?? {};
+  const costs = o.costs?.quick && o.costs.standard ? `one on quick costs ${o.costs.quick}, one on standard ${o.costs.standard}` : 'one on quick costs a small fraction of what you do, one on standard clearly less than you';
   const lines = [
     '# Working with helpers',
-    'You are this session’s main agent: you work out what is asked, decide how it is done, and answer for the result. You are also the most expensive model in it, so do not spend yourself on work a cheaper model does as well. Helpers are those models: one on quick costs a small fraction of what you do, one on standard clearly less than you.',
-    '- Once you know what is to be done, hand the doing over: write the brief, not the work. Code or text of more than a few dozen lines to a plan that is clear, the same change in many places, tests, a draft, reading through many files or pages: each is a helper’s job. Do a part yourself only when it is smaller than its brief (a few lines, a command or two), when deciding it is the work (a design, a diagnosis), or when it is the hard core of the problem.',
-    '- quick, for a job specified so exactly that little can go wrong and its result can be checked: a function or a module to a written specification, a targeted edit in files you name, the same mechanical change across many files, tests for cases you list, facts pulled out of documents, converting or formatting. Prefer it whenever the job is that clear.',
-    '- standard, for a clear part that still takes judgement along the way: a change you have described but not spelled out, a feature in code that must first be read, research on a set question, a draft to your outline.',
+    `You are this session’s main agent: you work out what is asked, decide how it is done, and answer for the result. You are also the most expensive model in it, so the doing goes to helpers wherever a cheaper model does it as well: ${costs}.`,
+    '- Sort the work before you start on it, in a line or two the user can read: the parts that go to helpers, each with its tier, and what you keep and why. Only a job of a few steps needs no sorting: do it.',
+    '- Hand over the doing, keep the deciding. Count a part by what would have to be written and read for it, not by how hard it is: more than about fifty lines of code or text to write, the same change in many places, tests, a draft, a handful of files or pages to read through, is a helper’s part once what is wanted is clear, however easy it would be for you. Easy is the reason to hand it over: you would be paid the most for the least. Yours are an edit of a few lines, a command or two, what is itself a decision (a design, a diagnosis), and the hard core of the problem.',
+    '- quick, for a job specified so exactly that little can go wrong and its result can be checked: a function or a small module to a written specification, a targeted edit in files you name, the same mechanical change across many files, tests for cases you list, facts pulled out of documents, converting or formatting. Prefer it whenever the job is that clear.',
+    '- standard, for a clear part that still takes judgement along the way: a change you have described but not spelled out, a feature in code that must first be read, a module whose rules bear on each other (a parser, a state machine), research on a set question, a draft to your outline.',
     '- best, for a hard part that stands on its own. The hardest thinking stays with you.',
-    '- A brief stands alone, since the helper sees nothing of this conversation: the goal, the files and facts it needs (name a file that holds the specification rather than repeating it), exact names, what not to touch, how to check the result, what to report. Decide the design first: a helper left to guess costs more than it saves.',
-    '- Start parts that do not depend on each other together with start_child_session, then end your turn: each reply comes back to you as a message. What depends on a part waits for it.',
-    '- You answer for what helpers hand back: run the checks and read what changed before you build on it or report it. Fix a slip yourself, send the helper back with message_child for more, or run the part again one tier up with step_up_child when the tier was too weak for it.',
+    '- A brief stands alone, since the helper sees nothing of this conversation: the goal, the files and facts it needs, exact names, what not to touch, how to check the result, what to report. Where the specification is already written down (a file, the request itself), the brief is a few lines that point at it: do not weigh the time a brief takes against the time the work would take you, weigh a few lines against the whole of the work at your price. Decide the design first: a helper left to guess costs more than it saves.',
   ];
-  const { standard, quick } = o.native ?? {};
   if (standard || quick) {
-    const models = [standard ? `model "${standard}" for a standard part` : '', quick ? `model "${quick}" for a quick one` : ''].filter(Boolean).join(' and ');
+    const models = [quick ? `model "${quick}" for a quick part` : '', standard ? `model "${standard}" for a standard one` : ''].filter(Boolean).join(' and ');
     lines.push(
-      `- Your own Agent tool hands a part over inside this turn, its result coming back as the tool’s result: right for a search or a small job you need before your next step. Give it ${models}; with none it runs on your model and costs what you do.`,
+      `- Two ways to hand a part over. Your own Agent tool, for a part of a few minutes: start those that do not depend on each other in one message, each with ${models} (with no model it runs on yours and saves nothing), and their results come back in this turn. start_child_session, for a long part, one the user should be able to follow and steer, or another program’s model: start them together, then end your turn, and each reply comes back to you as a message. What depends on a part waits for it.`,
     );
-  }
+  } else lines.push('- Start parts that do not depend on each other together with start_child_session, then end your turn: each reply comes back to you as a message. What depends on a part waits for it.');
+  lines.push(
+    '- You answer for what helpers hand back: run the checks and read what changed before you build on it or report it. Fix a slip yourself, send the helper back for more, or give the part to a higher tier when the tier was too weak for it (step_up_child does that for a child session).',
+  );
   if (o.stepUp)
     lines.push(
       '- When the problem proves harder than it looked (a fix that has failed twice, a cause you cannot find, constraints that pull against each other, a proof), call step_up_session to carry on with the strongest model instead of going round in circles.',
@@ -104,7 +121,23 @@ export function teamNote(d: Deps, s: SpawnInfo): string | null {
   const cheaper = (['standard', 'quick'] as const).filter((t) => (picks[t].model || picks[t].effort) && !samePick(picks[t], picks[own]));
   if (!cheaper.length) return null;
   const native = s.agent === 'claude' ? { standard: nativeName(d, picks.standard), quick: nativeName(d, picks.quick) } : undefined;
+  // What each cheaper tier costs beside this lead, when the price table knows both models.
+  const lead = priceOf(d, s, modelOf(d, s).model ?? picks[own].model);
+  const beside = (t: 'quick' | 'standard') => {
+    const p = priceOf(d, s, picks[t].model);
+    return lead && p !== null && lead > 0 ? costWords(p / lead) : undefined;
+  };
   // A session on Automatic is told of stepping up whatever it thinks with now (one already on Max too): the same words from one such session to the next.
   const stepUp = x.auto === true && teamOf(d.db).hard && !findAssistant(d.db, x.assistant)?.tier && !!(picks.max.model || picks.max.effort) && !samePick(picks.max, picks.best);
-  return teamInstructions({ native, stepUp });
+  return teamInstructions({ native, stepUp, costs: { quick: beside('quick'), standard: beside('standard') } });
+}
+
+/** What a model costs for a million tokens in and a million out, at API prices; 0 for one on this computer; null when no price is known. */
+function priceOf(d: Deps, s: { agent: Agent; acpAgent?: string }, model: string | undefined): number | null {
+  if (!model) return null;
+  if (/^(ollama|vllm)\//.test(model)) return 0;
+  const p = tierProgram(s.agent, s.acpAgent);
+  const name = p && p !== 'console' ? resolvedName(seenModels(d.db)[p] ?? [], model) : model;
+  const r = rateFor(d.db, name) ?? rateFor(d.db, model);
+  return r ? r.input + r.output : null;
 }
