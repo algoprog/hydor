@@ -177,7 +177,7 @@ export class SearchService {
       else if (added) cur.enabled = true;
       this.stored.providers[p.id] = cur;
       this.searcher.wake(p.id);
-      if (p.id === 'naget' && (pp.key !== undefined || pp.url !== undefined)) void this.refreshTaxonomy();
+      if (p.id === 'naget' && (pp.key !== undefined || pp.url !== undefined || pp.enabled === true)) void this.refreshTaxonomy();
     }
     this.save();
     return this.view();
@@ -238,7 +238,8 @@ export class SearchService {
 
   async refreshTaxonomy(): Promise<void> {
     const c = this.configured().find((x) => x.provider.id === 'naget');
-    if (!c) return;
+    // Turned off, Naget Search hears nothing from this app, not even for its categories.
+    if (!c?.enabled) return;
     try {
       this.taxonomy = await fetchTaxonomy({ key: c.key, url: c.url, signal: AbortSignal.timeout(20_000), fetch: this.fetch, credits: (x) => this.noteCredits(x) });
       this.kv.set('search.taxonomy', JSON.stringify(this.taxonomy));

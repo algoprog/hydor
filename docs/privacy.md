@@ -46,7 +46,7 @@ These need nothing from you and are on from the first start, except where noted.
 | --- | --- | --- |
 | `github.com` (and the download servers it redirects to) | **Desktop apps:** a minute after they start, then every 4 hours. **Installs from git** (the installer, Docker): 3 minutes after the server starts, then once a day. | The apps ask for one small file that names the newest version for your system, with `hydor/<version>` as the program's name. A copy from git runs an ordinary `git fetch` against the address it was cloned from. GitHub sees your IP address, as any website would. With **Update automatically** on, a new version of the app is downloaded too. |
 | `registry.npmjs.org` (or the registry your npm is set to) | About 10 minutes after the app starts, then once a day. Also the first time an agent program is needed and not installed. | npm asks for the newest version of each agent program on the computer (Claude Code, Codex, Gemini CLI…), by its package name, with npm's usual headers (npm and Node.js versions, your system). With **Update automatically** on, newer versions are downloaded. |
-| `naget.com` | When the server starts if the list is older than a day, then once a day. | A request for Naget Search's list of categories. No search words and no key of yours are in it. |
+| `naget.com` | While Naget Search is on (it is by default): when the server starts if the list is older than a day, then once a day. | A request for Naget Search's list of categories. No search words and no key of yours are in it. |
 | `raw.githubusercontent.com` | The first time after a start that the app works out what usage would cost, then at most once a day. | A request for a public price table (LiteLLM's). Nothing of yours. |
 | `pypi.org`, `files.pythonhosted.org`, `huggingface.co` | Once, a minute after the first start, to set up search by meaning (about 350 MB with its Python packages). | The names of three Python packages, and the model's files at a fixed version. The model then runs on your computer: your notes and searches never go anywhere. |
 | `api.anthropic.com` | While the app is open and reads your Claude plan's usage, and while a session waits for a limit to lift. Only when Claude Code is signed in with a claude.ai account. | The sign-in token Claude Code already keeps, to read your plan's limits and any limit resets you hold. Nothing from your conversations. |
@@ -102,9 +102,8 @@ Hydor gives its agents tools. The agent decides when to call one, and the call i
   stops installs: the daily run then only reads the newest versions from npm. The look has no switch. An agent
   program that is missing and needed is installed once, and the Docker image starts with Claude Code's own
   updates off.
-- **Naget Search.** Turn it off in Settings → Capabilities → Search, and give no key. The daily category list
-  still comes, since turning Naget Search off does not stop it; searches go to the next provider, and DuckDuckGo
-  is on by default too. Turn off every provider you do not want, and add your own SearXNG address to keep
+- **Naget Search.** Turn it off in Settings → Capabilities → Search: the app then sends it nothing, not even the
+  daily request for its categories. Searches go to the next provider, and DuckDuckGo is on by default too. Turn off every provider you do not want, and add your own SearXNG address to keep
   searches on your own server. With none on, Claude Code and Codex use their own built-in search.
 - **Price table.** Set `PRICES_URL` to nothing (an empty value). Estimates then use only the prices you set.
 - **Search by meaning.** Turn off **Search by meaning** in Settings → Capabilities → Memory, or start with

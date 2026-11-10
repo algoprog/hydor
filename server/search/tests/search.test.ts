@@ -638,6 +638,18 @@ describe('the search service and its tools', () => {
     assert.ok(svc.categoryIds().includes('uspto'), 'the documented categories meanwhile');
   });
 
+  it('asks Naget Search nothing, not even its categories, while it is off, and asks again once it is on', async () => {
+    const { f, calls } = fake(() => json(403, fixture('naget-403.json')));
+    const svc = new SearchService({ kv: memory(), fetch: f });
+    svc.update({ provider: { id: 'naget', enabled: false } });
+    await svc.refreshTaxonomy();
+    assert.equal(calls.length, 0, 'no request while Naget Search is off');
+    assert.ok(svc.categoryIds().includes('uspto'), 'the documented categories meanwhile');
+    svc.update({ provider: { id: 'naget', enabled: true } });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(calls.length, 1, 'turning it on reads its categories');
+  });
+
   it('tests a provider on its own, with a key not saved yet', async () => {
     const { f, calls } = fake(() => json(200, fixture('brave.json')));
     const svc = new SearchService({ kv: memory(), fetch: f });
