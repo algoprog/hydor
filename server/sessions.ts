@@ -28,7 +28,7 @@ import { removeSessionScratch } from './tasklog.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
 import { beforeSend, featureDeps, messageNotes, spawnAdditions, turnEnded } from './features/registry.ts';
-import { dropNotes } from './notes.ts';
+import { addNote, dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
@@ -41,6 +41,10 @@ import { titleFor } from './titles.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { carriedExtra, checkHandoff, checkModelSwitch, confidentialStart, confidentialTitle, localModel } from './confidential/index.ts';
 import { agentStart } from './assistants/rules.ts';
+import { autoPlan, tierNote, type TierNote } from './assistants/auto.ts';
+import { noteModels } from './assistants/tiers.ts';
+import { AUTO_MODEL, type Tier, type TierPick } from '../shared/tiers.ts';
+import { opensTurn } from './opinion/turns.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -916,7 +920,7 @@ export class SessionManager extends EventEmitter {
     if (agent === 'claude') {
       const sessionId = opts.sessionId ?? crypto.randomUUID();
       // What the app's capabilities add: instructions (memory, the assistant), MCP servers, environment.
-      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt });
+      const add = await spawnAdditions({ agent, key: `claude:${sessionId}`, cwd, runId, resume: !!opts.resume || !!opts.forkFrom, extra: opts.extra ?? sessionExtra(this.db, `claude:${sessionId}`), prompt: opts.prompt, model: opts.model });
       Object.assign(env, add.env);
       const o = { cwd, sessionId, resume: !!opts.resume, forkFrom: opts.forkFrom, forkAt: opts.forkAt, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
       const meta: RunMeta = { runId, agent, key: `claude:${sessionId}`, createdAt: Date.now(), cwd, opts: { ...o, account } };
@@ -936,7 +940,7 @@ export class SessionManager extends EventEmitter {
       return l;
     }
     const known = opts.threadId ? `codex:${opts.threadId}` : undefined;
-    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}), prompt: opts.prompt });
+    const add = await spawnAdditions({ agent, key: known, cwd, runId, resume: !!opts.threadId, extra: opts.extra ?? (known ? sessionExtra(this.db, known) : {}), prompt: opts.prompt, model: opts.model });
     Object.assign(env, add.env);
     const o = { cwd, threadId: opts.threadId, forkFrom: opts.forkFrom, forkLastTurn: opts.forkFrom ? opts.forkAt : undefined, model: opts.model, effort: opts.effort, mode: opts.mode, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent, createdAt: Date.now(), cwd, opts: { ...o, account } };
@@ -973,7 +977,7 @@ export class SessionManager extends EventEmitter {
     const runId = crypto.randomBytes(6).toString('hex');
     // Console asks the app to get its model ready (start a vLLM server) at this run's own address.
     if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
-    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt });
+    const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model });
     Object.assign(env, add.env);
     const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
@@ -1050,10 +1054,18 @@ export class SessionManager extends EventEmitter {
   }
 
   async create(o: CreateOpts): Promise<string> {
+    // Automatic: no model of its own, so its agent's tier decides, else the tiers do (below).
+    const wantAuto = o.model === AUTO_MODEL;
+    if (wantAuto) o = { ...o, model: undefined };
+    // What was picked for it, to remember for the next session: not what a tier adds.
+    const picked = { effort: o.effort };
     // A confidential session (or a child of one): Custom with a local model, memory off (server/confidential).
     o = confidentialStart(this.db, o);
     // Started as one of your agents: its tier's model when none was picked, and what is left of its monthly budget as its cap.
     o = agentStart(this.db, o);
+    // Automatic: Best's model for its program. Whether the request is a hard problem, which Max takes, is asked now and known before its message goes.
+    const auto = wantAuto && !o.model ? autoPlan(this.db, { agent: o.agent, acpAgent: o.acpAgent, prompt: splitHandoff(o.prompt ?? '')?.request ?? o.prompt, extra: o.extra }) : null;
+    if (auto) o = { ...o, model: auto.model, effort: o.effort ?? auto.effort };
     if (o.agent === 'claude') await ensureClaude();
     // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start;
     // a confidential one only from a helper model on this computer, else from its first words.
@@ -1089,12 +1101,15 @@ export class SessionManager extends EventEmitter {
     if (account) this.db.prepare('update app_sessions set account = ? where key = ?').run(account, l.key);
     if (o.acpAgent) this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(o.acpAgent, l.key);
     if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
-    if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: o.effort, mode, account: o.account ?? '' });
+    if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
     const here = onThisComputer(o.paths);
     const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
     const images = [...(o.images ?? []), ...here.images];
+    // A hard problem, on Automatic: Max takes it from its first step.
+    const hard = auto?.hard ? await auto.hard : null;
+    if (hard) await this.moveToTier(l.key, 'max', hard, { event: 'auto', why: hard.why }).catch(() => {});
     if (prompt || images.length) {
       await beforeSend(l.key);
       await this.snapshot(l.key);
@@ -1975,6 +1990,34 @@ export class SessionManager extends EventEmitter {
     this.queueSummary(key);
   }
 
+  /**
+   * Moves a session to a tier's model and effort (Automatic's Max for a hard problem, an agent's own step up), which
+   * stays what the session runs with but not what new sessions start with; a line in its conversation says so.
+   */
+  async moveToTier(key: string, tier: Tier, pick: TierPick, why: { event: TierNote['event']; why?: string }) {
+    checkModelSwitch(this.db, key, pick.model);
+    const l = this.lives.get(key);
+    if (l) await l.adapter.configure({ ...(pick.model ? { model: pick.model } : {}), ...(pick.effort ? { effort: pick.effort } : {}) });
+    this.db.prepare('update app_sessions set model = coalesce(?, model), effort = coalesce(?, effort) where key = ?').run(pick.model ?? null, pick.effort ?? null, key);
+    this.queueSummary(key);
+    const s = this.summary(key);
+    const data = tierNote(this.db, { agent: agentOfKey(key), acpAgent: s?.acpAgent, event: why.event, tier, model: pick.model ?? l?.adapter.state.model, why: why.why });
+    void this.noteAtTurn(key, 'tier', data);
+  }
+
+  /** Adds a note to a session's conversation under the turn that is running (or about to: a start's first message may take a moment to show). */
+  private async noteAtTurn(key: string, kind: string, data: unknown) {
+    let anchor: string | undefined;
+    for (let i = 0; i < 20 && !anchor; i++) {
+      try {
+        const items = (await this.timeline(key)).parser.items;
+        for (let j = items.length - 1; j >= 0 && !anchor; j--) if (opensTurn(items[j])) anchor = items[j].id;
+      } catch {}
+      if (!anchor) await new Promise((r) => setTimeout(r, 500));
+    }
+    addNote(this.db, { key, kind, anchor, data });
+  }
+
   async stopTask(key: string, taskId: string) {
     await this.live(key).adapter.stopTask(taskId);
   }
@@ -2214,6 +2257,8 @@ export class SessionManager extends EventEmitter {
     }
     if (agent === 'claude') {
       const models = await this.claude.models().catch(() => []);
+      // The tiers nobody changed follow what each program offers.
+      noteModels(this.db, 'claude', models);
       // No models: Claude Code did not start (asking for its commands would only start it again), and the menu says why.
       const why = models.length ? null : this.claude.modelsError;
       if (why) return { models, modes: CLAUDE_MODES, defaultMode: this.defaults('claude').mode ?? 'default', commands: [], modelsError: why };
@@ -2221,6 +2266,7 @@ export class SessionManager extends EventEmitter {
       return { models, modes: CLAUDE_MODES, defaultMode: this.defaults('claude').mode ?? 'default', commands };
     }
     const models = await this.codex.models().catch(() => []);
+    noteModels(this.db, 'codex', models);
     const sandbox = await this.codexSandbox();
     return {
       models,

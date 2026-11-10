@@ -73,6 +73,8 @@ export interface SpawnInfo {
   extra: SessionExtra;
   /** The first message, when a new session starts with one (memory puts what bears on it first). */
   prompt?: string;
+  /** The model it starts with, when one is named (none: the program's own default). */
+  model?: string;
 }
 
 /** An MCP server for an agent: at an address, or a command it starts. */

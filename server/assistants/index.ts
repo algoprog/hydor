@@ -9,7 +9,7 @@
 // For other capabilities (apps, automations): listAssistants(), assistantById(id) and assistantStart(id).
 import crypto from 'node:crypto';
 import { agentMode, ASSISTANT_ICONS, assistantExtra, TOOL_KINDS, type AgentDraft, type Assistant, type AssistantsState, type AssistantSwitch } from '../../shared/assistants.ts';
-import { DEFAULT_TIERS, isTier } from '../../shared/tiers.ts';
+import { isTier } from '../../shared/tiers.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { Agent } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -27,7 +27,7 @@ import { makeProjectAgent } from './projectAgent.ts';
 import { handBackTool, resultsOf } from './output.ts';
 import { ensureStanding, inboxCounts, inboxOf, inboxTurnEnded, sendToInbox, standingKey, sweepInboxes } from './inbox.ts';
 import { activity, monthSpend } from './rules.ts';
-import { setTiers, tiersOf } from './tiers.ts';
+import { seenModels, setTeam, setTiers, teamOf, tierDefaults, tiersOf } from './tiers.ts';
 import { findAgentFiles, parseAgentFile, readAgentFile } from './importer.ts';
 import { instructionsFor, spawnFor, switchNote, type Target } from './instructions.ts';
 import { allAssistants, cleanAssistant, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
@@ -114,7 +114,7 @@ const DRAFT_SYSTEM = [
   '{"name": 1 to 4 words, "icon": one of ICONS, "description": one line of at most 120 characters on what it does,',
   '"instructions": what the agent reads at the start of each session: second person, 3 to 10 short lines on what to do, how, and what to hand back,',
   '"tools": the kinds it needs, from read (read files), edit (create and change files), run (run commands), web (search and read the web), mcp (other tools),',
-  '"tier": "quick" for clear jobs whose result can be checked, "standard" for most work, "best" for hard, open-ended problems,',
+  '"tier": "quick" for small, very clear jobs whose result can be checked, "standard" for clear tasks of medium size, "best" for work that needs planning and judgement, "max" only for the hardest problems,',
   '"schedule": null, or when it should run by itself: {"kind":"daily","time":"HH:MM","days":[0-6, Sunday is 0; leave out for every day]} or {"kind":"every","minutes":n},',
   '"task": with a schedule, the message each run starts with (one sentence, an instruction); else null,',
   '"budgetUsd": a monthly budget in dollars only when the user names one; else null}.',
@@ -205,12 +205,20 @@ function routes(d: Deps) {
     d.broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
     return { assistant: r.agent, how: r.how, kind: r.kind, ...state() };
   });
-  // Settings → Models → Tiers.
-  app.get('/api/models/tiers', async () => ({ tiers: tiersOf(db), defaults: DEFAULT_TIERS }));
+  // Settings → Models → Tiers: what each tier means for each program, and how sessions use them (the team).
+  const tiersState = () => ({ tiers: tiersOf(db), defaults: tierDefaults(db), team: teamOf(db) });
+  app.get('/api/models/tiers', async () => {
+    // The tiers nobody changed follow the models each program offers: asked for once, before they are first shown.
+    const seen = seenModels(db);
+    await Promise.all((['claude', 'codex'] as const).filter((p) => !seen[p]?.length).map((p) => Promise.race([d.sessions.catalog(p).catch(() => null), new Promise((r) => setTimeout(r, 8000))])));
+    return tiersState();
+  });
   app.put('/api/models/tiers', async (req) => {
-    const tiers = setTiers(db, body(req).tiers);
+    const b = body(req);
+    if (b.tiers !== undefined) setTiers(db, b.tiers);
+    if (b.team !== undefined) setTeam(db, b.team);
     changed();
-    return { tiers, defaults: DEFAULT_TIERS };
+    return tiersState();
   });
   app.post('/api/assistants', async (req) => {
     const a = saveAssistant(db, { ...body(req), id: undefined });
