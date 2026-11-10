@@ -1,5 +1,5 @@
 // Settings → More agents: agents beyond Claude Code and Codex that speak the Agent Client Protocol
-// (Gemini CLI, OpenCode, Qwen Code, Goose…). Each is a command the app starts per session; signing in
+// (Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent, Pi…). Each is a command the app starts per session; signing in
 // happens once in the agent's own CLI.
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Plus, Trash2, XCircle } from 'lucide-react';

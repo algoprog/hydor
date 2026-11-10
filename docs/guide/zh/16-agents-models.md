@@ -11,7 +11,7 @@ Hydor 可以运行好几种 AI 智能体：Claude Code、Codex、Custom（应用
 - **Claude Code**（Anthropic）。使用你的 Claude 套餐运行，或者从 Anthropic API 账户计费。它的模型是 Anthropic 的（Opus、Sonnet、Haiku）。它有自己的用量限制，显示在[用量页面](/usage)上。
 - **Codex**（OpenAI）。使用你的 ChatGPT 套餐运行。它的模型是 OpenAI 的。它也有用量限制，同样显示在用量页面上。Codex 随应用一起提供。
 - **Custom**，应用自己的智能体。它可以运行你在[设置 → 智能体 → 模型](/settings?s=models)中添加的任何模型：通过 OpenRouter 使用的模型、这台电脑上的模型（用 Ollama 或 vLLM），或者任何兼容 OpenAI 的端点。想用开放模型、更便宜的模型，或者完全不离开你电脑的模型时，就用它。请看[Custom，应用自己的智能体](/guide/custom)。
-- **支持 ACP 的智能体**：Gemini CLI、OpenCode、Qwen Code、Goose、Kimi CLI、Auggie，或者你自己的命令。ACP（Agent Client Protocol，智能体客户端协议）是应用与智能体程序对话的一种通用方式。每个智能体都在它自己的程序里登录一次，并使用它自己的模型。
+- **支持 ACP 的智能体**：Gemini CLI、OpenCode、Qwen Code、Goose、Kimi CLI、Auggie、Hermes Agent、Pi、OpenClaw，或者你自己的命令。ACP（Agent Client Protocol，智能体客户端协议）是应用与智能体程序对话的一种通用方式。每个智能体都在它自己的程序里登录一次，并使用它自己的模型。
 
 各自在应用里能做什么：
 
@@ -67,7 +67,7 @@ Hydor 可以运行好几种 AI 智能体：Claude Code、Codex、Custom（应用
 
 Claude Code、Codex、Gemini CLI 等都是这台电脑上的程序。你不必手动安装它们。
 
-打开[设置 → 智能体 → 账户](/settings?s=accounts&find=Agent%20programs)，滚动到**智能体程序**。这里列出 Claude Code、Codex、Gemini CLI、OpenCode、Qwen Code 和 Auggie，每个都注明了会话所运行的版本和来源：
+打开[设置 → 智能体 → 账户](/settings?s=accounts&find=Agent%20programs)，滚动到**智能体程序**。这里列出 Claude Code、Codex、Gemini CLI、OpenCode、Qwen Code、Auggie 和 Pi，每个都注明了会话所运行的版本和来源：
 
 - **你自己安装的**：是你自己装的。
 - **由应用安装**：应用把它装在了自己的文件夹里。
@@ -78,7 +78,7 @@ Claude Code、Codex、Gemini CLI 等都是这台电脑上的程序。你不必�
 
 缺少的程序在第一次需要时也会自动安装：Claude Code 是在你登录它或开始一个 Claude Code 会话时，ACP 智能体是在你于设置 → 更多智能体中添加它或用它开始会话时。应用会用 npm 把它们装进自己的文件夹，所以你不需要管理员权限。
 
-Goose 和 Kimi CLI 不在这个列表里：请自己安装它们（设置 → 更多智能体里写明了去哪里获取）。
+Goose、Kimi CLI、Hermes Agent 和 OpenClaw 不在这个列表里：请自己安装它们（设置 → 更多智能体里写明了去哪里获取）。Pi 分两部分安装，即它的 ACP 适配器和 Pi 本身；列表里两者合为一行。
 
 ## 让智能体程序保持最新
 
@@ -86,7 +86,7 @@ Goose 和 Kimi CLI 不在这个列表里：请自己安装它们（设置 → �
 
 - 应用安装的副本通过 npm 在它自己的文件夹里更新。Codex 会换用比应用自带的那份更新的副本。
 - 你自己安装的程序用它们自带的更新程序更新：Claude Code 用 `claude update`，Codex 用 `codex update`（也就是你终端里运行的那份），OpenCode 用 `opencode upgrade`。
-- 你用 `npm install -g` 安装的 Gemini CLI、Qwen Code 或 Auggie 会通过 npm 更新，前提是你的用户可以写入那个文件夹。用其他方式安装的，请按你安装它的方式自己更新。
+- 你用 `npm install -g` 安装的 Gemini CLI、Qwen Code、Auggie 或 Pi 会通过 npm 更新，前提是你的用户可以写入那个文件夹。用其他方式安装的，请按你安装它的方式自己更新。
 - Claude Code 跟随它自己的发布渠道：它的设置里写着 `"autoUpdatesChannel": "stable"` 时用稳定版，否则用最新版。
 - 如果你用 `DISABLE_AUTOUPDATER=1` 关掉了 Claude Code 自己的更新（Docker 镜像就是这样做的），应用也不会自行更新你的 Claude Code。**立即更新**仍然会更新它。
 
@@ -184,12 +184,12 @@ Claude Code 和 Codex 需要先登录才能工作。打开[设置 → 智能体 
 打开[设置 → 智能体 → 更多智能体](/settings?s=agents&find=Agents%20that%20speak%20ACP)。
 
 - **你的智能体**（“开始会话时，它们会显示在 Claude Code 和 Codex 旁边”）先列出 Custom，然后是你添加的智能体。程序已经装在这里的，会显示一个对勾。
-- **支持 ACP 的智能体**（“先安装一个，在它自己的 CLI 中登录一次，然后在这里添加”）列出你还没添加的已知智能体：Gemini CLI、OpenCode、Qwen Code、Goose、Kimi CLI 和 Auggie。带叉号的一行表示还没安装，并会说明怎么获取。
+- **支持 ACP 的智能体**（“先安装一个，在它自己的 CLI 中登录一次，然后在这里添加”）列出你还没添加的已知智能体：Gemini CLI、OpenCode、Qwen Code、Goose、Kimi CLI、Auggie、Hermes Agent、Pi 和 OpenClaw。带叉号的一行表示还没安装，并会说明怎么获取。
 
 添加方法：
 
 1. 点击它旁边的**添加**。如果程序已经装好，这个按钮会显得更醒目。
-2. 如果应用知道怎么安装它（Gemini CLI、OpenCode、Qwen Code、Auggie），会立即在后台安装。Goose 和 Kimi CLI 需要你自己按它们那一行里的地址安装。
+2. 如果应用知道怎么安装它（Gemini CLI、OpenCode、Qwen Code、Auggie、Pi），会立即在后台安装。Goose、Kimi CLI、Hermes Agent 和 OpenClaw 需要你自己按它们那一行里的命令或地址安装。
 3. 在智能体自己的程序里登录一次：打开[终端](/terminal)，运行它的命令（例如 `gemini`），然后按它的登录步骤操作。如果跳过这一步，会话会告诉你：“Gemini CLI 尚未登录。请在终端中运行一次 gemini 并在那里登录，然后重试。”
 
 现在这个智能体就会出现在开始页的**运行于**列表里了。
@@ -210,6 +210,14 @@ Claude Code 和 Codex 需要先登录才能工作。打开[设置 → 智能体 
 
 这个命令必须以 ACP 模式启动智能体，通过它的标准输入和输出进行通信。
 
+### Hermes Agent、Pi 和 OpenClaw
+
+有三个人们常在自己终端里运行的智能体在这里也能用，各有需要知道的地方：
+
+- **Hermes Agent**（Nous Research）。用它自己的命令安装：`curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash`（或到 hermes-agent.nousresearch.com）。应用不会替你运行来自网络的脚本。然后在[终端](/terminal)里运行一次 `hermes model`，登录并选好它的模型。应用用 `hermes acp` 启动它。Hermes 把自己的会话和记忆保存在它自己的文件夹（`~/.hermes`）里，并在后台启动一个它自己的辅助进程，空闲一段时间后会自行停止。它的审批卡片提供 **Allow once**、**Allow for session**、**Allow always**、**Deny** 和 **Deny always**（按钮上的字样由 Hermes 给出，不翻译），应用的工具也能用到它。
+- **Pi**。Pi 本身不支持 ACP，所以应用会把适配器 `pi-acp` 和 Pi 一起安装，都用 npm 装在应用自己的文件夹里（不运行它们的安装脚本）。你自己装的 Pi 在 PATH 上时会直接使用。在终端里运行一次 `pi`，用 `/login` 登录，或者在它的 `models.json` 里配置你自己的模型。Pi 自己不会请求权限：只有它的扩展发出询问时，你才会看到审批卡片。应用的准则、记忆笔记和技能会随第一条消息传给 Pi，但应用的工具（页面、搜索……）不会：适配器不会转交它们。
+- **OpenClaw**。`openclaw acp` 会连接你的 OpenClaw Gateway，所以请先设置好 OpenClaw（`openclaw onboard`），并让它的 Gateway 保持运行。用 `curl -fsSL https://openclaw.ai/install.sh | bash` 安装。它的桥接不接受 MCP 服务器，所以应用的工具到不了它；会话启动时会说明这一点。
+
 ### ACP 智能体在这里能做和不能做的事
 
 应用会在你选的文件夹中打开会话，显示智能体的消息和步骤，并在智能体请求权限时询问你。有些地方和 Claude Code、Codex 不一样：
@@ -218,6 +226,7 @@ Claude Code 和 Codex 需要先登录才能工作。打开[设置 → 智能体 
 - 不能重新打开之前会话的智能体，在你继续一个旧会话时会从头开始，不带上面的对话。会话里会注明这一点。
 - 你附加的图片，只有在它接受图片时才能传给它。
 - 目标、分叉和转交都不可用（Custom 有目标和分叉）。
+- 应用的工具（页面、搜索、记忆……）以 MCP 服务器的形式交给智能体：智能体接受地址时用地址，否则通过应用为它启动的一个小程序转接。完全不接受的智能体（Pi、OpenClaw）只用自己的工具工作，但仍会收到准则、记忆笔记和技能。
 
 ## Custom 的模型从哪里来
 
@@ -394,6 +403,7 @@ vLLM 是一个在 NVIDIA 显卡上运行模型的快速服务器，也是这里�
 - “这里装了哪些智能体程序？帮我装上 Gemini CLI。”
 - “Claude Code 和 Codex 是最新的吗？现在就更新它们。”
 - “把 OpenCode 加到我的智能体里。”
+- “把 Hermes Agent 和 Pi 加到我的智能体里，并告诉我还有什么要自己安装。”
 - “在 Hugging Face 上找一个在这台电脑上能流畅运行、还能看图片的模型，查看一下，然后安装最合适的大小。”
 - “把 OpenRouter 上最新的 DeepSeek 模型加到我的模型里。”（设置好 OpenRouter 密钥之后）
 - “把辅助模型换成一个能看图片的。”

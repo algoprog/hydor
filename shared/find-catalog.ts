@@ -40,7 +40,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['connect', 'Connect other agents', 'App', 'Let agents elsewhere start and steer sessions here, through this app’s MCP server'],
   ['machines', 'Machines', 'App', 'Other machines running Hydor, to use from here, and access to this one'],
   ['accounts', 'Accounts', 'Agents', 'The Claude Code and Codex sign-ins every session uses'],
-  ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP'],
+  ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent, Pi and other agents that speak ACP'],
   ['models', 'Models', 'Agents', 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM'],
   ['guidelines', 'Agent Guidelines', 'Agents', 'What every agent follows: in every session, in a project, or in one session'],
   ['mcp', 'MCP servers', 'Agents', 'Tools the agents can call'],
@@ -106,12 +106,12 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['accounts', 'Your accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
   ['accounts', 'Switch accounts at a limit', 'auto switch rotate use all accounts usage limit continue other account', 'A session that runs out of usage carries on with another account'],
   ['accounts', 'Use API credit at a limit', 'api credit key anthropic billing console usage limit every claude account carry on pay', 'When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key'],
-  ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie version', 'Which agent programs are installed, and installing the others'],
+  ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie pi version', 'Which agent programs are installed, and installing the others'],
   ['accounts', 'Update automatically', 'update upgrade newest latest version claude code codex gemini opencode agent programs daily', 'Keeps Claude Code, Codex and the other agent programs at their newest version', 'Update agent programs automatically'],
   // Agents › More agents
   ['agents', 'Your agents', 'acp agents custom', 'Agents that show next to Claude Code and Codex'],
   ['agents', 'Add your own', 'acp command custom agent', 'Any agent that speaks ACP, by its command', 'Add your own agent'],
-  ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose acp', 'Gemini CLI, OpenCode, Qwen Code and Goose, ready to add'],
+  ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose hermes agent pi openclaw acp', 'Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent and Pi, ready to add'],
   // Agents › Models
   ['models', 'Helper model', 'small model haiku memory tidy auto mode second opinion', 'The model for small jobs beside sessions'],
   ['models', 'Tiers', 'tiers quick standard best max cheaper cheap strong strongest model per job helpers subagents haiku sonnet opus fable terra sol astra effort automatic', 'The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its helpers get Standard and Quick'],
