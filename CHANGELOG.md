@@ -27,8 +27,9 @@ over, and Discord and Slack join Telegram.
 - **Naget Search turned off hears nothing from the app**, not even the daily request for its categories.
 - **What leaves your computer**: a new page lists every connection Hydor itself makes, host by host, with how to turn
   each one off. Hydor has no telemetry.
-- **Compared with other agents**: honest pages on Hermes Agent, pi, Atomic Agent and OpenClaw, each with its sources
-  and what it does better; a README that says what Hydor is in one sentence; a security policy and a code of conduct.
+- **Hydor vs other agents**: pages on Hermes Agent, pi, Atomic Agent and OpenClaw (hydor.app/compare) showing what
+  Hydor gives you that they don't, and how to bring each one along, with sources; a README that says what Hydor is in
+  one sentence; a security policy and a code of conduct.
 
 ## 0.53.0 · 10 November 2026
 
