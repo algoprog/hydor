@@ -1,0 +1,5 @@
+{
+  "name": "flaky-queue",
+  "private": true,
+  "type": "module"
+}

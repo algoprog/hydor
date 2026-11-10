@@ -1,0 +1,10 @@
+The todo program in this folder needs due dates. Today `node src/cli.mjs list` prints each open item as `#<id> <title>`, for example `#1 Buy milk`; keep that format. What I would like:
+
+- `add <title> --due YYYY-MM-DD` stores a due date with the item (the flag may come before or after the title words) and still prints `added #<id>`. If the date is not a real calendar date (`2025-02-30`, `2025-13-01`, `2025-1-5`, `tomorrow`, or `--due` with no date after it), print a message on stderr, exit with code 2 and add nothing.
+- `list` shows the open items sorted by due date, earliest first. Items without a due date come last, and items with the same due date (or none) go in id order. A line is the old line with ` (due YYYY-MM-DD)` added when the item has a date, for example `#3 Pay rent (due 2025-07-01)`. As before, when there is nothing to show it prints `nothing to do`.
+- `list --overdue [--today YYYY-MM-DD]` shows only open items whose due date is before today (an item due today is not overdue), in the same order and format. Today is the `--today` date, or the current date in the local time zone if the flag is missing. `--today` follows the same rule as `--due`: an invalid date, or no date after it, is an error with exit code 2. It only matters for `--overdue` and `stats`; plain `list` ignores it.
+- `list --json` prints, instead of lines, a JSON array of the items that would have been shown, each an object with exactly the keys `id`, `title`, `done` and `due` (`due` is `null` when there is none), and nothing else on stdout (`[]` when there are none). It combines with `--overdue`.
+- `stats` prints exactly one line, `open: N, done: M, overdue: K`, where K counts open items due before today (same meaning of today, `--today` accepted).
+- Data files written before this change, whose items have no `due` field, must keep loading and working.
+
+`done`, `remove` and the other messages stay as they are. Please update README.md to describe the new options and add tests for them in test/ (the existing ones must still pass with `node --test`). Plain Node.js 22, no packages.

@@ -1,0 +1,3 @@
+Please move this little program from the old `log(level, message, ...more)` function to the new logger in src/logger.mjs. Every call `log('info', 'text', extra)` should become `logger.info('text', extra)` (and `warn` and `error` the same way); where the level is held in a variable, use `logger[level](message, ...)`. Fix the imports so each file imports `logger` from the right relative path to src/logger.mjs, and delete src/log.mjs when nothing uses it any more.
+
+Behaviour and output must stay exactly the same: `node main.mjs` must print what it prints now, and `node --test` must still pass. Only calls to `log` change; leave everything else as it is, including comments and anything else that happens to have "log" in its name or text.
