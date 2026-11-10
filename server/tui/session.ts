@@ -359,8 +359,9 @@ export class Printer {
 
   /** Lines printed outside the conversation (a command's answer): the next block keeps its blank line. */
   aside(lines: string[]): string[] {
-    this.last = null;
-    return lines.length ? ['', ...lines] : [];
+    if (!lines.length) return [];
+    this.last = 'turn';
+    return ['', ...lines];
   }
 
   /** Everything there now counts as printed (history shown another way, or not at all). */

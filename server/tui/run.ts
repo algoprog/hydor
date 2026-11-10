@@ -10,7 +10,7 @@ import type { SessionNote } from '../../shared/features.ts';
 import type { LiveState, TimelineItem } from '../../shared/types.ts';
 import { UsageError, type Opts } from './args.ts';
 import { ApiError, enc, type Conn } from './client.ts';
-import { readStdin } from './commands.ts';
+import { readStdin, whyNoReply } from './commands.ts';
 import { INDENT, modelLabel, textLines, type Look } from './lines.ts';
 import { busy, lastReply, Printer, SessionView } from './session.ts';
 import { catalogOf, newStartId, planStart, startBody, tiersOf, type Boot } from './start.ts';
@@ -58,6 +58,9 @@ function verdict(view: SessionView, since: { settled?: number }): Pick<RunResult
   const now = Date.now();
   since.settled ??= now;
   // Settled a moment (a helper's reply may be on its way), with the turn's end in the conversation; or settled a while.
+  const replied = !!lastReply(view.items) || view.items.some((i) => i.kind === 'turn');
+  // Settled with nothing to show for it a few seconds on: it never got going (a usage limit, an error at the start).
+  if (!replied && now - since.settled >= 3000) return { status: 'failed', error: '' };
   if (!(turn && now - since.settled >= 1200) && now - since.settled < 15_000) return null;
   if (l?.status === 'exited' && l.error) return { status: 'failed', error: l.error };
   if (turn?.status === 'failed') return { status: 'failed', error: lastError(view.items) ?? 'The turn failed' };
@@ -211,6 +214,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
   });
   // The last lines of the transcript land a moment after the turn ends.
   if (outcome.status === 'done') await view.refresh().catch(() => {});
+  if (outcome.status === 'failed' && !outcome.error) outcome.error = await whyNoReply(conn, view, plan.agent);
   stream();
   showProgress();
   const r = resultOf(conn, view, outcome, t0, 0);

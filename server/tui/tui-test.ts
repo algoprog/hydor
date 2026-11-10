@@ -441,6 +441,12 @@ async function play(f: Fake, text: string) {
     return;
   }
   if (/slow/.test(text)) return; // works until stopped
+  if (/limit/.test(text)) {
+    // The plan's usage is used up: the turn ends at once, with nothing in it.
+    f.items.pop();
+    setLive(f, { status: 'idle' });
+    return;
+  }
   if (/approve/.test(text)) {
     const a: ApprovalRequest = { ...APPROVAL, createdAt: Date.now() };
     setLive(f, { status: 'waiting', pendingApprovals: 1 }, { approvals: [a], items: [{ kind: 'tool', id: 'tb', seq: 0, ts: Date.now(), tool: { name: 'Bash', category: 'command', title: 'npm test', status: 'pending' } }] });
@@ -516,6 +522,7 @@ const server = http.createServer((req, res) => {
       return send(200, tiersState);
     }
     if (p.startsWith('/api/catalog/')) return send(200, { models: [{ value: 'opus', label: 'Opus 5.5', resolved: 'claude-opus-5-5', efforts: ['low', 'high'], isDefault: true }, { value: 'haiku', label: 'Haiku 4.5', resolved: 'claude-haiku-4-5', efforts: [] }], modes: [{ value: 'default', label: 'Ask', description: '' }, { value: 'acceptEdits', label: 'Accept edits', description: '' }, { value: 'bypassPermissions', label: 'Full access', description: '' }], defaultMode: 'default', commands: [{ name: 'compact' }] });
+    if (p === '/api/usage') return send(200, { claude: { agent: 'claude', ok: true, fetchedAt: Date.now(), windows: [{ id: 'w', label: 'Weekly · all models', usedPercent: 100, resetsAt: Date.now() + 3 * 3600_000 }], limited: { label: 'Weekly · all models', resetsAt: Date.now() + 3 * 3600_000 } } });
     if (p === '/api/assistants') return send(200, { assistants: [{ id: 'general', name: 'General', icon: 'sparkles', description: 'Anything', instructions: '', builtin: true }] });
     if (p === '/api/sessions' && req.method === 'POST') {
       const s = newFake(String(body.prompt).slice(0, 40));
@@ -668,6 +675,14 @@ test('run: a failed turn exits 1, an approval with nobody to answer 3, a timeout
   assert.ok(calls.some((c) => c.method === 'POST' && c.path === `/api/sessions/${encodeURIComponent(key)}/interrupt`), 'its turn was stopped');
 });
 
+test('run: a turn that ends with nothing in it (a usage limit) fails, and says why', async () => {
+  const r = await hydor(['run', '--json', 'hit the limit']);
+  assert.equal(r.code, 1);
+  const j = JSON.parse(r.out);
+  assert.equal(j.status, 'failed');
+  assert.match(j.error, /^Claude Code is at its usage limit \(Weekly · all models\): it lifts in 2h 59m|^Claude Code is at its usage limit \(Weekly · all models\): it lifts in 3h 0m/);
+});
+
 test('run: a socket that drops and comes back misses nothing', async () => {
   const r = await hydor(['run', '--stream-json', 'drop the line']);
   assert.equal(r.code, 0, r.err);
@@ -807,6 +822,31 @@ for (const cols of [80, 120]) {
     for (const l of s.split('\n')) assert.ok(strWidth(l) <= cols, l);
   });
 }
+
+test('the chat with stdout not a terminal: no colour and no region, each line typed sent', async () => {
+  const out = path.join(DATA, 'plain-out.txt');
+  const env = { ...ENV } as Record<string, string>;
+  delete env.NO_COLOR;
+  const p = pty.spawn('/bin/sh', ['-c', `exec "${process.execPath}" "${CLI}" > "${out}"`], { cols: 80, rows: 24, env, cwd: DATA });
+  let exit: number | null = null;
+  p.onExit((e) => (exit = e.exitCode));
+  const read = () => (fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : '');
+  const until = async (re: RegExp) => {
+    const t0 = Date.now();
+    while (!re.test(read()) && Date.now() - t0 < 8000) await sleep(50);
+    assert.match(read(), re);
+  };
+  await until(/HYDΩR 9\.9\.9/);
+  p.write('say hello plainly\r');
+  await until(/I looked at the README\./);
+  p.write('\x04');
+  const t0 = Date.now();
+  while (exit === null && Date.now() - t0 < 8000) await sleep(50);
+  assert.equal(exit, 0);
+  const text = read();
+  assert.ok(!text.includes('\x1b['), 'no escape codes');
+  assert.match(text, /› say hello plainly\n\n {2}Hello there\.\n\n {2}● Read README\.md\n\n {2}I looked at the README\.\n\n {2}✓ 900 ms · Opus 5\.5/);
+});
 
 // ---- run ---------------------------------------------------------------------------------------------------------------
 

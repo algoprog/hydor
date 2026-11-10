@@ -49,26 +49,41 @@ export function statusWord(s: SessionSummary, p: Paint): string {
   return '';
 }
 
-/** A session's id, short: what `hydor sessions` shows and the other commands take. */
-export const shortKey = (s: Pick<SessionSummary, 'id'>) => s.id.slice(0, 8);
+/**
+ * How much of each session's id `hydor sessions` shows: the shortest start (8 characters at least) that tells the
+ * listed ones apart (Codex's ids begin with the time they were made, so theirs need more).
+ */
+export function keyLength(list: Pick<SessionSummary, 'id'>[]): number {
+  let n = 8;
+  while (n < 36 && new Set(list.map((s) => s.id.slice(0, n))).size < list.length) n++;
+  return n;
+}
 
-/** The sessions as aligned lines, latest first. */
-export function sessionLines(list: SessionSummary[], look: Look): string[] {
+/** A session's id, short: what `hydor sessions` shows and the other commands take. */
+export const shortKey = (s: Pick<SessionSummary, 'id'>, n = 8) => s.id.slice(0, n);
+
+/** A folder, cut from its start to fit (its end says most). */
+const folderIn = (p: string, max: number) => (strWidth(p) <= max ? p : `…${p.slice(p.length - max + 1)}`);
+
+/** The sessions as aligned lines, latest first (cut to the width on a terminal only). */
+export function sessionLines(list: SessionSummary[], look: Look, fit = true): string[] {
   const { p } = look;
   if (!list.length) return ['No sessions yet: `hydor` starts one here.'];
+  const n = keyLength(list);
   const rows = list.map((s) => [
-    p.dim(shortKey(s)),
+    p.dim(shortKey(s, n)),
     statusWord(s, p) || p.dim('·'),
-    s.title || s.firstPrompt || '(untitled)',
+    (s.title || s.firstPrompt || '(untitled)').replace(/\s+/g, ' '),
     p.dim([s.acpName ?? (s.agent === 'claude' ? 'Claude Code' : s.agent === 'codex' ? 'Codex' : 'Agent'), modelLabel(s.live?.model ?? s.model)].filter(Boolean).join(' · ')),
-    p.dim(tildify(s.cwd, look.home)),
+    p.dim(folderIn(tildify(s.cwd, look.home), fit ? 28 : 200)),
     p.dim(timeAgo(s.updatedAt)),
   ]);
+  if (!fit) return columns(rows);
   // The title takes what the width leaves.
   const fixed = [0, 1, 3, 4, 5].reduce((a, i) => a + Math.max(...rows.map((r) => strWidth(r[i]))) + 2, 0);
-  const room = Math.max(16, look.width - fixed);
+  const room = Math.max(20, look.width - fixed - 1);
   for (const r of rows) r[2] = truncate(r[2], room);
-  return columns(rows).map((l) => truncate(l, look.width));
+  return columns(rows).map((l) => truncate(l, look.width - 1));
 }
 
 /** `hydor sessions`: the latest sessions (helpers only with --all). */
@@ -77,7 +92,7 @@ async function sessions(conn: Conn, o: Opts, look: Look) {
   const { sessions: all, total } = await conn.api<{ sessions: SessionSummary[]; total: number }>('GET', `/api/sessions?limit=${o.all ? 300 : Math.min(300, limit * 3)}`);
   const list = (o.all ? all : all.filter((s) => !s.extra?.parent)).slice(0, limit);
   if (o.json) return json({ sessions: list, total });
-  say(sessionLines(list, look));
+  say(sessionLines(list, look, !!process.stdout.isTTY));
 }
 
 /** A session's whole conversation (every page of it). */
@@ -169,7 +184,7 @@ export function modelLines(name: string, cat: AgentCatalog, look: Look): string[
   const { p } = look;
   const out = [p.bold(name)];
   if (!cat.models.length) out.push(p.dim(`  ${cat.modelsError ?? 'No models to pick here.'}`));
-  const rows = cat.models.map((m) => [`  ${m.value}`, `${m.label}${m.isDefault ? p.dim(' (default)') : ''}`, p.dim(m.efforts.length ? `effort: ${m.efforts.join(', ')}` : '')]);
+  const rows = cat.models.map((m) => [`  ${m.value}`, `${m.label}${m.isDefault && !/default/i.test(m.label) ? p.dim(' (default)') : ''}`, p.dim(m.efforts.length ? `effort: ${m.efforts.join(', ')}` : '')]);
   out.push(...columns(rows).map((l) => truncate(l, look.width)));
   if (cat.modes.length) out.push(p.dim(`  Modes: ${cat.modes.map((m) => `${m.label} (${m.value})${m.value === cat.defaultMode ? ' default' : ''}`).join(', ')}`));
   return out;
@@ -312,6 +327,23 @@ function inTime(at?: number | null): string {
   return h < 48 ? `in ${h}h ${m % 60}m` : `in ${Math.round(h / 24)} days`;
 }
 
+/** Why a turn ended with no reply: the agent's error, or its plan at its usage limit, in a sentence. */
+export async function whyNoReply(conn: Conn, view: { live: LiveState | null; items: TimelineItemLike[] }, agent: string): Promise<string> {
+  if (view.live?.error) return `The agent stopped: ${view.live.error}`;
+  const err = [...view.items].reverse().find((i) => i.kind === 'system' && (i as { level?: string }).level === 'error') as { text?: string } | undefined;
+  if (err?.text) return err.text;
+  if (agent === 'claude' || agent === 'codex') {
+    try {
+      const u = await conn.api<{ claude?: AgentUsage; codex?: AgentUsage }>('GET', '/api/usage', undefined, { timeoutMs: 20_000 });
+      const a = agent === 'claude' ? u.claude : u.codex;
+      if (a?.limited) return `${agent === 'claude' ? 'Claude Code' : 'Codex'} is at its usage limit (${a.limited.label})${a.limited.resetsAt ? `: it lifts ${inTime(a.limited.resetsAt)}` : ''}`;
+    } catch {}
+  }
+  return 'The agent stopped without a reply';
+}
+
+type TimelineItemLike = { kind: string };
+
 /** Plan usage as lines: each program's windows with a bar, its limit when used up. */
 export function usageLines(u: { claude?: AgentUsage; codex?: AgentUsage }, look: Look): string[] {
   const { p } = look;
@@ -368,7 +400,8 @@ async function status(o: Opts, look: Look) {
   }
   if (v) {
     out.push(`Sessions: ${working.length} working, ${waiting.length} ${waiting.length === 1 ? 'needs' : 'need'} you`);
-    for (const s of [...waiting, ...working].slice(0, 10)) out.push(`  ${statusWord(s, p)}  ${truncate(s.title || '(untitled)', look.width - 20)} ${p.dim(shortKey(s))}`);
+    const shown = [...waiting, ...working].slice(0, 10);
+    for (const s of shown) out.push(`  ${statusWord(s, p)}  ${truncate(s.title || '(untitled)', look.width - 20)} ${p.dim(shortKey(s, keyLength(list)))}`);
   }
   say(out);
 }

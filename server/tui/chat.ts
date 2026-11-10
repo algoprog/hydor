@@ -13,7 +13,7 @@ import type { AppField } from '../../shared/apps.ts';
 import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import type { Opts } from './args.ts';
 import { enc, type Conn } from './client.ts';
-import { agentLines, conversationLines, openBrowser, resolveKey, sessionLines, shortKey, statusWord, tierLines, usageLines } from './commands.ts';
+import { conversationLines, openBrowser, resolveKey, sessionLines, shortKey, statusWord, tierLines, usageLines, whyNoReply } from './commands.ts';
 import { KeyReader, layout, LineEditor, type Key } from './editor.ts';
 import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, choiceLine, INDENT, isDeny, itemLines, modelLabel, runningLine, stepLines, textLines, tierName, type Look } from './lines.ts';
 import { busy, historyLines, Printer, SessionView } from './session.ts';
@@ -117,6 +117,8 @@ export class Chat {
   private done!: (code: number) => void;
   private histFile = '';
   private busyAsk = false;
+  /** A message sent: the turns ended and the items there were then, to tell a turn that ends with no reply. */
+  private expect: { len: number; at: number; timer?: NodeJS.Timeout } | null = null;
 
   constructor(
     private conn: Conn,
@@ -257,8 +259,32 @@ export class Chat {
     // A card answered elsewhere (the web app, or the turn ended) goes away here too.
     if ((this.ui.kind === 'question' || this.ui.kind === 'form') && !view.overlay.approvals.some((a) => a.id === (this.ui as { a: ApprovalRequest }).a.id)) this.ui = { kind: 'input' };
     this.write(out);
+    this.checkReply();
     this.tickSpinner();
     this.render();
+  }
+
+  /**
+   * A message of yours that came to nothing a few seconds on (a usage limit, an error at its start: the agent may
+   * answer so fast it never shows as working): a line saying why.
+   */
+  private checkReply() {
+    const view = this.view;
+    const e = this.expect;
+    if (!view || !e || busy(view.live) || this.starting) return;
+    if (view.items.slice(e.len).some((i) => i.kind === 'assistant' || i.kind === 'turn' || i.kind === 'system') || view.overlay.items.some((i) => i.kind === 'assistant')) {
+      this.expect = null;
+      return;
+    }
+    const wait = e.at + 3000 - Date.now();
+    if (wait > 0) {
+      if (!e.timer) e.timer = setTimeout(() => ((e.timer = undefined), this.checkReply()), wait + 50);
+      return;
+    }
+    this.expect = null;
+    void whyNoReply(this.conn, view, this.prog.agent).then((why) => {
+      if (this.view === view) this.say(`${INDENT}${this.look.p.red('✗')} ${this.look.p.red(why)}`);
+    });
   }
 
   private working(): boolean {
@@ -586,7 +612,7 @@ export class Chat {
     const s = this.view?.summary;
     this.view?.close();
     this.conn.close();
-    if (key && !this.plain) process.stdout.write(`${this.look.p.dim(`Carry on with: hydor resume ${s ? shortKey(s) : key}`)}\n`);
+    if (key && !this.plain) process.stdout.write(`${this.look.p.dim(`Carry on with: hydor resume ${s?.agent === 'claude' ? shortKey(s) : key}`)}\n`);
     this.giveBack?.();
     this.done(code);
   }
@@ -660,6 +686,7 @@ export class Chat {
       this.render();
       try {
         const { key } = await this.conn.api<{ key: string }>('POST', '/api/sessions', startBody(this.plan, text, newStartId()), { timeoutMs: 120_000 });
+        this.expect = { len: 0, at: Date.now() };
         await this.openView(key, false);
       } catch (e) {
         this.say(p.red(`It did not start: ${(e as Error).message}`));
@@ -681,7 +708,9 @@ export class Chat {
         this.starting = Date.now();
         this.tickSpinner();
         this.render();
+        const len = this.view.items.length;
         await this.conn.api('POST', `/api/sessions/${enc(key)}/message`, { text });
+        this.expect = { len, at: Date.now() };
       }
     } catch (e) {
       this.flash(p.red((e as Error).message));
@@ -710,7 +739,7 @@ export class Chat {
       switch (name) {
         case 'help':
         case '?':
-          return this.say(...helpLines(this.look, this.cat));
+          return this.say(...helpLines(this.look));
         case 'quit':
         case 'exit':
         case 'q':
@@ -833,7 +862,6 @@ export class Chat {
     if (arg) return apply(arg);
     const { assistants } = await this.conn.api<{ assistants: Assistant[] }>('GET', '/api/assistants');
     this.pick('Work as which agent?', assistants.map((a) => ({ label: a.name, hint: truncate(a.description ?? '', 50), value: a.id })), apply);
-    void agentLines;
   }
 
   private async helpers(arg: string) {
@@ -938,18 +966,21 @@ function choicesOf(f: AppField): string[] {
 
 const p = (look: Look) => look.p;
 
-/** /help: the commands and the keys. */
-function helpLines(look: Look, cat: AgentCatalog): string[] {
-  const { p: c } = look;
-  const rows = SLASH.map((s) => `${INDENT}${c.accent(`/${s.name}`)}${s.args ? ` ${c.dim(s.args)}` : ''}  ${c.dim(s.what)}`);
-  return [
-    ...rows,
-    ...(cat.commands?.length ? [`${INDENT}${c.dim(`Any other /command goes to the agent as it is (${cat.commands.slice(0, 6).map((x) => `/${x.name.replace(/^\//, '')}`).join(', ')}…)`)}`] : []),
-    '',
-    `${INDENT}${c.dim('Enter sends · Alt+Enter, Ctrl+J or \\ then Enter: a new line · ↑ ↓ earlier messages · Tab completes /commands and @files')}`,
-    `${INDENT}${c.dim('Esc or Ctrl+C stops the turn · Ctrl+C clears the line, twice leaves · Ctrl+D leaves · Ctrl+L clears the screen')}`,
-    `${INDENT}${c.dim('While it works, Enter queues the message · a card waiting: y, n or its number answers; words deny it with them')}`,
+/** /help: the commands and the keys, wrapped to the width. */
+function helpLines(look: Look): string[] {
+  const { p: c, width } = look;
+  const w = Math.max(...SLASH.map((s) => `/${s.name}${s.args ? ` ${s.args}` : ''}`.length)) + 2;
+  const rows = SLASH.flatMap((s) => {
+    const head = `/${s.name}${s.args ? ` ${s.args}` : ''}`;
+    return wrap(c.dim(s.what), width - 1, { first: `${INDENT}${c.accent(`/${s.name}`)}${s.args ? ` ${c.dim(s.args)}` : ''}${' '.repeat(w - head.length)}`, indent: INDENT + ' '.repeat(w) });
+  });
+  const keys = [
+    'Any other /command goes to the agent as it is (Tab lists them).',
+    'Enter sends. Alt+Enter, Ctrl+J or a \\ before Enter adds a line. ↑ and ↓ go through earlier messages. Tab completes /commands, @files and models.',
+    'Esc or Ctrl+C stops the turn. Ctrl+C clears the line; twice, it leaves (so does Ctrl+D). Ctrl+L clears the screen.',
+    'While the agent works, Enter queues your message. A card waiting for you: y, n or its number answers it; words deny it with them.',
   ];
+  return [...rows, '', ...keys.flatMap((k) => wrap(c.dim(k), width - 1, { first: INDENT, indent: INDENT }))];
 }
 
 /** `hydor`, `hydor chat`, `hydor -c`, `hydor resume [key]`: the chat. */
@@ -979,7 +1010,8 @@ export async function chatCommand(conn: Conn, o: Opts, boot: Boot, message?: str
     }
   }
   const chat = new Chat(conn, o, boot, plain);
-  return chat.run(key, message ?? (o.args.join(' ').trim() || undefined));
+  const words = (o.cmd === 'resume' ? o.args.slice(1) : o.args).join(' ').trim();
+  return chat.run(key, message ?? (words || undefined));
 }
 
 export { p as paintOf };
