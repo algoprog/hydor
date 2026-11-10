@@ -632,7 +632,8 @@ export class SessionManager extends EventEmitter {
         const plain = it.text.replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>|]/g, '').replace(/\s+/g, ' ').trim();
         return plain.length > 160 ? plain.slice(0, 159) + '…' : plain || undefined;
       }
-      if (it.kind === 'user') return undefined;
+      // What begins a turn ends the look; a note, a command's output or a model switch written down after the reply does not.
+      if (opensTurn(it)) return undefined;
     }
     return undefined;
   }

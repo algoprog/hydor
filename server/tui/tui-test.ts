@@ -351,6 +351,10 @@ test('the printer: each final item once, in order; what is under way held for th
   assert.deepEqual(after.lines, ['', '  ● Read /r', '', '  Two.']);
   assert.deepEqual(pr.take(v).lines, []);
   assert.equal(lastReply(v.items), 'First part.\n\nSecond part.');
+  // A step up to Max leaves the program's own "/model …" and what it printed after the reply: they are not the person's, and the reply stands.
+  const slash: TimelineItem = { kind: 'user', id: 'm1', seq: 0, text: '/model claude-fable-5-2', meta: 'slash' };
+  const printed: TimelineItem = { kind: 'user', id: 'm2', seq: 0, text: 'Set model to claude-fable-5-2', meta: 'command-output' };
+  assert.equal(lastReply([user, reply, slash, printed, turn]), 'First part.\n\nSecond part.');
   // A step in the background is printed as it starts.
   const bg = tool({ name: 'Bash', category: 'command', title: 'npm run dev', status: 'running', background: true }, { id: 'bg' });
   const p2 = new Printer(look(60), { brief: true });
