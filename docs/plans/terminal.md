@@ -235,15 +235,16 @@ after the two branches are merged.
   unique start of an id or key. Piped, its lines are not cut to a width.
 - **"Done" for `run`**: not working, no helper working or owing its reply (each helper's turns are counted against the
   replies the lead got; a helper stepped up is not waited for; a reply is waited for at most 120 s after its helper
-  stopped), no background task running (`live.backgroundTasks` with status `running`, the session's or a helper's:
-  Claude Code's own Agent tool and commands in the background, after which the lead ends its turn idle and is woken by
-  each one's end; a "Background task …: …" notice after the last turn's end means a woken turn is on its way, so that
+  stopped), no background helper running (`live.backgroundTasks` entries whose `kind` contains "agent" and whose
+  `status` is `running`, the session's or a helper's: Claude Code's own Agent tool in the background, after which the
+  lead ends its turn idle and is woken by each one's end; a command left running there, kind "local_bash" such as a
+  dev server, may never end and does not count, as on the tiers branch's server; a "Background task …: …" notice after the last turn's end means a woken turn is on its way, so that
   turn's end is not the last), nothing queued (a held queue does not count), settled 1.2 s with the turn's end in the conversation, or
   settled 15 s without one. Its socket is backed by a look at the session and its helpers every 2 s.
-- **Background tasks in the chat**: while one runs, the region says so ("At work in the background: Check the docs",
+- **Background helpers in the chat** (the same "agent" kinds): while one runs, the region says so ("At work in the background: Check the docs",
   "2 helpers at work in the background: …") and the status line says each one's end wakes the agent; a "Background
   task completed: …" notice is one line ("◆ Finished in the background: …", stopped and failed in their colours);
-  `/helpers` lists them (running, and those that ended), and `/stop` stops them with the turn
+  `/helpers` lists them (running, and the background tasks that ended), and `/stop` stops them with the turn
   (`POST /api/sessions/:key/tasks/:taskId/stop`), as `run` does on `--timeout` and Ctrl+C.
 - **`send`** posts to `/message` when the session is not working and to `/queue` when it is.
 - **The chat's input** treats a line and its Enter in one read as typed (a paste without bracketed paste is text with a

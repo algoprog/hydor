@@ -359,13 +359,15 @@ test('the printer: each final item once, in order; what is under way held for th
 
 test('settled: not while the session or a helper has a task running in the background', () => {
   const v = viewOf([{ kind: 'user', id: 'u', seq: 0, text: 'go' }, { kind: 'turn', id: 't', seq: 0, status: 'completed' }]);
-  v.live = { status: 'idle', startedAt: 0, pendingApprovals: 0, backgroundTasks: [{ id: 'b', description: 'Check the docs', status: 'running' }] };
+  v.live = { status: 'idle', startedAt: 0, pendingApprovals: 0, backgroundTasks: [{ id: 'b', description: 'Check the docs', kind: 'local_agent', status: 'running' }] };
   assert.equal(v.settled(), false);
-  v.live = { ...v.live, backgroundTasks: [] };
+  // A command left running in the background (a dev server) may never end: it does not hold the work back.
+  v.live = { ...v.live, backgroundTasks: [{ id: 'd', description: 'npm run dev', kind: 'local_bash', status: 'running' }] };
   assert.equal(v.settled(), true);
+  assert.deepEqual(v.background(), []);
   const child: ChildNote = { child: 'claude:c', agent: 'claude', label: 'L', title: 'T', brief: '', cwd: '/', startedAt: 0 };
   const idle = { status: 'idle' as const, startedAt: 0, pendingApprovals: 0 };
-  v.helpers.set('claude:c', { key: 'claude:c', note: child, turns: 1, replies: 1, summary: { key: 'claude:c', agent: 'claude', id: 'c', title: 'T', stats: {} as SessionSummary['stats'], live: { ...idle, backgroundTasks: [{ id: 'x', description: 'Run the tests', status: 'running' }] } } });
+  v.helpers.set('claude:c', { key: 'claude:c', note: child, turns: 1, replies: 1, summary: { key: 'claude:c', agent: 'claude', id: 'c', title: 'T', stats: {} as SessionSummary['stats'], live: { ...idle, backgroundTasks: [{ id: 'x', description: 'Run the tests', kind: 'local_agent', status: 'running' }] } } });
   assert.equal(v.settled(), false, 'a helper’s task in the background');
   assert.deepEqual(v.background().map((b) => [b.key, b.task.description]), [['claude:c', 'Run the tests']]);
   // Its end woke the agent: the turn before it is not the last one.
@@ -500,17 +502,19 @@ async function play(f: Fake, text: string) {
     // Claude Code's own Agent tool in the background: the turn ends with it running, and its end wakes the lead.
     push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A helper is running; I’ll review it as it comes back.' });
     push(f, turnEnd());
-    setLive(f, { status: 'idle', backgroundTasks: [{ id: 'bg1', description: 'Check the docs', kind: 'local_agent', status: 'running', startedAt: Date.now() }] });
+    const devServer = { id: 'dev', description: 'npm run dev', kind: 'local_bash', status: 'running', startedAt: Date.now() };
+    setLive(f, { status: 'idle', backgroundTasks: [devServer, { id: 'bg1', description: 'Check the docs', kind: 'local_agent', status: 'running', startedAt: Date.now() }] });
     await sleep(1800);
     // It ends: its notice, a moment with nothing running and the lead idle, then the turn it wakes.
     push(f, { kind: 'system', id: `bg${Math.random()}`, seq: 0, ts: Date.now(), level: 'info', text: 'Background task completed: Check the docs' });
-    setLive(f, { status: 'idle', backgroundTasks: [] });
+    setLive(f, { status: 'idle', backgroundTasks: [devServer] });
     await sleep(700);
     setLive(f, { status: 'working', turnStartedAt: Date.now() });
     await sleep(150);
     push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'The docs check out.' });
     push(f, turnEnd());
-    setLive(f, { status: 'idle' });
+    // The dev server goes on running: the work is done all the same.
+    setLive(f, { status: 'idle', backgroundTasks: [devServer] });
     return;
   }
   if (/approve/.test(text)) {

@@ -36,7 +36,7 @@ const SLASH: { name: string; args?: string; what: string }[] = [
   { name: 'tiers', what: 'which model each tier means' },
   { name: 'usage', what: 'plan usage and limits' },
   { name: 'cost', what: 'what this session and its helpers cost' },
-  { name: 'stop', what: 'stop the turn, and what works in the background' },
+  { name: 'stop', what: 'stop the turn, and the helpers in the background' },
   { name: 'rename', args: '<title>', what: 'rename the session' },
   { name: 'open', what: 'its address in the web app' },
   { name: 'quit', what: 'leave (the session goes on in the app)' },
@@ -615,7 +615,7 @@ export class Chat {
     try {
       if (busy(view.live)) await this.conn.api('POST', `/api/sessions/${enc(view.key)}/interrupt`, {});
       await Promise.all(tasks.map(({ key, task }) => this.conn.api('POST', `/api/sessions/${enc(key)}/tasks/${encodeURIComponent(task.id)}/stop`, {})));
-      if (busy(view.live) || tasks.length) this.flash(this.look.p.dim(tasks.length ? 'Stopping it, and what works in the background…' : 'Stopping its turn…'), 2000);
+      if (busy(view.live) || tasks.length) this.flash(this.look.p.dim(tasks.length ? 'Stopping it, and its helpers in the background…' : 'Stopping its turn…'), 2000);
       else this.flash(this.look.p.dim('Nothing is working'), 2000);
     } catch (e) {
       this.flash(this.look.p.red((e as Error).message));
@@ -885,7 +885,7 @@ export class Chat {
     const { p } = this.look;
     const view = this.view;
     const hs = view ? [...view.helpers.values()] : [];
-    // What works in the background (Claude Code's own agents and commands): those running, then those that ended.
+    // Claude Code's own helpers in the background: those running, then the background tasks that ended.
     const running = view?.background() ?? [];
     const ended = (view?.items ?? []).flatMap((i) => (i.kind === 'system' ? [backgroundEnd(i.text)].filter((x) => !!x) : [])) as { status: string; what: string }[];
     const bgLines = [
@@ -986,11 +986,10 @@ export class Chat {
 }
 
 /** What works in the background, in a line: "At work in the background: Check the docs", "2 helpers at work in the background: …". */
-function backgroundWords(list: { task: { description: string; kind?: string; startedAt?: number } }[]): string {
-  const agents = list.every((x) => !/bash|shell|command|monitor/i.test(x.task.kind ?? ''));
+function backgroundWords(list: { task: { description: string; startedAt?: number } }[]): string {
   const what = list.map((x) => x.task.description.replace(/\s+/g, ' ')).join(' · ');
   if (list.length === 1) return `At work in the background: ${what}${list[0].task.startedAt ? ` · ${elapsed(list[0].task.startedAt)}` : ''}`;
-  return `${list.length} ${agents ? 'helpers' : 'tasks'} at work in the background: ${what}`;
+  return `${list.length} helpers at work in the background: ${what}`;
 }
 
 /** A form field's choices: a choice's options, or Yes and No. */
