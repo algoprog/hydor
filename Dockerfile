@@ -70,11 +70,12 @@ RUN if [ "$BROWSER" = true ]; then apt-get update \
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
  && npm cache clean --force
 
-# The image's `node` user, with your ids.
+# The image's `node` user, with your ids; the `hydor` command (Hydor in a terminal: docker exec -it <container> hydor).
 RUN groupmod -o -g ${GID} node \
  && usermod -o -u ${UID} -g ${GID} node \
  && mkdir -p /workspace /app \
- && chown node:node /workspace /home/node /app
+ && chown node:node /workspace /home/node /app \
+ && ln -s /app/bin/hydor.mjs /usr/local/bin/hydor
 
 WORKDIR /app
 USER node

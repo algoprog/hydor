@@ -27,6 +27,7 @@ The guide is also in [Chinese (简体中文)](zh/) and [Greek (Ελληνικά)
 - [Phones, other machines and sharing](20-devices.md)
 - [Look, language and updates](21-app.md)
 - [Let agents work the app for you](22-ask-agents.md)
+- [Hydor in a terminal](27-terminal.md)
 - [Every setting](30-settings.md)
 - [The app's API](90-api.md)
 

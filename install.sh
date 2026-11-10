@@ -57,6 +57,18 @@ npm ci --no-audit --no-fund
 say "Building"
 npm run build
 
+# The `hydor` command (Hydor in a terminal), linked into ~/.local/bin when that folder is on the PATH.
+bin_dir="$HOME/.local/bin"
+case ":$PATH:" in
+  *":$bin_dir:"*)
+    if { [ ! -e "$bin_dir/hydor" ] || [ -L "$bin_dir/hydor" ]; } && mkdir -p "$bin_dir" 2>/dev/null && ln -sf "$dir/bin/hydor.mjs" "$bin_dir/hydor" 2>/dev/null; then
+      printf '\nThe hydor command is ready: run hydor to talk to an agent in a terminal (hydor help says more).\n'
+    else
+      printf '\nNote: %s/hydor is another file, so the hydor command was not linked: run %s/bin/hydor.mjs instead.\n' "$bin_dir" "$dir"
+    fi ;;
+  *) printf '\nNote: %s is not on your PATH, so the hydor command was not linked: run %s/bin/hydor.mjs, or link it where you keep commands.\n' "$bin_dir" "$dir" ;;
+esac
+
 command -v claude >/dev/null || printf '\nNote: Claude Code is not installed (npm install -g @anthropic-ai/claude-code). Codex comes with the app.\n'
 
 if [ "${NO_SERVICE:-}" = 1 ]; then
