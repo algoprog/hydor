@@ -520,10 +520,10 @@ An app travels as one file: a .json, or a .hydor-app (a zip of its app.json, dat
 - `GET /api/apps/:id/keys` — your app's API keys, never their values. Returns: `{ keys: [{ id, name, hint — first and last characters, createdAt, lastUsed? }] }`.
 - `DELETE /api/apps/:id/keys/:keyId` — revokes a key; programs using it stop at once. Returns: `{ ok: true }`.
 
-## App-wide switches (Settings → General → Resume after usage limits, Settings → Accounts → Switch accounts at a limit)
+## App-wide switches (Settings → General → Resume after usage limits, Settings → Accounts → Switch accounts at a limit and Use API credit at a limit)
 
-- `GET /api/app-settings` — whether sessions stopped by a plan's usage limit continue by themselves a minute after it resets, and whether a session whose account runs out of usage moves to another of its agent's accounts with usage left and carries on (both off by default). Returns: `{ autoResume: boolean, autoSwitch: boolean }`.
-- `PUT /api/app-settings` — turns either on or off. Body: `{ autoResume?: boolean, autoSwitch?: boolean }` (each left as is when absent). Returns: `{ autoResume: boolean, autoSwitch: boolean }`.
+- `GET /api/app-settings` — whether sessions stopped by a plan's usage limit continue by themselves a minute after it resets, whether a session whose account runs out of usage moves to another of its agent's accounts with usage left and carries on, and whether Claude Code sessions carry on billed to an Anthropic API key (API credit) when every Claude account is at its limit (autoResume and apiCredit are off by default, autoSwitch is on). Returns: `{ autoResume: boolean, autoSwitch: boolean, apiCredit: boolean }`.
+- `PUT /api/app-settings` — turns any of them on or off. Body: `{ autoResume?: boolean, autoSwitch?: boolean, apiCredit?: boolean }` (each left as is when absent). Returns: `{ autoResume: boolean, autoSwitch: boolean, apiCredit: boolean }`.
 
 ## Pages (the Library)
 
@@ -726,10 +726,12 @@ Settings → Agents → Plugins. A plugin is a folder in the Agent Plugins 1.0 f
 
 ## Accounts (Claude Code and Codex)
 
-- `GET /api/accounts` — sign-in state of each CLI's own account and of every added account. Returns: `{ claude: AccountStatus, codex: AccountStatus, extra: [{ id, agent: "claude"|"codex", name, status: AccountStatus }] }`, where AccountStatus is `{ agent, loggedIn: boolean, email?, plan?, method?, detail?, error? }`.
+- `GET /api/accounts` — sign-in state of each CLI's own account and of every added account. Returns: `{ claude: AccountStatus, codex: AccountStatus, extra: [{ id, agent: "claude"|"codex", name, status: AccountStatus }], apiKeys: { main: boolean, [accountId]: boolean } — whether the CLI's own Claude sign-in (main) and each added Claude account has an Anthropic API key saved for API credit }`, where AccountStatus is `{ agent, loggedIn: boolean, email?, plan?, method?, detail?, error? }`.
 - `POST /api/agent-accounts` — adds another account for an agent (its own folder; settings, instructions, skills and plugins shared). It then needs signing in, which only the user can do (Settings → Accounts). Body: `{ agent: "claude"|"codex", name: string — 1–40 chars, unique per agent (409 if taken) }`. Returns: `{ id, agent, name }`.
 - `PATCH /api/agent-accounts/:id` — renames an added account. Body: `{ name: string — 1–40 chars }`. Returns: `{ ok: true }`.
 - `DELETE /api/agent-accounts/:id` — removes an added account; its sessions leave the list. Query: `wipe?: "1" — also delete its sign-in and its sessions' history (cannot be undone)`. 409 while sessions run as it. Returns: `{ ok: true }`.
+- `PUT /api/accounts/claude/api-keys/:account` — saves the Anthropic API key (from console.anthropic.com) of a Claude Code account, its API credit for when every account is at its usage limit and **Use API credit at a limit** is on; `:account` is `main` (the CLI's own sign-in) or an added account's id. The key is checked with Anthropic and kept encrypted in the vault. The user's own call, from Settings → Accounts. Body: `{ key: string — starts with sk-ant- }`. Returns: `{ ok: true, checked: boolean — false when Anthropic could not be reached to check it }`.
+- `DELETE /api/accounts/claude/api-keys/:account` — removes that account's API key. Returns: `{ ok: true }`.
 
 ## More agents (ACP)
 

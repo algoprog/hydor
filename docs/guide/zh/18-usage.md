@@ -68,7 +68,7 @@ Claude Code 和 Codex 运行在有使用限额的套餐上，每次调用模型�
 - 只有真正被限额打断的一轮才会继续；工作刚好完成时套餐用量才到 100% 的，不算。如果会话已经不靠它继续了（你发了消息、按了 **停止**，或者某一轮正常完成），已计划的继续就会取消。等待期间智能体自己开始的一轮（例如它的某个后台智能体也因同一限额停下）不会取消它。你按 **停止** 停下的会话，即使限额的错误先出现，也不会自动继续，直到你再给它发消息。
 - 通知上的 **取消** 会取消已计划的继续。
 
-如果这个智能体有不止一个账户，[**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)会立即让会话换另一个账户继续，只有在每个账户都达到限额时才会等待（见[智能体、账户和模型](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)）。
+如果这个智能体有不止一个账户，[**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)会立即让会话换另一个账户继续，只有在每个账户都达到限额时才会等待（见[智能体、账户和模型](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)）。对于 Claude Code，[**达到限额时使用 API 额度**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)可以在那时让会话按你保存的 Anthropic API 密钥计费继续，而不是等待（见[所有账户都达到限额时使用 API 额度](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit)）。
 
 ## 使用限额重置
 

@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.53.0 · 10 November 2026
+
+Claude Code sessions can carry on with your API credit when every account is at its usage limit.
+
+- **Use API credit at a limit**, in Settings → Agents → Accounts, is off until you turn it on. When a Claude Code
+  session's account runs out of usage, the session first moves to another account with usage left, as before. When
+  none has any, it carries on, billed to the Anthropic API key you saved for that account (or for another of your
+  Claude accounts), without moving its history. Once a plan has usage again, the session goes back to it after the
+  turn.
+- Each Claude Code account's **⋯** menu has **Add API key…** (checked with Anthropic, kept encrypted on this computer)
+  and **Remove API key**. A row with a key shows "API credit", and so does a session while it runs on it.
+- Agents cannot add or read these keys.
+
 ## 0.52.0 · 10 November 2026
 
 A strong model leads and cheaper ones do the clear parts, by default; and Hydor in a terminal.

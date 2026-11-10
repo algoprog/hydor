@@ -355,6 +355,8 @@ export interface SessionSummary {
   resumeAt?: number;
   /** The added account it runs as (Settings → Accounts); missing for the CLI's own sign-in. */
   account?: string;
+  /** Running on its account's API credit (an Anthropic API key) because every Claude account is at its usage limit. */
+  apiCredit?: boolean;
   /** For an ACP session: which agent (its id in Settings → More agents) and its name. */
   acpAgent?: string;
   acpName?: string;

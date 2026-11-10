@@ -41,6 +41,7 @@ const RULES: Rule[] = [
   ['W', /^\/api\/signatures$/, 'refuse', 'Only the user draws their signature: ask for one with ask_signature, which shows them a card to draw it on.'],
   ['POST', /^\/api\/apps\/[^/]+\/secrets$/, 'refuse', 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).'],
   ['*', /^\/api\/accounts\/[^/]+\/(login|logout)/, 'refuse', 'Signing in and out of an agent’s account is the user’s to do, in Settings → Agents → Accounts.'],
+  ['*', /^\/api\/accounts\/claude\/api-keys\//, 'refuse', 'An API key is the user’s to add, in Settings → Agents → Accounts (an account’s ⋯ menu → Add API key…).'],
   ['W', /^\/api\/budget\//, 'refuse', 'Spending caps are the user’s to set: the session’s menu → Spending cap, or Options on the start page.'],
   ['W', /^\/api\/sessions\/[^/]+\/(takeover|seen|queue)/, 'refuse', 'That is for the session’s own page.'],
   ['W', /^\/api\/sites$/, 'refuse', 'Publish with your publish_site tool: the user confirms on its card.'],

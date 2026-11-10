@@ -14,7 +14,7 @@ import { toast, toastError, useApp, useAppSettings, useLogins, useUI } from '../
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, IconButton, MenuItem, Popover, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
+import { Badge, Button, cx, Dialog, IconButton, MenuItem, Popover, Throbber, inputCls, Section, Segmented, Switch, Tabs, useConfirm, useIsMobile } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
 import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
@@ -259,7 +259,7 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
 /** Something a row's ⋯ menu does besides signing out. */
 type RowAction = { label: string; icon?: ReactNode; danger?: boolean; run: () => void };
 
-function AccountRow({ a, account, onChange, actions = [] }: { a: AccountStatus | null; account?: AgentAccount; onChange: () => void; actions?: RowAction[] }) {
+function AccountRow({ a, account, onChange, actions = [], apiKey }: { a: AccountStatus | null; account?: AgentAccount; onChange: () => void; actions?: RowAction[]; apiKey?: boolean }) {
   const agent = a?.agent ?? account?.agent;
   const q = account ? `?account=${encodeURIComponent(account.id)}` : '';
   const [login, setLogin] = useState(false);
@@ -301,6 +301,11 @@ function AccountRow({ a, account, onChange, actions = [] }: { a: AccountStatus |
               <span className="font-normal text-fg-3" translate="no">
                 {' '}
                 · {account.name}
+              </span>
+            )}
+            {apiKey && (
+              <span className="ml-2 align-middle" title="An Anthropic API key is saved for this account: used only when every account is at its usage limit and Use API credit at a limit is on">
+                <Badge>API credit</Badge>
               </span>
             )}
           </div>
@@ -792,6 +797,79 @@ function AutoSwitchSetting() {
   );
 }
 
+/** When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key saved for an account. Kept on the server. */
+function ApiCreditSetting() {
+  const on = useAppSettings((s) => s.apiCredit);
+  useEffect(() => void useAppSettings.getState().load(), []);
+  return (
+    <SettingRow label="Use API credit at a limit" hint="When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on.">
+      {on === null ? (
+        <Throbber className="text-fg-3" />
+      ) : (
+        <Switch
+          on={on}
+          label="Use API credit at a limit"
+          onChange={(v) => {
+            useAppSettings.getState().set({ apiCredit: v });
+            put('/api/app-settings', { apiCredit: v }).catch((e) => (useAppSettings.getState().set({ apiCredit: !v }), toastError(e)));
+          }}
+        />
+      )}
+    </SettingRow>
+  );
+}
+
+/** Saves the Anthropic API key of a Claude Code account (its API credit): checked with Anthropic, kept encrypted. */
+function ApiKeyDialog({ target, onClose, onDone }: { target: { id: string; name: string } | null; onClose: () => void; onDone: () => void }) {
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    setKey('');
+    setError('');
+  }, [target?.id]);
+  const save = async () => {
+    if (!target || !key.trim() || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await put(`/api/accounts/claude/api-keys/${encodeURIComponent(target.id)}`, { key: key.trim() });
+      onDone();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog open={!!target} onClose={onClose} title={target ? `API key for ${target.name}` : ''} width={460}>
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+      >
+        <label className="block">
+          <span className="mb-1.5 block text-[12px] font-medium text-fg-2">Anthropic API key</span>
+          <input autoFocus type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…" className={cx(inputCls, 'w-full font-mono text-[12.5px]')} />
+        </label>
+        <p className="text-[12px] leading-snug text-fg-3">From console.anthropic.com → API keys. Used only when every account is at its usage limit and Use API credit at a limit is on. Kept encrypted on this computer.</p>
+        {error && <p className="text-[12.5px] text-err">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={!key.trim() || busy}>
+            {busy ? 'Checking…' : 'Save key'}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 /** How long a session may stay inactive before the app deletes it. */
 const AGES: [number, string][] = [
   [90, '3 months'],
@@ -983,11 +1061,12 @@ function SecuritySettings() {
   );
 }
 
-type AccountsInfo = { claude: AccountStatus; codex: AccountStatus; extra: (AgentAccount & { status: AccountStatus })[] };
+type AccountsInfo = { claude: AccountStatus; codex: AccountStatus; extra: (AgentAccount & { status: AccountStatus })[]; apiKeys?: Record<string, boolean> };
 
 function AccountSettings() {
   const [accounts, setAccounts] = useState<AccountsInfo | null>(null);
   const [adding, setAdding] = useState(false);
+  const [keyFor, setKeyFor] = useState<{ id: string; name: string } | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const load = () =>
     api<AccountsInfo>('/api/accounts')
@@ -1022,9 +1101,14 @@ function AccountSettings() {
     await del(`/api/agent-accounts/${a.id}${wipe ? '?wipe=1' : ''}`).catch(toastError);
     load();
   };
+  /** A Claude Code account's API key actions (its API credit): `id` is "main" for the CLI's own sign-in. */
+  const keyActions = (id: string, name: string): RowAction[] => [
+    { label: accounts?.apiKeys?.[id] ? 'Change API key…' : 'Add API key…', icon: <KeyRound size={14} />, run: () => setKeyFor({ id, name }) },
+    ...(accounts?.apiKeys?.[id] ? [{ label: 'Remove API key', icon: <Trash2 size={14} />, run: () => void del(`/api/accounts/claude/api-keys/${encodeURIComponent(id)}`).catch(toastError).then(load) }] : []),
+  ];
   // Each agent's own sign-in, then the accounts added for it.
   const rows = (agent: Agent, main: AccountStatus | undefined) => [
-    <AccountRow key={agent} a={main ?? null} onChange={load} />,
+    <AccountRow key={agent} a={main ?? null} onChange={load} apiKey={agent === 'claude' && !!accounts?.apiKeys?.main} actions={agent === 'claude' ? keyActions('main', 'Claude Code') : []} />,
     ...(accounts?.extra ?? [])
       .filter((x) => x.agent === agent)
       .map((x) => (
@@ -1033,8 +1117,10 @@ function AccountSettings() {
           a={x.status}
           account={x}
           onChange={load}
+          apiKey={x.agent === 'claude' && !!accounts?.apiKeys?.[x.id]}
           actions={[
             { label: 'Rename', icon: <Pencil size={14} />, run: () => rename(x) },
+            ...(x.agent === 'claude' ? keyActions(x.id, x.name) : []),
             { label: 'Remove', icon: <Trash2 size={14} />, danger: true, run: () => remove(x) },
           ]}
         />
@@ -1055,10 +1141,12 @@ function AccountSettings() {
           {rows('claude', accounts?.claude)}
           {rows('codex', accounts?.codex)}
           {!!accounts?.extra.length && <AutoSwitchSetting />}
+          {(accounts?.claude.loggedIn || accounts?.extra.some((x) => x.agent === 'claude')) && <ApiCreditSetting />}
         </div>
       </Section>
       <AgentPrograms />
       <AddAgentAccount open={adding} onClose={() => setAdding(false)} onAdded={load} />
+      <ApiKeyDialog target={keyFor} onClose={() => setKeyFor(null)} onDone={load} />
       {confirmNode}
     </div>
   );

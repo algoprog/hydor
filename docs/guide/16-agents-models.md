@@ -158,10 +158,27 @@ With two or more accounts for the same agent, the app can use them all: when one
 - When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A note at the top of the app says which account it moved to.
 - Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex.
 - A Codex goal moves with the session and keeps going.
-- When every account is at its limit, nothing moves. With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
+- When every account is at its limit, nothing moves (unless **Use API credit at a limit** is on, below). With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
 - A new session started on an account that is at its limit starts on one with usage left instead, and a message you send to a session whose account is at its limit moves the session first, so the message isn't turned away.
 - Sessions open in VS Code or a terminal stay on their account.
 - The app's own quick questions to Claude Code or Codex (the helper model on **Automatic**, an app's quick model steps, pull-request descriptions, command suggestions) go to your next signed-in account the same way when one is at its limit, or signed out.
+
+## Use API credit when every account is at its limit
+
+If you have an Anthropic API key (from [console.anthropic.com](https://console.anthropic.com) → API keys), your Claude Code sessions can carry on with it when every Claude Code account is at its usage limit, instead of stopping. It costs money: the session is billed by Anthropic at API prices for as long as it runs this way, not covered by your subscription.
+
+1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit). On the row of a Claude Code account in **Your accounts** (your main sign-in, or one you added), click **⋯** and then **Add API key…**.
+2. Paste the key in **Anthropic API key** and click **Save key**. The app checks it with Anthropic and keeps it encrypted on this computer. The row then shows an **API credit** tag. **Change API key…** replaces it and **Remove API key** deletes it.
+3. Turn on **Use API credit at a limit** ("When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on."). It shows once Claude Code is signed in or you have added a Claude Code account.
+
+What happens then:
+
+- When a Claude Code session's account hits its usage limit, the app first tries what **Switch accounts at a limit** does: another account with usage left. Only when none has any left, and the setting is on, the session carries on billed to the API key.
+- The session stays on its own account, so its history does not move. If that account has no key, the key of another Claude Code account is used.
+- The session shows an **API credit** tag next to its account at the top. Hover over it to see why.
+- When a plan has usage again, the session goes back to it after its next turn ends: to its own account, or to another with usage left. You don't have to do anything.
+- If the app can't read an account's usage, it never moves your work to API billing.
+- Codex is not affected: it has no API credit.
 
 ## Add Gemini CLI, OpenCode and other ACP agents
 
@@ -383,4 +400,5 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Make the helper model one that sees images."
 - "Stop the vLLM model that's running, to free the graphics card."
 - "Use all my Claude accounts: when one hits its limit, carry on with another."
+- "When all my Claude accounts run out, carry on with my API credit."
 - "Which model does each tier use for Claude Code and Codex? Make Max mean Opus for Claude Code."
