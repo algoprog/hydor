@@ -85,7 +85,7 @@ function pages(root, { guide, topics }) {
 }
 
 /** Where a link in a document goes on the site: one of its pages, a place in the app (no page for it), or out. */
-function linkFor(href, file, bySlugFile) {
+function linkFor(href, file, hrefOfFile) {
   if (!href || href.startsWith('#')) return { href };
   if (/^(https?:|mailto:)/.test(href)) return { href, out: true };
   if (href === '/guide' || href === '/guide/') return { href: '/docs/' };
@@ -97,14 +97,14 @@ function linkFor(href, file, bySlugFile) {
   const rel = path.posix.normalize(path.posix.join(path.posix.dirname(file), p));
   if (rel === 'README.md') return { href: `/${hash ? `#${hash}` : ''}` };
   if (rel === 'docs/guide' || rel === 'docs/guide/' || rel === 'docs/guide/README.md') return { href: '/docs/' };
-  const slug = bySlugFile.get(rel);
-  if (slug) return { href: `/docs/${slug}${hash ? `#${hash}` : ''}` };
+  const page = hrefOfFile.get(rel);
+  if (page) return { href: `${page}${hash ? `#${hash}` : ''}` };
   const isDir = p.endsWith('/') || !path.posix.extname(rel);
   return { href: `${REPO}/${isDir ? 'tree' : 'blob'}/main/${rel.replace(/\/$/, '')}${hash ? `#${hash}` : ''}`, out: true };
 }
 
 /** A document's Markdown as the page's HTML: headings with the app's ids, its pictures as figures, links resolved. */
-function renderDoc(md, { file, anchors, bySlugFile, image }) {
+function renderDoc(md, { file, anchors, hrefOfFile, image }) {
   let at = 0;
   const heading =
     (level) =>
@@ -119,7 +119,7 @@ function renderDoc(md, { file, anchors, bySlugFile, image }) {
     h5: heading(5),
     h6: heading(6),
     a: ({ node, href, children, ...rest }) => {
-      const to = linkFor(href, file, bySlugFile);
+      const to = linkFor(href, file, hrefOfFile);
       if (to.app) return h('span', { className: 'in-app', title: 'A place in the app' }, children);
       return h('a', { ...rest, href: to.href, ...(to.out ? { rel: 'noopener' } : {}) }, children);
     },
@@ -240,12 +240,40 @@ ${body}
 `;
 }
 
+
+/** The comparison pages (/compare): docs/compare/README.md is the overview, the other files one page each. They are
+ * ordinary Markdown on GitHub, with relative links; here they take the site's own look. */
+function comparePages(root, { guide }) {
+  const dir = path.join(root, 'docs/compare');
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
+  const first = ['README.md', 'hermes-agent.md', 'pi.md', 'atomic-agent.md', 'openclaw.md'];
+  files.sort((a, b) => (first.includes(a) ? first.indexOf(a) : first.length) - (first.includes(b) ? first.indexOf(b) : first.length) || a.localeCompare(b));
+  return files.map((f) => {
+    const md = fs.readFileSync(path.join(dir, f), 'utf8');
+    const slug = f === 'README.md' ? '' : f.replace(/\.md$/, '');
+    const t = guide.parseTopic(f, md);
+    const blurb = t.summary
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[*`]/g, '')
+      .replace(/\s*Checked 10 November 2026\.?$/, '');
+    return { file: `docs/compare/${f}`, href: slug ? `/compare/${slug}` : '/compare/', out: slug ? `compare/${slug}.html` : 'compare/index.html', topic: t, blurb };
+  });
+}
+
+/** What each comparison page shows beside it: the pages of /compare, the open one marked. */
+function compareSide(pages, current) {
+  return `<div class="side-group"><p>Compare</p><ul>${pages
+    .map((p) => `<li><a href="${p.href}"${p.href === current ? ' aria-current="page"' : ''}>${esc(p.href === '/compare/' ? 'All compared' : p.topic.title.replace(/^Hydor and /, ''))}</a></li>`)
+    .join('')}</ul></div><div class="side-group"><p>More</p><ul><li><a href="/docs/">Docs</a></li><li><a href="/docs/features">Everything Hydor does</a></li></ul></div>`;
+}
+
 export async function buildDocs({ root, out, indexHtml }) {
   const mods = await appModules(root);
   const { guide, lucide } = mods;
   const all = pages(root, mods);
   for (const p of all) if (!p.icon) p.icon = lucide[p.iconName] ?? lucide.BookOpen;
-  const bySlugFile = new Map(all.map((p) => [p.file, p.slug]));
+  const compare = comparePages(root, mods);
+  const hrefOfFile = new Map([...all.map((p) => [p.file, `/docs/${p.slug}`]), ...compare.map((p) => [p.file, p.href])]);
   const shell = shellOf(indexHtml);
   const docsOut = path.join(out, 'docs');
   fs.mkdirSync(path.join(docsOut, 'images'), { recursive: true });
@@ -266,7 +294,7 @@ export async function buildDocs({ root, out, indexHtml }) {
     const t = p.topic;
     const md = fs.readFileSync(path.join(root, p.file), 'utf8');
     const bodyMd = md.replace(/^\s*# .*\n/, '');
-    const html = renderDoc(bodyMd, { file: p.file, anchors: t.anchors, bySlugFile, image });
+    const html = renderDoc(bodyMd, { file: p.file, anchors: t.anchors, hrefOfFile, image });
     const prev = all[i - 1];
     const next = all[i + 1];
     const toc = t.sections.length > 1 ? `<nav class="doc-toc" aria-label="On this page"><p>On this page</p><ul>${t.sections.map((s) => `<li><a href="#${s.id}">${esc(s.title)}</a></li>`).join('')}</ul></nav>` : '';
@@ -326,6 +354,37 @@ ${groups
     page(shell, { title: 'Hydor docs', description: 'Every part of Hydor, in plain words, with search: the guide the app shows under Help, installation, remote access and more.', url: '/docs/', body: home, bodyClass: 'docs docs-landing' }),
   );
 
+  // The comparison pages, in the same look as the docs, with the other pages of /compare down the side.
+  fs.mkdirSync(path.join(out, 'compare'), { recursive: true });
+  compare.forEach((p, i) => {
+    const t = p.topic;
+    const md = fs.readFileSync(path.join(root, p.file), 'utf8');
+    const html = renderDoc(md.replace(/^\s*# .*\n/, ''), { file: p.file, anchors: t.anchors, hrefOfFile, image });
+    const prev = compare[i - 1];
+    const next = compare[i + 1];
+    const label = (q) => esc(q.href === '/compare/' ? 'All compared' : q.topic.title);
+    const toc = t.sections.length > 1 ? `<nav class="doc-toc" aria-label="On this page"><p>On this page</p><ul>${t.sections.map((s) => `<li><a href="#${s.id}">${esc(s.title)}</a></li>`).join('')}</ul></nav>` : '';
+    const body = `  <div class="docs-shell compare-shell${p.href === '/compare/' ? ' compare-wide' : ''}">
+    <aside class="docs-side" aria-label="The comparisons">
+      ${searchButton('side-search')}
+      <nav>${compareSide(compare, p.href)}</nav>
+    </aside>
+    <main id="main" class="docs-main">
+      <article class="doc">
+        <p class="doc-crumbs"><a href="/compare/">Compare</a>${p.href === '/compare/' ? '' : `<span>›</span>${esc(t.title.replace(/^Hydor and /, ''))}`}</p>
+        <header class="doc-head"><span class="doc-icon">${svg(lucide.Scale ?? lucide.BookOpen, 22)}</span><h1>${esc(t.title)}</h1></header>
+        <div class="doc-body">
+${html}
+        </div>
+        <nav class="doc-pager" aria-label="Other comparisons">${prev ? `<a class="prev" href="${prev.href}"><span>Previous</span>${label(prev)}</a>` : '<span></span>'}${next ? `<a class="next" href="${next.href}"><span>Next</span>${label(next)}</a>` : ''}</nav>
+        <p class="doc-edit"><a href="${REPO}/edit/main/${p.file}" rel="noopener">Change this page on GitHub</a> · checked 10 November 2026</p>
+      </article>
+      ${toc}
+    </main>
+  </div>`;
+    fs.writeFileSync(path.join(out, p.out), page(shell, { title: `${t.title} · Hydor`, description: p.blurb.slice(0, 200), url: p.href, body, bodyClass: 'docs compare' }));
+  });
+
   // What the search finds: each page's sections in plain words (not the API, as in the app's search box, nor the
   // release notes), for Help's own search.
   const index = all
@@ -342,5 +401,5 @@ ${groups
     alias: { '@shared': path.join(root, 'shared') },
     logLevel: 'warning',
   });
-  return all.map((p) => `/docs/${p.slug}`);
+  return [...all.map((p) => `/docs/${p.slug}`), ...compare.map((p) => p.href)];
 }

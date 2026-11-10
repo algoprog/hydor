@@ -64,3 +64,8 @@ over existing files), and new text is written as the guide is: plain words, for 
 - Written with an AI's help is fine, as long as you have read every line, run it and stand behind it. Issues and pull
   requests that read as unchecked output (a diagnosis no one confirmed, code no one ran) are closed.
 - Hydor is under the [Apache License 2.0](LICENSE): what you contribute is too.
+
+## Conduct and security
+
+Everyone who takes part follows the [Code of Conduct](CODE_OF_CONDUCT.md). To report a vulnerability, use GitHub's
+private reporting as [SECURITY.md](SECURITY.md) says, not a public issue.
