@@ -7,6 +7,7 @@ import type { SessionExtra } from '@shared/features';
 import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
 import { isConfidential } from '@shared/confidential';
+import { AUTO_MODEL, tierProgram } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
@@ -17,7 +18,7 @@ import { startSession, warmMemory } from '../../lib/starting';
 import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
 import { toast, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
-import { EffortPicker, findModel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
+import { EffortPicker, findModel, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
 import { cx, IconButton, Popover, SettingChip, SettingLayout, SheetsOnPhone, Switch, useIsMobile } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
@@ -31,6 +32,7 @@ import { ExploreButton } from './ExploreButton';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
+import { useTeam, useTierMap } from '../assistants/agentsState';
 import { NewSpaceDialog } from '../spaces/parts';
 import { useSpaces } from '../spaces/state';
 import type { Space } from '@shared/spaces';
@@ -204,6 +206,12 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     ta.current?.focus();
   };
 
+  // Automatic: the tiers pick the model (Best's, or Max's for a hard problem). Offered where the team is on and the
+  // program has tiers (Custom once its Best names a model); a confidential session picks among this computer's models.
+  const tiers = useTierMap();
+  const team = useTeam();
+  const prog = tierProgram(agent, acpId ?? undefined);
+  const autoOn = !!team?.on && !!prog && !isConfidential(extra) && (prog !== 'console' || !!tiers?.console.best.model);
   // Each agent starts from what it last ran with here (else from its last session's), or from a link's model.
   const linked = useRef<{ agent: Agent; model: string } | null>(link?.model ? { agent: first.agent, model: link.model } : null);
   useEffect(() => {
@@ -211,14 +219,16 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     const p = cat?.prefs ?? {};
     const pick = linked.current?.agent === agent ? linked.current : null;
     if (pick && cat) linked.current = null;
-    const m = pick ? pick.model : r.model !== undefined ? r.model : p.model;
+    const last = pick ? pick.model : r.model !== undefined ? r.model : p.model;
+    // No model picked (or the program's own default): Automatic where it is offered. Automatic kept from when it was: the default.
+    const m = autoOn ? (last ?? AUTO_MODEL) : last === AUTO_MODEL ? null : last;
     // Codex's default must be named: unnamed, Codex takes config.toml's model, which a ChatGPT sign-in may not allow.
     setModel(m ?? (agent === 'codex' ? (cat?.models.find((x) => x.isDefault)?.value ?? null) : null));
     setEffort((r.effort !== undefined ? r.effort : p.effort) ?? null);
     const md = (r.mode !== undefined ? r.mode : p.mode) ?? null;
     setMode(md && (!cat || cat.modes.some((x) => x.value === md)) ? md : cat?.defaultMode || null);
     setAccount((r.account !== undefined ? r.account : p.account) ?? '');
-  }, [agent, acpId, cat]);
+  }, [agent, acpId, cat, autoOn]);
   // Confidential: Custom, with the best model on this computer (or the one picked, when it is one of them).
   const confidential = isConfidential(extra);
   const local = useConfidentialInfo();
@@ -296,7 +306,8 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
       agent,
       acpAgent: agent === 'acp' ? acpId : undefined,
       prompt,
-      model,
+      // The arena sets named models against each other: Automatic goes in as the model it would start on.
+      model: model === AUTO_MODEL && arenaOf(extra) ? bestModel : model,
       effort: agent === 'acp' ? undefined : effort,
       mode,
       account: acct,
@@ -350,8 +361,17 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     }
   };
 
+  // On Automatic the effort is the Best model's to pick from; what Automatic comes to, for its line in the model menu.
+  const bestModel = prog ? (tiers?.[prog].best.model ?? null) : null;
+  const maxModel = prog ? (tiers?.[prog].max.model ?? null) : null;
+  const effortModel = model === AUTO_MODEL ? bestModel : model;
+  const autoHint = !autoOn
+    ? undefined
+    : team?.hard && maxModel && maxModel !== bestModel
+      ? `${modelLabel(cat, bestModel)}, or ${modelLabel(cat, maxModel)} for a hard problem`
+      : modelLabel(cat, bestModel);
   // What the Options chip names: the settings under it that are not as usual.
-  const levels = findModel(cat, model)?.efforts ?? [];
+  const levels = findModel(cat, effortModel)?.efforts ?? [];
   const effortOn = agent !== 'acp' && !!effort && (!cat || levels.length > 0) ? effort[0].toUpperCase() + effort.slice(1) : null;
   const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
   const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
@@ -490,7 +510,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
           <SheetsOnPhone.Provider value>
             <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
               <AgentPicker label="Runs on" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} localOnly={confidential} />
-              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} localOnly={confidential} />
+              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} localOnly={confidential} auto={autoHint} />
               <WorkFolderChip
                 value={cwd}
                 task={task}
@@ -531,7 +551,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
               <FeatureStartOptions part="lead" value={extra} cwd={cwd} onChange={onExtra} />
               <span data-tour="pickers" className="ml-auto flex min-w-0">
                 <MoreOptions changed={changed} title={optionsTitle}>
-                  <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={model} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
+                  <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={effortModel} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
                   <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
                   {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
                   <FeatureStartOptions part="rest" value={extra} cwd={cwd} onChange={onExtra} />

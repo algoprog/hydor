@@ -109,7 +109,9 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose acp', 'Gemini CLI, OpenCode, Qwen Code and Goose, ready to add'],
   // Agents › Models
   ['models', 'Helper model', 'small model haiku memory tidy auto mode second opinion', 'The model for small jobs beside sessions'],
-  ['models', 'Tiers', 'tiers quick standard best cheaper cheap strong model per job helpers subagents haiku sonnet opus effort automatic', 'The model Quick, Standard and Best mean for each program: agents think with a tier, and give their helpers one'],
+  ['models', 'Tiers', 'tiers quick standard best max cheaper cheap strong strongest model per job helpers subagents haiku sonnet opus fable terra sol astra effort automatic', 'The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its helpers get Standard and Quick'],
+  ['models', 'Lead with helpers', 'team orchestrate delegate subagents helpers cheaper cost save main agent plan lead automatic sonnet haiku', 'A session’s main agent plans, hands clear parts to helpers on cheaper tiers and checks their work'],
+  ['models', 'Max for hard problems', 'automatic hard complex difficult problem strongest model fable astra step up escalate', 'Automatic starts a hard problem on Max, and an agent may move itself there when a problem proves harder than it looked'],
   ['models', 'On this machine', 'local models ollama vllm gpu download', 'Models installed here, and their downloads', 'Models on this machine'],
   ['models', 'Add a model from Hugging Face', 'hugging face hf download install gguf vllm ollama suggested recommended for this computer lfm3 gemma flint glm', 'The ones suggested for this computer, or search, see how each would run here, and install it'],
   ['models', 'OpenRouter', 'openrouter api key models cloud suggested gpt grok claude opus', 'Models through OpenRouter, with your key'],

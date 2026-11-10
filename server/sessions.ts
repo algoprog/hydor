@@ -41,9 +41,9 @@ import { titleFor } from './titles.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { carriedExtra, checkHandoff, checkModelSwitch, confidentialStart, confidentialTitle, localModel } from './confidential/index.ts';
 import { agentStart } from './assistants/rules.ts';
-import { autoPlan, tierNote, type TierNote } from './assistants/auto.ts';
+import { autoPlan, tierNote } from './assistants/auto.ts';
 import { noteModels } from './assistants/tiers.ts';
-import { AUTO_MODEL, type Tier, type TierPick } from '../shared/tiers.ts';
+import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/tiers.ts';
 import { opensTurn } from './opinion/turns.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */

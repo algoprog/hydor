@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AppTheme } from '@shared/themes';
 import type { FolderOrigin } from '@shared/sidebar';
+import type { TeamSettings, TierMap } from '@shared/tiers';
 import type {
   AcpAgentDef,
   Agent,
@@ -126,6 +127,9 @@ export interface Bootstrap {
   accounts: AgentAccount[];
   /** Agents that speak ACP, set up in Settings → More agents. */
   acpAgents: AcpAgentDef[];
+  /** Which model each tier means, and how sessions use the tiers (the start page's Automatic); missing on servers before the team. */
+  tiers?: TierMap;
+  team?: TeamSettings;
 }
 
 export const useApp = create<{
