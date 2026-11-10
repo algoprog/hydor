@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { Check, ChevronRight, Cpu, Gauge, ShieldCheck } from 'lucide-react';
+import { AUTO_MODEL, modelFamily as family, newerVersion as newer } from '@shared/tiers';
 import type { Agent, AgentCatalog, ModelOption, SessionPrefs } from '@shared/types';
 import { api } from '../lib/api';
 import { go } from '../lib/nav';
@@ -54,19 +55,6 @@ export function modelLabel(c: Catalog | undefined, value?: string | null): strin
   return value.replace(/^claude-/, '').replace(/-\d{8}$/, '').replace(/\[1m\]$/, ' 1M');
 }
 
-/** "Opus 5.5" → opus [5, 5]; "GPT-6-Luna" → gpt luna [6]: models of one family differ only in their version. */
-function family(label: string): { name: string; version: number[] } | null {
-  const m = /\d+(?:[.-]\d+)*/.exec(label);
-  if (!m) return null;
-  const name = (label.slice(0, m.index) + ' ' + label.slice(m.index + m[0].length)).toLowerCase().replace(/[\s_-]+/g, ' ').trim();
-  return { name, version: m[0].split(/[.-]/).map(Number) };
-}
-
-const newer = (a: number[], b: number[]) => {
-  for (let i = 0; i < Math.max(a.length, b.length); i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
-  return false;
-};
-
 interface ModelRow {
   opt: ModelOption;
   /** What picking it sets: null for the agent's default. */
@@ -77,24 +65,27 @@ interface ModelRow {
   older: boolean;
 }
 
-/** One row per model, the default marked rather than listed twice; older versions of a family are set apart. */
-function modelRows(c: Catalog): ModelRow[] {
+/**
+ * One row per model, the default marked rather than listed twice; older versions of a family are set apart. `named`:
+ * picking the default model names it (where "no model" means Automatic, the tiers' pick).
+ */
+function modelRows(c: Catalog, named = false): ModelRow[] {
   const def = c.models.find((m) => m.isDefault);
   const defModel = def?.value === 'default' ? findModel(c, def.resolved) : def;
-  const named = c.models.filter((m) => m.value !== 'default');
+  const listed = c.models.filter((m) => m.value !== 'default');
   const best = new Map<string, number[]>();
-  for (const m of named) {
+  for (const m of listed) {
     const f = family(m.label);
     if (f && (!best.has(f.name) || newer(f.version, best.get(f.name)!))) best.set(f.name, f.version);
   }
-  return named.map((m) => {
+  return listed.map((m) => {
     const f = family(m.label);
     const isDefault = m === defModel;
     return {
       opt: m,
       // Claude's "default" follows its recommendation; Codex's must be named, or Codex falls back to its
       // config.toml model, which a ChatGPT sign-in may not allow.
-      value: isDefault && def?.value === 'default' ? null : m.value,
+      value: isDefault && def?.value === 'default' && !named ? null : m.value,
       label: m.label,
       hint: m.description,
       isDefault,
@@ -103,12 +94,29 @@ function modelRows(c: Catalog): ModelRow[] {
   });
 }
 
-function ModelMenu({ agent, c, value, onPick, localOnly, onClose }: { agent: Agent; c: Catalog | undefined; value?: string | null; onPick: (v: string | null) => void; localOnly?: boolean; onClose?: () => void }) {
+function ModelMenu({
+  agent,
+  c,
+  value,
+  onPick,
+  localOnly,
+  onClose,
+  auto,
+}: {
+  agent: Agent;
+  c: Catalog | undefined;
+  value?: string | null;
+  onPick: (v: string | null) => void;
+  localOnly?: boolean;
+  onClose?: () => void;
+  /** Automatic is offered first, with this line on what it picks. */
+  auto?: string;
+}) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   if (!c) return <div className="px-2.5 py-1.5 text-[12px] text-fg-3">Loading {agentName(agent)} models…</div>;
   // A confidential session: only models on this computer or your network.
-  const rows = modelRows(c).filter((r) => !localOnly || r.opt.local);
+  const rows = modelRows(c, !!auto).filter((r) => !localOnly || r.opt.local);
   if (localOnly && !rows.length)
     return (
       <div className="px-2.5 py-2 text-[12.5px] leading-snug text-fg-3">
@@ -121,7 +129,8 @@ function ModelMenu({ agent, c, value, onPick, localOnly, onClose }: { agent: Age
     );
   if (!rows.length) return <NoModels agent={agent} why={c.modelsError} />;
   // The chosen model, with "default" read as the model it stands for.
-  const chosen = findModel(c, value);
+  const isAuto = !!auto && value === AUTO_MODEL;
+  const chosen = isAuto ? undefined : findModel(c, value);
   const chosenModel = chosen?.value === 'default' ? findModel(c, chosen.resolved) : chosen;
   const selected = (r: ModelRow) => r.opt === chosenModel;
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -141,6 +150,19 @@ function ModelMenu({ agent, c, value, onPick, localOnly, onClose }: { agent: Age
           placeholder="Search models"
           className="mx-1 mb-1 h-8 w-[calc(100%-8px)] rounded-lg bg-bg-2 px-2.5 text-[13px] outline-none placeholder:text-fg-3"
         />
+      )}
+      {auto && !words.length && (
+        <button
+          type="button"
+          onClick={() => onPick(AUTO_MODEL)}
+          className={cx('mb-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-bg-2', isAuto && 'bg-bg-2')}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] text-fg">Automatic</span>
+            <span className="block text-[11.5px] leading-snug text-fg-3">{auto}</span>
+          </span>
+          {isAuto && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+        </button>
       )}
       {shown.map((r) => (
         <button
@@ -199,6 +221,7 @@ export function ModelPicker({
   acp,
   label,
   localOnly,
+  auto,
 }: {
   agent: Agent;
   value?: string | null;
@@ -210,16 +233,19 @@ export function ModelPicker({
   label?: string;
   /** Only the models on this computer or your network (a confidential session). */
   localOnly?: boolean;
+  /** Offers Automatic first (the start page, where the tiers pick the model), with this line on what it picks; `value` is then "auto" for it. */
+  auto?: string;
 }) {
   const c = useCatalog(agent, acp);
   if (agent === 'acp' && !c?.models.length) return null;
+  const isAuto = !!auto && value === AUTO_MODEL;
   const def = !value && label ? c?.models.find((m) => m.isDefault) : undefined;
   return (
     <Picker
       icon={<Cpu size={label ? 14 : 13} className="shrink-0" />}
       label={label}
-      value={c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
-      title={def ? `Model: ${agentName(agent)}'s default` : 'Model'}
+      value={isAuto ? 'Automatic' : c ? (def?.resolved ? modelLabel(c, def.resolved) : modelLabel(c, value)) : '…'}
+      title={isAuto ? `Model: ${auto}` : def ? `Model: ${agentName(agent)}'s default` : 'Model'}
       disabled={disabled}
       width={260}
     >
@@ -229,6 +255,7 @@ export function ModelPicker({
           c={c}
           value={value}
           localOnly={localOnly}
+          auto={auto}
           onClose={close}
           onPick={(v) => {
             onChange(v);

@@ -6,9 +6,10 @@ import { create } from 'zustand';
 import type { AgentActivity, Assistant, ToolKind } from '@shared/assistants';
 import type { TaskSchedule } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
-import { tierLabel, type Tier, type TierMap } from '@shared/tiers';
+import { tierLabel, type TeamSettings, type Tier, type TierMap } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
+import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 
 export const useActivity = create<{ byId: Record<string, AgentActivity> | null }>(() => ({ byId: null }));
@@ -39,23 +40,27 @@ export function useAgentActivity(): Record<string, AgentActivity> | null {
   return useActivity((s) => s.byId);
 }
 
-export const useTiers = create<{ tiers: TierMap | null }>(() => ({ tiers: null }));
+/** The tiers as set, and how sessions use them (the team): as the page opened with them, then as the server has them. */
+export const useTiers = create<{ tiers: TierMap | null; team: TeamSettings | null }>(() => ({ tiers: useApp.getState().boot?.tiers ?? null, team: useApp.getState().boot?.team ?? null }));
 let tiersAsked = false;
-/** The tiers as set (each program's model and effort for Quick, Standard and Best), loaded once. */
+function askTiers() {
+  if (tiersAsked) return;
+  tiersAsked = true;
+  const load = () => api<{ tiers: TierMap; team?: TeamSettings }>('/api/models/tiers').then((r) => useTiers.setState({ tiers: r.tiers, team: r.team ?? null }));
+  load().catch(() => (tiersAsked = false));
+  onFeatureEvent('assistants', () => void load().catch(() => {}));
+}
+/** The tiers as set (each program's model and effort for Quick, Standard, Best and Max), loaded once. */
 export function useTierMap(): TierMap | null {
-  useEffect(() => {
-    if (tiersAsked) return;
-    tiersAsked = true;
-    api<{ tiers: TierMap }>('/api/models/tiers')
-      .then((r) => useTiers.setState({ tiers: r.tiers }))
-      .catch(() => (tiersAsked = false));
-    onFeatureEvent('assistants', () =>
-      api<{ tiers: TierMap }>('/api/models/tiers')
-        .then((r) => useTiers.setState({ tiers: r.tiers }))
-        .catch(() => {}),
-    );
-  }, []);
-  return useTiers((s) => s.tiers);
+  useEffect(askTiers, []);
+  const boot = useApp((s) => s.boot?.tiers);
+  return useTiers((s) => s.tiers) ?? boot ?? null;
+}
+/** How sessions use the tiers (Settings → Models → Tiers): the team on or off, Max for hard problems; null on a server from before them. */
+export function useTeam(): TeamSettings | null {
+  useEffect(askTiers, []);
+  const boot = useApp((s) => s.boot?.team);
+  return useTiers((s) => s.team) ?? boot ?? null;
 }
 
 // ---- in words -------------------------------------------------------------------------------------------

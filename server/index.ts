@@ -35,6 +35,7 @@ import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refres
 import { askCommands, commandHistory, complete, migrateTermHistory, recordCommand } from './termsuggest.ts';
 import { repoInfo, WORKTREES_ROOT } from './worktrees.ts';
 import { DEFAULT_TASK_ROOT, taskRoot } from './assistants/store.ts';
+import { teamOf, tiersOf } from './assistants/tiers.ts';
 import { WORK_DIR as APPS_WORK_DIR } from './apps/runs.ts';
 import { FRAME_CSP, FRAME_HTML } from './notebook/frame.ts';
 import { accessOk, accessTokens, bearerOf, createAccessToken, machineInfo, Machines, revokeAccessToken } from './machines.ts';
@@ -278,6 +279,9 @@ app.get('/api/bootstrap', async () => ({
   update: updateState() ?? undefined,
   accounts: addedAccounts(db),
   acpAgents: acpAgents(db),
+  // The start page offers Automatic by them.
+  tiers: tiersOf(db),
+  team: teamOf(db),
 }));
 
 /** Checks for a newer version now (Settings → About). */

@@ -12,6 +12,7 @@ import { useSessions } from '../../lib/store';
 import type { WebFeature } from '../registry';
 import { saveChildSettings, useChildSettingsState } from '../swarm/state';
 import { ChildCard } from './ChildCard';
+import { TierLine } from './TierLine';
 
 /** In a child session, above the message box: where its replies go. */
 function ParentDock({ s }: { s: SessionSummary }) {
@@ -90,7 +91,7 @@ function ChildSettingsBody() {
 
 export const childrenFeature: WebFeature = {
   id: 'children',
-  noteViews: { child: ChildCard },
+  noteViews: { child: ChildCard, tier: TierLine },
   SessionDock: ParentDock,
   settings: [{ id: 'children', label: 'Child sessions', icon: Network, sub: 'Agents handing parts of a job to other agents, and swarms for hard problems', Body: ChildSettingsBody }],
 };

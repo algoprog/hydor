@@ -23,6 +23,16 @@ export const tierLabel = (t: Tier | undefined): string => TIERS.find((x) => x.id
 /** The model a session names to start on Automatic: the server picks Best's, or Max's for a hard problem. */
 export const AUTO_MODEL = 'auto';
 
+/** A note of kind "tier" in a conversation: the session moved to a tier's model by itself. */
+export interface TierNote {
+  /** auto: Automatic started it there (its request reads as a hard problem); stepUp: its agent stepped itself up. */
+  event: 'auto' | 'stepUp';
+  tier: Tier;
+  /** The model it thinks with now, as people read it ("Fable 5.2"). */
+  label: string;
+  why?: string;
+}
+
 /** A tier's model and effort for one agent program, in that program's own names; unset keeps the program's default. */
 export interface TierPick {
   model?: string;

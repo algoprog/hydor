@@ -708,9 +708,11 @@ export const children: Feature = {
     const x = sessionExtra(d.db, ctx.key);
     const lead = findAssistant(d.db, x.assistant);
     const local = confidentialRun(ctx);
-    const start = startTool(d, maxFor(d.db, ctx), local, namedFor(d, ctx.key), ceilingOf(d, ctx, lead), teamOf(d.db).on && roleOf(d.db, ctx)?.role !== 'lead');
+    // A swarm's lead picked its model for a hard problem already, and its members think with it.
+    const swarm = roleOf(d.db, ctx)?.role === 'lead';
+    const start = startTool(d, maxFor(d.db, ctx), local, namedFor(d, ctx.key), ceilingOf(d, ctx, lead), teamOf(d.db).on && !swarm);
     // Its own step up to Max, where Max is another model than Best and its agent names no tier of its own.
-    const self = !local && tierProgram(ctx.agent, ctx.acpAgent) && !('no' in stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: x.assistant }));
+    const self = !local && !swarm && tierProgram(ctx.agent, ctx.acpAgent) && !('no' in stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: x.assistant }));
     return [start, LIST, MESSAGE, STEP_UP, ...(self ? [STEP_UP_SELF] : [])];
   },
 

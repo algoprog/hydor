@@ -3,21 +3,11 @@
 // while the agent starts, so the start waits for nothing; its answer is there before the first message goes. Also
 // the note a conversation gets when a session moves to Max, by Automatic or by its own agent's step up.
 import type { SessionExtra } from '../../shared/features.ts';
-import { tierLabel, tierProgram, type Tier, type TierPick } from '../../shared/tiers.ts';
+import { tierLabel, tierProgram, type Tier, type TierNote, type TierPick } from '../../shared/tiers.ts';
 import type { Agent } from '../../shared/types.ts';
 import type { DB } from '../db.ts';
 import { helperJson } from '../helper.ts';
 import { modelName, teamOf, tiersOf } from './tiers.ts';
-
-/** A note of kind "tier": a session moved to a tier's model by itself. */
-export interface TierNote {
-  /** auto: Automatic started it there; stepUp: its agent stepped itself up. */
-  event: 'auto' | 'stepUp';
-  tier: Tier;
-  /** The model it thinks with now, as people read it ("Fable 5.2"). */
-  label: string;
-  why?: string;
-}
 
 export const SIZE_SYSTEM = [
   'You size up a request someone is about to give an AI agent, to decide which model takes it. Answer with one JSON object and nothing else:',
