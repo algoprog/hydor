@@ -162,6 +162,7 @@ hydor sessions                                     # what each session is doing
 - [Remote access](docs/remote-access.md): your phone and other devices, over HTTPS
 - [Several machines](docs/machines.md): agents on other machines, from one place
 - [How it works](docs/how-it-works.md): architecture and security
+- [Privacy](docs/privacy.md): what leaves your computer, host by host: no telemetry, and how to turn each connection off
 - [Compared with other agents](docs/compare/README.md): Hermes Agent, pi, Atomic Agent and OpenClaw, with sources
 - [Development](docs/development.md): building and changing the app
 - [Contributing](CONTRIBUTING.md), [security](SECURITY.md) and the [code of conduct](CODE_OF_CONDUCT.md)
