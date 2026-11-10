@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -23,6 +23,7 @@ import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
 import { Wordmark } from '../../components/Logo';
 import { LoginDialog } from '../settings/SettingsPage';
+import { BringIn } from '../memory/BringIn';
 import { shortGpu } from '../settings/ModelsSettings';
 import { TourLocal, TourMedia, TourOpenRouter } from './TourModels';
 import { Sea, SourcesMap, TideMark, TourProgress, WelcomeFilm, type Use } from './scenes';
@@ -89,9 +90,13 @@ interface TourState {
   picked: boolean;
   /** Right after choosing the password: that screen was the welcome. */
   fresh: boolean;
+  /** The other assistants with a folder on this computer (Hermes, pi…): when there are any, a step offers to bring in what they know. */
+  found: string[];
+  /** The Bring in dialog is open over the tour. */
+  bringIn: boolean;
 }
 
-const useTour = create<TourState>(() => ({ open: false, closing: false, i: 0, signIn: null, accountsRev: 0, uses: [], picked: false, fresh: false }));
+const useTour = create<TourState>(() => ({ open: false, closing: false, i: 0, signIn: null, accountsRev: 0, uses: [], picked: false, fresh: false, found: [], bringIn: false }));
 
 /** The tour is on screen (tips wait for it). */
 export const tourOpen = () => useTour.getState().open;
@@ -106,8 +111,12 @@ export function startTour(from?: string, fresh = false) {
   window.clearTimeout(builtTimer);
   const saved = savedUses();
   const uses = saved ?? [];
-  const i = from ? steps(uses, fresh).findIndex((s) => s.id === from) : 0;
-  useTour.setState({ open: true, closing: false, i: Math.max(0, i), signIn: null, uses, picked: !!saved, fresh });
+  const i = from ? steps(uses, fresh, []).findIndex((s) => s.id === from) : 0;
+  useTour.setState({ open: true, closing: false, i: Math.max(0, i), signIn: null, uses, picked: !!saved, fresh, found: [], bringIn: false });
+  // Which assistants are here is looked up as the tour opens; the step comes (and the dots count it) once it is known.
+  api<{ found: { name: string }[] }>('/api/memory/bring-in/found')
+    .then((r) => useTour.setState({ found: r.found.map((f) => f.name) }))
+    .catch(() => {});
 }
 
 
@@ -116,7 +125,7 @@ export function startTour(from?: string, fresh = false) {
 function endTour(finished = false, skipped = false) {
   const s = useTour.getState();
   if (!s.open || s.closing) return;
-  useTour.setState({ closing: true, signIn: null });
+  useTour.setState({ closing: true, signIn: null, bringIn: false });
   window.clearTimeout(closeTimer);
   closeTimer = window.setTimeout(() => {
     useTour.setState({ open: false, closing: false });
@@ -416,6 +425,27 @@ function NotifySetup() {
 }
 
 /** First things to try: each puts its words in the message box (and, at the end, ends the tour there). */
+/** The assistants found, and the button that opens Bring in over the tour (the dialog lists what would come first). */
+function BringInStep() {
+  const found = useTour((s) => s.found);
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap gap-2">
+        {found.map((n) => (
+          <span key={n} className="rounded-full border border-line bg-bg-1 px-3 py-1 text-[13px] text-fg-2" translate="no">
+            {n}
+          </span>
+        ))}
+      </div>
+      <div>
+        <Button variant="secondary" icon={<Import size={15} />} onClick={() => useTour.setState({ bringIn: true })}>
+          Bring in what they know
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const FIRST_TASKS = ['Plan a 3-day trip to Lisbon in May', 'Sum up a PDF I drop in', 'Make a budget spreadsheet for a small café'];
 
 function TryThese({ finish }: { finish?: boolean }) {
@@ -467,7 +497,7 @@ function DotsLegend() {
 /** "a, b or c" */
 const either = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}` : (xs[0] ?? ''));
 
-function steps(uses: Use[], fresh: boolean): Step[] {
+function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
   const has = (u: Use) => uses.includes(u);
   const claude = has('claude');
   const codex = has('codex');
@@ -554,6 +584,19 @@ function steps(uses: Use[], fresh: boolean): Step[] {
       scene: (u) => <SourcesMap on={u} focus="agents" />,
       Extra: AgentsSetup,
     });
+  // Another assistant's folder is here: one step offers its memory and skills, before the tour moves into the app.
+  if (found.length)
+    list.push({
+      id: 'bring-in',
+      title: 'Coming from another agent?',
+      body: 'Hydor found these on this computer. Bring over what they know about you, and the skills you made, in one step. You see everything first, and nothing is added until you pick.',
+      scene: () => (
+        <div className="flex w-full justify-center">
+          <TideMark size={84} />
+        </div>
+      ),
+      Extra: BringInStep,
+    });
   const names = [claude && 'Claude Code', codex && 'Codex', models && 'Custom with your models', has('agents') && 'the agents you added'].filter((x): x is string => !!x);
   // The app arrives in this order, the message box before the row under it.
   list.push(
@@ -626,8 +669,8 @@ function steps(uses: Use[], fresh: boolean): Step[] {
 }
 
 // The new install's first screen counts the tour's steps without the tour (setup.ts): checked here while developing.
-if (import.meta.env.DEV && steps([], true).length + 1 !== TOUR_SETUP_STEPS)
-  console.warn(`TOUR_SETUP_STEPS is ${TOUR_SETUP_STEPS} in tour/setup.ts, but a new install's tour has ${steps([], true).length + 1} steps`);
+if (import.meta.env.DEV && steps([], true, []).length + 1 !== TOUR_SETUP_STEPS)
+  console.warn(`TOUR_SETUP_STEPS is ${TOUR_SETUP_STEPS} in tour/setup.ts, but a new install's tour has ${steps([], true, []).length + 1} steps`);
 
 // ---- the overlay ----------------------------------------------------------------------------
 
@@ -829,11 +872,13 @@ function TourPage(p: {
 }
 
 export function Tour() {
-  const { open, closing, i, signIn, uses, fresh } = useTour();
+  const { open, closing, i, signIn, uses, fresh, found, bringIn } = useTour();
+  // A dialog is open over the tour: the tour waits under it.
+  const over = !!signIn || bringIn;
   const boot = useApp((s) => s.boot);
   const mobile = useIsMobile();
   const [loc] = useLocation();
-  const list = useMemo(() => steps(uses, fresh), [uses, fresh]);
+  const list = useMemo(() => steps(uses, fresh, found), [uses, fresh, found]);
   const step = open ? list[Math.min(i, list.length - 1)] : undefined;
   // The step's target as last looked for: where it comes to rest, or null while it is not there.
   const [seen, setSeen] = useState<{ id: string; r: DOMRect | null } | null>(null);
@@ -918,7 +963,7 @@ export function Tour() {
       const shut: Box = { x: innerWidth / 2, y: innerHeight / 2, w: 0, h: 0 };
       let lit: Box | null = shut;
       let ringed: Box | null = shut;
-      if (step?.target && !signIn) {
+      if (step?.target && !over) {
         const el = document.querySelector(`[data-tour="${step.target}"]`);
         const whole = el && step.focus ? document.querySelector(`[data-tour="${step.focus}"]`) : null;
         const [r, w] = el ? settled(whole ? [el, whole] : [el]) : [];
@@ -961,7 +1006,7 @@ export function Tour() {
       cancelAnimationFrame(raf);
       clearTimeout(t);
     };
-  }, [open, step, signIn]);
+  }, [open, step, over]);
 
   // The card grows and shrinks with what it holds.
   useLayoutEffect(() => {
@@ -989,7 +1034,7 @@ export function Tour() {
   const back = () => i > 0 && useTour.setState({ i: i - 1 });
 
   useEffect(() => {
-    if (!step || signIn || closing) return;
+    if (!step || over || closing) return;
     const k = (e: KeyboardEvent) => {
       if (editable(e.target)) return;
       if (e.key === 'Escape') {
@@ -1005,8 +1050,8 @@ export function Tour() {
   // Enter goes on: the next button takes the focus at each step (and as the card comes in).
   const cardIn = !!at;
   useEffect(() => {
-    if (step && !signIn) nextBtn.current?.focus({ preventScroll: true });
-  }, [step?.id, signIn, cardIn]);
+    if (step && !over) nextBtn.current?.focus({ preventScroll: true });
+  }, [step?.id, over, cardIn]);
 
   if (!step) return null;
 
@@ -1032,7 +1077,7 @@ export function Tour() {
     <>
       {createPortal(
         // Under a sign-in's dialog while it is open.
-        <div className={cx('fixed inset-0', signIn ? 'z-[45]' : 'z-[55]', closing && 'pointer-events-none')} onPointerDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
+        <div className={cx('fixed inset-0', over ? 'z-[45]' : 'z-[55]', closing && 'pointer-events-none')} onPointerDown={(e) => e.target === e.currentTarget && e.preventDefault()}>
           {!onPage && (
             <>
               <div ref={scrim} className={cx('scrim tour-scrim pointer-events-none fixed inset-0', closing && 'opacity-0')} />
@@ -1113,6 +1158,7 @@ export function Tour() {
         </div>,
         document.body,
       )}
+      {bringIn && <BringIn open onClose={() => useTour.setState({ bringIn: false })} />}
       {signIn && (
         <LoginDialog
           agent={signIn}
