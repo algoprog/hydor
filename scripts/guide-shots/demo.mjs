@@ -657,7 +657,8 @@ export async function seedApi(api, home, now, s) {
     },
   });
 
-  await api('PUT', '/api/start', { agent: 'claude', runs: { claude: { model: 'opus', effort: 'high' } }, assistant: 'general', task: true });
+  // The start page as it opens for someone new: the model on Automatic (the tiers pick it).
+  await api('PUT', '/api/start', { agent: 'claude', runs: { claude: { model: 'auto', effort: 'high' } }, assistant: 'general', task: true });
   return { spaces: { thesis, garden, taxes, shop: shopSpace } };
 }
 
@@ -839,5 +840,6 @@ export const CATALOG = {
     { value: 'opus', label: 'Opus 5.5', resolved: 'claude-opus-5-5', description: 'The most capable, for hard and long work', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high' },
     { value: 'sonnet', label: 'Sonnet 5.5', resolved: 'claude-sonnet-5-5', description: 'Fast and capable, for everyday work', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'medium' },
     { value: 'haiku', label: 'Haiku 5.5', resolved: 'claude-haiku-5-5', description: 'The fastest, for quick answers', efforts: [] },
+    { value: 'fable', label: 'Fable 5.2', resolved: 'claude-fable-5-2', description: 'The strongest, for the hardest problems', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultEffort: 'high' },
   ],
 };
