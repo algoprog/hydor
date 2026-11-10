@@ -850,8 +850,10 @@ about risky ones, and commands can run in a sandbox that lets them change files 
   (described by the helper model for a model that does not see), and web pages as clean Markdown.
 - **Careful with commands**: each part of a command is checked. "Always allow" covers just the commands you
   approved (`git status`, `npm run build`), so nothing can ride along after `&&`; commands that only look
-  around run freely; risky ones (sudo, deleting outside the folder, running a download) ask every time, in every
-  mode. Files outside the folder and files with keys or passwords ask before they are read or changed.
+  around run freely; risky ones (sudo, deleting outside the folder, running a download) ask every time outside
+  Full access. Full access runs tools and commands without approval prompts or the command sandbox, with the
+  computer account's permissions; confidential network isolation still applies. In the asking modes, files
+  outside the folder and files with keys or passwords ask before they are read or changed.
 - **Made for any model**: long output is kept in a file the model can page through, repeated or stuck steps
   are caught, malformed tool calls are repaired, independent reads run together, servers run in the
   background, and each model family gets its maker's sampling, edit format and reasoning effort. With many

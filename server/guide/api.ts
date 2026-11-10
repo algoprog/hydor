@@ -3,8 +3,8 @@
 // What it may do follows the rules below: reading is free; a change shows the user a card first (with a form
 // to fill in or check, when the agent gives one), which they can allow for the rest of the session; risky or
 // hard-to-undo changes ask every time; some things are never an agent's (passwords, keys' values, files and
-// commands, answering approval cards). Plan mode only reads; full access asks nothing (Custom's still asks
-// before the risky ones). Settings kept on each device (theme, language…) go to the pages showing the session.
+// commands, answering approval cards). Plan mode only reads; Full access asks nothing.
+// Settings kept on each device (theme, language…) go to the pages showing the session.
 import crypto from 'node:crypto';
 import { formContent, formFields } from '../../shared/forms.ts';
 import type { ApprovalRequest } from '../../shared/types.ts';
@@ -129,14 +129,14 @@ function refusedBody(method: string, path: string, body: Json, own: string): str
 
 // ---- the session's permissions -------------------------------------------------------------------
 
-export type Mode = 'read-only' | 'full' | 'custom-full' | 'normal';
+export type Mode = 'read-only' | 'full' | 'normal';
 
 export function modeOf(ctx: RunCtx): Mode {
   const m = ctx.deps.sessions.adapterByRun(ctx.runId)?.state.mode;
   const custom = ctx.agent === 'acp' && ctx.acpAgent === CONSOLE_ID;
   if (m === 'plan' || (ctx.agent === 'codex' && m === 'read-only')) return 'read-only';
   if ((ctx.agent === 'claude' && m === 'bypassPermissions') || (ctx.agent === 'codex' && m === 'full')) return 'full';
-  if (custom && m === 'full') return 'custom-full';
+  if (custom && m === 'full') return 'full';
   return 'normal';
 }
 
@@ -294,8 +294,8 @@ export async function appApi(a: ApiArgs, ctx: RunCtx): Promise<ToolOutput> {
   if (mode === 'read-only') return { text: 'This session only reads (Plan mode, or read-only): tell the user what you would change, or ask them to switch the mode.', isError: true };
 
   const form = a.form && typeof a.form === 'object' ? (a.form as Json) : null;
-  // A form always shows (it asks for something); otherwise full access asks nothing, Custom's full access only
-  // what asks every time, and the rest of the modes everything not yet allowed for the session.
+  // A form always shows (it asks for input); otherwise Full access asks nothing,
+  // and the other modes ask for changes not yet allowed for the session.
   const needsCard = !!form || (rule.level === 'always' ? mode !== 'full' : mode === 'normal' && !allowed.has(ctx.key));
   if (needsCard) {
     const answer = await askCard(ctx, { method, url, path, body, summary: a.summary, form, rule });

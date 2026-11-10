@@ -1,4 +1,4 @@
-// The sandbox for Custom's commands in Auto and Full modes: with bubblewrap (bwrap) here, a command
+// The sandbox for Custom's commands in Auto mode: with bubblewrap (bwrap) here, a command
 // runs with the system read-only except the session folder and /tmp (the network stays open), so it
 // cannot change files elsewhere. Without bwrap, or where it cannot start (some containers), commands
 // run as before. Settings → Custom turns it off.
@@ -92,14 +92,17 @@ export interface Shell {
 }
 
 /**
- * How bash runs a command for this session now: in the sandbox in Auto and Full modes, when it is on and works here;
+ * How bash runs a command for this session now: in the sandbox in Auto mode, when it is on and works here;
  * in a confidential session (`confidential`) always without network, in every mode, the files kept as the mode has
  * them. Undefined: as it is (main.ts then has a confidential session's commands ask each time).
  */
 export async function sandboxShell(cwd: string, mode: string, confidential = false): Promise<((command: string) => Shell) | undefined> {
+  // Full access uses the host shell, not bubblewrap (which also prevents sudo).
+  // Confidential network isolation is independent of the permission mode.
+  if (mode === 'full' && !confidential) return undefined;
   const bin = sandboxAvailable();
   if (!bin) return undefined;
-  const walls = (mode === 'auto' || mode === 'full') && (await wanted());
+  const walls = mode === 'auto' && (await wanted());
   const cut = confidential && netCutAvailable();
   if (confidential && !cut) return undefined;
   if (!walls && !cut) return undefined;

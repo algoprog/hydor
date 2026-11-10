@@ -8,7 +8,7 @@ Everything the app's pages do goes through its HTTP API, and agents use the same
 - A change shows the user a card first, with what changes (before → after for a setting) and the call itself. Give `summary`, the change in a few plain words, as its title. The user can allow it once, allow such changes for the rest of the session, or say no. Deleting, starting agent work, adding MCP servers or machines, changing what agents may do and similar changes ask every time.
 - To have the user fill in or check details on that card, give `form`: fields as a JSON schema's properties (`type`, `title`, `description`, `enum`, `default`, `format`…), each named by its address in `body` (`name`, `settings.results`), filled in from `body`; the user's answers go into `body` before the call.
 - Read the current state before changing it: most settings are read with `GET` at the same address their `PUT` or `PATCH` writes.
-- In Plan mode (and Codex's Read only) an agent only reads. With Claude Code's Bypass or Codex's Full access no card shows; Custom's Full access asks only for the changes that ask every time.
+- In Plan mode (and Codex's Read only) an agent only reads. With Claude Code's Bypass or Codex's or Custom's Full access no approval card shows. Forms still show when details are needed.
 - Never through app_api: the password and signing in, keys' values (ask with request_secret), a signature's picture or any change to one (ask_signature and place_signature), making access tokens and API keys, answering approval cards and the cards that ask the user to decide, a session's permissions and spending cap, files, terminals, notebooks and git (agents use their own tools), the live browser (the browser tools), the Mac's screen, mouse and keyboard and macOS's permissions for them (the computer tools; the user allows those in Settings).
 - Links for the user: the app's address plus the page: `/s/<session key>`, `/projects/<id>`, `/apps/<id>`, `/pages/<id>`, `/settings?s=<section>`, `/guide/<topic>#<section>`.
 
@@ -759,7 +759,7 @@ Settings → Agents → Plugins. A plugin is a folder in the Agent Plugins 1.0 f
 
 ## Custom (Settings → Capabilities → Custom)
 
-- `GET /api/custom/settings` — Custom's settings. Returns: `{ sandbox: boolean — commands in Auto and Full access run in the sandbox (default true); goalRounds: number — next steps a goal sends before it pauses (default 30); bwrap: boolean — the sandbox can run on this computer }`.
+- `GET /api/custom/settings` — Custom's settings. Returns: `{ sandbox: boolean — commands in Auto mode run in the sandbox; Full access bypasses it (default true); goalRounds: number — next steps a goal sends before it pauses (default 30); bwrap: boolean — the sandbox can run on this computer }`.
 - `PUT /api/custom/settings` — changes them; merges. Body: `{ sandbox?: boolean; goalRounds?: integer 1–500 (the UI offers 10, 30, 100) }`. Returns: as GET.
 
 ## Usage and limits

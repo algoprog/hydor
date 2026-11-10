@@ -52,10 +52,10 @@ The **Permissions** setting (under **Options** on the start page, or in the menu
 - **Ask** (the default): asks before editing files and before running commands. Commands that only look around (`ls`, `cat`, `git status` and the like) run freely.
 - **Accept edits**: edits files in the session's folder freely; asks before running commands (except ones that only look around) and before anything outside the folder.
 - **Auto**: routine steps go ahead; a quick check asks you about risky ones. See [Auto mode](#auto-mode).
-- **Full access**: asks only before risky commands (running as administrator, deleting outside the folder, running a download…). Commands run in the [sandbox](#the-sandbox-for-commands) when it's on.
+- **Full access**: tools and commands run without approval prompts or the command [sandbox](#the-sandbox-for-commands), including administrator commands and changes outside the folder. They use your computer account's permissions: this does not grant administrator access your account lacks. Confidential sessions still keep their network restrictions.
 - **Plan**: reads and plans only. Custom can't edit files or run commands, and only uses tools that read. It ends with a numbered plan. To carry it out, switch to another mode and tell it to go ahead.
 
-In every mode, some commands always ask: see [Commands that always ask](#commands-that-always-ask).
+Outside Full access, some commands always ask: see [Commands that always ask](#commands-that-always-ask).
 
 ## Approve or deny what Custom wants to do
 
@@ -76,7 +76,7 @@ How **Always allow** works for commands: Custom splits a command into its parts 
 
 ## Commands that always ask
 
-Some steps ask you every time, in every mode, Full access and Auto included, whatever you allowed before:
+Outside Full access, these steps ask you every time, Auto included, whatever you allowed before:
 
 - running as the administrator (`sudo` and the like);
 - deleting files outside the session folder, deleting the session folder itself, or deleting files it can't name in advance;
@@ -117,7 +117,7 @@ In the session, a step Auto let through carries a small **Auto** label; hover ov
 
 ## The sandbox for commands
 
-In Auto and Full access, Custom's commands can run in a sandbox: they can change files only in the session's folder and the temporary folder (`/tmp`), and everything else on the computer is read-only. They can still use the network. When the session works in a git worktree or a subfolder of a repository, the repository's own folder stays writable too, so git can commit. Package managers' caches move to the temporary folder.
+In Auto mode, Custom's commands can run in a sandbox: they can change files only in the session's folder and the temporary folder (`/tmp`), and everything else on the computer is read-only. They can still use the network. When the session works in a git worktree or a subfolder of a repository, the repository's own folder stays writable too, so git can commit. Package managers' caches move to the temporary folder.
 
 When a command runs into the sandbox's walls, Custom is told it ran in a sandbox, and either works within it or tells you what needs doing elsewhere.
 
@@ -213,14 +213,14 @@ A [spending cap](/guide/usage#cap-what-a-session-spends) works for Custom sessio
 [Settings → Capabilities → Custom](/settings?s=custom) ("Auto mode, a sandbox for commands, and how long goals run") has three parts:
 
 - **Auto mode** ("One of Custom's modes, beside Ask, Accept edits, Full access and Plan."): what Auto lets through, what always asks, and that the helper model does the check. Nothing to switch: you pick Auto per session under **Permissions**.
-- **Sandbox for commands** ("In Auto and Full access modes, commands can change files only in the session's folder and /tmp. They can still use the network."): a switch, on by default. Greyed out when bubblewrap can't run here.
+- **Sandbox for commands** ("In Auto mode, commands can change files only in the session's folder and /tmp. Full access runs without this sandbox or approval prompts."): a switch, on by default. Greyed out when bubblewrap can't run here.
 - **Goals** ("With /goal, Custom keeps working, turn after turn, until the goal holds. After this many rounds it pauses for you."): **10**, **30** (the default) or **100** rounds. It also pauses after three rounds without progress.
 
 Custom's models are in [Settings → Agents → Models](/settings?s=models), and the model that does the checks is the **Helper model** there.
 
 ## Ask an agent
 
-- "Turn off the sandbox for Custom's commands."
+- "Turn off the sandbox for Custom's Auto mode commands."
 - "Let Custom's goals run for up to 100 rounds."
 - "Set a goal on my Custom session 'Upload page': npm test passes and uploads of 2 GB work."
 - "Which helper model does Auto mode use, and can it see images?"

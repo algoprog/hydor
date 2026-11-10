@@ -273,7 +273,7 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Custom](/settings?s=custom): auto mode, a sandbox for commands, and how long goals run. More in [Custom, the app's own agent](/guide/custom).
 
 - [**Auto mode**](/settings?s=custom&find=Auto%20mode): Custom approves safe steps by itself.
-- [**Sandbox for commands**](/settings?s=custom&find=Sandbox%20for%20commands): Commands run in a sandbox.
+- [**Sandbox for commands**](/settings?s=custom&find=Sandbox%20for%20commands): Auto mode commands run in a sandbox; Full access runs without it.
 - [**Goals**](/settings?s=custom&find=Goals): How many rounds a goal may run.
 
 ## Ask an agent

@@ -68,6 +68,8 @@ Sessions keep running when you close the tab, and the ones you start in VS Code 
 - **Work that runs by itself**: scheduled tasks, watchers, webhooks, and goals an agent keeps working on.
 - **Around the agents**: a terminal, files, Git, usage and limits (under System), several machines, and one search box
   (`Ctrl+K`).
+- **Your choice of permissions**: Custom's Auto mode checks risky steps and can sandbox commands; Full access
+  runs tools and commands without approval prompts or the command sandbox, with your computer account's permissions.
 - **Private when it must be**: confidential sessions on local models only, and a vault of keys agents use without
   seeing them.
 

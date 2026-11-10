@@ -42,7 +42,7 @@ export function startProc(command: string, o: { cwd: string; dir: string; sessio
   fs.mkdirSync(folder, { recursive: true, mode: 0o700 });
   const log = path.join(folder, `${id}-${Date.now().toString(36)}.log`);
   const out = fs.createWriteStream(log, { mode: 0o600 });
-  // Through the session's shell: the sandbox in Auto and Full modes, where it is on.
+  // Through the session's shell: the sandbox in Auto mode, where it is on.
   const sh: { cmd: string; args: string[]; env?: Record<string, string> } = o.shell?.(command) ?? bashCommand(command);
   const child = spawn(sh.cmd, sh.args, { cwd: o.cwd, env: { ...shellEnv(), ...sh.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   const p: Proc = { id, session: o.session, command, pid: child.pid ?? 0, started: Date.now(), log, recent: '', total: 0, seen: 0, child, changed: new Set() };

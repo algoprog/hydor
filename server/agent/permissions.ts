@@ -1,5 +1,5 @@
 // Whether a tool call goes ahead without asking the user: by the session's mode, the rules saved with
-// "Always allow", and checks no rule overrides. Risky commands and files ask every time, in every mode.
+// "Always allow", and checks no rule overrides. Full access allows every step; other modes still ask for risky commands.
 // In the asking modes (Ask, Accept edits, Plan), so do files outside the session folder and files that
 // hold keys or passwords, until the user allows that folder or file.
 import fs from 'node:fs';
@@ -20,7 +20,7 @@ export interface Ask {
   parts?: Part[];
   /** Files it reads or writes ('' for a write whose target is not known). */
   paths?: { path: string; write?: boolean }[];
-  /** Why it asks every time, whatever the mode and the rules. */
+  /** Why it asks every time outside Full access, whatever the saved rules. */
   risk?: string;
   /** Why it could not be read with confidence: it asks, with no "Always allow". */
   opaque?: string;
@@ -92,9 +92,11 @@ const gitInternal = (p: string) => /(^|[\\/])\.git([\\/]|$)/.test(p);
  * Whether `r` goes ahead, and if not, what "Always allow" would save. `readable` are folders read freely:
  * the session's own (long output, pages it fetched) and the skills' (their reference files).
  */
-export function decide(r: Ask, o: { mode: string; allow: string[]; cwd: string; readable?: string[] }): Verdict {
-  if (r.risk) return { ok: false, save: [], why: `asks every time: it ${r.risk}` };
+export function decide(r: Ask, o: { mode: string; allow: string[]; cwd: string; readable?: string[]; requireApproval?: boolean }): Verdict {
+  // Confidential isolation may need consent when this computer cannot enforce it.
+  if (o.requireApproval) return { ok: false, save: [], why: r.risk };
   if (o.mode === 'full') return { ok: true, save: [] };
+  if (r.risk) return { ok: false, save: [], why: `asks every time: it ${r.risk}` };
   const need: string[] = [];
   const add = (k: string) => void (need.includes(k) || need.push(k));
   let why: string | undefined;

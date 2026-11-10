@@ -1,10 +1,10 @@
-// Custom's settings beyond its models (Settings → Custom): the sandbox for its commands in Auto and
-// Full modes, and how many rounds a goal may take.
+// Custom's settings beyond its models (Settings → Custom): the sandbox for its commands in Auto
+// mode, and how many rounds a goal may take.
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 
 export interface CustomSettings {
-  /** Commands in Auto and Full modes run in the sandbox (when bwrap works here). */
+  /** Commands in Auto mode run in the sandbox (when bwrap works here). */
   sandbox: boolean;
   /** Most next steps a goal sends before it pauses. */
   goalRounds: number;

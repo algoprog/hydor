@@ -490,7 +490,7 @@ export interface ShellCheck {
   parts: Part[];
   /** Files it reads or writes (absolute; '' for a write whose target is not known). */
   paths: { path: string; write?: boolean }[];
-  /** Why it asks every time, whatever the mode and the rules. */
+  /** Why it asks every time outside Full access, whatever the saved rules. */
   risk?: string;
   /** Why it could not be read with confidence. */
   opaque?: string;
