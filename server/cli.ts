@@ -1,4 +1,6 @@
-// Maintenance commands, run on the host:
+// The `hydor` command (bin/hydor.mjs runs this file). Without a command, or with one of the terminal's (chat, run,
+// resume, sessions, show, send, stop, models, tiers, agents, tasks, usage, status, serve, open), it is Hydor in a
+// terminal: server/tui/main.ts, loaded only then. Maintenance commands, run on the host:
 //   node dist/server/cli.js set-password        prompts; resets the web password, signs everyone out, lifts sign-in pauses
 //   node dist/server/cli.js setup-token         prints the one-time token for first setup
 //   node dist/server/cli.js access-token [name] prints a new token for another Hydor to use this machine
@@ -144,15 +146,14 @@ if (cmd === 'set-password') {
     systemctl('restart', UNIT);
     console.log('Updated and restarted.');
   } else console.log('Updated. Restart the server to use the new version (running agents are not interrupted).');
+} else if (cmd === 'service') {
+  console.error('usage: hydor service install | uninstall | status | logs');
+  process.exitCode = 2;
 } else {
-  console.log(`usage: node dist/server/cli.js <command>
-
-  set-password        reset the web password (signs everyone out)
-  setup-token         print the one-time token for the first setup
-  service install     run the app as a systemd user service, started at boot
-  service uninstall   stop and remove that service
-  service status      is it running
-  service logs        its recent log
-  update              pull the latest version, build it, restart the service
-  app …               your apps: list, new, folder, dev, try, export, import (app help says more)`);
+  // Everything else is Hydor in a terminal (with no command at all, the chat).
+  const { tuiCommand } = await import('./tui/main.ts');
+  const code = await tuiCommand(process.argv.slice(2));
+  process.exitCode = code;
+  // Whatever still holds the process (a socket closing, a timer) does not keep it from ending.
+  setTimeout(() => process.exit(code), 300).unref();
 }
