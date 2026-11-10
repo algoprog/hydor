@@ -250,12 +250,18 @@ export function MonitorPage() {
       <SystemHeader tab="monitor" />
       <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-fg-3">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
-          <span translate="no" className="font-medium text-fg-2">
-            {info.hostname}
+        <div className="mb-4 flex flex-col gap-0.5 text-[12.5px] text-fg-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-1.5">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
+            <span translate="no" className="font-medium text-fg-2">
+              {info.hostname}
+            </span>
+            <span>· up {uptime(info.uptime)}</span>
           </span>
-          · {info.cpuModel} · {info.cores} threads · up {uptime(info.uptime)} · {info.os} · {info.kernel}
+          <span className="min-w-0 sm:truncate">
+            <span className="hidden sm:inline">· </span>
+            {info.cpuModel} · {info.cores} threads · {info.os} · {info.kernel}
+          </span>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5 [&>:last-child:nth-child(odd)]:col-span-2 lg:[&>:last-child:nth-child(odd)]:col-span-1">
           <Tile icon={<Cpu size={13} />} label="CPU" value={pct(s.cpu)} sub={`load ${s.load.map((l) => l.toFixed(2)).join(' · ')}`} spark={series.cpu.slice(-60)} sparkMax={100} />
@@ -308,7 +314,10 @@ export function MonitorPage() {
                   <span className="text-[22px] font-semibold">{pct(g.util)}</span>
                   <span className="text-[12px] text-fg-3">utilization</span>
                 </div>
-                <TimeSeries series={[{ label: 'Utilization', color: 'var(--viz-1)', values: samples.map((x) => x.gpus[gi]?.util ?? null) }]} times={times} max={100} format={(v) => `${Math.round(v)}%`} height={96} ticks={2} />
+                {/* On a phone the graphics cards stack into a long page: each shows its numbers, and the GPU tile above its line. */}
+                <div className="hidden sm:block">
+                  <TimeSeries series={[{ label: 'Utilization', color: 'var(--viz-1)', values: samples.map((x) => x.gpus[gi]?.util ?? null) }]} times={times} max={100} format={(v) => `${Math.round(v)}%`} height={96} ticks={2} />
+                </div>
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
                   <div className="col-span-2">
                     <div className="mb-1 flex justify-between text-[12px]">
@@ -358,7 +367,7 @@ export function MonitorPage() {
                 { label: 'Upload', color: 'var(--viz-2)', values: series.tx },
               ]}
               times={times}
-              format={(v) => rate(v).replace(' ', '')}
+              format={(v) => rate(v).replace(' ', '').replace('/s', '')}
               height={130}
             />
             <div className="mt-3 space-y-1">
@@ -391,7 +400,7 @@ export function MonitorPage() {
                 { label: 'Write', color: 'var(--viz-2)', values: series.wr },
               ]}
               times={times}
-              format={(v) => rate(v).replace(' ', '')}
+              format={(v) => rate(v).replace(' ', '').replace('/s', '')}
               height={110}
             />
             <div className="mt-3 space-y-2.5">
