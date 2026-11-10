@@ -103,7 +103,9 @@
 [设置 → 模型](/settings?s=models)：Custom（本应用自带的智能体）的模型：OpenRouter、Ollama，以及在这里用 vLLM 运行的 Hugging Face 模型。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**辅助模型**](/settings?s=models&find=Helper%20model)：在会话之外处理小任务的模型。
-- [**档位**](/settings?s=models&find=Tiers)：快速、标准和最佳在每个程序中对应的模型：智能体用某个档位思考，并给它们的助手分配档位。
+- [**档位**](/settings?s=models&find=Tiers)：快速、标准、最佳和最高在每个程序中对应的模型：会话由最佳或最高档位主导，它的助手使用标准和快速档位。
+- [**主智能体带领助手**](/settings?s=models&find=Lead%20with%20helpers)：会话的主智能体负责规划，把明确的部分交给更便宜档位的助手，并检查它们的工作。
+- [**难题用最高档位**](/settings?s=models&find=Max%20for%20hard%20problems)：“自动”会让难题从最高档位开始；当问题比看起来更难时，智能体也可以自己升到最高档位。
 - [**在本机**](/settings?s=models&find=On%20this%20machine)：安装在这里的模型及其下载。
 - [**从 Hugging Face 添加模型**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face)：为这台电脑推荐的模型，或者搜索，看看每一个在这里运行得如何，然后安装它。
 - [**OpenRouter**](/settings?s=models&find=OpenRouter)：通过 OpenRouter 使用的模型，用你的密钥。
