@@ -1,9 +1,10 @@
 // Settings → Memory → Bring in: what other assistants know about the user, as notes here. The user picks the sources
-// found on this computer (Claude Code, Codex, Hermes, OpenClaw: sources.ts) and export files from ChatGPT or Claude
+// found on this computer (Claude Code, Codex, Hermes, OpenClaw, pi, Atomic Agent: sources.ts) and export files from ChatGPT or Claude
 // (exports.ts, uploaded in parts like any file); the helper model reads them a batch at a time, with the notes memory
 // has already, and proposes notes (about the user, or about a project whose folder is here) and lines for the
 // profile; nothing is added until the user picks from those. One reading at a time, kept while the app runs: the
-// dialog can close and open again on it. Material never gives a note a secret, or text that would steer agents.
+// dialog can close and open again on it. Material never gives a note a secret, or text that would steer agents. Skills
+// the user made in those assistants are listed beside it and copied, as picked, into the user's own skills (skills.ts).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +19,8 @@ import { findNotes } from '../search.ts';
 import { secretIn, steeringIn } from '../secrets.ts';
 import { addEntry, cleanText, entries, profileWords, repoRoot, sameText, words, type Place } from '../store.ts';
 import { readExport, type ExportView } from './exports.ts';
-import { defaultRoots, localSources, readSource, SOURCE_IDS, type Material, type Roots, type SourceId } from './sources.ts';
+import { bringSkills, findSkills, skillView } from './skills.ts';
+import { defaultRoots, foundAssistants, localSources, readSource, SOURCE_IDS, type Material, type Roots, type SourceId } from './sources.ts';
 
 /** The helper, asked for JSON. */
 export type Ask = (q: { system: string; prompt: string; signal: AbortSignal }) => Promise<unknown>;
@@ -411,7 +413,7 @@ export function clearFiles() {
 
 // ---- the routes ----------------------------------------------------------------------------------------
 
-export function bringinRoutes(d: Pick<Deps, 'app' | 'db'>, edited: () => void, o: { ask?: Ask; roots?: () => Roots } = {}) {
+export function bringinRoutes(d: Pick<Deps, 'app' | 'db'> & Partial<Pick<Deps, 'broadcast'>>, edited: () => void, o: { ask?: Ask; roots?: () => Roots } = {}) {
   const { app, db } = d;
   const ask: Ask = o.ask ?? ((q) => helperJson(db, { system: q.system, prompt: q.prompt, signal: q.signal, maxTokens: 4000, timeoutMs: 240_000 }, 'notes'));
   const roots = o.roots ?? defaultRoots;
@@ -419,6 +421,22 @@ export function bringinRoutes(d: Pick<Deps, 'app' | 'db'>, edited: () => void, o
   const state = () => ({ sources: localSources(roots()), files: [...files.values()].map(fileView), job: jobView() });
 
   app.get('/api/memory/bring-in', async () => state());
+
+  // Which assistants have a folder here, by the folder alone (the setup tour asks).
+  app.get('/api/memory/bring-in/found', async () => ({ found: foundAssistants(roots()) }));
+
+  // The skills found in them, each with what would be copied (nothing is written).
+  app.get('/api/memory/bring-in/skills', async () => ({ skills: findSkills(roots()).map(skillView) }));
+
+  // Copies the picked ones into the user's own skills.
+  app.post('/api/memory/bring-in/skills', async (req) => {
+    const b = (req.body ?? {}) as { ids?: unknown };
+    const ids = (Array.isArray(b.ids) ? b.ids : []).filter((x): x is string => typeof x === 'string');
+    if (!ids.length) throw new HttpError(400, 'Pick the skills to copy');
+    const results = bringSkills(db, ids, roots());
+    if (results.some((r) => r.status === 'copied')) d.broadcast?.({ t: 'feature', id: 'skillpack', data: { library: true } });
+    return { results, skills: findSkills(roots()).map(skillView) };
+  });
 
   app.put('/api/memory/bring-in/file', async (req) => {
     const q = req.query as Record<string, string>;
