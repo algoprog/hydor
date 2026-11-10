@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const pct = (x) => `${Math.round(x * 100)}%`;
+/** A share as a percentage: whole when it is one, else to a tenth (99.5%, so that one missed check in two hundred still shows). */
+const pct = (x) => `${Math.abs(x * 100 - Math.round(x * 100)) < 0.05 ? Math.round(x * 100) : (x * 100).toFixed(1)}%`;
 const usd = (x) => `$${x.toFixed(2)}`;
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
