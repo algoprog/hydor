@@ -76,7 +76,10 @@ export function TiersSection() {
                 {TIERS.map((t) => (
                   <tr key={t.id} className="align-top">
                     <td className="pr-2">
-                      <div className="font-medium">{t.label}</div>
+                      {/* By its name among the agents' words ("Max" is also a column's largest value elsewhere). */}
+                      <div data-i18n="agents" className="font-medium">
+                        {t.label}
+                      </div>
                       <div className="text-[12px] leading-snug text-fg-3">{t.hint}</div>
                     </td>
                     {TIER_PROGRAMS.map((p) => {
