@@ -234,6 +234,18 @@ export function userLines(item: Extract<TimelineItem, { kind: 'user' }>, look: L
 /** A notice: dim, or in the colour of a warning or an error. */
 export function systemLines(item: Extract<TimelineItem, { kind: 'system' }>, look: Look): string[] {
   const { p } = look;
+  // A task in the background that ended: one line, as a helper's reply is.
+  const bg = /^Background task (\w+): ([\s\S]*)$/.exec(item.text.trim());
+  if (bg) {
+    const [, status, what] = bg;
+    const line =
+      status === 'completed'
+        ? `${p.accent('◆')} Finished in the background: ${what}`
+        : status === 'failed'
+          ? `${p.red('◆')} ${p.red(`Failed in the background: ${what}`)}`
+          : `${p.yellow('◆')} ${p.yellow(`${status === 'stopped' || status === 'killed' ? 'Stopped' : status[0].toUpperCase() + status.slice(1)} in the background: ${what}`)}`;
+    return [truncate(`${INDENT}${line.replace(/\s+/g, ' ')}`, look.width)];
+  }
   const c = item.level === 'error' ? p.red : item.level === 'warn' ? p.yellow : p.dim;
   return wrap(c(item.text.trim()), look.width, { first: `${INDENT}${c('·')} `, indent: `${INDENT}  ` });
 }
