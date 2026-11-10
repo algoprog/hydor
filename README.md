@@ -60,8 +60,9 @@ your machine. See [keep a session confidential](docs/guide/02-sessions.md#keep-a
 
 - **Run it inside Hydor.** Hermes Agent, pi, Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie run as
   agents of Hydor, beside Claude Code, Codex and its own agent ([agents and models](docs/guide/16-agents-models.md)).
-- **Bring in what it knows.** **Settings → Memory → Bring in** takes memory and skills from Hermes Agent, OpenClaw,
-  pi and Atomic Agent, and ChatGPT, Claude, Claude Code and Codex too; you pick the notes, and the setup tour offers it
+- **Bring in what it knows.** **Settings → Memory → Bring in** takes the memory and the skills you made in Hermes
+  Agent, OpenClaw, pi and Atomic Agent, and what ChatGPT, Claude, Claude Code and Codex know about you. You see it
+  all first and pick what comes over, and the setup tour offers it when it finds one of them
   ([memory](docs/guide/06-memory.md)).
 - **Talk to your agents from a chat app.** Telegram, Discord or Slack, under **Settings → Chat apps**
   ([devices](docs/guide/20-devices.md)).
