@@ -3,6 +3,39 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.52.0 · 10 November 2026
+
+A strong model leads and cheaper ones do the clear parts, by default; and Hydor in a terminal.
+
+- **Automatic** is the start page's model until you pick another: a session starts on the **Best** tier's model
+  (Opus for Claude Code), or on **Max**'s (the newest Fable) when your request reads as a hard problem. The helper
+  model sizes the request up while the agent starts, so nothing waits for it, and a line in the conversation says
+  when Max was picked, and why. A model you picked before stays picked: choose Automatic in the Model menu.
+- **The main agent leads helpers**: it works out what is asked, plans, hands the clear parts to helpers on cheaper
+  tiers, checks what comes back and answers for the result. **Standard** (Sonnet) takes clear tasks of medium size,
+  **Quick** (Haiku) small, very clear jobs; a helper asked for with no tier gets Standard, and none thinks with a tier
+  above its lead's. Claude Code's own helpers inside a turn are told the same models.
+- **Four tiers**: Quick, Standard, Best and the new **Max**, for the hardest problems. For Codex they start as Luna,
+  Terra, Sol and Astra, or the nearest your plan offers. A tier you leave alone follows its program's newest model
+  of that kind, so a new Fable or Opus is picked up by itself.
+- **Stepping up**: a main agent on Automatic may move itself to Max when a problem proves harder than it looked (a
+  line in the conversation says so). A helper whose turn was stopped by your plan's usage limit is no longer run
+  again a tier up for it.
+- **Two switches** under Settings → Models → Tiers: **Lead with helpers** and **Max for hard problems**, both on to
+  start.
+- **Finished means finished**: a lead that ends its turn while its helpers still work no longer notifies you that it
+  is done; the turn after them does.
+- **Hydor in a terminal**: the new `hydor` command talks to an agent in the terminal's own scrollback (its text as
+  it comes, each step on a line, approvals and questions answered with a key, helpers, queued messages, commands
+  such as `/model` and `/helpers`), runs one request for a script (`hydor run "…" --json`, with exit codes), and
+  looks after sessions, models, tiers, agents, scheduled tasks and usage. It uses the same Hydor as the app, on this
+  computer or another one, and starts it when nothing is running. Help → **Hydor in a terminal** has the rest.
+- **Measured, not assumed**: on nine coding tasks with hidden checks, a led session passed every check in every
+  run. It cost about a tenth less than Opus alone on the seven ordinary ones, two thirds less than Fable for
+  everything, and more than Opus alone where Automatic took a problem to Max that Opus could have solved (that is
+  what the second switch is for). `scripts/tier-bench` runs the same measurement on your own models and plan;
+  `docs/plans/tiers-and-the-team.md` has the numbers.
+
 ## 0.51.2 · 10 November 2026
 
 Usage fits a phone.
