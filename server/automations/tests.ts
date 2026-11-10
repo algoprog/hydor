@@ -86,6 +86,11 @@ class Sessions extends EventEmitter {
   add(key: string, status = 'idle') {
     this.fakes.set(key, { key, agent: 'claude', title: 'Chat', cwd: root, status, cost: 1, items: [], queue: [] });
   }
+  /** Sessions whose last turn their plan's usage limit stopped. */
+  limited = new Set<string>();
+  stoppedAtLimit(key: string) {
+    return this.limited.has(key);
+  }
   async deliverOrQueue(key: string, text: string) {
     this.delivered.push({ key, text });
     const f = this.fakes.get(key);
@@ -458,13 +463,19 @@ await test('a run as an agent that thinks with a tier: when it fails, it runs ag
   await sessions.endTurn(scheduler, third.key!, 'The site is down.');
   await sleep(50);
   assert.equal(sessions.created.length, n0 + 3);
+  // A run its plan's usage limit stopped is no failure of the tier: another account takes it over, or it waits for the reset.
+  const k1 = (await scheduler.runNow(t.id))!;
+  sessions.limited.add(k1);
+  await sessions.endTurn(scheduler, k1, '', { error: true });
+  await sleep(50);
+  assert.equal(sessions.created.length, n0 + 4);
   // A task that names its own model, or a run that went well: no step up.
   const fixed = scheduler.save({ ...base, name: 'Fixed model', model: 'opus', extra: { assistant: scout.id }, schedule: { kind: 'every', minutes: 30 } });
   const k2 = (await scheduler.runNow(fixed.id))!;
   scheduler.report(scheduler.runIn(k2)!.id, 'failed', 'No');
   await sessions.endTurn(scheduler, k2, 'No.');
   await sleep(50);
-  assert.equal(sessions.created.length, n0 + 4);
+  assert.equal(sessions.created.length, n0 + 5);
   scheduler.remove(t.id);
   scheduler.remove(fixed.id);
 });
