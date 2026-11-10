@@ -164,6 +164,7 @@ export class AcpLive extends LiveAdapter {
   private caps: Json = {};
   private loading = false;
   private prompting = false;
+  private promptDone?: Promise<void>;
   private permissions = new Map<string, { rpcId: string | number; options: Json[] }>();
   /** The ACP session has had the app's instructions (they go with its first message), by its id. */
   private briefed?: string;
@@ -429,19 +430,30 @@ export class AcpLive extends LiveAdapter {
 
   async sendMessage(text: string, images: ImageInput[]): Promise<void> {
     if (!this.acpSession) throw new HttpError(409, 'The agent is still starting');
-    if (this.prompting) throw new HttpError(409, 'The agent takes one message at a time: send it when this turn ends');
+    if (this.prompting && this.o.def.id !== CONSOLE_ID) throw new HttpError(409, 'The agent takes one message at a time: send it when this turn ends');
     const id = `u${Date.now().toString(36)}${crypto.randomBytes(2).toString('hex')}`;
     const prompt: Json[] = this.briefing();
-    this.record({ t: 'prompt', id, text, images: images.length || undefined });
     if (text) prompt.push({ type: 'text', text });
     if (this.caps.promptCapabilities?.image) for (const img of images) prompt.push({ type: 'image', mimeType: img.mediaType, data: img.data });
+    if (this.prompting) {
+      // Custom consumes these between model steps, after all tool results are in place. Other ACP
+      // agents have no such extension. The turn may have finished while this request was in flight.
+      const r = await this.rpc.call('_hydor/message', { sessionId: this.acpSession, prompt, promptId: id });
+      if (!r.accepted) {
+        await this.promptDone;
+        return this.sendMessage(text, images);
+      }
+      this.record({ t: 'prompt', id, text, images: images.length || undefined });
+      return;
+    }
+    this.record({ t: 'prompt', id, text, images: images.length || undefined });
     this.prompting = true;
     this.state.status = 'working';
     this.state.turnStartedAt = Date.now();
     this.state.error = undefined;
     this.changed();
     // The call returns when the turn ends, however long that takes.
-    this.rpc
+    this.promptDone = this.rpc
       // Custom keeps the prompt's id with the turn: forks and "Edit from here" cut its conversation by it.
       .call('session/prompt', { sessionId: this.acpSession, prompt, ...(this.o.def.id === CONSOLE_ID ? { _meta: { promptId: id } } : {}) }, 7 * 24 * 3600_000)
       .then((r) => this.turnEnded({ stopReason: r?.stopReason ?? 'end_turn' }))
