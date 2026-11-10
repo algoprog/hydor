@@ -45,6 +45,7 @@ import { autoPlan, tierNote } from './assistants/auto.ts';
 import { noteModels } from './assistants/tiers.ts';
 import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/tiers.ts';
 import { opensTurn } from './opinion/turns.ts';
+import { childKeys } from './children/family.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -594,10 +595,24 @@ export class SessionManager extends EventEmitter {
           .prepare('insert into app_sessions (key, agent, done_at, created_at, updated_at) values (?, ?, ?, ?, ?) on conflict(key) do update set done_at = excluded.done_at')
           .run(s.key, s.agent, now, now, now);
         this.queueSummary(s.key);
-        // The last lines of the transcript land a moment after the turn ends. A Custom goal still going says when it is met.
-        if (!(s.acpAgent === CONSOLE_ID && s.goal?.status === 'active')) setTimeout(() => this.notify({ ...base, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
+        // The last lines of the transcript land a moment after the turn ends. A Custom goal still going says when it is met,
+        // and a lead whose helpers are still at work is not finished: their replies wake it, and the turn after them says so.
+        if (!(s.acpAgent === CONSOLE_ID && s.goal?.status === 'active') && !this.helpersAtWork(s)) setTimeout(() => this.notify({ ...base, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
       }
     }
+  }
+
+  /**
+   * Whether a session that ended its turn still has helpers at work: its agent's own in the background (Claude Code's
+   * Agent tool), or child sessions it started. It is woken as each ends, so it has not finished.
+   */
+  private helpersAtWork(s: SessionSummary): boolean {
+    // Its own helpers alone ("local_agent"): a command left running in the background (a dev server) may never end.
+    if ((s.live?.backgroundTasks ?? []).some((t) => (t.kind ?? '').includes('agent') && t.status === 'running')) return true;
+    return childKeys(this.db, s.key).some((k) => {
+      const st = this.lives.get(k)?.adapter.state.status;
+      return st === 'working' || st === 'starting';
+    });
   }
 
   /** Set by the scheduler: a scheduled run's notice may read differently, or not go out (nothing to report). */

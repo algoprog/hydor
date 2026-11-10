@@ -65,16 +65,17 @@ const save = () => fs.writeFileSync(out, JSON.stringify(results, null, 1));
 /** A session's child sessions: the cards in its conversation. */
 const childrenOf = async (key) => (await api('GET', `/api/sessions/${enc(key)}/notes`)).notes.filter((n) => n.kind === 'child').map((n) => n.data);
 
-/** Waits until a session and its children have finished: nothing working, nothing queued, for a little while. */
+/** Waits until a session and its children have finished: nothing working, nothing in the background, nothing queued, for a little while. */
 async function finished(key, since) {
   let quiet = 0;
   for (;;) {
     await sleep(4000);
     if (Date.now() - since > LIMIT_MS) return 'timeout';
     const s = (await api('GET', `/api/sessions/${enc(key)}`)).summary;
-    const kids = await childrenOf(key);
-    const kidStates = await Promise.all(kids.map((k) => api('GET', `/api/sessions/${enc(k.child)}`).then((r) => r.summary?.live?.status, () => undefined)));
-    const busy = BUSY.has(s?.live?.status) || (s?.queue?.length ?? 0) > 0 || kidStates.some((st) => BUSY.has(st));
+    const kids = await Promise.all((await childrenOf(key)).map((k) => api('GET', `/api/sessions/${enc(k.child)}`).then((r) => r.summary, () => null)));
+    // A turn may end with helpers still at work in the background (Claude Code's own): their agent is woken as each ends.
+    const atWork = (x) => BUSY.has(x?.live?.status) || (x?.live?.backgroundTasks ?? []).some((t) => (t.kind ?? '').includes('agent') && t.status === 'running') || (x?.queue?.length ?? 0) > 0;
+    const busy = atWork(s) || kids.some(atWork);
     // A turn has to have ended: a session that has not begun yet is not finished.
     quiet = busy || !(s?.stats?.turns > 0 || s?.live?.status === 'error' || !s?.live) ? 0 : quiet + 1;
     if (s?.live?.status === 'error' && !busy) return 'error';
