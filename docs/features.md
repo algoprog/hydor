@@ -50,7 +50,11 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   network (bubblewrap), or ask each time where that can't be done; its title, notices and memory send nothing out; a
   lock and a calm tint show it. Enforced on the server, not only in the page.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI,
-  OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own).
+  OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent, Pi, OpenClaw, or a command of your own). Their approvals
+  become approval cards you can answer from a phone, and the app's guidelines, memory notes and skills reach them with
+  the first message; the app's tools reach every one that takes MCP servers (through a small bridge when it takes only
+  commands). Pi installs by itself (its ACP adapter and Pi, with npm, without install scripts); Hermes Agent and
+  OpenClaw show their own install command.
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
   shows its own usage and limits. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage moves, with its history, to another account with usage left and carries on, and the app's own quick
