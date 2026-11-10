@@ -465,8 +465,8 @@ test('Discord: unlinking a chat, and removing the bot', async () => {
 });
 
 // ---- a stand-in for Slack -------------------------------------------------------------------------
-const BOT = 'xoxb-1111111111-2222222222-fakefakefakefake';
-const APP = 'xapp-1-A111-3333333333-fakefakefakefake';
+const BOT = 'xoxb-fake-test-bot-token';
+const APP = 'xapp-fake-test-app-token';
 const slSent: { method: string; body: any }[] = [];
 const slResponses: any[] = [];
 const sl = { count: 0, opens: 0, scopes: 'app_mentions:read,chat:write,commands,im:history,reactions:write,users:read', slow: 0 };
