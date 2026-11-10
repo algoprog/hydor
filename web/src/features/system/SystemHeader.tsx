@@ -105,7 +105,8 @@ export function SystemHeader({ tab, actions, sub }: { tab: SystemTab; actions?: 
   useEffect(() => {
     strip.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [tab, mobile]);
-  if (mobile) return <PageHeader title={<PhoneSwitcher tab={tab} />} sub={sub} actions={actions} />;
+  // A phone has no room for a subtitle beside the actions: cut short, it only made the header taller.
+  if (mobile) return <PageHeader title={<PhoneSwitcher tab={tab} />} actions={actions} />;
   return (
     <PageHeader title="System" sub={sub} actions={actions}>
       <div ref={strip} role="tablist" aria-label="System" className="flex items-end gap-0.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
