@@ -57,12 +57,12 @@ A deep research runs many agents at once. Set a spending cap in the same Options
 
 ## Let an agent hand work to child sessions
 
-Any agent can hand a self-contained part of its job to a new session, a child session, which works on it at the same time and reports back. There is nothing to switch on: ask in plain words ("have three child sessions each research one supplier", "let Codex write the tests while you do the docs"), or let the agent decide when a job splits well.
+Any agent can hand a self-contained part of its job to a new session, a child session, which works on it at the same time and reports back. There is nothing to switch on: ask in plain words ("have three child sessions each research one supplier", "let Codex write the tests while you do the docs"), or let the agent decide when a job splits well. A session's main agent is told to work this way by itself: it keeps the planning and the checking, and hands clear parts to helpers on cheaper tiers, so the job costs less (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job); **Lead with helpers** there turns it off).
 
 For each child, the agent picks:
 
 - **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a child runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part.
-- **A tier** for its part: **Quick** for a clear, checkable part, **Standard** for most, **Best** for a hard one; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). An agent of yours can cap its helpers' tiers.
+- **A tier** for its part: **Quick** for a small, very clear job, **Standard** for a clear task of medium size (what a child gets when none is asked for), **Best** for a hard part that stands on its own; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). A child never thinks with a tier above its parent's own, and an agent of yours can cap its helpers' tiers lower.
 - **One of your agents**, by name, instead of a plain child: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)). An agent that keeps a conversation of its own gets the work in its inbox instead, and its reply comes back when it gets to it.
 - **The folder**: the parent's, unless it names another.
 - **A worktree** if it wants one: a separate copy of the folder's git repository on a new branch, so the child's changes do not mix with anyone else's.
@@ -78,7 +78,7 @@ In the parent's conversation, the reply shows as one line: "Reply from", the chi
 
 - A reply longer than about 4,000 characters arrives as a short summary written by the helper model ([Agents, accounts and models](/guide/agents-models)); the parent can still read it whole.
 - If a child stops with an error, or is stopped before it finishes, the parent is told that too.
-- A child started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, never above the highest its lead allows; the parent is told it happened and why. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a child up itself when it finds its result not good enough.
+- A child started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, as far as Best and never above the highest its lead allows; the parent is told it happened and why. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a child up itself when it finds its result not good enough.
 - The parent can check on its children at any time (what each is doing, its agent and model, what it has spent, the start of its latest reply) and send one of them more to do.
 - Replies from turns that ended while the app was stopped are passed on when it starts again.
 

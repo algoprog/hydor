@@ -13,7 +13,7 @@ An agent can hold:
 - **Instructions**: who it is and how it works. It is told to work this way throughout, but what you ask in the conversation comes first.
 - **Where it works**: everywhere, or only in some of your projects (see [Where an agent works](#where-an-agent-works)).
 - **When it works**: when you or another agent asks, and on its own schedules (see [When an agent works: schedules](#when-an-agent-works-schedules)).
-- **What it thinks with**: Automatic, or a tier (Quick, Standard or Best) whose model you set once for each program (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
+- **What it thinks with**: Automatic, or a tier (Quick, Standard, Best or Max) whose model you set once for each program (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **Its team**: the other agents it may hand parts of its work to, and whether other agents may hand it work (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
 - **A monthly budget**: what its sessions may spend in a month (see [A monthly budget](#a-monthly-budget)).
 - **What it hands back**: the fields of each result, checked, and where each goes: a file, the Library, a webhook, a notification (see [What an agent hands back](#what-an-agent-hands-back)).
@@ -173,7 +173,7 @@ The editor that **All settings** opens has every setting of an agent; on a phone
   - **Plan**: reads and plans only, until you approve.
 
   Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
-- **Thinks with**: **Automatic**, **Quick**, **Standard** or **Best**; under it **Helpers it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
+- **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**; under it **Helpers it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **What it may use**: five switches, all on for a new agent (see below).
 - **Skills to favor**: skill names, one at a time (see below).
 - **Connections**: shown when you have connected accounts (see below).
@@ -246,23 +246,24 @@ Every schedule is also in [Settings → Agents → Scheduled tasks](/settings?s=
 
 Tiers pick a model by the job instead of by its name:
 
-- **Quick**: the cheapest, for clear jobs whose result can be checked, such as translating, pulling out facts, sorting, formatting and short summaries.
-- **Standard**: most work: writing, research, changes to code.
-- **Best**: the strongest, for hard, open-ended problems: planning, hard bugs, proofs, reviews that matter.
+- **Quick**: the cheapest, for small, very clear jobs whose result can be checked, such as a targeted edit, pulling out facts, sorting, formatting and short summaries.
+- **Standard**: clear tasks of medium size: a change that is spelled out, tests, research on a set question, a draft to an outline.
+- **Best**: a session's main agent. It works out what is asked, plans, leads helpers and checks their work.
+- **Max**: the strongest, for the hardest problems: stubborn bugs, proofs, designs with many constraints.
 
-An agent set to a tier starts on that tier's model for the program it runs on, unless a model was picked for the session; set to **Automatic** (the default), it uses the model picked where it starts: the start page, the scheduled task, or the agent that hands it work.
+An agent set to a tier starts on that tier's model for the program it runs on, unless a model was picked for the session; set to **Automatic** (the default), it uses the model picked where it starts: the start page, the scheduled task, or the agent that hands it work. On the start page that pick can itself be **Automatic**: Best, or Max when the request reads as a hard problem (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)).
 
-[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means, in a table with a column for each program: for **Claude Code** a model (Haiku, Sonnet and Opus to start) and an effort; for **Codex** a model and an effort (its default model to start, with low, medium and high effort); for **Custom** one of your Custom models, or nothing, which keeps the model the session picked. **Back to the defaults** puts them back.
+[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means, in a table with a column for each program: for **Claude Code** a model (Haiku, Sonnet, Opus and the newest Fable to start) and an effort; for **Codex** a model and an effort (Terra, Sol and Astra to start, with Terra at low effort for Quick; on a plan without them, the nearest it offers); for **Custom** one of your Custom models, or nothing, which keeps the model the session picked. A tier you leave alone follows its program's newest model of that kind. **Back to the defaults** puts them back.
 
-**Helpers it starts, never above** caps the tiers of the helpers an agent starts: asked for a higher one, a helper gets this one, and one asked for with no tier gets it too. A model named outright is used as named.
+**Helpers it starts, never above** caps the tiers of the helpers an agent starts: asked for a higher one, a helper gets this one. A helper never thinks with a tier above the one its lead thinks with either. A model named outright is used as named.
 
-**Step up when a check fails** (on unless you turn it off): a helper the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, never above the highest the agent allows. The lead hears that it did and why, and the new helper is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a helper up itself when it finds the result not good enough.
+**Step up when a check fails** (on unless you turn it off): a helper the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, as far as Best and never above the highest the agent allows. The lead hears that it did and why, and the new helper is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a helper up itself when it finds the result not good enough.
 
 ## Agents that hand work to other agents
 
 An agent can hand a part of its work to a new session that works on it beside it: a child session (see [Deep research, second opinions and several agents](/guide/research)). It can start:
 
-- **a plain helper**, with a tier for its part: Quick for a clear, checkable part, Standard for most, Best for a hard one;
+- **a plain helper**, with a tier for its part: Quick for a small, very clear job, Standard for a clear task of medium size (what a helper gets when none is asked for), Best for a hard part that stands on its own;
 - **one of your agents**, by name: it works with its own instructions, tools, connections, mode and tier, and its reply comes back to the agent that asked.
 
 Who may hand work to whom:
@@ -438,6 +439,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Let my Release manager agent hand work to Translator and Test runner."
 - "Make my Translator agent work only in the Hydor project."
 - "Make Quick mean Haiku for Claude Code and my local Qwen model for Custom."
+- "Turn off Max for hard problems, so Automatic always starts on Best."
 - "Import my Claude Code agent file ~/.claude/agents/code-reviewer.md as an agent."
 - "Which agents do I have, what does each think with, and what did they spend this month?"
 - "Make my Paper scout hand back a list of papers, each with a title, a link and why it matters, as a page in the Library and a notification."
