@@ -3623,6 +3623,32 @@ kbd {
   color: var(--fg-3);
 }
 
+/* The comparison overview: the table gets the whole width, the text stays at reading width. */
+.compare-wide .docs-main {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.compare-wide .doc {
+  max-width: none;
+}
+
+.compare-wide .doc-toc {
+  display: none;
+}
+
+.compare-wide .doc-body > :not(.table-wrap) {
+  max-width: 780px;
+}
+
+.compare-wide .doc-body table {
+  min-width: 980px;
+}
+
+.compare-wide .doc-body td:first-child,
+.compare-wide .doc-body th:first-child {
+  width: 140px;
+}
+
 @media (max-width: 1180px) {
   .docs-main {
     grid-template-columns: minmax(0, 1fr);
