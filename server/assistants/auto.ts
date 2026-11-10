@@ -70,6 +70,8 @@ export async function sizeRequest(db: DB, request: string, ask: typeof helperJso
 /** Why a request reads as a hard problem, in a few words, by the helper model; null when it does not, or when the helper cannot say in time. */
 export async function sizeUp(db: DB, request: string, ask: typeof helperJson = helperJson, ms = SIZE_MS): Promise<string | null> {
   const r = await sizeRequest(db, request, ask, ms);
+  // The session starts on Best either way, so only the server's log can say that the helper model was not there to ask.
+  if (r.error) console.warn(`[auto] a request was not sized up, so its session starts on Best: ${r.error}`);
   return r.hard ? (r.why ?? 'a hard problem') : null;
 }
 
