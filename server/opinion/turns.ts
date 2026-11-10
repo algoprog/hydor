@@ -2,8 +2,11 @@
 // did until the next one. Child sessions report a turn's reply; a second opinion checks a turn's work.
 import type { FileChange, TimelineItem, UserItem } from '../../shared/types.ts';
 
-/** A message from the user that begins a turn (not a note the harness added, nor a command's output). */
-export const opensTurn = (it: TimelineItem): it is UserItem => it.kind === 'user' && it.meta !== 'note' && it.meta !== 'command-output';
+/** The program's own record of a model switch ("/model …": Claude Code writes one down when a session's model changes, mid-turn too, as when it steps up to Max). */
+const modelSwitch = (it: UserItem) => it.meta === 'slash' && /^\/model\b/.test(it.text.trim());
+
+/** A message from the user that begins a turn (not a note the harness added, a command's output, nor a model switch written down mid-turn). */
+export const opensTurn = (it: TimelineItem): it is UserItem => it.kind === 'user' && it.meta !== 'note' && it.meta !== 'command-output' && !modelSwitch(it);
 
 export interface Turn {
   /** The message that began it; none for what came before the first one. */

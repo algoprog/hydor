@@ -332,11 +332,14 @@ export function backgroundEnd(text: string): { status: string; what: string } | 
   return m ? { status: m[1], what: m[2].trim() } : null;
 }
 
+/** What the app or the program put in the conversation, not the person: a command such as "/model …" (a step up to Max leaves one) and what it printed, a note. */
+const aside = (it: TimelineItem) => it.kind === 'user' && (it.meta === 'slash' || it.meta === 'command-output' || it.meta === 'note');
+
 /** The agent's last reply: its text after its last step in the latest turn (several texts in a row, together). */
 export function lastReply(items: TimelineItem[]): string {
   const out: string[] = [];
   let i = items.length - 1;
-  while (i >= 0 && (items[i].kind === 'turn' || items[i].kind === 'system' || items[i].kind === 'thinking')) i--;
+  while (i >= 0 && (items[i].kind === 'turn' || items[i].kind === 'system' || items[i].kind === 'thinking' || aside(items[i]))) i--;
   for (; i >= 0; i--) {
     const it = items[i];
     if (it.kind === 'assistant') {
