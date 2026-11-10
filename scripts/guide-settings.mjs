@@ -25,7 +25,7 @@ const OPTIONS = rows('OPTIONS'); // [section, words, keywords, text, title?]
 const TOPIC = {
   general: 'app',
   notifications: 'inbox',
-  telegram: 'devices',
+  chat: 'devices',
   security: 'app',
   signatures: 'library',
   scm: 'devices',
