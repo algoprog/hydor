@@ -976,11 +976,16 @@ programs shows each program's version and what is out, with Check now, Update no
   (notify_user) for what cannot wait. A plain yes-or-no approval has Approve and Deny right on the notification
   (where the browser shows buttons), and the Inbox lists everything waiting on you across sessions, scheduled
   tasks and machines, with approvals, questions and forms answered right there.
-- Telegram (Settings → Telegram): a bot of your own, made with @BotFather, that only the chats you link with a one-time
-  code can use. A message starts a session or goes on with the chat's own, its reply comes back when the turn ends
-  (formatted, in up to ten messages when long, "typing…" while it works), a yes-or-no question comes with buttons
-  that answer it, /new, /sessions, /stop and /status steer it, and every session's notices can come too. The app
-  asks Telegram for messages itself, so it needs no address on the internet.
+- Chat apps (Settings → Chat apps): your agents in Telegram, Discord or Slack, each through a bot or app of your own
+  (a Telegram bot from @BotFather, a Discord bot from the Developer Portal, a Slack app from a manifest the app gives
+  you, with the exact scopes). Only the chats you link with a one-time code can use it. A message starts a session or
+  goes on with the chat's own, its reply comes back when the turn ends (formatted for the app: Telegram's HTML,
+  Discord Markdown, Slack mrkdwn in blocks; in up to ten messages when long; "typing…" in Telegram and Discord, an
+  hourglass in Slack while it works), a yes-or-no question comes with buttons that answer it, /new, /sessions, /stop
+  and /status steer it (slash commands in Discord, /hydor in Slack), and every session's notices can come too. In
+  Discord and Slack a channel works too, when the person who linked it mentions the bot. The app connects out (it
+  asks Telegram for messages, opens Discord's Gateway and Slack's Socket Mode WebSockets itself), so none needs an
+  address on the internet; the tokens are kept in the vault.
 
 ## Shipping the work
 - Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its

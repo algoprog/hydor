@@ -314,11 +314,11 @@ test('Discord: in a server only the person who linked it is heard, and only when
   dcMsg(`<@900> ${code}`, { ...guild, mentions: me });
   await until('linked in the channel', () => discordChats(d).some((c) => c.id === 'C500'));
   assert.equal(discordChats(d).find((c) => c.id === 'C500')!.kind, 'channel');
+  await until('its welcome', () => dcTexts().some((t, i) => i >= before && t.startsWith('Linked to Hydor')));
   // Another person in that channel is a stranger.
   const n = dcSent.length;
   dcMsg('<@900> let me in', { ...guild, mentions: me, author: { id: 'U2', username: 'eve' } });
-  await until('told', () => dcSent.length > n);
-  assert.match(lastDc().body.content, /someone’s own Hydor/);
+  await until('told', () => dcTexts().slice(n).some((t) => /someone’s own Hydor/.test(t)));
   assert.equal(did.filter((x) => x.what === 'create').length, 1, 'no session for a stranger');
   // The linked person, mentioning the bot: a session, without the mention in what it is told.
   dcMsg('<@900> Fix the login page', { ...guild, mentions: me });
@@ -402,6 +402,7 @@ test('Discord: slash commands answer in the channel: /sessions to go on with ano
   dcSlash('new', 'Write a haiku');
   await until('a new session', () => did.at(-1)?.what === 'create' && did.at(-1)?.text === 'Write a haiku');
   assert.equal(did.at(-1)!.key, 'claude:made-3');
+  await until('its answer', () => dcCalls.at(-1)?.body.data?.content?.startsWith('On it'));
   // A person not linked in this channel is told so, for themselves.
   const c2 = dcCalls.length;
   dcSlash('new', 'nope', { id: 'U9', username: 'eve' });
@@ -639,7 +640,7 @@ test('Slack: in a channel only the person who linked it is heard, and only when 
   assert.equal(slackChats(d).find((c) => c.id === 'C900')!.kind, 'channel');
   const n = posts().length;
   slMention('let me in', 'C900', 'U2');
-  await until('told', () => posts().length > n);
+  await until('told', () => posts().slice(n).some((p) => /someone’s own Hydor/.test(p.text)));
   assert.equal(did.filter((x) => x.what === 'create').length, 1, 'no session for a stranger');
   slMention('Fix the login page');
   await until('a session', () => did.filter((x) => x.what === 'create').length === 2);
@@ -665,7 +666,7 @@ test('Slack: what an agent asks comes with buttons; a press answers it once and 
   const id = slAction(allow.action_id);
   await until('answered', () => did.at(-1)?.what === 'answer');
   assert.deepEqual(did.at(-1), { what: 'answer', key: 'claude:made-1', text: 'ap1', a: { decision: 'allow' } });
-  assert.ok(acks.some((a) => a.envelope_id === id), 'the press is acknowledged');
+  await until('the press acknowledged', () => acks.some((a) => a.envelope_id === id));
   await until('the message updated', () => slSent.some((s) => s.method === 'chat.update'));
   const u = slSent.find((s) => s.method === 'chat.update')!.body;
   assert.deepEqual([u.channel, u.ts], [SDM, '9.1']);

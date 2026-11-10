@@ -111,7 +111,9 @@ function Page() {
     // Connections are the Apps page's Connected apps now: an old link (and a sign-in coming back) goes there.
     if (q.get('s') === 'connections') return <ToConnected q={q} />;
     // Instructions (CLAUDE.md and AGENTS.md) are part of Agent Guidelines now, and the Skill library part of Skills.
-    const s = q.get('s') === 'instructions' ? 'guidelines' : q.get('s') === 'skillpack' ? 'skills' : q.get('s');
+    // Telegram's page is Chat apps now, with Discord and Slack beside it.
+    const old: Record<string, string> = { instructions: 'guidelines', skillpack: 'skills', telegram: 'chat', discord: 'chat', slack: 'chat' };
+    const s = q.get('s') && old[q.get('s')!] ? old[q.get('s')!] : q.get('s');
     const agent = q.get('agent');
     return <SettingsPage section={isSettingsSection(s) ? s : null} cwd={q.get('cwd')} agent={agent === 'claude' || agent === 'codex' ? agent : null} />;
   }

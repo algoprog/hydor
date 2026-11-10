@@ -32,35 +32,38 @@ A notification can reach your phone when a session finishes, fails or needs your
 
 On an iPhone or iPad, add the app to your Home Screen first and open it from there: the browser can't receive them otherwise. If notifications are blocked for the site, allow them in the browser's settings first. A plain yes-or-no approval comes with **Approve** and **Deny** on the notification itself, where the phone shows buttons. More in [Inbox and notifications](/guide/inbox).
 
-## Talk to your agents from Telegram
+## Talk to your agents from Telegram, Discord and Slack
 
-From a Telegram chat, on any phone or computer with Telegram, you can start sessions, read their replies and answer what agents ask. Hydor asks Telegram for new messages itself, so this works without the app having an address on the internet.
+From a chat in Telegram, Discord or Slack, on any phone or computer, you can start sessions, read their replies and answer what agents ask. Each works through a bot or app of your own, set up in [Settings → App → Chat apps](/settings?s=chat). Hydor connects out to them (it asks Telegram for new messages, and opens a WebSocket to Discord's Gateway and to Slack's Socket Mode), so none of them needs the app to have an address on the internet.
 
-### Connect a bot
+### Connect a bot or app
 
-1. In Telegram, open @BotFather, send `/newbot` and give the bot a name and a username. It answers with a token, like `123456789:AA…`.
-2. Open [Settings → App → Telegram](/settings?s=telegram&find=Bot), paste the token and press **Connect**. The token is kept in the vault, encrypted, and never shows in the app again; the bot's name and "Listening for messages" show under **Bot**.
+Open [Chat apps](/settings?s=chat) and press the row of the one you want: its steps are there. What you paste is kept in the vault, encrypted, and never shows in the app again.
 
-**Change token** puts in another one (another bot's chats link again); **Remove the bot** takes it out of Hydor, and the bot stays yours in Telegram.
+- **Telegram**: in Telegram, open @BotFather, send `/newbot` and give the bot a name and a username. Paste the token it answers with, like `123456789:AA…`, under [Telegram](/settings?s=chat&find=Telegram), and press **Connect**.
+- **Discord**: in the Developer Portal (discord.com/developers/applications) make a **New Application**. Under **Bot**, press **Reset Token** and copy it, and turn on **Message Content Intent** so the bot can read what you write. Paste the token under [Discord](/settings?s=chat&find=Discord) and press **Connect**. Then add the bot to a server of yours with **More → Add the bot to a server** (Discord only lets you message a bot you share a server with, so a small server of your own does). The invitation asks for View Channels, Send Messages and Read Message History, and Hydor makes its slash commands known.
+- **Slack**: at api.slack.com/apps choose **Create New App → From a manifest**, pick your workspace and paste the manifest that **Copy manifest** (under [Slack](/settings?s=chat&find=Slack)) copies: it turns on Socket Mode, subscribes to direct messages and mentions, adds the `/hydor` command and asks for the bot scopes `app_mentions:read`, `chat:write`, `commands`, `im:history`, `reactions:write` and `users:read`. Under **Basic Information → App-Level Tokens** generate a token with the `connections:write` scope (it starts with `xapp-`); under **Install App** install the app to your workspace and copy the Bot User OAuth Token (it starts with `xoxb-`). Paste both and press **Connect**.
+
+Connected, a row shows the bot's name and what it is doing ("Listening for messages", or what is wrong: Discord's Message Content Intent off, a scope Slack's app lacks). **More → Change token** (**Change tokens** for Slack) puts in others (another bot's chats link again); **More → Disconnect** takes it out of Hydor, and the bot or app stays yours.
 
 ### Link a chat
 
 Only the chats you link can use the bot: anyone else who finds it is told it is someone's own.
 
-1. Press [Link a chat](/settings?s=telegram&find=Link%20a%20chat). It shows a code that works once, for ten minutes.
-2. Press **Open in Telegram** on the device with your Telegram, then **Start** in the chat that opens; or send the bot the code. The chat shows under **Your chats** with its name.
+1. Open the row and press [Link a chat](/settings?s=chat&find=Link%20a%20chat). It shows a code that works once, for ten minutes.
+2. In Telegram, press **Open in Telegram** and then **Start** in the chat that opens, or send the bot the code. In Discord and Slack, send the bot or app the code in a direct message, or mention it with the code in a channel. The chat shows in the row with its name.
 
-**Unlink** beside a chat takes its use of your agents away.
+A channel links to the person who sent the code: only they are heard there, and only when they mention the bot. **Unlink** beside a chat takes its use of your agents away.
 
 ### What a chat can do
 
-- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set in [New sessions use](/settings?s=telegram&find=New%20sessions%20use) (Claude Code or Codex). What you send while the agent works waits in the session's queue.
-- **The reply** comes back when the agent's turn ends, with its formatting, in up to ten messages when it is long (the rest stays in the session); "typing…" shows while it works. **Open in Hydor** opens the session in the app, when the app has an address on the internet.
+- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set under **More** (**New sessions use Claude Code** or **New sessions use Codex**). What you send while the agent works waits in the session's queue.
+- **The reply** comes back when the agent's turn ends, formatted for the app (Telegram's formatting; Discord's Markdown, in messages of 2,000 characters; Slack's mrkdwn in blocks), in up to ten messages when it is long (the rest stays in the session). Telegram and Discord show "typing…" while it works; Slack puts an hourglass on your message. **Open in Hydor** opens the session in the app, when the app has an address on the internet.
 - **What an agent asks**: a plain yes-or-no question comes with buttons that answer it; anything more (a form, a plan) comes with a link to answer it in the app.
-- **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them.
-- **Notices**: with [Notices from every session](/settings?s=telegram&find=Notices%20from%20every%20session) on, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
+- **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them. Discord lists them as slash commands; in Slack they come after `/hydor` (`/hydor new`, and `/hydor` with other words is a message to the session); in Discord and Slack `!new`, `!status` and the rest also work typed as a message.
+- **Notices**: with **Notices from every session** on under **More**, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
 
-Pictures, files and voice messages don't reach the agents from Telegram yet: send words.
+Pictures, files and voice messages don't reach the agents from a chat yet: send words.
 
 ## Reach the app from another device
 
@@ -201,5 +204,7 @@ How pull requests are opened and followed: [Open a pull request from a session](
 - "Rename the machine called gpu-box to Studio GPU."
 - "List the tokens other agents use to reach this app, and revoke the one named old laptop."
 - "Add my GitHub account using the GitHub CLI's sign-in."
-- "Send my Telegram chats the notices of every session, not only the ones they started."
-- "Which Telegram chats are linked to this app?"
+- "Send my chats in Telegram, Discord and Slack the notices of every session, not only the ones they started."
+- "Which chats are linked to this app, in each chat app?"
+- "Make new sessions from my Discord chat use Codex."
+- "Disconnect the Slack app."
