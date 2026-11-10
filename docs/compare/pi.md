@@ -1,55 +1,54 @@
-# Hydor and pi
+# Hydor vs pi
 
-pi is a minimal terminal coding agent that you shape with TypeScript extensions. Hydor is an app that runs agents, pi among them, and gives them memory, a phone, a Library and approvals. This page says where each is the better fit, and how to use both. Checked 10 November 2026.
+Like pi? Keep it: it runs inside Hydor as one of its agents, with the same models, extensions and `/login` as in your terminal. On top you get the official Claude Code and Codex on your own plans, approvals and a sandbox, one memory for every agent, and a phone app. Checked 10 November 2026.
 
-## Who pi is for
+## At a glance
 
-Developers who want a small, fast coding agent in the terminal that does exactly what they build into it. pi is by Earendil, under the MIT license, written in TypeScript [1]. It ships a minimal core with a short system prompt, and "skips features like sub-agents and plan mode": you add what you want with extensions, skills, prompt templates and packages [2]. As of 10 November 2026 its repository has 121k stars [3], and its coding-agent package on npm was downloaded 6.2 million times in the week to 9 November [4]. Its 1.0 reached 1,689 points on Hacker News on 1 October 2026 [5].
+| | Hydor | pi |
+|---|---|---|
+| **Runs the official Claude Code and Codex on your own plans, and shows the sessions you started in VS Code or a terminal** | ✓ | — Its own agent [2] |
+| **Runs other agents inside it**: Hermes Agent, pi, OpenClaw, Gemini CLI, OpenCode, Goose and more | ✓ | — |
+| **One memory that every agent shares**, found by meaning and checked against your conversations each day | ✓ | — None built in; left to extensions [2] |
+| **On your phone**: installs as an app with notifications, and you approve or deny from the notification | ✓ | Partial: a terminal program; its Slack bot is a separate package [1] |
+| **Desktop apps** for Mac (Apple silicon and Intel), Windows and Linux | ✓ | — Terminal only [2] |
+| **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | — No built-in permission system; run it in a container [1][4] |
+| **A Library** of documents, slides, spreadsheets, LaTeX and diagrams that you edit in the app | ✓ | Partial: `/export` and `/share` make a page of a session [2] |
+| **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models through llama.cpp [3] |
+| **No telemetry** | ✓ | — Install and update reports on by default; off with a setting [6] |
+| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [5] | — No sub-agents by design [2] |
 
-## What pi does better than Hydor
+## Why people switch to Hydor
 
-- **Small and yours.** Extensions are TypeScript modules with access to tools, commands, shortcuts, events and the terminal interface; ask pi to change itself, press `/reload` and carry on [2]. Hydor is a larger app with a server; you extend it with skills, plugins, apps and connected tools, not by rewriting its loop.
-- **A context you control.** A minimal system prompt, project instructions loaded from AGENTS.md, and compaction you can replace by an extension [2].
-- **Sessions as a tree.** `/tree` goes back to any earlier point and carries on from there; every branch lives in one file, and `/export` and `/share` make a page of a session [2]. Hydor can fork a session from any reply, but keeps them as separate sessions.
-- **Four ways to run it.** Interactive, print or JSON for scripts, RPC for other programs, and an SDK to build it into your own app; its page points to OpenClaw as a real-world example [2]. Hydor has the `hydor` command, `hydor run` for scripts, and an HTTP API.
-- **Many providers, by choice.** More than 15 providers and hundreds of models, with `/login` for a subscription or an API key, and local models through llama.cpp [2][6].
-- **Lighter to install and audit.** Its installer pins every dependency, and a written supply-chain policy says how changes to them are reviewed [1].
+- **Approvals and a sandbox, when you want them.** pi does not ask before every tool call and has no built-in permission system; its guide says to run it in a container or a virtual machine [1][4]. Hydor asks before risky steps and shows them on your phone with **Approve** and **Deny**, can sandbox commands, keeps your keys in a vault that agents use without seeing them, and has a Full access mode for when you want none of it.
+- **The official Claude Code and Codex on your plans.** Hydor runs the `claude` and `codex` programs themselves, signed in with what you pay for, and shows the sessions you started in VS Code or a terminal. pi is its own agent [2].
+- **One memory for every agent.** pi leaves memory to extensions [2]. Hydor keeps notes found by meaning, checks them each day against your conversations, and shares them with every agent you run, pi included. After a hard task an agent can propose a skill, and it is kept only when you approve it.
+- **A phone and a screen.** A web app that installs on your phone, with notifications and diffs, and desktop apps for Mac, Windows and Linux. pi is a terminal program, and its chat automation for Slack is a separate package [1].
+- **More than code.** A Library of documents, slides, spreadsheets, LaTeX and diagrams, apps with views of their own, research with sources, scheduled tasks and watchers.
+- **A strong model leading cheaper helpers, and no telemetry.** pi skips sub-agents by design [2]. In Hydor's own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [5]. pi's settings say anonymous install and update reporting is on by default, off with a setting or `PI_TELEMETRY=0` [6]; Hydor has no analytics libraries.
 
-## Where Hydor is ahead
+## Keep what you like about pi
 
-- **Official Claude Code and Codex on your plans**, with sessions from VS Code or a terminal shown too. pi is its own agent.
-- **A phone and a screen.** A web app that installs on a phone, notifications, approvals and diffs; desktop apps for Mac, Windows and Linux. pi is a terminal program, and its chat automation for Slack is a separate package [1].
-- **Approvals and a sandbox, if you want them.** pi does not ask before every tool call and has no built-in permission system; its guide says to run it in a container or a virtual machine [7]. That is a clear choice and a good fit for people who already do. Hydor asks before risky steps, shows them on your phone and can sandbox commands, and has a Full access mode when you want none of it.
-- **One memory for every agent**, checked against your conversations each day, and skills that agents propose after hard tasks and you approve. pi leaves memory to extensions [2].
-- **Sub-agents and tiers.** By design pi has no sub-agents [2]. Hydor has a strong model lead cheaper helpers: in our own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at 9% less than the Best tier alone and 67% less than everything on Max [8].
-- **More than code.** A Library of documents, slides, spreadsheets, LaTeX and diagrams, apps, research with sources, scheduled tasks and watchers.
-- **Confidential sessions, a vault and no telemetry.** pi's settings say anonymous install and update reporting is on by default; you turn it off with a setting or `PI_TELEMETRY=0` [9]. Hydor has no analytics libraries.
+Hydor runs pi as one of its agents, so you keep what you built.
 
-## A note on contributing
+- **Run it in Hydor.** Pick pi as the agent of a session and use your own models, skills and `/login`, with Hydor's guidelines, memory notes and skills sent to it with the first message. You also get the phone app, approval cards from pi's extensions that ask, and the Library to keep what it writes. Hydor's own tools (pages, search) do not reach pi: the adapter does not pass them on.
+- **Bring in what you taught it.** [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6) reads the instructions you gave pi and lists the skills you made in it, as notes and skills you pick from. Nothing is added until you do.
+- **Nothing is taken away.** Your pi sessions and extensions stay where they are: run `pi` in a terminal whenever you like.
 
-pi closes issues and pull requests from new contributors automatically by default, and its maintainers review the closed ones daily [1]. Hydor asks you to open an issue first for anything bigger than a small change ([CONTRIBUTING.md](../../CONTRIBUTING.md)), and closes ones that read as unchecked output.
+## Switch in a few minutes
 
-## How to switch
-
-Hydor runs pi as one of its agents, so you can use both.
-
-1. Install pi with its own installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`, and run `/login` in it once.
-2. In Hydor, add it under [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP) and pick it as the agent of a session.
-3. To keep your pi skills, open [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6). It shows what it found as notes and skills you pick from, and adds nothing until you do. The setup tour offers it too.
-
-Your pi sessions and extensions stay where they are: run `pi` in a terminal whenever you like.
+1. [Install Hydor](../install.md) and sign in to Claude Code and Codex with the plans you pay for, under [Settings → Agents → Accounts](/settings?s=accounts).
+2. Install pi with its own installer or `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`, and run `/login` in it once. In Hydor, add it under [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP) and pick it as the agent of a session.
+3. Open [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6), tick pi, and pick what to keep. The setup tour offers it too.
+4. Start a job in Claude Code, Codex or pi from the same place, and follow it from your phone.
 
 ## Sources
 
-1. [pi README](https://github.com/earendil-works/pi#readme): license, packages, contributor policy, supply-chain notes, Slack automation.
-2. [pi.dev](https://pi.dev/): what it is, extensions, sessions, modes, providers.
-3. [GitHub API, earendil-works/pi](https://api.github.com/repos/earendil-works/pi): stars, license, language.
-4. [npm downloads of @earendil-works/pi-coding-agent](https://api.npmjs.org/downloads/point/last-week/@earendil-works/pi-coding-agent), 3 to 9 November 2026.
-5. [Pi 1.0 on Hacker News](https://news.ycombinator.com/item?id=49926069).
-6. [pi docs: providers](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/providers.md) and [llama.cpp](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/llama-cpp.md).
-7. [pi docs: Run Pi safely](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md).
-8. [Tiers and the team](../plans/tiers-and-the-team.md): Hydor's benchmark, with its tasks and runs.
-9. [pi docs: settings](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/settings.md) and [environment variables](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md).
+1. [pi README](https://github.com/earendil-works/pi#readme): packages, permissions and containers, Slack automation.
+2. [pi.dev](https://pi.dev/): what it is, extensions, sessions, no sub-agents, no permission popups.
+3. [pi docs: providers](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/providers.md) and [llama.cpp](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/llama-cpp.md).
+4. [pi docs: Run Pi safely](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/security.md).
+5. [Tiers and the team](../plans/tiers-and-the-team.md): Hydor's benchmark, with its tasks and runs.
+6. [pi docs: settings](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/settings.md) and [environment variables](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md).
 
 Checked 10 November 2026. Something out of date? [Open an issue](https://github.com/algoprog/hydor/issues) and it will be corrected. Hydor is not affiliated with Earendil or the pi project.
 

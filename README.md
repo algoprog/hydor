@@ -75,24 +75,22 @@ delete all of it ([memory](docs/guide/06-memory.md), [skills](docs/guide/13-skil
 
 ## How it compares
 
-As of 10 November 2026; each page links its sources, and says what the other project does better.
+As of 10 November 2026. Hydor runs the official Claude Code and Codex on your own plans, runs Hermes Agent, pi and
+OpenClaw inside it, and gives all of them one memory, a phone app and a Library. Each page has its sources.
 
 | | Hydor | [Hermes Agent](docs/compare/hermes-agent.md) | [pi](docs/compare/pi.md) | [Atomic Agent](docs/compare/atomic-agent.md) | [OpenClaw](docs/compare/openclaw.md) |
 |---|---|---|---|---|---|
-| Official Claude Code and Codex on your plan | Yes | Claude by API key or Nous Portal | Its own agent | Its own agent | Claude CLI and Codex harness |
-| Interfaces and phone | Web app for your phone, desktop apps, terminal, Telegram | Terminal, desktop app, chat apps | Terminal | Terminal, desktop app, Telegram, Discord | Web UI, terminal, apps for phones and desktops, chat apps |
-| Memory | One for every agent, found by meaning | Two small files per profile, session search | Left to extensions | Local notes with hybrid recall | On your computer |
-| Learning | Skills proposed, you approve | Writes skills by itself | Skills you write or install | Reflection writes memory | Skills and plugins |
-| Chat apps | Telegram, Discord, Slack | More than 20 | Slack in a separate package | Telegram, Discord | 20 or more |
-| Local models | Any, plus confidential sessions | Any OpenAI-compatible endpoint | llama.cpp and others | Built for it | Yes |
-| Safety | Approvals, checks, optional sandbox, vault | Command approval, container isolation | No prompts; run it in a container | Approvals | Pairing; sandbox optional |
-| Telemetry | None | None by default | Install reports on by default | Analytics on by default | Update check; statistics opt-in |
-| Documents and apps | Library and apps | Tools and skills | Coding core | Browser and files | Canvas and device actions |
-| License | Apache-2.0 | MIT | MIT | MIT | MIT |
+| Official Claude Code and Codex on your plans, with VS Code and terminal sessions shown | ✓ | Partial: Claude Code, through a skill | — Its own agent | Partial: drives your sign-ins | Partial: Claude CLI and Codex |
+| Runs other agents inside it | ✓ | Partial: Claude Code | — | Partial: Claude Code and Codex | Partial: through ACP |
+| One memory every agent shares, found by meaning | ✓ | Partial: two small files per profile | — Left to extensions | Partial: its own notes | Partial: its own memory |
+| Phone app with notifications and approvals | ✓ | Partial: chat apps | Partial: terminal; Slack bot apart | Partial: Telegram and Discord | Partial: iOS and Android apps |
+| Approvals, a command sandbox and a vault | ✓ | Partial: approvals, containers | — Run it in a container | Partial: approvals | Partial: pairing, optional sandbox |
+| Confidential sessions on local models only | ✓ | Partial: local models | Partial: local models | Partial: local models | Partial: local models |
+| No telemetry | ✓ | ✓ | — Reports on by default | — Analytics on by default | ✓ Daily version check only |
+| A strong model leading cheaper helpers | ✓ 9% less than Best alone | Partial: subagents | — | Partial: Fusion | Partial: sub-agents |
 
-Hermes Agent has far more chat apps, learns on its own and can run in the cloud; pi is smaller and yours to rebuild;
-Atomic Agent is tuned for small local models; OpenClaw lives in your messengers. Hydor is young: its repository went
-public in late October 2026, and each of them has more users. The full pages are at
+Already use one of them? Keep it: Hermes Agent, pi and OpenClaw run inside Hydor as agents, and **Settings → Memory →
+Bring in** takes the memory and skills of all four over. The full comparison, with every source, is at
 [hydor.app/compare](https://hydor.app/compare/): [Hermes Agent](docs/compare/hermes-agent.md),
 [pi](docs/compare/pi.md), [Atomic Agent](docs/compare/atomic-agent.md) and [OpenClaw](docs/compare/openclaw.md).
 

@@ -1,40 +1,49 @@
-# Hydor and Atomic Agent
+# Hydor vs Atomic Agent
 
-Atomic Agent is a local-first agent built to get good results from small open-weight models on your own machine. Hydor is an app that runs many agents, with one memory, from any device. This page says where each is the better fit, and how to use both. Checked 10 November 2026.
+Hydor runs your local models too, and adds what Atomic Agent does not have: the official Claude Code and Codex with the sessions you started in VS Code or a terminal, many more agents beside its own, one memory for all of them, a phone app and a Library. Bring in Atomic Agent's memory and skills, and keep using your local models in Hydor. Checked 10 November 2026.
 
-## Who Atomic Agent is for
+## At a glance
 
-People who want to run open-weight models on their own computer and have an agent that is designed around what small models can and cannot do. It runs its own build of llama.cpp, grammar-constrains the tool calls the model makes, and keeps the prompt small [1]. It is by AtomicBot, under the MIT license, written in TypeScript, and as of 10 November 2026 its repository has 3.5k stars [2]. Its README calls it a developer preview [1].
+| | Hydor | Atomic Agent |
+|---|---|---|
+| **Runs the official Claude Code and Codex on your own plans, and shows the sessions you started in VS Code or a terminal** | ✓ | Partial: drives your Claude Code and Codex sign-ins through their CLIs; a handoff command picks up a stopped session [1] |
+| **Runs other agents inside it**: Hermes Agent, pi, OpenClaw, Gemini CLI, OpenCode, Goose and more | ✓ | Partial: Claude Code and Codex [1] |
+| **One memory that every agent shares**, found by meaning and checked against your conversations each day | ✓ | Partial: its own notes, lessons and procedures [1] |
+| **On your phone**: installs as an app with notifications, and you approve or deny from the notification | ✓ | Partial: Telegram and Discord, with approval buttons [1] |
+| **Desktop apps** for Mac (Apple silicon and Intel), Windows and Linux | ✓ | Partial: Apple silicon Macs, Windows and Linux; no Intel Macs yet [1] |
+| **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | Partial: approvals, and keys kept out of the commands it runs [1] |
+| **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models, which it is built for [1] |
+| **No telemetry** | ✓ | — Anonymous usage analytics on by default [1] |
+| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [2] | Partial: Fusion, a planner with workers [1] |
 
-## What Atomic Agent does better than Hydor
+## Why people switch to Hydor
 
-- **Small local models.** Grammar-constrained tool calls on llama.cpp, a model recommender for your RAM and GPU, a context-frugal loop and a KV-cache compression build [1]. Hydor's own agent, Custom, runs any model through Ollama, vLLM, OpenRouter or any OpenAI-compatible endpoint, and is built for breadth of models rather than for tuning to small ones.
-- **A published result.** On the public GAIA validation Level 1 split (53 tasks), with the same local Qwen 3.6 35B-A3B for both, Atomic Agent scored 69.8% and Hermes Agent 58.5% [1]. This was run by Atomic's own team, and its write-up and raw runs are published [1]. We have not run GAIA on Hydor, so we have no number to set beside it.
-- **Overnight runs.** `atomic-agent overnight` runs one long task with nobody watching, capped by a dollar budget and a number of hours [1].
-- **Fusion.** One model plans and a pool of workers does the clear parts [1]. Hydor does this too with its tiers and team; the two are different designs, and we have not compared them.
+- **The official Claude Code and Codex, and more agents.** Atomic Agent can drive your Claude Code and Codex sign-ins through their own CLIs, and pick up a session they stopped with a handoff command [1]. Hydor runs the official programs themselves on your plans and shows the sessions you started in VS Code or a terminal, so there is nothing to hand off. Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent and pi run inside Hydor beside its own agent.
+- **One memory for every agent.** Atomic Agent keeps notes, lessons and procedures for itself [1]. Hydor keeps one set of notes for every agent you use, found by meaning and checked each day against your conversations. After a hard task an agent can propose a skill, and it is kept only when you approve it.
+- **Every screen.** A web app that installs on your phone, with notifications and **Approve** and **Deny** on the notification. Desktop apps for Mac (Apple silicon and Intel), Windows and Linux, the `hydor` command, and Telegram, Discord and Slack. On a Mac, Atomic Agent's builds are for Apple silicon; Intel Macs are not supported yet [1].
+- **A Library and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit in the app, and small apps with views of their own.
+- **No telemetry.** Atomic Agent's README says "Anonymous usage analytics is on by default", with crash reports to Sentry on the same switch; you turn them off with a setting [1]. Hydor has no analytics libraries to switch off.
+- **A strong model leading cheaper helpers.** Atomic Agent's Fusion has one model plan and a pool of workers do the clear parts [1]. Hydor's tiers and team work in a similar way, with a number behind it: in its own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [2].
 
-## Where Hydor is ahead
+## Keep what you like about Atomic Agent
 
-- **Official Claude Code and Codex on your plans.** Atomic Agent is its own agent; it can take over a Claude Code or Codex session you stopped, and import from them [1]. Hydor runs the official programs, and sessions started in VS Code or a terminal show up.
-- **More agents.** Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent and pi run inside Hydor beside its own.
-- **A phone and every screen.** A web app that installs on a phone with notifications and approvals, desktop apps for Mac, Windows and Linux, the `hydor` command, and Telegram, Discord and Slack. Atomic Agent has a terminal interface, a desktop app and Telegram and Discord [1]. On a Mac its builds are for Apple silicon; Intel Macs are not supported yet [1]. Hydor has an app for Intel Macs too.
-- **One memory for every agent**, checked each day against your conversations, with skills proposed after hard tasks and approved by you.
-- **A Library and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into, and small apps with views of their own.
-- **No telemetry.** Atomic Agent's README says "Anonymous usage analytics is on by default", with crash reports to Sentry on the same switch; it honours `DO_NOT_TRACK` [1]. Hydor has no analytics libraries to switch off.
-- **Lower requirements.** Atomic Agent needs Node.js 25.7 or newer [1]. The Hydor apps bring everything they need; building from source takes Node.js 22.12 or newer.
+- **Bring in what it knows.** [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6) reads Atomic Agent's memory store (what it knows about you, its notes, lessons and procedures) and the skills you made in it, and shows them as notes you pick from. Nothing is added until you do. Hydor reads a copy, so Atomic Agent can keep running.
+- **Keep your local models.** Hydor's own agent, Custom, runs any model through Ollama, vLLM, OpenRouter or any OpenAI-compatible endpoint, including the llama.cpp server you already run. Turn on **Confidential** for a session that must stay on your computer: it uses only local models, with every tool that reaches the internet off.
+- **Keep Atomic Agent for what it is built for.** Its grammar-constrained tool calls and its model recommender for small models stay in Atomic Agent [1]; it runs on its own, and Hydor does not need to know.
 
-## How to switch
+## Switch in a few minutes
 
-1. Keep Atomic Agent for the local-model work it is built for; it runs on its own, and Hydor does not need to know.
-2. Use Hydor's Custom agent against the same llama.cpp server, Ollama or vLLM endpoint, and turn on **Confidential** for a session that must stay on your computer.
-3. To bring over what Atomic Agent knows, open [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6): it reads Atomic Agent's memory and skills and shows them as notes you pick from; nothing is added until you do. The setup tour offers it too.
+1. [Install Hydor](../install.md) and sign in to Claude Code and Codex with the plans you pay for, under [Settings → Agents → Accounts](/settings?s=accounts).
+2. Open [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6), tick Atomic Agent, and pick the notes and skills to keep. The setup tour offers it too.
+3. Add your local model under [Settings → Agents → Models](/settings?s=models) and start a Custom session with it, or use **Confidential** when it must stay local.
+4. Start your next job from the same place, and follow it from your phone.
 
 Going the other way, Atomic Agent's own `atomic-agent import` command brings in Claude Code, Codex, Hermes, OpenClaw and pi data [1].
 
 ## Sources
 
-1. [Atomic Agent README](https://github.com/AtomicBot-ai/atomic-agent#readme): local models, GAIA benchmark, Fusion, overnight runs, platforms, importers, privacy and egress, requirements. Its site is [atomicagent.io](https://atomicagent.io).
-2. [GitHub API, AtomicBot-ai/atomic-agent](https://api.github.com/repos/AtomicBot-ai/atomic-agent): stars, license, language.
+1. [Atomic Agent README](https://github.com/AtomicBot-ai/atomic-agent#readme): local models, Claude Code and Codex sign-ins and handoff, Fusion, memory, Telegram and Discord, platforms, importers, privacy and analytics. Its site is [atomicagent.io](https://atomicagent.io).
+2. [Tiers and the team](../plans/tiers-and-the-team.md): Hydor's benchmark, with its tasks and runs.
 
 Checked 10 November 2026. Something out of date? [Open an issue](https://github.com/algoprog/hydor/issues) and it will be corrected. Hydor is not affiliated with AtomicBot.
 

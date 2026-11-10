@@ -264,7 +264,7 @@ function comparePages(root, { guide }) {
 /** What each comparison page shows beside it: the pages of /compare, the open one marked. */
 function compareSide(pages, current) {
   return `<div class="side-group"><p>Compare</p><ul>${pages
-    .map((p) => `<li><a href="${p.href}"${p.href === current ? ' aria-current="page"' : ''}>${esc(p.href === '/compare/' ? 'All compared' : p.topic.title.replace(/^Hydor and /, ''))}</a></li>`)
+    .map((p) => `<li><a href="${p.href}"${p.href === current ? ' aria-current="page"' : ''}>${esc(p.href === '/compare/' ? 'All compared' : p.topic.title.replace(/^Hydor (?:and|vs) /, ''))}</a></li>`)
     .join('')}</ul></div><div class="side-group"><p>More</p><ul><li><a href="/docs/">Docs</a></li><li><a href="/docs/features">Everything Hydor does</a></li></ul></div>`;
 }
 
@@ -372,7 +372,7 @@ ${groups
     </aside>
     <main id="main" class="docs-main">
       <article class="doc">
-        <p class="doc-crumbs"><a href="/compare/">Compare</a>${p.href === '/compare/' ? '' : `<span>›</span>${esc(t.title.replace(/^Hydor and /, ''))}`}</p>
+        <p class="doc-crumbs"><a href="/compare/">Compare</a>${p.href === '/compare/' ? '' : `<span>›</span>${esc(t.title.replace(/^Hydor (?:and|vs) /, ''))}`}</p>
         <header class="doc-head"><span class="doc-icon">${svg(lucide.Scale ?? lucide.BookOpen, 22)}</span><h1>${esc(t.title)}</h1></header>
         <div class="doc-body">
 ${html}

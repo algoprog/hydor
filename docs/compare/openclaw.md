@@ -1,51 +1,49 @@
-# Hydor and OpenClaw
+# Hydor vs OpenClaw
 
-OpenClaw is an open-source assistant that runs on your own computer and meets you in the chat apps you already use. Hydor is an app that runs coding and research agents, with one memory, from any device. This page says where each is the better fit, and how to use both. Checked 10 November 2026.
+Like OpenClaw? Keep it: it runs inside Hydor as one of its agents, and you add the things Hydor is built around: the official Claude Code and Codex on your own plans with approvals and diffs, one memory for every agent, a Library, and a phone app. Bring in OpenClaw's memory and skills, and keep its Gateway for your chat apps. Checked 10 November 2026.
 
-## Who OpenClaw is for
+## At a glance
 
-People who want a personal assistant that answers in WhatsApp, Telegram, Slack, Discord, iMessage and 20 or more other channels, with companion apps for macOS, iOS, Android, Windows and Linux [1]. It is under the MIT license, written in TypeScript, and stewarded by the OpenClaw Foundation, which its README describes as an independent 501(c)(3) with no paid tier, hosted service or token [1][2]. As of 10 November 2026 its repository has 394k stars and 83k forks [2].
+| | Hydor | OpenClaw |
+|---|---|---|
+| **Runs the official Claude Code and Codex on your own plans, and shows the sessions you started in VS Code or a terminal** | ✓ | Partial: runs the Claude CLI and Codex through its app-server [2] |
+| **Runs other agents inside it**: Hermes Agent, pi, OpenClaw, Gemini CLI, OpenCode, Goose and more | ✓ | Partial: Claude Code, Gemini CLI, OpenCode and others through ACP [4] |
+| **One memory that every agent shares**, found by meaning and checked against your conversations each day | ✓ | Partial: its own memory, on your computer [1] |
+| **On your phone**: installs as an app with notifications, and you approve or deny from the notification | ✓ | Partial: iOS and Android apps, and chat apps [1] |
+| **Desktop apps** for Mac (Apple silicon and Intel), Windows and Linux | ✓ | ✓ Companion apps for macOS, Windows and Linux [1] |
+| **Approvals, a command sandbox and a vault** that agents use without seeing your keys | ✓ | Partial: sender pairing, a sandbox you set up, approvals in chat apps [1][2] |
+| **A Library** of documents, slides, spreadsheets, LaTeX and diagrams that you edit in the app | ✓ | Partial: a Canvas in its companion apps [1] |
+| **Confidential sessions**: local models only, with every network tool off | ✓ | Partial: local models [1] |
+| **A strong model leading cheaper helpers** | ✓ 9% less than Best alone, 67% less than everything on Max [3] | Partial: sub-agents [2] |
 
-## What OpenClaw does better than Hydor
+## Why people switch to Hydor
 
-- **Chat apps, and a phone in your pocket.** More than 20 channels, and native apps for iOS and Android with voice, a canvas, camera and screen on the devices that have them [1]. Hydor has a web app that installs on a phone, and Telegram, Discord and Slack.
-- **A shared assistant.** One gateway can run as a personal assistant or as a shared one for several people [1].
-- **Plugins and a registry.** Models, channels and agent harnesses are plugins, shared through ClawHub [1].
-- **Size and age in the field.** Far more people use it; Hydor's repository went public in late October 2026.
-- **An organisation behind it.** A foundation that employs its core team and signs releases [1].
+- **Built around coding agents.** Hydor runs the official `claude` and `codex` programs on your plans and shows the sessions you started in VS Code or a terminal. You follow long sessions from your phone: every step in plain words, every change as a diff, and worktrees to keep jobs apart. OpenClaw's docs describe reusing the Claude CLI and running Codex through its app-server [2]; in Hydor those programs are the centre.
+- **More agents, one memory.** Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent and pi run inside Hydor beside Claude Code, Codex and its own agent, and they all share one set of notes, found by meaning and checked each day against your conversations. After a hard task an agent can propose a skill, and it is kept only when you approve it.
+- **Approvals on your phone, a sandbox and a vault.** OpenClaw's README says tools run on the host for the main session unless you configure sandboxing [1]. Hydor asks before risky steps and shows them on your phone with **Approve** and **Deny**, can sandbox commands, and keeps your keys in a vault that agents use without seeing them.
+- **A Library and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into and you edit as in Word, PowerPoint, Excel and Overleaf, and small apps with views of their own.
+- **A strong model leading cheaper helpers.** In Hydor's own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at **9% less than the Best tier alone, and 67% less than running everything on Max** [3]. We have not compared this with OpenClaw.
+- **Private by choice.** Confidential sessions use only models on your computer, with every tool that reaches the internet turned off.
 
-## Where Hydor is ahead
+## Keep what you like about OpenClaw
 
-- **Coding agents as the centre.** Hydor is built around approvals, diffs, worktrees and following long coding sessions from your phone, and shows sessions you started in VS Code or a terminal. OpenClaw's docs describe reusing the Claude CLI and running Codex through its app-server [3]; Hydor's design centres on running those programs.
-- **More agents.** Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Hermes Agent and pi run inside Hydor beside Claude Code, Codex and its own agent.
-- **One memory for every agent**, checked each day against your conversations, and skills that agents propose after hard tasks and you approve.
-- **A strong model leading cheaper helpers.** In Hydor's own benchmark of 10 November 2026 (seven coding tasks, run by us) the team passed every check at 9% less than the Best tier alone and 67% less than everything on Max [4]. We have not compared this with OpenClaw.
-- **A Library and apps.** Documents, slides, spreadsheets, LaTeX and diagrams that agents write into, and small apps with views of their own.
-- **Confidential sessions and a vault.** Sessions that use only models on your computer, and keys that agents use without seeing them.
-- **No telemetry.** OpenClaw sends a daily update check by default; its anonymous feature statistics are opt-in, and `DO_NOT_TRACK` turns off the counting but not the update check [5]. Hydor sends nothing of the kind: it has no analytics libraries.
-- **Safety defaults.** OpenClaw's README says tools run on the host for the main session unless you set up sandboxing [1]. It also pairs unknown senders on direct messages by default. Hydor asks before risky steps and can sandbox commands.
+- **Run it in Hydor.** OpenClaw's `openclaw acp` bridge connects Hydor to your Gateway, so set OpenClaw up first (`openclaw onboard`) and keep its Gateway running. Add it under [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP) and pick it as the agent of a session: you get the phone app and the Library around it, and Hydor's guidelines, memory notes and skills reach it with the first message. Hydor's own tools do not: its bridge refuses them, so it works with its own tools.
+- **Bring in what it knows.** [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6) reads OpenClaw's MEMORY.md and USER.md and the skills it holds (its workspace, shared and learned skills), and shows them as notes you pick from. Nothing is added until you do. The setup tour offers it too.
+- **Keep its Gateway for your chat apps.** Leave OpenClaw answering in the chat apps it covers, and connect Telegram, Discord or Slack for the agents you run in Hydor under **Settings → Chat apps**.
 
-## Is OpenClaw built on pi?
+## Switch in a few minutes
 
-In part, as far as we can tell. pi's own page points to OpenClaw as a real-world integration of pi's SDK [6]; OpenClaw's README thanks pi's author "for pi" [1]; and OpenClaw's package depends on pi's terminal-interface library, `@earendil-works/pi-tui` [7]. We did not find OpenClaw's own docs saying how much of its agent loop is pi's, so we say no more than that. [Hydor and pi](pi.md) compares Hydor with pi itself.
-
-## How to switch
-
-1. Keep OpenClaw for the chat apps it covers, and open Hydor beside it.
-2. To keep what OpenClaw knows, open [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6): it reads OpenClaw's memory and skills and shows them as notes you pick from; nothing is added until you do. The setup tour offers it too.
-3. For talking to agents from a chat app, connect Telegram, Discord or Slack under **Settings → Chat apps**.
-
-OpenClaw can also import from Claude Code [3], and Hermes Agent and Atomic Agent import from OpenClaw.
+1. [Install Hydor](../install.md) and sign in to Claude Code and Codex with the plans you pay for, under [Settings → Agents → Accounts](/settings?s=accounts).
+2. Open [Settings → Memory → Bring in](/settings?s=memory&find=Bring%20in%E2%80%A6), tick OpenClaw, and pick the notes and skills to keep.
+3. If you want OpenClaw in Hydor too, keep its Gateway running and add it under [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP).
+4. For talking to your agents from a chat app, connect Telegram, Discord or Slack under **Settings → Chat apps**.
 
 ## Sources
 
-1. [OpenClaw README](https://github.com/openclaw/openclaw#readme): what it is, channels, apps, license, foundation, security, thanks to pi.
-2. [GitHub API, openclaw/openclaw](https://api.github.com/repos/openclaw/openclaw): stars, forks, license, language.
-3. [OpenClaw docs](https://docs.openclaw.ai/llms.txt): its index lists the Codex harness, the Claude CLI backend and the Claude Code import.
-4. [Tiers and the team](../plans/tiers-and-the-team.md): Hydor's benchmark, with its tasks and runs.
-5. [OpenClaw docs: usage telemetry and update checks](https://docs.openclaw.ai/gateway/telemetry).
-6. [pi.dev](https://pi.dev/).
-7. [OpenClaw package.json](https://github.com/openclaw/openclaw/blob/main/package.json).
+1. [OpenClaw README](https://github.com/openclaw/openclaw#readme): what it is, apps, memory, security and sandboxing, local models.
+2. [OpenClaw docs](https://docs.openclaw.ai/llms.txt): its index lists the Codex harness, the Claude CLI backend, exec approvals in chat apps, sub-agents and the Claude Code import.
+3. [Tiers and the team](../plans/tiers-and-the-team.md): Hydor's benchmark, with its tasks and runs.
+4. [OpenClaw docs: ACP agents](https://docs.openclaw.ai/tools/acp-agents): the external harnesses it runs through ACP.
 
 Checked 10 November 2026. Something out of date? [Open an issue](https://github.com/algoprog/hydor/issues) and it will be corrected. Hydor is not affiliated with OpenClaw or the OpenClaw Foundation.
 
