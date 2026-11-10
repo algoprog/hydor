@@ -105,7 +105,9 @@ export async function planStart(conn: Conn, o: Opts, boot: Boot, tiers: TiersSta
   }
   const run = start.runs?.[agentKey(prog.agent, prog.acpAgent)] ?? {};
   const own = assistant && assistant.agent === prog.agent ? assistant : undefined;
-  let model = o.model ?? own?.model ?? (run.model || undefined);
+  // The start page's Automatic counts only while the team is on, as there.
+  const last = run.model === 'auto' && !tiers?.team?.on ? undefined : run.model || undefined;
+  let model = o.model ?? own?.model ?? last;
   // Automatic when the server has a team, unless an agent of yours thinks with a tier of its own.
   if (!model && tiers?.team?.on && !assistant?.tier) model = 'auto';
   if (model === 'auto' && !tiers?.team) model = undefined;
@@ -117,7 +119,7 @@ export async function planStart(conn: Conn, o: Opts, boot: Boot, tiers: TiersSta
     mode: mode ?? undefined,
     assistant,
     // On another computer, a folder here means nothing there: its default folder, unless one is named.
-    cwd: o.cwd ? (conn.local ? path.resolve(o.cwd) : o.cwd) : conn.local ? process.cwd() : undefined,
+    cwd: o.cwd ? (conn.here ? path.resolve(o.cwd) : o.cwd) : conn.here ? process.cwd() : undefined,
     worktree: o.worktree,
     capUsd: o.cap ?? start.capUsd,
     memory: o.noMemory ? false : start.memory !== false,

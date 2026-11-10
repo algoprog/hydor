@@ -21,11 +21,20 @@ export class ApiError extends Error {
   }
 }
 
+/** What a session has spent at API prices, its child sessions' with it (GET /api/budget/:key); null when the server cannot say. */
+export interface Spent {
+  spentUsd: number;
+  ownUsd: number;
+  childrenUsd: number;
+}
+
 export interface Conn {
   /** The server's address, without a slash at its end. */
   base: string;
   /** This computer's server (its token made here). */
   local: boolean;
+  /** The server runs on this computer (its own, or one named at a loopback address): a folder here is a folder there. */
+  here: boolean;
   /** The server's version, from its health check. */
   version: string;
   /** Calls the API; the server's `{ error }` as an ApiError. */
@@ -156,6 +165,7 @@ export async function connect(o: { server?: string; token?: string; start?: bool
   const conn: Conn = {
     base,
     local,
+    here: local || LOCAL_HOSTS.test(new URL(base).hostname),
     version,
     async api<T>(method: string, p: string, body?: unknown, opts: { timeoutMs?: number } = {}): Promise<T> {
       let r = await call(method, p, body, opts.timeoutMs);
@@ -193,6 +203,16 @@ export async function connect(o: { server?: string; token?: string; start?: bool
     },
   };
   return conn;
+}
+
+/** What a session has spent, its child sessions' with it, as the server adds it up; null when it cannot say (an older server). */
+export async function spentOf(conn: Conn, key: string): Promise<Spent | null> {
+  try {
+    const b = await conn.api<Partial<Spent>>('GET', `/api/budget/${enc(key)}`, undefined, { timeoutMs: 15_000 });
+    return typeof b.spentUsd === 'number' ? { spentUsd: b.spentUsd, ownUsd: b.ownUsd ?? b.spentUsd, childrenUsd: b.childrenUsd ?? 0 } : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

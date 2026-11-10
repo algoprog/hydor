@@ -10,7 +10,7 @@ import { childReplyOf } from '../../shared/children.ts';
 import type { SessionNote } from '../../shared/features.ts';
 import type { LiveState, TimelineItem } from '../../shared/types.ts';
 import { UsageError, type Opts } from './args.ts';
-import { ApiError, enc, type Conn } from './client.ts';
+import { ApiError, enc, spentOf, type Conn } from './client.ts';
 import { readStdin, whyNoReply } from './commands.ts';
 import { INDENT, modelLabel, textLines, type Look } from './lines.ts';
 import { busy, lastReply, Printer, SessionView } from './session.ts';
@@ -221,6 +221,13 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
   stream();
   showProgress();
   const r = resultOf(conn, view, outcome, t0, 0);
+  // What it cost as the server adds it up (its tokens at their price until the agent's own figure lands), helpers and all.
+  const spent = key ? await spentOf(conn, key) : null;
+  if (spent) r.costUsd = Math.round(spent.spentUsd * 10_000) / 10_000;
+  for (const c of r.children) {
+    const own = await spentOf(conn, c.key);
+    if (own) c.costUsd = Math.round(own.ownUsd * 10_000) / 10_000;
+  }
   view.close();
   if (o.json) emit(r);
   else if (o.streamJson) emit({ type: 'result', ...r });

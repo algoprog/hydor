@@ -223,7 +223,7 @@ export async function tierLines(conn: Conn, look: Look, t?: TiersState | null): 
   };
   const rows = [['', ...TIER_PROGRAMS.map((x) => p.bold(x.label))], ...tierIds(st).map((id) => [p.bold(tierName(id)), ...PROGRAMS.map((x, i) => cell(x.tier, id, i))])];
   const out = columns(rows, '   ');
-  if (st.team) out.push('', `Automatic for new sessions: ${st.team.on ? p.green('on') : 'off'}    Hard problems go to Max: ${st.team.hard ? p.green('on') : 'off'}`);
+  if (st.team) out.push('', `Lead with helpers: ${st.team.on ? p.green('on') : 'off'}    Max for hard problems: ${st.team.hard ? p.green('on') : 'off'}`);
   return out;
 }
 

@@ -809,7 +809,7 @@ test('tiers: shown, set, the team switched', async () => {
   assert.equal(shown.code, 0, shown.err);
   assert.match(shown.out, /Quick +Haiku 4\.5/);
   assert.match(shown.out, /Max/);
-  assert.match(shown.out, /Automatic for new sessions: on/);
+  assert.match(shown.out, /Lead with helpers: on    Max for hard problems: off/);
   const set = await hydor(['tiers', 'set', 'claude', 'best', 'haiku', '--effort', 'high']);
   assert.equal(set.code, 0, set.err);
   const put = calls.filter((c) => c.method === 'PUT' && c.path === '/api/models/tiers').at(-1)!;
