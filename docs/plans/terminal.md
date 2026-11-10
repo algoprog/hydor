@@ -35,8 +35,9 @@ implemented twice.
    socket's upgrade; the server's `onRequest` hook (server/index.ts) accepts it for `/api/` and `/ws` alike.
 2. Otherwise this computer's: the port from the service's env file and `PORT` as `server/cli.ts` already reads them
    (`server/config.ts`), at `http://127.0.0.1:<port>`. Its token is made once straight in the database
-   (`createAccessToken(db, 'Terminal')`, server/machines.ts, the way `access-token` does) and kept in
-   `<dataDir>/cli-token` (mode 0600); a kept token the server refuses (401) is made again once.
+   (`createAccessToken(db, …)`, server/machines.ts, the way `access-token` does) and kept in `<dataDir>/cli-token`
+   (mode 0600): the same file and name ("This computer’s command line") as `hydor app …` already uses, so Settings →
+   Machines lists one token for the command line. A kept token the server refuses (401) is made again once.
 3. Nothing answers `/api/health` there: start the server in the background (`node dist/server/index.js`, detached,
    its output appended to `<dataDir>/logs/terminal-server.log`), wait for health (say "Starting Hydor…" on stderr
    after a second, give up after 60 s with where the log is), and leave it running when the command ends: sessions
@@ -93,8 +94,14 @@ reply to stdout, and ends.
 - An approval or a question with nobody to answer: with `--mode full` (or `--yes`, the same) none are asked; otherwise
   the run stops, says what it was asked on stderr and exits 3 (the session stays, to answer in the app or with
   `hydor resume`).
-- `--json`: one object on stdout when it ends: `{ key, url, status, reply, model, costUsd, tokens: { in, out, cached },
-  durationMs, turns, children: [{ key, title, label, tier, costUsd, status }], error? }`. `--stream-json`: one JSON
+- A turn that ends with nothing in it (no reply, no turn's end: the plan at its usage limit, an error at its start)
+  fails the run (exit 1) a few seconds on, with the reason: the agent's error, or "Claude Code is at its usage limit
+  (Weekly · all models): it lifts in 46h 41m" from `GET /api/usage`. (The first real run found this: it used to end
+  as done with an empty reply.)
+- `--json`: one object on stdout when it ends: `{ key, url, status ('done' | 'failed' | 'needs-answer' | 'timeout' |
+  'interrupted'), reply, model, costUsd, tokens: { in, out, cached }, durationMs, turns, children: [{ key, title, label,
+  tier, costUsd, status }], error?, asks? }`; `costUsd` and `tokens` are the lead's and its helpers' together, `asks` is
+  what it waits for. `--stream-json`: one JSON
   line per event as it happens (`{type:'item', item}`, `{type:'live', live}`, `{type:'note', note}`, then
   `{type:'result', …}` as above).
 - `--timeout <seconds>`: stop the turn and exit 124 when it takes longer.
@@ -160,7 +167,8 @@ once and left.
   `PUT /api/assistants/session/:key`), `/helpers`, `/tiers`, `/usage`, `/cost` (this session and its helpers),
   `/stop`, `/rename <title>`, `/open` (its address in the web app), `/quit`. Without an argument a command that
   picks (model, effort, mode, agent, sessions) shows a numbered list to choose from. Any other `/name` goes to the
-  agent as it is (the program's own commands: `GET /api/sessions/:key/commands`).
+  agent as it is (the program's own commands and skills, as `GET /api/catalog/:agent` lists them in `commands`, which
+  Tab completes; `GET /api/sessions/:key/commands` lists the shell commands a session ran, not these).
 - **Not a terminal** (piped): `hydor` with stdin piped reads it as the message and behaves as `run`; with stdout
   piped there are no colours, no spinner and no redrawn region. `NO_COLOR` and `--no-color` turn colours off;
   `FORCE_COLOR` turns them on.
@@ -175,8 +183,10 @@ when a server does not have it yet (an older Hydor on another machine):
 
 - A session may start with `model: "auto"` (`POST /api/sessions`): Automatic. The server picks the model: the Best
   tier's for the program, or the Max tier's when the request reads as a hard problem. The terminal's default model
-  for a new session is `auto` when `GET /api/models/tiers` answers with a `team` object, unless a model is named or
-  the start page's last pick for that program is another model.
+  for a new session is `auto` when `GET /api/models/tiers` answers with a `team` whose `on` is true (`hydor tiers team
+  off` turns that default off; `--model auto` and `/model auto` still work while a `team` is there), unless a model is
+  named, the start page's last pick for that program is another model, or the agent of yours it starts as thinks with a
+  tier of its own (the server then picks that tier's model).
 - Tiers are `quick`, `standard`, `best` and `max` (labels Quick, Standard, Best, Max; `shared/tiers.ts` has them:
   import `TIERS` and `tierLabel`, and code for `max` being there or not).
 - `GET /api/models/tiers` → `{ tiers, defaults, team?: { on: boolean, hard: boolean } }` where `tiers[program][tier]` is
@@ -198,8 +208,11 @@ when a server does not have it yet (an older Hydor on another machine):
   end (start, items and live events streamed, a helper's note, done only after the helper's reply and the lead's next
   turn, `--json`'s object, the exit codes for a failed turn, an approval with nobody to answer, a timeout), `sessions
   --json`, `tiers` show and set, a socket that drops and comes back.
-- The chat itself in a pseudo-terminal (`node-pty` is already a dependency): type a message, see a streamed reply,
-  answer an approval with a key, queue a message while a turn runs, Ctrl+C twice to leave.
+- The chat itself in a pseudo-terminal (`node-pty` is already a dependency), its screen read back through a headless
+  `@xterm/xterm` (already a dependency): type a message, see a streamed reply, answer an approval with a key, queue a
+  message while a turn runs, paste lines, Ctrl+C twice to leave, at 80 and 120 columns; a question (one pick, several
+  picks in one read, your own words) and a form field by field; Tab; Esc stopping a turn; a resize while it works;
+  and with stdout not a terminal.
 
 ## Docs that change with it (AGENTS.md)
 
@@ -208,3 +221,32 @@ knowing it; `docs/features.md`, `README.md`, `docs/install.md` (the maintenance 
 `node dist/server/cli.js …`: `hydor …` is the short way once it is linked, both keep working), `docs/development.md`
 for the test. The Chinese and Greek guide, the search box's catalog and vectors, and the release notes are done
 after the two branches are merged.
+
+## What the first build changed or settled
+
+- **A word that reads like a command**: the first word is the command when it is one; otherwise the words are the
+  chat's first message. A single lowercase word that is no command (`hydor sesions`) is taken for a typo: "Unknown
+  command" with the usage and exit 2 (a one-word message goes as `hydor chat hello`).
+- **The start page's last picks** give the program, its model, effort and mode, the agent of yours it starts as (unless
+  that is General), memory and the spending cap; not the worktree or the folder (they belong to the start page's own
+  folder). On another computer's Hydor no folder is sent unless `--cwd` names one there.
+- **Short keys**: `hydor sessions` shows the shortest start of each id (8 characters at least) that tells the listed
+  sessions apart (Codex's ids begin with the time they were made, so 8 were not enough), and the commands take any
+  unique start of an id or key. Piped, its lines are not cut to a width.
+- **"Done" for `run`**: not working, no helper working or owing its reply (each helper's turns are counted against the
+  replies the lead got; a helper stepped up is not waited for; a reply is waited for at most 120 s after its helper
+  stopped), nothing queued (a held queue does not count), settled 1.2 s with the turn's end in the conversation, or
+  settled 15 s without one. Its socket is backed by a look at the session and its helpers every 2 s.
+- **`send`** posts to `/message` when the session is not working and to `/queue` when it is.
+- **The chat's input** treats a line and its Enter in one read as typed (a paste without bracketed paste is text with a
+  line break inside it), and keys that answer a card are taken one by one even when several come in one read.
+- **A message that comes to nothing** in the chat (a usage limit answers before the agent ever shows as working) gets a
+  red line saying why, three seconds on.
+- **The guide's picture** (`docs/guide/images/terminal.webp`, `-light.webp`) is drawn from the chat's own renderers
+  (the Printer and the region's lines, as ANSI) in the app's dark and light colours and screenshotted with headless
+  Chromium; `scripts/guide-shots` has no step for it yet.
+- **Not tried against a real agent**: the environment's Claude Code account was at its weekly limit when the build was
+  tried (Codex was not to be used), so the real runs only reached the limit, which is how the empty-turn case above was
+  found. Everything else was tried against the test's fake server and, for the listing commands and the chat's own
+  commands, a scratch server built from the branch.
+

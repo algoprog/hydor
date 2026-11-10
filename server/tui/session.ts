@@ -535,6 +535,3 @@ export function historyLines(items: TimelineItem[], notes: SessionNote[], look: 
   return out.filter((l, i, all) => !(l === '' && (i === 0 || all[i - 1] === '')));
 }
 
-/** A step under way, for the region. */
-export const isStep = (it: TimelineItem): it is ToolItem => it.kind === 'tool';
-export { INDENT };

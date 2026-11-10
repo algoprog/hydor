@@ -118,7 +118,7 @@ export async function conversationLines(conn: Conn, key: string, look: Look, o: 
   ]);
   const s = one.summary;
   const { p } = look;
-  const head = s ? [p.bold(s.title || '(untitled)'), p.dim([s.acpName ?? programName(s.agent, s.acpAgent), tildify(s.cwd, look.home), statusWord({ ...s, live: one.live }, { ...p, yellow: p.yellow })].filter(Boolean).join(' · '))] : [p.bold(key)];
+  const head = s ? [p.bold(s.title || '(untitled)'), p.dim([s.acpName ?? programName(s.agent, s.acpAgent), tildify(s.cwd, look.home), statusWord({ ...s, live: one.live }, p)].filter(Boolean).join(' · '))] : [p.bold(key)];
   return [...head, '', ...historyLines(tl.items, notes.notes, { ...look, cwd: s?.cwd ?? look.cwd }, o)];
 }
 
@@ -488,4 +488,3 @@ export async function listCommand(conn: Conn | null, o: Opts, look: Look): Promi
   }
 }
 
-export { money };

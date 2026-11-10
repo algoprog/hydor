@@ -447,6 +447,35 @@ async function play(f: Fake, text: string) {
     setLive(f, { status: 'idle' });
     return;
   }
+  if (/ask me questions/.test(text)) {
+    // Questions (one pick, several picks, your own words), then a form a connected app asks for.
+    const q: ApprovalRequest = {
+      id: 'q1',
+      title: 'A few questions',
+      kind: 'question',
+      createdAt: Date.now(),
+      questions: [
+        { id: 'color', header: 'Colour', question: 'Which colour?', options: [{ label: 'Red' }, { label: 'Blue', description: 'calm' }] },
+        { id: 'size', question: 'Which sizes?', multiSelect: true, options: [{ label: 'S' }, { label: 'M' }, { label: 'L' }] },
+        { id: 'name', question: 'Its name?', options: [{ label: 'Default' }] },
+      ],
+      options: [{ id: 'answer', label: 'Send answers', style: 'primary' }, { id: 'deny', label: 'Skip' }],
+    };
+    setLive(f, { status: 'waiting', pendingApprovals: 1 }, { approvals: [q] });
+    f.answers.push({ id: q.id, body: await new Promise<any>((r) => (f.waitAnswer = r)) });
+    const form: ApprovalRequest = {
+      id: 'f1',
+      title: 'Where to?',
+      kind: 'other',
+      from: 'Maps',
+      createdAt: Date.now(),
+      form: { fields: [{ id: 'city', label: 'City', type: 'text', required: true }, { id: 'when', label: 'When', type: 'choice', options: ['Today', 'Tomorrow'] }, { id: 'pets', label: 'Pets', type: 'yesno', default: 'No' }] },
+      options: [{ id: 'accept', label: 'Send' }, { id: 'decline', label: 'Decline' }],
+    };
+    setLive(f, { status: 'waiting', pendingApprovals: 1 }, { approvals: [form] });
+    f.answers.push({ id: form.id, body: await new Promise<any>((r) => (f.waitAnswer = r)) });
+    setLive(f, { status: 'working', pendingApprovals: 0 });
+  }
   if (/approve/.test(text)) {
     const a: ApprovalRequest = { ...APPROVAL, createdAt: Date.now() };
     setLive(f, { status: 'waiting', pendingApprovals: 1 }, { approvals: [a], items: [{ kind: 'tool', id: 'tb', seq: 0, ts: Date.now(), tool: { name: 'Bash', category: 'command', title: 'npm test', status: 'pending' } }] });
@@ -778,7 +807,11 @@ async function chatIn(cols: number) {
     }
     throw new Error(`The screen never showed ${re}:\n${await screen()}\n---- what it wrote last:\n${JSON.stringify(raw.slice(-3000))}`);
   };
-  return { p, screen, until, raw: () => raw, exit: () => exit };
+  const resize = (c: number) => {
+    p.resize(c, 30);
+    term.resize(c, 30);
+  };
+  return { p, screen, until, resize, raw: () => raw, exit: () => exit };
 }
 
 for (const cols of [80, 120]) {
@@ -822,6 +855,54 @@ for (const cols of [80, 120]) {
     for (const l of s.split('\n')) assert.ok(strWidth(l) <= cols, l);
   });
 }
+
+test('the chat: Tab completes, a question and a form answered field by field, Esc stops a turn, a resize while it works', async () => {
+  const c = await chatIn(100);
+  await c.until(/What should the agent do\?/);
+  c.p.write('/he\t');
+  await c.until(/\/help {2}\/helpers\n› \/help$/m);
+  c.p.write('\x15/ti\t');
+  await c.until(/› \/tiers $/m);
+  c.p.write('\x15');
+  c.p.write('ask me questions\r');
+  await c.until(/Which colour\?/);
+  assert.match(await c.screen(), /2 Blue · calm/);
+  c.p.write('2');
+  await c.until(/Which sizes\?/);
+  // Two picks in one read, as quick typing over a slow link sends them.
+  c.p.write('13');
+  await c.until(/1 \[x\] S\n.*\n.*3 \[x\] L/);
+  c.p.write('\r');
+  await c.until(/Its name\?/);
+  c.p.write('Rex\r');
+  await c.until(/City \(needed\)/);
+  c.p.write('\r');
+  await c.until(/It is needed/);
+  c.p.write('Lisbon\r');
+  await c.until(/When/);
+  c.p.write('2');
+  await c.until(/Pets/);
+  c.p.write('\r');
+  await c.until(/Hello there\./);
+  const f = [...fakes.values()].filter((x) => x.summary.title.startsWith('ask me questions')).at(-1)!;
+  assert.deepEqual(f.answers[0].body, { decision: 'answer', answers: { color: 'Blue', size: 'S, L', name: 'Rex' } });
+  assert.deepEqual(f.answers[1].body, { decision: 'accept', answers: {}, form: { city: 'Lisbon', when: 'Tomorrow', pets: 'No' } });
+  await c.until(/✓ 900 ms/);
+  // A turn that runs until stopped: Esc stops it, a resize meanwhile draws the region again at the new width.
+  c.p.write('be slow\r');
+  await c.until(/Working · \d+ s · esc to stop/);
+  c.resize(70);
+  await sleep(300);
+  c.p.write('\x1b');
+  await c.until(/■ Stopped/);
+  assert.ok(calls.some((x) => x.method === 'POST' && x.path === `/api/sessions/${encodeURIComponent([...fakes.values()].at(-1)!.key)}/interrupt`));
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+  const tail = (await c.screen()).split('\n').slice(-6);
+  for (const l of tail) assert.ok(strWidth(l) <= 70, l);
+});
 
 test('the chat with stdout not a terminal: no colour and no region, each line typed sent', async () => {
   const out = path.join(DATA, 'plain-out.txt');
