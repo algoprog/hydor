@@ -1065,7 +1065,7 @@ export class SessionManager extends EventEmitter {
     o = agentStart(this.db, o);
     // Automatic: Best's model for its program. Whether the request is a hard problem, which Max takes, is asked now and known before its message goes.
     const auto = wantAuto && !o.model ? autoPlan(this.db, { agent: o.agent, acpAgent: o.acpAgent, prompt: splitHandoff(o.prompt ?? '')?.request ?? o.prompt, extra: o.extra }) : null;
-    if (auto) o = { ...o, model: auto.model, effort: o.effort ?? auto.effort };
+    if (auto) o = { ...o, model: auto.model, effort: o.effort ?? auto.effort, extra: { ...o.extra, auto: true } };
     if (o.agent === 'claude') await ensureClaude();
     // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start;
     // a confidential one only from a helper model on this computer, else from its first words.
@@ -1101,7 +1101,7 @@ export class SessionManager extends EventEmitter {
     if (account) this.db.prepare('update app_sessions set account = ? where key = ?').run(account, l.key);
     if (o.acpAgent) this.db.prepare('update app_sessions set acp_agent = ? where key = ?').run(o.acpAgent, l.key);
     if (o.extra && Object.keys(o.extra).length) setSessionExtra(this.db, l.key, o.extra);
-    if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
+    if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: auto ? undefined : o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
     const here = onThisComputer(o.paths);
