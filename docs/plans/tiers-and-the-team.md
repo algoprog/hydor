@@ -58,7 +58,8 @@ measurements say.*
 copy of the app by one agent alone on each tier's model and by a session on Automatic with the team on; and thirty
 requests, ten of them hard, sized up by the helper model. Claude Code throughout: Haiku 5.5, Sonnet 5.5, Opus 5.5
 and Fable 5.2 as Quick, Standard, Best and Max. Costs are what the tokens would cost at API prices on 10 November
-2026 (a plan is flat-rate: the figures compare runs). Checks are the share of a task's hidden cases that pass.
+2026 (a plan is flat-rate: the figures compare runs). Checks are the share of a task's hidden cases that pass. Every
+run behind the tables is recorded in `scripts/tier-bench/results/2026-11-10/`, and `report.mjs` shows them again.
 
 **Sizing up.** The helper model (Haiku through Claude Code) called all 10 hard requests hard and kept all 20 plain
 ones on Best, in 1.8 s at the median and 3.7 s at most. A start waits at most 10 s for it.
@@ -81,7 +82,8 @@ Each cell: checks passed · cost · time.
 | **All seven** | **100% · $0.15 · 13.3 min** | **100% · $1.63 · 10.7 min** | **100% · $4.11 · 15.2 min** | – | **100% · $3.76 · 14.0 min** |
 
 - **No check was lost by leading with helpers**: the team passed every hidden case in every run (14 runs), as Best
-  alone did (19 runs).
+  alone did (19 runs). The team's 14 are the runs made with the lead's instructions as shipped; the 19 made with
+  earlier wordings of them are left out of the means, and passed every case as well (for 2% less than Best alone).
 - **The team cost 9% less than Best alone** over the seven, and took about as long: from 27% less where Quick helpers
   did real work (the evaluator's tests, four modules) and half the time on the twelve modules, to 41% more on the one
   task whose request reads as a hard problem, which Automatic started on Max although Best alone solves it.
