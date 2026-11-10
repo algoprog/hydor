@@ -19,7 +19,7 @@ import { BUILTINS } from './builtins.ts';
 import { activity, agentSessions, agentStart, monthSpend, monthStart } from './rules.ts';
 import { cleanAssistant, findAssistant, removeAssistant, saveAssistant } from './store.ts';
 import { modelName, noteModels, seenModels, setTeam, setTiers, teamOf, tierDefaults, tierOf, tierPick, tiersOf } from './tiers.ts';
-import { autoPlan, sizeUp, tierNote } from './auto.ts';
+import { autoPlan, sizeRequest, sizeUp, tierNote } from './auto.ts';
 import { enoughToGoOn, fromTemplate, kindOf, makeProjectAgent, scanFolder, templateOf } from './projectAgent.ts';
 import { createSpace, spaceById } from '../spaces/index.ts';
 import { EventEmitter } from 'node:events';
@@ -144,24 +144,33 @@ test('tiers: four of them, each program its own; before a program lists its mode
   assert.equal(lowerTier(undefined, 'quick'), 'quick');
 });
 
-test('tiers follow the models a program offers: the newest of each family, Fable for Max, Terra, Sol and Astra for Codex', () => {
+test('tiers follow the models a program offers: the newest of each family, small to strongest (Haiku to Fable, Luna to Astra)', () => {
   const d = defaultTiers({ claude: CLAUDE_MODELS, codex: CODEX_FULL });
   assert.deepEqual(d.claude, { quick: { model: 'haiku' }, standard: { model: 'sonnet' }, best: { model: 'opus' }, max: { model: 'claude-fable-5-2' } });
-  // Three models for four tiers: small jobs go to Terra at low effort.
+  // Each maker's small model for Quick, its middle one for Standard, its main one for Best, its strongest for Max.
   assert.deepEqual(d.codex, {
-    quick: { model: 'gpt-6-terra', effort: 'low' },
+    quick: { model: 'gpt-6-luna', effort: 'medium' },
     standard: { model: 'gpt-6-terra', effort: 'medium' },
     best: { model: 'gpt-6.1-sol', effort: 'high' },
     max: { model: 'gpt-6.2-astra', effort: 'high' },
   });
-  // A plan without Sol and Astra: the nearest it has, with more effort where tiers share a model.
+  // A plan without Sol and Astra: the nearest it has, told apart by effort where tiers share a model.
   const free = defaultTiers({ codex: CODEX_FREE }).codex;
   assert.deepEqual(free, {
-    quick: { model: 'gpt-5.6-terra', effort: 'low' },
+    quick: { model: 'gpt-6-luna', effort: 'medium' },
     standard: { model: 'gpt-5.6-terra', effort: 'medium' },
     best: { model: 'gpt-5.6-terra', effort: 'high' },
     max: { model: 'gpt-5.6-terra', effort: 'xhigh' },
   });
+  // One model for everything: every tier on it, from low effort to the most.
+  assert.deepEqual(defaultTiers({ codex: [{ value: 'gpt-6-luna', label: 'GPT-6-Luna', isDefault: true }] }).codex, {
+    quick: { model: 'gpt-6-luna', effort: 'low' },
+    standard: { model: 'gpt-6-luna', effort: 'medium' },
+    best: { model: 'gpt-6-luna', effort: 'high' },
+    max: { model: 'gpt-6-luna', effort: 'xhigh' },
+  });
+  // A Claude plan without Opus: Sonnet leads.
+  assert.deepEqual(defaultTiers({ claude: CLAUDE_MODELS.filter((m) => !/opus|fable|default/i.test(m.label)) }).claude, { quick: { model: 'haiku' }, standard: { model: 'sonnet' }, best: { model: 'sonnet' }, max: { model: 'sonnet' } });
   // Families nobody has heard of: the program's own default model, at each effort.
   assert.deepEqual(defaultTiers({ codex: [{ value: 'o9', label: 'o9' }] }).codex.best, { effort: 'high' });
   // A plan without Fable: Opus leads the hardest problems too.
@@ -222,7 +231,9 @@ test('the tier a model is: by its name or what it stands for, else by its family
   const free = defaultTiers({ codex: CODEX_FREE }).codex;
   assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-5.6-terra', 'medium'), 'standard');
   assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-5.6-terra'), 'max');
-  assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-6-luna'), undefined);
+  assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-6-luna'), 'quick');
+  assert.equal(tierOfModel(free, CODEX_FREE, 'gpt-5.6-luna'), 'quick', 'an older Luna is Quick where Quick is Luna');
+  assert.equal(tierOfModel(free, CODEX_FREE, 'o9-mystery'), undefined);
 });
 
 test('the team: on with Max for hard problems until changed; a change keeps the rest', () => {
@@ -244,6 +255,13 @@ test('Automatic: Best’s model, and Max’s once the helper model reads the req
   assert.equal(await sizeUp(db, 'What is the capital of France?', easy), null);
   assert.equal(await sizeUp(db, 'hello there', hard), null);
   assert.equal(await sizeUp(db, 'Prove that this bound is tight', broken), null);
+  // Why it could not say is kept apart from "not hard" (the benchmark reads it); a start never waits past the limit, and the helper's call is stopped.
+  assert.deepEqual(await sizeRequest(db, 'Prove that this bound is tight', broken), { hard: false, error: 'the helper is away' });
+  let stopped = false;
+  const silent = ((_db: unknown, q: { signal?: AbortSignal }) => new Promise(() => q.signal?.addEventListener('abort', () => (stopped = true)))) as any;
+  const t0 = Date.now();
+  assert.deepEqual(await sizeRequest(db, 'Prove that this bound is tight', silent, 120), { hard: false, error: 'the helper model did not answer within 0 s' });
+  assert.ok(Date.now() - t0 < 1000 && stopped, 'stopped at the limit');
   // The plan: Best now; Max when it is hard.
   const plan = autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n' }, hard)!;
   assert.deepEqual({ tier: plan.tier, model: plan.model, effort: plan.effort }, { tier: 'best', model: 'opus', effort: undefined });
@@ -274,9 +292,9 @@ test('a session started as an agent: its tier’s model when none was picked; th
   const scout = saveAssistant(db, { name: 'Scout', instructions: 'Find papers.', tier: 'quick' });
   assert.deepEqual(agentStart(db, { agent: 'claude', extra: { assistant: scout.id } }), { agent: 'claude', model: 'haiku', extra: { assistant: scout.id } });
   assert.equal(agentStart(db, { agent: 'claude', model: 'opus', extra: { assistant: scout.id } }).model, 'opus');
-  assert.deepEqual(agentStart(db, { agent: 'codex', extra: { assistant: scout.id } }), { agent: 'codex', model: 'gpt-6-terra', effort: 'low', extra: { assistant: scout.id } });
+  assert.deepEqual(agentStart(db, { agent: 'codex', extra: { assistant: scout.id } }), { agent: 'codex', model: 'gpt-6-luna', effort: 'medium', extra: { assistant: scout.id } });
   // An effort picked for the session stays; the tier's model still applies.
-  assert.deepEqual(agentStart(db, { agent: 'codex', effort: 'high', extra: { assistant: scout.id } }), { agent: 'codex', model: 'gpt-6-terra', effort: 'high', extra: { assistant: scout.id } });
+  assert.deepEqual(agentStart(db, { agent: 'codex', effort: 'high', extra: { assistant: scout.id } }), { agent: 'codex', model: 'gpt-6-luna', effort: 'high', extra: { assistant: scout.id } });
   // No tier, or no such agent: as it was.
   const plain = { agent: 'claude' as const, extra: { assistant: 'researcher' } };
   assert.equal(agentStart(db, plain), plain);

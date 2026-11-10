@@ -282,7 +282,7 @@ agents that speak ACP and take MCP servers.
 - **Tiers and the team** (Settings → Models → Tiers): four tiers name a model and an effort for Claude Code, Codex
   and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
   agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers
-  (Haiku, Sonnet, Opus and Fable; Terra, Sol and Astra, with Terra at low effort for Quick). The start page's Model
+  (Haiku, Sonnet, Opus and Fable for Claude Code; Luna, Terra, Sol and Astra for Codex). The start page's Model
   opens on Automatic: the session starts on Best, or on Max when the helper model reads the request as a hard problem
   (sized up while the agent starts; a line in the conversation says why). The main agent is told to lead: it plans,
   hands clear parts to helpers on Standard and Quick (a helper asked for with no tier gets Standard, and none thinks

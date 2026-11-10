@@ -22,27 +22,55 @@ export const SIZE_SYSTEM = [
 ].join(' ');
 
 /** How long the helper model has to answer: a start never waits longer for it than this. */
-export const SIZE_MS = 9000;
+export const SIZE_MS = 10_000;
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
-/** Why a request reads as a hard problem, in a few words, by the helper model; null when it does not, or when the helper cannot say in time. */
-export async function sizeUp(db: DB, request: string, ask: typeof helperJson = helperJson): Promise<string | null> {
+/** What the helper model made of a request: a hard problem (and why, in a few words) or not; `error` when it could not say. */
+export interface Sized {
+  hard: boolean;
+  why?: string;
+  error?: string;
+}
+
+/**
+ * Sizes a request up with the helper model, within `ms`: past that its call is stopped (on Automatic, its program
+ * ends) and the request counts as not hard, so a start never waits on a helper that is slow or away.
+ */
+export async function sizeRequest(db: DB, request: string, ask: typeof helperJson = helperJson, ms = SIZE_MS): Promise<Sized> {
   const text = request.trim();
   // A greeting or a two-word command is never one.
-  if (words(text) < 3) return null;
-  try {
-    const r = await ask<{ hard?: unknown; why?: unknown }>(db, { system: SIZE_SYSTEM, prompt: `<request>\n${text.slice(0, 6000)}\n</request>`, maxTokens: 80, timeoutMs: SIZE_MS }, 'a size');
-    if (r.hard !== true) return null;
-    return (
-      String(r.why ?? '')
+  if (words(text) < 3) return { hard: false };
+  const stop = new AbortController();
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<Sized>((resolve) => {
+    timer = setTimeout(() => {
+      stop.abort();
+      resolve({ hard: false, error: `the helper model did not answer within ${Math.round(ms / 1000)} s` });
+    }, ms);
+  });
+  const asked = ask<{ hard?: unknown; why?: unknown }>(db, { system: SIZE_SYSTEM, prompt: `<request>\n${text.slice(0, 6000)}\n</request>`, maxTokens: 80, timeoutMs: ms, signal: stop.signal }, 'a size').then(
+    (r): Sized => {
+      if (r.hard !== true) return { hard: false };
+      const why = String(r.why ?? '')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 160) || 'a hard problem'
-    );
-  } catch {
-    return null;
+        .slice(0, 160);
+      return { hard: true, why: why || 'a hard problem' };
+    },
+    (e): Sized => ({ hard: false, error: (e as Error)?.message || 'the helper model did not answer' }),
+  );
+  try {
+    return await Promise.race([asked, late]);
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** Why a request reads as a hard problem, in a few words, by the helper model; null when it does not, or when the helper cannot say in time. */
+export async function sizeUp(db: DB, request: string, ask: typeof helperJson = helperJson, ms = SIZE_MS): Promise<string | null> {
+  const r = await sizeRequest(db, request, ask, ms);
+  return r.hard ? (r.why ?? 'a hard problem') : null;
 }
 
 const samePick = (a: TierPick, b: TierPick) => (a.model ?? '') === (b.model ?? '') && (a.effort ?? '') === (b.effort ?? '');
