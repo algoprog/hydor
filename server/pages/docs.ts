@@ -58,7 +58,10 @@ import { FONTS, googleFamilies } from '../../shared/slides.ts';
 import { docRefs, type Refs } from '../../shared/doc-refs.ts';
 import { bookmarkName, citationOf, sourcesFromXml, watermarkOf } from './docx-parts.ts';
 import { paginateDoc } from '../../shared/doc-paginate.ts';
-import { citeItems, citeOf, cleanSources, COLUMN_GAP, notesHtml, paperOf, styleOf, type Source } from '../../shared/docs.ts';
+import { citeItems, citeOf, cleanSources, COLUMN_GAP, defaultNumFmt, notesHtml, PAPER_SIZES, paperOf, styleOf, type NumFmt, type PaperSize, type Source } from '../../shared/docs.ts';
+
+/** Word's names for how a list counts, as this app's. */
+const WORD_NUM_FMT: Record<string, NumFmt> = { decimal: 'decimal', lowerLetter: 'lower-alpha', lowerRoman: 'lower-roman', upperLetter: 'upper-alpha', upperRoman: 'upper-roman' };
 import { CITE_STYLE_NAMES, sourceFromBibtex, sourceLine } from '../../shared/doc-cite.ts';
 import { scriptSafe } from './kit.ts';
 import { HttpError } from '../auth.ts';
@@ -67,7 +70,7 @@ import { rels } from '../documents/ooxml.ts';
 import { all, att, isEl, kid, kids, parseXml, patt, path as xpath, type El } from '../documents/xml.ts';
 import { Zip } from '../documents/zip.ts';
 import { assetDataUrl, getAsset, pictureType, putAsset, takeIn } from './assets.ts';
-import { authorOf, docxFile, editorStylesXml, MONO_DOC, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
+import { authorOf, docxFile, editorStylesXml, MONO_DOC, PAPER_TWIPS, type DocBlock as WordBlock, type DocCell, type DocLook, type DocRev, type DocRun as WordRun, type DocSpace } from './docx.ts';
 import { katexStyle, texToHtml } from './math.ts';
 import { DOC_EDITS_HELP } from '../../shared/doc-edits.ts';
 import { docFromPdf } from './doc-files.ts';
@@ -161,6 +164,7 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
         cite: v.cite ?? v.citeStyle ?? base?.cite,
         styles: given('styles') ? v.styles : base?.styles,
         watermark: given('watermark') ? v.watermark : base?.mark,
+        lang: given('lang') ? v.lang : base?.lang,
       },
       { src: (s) => (s.length <= 4096 ? s : null) },
     );
@@ -401,7 +405,7 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
 /** How the document prints: its paper and margins, its header and footer on every page, its sheets as pages, what belongs together kept together. */
 function printCss(doc: Doc): string {
   return [
-    `@page{size:${doc.page.size === 'letter' ? 'letter' : 'A4'}${doc.page.orient === 'landscape' ? ' landscape' : ''};margin:${doc.page.margin}mm;${marginBoxes(doc)}}`,
+    `@page{size:${{ a4: 'A4', letter: 'letter', legal: 'legal', a3: 'A3', a5: 'A5' }[doc.page.size] ?? 'A4'}${doc.page.orient === 'landscape' ? ' landscape' : ''};margin:${doc.page.margin}mm;${marginBoxes(doc)}}`,
     doc.titlePage ? '@page:first{@top-left{content:none}@top-center{content:none}@top-right{content:none}@bottom-left{content:none}@bottom-center{content:none}@bottom-right{content:none}}' : '',
     '.nd-band{display:none}',
     `html,body{background:${doc.page.color ?? '#fff'}!important}`,
@@ -755,7 +759,15 @@ export function wordSpaces(doc: Doc, blocks: Block[] = doc.blocks): (DocSpace & 
  * of its fonts (`fonts`, wordFonts of docFaces) inside it.
  */
 export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string) => Picture | null, fonts?: Map<string, EmbeddedFont>): Buffer {
-  const { groups } = listInfo(doc.blocks);
+  const { groups, fmts, counts } = listInfo(doc.blocks);
+  // Where each numbered list starts counting, when not at 1: Word says so once, in its numbering.
+  const starts = new Map<number, number>();
+  const seenGroup = new Set<number>();
+  doc.blocks.forEach((b, i) => {
+    if (b.type !== 'li' || b.list !== 'number' || seenGroup.has(groups[i])) return;
+    seenGroup.add(groups[i]);
+    if (counts[i] > 1) starts.set(groups[i], counts[i]);
+  });
   // Footnotes' numbers, citations' and cross-references' words, numbered captions, the bibliography; and the places
   // the document points to (cross-references, links to a place in it) and its own bookmarks, each a bookmark.
   const refs = docRefs(doc);
@@ -838,6 +850,8 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
         ordered: b.list === 'number',
         lvl: b.lvl ?? 0,
         list: groups[i],
+        ...(b.list === 'number' && fmts[i] !== defaultNumFmt(b.lvl ?? 0) ? { fmt: fmts[i] } : {}),
+        ...(b.list === 'number' && starts.has(groups[i]) ? { start: starts.get(groups[i]) } : {}),
         runs: b.runs.map((r) => wordRun(r, sgs, wr)),
         keep: true,
         space,
@@ -875,8 +889,9 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     heads: (['h1', 'h2', 'h3', 'h4', 'h4', 'h4'] as ParaStyle[]).map((s) => Math.round(doc.size * styleOf(doc, s).k * 2) / 2),
     ...(doc.styles ? { styles: doc.styles } : {}),
     editor: { cjk },
+    ...(doc.lang ? { lang: doc.lang } : {}),
   };
-  return docxFile({ title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
+  return docxFile({ title, lang: doc.lang ?? '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
     title,
     paper: doc.page.size,
     margin: doc.page.margin,
@@ -986,7 +1001,11 @@ interface WCtx {
   zip: Zip;
   rels: ReturnType<typeof rels>;
   styles: Map<string, WStyle>;
-  nums: Map<string, Map<number, { fmt: string; text: string }>>;
+  nums: Map<string, Map<number, { fmt: string; text: string; start?: number }>>;
+  /** The numberings (and levels) whose first paragraph has been read: only that one says where the list starts. */
+  numSeen: Set<string>;
+  /** The numbering of the paragraph just before (none: it was no list item). */
+  numPrev: string | null;
   theme: { major?: string; minor?: string };
   font: string;
   size: number;
@@ -1077,7 +1096,7 @@ function rLook(ctx: WCtx, rPr: El | undefined, into: Look) {
 }
 
 /** What a paragraph is: its style (a heading, the title…), list, alignment and indent. */
-function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kind: 'bullet' | 'number' | 'check'; lvl: number }; align?: Align; lvl: number; left: number; hanging: number; caption: boolean } {
+function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kind: 'bullet' | 'number' | 'check'; lvl: number; fmt?: NumFmt; start?: number; cont?: boolean }; align?: Align; lvl: number; left: number; hanging: number; caption: boolean } {
   const id = att(kid(pPr, 'pStyle'), 'val');
   const styles = chain(ctx, id);
   let style: ParaStyle = 'normal';
@@ -1106,12 +1125,23 @@ function pKind(ctx: WCtx, pPr: El | undefined): { style: ParaStyle; list?: { kin
         ilvl ??= s.ilvl;
         break;
       }
-  let list: { kind: 'bullet' | 'number' | 'check'; lvl: number } | undefined;
+  let list: { kind: 'bullet' | 'number' | 'check'; lvl: number; fmt?: NumFmt; start?: number; cont?: boolean } | undefined;
   if (numId && numId !== '0' && !headingLevel(style) && style !== 'title') {
     const lv = ctx.nums.get(numId)?.get(ilvl ?? 0);
     if (lv && lv.fmt !== 'none')
       list = { kind: lv.fmt === 'bullet' ? (/[☐☑☒□]/.test(lv.text) ? 'check' : 'bullet') : 'number', lvl: Math.min(4, ilvl ?? 0) };
+    if (list?.kind === 'number' && lv) {
+      // How it counts (1. a. i. A. I.), when not as its level does by itself; and where it starts, said once, by its first paragraph.
+      const f = WORD_NUM_FMT[lv.fmt];
+      if (f && f !== defaultNumFmt(list.lvl)) list.fmt = f;
+      const seen = `${numId}:${ilvl ?? 0}`;
+      if (!ctx.numSeen.has(seen)) {
+        ctx.numSeen.add(seen);
+        if (lv.start && lv.start !== 1) list.start = lv.start;
+      } else if (ctx.numPrev !== numId) list.cont = true;
+    }
   }
+  ctx.numPrev = list ? (numId ?? null) : null;
   const jc = att(kid(pPr, 'jc'), 'val');
   const align: Align | undefined = jc === 'center' ? 'center' : jc === 'right' || jc === 'end' ? 'right' : jc === 'both' || jc === 'distribute' ? 'justify' : undefined;
   const left = Number(att(kid(pPr, 'ind'), 'left') ?? att(kid(pPr, 'ind'), 'start') ?? 0) || 0;
@@ -1524,7 +1554,7 @@ function wordParagraphBody(ctx: WCtx, p: El, pPr: El | undefined, out: Record<st
   if (own) runs = mergeRuns([{ ...runs[1], t: runs[1].t.replace(/^[\t ]+/, '') }, ...runs.slice(2)].filter((r) => r.t));
   const lead = own ? { icon: own, rest: runs[0]?.t ?? '' } : shaded ? leadingIcon(runs[0]?.t ?? '') : null;
   const block = (rs: Run[]): Record<string, unknown> => {
-    if (c.check || k.list) return { type: 'li', list: c.check ? 'check' : k.list!.kind, lvl: k.list?.lvl ?? checkLvl, ...(c.checked ? { checked: true } : {}), ...(k.align ? { align: k.align } : {}), ...space, runs: rs };
+    if (c.check || k.list) return { type: 'li', list: c.check ? 'check' : k.list!.kind, lvl: k.list?.lvl ?? checkLvl, ...(k.list?.fmt ? { fmt: k.list.fmt } : {}), ...(k.list?.start !== undefined ? { start: k.list.start } : {}), ...(k.list?.cont ? { cont: true } : {}), ...(c.checked ? { checked: true } : {}), ...(k.align ? { align: k.align } : {}), ...space, runs: rs };
     if (lead && k.style === 'normal') return { type: 'p', style: 'callout', icon: lead.icon, tint: `#${shade!.toLowerCase()}`, ...(k.align ? { align: k.align } : {}), ...space, runs: rs.length ? mergeRuns([{ ...rs[0], t: lead.rest }, ...rs.slice(1)]) : [] };
     const b: Record<string, unknown> = { type: 'p', runs: k.style === 'code' ? [{ t: rs.map((r) => r.t).join('') }] : rs, ...space };
     if (k.style !== 'normal') b.style = k.style;
@@ -1751,21 +1781,24 @@ function wordDoc(buf: Buffer): Doc {
     });
   }
 
-  const nums = new Map<string, Map<number, { fmt: string; text: string }>>();
+  const nums = new Map<string, Map<number, { fmt: string; text: string; start?: number }>>();
   const nx = zip.text(part('numbering') ?? 'word/numbering.xml');
   if (nx) {
     const nroot = parseXml(nx).root;
-    const abstract = new Map<string, Map<number, { fmt: string; text: string }>>();
+    const abstract = new Map<string, Map<number, { fmt: string; text: string; start?: number }>>();
     for (const a of kids(nroot, 'abstractNum')) {
-      const lv = new Map<number, { fmt: string; text: string }>();
-      for (const l of kids(a, 'lvl')) lv.set(Number(att(l, 'ilvl') ?? 0), { fmt: att(kid(l, 'numFmt'), 'val') ?? 'decimal', text: att(kid(l, 'lvlText'), 'val') ?? '' });
+      const lv = new Map<number, { fmt: string; text: string; start?: number }>();
+      for (const l of kids(a, 'lvl')) lv.set(Number(att(l, 'ilvl') ?? 0), { fmt: att(kid(l, 'numFmt'), 'val') ?? 'decimal', text: att(kid(l, 'lvlText'), 'val') ?? '', start: Number(att(kid(l, 'start'), 'val')) || undefined });
       abstract.set(att(a, 'abstractNumId') ?? '', lv);
     }
     for (const n of kids(nroot, 'num')) {
       const lv = new Map(abstract.get(att(kid(n, 'abstractNumId'), 'val') ?? '') ?? []);
       for (const o of kids(n, 'lvlOverride')) {
         const l = kid(o, 'lvl');
-        if (l) lv.set(Number(att(o, 'ilvl') ?? 0), { fmt: att(kid(l, 'numFmt'), 'val') ?? 'decimal', text: att(kid(l, 'lvlText'), 'val') ?? '' });
+        if (l) lv.set(Number(att(o, 'ilvl') ?? 0), { fmt: att(kid(l, 'numFmt'), 'val') ?? 'decimal', text: att(kid(l, 'lvlText'), 'val') ?? '', start: Number(att(kid(l, 'start'), 'val')) || undefined });
+        // A level's own start for this numbering (a restart): Word writes it as <w:startOverride>.
+        const so = Number(att(kid(o, 'startOverride'), 'val'));
+        if (so && !l) lv.set(Number(att(o, 'ilvl') ?? 0), { ...(lv.get(Number(att(o, 'ilvl') ?? 0)) ?? { fmt: 'decimal', text: '' }), start: so });
       }
       nums.set(att(n, 'numId') ?? '', lv);
     }
@@ -1786,7 +1819,8 @@ function wordDoc(buf: Buffer): Doc {
   const sect = kids(body, 'sectPr').pop() ?? all(body, 'sectPr').pop();
   const pw = Number(att(kid(sect, 'pgSz'), 'w')) || 11906;
   const ph = Number(att(kid(sect, 'pgSz'), 'h')) || 16838;
-  const letter = Math.abs(Math.min(pw, ph) - 12240) < Math.abs(Math.min(pw, ph) - 11906) && Math.abs(Math.max(pw, ph) - 15840) < 400;
+  // The paper whose size is nearest (within a few millimetres), else A4.
+  const paperSize: PaperSize = (PAPER_SIZES.find((k) => Math.abs(Math.min(pw, ph) - PAPER_TWIPS[k].w) < 400 && Math.abs(Math.max(pw, ph) - PAPER_TWIPS[k].h) < 400) ?? 'a4') as PaperSize;
   const left = Number(att(kid(sect, 'pgMar'), 'left')) || 1440;
   const right = Number(att(kid(sect, 'pgMar'), 'right')) || left;
   const margin = Math.round(((left + right) / 2 / 56.6929) * 10) / 10;
@@ -1795,7 +1829,7 @@ function wordDoc(buf: Buffer): Doc {
   const defaults = all(sroot, 'rPrDefault')[0];
   const normal = [...styles.entries()].find(([id, s]) => id === 'Normal' || s.name.toLowerCase() === 'normal')?.[1];
   const defLook: Look = {};
-  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, openCm: new Set(), cmIds: new Map(), toc: 0, rev: null, sugs: [], lastRev: null, plainSince: true, nextBreak: null, notes: new Map(), marksHere: [], marks: new Map() };
+  const ctx: WCtx = { zip, rels: r, styles, nums, theme, font: 'Arial', size: 11, textEmu: Math.max(1, pw - left - right) * 635, pics: 0, numSeen: new Set(), numPrev: null, openCm: new Set(), cmIds: new Map(), toc: 0, rev: null, sugs: [], lastRev: null, plainSince: true, nextBreak: null, notes: new Map(), marksHere: [], marks: new Map() };
   // Footnotes and endnotes first (the words' marks are theirs), each read as a paragraph's words are.
   for (const [kind, type, prefix] of [
     ['footnote', 'footnotes', 'f'],
@@ -1855,7 +1889,7 @@ function wordDoc(buf: Buffer): Doc {
   }
   const notes = [...ctx.notes].map(([id, runs]) => ({ id, runs }));
   const doc = normalizeDoc({
-    page: { size: letter ? 'letter' : 'a4', margin, ...(orient ? { orient } : {}), ...(ncols > 1 ? { cols: Math.min(3, ncols) } : {}), ...(color ? { color } : {}) },
+    page: { size: paperSize, margin, ...(orient ? { orient } : {}), ...(ncols > 1 ? { cols: Math.min(3, ncols) } : {}), ...(color ? { color } : {}) },
     font,
     size: ctx.size,
     blocks: out,
@@ -1868,6 +1902,8 @@ function wordDoc(buf: Buffer): Doc {
     ...(sources.length ? { sources } : {}),
     ...(mark ? { mark } : {}),
     styles: wordStyles(zip, sroot, font, ctx.size),
+    // The language its text is in: the one its default run properties name.
+    lang: att(kid(kid(all(sroot, 'rPrDefault')[0], 'rPr'), 'lang'), 'val'),
   });
   // Each comment's quote: the words it is on, as they read.
   if (!doc.comments?.length) return doc;
@@ -2109,7 +2145,7 @@ const DOC_HELP = [
   'Braces at the end of a paragraph or heading say what Markdown cannot: {.title} makes it the document’s title, {.subtitle} its subtitle, {.center}, {.right} or {.justify} aligns it, {indent=1} indents it a step. Colours, sizes and fonts: <span style="color:#c5221f; background-color:#fde68a; font-size:14pt; font-family:Georgia">words</span>.',
   'Pictures: ![what it shows](src "its caption"){width=50% .left} on a line of their own (centred, the text’s width, unless said); src is a file of this session (a picture you made), a public https address, or a picture the document has already (naget-asset:…).',
   'Instead of markdown you may give blocks: [{"title": "…"}, {"h1": "…"}, {"p": "…"}, {"bullet": "…", "lvl": 1}, {"number": "…"}, {"check": "…", "checked": true}, {"bullets": ["…", ["a level deeper"]]}, {"quote": "…"}, {"code": "…"}, {"table": [["Head", "Head"], ["a", "b"]], "head": true}, {"image": "src", "caption": "…", "width": 0.5}, {"hr": true}, {"pagebreak": true}]; their words are markdown too.',
-  'page: {"size": "a4" or "letter", "margin": millimetres, "orient": "landscape" (portrait unless said), "cols": 2 or 3 (columns of words on every page), "color": "#fef7e0" (the paper’s colour)} (A4 and 25.4 mm unless said); watermark: "DRAFT" (words across every page, faint) or {"src": a picture}, "" for none; styles: the paragraph styles’ own looks, {"h1": {"font": "Georgia", "size": 20, "color": "#1a73e8", "bold": true, "italic": false, "line": 1.15, "before": 18, "after": 6, "align": "center"}, "normal": {…}, "title": …, "subtitle", "h2"–"h4", "quote", "code", "callout"} (sizes and spaces in points, lines in lines), as Format → Paragraph styles sets them; font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
+  'page: {"size": "a4", "letter", "legal", "a3" or "a5", "margin": millimetres, "orient": "landscape" (portrait unless said), "cols": 2 or 3 (columns of words on every page), "color": "#fef7e0" (the paper’s colour)} (A4 and 25.4 mm unless said); watermark: "DRAFT" (words across every page, faint) or {"src": a picture}, "" for none; styles: the paragraph styles’ own looks, {"h1": {"font": "Georgia", "size": 20, "color": "#1a73e8", "bold": true, "italic": false, "line": 1.15, "before": 18, "after": 6, "align": "center"}, "normal": {…}, "title": …, "subtitle", "h2"–"h4", "quote", "code", "callout"} (sizes and spaces in points, lines in lines), as Format → Paragraph styles sets them; font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
   'More in markdown: > 💡 words {.callout} is a callout, a tinted box with its emoji (tint=#e8f0fe for another tint; GitHub’s > [!NOTE], [!TIP], [!WARNING] work too); {line=1.5 before=12 after=6} at a paragraph’s end sets its line spacing (in lines) and the space before and after it (in points); $$ on lines of their own around LaTeX is an equation, and $x^2$ is maths among words (write a dollar sign as \\$); [TOC] alone on a line is a table of contents, made from the headings and kept up to date. A table with merged or shaded cells is written as HTML: <table><tr><td colspan="2" rowspan="2" style="background-color:#e8f0fe; vertical-align:middle">…</td></tr></table>.',
   'Footnotes: a mark [^1] in the words and, after the document, [^1]: its words (a line that goes on, indented); they are numbered and printed at the foot of their page. Citations: [@key] or [@key1; @key2, p. 4], each key a source in sources (objects {id, kind: article|book|chapter|conference|thesis|report|web|other, title, authors: [{family, given}] or "Family, Given and …", year, in: the journal, book or site, volume, issue, pages, publisher, doi, url}, or BibTeX entries in bibtex), written in the citation style cite: apa (unless said), mla, chicago or ieee; [BIBLIOGRAPHY] alone on a line lists the sources cited, kept up to date (put a heading such as # References before it). Sources sent are added to those the document has (by key).',
   'Numbered captions and cross-references: a picture’s caption numbered as a figure with {label=Figure} after it (![…](src "Its caption"){label=Figure}); a table’s with a line Table: its caption {label=Table} before it; an equation’s with $$ … $$ {label=Equation}. Give what you refer to an id with {#id} (on a heading, a picture, a Table: line, an equation, a paragraph) and refer to it with <ref to="id"/>, which shows “Figure 2”, “Table 1”, “Equation 3” or the heading’s words; [words](#id) links to it; {bookmark="Name"} at a paragraph’s end makes it a bookmark of the document.',
@@ -2131,10 +2167,11 @@ export const SAVE_DOC_SCHEMA = {
     title: { type: 'string', description: 'The document’s name in the Library: "Offer letter".' },
     markdown: { type: 'string', description: 'The whole document, in Markdown (as above).' },
     blocks: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'object' }] }, description: 'Instead of markdown: the document’s blocks, in order.' },
-    page: { description: '{"size": "a4" | "letter", "margin": mm, "orient"?: "landscape", "cols"?: 2 | 3, "color"?: "#rrggbb"}, or "a4" or "letter".', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    page: { description: '{"size": "a4" | "letter" | "legal" | "a3" | "a5", "margin": mm, "orient"?: "landscape", "cols"?: 2 | 3, "color"?: "#rrggbb"}, or just the paper\'s name.', anyOf: [{ type: 'string' }, { type: 'object' }] },
     sources: { type: 'array', items: { anyOf: [{ type: 'object' }, { type: 'string' }] }, description: 'Sources to cite as [@key]: {"id": "smith2020", "kind": "article", "title": "…", "authors": [{"family": "Smith", "given": "Jo"}], "year": "2020", "in": "Nature", "volume", "issue", "pages", "publisher", "doi", "url"}, or BibTeX entries. Added to the document’s (by key).' },
     bibtex: { type: 'string', description: 'Instead of sources: BibTeX entries to cite as [@key].' },
     cite: { type: 'string', enum: ['apa', 'mla', 'chicago', 'ieee'], description: 'The citation style (APA unless said).' },
+    lang: { type: 'string', description: 'The language the words are in, as a tag: "en-US", "el", "de". It sets the editor’s spell check and the language Word files say their text is in. Left out, it stays as it was.' },
     watermark: { description: 'Words across every page ("DRAFT"), or {"src": a picture}; "" removes it.', anyOf: [{ type: 'string' }, { type: 'object' }] },
     styles: { type: 'object', description: 'The paragraph styles’ own looks: {"h1": {"font", "size", "color", "bold", "italic", "line", "before", "after", "align"}, "normal": …}. Left out, they stay as they were; {} resets them.' },
     font: { type: 'string', description: 'The body text’s font: "Arial", "Georgia"…' },

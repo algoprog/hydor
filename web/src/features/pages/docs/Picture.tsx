@@ -3,7 +3,7 @@
 // its description (for those who cannot see it), editing it in the picture editor, another picture in its place,
 // changing it with AI (a short menu: Change with AI, Remove the background, Erase part of it), asking an agent about
 // it, and taking it out. A line across, a page break or a table of contents picked has the bar's last button alone.
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { AlignCenter, AlignLeft, AlignRight, Captions, Eraser, FileText, ImageMinus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Wand, WandSparkles } from 'lucide-react';
 import type { Block, ImageBlock } from '@shared/docs';
 import { Button, cx, inputCls, MenuItem, Popover, Switch } from '../../../components/ui';
@@ -42,6 +42,7 @@ export function Picked({
   onAi,
   onEdit,
   onAsk,
+  ask,
 }: {
   engine: DocEngine;
   block: Block;
@@ -55,6 +56,8 @@ export function Picked({
   /** The picture in the picture editor, in a tab of its own; saved, it takes this one's place. */
   onEdit?: (id: string) => void;
   onAsk?: () => void;
+  /** The caption's or the description's box asked for from elsewhere (the right-click menu): which picture and which, and a time that changes with each ask. */
+  ask?: { id: string; what: 'caption' | 'alt'; n: number } | null;
 }) {
   const [box, setBox] = useState<Rect | null>(null);
   const [edit, setEdit] = useState<'caption' | 'alt' | null>(null);
@@ -64,6 +67,13 @@ export function Picked({
   const altRef = useRef<HTMLButtonElement>(null);
   const aiRef = useRef<HTMLButtonElement>(null);
   const img = block.type === 'image' ? (block as ImageBlock) : null;
+  useEffect(() => {
+    if (ask && img && ask.id === img.id) {
+      setText(ask.what === 'alt' ? (img.alt ?? '') : (img.caption ?? ''));
+      setEdit(ask.what);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ask?.n]);
   const target = () => {
     const el = engine.elementOf(block.id);
     return (img ? el?.querySelector('img') : el) ?? null;

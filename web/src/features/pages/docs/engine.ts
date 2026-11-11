@@ -9,7 +9,10 @@
 // back and forth through the model's versions. In Suggesting, every edit goes through the model as a suggestion
 // (suggest.ts): the browser types nothing itself then, but for an input method's words, made a suggestion afterwards.
 // An agent's version being written shows in place of the document (preview), drawn only where it differs, the
-// document and its history kept underneath.
+// document and its history kept underneath. A right-click (or the menu key, or a long press on a phone) tells the editor
+// what is under it and puts the caret or the picked picture there, for the editor's own menu; Shift+right-click is
+// the browser's. Words typed are tidied as Google Docs does (autoformat.ts: links, curly quotes, dashes, signs), the
+// change one step that Undo takes back alone; selected words can be dragged to move (or, with Ctrl, copy) them.
 import {
   isAtom,
   citeItems,
@@ -25,6 +28,7 @@ import {
   runsHtml,
   resolveSuggestion,
   runsText,
+  styleOf,
   tocEntries,
   type Align,
   type Band,
@@ -41,6 +45,9 @@ import {
   type TocEntry,
 } from '@shared/docs';
 import { docRefs, refsKey, type Refs } from '@shared/doc-refs';
+import { isApple, isCopyDrag, isMod } from '../common/keys';
+import { isMenuKey } from '../common/menus';
+import { fractionBefore, lonelyUrl, replaceTyped, urlBefore } from './autoformat';
 import * as ops from './ops';
 import type { Pos, TableOp } from './ops';
 import { CUT, htmlWithoutCuts } from './paging';
@@ -93,6 +100,17 @@ export type AtomClick =
   | { kind: 'mark'; k: 'fn' | 'cite' | 'xref'; at: Pos; t: string; rect: DOMRect }
   | { kind: 'caption'; id: string };
 
+/** What a right-click, the menu key or a long press found: a picture, another block of its own, a thing among the words (an atom's click), or words. */
+export type ContextHit = AtomClick | { kind: 'image'; id: string } | { kind: 'block'; id: string } | { kind: 'text' };
+
+/** A right-click menu asked for: where on the screen (the caret's, when the keyboard asked), and what is there. */
+export interface ContextOpen {
+  x: number;
+  y: number;
+  keyed?: boolean;
+  hit: ContextHit;
+}
+
 /** The look and the paragraph's style the format painter carries to the next words picked. */
 export interface Paint {
   look: Look;
@@ -124,11 +142,18 @@ export interface EngineOpts {
   bibHint?: string;
   /** A click on an equation, or on a callout's emoji. */
   onAtom?: (a: AtomClick) => void;
+  /** A right-click, the menu key (Shift+F10) or a long press: the editor shows its menu for what is there. */
+  onContext?: (c: ContextOpen) => void;
+  /** A short message for the person (a dropped file the document cannot take). */
+  onNotice?: (m: string) => void;
   /** The format painter carried its look to words (and, unless it stays on, is off now). */
   onPainted?: () => void;
   /** Blocks drawn anew (null: all of them), as soon as they are on the page: the pages' layout puts back what it gave them. */
   onDrawn?: (ids: string[] | null) => void;
 }
+
+/** What a file dropped or pasted that is not a picture is told. */
+const NOT_PICTURES = 'A document takes pictures only (PNG, JPEG, GIF, WebP or SVG). Other files cannot be dropped in: add one to the page, or write what is in it here.';
 
 const HISTORY_MAX = 200;
 const FLAGS: Flag[] = ['b', 'i', 'u', 's', 'code', 'sup', 'sub'];
@@ -242,6 +267,17 @@ export class DocEngine {
   paint: Paint | null = null;
   /** Who suggests, while edits are suggestions (Suggesting); null while they are edits. */
   suggesting: sg.Me | null = null;
+  /** Tools → Automatic links, and Smart quotes and symbols. */
+  private autoOn = { links: true, smart: true };
+  /** The last automatic change: the document as it was typed (what Undo goes back to, alone) and as it was made. */
+  private autoDone: { raw: Doc; rawAt: Pos; done: Doc; at: Pos } | null = null;
+  /** The words being dragged (to move or copy), and the document they are in. */
+  private drag: { s: Pos; e: Pos; doc: Doc } | null = null;
+  /** The look Ctrl+Alt+C copied, for Ctrl+Alt+V. */
+  copied: Paint | null = null;
+  /** A finger held on the page: it opens the menu (a phone has no right-click). */
+  private hold: { x: number; y: number; timer: number } | null = null;
+  private heldAt = 0;
 
   constructor(
     public root: HTMLElement,
@@ -250,6 +286,9 @@ export class DocEngine {
   ) {
     this.doc = ops.fixDoc(doc);
     root.setAttribute('translate', 'no');
+    // A screen reader reads it as a text box of many lines; its name is the document's (set by the editor).
+    root.setAttribute('role', 'textbox');
+    root.setAttribute('aria-multiline', 'true');
     root.spellcheck = true;
     this.setReadOnly(o.readOnly);
     this.draw(true);
@@ -264,8 +303,18 @@ export class DocEngine {
     on('paste', (e) => this.onPaste(e));
     on('copy', (e) => this.onCopy(e, false));
     on('cut', (e) => this.onCopy(e, true));
-    on('dragstart', (e) => e.preventDefault());
-    on('dragover', (e) => e.dataTransfer && [...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/html' || t === 'text/plain') && e.preventDefault());
+    on('contextmenu', (e) => this.onContextMenu(e));
+    on('pointerdown', (e) => this.onHold(e));
+    on('pointermove', (e) => this.hold && Math.hypot(e.clientX - this.hold.x, e.clientY - this.hold.y) > 10 && this.endHold());
+    on('pointerup', () => this.endHold());
+    on('pointercancel', () => this.endHold());
+    on('dragstart', (e) => this.onDragStart(e));
+    on('dragend', () => (this.drag = null));
+    on('dragover', (e) => {
+      if (!e.dataTransfer || ![...e.dataTransfer.types].some((t) => t === 'Files' || t === 'text/html' || t === 'text/plain')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = this.drag ? (isCopyDrag(e) ? 'copy' : 'move') : 'copy';
+    });
     on('drop', (e) => this.onDrop(e));
     on('compositionstart', () => (this.composing = true));
     on('compositionend', () => {
@@ -283,6 +332,18 @@ export class DocEngine {
   destroy() {
     for (const f of this.off) f();
     cancelAnimationFrame(this.frame);
+    this.endHold();
+  }
+
+  /** The automatic changes while typing, as Tools → Preferences have them: links, and quotes, dashes and signs. */
+  setAuto(p: Partial<{ links: boolean; smart: boolean }>) {
+    this.autoOn = { ...this.autoOn, ...p };
+  }
+
+  /** The language the words are in (the browser's spell check goes by it); none: the page's own. */
+  setLang(lang: string | undefined) {
+    if (lang) this.root.lang = lang;
+    else this.root.removeAttribute('lang');
   }
 
   /** Edits as suggestions (of `me`), or as edits again (null). */
@@ -651,7 +712,7 @@ export class DocEngine {
    * A new model: kept for undo (changes of one kind in a row, typing say, undo together), drawn (unless the page
    * shows it already), the selection set where the change leaves it.
    */
-  private commit(doc: Doc, sel: Sel | null, o: { key?: string; draw?: boolean; pick?: string | null } = {}) {
+  private commit(doc: Doc, sel: Sel | null, o: { key?: string; draw?: boolean; pick?: string | null; auto?: { raw: Doc; rawAt: Pos } } = {}) {
     // Nothing changes while an agent's version shows (a key or a menu would change that version, not the document).
     if (this.own) return;
     const next = ops.fixDoc(doc);
@@ -671,6 +732,7 @@ export class DocEngine {
       this.doc = next;
     }
     this.before = null;
+    this.autoDone = o.auto && sel ? { raw: ops.fixDoc(o.auto.raw), rawAt: o.auto.rawAt, done: this.doc, at: sel.f } : null;
     if (o.pick !== undefined && o.pick !== this.picked) this.setPicked(o.pick);
     if (o.draw !== false) this.draw();
     if (sel && !this.picked) this.place(sel);
@@ -679,12 +741,25 @@ export class DocEngine {
   }
 
   /** An edit's result applied: its model, its caret (or what it picks). */
-  private apply(e: ops.Edit, key?: string) {
-    this.commit(e.doc, e.pick ? null : { a: e.at, f: e.at }, { key, pick: e.pick ?? null });
+  private apply(e: ops.Edit, key?: string, auto?: { raw: Doc; rawAt: Pos }) {
+    this.commit(e.doc, e.pick ? null : { a: e.at, f: e.at }, { key, pick: e.pick ?? null, auto });
   }
 
   undo() {
     if (this.own) return;
+    // Right after an automatic change (a curly quote, a dash, a link), Undo takes back just that: the words as typed.
+    const a = this.autoDone;
+    this.autoDone = null;
+    if (a && this.doc === a.done && !this.picked && ops.samePos(this.range()[1], a.at)) {
+      this.future.push({ doc: this.doc, sel: this.sel });
+      this.doc = a.raw;
+      this.last = null;
+      this.draw();
+      this.place({ a: a.rawAt, f: a.rawAt });
+      this.o.onChange(this.doc);
+      this.emitSoon();
+      return;
+    }
     const e = this.past.pop();
     if (!e) return;
     this.future.push({ doc: this.doc, sel: this.sel });
@@ -765,6 +840,7 @@ export class DocEngine {
     if (t === 'insertText' || t === 'insertReplacementText') {
       const data = e.data ?? e.dataTransfer?.getData('text/plain') ?? '';
       if (collapsed && t === 'insertText' && data === ' ' && this.shortcut(s)) return e.preventDefault();
+      if (collapsed && t === 'insertText' && data.length === 1 && this.autoType(s, data)) return e.preventDefault();
       // At the end of a comment's words (or a link), the browser would type into them and stretch the comment: the
       // words go in here instead, as lookAt says they look.
       const boxRuns = ops.boxRuns(this.doc, s.b, s.c) ?? [];
@@ -935,6 +1011,61 @@ export class DocEngine {
     if (sel) this.place(sel, false);
   }
 
+  /**
+   * A character typed at a caret, tidied as Google Docs does (autoformat.ts): a web address followed by a space is made
+   * a link, "1/2" and the like their sign, and a quote, dash, (c), arrow or ellipsis typed its proper character. One
+   * change, which Undo takes back alone (the words as they were typed). True when the character was dealt with here.
+   * Not while suggesting, and not in code, in a link or next to an equation, a footnote's mark or a citation.
+   */
+  private autoType(at: Pos, ch: string): boolean {
+    if (this.suggesting || this.picked || (!this.autoOn.links && !this.autoOn.smart)) return false;
+    const b = ops.blockOf(this.doc, at.b);
+    if (!b || (b.type === 'p' && b.style === 'code')) return false;
+    const runs = ops.boxRuns(this.doc, at.b, at.c) ?? [];
+    const prev = ops.runAt(runs, at.o);
+    const look = this.pending ?? ops.lookAt(runs, at.o);
+    if (look.code || look.link || (prev && (prev.code || prev.link || isAtom(prev)))) return false;
+    const before = runsText(runs).slice(0, at.o);
+    const typed = ops.insertText(this.doc, at, ch, look);
+    // The place the caret is at in the box, `drop` characters back.
+    const back = (n: number): Pos => ({ ...at, o: at.o - n });
+    if (ch === ' ' || ch === '\u00a0') {
+      const u = this.autoOn.links ? urlBefore(before) : null;
+      if (u && !ops.runAt(runs, u.to)?.link) {
+        const linked = ops.setValue(this.doc, { ...at, o: u.from }, { ...at, o: u.to }, 'link', u.url);
+        const done = ops.insertText(linked, at, ch, look);
+        this.pending = null;
+        this.apply(done, `type:${at.b}`, { raw: typed.doc, rawAt: typed.at });
+        return true;
+      }
+      const f = this.autoOn.smart ? fractionBefore(before) : null;
+      if (f) {
+        const cut = ops.deleteRange(this.doc, back(f.drop), at);
+        const done = ops.insertText(cut.doc, cut.at, f.put + ch, look);
+        this.pending = null;
+        this.apply(done, `type:${at.b}`, { raw: typed.doc, rawAt: typed.at });
+        return true;
+      }
+      return false;
+    }
+    const r = replaceTyped(before, ch, this.autoOn.smart);
+    if (!r) return false;
+    const cut = r.drop ? ops.deleteRange(this.doc, back(r.drop), at) : { doc: this.doc, at };
+    const done = ops.insertText(cut.doc, cut.at, r.put, look);
+    this.pending = null;
+    this.apply(done, `type:${at.b}`, { raw: typed.doc, rawAt: typed.at });
+    return true;
+  }
+
+  /** The web address the caret's words end with, made a link in `doc` (Enter after one: it becomes a link as the paragraph breaks). */
+  private linkedBefore(doc: Doc, at: Pos): Doc {
+    if (!this.autoOn.links || this.suggesting) return doc;
+    const runs = ops.boxRuns(doc, at.b, at.c) ?? [];
+    const u = urlBefore(runsText(runs).slice(0, at.o));
+    if (!u || runs.some((r, i, all) => r.link && ops.runAt(all, u.to) === r)) return doc;
+    return ops.setValue(doc, { ...at, o: u.from }, { ...at, o: u.to }, 'link', u.url);
+  }
+
   /** "# ", "- ", "1. ", "[] ", "> " typed at a paragraph's start: a heading, a list, a checklist, a quote. */
   private shortcut(at: Pos): boolean {
     if (at.c) return false;
@@ -979,6 +1110,8 @@ export class DocEngine {
     const cut = ops.deleteRange(this.doc, s, e);
     const at = cut.at;
     const b = ops.blockOf(cut.doc, at.b);
+    // A web address just typed, and Enter: it becomes a link as the paragraph breaks.
+    if (ops.samePos(s, e)) cut.doc = this.linkedBefore(cut.doc, at);
     if (!at.c && b?.type === 'p' && !b.style) {
       const text = runsText(b.runs);
       if (/^(-{3,}|\*{3,}|_{3,})$/.test(text) && at.o === text.length) {
@@ -993,6 +1126,15 @@ export class DocEngine {
 
   private onKey(e: KeyboardEvent) {
     if (this.o.onKey?.(e)) return;
+    // The menu key (or Shift+F10): the right-click menu, at the caret.
+    if (isMenuKey(e)) {
+      e.preventDefault();
+      const r = this.caretRect();
+      const box = this.root.getBoundingClientRect();
+      const pk = this.picked ? ops.blockOf(this.doc, this.picked) : undefined;
+      this.o.onContext?.({ x: r ? r.left : box.left + 24, y: r ? r.bottom + 4 : box.top + 24, keyed: true, hit: pk ? (pk.type === 'image' ? { kind: 'image', id: pk.id } : { kind: 'block', id: pk.id }) : { kind: 'text' } });
+      return;
+    }
     if (this.o.readOnly) return;
     if (e.key === 'Escape' && this.paint) {
       e.preventDefault();
@@ -1043,6 +1185,21 @@ export class DocEngine {
         return this.style(m[1] === '0' ? 'normal' : (`h${m[1]}` as ParaStyle));
       }
     }
+    // Ctrl+Alt+C and Ctrl+Alt+V: the look of words copied, and put on others. (Not AltGr, which some keyboards type letters with.)
+    if (mod && e.altKey && !e.shiftKey && !e.getModifierState('AltGraph') && (e.code === 'KeyC' || e.code === 'KeyV')) {
+      e.preventDefault();
+      return e.code === 'KeyC' ? this.copyFormat() : this.pasteFormat();
+    }
+    // Ctrl+] and Ctrl+[: a step more or less indent.
+    if (mod && !e.altKey && !e.shiftKey && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
+      e.preventDefault();
+      return this.indent(e.code === 'BracketRight' ? 1 : -1);
+    }
+    // Ctrl+Shift+> and Ctrl+Shift+<: the words' size up and down (the keys . and , too).
+    if (mod && e.shiftKey && !e.altKey && (e.code === 'Period' || e.code === 'Comma')) {
+      e.preventDefault();
+      return this.bigger(e.code === 'Period' ? 1 : -1);
+    }
     if (mod && e.shiftKey && !e.altKey) {
       const map: Record<string, () => void> = {
         Digit7: () => this.list('number'),
@@ -1084,6 +1241,8 @@ export class DocEngine {
   }
 
   private onDown(e: MouseEvent) {
+    // Only the primary button acts on what is clicked (a right or middle click is for the menu or the browser; on a Mac Ctrl+click is a right-click).
+    if (e.button !== 0 || (isApple && e.ctrlKey)) return;
     const t = e.target as HTMLElement;
     // A line of a table of contents goes to its heading.
     const line = t.closest('.nd-toc [data-h]') as HTMLElement | null;
@@ -1157,12 +1316,114 @@ export class DocEngine {
     }
     if (this.picked) this.setPicked(null);
     const a = t.closest('a[href]') as HTMLAnchorElement | null;
-    if (a && (e.ctrlKey || e.metaKey)) {
+    if (a && isMod(e)) {
       e.preventDefault();
       const to = /^#nd-([A-Za-z0-9_-]{1,24})$/.exec(a.getAttribute('href') ?? '')?.[1];
       if (to) this.focusBlock(to);
       else window.open(a.href, '_blank', 'noopener,noreferrer');
     }
+  }
+
+  // ---- the right-click menu ------------------------------------------------------------------------------------------
+
+  /** What is at a point of the page: a picture or another block of its own, a thing among the words, or words. */
+  private hitAt(t: Element, x: number, y: number): ContextHit {
+    const blockOf = (el: Element) => (el.closest('[data-b]') as HTMLElement | null)?.dataset.b;
+    const img = t.closest('figure.nd-img');
+    if (img && this.root.contains(img)) return { kind: 'image', id: (img as HTMLElement).dataset.b! };
+    const mx = t.closest('.nd-math:not(.nd-m)') as HTMLElement | null;
+    if (mx && this.root.contains(mx) && mx.dataset.b) return { kind: 'math', id: mx.dataset.b };
+    const blk = t.closest('.nd-hr, .nd-pb, .nd-toc') as HTMLElement | null;
+    if (blk && this.root.contains(blk) && blk.dataset.b) return { kind: 'block', id: blk.dataset.b };
+    const mark = t.closest('.nd-x[data-tex]') as HTMLElement | null;
+    if (mark && this.root.contains(mark) && mark.closest('[data-t]')) {
+      const after = this.posOf(mark.parentNode!, indexIn(mark) + 1);
+      if (after) return { kind: 'mark', k: mark.dataset.k as 'fn' | 'cite' | 'xref', at: { ...after, o: after.o - mark.dataset.tex!.length }, t: mark.dataset.tex!, rect: mark.getBoundingClientRect() };
+    }
+    const run = t.closest('.nd-m[data-tex]') as HTMLElement | null;
+    if (run && this.root.contains(run) && run.closest('[data-t]')) {
+      const after = this.posOf(run.parentNode!, indexIn(run) + 1);
+      if (after) return { kind: 'mathRun', at: { ...after, o: after.o - run.getAttribute('data-tex')!.length }, tex: run.getAttribute('data-tex')! };
+    }
+    const cap = t.closest('caption.nd-cap');
+    if (cap && this.root.contains(cap) && blockOf(cap)) return { kind: 'caption', id: blockOf(cap)! };
+    const call = t.closest('.nd-callout') as HTMLElement | null;
+    if (call && this.root.contains(call)) {
+      const r = call.getBoundingClientRect();
+      const em = parseFloat(getComputedStyle(call).fontSize) || 15;
+      if (x < r.left + em * 2.6 && y < r.top + em * 2.4) return { kind: 'icon', id: call.dataset.b! };
+    }
+    return { kind: 'text' };
+  }
+
+  /** Whether a place is inside the words (or the table's cells) picked. */
+  private insideSelection(p: Pos): boolean {
+    const [s, e] = this.range();
+    if (ops.samePos(s, e)) return false;
+    if (s.c && e.c && s.b === e.b && p.c && p.b === s.b) {
+      const [r0, r1] = [Math.min(s.c[0], e.c[0]), Math.max(s.c[0], e.c[0])];
+      const [c0, c1] = [Math.min(s.c[1], e.c[1]), Math.max(s.c[1], e.c[1])];
+      if (!(r0 === r1 && c0 === c1)) return p.c[0] >= r0 && p.c[0] <= r1 && p.c[1] >= c0 && p.c[1] <= c1;
+    }
+    return ops.cmp(this.doc, s, p) <= 0 && ops.cmp(this.doc, p, e) <= 0;
+  }
+
+  /**
+   * The right-click menu asked for at a point: a picture (or another block of its own) under it is picked, else the
+   * caret goes there, unless the point is inside the words (or cells) already picked, which then stay picked. Shift
+   * and right-click is the browser's own menu, which has the spelling suggestions.
+   */
+  private onContextMenu(e: MouseEvent) {
+    if (e.shiftKey) return;
+    // A finger held was dealt with already (some phones send this too); if this came first, it is this one's to deal with.
+    if (this.heldAt && Date.now() - this.heldAt < 1200) return void e.preventDefault();
+    this.endHold();
+    e.preventDefault();
+    this.openContext(e.target as Element, e.clientX, e.clientY);
+  }
+
+  private openContext(t: Element, x: number, y: number) {
+    const hit = this.hitAt(t, x, y);
+    if (!this.o.readOnly) {
+      if (hit.kind === 'image' || hit.kind === 'block' || hit.kind === 'math') this.setPicked(hit.id);
+      else {
+        const pt = caretAt(x, y);
+        const at = pt ? this.posOf(pt.node, pt.offset) : null;
+        if (at && !this.insideSelection(at)) {
+          this.setPicked(null);
+          this.place({ a: at, f: at }, false);
+        }
+        if (hit.kind === 'mark' || hit.kind === 'mathRun') {
+          const after: Pos = { ...hit.at, o: hit.at.o + (hit.kind === 'mark' ? hit.t.length : hit.tex.length) };
+          this.setPicked(null);
+          this.place({ a: after, f: after }, false);
+        }
+      }
+    }
+    this.o.onContext?.({ x, y, hit });
+  }
+
+  /** A finger held still on the page opens the menu (a phone has no right-click). */
+  private onHold(e: PointerEvent) {
+    this.endHold();
+    if (e.pointerType === 'mouse' || !e.isPrimary) return;
+    const t = e.target as Element;
+    const x = e.clientX;
+    const y = e.clientY;
+    this.hold = {
+      x,
+      y,
+      timer: window.setTimeout(() => {
+        this.hold = null;
+        this.heldAt = Date.now();
+        this.openContext(t, x, y);
+      }, 550),
+    };
+  }
+
+  private endHold() {
+    if (this.hold) window.clearTimeout(this.hold.timer);
+    this.hold = null;
   }
 
   // ---- pasting, copying, dropping ------------------------------------------------------------------------------------
@@ -1288,6 +1549,19 @@ export class DocEngine {
     if (asPlain) this.plainNext = true;
     const files = [...dt.files].filter((f) => f.type.startsWith('image/'));
     if (files.length && !dt.getData('text/html')) return void this.addPictures(files);
+    if (dt.files.length && !files.length && !dt.getData('text/html') && !dt.getData('text/plain')) return void this.o.onNotice?.(NOT_PICTURES);
+    // A web address pasted over words picked: the words become a link to it (one change).
+    if (this.autoOn.links && !this.plainNext && !this.picked && !this.suggesting) {
+      const [a, z] = this.range();
+      const text = dt.getData('text/plain').trim();
+      // A link to one of this page's own headings (Copy link to this heading) is a link to that place here.
+      const mine = text.startsWith(`${location.origin}${location.pathname}`) ? /#nd-([A-Za-z0-9_-]{1,24})$/.exec(text)?.[1] : undefined;
+      const url = mine && ops.blockOf(this.doc, mine) ? `#${mine}` : lonelyUrl(text);
+      if (url && !ops.samePos(a, z) && ops.sameBox(a, z)) {
+        this.before = this.sel;
+        return this.commit(ops.setValue(this.doc, a, z, 'link', url), this.sel);
+      }
+    }
     const [s] = this.range();
     const target = ops.blockOf(this.doc, s.b);
     // In code, words come as they are.
@@ -1351,18 +1625,58 @@ export class DocEngine {
     this.apply(ops.deleteRange(this.doc, s, en));
   }
 
+  /** Selected words dragged: they are moved (or, with Ctrl, copied) where they are dropped; anything else is not dragged. */
+  private onDragStart(e: DragEvent) {
+    const [s, z] = this.range();
+    const sel = window.getSelection();
+    const inside = !!sel && !sel.isCollapsed && !!e.target && sel.containsNode(e.target as Node, true);
+    // Within one place of words or across paragraphs (a table's cells are not dragged), and not while suggesting.
+    if (this.o.readOnly || this.picked || this.suggesting || !inside || ops.samePos(s, z) || (!ops.sameBox(s, z) && (s.c || z.c)) || !e.dataTransfer) return void e.preventDefault();
+    const blocks = asAccepted(ops.asDoc(this.doc, ops.sliceBlocks(this.doc, s, z))).blocks;
+    e.dataTransfer.setData('text/html', copyHtml(blocks, this.o.src));
+    e.dataTransfer.setData('text/plain', ops.blocksPlain(blocks));
+    e.dataTransfer.effectAllowed = 'copyMove';
+    this.drag = { s, e: z, doc: this.doc };
+  }
+
+  /** Dragged words dropped at a place: moved there (taken out where they were), or copied; one change. A drop on themselves does nothing. */
+  private dropWords(at: Pos, copy: boolean) {
+    const d = this.drag;
+    this.drag = null;
+    if (!d || d.doc !== this.doc) return;
+    const { s, e } = d;
+    if (ops.cmp(this.doc, s, at) <= 0 && ops.cmp(this.doc, at, e) <= 0) return;
+    this.before = this.sel;
+    const slice = ops.sliceBlocks(this.doc, s, e);
+    if (copy) {
+      const ins = ops.insertBlocks(this.doc, at, ops.withoutComments(slice));
+      return this.apply(ins);
+    }
+    // Taken out first; a place after the words in their last paragraph shifts back by what went (and across paragraphs, into the first).
+    const cut = ops.deleteRange(this.doc, s, e);
+    const to: Pos = at.b === e.b && ops.sameCell(at.c, e.c) && ops.cmp(this.doc, e, at) <= 0 ? { ...at, b: s.b, ...(s.c ? { c: s.c } : {}), o: s.o + at.o - e.o } : at;
+    this.apply(ops.insertBlocks(cut.doc, to, slice));
+  }
+
   private onDrop(e: DragEvent) {
     if (this.o.readOnly || !e.dataTransfer) return;
     e.preventDefault();
     const pt = caretAt(e.clientX, e.clientY);
     const at = pt ? this.posOf(pt.node, pt.offset) : null;
+    if (this.drag) {
+      if (at) this.dropWords(at, isCopyDrag(e));
+      this.drag = null;
+      return;
+    }
     if (at) {
       this.setPicked(null);
       this.place({ a: at, f: at }, false);
     }
     const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
     if (files.length) return void this.addPictures(files);
-    this.insert(this.blocksFrom(e.dataTransfer, false));
+    const blocks = this.blocksFrom(e.dataTransfer, false);
+    if (!blocks.length && e.dataTransfer.files.length) return void this.o.onNotice?.(NOT_PICTURES);
+    this.insert(blocks);
   }
 
   // ---- what the toolbar asks ----------------------------------------------------------------------------------------
@@ -1455,6 +1769,13 @@ export class DocEngine {
     this.commit(ops.toggleList(this.doc, s, e, kind), this.sel);
   }
 
+  /** The numbered items picked: how their list counts, where it starts, or that it goes on from the one before (one change). */
+  numbering(patch: ops.NumberingPatch) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.setNumbering(this.doc, s, e, patch), this.sel);
+  }
+
   indent(by: 1 | -1) {
     this.before = this.sel;
     const [s, e] = this.range();
@@ -1467,11 +1788,20 @@ export class DocEngine {
     this.commit(ops.setAlign(this.doc, s, e, a), this.sel);
   }
 
+  /** A change to the table's rows or columns: for every one the cells picked are in (as many put in as are picked, all of them taken out), as one step. */
   table(op: TableOp) {
-    const [s] = this.range();
+    const [s, e] = this.range();
     if (!s.c) return;
     this.before = this.sel;
-    this.apply(ops.tableOp(this.doc, s.b, s.c, op));
+    this.apply(ops.tableOps(this.doc, s.b, s.c, e.c && e.b === s.b ? e.c : s.c, op));
+  }
+
+  /** How many rows and columns the cells picked cover (1 × 1 at a caret). */
+  pickedCells(): { rows: number; cols: number } {
+    const [s, e] = this.range();
+    if (!s.c) return { rows: 0, cols: 0 };
+    const f = e.c && e.b === s.b ? e.c : s.c;
+    return { rows: Math.abs(f[0] - s.c[0]) + 1, cols: Math.abs(f[1] - s.c[1]) + 1 };
   }
 
   /** A picture's width, alignment, caption, description or source. */
@@ -1831,6 +2161,52 @@ export class DocEngine {
     this.apply(ops.moveBlock(this.doc, id, to));
   }
 
+  /** A copy of a block right after it (comments' marks left behind), the caret in it: one change. */
+  duplicateBlock(id: string) {
+    const i = ops.indexOf(this.doc, id);
+    const b = this.doc.blocks[i];
+    if (!b || this.o.readOnly) return;
+    this.before = this.sel;
+    this.setPicked(null);
+    const copy = ops.withoutComments([{ ...structuredClone(b), id: ops.freshId(this.doc) } as Block])[0];
+    const next = ops.splice(this.doc, i + 1, 0, [copy]);
+    if (copy.type === 'image' || copy.type === 'hr' || copy.type === 'pagebreak' || copy.type === 'toc' || copy.type === 'math') return this.commit(next, null, { pick: copy.id });
+    this.apply({ doc: next, at: ops.nearPos(next, i + 1) });
+  }
+
+  /** A block taken out (as a suggestion while suggesting): one change. */
+  deleteBlock(id: string) {
+    if (this.o.readOnly || !ops.blockOf(this.doc, id)) return;
+    this.before = this.sel;
+    this.setPicked(null);
+    this.apply(this.suggesting ? sg.removeBlock(this.doc, id, this.suggesting) : ops.removeBlock(this.doc, id));
+  }
+
+  /** A block a place up (-1) or down (1), the caret kept in it. */
+  moveBlockBy(id: string, by: 1 | -1) {
+    const i = ops.indexOf(this.doc, id);
+    const to = by < 0 ? i - 1 : i + 2;
+    if (i < 0 || to < 0 || to > this.doc.blocks.length || this.o.readOnly) return;
+    this.moveBlock(id, to);
+  }
+
+  /** The words of a paragraph (or a table's cell…) picked, whole: a comment can be put on them. False when it has none. */
+  selectBlockWords(id: string): boolean {
+    const b = ops.blockOf(this.doc, id);
+    if (!b || !ops.isText(b) || !b.runs.length) return false;
+    this.setPicked(null);
+    this.place({ a: { b: id, o: 0 }, f: { b: id, o: ops.lenOf(b.runs) } }, false);
+    return true;
+  }
+
+  /** A block as another paragraph style (a list's item or a heading becomes a paragraph of it): one change, by the handle's menu. */
+  styleBlock(id: string, st: ParaStyle) {
+    if (!ops.blockOf(this.doc, id) || this.o.readOnly) return;
+    this.before = this.sel;
+    const at: Pos = { b: id, o: 0 };
+    this.commit(ops.setStyle(this.doc, at, at, st), this.sel);
+  }
+
   /** A table of contents at the caret. */
   insertToc() {
     this.insert([{ id: ops.freshId(this.doc), type: 'toc' }]);
@@ -1879,14 +2255,44 @@ export class DocEngine {
 
   /** The format painter on: it carries the look of the words at the caret, and their paragraph's style, to the next words picked. */
   startPaint(sticky: boolean) {
+    this.paint = this.takePaint(sticky);
+    this.root.classList.add('nd-painting');
+    this.emitSoon();
+  }
+
+  /** The look of the words at the caret, and their paragraph's style, as the painter carries them. */
+  private takePaint(sticky: boolean): Paint {
     const [s] = this.range();
     const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
     const { link: _l, cm: _c, math: _m, fn: _n, cite: _ci, xref: _x, ...look } = this.pending ?? ops.lookAt(runs, s.o);
     const b = ops.blockOf(this.doc, s.b);
     const para = !s.c && b && ops.isText(b) ? { style: b.type === 'p' ? (b.style ?? 'normal') : ('normal' as ParaStyle), align: b.align, lh: b.lh, sb: b.sb, sa: b.sa } : null;
-    this.paint = { look, para, sticky };
-    this.root.classList.add('nd-painting');
-    this.emitSoon();
+    return { look, para, sticky };
+  }
+
+  /** Ctrl+Alt+C: the look of the words at the caret (and their paragraph's style) kept, for Ctrl+Alt+V to put on others. */
+  copyFormat() {
+    if (this.picked) return;
+    this.copied = this.takePaint(false);
+    this.o.onNotice?.('The formatting is copied: pick words and press Ctrl+Alt+V to put it on them.');
+  }
+
+  /** Ctrl+Alt+V: the look Ctrl+Alt+C kept put on the words picked (the word at a caret). */
+  pasteFormat() {
+    if (this.o.readOnly || this.picked) return;
+    if (!this.copied) return void this.o.onNotice?.('Nothing is copied yet: put the caret in words and press Ctrl+Alt+C first.');
+    this.applyPaint(this.copied);
+  }
+
+  /** The words' size a step up or down through the usual sizes (8, 9, 10, 11, 12, 14, 18, 24, 30, 36, 48, 60, 72, 96). */
+  bigger(dir: 1 | -1) {
+    if (this.picked || this.o.readOnly) return;
+    const [s, e] = this.range();
+    const runs = ops.boxRuns(this.doc, s.b, s.c) ?? [];
+    const look = ops.samePos(s, e) ? (this.pending ?? ops.lookAt(runs, s.o)) : ops.commonLook(this.doc, s, e);
+    const b = ops.blockOf(this.doc, s.b);
+    const base = this.doc.size * (b?.type === 'p' ? (styleOf(this.doc, b.style ?? 'normal').k ?? 1) : 1);
+    this.value('size', ops.stepSize(look.size ?? base, dir));
   }
 
   stopPaint() {
@@ -1902,6 +2308,20 @@ export class DocEngine {
     if (!p || this.o.readOnly) return;
     const [s, e] = this.range();
     if (ops.samePos(s, e)) return;
+    this.applyPaint(p);
+    if (!p.sticky) {
+      this.stopPaint();
+      this.o.onPainted?.();
+    }
+  }
+
+  /** A look put on the words picked (the word at a caret), with its paragraph's style, as one change. */
+  private applyPaint(p: Paint) {
+    let [s, e] = this.range();
+    if (ops.samePos(s, e)) {
+      const w = ops.wordAt(ops.boxRuns(this.doc, s.b, s.c) ?? [], s.o);
+      if (w) [s, e] = [{ ...s, o: w[0] }, { ...s, o: w[1] }];
+    }
     this.before = this.sel;
     let d = this.relook(this.doc, s, e, (r) => (isAtom(r) ? r : { t: r.t, ...p.look, ...(r.link ? { link: r.link } : {}), ...(r.cm ? { cm: r.cm } : {}), ...(r.ins ? { ins: r.ins } : {}), ...(r.del ? { del: r.del } : {}), ...(r.fmt ? { fmt: r.fmt, was: r.was } : {}) }));
     if (p.para && !s.c) {
@@ -1911,10 +2331,6 @@ export class DocEngine {
       d = ops.setSpacing(d, s, e, { lh: para.lh, sb: para.sb, sa: para.sa });
     }
     this.commit(d, this.sel);
-    if (!p.sticky) {
-      this.stopPaint();
-      this.o.onPainted?.();
-    }
   }
 
   /** The document as Markdown (to copy it all as text). */
