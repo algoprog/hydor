@@ -2610,6 +2610,11 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     </>
   );
 
+  const announce = (() => {
+    if (edit || !calc) return '';
+    const v = formatValue(calc.value(sheetIx, sel.r, sel.c), active?.s);
+    return `${refName(sel.r, sel.c)}: ${holds(active) ? v : tr('empty')}${activeFormula ? `, ${tr('formula')} =${activeFormula}` : ''}`;
+  })();
   const askNow = onAsk ? () => (setCtx(null), onAsk(leadFor(selRef.current).lead)) : undefined;
   /** What the right-click menu offers for what was pressed on: cells, a column's letter or a row's number. */
   const ctxItems = (on: 'cell' | 'col' | 'row'): MenuEntry[] => {
@@ -2899,6 +2904,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         void dropFiles([...e.dataTransfer.files]);
       }}
     >
+      {/* What a screen reader hears as the active cell changes: its place, what it shows, its formula. */}
+      <div className="sr-only" role="status" aria-live="polite" translate="no">
+        {announce}
+      </div>
       {dropping && (
         <div className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-accent/10 text-[14px] font-medium text-accent">Drop an Excel, OpenDocument, CSV or TSV file to add its sheets</div>
       )}
@@ -3214,7 +3223,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         }}
       />
       {/* The right-click menu: the menus' own actions, built here for what was pressed on (cells, a column's letter, a row's number). */}
-      <ContextMenu at={ctx} items={ctx ? ctxItems(ctx.on) : []} onClose={() => setCtx(null)} />
+      <ContextMenu at={ctx} items={ctx ? ctxItems(ctx.on) : []} onClose={() => setCtx(null)} width={280} />
       {/* A cell's own pickers: a list, a calendar, its note, a character to put in. */}
       <div ref={pickRef} className="pointer-events-none fixed" style={pick ? { left: pick.at.left, top: pick.at.top, width: pick.at.width, height: pick.at.height } : { left: -10, top: -10, width: 1, height: 1 }} />
       <Popover
