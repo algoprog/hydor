@@ -14,6 +14,7 @@
 // Routes, signed in:
 //   GET/POST /api/pages, GET/PATCH/DELETE /api/pages/:id, GET /api/pages/kept?key=, GET /api/pages/drafts?key=
 //   POST /api/pages/folders, PATCH/DELETE /api/pages/folders/:id (the Library's folders: folders.ts),
+//   POST /api/pages/sheet-file (the sheets of a spreadsheet file, to add to a workbook that is open)
 //   POST /api/pages/import-folder (a folder of this computer brought in: import-folder.ts)
 //   POST /api/pages/:id/versions, GET /api/pages/:id/versions/:v, POST …/restore, POST /api/pages/:id/copy
 //   POST /api/pages/:id/storage, GET/DELETE /api/pages/:id/data, POST /api/pages/:id/link, GET /api/pages/:id/thumb
@@ -983,6 +984,24 @@ function routes(d: Deps) {
     // A file brought in says what it is: the helper reads it.
     if (!page.description) describeLater(d, page.id);
     return { page, notes: got.notes ?? [] };
+  });
+  /**
+   * The sheets of a spreadsheet file, to add to a workbook that is open (a file dropped on the editor): not kept as a
+   * page of its own.
+   */
+  app.post('/api/pages/sheet-file', { bodyLimit: 40 * 1024 * 1024 }, async (req) => {
+    const b = B(req);
+    const name = typeof b.name === 'string' ? b.name.slice(0, 300) : '';
+    if (kindForFile(name) !== 'sheet' || typeof b.data !== 'string') throw new HttpError(400, 'Send a spreadsheet file’s name (.xlsx, .ods, .csv or .tsv) and its data (base64).');
+    const data = Buffer.from(b.data, 'base64');
+    if (data.length > 30 * 1024 * 1024) throw new HttpError(413, 'It is over 30 MB, too large to bring in.');
+    try {
+      const got = await mustKind('sheet').fromFile!(data, name, db);
+      const book = got.model as { sheets: unknown[] };
+      return { sheets: book.sheets, notes: got.notes ?? [] };
+    } catch (e) {
+      throw new HttpError(422, `That file could not be read: ${(e as Error).message}`);
+    }
   });
   /**
    * Renames a page ({ title }), gives it a description ({ description }: '' takes it away), moves it to a space ({ space: a

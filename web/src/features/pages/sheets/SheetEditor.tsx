@@ -24,6 +24,7 @@ import {
   dateSerial,
   DEFAULT_DP,
   formatValue,
+  FUNCTION_NAMES,
   formulaProblem,
   formulaRefs,
   generalNumber,
@@ -83,6 +84,7 @@ import { findIssues, type CleanIssue } from '@shared/sheet-clean';
 import { flashFill } from '@shared/sheet-flash';
 import { htmlText, looksFor, parseHtmlTable, tableText } from '@shared/sheet-html';
 import { allowed, columnValues, CondFormats, filterHidden, listOptions, Merges, Rules } from '@shared/sheet-rules';
+import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { Button, cx, MenuBack, MenuItem, MenuSep, Popover, SheetsOnPhone, useConfirm } from '../../../components/ui';
@@ -98,10 +100,11 @@ import { ChartLayer, ChartPanel } from './Charts';
 import { CommentsPanel, type SheetCommentAi } from './CommentsPanel';
 import { commentsRequest, sheetWhere } from '@shared/comment-asks';
 import { CondPanel } from './CondPanel';
-import { DupDialog, FormatDialog, SizeDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
+import { DupDialog, FormatDialog, FunctionsDialog, SizeDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
 import { fillDownTo, fillSeries } from './fill';
 import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
+import { FUNCTION_INFO } from './functions';
 import { fontPx, Grid, textWidth, type Edit, type GridGeo, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
 import { sheetMenus, type MenuCtx } from './menus';
 import {
@@ -246,7 +249,7 @@ function codeDecimals(code: string, d: 1 | -1): string {
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
 type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | { kind: 'analyze'; block: Rect; header: boolean } | { kind: 'clean'; block: Rect; header: boolean } | { kind: 'names' } | { kind: 'protect' } | { kind: 'pivot'; start: PivotDef; editing: boolean } | null;
-type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | 'print' | null;
+type DialogState = 'functions' | 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | 'print' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 /** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
@@ -316,7 +319,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   // A list cell being typed into: the option its words pick (Enter takes it).
   const [suggestAt, setSuggestAt] = useState(0);
   const find = useFind();
-  const [findHow, setFindHow] = useState({ formulas: false, wholeCell: false, allSheets: false });
+  const [findHow, setFindHow] = useState<{ formulas: boolean; wholeCell: boolean; allSheets: boolean; area?: { si: number; rects: Rect[] } | null }>({ formulas: false, wholeCell: false, allSheets: false });
   const [findAt, setFindAt] = useState(-1);
 
   const setEdit = (e: Edit | null) => {
@@ -1370,6 +1373,53 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     swap({ ...book, sheets: list });
     setSi(to);
   };
+  // A spreadsheet file dropped on the editor: its sheets come in after the sheet shown, as one step.
+  const [dropping, setDropping] = useState(false);
+  const droppingRef = useRef(false);
+  const addSheets = (made: Sheet[]) => {
+    if (!book || !made.length) return;
+    const room = SHEET_LIMITS.sheets - book.sheets.length;
+    if (room <= 0) return void toast(tr('A spreadsheet holds at most 50 sheets.'));
+    const names = book.sheets.map((s) => s.name);
+    const list: Sheet[] = [];
+    for (const m of made.slice(0, room)) list.push({ ...m, id: newId(), name: uniqueSheetName(m.name, [...names, ...list.map((s) => s.name)]) });
+    if (list.length < made.length) toast(tr('A spreadsheet holds at most 50 sheets.'));
+    if (sheet) sels.current.set(sheet.id, selRef.current);
+    swap({ ...book, sheets: [...book.sheets.slice(0, sheetIx + 1), ...list, ...book.sheets.slice(sheetIx + 1)] });
+    setSi(sheetIx + 1);
+    selRef.current = cellSel(0, 0);
+    setSelState(cellSel(0, 0));
+  };
+  const dropFiles = async (files: File[]) => {
+    const made: Sheet[] = [];
+    const base64 = (f: File) =>
+      new Promise<string>((ok, fail) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, ''));
+        r.onerror = () => fail(new Error('The file could not be read'));
+        r.readAsDataURL(f);
+      });
+    for (const f of files) {
+      if (f.size > 30 * 1024 * 1024) {
+        toast(tr('That file is over 30 MB.'), 'error');
+        continue;
+      }
+      try {
+        if (/\.(csv|tsv|txt)$/i.test(f.name)) {
+          const got = sheetFromCsv(await f.text(), f.name.replace(/\.[^.]+$/, '') || 'Data', newId());
+          made.push(got.sheet);
+          for (const n of got.notes) toast(n);
+        } else if (/\.(xlsx|xlsm|ods)$/i.test(f.name)) {
+          const got = await post<{ sheets: Sheet[]; notes: string[] }>('/api/pages/sheet-file', { name: f.name, data: await base64(f) });
+          made.push(...got.sheets);
+          for (const n of got.notes) toast(n);
+        } else toast(tr(`“${f.name}” is not a spreadsheet file: use an .xlsx, .ods, .csv or .tsv file.`));
+      } catch (e) {
+        toastError(e);
+      }
+    }
+    addSheets(made);
+  };
   const importCsv = async (f: File) => {
     if (f.size > 20 * 1024 * 1024) return void toast(tr('That file is over 20 MB.'), 'error');
     try {
@@ -1696,7 +1746,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (!book || !sheet || !calc || !toolBlock) return;
     const got = removeDuplicates(sheet, calc, sheetIx, toolBlock, header, cols);
     change(cellsPatch(book, sheetIx, got.changes));
-    toast(got.removed ? `${got.removed} duplicate row${got.removed === 1 ? '' : 's'} removed` : tr('No duplicate rows were found.'));
+    toast(got.removed ? tr(`${got.removed} duplicate row${got.removed === 1 ? '' : 's'} removed`) : tr('No duplicate rows were found.'));
   };
   const splitText = async (sepr: string) => {
     if (!book || !sheet || !calc) return;
@@ -2045,6 +2095,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   useEffect(() => setFindAt(-1), [find.query, find.options, findHow]);
   useEffect(() => {
     if (!findHow.allSheets) setFindAt(-1);
+    // Cells picked to search in are on the sheet they were picked on.
+    setFindHow((h) => (h.area && h.area.si !== sheetIx ? { ...h, area: null } : h));
   }, [sheetIx]); // eslint-disable-line react-hooks/exhaustive-deps
   const afterReplace = useRef(false);
   useEffect(() => {
@@ -2103,7 +2155,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       bySheet.set(m.si, list);
     }
     change(together([...bySheet].map(([s, changes]) => cellsPatch(book, s, changes))));
-    toast(count ? `${count} replacement${count === 1 ? '' : 's'} made` : tr('Nothing was replaced.'));
+    toast(count ? tr(`${count} replacement${count === 1 ? '' : 's'} made`) : tr('Nothing was replaced.'));
   };
 
   // ---- the Kanban board ------------------------------------------------------------------------------------------------------------
@@ -2287,6 +2339,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (mod && lower === 's') return void (e.preventDefault(), save());
     if (mod && lower === 'f') return void (e.preventDefault(), find.show());
     if (mod && lower === 'h') return void (e.preventDefault(), find.show(!readOnly));
+    // Ctrl+P: the print setup (the page prints through it: orientation, fit, the area, the header rows), not the browser's own box.
+    if (mod && lower === 'p' && !e.shiftKey && !e.altKey) return void (e.preventDefault(), e.stopPropagation(), !readOnly && setDialog('print'));
     // Undo and Redo: Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y, as the menu says (the app's own Ctrl+Z, for a pin, is not for here).
     if (mod && (lower === 'z' || lower === 'y')) return void (e.preventDefault(), e.stopPropagation(), lower === 'y' || e.shiftKey ? redo() : undo());
     if (mod && (k === '/' || e.code === 'Slash')) return void (e.preventDefault(), setDialog('shortcuts'));
@@ -2679,6 +2733,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     comment: () => openComments(!readOnly),
     comments: () => openComments(false),
     func: (name) => typeIn(`=${name}(`),
+    allFunctions: () => setDialog('functions'),
     hiddenSheets: book ? book.sheets.flatMap((s, i) => (s.hidden ? [{ i, name: s.name }] : [])) : [],
     showSheet,
     autoSum,
@@ -2784,6 +2839,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+Shift+Z', 'Redo'],
         ['Ctrl+F', 'Find'],
         ['Ctrl+H', 'Find and replace'],
+        ['Ctrl+P', 'Print and PDF setup'],
         ['Ctrl+S', 'Save'],
       ],
     },
@@ -2819,7 +2875,33 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const panelChart = panel?.kind === 'chart' ? chartOf(panel.id) : undefined;
 
   const body = (
-    <div ref={root} className="flex h-full min-h-0 flex-col bg-bg" onFocusCapture={onFocusCapture}>
+    <div
+      ref={root}
+      className="relative flex h-full min-h-0 flex-col bg-bg"
+      onFocusCapture={onFocusCapture}
+      onDragOver={(e) => {
+        // A spreadsheet file dragged over: its sheets can be added.
+        if (readOnly || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!droppingRef.current) setDropping((droppingRef.current = true));
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDropping((droppingRef.current = false));
+      }}
+      onDrop={(e) => {
+        if (readOnly || !e.dataTransfer.files.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDropping((droppingRef.current = false));
+        void dropFiles([...e.dataTransfer.files]);
+      }}
+    >
+      {dropping && (
+        <div className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-accent/10 text-[14px] font-medium text-accent">Drop an Excel, OpenDocument, CSV or TSV file to add its sheets</div>
+      )}
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
@@ -2963,6 +3045,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             onFilter={(c, at) => setFilterMenu({ c, at })}
             onFill={fillTo}
             onMove={moveCells}
+            onZoom={(f) => setZoom(Math.max(0.5, Math.min(2, Math.round(zoom * f * 100) / 100)))}
             onPicked={paint}
             painting={!!painter}
             onMoveLines={moveLines}
@@ -3000,8 +3083,28 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
                     In formulas
                   </label>
                   <label className="flex items-center gap-1.5">
-                    <input type="checkbox" checked={findHow.allSheets} onChange={(e) => setFindHow({ ...findHow, allSheets: e.target.checked })} className="accent-[var(--accent)]" />
+                    <input type="checkbox" checked={findHow.allSheets && !findHow.area} disabled={!!findHow.area} onChange={(e) => setFindHow({ ...findHow, allSheets: e.target.checked })} className="accent-[var(--accent)]" />
                     All sheets
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={!!findHow.area}
+                      onChange={(e) => {
+                        if (!e.target.checked) return setFindHow({ ...findHow, area: null });
+                        // The cells picked now (and any other ranges picked beside them); a single cell is no range to search in.
+                        const rects = [rectOf(selRef.current), ...moreRef.current];
+                        if (rects.length === 1 && single(selRef.current)) return void toast(tr('Pick the cells to search in first, then tick this.'));
+                        setFindHow({ ...findHow, allSheets: false, area: { si: sheetIx, rects } });
+                      }}
+                      className="accent-[var(--accent)]"
+                    />
+                    Only in the cells picked
+                    {findHow.area && (
+                      <span translate="no" className="text-fg-3">
+                        {findHow.area.rects.map((r) => rectLabel(r, size.rows, size.cols)).join(', ')}
+                      </span>
+                    )}
                   </label>
                 </div>
               }
@@ -3252,6 +3355,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dialog === 'sort' && toolBlock && <SortDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onSort={sortRangeBy} onClose={() => setDialog(null)} />}
       {dialog === 'dups' && toolBlock && <DupDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onRemove={removeDups} onClose={() => setDialog(null)} />}
       {dialog === 'summary' && toolBlock && <SummaryDialog cols={colChoices(toolBlock, true)} onMake={summarize} onClose={() => setDialog(null)} />}
+      {dialog === 'functions' && <FunctionsDialog names={FUNCTION_NAMES} info={FUNCTION_INFO} onPick={(n) => typeIn(`=${n}(`)} onClose={() => setDialog(null)} />}
       {sizeAsk && <SizeDialog axis={sizeAsk.axis} count={sizeAsk.axis === 'col' ? nCols : nRows} value={sizeAsk.value} onApply={(px) => sizeSelected(sizeAsk.axis, px)} onClose={() => (setSizeAsk(null), grid.current?.focus())} />}
       {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={(sp) => void splitText(sp)} onClose={() => setDialog(null)} />}
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}

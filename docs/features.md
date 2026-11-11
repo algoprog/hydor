@@ -599,7 +599,9 @@ agents that speak ACP and take MCP servers.
   and paste with Excel, Google Sheets and web tables (their bold, italic, underline, colours, alignment and number
   formats come along; cells cut move for real: the formulas, names, charts and rules that used
   them follow), cells, rows and columns moved by dragging (Ctrl to copy; references follow), and the sum, average and
-  count of what is picked. AI in them uses the
+  count of what is picked. Find and replace with regular expressions, within the cells picked or across sheets; a list of every
+  function with its help (Insert → Function → All functions…); Ctrl+wheel to zoom; Ctrl+P for the print setup; an
+  Excel, ODS, CSV or TSV file dropped on the editor adds its sheets. AI in them uses the
   helper model, saying what it costs: the AI function (=AI(prompt, cells…), as Google Sheets has it: each answer
   worked out once and kept with the sheet, cells asked together, asked again only when they change or with
   Refresh, never just by opening the sheet), Write a formula from words, Explain this formula, Fill with AI

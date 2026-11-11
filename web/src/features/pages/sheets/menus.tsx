@@ -123,6 +123,8 @@ export interface MenuCtx {
   comment(): void;
   comments(): void;
   func(name: string): void;
+  /** Insert → Function → All functions…: the list of every function, to find one in. */
+  allFunctions(): void;
   /** Insert → AutoSum: a function of the numbers above or beside the cell. */
   autoSum(fn: string): void;
   chars(): void;
@@ -269,7 +271,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       !ro && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'discussion thread reply', run: m.comment },
       !ro && { label: 'Link', icon: <Link2 size={14} />, keys: 'Ctrl+K', also: 'hyperlink url web address', run: m.link },
       !ro && { label: 'AutoSum', icon: <Sigma size={14} />, also: 'total sum add up average count max min', items: AUTOSUMS.map((f) => ({ label: f.label, keys: f.fn === 'SUM' ? 'Alt+=' : undefined, run: () => m.autoSum(f.fn) })) },
-      !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: FUNCS.map((f) => ({ label: f, run: () => m.func(f) })) },
+      !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: [...FUNCS.map((f) => ({ label: f, run: () => m.func(f) })), '-' as const, { label: 'All functions…', also: 'list search every formula help', run: m.allFunctions }] },
       !ro && m.ai && { label: 'Formula with AI', icon: <Sparkles size={14} />, also: 'write a formula ai assistant describe words', run: m.ai.formula },
       !ro && m.ai && { label: 'Table made with AI', icon: <WandSparkles size={14} />, also: 'generate table ai list template', run: m.ai.table },
       !ro && { label: 'Special character', icon: <Omega size={14} />, also: 'emoji symbol', run: m.chars },
@@ -413,7 +415,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       { label: 'Trace precedents', icon: <ArrowRightToLine size={14} />, also: 'cells this formula uses audit', run: () => m.trace('pre') },
       { label: 'Trace dependents', icon: <ArrowRightFromLine size={14} />, also: 'formulas that use this cell audit', run: () => m.trace('dep') },
       m.traced && { label: 'Remove traces', run: m.untrace },
-      !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
+      !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, keys: 'Ctrl+P', also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
       '-',
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',
