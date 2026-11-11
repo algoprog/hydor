@@ -1,19 +1,23 @@
 // A diagram page on screen, as draw.io's canvas: the page drawn by the same renderer as its files (each item on its own,
 // drawn again only when it or what it joins changes), panned with a drag on empty space (the middle button, Space, or a
 // finger), zoomed with Ctrl and the wheel or a pinch; picking (a click, Shift for more, a drag across the page),
-// moving (guides line shapes up with the others, the grid takes them otherwise; Alt or Ctrl drags a copy; dropped in a
-// container, a shape goes in it), resizing and turning; the blue arrows round a shape pointed at, which add a shape
+// moving (guides line shapes up with the others, with the gaps they share, and say how far the nearest shape is on each
+// side; the grid takes them otherwise; Ctrl drags a copy, Alt snaps to nothing, Shift keeps it straight; dropped in a
+// container, a shape goes in it), resizing (its edges line up with the others' too, or make it as wide or high as
+// another, with the same pink guides and pills; Shift keeps its shape) and turning; the blue arrows round a shape pointed at, which add a shape
 // joined to it in a click or draw a connector where they are dragged; a connector's ends dragged to other shapes (or a
 // fixed point of one), its bends and runs moved, its words slid along it; words typed in place. What changes is handed
 // up when a gesture ends: the editor keeps it, for Undo.
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { CONTAINER_KINDS, DARK, fontCss, inkOn, isEdge, isShape, LIGHT, newId, ROW_KINDS, type Diagram, type DiagramEdge, type DiagramEnd, type DiagramItem, type DiagramPage, type DiagramShape } from '@shared/diagram';
+import { CONTAINER_KINDS, DARK, descendants, fontCss, inkOn, isEdge, isShape, LIGHT, newId, ROW_KINDS, type Diagram, type DiagramEdge, type DiagramEnd, type DiagramItem, type DiagramPage, type DiagramShape } from '@shared/diagram';
 import { KINDS, labelBox, lookOf, pageBox, perimeterPoint, portPoint, shapeGeom, shapePorts, toLocal, toPage, type Box, type Pt } from '@shared/diagram-shapes';
 import { alongWalk, edgeGeom, type EdgeGeom } from '@shared/diagram-route';
 import { DEFS, edgeSvg, FLOW_CSS, shapeSvg, themeCss } from '@shared/diagram-render';
-import { boundsOf, cloneItems, hitItem, itemsIn, moveItems, movingSet, reparent, snapBox, snapTo, updateItem, type Guide } from '@shared/diagram-ops';
+import { boundsOf, cloneItems, hitItem, itemsIn, moveItems, movingSet, reparent, snapTo, updateItem } from '@shared/diagram-ops';
+import { GUIDE_COLOUR, SNAP, type SnapBox, type SnapGap, type SnapGuide } from '@shared/snap';
 import { lineHeight, textSize } from '@shared/diagram-text';
 import { cx } from '../../../components/ui';
+import { isCopyDrag, isNoSnap } from '../common/keys';
 
 export interface View {
   x: number;
@@ -83,6 +87,33 @@ type Drag =
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
+/** What a drag shows over the page: guide lines, the gaps between shapes, and small pills with a length or a size. */
+interface Marks {
+  guides: SnapGuide[];
+  gaps: SnapGap[];
+  pills: { x: number; y: number; text: string }[];
+}
+const NO_MARKS: Marks = { guides: [], gaps: [], pills: [] };
+
+/** A small pink pill with white words, the same size on the screen at any zoom. */
+function Pill({ x, y, text, k }: { x: number; y: number; text: string; k: number }) {
+  const w = text.length * 6.2 + 10;
+  return (
+    <g transform={`translate(${x} ${y}) scale(${1 / k})`} style={{ pointerEvents: 'none' }}>
+      <rect x={-w / 2} y={-8} width={w} height={16} rx={5} fill={GUIDE_COLOUR} />
+      <text y={3.8} textAnchor="middle" fontSize={10.5} fontWeight={600} fill="#fff" fontFamily="system-ui, sans-serif">
+        {text}
+      </text>
+    </g>
+  );
+}
+
+/** The pills for "as wide as" and "as high as" another shape: an "=" on each of them, under it or beside it. */
+function equalPills(box: SnapBox, same: SnapBox[], horizontal: boolean, k: number): { x: number; y: number; text: string }[] {
+  const at = (b: SnapBox) => (horizontal ? { x: b.x + b.w / 2, y: b.y + b.h + 12 / k, text: '=' } : { x: b.x + b.w + 12 / k, y: b.y + b.h / 2, text: '=' });
+  return same.length ? [at(box), ...same.map(at)] : [];
+}
+
 /** An item drawn: its SVG, made again only when it (or, for a connector, a shape it joins) changes. */
 const ItemView = memo(function ItemView({ svg }: { svg: string }) {
   return <g dangerouslySetInnerHTML={{ __html: svg }} />;
@@ -95,7 +126,7 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
   const [drag, setDrag] = useState<Drag | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<DiagramPage | null>(null);
-  const [guides, setGuides] = useState<Guide[]>([]);
+  const [marks, setMarks] = useState<Marks>(NO_MARKS);
   const [hover, setHover] = useState<string | null>(null);
   const [target, setTarget] = useState<{ id: string; port?: [number, number] } | null>(null);
   const [editing, setEditing] = useState<{ id: string; part: 'text' | 'rows'; value: string; end?: boolean } | null>(null);
@@ -337,7 +368,7 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
       return it && !it.locked && (isShape(it) || (isEdge(it) && (!it.from.id || !it.to.id)));
     });
     if (!movable.length) return;
-    setD({ kind: 'move', p0: p, ids: movingSet(page, movable), base: page, moved: false, copy: e.altKey || e.ctrlKey || e.metaKey, hit: hit.id, wasSel });
+    setD({ kind: 'move', p0: p, ids: movingSet(page, movable), base: page, moved: false, copy: isCopyDrag(e), hit: hit.id, wasSel });
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -381,17 +412,34 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
         onSel(copies.filter((c) => sel.includes(items[copies.indexOf(c)]?.id ?? '')).map((c) => c.id));
       }
       const box = boundsOf(base, new Set([...ids].filter((id) => shapes.has(id) || base.items.some((x) => x.id === id && isShape(x)))));
-      let g: Guide[] = [];
+      let m = NO_MARKS;
       if (box && snap) {
         const moved = { ...box, x: box.x + dx, y: box.y + dy };
-        const s = snapBox(moved, othersInView(ids), 6 / view.k);
-        g = s.guides;
-        dx += s.dx;
-        dy += s.dy;
-        if (!s.guides.some((x) => x.axis === 'x') && grid) dx = snapTo(box.x + dx, grid) - box.x;
-        if (!s.guides.some((x) => x.axis === 'y') && grid) dy = snapTo(box.y + dy, grid) - box.y;
+        const others = othersInView(ids);
+        // Alt (⌘ on a Mac): no snapping to anything for this drag; the distances still show.
+        let ex = dx;
+        let ey = dy;
+        const guides: SnapGuide[] = [];
+        let gaps: SnapGap[] = [];
+        if (!isNoSnap(e)) {
+          const s1 = SNAP.snapMove(moved, others, tol);
+          const s2 = SNAP.snapEqual(moved, others, tol, s1.dx, s1.dy, s1.x, s1.y);
+          ex += s2.dx;
+          ey += s2.dy;
+          guides.push(...s1.guides);
+          gaps = s2.gaps;
+          if (!s1.x && s2.dx === s1.dx && grid) ex = snapTo(box.x + dx, grid) - box.x;
+          if (!s1.y && s2.dy === s1.dy && grid) ey = snapTo(box.y + dy, grid) - box.y;
+        }
+        // How far the nearest shape is on each side, where an equal gap does not say so already.
+        const at = { x: box.x + ex, y: box.y + ey, w: box.w, h: box.h };
+        const same = (a: SnapGap, b: SnapGap) => Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5 && Math.abs(a.w - b.w) < 0.5 && Math.abs(a.h - b.h) < 0.5;
+        for (const g of SNAP.neighbourGaps(at, others)) if (!gaps.some((q) => same(q, g))) gaps.push(g);
+        m = { guides, gaps, pills: [] };
+        dx = ex;
+        dy = ey;
       }
-      setGuides(g);
+      setMarks(m);
       setPreview(moveItems(base, ids, r2(dx), r2(dy)));
       dragRef.current = { ...d, moved: true, base, ids };
       return;
@@ -408,8 +456,31 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
       if (hx === 1) x1 = Math.max(l.x, 8);
       if (hy === 0) y0 = Math.min(l.y, s.h - 8);
       if (hy === 1) y1 = Math.max(l.y, 8);
-      // Shift keeps its shape; a corner of a turned shape keeps the opposite corner where it was.
-      if (e.shiftKey && hx !== 0.5 && hy !== 0.5) {
+      let nb = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      let m = NO_MARKS;
+      if (!s.rot) {
+        // Unturned: the edges that move line up with the other shapes' (or make it as wide or high as one), else go to
+        // the grid; Shift keeps its shape, the edge that moves most leading. Alt (⌘ on a Mac) snaps to nothing.
+        const on = snap && !isNoSnap(e);
+        const skip = new Set([s.id, ...descendants(page, s.id)]);
+        const r = SNAP.snapResize({
+          box: { x: s.x + x0, y: s.y + y0, w: x1 - x0, h: y1 - y0 },
+          from: { x: s.x, y: s.y, w: s.w, h: s.h },
+          edges: { l: hx === 0, r: hx === 1, t: hy === 0, b: hy === 1 },
+          others: on ? othersInView(skip) : [],
+          tol: on ? tol : 0,
+          grid: on && grid ? grid : 0,
+          ratio: e.shiftKey,
+          min: 4,
+        });
+        nb = { x: r.box.x - s.x, y: r.box.y - s.y, w: r.box.w, h: r.box.h };
+        m = {
+          guides: r.guides,
+          gaps: [],
+          pills: [{ x: r.box.x + r.box.w / 2, y: r.box.y + r.box.h + 20 / view.k, text: `${Math.round(r.box.w)} × ${Math.round(r.box.h)}` }, ...equalPills(r.box, r.sameW, true, view.k), ...equalPills(r.box, r.sameH, false, view.k)],
+        };
+      } else if (e.shiftKey && hx !== 0.5 && hy !== 0.5) {
+        // A corner of a turned shape keeps its shape (and the opposite corner where it was).
         const ratio = s.w / s.h;
         const w = x1 - x0;
         const h = y1 - y0;
@@ -422,20 +493,9 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
           if (hx === 0) x0 = x1 - nw;
           else x1 = x0 + nw;
         }
+        nb = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
       }
-      let nb = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-      // Unturned: its edges snap to the grid.
-      if (!s.rot && snap && grid) {
-        const ax = s.x + x0;
-        const ay = s.y + y0;
-        const bx = s.x + x1;
-        const by = s.y + y1;
-        const sx0 = hx === 0 ? snapTo(ax, grid) : ax;
-        const sy0 = hy === 0 ? snapTo(ay, grid) : ay;
-        const sx1 = hx === 1 ? snapTo(bx, grid) : bx;
-        const sy1 = hy === 1 ? snapTo(by, grid) : by;
-        nb = { x: sx0 - s.x, y: sy0 - s.y, w: Math.max(4, sx1 - sx0), h: Math.max(4, sy1 - sy0) };
-      }
+      setMarks(m);
       // Where its corner went on the page: the shape turned about its new middle keeps the anchored side in place.
       const c0 = toPage(s, nb.x + nb.w / 2, nb.y + nb.h / 2);
       const next: DiagramShape = { ...s, x: r2(c0.x - nb.w / 2), y: r2(c0.y - nb.h / 2), w: r2(nb.w), h: r2(nb.h) };
@@ -529,7 +589,7 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
   const onPointerUp = (e: React.PointerEvent) => {
     const d = dragRef.current;
     setD(null);
-    setGuides([]);
+    setMarks(NO_MARKS);
     const pv = preview;
     setPreview(null);
     setTarget(null);
@@ -783,7 +843,31 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
     const r = { x: Math.min(drag.p0.x, drag.p1.x), y: Math.min(drag.p0.y, drag.p1.y), w: Math.abs(drag.p1.x - drag.p0.x), h: Math.abs(drag.p1.y - drag.p0.y) };
     overlay.push(<rect key="band" x={r.x} y={r.y} width={r.w} height={r.h} fill={blue} fillOpacity={0.08} stroke={blue} strokeWidth={1 / k} />);
   }
-  for (const g of guides) overlay.push(g.axis === 'x' ? <line key={`g${g.axis}${g.at}`} x1={g.at} y1={g.from - 10 / k} x2={g.at} y2={g.to + 10 / k} stroke="#e8590c" strokeWidth={1 / k} /> : <line key={`g${g.axis}${g.at}`} x1={g.from - 10 / k} y1={g.at} x2={g.to + 10 / k} y2={g.at} stroke="#e8590c" strokeWidth={1 / k} />);
+  const pink = GUIDE_COLOUR;
+  for (const g of marks.guides) overlay.push(g.axis === 'x' ? <line key={`g${g.axis}${g.at}`} x1={g.at} y1={g.from - 10 / k} x2={g.at} y2={g.to + 10 / k} stroke={pink} strokeWidth={1 / k} /> : <line key={`g${g.axis}${g.at}`} x1={g.from - 10 / k} y1={g.at} x2={g.to + 10 / k} y2={g.at} stroke={pink} strokeWidth={1 / k} />);
+  // A gap: a line across it, a short bar at each end, and its length in a pill (not where it is too small to read).
+  marks.gaps.forEach((g, i) => {
+    const cap = 4 / k;
+    const mid = { x: g.x + g.w / 2, y: g.y + g.h / 2 };
+    overlay.push(
+      <g key={`gap${i}`} stroke={pink} strokeWidth={1 / k} style={{ pointerEvents: 'none' }}>
+        <line x1={g.x} y1={g.y} x2={g.x + g.w} y2={g.y + g.h} />
+        {g.vertical ? (
+          <>
+            <line x1={g.x - cap} y1={g.y} x2={g.x + cap} y2={g.y} />
+            <line x1={g.x - cap} y1={g.y + g.h} x2={g.x + cap} y2={g.y + g.h} />
+          </>
+        ) : (
+          <>
+            <line x1={g.x} y1={g.y - cap} x2={g.x} y2={g.y + cap} />
+            <line x1={g.x + g.w} y1={g.y - cap} x2={g.x + g.w} y2={g.y + cap} />
+          </>
+        )}
+      </g>,
+    );
+    if (g.value * k >= 18) overlay.push(<Pill key={`gp${i}`} x={g.vertical ? mid.x + 18 / k : mid.x} y={g.vertical ? mid.y : mid.y - 12 / k} text={`${Math.round(g.value)}`} k={k} />);
+  });
+  marks.pills.forEach((q, i) => overlay.push(<Pill key={`pill${i}`} x={q.x} y={q.y} text={q.text} k={k} />));
   if (mark) {
     const it = shown.items.find((x) => x.id === mark);
     const b = it ? boundsOf(shown, new Set([it.id])) : null;
@@ -810,7 +894,7 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
       ? { backgroundImage: `radial-gradient(circle, ${dot} ${Math.max(0.6, Math.min(1.2, k))}px, transparent ${Math.max(0.6, Math.min(1.2, k)) + 0.4}px)`, backgroundSize: `${gs}px ${gs}px`, backgroundPosition: `${view.x - gs / 2}px ${view.y - gs / 2}px` }
       : {};
   const flow = shown.items.some((it) => isEdge(it) && it.style?.flow);
-  const cursor = drag?.kind === 'pan' ? 'grabbing' : drag?.kind === 'move' ? 'move' : joining ? 'crosshair' : space.current ? 'grab' : 'default';
+  const cursor = drag?.kind === 'pan' ? 'grabbing' : drag?.kind === 'move' ? (drag.copy && drag.moved ? 'copy' : 'move') : joining ? 'crosshair' : space.current ? 'grab' : 'default';
   return (
     <div
       ref={root}
@@ -834,7 +918,7 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
         onTouchPointer(e, 'up');
         setD(null);
         setPreview(null);
-        setGuides([]);
+        setMarks(NO_MARKS);
       }}
       onPointerLeave={() => !dragRef.current && setHover(null)}
       onDoubleClick={onDoubleClick}

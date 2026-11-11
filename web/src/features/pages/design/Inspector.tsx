@@ -363,6 +363,8 @@ export function DesignInspector({
     { icon: <AlignCenterHorizontal size={15} />, title: tr('In the middle, up and down'), run: () => cmd('align', 'middle') },
     { icon: <AlignEndHorizontal size={15} />, title: tr('Bottom'), run: () => cmd('align', 'bottom') },
   ];
+  // Several picked, lined up with the page each (rather than with one another).
+  const alignPageItems = alignItems.map((it, i) => ({ ...it, run: () => cmd('align', { how: ['left', 'center', 'right', 'top', 'middle', 'bottom'][i], to: 'page' }) }));
   const orderItems = [
     { icon: <ArrowUpToLine size={15} />, title: tr('Bring to front (Ctrl+Shift+])'), run: () => cmd('order', 'front') },
     { icon: <ArrowUp size={15} />, title: tr('Bring forward (Ctrl+])'), run: () => cmd('order', 'forward') },
@@ -387,6 +389,9 @@ export function DesignInspector({
         <div className="space-y-1.5 px-3">
           <Row label="Line up">
             <Icons items={alignItems} />
+          </Row>
+          <Row label="On the page" hint="Each one lined up with the page">
+            <Icons items={alignPageItems} />
           </Row>
           <Row label="Spread out" hint="Even gaps between three or more">
             <Icons
@@ -791,7 +796,7 @@ export function DesignInspector({
           {(['x', 'y', 'w', 'h'] as const).map((k) => (
             <label key={k} className="flex items-center gap-1.5">
               <span className="w-4 shrink-0 text-[11.5px] text-fg-3 uppercase">{k === 'w' ? 'W' : k === 'h' ? 'H' : k}</span>
-              <NumField value={`${Math.round(el[k] * 10) / 10}px`} onChange={(v) => v && cmd('geom', { [k]: parseFloat(v), ...(k === 'w' && isWords ? {} : {}) })} scrub={k.toUpperCase()} />
+              <NumField value={`${Math.round(el[k] * 10) / 10}px`} onChange={(v) => v && cmd('geom', { [k]: parseFloat(v) })} scrub={k.toUpperCase()} />
             </label>
           ))}
           <label className="flex items-center gap-1.5">
