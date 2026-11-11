@@ -239,7 +239,8 @@ export function copyOf(sh: Sheet, calc: Calc, si: number, x0: Rect): { clip: Cli
 }
 
 /** What a paste puts where: from cells copied here (formulas moved along, looks kept), or from text (typed as typing). */
-export function pasteChanges(sh: Sheet, target: Rect, src: { clip: Clip } | { text: string }): { changes: Record<string, Cell | null>; x: Rect; cut: boolean } {
+/** `styles`: the looks a table copied from Excel, Google Sheets or a web page carried, cell by cell (sheet-html.ts). */
+export function pasteChanges(sh: Sheet, target: Rect, src: { clip: Clip } | { text: string; styles?: (CellStyle | undefined)[][] }): { changes: Record<string, Cell | null>; x: Rect; cut: boolean } {
   let grid: (Cell | null)[][];
   let from: { r: number; c: number } | null = null;
   if ('clip' in src) {
@@ -248,7 +249,10 @@ export function pasteChanges(sh: Sheet, target: Rect, src: { clip: Clip } | { te
   } else {
     const rows = parseDelimited(src.text.replace(/\r?\n$/, ''), '\t').rows;
     // Text from elsewhere: typed as if typed here, formulas included.
-    grid = rows.map((row) => row.map((t) => (t === '' ? null : typedCell(parseInput(t), undefined))));
+    grid = rows.map((row, i) => row.map((t, j) => {
+      const style = src.styles?.[i]?.[j];
+      return t === '' ? (style ? { s: style } : null) : typedCell(parseInput(t, style?.fmt), style);
+    }));
     if (!grid.length) grid = [[null]];
   }
   const h = grid.length;

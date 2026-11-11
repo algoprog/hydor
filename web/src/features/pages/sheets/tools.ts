@@ -248,6 +248,8 @@ export interface FindHow extends FindOptions {
   wholeCell: boolean;
   /** Every sheet, from this one on. */
   allSheets: boolean;
+  /** Only these cells of one sheet (Only in the cells picked): the sheet's place, and the ranges. */
+  area?: { si: number; rects: Rect[] } | null;
 }
 
 /** What a cell is searched in: its formula (or value as typed), or what it shows. */
@@ -270,12 +272,13 @@ function matchesOf(text: string, q: string, o: FindHow): Match[] {
 export function findCells(book: Workbook, calc: Calc, si: number, q: string, o: FindHow, limit = 5000): Found[] {
   const out: Found[] = [];
   if (!q) return out;
-  const order = o.allSheets ? [...book.sheets.keys()].map((i) => (si + i) % book.sheets.length) : [si];
+  const order = o.area ? [o.area.si] : o.allSheets ? [...book.sheets.keys()].map((i) => (si + i) % book.sheets.length) : [si];
   for (const s of order) {
     const sh = book.sheets[s];
     for (const k of calc.keys(s)) {
       const r = Math.floor(k / 16_384);
       const c = k % 16_384;
+      if (o.area && !o.area.rects.some((x) => r >= x.r1 && r <= x.r2 && c >= x.c1 && c <= x.c2)) continue;
       const cell = sh.cells[refName(r, c)];
       if (matchesOf(searched(cell, calc, s, r, c, o.formulas), q, o).length) out.push({ si: s, r, c });
       if (out.length >= limit) return out;

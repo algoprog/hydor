@@ -1,10 +1,10 @@
 // The spreadsheet editor's dialogs: Sort range (by several columns in turn, with a header row or not), Remove
 // duplicates (by the columns chosen), Split text to columns (by a separator found or chosen), Summarize by (a table's
-// summary as a sheet of formulas, as a pivot table gives one), and Custom number format (an Excel code, with a
-// preview of the cell picked and codes to start from).
+// summary as a sheet of formulas, as a pivot table gives one), Custom number format (an Excel code, with a
+// preview of the cell picked and codes to start from), Find's helpers, and Resize column / row (an exact size).
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { formatValue, type CellStyle, type Scalar } from '@shared/sheets';
+import { formatValue, MAX_H, MAX_W, MIN_H, MIN_W, type CellStyle, type Scalar } from '@shared/sheets';
 import type { SummaryFn } from './tools';
 import { Button, cx, Dialog, IconButton, Segmented } from '../../../components/ui';
 import { smallInput } from './Panel';
@@ -330,6 +330,103 @@ export function SummaryDialog({ cols, onMake, onClose }: { cols: ColChoice[]; on
         </Button>
       )}
       {across !== null && <p className="mt-2 text-[12px] text-fg-3">With columns too, the first value is summed up for each pair.</p>}
+    </Dialog>
+  );
+}
+
+/** Resize column… and Resize row…: an exact width or height in pixels, for each column or row picked. */
+export function SizeDialog({ axis, count, value, onApply, onClose }: { axis: 'col' | 'row'; count: number; value: number; onApply: (px: number) => void; onClose: () => void }) {
+  const [text, setText] = useState(String(value));
+  const [min, max] = axis === 'col' ? [MIN_W, MAX_W] : [MIN_H, MAX_H];
+  const n = Number(text);
+  const ok = text.trim() !== '' && Number.isFinite(n) && n >= min && n <= max;
+  const go = () => {
+    if (!ok) return;
+    onApply(n);
+    onClose();
+  };
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width={360}
+      title={axis === 'col' ? (count === 1 ? 'Resize column' : `Resize ${count} columns`) : count === 1 ? 'Resize row' : `Resize ${count} rows`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!ok} onClick={go}>
+            OK
+          </Button>
+        </>
+      }
+    >
+      <label className="flex items-center gap-2 text-[13.5px]">
+        <span className="shrink-0 text-fg-2">{axis === 'col' ? 'Column width' : 'Row height'}</span>
+        <input
+          autoFocus
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          value={text}
+          aria-label={axis === 'col' ? 'Column width in pixels' : 'Row height in pixels'}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => e.key === 'Enter' && go()}
+          className={cx(smallInput, 'w-24')}
+        />
+        <span className="text-fg-3">pixels</span>
+      </label>
+      <p className="mt-2 text-[12.5px] text-fg-3">{`From ${min} to ${max}.`}</p>
+    </Dialog>
+  );
+}
+
+/** Insert → Function → All functions…: every function with how it is written and what it gives, found by its name or its words; one picked starts it in the cell. */
+export function FunctionsDialog({ names, info, onPick, onClose }: { names: string[]; info: Record<string, [string, string]>; onPick: (name: string) => void; onClose: () => void }) {
+  const [q, setQ] = useState('');
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const list = names.filter((n) => !words.length || words.every((w) => n.toLowerCase().includes(w) || (info[n]?.[1] ?? '').toLowerCase().includes(w) || (info[n]?.[0] ?? '').toLowerCase().includes(w)));
+  // A name that begins with what was typed first.
+  const first = words[0] ?? '';
+  const sortedList = first ? [...list].sort((a, b) => Number(b.toLowerCase().startsWith(first)) - Number(a.toLowerCase().startsWith(first)) || a.localeCompare(b)) : list;
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width={600}
+      title="All functions"
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      <input
+        autoFocus
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && sortedList[0]) (onPick(sortedList[0]), onClose());
+        }}
+        placeholder="Find a function by its name or what it does"
+        aria-label="Find a function"
+        className={cx(smallInput, 'mb-2 w-full')}
+      />
+      <div className="mb-1.5 text-[12px] text-fg-3">{sortedList.length === 1 ? '1 function' : `${sortedList.length} functions`}</div>
+      <div className="max-h-[380px] overflow-y-auto rounded-xl border border-line">
+        {sortedList.map((n) => (
+          <button key={n} type="button" onClick={() => (onPick(n), onClose())} className="block w-full border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-bg-2">
+            <span translate="no" className="block text-[13px] font-medium break-all text-fg">
+              {info[n]?.[0] ?? `${n}(…)`}
+            </span>
+            {info[n] && <span className="mt-0.5 block text-[12.5px] leading-snug text-fg-3">{info[n][1]}</span>}
+          </button>
+        ))}
+        {!sortedList.length && <div className="px-3 py-6 text-center text-[13px] text-fg-3">No function matches.</div>}
+      </div>
     </Dialog>
   );
 }

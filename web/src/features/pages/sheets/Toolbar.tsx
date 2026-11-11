@@ -4,7 +4,7 @@
 // borders and merging; alignment and wrapping; and the filter. Everything else is in the menus. Its buttons keep the
 // focus where it was (a cell being typed into stays so).
 import { useRef, useState, type ReactNode } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, Baseline, Bold, ChevronDown, DecimalsArrowLeft, DecimalsArrowRight, Italic, ListFilter, PaintBucket, Redo2, Strikethrough, TableCellsMerge, Undo2, WrapText } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Baseline, Bold, ChevronDown, DecimalsArrowLeft, DecimalsArrowRight, DollarSign, Italic, PaintRoller, ListFilter, PaintBucket, Percent, Redo2, Sigma, Strikethrough, TableCellsMerge, Undo2, WrapText } from 'lucide-react';
 import { type BorderKind, type CellStyle, type NumFmt } from '@shared/sheets';
 import { cx, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { MenuBar, type MenuDef } from '../common/menus';
@@ -228,6 +228,13 @@ export interface ToolbarProps {
   onRedo: () => void;
   onStyle: (set: Partial<CellStyle>) => void;
   onFormat: (fmt: NumFmt | 'custom', cur?: string) => void;
+  /** The $ and % buttons. */
+  onToggleFormat: (fmt: 'currency' | 'percent') => void;
+  /** The format painter: copy the look of the cell picked onto what is picked next (`keep`: a double click, it stays on). */
+  painting: boolean;
+  onPainter: (keep: boolean) => void;
+  /** The Σ button: a function of the numbers beside the cell. */
+  onAutoSum: (fn: string) => void;
   onDecimals: (step: 1 | -1) => void;
   onBorders: (where: BorderWhere) => void;
   onMerge: (how: 'all' | 'across' | 'down' | 'none') => void;
@@ -250,6 +257,15 @@ export const FORMATS: { fmt: NumFmt | 'custom'; cur?: string; label: string; hin
   { fmt: 'datetime', label: 'Date and time', hint: '2026-11-05 14:30' },
   { fmt: 'duration', label: 'Duration', hint: '26:30:00' },
   { fmt: 'custom', label: 'Custom number format', hint: '' },
+];
+
+/** What AutoSum offers (Insert → AutoSum has the same). */
+export const AUTOSUMS = [
+  { fn: 'SUM', label: 'Sum' },
+  { fn: 'AVERAGE', label: 'Average' },
+  { fn: 'COUNT', label: 'Count numbers' },
+  { fn: 'MAX', label: 'Max' },
+  { fn: 'MIN', label: 'Min' },
 ];
 
 const FMT_SHORT: Record<NumFmt, string> = { general: '123', number: '1.0', percent: '%', currency: '$', accounting: '$', scientific: '1E', date: 'Date', time: 'Time', datetime: 'Date', duration: 'Time', text: 'Text' };
@@ -289,6 +305,25 @@ export function Toolbar(p: ToolbarProps) {
           ))
         }
       </MenuTool>
+      <button
+        type="button"
+        title="Format painter: copy the look of the cells picked onto others (double-click to paint several times)"
+        aria-label="Format painter"
+        aria-pressed={p.painting}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => p.onPainter(false)}
+        onDoubleClick={() => p.onPainter(true)}
+        className={cx('flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', p.painting && 'bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent')}
+      >
+        <PaintRoller size={15} />
+      </button>
+      {sep}
+      <Tool label="Format as currency (Ctrl+Shift+4)" on={fmt === 'currency'} onClick={() => p.onToggleFormat('currency')}>
+        <DollarSign size={15} />
+      </Tool>
+      <Tool label="Format as percent (Ctrl+Shift+5)" on={fmt === 'percent'} onClick={() => p.onToggleFormat('percent')}>
+        <Percent size={15} />
+      </Tool>
       <Tool label="Fewer decimals" onClick={() => p.onDecimals(-1)}>
         <DecimalsArrowLeft size={16} />
       </Tool>
@@ -352,6 +387,13 @@ export function Toolbar(p: ToolbarProps) {
         <WrapText size={15} />
       </Tool>
       {sep}
+      <MenuTool label="AutoSum (Alt+=)" icon={<Sigma size={15} />} width={200}>
+        {(close) => AUTOSUMS.map((f) => (
+          <MenuItem key={f.fn} hint={f.fn === 'SUM' ? 'Alt+=' : undefined} onClick={() => (p.onAutoSum(f.fn), close())}>
+            {f.label}
+          </MenuItem>
+        ))}
+      </MenuTool>
       <Tool label={p.filtered ? 'Remove the filter' : 'Create a filter'} on={p.filtered} onClick={p.onFilter}>
         <ListFilter size={15} />
       </Tool>

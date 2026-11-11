@@ -19,6 +19,7 @@ import {
   MessagesSquare,
   Omega,
   Paintbrush,
+  PaintRoller,
   Redo2,
   RemoveFormatting,
   Scissors,
@@ -54,7 +55,7 @@ import {
 } from 'lucide-react';
 import { CELL_FONTS, colName, type BorderKind, type CellStyle, type NumFmt } from '@shared/sheets';
 import type { MenuDef, MenuEntry } from '../common/menus';
-import { BORDER_KINDS_SHOWN, BORDER_WHERE, BorderIcon, FORMATS, SIZES } from './Toolbar';
+import { AUTOSUMS, BORDER_KINDS_SHOWN, BORDER_WHERE, BorderIcon, FORMATS, SIZES } from './Toolbar';
 import type { BorderWhere, PasteHow } from './tools';
 
 /** The date formats offered besides the plain one, as codes. */
@@ -65,6 +66,9 @@ export const DATE_CODES: { code?: string; label: string; hint: string }[] = [
   { code: 'd mmm yyyy', label: 'Day and short month', hint: '5 Nov 2026' },
   { code: 'dddd, d mmmm yyyy', label: 'Weekday and month', hint: 'Thursday, 5 November 2026' },
 ];
+
+/** The keys that set a number format at once. */
+const QUICK_KEYS: Record<string, string> = { number: 'Ctrl+Shift+1', time: 'Ctrl+Shift+2', date: 'Ctrl+Shift+3', currency: 'Ctrl+Shift+4', percent: 'Ctrl+Shift+5', scientific: 'Ctrl+Shift+6' };
 
 export const ZOOMS = [50, 75, 90, 100, 110, 125, 150, 175, 200];
 
@@ -85,6 +89,9 @@ export interface MenuCtx {
   c: number;
   hiddenRows: boolean;
   hiddenCols: boolean;
+  /** Sheets hidden from the tabs (View → Show hidden sheets lists them). */
+  hiddenSheets: { i: number; name: string }[];
+  showSheet(i: number): void;
   zoom: number;
   formulas: boolean;
   note: boolean;
@@ -116,10 +123,17 @@ export interface MenuCtx {
   comment(): void;
   comments(): void;
   func(name: string): void;
+  /** Insert → Function → All functions…: the list of every function, to find one in. */
+  allFunctions(): void;
+  /** Insert → AutoSum: a function of the numbers above or beside the cell. */
+  autoSum(fn: string): void;
   chars(): void;
   addSheet(): void;
   setStyle(set: Partial<CellStyle>): void;
   setFormat(fmt: NumFmt | 'custom', cur?: string): void;
+  /** Format → Format painter: copy the look of the cell picked onto what is picked next. */
+  painter(): void;
+  painting: boolean;
   setCode(code: string | undefined): void;
   borders(where: BorderWhere): void;
   setLine(l: { kind: BorderKind; color?: string }): void;
@@ -220,8 +234,8 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           { label: 'Nothing frozen', checked: !m.freeze?.rows && !m.freeze?.cols, run: () => m.setFreeze(0, 0) },
           { label: 'The first row', checked: m.freeze?.rows === 1 && !m.freeze?.cols, run: () => m.setFreeze(1, 0) },
           { label: 'The first column', checked: !m.freeze?.rows && m.freeze?.cols === 1, run: () => m.setFreeze(0, 1) },
-          { label: `Rows up to ${m.r + 1}`, disabled: m.r + 1 > 50, run: () => m.setFreeze(m.r + 1, m.freeze?.cols ?? 0) },
-          { label: `Columns up to ${colName(m.c)}`, disabled: m.c + 1 > 20, run: () => m.setFreeze(m.freeze?.rows ?? 0, m.c + 1) },
+          { label: `Rows up to ${m.r + 1}`, run: () => m.setFreeze(m.r + 1, m.freeze?.cols ?? 0) },
+          { label: `Columns up to ${colName(m.c)}`, run: () => m.setFreeze(m.freeze?.rows ?? 0, m.c + 1) },
         ],
       },
       {
@@ -237,6 +251,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       '-',
       m.hiddenRows && { label: 'Show all hidden rows', icon: <Eye size={14} />, run: () => m.showAll('row') },
       m.hiddenCols && { label: 'Show all hidden columns', icon: <Eye size={14} />, run: () => m.showAll('col') },
+      m.hiddenSheets.length > 0 && !ro && { label: 'Show hidden sheets', icon: <Eye size={14} />, also: 'unhide tab sheet', items: m.hiddenSheets.map((h) => ({ label: h.name, run: () => m.showSheet(h.i) })) },
     ],
   };
   const insert: MenuDef = {
@@ -255,7 +270,8 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       !ro && { label: m.note ? 'Edit note' : 'Note', icon: <StickyNote size={14} />, keys: 'Shift+F2', also: 'memo', run: m.noteEdit },
       !ro && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', also: 'discussion thread reply', run: m.comment },
       !ro && { label: 'Link', icon: <Link2 size={14} />, keys: 'Ctrl+K', also: 'hyperlink url web address', run: m.link },
-      !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: FUNCS.map((f) => ({ label: f, run: () => m.func(f) })) },
+      !ro && { label: 'AutoSum', icon: <Sigma size={14} />, also: 'total sum add up average count max min', items: AUTOSUMS.map((f) => ({ label: f.label, keys: f.fn === 'SUM' ? 'Alt+=' : undefined, run: () => m.autoSum(f.fn) })) },
+      !ro && { label: 'Function', icon: <Sigma size={14} />, also: 'formula', items: [...FUNCS.map((f) => ({ label: f, run: () => m.func(f) })), '-' as const, { label: 'All functions…', also: 'list search every formula help', run: m.allFunctions }] },
       !ro && m.ai && { label: 'Formula with AI', icon: <Sparkles size={14} />, also: 'write a formula ai assistant describe words', run: m.ai.formula },
       !ro && m.ai && { label: 'Table made with AI', icon: <WandSparkles size={14} />, also: 'generate table ai list template', run: m.ai.table },
       !ro && { label: 'Special character', icon: <Omega size={14} />, also: 'emoji symbol', run: m.chars },
@@ -268,13 +284,13 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
         {
           label: 'Date',
           also: 'day month year',
-          items: DATE_CODES.map((d) => ({ label: d.label, keys: undefined, also: d.hint, checked: s?.fmt === 'date' && (s.code ?? undefined) === d.code, run: () => (d.code ? m.setCode(d.code) : m.setFormat('date')) })),
+          items: DATE_CODES.map((d) => ({ label: d.label, also: d.hint, keys: d.code ? undefined : QUICK_KEYS.date, checked: s?.fmt === 'date' && (s.code ?? undefined) === d.code, run: () => (d.code ? m.setCode(d.code) : m.setFormat('date')) })),
         },
       ];
     if (f.fmt === 'currency' && f.cur !== '$') return [];
     if (f.fmt === 'currency')
-      return [{ label: 'Currency', items: FORMATS.filter((x) => x.fmt === 'currency').map((x) => ({ label: x.label, also: x.hint, checked: s?.fmt === 'currency' && (s.cur ?? '$') === x.cur && !s.code, run: () => m.setFormat('currency', x.cur) })) }];
-    return [{ label: f.label, also: f.hint, checked: f.fmt === 'custom' ? !!s?.code : (s?.fmt ?? 'general') === f.fmt && !s?.code, run: () => m.setFormat(f.fmt, f.cur) }];
+      return [{ label: 'Currency', items: FORMATS.filter((x) => x.fmt === 'currency').map((x) => ({ label: x.label, keys: x.cur === '$' ? QUICK_KEYS.currency : undefined, also: x.hint, checked: s?.fmt === 'currency' && (s.cur ?? '$') === x.cur && !s.code, run: () => m.setFormat('currency', x.cur) })) }];
+    return [{ label: f.label, keys: QUICK_KEYS[f.fmt], also: f.hint, checked: f.fmt === 'custom' ? !!s?.code : (s?.fmt ?? 'general') === f.fmt && !s?.code, run: () => m.setFormat(f.fmt, f.cur) }];
   });
   const format: MenuDef = {
     label: 'Format',
@@ -356,6 +372,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
             ],
           },
           { label: 'Conditional formatting', icon: <Paintbrush size={14} />, also: 'colour scale data bars highlight rules', run: m.conditional },
+          { label: 'Format painter', icon: <PaintRoller size={14} />, also: 'copy format style look brush paint', checked: m.painting, run: m.painter },
           { label: 'Clear formatting', icon: <RemoveFormatting size={14} />, keys: 'Ctrl+\\', run: () => m.clear(true) },
         ],
   };
@@ -398,7 +415,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       { label: 'Trace precedents', icon: <ArrowRightToLine size={14} />, also: 'cells this formula uses audit', run: () => m.trace('pre') },
       { label: 'Trace dependents', icon: <ArrowRightFromLine size={14} />, also: 'formulas that use this cell audit', run: () => m.trace('dep') },
       m.traced && { label: 'Remove traces', run: m.untrace },
-      !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
+      !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, keys: 'Ctrl+P', also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
       '-',
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',

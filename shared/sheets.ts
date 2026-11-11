@@ -390,6 +390,10 @@ export interface Sheet {
   print?: PrintSetup;
   /** The grid's lines hidden in the editor (View → Gridlines), as Excel's showGridLines. */
   noGrid?: boolean;
+  /** The colour of the sheet's tab (#rrggbb), as Excel's tab colour. */
+  tabColor?: string;
+  /** The sheet's tab is hidden (right-click a tab: Hide; Show hidden sheets brings it back), as Excel's hidden sheets. */
+  hidden?: boolean;
   /** The pivot table this sheet holds (made by Data → Pivot table). */
   pivot?: PivotDef;
 }
@@ -1300,17 +1304,21 @@ function colSpan(k: string): [number, number] | null {
   return a < 0 || b < 0 ? null : [Math.min(a, b), Math.min(SHEET_LIMITS.cols - 1, Math.max(a, b))];
 }
 
+/**
+ * Rows and columns that stay in view: any number the sheet holds (Freeze up to here may be far down). The editor draws no
+ * more of them than fit in its window, so there is always room left to scroll.
+ */
 function freezeOf(v: unknown): { rows?: number; cols?: number } | undefined {
   let rows: number | undefined;
   let cols: number | undefined;
   if (v === true) rows = 1;
-  else if (typeof v === 'number') rows = intIn(v, 0, 50);
+  else if (typeof v === 'number') rows = intIn(v, 0, SHEET_LIMITS.rows);
   else if (typeof v === 'string') {
     const p = parseRef(v);
-    if (p) [rows, cols] = [Math.min(50, p.r), Math.min(20, p.c)];
+    if (p) [rows, cols] = [Math.min(SHEET_LIMITS.rows, p.r), Math.min(SHEET_LIMITS.cols, p.c)];
   } else if (isObj(v)) {
-    rows = intIn(v.rows ?? v.row ?? v.r, 0, 50);
-    cols = intIn(v.cols ?? v.columns ?? v.col ?? v.c, 0, 20);
+    rows = intIn(v.rows ?? v.row ?? v.r, 0, SHEET_LIMITS.rows);
+    cols = intIn(v.cols ?? v.columns ?? v.col ?? v.c, 0, SHEET_LIMITS.cols);
   }
   const out: { rows?: number; cols?: number } = {};
   if (rows) out.rows = rows;
@@ -2234,6 +2242,10 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   // The grid's lines hidden: noGrid: true, or gridlines: false (an agent's words), else as the file had them.
   const noGrid = raw.noGrid ?? (raw.gridlines === undefined ? undefined : raw.gridlines === false) ?? base?.noGrid;
   if (noGrid === true) sheet.noGrid = true;
+  // The tab's colour, and the sheet hidden from the tabs (a sheet's hidden rows and columns are `hidden: {rows, cols}`, an object).
+  const tab = cleanColor(raw.tabColor ?? raw.tab);
+  if (tab) sheet.tabColor = tab;
+  if (raw.hidden === true || raw.state === 'hidden' || raw.state === 'veryHidden') sheet.hidden = true;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
   for (const k of [...cells.keys()].sort((a, b) => a - b)) out[refName(unpackR(k), unpackC(k))] = cells.get(k)!;
@@ -2264,6 +2276,8 @@ export function normalizeBook(input: unknown, o: NormalizeOptions = {}): Workboo
     .map((s, i) => sheetOf(s, i, ids, names, budget, commentIds))
     .filter((s): s is Sheet => !!s);
   if (!sheets.length) sheets.push({ id: newId(), name: 'Sheet 1', cells: {} });
+  // At least one sheet shows.
+  if (sheets.every((s) => s.hidden)) delete sheets[0].hidden;
   const { cells, rows, cols } = budget.cut;
   if (cells) o.notes?.push(`${cells} cell${cells === 1 ? '' : 's'} left out: a workbook holds at most ${SHEET_LIMITS.cells.toLocaleString('en')} cells.`);
   if (rows) o.notes?.push(`Cells below row ${SHEET_LIMITS.rows.toLocaleString('en')} were left out.`);
@@ -2305,6 +2319,8 @@ export function bookText(b: Workbook): string {
     if (sh.groups?.length) head.groups = sh.groups;
     if (sh.print) head.print = sh.print;
     if (sh.noGrid) head.noGrid = true;
+    if (sh.tabColor) head.tabColor = sh.tabColor;
+    if (sh.hidden) head.hidden = true;
     if (sh.pivot) head.pivot = sh.pivot;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
@@ -3032,8 +3048,8 @@ export function adjustForInsert(book: Workbook, sheetId: string, axis: 'row' | '
       const next = withSizes({ ...s, cells }, row ? s.cols : moveSizes(s.cols, shift, SHEET_LIMITS.cols), row ? moveSizes(s.rows, shift, SHEET_LIMITS.rows) : s.rows);
       if (s.freeze) {
         const fz = { ...s.freeze };
-        if (row && fz.rows && at < fz.rows) fz.rows = Math.min(50, fz.rows + count);
-        if (!row && fz.cols && at < fz.cols) fz.cols = Math.min(20, fz.cols + count);
+        if (row && fz.rows && at < fz.rows) fz.rows = Math.min(SHEET_LIMITS.rows, fz.rows + count);
+        if (!row && fz.cols && at < fz.cols) fz.cols = Math.min(SHEET_LIMITS.cols, fz.cols + count);
         next.freeze = fz;
       }
       return next;
@@ -3095,6 +3111,181 @@ export function adjustForDelete(book: Workbook, sheetId: string, axis: 'row' | '
         else delete next.freeze;
       }
       return next;
+    }),
+  };
+}
+
+// ---- cells and lines moved ---------------------------------------------------------------------------------------
+
+/** A reference's two corners when it is a cell or a range of cells (whole columns and rows have no cell corners). */
+const cellCorners = (ref: RefTok): [RefPart, RefPart] | null => {
+  if (ref.a.r === undefined || ref.a.c === undefined) return null;
+  if (ref.b && (ref.b.r === undefined || ref.b.c === undefined)) return null;
+  return [ref.a, ref.b ?? ref.a];
+};
+
+/** Cells in the order of their positions (rows first), as sheets keep them. */
+function sortedCells(cells: Record<string, Cell>): Record<string, Cell> {
+  const list = Object.keys(cells)
+    .map((k) => [keyOf(k), k] as const)
+    .filter(([n]) => n >= 0)
+    .sort((a, b) => a[0] - b[0]);
+  const out: Record<string, Cell> = {};
+  for (const [, k] of list) out[k] = cells[k];
+  return out;
+}
+
+/**
+ * Cells moved, as Excel and Google Sheets do for Cut and Paste or a drag: the block `x` of a sheet goes with its
+ * looks, notes and comments to where its top left corner is now `to` (on the same sheet or on another), what was
+ * there is replaced, and every formula, name, chart, rule and list that pointed at the cells (a cell, or a range all
+ * of whose cells moved) points at them where they are now. The formulas in the cells that moved keep pointing where
+ * they did, apart from those that pointed into the block itself. Ranges only partly in the block stay as they were.
+ * Rules, merges and filters follow when they lie wholly in the block, on the same sheet.
+ */
+export function adjustForMove(book: Workbook, from: { sheet: string; x: Rect }, to: { sheet: string; r: number; c: number }): Workbook {
+  const src = book.sheets.find((s) => s.id === from.sheet);
+  const dst = book.sheets.find((s) => s.id === to.sheet);
+  if (!src || !dst) return book;
+  const x = from.x;
+  const dr = to.r - x.r1;
+  const dc = to.c - x.c1;
+  const same = src.id === dst.id;
+  if (same && !dr && !dc) return book;
+  const dest: Rect = { r1: x.r1 + dr, c1: x.c1 + dc, r2: x.r2 + dr, c2: x.c2 + dc };
+  if (dest.r2 >= SHEET_LIMITS.rows || dest.c2 >= SHEET_LIMITS.cols || dest.r1 < 0 || dest.c1 < 0) return book;
+  const inX = (p: RefPart) => p.r! >= x.r1 && p.r! <= x.r2 && p.c! >= x.c1 && p.c! <= x.c2;
+  const shift = (p: RefPart): RefPart => ({ ...p, r: p.r! + dr, c: p.c! + dc });
+  /**
+   * The formula (written on the sheet `on`; `moving` when it is in a cell that goes) with its references to the block
+   * following it. With `named`, only references that carry a sheet's name change (the rules of other sheets).
+   */
+  const retarget = (formula: string, on: Sheet, moving: boolean, named = false): string =>
+    rewrite(formula, (t) => {
+      if (t.k !== 'ref') return undefined;
+      const written = t.ref.sheet !== undefined;
+      if (named && !written) return undefined;
+      const corners = (t.ref.sheet ?? on.name).toLowerCase() === src.name.toLowerCase() ? cellCorners(t.ref) : null;
+      if (!corners || !inX(corners[0]) || !inX(corners[1])) {
+        // A formula carried to another sheet keeps pointing at the cells it did: its references get their sheet's name.
+        return moving && !same && !written ? `${quoteSheet(on.name)}!${formula.slice(t.ps, t.e)}` : undefined;
+      }
+      const next = { a: shift(t.ref.a), ...(t.ref.b ? { b: shift(t.ref.b) } : {}) };
+      const lives = moving ? dst : on;
+      return (same ? prefixOf(formula, t) : lives.id === dst.id ? '' : `${quoteSheet(dst.name)}!`) + refText(next);
+    });
+  // Formulas everywhere (and names).
+  const moved: Workbook = { ...book, sheets: book.sheets.map((s) => ({ ...s, cells: { ...s.cells } })) };
+  for (const s of moved.sheets) {
+    for (const k in s.cells) {
+      const c = s.cells[k];
+      if (c.f === undefined) continue;
+      const n = keyOf(k);
+      const moving = s.id === src.id && n >= 0 && inX({ r: unpackR(n), c: unpackC(n) });
+      const next = retarget(c.f, s, moving);
+      if (next !== c.f) s.cells[k] = { ...c, f: next };
+    }
+  }
+  if (moved.names) moved.names = moved.names.map((n) => {
+    const ref = retarget(n.ref, (n.sheet && book.sheets.find((s) => s.id === n.sheet)) || NO_SHEET, false);
+    return ref === n.ref ? n : { ...n, ref };
+  });
+  // Rules, charts and the rest of every sheet (their comments are moved below).
+  moved.sheets = moved.sheets.map((s0) => {
+    const s = mapSheetRefs({ ...s0, comments: undefined }, (t) => retarget(t, s0, false, !same));
+    if (s0.comments) s.comments = s0.comments;
+    else delete s.comments;
+    return s;
+  });
+  // The cells (and their comments) leave the block, and come to where it goes, over what was there.
+  const out = moved.sheets.find((s) => s.id === src.id)!;
+  const into = moved.sheets.find((s) => s.id === dst.id)!;
+  const carried: [string, Cell][] = [];
+  for (const k in out.cells) {
+    const n = keyOf(k);
+    if (n < 0 || !inX({ r: unpackR(n), c: unpackC(n) })) continue;
+    carried.push([refName(unpackR(n) + dr, unpackC(n) + dc), out.cells[k]]);
+    delete out.cells[k];
+  }
+  for (const k in into.cells) {
+    const n = keyOf(k);
+    if (n < 0) continue;
+    const [r, c] = [unpackR(n), unpackC(n)];
+    if (r >= dest.r1 && r <= dest.r2 && c >= dest.c1 && c <= dest.c2) delete into.cells[k];
+  }
+  for (const [k, c] of carried) into.cells[k] = c;
+  into.cells = sortedCells(into.cells);
+  if (!same) out.cells = sortedCells(out.cells);
+  const within = (cm: SheetComment, r: Rect) => {
+    const p = parseRef(cm.cell);
+    return !!p && p.r >= r.r1 && p.r <= r.r2 && p.c >= r.c1 && p.c <= r.c2;
+  };
+  const going = (src.comments ?? []).filter((cm) => within(cm, x)).map((cm) => {
+    const p = parseRef(cm.cell)!;
+    return { ...cm, cell: refName(p.r + dr, p.c + dc) };
+  });
+  if (going.length || dst.comments?.some((cm) => within(cm, dest))) {
+    const keep = (sh: Sheet, gone: Rect[]) => (sh.comments ?? []).filter((cm) => !gone.some((g) => within(cm, g)));
+    const put = (sh: Sheet, list: SheetComment[]) => {
+      if (list.length) sh.comments = list.sort((a, b) => keyOf(a.cell) - keyOf(b.cell));
+      else delete sh.comments;
+    };
+    if (same) put(out, [...keep(out, [x, dest]), ...going]);
+    else {
+      put(out, keep(out, [x]));
+      put(into, [...keep(into, [dest]), ...going]);
+    }
+  }
+  return moved;
+}
+
+/**
+ * Whole rows (or columns) moved: `count` of them from `from` go to before the row (column) `to`, as dragging their
+ * numbers (letters) does. Their cells, heights (widths) and hidden ones go along, and every formula that pointed at
+ * a cell in them points where it went; ranges follow by their ends, so a range the rows moved out of shrinks.
+ */
+export function adjustForMoveLines(book: Workbook, sheetId: string, axis: 'row' | 'col', from: number, count: number, to: number): Workbook {
+  const sh = book.sheets.find((s) => s.id === sheetId);
+  if (!sh || count <= 0 || (to >= from && to <= from + count)) return book;
+  const row = axis === 'row';
+  const limit = row ? SHEET_LIMITS.rows : SHEET_LIMITS.cols;
+  const end = from + count;
+  if (end > limit || to > limit) return book;
+  /** Where the row (column) `i` goes. */
+  const perm = (i: number): number => {
+    if (i >= from && i < end) return to > end ? i - from + (to - count) : i - from + to;
+    if (to > end && i >= end && i < to) return i - count;
+    if (to < from && i >= to && i < from) return i + count;
+    return i;
+  };
+  const get = (p: RefPart) => (row ? p.r : p.c);
+  const set = (p: RefPart, v: number): RefPart => (row ? { ...p, r: v } : { ...p, c: v });
+  const move = (ref: RefTok): RefTok => {
+    const s = get(ref.a);
+    if (s === undefined) return ref;
+    if (!ref.b) return { ...ref, a: set(ref.a, perm(s)) };
+    const [lo, hi] = [Math.min(s, get(ref.b)!), Math.max(s, get(ref.b)!)];
+    const inside = (i: number) => i >= from && i < end;
+    let [p, q] = [perm(lo), perm(hi)];
+    if (!(inside(lo) && inside(hi))) {
+      // A range follows the rows that are not moved: it keeps the moved ones only when they land between them.
+      const first = inside(lo) ? end : lo;
+      const last = inside(hi) ? from - 1 : hi;
+      [p, q] = [perm(first), perm(last)];
+      const [bp, bq] = [perm(from), perm(end - 1)];
+      if (bp >= p && bq <= q) [p, q] = [Math.min(p, bp), Math.max(q, bq)];
+    }
+    return { ...ref, a: set(ref.a, p), b: set(ref.b, q) };
+  };
+  const moved = mapNames(mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, move)), (f, on) => moveRefs(f, on, sh.name, move));
+  return {
+    ...moved,
+    sheets: moved.sheets.map((s0) => {
+      const mine = s0.id === sheetId;
+      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, move), mine && !row ? perm : undefined, mine ? (k) => moveCorner(k, row, perm, 0) : undefined);
+      if (!mine) return s;
+      const cells = moveCells(s, (r, c) => (row ? [perm(r), c] : [r, perm(c)]));
+      return withSizes({ ...s, cells }, row ? s.cols : moveSizes(s.cols, perm, SHEET_LIMITS.cols), row ? moveSizes(s.rows, perm, SHEET_LIMITS.rows) : s.rows);
     }),
   };
 }
@@ -3177,7 +3368,7 @@ export function excelFormula(f: string, sheetNames: Set<string>, names: Set<stri
       const to = k < call.commas.length ? call.commas[k] : call.close;
       return toks.slice(from, to);
     };
-    if (n === 'AI' || n === 'SPARKLINE') return null;
+    if (n === 'AI' || n === 'SPARKLINE' || GOOGLE_ONLY.has(n)) return null;
     if (n === 'ARRAYFORMULA') put(t.s, t.e, '');
     else if (n === 'REGEXMATCH') put(t.s, t.e, '_xlfn.REGEXTEST');
     else if (n === 'JOIN') {
@@ -3237,8 +3428,12 @@ const XLFN = new Set([
   'UNIQUE', 'SEQUENCE', 'SORTBY', 'LET', 'LAMBDA', 'MAP', 'REDUCE', 'SCAN', 'BYROW', 'BYCOL', 'MAKEARRAY', 'ISOMITTED', 'TEXTSPLIT', 'TEXTBEFORE',
   'TEXTAFTER', 'VSTACK', 'HSTACK', 'TAKE', 'DROP', 'CHOOSECOLS', 'CHOOSEROWS', 'TOCOL', 'TOROW', 'WRAPROWS', 'WRAPCOLS', 'EXPAND', 'REGEXTEST',
   'REGEXEXTRACT', 'REGEXREPLACE', 'IMAGE', 'RANDARRAY', 'FORECAST.LINEAR', 'NETWORKDAYS.INTL', 'WORKDAY.INTL', 'PERCENTILE.EXC', 'QUARTILE.EXC',
-  'RANK.AVG', 'PERCENTRANK.INC', 'PERCENTRANK.EXC', 'COVARIANCE.P', 'COVARIANCE.S',
+  'RANK.AVG', 'PERCENTRANK.INC', 'PERCENTRANK.EXC', 'COVARIANCE.P', 'COVARIANCE.S', 'NORM.S.DIST', 'NORM.S.INV', 'FORMULATEXT', 'NUMBERVALUE', 'UNICODE', 'UNICHAR',
+  'ARABIC', 'ENCODEURL',
 ]);
+
+/** Google Sheets' functions Excel has nothing like: a cell with one is written to an Excel file as the value it shows. */
+const GOOGLE_ONLY = new Set(['COUNTUNIQUE', 'ISURL', 'ISEMAIL', 'FLATTEN', 'SORTN']);
 
 // ---- formulas: working them out ----------------------------------------------------------------------------------
 
@@ -3415,6 +3610,12 @@ const FRAME_LIMIT = 700;
 /** The most values an array may hold. */
 const MAX_ARRAY = 2_000_000;
 
+/** How a sheet's filter is worked out (sheet-rules.ts sets it when it is loaded): the rows it hides. */
+let filterHook: ((sh: Sheet, si: number, calc: Calc) => Set<number>) | null = null;
+export function setFilterHook(f: (sh: Sheet, si: number, calc: Calc) => Set<number>) {
+  filterHook = f;
+}
+
 export interface CalcOptions {
   /** The time TODAY and NOW give (this computer's clock otherwise). */
   now?: Date;
@@ -3430,7 +3631,7 @@ export interface CalcOptions {
 const SPILL_FNS = new Set([
   'FILTER', 'SORT', 'UNIQUE', 'SEQUENCE', 'SORTBY', 'TRANSPOSE', 'RANDARRAY', 'ARRAYFORMULA', 'LET', 'MAP', 'SCAN', 'BYROW', 'BYCOL', 'MAKEARRAY',
   'TEXTSPLIT', 'SPLIT', 'VSTACK', 'HSTACK', 'TAKE', 'DROP', 'CHOOSECOLS', 'CHOOSEROWS', 'TOCOL', 'TOROW', 'WRAPROWS', 'WRAPCOLS', 'EXPAND',
-  'REGEXEXTRACT', 'TREND', 'GROWTH', 'LINEST', 'LOGEST', 'MMULT', 'MINVERSE', 'FREQUENCY', 'REDUCE',
+  'REGEXEXTRACT', 'TREND', 'GROWTH', 'LINEST', 'LOGEST', 'MMULT', 'MINVERSE', 'FREQUENCY', 'REDUCE', 'FLATTEN', 'SORTN',
 ]);
 
 /** Whether a formula's result is an array that spills: one of SPILL_FNS outermost, or a LAMBDA called (=LAMBDA(x, x*2)(A1:A9)). */
@@ -3457,6 +3658,8 @@ export class Calc {
   private busy: Set<number>[] = [];
   private ext: ({ rows: number; cols: number } | null)[] = [];
   private sorted: (number[] | null)[] = [];
+  /** Per sheet: the rows its filter hides, worked out when SUBTOTAL first asks (and again after any change). */
+  private filt: (Set<number> | null)[] = [];
   private byName = new Map<string, number>();
   private frames = 0;
   private rowsMax = -1;
@@ -3534,6 +3737,7 @@ export class Calc {
   }
 
   private clear() {
+    this.filt = this.book.sheets.map(() => null);
     this.memo = this.book.sheets.map(() => new Map());
     this.busy = this.book.sheets.map(() => new Set());
     this.spilt = this.book.sheets.map(() => new Map());
@@ -3746,6 +3950,18 @@ export class Calc {
 
   sheetIndex(name: string): number {
     return this.byName.get(name.toLowerCase()) ?? -1;
+  }
+
+  /** Whether a row is hidden by hand (for SUBTOTAL's 101 to 111). */
+  rowHidden(si: number, r: number): boolean {
+    return !!this.book.sheets[si]?.rows?.[r]?.hidden;
+  }
+
+  /** Whether the sheet's filter hides a row (for SUBTOTAL): known once sheet-rules.ts is loaded, which the editor and the server always do. */
+  rowFiltered(si: number, r: number): boolean {
+    const sh = this.book.sheets[si];
+    if (!filterHook || !sh?.filter) return false;
+    return (this.filt[si] ??= filterHook(sh, si, this)).has(r);
   }
 
   /** The cell itself (what it holds), or undefined. */
@@ -6770,12 +6986,571 @@ const LIFT = new Map<string, 'all' | number[]>([
     'HOUR', 'MINUTE', 'SECOND', 'WEEKDAY', 'WEEKNUM', 'ISOWEEKNUM', 'EOMONTH', 'EDATE', 'DATEDIF', 'DAYS', 'DATEVALUE', 'TIMEVALUE', 'ISBLANK', 'ISNUMBER',
     'ISTEXT', 'ISNONTEXT', 'ISLOGICAL', 'ISERROR', 'ISERR', 'ISNA', 'ISEVEN', 'ISODD', 'N', 'T', 'NOT', 'ROUND', 'ROUNDUP', 'ROUNDDOWN', 'TRUNC', 'INT',
     'ABS', 'SIGN', 'SQRT', 'POWER', 'EXP', 'LN', 'LOG10', 'LOG', 'MOD', 'QUOTIENT', 'CEILING', 'FLOOR', 'MROUND', 'EVEN', 'ODD',
+    'DEC2BIN', 'DEC2OCT', 'DEC2HEX', 'BIN2DEC', 'OCT2DEC', 'HEX2DEC', 'UNICODE', 'UNICHAR', 'ROMAN', 'ARABIC', 'ISURL', 'ISEMAIL', 'ENCODEURL', 'NUMBERVALUE', 'DOLLAR', 'YEARFRAC', 'DAYS360', 'EFFECT', 'NOMINAL', 'SLN',
   ].map((n) => [n, 'all'] as [string, 'all']),
   ...['VLOOKUP', 'HLOOKUP', 'XLOOKUP', 'MATCH', 'XMATCH'].map((n) => [n, [0]] as [string, number[]]),
   ...['COUNTIF', 'SUMIF', 'AVERAGEIF'].map((n) => [n, [1]] as [string, number[]]),
 ]);
 
-const FNS: Record<string, Fn> = { ...MATH_FNS, ...LOGIC_FNS, ...INFO_FNS, ...LOOKUP_FNS, ...TEXT_FNS, ...DATE_FNS, ...MONEY_FNS, ...ARRAY_FNS, ...LAMBDA_FNS, ...ARRAY2_FNS, ...TEXT2_FNS, ...STAT_FNS, ...AI_FNS };
+// ---- formulas: more of Excel's and Google Sheets' functions ------------------------------------------------------------
+// SUBTOTAL; the loans and depreciation (XIRR, XNPV, MIRR, SLN, DB, DDB, CUMIPMT, CUMPRINC, EFFECT, NOMINAL); dates
+// (YEARFRAC, DAYS360); the normal distribution, skew and kurtosis, COMBIN, PERMUT, TRIMMEAN; words and numbers
+// (NUMBERVALUE, DOLLAR, UNICODE, UNICHAR, ROMAN, ARABIC, ENCODEURL, the number systems); and Google Sheets' COUNTUNIQUE,
+// ISURL, ISEMAIL, FLATTEN and SORTN.
+
+/** The error function's complement for z ≥ 0: a series for the middle, a continued fraction for the tail. */
+function erfcPos(z: number): number {
+  if (z < 2.5) {
+    // erf(z) = 2/√π · e^(−z²) · Σ 2ⁿ z^(2n+1) / (1·3·5…(2n+1)): all terms positive, so nothing is lost.
+    let term = z;
+    let s = z;
+    for (let n = 1; n < 200; n++) {
+      term *= (2 * z * z) / (2 * n + 1);
+      s += term;
+      if (term < s * 1e-17) break;
+    }
+    return 1 - (2 / Math.sqrt(Math.PI)) * Math.exp(-z * z) * s;
+  }
+  let f = 0;
+  for (let k = 150; k >= 1; k--) f = k / 2 / (z + f);
+  return Math.exp(-z * z) / Math.sqrt(Math.PI) / (z + f);
+}
+/** The standard normal distribution's cumulative probability. */
+const normCdf = (x: number) => (x >= 0 ? 1 - 0.5 * erfcPos(x / Math.SQRT2) : 0.5 * erfcPos(-x / Math.SQRT2));
+/** The standard normal distribution's inverse (Acklam's rational approximation, then one step to full precision). */
+function normInv(p: number): number {
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  let x: number;
+  if (p < 0.02425) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  } else if (p > 1 - 0.02425) {
+    const q = Math.sqrt(-2 * Math.log(1 - p));
+    x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  } else {
+    const q = p - 0.5;
+    const r = q * q;
+    x = ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  const e = normCdf(x) - p;
+  const u = e * Math.sqrt(2 * Math.PI) * Math.exp((x * x) / 2);
+  return x - u / (1 + (x * u) / 2);
+}
+
+/** The depreciation, loan and bond functions' working: the interest and the principal paid in a period of a loan. */
+const ipmtAt = (r: number, per: number, n: number, pv: number, ty: number) => {
+  const pmt = pmtOf(r, n, pv, 0, ty);
+  if (ty === 1) return per === 1 ? 0 : (fv(r, per - 2, pmt, pv, 1) - pmt) * r;
+  return fv(r, per - 1, pmt, pv, 0) * r;
+};
+/** CUMIPMT's and CUMPRINC's: the interest (or principal) paid from one period to another, as Excel checks them. */
+const cumulative = (principal: boolean): Fn =>
+  money(6, 6, (r, n, pv, from, to, type) => {
+    const [s, e] = [Math.trunc(from), Math.trunc(to)];
+    if (r <= 0 || n <= 0 || pv <= 0 || s < 1 || e < s || e > n || (type !== 0 && type !== 1)) return E.NUM;
+    let total = 0;
+    for (let per = s; per <= e; per++) {
+      const ip = ipmtAt(r, per, n, pv, type);
+      total += principal ? pmtOf(r, n, pv, 0, type) - ip : ip;
+    }
+    return total;
+  });
+
+/** Days from one date to another on a year of twelve 30-day months, as Excel's DAYS360 and bond rules count them. */
+function days360(a: number, b: number, european: boolean): number {
+  const p = serialParts(a);
+  const q = serialParts(b);
+  let d1 = p.d;
+  let d2 = q.d;
+  const leap = daysIn(p.y, 2) === 29;
+  if (d1 === 31) d1 = 30;
+  else if (!european && p.m === 2 && (d1 === 29 || (d1 === 28 && !leap))) d1 = 30;
+  if (d2 === 31 && (european || d1 === 30)) d2 = 30;
+  return (q.y - p.y) * 360 + (q.m - p.m) * 30 + (d2 - d1);
+}
+/** The fraction of a year between two dates, by Excel's day-count bases 0 to 4. */
+function yearFrac(a0: number, b0: number, basis: number): number | CellError {
+  const [a, b] = a0 <= b0 ? [Math.floor(a0), Math.floor(b0)] : [Math.floor(b0), Math.floor(a0)];
+  switch (basis) {
+    case 0:
+      return days360(a, b, false) / 360;
+    case 4:
+      return days360(a, b, true) / 360;
+    case 2:
+      return (b - a) / 360;
+    case 3:
+      return (b - a) / 365;
+    case 1: {
+      const p = serialParts(a);
+      const q = serialParts(b);
+      const leap = (y: number) => daysIn(y, 2) === 29;
+      if (p.y === q.y) return (b - a) / (leap(p.y) ? 366 : 365);
+      // Within a year of the start: 366 when a 29 February lies between, else 365.
+      const yearOn = dateSerial(p.y + 1, p.m, Math.min(p.d, daysIn(p.y + 1, p.m)));
+      if (b <= yearOn) {
+        const feb = (y: number) => dateSerial(y, 2, 29);
+        const has29 = (leap(p.y) && a <= feb(p.y) && b >= feb(p.y)) || (leap(q.y) && a <= feb(q.y) && b >= feb(q.y));
+        return (b - a) / (has29 ? 366 : 365);
+      }
+      let days = 0;
+      for (let y = p.y; y <= q.y; y++) days += leap(y) ? 366 : 365;
+      return (b - a) / (days / (q.y - p.y + 1));
+    }
+  }
+  return E.NUM;
+}
+
+/** A number in base 2, 8 or 16 as Excel writes it: negatives in ten digits of two's complement. */
+const BASES: Record<string, number> = { BIN: 2, OCT: 8, HEX: 16 };
+function toBase(name: keyof typeof BASES): Fn {
+  const base = BASES[name];
+  const bits = base === 2 ? 10 : base === 8 ? 30 : 40;
+  const lim = 2 ** (bits - 1);
+  return def(1, 2, (c, a, cx) => {
+    const raw = S(c, a[0], cx);
+    const x = raw instanceof CellError ? raw : toNum(raw);
+    const places = opt(c, a, 1, cx, 0);
+    if (x instanceof CellError) return x;
+    if (places instanceof CellError) return places;
+    const n = Math.trunc(x);
+    if (n < -lim || n >= lim) return E.NUM;
+    const text = (n < 0 ? n + 2 ** bits : n).toString(base).toUpperCase();
+    if (n < 0) return text.padStart(10, base === 2 ? '1' : base === 8 ? '7' : 'F');
+    if (has(a, 1)) {
+      const p = Math.trunc(places);
+      if (p < 1 || p > 10 || text.length > p) return E.NUM;
+      return text.padStart(p, '0');
+    }
+    return text;
+  });
+}
+function fromBase(name: keyof typeof BASES): Fn {
+  const base = BASES[name];
+  const bits = base === 2 ? 10 : base === 8 ? 30 : 40;
+  const digits = base === 2 ? /^[01]+$/ : base === 8 ? /^[0-7]+$/ : /^[0-9a-f]+$/i;
+  return def(1, 1, (c, a, cx) => {
+    const raw = S(c, a[0], cx);
+    if (raw instanceof CellError) return raw;
+    const t = raw === null ? '0' : typeof raw === 'boolean' ? '' : String(raw);
+    if (!digits.test(t) || t.length > 10) return E.NUM;
+    const v = parseInt(t, base);
+    // Ten digits whose top bit is set are negative.
+    return t.length === 10 && v >= 2 ** (bits - 1) ? v - 2 ** bits : v;
+  });
+}
+
+const ROMANS: [number, string][] = [[1000, 'M'], [500, 'D'], [100, 'C'], [50, 'L'], [10, 'X'], [5, 'V'], [1, 'I']];
+/** ROMAN's numerals for a form 0 (classic) to 4 (the most concise): each form allows subtracting smaller symbols from the larger ones. */
+function romanOf(n: number, form: number): string {
+  // The pairs (value, letters) a form allows, as Excel's table: M and D from C, L, X, V, I; C and L from X, V, I; X and V from I.
+  const pairs: [number, string][] = [];
+  const sub = (big: string, bigV: number, subs: string[]) => {
+    for (let k = 0; k < subs.length && k <= form; k++) {
+      const s = ROMANS.find((r) => r[1] === subs[k])!;
+      pairs.push([bigV - s[0], s[1] + big]);
+    }
+  };
+  sub('M', 1000, ['C', 'L', 'X', 'V', 'I']);
+  sub('D', 500, ['C', 'L', 'X', 'V', 'I']);
+  sub('C', 100, ['X', 'V', 'I']);
+  sub('L', 50, ['X', 'V', 'I']);
+  sub('X', 10, ['I']);
+  sub('V', 5, ['I']);
+  const table = [...ROMANS.map(([v, s]) => [v, s] as [number, string]), ...pairs].sort((x, y) => y[0] - x[0]);
+  let out = '';
+  let left = n;
+  for (const [v, s] of table) {
+    while (left >= v) {
+      out += s;
+      left -= v;
+    }
+  }
+  return out;
+}
+
+/** The rows of the cells of a SUBTOTAL's range that count: those a filter hides never do; those hidden by hand only for 1–11. */
+const SUBTOTALS: Record<number, (xs: number[], seen: Scalar[]) => number | CellError> = {
+  1: (xs) => mean(xs),
+  2: (xs) => xs.length,
+  3: (_, seen) => seen.length,
+  4: (xs) => (xs.length ? Math.max(...xs) : 0),
+  5: (xs) => (xs.length ? Math.min(...xs) : 0),
+  6: (xs) => (xs.length ? xs.reduce((p, x) => p * x, 1) : 0),
+  7: (xs) => stdev(true)(xs),
+  8: (xs) => stdev(false)(xs),
+  9: (xs) => sum(xs),
+  10: (xs) => variance(xs, true),
+  11: (xs) => variance(xs, false),
+};
+
+const MORE_FNS: Record<string, Fn> = {
+  SUBTOTAL: def(2, 255, (c, a, cx) => {
+    const k = N(c, a[0], cx);
+    if (k instanceof CellError) return k;
+    const num = Math.trunc(k);
+    const noHidden = num >= 101 && num <= 111;
+    const f = SUBTOTALS[noHidden ? num - 100 : num];
+    if (!f) return E.VALUE;
+    const xs: number[] = [];
+    const seen: Scalar[] = [];
+    let err: CellError | null = null;
+    for (let i = 1; i < a.length; i++) {
+      const v = evA(c, a[i], cx);
+      if (!isRg(v) && !isArr(v)) {
+        const s = c.sc(v, cx);
+        if (s instanceof CellError) return s;
+        if (typeof s === 'number') xs.push(s);
+        if (s !== null) seen.push(s);
+        continue;
+      }
+      c.each(v, (s, di, dj) => {
+        if (isRg(v)) {
+          const r = v.r1 + di;
+          // Rows a filter hides, and those hidden by hand for 101–111, do not count; nor do other SUBTOTALs inside the range.
+          if (c.rowFiltered(v.si, r) || (noHidden && c.rowHidden(v.si, r))) return;
+          if (/(^|[^A-Za-z0-9_.])SUBTOTAL\s*\(/i.test(c.cellAt(v.si, r, v.c1 + dj)?.f ?? '')) return;
+        }
+        if (s instanceof CellError) err ??= s;
+        else {
+          if (typeof s === 'number') xs.push(s);
+          if (s !== null) seen.push(s);
+        }
+      });
+    }
+    if (err) return err;
+    const r = f(xs, seen);
+    return r instanceof CellError ? r : fin(r);
+  }),
+  COUNTUNIQUE: def(1, 255, (c, a, cx) => {
+    const seen = new Set<string>();
+    let err: CellError | null = null;
+    for (const n of a) {
+      const v = evA(c, n, cx);
+      const add = (s: Scalar) => {
+        if (s instanceof CellError) err ??= s;
+        else if (s !== null && s !== '') seen.add(typeof s === 'string' ? `s${s.toLowerCase()}` : `${typeof s}${String(s)}`);
+      };
+      if (isRg(v) || isArr(v)) c.each(v, (s) => void add(s));
+      else add(c.sc(v, cx));
+    }
+    return err ?? seen.size;
+  }),
+  YEARFRAC: def(2, 3, (c, a, cx) => {
+    const s = dateArg(c, a[0], cx);
+    const e = dateArg(c, a[1], cx);
+    const basis = opt(c, a, 2, cx, 0);
+    if (s instanceof CellError) return s;
+    if (e instanceof CellError) return e;
+    if (basis instanceof CellError) return basis;
+    const b = Math.trunc(basis);
+    if (b < 0 || b > 4) return E.NUM;
+    const r = yearFrac(s, e, b);
+    return r instanceof CellError ? r : fin(r);
+  }),
+  DAYS360: def(2, 3, (c, a, cx) => {
+    const s = dateArg(c, a[0], cx);
+    const e = dateArg(c, a[1], cx);
+    const m = has(a, 2) ? B(c, a[2], cx) : false;
+    if (s instanceof CellError) return s;
+    if (e instanceof CellError) return e;
+    if (m instanceof CellError) return m;
+    return days360(Math.floor(s), Math.floor(e), m);
+  }),
+  XNPV: def(3, 3, (c, a, cx) => {
+    const r = N(c, a[0], cx);
+    const vs = numbersOf(c, [a[1]], cx);
+    const ds = numbersOf(c, [a[2]], cx);
+    if (r instanceof CellError) return r;
+    if (vs instanceof CellError) return vs;
+    if (ds instanceof CellError) return ds;
+    if (vs.length !== ds.length || !vs.length) return E.NUM;
+    if (r <= -1 || ds.some((d) => d < ds[0])) return E.NUM;
+    return fin(vs.reduce((s, v, i) => s + v / (1 + r) ** ((Math.floor(ds[i]) - Math.floor(ds[0])) / 365), 0));
+  }),
+  XIRR: def(2, 3, (c, a, cx) => {
+    const vs = numbersOf(c, [a[0]], cx);
+    const ds = numbersOf(c, [a[1]], cx);
+    const g = opt(c, a, 2, cx, 0.1);
+    if (vs instanceof CellError) return vs;
+    if (ds instanceof CellError) return ds;
+    if (g instanceof CellError) return g;
+    if (vs.length !== ds.length || vs.length < 2 || ds.some((d) => d < ds[0])) return E.NUM;
+    if (!vs.some((v) => v > 0) || !vs.some((v) => v < 0)) return E.NUM;
+    const years = ds.map((d) => (Math.floor(d) - Math.floor(ds[0])) / 365);
+    const r = solve((x) => (x <= -1 ? NaN : vs.reduce((s, v, i) => s + v / (1 + x) ** years[i], 0)), g);
+    return r instanceof CellError ? r : fin(r);
+  }),
+  MIRR: def(3, 3, (c, a, cx) => {
+    const vs = numbersOf(c, [a[0]], cx);
+    const fr = N(c, a[1], cx);
+    const rr = N(c, a[2], cx);
+    if (vs instanceof CellError) return vs;
+    if (fr instanceof CellError) return fr;
+    if (rr instanceof CellError) return rr;
+    const n = vs.length;
+    if (n < 2 || !vs.some((v) => v > 0) || !vs.some((v) => v < 0)) return E.DIV;
+    const npv = (rate: number, xs: number[]) => xs.reduce((s, v, i) => s + v / (1 + rate) ** (i + 1), 0);
+    const up = npv(rr, vs.map((v) => (v > 0 ? v : 0)));
+    const down = npv(fr, vs.map((v) => (v < 0 ? v : 0)));
+    return fin((-up * (1 + rr) ** n / (down * (1 + fr))) ** (1 / (n - 1)) - 1);
+  }),
+  SLN: money(3, 3, (cost, salvage, life) => (life === 0 ? E.DIV : (cost - salvage) / life)),
+  DB: money(4, 5, (cost, salvage, life, period, month) => {
+    const m = Number.isNaN(month) ? 12 : Math.trunc(month);
+    const per = Math.trunc(period);
+    if (cost < 0 || salvage < 0 || life <= 0 || per < 1 || m < 1 || m > 12 || per > life + (m < 12 ? 1 : 0)) return E.NUM;
+    if (cost === 0) return 0;
+    const rate = Math.round((1 - (salvage / cost) ** (1 / life)) * 1000) / 1000;
+    let total = 0;
+    let dep = 0;
+    for (let i = 1; i <= per; i++) {
+      dep = i === 1 ? (cost * rate * m) / 12 : i === life + 1 ? ((cost - total) * rate * (12 - m)) / 12 : (cost - total) * rate;
+      total += dep;
+    }
+    return dep;
+  }),
+  DDB: money(4, 5, (cost, salvage, life, period, factor) => {
+    const f = Number.isNaN(factor) ? 2 : factor;
+    if (cost < 0 || salvage < 0 || life <= 0 || period < 1 || period > life || f <= 0) return E.NUM;
+    let total = 0;
+    let dep = 0;
+    for (let i = 1; i <= Math.ceil(period); i++) {
+      dep = Math.max(0, Math.min((cost - total) * (f / life), cost - salvage - total));
+      total += dep;
+    }
+    return dep;
+  }),
+  CUMIPMT: cumulative(false),
+  CUMPRINC: cumulative(true),
+  EFFECT: money(2, 2, (r, n) => (r <= 0 || Math.trunc(n) < 1 ? E.NUM : (1 + r / Math.trunc(n)) ** Math.trunc(n) - 1)),
+  NOMINAL: money(2, 2, (e, n) => (e <= 0 || Math.trunc(n) < 1 ? E.NUM : Math.trunc(n) * ((1 + e) ** (1 / Math.trunc(n)) - 1))),
+  'NORM.S.DIST': def(1, 2, (c, a, cx) => {
+    const z = N(c, a[0], cx);
+    const cum = has(a, 1) ? B(c, a[1], cx) : true;
+    if (z instanceof CellError) return z;
+    if (cum instanceof CellError) return cum;
+    return cum ? normCdf(z) : fin(Math.exp((-z * z) / 2) / Math.sqrt(2 * Math.PI));
+  }),
+  NORMSDIST: def(1, 1, (c, a, cx) => {
+    const z = N(c, a[0], cx);
+    return z instanceof CellError ? z : normCdf(z);
+  }),
+  'NORM.DIST': def(4, 4, (c, a, cx) => {
+    const x = N(c, a[0], cx);
+    const m = N(c, a[1], cx);
+    const sd = N(c, a[2], cx);
+    const cum = B(c, a[3], cx);
+    if (x instanceof CellError) return x;
+    if (m instanceof CellError) return m;
+    if (sd instanceof CellError) return sd;
+    if (cum instanceof CellError) return cum;
+    if (sd <= 0) return E.NUM;
+    const z = (x - m) / sd;
+    return cum ? normCdf(z) : fin(Math.exp((-z * z) / 2) / (sd * Math.sqrt(2 * Math.PI)));
+  }),
+  'NORM.S.INV': math(1, 1, (p) => (p <= 0 || p >= 1 ? E.NUM : normInv(p))),
+  NORMSINV: math(1, 1, (p) => (p <= 0 || p >= 1 ? E.NUM : normInv(p))),
+  'NORM.INV': math(3, 3, (p, m, sd) => (p <= 0 || p >= 1 || sd <= 0 ? E.NUM : m + sd * normInv(p))),
+  SKEW: agg((xs) => {
+    const n = xs.length;
+    if (n < 3) return E.DIV;
+    const m = sum(xs) / n;
+    const s = Math.sqrt(sum(xs.map((x) => (x - m) ** 2)) / (n - 1));
+    return s === 0 ? E.DIV : (n / ((n - 1) * (n - 2))) * sum(xs.map((x) => ((x - m) / s) ** 3));
+  }),
+  KURT: agg((xs) => {
+    const n = xs.length;
+    if (n < 4) return E.DIV;
+    const m = sum(xs) / n;
+    const s = Math.sqrt(sum(xs.map((x) => (x - m) ** 2)) / (n - 1));
+    return s === 0 ? E.DIV : ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * sum(xs.map((x) => ((x - m) / s) ** 4)) - (3 * (n - 1) ** 2) / ((n - 2) * (n - 3));
+  }),
+  COMBIN: math(2, 2, (n, k) => {
+    const [a, b] = [Math.trunc(n), Math.trunc(k)];
+    if (a < 0 || b < 0 || b > a) return E.NUM;
+    let r = 1;
+    for (let i = 1; i <= Math.min(b, a - b); i++) r = (r * (a - i + 1)) / i;
+    return Math.round(r);
+  }),
+  PERMUT: math(2, 2, (n, k) => {
+    const [a, b] = [Math.trunc(n), Math.trunc(k)];
+    if (a < 0 || b < 0 || b > a) return E.NUM;
+    let r = 1;
+    for (let i = 0; i < b; i++) r *= a - i;
+    return r;
+  }),
+  TRIMMEAN: def(2, 2, (c, a, cx) => {
+    const xs = numbersOf(c, [a[0]], cx);
+    const p = N(c, a[1], cx);
+    if (xs instanceof CellError) return xs;
+    if (p instanceof CellError) return p;
+    if (p < 0 || p >= 1 || !xs.length) return E.NUM;
+    // Excel leaves out a whole number of values, the same count from each end (rounded down to an even number).
+    const cut = Math.floor(Math.floor(xs.length * p) / 2);
+    return mean(sorted(xs).slice(cut, xs.length - cut));
+  }),
+  FORMULATEXT: def(1, 1, (c, a, cx) => {
+    const v = c.ev(a[0], cx);
+    if (!isRg(v)) return E.NA;
+    const f = c.cellAt(v.si, v.r1, v.c1)?.f;
+    return f === undefined ? E.NA : `=${f}`;
+  }),
+  ISURL: def(1, 1, (c, a, cx) => {
+    const v = S(c, a[0], cx);
+    return typeof v === 'string' && /^(?:(?:https?|ftp):\/\/)?(?:[\w-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?$/i.test(v.trim());
+  }),
+  ISEMAIL: def(1, 1, (c, a, cx) => {
+    const v = S(c, a[0], cx);
+    return typeof v === 'string' && /^[A-Za-z0-9._%+'-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}$/.test(v.trim());
+  }),
+  NUMBERVALUE: def(1, 3, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    const dec = has(a, 1) ? T(c, a[1], cx) : '.';
+    const grp = has(a, 2) ? T(c, a[2], cx) : ',';
+    if (t instanceof CellError) return t;
+    if (dec instanceof CellError) return dec;
+    if (grp instanceof CellError) return grp;
+    if (dec === grp || dec.length !== 1 || (has(a, 2) && grp.length !== 1)) return E.VALUE;
+    let s = t.replace(/\s+/g, '');
+    if (s === '') return 0;
+    // Each % at the end divides by a hundred.
+    let pct = 0;
+    while (s.endsWith('%')) {
+      s = s.slice(0, -1);
+      pct++;
+    }
+    const ints = s.split(dec);
+    if (ints.length > 2) return E.VALUE;
+    const clean = ints.map((x, i) => (i === 0 && grp ? x.split(grp).join('') : x));
+    const text = clean.join('.');
+    if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return E.VALUE;
+    return fin(Number(text) / 100 ** pct);
+  }),
+  DOLLAR: def(1, 2, (c, a, cx) => {
+    const x = N(c, a[0], cx);
+    const dp = opt(c, a, 1, cx, 2);
+    if (x instanceof CellError) return x;
+    if (dp instanceof CellError) return dp;
+    const d = Math.trunc(dp);
+    const r = roundTo(x, d);
+    const body = fixed(Math.abs(r), Math.max(0, d), true);
+    return r < 0 ? `($${body})` : `$${body}`;
+  }),
+  UNICODE: def(1, 1, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    return t instanceof CellError ? t : t === '' ? E.VALUE : (t.codePointAt(0) as number);
+  }),
+  UNICHAR: def(1, 1, (c, a, cx) => {
+    const n = N(c, a[0], cx);
+    if (n instanceof CellError) return n;
+    const k = Math.trunc(n);
+    return k < 1 || k > 0x10ffff || (k >= 0xd800 && k <= 0xdfff) ? E.VALUE : String.fromCodePoint(k);
+  }),
+  ROMAN: def(1, 2, (c, a, cx) => {
+    const x = N(c, a[0], cx);
+    if (x instanceof CellError) return x;
+    // The form: 0 or TRUE classic; 1 to 3 more concise; 4 or FALSE the most concise.
+    let form = 0;
+    if (has(a, 1)) {
+      const v = S(c, a[1], cx);
+      if (v instanceof CellError) return v;
+      form = typeof v === 'boolean' ? (v ? 0 : 4) : Math.trunc(toNum(v) as number);
+    }
+    const n = Math.trunc(x);
+    if (n < 0 || n > 3999 || form < 0 || form > 4 || Number.isNaN(form)) return E.VALUE;
+    return n === 0 ? '' : romanOf(n, form);
+  }),
+  ARABIC: def(1, 1, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    if (t instanceof CellError) return t;
+    const s = t.trim().toUpperCase();
+    const neg = s.startsWith('-');
+    const body = neg ? s.slice(1) : s;
+    if (body === '') return neg ? E.VALUE : 0;
+    if (!/^[MDCLXVI]+$/.test(body) || body.length > 255) return E.VALUE;
+    const val: Record<string, number> = { M: 1000, D: 500, C: 100, L: 50, X: 10, V: 5, I: 1 };
+    let total = 0;
+    for (let i = 0; i < body.length; i++) {
+      const v = val[body[i]];
+      total += v < (val[body[i + 1]] ?? 0) ? -v : v;
+    }
+    return neg ? -total : total;
+  }),
+  DEC2BIN: toBase('BIN'),
+  DEC2OCT: toBase('OCT'),
+  DEC2HEX: toBase('HEX'),
+  BIN2DEC: fromBase('BIN'),
+  OCT2DEC: fromBase('OCT'),
+  HEX2DEC: fromBase('HEX'),
+  ENCODEURL: def(1, 1, (c, a, cx) => {
+    const t = T(c, a[0], cx);
+    return t instanceof CellError ? t : encodeURIComponent(t).replace(/[!'()*]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  }),
+  FLATTEN: def(1, 255, (c, a, cx) => {
+    const d: Scalar[] = [];
+    for (const n of a) {
+      const v = c.arr(evA(c, n, cx));
+      if (v instanceof CellError) return v;
+      d.push(...v.d);
+    }
+    if (d.length > MAX_ARRAY) return E.NUM;
+    return { k: 'arr', h: d.length, w: 1, d };
+  }),
+  SORTN: def(1, 255, (c, a, cx) => {
+    const src = c.arr(evA(c, a[0], cx));
+    if (src instanceof CellError) return src;
+    const count = opt(c, a, 1, cx, 1);
+    const ties = opt(c, a, 2, cx, 0);
+    if (count instanceof CellError) return count;
+    if (ties instanceof CellError) return ties;
+    const n = Math.trunc(count);
+    const mode = Math.trunc(ties);
+    if (n < 1 || mode < 0 || mode > 3) return E.VALUE;
+    // Pairs of a column to sort by and whether it goes up (TRUE, the default).
+    const keys: { col: number; asc: boolean }[] = [];
+    for (let i = 3; i < a.length; i += 2) {
+      const col = N(c, a[i], cx);
+      const asc = has(a, i + 1) ? B(c, a[i + 1], cx) : true;
+      if (col instanceof CellError) return col;
+      if (asc instanceof CellError) return asc;
+      if (col < 1 || col > src.w) return E.VALUE;
+      keys.push({ col: Math.trunc(col) - 1, asc });
+    }
+    if (!keys.length) keys.push({ col: 0, asc: true });
+    const lines = linesOf(src, false);
+    const cmp = (x: Scalar[], y: Scalar[]) => {
+      for (const k of keys) {
+        const d = sortCmp(x[k.col], y[k.col]);
+        if (d) return d * (x[k.col] === null || y[k.col] === null || k.asc ? 1 : -1);
+      }
+      return 0;
+    };
+    let rows = lines.map((l, i) => [l, i] as const).sort((x, y) => cmp(x[0], y[0]) || x[1] - y[1]).map((x) => x[0]);
+    // Modes 2 and 3 leave out rows that repeat an earlier one.
+    if (mode >= 2) {
+      const seen = new Set<string>();
+      rows = rows.filter((l) => {
+        const k = l.map((v) => (typeof v === 'string' ? `s${v.toLowerCase()}` : `${typeof v}${String(v)}`)).join('\u0001');
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    }
+    let kept = rows.slice(0, n);
+    // Modes 1 and 3 keep the rows that tie with the last one kept.
+    if ((mode === 1 || mode === 3) && rows.length > n) for (let i = n; i < rows.length && cmp(rows[i], rows[n - 1]) === 0; i++) kept.push(rows[i]);
+    if (!kept.length) kept = [];
+    return kept.length ? fromLines(kept, false) : E.NA;
+  }),
+};
+
+MORE_FNS.NORMDIST = MORE_FNS['NORM.DIST'];
+MORE_FNS.NORMINV = MORE_FNS['NORM.INV'];
+
+const FNS: Record<string, Fn> = { ...MATH_FNS, ...LOGIC_FNS, ...INFO_FNS, ...LOOKUP_FNS, ...TEXT_FNS, ...DATE_FNS, ...MONEY_FNS, ...ARRAY_FNS, ...LAMBDA_FNS, ...ARRAY2_FNS, ...TEXT2_FNS, ...STAT_FNS, ...MORE_FNS, ...AI_FNS };
 FNS['MODE.SNGL'] = FNS.MODE;
 FNS['RANK.EQ'] = FNS.RANK;
 

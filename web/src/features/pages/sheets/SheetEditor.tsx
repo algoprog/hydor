@@ -11,7 +11,7 @@
 // Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. While an agent writes a
 // new version (live.ts), it shows as it comes, read-only, the cell its words arrive in boxed and kept in view.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye, MessageCircleQuestionMark, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, ListTree, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye, MessageCircleQuestionMark, RefreshCw } from 'lucide-react';
 import { newCommentId } from '@shared/comments';
 import {
   cleanBorder,
@@ -24,6 +24,7 @@ import {
   dateSerial,
   DEFAULT_DP,
   formatValue,
+  FUNCTION_NAMES,
   formulaProblem,
   formulaRefs,
   generalNumber,
@@ -32,6 +33,7 @@ import {
   keyOf,
   MAX_H,
   MAX_W,
+  MIN_H,
   MIN_W,
   newId,
   nowSerial,
@@ -64,6 +66,8 @@ import {
   type Workbook,
   type CellValue,
   adjustForDelete,
+  adjustForMove,
+  adjustForMoveLines,
   normalizeBook,
   quoteSheet,
   renameName,
@@ -78,14 +82,16 @@ import { dependents, goalSeek, precedents, rectWords } from '@shared/sheet-whati
 import type { AnalyzeIdea, FillAnswer, TableAnswer } from '@shared/sheet-ai';
 import { findIssues, type CleanIssue } from '@shared/sheet-clean';
 import { flashFill } from '@shared/sheet-flash';
+import { htmlText, looksFor, parseHtmlTable, tableText } from '@shared/sheet-html';
 import { allowed, columnValues, CondFormats, filterHidden, listOptions, Merges, Rules } from '@shared/sheet-rules';
+import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { Button, cx, MenuBack, MenuItem, MenuSep, Popover, SheetsOnPhone, useConfirm } from '../../../components/ui';
 import { CharPicker } from '../common/CharPicker';
 import { FindBar, useFind } from '../common/FindBar';
 import { isMod } from '../common/keys';
-import { MenuBar } from '../common/menus';
+import { ContextMenu, MenuBar, type MenuEntry } from '../common/menus';
 import { useOwnScroll } from '../live';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
@@ -94,10 +100,11 @@ import { ChartLayer, ChartPanel } from './Charts';
 import { CommentsPanel, type SheetCommentAi } from './CommentsPanel';
 import { commentsRequest, sheetWhere } from '@shared/comment-asks';
 import { CondPanel } from './CondPanel';
-import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
+import { DupDialog, FormatDialog, FunctionsDialog, SizeDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
 import { fillDownTo, fillSeries } from './fill';
 import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
+import { FUNCTION_INFO } from './functions';
 import { fontPx, Grid, textWidth, type Edit, type GridGeo, type GridHandle, type GridView, type RefBox, type Smart } from './Grid';
 import { sheetMenus, type MenuCtx } from './menus';
 import {
@@ -242,7 +249,7 @@ function codeDecimals(code: string, d: 1 | -1): string {
 const clone = (b: Workbook): Workbook => structuredClone(b);
 
 type PanelState = { kind: 'cf' } | { kind: 'dv'; start?: Validation } | { kind: 'chart'; id: string } | { kind: 'comments'; draft?: boolean } | { kind: 'analyze'; block: Rect; header: boolean } | { kind: 'clean'; block: Rect; header: boolean } | { kind: 'names' } | { kind: 'protect' } | { kind: 'pivot'; start: PivotDef; editing: boolean } | null;
-type DialogState = 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | 'print' | null;
+type DialogState = 'functions' | 'sort' | 'dups' | 'split' | 'format' | 'shortcuts' | 'summary' | 'table-ai' | 'link' | 'goal' | 'print' | null;
 type PickState = { kind: 'list' | 'date' | 'note' | 'chars'; r: number; c: number; at: DOMRect } | null;
 
 /** Where an agent's words are arriving: its cell, boxed in the app's busy colour with a small flag (as a collaborator's in Google Sheets). */
@@ -287,7 +294,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const caretRef = useRef(0);
   const [caret, setCaret] = useState(0);
   const [cutMark, setCutMark] = useState<{ sheet: string; x: Rect } | null>(null);
-  const [ctx, setCtx] = useState<{ x: number; y: number; on: 'cell' | 'col' | 'row'; sub?: 'paste' } | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; on: 'cell' | 'col' | 'row'; keyed?: boolean } | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [confirm, confirmNode] = useConfirm();
@@ -312,7 +319,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   // A list cell being typed into: the option its words pick (Enter takes it).
   const [suggestAt, setSuggestAt] = useState(0);
   const find = useFind();
-  const [findHow, setFindHow] = useState({ formulas: false, wholeCell: false, allSheets: false });
+  const [findHow, setFindHow] = useState<{ formulas: boolean; wholeCell: boolean; allSheets: boolean; area?: { si: number; rects: Rect[] } | null }>({ formulas: false, wholeCell: false, allSheets: false });
   const [findAt, setFindAt] = useState(-1);
 
   const setEdit = (e: Edit | null) => {
@@ -367,7 +374,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const calc = liveCalc ?? calcRef.current;
   // What draws the cells again: each change here, or each draw of the agent's version.
   const shownRev = liveOn ? -agent!.n : rev;
-  const sheetIx = book ? Math.min(si, book.sheets.length - 1) : 0;
+  // A workbook that opens (or comes back from an older version) on a hidden sheet shows the first one that shows.
+  const sheetIx = book ? (book.sheets[Math.min(si, book.sheets.length - 1)]?.hidden ? Math.max(0, book.sheets.findIndex((s) => !s.hidden)) : Math.min(si, book.sheets.length - 1)) : 0;
   const sheet: Sheet | undefined = book?.sheets[sheetIx];
   const size = useMemo(() => (calc ? gridSize(calc, sheetIx, sheet) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev, sheet]); // eslint-disable-line react-hooks/exhaustive-deps
   // The sheet and the cell being written stay in view, unless a sheet was picked or the cells scrolled here lately.
@@ -864,6 +872,57 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     restyle((s) => withStyle(s, { fmt: fmt === 'general' ? undefined : fmt, dp: undefined, code: undefined, cur: (fmt === 'currency' || fmt === 'accounting') && cur && cur !== '$' ? cur : undefined }));
   };
   const setCode = (code: string | undefined) => restyle((s) => withStyle(s, { code, dp: undefined, cur: undefined, fmt: undefined }));
+  /** Ctrl+Shift+1 to 6: number, time, date, currency, percent, scientific (Excel's quick formats). */
+  const quickFormat = (n: number) => {
+    const fmt = (['number', 'time', 'date', 'currency', 'percent', 'scientific'] as const)[n - 1];
+    if (fmt) setFormat(fmt, '$');
+  };
+  /** The $ and % buttons: the format on, or back to automatic when the cell has it already. */
+  const toggleFormat = (fmt: 'currency' | 'percent') => setFormat(active?.s?.fmt === fmt && !active.s.code ? 'general' : fmt, '$');
+  /**
+   * AutoSum (Alt+=, Insert → AutoSum, the Σ button): `fn` of the numbers above the cell (else to its left); with several
+   * cells picked, of each column under them (of the row, for one row). Where there are no numbers it starts the formula.
+   */
+  const autoSum = (fn: string) => {
+    if (!book || !sheet || !calc || readOnly) return;
+    const b = rectOf(selRef.current);
+    const num = (r: number, c: number) => r >= 0 && c >= 0 && typeof calc.value(sheetIx, r, c) === 'number';
+    const changes: Record<string, Cell | null> = {};
+    const put = (r: number, c: number, range: string) => {
+      const k = refName(r, c);
+      changes[k] = typedInto(sheet.cells[k], `=${fn}(${range})`);
+    };
+    if (!single(selRef.current)) {
+      if (b.r2 > b.r1) for (let c = b.c1; c <= b.c2; c++) put(b.r2 + 1, c, `${refName(b.r1, c)}:${refName(b.r2, c)}`);
+      else put(b.r1, b.c2 + 1, `${refName(b.r1, b.c1)}:${refName(b.r1, b.c2)}`);
+    } else {
+      const { r, c } = selRef.current;
+      let top = r;
+      while (num(top - 1, c)) top--;
+      let left = c;
+      while (num(r, left - 1)) left--;
+      if (top < r) put(r, c, `${refName(top, c)}:${refName(r - 1, c)}`);
+      else if (left < c) put(r, c, `${refName(r, left)}:${refName(r, c - 1)}`);
+      else return typeIn(`=${fn}(`);
+    }
+    change(cellsPatch(book, sheetIx, changes));
+    grid.current?.focus();
+  };
+  // The format painter: the look of the cell picked, to paint on what is picked next (a double click keeps it on; Esc ends it).
+  const [painter, setPainter] = useState<{ s: CellStyle | undefined; keep: boolean } | null>(null);
+  const startPainter = (keep: boolean) => {
+    if (readOnly) return;
+    if (painter && !keep) return setPainter(null);
+    setPainter({ s: active?.s, keep });
+    toast(tr(keep ? 'Format painter on: pick cells to paint them; Esc to stop.' : 'Format painter: pick the cells to paint.'));
+  };
+  /** The cells picked are painted with the look the painter holds (all of it: a cell with none loses its own). */
+  const paint = () => {
+    if (!painter) return;
+    const s = painter.s;
+    if (!painter.keep) setPainter(null);
+    restyle(() => s);
+  };
   const stepDecimals = (d: 1 | -1) => {
     if (!calc) return;
     const s = active?.s;
@@ -913,22 +972,27 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   };
 
   // ---- sizes, freezing, zoom --------------------------------------------------------------------------------------------------
-  const setSize = (axis: 'col' | 'row', i: number, sz: number | null) => {
+  /** Several columns' (or rows') sizes set in one step (null: back to the default size). */
+  const setSizes = (axis: 'col' | 'row', sizes: [number, number | null][]) => {
     if (!sheet) return;
     const key = axis === 'col' ? 'cols' : 'rows';
     const next: Record<number, { w?: number; h?: number; hidden?: boolean }> = { ...(sheet[key] ?? {}) };
-    const cur = { ...(next[i] ?? {}) };
-    if (sz === null || sz === (axis === 'col' ? COL_W : ROW_H)) delete cur[axis === 'col' ? 'w' : 'h'];
-    else cur[axis === 'col' ? 'w' : 'h'] = sz;
-    if (Object.keys(cur).length) next[i] = cur;
-    else delete next[i];
+    for (const [i, sz] of sizes) {
+      const cur = { ...(next[i] ?? {}) };
+      if (sz === null || sz === (axis === 'col' ? COL_W : ROW_H)) delete cur[axis === 'col' ? 'w' : 'h'];
+      else cur[axis === 'col' ? 'w' : 'h'] = sz;
+      if (Object.keys(cur).length) next[i] = cur;
+      else delete next[i];
+    }
     change(metaPatch(sheet, { [key]: Object.keys(next).length ? next : undefined }));
   };
-  const fit = (axis: 'col' | 'row', i: number) => {
-    if (!sheet || !calc) return;
+  const setSize = (axis: 'col' | 'row', i: number, sz: number | null) => setSizes(axis, [[i, sz]]);
+  /** The size that fits what a column (or row) holds, or null for the default. */
+  const fitSize = (axis: 'col' | 'row', i: number): number | null => {
+    if (!sheet || !calc) return null;
     if (axis === 'row') {
       const hgt = neededHeight(i);
-      return setSize('row', i, hgt <= ROW_H ? null : Math.min(MAX_H, hgt));
+      return hgt <= ROW_H ? null : Math.min(MAX_H, hgt);
     }
     let most = 0;
     for (const [k, r] of cellsIn(sheet, calc, sheetIx, { r1: 0, c1: i, r2: size.rows - 1, c2: i })) {
@@ -936,7 +1000,31 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       if (!holds(cell)) continue;
       most = Math.max(most, textWidth(formatValue(calc.value(sheetIx, r, i), cell.s), cell.s) + 14);
     }
-    setSize('col', i, most ? Math.max(MIN_W + 16, Math.min(MAX_W, Math.ceil(most))) : null);
+    return most ? Math.max(MIN_W + 16, Math.min(MAX_W, Math.ceil(most))) : null;
+  };
+  const fit = (axis: 'col' | 'row', i: number) => setSize(axis, i, fitSize(axis, i));
+  /** The columns (or rows) picked: the whole ones a header was clicked on, else those the cells picked are in. */
+  const pickedLines = (axis: 'col' | 'row'): number[] => {
+    const [a, b] = axis === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    return Array.from({ length: b - a + 1 }, (_, k) => a + k);
+  };
+  const fitSelected = (axis: 'col' | 'row') => setSizes(axis, pickedLines(axis).map((i) => [i, fitSize(axis, i)]));
+  /** Resize column… and Resize row…: the exact size asked for in a dialog, for each one picked. */
+  const [sizeAsk, setSizeAsk] = useState<{ axis: 'col' | 'row'; value: number } | null>(null);
+  const askSize = (axis: 'col' | 'row') => {
+    if (!sheet) return;
+    setSizeAsk({ axis, value: axis === 'col' ? colW(sheet, x.c1) : rowH(sheet, x.r1) });
+  };
+  const sizeSelected = (axis: 'col' | 'row', value: number) => {
+    const sz = Math.max(axis === 'col' ? MIN_W : MIN_H, Math.min(axis === 'col' ? MAX_W : MAX_H, Math.round(value)));
+    setSizes(axis, pickedLines(axis).map((i) => [i, sz]));
+  };
+  /** Move up, Move down, Move left, Move right: the rows (columns) picked go one place over. */
+  const moveStep = (axis: 'row' | 'col', dir: -1 | 1) => {
+    const [a, b] = axis === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    const limit = axis === 'row' ? size.rows : size.cols;
+    if (dir < 0 ? a < 1 : b + 1 >= limit) return;
+    moveLines(axis, a, b - a + 1, dir < 0 ? a - 1 : b + 2);
   };
   const setFreeze = (rows: number, cols: number) => {
     if (!sheet) return;
@@ -1043,6 +1131,36 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     setSel(rectSel(limited, selRef.current.r, selRef.current.c));
     grid.current?.focus();
   };
+  /**
+   * Cells dragged by their border to a new place (the grid says how many rows and columns): moved, with what pointed at
+   * them following, or copied with the copy key held (formulas move along as in any copy).
+   */
+  const moveCells = (from: Rect, dr: number, dc: number, copy: boolean) => {
+    const b = bookRef.current;
+    if (!b || !sheet || !calc || readOnly || (!dr && !dc)) return;
+    const to = { r1: from.r1 + dr, c1: from.c1 + dc, r2: from.r2 + dr, c2: from.c2 + dc };
+    if (to.r1 < 0 || to.c1 < 0 || to.r2 >= SHEET_LIMITS.rows || to.c2 >= SHEET_LIMITS.cols) return void toast(tr('That would go past the end of the sheet.'));
+    if (copy) {
+      const got = pasteChanges(sheet, to, { clip: copyOf(sheet, calc, sheetIx, from).clip });
+      change(cellsPatch(b, sheetIx, got.changes));
+      setSel(rectSel(got.x, got.x.r1, got.x.c1), true);
+      return;
+    }
+    const after = adjustForMove(b, { sheet: sheet.id, x: from }, { sheet: sheet.id, r: to.r1, c: to.c1 });
+    if (after === b) return;
+    change({ k: 'book', before: b, after });
+    setSel(rectSel(to), true);
+  };
+  /** Rows or columns dragged by their numbers (letters) before the row (column) `to`; also Move up, Move down, Move left and Move right. */
+  const moveLines = (axis: 'row' | 'col', from: number, count: number, to: number) => {
+    const b = bookRef.current;
+    if (!b || !sheet || readOnly) return;
+    const after = adjustForMoveLines(b, sheet.id, axis, from, count, to);
+    if (after === b) return;
+    change({ k: 'book', before: b, after });
+    const start = to > from ? to - count : to;
+    setSel(axis === 'row' ? { r: start, c: 0, ar: start, ac: 0, fr: start + count - 1, fc: size.cols - 1 } : { r: 0, c: start, ar: 0, ac: start, fr: size.rows - 1, fc: start + count - 1 }, true);
+  };
   const fillDown = () => {
     if (!sheet || !calc) return;
     const src = rectOf(selRef.current);
@@ -1073,58 +1191,47 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     e.clipboardData.setData('text/html', got.html);
   };
   const norm = (t: string) => t.replace(/\r\n?/g, '\n').replace(/\n$/, '');
-  const pasteText = (text: string) => {
+  /** Text pasted (`html`: the table it came with from Excel, Google Sheets or a web page, which gives the cells their looks). */
+  const pasteText = (text: string, html?: string) => {
     const b = bookRef.current;
     if (!b || !sheet || readOnly) return;
     const own = clip && norm(clip.text) === norm(text) ? clip : null;
     const target = rectOf(selRef.current);
-    const got = pasteChanges(sheet, target, own ? { clip: own } : { text });
-    const patches: (Patch | null)[] = [];
     if (own?.cut) {
-      // Cells cut leave where they were (all but those pasted over), their comments going with them.
-      const from = b.sheets.find((s) => s.id === own.sheet);
-      const dr = got.x.r1 - own.x.r1;
-      const dc = got.x.c1 - own.x.c1;
-      const inCut = (cm: SheetComment) => {
-        const p = parseRef(cm.cell)!;
-        return p.r >= own.x.r1 && p.r <= own.x.r2 && p.c >= own.x.c1 && p.c <= own.x.c2;
-      };
-      const going = from?.comments?.filter(inCut) ?? [];
-      if (from && going.length) {
-        const moved = going.map((cm) => {
-          const p = parseRef(cm.cell)!;
-          return { ...cm, cell: refName(p.r + dr, p.c + dc) };
-        });
-        const keep = (list: SheetComment[] | undefined, out: Set<string>) => (list ?? []).filter((cm) => !out.has(cm.cell));
-        const target = new Set(moved.map((m) => m.cell));
-        if (from.id === sheet.id) patches.push(metaPatch(from, { comments: [...keep(from.comments?.filter((cm) => !inCut(cm)), target), ...moved].sort((x, y) => keyOf(x.cell) - keyOf(y.cell)) }));
-        else {
-          const rest = from.comments!.filter((cm) => !inCut(cm));
-          patches.push(metaPatch(from, { comments: rest.length ? rest : undefined }));
-          patches.push(metaPatch(sheet, { comments: [...keep(sheet.comments, target), ...moved].sort((x, y) => keyOf(x.cell) - keyOf(y.cell)) }));
-        }
-      }
-      if (from) {
-        const empty: Record<string, Cell | null> = {};
-        for (let r = own.x.r1; r <= own.x.r2; r++)
-          for (let c = own.x.c1; c <= own.x.c2; c++) {
-            const k = refName(r, c);
-            if (from.id !== sheet.id || !(k in got.changes)) empty[k] = null;
-          }
-        patches.push(cellsPatch(b, b.sheets.indexOf(from), empty));
-      }
+      // Cells cut move (looks, notes and comments too) and everything that pointed at them points where they went:
+      // formulas, names, charts, rules.
+      const w = own.x.c2 - own.x.c1;
+      const h = own.x.r2 - own.x.r1;
       clip = null;
       setCutMark(null);
+      if (target.r1 + h >= SHEET_LIMITS.rows || target.c1 + w >= SHEET_LIMITS.cols) return void toast(tr('That would go past the end of the sheet.'));
+      const after = adjustForMove(b, { sheet: own.sheet, x: own.x }, { sheet: sheet.id, r: target.r1, c: target.c1 });
+      if (after === b) return;
+      change({ k: 'book', before: b, after });
+      setSel(rectSel({ r1: target.r1, c1: target.c1, r2: target.r1 + h, c2: target.c1 + w }), true);
+      return;
     }
-    patches.push(cellsPatch(b, sheetIx, got.changes));
-    change(together(patches));
+    const styles = !own && html ? (looksFor(text, html) ?? undefined) : undefined;
+    const got = pasteChanges(sheet, target, own ? { clip: own } : { text, styles });
+    change(cellsPatch(b, sheetIx, got.changes));
     setSel(rectSel(got.x), true);
   };
   const onPaste = (e: React.ClipboardEvent) => {
-    const text = e.clipboardData.getData('text/plain');
-    if (!text) return;
+    const d = e.clipboardData;
+    const html = d.getData('text/html');
+    let text = d.getData('text/plain');
+    // A clipboard with only a table in it (some apps): its words are the cells.
+    const table = !text && html ? parseHtmlTable(html) : null;
+    if (table) text = tableText(table);
+    else if (!text && html) text = htmlText(html);
+    if (!text) {
+      // Only a picture, or something that has no words in it: say so rather than do nothing.
+      e.preventDefault();
+      if (!readOnly) toast(tr(Array.from(d.items ?? []).some((i) => i.type.startsWith('image/')) ? 'A picture can’t be pasted into cells. Insert it with a link or =IMAGE(“address”) instead.' : 'There is nothing in the clipboard that can be pasted into cells.'));
+      return;
+    }
     e.preventDefault();
-    pasteText(text);
+    pasteText(text, html || undefined);
   };
   /** The menu's Copy, Cut and Paste (the keys go through the clipboard events above). */
   const menuCopy = async (cut: boolean) => {
@@ -1149,10 +1256,29 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       return clip ? clip.text : null;
     }
   };
-  const menuPaste = async () => {
+  /** The clipboard's words, with its HTML when the browser lets it be read (the menu's Paste; Ctrl+V gets both with the event). */
+  const readClipboardWithLooks = async (): Promise<{ text: string; html?: string; picture?: boolean } | null> => {
+    try {
+      if (navigator.clipboard.read) {
+        for (const item of await navigator.clipboard.read()) {
+          const html = item.types.includes('text/html') ? await (await item.getType('text/html')).text() : undefined;
+          const text = item.types.includes('text/plain') ? await (await item.getType('text/plain')).text() : undefined;
+          if (text === undefined && !html) return item.types.some((t) => t.startsWith('image/')) ? { text: '', picture: true } : { text: '' };
+          const table = text === undefined && html ? parseHtmlTable(html) : null;
+          return { text: text ?? (table ? tableText(table) : htmlText(html ?? '')), html };
+        }
+      }
+    } catch {
+      // Not allowed, or not there: the plain words, if it will give them.
+    }
     const t = await readClipboard();
-    if (t !== null) pasteText(t);
-    else toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+    return t === null ? null : { text: t };
+  };
+  const menuPaste = async () => {
+    const got = await readClipboardWithLooks();
+    if (got === null) return void toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+    if (!got.text) return void toast(tr(got.picture ? 'A picture can’t be pasted into cells. Insert it with a link or =IMAGE(“address”) instead.' : 'There is nothing in the clipboard that can be pasted into cells.'));
+    pasteText(got.text, got.html);
   };
   /** Paste special: values, looks or formulas alone, or turned on its side. */
   const pasteHow = async (how: PasteHow) => {
@@ -1174,6 +1300,13 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   };
 
   // ---- sheets -------------------------------------------------------------------------------------------------------------------
+  /** A sheet with its tab's colour or hidden state set (undefined takes it off). */
+  const withTab = (s: Sheet, set: { tabColor?: string; hidden?: true }): Sheet => {
+    const next = { ...s, ...set };
+    if (next.tabColor === undefined) delete next.tabColor;
+    if (next.hidden === undefined) delete next.hidden;
+    return next;
+  };
   const swap = (after: Workbook) => book && change({ k: 'book', before: book, after });
   const addSheet = (made?: Sheet) => {
     if (!book) return;
@@ -1208,6 +1341,30 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     swap(removeSheet(bookRef.current!, book.sheets[i].id));
     setSi(Math.max(0, i - 1));
   };
+  /** A sheet's tab given a colour (or none). */
+  const tabColor = (i: number, color: string | undefined) => {
+    if (!book || !book.sheets[i]) return;
+    swap({ ...book, sheets: book.sheets.map((s, k) => (k === i ? withTab(s, { tabColor: color }) : s)) });
+  };
+  /** A sheet hidden from the tabs (at least one stays), and shown again. */
+  const hideSheet = (i: number) => {
+    if (!book || !book.sheets[i] || book.sheets.filter((s) => !s.hidden).length < 2) return void toast(tr('At least one sheet has to show.'));
+    swap({ ...book, sheets: book.sheets.map((s, k) => (k === i ? withTab(s, { hidden: true }) : s)) });
+    if (i === sheetIx) {
+      // The sheet being looked at went: the nearest one that shows is picked.
+      const rest = book.sheets.map((_, k) => k).filter((k) => k !== i && !book.sheets[k].hidden);
+      const next = rest.filter((k) => k < i).pop() ?? rest[0];
+      const s = sels.current.get(book.sheets[next].id) ?? cellSel(0, 0);
+      setSi(next);
+      selRef.current = s;
+      setSelState(s);
+    }
+  };
+  const showSheet = (i: number) => {
+    if (!book || !book.sheets[i]?.hidden) return;
+    swap({ ...book, sheets: book.sheets.map((s, k) => (k === i ? withTab(s, { hidden: undefined }) : s)) });
+    pickSheet(i);
+  };
   const moveSheet = (from: number, to: number) => {
     if (!book || to < 0 || to >= book.sheets.length || from === to) return;
     const list = [...book.sheets];
@@ -1215,6 +1372,53 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     list.splice(to, 0, s);
     swap({ ...book, sheets: list });
     setSi(to);
+  };
+  // A spreadsheet file dropped on the editor: its sheets come in after the sheet shown, as one step.
+  const [dropping, setDropping] = useState(false);
+  const droppingRef = useRef(false);
+  const addSheets = (made: Sheet[]) => {
+    if (!book || !made.length) return;
+    const room = SHEET_LIMITS.sheets - book.sheets.length;
+    if (room <= 0) return void toast(tr('A spreadsheet holds at most 50 sheets.'));
+    const names = book.sheets.map((s) => s.name);
+    const list: Sheet[] = [];
+    for (const m of made.slice(0, room)) list.push({ ...m, id: newId(), name: uniqueSheetName(m.name, [...names, ...list.map((s) => s.name)]) });
+    if (list.length < made.length) toast(tr('A spreadsheet holds at most 50 sheets.'));
+    if (sheet) sels.current.set(sheet.id, selRef.current);
+    swap({ ...book, sheets: [...book.sheets.slice(0, sheetIx + 1), ...list, ...book.sheets.slice(sheetIx + 1)] });
+    setSi(sheetIx + 1);
+    selRef.current = cellSel(0, 0);
+    setSelState(cellSel(0, 0));
+  };
+  const dropFiles = async (files: File[]) => {
+    const made: Sheet[] = [];
+    const base64 = (f: File) =>
+      new Promise<string>((ok, fail) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).replace(/^data:[^,]*,/, ''));
+        r.onerror = () => fail(new Error('The file could not be read'));
+        r.readAsDataURL(f);
+      });
+    for (const f of files) {
+      if (f.size > 30 * 1024 * 1024) {
+        toast(tr('That file is over 30 MB.'), 'error');
+        continue;
+      }
+      try {
+        if (/\.(csv|tsv|txt)$/i.test(f.name)) {
+          const got = sheetFromCsv(await f.text(), f.name.replace(/\.[^.]+$/, '') || 'Data', newId());
+          made.push(got.sheet);
+          for (const n of got.notes) toast(n);
+        } else if (/\.(xlsx|xlsm|ods)$/i.test(f.name)) {
+          const got = await post<{ sheets: Sheet[]; notes: string[] }>('/api/pages/sheet-file', { name: f.name, data: await base64(f) });
+          made.push(...got.sheets);
+          for (const n of got.notes) toast(n);
+        } else toast(tr(`“${f.name}” is not a spreadsheet file: use an .xlsx, .ods, .csv or .tsv file.`));
+      } catch (e) {
+        toastError(e);
+      }
+    }
+    addSheets(made);
   };
   const importCsv = async (f: File) => {
     if (f.size > 20 * 1024 * 1024) return void toast(tr('That file is over 20 MB.'), 'error');
@@ -1542,7 +1746,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (!book || !sheet || !calc || !toolBlock) return;
     const got = removeDuplicates(sheet, calc, sheetIx, toolBlock, header, cols);
     change(cellsPatch(book, sheetIx, got.changes));
-    toast(got.removed ? `${got.removed} duplicate row${got.removed === 1 ? '' : 's'} removed` : tr('No duplicate rows were found.'));
+    toast(got.removed ? tr(`${got.removed} duplicate row${got.removed === 1 ? '' : 's'} removed`) : tr('No duplicate rows were found.'));
   };
   const splitText = async (sepr: string) => {
     if (!book || !sheet || !calc) return;
@@ -1891,6 +2095,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   useEffect(() => setFindAt(-1), [find.query, find.options, findHow]);
   useEffect(() => {
     if (!findHow.allSheets) setFindAt(-1);
+    // Cells picked to search in are on the sheet they were picked on.
+    setFindHow((h) => (h.area && h.area.si !== sheetIx ? { ...h, area: null } : h));
   }, [sheetIx]); // eslint-disable-line react-hooks/exhaustive-deps
   const afterReplace = useRef(false);
   useEffect(() => {
@@ -1949,7 +2155,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       bySheet.set(m.si, list);
     }
     change(together([...bySheet].map(([s, changes]) => cellsPatch(book, s, changes))));
-    toast(count ? `${count} replacement${count === 1 ? '' : 's'} made` : tr('Nothing was replaced.'));
+    toast(count ? tr(`${count} replacement${count === 1 ? '' : 's'} made`) : tr('Nothing was replaced.'));
   };
 
   // ---- the Kanban board ------------------------------------------------------------------------------------------------------------
@@ -2133,6 +2339,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (mod && lower === 's') return void (e.preventDefault(), save());
     if (mod && lower === 'f') return void (e.preventDefault(), find.show());
     if (mod && lower === 'h') return void (e.preventDefault(), find.show(!readOnly));
+    // Ctrl+P: the print setup (the page prints through it: orientation, fit, the area, the header rows), not the browser's own box.
+    if (mod && lower === 'p' && !e.shiftKey && !e.altKey) return void (e.preventDefault(), e.stopPropagation(), !readOnly && setDialog('print'));
     // Undo and Redo: Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y, as the menu says (the app's own Ctrl+Z, for a pin, is not for here).
     if (mod && (lower === 'z' || lower === 'y')) return void (e.preventDefault(), e.stopPropagation(), lower === 'y' || e.shiftKey ? redo() : undo());
     if (mod && (k === '/' || e.code === 'Slash')) return void (e.preventDefault(), setDialog('shortcuts'));
@@ -2157,6 +2365,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       const key = lower as 'b' | 'i' | 'u';
       return setStyle({ [key]: !active?.s?.[key] || undefined });
     }
+    // Ctrl+Shift+1 to 6 set the number, time, date, currency, percent and scientific formats; Alt+= is AutoSum.
+    if (mod && e.shiftKey && !e.altKey && !readOnly && /^Digit[1-6]$/.test(e.code)) return void (e.preventDefault(), e.stopPropagation(), quickFormat(Number(e.code.slice(5))));
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (k === '=' || e.code === 'Equal') && !readOnly) return void (e.preventDefault(), autoSum('SUM'));
     if (e.altKey && e.shiftKey && e.code === 'Digit5' && !readOnly) return void (e.preventDefault(), setStyle({ s: !active?.s?.s || undefined }));
     if (mod && k === '\\' && !readOnly) return void (e.preventDefault(), clear(true));
     if (mod && e.shiftKey && lower === 'l' && !readOnly) return void (e.preventDefault(), toggleFilter());
@@ -2234,6 +2445,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       return e.shiftKey ? setSel({ ...s, fr: s.fr + n }, true) : setSel(cellSel(s.r + n, s.c), true);
     }
     if (k === 'Escape') {
+      if (painter) setPainter(null);
       if (find.open) find.close();
       if (cutMark) {
         setCutMark(null);
@@ -2247,7 +2459,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if ((k === 'ContextMenu' || (k === 'F10' && e.shiftKey)) && root.current) {
       e.preventDefault();
       const b = root.current.getBoundingClientRect();
-      setCtx({ x: b.left + 120, y: b.top + 140, on: 'cell' });
+      setCtx({ x: b.left + 120, y: b.top + 140, on: 'cell', keyed: true });
       return;
     }
     // A key typed on the grid itself (a keyboard with a tablet): typing begins with it.
@@ -2398,7 +2610,75 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     </>
   );
 
+  const announce = (() => {
+    if (edit || !calc) return '';
+    const v = formatValue(calc.value(sheetIx, sel.r, sel.c), active?.s);
+    return `${refName(sel.r, sel.c)}: ${holds(active) ? v : tr('empty')}${activeFormula ? `, ${tr('formula')} =${activeFormula}` : ''}`;
+  })();
   const askNow = onAsk ? () => (setCtx(null), onAsk(leadFor(selRef.current).lead)) : undefined;
+  /** What the right-click menu offers for what was pressed on: cells, a column's letter or a row's number. */
+  const ctxItems = (on: 'cell' | 'col' | 'row'): MenuEntry[] => {
+    const ro = !!readOnly;
+    const done = (f: () => void) => () => (setCtx(null), f());
+    const lines: 'row' | 'col' = on === 'row' ? 'row' : 'col';
+    const [first, last] = lines === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    const frozen = lines === 'row' ? sheet.freeze?.rows : sheet.freeze?.cols;
+    const header: MenuEntry[] =
+      on === 'cell' || ro
+        ? []
+        : [
+            '-',
+            lines === 'row'
+              ? { label: nRows === 1 ? 'Resize row…' : `Resize ${nRows} rows…`, also: 'height size', run: done(() => askSize('row')) }
+              : { label: nCols === 1 ? 'Resize column…' : `Resize ${nCols} columns…`, also: 'width size', run: done(() => askSize('col')) },
+            { label: 'Fit to the data', also: 'auto size best fit', run: done(() => fitSelected(lines)) },
+            lines === 'row'
+              ? { label: `Freeze up to row ${last + 1}`, checked: frozen === last + 1, run: done(() => setFreeze(frozen === last + 1 ? 0 : last + 1, sheet.freeze?.cols ?? 0)) }
+              : { label: `Freeze up to column ${colName(last)}`, checked: frozen === last + 1, run: done(() => setFreeze(sheet.freeze?.rows ?? 0, frozen === last + 1 ? 0 : last + 1)) },
+            { label: lines === 'row' ? 'Group rows' : 'Group columns', icon: <ListTree size={14} />, keys: 'Alt+Shift+Right', run: done(() => group()) },
+            { label: lines === 'row' ? 'Ungroup rows' : 'Ungroup columns', keys: 'Alt+Shift+Left', run: done(() => group(true)) },
+            { label: lines === 'row' ? 'Move up' : 'Move left', icon: lines === 'row' ? <ArrowUp size={14} /> : <ArrowLeft size={14} />, disabled: first < 1, run: done(() => moveStep(lines, -1)) },
+            { label: lines === 'row' ? 'Move down' : 'Move right', icon: lines === 'row' ? <ArrowDown size={14} /> : <ArrowRight size={14} />, disabled: last + 1 >= (lines === 'row' ? size.rows : size.cols), run: done(() => moveStep(lines, 1)) },
+          ];
+    return [
+      !ro && { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', run: done(() => void menuCopy(true)) },
+      { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', run: done(() => void menuCopy(false)) },
+      !ro && { label: 'Paste', icon: <ClipboardPaste size={14} />, keys: 'Ctrl+V', run: done(() => void menuPaste()) },
+      !ro && {
+        label: 'Paste special',
+        icon: <ClipboardPaste size={14} />,
+        items: [
+          { label: 'Values only', keys: 'Ctrl+Shift+V', run: done(() => void pasteHow('values')) },
+          { label: 'Formats only', run: done(() => void pasteHow('formats')) },
+          { label: 'Formulas only', run: done(() => void pasteHow('formulas')) },
+          { label: 'Transposed', run: done(() => void pasteHow('transposed')) },
+        ],
+      },
+      !ro && '-',
+      !ro && on !== 'col' && { label: nRows === 1 ? 'Insert a row above' : `Insert ${nRows} rows above`, icon: <BetweenHorizontalStart size={14} />, run: done(() => insert('row', false)) },
+      !ro && on === 'row' && { label: nRows === 1 ? 'Insert a row below' : `Insert ${nRows} rows below`, icon: <BetweenHorizontalStart size={14} />, run: done(() => insert('row', true)) },
+      !ro && on !== 'row' && { label: nCols === 1 ? 'Insert a column left' : `Insert ${nCols} columns left`, icon: <BetweenVerticalStart size={14} />, run: done(() => insert('col', false)) },
+      !ro && on === 'col' && { label: nCols === 1 ? 'Insert a column right' : `Insert ${nCols} columns right`, icon: <BetweenVerticalStart size={14} />, run: done(() => insert('col', true)) },
+      !ro && on !== 'col' && { label: nRows === 1 ? 'Delete this row' : `Delete ${nRows} rows`, icon: <Trash2 size={14} />, run: done(() => remove('row')) },
+      !ro && on !== 'row' && { label: nCols === 1 ? 'Delete this column' : `Delete ${nCols} columns`, icon: <Trash2 size={14} />, run: done(() => remove('col')) },
+      !ro && on === 'row' && { label: nRows === 1 ? 'Hide this row' : `Hide ${nRows} rows`, icon: <EyeOff size={14} />, run: done(() => hide('row')) },
+      !ro && on === 'col' && { label: nCols === 1 ? 'Hide this column' : `Hide ${nCols} columns`, icon: <EyeOff size={14} />, run: done(() => hide('col')) },
+      !ro && on === 'row' && hasHiddenRows && { label: 'Show all hidden rows', icon: <Eye size={14} />, run: done(() => showAll('row')) },
+      !ro && on === 'col' && hasHiddenCols && { label: 'Show all hidden columns', icon: <Eye size={14} />, run: done(() => showAll('col')) },
+      !ro && on === 'col' && { label: 'Sort A to Z', icon: <ArrowDownAZ size={14} />, run: done(() => sort(true)) },
+      !ro && on === 'col' && { label: 'Sort Z to A', icon: <ArrowDownZA size={14} />, run: done(() => sort(false)) },
+      ...header,
+      !ro && '-',
+      !ro && on === 'cell' && { label: activeNote ? 'Edit note' : 'Insert note', icon: <StickyNote size={14} />, keys: 'Shift+F2', run: done(editNote) },
+      on === 'cell' && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', run: done(() => openComments(!ro)) },
+      on === 'cell' && !!activeFormula && { label: 'Explain this formula', icon: <MessageCircleQuestionMark size={14} />, run: done(() => setAiPop('explain')) },
+      on === 'cell' && !ro && asksAi(activeFormula || undefined) && { label: 'Refresh the AI answer', icon: <RefreshCw size={14} />, run: done(() => aiCells.refresh([{ sheet: sheet.id, cell: refName(sel.r, sel.c) }])) },
+      on !== 'col' && { label: 'Expand row', icon: <Maximize2 size={14} />, run: done(() => setRowCard(sel.r)) },
+      !ro && { label: 'Clear', icon: <Eraser size={14} />, keys: 'Delete', run: done(() => clear()) },
+      askNow && '-',
+      askNow && { label: 'Ask the agent about it', icon: <Sparkles size={14} />, run: askNow },
+    ];
+  };
   const hasHiddenRows = Object.values(sheet.rows ?? {}).some((v) => v.hidden);
   const hasHiddenCols = Object.values(sheet.cols ?? {}).some((v) => v.hidden);
   const activeNote = !!active?.note;
@@ -2458,6 +2738,12 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     comment: () => openComments(!readOnly),
     comments: () => openComments(false),
     func: (name) => typeIn(`=${name}(`),
+    allFunctions: () => setDialog('functions'),
+    hiddenSheets: book ? book.sheets.flatMap((s, i) => (s.hidden ? [{ i, name: s.name }] : [])) : [],
+    showSheet,
+    autoSum,
+    painter: () => startPainter(false),
+    painting: !!painter,
     chars: openChars,
     addSheet: () => addSheet(),
     setStyle,
@@ -2558,6 +2844,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+Shift+Z', 'Redo'],
         ['Ctrl+F', 'Find'],
         ['Ctrl+H', 'Find and replace'],
+        ['Ctrl+P', 'Print and PDF setup'],
         ['Ctrl+S', 'Save'],
       ],
     },
@@ -2569,6 +2856,13 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+U', 'Underline'],
         ['Alt+Shift+5', 'Strikethrough'],
         ['Ctrl+\\', 'Clear formatting'],
+        ['Ctrl+Shift+1', 'Number format (1,234.00)'],
+        ['Ctrl+Shift+2', 'Time format'],
+        ['Ctrl+Shift+3', 'Date format'],
+        ['Ctrl+Shift+4', 'Currency format'],
+        ['Ctrl+Shift+5', 'Percent format'],
+        ['Ctrl+Shift+6', 'Scientific format'],
+        ['Alt+=', 'AutoSum'],
         ['Ctrl+Shift+L', 'Create or remove a filter'],
         ['Ctrl+`', 'Show formulas'],
         ['Alt+/', 'Search the menus'],
@@ -2586,7 +2880,37 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const panelChart = panel?.kind === 'chart' ? chartOf(panel.id) : undefined;
 
   const body = (
-    <div ref={root} className="flex h-full min-h-0 flex-col bg-bg" onFocusCapture={onFocusCapture}>
+    <div
+      ref={root}
+      className="relative flex h-full min-h-0 flex-col bg-bg"
+      onFocusCapture={onFocusCapture}
+      onDragOver={(e) => {
+        // A spreadsheet file dragged over: its sheets can be added.
+        if (readOnly || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!droppingRef.current) setDropping((droppingRef.current = true));
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDropping((droppingRef.current = false));
+      }}
+      onDrop={(e) => {
+        if (readOnly || !e.dataTransfer.files.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDropping((droppingRef.current = false));
+        void dropFiles([...e.dataTransfer.files]);
+      }}
+    >
+      {/* What a screen reader hears as the active cell changes: its place, what it shows, its formula. */}
+      <div className="sr-only" role="status" aria-live="polite" translate="no">
+        {announce}
+      </div>
+      {dropping && (
+        <div className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-accent/10 text-[14px] font-medium text-accent">Drop an Excel, OpenDocument, CSV or TSV file to add its sheets</div>
+      )}
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
@@ -2612,6 +2936,10 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           onRedo={redo}
           onStyle={setStyle}
           onFormat={setFormat}
+          onToggleFormat={toggleFormat}
+          painting={!!painter}
+          onPainter={startPainter}
+          onAutoSum={autoSum}
           onDecimals={stepDecimals}
           onBorders={borders}
           onMerge={(h2) => void merge(h2)}
@@ -2725,6 +3053,11 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             onSmart={onSmart}
             onFilter={(c, at) => setFilterMenu({ c, at })}
             onFill={fillTo}
+            onMove={moveCells}
+            onZoom={(f) => setZoom(Math.max(0.5, Math.min(2, Math.round(zoom * f * 100) / 100)))}
+            onPicked={paint}
+            painting={!!painter}
+            onMoveLines={moveLines}
             onFillDown={fillDown}
             onUnhide={unhide}
             onExpand={(r) => setRowCard(r)}
@@ -2759,8 +3092,28 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
                     In formulas
                   </label>
                   <label className="flex items-center gap-1.5">
-                    <input type="checkbox" checked={findHow.allSheets} onChange={(e) => setFindHow({ ...findHow, allSheets: e.target.checked })} className="accent-[var(--accent)]" />
+                    <input type="checkbox" checked={findHow.allSheets && !findHow.area} disabled={!!findHow.area} onChange={(e) => setFindHow({ ...findHow, allSheets: e.target.checked })} className="accent-[var(--accent)]" />
                     All sheets
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={!!findHow.area}
+                      onChange={(e) => {
+                        if (!e.target.checked) return setFindHow({ ...findHow, area: null });
+                        // The cells picked now (and any other ranges picked beside them); a single cell is no range to search in.
+                        const rects = [rectOf(selRef.current), ...moreRef.current];
+                        if (rects.length === 1 && single(selRef.current)) return void toast(tr('Pick the cells to search in first, then tick this.'));
+                        setFindHow({ ...findHow, allSheets: false, area: { si: sheetIx, rects } });
+                      }}
+                      className="accent-[var(--accent)]"
+                    />
+                    Only in the cells picked
+                    {findHow.area && (
+                      <span translate="no" className="text-fg-3">
+                        {findHow.area.rects.map((r) => rectLabel(r, size.rows, size.cols)).join(', ')}
+                      </span>
+                    )}
                   </label>
                 </div>
               }
@@ -2827,6 +3180,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       )}
       <SheetTabs
         names={book.sheets.map((s) => s.name)}
+        colors={book.sheets.map((s) => s.tabColor)}
+        hidden={book.sheets.map((s) => !!s.hidden)}
         active={sheetIx}
         readOnly={readOnly}
         onPick={pickSheet}
@@ -2836,6 +3191,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         onDuplicate={duplicateSheet}
         onDelete={(i) => void deleteSheet(i)}
         onMove={moveSheet}
+        onColor={tabColor}
+        onHide={hideSheet}
+        onShow={showSheet}
         status={status || undefined}
         last={!(dirty && !readOnly)}
       />
@@ -2864,144 +3222,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           if (f) void importCsv(f);
         }}
       />
-      {/* The right-click menu, its Paste special list opened in its place. */}
-      <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctx?.x ?? -10, top: ctx?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={!!ctx} onClose={() => setCtx(null)} width={248}>
-        {ctx && (
-          <div onMouseDown={(e) => e.preventDefault()}>
-            {ctx.sub === 'paste' ? (
-              <>
-                <MenuBack onClick={() => setCtx({ ...ctx, sub: undefined })}>Paste special</MenuBack>
-                <MenuItem hint="Ctrl+Shift+V" onClick={() => (setCtx(null), void pasteHow('values'))}>
-                  Values only
-                </MenuItem>
-                <MenuItem onClick={() => (setCtx(null), void pasteHow('formats'))}>Formats only</MenuItem>
-                <MenuItem onClick={() => (setCtx(null), void pasteHow('formulas'))}>Formulas only</MenuItem>
-                <MenuItem onClick={() => (setCtx(null), void pasteHow('transposed'))}>Transposed</MenuItem>
-              </>
-            ) : (
-              <>
-                {!readOnly && (
-                  <MenuItem icon={<Scissors size={14} />} hint="Ctrl+X" onClick={() => (setCtx(null), void menuCopy(true))}>
-                    Cut
-                  </MenuItem>
-                )}
-                <MenuItem icon={<Copy size={14} />} hint="Ctrl+C" onClick={() => (setCtx(null), void menuCopy(false))}>
-                  Copy
-                </MenuItem>
-                {!readOnly && (
-                  <MenuItem icon={<ClipboardPaste size={14} />} hint="Ctrl+V" onClick={() => (setCtx(null), void menuPaste())}>
-                    Paste
-                  </MenuItem>
-                )}
-                {!readOnly && (
-                  <MenuItem icon={<ClipboardPaste size={14} />} submenu onClick={() => setCtx({ ...ctx, sub: 'paste' })}>
-                    Paste special
-                  </MenuItem>
-                )}
-                {!readOnly && <MenuSep />}
-                {!readOnly && ctx.on !== 'col' && (
-                  <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', false))}>
-                    {nRows === 1 ? 'Insert a row above' : `Insert ${nRows} rows above`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'row' && (
-                  <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', true))}>
-                    {nRows === 1 ? 'Insert a row below' : `Insert ${nRows} rows below`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on !== 'row' && (
-                  <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', false))}>
-                    {nCols === 1 ? 'Insert a column left' : `Insert ${nCols} columns left`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && (
-                  <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', true))}>
-                    {nCols === 1 ? 'Insert a column right' : `Insert ${nCols} columns right`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on !== 'col' && (
-                  <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('row'))}>
-                    {nRows === 1 ? 'Delete this row' : `Delete ${nRows} rows`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on !== 'row' && (
-                  <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('col'))}>
-                    {nCols === 1 ? 'Delete this column' : `Delete ${nCols} columns`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'row' && (
-                  <MenuItem icon={<EyeOff size={14} />} onClick={() => (setCtx(null), hide('row'))}>
-                    {nRows === 1 ? 'Hide this row' : `Hide ${nRows} rows`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && (
-                  <MenuItem icon={<EyeOff size={14} />} onClick={() => (setCtx(null), hide('col'))}>
-                    {nCols === 1 ? 'Hide this column' : `Hide ${nCols} columns`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'row' && hasHiddenRows && (
-                  <MenuItem icon={<Eye size={14} />} onClick={() => (setCtx(null), showAll('row'))}>
-                    Show all hidden rows
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && hasHiddenCols && (
-                  <MenuItem icon={<Eye size={14} />} onClick={() => (setCtx(null), showAll('col'))}>
-                    Show all hidden columns
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && (
-                  <>
-                    <MenuItem icon={<ArrowDownAZ size={14} />} onClick={() => (setCtx(null), sort(true))}>
-                      Sort A to Z
-                    </MenuItem>
-                    <MenuItem icon={<ArrowDownZA size={14} />} onClick={() => (setCtx(null), sort(false))}>
-                      Sort Z to A
-                    </MenuItem>
-                  </>
-                )}
-                {!readOnly && <MenuSep />}
-                {!readOnly && ctx.on === 'cell' && (
-                  <MenuItem icon={<StickyNote size={14} />} hint="Shift+F2" onClick={() => (setCtx(null), editNote())}>
-                    {activeNote ? 'Edit note' : 'Insert note'}
-                  </MenuItem>
-                )}
-                {ctx.on === 'cell' && (
-                  <MenuItem icon={<MessageSquarePlus size={14} />} hint="Ctrl+Alt+M" onClick={() => (setCtx(null), openComments(!readOnly))}>
-                    Comment
-                  </MenuItem>
-                )}
-                {ctx.on === 'cell' && activeFormula && (
-                  <MenuItem icon={<MessageCircleQuestionMark size={14} />} onClick={() => (setCtx(null), setAiPop('explain'))}>
-                    Explain this formula
-                  </MenuItem>
-                )}
-                {ctx.on === 'cell' && !readOnly && asksAi(activeFormula || undefined) && (
-                  <MenuItem icon={<RefreshCw size={14} />} onClick={() => (setCtx(null), aiCells.refresh([{ sheet: sheet.id, cell: refName(sel.r, sel.c) }]))}>
-                    Refresh the AI answer
-                  </MenuItem>
-                )}
-                {ctx.on !== 'col' && (
-                  <MenuItem icon={<Maximize2 size={14} />} onClick={() => (setCtx(null), setRowCard(sel.r))}>
-                    Expand row
-                  </MenuItem>
-                )}
-                {!readOnly && (
-                  <MenuItem icon={<Eraser size={14} />} hint="Delete" onClick={() => (setCtx(null), clear())}>
-                    Clear
-                  </MenuItem>
-                )}
-                {askNow && <MenuSep />}
-                {askNow && (
-                  <MenuItem icon={<Sparkles size={14} />} onClick={askNow}>
-                    Ask the agent about it
-                  </MenuItem>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </Popover>
+      {/* The right-click menu: the menus' own actions, built here for what was pressed on (cells, a column's letter, a row's number). */}
+      <ContextMenu at={ctx} items={ctx ? ctxItems(ctx.on) : []} onClose={() => setCtx(null)} width={280} />
       {/* A cell's own pickers: a list, a calendar, its note, a character to put in. */}
       <div ref={pickRef} className="pointer-events-none fixed" style={pick ? { left: pick.at.left, top: pick.at.top, width: pick.at.width, height: pick.at.height } : { left: -10, top: -10, width: 1, height: 1 }} />
       <Popover
@@ -3142,6 +3364,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dialog === 'sort' && toolBlock && <SortDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onSort={sortRangeBy} onClose={() => setDialog(null)} />}
       {dialog === 'dups' && toolBlock && <DupDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onRemove={removeDups} onClose={() => setDialog(null)} />}
       {dialog === 'summary' && toolBlock && <SummaryDialog cols={colChoices(toolBlock, true)} onMake={summarize} onClose={() => setDialog(null)} />}
+      {dialog === 'functions' && <FunctionsDialog names={FUNCTION_NAMES} info={FUNCTION_INFO} onPick={(n) => typeIn(`=${n}(`)} onClose={() => setDialog(null)} />}
+      {sizeAsk && <SizeDialog axis={sizeAsk.axis} count={sizeAsk.axis === 'col' ? nCols : nRows} value={sizeAsk.value} onApply={(px) => sizeSelected(sizeAsk.axis, px)} onClose={() => (setSizeAsk(null), grid.current?.focus())} />}
       {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={(sp) => void splitText(sp)} onClose={() => setDialog(null)} />}
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />

@@ -4,6 +4,7 @@
 // checkbox, stars) and whether what it holds is allowed; and which cells are merged into which. The editor, the
 // workbook's page and the Excel export all use these. Nothing here needs Node or a browser.
 import {
+  setFilterHook,
   CellError,
   colIndex,
   compare,
@@ -481,3 +482,6 @@ export class Merges {
     return out;
   }
 }
+
+// SUBTOTAL leaves out the rows a filter hides: the calculator asks for them here.
+setFilterHook(filterHidden);

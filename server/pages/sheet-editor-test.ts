@@ -15,6 +15,7 @@ import type { Deps, RunCtx } from '../features/types.ts';
 import { accountingParts, adjustForDelete, adjustForInsert, bookOutline, bookText, chartBox, cleanBorder, codeColor, computeBook, formatValue, inputText, normalizeBook, parseInput, renameSheet, sheetSizes, type Workbook } from '../../shared/sheets.ts';
 import { allowed, CondFormats, filterHidden, hiddenRows, listOptions, Merges, Rules } from '../../shared/sheet-rules.ts';
 import { chartData, chartProblem, chartSvg } from '../../shared/sheet-chart.ts';
+import { hasHtmlTable, htmlText, looksFor, msoNumberFormat, parseHtmlTable, tableText } from '../../shared/sheet-html.ts';
 import { bookForAgent, bookPage, csvOfBook, importBook, xlsxOfBook } from './sheets.ts';
 import { delimitedFile } from './filemodel.ts';
 import { Zip } from '../documents/zip.ts';
@@ -554,6 +555,69 @@ const sh = book.sheets[0];
   ok(after.sheets[1].comments?.[0].by === 'agent' && after.sheets[1].comments[0].cell === 'A2' && answeredText.includes('There is no comment zz'), 'and adds one of the agent’s, saying what it could not do');
   await app.close();
   fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// ---- a table pasted from Excel, Google Sheets or a web page: its looks ---------------------------------------------------
+{
+  const excel = `<html><head><style><!--table {mso-displayed-decimal-separator:"\\.";}
+.xl65 {mso-number-format:"0\\.00%"; font-weight:700; color:black; background:#FFFF00; mso-pattern:black none;}
+.xl66 {mso-number-format:"\\#\\,\\#\\#0\\.00"; text-align:center; color:#C00000; font-style:italic;}
+td {color:windowtext; vertical-align:bottom;}
+--></style></head><body><!--StartFragment--><table border=0 cellpadding=0 cellspacing=0><tr><td class=xl65>Rate</td><td class=xl66 style='text-decoration:underline'>1,234.50</td></tr><tr><td>plain&nbsp;</td><td>x &amp; y<br>line 2</td></tr></table><!--EndFragment--></body></html>`;
+  const t = parseHtmlTable(excel)!;
+  ok(t.length === 2 && t[0].length === 2 && t[0][0].text === 'Rate' && t[1][0].text === 'plain', 'Excel: the table’s rows and cells are read');
+  ok(t[0][0].style?.b === true && t[0][0].style.fill === '#ffff00' && !t[0][0].style.color && t[0][0].style.fmt === 'percent' && t[0][0].style.dp === 2, 'Excel: bold, a fill, and the percent format from its class (black text is the default, not a colour)');
+  ok(t[0][1].style?.color === '#c00000' && t[0][1].style.i === true && t[0][1].style.u === true && t[0][1].style.align === 'center' && t[0][1].style.fmt === 'number', 'Excel: a colour, italic, underline from its own style, centred, a number format');
+  ok(t[1][0].style === undefined && t[1][1].text === 'x & y\nline 2', 'cells with no look have none; entities and line breaks are read');
+  ok(msoNumberFormat('"\\#\\,\\#\\#0\\.00"') === '#,##0.00' && msoNumberFormat('Percent') === '0.00%' && msoNumberFormat('\\@') === '@', 'Excel’s number format names and escapes');
+  const sheets = `<meta charset="utf-8"><google-sheets-html-origin><table xmlns="http://www.w3.org/1999/xhtml" cellspacing="0" cellpadding="0" dir="ltr" border="1"><tbody><tr><td style="overflow:hidden;padding:2px 3px 2px 3px;vertical-align:bottom;font-weight:bold;background-color:#d9ead3;text-align:right;" data-sheets-value="{&quot;1&quot;:3,&quot;3&quot;:0.5}" data-sheets-numberformat="{&quot;1&quot;:2,&quot;2&quot;:&quot;0.00%&quot;,&quot;3&quot;:1}">50.00%</td><td style="font-style:italic;color:rgb(255,0,0);text-decoration:line-through;">gone</td><td colspan="2" style="text-align:left;">wide</td></tr><tr><td>a</td><td>b</td><td>c</td><td>d</td></tr></tbody></table>`;
+  const g = parseHtmlTable(sheets)!;
+  ok(g[0][0].style?.b === true && g[0][0].style.fill === '#d9ead3' && g[0][0].style.align === 'right' && g[0][0].style.fmt === 'percent', 'Google Sheets: bold, fill, alignment and its number format');
+  ok(g[0][1].style?.i === true && g[0][1].style.s === true && g[0][1].style.color === '#ff0000', 'Google Sheets: italic, struck through, an rgb() colour');
+  ok(g[0].length === 4 && g[0][2].text === 'wide' && g[0][3].text === '' && g[1].length === 4, 'a cell spanning two columns leaves an empty one, so rows line up');
+  const web = '<table><tr><th>Name</th><th style="background:#fff">Qty</th></tr><tr><td><b>Tea</b></td><td><span style="color:#2980b9">5</span> <font color="#2980b9">kg</font></td></tr></table>';
+  const w = parseHtmlTable(web)!;
+  ok(w[0][0].style?.b === true && !w[0][1].style?.fill, 'a web table: a header is bold; a white fill is no fill');
+  ok(w[1][0].style?.b === true && w[1][1].style?.color === '#2980b9', 'a web table: bold by a tag around the words, a colour by span and font tags');
+  ok(parseHtmlTable('<p>no table</p>') === null && !hasHtmlTable('<p>x</p>'), 'HTML with no table gives none');
+  const span = parseHtmlTable('<table><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>c</td></tr></table>')!;
+  ok(span[1].length === 2 && span[1][0].text === '' && span[1][1].text === 'c', 'a cell spanning two rows holds its place in the next');
+  const nested = parseHtmlTable('<table><tr><td>out<table><tr><td>in</td></tr></table></td><td>b</td></tr></table>')!;
+  ok(nested.length === 1 && nested[0].length === 2 && nested[0][1].text === 'b', 'a table inside a cell is not read as rows of the outer one');
+  ok(tableText(t) === 'Rate\t1,234.50\nplain\t"x & y\nline 2"', 'a table as tab-separated text, for a clipboard that holds nothing else');
+  ok(htmlText('<p>Hello&nbsp;<b>you</b></p><p>two</p>') === 'Hello you\ntwo', 'HTML without a table as its words');
+  // Looks go with the plain text when it is the same table.
+  const looks = looksFor('Rate\t"1,234.50"\nplain\t"x & y\nline 2"', excel);
+  ok(!!looks && looks.length === 2 && looks[0][0]?.b === true && looks[1][0] === undefined, 'looks for the plain text of the same table');
+  ok(looksFor('only\tone row', excel) === null, 'and none for text that is not that table');
+  ok(looksFor('a\tb', '<table><tr><td>a</td><td>b</td></tr></table>') === null, 'and none when the table carries no look');
+}
+
+// ---- sheet tabs: colour and hidden sheets, kept in the workbook and in Excel files ----------------------------------------
+{
+  const b = normalizeBook({ sheets: [{ name: 'Front', hidden: true, rows: [[1]] }, { name: 'Data', tabColor: '#1A73E8', rows: [[2]] }, { name: 'Notes', tab: 'red', hidden: true, rows: [[3]] }] });
+  ok(b.sheets[0].hidden === true && b.sheets[1].tabColor === '#1a73e8' && b.sheets[2].tabColor === '#ff0000' && b.sheets[2].hidden === true && !b.sheets[1].hidden, 'tabs: a colour and hidden as kept (colours as #rrggbb)');
+  const all = normalizeBook({ sheets: [{ name: 'A', hidden: true }, { name: 'B', hidden: true }] });
+  ok(!all.sheets[0].hidden && all.sheets[1].hidden === true, 'tabs: with every sheet hidden, the first shows');
+  const again = normalizeBook(JSON.parse(bookText(b)));
+  ok(again.sheets[1].tabColor === '#1a73e8' && again.sheets[0].hidden === true && !again.sheets[1].hidden, 'tabs: kept with the workbook’s text');
+  const rows = normalizeBook({ sheets: [{ name: 'R', rows: [[1]], hidden: { rows: [1] } }] });
+  ok(!rows.sheets[0].hidden && rows.sheets[0].rows?.[0]?.hidden === true, 'a sheet’s hidden rows are not a hidden sheet');
+  const z = new Zip(xlsxOfBook(b, 'T'));
+  const wb = z.text('xl/workbook.xml') ?? '';
+  ok(/<workbookView activeTab="1"\/>/.test(wb) && /<sheet name="Front" sheetId="1" state="hidden"/.test(wb) && /<sheet name="Data" sheetId="2" r:id/.test(wb) && /<sheet name="Notes" sheetId="3" state="hidden"/.test(wb), 'Excel: hidden sheets as state="hidden", the first that shows is the one open');
+  const s2 = z.text('xl/worksheets/sheet2.xml') ?? '';
+  ok(s2.includes('<sheetPr><tabColor rgb="FF1A73E8"/></sheetPr>') && s2.includes('tabSelected="1"') && !(z.text('xl/worksheets/sheet1.xml') ?? '').includes('tabSelected'), 'Excel: the tab’s colour, and the selected tab the first that shows');
+  const back = importBook(xlsxOfBook(b, 'T'), 'T.xlsx').book;
+  ok(back.sheets[0].hidden === true && back.sheets[1].tabColor === '#1a73e8' && !back.sheets[1].hidden && back.sheets[2].hidden === true && back.sheets[2].tabColor === '#ff0000', 'and read back: hidden sheets and tab colours');
+}
+
+// ---- frozen rows and columns: no cap but the sheet's own ------------------------------------------------------------------
+{
+  const b = normalizeBook({ sheets: [{ name: 'F', rows: [[1]], freeze: { rows: 200, cols: 30 } }, { name: 'G', rows: [[1]], freeze: 'D120' }] });
+  ok(b.sheets[0].freeze?.rows === 200 && b.sheets[0].freeze.cols === 30 && b.sheets[1].freeze?.rows === 119 && b.sheets[1].freeze.cols === 3, 'freeze: far past 50 rows and 20 columns is kept');
+  const more = adjustForInsert(b, b.sheets[0].id, 'row', 0, 5).sheets[0].freeze;
+  ok(more?.rows === 205, 'freeze: rows put in above grow it, with no cap');
 }
 
 console.log(`${passed} passed, ${failed} failed`);
