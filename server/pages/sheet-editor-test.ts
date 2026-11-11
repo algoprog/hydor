@@ -593,5 +593,24 @@ td {color:windowtext; vertical-align:bottom;}
   ok(looksFor('a\tb', '<table><tr><td>a</td><td>b</td></tr></table>') === null, 'and none when the table carries no look');
 }
 
+// ---- sheet tabs: colour and hidden sheets, kept in the workbook and in Excel files ----------------------------------------
+{
+  const b = normalizeBook({ sheets: [{ name: 'Front', hidden: true, rows: [[1]] }, { name: 'Data', tabColor: '#1A73E8', rows: [[2]] }, { name: 'Notes', tab: 'red', hidden: true, rows: [[3]] }] });
+  ok(b.sheets[0].hidden === true && b.sheets[1].tabColor === '#1a73e8' && b.sheets[2].tabColor === '#ff0000' && b.sheets[2].hidden === true && !b.sheets[1].hidden, 'tabs: a colour and hidden as kept (colours as #rrggbb)');
+  const all = normalizeBook({ sheets: [{ name: 'A', hidden: true }, { name: 'B', hidden: true }] });
+  ok(!all.sheets[0].hidden && all.sheets[1].hidden === true, 'tabs: with every sheet hidden, the first shows');
+  const again = normalizeBook(JSON.parse(bookText(b)));
+  ok(again.sheets[1].tabColor === '#1a73e8' && again.sheets[0].hidden === true && !again.sheets[1].hidden, 'tabs: kept with the workbook’s text');
+  const rows = normalizeBook({ sheets: [{ name: 'R', rows: [[1]], hidden: { rows: [1] } }] });
+  ok(!rows.sheets[0].hidden && rows.sheets[0].rows?.[0]?.hidden === true, 'a sheet’s hidden rows are not a hidden sheet');
+  const z = new Zip(xlsxOfBook(b, 'T'));
+  const wb = z.text('xl/workbook.xml') ?? '';
+  ok(/<workbookView activeTab="1"\/>/.test(wb) && /<sheet name="Front" sheetId="1" state="hidden"/.test(wb) && /<sheet name="Data" sheetId="2" r:id/.test(wb) && /<sheet name="Notes" sheetId="3" state="hidden"/.test(wb), 'Excel: hidden sheets as state="hidden", the first that shows is the one open');
+  const s2 = z.text('xl/worksheets/sheet2.xml') ?? '';
+  ok(s2.includes('<sheetPr><tabColor rgb="FF1A73E8"/></sheetPr>') && s2.includes('tabSelected="1"') && !(z.text('xl/worksheets/sheet1.xml') ?? '').includes('tabSelected'), 'Excel: the tab’s colour, and the selected tab the first that shows');
+  const back = importBook(xlsxOfBook(b, 'T'), 'T.xlsx').book;
+  ok(back.sheets[0].hidden === true && back.sheets[1].tabColor === '#1a73e8' && !back.sheets[1].hidden && back.sheets[2].hidden === true && back.sheets[2].tabColor === '#ff0000', 'and read back: hidden sheets and tab colours');
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

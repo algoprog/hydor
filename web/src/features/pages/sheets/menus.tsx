@@ -89,6 +89,9 @@ export interface MenuCtx {
   c: number;
   hiddenRows: boolean;
   hiddenCols: boolean;
+  /** Sheets hidden from the tabs (View → Show hidden sheets lists them). */
+  hiddenSheets: { i: number; name: string }[];
+  showSheet(i: number): void;
   zoom: number;
   formulas: boolean;
   note: boolean;
@@ -246,6 +249,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       '-',
       m.hiddenRows && { label: 'Show all hidden rows', icon: <Eye size={14} />, run: () => m.showAll('row') },
       m.hiddenCols && { label: 'Show all hidden columns', icon: <Eye size={14} />, run: () => m.showAll('col') },
+      m.hiddenSheets.length > 0 && !ro && { label: 'Show hidden sheets', icon: <Eye size={14} />, also: 'unhide tab sheet', items: m.hiddenSheets.map((h) => ({ label: h.name, run: () => m.showSheet(h.i) })) },
     ],
   };
   const insert: MenuDef = {

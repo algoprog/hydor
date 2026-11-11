@@ -585,11 +585,14 @@ interface SheetLinks {
   defined?: Set<string>;
 }
 
+/** The first sheet that shows (Excel opens on it; one hidden cannot be the one picked). */
+const firstShown = (book: Workbook) => Math.max(0, book.sheets.findIndex((s) => !s.hidden));
+
 /**
  * A sheet's part: its frozen panes, columns' widths, rows' heights and cells, each formula with what it gives, and its
  * rules (`lists`: where the lists kept on the hidden sheet of lists are; `ofLists`: this is that sheet, never the one picked).
  */
-function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}, lists?: Map<Validation, string>, ofLists = false): string {
+function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings, names: Set<string>, links: SheetLinks = {}, lists?: Map<Validation, string>, ofLists = false, first = 0): string {
   const e = calc.shownExtent(si);
   // Rows hidden by hand, or by the filter (Excel writes those hidden too, and its filter says why).
   const hidden = hiddenRows(sh, si, calc);
@@ -721,9 +724,9 @@ function sheetXml(sh: Sheet, si: number, calc: Calc, st: XlStyles, ss: XlStrings
   const mm12 = '0.4724';
   return (
     `${XML_HEAD}<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_R}">` +
-    (fit ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '') +
+    (fit || sh.tabColor ? `<sheetPr>${sh.tabColor ? `<tabColor rgb="FF${sh.tabColor.slice(1).toUpperCase()}"/>` : ''}${fit ? '<pageSetUpPr fitToPage="1"/>' : ''}</sheetPr>` : '') +
     `<dimension ref="${e.rows ? `A1:${refName(e.rows - 1, Math.max(0, e.cols - 1))}` : 'A1'}"/>` +
-    `<sheetViews><sheetView workbookViewId="0"${sh.noGrid ? ' showGridLines="0"' : ''}${si === 0 && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
+    `<sheetViews><sheetView workbookViewId="0"${sh.noGrid ? ' showGridLines="0"' : ''}${si === first && !ofLists ? ' tabSelected="1"' : ''}>${pane}</sheetView></sheetViews>` +
     // Rows as tall as the editor's (24 px) unless they say.
     `<sheetFormatPr defaultColWidth="${xlWidth(COL_W)}" defaultRowHeight="${xlHeight(ROW_H)}" customHeight="1"${outlineRow ? ` outlineLevelRow="${outlineRow}"` : ''}${outlineCol ? ` outlineLevelCol="${outlineCol}"` : ''}/>${cols}` +
     `<sheetData>${body}</sheetData>` +
@@ -811,7 +814,7 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     }
     if (hl.length) links.hyperlinks = hl;
     if (rels.length) extra.push({ name: `xl/worksheets/_rels/sheet${si + 1}.xml.rels`, data: relsXml(rels) });
-    return sheetXml(sh, si, calc, st, ss, names, links, lists.ref);
+    return sheetXml(sh, si, calc, st, ss, names, links, lists.ref, false, firstShown(book));
   });
   // The sheet of lists goes after the others, hidden.
   if (lists.sheet) sheets.push(sheetXml(lists.sheet, 0, computeBook({ v: 1, sheets: [lists.sheet] }), st, ss, names, {}, undefined, true));
@@ -857,8 +860,8 @@ export function xlsxOfBook(book: Workbook, title: string, calc: Calc = computeBo
     })
     .join('');
   const workbook =
-    `${XML_HEAD}<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><workbookPr/><bookViews><workbookView activeTab="0"/></bookViews>` +
-    `<sheets>${titles.map((t, i) => `<sheet name="${xesc(t)}" sheetId="${i + 1}"${i >= book.sheets.length ? ' state="hidden"' : ''} r:id="rId${i + 1}"/>`).join('')}</sheets>` +
+    `${XML_HEAD}<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_R}"><workbookPr/><bookViews><workbookView activeTab="${firstShown(book)}"/></bookViews>` +
+    `<sheets>${titles.map((t, i) => `<sheet name="${xesc(t)}" sheetId="${i + 1}"${i >= book.sheets.length || (book.sheets[i].hidden && i !== firstShown(book)) ? ' state="hidden"' : ''} r:id="rId${i + 1}"/>`).join('')}</sheets>` +
     (filterNames || ownNames ? `<definedNames>${filterNames}${ownNames}</definedNames>` : '') +
     '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>';
   const wbRels = relsXml([
@@ -1250,6 +1253,12 @@ function readXlsx(z: Zip, notes: string[]): { book: Workbook; notes: string[]; l
     // A header or footer (but the sheet's name at the top, as the app prints it and its own files say).
     if (/<(?:\w+:)?(?:odd|even|first)(?:Header|Footer)>\s*[^<\s]/.test(xml.replace(/<(?:\w+:)?oddHeader>&amp;L&amp;(?:"|&quot;)-,Bold(?:"|&quot;)&amp;12&amp;A<\/(?:\w+:)?oddHeader>/, ''))) loses.add('print');
     const sheet = readWorksheet(xml, name, shared, styles, date1904, state, names);
+    // The tab's colour, and whether the sheet is hidden (a hidden sheet of lists is read for its lists below).
+    const tab = /<(?:\w+:)?sheetPr\b[^>]*>[\s\S]*?<(?:\w+:)?tabColor\b[^>]*\/?>/.exec(xml);
+    const tabEl = tab ? parseXml(`<x>${/<(?:\w+:)?tabColor\b[^>]*\/?>/.exec(tab[0])![0]}</x>`).root : null;
+    const tabColor = tabEl ? colorOf(kid(tabEl, 'tabColor'), theme) : null;
+    if (tabColor) sheet.tabColor = tabColor;
+    if (/^(hidden|veryHidden)$/.test(att(s, 'state') ?? '')) sheet.hidden = true;
     const base = sheet.base as { cells: Record<string, Cell>; cols: Record<number, { w?: number; hidden?: boolean }>; rows: Record<number, { h?: number; hidden?: boolean }> } & Obj;
     // Cells' links: to the web (by the sheet's relationships) or to a place in the workbook.
     for (const m of xml.matchAll(/<(?:\w+:)?hyperlink\b([^>]*)\/?>/g)) {

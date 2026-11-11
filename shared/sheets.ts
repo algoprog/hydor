@@ -390,6 +390,10 @@ export interface Sheet {
   print?: PrintSetup;
   /** The grid's lines hidden in the editor (View → Gridlines), as Excel's showGridLines. */
   noGrid?: boolean;
+  /** The colour of the sheet's tab (#rrggbb), as Excel's tab colour. */
+  tabColor?: string;
+  /** The sheet's tab is hidden (right-click a tab: Hide; Show hidden sheets brings it back), as Excel's hidden sheets. */
+  hidden?: boolean;
   /** The pivot table this sheet holds (made by Data → Pivot table). */
   pivot?: PivotDef;
 }
@@ -2234,6 +2238,10 @@ function sheetOf(raw: unknown, i: number, ids: Set<string>, names: string[], bud
   // The grid's lines hidden: noGrid: true, or gridlines: false (an agent's words), else as the file had them.
   const noGrid = raw.noGrid ?? (raw.gridlines === undefined ? undefined : raw.gridlines === false) ?? base?.noGrid;
   if (noGrid === true) sheet.noGrid = true;
+  // The tab's colour, and the sheet hidden from the tabs (a sheet's hidden rows and columns are `hidden: {rows, cols}`, an object).
+  const tab = cleanColor(raw.tabColor ?? raw.tab);
+  if (tab) sheet.tabColor = tab;
+  if (raw.hidden === true || raw.state === 'hidden' || raw.state === 'veryHidden') sheet.hidden = true;
   // Cells in reading order: row by row, left to right.
   const out: Record<string, Cell> = {};
   for (const k of [...cells.keys()].sort((a, b) => a - b)) out[refName(unpackR(k), unpackC(k))] = cells.get(k)!;
@@ -2264,6 +2272,8 @@ export function normalizeBook(input: unknown, o: NormalizeOptions = {}): Workboo
     .map((s, i) => sheetOf(s, i, ids, names, budget, commentIds))
     .filter((s): s is Sheet => !!s);
   if (!sheets.length) sheets.push({ id: newId(), name: 'Sheet 1', cells: {} });
+  // At least one sheet shows.
+  if (sheets.every((s) => s.hidden)) delete sheets[0].hidden;
   const { cells, rows, cols } = budget.cut;
   if (cells) o.notes?.push(`${cells} cell${cells === 1 ? '' : 's'} left out: a workbook holds at most ${SHEET_LIMITS.cells.toLocaleString('en')} cells.`);
   if (rows) o.notes?.push(`Cells below row ${SHEET_LIMITS.rows.toLocaleString('en')} were left out.`);
@@ -2305,6 +2315,8 @@ export function bookText(b: Workbook): string {
     if (sh.groups?.length) head.groups = sh.groups;
     if (sh.print) head.print = sh.print;
     if (sh.noGrid) head.noGrid = true;
+    if (sh.tabColor) head.tabColor = sh.tabColor;
+    if (sh.hidden) head.hidden = true;
     if (sh.pivot) head.pivot = sh.pivot;
     out.push(` ${JSON.stringify(head).slice(0, -1)},"cells":{`);
     const byRow = new Map<number, string[]>();
