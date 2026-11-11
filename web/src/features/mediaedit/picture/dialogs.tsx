@@ -8,6 +8,7 @@ import { Button, cx, Dialog, Empty } from '../../../components/ui';
 import { mu } from '../../../lib/machine';
 import { mediaUrl, useMedia } from '../../media/state';
 import { Check, ColorButton, FieldRow, ScrubNumber, Seg } from '../shell';
+import { fitNewSize, NEW_PRESETS, presetOf, type NewBackground } from './newpicture';
 
 export function ImageSizeDialog({ open, w, h, onClose, onApply }: { open: boolean; w: number; h: number; onClose: () => void; onApply: (w: number, h: number) => void }) {
   const [unit, setUnit] = useState<'px' | '%'>('px');
@@ -57,6 +58,78 @@ export function ImageSizeDialog({ open, w, h, onClose, onApply }: { open: boolea
           Keep its shape
         </Check>
         <p className={cx('text-[12px]', big ? 'text-err' : 'text-fg-3')}>{big ? `At most ${LIMITS.side} pixels a side and ${LIMITS.pixels / 1e6} million in all.` : `Now ${w} × ${h}; it will be ${size.w} × ${size.h} pixels.`}</p>
+      </div>
+    </Dialog>
+  );
+}
+
+/** File → New: a blank picture of a size (a preset or any), on white, see-through or a colour. */
+export function NewPictureDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (w: number, h: number, bg: NewBackground, color: string) => void }) {
+  const [size, setSize] = useState({ w: 1080, h: 1080 });
+  const [bg, setBg] = useState<NewBackground>('white');
+  const [color, setColor] = useState('#1f2937');
+  useEffect(() => {
+    if (open) setBg('white');
+  }, [open]);
+  const preset = presetOf(size.w, size.h);
+  const fit = fitNewSize(size.w, size.h);
+  const sized = (w: number, h: number) => setSize({ w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)) });
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="New picture"
+      width={440}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => (onCreate(fit.w, fit.h, bg, color), onClose())}>
+            Create
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-[13px]">
+        <p className="text-[12.5px] leading-snug text-fg-3">A blank picture opens in a tab of its own; Save keeps it in your Library.</p>
+        <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Size">
+          {NEW_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={preset.id === p.id}
+              onClick={() => p.w && p.h && sized(p.w, p.h)}
+              className={cx('flex flex-col items-start rounded-lg border px-2.5 py-1.5 text-left', preset.id === p.id ? 'border-accent bg-accent-soft' : 'border-line-2 bg-bg-1 hover:bg-bg-2')}
+            >
+              <span className="text-[12.5px] font-medium">{p.label}</span>
+              <span className="tnum text-[11.5px] text-fg-3">{p.about}</span>
+            </button>
+          ))}
+        </div>
+        <FieldRow label="Width">
+          <ScrubNumber value={size.w} min={1} max={LIMITS.side} width={84} unit="px" onChange={(v) => sized(v, size.h)} />
+        </FieldRow>
+        <FieldRow label="Height">
+          <ScrubNumber value={size.h} min={1} max={LIMITS.side} width={84} unit="px" onChange={(v) => sized(size.w, v)} />
+          <button type="button" className="text-[12px] text-fg-3 hover:text-fg" onClick={() => sized(size.h, size.w)} title="Turn it on its side">
+            Swap
+          </button>
+        </FieldRow>
+        <FieldRow label="Background">
+          <Seg
+            value={bg}
+            options={[
+              { value: 'white', label: 'White' },
+              { value: 'transparent', label: 'See-through' },
+              { value: 'colour', label: 'Colour' },
+            ]}
+            onChange={setBg}
+          />
+          {bg === 'colour' && <ColorButton value={color} label="Background colour" onChange={(c) => setColor(c)} />}
+        </FieldRow>
+        <p className={cx('text-[12px]', fit.cut ? 'text-err' : 'text-fg-3')}>{fit.cut ? `That is more than the editor holds: it will be ${fit.w} × ${fit.h} pixels (at most ${LIMITS.side} a side and ${LIMITS.pixels / 1e6} million in all).` : `${fit.w} × ${fit.h} pixels.`}</p>
       </div>
     </Dialog>
   );

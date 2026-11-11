@@ -45,6 +45,7 @@ import { CROP_SHAPES, MARK_FONTS, type CropShape, type FontId } from '@shared/me
 import { viaLink } from '../../../lib/machine';
 import { Button, IconButton, Popover } from '../../../components/ui';
 import { Check, ColorButton, MiniSelect, OptionsBar, OptionsLabel, OptionsSep, ScrubNumber, Seg, type RailGroup } from '../shell';
+import { ALIGNS } from './menus';
 import type { PictureEd, ToolId } from './editor';
 import { cropOfShape, cropRatio } from './interact';
 import { EmojiGrid } from './panels';
@@ -124,7 +125,7 @@ export function toolForKey(key: string, current: ToolId): ToolId | null {
 
 /** What each tool does, for the options bar's hint. */
 const HINTS: Partial<Record<ToolId, string>> = {
-  move: 'Drag to move the picked layer; a click on words or a shape picks it.',
+  move: 'Drag to move the picked layer: Shift keeps it straight, Ctrl drags a copy, Alt does not snap.',
   'marquee-rect': 'Drag to select. Shift adds to the selection, Alt takes away.',
   'marquee-ellipse': 'Drag to select. Shift adds to the selection, Alt takes away.',
   lasso: 'Drag round what to select.',
@@ -218,7 +219,7 @@ export function ToolOptions({ ed, mobile }: { ed: PictureEd; mobile?: boolean })
     const x = ed.xform;
     body = (
       <>
-        <OptionsLabel>Free transform</OptionsLabel>
+        <OptionsLabel>{x.sel ? 'Transform selection' : 'Free transform'}</OptionsLabel>
         <ScrubNumber label="W" value={Math.round(x.sx * 100)} min={1} max={2000} unit="%" width={60} onChange={(v) => ed.setTransform({ sx: v / 100 })} />
         <ScrubNumber label="H" value={Math.round(x.sy * 100)} min={1} max={2000} unit="%" width={60} onChange={(v) => ed.setTransform({ sy: v / 100 })} />
         <ScrubNumber label="Turn" value={x.angle} min={-360} max={360} step={0.5} unit="°" width={62} onChange={(v) => ed.setTransform({ angle: v })} />
@@ -240,9 +241,19 @@ export function ToolOptions({ ed, mobile }: { ed: PictureEd; mobile?: boolean })
             <Check on={o.autoSelect} onChange={(v) => set({ autoSelect: v })} title="A click picks the layer under the pointer">
               Auto-select
             </Check>
+            <Check on={ed.snap} onChange={(v) => ed.setSnap(v)} title="Lines up with the canvas, the guides and the other layers (Alt held: not this time)">
+              Snap
+            </Check>
             <Button size="sm" variant="secondary" className="h-7" onClick={() => ed.startTransform()}>
               Free transform
             </Button>
+            <OptionsSep />
+            <OptionsLabel>Align</OptionsLabel>
+            {ALIGNS.map((a) => (
+              <IconButton key={a.how} label={`Align ${a.label.toLowerCase()}: line the picked layer up with the canvas`} size="sm" onClick={() => ed.alignLayer(a.how)}>
+                {a.icon}
+              </IconButton>
+            ))}
             {hint}
           </>
         );
