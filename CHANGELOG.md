@@ -3,6 +3,16 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.54.6 · 11 November 2026
+
+Limit resets no longer go missing because the app asked for them too often.
+
+- The app read your Claude limit resets with every usage refresh: every two minutes while a page was open, and more
+  often while a session waited out a limit. Anthropic started refusing those reads, so the list in System → Usage
+  went missing. It now reads them about every ten minutes, waits longer after a refusal, and keeps showing the list
+  it last read in between, even after the app restarts.
+- A reset you use leaves the list at once.
+
 ## 0.54.5 · 11 November 2026
 
 Claude limit resets show in the Mac app again, and a session whose helpers are still running shows as working.
