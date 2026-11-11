@@ -15,6 +15,7 @@ import {
   SLIDE_W,
   slideH,
   ungroupEls,
+  scaleEls,
   cleanEmbedUrl,
   type Anim,
   type AnimFx,
@@ -43,6 +44,7 @@ import {
   type TableEl,
   type TextEl,
   type TransitionFx,
+  turnedBox,
 } from '@shared/slides';
 import { STARTERS } from './starters';
 
@@ -160,6 +162,42 @@ export function duplicateSlides(d: Deck, list: number[]): { deck: Deck; at: numb
   const last = sorted[sorted.length - 1];
   slides.splice(last + 1, 0, ...sorted.map((i) => fresh(d.slides[i])));
   return { deck: { ...d, slides }, at: last + 1 };
+}
+
+/**
+ * A part sized with others picked together: the box they fill (`from`) is made `to`, and each part keeps its place and size
+ * in it (a group's parts sized with it, a line's two ends moved). Whole pixels.
+ */
+export function scalePicked(e: El, from: { x: number; y: number; w: number; h: number }, to: { x: number; y: number; w: number; h: number }): El {
+  const sx = to.w / Math.max(1, from.w);
+  const sy = to.h / Math.max(1, from.h);
+  const out = { ...e, x: Math.round(to.x + (e.x - from.x) * sx), y: Math.round(to.y + (e.y - from.y) * sy), w: Math.round(e.w * sx), h: Math.round(e.h * sy) } as El;
+  return e.type === 'group' ? ({ ...out, els: scaleEls(e.els, sx, sy) } as El) : out;
+}
+
+/** A part turned with others picked together, by `deg` about a point: its middle goes round it, and it turns as much (a line's two ends go round). */
+export function spinPicked(e: El, c: { x: number; y: number }, deg: number): El {
+  const a = (deg * Math.PI) / 180;
+  const at = (x: number, y: number) => ({ x: c.x + (x - c.x) * Math.cos(a) - (y - c.y) * Math.sin(a), y: c.y + (x - c.x) * Math.sin(a) + (y - c.y) * Math.cos(a) });
+  if (e.type === 'line') {
+    const p = at(e.x, e.y);
+    const q = at(e.x + e.w, e.y + e.h);
+    return { ...e, x: Math.round(p.x), y: Math.round(p.y), w: Math.round(q.x - p.x), h: Math.round(q.y - p.y) };
+  }
+  const m = at(e.x + e.w / 2, e.y + e.h / 2);
+  const rot = ((((e.rot ?? 0) + deg) % 360) + 360) % 360;
+  return { ...e, x: Math.round(m.x - e.w / 2), y: Math.round(m.y - e.h / 2), rot: Math.round(rot * 10) / 10 || undefined };
+}
+
+/** Slides moved together (they keep their order) to where `over` is: after it when they came from before it, else before it. */
+export function moveSlides(d: Deck, ids: string[], over: string): Deck {
+  const from = d.slides.findIndex((s) => ids.includes(s.id));
+  const target = d.slides.findIndex((s) => s.id === over);
+  if (from < 0 || target < 0 || ids.includes(over)) return d;
+  const moved = d.slides.filter((s) => ids.includes(s.id));
+  const rest = d.slides.filter((s) => !ids.includes(s.id));
+  const at = rest.findIndex((s) => s.id === over) + (from < target ? 1 : 0);
+  return { ...d, slides: [...rest.slice(0, at), ...moved, ...rest.slice(at)] };
 }
 
 export function removeSlides(d: Deck, list: number[]): Deck {
@@ -495,16 +533,18 @@ export function restack(d: Deck, i: number, ids: string[], how: 'front' | 'back'
 
 export type AlignHow = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 
-/** Parts lined up with each other (two or more), or with the slide (one). */
-export function align(d: Deck, i: number, ids: string[], how: AlignHow): Deck {
+/**
+ * Parts lined up with each other (two or more), or with the slide (one, or several with `toSlide`; with their group when
+ * they are in one). A turned part lines up by the box it shows, round its turned corners.
+ */
+export function align(d: Deck, i: number, ids: string[], how: AlignHow, toSlide = false): Deck {
   const s = d.slides[i];
   const lv = levelOf(s.els, ids);
   const picked = (lv?.els ?? s.els).filter((e) => ids.includes(e.id));
   if (!picked.length) return d;
-  const boxes = picked.map(boxOf);
-  // One part lines up with the slide, or with its group when it is in one.
+  const boxes = picked.map(turnedBox);
   const area =
-    picked.length === 1
+    picked.length === 1 || toSlide
       ? lv?.group
         ? { x: 0, y: 0, w: lv.group.w, h: lv.group.h }
         : { x: 0, y: 0, w: W, h: heightOf(d) }
@@ -514,7 +554,7 @@ export function align(d: Deck, i: number, ids: string[], how: AlignHow): Deck {
           return { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y };
         })();
   return setEls(d, i, ids, (e) => {
-    const b = boxOf(e);
+    const b = turnedBox(e);
     let dx = 0;
     let dy = 0;
     if (how === 'left') dx = area.x - b.x;
@@ -527,10 +567,10 @@ export function align(d: Deck, i: number, ids: string[], how: AlignHow): Deck {
   });
 }
 
-/** Three or more parts spread evenly across or down. */
+/** Three or more parts spread evenly across or down (by the boxes they show). */
 export function distribute(d: Deck, i: number, ids: string[], axis: 'h' | 'v'): Deck {
   const s = d.slides[i];
-  const picked = (levelOf(s.els, ids)?.els ?? s.els).filter((e) => ids.includes(e.id)).map((e) => ({ e, b: boxOf(e) }));
+  const picked = (levelOf(s.els, ids)?.els ?? s.els).filter((e) => ids.includes(e.id)).map((e) => ({ e, b: turnedBox(e) }));
   if (picked.length < 3) return d;
   const key = axis === 'h' ? 'x' : 'y';
   const size = axis === 'h' ? 'w' : 'h';
@@ -546,12 +586,19 @@ export function distribute(d: Deck, i: number, ids: string[], axis: 'h' | 'v'): 
     pos += p.b[size] + gap;
   }
   return setEls(d, i, ids, (e) => {
-    const b = boxOf(e);
+    const b = turnedBox(e);
     const target = at.get(e.id);
     if (target === undefined) return e;
     const delta = Math.round(target - b[key]);
     return { ...e, [key]: e[key] + delta } as El;
   });
+}
+
+/** Every part picked locked in place (all of them locked or, when every one is, unlocked): lock is for the parts together. */
+export function lockEls(d: Deck, i: number, ids: string[]): Deck {
+  const picked = ids.map((id) => findEl(d.slides[i].els, id)).filter((e): e is El => !!e);
+  const on = !picked.every((e) => e.lock);
+  return setEls(d, i, ids, (e) => ({ ...e, lock: on || undefined }));
 }
 
 // ---- text ----------------------------------------------------------------------------------------------
@@ -737,6 +784,81 @@ export function fillCells(t: TableEl, r0: number, c0: number, r1: number, c1: nu
     }
   const { fills: _f, ...rest } = t;
   return Object.keys(fills).length ? { ...rest, fills } : rest;
+}
+
+/** The most rows and columns a table has. */
+export const TABLE_MAX = { rows: 40, cols: 12 };
+
+const colsOf = (t: TableEl) => Math.max(1, ...t.rows.map((r) => r.length));
+
+/** A table's fills moved: the cell at "row,column" goes where `to` says (null: it goes). */
+const refill = (t: TableEl, to: (r: number, c: number) => [number, number] | null): TableEl => {
+  if (!t.fills) return t;
+  const fills: Record<string, string> = {};
+  for (const [k, v] of Object.entries(t.fills)) {
+    const [r, c] = k.split(',').map(Number);
+    const at = to(r, c);
+    if (at) fills[`${at[0]},${at[1]}`] = v;
+  }
+  const { fills: _f, ...rest } = t;
+  return Object.keys(fills).length ? { ...rest, fills } : rest;
+};
+
+/** The merges moved or sized: `f` gives a merge's new place, or null when it is gone (a merge of one cell is gone too). */
+const remerge = (t: TableEl, f: (m: Merge) => Merge | null): TableEl => {
+  if (!t.merges) return t;
+  const merges = t.merges.map(f).filter((m): m is Merge => !!m && m.rs * m.cs > 1);
+  const { merges: _m, ...rest } = t;
+  return merges.length ? { ...rest, merges } : rest;
+};
+
+/**
+ * A row put in before row `at` (the table's row count: after the last): empty, merges that span the place grown by it,
+ * the rows and fills after it moved down, the table taller by a row. Null where the table has all the rows it may.
+ */
+export function insertRow(t: TableEl, at: number): TableEl | null {
+  if (t.rows.length >= TABLE_MAX.rows) return null;
+  const i = Math.max(0, Math.min(t.rows.length, at));
+  const rows = [...t.rows.slice(0, i), Array(colsOf(t)).fill(''), ...t.rows.slice(i)];
+  const grown = remerge(t, (m) => (m.r >= i ? { ...m, r: m.r + 1 } : m.r + m.rs > i ? { ...m, rs: m.rs + 1 } : m));
+  return { ...refill(grown, (r, c) => [r >= i ? r + 1 : r, c]), rows, h: Math.round(t.h + t.h / t.rows.length) };
+}
+
+/** A column put in before column `at` (the column count: after the last), as `insertRow` puts a row in; its width the others' average. */
+export function insertCol(t: TableEl, at: number): TableEl | null {
+  const n = colsOf(t);
+  if (n >= TABLE_MAX.cols) return null;
+  const i = Math.max(0, Math.min(n, at));
+  const rows = t.rows.map((r) => {
+    const row = [...r, ...Array(n - r.length).fill('')];
+    return [...row.slice(0, i), '', ...row.slice(i)];
+  });
+  const grown = remerge(t, (m) => (m.c >= i ? { ...m, c: m.c + 1 } : m.c + m.cs > i ? { ...m, cs: m.cs + 1 } : m));
+  const out: TableEl = { ...refill(grown, (r, c) => [r, c >= i ? c + 1 : c]), rows };
+  if (t.cols) {
+    const avg = t.cols.reduce((a, b) => a + b, 0) / Math.max(1, t.cols.length);
+    out.cols = [...t.cols.slice(0, i), avg, ...t.cols.slice(i)];
+  }
+  if (t.aligns) out.aligns = [...t.aligns.slice(0, i), t.aligns[Math.max(0, i - 1)] ?? 'left', ...t.aligns.slice(i)];
+  return out;
+}
+
+/** Row `r` taken out (a table keeps one at least): merges across it narrowed, the rows and fills after it moved up. */
+export function deleteRow(t: TableEl, r: number): TableEl | null {
+  if (t.rows.length < 2 || r < 0 || r >= t.rows.length) return null;
+  const shrunk = remerge(t, (m) => (m.r > r ? { ...m, r: m.r - 1 } : m.r + m.rs > r ? { ...m, rs: m.rs - 1 } : m));
+  return { ...refill(shrunk, (y, c) => (y === r ? null : [y > r ? y - 1 : y, c])), rows: t.rows.filter((_, i) => i !== r), h: Math.max(20, Math.round(t.h - t.h / t.rows.length)) };
+}
+
+/** Column `c` taken out (a table keeps one at least), as `deleteRow` takes a row out. */
+export function deleteCol(t: TableEl, c: number): TableEl | null {
+  const n = colsOf(t);
+  if (n < 2 || c < 0 || c >= n) return null;
+  const shrunk = remerge(t, (m) => (m.c > c ? { ...m, c: m.c - 1 } : m.c + m.cs > c ? { ...m, cs: m.cs - 1 } : m));
+  const out: TableEl = { ...refill(shrunk, (r, x) => (x === c ? null : [r, x > c ? x - 1 : x])), rows: t.rows.map((row) => row.filter((_, i) => i !== c)) };
+  if (t.cols) out.cols = t.cols.filter((_, i) => i !== c);
+  if (t.aligns) out.aligns = t.aligns.filter((_, i) => i !== c);
+  return out;
 }
 
 /** Rows or columns removed from a table: merges and fills that were in them go, those after move up or left. */
