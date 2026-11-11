@@ -531,11 +531,12 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     }
     const s = P.sel;
     // The border of the cells picked, or a picked row's number or column's letter: a drag moves them (a click is a click).
-    if (!readOnly && !P.edit && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    // (Ctrl or ⌥ held already: the copy is dragged; a click there with Ctrl is still a range added.)
+    if (!readOnly && !P.edit && !e.shiftKey) {
       const x0 = rectOf(s);
       const allCols = x0.c1 === 0 && x0.c2 >= cols - 1;
       const allRows = x0.r1 === 0 && x0.r2 >= rows - 1;
-      const kind: DragKind | null = r < 0 && c >= 0 ? (allRows && !allCols && c >= x0.c1 && c <= x0.c2 ? 'moveCols' : null) : c < 0 && r >= 0 ? (allCols && !allRows && r >= x0.r1 && r <= x0.r2 ? 'moveRows' : null) : r >= 0 && c >= 0 && onEdge(e.clientX, e.clientY) ? 'move' : null;
+      const kind: DragKind | null = r < 0 && c >= 0 ? (allRows && !allCols && c >= x0.c1 && c <= x0.c2 && !e.ctrlKey && !e.metaKey && !e.altKey ? 'moveCols' : null) : c < 0 && r >= 0 ? (allCols && !allRows && r >= x0.r1 && r <= x0.r2 && !e.ctrlKey && !e.metaKey && !e.altKey ? 'moveRows' : null) : r >= 0 && c >= 0 && onEdge(e.clientX, e.clientY) ? 'move' : null;
       if (kind) {
         drag.current = { kind, id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, from: [r, c] };
         scroller.current?.setPointerCapture(e.pointerId);
@@ -622,7 +623,10 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       // No drag: it was a click after all.
       if (d.kind === 'moveCols') return P.onSel({ r: 0, c, ar: 0, ac: c, fr: rows - 1, fc: c });
       if (d.kind === 'moveRows') return P.onSel({ r, c: 0, ar: r, ac: 0, fr: r, fc: cols - 1 });
-      if (r >= 0 && c >= 0) P.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
+      if (r >= 0 && c >= 0) {
+        if ((e.ctrlKey || e.metaKey) && P.onAddRange) P.onAddRange(r, c);
+        else P.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
+      }
       return;
     }
     if (d.kind === 'fill') {
