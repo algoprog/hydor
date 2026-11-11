@@ -66,6 +66,8 @@ function DictationSettings() {
               options={[
                 { value: '', label: 'Same as this browser', hint: languageName(navigator.language || 'en-US') },
                 ...LANGUAGES.map((l) => ({ value: l as string, label: languageName(l), hint: l })),
+                // One set elsewhere that the list has not: shown by its name, as before.
+                ...(p.lang && !(LANGUAGES as readonly string[]).includes(p.lang) ? [{ value: p.lang, label: languageName(p.lang), hint: p.lang }] : []),
               ]}
               onChange={(l) => p.set({ lang: l })}
             />

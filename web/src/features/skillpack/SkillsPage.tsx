@@ -1159,7 +1159,15 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
         </div>
         <div className="max-w-full overflow-x-auto [&::-webkit-scrollbar]:hidden">
           <div className="w-max">
-            <Segmented size="sm" value={filter} onChange={setFilter} options={shownFilters.map((f) => ({ value: f.value, label: f.label }))} />
+            <Segmented size="sm" value={filter} onChange={setFilter} options={shownFilters.map((f) => ({
+                value: f.value,
+                label: (
+                  <>
+                    {f.label}
+                    {!!counts[f.value] && <span className="tnum font-normal text-fg-3">{counts[f.value]}</span>}
+                  </>
+                ),
+              }))} />
           </div>
         </div>
         {sp && (

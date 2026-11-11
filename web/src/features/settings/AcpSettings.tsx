@@ -118,8 +118,11 @@ export function AcpSettings() {
               label={<span translate="no">{a.name}</span>}
               hint={
                 a.installed ? (
-                  <span className="flex items-center gap-1.5">
-                    <CheckCircle2 size={12} className="shrink-0 text-ok" /> Installed
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <CheckCircle2 size={12} className="shrink-0 text-ok" /> <span className="shrink-0">Installed</span>
+                    <span className="truncate font-mono text-[11.5px]" title={[a.command, ...a.args].join(' ')} translate="no">
+                      · {[a.command, ...a.args].join(' ')}
+                    </span>
                   </span>
                 ) : (
                   <span className="flex min-w-0 items-center gap-1.5">

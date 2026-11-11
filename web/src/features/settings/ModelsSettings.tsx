@@ -1248,7 +1248,7 @@ function Runtimes({ st }: { st: ModelsState }) {
         title="Hugging Face token"
         placeholder="hf_…"
         note="Only for gated or private models."
-        onSave={(key) => put('/api/models', { hfToken: key })}
+        onSave={(key) => put('/api/models', { hfToken: key }).then(() => toast('Saved', 'ok'))}
       />
       <Dialog
         open={!!ep}

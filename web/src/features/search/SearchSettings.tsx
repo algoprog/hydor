@@ -246,28 +246,7 @@ function ProviderRow({
           {test && (
             <div className="flex items-start gap-2 text-[12.5px]">
               <div className="min-w-0 flex-1">
-                {test === 'busy' ? (
-                  <span className="flex items-center gap-2 text-fg-3">
-                    <Throbber /> Searching with {p.name}…
-                  </span>
-                ) : test.ok ? (
-                  <>
-                    <div className="flex items-center gap-1.5 text-ok">
-                      <Check size={13} strokeWidth={2.6} />
-                      Works: {test.count} result{test.count === 1 ? '' : 's'} in {duration(test.ms)}
-                    </div>
-                    {test.sample?.map((r) => (
-                      <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-fg-3 hover:text-accent">
-                        <span translate="no">{r.title}</span> <span className="text-fg-3/70">· {siteOf(r.url)}</span>
-                      </a>
-                    ))}
-                  </>
-                ) : (
-                  <div className="flex items-start gap-1.5 text-err">
-                    <X size={13} className="mt-[2px] shrink-0" />
-                    <span>{test.error}</span>
-                  </div>
-                )}
+                <TestLine test={test} name={p.name} />
               </div>
               {test !== 'busy' && (
                 <IconButton label="Close the test" size="sm" onClick={() => setTest(null)}>
@@ -285,6 +264,9 @@ function ProviderRow({
         width={440}
         footer={
           <>
+            <Button variant="ghost" icon={<Play size={14} />} disabled={test === 'busy'} onClick={run} className="mr-auto">
+              Test
+            </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
@@ -331,9 +313,44 @@ function ProviderRow({
               <input id={`url-${p.id}`} value={url} onChange={(e) => setUrl(e.target.value)} placeholder={p.url.placeholder} autoComplete="off" spellCheck={false} autoFocus={!takesKey} className={inputCls} />
             </div>
           )}
+          {test && (
+            <div className="rounded-lg bg-bg-1 px-3 py-2 text-[12.5px]">
+              <TestLine test={test} name={p.name} />
+            </div>
+          )}
           <button type="submit" className="hidden" />
         </form>
       </Dialog>
     </Row>
+  );
+}
+
+/** What a test search found, or why it failed, or that it is running. */
+function TestLine({ test, name }: { test: SearchTestResult | 'busy'; name: string }) {
+  return (
+    <>
+      {test === 'busy' ? (
+        <span className="flex items-center gap-2 text-fg-3">
+          <Throbber /> Searching with {name}…
+        </span>
+      ) : test.ok ? (
+        <>
+          <div className="flex items-center gap-1.5 text-ok">
+            <Check size={13} strokeWidth={2.6} />
+            Works: {test.count} result{test.count === 1 ? '' : 's'} in {duration(test.ms)}
+          </div>
+          {test.sample?.map((r) => (
+            <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-fg-3 hover:text-accent">
+              <span translate="no">{r.title}</span> <span className="text-fg-3/70">· {siteOf(r.url)}</span>
+            </a>
+          ))}
+        </>
+      ) : (
+        <div className="flex items-start gap-1.5 text-err">
+          <X size={13} className="mt-[2px] shrink-0" />
+          <span>{test.error}</span>
+        </div>
+      )}
+    </>
   );
 }
