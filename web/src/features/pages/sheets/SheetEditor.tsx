@@ -902,6 +902,21 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     change(cellsPatch(book, sheetIx, changes));
     grid.current?.focus();
   };
+  // The format painter: the look of the cell picked, to paint on what is picked next (a double click keeps it on; Esc ends it).
+  const [painter, setPainter] = useState<{ s: CellStyle | undefined; keep: boolean } | null>(null);
+  const startPainter = (keep: boolean) => {
+    if (readOnly) return;
+    if (painter && !keep) return setPainter(null);
+    setPainter({ s: active?.s, keep });
+    toast(tr(keep ? 'Format painter on: pick cells to paint them; Esc to stop.' : 'Format painter: pick the cells to paint.'));
+  };
+  /** The cells picked are painted with the look the painter holds (all of it: a cell with none loses its own). */
+  const paint = () => {
+    if (!painter) return;
+    const s = painter.s;
+    if (!painter.keep) setPainter(null);
+    restyle(() => s);
+  };
   const stepDecimals = (d: 1 | -1) => {
     if (!calc) return;
     const s = active?.s;
@@ -2281,6 +2296,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       return e.shiftKey ? setSel({ ...s, fr: s.fr + n }, true) : setSel(cellSel(s.r + n, s.c), true);
     }
     if (k === 'Escape') {
+      if (painter) setPainter(null);
       if (find.open) find.close();
       if (cutMark) {
         setCutMark(null);
@@ -2506,6 +2522,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     comments: () => openComments(false),
     func: (name) => typeIn(`=${name}(`),
     autoSum,
+    painter: () => startPainter(false),
+    painting: !!painter,
     chars: openChars,
     addSheet: () => addSheet(),
     setStyle,
@@ -2668,6 +2686,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           onStyle={setStyle}
           onFormat={setFormat}
           onToggleFormat={toggleFormat}
+          painting={!!painter}
+          onPainter={startPainter}
           onAutoSum={autoSum}
           onDecimals={stepDecimals}
           onBorders={borders}
@@ -2783,6 +2803,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             onFilter={(c, at) => setFilterMenu({ c, at })}
             onFill={fillTo}
             onMove={moveCells}
+            onPicked={paint}
+            painting={!!painter}
             onMoveLines={moveLines}
             onFillDown={fillDown}
             onUnhide={unhide}

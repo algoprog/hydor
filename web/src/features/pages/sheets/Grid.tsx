@@ -129,6 +129,10 @@ interface Props {
   /** The fill handle dragged from the selection over `target`; Ctrl held. */
   onFill: (target: Rect, ctrl: boolean) => void;
   onFillDown: () => void;
+  /** A pick by the mouse is done (the button let go): the format painter paints what was picked. */
+  onPicked?: () => void;
+  /** The format painter is on: the pointer shows it. */
+  painting?: boolean;
   /** The cells picked dragged by whole rows and columns (`dr`, `dc`) and dropped: moved, or copied with the copy key held. */
   onMove: (x: Rect, dr: number, dc: number, copy: boolean) => void;
   /** The picked rows (columns) from `from`, `count` of them, dropped before the row (column) `to`. */
@@ -568,6 +572,12 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    const d = drag.current;
+    finishPointer(e);
+    // A pick is done: the format painter paints it.
+    if (d && d.id === e.pointerId && (d.kind === 'cells' || d.kind === 'cols' || d.kind === 'rows' || (!d.moved && (d.kind === 'move' || d.kind === 'moveCols' || d.kind === 'moveRows')))) cb.current.onPicked?.();
+  };
+  const finishPointer = (e: React.PointerEvent) => {
     const d = drag.current;
     if (auto.current) cancelAnimationFrame(auto.current);
     auto.current = null;
@@ -1112,7 +1122,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => e.target === scroller.current && cb.current.onKey(e)}
-      className={cx('relative min-h-0 flex-1 overflow-auto overscroll-contain bg-bg leading-[1.35] text-fg outline-none select-none [-webkit-touch-callout:none]', (edge || moving) && 'cursor-move')}
+      className={cx('relative min-h-0 flex-1 overflow-auto overscroll-contain bg-bg leading-[1.35] text-fg outline-none select-none [-webkit-touch-callout:none]', (edge || moving) && 'cursor-move', p.painting && 'cursor-copy')}
       style={{ fontSize: 13.3 * z }}
     >
       <div className="relative" style={{ width: W, height: H }}>
