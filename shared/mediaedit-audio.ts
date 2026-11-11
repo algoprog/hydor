@@ -87,6 +87,20 @@ export interface SoundClip {
   /** Seconds at its start coming in from silence, and at its end going out to it. */
   fadeIn?: number;
   fadeOut?: number;
+  /** Its fades along a half sine instead of a straight line (as the Fade effect's "Smooth"). */
+  fadeSmooth?: boolean;
+  /**
+   * Its volume line: points along the clip (seconds from where it starts on the timeline, and the volume there as a
+   * multiple of what it is, 1 as it is, 0 silent, 2 twice as loud), with straight lines between them and the first
+   * and last volumes kept beyond them. Left out: the volume does not change along it.
+   */
+  env?: EnvPoint[];
+}
+
+/** A point of a clip's volume line. */
+export interface EnvPoint {
+  t: number;
+  v: number;
 }
 
 /** A track: clips one after another (never over each other), with its volume and place between the speakers. */
@@ -429,6 +443,104 @@ export function readSoundClock(s: string): number | null {
 const SRC = /^(?:|media:[a-f0-9]{10}|naget-sound:[a-f0-9]{16,64}|naget-video:[a-f0-9]{16,64}|[^\u0000-\u001f]{1,4096})$/;
 const ID = /^[A-Za-z0-9_-]{1,40}$/;
 
+// ---- a clip's volume line ------------------------------------------------------------------------------------------
+
+/** The most points a volume line has, and the loudest it goes (a multiple: 4 is +12 dB). */
+export const ENV_POINTS = 64;
+export const ENV_MAX = 4;
+
+/** The volume of a line at `u` seconds from the clip's start (1 where there is no line). */
+export function envGainAt(env: readonly EnvPoint[] | undefined, u: number): number {
+  if (!env?.length) return 1;
+  if (u <= env[0].t) return env[0].v;
+  const last = env[env.length - 1];
+  if (u >= last.t) return last.v;
+  let lo = 0;
+  let hi = env.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (env[mid].t <= u) lo = mid;
+    else hi = mid;
+  }
+  const a = env[lo];
+  const b = env[hi];
+  return a.v + ((b.v - a.v) * (u - a.t)) / Math.max(1e-9, b.t - a.t);
+}
+
+/** A line with nothing in it to hear (every point at 1, or no points) is no line. */
+const plainEnv = (env: EnvPoint[]) => !env.length || env.every((p) => Math.abs(p.v - 1) < 5e-4);
+
+/** A line cleaned up: its points in order along [0, `len`], not closer than a millisecond, in range; undefined when it changes nothing. */
+export function cleanEnv(raw: unknown, len: number): EnvPoint[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const pts: EnvPoint[] = [];
+  for (const q of raw) {
+    if (!q || typeof q !== 'object') continue;
+    const t = Number((q as EnvPoint).t);
+    const v = Number((q as EnvPoint).v);
+    if (!Number.isFinite(t) || !Number.isFinite(v)) continue;
+    pts.push({ t: Math.min(len, Math.max(0, t)), v: Math.min(ENV_MAX, Math.max(0, v)) });
+  }
+  pts.sort((a, b) => a.t - b.t);
+  const out: EnvPoint[] = [];
+  for (const q of pts) {
+    const prev = out[out.length - 1];
+    if (prev && q.t - prev.t < 0.001) out[out.length - 1] = q;
+    else out.push(q);
+    if (out.length >= ENV_POINTS) break;
+  }
+  const rounded = out.map((q) => ({ t: r3(q.t), v: Math.round(q.v * 1000) / 1000 }));
+  return plainEnv(rounded) ? undefined : rounded;
+}
+
+/** The part of a line from `u0` to `u1` (seconds from the clip's start; either may lie outside it), as the line of a clip that starts at `u0`. */
+export function envSlice(env: readonly EnvPoint[] | undefined, u0: number, u1: number): EnvPoint[] | undefined {
+  if (!env?.length || u1 - u0 < 1e-6) return undefined;
+  const inner = env.filter((q) => q.t > u0 + 1e-6 && q.t < u1 - 1e-6).map((q) => ({ t: us(q.t - u0), v: q.v }));
+  const out = [{ t: 0, v: envGainAt(env, u0) }, ...inner, { t: us(u1 - u0), v: envGainAt(env, u1) }];
+  return plainEnv(out) ? undefined : out;
+}
+
+/** A line stretched in time by `k` (a clip played at another speed lasts 1/speed as long). */
+export const envScale = (env: readonly EnvPoint[] | undefined, k: number): EnvPoint[] | undefined => (env?.length ? env.map((q) => ({ t: us(q.t * k), v: q.v })) : undefined);
+
+/** A point added to a line at `u` (its volume there, or as the line has it), the others where they were. Returns the line and the new point's place in it. */
+export function envAdd(env: readonly EnvPoint[] | undefined, u: number, len: number, v?: number): { env: EnvPoint[]; at: number } {
+  const t = r3(Math.min(len, Math.max(0, u)));
+  const vv = Math.min(ENV_MAX, Math.max(0, v ?? envGainAt(env, t)));
+  // A first point holds the volume it was: the line starts out straight, at 1 along all of the clip's length.
+  const base: EnvPoint[] = env?.length ? [...env] : [];
+  const next = [...base.filter((q) => Math.abs(q.t - t) >= 0.001), { t, v: vv }].sort((a, b) => a.t - b.t).slice(0, ENV_POINTS);
+  return { env: next, at: next.findIndex((q) => q.t === t) };
+}
+
+/** A point of a line moved to `u` and volume `v`, kept between its neighbours (a line keeps its points in order). */
+export function envMove(env: readonly EnvPoint[], i: number, u: number, v: number, len: number): EnvPoint[] {
+  if (i < 0 || i >= env.length) return [...env];
+  const lo = i > 0 ? env[i - 1].t + 0.002 : 0;
+  const hi = i < env.length - 1 ? env[i + 1].t - 0.002 : len;
+  const t = r3(Math.min(Math.max(lo, hi), Math.max(Math.min(lo, hi), u)));
+  return env.map((q, k) => (k === i ? { t, v: Math.round(Math.min(ENV_MAX, Math.max(0, v)) * 1000) / 1000 } : q));
+}
+
+/** A line without its `i`th point (undefined when none is left). */
+export function envRemove(env: readonly EnvPoint[], i: number): EnvPoint[] | undefined {
+  const out = env.filter((_, k) => k !== i);
+  return out.length ? out : undefined;
+}
+
+/** How a clip's fade is shaped at `x` (0 to 1 of the way along it). */
+export const clipFade = (c: Pick<SoundClip, 'fadeSmooth'>, x: number) => fadeCurve(x, !!c.fadeSmooth);
+
+/** A clip's volume at `u` seconds from its start: its gain, its volume line and its fades (the clip as heard). */
+export function clipGainAt(c: SoundClip, u: number): number {
+  const len = clipLength(c);
+  let e = dbGain(c.gain ?? 0) * envGainAt(c.env, u);
+  if (c.fadeIn && u < c.fadeIn) e *= clipFade(c, u / c.fadeIn);
+  if (c.fadeOut && u > len - c.fadeOut) e *= clipFade(c, Math.max(0, (len - u) / c.fadeOut));
+  return e;
+}
+
 /**
  * An edit as it can be made: every value in its range, clips inside their sounds (`length` says how long each sound
  * is; one it does not know is taken as it is), in order on their tracks and never over each other, effects with known
@@ -467,6 +579,9 @@ export function normalizeSoundRecipe(raw: unknown, o: { length: (src: string) =>
       const fo = num(c.fadeOut, 0, most);
       if (fi !== undefined && fi >= 0.005) clip.fadeIn = r3(fi);
       if (fo !== undefined && fo >= 0.005) clip.fadeOut = r3(fo);
+      if (c.fadeSmooth === true && (clip.fadeIn || clip.fadeOut)) clip.fadeSmooth = true;
+      const env = cleanEnv(c.env, clipLength(clip));
+      if (env) clip.env = env;
       clips.push(clip);
       if (clips.length >= LIMITS.clips) break;
     }
@@ -479,8 +594,14 @@ export function normalizeSoundRecipe(raw: unknown, o: { length: (src: string) =>
       if (prev && c.at < end - 1e-6) {
         const cut = (end - c.at) * (c.speed ?? 1);
         if (c.to - c.from - cut < LIMITS.part) continue;
+        const was = c.at;
         c.from = us(c.from + cut);
         c.at = us(end);
+        if (c.env) {
+          const e = envSlice(c.env, c.at - was, clipEnd(c) - was);
+          if (e) c.env = e;
+          else delete c.env;
+        }
       }
       kept.push(c);
     }
@@ -563,6 +684,9 @@ function piece(c: SoundClip, a: number, b: number, id = newId()): SoundClip {
   const out: SoundClip = { ...c, id, at: us(a), from: us(sourceTime(c, a)), to: us(sourceTime(c, b)) };
   delete out.fadeIn;
   delete out.fadeOut;
+  delete out.env;
+  const env = envSlice(c.env, a - c.at, b - c.at);
+  if (env) out.env = env;
   const half = (b - a) / 2;
   if (c.fadeIn && Math.abs(a - c.at) < 1e-6) out.fadeIn = r3(Math.min(c.fadeIn, half));
   if (c.fadeOut && Math.abs(b - clipEnd(c)) < 1e-6) out.fadeOut = r3(Math.min(c.fadeOut, half));
@@ -596,6 +720,13 @@ const withEffects = (r: SoundRecipe, effects: SoundEffect[] | undefined): SoundR
   if (!effects) delete out.effects;
   return out;
 };
+
+/**
+ * The tracks an edit that moves what follows is made on: with `inStep` (the editor's "Keep the tracks in step", as
+ * Audacity's sync-lock) every track, so a deletion or an insertion closes or opens the same time on all of them and
+ * what is placed on the timeline (the other tracks' clips, the markers) stays in step; else the tracks given.
+ */
+export const rippleTracks = (r: SoundRecipe, tracks: string[], inStep: boolean): string[] => (inStep ? r.tracks.map((t) => t.id) : tracks);
 
 /** Split the clips at `t` on these tracks. */
 export function splitAt(r: SoundRecipe, tracks: string[], t: number): SoundRecipe {
@@ -682,10 +813,10 @@ export function copyRange(r: SoundRecipe, tracks: string[], a: number, b: number
 
 /**
  * What was copied, put in at `t` on these tracks (the first copied track on the first of them, and so on; more copied
- * tracks than given go on new tracks): with `ripple` the rest moves on to make room, without it (a video's sound) it
- * goes over what is there, and what reaches past the end is left out.
+ * tracks than given go on new tracks): with `ripple` the rest moves on to make room (with `inStep`, on every track),
+ * without it (a video's sound) it goes over what is there, and what reaches past the end is left out.
  */
-export function pasteAt(r: SoundRecipe, tracks: string[], t: number, clip: SoundClipboard, ripple: boolean, src: string): Edited & { tracks: string[] } {
+export function pasteAt(r: SoundRecipe, tracks: string[], t: number, clip: SoundClipboard, ripple: boolean, src: string, inStep = false): Edited & { tracks: string[] } {
   let out = r;
   const targets = [...tracks];
   while (targets.length < clip.tracks.length && out.tracks.length < LIMITS.tracks) {
@@ -696,7 +827,8 @@ export function pasteAt(r: SoundRecipe, tracks: string[], t: number, clip: Sound
   const used = targets.slice(0, clip.tracks.length);
   let map: TimeMap = same;
   if (ripple) {
-    const e = insertGap(out, used, t, clip.length);
+    // `inStep`: the tracks that are not pasted into open the same gap, so every track stays in step (and the markers go with them).
+    const e = insertGap(out, inStep ? out.tracks.map((x) => x.id) : used, t, clip.length);
     out = e.recipe;
     map = e.map;
   } else out = clearRange(out, used, t, t + clip.length);
@@ -743,6 +875,7 @@ export function changeSpeed(r: SoundRecipe, tracks: string[], a: number, b: numb
       if (Math.abs(out.speed! - 1) < 0.0005) delete out.speed;
       if (out.fadeIn) out.fadeIn = r3(out.fadeIn * k);
       if (out.fadeOut) out.fadeOut = r3(out.fadeOut * k);
+      if (out.env) out.env = envScale(out.env, k);
       return out;
     }),
   }));
@@ -806,6 +939,10 @@ export function trimClip(r: SoundRecipe, track: string, clipId: string, edge: 's
       next = { ...c, to: us(c.from + (end - c.at) * s) };
     }
     const half = clipLength(next) / 2;
+    // Its volume line follows the sound: what is cut off goes, what is let in has the line's first or last volume.
+    const env = envSlice(c.env, next.at - c.at, clipEnd(next) - c.at);
+    delete next.env;
+    if (env) next.env = env;
     if (next.fadeIn && next.fadeIn > half) next.fadeIn = r3(half);
     if (next.fadeOut && next.fadeOut > half) next.fadeOut = r3(half);
     return { ...x, clips: x.clips.map((y) => (y.id === clipId ? next : y)) };

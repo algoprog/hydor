@@ -5,6 +5,7 @@
 import './engine-test-env';
 import assert from 'node:assert/strict';
 import type { SoundRecipe, SoundTrack } from '@shared/mediaedit-audio';
+import { cleanTempo, gridLines, gridStep, hop, nearestGrid, snapPointsOf, snapTime, zeroCrossing } from './snap';
 import { makePeaks, measure, minMax, renderClips, renderTrack, timeEffects, type Decoded } from './engine';
 
 let passed = 0;
@@ -105,6 +106,78 @@ test('measured as Normalize and Loudness hear it', () => {
   const m = measure([t], { tracks: [t] }, 0, 2, () => tone, R);
   assert.ok(Math.abs(m.peak - -6.02) < 0.2, `peak ${m.peak}`);
   assert.ok(Math.abs(m.lufs - (-0.691 + 10 * Math.log10(0.25))) < 0.3, `loudness ${m.lufs}`);
+});
+
+test('a volume line and smooth fades are heard as they are drawn', () => {
+  // Down to silence in the middle, back up at the end (straight lines, to the sample).
+  const e = renderClips(track([{ id: 'c', src: '', at: 0, from: 0, to: 2, env: [{ t: 0, v: 1 }, { t: 1, v: 0 }, { t: 2, v: 1 }] }]), 0, 2 * R, R, get);
+  assert.ok(Math.abs(e[0][R / 2] - ramp[R / 2] * 0.5) < 1e-3, 'halfway down');
+  assert.ok(Math.abs(e[0][R]) < 1e-3, 'silent at the bottom');
+  assert.ok(Math.abs(e[0][Math.round(1.5 * R)] - ramp[Math.round(1.5 * R)] * 0.5) < 1e-3, 'halfway back up');
+  // Its first and last volumes are kept beyond its points.
+  const k = renderClips(track([{ id: 'c', src: '', at: 0, from: 0, to: 2, env: [{ t: 0.5, v: 0.5 }] }]), 0, 2 * R, R, get);
+  assert.ok(Math.abs(k[0][100] - ramp[100] * 0.5) < 1e-6 && Math.abs(k[0][R + 100] - ramp[R + 100] * 0.5) < 1e-6, 'one point: a steady volume');
+  // A smooth fade is a half sine: a quarter of the way in, 0.146 of the volume, not 0.25.
+  const f = renderClips(track([{ id: 'c', src: '', at: 0, from: 0, to: 2, fadeIn: 1, fadeSmooth: true }]), 0, 2 * R, R, get);
+  assert.ok(Math.abs(f[0][R / 4] - ramp[R / 4] * (0.5 - 0.5 * Math.cos(Math.PI / 4))) < 1e-3, 'smooth, a quarter in');
+  assert.ok(Math.abs(f[0][R / 2] - ramp[R / 2] * 0.5) < 1e-3, 'halfway, as a straight fade');
+});
+
+test('the nearest zero crossing', () => {
+  const x = sine(100, 1);
+  // A 100 Hz sine at 8 kHz crosses zero every 40 samples (5 ms).
+  const t = zeroCrossing([x], R, 0.0123, 0.01);
+  assert.ok(Math.abs(t * 100 * 2 - Math.round(t * 100 * 2)) < 0.05, `at a crossing: ${t}`);
+  assert.ok(Math.abs(t - 0.0123) <= 0.0026, `the nearest: ${t}`);
+  assert.equal(zeroCrossing([x], R, 0.0123, 0.0001), 0.0123, 'none within the window: where it was');
+  assert.equal(zeroCrossing([Float32Array.from({ length: 100 }, () => 0.5)], R, 0.005, 0.005), 0.005, 'a wave that never crosses');
+  // Both channels together: left alone crosses, but together they do not.
+  const both = zeroCrossing([Float32Array.from([1, 1, -1, -1]), Float32Array.from([1, 1, 3, 3])], 1, 2, 2);
+  assert.equal(both, 2, 'the channels averaged');
+  assert.equal(zeroCrossing([x], R, 0, 0.01) , 0, 'at the very start');
+});
+
+test('the grid', () => {
+  assert.deepEqual(gridStep({ kind: 'off' }, 100), null);
+  // Lines never closer than 28 pixels: at 100 px a second, a line every 0.5 s.
+  assert.deepEqual(gridStep({ kind: 'seconds' }, 100), { step: 0.5, every: 10 });
+  assert.deepEqual(gridStep({ kind: 'seconds' }, 10), { step: 5, every: 5 });
+  // At 120 beats a minute a beat is half a second: 100 px a second keeps a line a beat; zoomed out they join, zoomed in they split.
+  assert.deepEqual(gridStep({ kind: 'beats', bpm: 120 }, 100), { step: 0.5, every: 4 });
+  assert.deepEqual(gridStep({ kind: 'beats', bpm: 120 }, 400), { step: 0.125, every: 16 });
+  assert.deepEqual(gridStep({ kind: 'beats', bpm: 120 }, 20), { step: 2, every: 1 });
+  assert.equal(cleanTempo(5), 30);
+  assert.equal(cleanTempo(NaN), 120);
+  const lines = gridLines({ kind: 'beats', bpm: 120 }, 100, 1, 3);
+  assert.deepEqual(lines.map((l) => l.t).slice(0, 5), [1, 1.5, 2, 2.5, 3]);
+  assert.deepEqual(lines.filter((l) => l.major).map((l) => l.t), [2]);
+  assert.equal(nearestGrid({ kind: 'beats', bpm: 120 }, 100, 1.4), 1.5);
+  assert.equal(nearestGrid({ kind: 'off' }, 100, 1.4), null);
+});
+
+test('where a drag lands: a point, then the grid, then a zero crossing', () => {
+  const o = { on: true, tol: 0.05, points: [0, 2, 5] };
+  assert.equal(snapTime(2.03, o), 2, 'a clip’s edge');
+  assert.equal(snapTime(2.2, o), 2.2, 'nothing near');
+  assert.equal(snapTime(2.03, { ...o, except: [2] }), 2.03, 'not to where it is now');
+  assert.equal(snapTime(3.02, { ...o, grid: { t: 3 } }), 3, 'the grid');
+  assert.equal(snapTime(2.03, { ...o, grid: { t: 2.01 } }), 2, 'a point before the grid');
+  assert.equal(snapTime(3.02, { ...o, zero: (t) => t + 0.001 }), 3.021, 'a zero crossing when nothing else is near');
+  assert.equal(snapTime(2.03, { ...o, zero: () => 9 }), 2, 'not to a crossing from a point');
+  assert.equal(snapTime(2.03, { ...o, on: false }), 2.03, 'snapping off');
+  assert.equal(snapTime(2.03, { ...o, on: false, zero: () => 2.04 }), 2.04, 'the crossing does not need snapping on');
+  const r: SoundRecipe = { tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 1, from: 0, to: 2 }] }, { id: 'b', clips: [{ id: '2', src: '', at: 4, from: 0, to: 1 }] }] };
+  assert.deepEqual([...new Set(snapPointsOf(r, 2.5, [7], { a: 1.5, b: 2 }))].sort((a, b) => a - b), [0, 1, 1.5, 2, 2.5, 3, 4, 5, 7]);
+});
+
+test('hopping to the next marker or clip edge', () => {
+  const r: SoundRecipe = { tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 1, from: 0, to: 2 }] }, { id: 'b', clips: [{ id: '2', src: '', at: 4, from: 0, to: 1 }] }] };
+  assert.equal(hop(r, [6], 0, 1, 7), 1);
+  assert.equal(hop(r, [6], 1, 1, 7), 3);
+  assert.equal(hop(r, [6], 5, 1, 7), 6);
+  assert.equal(hop(r, [6], 7, 1, 7), null);
+  assert.equal(hop(r, [6], 4.5, -1, 7), 4);
+  assert.equal(hop(r, [6], 0, -1, 7), null);
 });
 
 console.log(`${passed} passed${process.exitCode ? ', some failed' : ''}`);

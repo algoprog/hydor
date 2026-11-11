@@ -15,14 +15,22 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import {
   changeSpeed,
+  cleanEnv,
   clipEnd,
+  clipGainAt,
   copyRange,
   deleteRange,
+  envAdd,
+  envGainAt,
+  envMove,
+  envRemove,
+  envSlice,
   insertGap,
   isFiller,
   moveClip,
   normalizeSoundRecipe,
   pasteAt,
+  rippleTracks,
   roomResponse,
   shortenPauses,
   silencesIn,
@@ -39,7 +47,7 @@ import { hasFfmpeg } from '../media/frames.ts';
 import { media } from '../media/index.ts';
 import { getMedia } from '../media/store.ts';
 import { readTimedWords } from '../voice/whisper.ts';
-import { audioGraphText, checkAudioChain, checkSoundPlan, gainFor, planSound, readLoudness, type SoundCaps } from './audio-plan.ts';
+import { audioGraphText, checkAudioChain, checkSoundPlan, envExpression, gainFor, planSound, readLoudness, type SoundCaps } from './audio-plan.ts';
 import { keptSoundFile } from './audio-store.ts';
 import { soundEdit } from './audio.ts';
 import { editAudioTool, readSilences } from './audio-tool.ts';
@@ -152,6 +160,58 @@ const lengths = (src: string) => (src === '' ? 10 : src === 'b.mp3' ? 4 : undefi
   ok(room[0].length > 40000 && Math.abs(room[0].reduce((n, x) => n + x * x, 0) - 1) < 1e-3 && room[0][100] === roomResponse(1, 48000)[0][100], 'a room’s response: the same each time, its energy 1');
 }
 
+// ---- a clip's volume line, and tracks kept in step -----------------------------------------------------------------------
+
+{
+  const line = [
+    { t: 0, v: 1 },
+    { t: 2, v: 0 },
+    { t: 4, v: 2 },
+  ];
+  ok(envGainAt(line, 0) === 1 && envGainAt(line, 1) === 0.5 && envGainAt(line, 2) === 0 && envGainAt(line, 3) === 1 && envGainAt(line, 9) === 2 && envGainAt(undefined, 3) === 1, 'a volume line: straight lines between points, the ends kept beyond them');
+  ok(envGainAt([{ t: 1, v: 0.5 }], 0) === 0.5 && envGainAt([{ t: 1, v: 0.5 }], 5) === 0.5, 'one point is a steady volume');
+  // Cleaned: in order, in range, closer than a millisecond merged, nothing to hear left out.
+  const c = cleanEnv([{ t: 3, v: 9 }, { t: -1, v: 0.5 }, { t: 3.0004, v: 1 }, { t: 'x', v: 1 }, null], 3.5);
+  ok(JSON.stringify(c) === '[{"t":0,"v":0.5},{"t":3,"v":1}]', `a line cleaned: ${JSON.stringify(c)}`);
+  ok(cleanEnv([{ t: 0, v: 1 }, { t: 2, v: 1 }], 3) === undefined && cleanEnv('x', 3) === undefined, 'a line that changes nothing is no line');
+  ok(cleanEnv(Array.from({ length: 200 }, (_, i) => ({ t: i / 100, v: i % 2 ? 0.5 : 1 })), 5)!.length === 64, 'at most 64 points');
+  // Cut, the line goes with the sound: split at 1, each part has its own line meeting at the same volume.
+  const r: SoundRecipe = { tracks: [{ id: 'a', clips: [{ id: 'c', src: '', at: 10, from: 0, to: 4, env: line }] }] };
+  const parts = deleteRange(r, ['a'], 11, 11.5, false).recipe.tracks[0].clips;
+  const [p1, p2] = parts;
+  ok(parts.length === 2 && JSON.stringify(p1.env) === '[{"t":0,"v":1},{"t":1,"v":0.5}]' && Math.abs(p2.env![0].v - envGainAt(line, 1.5)) < 1e-9 && p2.env!.length === 3 && p2.env![1].t === 0.5, `a split carries the line: ${JSON.stringify(parts)}`);
+  ok(Math.abs(clipGainAt(p2, 0.5) - envGainAt(line, 2)) < 1e-9, 'a part plays the volume the whole did there');
+  // A faster clip has a shorter line; a trimmed clip's line follows its sound.
+  const sp = changeSpeed(r, ['a'], 10, 14, 2).recipe.tracks[0].clips[0];
+  ok(sp.speed === 2 && JSON.stringify(sp.env!.map((q) => q.t)) === '[0,1,2]', `twice as fast: the line twice as short: ${JSON.stringify(sp.env)}`);
+  const tcl = trimClip(r, 'a', 'c', 'start', 11, 10).tracks[0].clips[0];
+  ok(tcl.at === 11 && tcl.from === 1 && tcl.env![0].t === 0 && tcl.env![0].v === 0.5, `a clip's start dragged: ${JSON.stringify(tcl.env)}`);
+  ok(envSlice(line, 0, 4)!.length === 3 && envSlice([{ t: 0, v: 1 }], 0, 4) === undefined, 'a whole slice is the line; a plain line has none');
+  // Points added, moved between their neighbours, removed.
+  const a = envAdd(line, 1, 4);
+  ok(a.env.length === 4 && a.env[a.at].t === 1 && a.env[a.at].v === 0.5, `a point added on the line keeps its volume: ${JSON.stringify(a)}`);
+  const m = envMove(a.env, a.at, 3, 3, 4);
+  ok(m[a.at].t < 2 && m[a.at].v === 3 && envMove(a.env, 1, 1, 9, 4)[1].v === 4 && envMove(a.env, 0, -5, 0.2, 4)[0].t === 0, `a point stays between its neighbours: ${JSON.stringify(m)}`);
+  ok(envRemove([{ t: 1, v: 0.5 }], 0) === undefined && envRemove(line, 1)!.length === 2, 'a point taken out');
+  // Recipes: a volume line and smooth fades are kept (cleaned); a clip's fades need fades.
+  const n = normalizeSoundRecipe({ tracks: [{ id: 'a', clips: [{ id: 'x', src: '', at: 0, from: 0, to: 4, env: [{ t: 0, v: 1 }, { t: 9, v: 0.2 }], fadeSmooth: true }, { id: 'y', src: '', at: 5, from: 0, to: 2, fadeSmooth: true, env: [{ t: 0, v: 1 }] }] }] }, { length: () => 10 });
+  ok(JSON.stringify(n.tracks[0].clips[0].env) === '[{"t":0,"v":1},{"t":4,"v":0.2}]' && n.tracks[0].clips[0].fadeSmooth === undefined && n.tracks[0].clips[1].env === undefined, `a recipe's lines cleaned to the clip: ${JSON.stringify(n.tracks[0].clips)}`);
+  // The expression ffmpeg gets: only numbers, if and lt.
+  const x = envExpression(line);
+  ok(x === 'if(lt(t,0),1,if(lt(t,2),1+(-0.5)*t,if(lt(t,4),(-2)+1*t,2)))', `the volume line as an expression: ${x}`);
+  ok(/^[0-9a-z.,()+*-]+$/.test(x) && !/[a-su-z]{2}/.test(x.replace(/if|lt/g, '')), `an expression of numbers, if and lt only: ${x}`);
+  // Keeping the tracks in step: a deletion on one track closes the time on all, the markers' map moves with it.
+  const two: SoundRecipe = { tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 0, from: 0, to: 10 }] }, { id: 'b', clips: [{ id: '2', src: 'b.mp3', at: 6, from: 0, to: 4 }] }] };
+  ok(JSON.stringify(rippleTracks(two, ['a'], true)) === '["a","b"]' && JSON.stringify(rippleTracks(two, ['a'], false)) === '["a"]', 'the tracks a ripple is made on');
+  const inStep = deleteRange(two, rippleTracks(two, ['a'], true), 2, 4, true);
+  ok(inStep.recipe.tracks[1].clips[0].at === 4 && inStep.map(6) === 4 && soundLength(inStep.recipe) === 8, 'a deletion on one track moves every track and the markers');
+  const alone = deleteRange(two, ['a'], 2, 4, true);
+  ok(alone.recipe.tracks[1].clips[0].at === 6 && alone.map(6) === 6, 'without it, the other tracks stay');
+  const cb = copyRange(two, ['a'], 0, 1, '');
+  const pin = pasteAt(two, ['a'], 3, cb, true, '', true);
+  ok(pin.recipe.tracks[1].clips[0].at === 7 && pin.map(6) === 7 && pasteAt(two, ['a'], 3, cb, true, '').recipe.tracks[1].clips[0].at === 6, 'a paste opens its time on every track when in step');
+}
+
 // ---- the plan and its checks ---------------------------------------------------------------------------------------
 
 const CAPS: SoundCaps = { rubberband: false, afirPlain: 'gtype', limiterLatency: true, encoders: { mp3: true, aac: true, opus: true, vorbis: true, flac: true } };
@@ -180,6 +240,21 @@ const CAPS: SoundCaps = { rubberband: false, afirPlain: 'gtype', limiterLatency:
   ok(plan.inputs.length === 2, `the sound read again where the track goes back in it: ${plan.inputs.length}`);
   ok(/anullsrc=r=44100:cl=stereo,atrim=end_sample=44100/.test(plan.graph) && /atempo=tempo=2/.test(plan.graph) && /lowshelf=f=100:t=s:w=1:g=3/.test(plan.graph), `gaps, speed and the effect on its range: ${plan.graph.slice(0, 300)}`);
   ok(/pan=stereo\|c0=1\*c0\|c1=1\*c0/.test(plan.graph) && plan.channels === 1, 'a mono sound made stereo inside, mono out');
+  // A clip's volume line and smooth fades, in the command.
+  {
+    const env = [{ t: 0, v: 1 }, { t: 1, v: 0.25 }, { t: 2, v: 1 }];
+    const p2 = planSound({
+      recipe: { tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 0, from: 0, to: 3, env, fadeIn: 1, fadeSmooth: true }] }] },
+      sources: new Map([['', src]]),
+      out: { format: 'wav' },
+      dir: '/j',
+      output: '/j/out.wav',
+      caps: CAPS,
+    });
+    ok(/volume=volume='if\(lt\(t,0\),1,if\(lt\(t,1\),/.test(p2.graph) && /:eval=frame/.test(p2.graph) && /afade=t=in:st=0:d=1:curve=hsin/.test(p2.graph), `a volume line and a smooth fade in the plan: ${p2.graph.slice(0, 400)}`);
+    throws(() => checkAudioChain({ ins: ['0:a'], filters: [{ name: 'afade', env: [{ t: 0, v: 1 }] }], outs: ['o'] }), /volume line/, 'a volume line only on volume');
+    throws(() => checkAudioChain({ ins: ['0:a'], filters: [{ name: 'volume', env: [{ t: 1, v: 1 }, { t: 0, v: 1 }] }], outs: ['o'] }), /volume line/, 'a volume line in order');
+  }
   checkSoundPlan(plan);
   throws(() => checkSoundPlan({ ...plan, args: [...plan.args.slice(0, -1), 'file:/etc/passwd'] }), /writes somewhere/, 'writes only its output');
   throws(() => checkAudioChain({ ins: ['0:a'], filters: [{ name: 'amovie', args: [['filename', 'x']] }], outs: ['o'] }), /may not use: amovie/, 'no filter that reads a file');
@@ -302,6 +377,13 @@ if (ff) {
   const lu = execFileSync('sh', ['-c', `ffmpeg -hide_banner -nostdin -i "${j.path}" -af ebur128=framelog=quiet -f null - 2>&1 | grep -A1 'Integrated loudness' | tail -1`], { env, encoding: 'utf8' });
   ok(near(Number(/I:\s*(-?[\d.]+)/.exec(lu)?.[1]), -16, 1), `loudness −16 LUFS: ${lu.trim()}`);
 
+  // A volume line, heard: a clip dipping to silence in the middle.
+  const dip: SoundRecipe = { tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 0, from: 0, to: 4, env: [{ t: 0, v: 1 }, { t: 2, v: 0 }, { t: 4, v: 1 }] }] }] };
+  j = await edit(dip, { format: 'wav' }, { file: tone, as: 'copy' });
+  ok(j.status === 'done' && samples(j.path) === 4 * 48000 && peakDb(j.path, 0, 0.1) > peakDb(tone) - 1.5 && peakDb(j.path, 1.95, 2.05) < peakDb(tone) - 25 && peakDb(j.path, 3.9, 4) > peakDb(tone) - 1.5, `a volume line: ${j.error ?? ''} ${peakDb(j.path, 0, 0.1)} ${peakDb(j.path, 1.95, 2.05)} ${peakDb(j.path, 3.9, 4)}`);
+  // At half speed the line stretches with the clip.
+  j = await edit({ tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 0, from: 0, to: 2, speed: 0.5, env: [{ t: 0, v: 1 }, { t: 2, v: 0 }, { t: 4, v: 1 }] }] }] }, { format: 'wav' }, { file: tone, as: 'copy' });
+  ok(j.status === 'done' && peakDb(j.path, 1.95, 2.05) < peakDb(tone) - 25, `a volume line on a slowed clip: ${j.error ?? ''} ${peakDb(j.path, 1.95, 2.05)}`);
   // Two tracks, at their volume and pan, as long as the longest.
   const mixed: SoundRecipe = { tracks: [{ id: 'a', clips: [{ id: '1', src: '', at: 0, from: 0, to: 2 }] }, { id: 'b', volume: -6, pan: -0.5, clips: [{ id: '2', src: voice, at: 1.5, from: 0, to: 2, fadeIn: 0.5 }] }] };
   j = await edit(mixed, { format: 'flac' }, { file: tone, as: 'copy' });

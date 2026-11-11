@@ -15,8 +15,9 @@ type KeyEvent = { key: string; code: string; ctrlKey: boolean; metaKey: boolean;
 /** Whether an event is these keys ("Ctrl+Shift+Z", "[", "Delete", "Ctrl+0", "Ctrl+="): Ctrl is ⌘ on a Mac. */
 export function matchKeys(keys: string, e: KeyEvent): boolean {
   const k = keys.trim();
-  const plus = k.endsWith('++');
-  const parts = (plus ? k.slice(0, -2) : k).split('+').filter(Boolean);
+  // "+" alone, or "Ctrl++": the plus key itself.
+  const plus = k === '+' || k.endsWith('++');
+  const parts = (k === '+' ? '' : plus ? k.slice(0, -2) : k).split('+').filter(Boolean);
   const last = plus ? '+' : (parts.pop() ?? '');
   const mods = new Set(parts.map((p) => p.toLowerCase()));
   const want = last.toLowerCase();

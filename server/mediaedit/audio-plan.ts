@@ -17,10 +17,13 @@ import {
   clipEnd,
   clipLength,
   echoTaps,
+  ENV_MAX,
+  ENV_POINTS,
   effectParams,
   panMatrix,
   roomResponse,
   soundLength,
+  type EnvPoint,
   type SoundEffect,
   type SoundOutput,
   type SoundRecipe,
@@ -65,6 +68,8 @@ type Value = string | number;
 export interface AFilter {
   name: string;
   args?: [string, Value][];
+  /** volume only: a clip's volume line (seconds from the clip's start, a multiple), made into the expression that follows it. */
+  env?: EnvPoint[];
   /** A value without a name (pan's channels: "stereo|c0=1*c0|c1=1*c1"). */
   pos?: string;
 }
@@ -87,6 +92,7 @@ export function checkAudioChain(c: AChain): void {
   for (const l of [...c.ins, ...c.outs]) if (!LABEL.test(l)) throw new Error(`A label the plan may not use: ${l}`);
   if (!c.filters.length) throw new Error('A chain without filters');
   for (const f of c.filters) {
+    checkEnv(f);
     if (!SOUND_FILTERS.has(f.name)) throw new Error(`A filter the plan may not use: ${f.name}`);
     if (f.pos !== undefined && (f.name !== 'pan' || !PAN.test(f.pos))) throw new Error(`${f.name} has a value the plan may not use`);
     for (const [k, v] of f.args ?? []) {
@@ -98,6 +104,35 @@ export function checkAudioChain(c: AChain): void {
   }
 }
 
+/** How many points a volume line may have in the plan, in order along the clip, each a time and a volume in range. */
+const checkEnv = (f: AFilter) => {
+  const env = f.env;
+  if (!env) return;
+  if (f.name !== 'volume' || env.length < 1 || env.length > ENV_POINTS) throw new Error(`${f.name} has a volume line the plan may not use`);
+  let last = -1;
+  for (const q of env) {
+    if (!Number.isFinite(q.t) || !Number.isFinite(q.v) || q.t < last || q.t < 0 || q.v < 0 || q.v > ENV_MAX) throw new Error('A volume line the plan may not use');
+    last = q.t;
+  }
+};
+
+/**
+ * A volume line as the expression volume takes (with eval=frame, `t` the seconds from the clip's start): straight lines
+ * between the points, the first volume before the first point and the last after the last. Built from the numbers only,
+ * with if and lt as its only functions.
+ */
+export function envExpression(env: EnvPoint[]): string {
+  const num = (x: number) => (x < 0 ? `(${n(x, 6)})` : n(x, 6));
+  let e = num(env[env.length - 1].v);
+  for (let i = env.length - 1; i > 0; i--) {
+    const a = env[i - 1];
+    const b = env[i];
+    const slope = (b.v - a.v) / Math.max(1e-6, b.t - a.t);
+    e = `if(lt(t,${n(b.t, 6)}),${num(a.v - slope * a.t)}+${num(slope)}*t,${e})`;
+  }
+  return `if(lt(t,${n(env[0].t, 6)}),${num(env[0].v)},${e})`;
+}
+
 const val = (v: Value) => (typeof v === 'number' ? n(v, 6) : v);
 
 /** The filter graph's text, its chains checked first. */
@@ -105,7 +140,7 @@ export function audioGraphText(chains: AChain[]): string {
   return chains
     .map((c) => {
       checkAudioChain(c);
-      const fs = c.filters.map((f) => (f.pos !== undefined ? `${f.name}=${f.pos}` : f.args?.length ? `${f.name}=${f.args.map(([k, v]) => `${k}=${val(v)}`).join(':')}` : f.name)).join(',');
+      const fs = c.filters.map((f) => (f.env ? `volume=volume='${envExpression(f.env)}':eval=frame` : f.pos !== undefined ? `${f.name}=${f.pos}` : f.args?.length ? `${f.name}=${f.args.map(([k, v]) => `${k}=${val(v)}`).join(':')}` : f.name)).join(',');
       return `${c.ins.map((l) => `[${l}]`).join('')}${fs}${c.outs.map((l) => `[${l}]`).join('')}`;
     })
     .join(';');
@@ -593,6 +628,9 @@ export function planSound(p: SoundPlanInput): SoundPlan {
       f.push(FMT(R));
       if (c.speed) for (const x of tempos(c.speed)) f.push({ name: 'atempo', args: [['tempo', n(x, 6)]] });
       if (c.gain) f.push({ name: 'volume', args: [['volume', dbArg(c.gain)]] });
+      // Its volume line, then its fades (smooth ones along a half sine, as the browser plays them).
+      if (c.env?.length) f.push({ name: 'volume', env: c.env });
+      const curve: [string, Value][] = c.fadeSmooth ? [['curve', 'hsin']] : [];
       const len = clipLength(c);
       if (c.fadeIn)
         f.push({
@@ -601,6 +639,7 @@ export function planSound(p: SoundPlanInput): SoundPlan {
             ['t', 'in'],
             ['st', 0],
             ['d', Math.min(len, c.fadeIn)],
+            ...curve,
           ],
         });
       if (c.fadeOut)
@@ -610,6 +649,7 @@ export function planSound(p: SoundPlanInput): SoundPlan {
             ['t', 'out'],
             ['st', Math.max(0, len - c.fadeOut)],
             ['d', Math.min(len, c.fadeOut)],
+            ...curve,
           ],
         });
       f.push(...exact(Math.max(1, b - Math.max(a, at))));
