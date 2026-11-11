@@ -802,6 +802,12 @@ export interface EdAsk {
   /** A chart's sources: the page's databases, their names, titles and columns. */
   dbs?: { name: string; title: string; cols: { name: string; kind: string }[] }[];
 }
+/** What a file dropped on the page becomes: its own block (the same ones Add's Media makes). */
+export type DroppedKind = 'picture' | 'pdf' | 'video' | 'audio' | 'file';
+const DROPPED: DroppedKind[] = ['picture', 'pdf', 'video', 'audio', 'file'];
+const droppedKind = (v: unknown): DroppedKind => (DROPPED.includes(v as DroppedKind) ? (v as DroppedKind) : 'picture');
+/** The largest file of each kind: a picture is made small first; a video is the slides' limit; the rest are kept by the app (50 MB). */
+const DROP_LIMITS: Record<DroppedKind, number> = { picture: 40_000_000, pdf: 50_000_000, audio: 50_000_000, file: 50_000_000, video: 200 * 1024 * 1024 };
 const ASKS = new Set<string>(['emoji', 'icon', 'callout-icon', 'cover', 'picture', 'video', 'math', ...BLOCK_ASKS]);
 const rectOf = (v: unknown): EdAsk['rect'] => {
   const r = v as Record<string, unknown> | null;
@@ -842,8 +848,18 @@ export const EditFrame = forwardRef<
     onReady?: () => void;
     onLayers?: (tree: EdLayer) => void;
     onPage?: (page: EdPage) => void;
-    /** A part was copied (or cut): its HTML, to paste here or in another page. */
-    onCopied?: (c: { html: string; name: string }) => void;
+    /** A part was copied (or cut): its HTML and words, to paste here or in another page; `system`: the frame put it on the clipboard itself. */
+    onCopied?: (c: { html: string; name: string; text: string; system: boolean }) => void;
+    /** The menu's Paste: read the system clipboard (the frame may not) and answer with `cmd('pasteData', …)`. */
+    onClipRead?: (plain: boolean) => void;
+    /** The right-click menu's Description: the field of the part's own that should take the focus (the inspector's). */
+    onFocusField?: (field: string) => void;
+    /** Ctrl+wheel, Ctrl+= and Ctrl+- in the page: the view's zoom. */
+    onZoom?: (op: 'in' | 'out' | 'fit') => void;
+    /** Ctrl+F (Ctrl+H: `replace`) pressed in the page: the find bar. */
+    onFind?: (replace: boolean) => void;
+    /** What the page found of what the bar asked for: how many matches, and which is on view (from 0, or -1). */
+    onFound?: (count: number, index: number) => void;
     /** Words are being changed in the page (a phone's keyboard is up). */
     onEditing?: (on: boolean) => void;
     /** A block's menu is open in the page (on a phone, the drawer under it makes room). */
@@ -856,8 +872,8 @@ export const EditFrame = forwardRef<
     store?: Store;
     /** The editor asks for something chosen in the app: an emoji, an icon, a cover, a picture, a video, maths. */
     onAsk?: (a: EdAsk) => void;
-    /** A picture dropped or pasted in the page, to make small enough to live in it (and answer with `fill`). */
-    onFile?: (id: string, file: File) => void;
+    /** A file dropped or pasted in the page: a picture to make small enough to live in it, or another file to keep (a PDF, a video, a sound, any file); answered with `fill`. */
+    onFile?: (id: string, file: File, what: DroppedKind) => void;
     /** The block menu's Ask the agent. */
     onAgent?: () => void;
     /** Ctrl+Shift+/ in the page: the keyboard shortcuts. */
@@ -872,11 +888,11 @@ export const EditFrame = forwardRef<
     onDesign?: (d: Record<string, unknown>) => void;
     className?: string;
   }
->(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign, className }, handle) {
+>(function EditFrame({ html, base, title = 'Page', labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onClipRead, onFocusField, onZoom, onFind, onFound, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign, className }, handle) {
   const ref = useRef<HTMLIFrameElement>(null);
   const offline = useContext(OfflineFrames);
-  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign });
-  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign };
+  const cb = useRef({ html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onClipRead, onFocusField, onZoom, onFind, onFound, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign });
+  cb.current = { html, base, labels, onSel, onState, onPalette, onSave, onReady, onLayers, onPage, onCopied, onClipRead, onFocusField, onZoom, onFind, onFound, onEditing, onMenu, onComment, onCommentOpen, store, onAsk, onFile, onAgent, onKeys, onAi, onAiStop, onDbAi, onUpload, onDesign };
   const ch = useRef({ n: '', seq: 0, waits: new Map<number, (html: string) => void>(), anchorWaits: new Map<number, (list: { id: string; on: PageAnchor }[]) => void>() });
   const send = (m: Record<string, unknown>) => ref.current?.contentWindow?.postMessage({ ...m, type: 'wa-ed', n: ch.current.n }, '*');
   useThemeChange(() => ch.current.n && send({ cmd: 'theme', arg: { theme: themeNow(), css: themeCss() } }));
@@ -933,7 +949,12 @@ export const EditFrame = forwardRef<
         paintBg(ref.current, d.page.bg);
         c.onPage?.(d.page as EdPage);
       } else if (d.type === 'wa-ed-layers' && d.tree && typeof d.tree === 'object') c.onLayers?.(d.tree as EdLayer);
-      else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '' });
+      else if (d.type === 'wa-ed-copied' && typeof d.html === 'string' && d.html.length < 2_000_000) c.onCopied?.({ html: d.html, name: typeof d.name === 'string' ? d.name : '', text: typeof d.text === 'string' ? d.text.slice(0, 1_000_000) : '', system: d.system === true });
+      else if (d.type === 'wa-ed-clip-read') c.onClipRead?.(d.plain === true);
+      else if (d.type === 'wa-ed-focus' && isStr(d.field, 20)) c.onFocusField?.(d.field);
+      else if (d.type === 'wa-ed-find') c.onFind?.(d.replace === true);
+      else if (d.type === 'wa-ed-found' && Number.isInteger(d.count) && Number.isInteger(d.index)) c.onFound?.(d.count, d.index);
+      else if (d.type === 'wa-ed-zoom' && (d.op === 'in' || d.op === 'out' || d.op === 'fit')) c.onZoom?.(d.op);
       else if (d.type === 'wa-ed-editing') c.onEditing?.(!!d.on);
       else if (d.type === 'wa-ed-menu') c.onMenu?.(!!d.on);
       else if (d.type === 'wa-ed-comment' && d.on && typeof d.on === 'object' && isStr(d.quote, 500)) c.onComment?.({ on: cleanAnchor(d.on) ?? {}, quote: d.quote });
@@ -955,7 +976,11 @@ export const EditFrame = forwardRef<
       }
       else if (d.type === 'wa-ed-save') c.onSave?.();
       else if (d.type === 'wa-ed-ask' && ASKS.has(d.what) && isStr(d.id, 20)) c.onAsk?.({ what: d.what, id: d.id, rect: rectOf(d.rect), has: d.has === true, tex: isStr(d.tex, 5000) ? d.tex : undefined, value: isStr(d.value, 40_000) ? d.value : undefined, dbs: Array.isArray(d.dbs) ? d.dbs.slice(0, 20) : undefined });
-      else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File && d.file.size <= 40_000_000 && /^image\//.test(d.file.type)) c.onFile?.(d.id, d.file);
+      else if (d.type === 'wa-ed-file' && isStr(d.id, 20) && d.file instanceof File) {
+        // A picture (the default), or what a file dropped on the page is made into: the editor says which, the limits are by kind.
+        const what = droppedKind(d.what);
+        if (d.file.size <= DROP_LIMITS[what] && (what !== 'picture' || /^image\//.test(d.file.type))) c.onFile?.(d.id, d.file, what);
+      }
       else if (d.type === 'wa-ed-agent') c.onAgent?.();
       else if (d.type === 'wa-ed-ai' && isStr(d.id, 20) && d.ask && typeof d.ask === 'object' && !Array.isArray(d.ask) && JSON.stringify(d.ask).length < 600_000) c.onAi?.(d.id, d.ask);
       else if (d.type === 'wa-ed-ai-stop' && isStr(d.id, 20)) c.onAiStop?.(d.id);
@@ -978,12 +1003,25 @@ export const EditFrame = forwardRef<
 
 export type Device = 'desktop' | 'tablet' | 'phone';
 const DEVICE_WIDTH: Record<Device, number> = { desktop: 0, tablet: 820, phone: 390 };
+/** The view's zoom: 'fit' shows the page as large as the room allows (a tablet's or a phone's width shrinks to fit), or a percentage. */
+export type Zoom = 'fit' | number;
+export const ZOOMS = [50, 75, 100, 125, 150, 200];
+/** The widest and narrowest a page can be shown at, in pixels. */
+export const WIDTH_RANGE = { min: 240, max: 3000 };
+
+/** The next zoom in or out from `now` (from Fit, 100 %), or Fit. */
+export function stepZoom(now: Zoom, op: 'in' | 'out' | 'fit'): Zoom {
+  if (op === 'fit') return 'fit';
+  const at = now === 'fit' ? 100 : now;
+  if (op === 'in') return ZOOMS.find((z) => z > at) ?? ZOOMS[ZOOMS.length - 1];
+  return [...ZOOMS].reverse().find((z) => z < at) ?? ZOOMS[0];
+}
 
 /**
- * The page at a device's width, centred, scaled down to fit when the space is narrower; the desktop
- * fills the space. Its child is the frame.
+ * The page at a device's width (or a width of its own), centred, shown at a zoom (50 to 200 %) or scaled down to fit when the
+ * room is narrower; the desktop at Fit fills the space. Zoomed in past the room, the stage scrolls sideways. Its child is the frame.
  */
-export function DeviceStage({ device, children, className }: { device: Device; children: ReactNode; className?: string }) {
+export function DeviceStage({ device, zoom = 'fit', width, children, className }: { device: Device; zoom?: Zoom; width?: number | null; children: ReactNode; className?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
@@ -993,24 +1031,31 @@ export function DeviceStage({ device, children, className }: { device: Device; c
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const want = DEVICE_WIDTH[device];
-  if (!want)
+  const want = width && width > 0 ? Math.round(width) : DEVICE_WIDTH[device];
+  const pad = 16;
+  const fixed = want > 0;
+  const scale = zoom === 'fit' ? (fixed && size.w ? Math.min(1, (size.w - pad * 2) / want) : 1) : zoom / 100;
+  if (!fixed && scale === 1)
     return (
       <div ref={box} className={cx('relative h-full w-full bg-white dark:bg-[#151412]', className)}>
         {children}
       </div>
     );
-  const pad = 16;
-  const scale = size.w ? Math.min(1, (size.w - pad * 2) / want) : 1;
-  const h = size.h ? (size.h - pad * 2) / scale : 0;
+  // The frame's own size is the room (or the width asked for) divided by the zoom, so that it shows as much as it would at 100 %, larger.
+  const frameW = fixed ? want : size.w / scale;
+  const frameH = Math.max(0, (size.h - (fixed ? pad * 2 : 0)) / scale);
+  const shownW = frameW * scale;
+  const innerW = Math.max(size.w, shownW + (fixed ? pad * 2 : 0));
   return (
-    <div ref={box} className={cx('relative h-full w-full overflow-hidden bg-bg-2', className)}>
+    <div ref={box} className={cx('relative h-full w-full overflow-x-auto overflow-y-hidden', fixed ? 'bg-bg-2' : 'bg-white dark:bg-[#151412]', className)}>
       {size.w > 0 && (
-        <div
-          className="absolute top-4 left-1/2 overflow-hidden rounded-[14px] bg-white shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)] dark:bg-[#151412]"
-          style={{ width: want, height: h, transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center' }}
-        >
-          {children}
+        <div className="relative h-full" style={{ width: innerW }}>
+          <div
+            className={cx('absolute overflow-hidden bg-white dark:bg-[#151412]', fixed && 'rounded-[14px] shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)]')}
+            style={{ width: frameW, height: frameH, left: fixed ? Math.max(pad, (innerW - shownW) / 2) : 0, top: fixed ? pad : 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+          >
+            {children}
+          </div>
         </div>
       )}
     </div>

@@ -335,6 +335,17 @@ agents that speak ACP and take MCP servers.
   change in words or discard, one step to undo; Markdown turns into blocks as you type, a ⋮⋮ beside
   each block drags it or turns it into another kind and colours it, several blocks are picked at once (with a drag from
   either margin, as in Notion), an item of a nested list turned into another block keeps its place under its parent,
+  a right-click on any part picks it and opens that menu with what is under it (a link's Open, Change and Remove, a
+  picture's Replace, Edit and Description, Place freely, Bring forward and Send backward; while writing, Cut, Copy, Paste,
+  Paste without formatting, Select all, Link, Bold and Italic), a part placed freely is dragged with pink guides and the
+  distances on small pills (snapping to the other parts' edges and middles, their gaps, the box and the page; Shift keeps
+  it straight, Alt turns snapping off, Ctrl drags a copy) and moved by the arrow keys, parts are sized from any side or
+  corner (Shift keeps the proportions, edges snap to other parts' edges and sizes), Ctrl+A picks every part, parts
+  reach the system clipboard as HTML and words while pasted HTML keeps bold, italic, links, headings and lists (Ctrl+Shift+V
+  pastes only the words, an address pasted over words links them), PDFs, videos, sounds and any other file dropped on the
+  page become their blocks in the order dropped, the view zooms from 50 to 200 % (Ctrl+wheel) and takes any width, Ctrl+F
+  and Ctrl+H find and replace words (never tags or addresses, one step to undo), a link typed as example.com goes to
+  https://example.com and an address that runs code is refused,
   code blocks are coloured in about twenty languages (a language picker, or Auto; agents' plain code blocks too), "@"
   links to another page of the Library, databases as in Notion (a table of typed columns: text, number, select,
   multi-select, date, checkbox, URL, email, phone, files and pictures, a formula over the row's other columns, created
