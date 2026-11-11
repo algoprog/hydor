@@ -14,17 +14,39 @@ export function Stack({ children, className }: { children: ReactNode; className?
 }
 
 /**
- * A group of settings: its title (and at most a short line under it) over one box of rows. `actions` sit at the
- * title's end: a small button that adds to the group's list, a ⋯ menu. `bare` leaves the box out, for what lays
- * itself out (cards, a gallery).
+ * A group of settings: its title (and at most a short line under it, the longer story behind `info`) over one box
+ * of rows. `actions` sit at the title's end: a small button that adds to the group's list, a ⋯ menu. `bare` leaves
+ * the box out, for what lays itself out (cards, a gallery, a text field of its own).
  */
-export function Group({ title, hint, actions, children, bare, className }: { title?: ReactNode; hint?: ReactNode; actions?: ReactNode; children: ReactNode; bare?: boolean; className?: string }) {
+export function Group({
+  title,
+  hint,
+  info,
+  actions,
+  children,
+  bare,
+  className,
+}: {
+  title?: ReactNode;
+  hint?: ReactNode;
+  /** The longer story of the whole group, behind an (i) beside its title. */
+  info?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  bare?: boolean;
+  className?: string;
+}) {
   return (
     <section className={cx('min-w-0', className)}>
       {(title || actions) && (
         <header className="mb-2 flex min-h-8 items-end gap-3 px-1">
           <div className="min-w-0 flex-1">
-            {title && <h3 className="text-[13px] font-semibold text-fg-2">{title}</h3>}
+            {title && (
+              <h3 className="flex items-center gap-1 text-[13px] font-semibold text-fg-2">
+                <span className="min-w-0">{title}</span>
+                {info && <Info>{info}</Info>}
+              </h3>
+            )}
             {hint && <p className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{hint}</p>}
           </div>
           {actions && <div className="-mb-0.5 flex shrink-0 items-center gap-1">{actions}</div>}
