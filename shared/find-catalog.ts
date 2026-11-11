@@ -207,7 +207,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['search', 'DuckDuckGo', 'duckduckgo ddg search', 'Web search without a key'],
   ['search', 'Results per search', 'results count number', 'How many results a search gives'],
   // Capabilities › Computer use
-  ['computer', 'Let agents use this computer', 'computer use control mac windows pc linux desktop apps screen mouse keyboard click type screenshot glow esc stop', 'Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first'],
+  ['computer', 'Computer use', 'computer use control mac windows pc linux desktop apps screen mouse keyboard click type screenshot glow esc stop', 'Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first'],
   ['computer', 'Accessibility', 'accessibility permission mouse keyboard control macos privacy', 'macOS’s permission for Hydor to use the mouse and keyboard', 'Accessibility permission'],
   ['computer', 'Screen Recording', 'screen recording permission screenshot see screen macos privacy', 'macOS’s permission for Hydor to see the screen', 'Screen Recording permission'],
   // Capabilities › Browser
@@ -255,7 +255,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['voice', 'Speech recognition on the server', 'whisper speech recognition server transcription', 'Recognize speech on this computer or with a service'],
   ['voice', 'Read aloud', 'text to speech tts read replies voice speak', 'Have replies read aloud'],
   // Capabilities › Assistants
-  ['assistants', 'Open Agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],
+  ['assistants', 'Your agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Custom
