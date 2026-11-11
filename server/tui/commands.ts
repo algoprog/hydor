@@ -36,17 +36,57 @@ export async function resolveKey(conn: Conn, given: string | undefined): Promise
   throw new UsageError(`“${given}” starts ${hits.length} sessions: give more of it`);
 }
 
+/** What a session is doing, as one of a few kinds ('' when nothing is). */
+function statusKind(s: SessionSummary): 'needs' | 'starting' | 'working' | 'stopping' | 'error' | 'outside' | 'finished' | '' {
+  const l = s.live;
+  if (l?.status === 'waiting' || (l?.pendingApprovals ?? 0) > 0) return 'needs';
+  if (l?.status === 'starting') return 'starting';
+  if (l?.status === 'working') return 'working';
+  if (l?.status === 'stopping') return 'stopping';
+  if (l?.status === 'error') return 'error';
+  if (s.external && s.external.status !== 'idle') return 'outside';
+  if (s.doneAt && (!s.seenAt || s.seenAt < s.doneAt)) return 'finished';
+  return '';
+}
+
 /** A session's state in the app's words: Working, Needs you, Starting, Finished (not read yet), or nothing. */
 export function statusWord(s: SessionSummary, p: Paint): string {
-  const l = s.live;
-  if (l?.status === 'waiting' || (l?.pendingApprovals ?? 0) > 0) return p.yellow('Needs you');
-  if (l?.status === 'starting') return p.accent('Starting');
-  if (l?.status === 'working') return p.accent('Working');
-  if (l?.status === 'stopping') return p.dim('Stopping');
-  if (l?.status === 'error') return p.red('Error');
-  if (s.external && s.external.status !== 'idle') return p.accent(s.external.status === 'waiting' ? `Needs you in ${s.external.client}` : `Working in ${s.external.client}`);
-  if (s.doneAt && (!s.seenAt || s.seenAt < s.doneAt)) return p.green('Finished');
-  return '';
+  switch (statusKind(s)) {
+    case 'needs':
+      return p.yellow('Needs you');
+    case 'starting':
+      return p.accent('Starting');
+    case 'working':
+      return p.accent('Working');
+    case 'stopping':
+      return p.dim('Stopping');
+    case 'error':
+      return p.red('Error');
+    case 'outside':
+      return p.accent(s.external!.status === 'waiting' ? `Needs you in ${s.external!.client}` : `Working in ${s.external!.client}`);
+    case 'finished':
+      return p.green('Finished');
+    default:
+      return '';
+  }
+}
+
+/** The mark before a session's state: ● accent when it works, ● yellow when it needs you, ✓ green when it finished, ✗ red on an error, · dim otherwise. */
+export function statusMark(s: SessionSummary, p: Paint): string {
+  switch (statusKind(s)) {
+    case 'needs':
+      return p.yellow('●');
+    case 'starting':
+    case 'working':
+    case 'outside':
+      return p.accent('●');
+    case 'error':
+      return p.red('✗');
+    case 'finished':
+      return p.green('✓');
+    default:
+      return p.dim('·');
+  }
 }
 
 /**
@@ -65,14 +105,14 @@ export const shortKey = (s: Pick<SessionSummary, 'id'>, n = 8) => s.id.slice(0, 
 /** A folder, cut from its start to fit (its end says most). */
 const folderIn = (p: string, max: number) => (strWidth(p) <= max ? p : `…${p.slice(p.length - max + 1)}`);
 
-/** The sessions as aligned lines, latest first (cut to the width on a terminal only). */
-export function sessionLines(list: SessionSummary[], look: Look, fit = true): string[] {
+/** The sessions as aligned lines, latest first (cut to the width on a terminal only, with a mark before each state). */
+export function sessionLines(list: SessionSummary[], look: Look, fit = true, marks = false): string[] {
   const { p } = look;
   if (!list.length) return ['No sessions yet: `hydor` starts one here.'];
   const n = keyLength(list);
   const rows = list.map((s) => [
     p.dim(shortKey(s, n)),
-    statusWord(s, p) || p.dim('·'),
+    marks ? `${statusMark(s, p)}${statusWord(s, p) ? ` ${statusWord(s, p)}` : ''}` : statusWord(s, p) || p.dim('·'),
     (s.title || s.firstPrompt || '(untitled)').replace(/\s+/g, ' '),
     p.dim([s.acpName ?? (s.agent === 'claude' ? 'Claude Code' : s.agent === 'codex' ? 'Codex' : 'Agent'), modelLabel(s.live?.model ?? s.model)].filter(Boolean).join(' · ')),
     p.dim(folderIn(tildify(s.cwd, look.home), fit ? 28 : 200)),
@@ -92,7 +132,7 @@ async function sessions(conn: Conn, o: Opts, look: Look) {
   const { sessions: all, total } = await conn.api<{ sessions: SessionSummary[]; total: number }>('GET', `/api/sessions?limit=${o.all ? 300 : Math.min(300, limit * 3)}`);
   const list = (o.all ? all : all.filter((s) => !s.extra?.parent)).slice(0, limit);
   if (o.json) return json({ sessions: list, total });
-  say(sessionLines(list, look, !!process.stdout.isTTY));
+  say(sessionLines(list, look, !!process.stdout.isTTY, !!process.stdout.isTTY));
 }
 
 /** A session's whole conversation (every page of it). */
@@ -393,15 +433,18 @@ async function status(o: Opts, look: Look) {
   const working = list.filter((s) => busy(s.live) && s.live?.status !== 'waiting');
   const waiting = list.filter((s) => s.live?.status === 'waiting' || (s.live?.pendingApprovals ?? 0) > 0);
   if (o.json) return json({ server: base, local: !remote, version: v, running: !!v, dataDir: remote ? undefined : config.dataDir, service: service === undefined ? undefined : service === null ? { installed: false } : { installed: true, unit: UNIT, state: service }, working: working.map((s) => s.key), waiting: waiting.map((s) => s.key) });
-  const out = [v ? `${p.bold(`Hydor ${v}`)} at ${base}${remote ? '' : p.dim(' (this computer)')}` : `${p.red('Nothing answers')} at ${base}${remote ? '' : p.dim(': hydor starts it when you run it, or hydor serve')}`];
+  const out = [v ? `${p.green('●')} ${p.bold(`Hydor ${v}`)}  running at ${base}${remote ? '' : p.dim(' (this computer)')}` : `${p.red('✗')} ${p.red('Nothing answers')} at ${base}${remote ? '' : p.dim(': hydor starts it when you run it, or hydor serve')}`];
+  const rows: string[][] = [];
   if (!remote) {
-    out.push(`Data folder: ${tildify(config.dataDir, look.home)}`);
-    if (process.platform === 'linux') out.push(service === null ? 'Service: not installed (hydor service install keeps it running, also after a restart)' : `Service: ${UNIT}, ${service}`);
+    rows.push([p.dim('Data'), tildify(config.dataDir, look.home)]);
+    if (process.platform === 'linux') rows.push([p.dim('Service'), service === null ? 'not installed (hydor service install keeps it running, also after a restart)' : `${UNIT}, ${service}`]);
   }
+  if (v) rows.push([p.dim('Sessions'), `${working.length} working, ${waiting.length} ${waiting.length === 1 ? 'needs' : 'need'} you`]);
+  out.push(...columns(rows).map((l) => `  ${l}`));
   if (v) {
-    out.push(`Sessions: ${working.length} working, ${waiting.length} ${waiting.length === 1 ? 'needs' : 'need'} you`);
     const shown = [...waiting, ...working].slice(0, 10);
-    for (const s of shown) out.push(`  ${statusWord(s, p)}  ${truncate(s.title || '(untitled)', look.width - 20)} ${p.dim(shortKey(s, keyLength(list)))}`);
+    const n = keyLength(list);
+    for (const s of shown) out.push(`    ${statusMark(s, p)} ${statusWord(s, p)}  ${truncate(s.title || '(untitled)', look.width - 24)} ${p.dim(shortKey(s, n))}`);
   }
   say(out);
 }

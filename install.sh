@@ -63,6 +63,7 @@ case ":$PATH:" in
   *":$bin_dir:"*)
     if { [ ! -e "$bin_dir/hydor" ] || [ -L "$bin_dir/hydor" ]; } && mkdir -p "$bin_dir" 2>/dev/null && ln -sf "$dir/bin/hydor.mjs" "$bin_dir/hydor" 2>/dev/null; then
       printf '\nThe hydor command is ready: run hydor to talk to an agent in a terminal (hydor help says more).\n'
+      printf 'Tab completion for your shell: hydor completion install\n'
     else
       printf '\nNote: %s/hydor is another file, so the hydor command was not linked: run %s/bin/hydor.mjs instead.\n' "$bin_dir" "$dir"
     fi ;;
