@@ -631,7 +631,9 @@ agents that speak ACP and take MCP servers.
   in its sandbox. They export as the PDF, the main .tex file or the whole project as a .zip. Jupyter notebooks
   (save_notebook, from an .ipynb an agent wrote and ran, or opened from one) show in the notebook page's own view,
   with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
-  the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; they export as the
+  the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; right-click menus on cells
+  (run it, the cells above or below it, copy, cut, paste, duplicate, split, merge, clear or fold an output), cells picked
+  together, an outline of the Markdown headings, a shortcuts list, and a run asked while the kernel starts waiting for it; they export as the
   .ipynb, a Python script with # %% cells, a PDF or a web page.
 - **Resolve comments with AI**: comment on words as you read (a part of a slide, a cell, a block), then Resolve with AI on
   one comment, Resolve N comments with AI at the top of the comments for all the open ones (a LaTeX document's every
