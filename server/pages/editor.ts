@@ -1,8 +1,9 @@
 // The visual editor that runs inside a page's sandboxed frame (/htmlframe) while the user edits the page.
 // The frame writes the page with its scripts held back (they would rebuild what the user changes), and
 // this script lets the user pick a part (a click or a tap), change its words where they are (a second
-// click) with a small bar for bold, italic, links and the like, drag it elsewhere or resize it by its
-// edges, and move, copy, wrap or delete it. The app's inspector changes its look and its address,
+// click) with a small bar for bold, italic, links and the like, drag it elsewhere (a placed part where the
+// pointer takes it, with pink guides; one that sticks when scrolled to where it sticks) or size it from any
+// side, open its menu with a right-click, and move, copy, wrap or delete it. The app's inspector changes its look and its address,
 // picture or words through messages (`wa-ed`), and the page's own look: its colours (CSS variables), its
 // fonts, its headings' and text's styles, its title, and CSS of the user's own.
 //
@@ -324,6 +325,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     .tag,.size{position:fixed;display:none;pointer-events:none;padding:1px 7px;border-radius:6px;background:${accent};color:${dark ? '#1a1306' : '#fff'};font:600 11px/18px system-ui,sans-serif;white-space:nowrap}
     .size,.gl{background:${GUIDE};color:#fff}
     .g{position:fixed;background:${GUIDE};pointer-events:none}
+    .g.ghost{background:none;border:1px dashed ${GUIDE};border-radius:3px;box-sizing:border-box}
     .gl{position:fixed;pointer-events:none;font:600 10px/16px system-ui,sans-serif;padding:0 4px;border-radius:4px;white-space:nowrap}
     .size{font-size:10.5px;line-height:16px}
     .bar,.rtb{position:fixed;display:none;pointer-events:auto;align-items:center;gap:1px;padding:3px;border-radius:10px;background:${panel};border:1px solid ${line};box-shadow:0 6px 20px rgba(0,0,0,.18);font:12px system-ui,sans-serif}
@@ -486,6 +488,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     toggle: ['sToggle', 'Toggle list'],
     callout: ['sCallout', 'Callout'],
   };
+  /** A placed part is being moved or sized: its bar and name step aside for the guides and the pills. */
+  let placing = false;
   const draw = () => {
     drawSel();
     W.draw();
@@ -537,6 +541,11 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     }
     rtb.style.display = 'none';
     rtb.classList.remove('linking', 'colouring');
+    if (placing) {
+      bar.style.display = 'none';
+      tag.style.display = 'none';
+      return;
+    }
     bar.style.display = 'flex';
     (bar.querySelector('[data-a=drag]') as HTMLElement).hidden = isBody;
     (bar.querySelector('[data-a=parent]') as HTMLElement).hidden = isBody;
@@ -599,6 +608,42 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     }
     return false;
   };
+  /** A part's box inside its border (where its padding starts): what the offsets of the parts placed in it count from. */
+  const innerOf = (x: Element): Box => {
+    const r = x.getBoundingClientRect();
+    const cs = getComputedStyle(x);
+    return { x: r.left + (parseFloat(cs.borderLeftWidth) || 0), y: r.top + (parseFloat(cs.borderTopWidth) || 0), w: x.clientWidth, h: x.clientHeight };
+  };
+  /** The screen: the part of the page in view (without its scroll bars). */
+  const screenBox = (): Box => ({ x: 0, y: 0, w: root.clientWidth || innerWidth, h: (document.compatMode === 'BackCompat' ? innerHeight : root.clientHeight) || innerHeight });
+  /**
+   * Where a part that sticks when scrolled sticks: the box that scrolls it (the screen, or a part of the page with a scroll bar
+   * of its own), and whether that box scrolls sideways too (only then does a stick from the left or the right count).
+   */
+  const stickPort = (el: Element): { box: Box; sideways: boolean } => {
+    for (let x = el.parentElement; x && x !== document.body && x !== root; x = x.parentElement) {
+      const cs = getComputedStyle(x);
+      if (/auto|scroll|hidden/.test(cs.overflowX + cs.overflowY)) return { box: innerOf(x), sideways: x.scrollWidth > x.clientWidth + 1 && !/visible|clip/.test(cs.overflowX) };
+    }
+    // (a whole page that scrolls sideways does so by mistake, a part too wide: a stick from the side is for a box that scrolls, a table's say)
+    return { box: screenBox(), sideways: false };
+  };
+  /**
+   * The box a placed part's offsets count from: the screen for one on the screen, the box that scrolls one that sticks, the
+   * nearest placed part around one on its block (else the page's first screen), the part it is in for one moved from where it falls.
+   */
+  const placeBox = (el: HTMLElement): Box => {
+    const pos = getComputedStyle(el).position;
+    if (pos === 'fixed') return screenBox();
+    if (pos === 'sticky') return stickPort(el).box;
+    if (pos === 'absolute') {
+      const op = el.offsetParent;
+      if (op && op !== document.body && op !== root) return innerOf(op);
+      const page = root.getBoundingClientRect();
+      return { x: page.left, y: page.top, w: root.clientWidth || innerWidth, h: screenBox().h };
+    }
+    return innerOf(el.parentElement ?? document.body);
+  };
   /** The parts a moved or sized part lines up with: its neighbours (and theirs one level in), the box it is in and the page. */
   const lineUps = (el: Element): { others: Box[]; frames: Box[] } => {
     const parent = el.parentElement ?? document.body;
@@ -610,15 +655,33 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       if (r.width < 1 || r.height < 1 || getComputedStyle(x).visibility === 'hidden') return;
       others.push(boxOfRect(r));
     };
+    const pos = el instanceof HTMLElement ? getComputedStyle(el).position : 'static';
+    // On the screen or stuck to it: what it lines up with are the others that stay on the screen (a header, a bar), and the screen.
+    if (pos === 'fixed' || pos === 'sticky') {
+      const port = pos === 'sticky' ? stickPort(el).box : screenBox();
+      let seen = 0;
+      for (const x of document.body.querySelectorAll('*')) {
+        if (++seen > 4000) break;
+        if (!ok(x) || x.contains(el)) continue;
+        const p = getComputedStyle(x).position;
+        if (p !== 'fixed' && p !== 'sticky') continue;
+        const r = x.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1 || r.bottom < port.y || r.top > port.y + port.h) continue;
+        // (another that sticks counts where it sticks, as it is when the page is scrolled)
+        const top = parseFloat(getComputedStyle(x).top);
+        others.push(p === 'sticky' && Number.isFinite(top) ? { x: r.left, y: port.y + top, w: r.width, h: r.height } : boxOfRect(r));
+      }
+      if (pos === 'fixed') for (const x of parent.children) if (ok(x)) add(x);
+      return { others, frames: [port] };
+    }
     for (const x of parent.children) if (ok(x)) add(x);
     for (const x of parent.children) if (ok(x) && !x.matches('p,h1,h2,h3,h4,h5,h6,li,span,a')) for (const c of x.children) if (ok(c)) add(c);
-    const pr = parent.getBoundingClientRect();
-    const cs = getComputedStyle(parent);
-    const bl = parseFloat(cs.borderLeftWidth) || 0;
-    const bt = parseFloat(cs.borderTopWidth) || 0;
-    const inner: Box = { x: pr.left + bl, y: pr.top + bt, w: parent.clientWidth, h: parent.clientHeight };
+    // The box its offsets count from (its block, for one on its block), the part it is in, and the page.
+    const inner = innerOf(parent);
+    const own = el instanceof HTMLElement && pos === 'absolute' ? placeBox(el) : inner;
     const page = root.getBoundingClientRect();
-    return { others, frames: [inner, { x: page.left, y: page.top, w: root.clientWidth, h: page.height }] };
+    const frames = [own, ...(own === inner ? [] : [inner]), { x: page.left, y: page.top, w: root.clientWidth, h: page.height }];
+    return { others, frames };
   };
   /** Draws what snapping found: thin pink lines, and the distances between parts as small pills on them. */
   const drawGuides = (o: { lines: { x1: number; y1: number; x2: number; y2: number }[]; gaps: { x: number; y: number; w: number; h: number; label: string; vertical: boolean }[] }) => {
@@ -1812,16 +1875,19 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         break;
       }
       case 'nudge': {
-        // The arrow keys (and the app's buttons) on a placed part.
-        if (!el || !isPlaced(el) || getComputedStyle(el).position === 'sticky') return;
+        // The arrow keys (and the app's buttons) on a placed part (one that sticks: where it sticks).
+        if (!el || !isPlaced(el)) return;
         return nudge(el, Number(arg?.dx) || 0, Number(arg?.dy) || 0);
       }
       case 'place': {
         // Place freely: where it falls, now moved from there (nothing jumps), so it can be dragged; or back in the flow.
         if (!el || el === body) return;
         remember();
-        if (arg === 'flow') selfStyle(el, { position: null, top: null, right: null, bottom: null, left: null, 'z-index': null });
-        else if (getComputedStyle(el).position === 'static') selfStyle(el, { position: 'relative' });
+        if (arg === 'flow') {
+          selfStyle(el, { position: null, top: null, right: null, bottom: null, left: null, 'z-index': null });
+          // (placed by the page's own CSS, a class: where it falls is said for it alone)
+          if (getComputedStyle(el).position !== 'static') selfStyle(el, { position: 'static' });
+        } else if (getComputedStyle(el).position === 'static') selfStyle(el, { position: 'relative' });
         break;
       }
       case 'layer': {
@@ -1980,16 +2046,145 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   };
   /** Whether a press just ended a drag: the click that follows it is not one on the page. */
   let dragged = false;
+  /** Whether the press going on moves a placed part (from the press to its end, moved or not). */
+  let freeHeld = false;
   /** A long press with a finger (the right-click of a phone): when it opened the menu, and its timer. */
   let longAt = 0;
   let pressTimer = 0;
+  /**
+   * Where a part that sticks when scrolled sticks now, in the frame's pixels: its offset from the top (or the bottom) of the box
+   * that scrolls it, and from its side where that box scrolls sideways. With no offset yet, where it is.
+   */
+  const stuckBox = (el: HTMLElement, port: { box: Box; sideways: boolean }): Box => {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    const a = anchorsOf(el);
+    const p = port.box;
+    const v = parseFloat(cs[a.y]);
+    const u = parseFloat(cs[a.x]);
+    return {
+      x: port.sideways && Number.isFinite(u) ? (a.x === 'left' ? p.x + u : p.x + p.w - u - r.width) : r.left,
+      y: Number.isFinite(v) ? (a.y === 'top' ? p.y + v : p.y + p.h - v - r.height) : r.top,
+      w: r.width,
+      h: r.height,
+    };
+  };
+  /**
+   * Makes a part that sticks when scrolled stick with its box at `at` (the frame's pixels): its offset from the top (or from the
+   * bottom, when that is the one it has), and from the left or the right only where the box that scrolls it scrolls sideways
+   * (elsewhere they would do nothing). Whole pixels, never less than none. Returns the box where it sticks.
+   */
+  const stickAt = (el: HTMLElement, at: { x: number; y: number }, port: { box: Box; sideways: boolean }): Box => {
+    const a = anchorsOf(el);
+    const r = el.getBoundingClientRect();
+    const p = port.box;
+    const y = Math.max(0, Math.round(a.y === 'top' ? at.y - p.y : p.y + p.h - (at.y + r.height)));
+    const x = Math.max(0, Math.round(a.x === 'left' ? at.x - p.x : p.x + p.w - (at.x + r.width)));
+    selfStyle(el, port.sideways ? { [a.y]: `${y}px`, [a.x]: `${x}px` } : { [a.y]: `${y}px` });
+    return {
+      x: port.sideways ? (a.x === 'left' ? p.x + x : p.x + p.w - x - r.width) : r.left,
+      y: a.y === 'top' ? p.y + y : p.y + p.h - y - r.height,
+      w: r.width,
+      h: r.height,
+    };
+  };
+  /** The words of the pill while a part that sticks is moved: how far from the screen's edge it sticks. */
+  const stickWords = (el: HTMLElement, port: { sideways: boolean }) => {
+    const a = anchorsOf(el);
+    const n = (side: string) => String(Math.round(parseFloat(el.style.getPropertyValue(side)) || 0));
+    const words = [L(a.y === 'top' ? 'sticksTop' : 'sticksBottom', a.y === 'top' ? 'Sticks {n} px from the top' : 'Sticks {n} px from the bottom').replace('{n}', n(a.y))];
+    if (port.sideways) words.push(L(a.x === 'left' ? 'sticksLeft' : 'sticksRight', a.x === 'left' ? '{n} px from the left' : '{n} px from the right').replace('{n}', n(a.x)));
+    return words.join(', ');
+  };
+  /**
+   * Dragging a part that sticks when scrolled sets where it sticks on the screen: its box goes where the pointer takes it, and
+   * its offset from the top (or the bottom) says so; sideways too where the box that scrolls it scrolls sideways. It snaps to the
+   * screen's edges and middle and to the parts that stay on the screen (a header it should stick under), with the same pink
+   * guides, distances and keys as the other placed parts. Lower in the page than the line it sticks at, it stays where it is
+   * until the page is scrolled: a dashed outline shows where it will stick.
+   */
+  const stickMove = (e: PointerEvent, el0: HTMLElement, tap?: () => void): boolean => {
+    let el = el0;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let moved = false;
+    let r0: DOMRect | null = null;
+    let port = stickPort(el0);
+    let near: { others: Box[]; frames: Box[] } | null = null;
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+      if (!moved) {
+        moved = true;
+        finishEditing();
+        remember();
+        lastStyle = null;
+        if (isCopyDrag(ev)) {
+          const c = el0.cloneNode(true) as HTMLElement;
+          c.removeAttribute('id');
+          for (const x of c.querySelectorAll('[id]')) x.removeAttribute('id');
+          el0.after(c);
+          el = c;
+        }
+        if (sel !== el) select(el);
+        r0 = el.getBoundingClientRect();
+        port = stickPort(el);
+        near = lineUps(el);
+        hover = null;
+        dragging = { target: el, after: false };
+        placing = true;
+      }
+      let dx = port.sideways ? ev.clientX - x0 : 0;
+      let dy = ev.clientY - y0;
+      if (ev.shiftKey) {
+        if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+      const want: Box = { x: r0!.left + dx, y: r0!.top + dy, w: r0!.width, h: r0!.height };
+      const s = G.snapMove(want, near!.others, near!.frames, SNAP, !isNoSnap(ev));
+      if (port.sideways) dx += s.dx;
+      dy += s.dy;
+      const at = stickAt(el, { x: r0!.left + dx, y: r0!.top + dy }, port);
+      // (what lines it up across is left out where it moves only up and down)
+      drawGuides(port.sideways ? s : { lines: s.lines.filter((l) => Math.abs(l.y1 - l.y2) < 0.5), gaps: s.gaps.filter((g) => g.vertical) });
+      const r = el.getBoundingClientRect();
+      if (Math.abs(r.top - at.y) > 1 || Math.abs(r.left - at.x) > 1) {
+        const g = document.createElement('div');
+        g.className = 'g ghost';
+        Object.assign(g.style, { left: `${at.x}px`, top: `${at.y}px`, width: `${at.w}px`, height: `${at.h}px` });
+        guidesEl.append(g);
+      }
+      pill(stickWords(el, port), { right: at.x + at.w, bottom: at.y + at.h });
+      redraw();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', up, true);
+      removeEventListener('pointercancel', up, true);
+      freeHeld = false;
+      placing = false;
+      clearGuides();
+      sizeTag.style.display = 'none';
+      dragging = null;
+      redraw();
+      if (!moved) return tap?.();
+      dragged = true;
+      setTimeout(() => (dragged = false), 0);
+      changed();
+    };
+    freeHeld = true;
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', up, true);
+    addEventListener('pointercancel', up, true);
+    return true;
+  };
   /**
    * Dragging a placed part moves it where the pointer goes: snapped to the parts around it, its box and the page, with pink
    * guides and the distances on them (Alt, ⌘ on a Mac: no snapping; Shift: straight; Ctrl, ⌥ on a Mac: a copy is dragged
    * and the part stays). A tap with no move is the caller's (`tap`). False when the part is not placed (the caller moves it in the flow).
    */
   const freeMove = (e: PointerEvent, el0: Element, tap?: () => void): boolean => {
-    if (!isPlaced(el0) || getComputedStyle(el0).position === 'sticky') return false;
+    if (!isPlaced(el0)) return false;
+    if (getComputedStyle(el0).position === 'sticky') return stickMove(e, el0, tap);
     let el: HTMLElement = el0;
     const x0 = e.clientX;
     const y0 = e.clientY;
@@ -2016,6 +2211,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         // (no hover frames over the parts it passes while it moves)
         hover = null;
         dragging = { target: el, after: false };
+        placing = true;
       }
       let dx = ev.clientX - x0;
       let dy = ev.clientY - y0;
@@ -2039,14 +2235,18 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       removeEventListener('pointermove', move, true);
       removeEventListener('pointerup', up, true);
       removeEventListener('pointercancel', up, true);
+      freeHeld = false;
+      placing = false;
       clearGuides();
       sizeTag.style.display = 'none';
       dragging = null;
+      redraw();
       if (!moved) return tap?.();
       dragged = true;
       setTimeout(() => (dragged = false), 0);
       changed();
     };
+    freeHeld = true;
     addEventListener('pointermove', move, true);
     addEventListener('pointerup', up, true);
     addEventListener('pointercancel', up, true);
@@ -2057,8 +2257,15 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     const key = `nudge:${pathOf(el).join('.')}:${JSON.stringify(ctx)}`;
     if (!(lastStyle && lastStyle.key === key && Date.now() - lastStyle.at < 1200)) remember();
     lastStyle = { key, at: Date.now() };
-    const r = el.getBoundingClientRect();
-    placeAt(el, r.left + dx, r.top + dy);
+    // (one that sticks: where it sticks moves, from where it sticks now)
+    if (getComputedStyle(el).position === 'sticky') {
+      const port = stickPort(el);
+      const b = stuckBox(el, port);
+      stickAt(el, { x: b.x + dx, y: b.y + dy }, port);
+    } else {
+      const r = el.getBoundingClientRect();
+      placeAt(el, r.left + dx, r.top + dy);
+    }
     changed();
   };
 
@@ -2170,6 +2377,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       selfStyle(el, props);
       if (placed && (edges.l || edges.t)) placeAt(el, edges.l ? box.x : el.getBoundingClientRect().left, edges.t ? box.y : el.getBoundingClientRect().top);
       moved = true;
+      placing = true;
       const r = el.getBoundingClientRect();
       pill(`${Math.round(r.width)} × ${Math.round(r.height)}`, r);
       redraw();
@@ -2180,6 +2388,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       removeEventListener('pointercancel', up, true);
       sizeTag.style.display = 'none';
       clearGuides();
+      placing = false;
+      redraw();
       if (moved) changed();
       else undo.pop();
     };
@@ -2326,6 +2536,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     contextRows: (t, words) => contextRows(t, words),
     command: (a, arg) => act(a, arg),
     freeMove,
+    moving: () => freeHeld,
     sideBySide,
     pasteWords: (html) => G.pasteWords(html),
     linkAddress: (raw) => G.linkAddress(raw),
@@ -2502,7 +2713,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     }
     // Where it sits: free to be dragged, or where the page puts it.
     const part = sel && sel !== document.body ? sel : null;
-    if (part && part instanceof HTMLElement && getComputedStyle(part).position !== 'sticky') {
+    if (part && part instanceof HTMLElement) {
       if (rows.length) rows.push('-');
       if (isPlaced(part)) {
         rows.push(
@@ -2822,8 +3033,9 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         e.preventDefault();
         return act(k === 'ArrowUp' ? 'up' : 'down');
       }
-      // A placed part moves with the arrows, a pixel (Shift: ten): the part beside it is picked only where it is not placed.
-      if (!mod && /^Arrow/.test(k) && isPlaced(sel) && getComputedStyle(sel).position !== 'sticky' && W.picked().length < 2) {
+      // A placed part moves with the arrows, a pixel (Shift: ten): the part beside it is picked only where it is not placed. One
+      // that sticks when scrolled moves up and down (where it sticks); left and right too only where its box scrolls sideways.
+      if (!mod && /^Arrow/.test(k) && isPlaced(sel) && W.picked().length < 2 && (k === 'ArrowUp' || k === 'ArrowDown' || getComputedStyle(sel).position !== 'sticky' || stickPort(sel).sideways)) {
         e.preventDefault();
         const n = e.shiftKey ? 10 : 1;
         return act('nudge', { dx: k === 'ArrowLeft' ? -n : k === 'ArrowRight' ? n : 0, dy: k === 'ArrowUp' ? -n : k === 'ArrowDown' ? n : 0 });

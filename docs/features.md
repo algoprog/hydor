@@ -339,7 +339,9 @@ agents that speak ACP and take MCP servers.
   picture's Replace, Edit and Description, Place freely, Bring forward and Send backward; while writing, Cut, Copy, Paste,
   Paste without formatting, Select all, Link, Bold and Italic), a part placed freely is dragged with pink guides and the
   distances on small pills (snapping to the other parts' edges and middles, their gaps, the box and the page; Shift keeps
-  it straight, Alt turns snapping off, Ctrl drags a copy) and moved by the arrow keys, parts are sized from any side or
+  it straight, Alt turns snapping off, Ctrl drags a copy) and moved by the arrow keys, one that sticks when scrolled is
+  dragged to where it sticks on the screen (under a header that stays there, with a dashed outline until the page is
+  scrolled), a long press on a phone opens the same menu, parts are sized from any side or
   corner (Shift keeps the proportions, edges snap to other parts' edges and sizes), Ctrl+A picks every part, parts
   reach the system clipboard as HTML and words while pasted HTML keeps bold, italic, links, headings and lists (Ctrl+Shift+V
   pastes only the words, an address pasted over words links them), PDFs, videos, sounds and any other file dropped on the

@@ -1035,29 +1035,24 @@ export function DeviceStage({ device, zoom = 'fit', width, children, className }
   const pad = 16;
   const fixed = want > 0;
   const scale = zoom === 'fit' ? (fixed && size.w ? Math.min(1, (size.w - pad * 2) / want) : 1) : zoom / 100;
-  if (!fixed && scale === 1)
-    return (
-      <div ref={box} className={cx('relative h-full w-full bg-white dark:bg-[#151412]', className)}>
-        {children}
-      </div>
-    );
+  // The desktop at Fit (or at 100 %): the frame fills the room as it is.
+  const fill = !fixed && scale === 1;
   // The frame's own size is the room (or the width asked for) divided by the zoom, so that it shows as much as it would at 100 %, larger.
   const frameW = fixed ? want : size.w / scale;
   const frameH = Math.max(0, (size.h - (fixed ? pad * 2 : 0)) / scale);
   const shownW = frameW * scale;
   const innerW = Math.max(size.w, shownW + (fixed ? pad * 2 : 0));
+  // One shape of boxes whatever the view: the frame inside is never made again (a page being edited keeps its changes and its undo).
   return (
-    <div ref={box} className={cx('relative h-full w-full overflow-x-auto overflow-y-hidden', fixed ? 'bg-bg-2' : 'bg-white dark:bg-[#151412]', className)}>
-      {size.w > 0 && (
-        <div className="relative h-full" style={{ width: innerW }}>
-          <div
-            className={cx('absolute overflow-hidden bg-white dark:bg-[#151412]', fixed && 'rounded-[14px] shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)]')}
-            style={{ width: frameW, height: frameH, left: fixed ? Math.max(pad, (innerW - shownW) / 2) : 0, top: fixed ? pad : 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}
-          >
-            {children}
-          </div>
+    <div ref={box} className={cx('relative h-full w-full', fill ? 'bg-white dark:bg-[#151412]' : cx('overflow-x-auto overflow-y-hidden', fixed ? 'bg-bg-2' : 'bg-white dark:bg-[#151412]'), className)}>
+      <div className="relative h-full" style={{ width: fill ? '100%' : innerW }}>
+        <div
+          className={cx('absolute overflow-hidden', fill ? 'inset-0' : 'bg-white dark:bg-[#151412]', fixed && 'rounded-[14px] shadow-[0_0_0_1px_var(--line-2),0_8px_30px_rgba(0,0,0,.18)]')}
+          style={fill ? undefined : { width: frameW, height: frameH, left: fixed ? Math.max(pad, (innerW - shownW) / 2) : 0, top: fixed ? pad : 0, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+        >
+          {children}
         </div>
-      )}
+      </div>
     </div>
   );
 }
