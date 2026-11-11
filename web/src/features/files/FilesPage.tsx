@@ -24,6 +24,8 @@ import { FolderView } from './FolderView';
 import { useFolderLead } from './ItemMenu';
 import { Places, type Place } from './Places';
 import { noteOpened } from './prefs';
+import { closeFileTab, useFiles } from './unsaved';
+import { UnsavedDialog } from './UnsavedDialog';
 import { searchFromUrl, searchUrl, SearchView } from './SearchView';
 import { RecentView, TrashView } from './TrashView';
 
@@ -130,7 +132,15 @@ let lastHere: { icon: ReactNode; label: string } | null = null;
 /** Open files as tabs, after the place they were opened from. */
 function FileTabs({ current, place }: { current: string | null; place: { icon: ReactNode; label: string } }) {
   const tabs = useUI((s) => s.tabs).filter((t) => t.kind === 'file');
+  const dirty = useFiles((s) => s.dirty);
   if (!tabs.length) return null;
+  // Closing a file with changes not saved asks first; closing the one shown goes to the last one left, or the folder.
+  const closeIt = async (id: string, active: boolean) => {
+    if (!(await closeFileTab(id))) return;
+    if (!active) return;
+    const rest = useUI.getState().tabs.filter((x) => x.kind === 'file');
+    go(rest.length ? filePath(rest[rest.length - 1].ref) : lastPlace);
+  };
   const tab = 'group flex h-8.5 max-w-[220px] min-w-0 shrink-0 cursor-pointer items-center gap-1.5 rounded-t-lg border border-b-0 text-[13px] transition-colors';
   return (
     <div className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-line px-2 [&::-webkit-scrollbar]:hidden">
@@ -147,7 +157,7 @@ function FileTabs({ current, place }: { current: string | null; place: { icon: R
           <div
             key={t.id}
             onClick={() => go(filePath(t.ref))}
-            onAuxClick={(e) => e.button === 1 && useUI.getState().closeTab(t.id)}
+            onAuxClick={(e) => e.button === 1 && void closeIt(t.id, active)}
             title={t.ref}
             className={cx(tab, 'pr-1 pl-3', active ? 'border-line bg-bg text-fg' : 'border-transparent text-fg-3 hover:text-fg-2')}
           >
@@ -155,14 +165,11 @@ function FileTabs({ current, place }: { current: string | null; place: { icon: R
             <span translate="no" className="min-w-0 truncate">
               {basename(t.ref)}
             </span>
+            {dirty[t.ref] && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                useUI.getState().closeTab(t.id);
-                if (active) {
-                  const rest = useUI.getState().tabs.filter((x) => x.kind === 'file');
-                  go(rest.length ? filePath(rest[rest.length - 1].ref) : lastPlace);
-                }
+                void closeIt(t.id, active);
               }}
               className={cx('flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-md hover:bg-bg-3', active ? 'opacity-70' : 'opacity-0 group-hover:opacity-100')}
               aria-label="Close file"
@@ -307,9 +314,16 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
   );
 
   if (mobile) {
-    if (path) return <FileView key={path} path={path} line={line} />;
+    if (path)
+      return (
+        <>
+          <UnsavedDialog />
+          <FileView key={path} path={path} line={line} />
+        </>
+      );
     return (
       <SheetsOnPhone.Provider value>
+        <UnsavedDialog />
         <div className="flex h-full min-h-0 flex-col">
           <SystemHeader tab="files" actions={title} />
           <div className="min-h-0 flex-1">{main}</div>
@@ -322,6 +336,7 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
   return (
     <div ref={pageRef} className="flex h-full min-h-0 flex-col">
       <SystemHeader tab="files" actions={fold ? title : undefined} />
+      <UnsavedDialog />
       <div className="flex min-h-0 flex-1">
         {!fold && (
           <nav aria-label="Places" className="w-[232px] shrink-0 overflow-y-auto border-r border-line bg-bg-1">

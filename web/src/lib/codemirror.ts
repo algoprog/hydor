@@ -1,6 +1,6 @@
 // CodeMirror 6 setup, loaded on demand by the file editor.
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, startCompletion, type CompletionContext } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { defaultKeymap, history, historyField, historyKeymap, indentWithTab } from '@codemirror/commands';
 import {
   bracketMatching,
   defaultHighlightStyle,
@@ -43,7 +43,15 @@ export interface EditorHandle {
   gotoLine: (line: number) => void;
   /** Opens the find bar: phones have no keyboard shortcut for it. */
   find: () => void;
+  /** The editor as it is: its text, selection and undo history as JSON, and how far it is scrolled, to be put back with `restore`. */
+  snapshot: () => EditorSnapshot;
   destroy: () => void;
+}
+
+/** What `createEditor` can put back of an editor that was taken down: the undo history, the selection and the scroll. */
+export interface EditorSnapshot {
+  state: unknown;
+  scroll: number;
 }
 
 // Where two themes style the same thing, the one listed first in an editor's extensions wins.
@@ -187,7 +195,7 @@ function diffSpan(a: string, b: string): { from: number; to: number; insert: str
 /** `phone`: no fold markers (too small to tap), no completions popping up while typing (Return would take one). */
 export async function createEditor(
   parent: HTMLElement,
-  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; onChange: (doc: string) => void; onSave: () => void },
+  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; restore?: EditorSnapshot; onChange: (doc: string) => void; onSave: () => void },
 ): Promise<EditorHandle> {
   const theme = new Compartment();
   const wrap = new Compartment();
@@ -197,53 +205,60 @@ export async function createEditor(
   const support = desc ? await desc.load().catch(() => null) : null;
   const themeExt = (dark: boolean) => (dark ? darkExt : lightExt);
 
-  const view = new EditorView({
-    parent,
-    state: EditorState.create({
-      doc: o.doc,
-      extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        highlightSpecialChars(),
-        history(),
-        o.phone ? [] : foldGutter(),
-        drawSelection(),
-        dropCursor(),
-        EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
-        bracketMatching(),
-        closeBrackets(),
-        autocompletion({ activateOnTyping: !o.phone }),
-        rectangularSelection(),
-        crosshairCursor(),
-        highlightActiveLine(),
-        highlightSelectionMatches(),
-        search({ top: true }),
-        keymap.of([
-          { key: 'Mod-s', preventDefault: true, run: () => (o.onSave(), true) },
-          ...closeBracketsKeymap,
-          ...defaultKeymap,
-          ...searchKeymap,
-          ...historyKeymap,
-          ...foldKeymap,
-          ...completionKeymap,
-          indentWithTab,
-        ]),
-        EditorState.readOnly.of(!!o.readOnly),
-        lang.of(support ?? []),
-        o.phone ? phoneTheme : [],
-        panelTheme,
-        phrases(),
-        theme.of(themeExt(o.dark)),
-        wrap.of(o.wrap ? EditorView.lineWrapping : []),
-        flashField,
-        flashTheme,
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) o.onChange(u.state.doc.toString());
-        }),
-      ],
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLineGutter(),
+    highlightSpecialChars(),
+    history(),
+    o.phone ? [] : foldGutter(),
+    drawSelection(),
+    dropCursor(),
+    EditorState.allowMultipleSelections.of(true),
+    indentOnInput(),
+    bracketMatching(),
+    closeBrackets(),
+    autocompletion({ activateOnTyping: !o.phone }),
+    rectangularSelection(),
+    crosshairCursor(),
+    highlightActiveLine(),
+    highlightSelectionMatches(),
+    search({ top: true }),
+    keymap.of([
+      { key: 'Mod-s', preventDefault: true, run: () => (o.onSave(), true) },
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...searchKeymap,
+      ...historyKeymap,
+      ...foldKeymap,
+      ...completionKeymap,
+      indentWithTab,
+    ]),
+    EditorState.readOnly.of(!!o.readOnly),
+    lang.of(support ?? []),
+    o.phone ? phoneTheme : [],
+    panelTheme,
+    phrases(),
+    theme.of(themeExt(o.dark)),
+    wrap.of(o.wrap ? EditorView.lineWrapping : []),
+    flashField,
+    flashTheme,
+    EditorView.updateListener.of((u) => {
+      if (u.docChanged) o.onChange(u.state.doc.toString());
     }),
-  });
+  ];
+  // An editor put back keeps its undo history and selection, when its text is still the text it was taken down with.
+  let state: EditorState | null = null;
+  const saved = o.restore?.state as { doc?: string } | undefined;
+  if (saved && saved.doc === o.doc) {
+    try {
+      state = EditorState.fromJSON(saved, { extensions }, { history: historyField });
+    } catch {}
+  }
+  const view = new EditorView({ parent, state: state ?? EditorState.create({ doc: o.doc, extensions }) });
+  if (state && o.restore?.scroll) {
+    const top = o.restore.scroll;
+    requestAnimationFrame(() => (view.scrollDOM.scrollTop = top));
+  }
 
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
   return {
@@ -269,6 +284,7 @@ export async function createEditor(
       view.focus();
     },
     find: () => openSearchPanel(view),
+    snapshot: () => ({ state: view.state.toJSON({ history: historyField }), scroll: view.scrollDOM.scrollTop }),
     destroy: () => (clearTimeout(flashTimer), view.destroy()),
   };
 }

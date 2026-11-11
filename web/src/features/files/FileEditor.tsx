@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, MessageSquarePlus, RotateCcw, Save, Search, Signature, SlidersHorizontal, SquareTerminal, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
-import type { EditorHandle } from '../../lib/codemirror';
+import type { EditorHandle, EditorSnapshot } from '../../lib/codemirror';
 import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
@@ -15,6 +15,8 @@ import { isPreviewable } from '@shared/documents';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
 import { useWatchMs } from './FileAsk';
+import { detectEol, forDisk, forEditor, type Eol } from './lineends';
+import { getDraft, isDirty, keepDraft, leaveFile, registerSaver, setDirty as noteDirty } from './unsaved';
 import { EDITABLE, editFile } from '../mediaedit/open';
 import { EDITABLE_VIDEO, editVideoFile } from '../mediaedit/video/open';
 import { EDITABLE_SOUND, editSoundFile } from '../mediaedit/audio/open';
@@ -101,7 +103,8 @@ export function FileEditor({
   const mobile = useIsMobile();
   const [file, setFile] = useState<FileData | null>(null);
   const [error, setError] = useState('');
-  const [dirty, setDirty] = useState(false);
+  // Coming back to a file with changes not saved, it starts as changed (its tab's dot stays on).
+  const [dirty, setDirty] = useState(() => !embedded && isDirty(path));
   useEffect(() => onDirty?.(dirty), [dirty, onDirty]);
   const [saving, setSaving] = useState(false);
   const [changedOnDisk, setChangedOnDisk] = useState(false);
@@ -135,6 +138,12 @@ export function FileEditor({
   // The text as last read or saved: the editor's differs while there are unsaved changes.
   const base = useRef('');
   const mtime = useRef(0);
+  // How the file's lines end (the editor's text always ends them with \n), and how they ended when it was read or saved.
+  const eol = useRef<Eol>('lf');
+  const baseEol = useRef<Eol>('lf');
+  // The editor's undo history and place from when this file was last open, put back as it is made.
+  const restore = useRef<EditorSnapshot | undefined>(undefined);
+  const changed = () => doc.current !== base.current || eol.current !== baseEol.current;
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const media = MEDIA[ext];
   const isMd = ext === 'md' || ext === 'markdown' || ext === 'mdx';
@@ -154,29 +163,49 @@ export function FileEditor({
     };
   }, [isHtml, mode, path]);
 
-  const load = useCallback(async () => {
+  // `keep`: the file as it was left open (changes not saved, undo history) comes back instead of what is on disk, which
+  // is told if it has changed since.
+  const load = useCallback(async (keep = false) => {
     setError('');
     try {
       const f = await api<FileData>(`/api/fs/read?path=${encodeURIComponent(path)}`);
+      const text = forEditor(f.content ?? '');
+      const disk = detectEol(f.content ?? '');
+      const kept = keep && !embedded ? getDraft(path) : undefined;
+      restore.current = undefined;
+      if (kept && f.content != null && (kept.text !== kept.base || kept.eol !== kept.baseEol || (kept.base === text && kept.mtime === f.mtime))) {
+        doc.current = kept.text;
+        base.current = kept.base;
+        eol.current = kept.eol;
+        baseEol.current = kept.baseEol;
+        // A file touched but not changed since is no conflict.
+        mtime.current = kept.base === text ? f.mtime : kept.mtime;
+        restore.current = { state: kept.state, scroll: kept.scroll };
+        setDirty(changed());
+        setChangedOnDisk(kept.base !== text);
+      } else {
+        doc.current = text;
+        base.current = text;
+        eol.current = disk;
+        baseEol.current = disk;
+        mtime.current = f.mtime;
+        setDirty(false);
+        setChangedOnDisk(false);
+      }
       setFile(f);
-      doc.current = f.content ?? '';
-      base.current = f.content ?? '';
-      mtime.current = f.mtime;
-      setDirty(false);
-      setChangedOnDisk(false);
       return f;
     } catch (e) {
       setError((e as Error).message);
       return null;
     }
-  }, [path]);
+  }, [path, embedded]);
 
   useEffect(() => {
     // A dialog editor (CLAUDE.md, a skill) opens straight into editing and leaves the Files tabs alone.
     if (!embedded) useUI.getState().openTab({ id: `f:${path}`, kind: 'file', ref: path });
     setFile(null);
     setMode((isMd || isHtml) && (!embedded || preview) ? 'preview' : 'edit');
-    load();
+    load(true);
   }, [path, load, isMd, isHtml, embedded, preview]);
 
   // Mount CodeMirror once the text is loaded; reading it again later (a change from elsewhere, a save) keeps it.
@@ -193,9 +222,10 @@ export function FileEditor({
         dark: isDark(),
         wrap,
         phone: mobile,
+        restore: restore.current,
         onChange: (d) => {
           doc.current = d;
-          setDirty(d !== base.current);
+          setDirty(changed());
         },
         onSave: () => saveRef.current(),
       });
@@ -208,6 +238,13 @@ export function FileEditor({
     return () => {
       alive = false;
       mo.disconnect();
+      // Taken down (another file's tab, Back): what it holds is kept, to be put back as it was.
+      const tabOpen = useUI.getState().tabs.some((t) => t.id === `f:${path}`);
+      // (Not what was left out with Don't save: it is not kept.)
+      if (handle && !embedded && tabOpen && (isDirty(path) || !changed())) {
+        const snap = handle.snapshot();
+        keepDraft(path, { text: doc.current, base: base.current, mtime: mtime.current, eol: eol.current, baseEol: baseEol.current, state: snap.state, scroll: snap.scroll });
+      }
       handle?.destroy();
       editor.current = null;
     };
@@ -224,11 +261,13 @@ export function FileEditor({
     setSaving(true);
     try {
       const content = doc.current;
-      const r = await put<{ mtime: number; size: number }>('/api/fs/write', { path, content, expectedMtime: force ? undefined : mtime.current });
+      const at = eol.current;
+      const r = await put<{ mtime: number; size: number }>('/api/fs/write', { path, content: forDisk(content, at), expectedMtime: force ? undefined : mtime.current });
       mtime.current = r.mtime;
       base.current = content;
+      baseEol.current = at;
       setFile((f) => (f ? { ...f, content, mtime: r.mtime, size: r.size } : f));
-      setDirty(doc.current !== content);
+      setDirty(changed());
       setChangedOnDisk(false);
       toast(`Saved ${basename(path)}`, 'ok');
       onSaved?.();
@@ -246,7 +285,19 @@ export function FileEditor({
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   if (saveFirst) saveFirst.current = async () => (dirtyRef.current ? saveRef.current() : true);
-
+  // Files page: whether there are changes not saved shows on the file's tab, which asks before it closes, and the file's
+  // own saving is there for it to use.
+  useEffect(() => {
+    if (embedded) return;
+    noteDirty(path, dirty);
+  }, [path, dirty, embedded]);
+  useEffect(() => {
+    if (embedded) return;
+    const off = registerSaver(path, async () => (dirtyRef.current ? saveRef.current() : true));
+    return () => {
+      off();
+    };
+  }, [path, embedded]);
   // Pick up edits made by agents or terminals, every second while an agent is at work.
   const watchMs = useWatchMs();
   const loaded = !!file;
@@ -262,7 +313,7 @@ export function FileEditor({
         if (dirtyRef.current) setChangedOnDisk(true);
         else {
           const f = await load();
-          if (f?.content != null) editor.current?.setDoc(f.content, { flash: true });
+          if (f?.content != null) editor.current?.setDoc(forEditor(f.content), { flash: true });
         }
       } catch {
       } finally {
@@ -343,7 +394,7 @@ export function FileEditor({
         <div className={cx('shrink-0 border-b border-line', !embedded && 'pt-[var(--safe-top)]')}>
           <div className={cx('flex items-center gap-1 px-2', embedded ? 'h-12' : 'h-14')}>
             {!embedded && (
-              <IconButton label="Back" onClick={() => history.back()}>
+              <IconButton label="Back" onClick={() => void leaveFile(path).then((ok) => ok && history.back())}>
                 <ArrowLeft size={18} />
               </IconButton>
             )}
@@ -505,7 +556,7 @@ export function FileEditor({
           <span className="flex-1">The file changed on disk since you opened it.</span>
           <Button size="sm" variant="ghost" icon={<RotateCcw size={13} />} onClick={async () => {
             const f = await load();
-            if (f?.content != null) editor.current?.setDoc(f.content);
+            if (f?.content != null) editor.current?.setDoc(forEditor(f.content));
           }}>
             Reload (discard mine)
           </Button>
