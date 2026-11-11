@@ -5,7 +5,7 @@
 import './engine-test-env';
 import assert from 'node:assert/strict';
 import type { SoundRecipe, SoundTrack } from '@shared/mediaedit-audio';
-import { cleanTempo, gridLines, gridStep, hop, nearestGrid, snapPointsOf, snapTime, zeroCrossing } from './snap';
+import { cleanTempo, gridLines, gridStep, hop, nearestGrid, snapPointsOf, snapTime, zeroCrossing, zeroOnTrack } from './snap';
 import { makePeaks, measure, minMax, renderClips, renderTrack, timeEffects, type Decoded } from './engine';
 
 let passed = 0;
@@ -135,6 +135,20 @@ test('the nearest zero crossing', () => {
   const both = zeroCrossing([Float32Array.from([1, 1, -1, -1]), Float32Array.from([1, 1, 3, 3])], 1, 2, 2);
   assert.equal(both, 2, 'the channels averaged');
   assert.equal(zeroCrossing([x], R, 0, 0.01) , 0, 'at the very start');
+});
+
+test('the zero crossing of what a track plays, on its clip, at its speed', () => {
+  const x = sine(100, 2);
+  const d = { ch: [x], rate: R };
+  const t = track([{ id: 'c', src: '', at: 10, from: 0, to: 2 }]);
+  const z = zeroOnTrack(t, () => d, 10.0123, 0.01);
+  // The clip starts at 10 s, so the crossings are 5 ms apart from there.
+  assert.ok(Math.abs((z - 10) * 200 - Math.round((z - 10) * 200)) < 0.05 && Math.abs(z - 10.0123) <= 0.0026, `at ${z}`);
+  assert.equal(zeroOnTrack(t, () => d, 5, 0.01), 5, 'no clip there: where it was');
+  assert.equal(zeroOnTrack(t, () => undefined, 10.0123, 0.01), 10.0123, 'its sound not read yet');
+  const fast = track([{ id: 'c', src: '', at: 0, from: 0, to: 2, speed: 2 }]);
+  const zf = zeroOnTrack(fast, () => d, 0.3, 0.01);
+  assert.ok(Math.abs(zf * 2 * 200 - Math.round(zf * 2 * 200)) < 0.05, `at twice the speed ${zf}`);
 });
 
 test('the grid', () => {
