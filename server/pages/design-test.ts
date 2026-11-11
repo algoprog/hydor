@@ -292,12 +292,40 @@ else {
     for (let i = 1; i <= 5; i++) await mouse([{ type: 'mouseMoved', x: (bb.l + bb.r) / 2 - 8 * i, y: by + 8 * i, mod: 1 }]);
     await mouse([{ type: 'mouseReleased', x: (bb.l + bb.r) / 2 - 40, y: by + 40, mod: 1 }]);
     ok((await styleOf('a', 'left')) === '100px' && (await styleOf('b', 'left')) !== left0, 'of a pick with a locked element, the others move and the locked one stays');
-    await js(`document.querySelector('[data-test="a"]').removeAttribute('data-locked');`);
     await cmd('undo');
+    await js(`document.querySelector('[data-test="a"]').removeAttribute('data-locked');`);
     for (const t of ['a', 'b']) {
       await cmd('select', { path: await pathOfBox(t) });
       await cmd('del');
     }
+
+    // Zoom to what is picked, lining several up with the page, words pasted from elsewhere, panning with Space.
+    await cmd('insert', { html: boxHtml('c', '#3a3') });
+    await cmd('geom', { x: 700, y: 120, w: 160, h: 90 });
+    await cmd('zoom', 'sel');
+    const zoomed = await last('wa-ed-design');
+    const zs = await js<{ z: number; cx: number; cy: number; w: number; h: number }>(`const b = document.querySelector('[data-test="c"]').getBoundingClientRect(); const a = document.querySelector('.n-artboard').getBoundingClientRect(); return { z: a.width / 1080, cx: b.left + b.width / 2, cy: b.top + b.height / 2, w: innerWidth, h: innerHeight };`);
+    ok(zs.z > 1.5 && Math.abs(zs.cx - zs.w / 2) < 3 && Math.abs(zs.cy - zs.h / 2) < 3, `zoomed to what is picked, in the middle of the window (${zs.z.toFixed(2)}×)`);
+    ok(zoomed?.what === 'zoom' && zoomed.fit === false, 'and it says it is no longer fitted');
+    await cmd('zoom', 'fit');
+    await cmd('selectAll');
+    await cmd('align', { how: 'left', to: 'page' });
+    ok(await js<boolean>(`return [...document.querySelectorAll('.n-artboard > .n-el')].every(function(e){ return Math.abs(e.getBoundingClientRect().left - document.querySelector('.n-artboard').getBoundingClientRect().left) < 1.5 })`), 'several picked, each lined up with the page’s left edge (not with one another)');
+    await cmd('undo');
+    ok((await styleOf('c', 'left')) === '700px', 'in one step');
+    await js(`var dt = new DataTransfer(); dt.setData('text/plain', 'Words from elsewhere'); document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); window.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));`);
+    await sleep(100);
+    const said = await js<any>(`return window.__msgs.filter(function(m){return m.type==='wa-ed-design'&&m.what==='text'}).pop() || null;`);
+    ok(said?.text === 'Words from elsewhere', 'words pasted from elsewhere are asked for as a text box');
+    await cmd('zoom', 2);
+    await js(`scrollTo(0, 0);`);
+    await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    await mouse([{ type: 'mouseMoved', x: 400, y: 400 }, { type: 'mousePressed', x: 400, y: 400 }, { type: 'mouseMoved', x: 400, y: 340 }, { type: 'mouseMoved', x: 400, y: 300 }, { type: 'mouseReleased', x: 400, y: 300 }]);
+    await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+    ok((await js<number>('return scrollY')) > 60, `Space and a drag pan the canvas (scrolled ${await js<number>('return scrollY')})`);
+    await cmd('zoom', 'fit');
+    await cmd('select', { path: await pathOfBox('c') });
+    await cmd('del');
 
     // A copy at another size, worked out from what shows.
     const id = 'r1';

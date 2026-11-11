@@ -2,14 +2,20 @@
 // (server/pages/design-editor.ts) moves, sizes, turns, snaps and groups what is on them; the Add panel on the left
 // (words, shapes, frames, pictures, icons, QR codes, videos, backgrounds, the brand), the inspector on the right (what
 // is picked, or the artboard), and a bar on top: undo, redo, Resize (a copy at another size), Download (PNG, JPG or a
-// PDF to print) and the zoom. In a narrow panel, Add opens over the page and the inspector sits under it.
+// PDF to print), the keyboard shortcuts (Ctrl+/) and the zoom. A right click (or the bar's ⋯, or the menu key) holds what
+// fits what is picked: cut, copy, paste, duplicate, delete, order, lining up with the page or with one another, lock,
+// group, the look copied from one to another, select all. Words pasted from elsewhere become a text box. In a narrow
+// panel, Add opens over the page and the inspector sits under it.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Download, Maximize, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Scaling, Undo2 } from 'lucide-react';
+import { Download, Keyboard, Maximize, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Scaling, Undo2 } from 'lucide-react';
 import { designSize, isDesignHtml, type DesignSize } from '@shared/design';
 import { fontsHref } from '@shared/design-fonts';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover } from '../../../components/ui';
+import { ContextMenu, type ContextMenuAt, type MenuEntry } from '../common/menus';
+import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
+import { COPY_DRAG_KEY, NO_SNAP_KEY } from '../common/keys';
 import { tr } from '../../../i18n/runtime';
 import { EditFrame, type EditHandle, type EdState, type Store } from '../frame';
 import { editKept } from '../../mediaedit/open';
@@ -20,7 +26,7 @@ import { firstFrame, uploadVideo } from '../slides/media';
 import { DesignAdd } from './AddPanel';
 import { DesignInspector } from './Inspector';
 import { DownloadDialog, ResizeDialog } from './dialogs';
-import { DEFAULT_LOOK, designLabels, type Look } from './elements';
+import { DEFAULT_LOOK, designLabels, pastedTextHtml, type Look } from './elements';
 import { useBrand } from './brand';
 
 /** What the design editor says is picked (design-editor.ts `tell`). */
@@ -68,6 +74,8 @@ export interface DSel {
   many: { x: number; y: number; w: number; h: number; types: string[]; locked: boolean } | null;
   canGroup: boolean;
   scope: boolean;
+  /** A look was copied (Copy the look), to paste on another. */
+  canLook?: boolean;
 }
 
 export type DCmd = (c: string, arg?: unknown) => void;
@@ -140,12 +148,12 @@ export function DesignEdit({
   const beside = width >= 760;
   const [addShown, setAddShown] = useState(true);
   const [addOver, setAddOver] = useState(false);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<ContextMenuAt | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [zoomMenu, setZoomMenu] = useState(false);
   const zoomRef = useRef<HTMLButtonElement>(null);
-  const menuAnchor = useRef<HTMLSpanElement>(null);
   const [focusWords, setFocusWords] = useState(0);
   const labels = useMemo(() => designLabels(), []);
   const brand = useBrand();
@@ -256,7 +264,15 @@ export function DesignEdit({
         return setUsed({ colours: ((d.colours as string[]) ?? []).slice(0, 16), fonts: ((d.fonts as string[]) ?? []).slice(0, 12) });
       case 'menu': {
         const f = editRef.current?.frame()?.getBoundingClientRect();
-        return f && setMenu({ x: f.left + Number(d.x), y: f.top + Number(d.y) });
+        return f && setMenu({ x: f.left + Number(d.x), y: f.top + Number(d.y), keyed: !!d.keyed });
+      }
+      case 'keys':
+        return setKeysOpen(true);
+      case 'text': {
+        // Words pasted from elsewhere: a text box with them, where the artboard shows.
+        const text = String(d.text ?? '').trim();
+        if (text) cmd('insert', { html: pastedTextHtml(text, board?.w ?? 1080, look) });
+        return;
       }
       case 'action':
         if (d.action === 'editPicture') return void editPicture();
@@ -307,27 +323,133 @@ export function DesignEdit({
     />
   );
 
-  const menuItems: [string, string | undefined, () => void][] = sel?.kind === 'el' || sel?.kind === 'many'
+  // The right-click menu: what fits what is picked (the keys of each are written beside it).
+  const pasteIn = () => cmd('paste', designClip ? { html: designClip } : undefined);
+  const pickedOne = sel?.kind === 'el' || sel?.kind === 'many';
+  const lockedNow = !!(sel?.el?.locked || sel?.many?.locked);
+  const alignList = (to?: 'page'): MenuEntry[] =>
+    (
+      [
+        ['Left edges', 'left'],
+        ['Centres', 'center'],
+        ['Right edges', 'right'],
+        ['Tops', 'top'],
+        ['Middles', 'middle'],
+        ['Bottoms', 'bottom'],
+      ] as const
+    ).map(([label, how]) => ({ label, run: () => cmd('align', to ? { how, to } : how) }));
+  const menuItems: MenuEntry[] = pickedOne
     ? [
-        ['Copy', 'Ctrl+C', () => cmd('copy')],
-        ['Paste', 'Ctrl+V', () => cmd('paste', designClip ? { html: designClip } : undefined)],
-        ['Duplicate', 'Ctrl+D', () => cmd('dup')],
-        ['Copy the look', 'Ctrl+Alt+C', () => cmd('copyStyle')],
-        ['Paste the look', 'Ctrl+Alt+V', () => cmd('pasteStyle')],
-        ['Bring forward', 'Ctrl+]', () => cmd('order', 'forward')],
-        ['Bring to front', 'Ctrl+Shift+]', () => cmd('order', 'front')],
-        ['Send backward', 'Ctrl+[', () => cmd('order', 'backward')],
-        ['Send to back', 'Ctrl+Shift+[', () => cmd('order', 'back')],
-        ...(sel.canGroup ? [['Group', 'Ctrl+G', () => cmd('group')] as [string, string, () => void]] : []),
-        ...(sel.el?.type === 'group' ? [['Ungroup', 'Ctrl+Shift+G', () => cmd('ungroup')] as [string, string, () => void]] : []),
-        [sel.el?.locked || sel.many?.locked ? 'Unlock' : 'Lock', 'Alt+Shift+L', () => cmd('lock')],
-        ...(onAsk && sel.el ? [['Ask the agent', undefined, ask] as [string, undefined, () => void]] : []),
+        { label: 'Cut', keys: 'Ctrl+X', disabled: lockedNow, run: () => cmd('cut') },
+        { label: 'Copy', keys: 'Ctrl+C', run: () => cmd('copy') },
+        { label: 'Paste', keys: 'Ctrl+V', run: pasteIn },
+        { label: 'Duplicate', keys: 'Ctrl+D', disabled: lockedNow, run: () => cmd('dup') },
+        { label: 'Delete', keys: 'Delete', danger: true, disabled: lockedNow, run: () => cmd('del') },
+        '-',
+        {
+          label: 'Order',
+          items: [
+            { label: 'Bring forward', keys: 'Ctrl+]', run: () => cmd('order', 'forward') },
+            { label: 'Bring to front', keys: 'Ctrl+Shift+]', run: () => cmd('order', 'front') },
+            { label: 'Send backward', keys: 'Ctrl+[', run: () => cmd('order', 'backward') },
+            { label: 'Send to back', keys: 'Ctrl+Shift+[', run: () => cmd('order', 'back') },
+          ],
+        },
+        { label: 'Align to the page', also: 'line up centre middle', disabled: lockedNow, items: alignList('page') },
+        {
+          label: 'Align to each other',
+          also: 'line up distribute space out',
+          disabled: lockedNow || (sel?.count ?? 0) < 2,
+          items: [...alignList(), '-', { label: 'Space out across', disabled: (sel?.count ?? 0) < 3, run: () => cmd('distribute', 'h') }, { label: 'Space out down', disabled: (sel?.count ?? 0) < 3, run: () => cmd('distribute', 'v') }],
+        },
+        '-',
+        { label: lockedNow ? 'Unlock' : 'Lock', keys: 'Alt+Shift+L', run: () => cmd('lock') },
+        sel?.canGroup && { label: 'Group', keys: 'Ctrl+G', run: () => cmd('group') },
+        sel?.el?.type === 'group' && { label: 'Ungroup', keys: 'Ctrl+Shift+G', run: () => cmd('ungroup') },
+        '-',
+        { label: 'Copy the look', keys: 'Ctrl+Alt+C', disabled: sel?.kind !== 'el', run: () => cmd('copyStyle') },
+        { label: 'Paste the look', keys: 'Ctrl+Alt+V', disabled: !sel?.canLook || lockedNow, run: () => cmd('pasteStyle') },
+        '-',
+        { label: 'Select all', keys: 'Ctrl+A', run: () => cmd('selectAll') },
+        !!onAsk && !!sel?.el && { label: 'Ask the agent', run: ask },
       ]
     : [
-        ['Paste', 'Ctrl+V', () => cmd('paste', designClip ? { html: designClip } : undefined)],
-        ['Select everything', 'Ctrl+A', () => cmd('selectAll')],
-        ['Add a page', undefined, () => cmd('addBoard', {})],
+        { label: 'Paste', keys: 'Ctrl+V', run: pasteIn },
+        { label: 'Select all', keys: 'Ctrl+A', run: () => cmd('selectAll') },
+        '-',
+        { label: 'Add a page', run: () => cmd('addBoard', {}) },
       ];
+
+  /** Every key the design editor has, as the Keyboard shortcuts dialog lists them. */
+  const shortcuts: ShortcutGroup[] = [
+    {
+      title: 'Parts',
+      items: [
+        ['Enter', 'Write in words, crop a picture, or go into a group'],
+        ['Esc', 'Stop writing, leave a group, pick nothing'],
+        ['Delete', 'Delete'],
+        ['Ctrl+D', 'Duplicate'],
+        ['Ctrl+G', 'Group'],
+        ['Ctrl+Shift+G', 'Ungroup'],
+        ['Alt+Shift+L', 'Lock or unlock'],
+        ['Arrow', 'Nudge by one pixel'],
+        ['Shift+Arrow', 'Nudge by ten'],
+        ['Ctrl+] / Ctrl+[', 'Bring forward or send backward'],
+        ['Ctrl+Shift+] / Ctrl+Shift+[', 'Bring to the front or send to the back'],
+        ['Ctrl+Alt+C', 'Copy the look'],
+        ['Ctrl+Alt+V', 'Paste the look'],
+        ['Menu key / Shift+F10', 'The menu for what is picked'],
+      ],
+    },
+    {
+      title: 'With the mouse',
+      items: [
+        ['Shift+Click', 'Pick more, or take one away'],
+        ['Double-click', 'Write in words, crop a picture, or go into a group'],
+        [`${COPY_DRAG_KEY}+Drag`, 'Drag a copy'],
+        [`${NO_SNAP_KEY}+Drag`, 'Move or size without snapping'],
+        ['Shift+Drag', 'Move straight across or down'],
+        ['Shift+Drag a handle', 'Size in proportion'],
+        ['Space+Drag', 'Pan'],
+        ['Ctrl+Wheel', 'Zoom'],
+      ],
+    },
+    {
+      title: 'Edit',
+      items: [
+        ['Ctrl+Z', 'Undo'],
+        ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'],
+        ['Ctrl+C', 'Copy'],
+        ['Ctrl+X', 'Cut'],
+        ['Ctrl+V', 'Paste (words from elsewhere become a text box)'],
+        ['Ctrl+A', 'Select all'],
+        ['Ctrl+S', 'Save'],
+      ],
+    },
+    {
+      title: 'View',
+      items: [
+        ['Ctrl+=', 'Zoom in'],
+        ['Ctrl+-', 'Zoom out'],
+        ['Ctrl+0', 'Fit the page'],
+        ['Shift+2', 'Zoom to what is picked'],
+        ['Ctrl+/', 'Keyboard shortcuts'],
+      ],
+    },
+  ];
+  // Ctrl+/ with the focus outside the page (the inspector's fields aside), as in the other editors.
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || (e.key !== '/' && e.key !== '?')) return;
+      const a = document.activeElement as HTMLElement | null;
+      if (a && a !== document.body && !shell.current?.contains(a)) return;
+      if (a?.closest('input,textarea,select,[contenteditable="true"]')) return;
+      e.preventDefault();
+      setKeysOpen(true);
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, []);
 
   const pct = `${Math.round(zoom.zoom * 100)}%`;
   return (
@@ -365,6 +487,9 @@ export function DesignEdit({
         <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => setDownloading(true)} title="PNG, JPG or a PDF to print">
           <span className="max-sm:hidden">Download</span>
         </Button>
+        <IconButton label="Keyboard shortcuts (Ctrl+/)" size="sm" onClick={() => setKeysOpen(true)}>
+          <Keyboard size={14} />
+        </IconButton>
         <span className="mx-1 h-5 w-px bg-line" />
         <IconButton label="Zoom out (Ctrl+−)" size="sm" onClick={() => cmd('zoom', 'out')}>
           <Minus size={14} />
@@ -378,6 +503,9 @@ export function DesignEdit({
         <Popover anchor={zoomRef} open={zoomMenu} onClose={() => setZoomMenu(false)} align="end" width={170}>
           <MenuItem icon={<Maximize size={14} />} hint="Ctrl+0" onClick={() => (setZoomMenu(false), cmd('zoom', 'fit'))}>
             <span className={cx(zoom.fit && 'font-semibold text-fg')}>Fit</span>
+          </MenuItem>
+          <MenuItem hint="Shift+2" onClick={() => (setZoomMenu(false), cmd('zoom', 'sel'))}>
+            Zoom to what is picked
           </MenuItem>
           <MenuSep />
           {ZOOMS.filter((z) => z >= 0.25).map((z) => (
@@ -410,22 +538,7 @@ export function DesignEdit({
             store={store}
             onDesign={onDesign}
           />
-          <span ref={menuAnchor} className="pointer-events-none fixed h-0 w-0" style={menu ? { left: menu.x, top: menu.y } : undefined} />
-          <Popover anchor={menuAnchor} open={!!menu} onClose={() => setMenu(null)} width={250}>
-            {menuItems.map(([label, hint, run]) => (
-              <MenuItem key={label} hint={hint} onClick={() => (setMenu(null), run())}>
-                {label}
-              </MenuItem>
-            ))}
-            {(sel?.kind === 'el' || sel?.kind === 'many') && (
-              <>
-                <MenuSep />
-                <MenuItem danger hint="Delete" onClick={() => (setMenu(null), cmd('del'))}>
-                  Delete
-                </MenuItem>
-              </>
-            )}
-          </Popover>
+          <ContextMenu at={menu} items={menuItems} onClose={() => setMenu(null)} />
         </div>
         <aside className={cx('flex min-h-0 shrink-0 flex-col bg-panel', beside ? 'w-[300px] border-l border-line' : 'h-[min(46%,420px)] min-h-[200px] border-t border-line')}>
           <DesignInspector
@@ -452,6 +565,7 @@ export function DesignEdit({
           <div className="-mx-5 -my-3 flex h-[min(70dvh,620px)] flex-col">{add}</div>
         </Dialog>
       )}
+      <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={shortcuts} part="design" />
       <DownloadDialog open={downloading} onClose={() => setDownloading(false)} html={() => editRef.current?.html() ?? Promise.resolve(html)} title={title} boards={boards.list} current={boards.current} />
       <ResizeDialog
         open={resizing}

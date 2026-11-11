@@ -31,6 +31,12 @@ export function textHtml(kind: 'heading' | 'subheading' | 'body' | 'small', W: n
   return tText(tr('Add a little bit of body text'), { x: 0, y: 0, w: s * 0.5, size: s * 0.026, font: look.body, color: look.ink, lh: 1.45 });
 }
 
+/** Words pasted from elsewhere: a text box in the design's body font, sized for the artboard (its width `W`). */
+export function pastedTextHtml(text: string, W: number, look: Look): string {
+  const s = Math.max(240, W);
+  return tText(text, { x: 0, y: 0, w: s * 0.5, size: s * 0.03, font: look.body, color: look.ink, lh: 1.4 });
+}
+
 /** A heading with a line under it, in a pair of fonts. */
 export function pairHtml(p: { head: string; body: string; weight: number; upper?: boolean }, W: number, look: Look): string {
   const s = Math.max(240, W);
