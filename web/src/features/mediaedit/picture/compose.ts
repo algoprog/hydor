@@ -6,7 +6,7 @@
 // server runs) and mixes it in as far as its mask, its opacity and (clipped) the layer under it say. While a stroke is
 // painted, a layer is moved or turned, or words are written, `live` says so and they show as they will be.
 import { blendOp } from '@shared/blend';
-import { applyLookSettings, hasLook, hideArea, type Affine } from '@shared/mediaedit';
+import { applyLookSettings, hasLook, hideArea, textReach, type Affine } from '@shared/mediaedit';
 import { drawMarks, markBox } from '../render';
 import { canvasOf, intersect, type AdjustLayer, type Doc, type Layer, type MarkLayer, type RasterLayer } from './doc';
 import type { Box } from './mask';
@@ -26,7 +26,7 @@ const isHide = (l: Layer) => l.kind === 'mark' && (l.mark.type === 'blur' || l.m
 /** A mark layer's box on the canvas, turned with it and with room for its line's width. */
 export function markBounds(l: MarkLayer, m?: Affine): Box {
   const b = markBox(l.mark);
-  const pad = 'width' in l.mark ? l.mark.width * 2 + 2 : 4;
+  const pad = 'width' in l.mark ? l.mark.width * 2 + 2 : l.mark.type === 'text' ? 4 + textReach(l.mark) : 4;
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
   const t = (l.angle * Math.PI) / 180;

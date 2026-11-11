@@ -7,9 +7,9 @@
 // its thirds, a free transform's handles, the picked mark's outline, the gradient's line, the AI tools' paint, the clone
 // stamp's source), the brush's ring at the pointer, and the box words are written in.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { MARK_FONTS, straightenZoom, textMetrics, type Mark } from '@shared/mediaedit';
+import { straightenZoom, textFont, textMetrics, type Mark } from '@shared/mediaedit';
 import { cx } from '../../../components/ui';
-import { markBox } from '../render';
+import { loadFont, markBox } from '../render';
 import { renderDoc } from './compose';
 import { activeLayer, layerOf } from './doc';
 import { PAINT_TOOLS, type PictureEd } from './editor';
@@ -103,6 +103,12 @@ export function View({
       zoom: () => tRef.current.z,
     };
   }, [ed, zoomAt, W, H, r]);
+
+  // Words in a font that is yet to load show in the nearest one, and again once it is there.
+  useEffect(() => {
+    const marks = doc.layers.flatMap((l) => (l.kind === 'mark' && l.mark.type === 'text' ? [l.mark] : []));
+    for (const m of marks) void loadFont(m).then(() => ed.fontReady(m));
+  }, [doc, ed]);
 
   // ---- the picture, put together --------------------------------------------------------------------------------
   const fx = doc.layers.some((l) => l.visible && (l.kind === 'adjust' || (l.kind === 'mark' && (l.mark.type === 'blur' || l.mark.type === 'pixelate'))));
@@ -866,8 +872,7 @@ function Words({ t, mark, onChange, onDone }: { t: ViewT; mark: Extract<Mark, { 
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
-  const f = MARK_FONTS.find((x) => x.id === (mark.font ?? 'sans')) ?? MARK_FONTS[0];
-  const { line, pad } = textMetrics(mark.size);
+  const { line, pad } = textMetrics(mark.size, mark.lineHeight);
   const b = markBox(mark.text ? mark : { ...mark, text: 'M' });
   return (
     <textarea
@@ -894,7 +899,8 @@ function Words({ t, mark, onChange, onDone }: { t: ViewT; mark: Extract<Mark, { 
         width: Math.max(b.w * t.z + 24, 60),
         height: Math.max(b.h * t.z, line * t.z) + 2,
         padding: pad * t.z,
-        font: `${f.id === 'heavy' ? 400 : 600} ${mark.size * t.z}px ${f.css}`,
+        font: textFont({ ...mark, size: mark.size * t.z }),
+        textAlign: mark.align === 'centre' ? 'center' : (mark.align ?? 'left'),
         lineHeight: `${line * t.z}px`,
         color: mark.color,
         background: mark.bg ?? 'transparent',

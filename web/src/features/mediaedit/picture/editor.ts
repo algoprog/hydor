@@ -4,8 +4,8 @@
 // the picture's size and turns, adjustments, what the AI tools bring back, the file saved). The screen (React) listens
 // and draws it again when it changes.
 import { blendOp, type BlendMode } from '@shared/blend';
-import { autoEnhance, histogramOf, moveMark, straightenZoom, type CropShape, type FontId, type LookSettings, type Mark } from '@shared/mediaedit';
-import { blobData, loadImage } from '../render';
+import { autoEnhance, fontOf, histogramOf, moveMark, straightenZoom, type CropShape, type FontId, type LookSettings, type Mark } from '@shared/mediaedit';
+import { blobData, loadFonts, loadImage } from '../render';
 import { flattenDoc, layerBox, layerInk, markBounds, renderDoc, type Live } from './compose';
 import {
   activeLayer,
@@ -87,6 +87,10 @@ export interface Opts {
   toClear: boolean;
   font: FontId;
   textSize: number;
+  /** New words: bold (the default), slanted, and against which side. */
+  bold: boolean;
+  italic: boolean;
+  align: 'left' | 'centre' | 'right';
   back: 'none' | 'dark' | 'light';
   width: number;
   fill: boolean;
@@ -116,6 +120,9 @@ export function defaultOpts(long: number): Opts {
     toClear: false,
     font: 'sans',
     textSize: Math.max(14, Math.round(long / 16)),
+    bold: true,
+    italic: false,
+    align: 'left',
     back: 'none',
     width: Math.max(2, Math.round(long / 220)),
     fill: false,
@@ -380,6 +387,15 @@ export class PictureEd {
     this.overlay = {};
   }
 
+  /** A font words use is loaded: the picture is put together again with it (once for each font and weight). */
+  private fontsShown = new Set<string>();
+  fontReady(m: { font?: string; bold?: boolean; italic?: boolean }) {
+    const key = `${m.font ?? ''}:${m.bold === false ? 0 : 1}:${m.italic ? 1 : 0}`;
+    if (this.fontsShown.has(key) || !m.font || fontOf(m.font).local || !fontOf(m.font).google) return;
+    this.fontsShown.add(key);
+    this.emit();
+  }
+
   // ---- tools and colours ----------------------------------------------------------------------------------------------
 
   setTool(t: ToolId) {
@@ -409,6 +425,10 @@ export class PictureEd {
       if (p.font) out = { ...out, font: p.font };
       if (p.textSize !== undefined) out = { ...out, size: p.textSize };
       if (p.back !== undefined) out = { ...out, bg: TEXT_BACKS[p.back] };
+      // Plain is `bold: false`; bold is what words are unless said (so it is left out); the same for italic and left.
+      if (p.bold !== undefined) out = { ...out, bold: p.bold ? undefined : false };
+      if (p.italic !== undefined) out = { ...out, italic: p.italic || undefined };
+      if (p.align !== undefined) out = { ...out, align: p.align === 'left' ? undefined : p.align };
     }
     if (p.hideStrength !== undefined && (out.type === 'blur' || out.type === 'pixelate')) out = { ...out, strength: p.hideStrength };
     if (out.type === 'emoji') {
@@ -1404,6 +1424,8 @@ export class PictureEd {
   /** The picture as a file: put together at its whole size, made the size asked, of its kind (a JPEG on white). */
   async file(format: 'png' | 'jpeg' | 'webp', quality: number, size?: { w: number; h: number }): Promise<{ blob: Blob; w: number; h: number; mime: string; made: 'png' | 'jpeg' | 'webp'; data: string }> {
     const d = this.doc;
+    // Words in a font from Google are drawn once the font is there.
+    await loadFonts(d.layers.flatMap((l) => (l.kind === 'mark' ? [l.mark] : [])));
     let c = flattenDoc(d);
     if (size && (size.w !== c.width || size.h !== c.height)) c = resample(c, size.w, size.h);
     if (format === 'jpeg') {

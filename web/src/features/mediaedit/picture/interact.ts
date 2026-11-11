@@ -466,7 +466,19 @@ function pressText(ed: PictureEd, p: Pt, t: ViewT) {
     return;
   }
   const o = ed.opts;
-  const m: Mark = { type: 'text', x: p[0], y: p[1] - textMetrics(o.textSize).line / 2, text: '', size: o.textSize, color: ed.fg, font: o.font, ...(TEXT_BACKS[o.back] ? { bg: TEXT_BACKS[o.back] } : {}) };
+  const m: Mark = {
+    type: 'text',
+    x: p[0],
+    y: p[1] - textMetrics(o.textSize).line / 2,
+    text: '',
+    size: o.textSize,
+    color: ed.fg,
+    font: o.font,
+    ...(TEXT_BACKS[o.back] ? { bg: TEXT_BACKS[o.back] } : {}),
+    ...(o.bold ? {} : { bold: false }),
+    ...(o.italic ? { italic: true } : {}),
+    ...(o.align !== 'left' ? { align: o.align } : {}),
+  };
   const l = ed.addMark(m, 'Add words', 'Words', false);
   ed.startWriting(l.id);
 }

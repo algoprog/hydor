@@ -658,7 +658,8 @@ agents that speak ACP and take MCP servers.
   reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto enhance, with a live
   histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas size,
   rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in Edit → Keyboard shortcuts),
-  pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background, erase, change
+  words in seventy fonts (the app's, Google's and the computer's own where the browser allows) with bold, italic,
+  alignment, line height, an outline and a shadow, the same when an agent edits a picture; pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background, erase, change
   with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and select the subject, free on this
   computer where the picture tools can do it. It saves at a size and as PNG, JPEG or WebP, over the original (the old
   file to the Trash) or as a copy, and exports to this device. The video editor is laid out as a professional one (a

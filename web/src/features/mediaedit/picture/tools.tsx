@@ -5,7 +5,12 @@
 // area is; the zoom.
 import { useRef, useState } from 'react';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   ArrowUpRight,
+  Bold,
+  Italic,
   Bandage,
   Blend,
   Brush,
@@ -41,10 +46,11 @@ import {
   X,
   ZoomIn,
 } from 'lucide-react';
-import { CROP_SHAPES, MARK_FONTS, type CropShape, type FontId } from '@shared/mediaedit';
+import { CROP_SHAPES, type CropShape } from '@shared/mediaedit';
 import { viaLink } from '../../../lib/machine';
 import { Button, IconButton, Popover } from '../../../components/ui';
 import { Check, ColorButton, MiniSelect, OptionsBar, OptionsLabel, OptionsSep, ScrubNumber, Seg, type RailGroup } from '../shell';
+import { FontPicker } from './fonts';
 import { ALIGNS } from './menus';
 import type { PictureEd, ToolId } from './editor';
 import { cropOfShape, cropRatio } from './interact';
@@ -360,8 +366,23 @@ export function ToolOptions({ ed, mobile }: { ed: PictureEd; mobile?: boolean })
       case 'text':
         body = (
           <>
-            <MiniSelect label="Font" value={o.font} options={MARK_FONTS.map((f) => ({ value: f.id, label: f.label }))} onChange={(v) => set({ font: v as FontId })} width={124} />
+            <FontPicker value={o.font} onChange={(v) => set({ font: v })} width={124} />
             <ScrubNumber label="Size" value={o.textSize} min={6} max={1200} unit="px" width={64} onChange={(v) => set({ textSize: v })} />
+            <IconButton label="Bold" size="sm" active={o.bold} onClick={() => set({ bold: !o.bold })}>
+              <Bold size={15} />
+            </IconButton>
+            <IconButton label="Italic" size="sm" active={o.italic} onClick={() => set({ italic: !o.italic })}>
+              <Italic size={15} />
+            </IconButton>
+            <Seg
+              value={o.align}
+              options={[
+                { value: 'left' as const, label: <AlignLeft size={13} />, title: 'Align left' },
+                { value: 'centre' as const, label: <AlignCenter size={13} />, title: 'Centre' },
+                { value: 'right' as const, label: <AlignRight size={13} />, title: 'Align right' },
+              ]}
+              onChange={(v) => set({ align: v })}
+            />
             <ColorButton value={ed.fg} label="Colour" onChange={(c, done) => ed.setFg(c, done)} size={22} />
             <OptionsLabel>Behind</OptionsLabel>
             <Seg value={o.back} options={BACKS} onChange={(v) => set({ back: v })} />
