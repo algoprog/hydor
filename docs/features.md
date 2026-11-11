@@ -576,8 +576,9 @@ agents that speak ACP and take MCP servers.
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
   document's fonts inside the file), OpenDocument for LibreOffice (its page, styles, lists, tables, pictures, footnotes and table of contents as LibreOffice's own), PDF on their paper, Markdown, EPUB (a chapter at each Heading 1, its footnotes, pictures and maths inside), plain text or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
-  stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about three hundred of
-  Excel's functions worked out as you type (lookups, criteria, dates, text, loans, FILTER, SORT, UNIQUE and
+  stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, nearly three hundred (290)
+  of Excel's functions worked out as you type (lookups, criteria, SUBTOTAL, dates, text, loans and depreciation,
+  the normal distribution, number systems, FILTER, SORT, UNIQUE and
   SEQUENCE that spill, and the newer ones: LET and LAMBDA with MAP, REDUCE, SCAN, BYROW and MAKEARRAY, VSTACK,
   HSTACK, TAKE, DROP, CHOOSECOLS, TOCOL and WRAPROWS, TEXTSPLIT, TEXTBEFORE and TEXTAFTER, regular expressions,
   TREND, LINEST, FORECAST and the statistics, Google Sheets' SPLIT, JOIN and ARRAYFORMULA, HYPERLINK, IMAGE and
