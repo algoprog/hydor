@@ -1,7 +1,7 @@
 // Settings → Machines: other machines running Hydor that this app shows (each under /m/<id>/,
 // reached over SSH or by URL), and the access tokens other machines use to reach the machine shown.
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, KeyRound, Plus, Trash2 } from 'lucide-react';
+import { ArrowUpRight, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { MachineView } from '@shared/types';
 import { api, del, patch, post } from '../../lib/api';
 import { ago } from '../../lib/format';
@@ -9,7 +9,8 @@ import { machineId, machinePath } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { toastError, useApp } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, IconButton, inputCls, MenuItem, MenuSep, Segmented, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Row, Stack } from './kit';
 import { MACHINE_DOT, machineLine } from '../machines/MachineSwitcher';
 import { RefreshIcon } from '../../components/RefreshIcon';
 
@@ -30,11 +31,12 @@ export function MachineSettings() {
     await del(`/api/machines/${m.id}`).catch(toastError);
     reload();
   };
+  const dot = (cls: string) => <span className={cx('h-2.5 w-2.5 rounded-full', cls)} aria-hidden />;
   return (
-    <div className="space-y-4">
-      <Section
+    <Stack>
+      <Group
         title="Machines"
-        sub="Each keeps its own sessions, files and sign-ins; the sidebar switches between them."
+        hint="Each keeps its own sessions, files and sign-ins; the sidebar switches between them"
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setEdit({ via: 'ssh', port: 8790 })}>
             Add a machine
@@ -42,67 +44,76 @@ export function MachineSettings() {
         }
       >
         {!loaded ? (
-          <Throbber className="text-fg-3" />
-        ) : (
-          <div className="-my-1 divide-y divide-line">
-            <div className="flex items-center gap-3 py-2.5">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-ok" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px] font-medium">{self?.host ?? 'This machine'}</div>
-                <div className="truncate text-[12px] text-fg-3">This server{self?.version ? ` · ${self.version}` : ''}</div>
-              </div>
-              {machineId && (
-                <Button size="sm" variant="ghost" icon={<ArrowUpRight size={13} />} onClick={() => (location.href = '/')}>
-                  Open
-                </Button>
-              )}
-            </div>
-            {list.map((m) => (
-              <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
-                <span className={cx('h-2 w-2 shrink-0 rounded-full', MACHINE_DOT[m.status.state])} aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13.5px] font-medium">{m.name}</div>
-                  <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
-                    <span className="truncate font-mono text-[11.5px]">{m.via === 'ssh' ? `ssh ${m.ssh}${m.port && m.port !== 8790 ? ` · port ${m.port}` : ''}` : m.url}</span>
-                    <span className="shrink-0">·</span>
-                    <span className={cx('shrink-0', m.status.state === 'offline' ? 'text-err' : m.status.waiting ? 'text-warn' : '')}>{machineLine(m)}</span>
-                    {m.status.state === 'online' && m.status.version && <span className="shrink-0">· {m.status.version}</span>}
-                  </div>
-                  {m.status.state === 'offline' && m.status.error && <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{m.status.error}</div>}
-                </div>
-                <div className="flex items-center gap-1">
-                  {m.status.state === 'offline' && (
-                    <IconButton label="Try again now" size="sm" onClick={() => post(`/api/machines/${m.id}/reconnect`).catch(toastError)}>
-                      <RefreshIcon size={14} />
-                    </IconButton>
-                  )}
-                  {m.id !== machineId && (
-                    <Button size="sm" variant="ghost" icon={<ArrowUpRight size={13} />} onClick={() => (location.href = machinePath(m.id))}>
-                      Open
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => setEdit(m)}>
-                    Edit
-                  </Button>
-                  <IconButton label="Remove" size="sm" onClick={() => remove(m)}>
-                    <Trash2 size={14} />
-                  </IconButton>
-                </div>
-              </div>
-            ))}
+          <div className="px-4 py-5">
+            <Throbber className="text-fg-3" />
           </div>
+        ) : (
+          <>
+            <Row
+              icon={dot('bg-ok')}
+              label={<span translate="no">{self?.host ?? 'This machine'}</span>}
+              hint={`This server${self?.version ? ` · ${self.version}` : ''}`}
+              control={
+                machineId && (
+                  <Button size="sm" variant="ghost" icon={<ArrowUpRight size={13} />} onClick={() => (location.href = '/')}>
+                    Open
+                  </Button>
+                )
+              }
+            />
+            {list.map((m) => (
+              <Row
+                key={m.id}
+                icon={dot(MACHINE_DOT[m.status.state])}
+                label={<span translate="no">{m.name}</span>}
+                hint={
+                  <>
+                    <span translate="no" className="font-mono text-[11.5px]">
+                      {m.via === 'ssh' ? `ssh ${m.ssh}${m.port && m.port !== 8790 ? ` · port ${m.port}` : ''}` : m.url}
+                    </span>{' '}
+                    · <span className={cx(m.status.state === 'offline' ? 'text-err' : m.status.waiting ? 'text-warn' : '')}>{machineLine(m)}</span>
+                    {m.status.state === 'online' && m.status.version && <> · {m.status.version}</>}
+                  </>
+                }
+                control={
+                  <>
+                    {m.status.state === 'offline' && (
+                      <IconButton label="Try again now" size="sm" onClick={() => post(`/api/machines/${m.id}/reconnect`).catch(toastError)}>
+                        <RefreshIcon size={14} />
+                      </IconButton>
+                    )}
+                    {m.id !== machineId && (
+                      <Button size="sm" variant="ghost" icon={<ArrowUpRight size={13} />} onClick={() => (location.href = machinePath(m.id))}>
+                        Open
+                      </Button>
+                    )}
+                    <MoreMenu width={200}>
+                      {(close) => (
+                        <>
+                          <MenuItem icon={<Pencil size={14} />} onClick={() => (close(), setEdit(m))}>
+                            Edit
+                          </MenuItem>
+                          <MenuSep />
+                          <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (close(), remove(m))}>
+                            Remove
+                          </MenuItem>
+                        </>
+                      )}
+                    </MoreMenu>
+                  </>
+                }
+              >
+                {m.status.state === 'offline' && m.status.error && <div translate="no" className="text-[12.5px] leading-snug text-fg-3">{m.status.error}</div>}
+              </Row>
+            ))}
+            {!list.length && <EmptyRow>None yet. Install Hydor on the other machine, make an access token there, then add it here: the sidebar then switches between machines, and notices from all of them reach you.</EmptyRow>}
+          </>
         )}
-        {loaded && !list.length && (
-          <p className="mt-3 text-[13px] leading-relaxed text-fg-3">
-            None yet. Install Hydor on the other machine, make an access token there, then add it here: the sidebar then switches between machines, and notices from all of
-            them reach you.
-          </p>
-        )}
-      </Section>
+      </Group>
       <AccessTokens />
       <EditMachine value={edit} onClose={() => setEdit(null)} onSaved={reload} />
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -243,40 +254,46 @@ function AccessTokens() {
     load();
   };
   return (
-    <Section
-      title={machineId && host ? `Access to ${host}` : 'Access from other machines'}
-      sub="Another Hydor with one of these tokens can do all you can here, running commands included. Make one for each machine that connects."
-      actions={
-        <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking(true)}>
-          New token
-        </Button>
-      }
-    >
-      {!list ? (
-        <Throbber className="text-fg-3" />
-      ) : !list.length ? (
-        <p className="text-[13px] leading-relaxed text-fg-3">None yet.</p>
-      ) : (
-        <div className="-my-1 divide-y divide-line">
-          {list.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 py-2.5">
-              <KeyRound size={15} className="shrink-0 text-fg-3" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px]">{t.name}</div>
-                <div className="text-[12px] text-fg-3">
-                  Made {ago(t.createdAt)} · {t.lastUsed ? `used ${ago(t.lastUsed)}` : 'not used yet'}
-                </div>
-              </div>
-              <IconButton label="Revoke" size="sm" onClick={() => revoke(t)}>
-                <Trash2 size={14} />
-              </IconButton>
-            </div>
-          ))}
-        </div>
-      )}
+    <>
+      <Group
+        title={machineId && host ? `Access to ${host}` : 'Access from other machines'}
+        hint="Another Hydor with a token can do all you can here, commands included"
+        info="Make one for each machine that connects."
+        actions={
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking(true)}>
+            New token
+          </Button>
+        }
+      >
+        {!list ? (
+          <div className="px-4 py-5">
+            <Throbber className="text-fg-3" />
+          </div>
+        ) : !list.length ? (
+          <EmptyRow>None yet</EmptyRow>
+        ) : (
+          list.map((t) => (
+            <Row
+              key={t.id}
+              icon={<KeyRound size={16} />}
+              label={<span translate="no">{t.name}</span>}
+              hint={`Made ${ago(t.createdAt)} · ${t.lastUsed ? `used ${ago(t.lastUsed)}` : 'not used yet'}`}
+              control={
+                <MoreMenu width={200}>
+                  {(close) => (
+                    <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (close(), revoke(t))}>
+                      Revoke
+                    </MenuItem>
+                  )}
+                </MoreMenu>
+              }
+            />
+          ))
+        )}
+      </Group>
       <NewToken open={making} onClose={() => setMaking(false)} onMade={load} />
       {confirmNode}
-    </Section>
+    </>
   );
 }
 

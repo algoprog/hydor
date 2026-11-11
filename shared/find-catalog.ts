@@ -95,7 +95,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
  */
 export const OPTIONS: [string, string, string, string, string?][] = [
   // App › General
-  ['general', 'Theme', 'dark mode light system appearance colours colors look', 'Dark, light, or following your device; or a theme of your own'],
+  ['general', 'Appearance', 'theme dark mode light system colours colors look', 'Dark, light, or following your device; or a theme of your own'],
   ['general', 'New theme', 'custom colours colors make create theme editor', 'Make a theme of your own from any of them'],
   ['general', 'Import', 'import share theme', 'Add a theme someone shared', 'Import a theme'],
   ['general', 'Language', 'language translate translation chinese greek 中文 简体 ελληνικά english', 'The language the app is shown in, and agents write in'],

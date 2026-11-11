@@ -1,10 +1,11 @@
 // Settings → Source control: the GitHub and Gitea accounts pull requests are opened with. Tokens go to
 // the server and stay there; this page only shows who each account signs in as.
 import { useEffect, useState } from 'react';
-import { ExternalLink, GitPullRequest, Trash2 } from 'lucide-react';
+import { ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { api, del, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, inputCls, MenuItem, MenuSep, Segmented, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Notice, Row, Stack } from './kit';
 
 interface AccountView {
   id: string;
@@ -32,55 +33,61 @@ export function ScmSettings() {
     load();
   };
   return (
-    <div className="space-y-4">
-      <Section
+    <Stack>
+      <Group
         title="Accounts"
-        sub="Pull requests open with these. Each covers the repositories on its server."
+        hint="Pull requests open with these; each covers the repositories on its server"
+        info="Pushing uses this machine’s own git setup (SSH keys or credential helper); the account is for opening the pull request and following its checks."
         actions={
-          <Button size="sm" variant="secondary" icon={<GitPullRequest size={14} />} onClick={() => setAdding(true)}>
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
             Add an account
           </Button>
         }
       >
         {!list ? (
-          <Throbber className="text-fg-3" />
-        ) : !list.length ? (
-          <p className="text-[13px] leading-relaxed text-fg-3">
-            None yet. Add your GitHub account{gh ? ' (the GitHub CLI on this machine is signed in, so that takes one click)' : ''}, or a Gitea server with an access token.
-          </p>
-        ) : (
-          <div className="-my-1 divide-y divide-line">
-            {list.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 py-2.5">
-                <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold', a.provider === 'github' ? 'bg-fg text-bg' : 'bg-ok/15 text-ok')}>
-                  {a.provider === 'github' ? 'GH' : 'Gt'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13.5px] text-fg">
-                    {a.login || 'Signed in'} <span className="text-fg-3">· {a.provider === 'github' ? 'GitHub' : 'Gitea'}</span>
-                  </div>
-                  <div className="truncate text-[12px] text-fg-3">
-                    {a.web}
-                    {a.useGh && ' · through the GitHub CLI'}
-                  </div>
-                </div>
-                <a href={a.web} target="_blank" rel="noreferrer" className="rounded-md p-1.5 text-fg-3 hover:bg-bg-2 hover:text-fg" title="Open the server">
-                  <ExternalLink size={14} />
-                </a>
-                <IconButton label="Remove" size="sm" onClick={() => remove(a)}>
-                  <Trash2 size={14} />
-                </IconButton>
-              </div>
-            ))}
+          <div className="px-4 py-5">
+            <Throbber className="text-fg-3" />
           </div>
+        ) : !list.length ? (
+          <EmptyRow>None yet. Add your GitHub account{gh ? ' (the GitHub CLI on this machine is signed in, so that takes one click)' : ''}, or a Gitea server with an access token.</EmptyRow>
+        ) : (
+          list.map((a) => (
+            <Row
+              key={a.id}
+              icon={<span className="text-[11px] font-semibold">{a.provider === 'github' ? 'GH' : 'Gt'}</span>}
+              label={
+                <>
+                  <span translate="no">{a.login || 'Signed in'}</span> <span className="text-fg-3">· {a.provider === 'github' ? 'GitHub' : 'Gitea'}</span>
+                </>
+              }
+              hint={
+                <span translate="no">
+                  {a.web}
+                  {a.useGh && ' · through the GitHub CLI'}
+                </span>
+              }
+              control={
+                <MoreMenu width={220}>
+                  {(close) => (
+                    <>
+                      <MenuItem icon={<ExternalLink size={14} />} onClick={() => (close(), window.open(a.web, '_blank', 'noreferrer'))}>
+                        Open the server
+                      </MenuItem>
+                      <MenuSep />
+                      <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (close(), remove(a))}>
+                        Remove
+                      </MenuItem>
+                    </>
+                  )}
+                </MoreMenu>
+              }
+            />
+          ))
         )}
-      </Section>
-      <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
-        Pushing uses this machine’s own git setup (SSH keys or credential helper); the account is for opening the pull request and following its checks.
-      </p>
+      </Group>
       <AddAccount open={adding} gh={gh} onClose={() => setAdding(false)} onAdded={load} />
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -133,12 +140,15 @@ function AddAccount({ open, gh, onClose, onAdded }: { open: boolean; gh: boolean
           ]}
         />
         {provider === 'github' && gh && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg-1 px-3 py-2.5">
-            <span className="min-w-0 flex-1 text-fg-2">The GitHub CLI on this machine is signed in.</span>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => save(true)}>
-              Use its sign-in
-            </Button>
-          </div>
+          <Notice
+            action={
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => save(true)}>
+                Use its sign-in
+              </Button>
+            }
+          >
+            The GitHub CLI on this machine is signed in.
+          </Notice>
         )}
         {provider === 'gitea' && (
           <label className="block">
