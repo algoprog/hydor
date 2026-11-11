@@ -710,11 +710,18 @@ agents that speak ACP and take MCP servers.
   that works (NVENC, VA-API, Quick Sync, VideoToolbox, AMF, Media Foundation; Settings → Images, video and audio), the
   processor taking over at once if it fails. Agents have edit_image and edit_video.
 - **The sound editor**: sounds open in an editor of their own, in a tab like the others ("Sound · its name"), laid
-  out as Audition or Audacity lay theirs: menus (File, Edit, Effects, Generate, View, with their shortcuts), a
+  out as Audition or Audacity lay theirs: menus (File, Edit, Effects, Generate, View, Help, with their shortcuts, and a list of every key in Help), a
   transport (play, stop, record, loop, the time, the part picked to type or drag, snapping, zoom, a meter of peaks
   and loudness), the tracks as lanes (a header each with mute, solo, record, volume and pan; stereo waveforms or a
-  spectrogram; clips to move, trim and fade by their handles; a ruler with markers; zoom along and up), a dock of
-  panels that fold and size (Effects, Properties, History, AI) and a status line. It opens MP3, WAV, M4A, AAC, OGG,
+  spectrogram; clips to move, trim, fade by their handles and drag a copy of; a volume line on a clip with points to
+  add, drag and remove, heard as it is saved; straight or smooth fades; a ruler with markers; zoom along and up;
+  right-click menus, a long press on a phone, on a clip, the part picked, a lane, the ruler and a marker; sounds and
+  videos dropped on a track or a new one), a dock of
+  panels that fold and size (Effects, Properties, History, AI) and a status line. Edges snap to clips, markers, the
+  playhead and a time grid (seconds, or beats at a tempo), and a part's edges and splits to the nearest zero
+  crossing; J, K and L shuttle backwards and forwards at up to four times; a deletion or paste on some tracks keeps
+  every track and the markers in step (as Audacity's sync-lock), or ripples all with Ripple delete. Moving an
+  effect's slider while playing changes the running sound without a break. It opens MP3, WAV, M4A, AAC, OGG,
   Opus, FLAC and WebM sounds, and the sound of a video, from the Library (Edit; a video's Edit its sound), Files
   (Edit, Edit the sound or Edit its sound in a file's menu) and a sound an agent made (Edit). Edits: cut, copy,
   paste (between sound editors too), delete (closing the gap) or silence, duplicate, split, trim to the part picked,

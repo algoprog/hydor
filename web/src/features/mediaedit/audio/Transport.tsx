@@ -1,4 +1,4 @@
-// The transport: to the start, play and pause (Space), stop, record (R), loop (L), to the end; the time where the
+// The transport: to the start, play and pause (Space), stop, record (R), loop (Q), to the end; the time where the
 // playhead is, large; the part picked (its start, end and length, each to type or drag); snapping; the zoom; and the
 // meter: each side's peak (held a moment) and the loudness of the last 0.4 seconds.
 import { useEffect, useRef } from 'react';
@@ -78,7 +78,7 @@ export function Transport(p: TransportProps) {
       <TBtn label={p.recording ? 'Stop recording' : 'Record'} keys="R" onClick={p.onRecord} on={p.recording} tone="err" disabled={!p.canRecord}>
         <Circle size={14} fill="currentColor" />
       </TBtn>
-      <TBtn label="Loop" keys="L" onClick={p.onLoop} on={p.loop}>
+      <TBtn label="Loop" keys="Q" onClick={p.onLoop} on={p.loop}>
         <Repeat size={15} />
       </TBtn>
       <TBtn label="To the end" keys="End" onClick={p.onEnd}>
@@ -99,10 +99,10 @@ export function Transport(p: TransportProps) {
       <span className="min-w-1 flex-1" />
       {!p.mobile && (
         <>
-          <TBtn label="Snap to clips, markers and the playhead" onClick={p.onSnap} on={p.snap}>
+          <TBtn label="Snap to clips, markers, the playhead and the time grid" onClick={p.onSnap} on={p.snap}>
             <Magnet size={15} />
           </TBtn>
-          <TBtn label="Zoom out" keys="−" onClick={() => p.zoom.set(p.zoom.pps / 1.5)}>
+          <TBtn label="Zoom out" keys="-" onClick={() => p.zoom.set(p.zoom.pps / 1.5)}>
             <Minus size={15} />
           </TBtn>
           <input

@@ -2,14 +2,20 @@
 // rename), and a lane for each track: its header (name, mute, solo, record, volume, pan, waveform or spectrogram) and
 // its clips. In a lane, a drag picks a part of the time (across lanes, of several tracks); a clip's name bar drags the
 // clip (along, or to another track), its ends trim it, the handles at its top corners set its fades, and a double-click
-// picks all of it. Ctrl and the wheel zoom about the pointer; the wheel sideways, or with Shift, moves along.
-import { memo, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+// picks all of it; where a clip has a volume line (or is the clip picked), a click on the line adds a point, a drag
+// moves one and a double-click takes it out. A right-click (a long press on a touch screen) on a clip, the part picked,
+// a lane, the ruler or a marker asks the editor for its menu. The edges of a part picked and the clips' edges snap to
+// each other, to the playhead, the markers, the time grid and (a part's edges) the nearest zero crossing. Ctrl and the
+// wheel zoom about the pointer; the wheel sideways, or with Shift, moves along.
+import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AudioWaveform, Circle, Ellipsis, Flag, Plus, Trash2, Volume2 } from 'lucide-react';
-import { clipEnd, clipLength, type SoundEffect, type SoundRecipe, type SoundTrack } from '@shared/mediaedit-audio';
+import { clipEnd, clipLength, envAdd, envGainAt, envMove, envRemove, newId, type EnvPoint, type SoundEffect, type SoundRecipe, type SoundTrack } from '@shared/mediaedit-audio';
 import { cx, IconButton, MenuItem, MenuSep, Popover } from '../../../components/ui';
+import { isCopyDrag, isNoSnap } from '../shell';
 import { useClock, type Clock } from '../video/clock';
-import { drawLane, drawRuler, HEADER, palette, tOf, xOf, type View } from './draw';
+import { bodyBox, drawLane, drawRuler, envValue, envY, HEADER, palette, tOf, xOf, type View } from './draw';
 import type { Get } from './engine';
+import { gridLines, nearestGrid, snapPointsOf, snapTime, zeroOnTrack, type Grid } from './snap';
 import { ScrubField, useThemeTick, useWidth } from './ui';
 
 export interface Sel {
@@ -27,6 +33,15 @@ export interface Picked {
   track: string;
   clip?: string;
 }
+/** What a right-click (or a long press) was on, for the editor to make its menu. */
+export type MenuTarget =
+  | { kind: 'clip'; track: string; clip: string; t: number }
+  | { kind: 'point'; track: string; clip: string; index: number }
+  | { kind: 'sel'; track: string; t: number }
+  | { kind: 'lane'; track: string; t: number }
+  | { kind: 'ruler'; t: number }
+  | { kind: 'marker'; id: string };
+
 export interface Recording {
   track: string | null;
   at: number;
@@ -58,12 +73,22 @@ export interface TracksProps {
   clock: Clock;
   seek: (t: number) => void;
   snap: boolean;
+  /** A part's edges (and a split) go to the nearest zero crossing of the sound. */
+  zero: boolean;
+  grid: Grid;
   markers: Marker[];
   onMarkers: (label: string, f: (m: Marker[]) => Marker[]) => void;
+  /** A marker to open for renaming (from its menu); the editor clears it once it is shown. */
+  renaming: string | null;
   markerDrag: { begin: () => void; end: () => void };
-  onMoveClip: (track: string, clip: string, toTrack: string, at: number, phase: Phase) => void;
+  /** `copyOf`: `clip` is a new clip, a copy of that one (made where it is dropped), and the original stays where it was. */
+  onMoveClip: (track: string, clip: string, toTrack: string, at: number, phase: Phase, copyOf?: string) => void;
   onTrimClip: (track: string, clip: string, edge: 'start' | 'end', t: number, phase: Phase) => void;
   onFade: (track: string, clip: string, which: 'in' | 'out', seconds: number, phase: Phase) => void;
+  /** A clip's volume line changed (a point added, moved or taken out; `undefined`: no line); a drag is begun and ended. */
+  onEnv: (track: string, clip: string, env: EnvPoint[] | undefined, phase: Phase, label: string) => void;
+  /** A right-click or a long press: where (client coordinates) and on what. */
+  onMenu: (at: { x: number; y: number }, what: MenuTarget) => void;
   onTrack: (id: string, patch: Partial<SoundTrack>, label: string) => void;
   trackDrag: { begin: (label: string) => void; end: () => void };
   onDeleteTrack: (id: string) => void;
@@ -77,12 +102,21 @@ export interface TracksProps {
 
 const DEFAULT_H = 104;
 
-/** The moments a drag snaps to: the ends of clips, the markers, the playhead, the selection's ends. */
-function snapPoints(p: TracksProps): number[] {
-  const out = [0, p.clock.get(), ...p.markers.map((m) => m.t)];
-  for (const t of p.recipe.tracks) for (const c of t.clips) out.push(c.at, clipEnd(c));
-  if (p.sel) out.push(p.sel.a, p.sel.b);
-  return out;
+/**
+ * A press held still on a touch screen or with a pen, which has no right button: after a moment `fire` is asked for the
+ * right-click menu at the point pressed. Returns what to call when the pointer moves (`moved`), when it is let go
+ * (`stop`), and whether the menu was made (`fired`, so the press is not also a click).
+ */
+function holdToMenu(e: { pointerType: string; clientX: number; clientY: number }, fire: (x: number, y: number) => void) {
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  let done = false;
+  const timer = e.pointerType === 'mouse' ? 0 : window.setTimeout(() => ((done = true), fire(x0, y0)), 480);
+  return {
+    moved: (x: number, y: number) => Math.hypot(x - x0, y - y0) > 8 && clearTimeout(timer),
+    stop: () => clearTimeout(timer),
+    fired: () => done,
+  };
 }
 
 export function Tracks(p: TracksProps) {
@@ -91,13 +125,27 @@ export function Tracks(p: TracksProps) {
   const head = p.mobile ? 0 : HEAD;
   const lanesRef = useRef<HTMLDivElement>(null);
   const tick = useThemeTick();
-  const snapTo = (t: number, except?: number[]) => {
-    if (!p.snap) return t;
-    let best = t;
-    let d = 8 / p.view.pps;
-    for (const s of snapPoints(p)) if (!except?.includes(s) && Math.abs(s - t) < d) [best, d] = [s, Math.abs(s - t)];
-    return best;
+  /** The nearest zero crossing of what the track plays at `t`, within a few pixels (at most 10 ms). */
+  const zeroAt = (trackId: string, t: number) => {
+    const tr = p.recipe.tracks.find((x) => x.id === trackId);
+    return tr ? zeroOnTrack(tr, p.get, t, Math.min(0.01, 8 / p.view.pps)) : t;
   };
+  /**
+   * Where a time lands: on a clip's edge, the playhead, a marker or the part picked's end, else on the time grid; and
+   * with `zero` (the track whose sound it cuts), else on the nearest zero crossing.
+   */
+  const snapTo = (t: number, except?: number[], zero?: string) =>
+    snapTime(t, {
+      on: p.snap,
+      points: snapPointsOf(p.recipe, p.clock.get(), p.markers.map((m) => m.t), p.sel),
+      tol: 8 / p.view.pps,
+      grid: (() => {
+        const g = nearestGrid(p.grid, p.view.pps, t);
+        return g === null ? null : { t: g };
+      })(),
+      zero: zero && p.zero ? (x) => zeroAt(zero, x) : null,
+      except,
+    });
   // Scrolling and zooming.
   const total = Math.max(p.length * 1.05 + 1, laneW / p.view.pps);
   const setX0 = (x0: number) => p.setView({ ...p.view, x0: Math.max(0, Math.min(Math.max(0, total - laneW / p.view.pps), x0)) });
@@ -208,15 +256,19 @@ function Ruler(p: TracksProps & { w: number; tick: number; snapTo: (t: number) =
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawRuler(g, { w: p.w, h, view: p.view, pal: palette(), length: p.length });
   }, [p.w, p.view, p.length, p.tick, h]);
+  const timeAt = (clientX: number, el: HTMLElement) => Math.max(0, Math.min(p.length, p.snapTo(tOf(p.view, clientX - el.getBoundingClientRect().left))));
   const down = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
-    const r = el.getBoundingClientRect();
-    const at = (x: number) => Math.max(0, Math.min(p.length, p.snapTo(tOf(p.view, x - r.left))));
-    p.seek(at(e.clientX));
-    const move = (ev: PointerEvent) => p.seek(at(ev.clientX));
+    const hold = holdToMenu(e, (x, y) => p.onMenu({ x, y }, { kind: 'ruler', t: timeAt(x, el) }));
+    p.seek(timeAt(e.clientX, el));
+    const move = (ev: PointerEvent) => {
+      hold.moved(ev.clientX, ev.clientY);
+      if (!hold.fired()) p.seek(timeAt(ev.clientX, el));
+    };
     const up = () => {
+      hold.stop();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
     };
@@ -224,7 +276,12 @@ function Ruler(p: TracksProps & { w: number; tick: number; snapTo: (t: number) =
     el.addEventListener('pointerup', up);
   };
   return (
-    <div className="relative min-w-0 flex-1 cursor-pointer" onPointerDown={down} title="Click or drag to move the playhead">
+    <div
+      className="relative min-w-0 flex-1 cursor-pointer"
+      onPointerDown={down}
+      onContextMenu={(e) => (e.preventDefault(), p.onMenu({ x: e.clientX, y: e.clientY }, { kind: 'ruler', t: timeAt(e.clientX, e.currentTarget) }))}
+      title="Click or drag to move the playhead"
+    >
       <canvas ref={cv} className="absolute inset-0" style={{ width: p.w, height: h }} />
       {p.markers.map((m) => (
         <MarkerFlag key={m.id} m={m} {...p} />
@@ -241,10 +298,13 @@ function RulerHead({ clock, view, w }: { clock: Clock; view: View; w: number }) 
   return <div className="pointer-events-none absolute bottom-0 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-fg" style={{ left: x, transform: 'translate(-50%, 50%) rotate(45deg)' }} />;
 }
 
-function MarkerFlag({ m, ...p }: TracksProps & { m: Marker; w: number; snapTo: (t: number) => number }) {
+function MarkerFlag({ m, ...p }: TracksProps & { m: Marker; w: number; snapTo: (t: number, except?: number[]) => number }) {
   const x = xOf(p.view, m.t);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(m.name);
+  useEffect(() => {
+    if (p.renaming === m.id) (setName(m.name), setEditing(true));
+  }, [p.renaming]);
   if (x < -80 || x > p.w + 4) return null;
   const down = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -253,18 +313,22 @@ function MarkerFlag({ m, ...p }: TracksProps & { m: Marker; w: number; snapTo: (
     el.setPointerCapture(e.pointerId);
     const x0 = e.clientX;
     let moved = false;
+    const hold = holdToMenu(e, (x, y) => p.onMenu({ x, y }, { kind: 'marker', id: m.id }));
     const move = (ev: PointerEvent) => {
-      if (!moved && Math.abs(ev.clientX - x0) < 3) return;
+      hold.moved(ev.clientX, ev.clientY);
+      if (hold.fired() || (!moved && Math.abs(ev.clientX - x0) < 3)) return;
       if (!moved) p.markerDrag.begin();
       moved = true;
-      const t = Math.max(0, Math.min(p.length, p.snapTo(m.t + (ev.clientX - x0) / p.view.pps)));
+      const raw = m.t + (ev.clientX - x0) / p.view.pps;
+      const t = Math.max(0, Math.min(p.length, isNoSnap(ev) ? raw : p.snapTo(raw, [m.t])));
       p.onMarkers('Move a marker', (list) => list.map((k) => (k.id === m.id ? { ...k, t } : k)));
     };
     const up = () => {
+      hold.stop();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       if (moved) p.markerDrag.end();
-      else p.seek(m.t);
+      else if (!hold.fired()) p.seek(m.t);
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
@@ -274,6 +338,7 @@ function MarkerFlag({ m, ...p }: TracksProps & { m: Marker; w: number; snapTo: (
       className="absolute top-0 z-10 flex h-[15px] max-w-36 items-center gap-1 rounded-r-sm bg-warn/85 pr-1.5 pl-1 text-[10px] font-medium text-black"
       style={{ left: x }}
       onPointerDown={down}
+      onContextMenu={(e) => (e.preventDefault(), e.stopPropagation(), p.onMenu({ x: e.clientX, y: e.clientY }, { kind: 'marker', id: m.id }))}
       onDoubleClick={(e) => (e.stopPropagation(), setName(m.name), setEditing(true))}
       title={`${m.name}: drag to move, double-click to rename`}
     >
@@ -300,9 +365,14 @@ function MarkerFlag({ m, ...p }: TracksProps & { m: Marker; w: number; snapTo: (
 
 // ---- a track ---------------------------------------------------------------------------------------------------------------
 
-type Hit = { kind: 'move' | 'trim-start' | 'trim-end' | 'fade-in' | 'fade-out' | 'select'; clip?: SoundTrack['clips'][number] };
+type Clip = SoundTrack['clips'][number];
+type Hit = { kind: 'move' | 'trim-start' | 'trim-end' | 'fade-in' | 'fade-out' | 'select' | 'env-line' | 'env-point'; clip?: Clip; index?: number };
 
-function hitTest(t: SoundTrack, view: View, x: number, y: number): Hit {
+/**
+ * What is at a point of a lane (x, y from its top left): a clip's name bar (to move it), its ends (to trim), the handles of its
+ * fades, and, on a clip with a volume line or the clip picked, the line's points and the line itself.
+ */
+function hitTest(t: SoundTrack, view: View, x: number, y: number, o: { picked: string | null; box: { top: number; bottom: number } }): Hit {
   for (const c of t.clips) {
     const xa = xOf(view, c.at);
     const xb = xOf(view, clipEnd(c));
@@ -315,14 +385,23 @@ function hitTest(t: SoundTrack, view: View, x: number, y: number): Hit {
     }
     if (Math.abs(x - xa) <= 4) return { kind: 'trim-start', clip: c };
     if (Math.abs(x - xb) <= 4) return { kind: 'trim-end', clip: c };
-    if (x >= xa && x <= xb) return { kind: y <= HEADER ? 'move' : 'select', clip: c };
+    if (x >= xa && x <= xb) {
+      if (y <= HEADER) return { kind: 'move', clip: c };
+      if (c.id === o.picked || c.env?.length) {
+        const pts = c.env ?? [];
+        for (let i = 0; i < pts.length; i++) if (Math.hypot(x - xOf(view, c.at + pts[i].t), y - envY(pts[i].v, o.box)) <= 8) return { kind: 'env-point', clip: c, index: i };
+        const line = envY(envGainAt(c.env, tOf(view, x) - c.at), o.box);
+        if (Math.abs(y - line) <= 5) return { kind: 'env-line', clip: c };
+      }
+      return { kind: 'select', clip: c };
+    }
   }
   return { kind: 'select' };
 }
 
-const CURSOR: Record<Hit['kind'], string> = { move: 'grab', 'trim-start': 'ew-resize', 'trim-end': 'ew-resize', 'fade-in': 'col-resize', 'fade-out': 'col-resize', select: 'text' };
+const CURSOR: Record<Hit['kind'], string> = { move: 'grab', 'trim-start': 'ew-resize', 'trim-end': 'ew-resize', 'fade-in': 'col-resize', 'fade-out': 'col-resize', select: 'text', 'env-line': 'crosshair', 'env-point': 'grab' };
 
-const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; index: number; w: number; tick: number; snapTo: (t: number, except?: number[]) => number; trackAtY: (y: number) => string | null }) {
+const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; index: number; w: number; tick: number; snapTo: (t: number, except?: number[], zero?: string) => number; trackAtY: (y: number) => string | null }) {
   const t = p.track;
   const h = p.heights[t.id] ?? DEFAULT_H;
   const cv = useRef<HTMLCanvasElement>(null);
@@ -330,6 +409,8 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
   const words = p.words(t);
   const effects: SoundEffect[] = (p.recipe.effects ?? []).filter((e) => e.track === t.id);
   const picked = p.picked?.track === t.id ? (p.picked.clip ?? null) : null;
+  const box = bodyBox(h, !!words?.length);
+  const grid = gridLines(p.grid, p.view.pps, tOf(p.view, 0), tOf(p.view, p.w));
   useLayoutEffect(() => {
     const c = cv.current;
     if (!c || p.w < 2) return;
@@ -338,8 +419,23 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
     c.height = Math.round(h * dpr);
     const g = c.getContext('2d')!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawLane(g, { w: p.w, h, view: p.view, track: t, get: p.get, pal: palette(), amp: p.amp, picked, mode, effects, words, loading: p.loading });
-  }, [p.w, h, p.view, t, p.version, p.amp, picked, mode, effects.map((e) => `${e.id}${e.range}${e.bypass}`).join(), words, p.tick]);
+    drawLane(g, { w: p.w, h, view: p.view, track: t, get: p.get, pal: palette(), amp: p.amp, picked, mode, effects, words, loading: p.loading, grid });
+  }, [p.w, h, p.view, t, p.version, p.amp, picked, mode, effects.map((e) => `${e.id}${e.range}${e.bypass}`).join(), words, p.tick, p.grid.kind, p.grid.kind === 'beats' ? p.grid.bpm : 0]);
+
+  /** What a right-click at a point of the lane is on. */
+  const target = (clientX: number, clientY: number, el: HTMLElement, hit: Hit): MenuTarget => {
+    const r = el.getBoundingClientRect();
+    const at = Math.max(0, tOf(p.view, clientX - r.left));
+    void clientY;
+    if (hit.kind === 'env-point' && hit.clip) return { kind: 'point', track: t.id, clip: hit.clip.id, index: hit.index ?? 0 };
+    if (p.sel && p.sel.tracks.includes(t.id) && at >= p.sel.a && at <= p.sel.b) return { kind: 'sel', track: t.id, t: at };
+    if (hit.clip) return { kind: 'clip', track: t.id, clip: hit.clip.id, t: at };
+    return { kind: 'lane', track: t.id, t: at };
+  };
+  const hitAt = (el: HTMLElement, clientX: number, clientY: number) => {
+    const r = el.getBoundingClientRect();
+    return hitTest(t, p.view, clientX - r.left, clientY - r.top, { picked, box });
+  };
 
   const down = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -347,7 +443,7 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
     const r = el.getBoundingClientRect();
     const x = e.clientX - r.left;
     const y = e.clientY - r.top;
-    const hit = hitTest(t, p.view, x, y);
+    const hit = hitTest(t, p.view, x, y, { picked, box });
     // A word picked (or added to the pick).
     if (words?.length && y > h - 16) {
       const at = tOf(p.view, x);
@@ -356,44 +452,94 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
     }
     el.setPointerCapture(e.pointerId);
     const at0 = tOf(p.view, x);
+    // Alt (⌘ on a Mac) held when the drag starts: no snapping for it. Ctrl (⌥ on a Mac) on a clip: drag a copy.
+    const loose = isNoSnap(e);
+    const copying = isCopyDrag(e) && hit.kind === 'move';
+    const snap = (v: number, except?: number[], zero?: string) => (loose ? v : p.snapTo(v, except, zero));
+    // A clip dragged is the clip itself, or its copy (the copy is made where the clip is, as the drag begins).
     const c = hit.clip;
+    const dragId = copying && c ? newId() : c?.id;
+    const hold = holdToMenu(e, (cx, cy) => {
+      cleanup();
+      p.onMenu({ x: cx, y: cy }, target(cx, cy, el, hit));
+    });
     let moved = false;
+    // The volume line being dragged: its points as they are now, and which one.
+    let line = c?.env ? [...c.env] : [];
+    let point = hit.index ?? -1;
+    const envLabel = hit.kind === 'env-line' ? 'Add a volume point' : 'Move a volume point';
+    // A press on the line makes a point (where it was pressed) as the drag begins, or when it is let go, but not when it becomes a long press.
+    let made = false;
+    const startLine = () => {
+      if (made || !c) return;
+      made = true;
+      const u = Math.max(0, Math.min(clipLength(c), snap(at0) - c.at));
+      const added = envAdd(c.env, u, clipLength(c));
+      line = added.env;
+      point = added.at;
+      p.onEnv(t.id, c.id, line, 'begin', envLabel);
+      p.onEnv(t.id, c.id, line, 'move', envLabel);
+    };
     const move = (ev: PointerEvent) => {
+      hold.moved(ev.clientX, ev.clientY);
+      if (hold.fired()) return;
       const dx = ev.clientX - e.clientX;
       if (!moved && Math.abs(dx) < 3 && Math.abs(ev.clientY - e.clientY) < 3) return;
       const t1 = tOf(p.view, ev.clientX - r.left);
+      const loose2 = isNoSnap(ev) || loose;
+      const snap2 = (v: number, except?: number[], zero?: string) => (loose2 ? v : p.snapTo(v, except, zero));
       if (!moved) {
         moved = true;
-        if (c && hit.kind === 'move') p.onMoveClip(t.id, c.id, t.id, c.at, 'begin');
+        if (c && hit.kind === 'move') p.onMoveClip(t.id, c.id, t.id, c.at, 'begin', copying ? c.id : undefined);
         if (c && hit.kind.startsWith('trim')) p.onTrimClip(t.id, c.id, hit.kind === 'trim-start' ? 'start' : 'end', c.at, 'begin');
         if (c && hit.kind.startsWith('fade')) p.onFade(t.id, c.id, hit.kind === 'fade-in' ? 'in' : 'out', 0, 'begin');
+        if (c && hit.kind === 'env-point') p.onEnv(t.id, c.id, line, 'begin', envLabel);
+        if (hit.kind === 'env-line') startLine();
       }
       if (c && hit.kind === 'move') {
         const to = p.trackAtY(ev.clientY) ?? t.id;
         const raw = c.at + (t1 - at0);
         // Its start, or its end, snaps.
-        const s1 = p.snapTo(raw, [c.at, clipEnd(c)]);
-        const s2 = p.snapTo(raw + clipLength(c), [c.at, clipEnd(c)]) - clipLength(c);
+        const s1 = snap2(raw, [c.at, clipEnd(c)]);
+        const s2 = snap2(raw + clipLength(c), [c.at, clipEnd(c)]) - clipLength(c);
         const at = s1 !== raw ? s1 : s2 !== raw ? s2 : raw;
-        p.onMoveClip(t.id, c.id, to, Math.max(0, at), 'move');
-      } else if (c && hit.kind.startsWith('trim')) p.onTrimClip(t.id, c.id, hit.kind === 'trim-start' ? 'start' : 'end', p.snapTo(t1, [hit.kind === 'trim-start' ? c.at : clipEnd(c)]), 'move');
+        p.onMoveClip(t.id, dragId!, to, Math.max(0, at), 'move', copying ? c.id : undefined);
+      } else if (c && hit.kind.startsWith('trim')) p.onTrimClip(t.id, c.id, hit.kind === 'trim-start' ? 'start' : 'end', snap2(t1, [hit.kind === 'trim-start' ? c.at : clipEnd(c)]), 'move');
       else if (c && hit.kind === 'fade-in') p.onFade(t.id, c.id, 'in', Math.max(0, t1 - c.at), 'move');
       else if (c && hit.kind === 'fade-out') p.onFade(t.id, c.id, 'out', Math.max(0, clipEnd(c) - t1), 'move');
-      else {
+      else if (c && (hit.kind === 'env-line' || hit.kind === 'env-point')) {
+        // A point follows the pointer along the clip (snapped in time) and up and down (to as it is, 1, and to silence).
+        const u = snap2(t1) - c.at;
+        let v = envValue(ev.clientY - r.top, box);
+        if (!loose2 && Math.abs(v - 1) < 0.04) v = 1;
+        if (!loose2 && v < 0.03) v = 0;
+        line = envMove(line, point, u, v, clipLength(c));
+        p.onEnv(t.id, c.id, line, 'move', envLabel);
+      } else {
         // A part of the time, on the lanes dragged over.
         const other = p.trackAtY(ev.clientY) ?? t.id;
         const ids = p.recipe.tracks.map((x) => x.id);
         const [i0, i1] = [ids.indexOf(t.id), ids.indexOf(other)].sort((a, b) => a - b);
-        const a = Math.max(0, p.snapTo(Math.min(at0, t1)));
-        const b = Math.max(0, p.snapTo(Math.max(at0, t1)));
+        const a = Math.max(0, snap2(Math.min(at0, t1), undefined, t.id));
+        const b = Math.max(0, snap2(Math.max(at0, t1), undefined, t.id));
         p.setSel(b - a > 0.0005 ? { a, b, tracks: ids.slice(i0, i1 + 1) } : null);
       }
     };
     const up = () => {
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
+      hold.stop();
+      cleanup();
+      if (hold.fired()) return;
+      if (c && hit.kind === 'env-line') {
+        startLine();
+        p.onEnv(t.id, c.id, line, 'end', envLabel);
+        return;
+      }
+      if (c && hit.kind === 'env-point' && moved) {
+        p.onEnv(t.id, c.id, line, 'end', envLabel);
+        return;
+      }
       if (moved) {
-        if (c && hit.kind === 'move') p.onMoveClip(t.id, c.id, t.id, c.at, 'end');
+        if (c && hit.kind === 'move') p.onMoveClip(t.id, dragId!, t.id, c.at, 'end', copying ? c.id : undefined);
         else if (c && hit.kind.startsWith('trim')) p.onTrimClip(t.id, c.id, 'start', 0, 'end');
         else if (c && hit.kind.startsWith('fade')) p.onFade(t.id, c.id, 'in', 0, 'end');
         return;
@@ -407,20 +553,28 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
       }
       p.setSel(null);
       p.pick(c ? { track: t.id, clip: c.id } : { track: t.id });
-      p.seek(Math.max(0, p.snapTo(at0)));
+      p.seek(Math.max(0, snap(at0, undefined, t.id)));
+    };
+    const cleanup = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
   };
   const [cursor, setCursor] = useState('text');
-  const hover = (e: React.PointerEvent<HTMLDivElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    setCursor(CURSOR[hitTest(t, p.view, e.clientX - r.left, e.clientY - r.top).kind]);
-  };
+  const hover = (e: React.PointerEvent<HTMLDivElement>) => setCursor(CURSOR[hitAt(e.currentTarget, e.clientX, e.clientY).kind]);
   const dbl = (e: React.MouseEvent<HTMLDivElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const hit = hitTest(t, p.view, e.clientX - r.left, e.clientY - r.top);
+    const hit = hitAt(e.currentTarget, e.clientX, e.clientY);
+    // A double-click on a volume point takes it out.
+    if (hit.kind === 'env-point' && hit.clip) return p.onEnv(t.id, hit.clip.id, envRemove(hit.clip.env ?? [], hit.index ?? 0), 'move', 'Take out a volume point');
+    if (hit.kind === 'env-line') return;
     if (hit.clip) p.setSel({ a: hit.clip.at, b: clipEnd(hit.clip), tracks: [t.id] });
+  };
+  const menu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const hit = hitAt(e.currentTarget, e.clientX, e.clientY);
+    p.onMenu({ x: e.clientX, y: e.clientY }, target(e.clientX, e.clientY, e.currentTarget, hit));
   };
   const sel = p.sel && p.sel.tracks.includes(t.id) ? p.sel : null;
   const rec = p.recording && (p.recording.track ?? '') === t.id ? p.recording : null;
@@ -428,7 +582,7 @@ const TrackRow = memo(function TrackRow(p: TracksProps & { track: SoundTrack; in
   return (
     <div data-track={t.id} className={cx('relative flex border-b border-line', t.mute && 'opacity-60')} style={{ height: h }}>
       {!p.mobile && <TrackHead {...p} t={t} h={h} isPicked={isPicked} />}
-      <div className="relative min-w-0 flex-1" style={{ cursor }} onPointerDown={down} onPointerMove={hover} onDoubleClick={dbl}>
+      <div data-lane className="relative min-w-0 flex-1" style={{ cursor }} onPointerDown={down} onPointerMove={hover} onDoubleClick={dbl} onContextMenu={menu}>
         <canvas ref={cv} className="absolute inset-0" style={{ width: p.w, height: h }} />
         {sel && <div className="pointer-events-none absolute inset-y-0 border-x border-accent bg-accent/20" style={{ left: xOf(p.view, sel.a), width: Math.max(1, (sel.b - sel.a) * p.view.pps) }} />}
         {rec && <RecordingClip rec={rec} view={p.view} h={h} />}
