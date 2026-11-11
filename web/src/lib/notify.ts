@@ -1,6 +1,8 @@
 // "A session finished, failed or needs you", on this device: a toast (and a soft chime) while the app
 // is in view, a system notification while it is in the background, and Web Push when no page is open
 // (a phone in a pocket). Push needs this device's permission and a subscription the server keeps.
+// In a desktop app, the app itself shows each one as the system's own notification (desktop/main.cjs),
+// even with its window closed, and the page shows only those the system did not show.
 import type { NotifyEvent } from '@shared/types';
 import { noticeText } from '@shared/notice';
 import { tr } from '../i18n/runtime';
@@ -33,10 +35,43 @@ export function setNotifyPrefs(p: Partial<NotifyPrefs>) {
 
 let pushOn = false;
 
+/** What the desktop app's window gives its page (desktop/preload.cjs); none in a browser. */
+interface DesktopBridge {
+  onNotices?: (show: (n: NotifyEvent) => void, open: (path: string) => void) => void;
+  notices?: () => Promise<SystemNotices | null>;
+  testNotice?: (title: string, body: string) => Promise<{ ok: boolean; error: string } | null>;
+}
+/** Whether the system shows the desktop app's notifications: null before the first; `error`, what it said when not. */
+export interface SystemNotices {
+  shows: boolean | null;
+  error: string;
+}
+const bridge = (window as unknown as { hydorDesktop?: DesktopBridge }).hydorDesktop;
+
+/** In a desktop app, the app shows the notices as the system's own notifications, and the page none of its own. */
+export const systemNotices = typeof bridge?.onNotices === 'function';
+
+/** Whether the system shows the desktop app's notifications (null outside one). */
+export const systemNoticesState = (): Promise<SystemNotices | null> => bridge?.notices?.().catch(() => null) ?? Promise.resolve(null);
+
+/** A notification from the desktop app to try them: whether the system showed it (null outside one). */
+export const testSystemNotice = (): Promise<{ ok: boolean; error: string } | null> =>
+  bridge?.testNotice?.(tr('Hydor'), tr('Notifications work on this device.')).catch(() => null) ?? Promise.resolve(null);
+
+let bridged = false;
+
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && window.isSecureContext;
 
 /** Registers the service worker and learns whether this device already gets pushes. */
 export async function initNotifications() {
+  // A notice the system did not show: here instead. Its machine is this server's own when it names none.
+  if (systemNotices && !bridged) {
+    bridged = true;
+    bridge!.onNotices!(
+      (n) => show(n, n.machine ? n.machine.id : null),
+      (path) => goFull(path),
+    );
+  }
   if (!('serviceWorker' in navigator) || !window.isSecureContext) return;
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data?.type === 'wa-open' && typeof e.data.url === 'string') goFull(e.data.url);
@@ -124,10 +159,17 @@ export function chime(kind: NotifyEvent['kind']) {
 export function handleNotify(n: NotifyEvent, own = false) {
   // Hands-free mode says what it hears of (features/voice/HandsFree.tsx).
   window.dispatchEvent(new CustomEvent('hydor:notify', { detail: n }));
+  // The desktop app shows it, and hands it back (initNotifications) only when the system did not.
+  if (systemNotices) return;
   // The machine the session is on (null: this server's own).
   const on = n.machine ? n.machine.id : own ? null : machineId;
   // The machine this page shows sends its own notices.
   if (own && on === machineId) return;
+  show(n, on);
+}
+
+/** A notice about a session on the machine `on` (null: this server's own), shown by the page. */
+function show(n: NotifyEvent, on: string | null) {
   // A session's notice opens it; one about something else (a template's run) where it says.
   const path = machinePath(on, n.url ?? sessionPath(n.key));
   const where = on === machineId ? undefined : (n.machine?.name ?? ownName());

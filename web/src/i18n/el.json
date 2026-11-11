@@ -22597,5 +22597,18 @@
 "What Claude Code, Codex, ChatGPT and others know about you, and your skills":"Όσα γνωρίζουν για εσάς το Claude Code, το Codex, το ChatGPT και άλλοι, και οι δεξιότητές σας",
 "What the last tidy-up changed":"Τι άλλαξε η τελευταία τακτοποίηση",
 "Your data":"Τα δεδομένα σας",
-"Needed by agents":"Χρήση από πράκτορες"
+"Needed by agents":"Χρήση από πράκτορες",
+"It didn’t show. Allow notifications for Hydor in the system’s settings.":"Δεν εμφανίστηκε. Επιτρέψτε τις ειδοποιήσεις για το Hydor στις ρυθμίσεις του συστήματος.",
+"Notifications work on this device.":"Οι ειδοποιήσεις λειτουργούν σε αυτή τη συσκευή.",
+"Shows a notification on this computer right away":"Δείχνει αμέσως μια ειδοποίηση σε αυτόν τον υπολογιστή",
+"Windows isn’t showing them, so they show inside the app":"Τα Windows δεν τις δείχνουν, οπότε εμφανίζονται μέσα στην εφαρμογή",
+"Your desktop isn’t showing them, so they show inside the app":"Η επιφάνεια εργασίας σας δεν τις δείχνει, οπότε εμφανίζονται μέσα στην εφαρμογή",
+"macOS isn’t showing them, so they show inside the app":"Το macOS δεν τις δείχνει, οπότε εμφανίζονται μέσα στην εφαρμογή",
+"As Windows notifications, even with the window closed":"Ως ειδοποιήσεις των Windows, ακόμη και με κλειστό το παράθυρο",
+"As your desktop’s notifications, even with the window closed":"Ως ειδοποιήσεις της επιφάνειας εργασίας σας, ακόμη και με κλειστό το παράθυρο",
+"As Mac notifications, even with the window closed":"Ως ειδοποιήσεις του Mac, ακόμη και με κλειστό το παράθυρο",
+"The app keeps running in the notification area when you close its window, and its notifications keep coming. To allow them or change how they show: Settings → System → Notifications → Hydor.":"Η εφαρμογή συνεχίζει να τρέχει στην περιοχή ειδοποιήσεων όταν κλείνετε το παράθυρό της, και οι ειδοποιήσεις της συνεχίζουν να έρχονται. Για να τις επιτρέψετε ή να αλλάξετε πώς εμφανίζονται: Ρυθμίσεις → Σύστημα → Ειδοποιήσεις → Hydor.",
+"The app keeps running in the system tray when you close its window, and its notifications keep coming. Your desktop’s settings say how they show.":"Η εφαρμογή συνεχίζει να τρέχει στο πλαίσιο συστήματος όταν κλείνετε το παράθυρό της, και οι ειδοποιήσεις της συνεχίζουν να έρχονται. Οι ρυθμίσεις της επιφάνειας εργασίας σας ορίζουν πώς εμφανίζονται.",
+"The app keeps running in the menu bar when you close its window, and its notifications keep coming. To allow them or change how they show: System Settings → Notifications → Hydor.":"Η εφαρμογή συνεχίζει να τρέχει στη γραμμή μενού όταν κλείνετε το παράθυρό της, και οι ειδοποιήσεις της συνεχίζουν να έρχονται. Για να τις επιτρέψετε ή να αλλάξετε πώς εμφανίζονται: Ρυθμίσεις συστήματος → Ειδοποιήσεις → Hydor.",
+"Only with notices the app shows inside its window: the system’s notifications make their own sound.":"Μόνο με τις ειδοποιήσεις που δείχνει η εφαρμογή μέσα στο παράθυρό της: οι ειδοποιήσεις του συστήματος έχουν τον δικό τους ήχο."
 }

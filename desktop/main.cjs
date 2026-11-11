@@ -28,9 +28,14 @@
 // 'pointer' }), the menu bar or tray says so, with Stop, and Esc (⌘⇧Esc too on a Mac) stops it ({ type:
 // 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
 // and Esc let go while the agent itself presses it; on Linux the app takes the agent's screenshots.
+//
+// Notices (a session finished, failed or needs you): the server sends each one here ({ type: 'notice' }), and the app
+// shows it as the system's own notification, even with the window closed; clicking it opens that session. The page in
+// the window shows none itself, only those the system did not show (not allowed in its settings), handed to it here.
 'use strict';
-const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
 const glow = require('./glow.cjs');
+const { createNotices } = require('./notices.cjs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -475,6 +480,8 @@ function onMessage(m) {
     void install(m);
   } else if (m.type === 'update') {
     onUpdate(m);
+  } else if (m.type === 'notice') {
+    sessionNotices.show(m);
   } else if (m.type === 'computer') {
     onComputer(m);
   } else if (m.type === 'pointer') {
@@ -535,6 +542,42 @@ function notify(n) {
   note.on('close', done);
   note.show();
 }
+
+// ---- notices: a session finished, failed or needs you (notices.cjs) ------------------------------------------------
+
+/** The path of the app's page the window shows; '' for none (the starting logo, a problem). */
+function shownPath() {
+  try {
+    const u = new URL(win.webContents.getURL());
+    return sameOrigin(u.href) ? u.pathname : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Opens the window at a page of the app: the page already there goes to it itself, without loading again. */
+function openAt(at) {
+  if (win && sameOrigin(win.webContents.getURL())) {
+    win.webContents.send('hydor:open', at);
+    openWindow();
+  } else go(at);
+}
+
+const sessionNotices = createNotices({
+  Notification,
+  mac: MAC,
+  front: () => (win && win.isVisible() && !win.isMinimized() && win.isFocused() ? shownPath() : null),
+  inApp: (n) => {
+    if (win && !win.webContents.isDestroyed()) win.webContents.send('hydor:notice', n);
+  },
+  open: openAt,
+  showApp: () => go(),
+});
+
+// What the page in the window asks (preload.cjs): only the app's own pages.
+const fromOwnPage = (e) => sameOrigin((e.senderFrame && e.senderFrame.url) || '');
+ipcMain.handle('hydor:notices', (e) => (fromOwnPage(e) ? sessionNotices.state() : null));
+ipcMain.handle('hydor:notice-test', (e, t) => (fromOwnPage(e) ? sessionNotices.test(t) : null));
 
 const SYSTEM_USING = MAC ? 'An agent is using your Mac' : WIN ? 'An agent is using your PC' : 'An agent is using your computer';
 
@@ -919,7 +962,8 @@ function openWindow(at) {
     });
     win.on('closed', () => (win = null));
     win.webContents.setWindowOpenHandler(({ url }) => {
-      if (sameOrigin(url)) return { action: 'allow', overrideBrowserWindowOptions: { width: 1100, height: 800, autoHideMenuBar: !MAC, webPreferences: { contextIsolation: true, sandbox: true } } };
+      // With the window's preload, a page there leaves notices to the app as the window's does.
+      if (sameOrigin(url)) return { action: 'allow', overrideBrowserWindowOptions: { width: 1100, height: 800, autoHideMenuBar: !MAC, webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') } } };
       if (/^(https?|mailto):/.test(url)) void shell.openExternal(url);
       return { action: 'deny' };
     });
@@ -1177,6 +1221,7 @@ app.whenReady().then(async () => {
   }
   appMenu();
   rebuildTray();
+  void sessionNotices.restore();
   // The window may use the microphone (voice) and show notifications; only for the app's own pages.
   session.defaultSession.setPermissionRequestHandler((wc, permission, done, details) => {
     const ok = sameOrigin(details.requestingUrl || wc.getURL());

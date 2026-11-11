@@ -1589,14 +1589,20 @@ sessions.on('notify', (event: NotifyEvent) => {
   broadcast({ t: 'notify', n });
   // A notification shows a title and a body: the session's name, then the status and the reply.
   const p = pushed(n);
-  push.send({ ...p.n, ...p.t, url: n.url ?? `/s/${encodeURIComponent(n.key)}`, api: '' }).catch(() => {});
+  const url = n.url ?? `/s/${encodeURIComponent(n.key)}`;
+  push.send({ ...p.n, ...p.t, url, api: '' }).catch(() => {});
+  // In a desktop app, the system's own notification (desktop/main.cjs).
+  tellDesktop({ type: 'notice', n, ...p.t, path: url });
 });
 // Other machines' notices come here too, so one device hears from all of them.
 machines.on('notify', (n: NotifyEvent) => {
   broadcast({ t: 'notify', n });
   const p = pushed(n);
+  const body = `${n.machine!.name} · ${p.t.body}`;
   // Its Approve and Deny go to that machine, through this server.
-  push.send({ ...p.n, title: p.t.title, body: `${n.machine!.name} · ${p.t.body}`, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}`, api: `/m/${n.machine!.id}` }).catch(() => {});
+  push.send({ ...p.n, title: p.t.title, body, url: `/m/${n.machine!.id}/s/${encodeURIComponent(n.key)}`, api: `/m/${n.machine!.id}` }).catch(() => {});
+  // Where the page opens it: that machine's page of it (web/src/lib/notify.ts).
+  tellDesktop({ type: 'notice', n, title: p.t.title, body, path: `/m/${n.machine!.id}${n.url ?? `/s/${encodeURIComponent(n.key)}`}` });
 });
 machines.on('changed', () => broadcast({ t: 'machines' }));
 /** A sign-in finished: with a session waiting out a limit, the new account's usage says when it continues. */

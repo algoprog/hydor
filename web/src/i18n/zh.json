@@ -22612,5 +22612,18 @@
 "What Claude Code, Codex, ChatGPT and others know about you, and your skills":"Claude Code、Codex、ChatGPT 和其他助手对你的了解，以及你的技能",
 "What the last tidy-up changed":"上次整理改了什么",
 "Your data":"你的数据",
-"Needed by agents":"智能体用到"
+"Needed by agents":"智能体用到",
+"It didn’t show. Allow notifications for Hydor in the system’s settings.":"没有显示出来。请在系统设置中允许 Hydor 发送通知。",
+"Notifications work on this device.":"通知在这台设备上可以正常工作。",
+"Shows a notification on this computer right away":"立即在这台电脑上显示一条通知",
+"Windows isn’t showing them, so they show inside the app":"Windows 没有显示它们，所以它们会显示在应用里",
+"Your desktop isn’t showing them, so they show inside the app":"你的桌面没有显示它们，所以它们会显示在应用里",
+"macOS isn’t showing them, so they show inside the app":"macOS 没有显示它们，所以它们会显示在应用里",
+"As Windows notifications, even with the window closed":"以 Windows 通知的形式送达，即使窗口已关闭",
+"As your desktop’s notifications, even with the window closed":"以你桌面的通知形式送达，即使窗口已关闭",
+"As Mac notifications, even with the window closed":"以 Mac 通知的形式送达，即使窗口已关闭",
+"The app keeps running in the notification area when you close its window, and its notifications keep coming. To allow them or change how they show: Settings → System → Notifications → Hydor.":"关闭窗口后，应用会继续在通知区域中运行，通知也会继续送达。要允许通知或更改它们的显示方式：设置 → 系统 → 通知 → Hydor。",
+"The app keeps running in the system tray when you close its window, and its notifications keep coming. Your desktop’s settings say how they show.":"关闭窗口后，应用会继续在系统托盘中运行，通知也会继续送达。它们如何显示由你桌面的设置决定。",
+"The app keeps running in the menu bar when you close its window, and its notifications keep coming. To allow them or change how they show: System Settings → Notifications → Hydor.":"关闭窗口后，应用会继续在菜单栏中运行，通知也会继续送达。要允许通知或更改它们的显示方式：系统设置 → 通知 → Hydor。",
+"Only with notices the app shows inside its window: the system’s notifications make their own sound.":"只在应用于窗口内显示通知时播放：系统通知有它们自己的声音。"
 }
