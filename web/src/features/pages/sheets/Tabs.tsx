@@ -1,12 +1,17 @@
 // The sheets' tabs under the grid: pick one; + adds a sheet; a double click renames one; its menu (the arrow on the
 // tab picked, or a right click or long press) duplicates, moves, deletes it, or adds a sheet from a CSV file; a
-// tab dragged with the mouse moves. What the selection adds up to sits at the right.
+// tab dragged with the mouse moves; a tab may have a colour (a bar under its name) and be hidden (the menu of a tab hides
+// it, and lists the hidden ones to show again). What the selection adds up to sits at the right.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, ChevronDown, Copy, FileUp, PencilLine, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, Copy, EyeOff, Eye, FileUp, PencilLine, Palette as PaletteIcon, Plus, Trash2 } from 'lucide-react';
 import { cx, IconButton, MenuItem, MenuSep, Popover } from '../../../components/ui';
+import { Palette } from './Toolbar';
 
 export interface TabsProps {
   names: string[];
+  /** Each sheet's tab colour (#rrggbb) and whether it is hidden, by place in `names`. */
+  colors?: (string | undefined)[];
+  hidden?: boolean[];
   active: number;
   readOnly?: boolean;
   onPick: (i: number) => void;
@@ -16,6 +21,9 @@ export interface TabsProps {
   onDuplicate: (i: number) => void;
   onDelete: (i: number) => void;
   onMove: (from: number, to: number) => void;
+  onColor: (i: number, color: string | undefined) => void;
+  onHide: (i: number) => void;
+  onShow: (i: number) => void;
   /** What sits at the right: the selection's sum and count. */
   status?: ReactNode;
   /** Nothing under it: it keeps clear of a phone's home bar. */
@@ -27,6 +35,7 @@ export function SheetTabs(p: TabsProps) {
   const [draft, setDraft] = useState('');
   const [menu, setMenu] = useState<{ i: number; el: HTMLElement } | null>(null);
   const [drop, setDrop] = useState<number | null>(null);
+  const [colours, setColours] = useState(false);
   const menuAnchor = useRef<HTMLElement | null>(null);
   const strip = useRef<HTMLDivElement>(null);
   const drag = useRef<{ i: number; x: number; on: boolean; id: number } | null>(null);
@@ -54,18 +63,17 @@ export function SheetTabs(p: TabsProps) {
     setMenu({ i, el });
   };
 
-  /** Where a tab dragged to x would go. */
+  const hiddenAt = (i: number) => !!p.hidden?.[i];
+  const shown = p.names.map((_, i) => i).filter((i) => !hiddenAt(i));
+  const lastShown = shown[shown.length - 1] ?? 0;
+  /** Where a tab dragged to x would go: before the sheet of that place (the number of sheets: at the end). */
   const slotAt = (x: number) => {
     const tabs = [...(strip.current?.querySelectorAll<HTMLElement>('[data-tab]') ?? [])];
-    let slot = tabs.length;
-    for (let k = 0; k < tabs.length; k++) {
-      const b = tabs[k].getBoundingClientRect();
-      if (x < b.left + b.width / 2) {
-        slot = k;
-        break;
-      }
+    for (const t of tabs) {
+      const b = t.getBoundingClientRect();
+      if (x < b.left + b.width / 2) return Number(t.dataset.tab);
     }
-    return slot;
+    return p.names.length;
   };
 
   return (
@@ -78,6 +86,7 @@ export function SheetTabs(p: TabsProps) {
       <div ref={strip} role="tablist" className="relative flex h-full min-w-0 flex-1 items-stretch overflow-x-auto [&::-webkit-scrollbar]:hidden">
         {p.names.map((name, i) => {
           const on = i === p.active;
+          if (hiddenAt(i)) return null;
           return (
             <div
               key={`${i}:${name}`}
@@ -152,8 +161,9 @@ export function SheetTabs(p: TabsProps) {
               )}
             >
               {on && <span className="absolute inset-x-0 top-0 h-[2px] bg-accent" />}
+              {p.colors?.[i] && <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: p.colors[i] }} />}
               {drop === i && <span className="absolute top-1 bottom-1 -left-px w-[2px] rounded bg-accent" />}
-              {drop === p.names.length && i === p.names.length - 1 && <span className="absolute top-1 -right-px bottom-1 w-[2px] rounded bg-accent" />}
+              {drop === p.names.length && i === lastShown && <span className="absolute top-1 -right-px bottom-1 w-[2px] rounded bg-accent" />}
               {renaming === i ? (
                 <input
                   autoFocus
@@ -196,7 +206,7 @@ export function SheetTabs(p: TabsProps) {
         })}
       </div>
       {p.status && <div className="ml-1 flex min-w-0 shrink-0 items-center gap-3 text-[12px] text-fg-3">{p.status}</div>}
-      <Popover anchor={menuAnchor} open={!!menu && !p.readOnly} onClose={() => setMenu(null)} width={240} prefer="above" title={menu ? p.names[menu.i] : ''}>
+      <Popover anchor={menuAnchor} open={!!menu && !p.readOnly} onClose={() => (setMenu(null), setColours(false))} width={240} prefer="above" title={menu ? p.names[menu.i] : ''}>
         {menu && (
           <>
             <MenuItem icon={<PencilLine size={14} />} onClick={() => (setMenu(null), startRename(menu.i))}>
@@ -211,6 +221,26 @@ export function SheetTabs(p: TabsProps) {
             <MenuItem icon={<ArrowRight size={14} />} disabled={menu.i === p.names.length - 1} onClick={() => (setMenu(null), p.onMove(menu.i, menu.i + 1))}>
               Move right
             </MenuItem>
+            <MenuItem icon={<PaletteIcon size={14} />} checked={colours} onClick={() => setColours((c) => !c)}>
+              Tab colour
+            </MenuItem>
+            {colours && <Palette value={p.colors?.[menu.i]} none="No colour" onPick={(c) => (setMenu(null), setColours(false), p.onColor(menu.i, c))} />}
+            <MenuItem icon={<EyeOff size={14} />} disabled={shown.length < 2} onClick={() => (setMenu(null), p.onHide(menu.i))}>
+              Hide this sheet
+            </MenuItem>
+            {p.names.some((_, i) => hiddenAt(i)) && (
+              <>
+                <MenuSep />
+                {p.names.map((n, i) =>
+                  hiddenAt(i) ? (
+                    <MenuItem key={i} icon={<Eye size={14} />} onClick={() => (setMenu(null), p.onShow(i))}>
+                      <span translate="no">{`Show “${n}”`}</span>
+                    </MenuItem>
+                  ) : null,
+                )}
+              </>
+            )}
+            <MenuSep />
             <MenuItem icon={<FileUp size={14} />} onClick={() => (setMenu(null), p.onImport())}>
               Add a sheet from a CSV file
             </MenuItem>

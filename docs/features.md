@@ -579,14 +579,17 @@ agents that speak ACP and take MCP servers.
   contents and headers and footers as Word's own; laid out so Word's pages break where the editor's do, the
   document's fonts inside the file), OpenDocument for LibreOffice (its page, styles, lists, tables, pictures, footnotes and table of contents as LibreOffice's own), PDF on their paper, Markdown, EPUB (a chapter at each Heading 1, its footnotes, pictures and maths inside), plain text or a web page. Spreadsheets (save_sheet, with
   formulas, or opened from an Excel, ODS, CSV or TSV file) work as in Excel, Google Sheets or Airtable: a grid that
-  stays quick with thousands of rows, frozen and hidden rows and columns, sizes to drag, about three hundred of
-  Excel's functions worked out as you type (lookups, criteria, dates, text, loans, FILTER, SORT, UNIQUE and
+  stays quick with thousands of rows, frozen (up to any row: Freeze up to here) and hidden rows and columns, sizes to drag or typed exactly, a right-click menu on letters and numbers (resize, fit, freeze, group, move), nearly three hundred (290)
+  of Excel's functions worked out as you type (lookups, criteria, SUBTOTAL, dates, text, loans and depreciation,
+  the normal distribution, number systems, FILTER, SORT, UNIQUE and
   SEQUENCE that spill, and the newer ones: LET and LAMBDA with MAP, REDUCE, SCAN, BYROW and MAKEARRAY, VSTACK,
   HSTACK, TAKE, DROP, CHOOSECOLS, TOCOL and WRAPROWS, TEXTSPLIT, TEXTBEFORE and TEXTAFTER, regular expressions,
   TREND, LINEST, FORECAST and the statistics, Google Sheets' SPLIT, JOIN and ARRAYFORMULA, HYPERLINK, IMAGE and
   SPARKLINE drawn in the cell) with each function's arguments shown, named ranges (and named LAMBDAs) in formulas
   and the name box, references that move as cells are copied, filled, inserted and deleted, the fill handle with
-  its series, number formats with Excel's own codes, borders, merged cells, filters, sorting by several columns,
+  its series, number formats with Excel's own codes (and Excel's quick keys: Ctrl+Shift+1 to 6, $ and % buttons),
+  AutoSum (Alt+= and a Σ button: sum, average, count, max, min),
+  a format painter (a double click keeps it on), borders, merged cells, filters, sorting by several columns,
   conditional formatting (rules, colour scales, data bars), dropdowns with coloured chips, checkboxes, star ratings
   and a calendar for dates, links on cells, protected ranges and sheets that warn or refuse changes, groups of rows
   and columns folded with + and −, gridlines on or off, notes and comment threads that agents answer, charts (eleven
@@ -594,8 +597,14 @@ agents that speak ACP and take MCP servers.
   and the axis's limits) that sit on their cells and move with them, of one range or of several (Ctrl+click), Paste
   special, removing duplicates, splitting text into columns, summaries and a pivot table editor (rows, columns,
   values, filters) of formulas that keep up, Goal seek, Trace precedents and dependents, a row opened as a card,
-  a Kanban board kept with its sheet (what it groups by, its cards' fields, its lanes' order), several sheets, copy
-  and paste with Excel and Google Sheets, and the sum, average and count of what is picked. AI in them uses the
+  a Kanban board kept with its sheet (what it groups by, its cards' fields, its lanes' order), several sheets (tabs
+  with colours, hidden sheets and drag to reorder, kept in Excel files), copy
+  and paste with Excel, Google Sheets and web tables (their bold, italic, underline, colours, alignment and number
+  formats come along; cells cut move for real: the formulas, names, charts and rules that used
+  them follow), cells, rows and columns moved by dragging (Ctrl to copy; references follow), and the sum, average and
+  count of what is picked. Find and replace with regular expressions, within the cells picked or across sheets; a list of every
+  function with its help (Insert → Function → All functions…); Ctrl+wheel to zoom; Ctrl+P for the print setup; an
+  Excel, ODS, CSV or TSV file dropped on the editor adds its sheets. AI in them uses the
   helper model, saying what it costs: the AI function (=AI(prompt, cells…), as Google Sheets has it: each answer
   worked out once and kept with the sheet, cells asked together, asked again only when they change or with
   Refresh, never just by opening the sheet), Write a formula from words, Explain this formula, Fill with AI
