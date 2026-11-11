@@ -4,8 +4,10 @@
 // It never throws, never shows anything, and returns what it did, for the trace:
 //   'fine'                           the first `hydor` on the PATH is already this app's (or a script someone wrote by hand)
 //   'relinked'                       a link of ours that pointed at where the app used to be points here now
-//   'linked <folder>'                a link in a folder on the PATH you can write to
+//   'linked <folder>'                a link in one of ~/.local/bin, ~/bin, /usr/local/bin, /opt/homebrew/bin (the first that
+//                                    is on the PATH, yours to write in, and holds no hydor that is not ours)
 //   'linked ~/.local/bin + <file>'   a link in ~/.local/bin, which that shell's startup file now adds to the PATH
+//                                    (a tool's own folder on the PATH, such as ~/.cargo/bin, is never used)
 //   'skipped: …'                     it left things as they were, and says why
 // What it will not do: write outside your own folders, replace a `hydor` that is not ours, or add to the PATH twice.
 'use strict';
@@ -21,14 +23,6 @@ const FISH_LINE = 'contains -- $HOME/.local/bin $PATH; or set -gx PATH $PATH $HO
 const FROM_AN_APP = '.app/Contents/Resources/bin/hydor';
 /** What a script someone wrote by hand to run the app's command mentions. */
 const SCRIPT_MENTIONS = '/Contents/Resources/server/dist/server/cli.js';
-/** Folders that are the system's own. */
-const SYSTEM = [/^\/usr\/bin(\/|$)/, /^\/bin(\/|$)/, /^\/usr\/sbin(\/|$)/, /^\/sbin(\/|$)/, /^\/System(\/|$)/, /^\/Library\/Apple(\/|$)/, /^\/usr\/libexec(\/|$)/];
-/**
- * Folders that belong to one version of something (a Node.js, a Python…): a link there goes when the version does, and
- * these are often first on the PATH.
- */
-const PER_VERSION = /\/(\.nvm|\.fnm|\.volta|\.asdf|\.pyenv|\.rbenv|\.rustup|\.sdkman|\.conda|\.venv|venv|miniconda\d*|anaconda\d*|node_modules|mise)(\/|$)/;
-
 const lstat = (p) => {
   try {
     return fs.lstatSync(p);
@@ -104,9 +98,6 @@ function isHandWritten(p) {
 /** The folders of a PATH: absolute ones, once each, in order. */
 const folders = (p) => [...new Set(String(p || '').split(path.delimiter).filter((d) => d && path.isAbsolute(d)).map((d) => path.resolve(d)))];
 
-/** Whether a link may go in this folder, whoever's it is: yours, not in an app, not the system's, not one version's. */
-const fit = (dir) => !dir.includes('.app/') && !dir.endsWith('.app') && !SYSTEM.some((r) => r.test(dir)) && !PER_VERSION.test(dir + '/') && canWrite(dir);
-
 /** Makes (or replaces) the link `file` to the launcher. */
 function link(file, launcher) {
   if (lstat(file)) fs.unlinkSync(file);
@@ -151,8 +142,9 @@ function addToPath(rc) {
  *   launcher   the app's bin/hydor
  *   loginPath  the PATH your login shell gives, or null/'' when it could not be read (then only ~/.local/bin is used)
  *   home, shell, env   default to this user's own (env: for ZDOTDIR)
+ *   candidates   the folders to link in, in order (default: ~/.local/bin, ~/bin, /usr/local/bin, /opt/homebrew/bin; for tests)
  */
-function linkCommand({ launcher, loginPath, home = os.homedir(), shell, env = process.env } = {}) {
+function linkCommand({ launcher, loginPath, home = os.homedir(), shell, env = process.env, candidates } = {}) {
   try {
     if (!launcher || !fs.existsSync(launcher)) return 'skipped: the app has no command inside';
     shell ??= (() => {
@@ -166,13 +158,14 @@ function linkCommand({ launcher, loginPath, home = os.homedir(), shell, env = pr
     const dirs = known ? folders(loginPath) : [];
     const tilde = (p) => (p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p);
     const localBin = path.join(home, '.local/bin');
+    candidates ??= [localBin, path.join(home, 'bin'), '/usr/local/bin', '/opt/homebrew/bin'];
 
     // Already fine: the first hydor a shell finds is this app's, or a script of the user's.
     if (known && first(dirs, launcher) === 'fine') return 'fine';
 
     // A link of ours that went stale (the app moved): pointed here, wherever the PATH or the usual folders have it.
     let relinked = false;
-    for (const dir of new Set([...dirs, '/usr/local/bin', '/opt/homebrew/bin', localBin, path.join(home, 'bin')])) {
+    for (const dir of new Set([...dirs, ...candidates])) {
       const f = path.join(dir, 'hydor');
       if (!isStale(f, launcher) || !canWrite(dir)) continue;
       try {
@@ -182,11 +175,11 @@ function linkCommand({ launcher, loginPath, home = os.homedir(), shell, env = pr
     }
     if (relinked && (!known || first(dirs, launcher) === 'fine')) return 'relinked';
 
-    // A folder on the PATH that is yours to write in.
+    // One of the general folders, when it is on the PATH and yours to write in.
     if (known) {
-      for (const dir of dirs) {
+      for (const dir of candidates.map((d) => path.resolve(d))) {
         const f = path.join(dir, 'hydor');
-        if (!fit(dir)) continue;
+        if (!dirs.includes(dir) || !canWrite(dir)) continue;
         if (isOurs(f, launcher)) return relinked ? 'relinked' : 'fine';
         if (lstat(f)) continue; // somebody else's hydor: left alone
         try {
