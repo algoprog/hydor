@@ -10,8 +10,8 @@
 // (suggest.ts): the browser types nothing itself then, but for an input method's words, made a suggestion afterwards.
 // An agent's version being written shows in place of the document (preview), drawn only where it differs, the
 // document and its history kept underneath. A right-click (or the menu key, or a long press on a phone) tells the editor
-// what is under it and puts the caret or the picked picture there, for the editor's own menu; Shift+right-click is
-// the browser's. Words typed are tidied as Google Docs does (autoformat.ts: links, curly quotes, dashes, signs), the
+// what is under it and puts the caret or the picked picture there (a long press picks the word, as phones do), for the
+// editor's own menu; Shift+right-click is the browser's. Words typed are tidied as Google Docs does (autoformat.ts: links, curly quotes, dashes, signs), the
 // change one step that Undo takes back alone; selected words can be dragged to move (or, with Ctrl, copy) them.
 import {
   isAtom,
@@ -108,6 +108,8 @@ export interface ContextOpen {
   x: number;
   y: number;
   keyed?: boolean;
+  /** A finger held (a phone): there is no Shift+right-click to tell of. */
+  touch?: boolean;
   hit: ContextHit;
 }
 
@@ -1377,12 +1379,15 @@ export class DocEngine {
     if (e.shiftKey) return;
     // A finger held was dealt with already (some phones send this too); if this came first, it is this one's to deal with.
     if (this.heldAt && Date.now() - this.heldAt < 1200) return void e.preventDefault();
+    // A phone's long press comes as this too (Android's), while the finger is still down.
+    const touch = !!this.hold || (e as PointerEvent).pointerType === 'touch';
     this.endHold();
     e.preventDefault();
-    this.openContext(e.target as Element, e.clientX, e.clientY);
+    this.openContext(e.target as Element, e.clientX, e.clientY, touch);
   }
 
-  private openContext(t: Element, x: number, y: number) {
+  /** The menu for what is at a point; a finger held on a word picks it first, as phones do (their own way of picking words, which the menu takes the place of). */
+  private openContext(t: Element, x: number, y: number, touch = false) {
     const hit = this.hitAt(t, x, y);
     if (!this.o.readOnly) {
       if (hit.kind === 'image' || hit.kind === 'block' || hit.kind === 'math') this.setPicked(hit.id);
@@ -1391,7 +1396,8 @@ export class DocEngine {
         const at = pt ? this.posOf(pt.node, pt.offset) : null;
         if (at && !this.insideSelection(at)) {
           this.setPicked(null);
-          this.place({ a: at, f: at }, false);
+          const w = touch ? ops.wordAt(ops.boxRuns(this.doc, at.b, at.c) ?? [], at.o) : null;
+          this.place(w && w[0] < w[1] ? { a: { ...at, o: w[0] }, f: { ...at, o: w[1] } } : { a: at, f: at }, false);
         }
         if (hit.kind === 'mark' || hit.kind === 'mathRun') {
           const after: Pos = { ...hit.at, o: hit.at.o + (hit.kind === 'mark' ? hit.t.length : hit.tex.length) };
@@ -1400,7 +1406,7 @@ export class DocEngine {
         }
       }
     }
-    this.o.onContext?.({ x, y, hit });
+    this.o.onContext?.({ x, y, hit, touch });
   }
 
   /** A finger held still on the page opens the menu (a phone has no right-click). */
@@ -1416,7 +1422,7 @@ export class DocEngine {
       timer: window.setTimeout(() => {
         this.hold = null;
         this.heldAt = Date.now();
-        this.openContext(t, x, y);
+        this.openContext(t, x, y, true);
       }, 550),
     };
   }

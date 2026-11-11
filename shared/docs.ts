@@ -220,8 +220,10 @@ export type BlockType = Block['type'];
 
 export interface Page {
   size: PaperSize;
-  /** Millimetres, on every side. */
+  /** Millimetres, on every side (but those `margins` gives). */
   margin: number;
+  /** Margins of their own on some sides (millimetres), where they are not `margin`: Page setup's Each side. */
+  margins?: Partial<Record<Side, number>>;
   /** The paper on its side. */
   orient?: 'landscape';
   /** The words in two or three columns on every page. */
@@ -345,6 +347,45 @@ export const PAPERS: Record<PaperSize, { w: number; h: number; label: string }> 
   a5: { w: 148, h: 210, label: 'A5' },
 };
 
+/** A side of the page, as its margins are given. */
+export type Side = 'top' | 'right' | 'bottom' | 'left';
+export const SIDES: Side[] = ['top', 'bottom', 'left', 'right'];
+
+/** The margin on each side of a page, in millimetres. */
+export function pageMargins(page: Page): Record<Side, number> {
+  const o = page.margins ?? {};
+  return { top: o.top ?? page.margin, right: o.right ?? page.margin, bottom: o.bottom ?? page.margin, left: o.left ?? page.margin };
+}
+
+/**
+ * A page with these margins (millimetres, each kept between 5 and 60): one `margin` when the four are the same, else
+ * the one most of them have as `margin` and the others in `margins`.
+ */
+export function withMargins(page: Page, sides: Partial<Record<Side, number>>): Page {
+  const cur = pageMargins(page);
+  const m = Object.fromEntries(SIDES.map((k) => [k, clampMargin(sides[k] ?? cur[k])])) as Record<Side, number>;
+  const vals = SIDES.map((k) => m[k]);
+  const base = vals.reduce((best, v) => (vals.filter((x) => x === v).length > vals.filter((x) => x === best).length ? v : best), vals[0]);
+  const own = Object.fromEntries(SIDES.filter((k) => m[k] !== base).map((k) => [k, m[k]]));
+  const { margins: _, ...rest } = page;
+  return { ...rest, margin: base, ...(Object.keys(own).length ? { margins: own } : {}) };
+}
+
+/** A margin as a document keeps it: millimetres to a tenth, between 5 and 60. */
+const clampMargin = (mm: number) => Math.min(60, Math.max(5, Math.round((Number.isFinite(mm) ? mm : DOC_DEFAULTS.page.margin) * 10) / 10));
+
+/** The margins in words, for an agent or a message: "25.4 mm margins", or each side's when they differ. */
+export function marginsText(page: Page): string {
+  const m = pageMargins(page);
+  return page.margins && Object.keys(page.margins).length ? `margins of ${m.top} mm at the top, ${m.bottom} mm at the bottom, ${m.left} mm on the left and ${m.right} mm on the right` : `${page.margin} mm margins`;
+}
+
+/** The width of the words on a page (between its left and right margins), in millimetres. */
+export function textWidthMm(page: Page): number {
+  const m = pageMargins(page);
+  return paperOf(page).w - m.left - m.right;
+}
+
 /** A document's sheet as it lies, in millimetres: its paper, on its side when landscape. */
 export function paperOf(page: Page): { w: number; h: number } {
   const p = PAPERS[page.size] ?? PAPERS.a4;
@@ -356,7 +397,7 @@ export const COLUMN_GAP = 12.7;
 
 /** The width of a column of words (the text's width when there is one column), in millimetres. */
 export function columnMm(page: Page): number {
-  const text = paperOf(page).w - 2 * page.margin;
+  const text = textWidthMm(page);
   const n = page.cols ?? 1;
   return n > 1 ? (text - (n - 1) * COLUMN_GAP) / n : text;
 }
@@ -1173,14 +1214,17 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   if (!isObj(v) || (typeof v.markdown !== 'string' && !Array.isArray(v.blocks))) throw new Error('A document needs markdown (a string) or blocks (an array).');
   const pg = typeof v.page === 'string' ? { size: v.page } : isObj(v.page) ? v.page : {};
   const size = pick(String(pg.size ?? pg.paper ?? v.paper ?? '').toLowerCase(), PAPER_SIZES) ?? DOC_DEFAULTS.page.size;
-  const margin = Math.min(60, Math.max(5, Math.round((mmOf(pg.margin ?? v.margin) ?? DOC_DEFAULTS.page.margin) * 10) / 10));
+  const margin = clampMargin(mmOf(isObj(pg.margin) ? undefined : (pg.margin ?? v.margin)) ?? DOC_DEFAULTS.page.margin);
   const used = new Set<string>();
   // Footnotes written in the Markdown or among the blocks, then those given as notes.
   const written = new Map<string, Run[]>();
   const opts: NormalizeOpts = { ...o, notes: written };
   const blocks = typeof v.markdown === 'string' && !Array.isArray(v.blocks) ? normalizeBlocks(mdBlocks(v.markdown), opts, used) : normalizeBlocks(v.blocks as unknown[], opts, used);
   if (!blocks.length) blocks.push({ id: cleanId(undefined, used), type: 'p', runs: [] });
-  const page: Page = { size, margin };
+  // Each side's own margin (page.margins, or a margin given as {top, bottom, left, right}).
+  const sides = isObj(pg.margins) ? pg.margins : isObj(pg.margin) ? pg.margin : null;
+  let page: Page = { size, margin };
+  if (sides) page = withMargins(page, Object.fromEntries(SIDES.flatMap((k) => (mmOf(sides[k]) !== null ? [[k, mmOf(sides[k])!]] : []))));
   if (/^land/i.test(String(pg.orient ?? pg.orientation ?? v.orientation ?? ''))) page.orient = 'landscape';
   const cols = Math.round(num(pg.cols ?? pg.columns ?? v.columns, 1, 3, 1));
   if (cols > 1) page.cols = cols as 2 | 3;

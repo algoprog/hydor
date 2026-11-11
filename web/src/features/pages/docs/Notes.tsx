@@ -63,7 +63,7 @@ export function PageNotes({ layout, zoom, doc, refs, textW, onOpen }: { layout: 
           key={p}
           data-keeps-editing
           className="pointer-events-auto absolute"
-          style={{ left: layout.margin, width: textW, top: p * step + layout.pageH - layout.margin - n.h }}
+          style={{ left: layout.margins.left, width: textW, top: p * step + layout.pageH - layout.margins.bottom - n.h }}
           onMouseDown={(ev) => ev.preventDefault()}
           onClick={(ev) => {
             const el = (ev.target as HTMLElement).closest('[data-note]') as HTMLElement | null;
