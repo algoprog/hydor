@@ -29,6 +29,37 @@ export interface CatalogItem {
 export const catalogText = (it: { title: string; keywords?: string; text?: string; where?: string }) =>
   [it.title, it.keywords, it.text, it.where].filter(Boolean).join('. ').replace(/\s+/g, ' ').trim().slice(0, 400);
 
+/** The guide topic that explains each Settings section: the section's "Learn more" opens it, and the guide's "Every
+ * setting" (scripts/guide-settings.mjs) links it. */
+export const SECTION_TOPIC: Record<string, string> = {
+  general: 'app',
+  notifications: 'inbox',
+  chat: 'devices',
+  security: 'app',
+  signatures: 'library',
+  scm: 'devices',
+  connect: 'devices',
+  machines: 'devices',
+  accounts: 'agents-models',
+  agents: 'agents-models',
+  models: 'agents-models',
+  guidelines: 'guidelines',
+  mcp: 'connections',
+  skills: 'skills',
+  plugins: 'connections',
+  tasks: 'tasks',
+  search: 'web',
+  browser: 'web',
+  computer: 'web',
+  memory: 'memory',
+  children: 'research',
+  images: 'documents-voice',
+  voice: 'documents-voice',
+  assistants: 'agents',
+  skillpack: 'skills',
+  custom: 'custom',
+};
+
 /** Every Settings section: id, label, tab, the line under its title (as SettingsPage.tsx and the features say). */
 export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', string][] = [
   ['general', 'General', 'App', 'Theme, and what Enter does while an agent works'],
@@ -230,7 +261,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
-  ['custom', 'Goals', 'goals rounds autonomous long running', 'How many rounds a goal may run'],
+  ['custom', 'Rounds before a goal pauses', 'goals rounds autonomous long running', 'How many rounds a goal may run before it pauses for you'],
 ];
 
 /** The themes that come with the app: name, and whether it is dark or light. */
