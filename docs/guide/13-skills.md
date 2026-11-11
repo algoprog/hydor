@@ -15,7 +15,7 @@ Agents don't read every skill all the time. At the start of a session an agent s
 The Skills page shows skills from five places, each marked on its row:
 
 - **Built in**: the skills that come with the app (more than sixty). They update with the app.
-- **Yours**: skills you wrote on this page, approved when an agent suggested them, copied from Hermes, OpenClaw, pi or Atomic Agent (see [Bring in from other assistants](/guide/memory#bring-in-from-other-assistants)), or put in your skills folder yourself.
+- **Yours**: skills you wrote on this page, approved when an agent suggested them, copied from other agents on this computer (see [Bring in from other assistants](/guide/memory#bring-in-from-other-assistants)), or put in your skills folder yourself.
 - **From plugins**: the skills of the [plugins](/guide/plugins) you turned on. They come and go with their plugin.
 - **Claude Code and Codex**: the agents' own skills, in their own folders. Only that agent gets them.
 - **In projects**: a project's own skills, which only its sessions get. You change them on the project's **Skills** tab: see [Give a project skills of its own](/guide/projects#give-a-project-skills-of-its-own).
@@ -370,7 +370,7 @@ Write one with **New skill**, picking **Claude Code** or **Codex** under **Who g
 - "Write a skill for every agent on how we check invoices, from these three examples."
 - "Make my own version of the research skill that always cites page numbers."
 - "Remove my skill invoice-checks", or "Bring back the skill I removed yesterday."
-- "Copy the skills I made in Hermes and pi into my own skills, and list them for me first."
+- "Copy the skills I made in other agents into my own skills, and list them for me first."
 - "Turn off bringing skills in by keywords for Custom."
 - "Stop suggesting skills at the start of new sessions."
 - "In my Shop website project, turn off Claude Code's deploy skill, and turn the docker skill on there only."

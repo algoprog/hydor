@@ -8,7 +8,7 @@
 <p align="center"><i>ὕδωρ, "water" in ancient Greek: it takes the shape of whatever holds it.</i></p>
 
 <p align="center">
-  Run <b>Claude Code</b>, <b>Codex</b>, <b>Hermes Agent</b>, <b>pi</b> or <b>any model</b> on your own computer, with one memory, from any device.
+  Run <b>Claude Code</b>, <b>Codex</b> or <b>any model</b> on your own computer, with one memory, from any device.
 </p>
 
 <p align="center"><a href="https://hydor.app"><b>hydor.app</b></a></p>
@@ -34,9 +34,9 @@
 </p>
 
 Hydor is a free, open-source app that runs the AI agents you already use on your own computer, with one memory for
-all of them and every session in your pocket: the official `claude` and `codex` tools on the plans you pay for, Hermes
-Agent, pi, Gemini CLI and other agents, and its own agent for any model, open-weight ones included. Sessions keep
-running when you close the tab, and the ones you start in VS Code or a terminal show up too.
+all of them and every session in your pocket: the official `claude` and `codex` tools on the plans you pay for,
+Gemini CLI and other agents, and its own agent for any model, open-weight ones included. Sessions keep running when
+you close the tab, and the ones you start in VS Code or a terminal show up too.
 
 ## Three ways in
 
@@ -58,12 +58,11 @@ your machine. See [keep a session confidential](docs/guide/02-sessions.md#keep-a
 
 ## Already use another agent?
 
-- **Run it inside Hydor.** Hermes Agent, pi, Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie run as
-  agents of Hydor, beside Claude Code, Codex and its own agent ([agents and models](docs/guide/16-agents-models.md)).
-- **Bring in what it knows.** **Settings → Memory → Bring in** takes the memory and the skills you made in Hermes
-  Agent, OpenClaw, pi and Atomic Agent, and what ChatGPT, Claude, Claude Code and Codex know about you. You see it
-  all first and pick what comes over, and the setup tour offers it when it finds one of them
-  ([memory](docs/guide/06-memory.md)).
+- **Run it inside Hydor.** Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie run as agents of
+  Hydor, beside Claude Code, Codex and its own agent ([agents and models](docs/guide/16-agents-models.md)).
+- **Bring in what it knows.** **Settings → Memory → Bring in** takes the memory and the skills you made in other
+  agents, and what ChatGPT, Claude, Claude Code and Codex know about you. You see it all first and pick what comes
+  over, and the setup tour offers it when it finds another agent on this computer ([memory](docs/guide/06-memory.md)).
 - **Talk to your agents from a chat app.** Telegram, Discord or Slack, under **Settings → Chat apps**
   ([devices](docs/guide/20-devices.md)).
 
@@ -75,24 +74,10 @@ delete all of it ([memory](docs/guide/06-memory.md), [skills](docs/guide/13-skil
 
 ## How it compares
 
-As of 10 November 2026. Hydor runs the official Claude Code and Codex on your own plans, runs Hermes Agent, pi and
-OpenClaw inside it, and gives all of them one memory, a phone app and a Library. Each page has its sources.
-
-| | Hydor | [Hermes Agent](docs/compare/hermes-agent.md) | [pi](docs/compare/pi.md) | [Atomic Agent](docs/compare/atomic-agent.md) | [OpenClaw](docs/compare/openclaw.md) |
-|---|---|---|---|---|---|
-| Official Claude Code and Codex on your plans, with VS Code and terminal sessions shown | ✓ | Partial: Claude Code, through a skill | — Its own agent | Partial: drives your sign-ins | Partial: Claude CLI and Codex |
-| Runs other agents inside it | ✓ | Partial: Claude Code | — | Partial: Claude Code and Codex | Partial: through ACP |
-| One memory every agent shares, found by meaning | ✓ | Partial: two small files per profile | — Left to extensions | Partial: its own notes | Partial: its own memory |
-| Phone app with notifications and approvals | ✓ | Partial: chat apps | Partial: terminal; Slack bot apart | Partial: Telegram and Discord | Partial: iOS and Android apps |
-| Approvals, a command sandbox and a vault | ✓ | Partial: approvals, containers | — Run it in a container | Partial: approvals | Partial: pairing, optional sandbox |
-| Confidential sessions on local models only | ✓ | Partial: local models | Partial: local models | Partial: local models | Partial: local models |
-| No telemetry | ✓ | ✓ | — Reports on by default | — Analytics on by default | ✓ Daily version check only |
-| A strong model leading cheaper helpers | ✓ 9% less than Best alone | Partial: subagents | — | Partial: Fusion | Partial: sub-agents |
-
-Already use one of them? Keep it: Hermes Agent, pi and OpenClaw run inside Hydor as agents, and **Settings → Memory →
-Bring in** takes the memory and skills of all four over. The full comparison, with every source, is at
-[hydor.app/compare](https://hydor.app/compare/): [Hermes Agent](docs/compare/hermes-agent.md),
-[pi](docs/compare/pi.md), [Atomic Agent](docs/compare/atomic-agent.md) and [OpenClaw](docs/compare/openclaw.md).
+Hydor runs the official Claude Code and Codex on your own plans, gives every agent one memory, puts every session on a
+phone app with notifications and approvals, and keeps what agents write in a Library you can edit. Its own agent works
+with any model, and a strong model can lead cheaper helpers. Each comparison has its sources:
+[how Hydor compares with other agents](docs/compare/README.md).
 
 ## What else it does
 
@@ -162,7 +147,7 @@ hydor sessions                                     # what each session is doing
 - [Several machines](docs/machines.md): agents on other machines, from one place
 - [How it works](docs/how-it-works.md): architecture and security
 - [Privacy](docs/privacy.md): what leaves your computer, host by host: no telemetry, and how to turn each connection off
-- [Compared with other agents](docs/compare/README.md): Hermes Agent, pi, Atomic Agent and OpenClaw, with sources
+- [Compared with other agents](docs/compare/README.md), with sources
 - [Development](docs/development.md): building and changing the app
 - [Contributing](CONTRIBUTING.md), [security](SECURITY.md) and the [code of conduct](CODE_OF_CONDUCT.md)
 

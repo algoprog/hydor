@@ -3,6 +3,15 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.54.2 · 11 November 2026
+
+Other agents, described more briefly in the guide and Settings.
+
+- **The guide** describes the agents you can add under Settings → Agents → More agents, and what Settings → Memory →
+  Bring in takes from other agents, in general terms. Each agent's row and the Bring in dialog still say exactly what
+  they find and how to get it.
+- **Settings → More agents** and the search box describe the agents that speak ACP more briefly.
+
 ## 0.54.1 · 11 November 2026
 
 Chat apps connect even when Telegram, Discord or Slack is slow to answer.
@@ -17,19 +26,16 @@ Chat apps connect even when Telegram, Discord or Slack is slow to answer.
 
 ## 0.54.0 · 10 November 2026
 
-Keep the agent you use and bring it into Hydor: Hermes Agent, Pi and OpenClaw run here, what other agents know comes
-over, and Discord and Slack join Telegram.
+More agents run in Hydor, what other agents know comes over, and Discord and Slack join Telegram.
 
-- **Hermes Agent, Pi and OpenClaw** join the agents that speak ACP, in Settings → Agents → More agents. Pick one as a
-  session's agent and follow it here, answer its approvals from your phone, and it gets your guidelines, memory and
-  skills like the others. Pi installs by itself with its ACP adapter; Hermes and OpenClaw show their own install
-  command. Hermes also gets the app's tools; Pi does not yet. Pi's commands show their output, and Hermes's replies no
-  longer start with blank lines.
-- **Bring in from other agents**: Settings → Memory → Bring in reads pi and Atomic Agent too, beside Claude Code,
-  Codex, Hermes and OpenClaw, and offers the skills you made in Hermes, OpenClaw, pi and Atomic Agent. You see each one
-  first; those you pick are copied into your own skills. A skill with a name you already have is left alone, and keys
-  and sign-in files never come over.
-- **The setup tour** asks "Coming from another agent?" when it finds one of them on this computer, and opens Bring in.
+- **Three more agents** that speak ACP join the others in Settings → Agents → More agents. Pick one as a session's
+  agent and follow it here, answer its approvals from your phone, and it gets your guidelines, memory and skills like
+  the others. The app installs one of them by itself, with its ACP adapter; the others show their own install
+  command. Not all of them get the app's tools yet.
+- **Bring in from other agents**: Settings → Memory → Bring in reads more agents, beside Claude Code and Codex, and
+  offers the skills you made in them. You see each one first; those you pick are copied into your own skills. A skill
+  with a name you already have is left alone, and keys and sign-in files never come over.
+- **The setup tour** asks "Coming from another agent?" when it finds another agent on this computer, and opens Bring in.
 - **Chat apps**: Discord and Slack join Telegram in one section, Settings → App → **Chat apps**. Each is a bot or app of
   your own that only chats linked with a one-time code can use: a message starts a session or carries on the chat's
   own, the reply comes back when the turn ends, yes-or-no questions come with buttons, and /new, /sessions, /stop and
@@ -39,9 +45,8 @@ over, and Discord and Slack join Telegram.
 - **Naget Search turned off hears nothing from the app**, not even the daily request for its categories.
 - **What leaves your computer**: a new page lists every connection Hydor itself makes, host by host, with how to turn
   each one off. Hydor has no telemetry.
-- **Hydor vs other agents**: pages on Hermes Agent, pi, Atomic Agent and OpenClaw (hydor.app/compare) showing what
-  Hydor gives you that they don't, and how to bring each one along, with sources; a README that says what Hydor is in
-  one sentence; a security policy and a code of conduct.
+- **Hydor vs other agents**: comparison pages (hydor.app/compare) showing what Hydor gives you that other agents
+  don't, with sources; a README that says what Hydor is in one sentence; a security policy and a code of conduct.
 - **The desktop apps open on the app, not an empty window**: opened after starting without one (at login, or after
   updating themselves with the window closed), from the Dock, Finder, the menu bar or a notification, the window
   stayed empty until you quit the app and opened it again. A page that cannot load while the app's server starts
@@ -157,7 +162,7 @@ Search by meaning without PyTorch, and where each turn's time and money went.
 
 Memory that starts with what other assistants already know about you, picked by you.
 
-- **Settings → Memory → Bring in…** reads what Claude Code, Codex, Hermes and OpenClaw keep on this computer, and the
+- **Settings → Memory → Bring in…** reads what Claude Code, Codex and other agents keep on this computer, and the
   export ChatGPT or Claude emails you, and turns it into notes you pick from.
 - **Only what lasts**: the helper model reads a part at a time against the notes memory has, and leaves out what it
   says already (also in other words), secrets, and text that would steer agents.

@@ -97,11 +97,11 @@
 
 ### Περισσότεροι πράκτορες
 
-[Ρυθμίσεις → Περισσότεροι πράκτορες](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent, Pi και άλλοι πράκτορες που μιλούν ACP. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
+[Ρυθμίσεις → Περισσότεροι πράκτορες](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose και άλλοι πράκτορες που μιλούν ACP. Περισσότερα στο [Πράκτορες, λογαριασμοί και μοντέλα](/guide/agents-models).
 
 - [**Οι πράκτορές σας**](/settings?s=agents&find=Your%20agents): Πράκτορες που εμφανίζονται δίπλα στο Claude Code και το Codex.
 - [**Προσθήκη δικού σας**](/settings?s=agents&find=Add%20your%20own): Οποιοσδήποτε πράκτορας που υποστηρίζει ACP, μέσω της εντολής του.
-- [**Πράκτορες που μιλούν ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent και Pi, έτοιμα για προσθήκη.
+- [**Πράκτορες που μιλούν ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code και Goose, έτοιμα για προσθήκη.
 
 ### Μοντέλα
 
@@ -231,7 +231,7 @@
 - [**Σημειώσεις**](/settings?s=memory&find=Notes): Κάθε σημείωση που φυλάσσεται, ανά θέση.
 - [**Προσθήκη σημείωσης**](/settings?s=memory&find=Add%20a%20note): Γράψτε μια σημείωση για να τη θυμούνται οι πράκτορες, για εσάς ή για ένα έργο.
 - [**Διαγραμμένες σημειώσεις**](/settings?s=memory&find=Deleted%20notes): Σημειώσεις που διαγράφηκαν τις τελευταίες 30 ημέρες, για επαναφορά.
-- [**Εισαγωγή…**](/settings?s=memory&find=Bring%20in%E2%80%A6): Σημειώσεις από όσα γνωρίζουν άλλοι βοηθοί για εσάς, και οι δεξιότητες που φτιάξατε σε αυτούς: Claude Code, Codex, Hermes, OpenClaw, pi, Atomic Agent ή αρχείο εξαγωγής από ChatGPT ή Claude.
+- [**Εισαγωγή…**](/settings?s=memory&find=Bring%20in%E2%80%A6): Σημειώσεις από όσα γνωρίζουν άλλοι βοηθοί για εσάς, και οι δεξιότητες που φτιάξατε σε αυτούς: Claude Code, Codex, άλλοι πράκτορες ή αρχείο εξαγωγής από ChatGPT ή Claude.
 - [**Εξαγωγή**](/settings?s=memory&find=Export): Όλες οι σημειώσεις σε Markdown για ανάγνωση ή σε JSON με το ιστορικό τους.
 - [**Εκκαθάριση όλων…**](/settings?s=memory&find=Clear%20all%E2%80%A6): Διαγράφει κάθε σημείωση και το ιστορικό της.
 

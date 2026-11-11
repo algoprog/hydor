@@ -40,7 +40,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['connect', 'Connect other agents', 'App', 'Let agents elsewhere start and steer sessions here, through this app’s MCP server'],
   ['machines', 'Machines', 'App', 'Other machines running Hydor, to use from here, and access to this one'],
   ['accounts', 'Accounts', 'Agents', 'The Claude Code and Codex sign-ins every session uses'],
-  ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent, Pi and other agents that speak ACP'],
+  ['agents', 'More agents', 'Agents', 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP'],
   ['models', 'Models', 'Agents', 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM'],
   ['guidelines', 'Agent Guidelines', 'Agents', 'What every agent follows: in every session, in a project, or in one session'],
   ['mcp', 'MCP servers', 'Agents', 'Tools the agents can call'],
@@ -111,7 +111,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Agents › More agents
   ['agents', 'Your agents', 'acp agents custom', 'Agents that show next to Claude Code and Codex'],
   ['agents', 'Add your own', 'acp command custom agent', 'Any agent that speaks ACP, by its command', 'Add your own agent'],
-  ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose hermes agent pi openclaw acp', 'Gemini CLI, OpenCode, Qwen Code, Goose, Hermes Agent and Pi, ready to add'],
+  ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose hermes agent pi openclaw acp', 'Gemini CLI, OpenCode, Qwen Code and Goose, ready to add'],
   // Agents › Models
   ['models', 'Helper model', 'small model haiku memory tidy auto mode second opinion', 'The model for small jobs beside sessions'],
   ['models', 'Tiers', 'tiers quick standard best max cheaper cheap strong strongest model per job helpers subagents haiku sonnet opus fable terra sol astra effort automatic', 'The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its helpers get Standard and Quick'],
@@ -199,7 +199,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Notes', 'memory notes remembered facts export json markdown', 'Every note kept, by place', 'Memory notes'],
   ['memory', 'Add a note', 'remember new note write fact tell agents', 'Write a note for agents to remember, about you or a project', 'Add a memory note'],
   ['memory', 'Deleted notes', 'trash bin restore undelete recover erase', 'Notes deleted in the last 30 days, to restore', 'Deleted memory notes'],
-  ['memory', 'Bring in…', 'import migrate switch transfer claude code codex chatgpt claude.ai hermes openclaw pi atomic agent export memories history chats skills', 'Notes from what other assistants know about you, and the skills you made in them: Claude Code, Codex, Hermes, OpenClaw, pi, Atomic Agent, or a ChatGPT or Claude export', 'Bring in memory and skills from other assistants'],
+  ['memory', 'Bring in…', 'import migrate switch transfer claude code codex chatgpt claude.ai hermes openclaw pi atomic agent export memories history chats skills', 'Notes from what other assistants know about you, and the skills you made in them: Claude Code, Codex, other agents, or a ChatGPT or Claude export', 'Bring in memory and skills from other assistants'],
   ['memory', 'Export', 'download backup save copy json markdown', 'Every note as Markdown to read, or as JSON with histories', 'Export memory notes'],
   ['memory', 'Clear all…', 'delete erase wipe forget everything', 'Deletes every note and its history', 'Clear all memory'],
   // Capabilities › Child sessions

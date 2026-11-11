@@ -36,7 +36,7 @@ Hydor's own code, in the latest release and on `main`:
 
 ## What is not
 
-- Bugs in what Hydor runs: Claude Code, Codex, Gemini CLI, OpenCode, Hermes Agent, pi and the other agents, or the
+- Bugs in what Hydor runs: Claude Code, Codex, Gemini CLI, OpenCode and the other agents, or the
   models behind them. Report them to their makers.
 - What an agent does with the permissions you gave it: in **Full access** it runs commands without asking, with your
   computer account's permissions. A prompt injection that makes an agent do
