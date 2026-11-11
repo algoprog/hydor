@@ -45,7 +45,7 @@ import { autoPlan, tierNote } from './assistants/auto.ts';
 import { noteModels } from './assistants/tiers.ts';
 import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/tiers.ts';
 import { opensTurn } from './opinion/turns.ts';
-import { childKeys } from './children/family.ts';
+import { ancestorsOf, runningChildren } from './children/family.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -389,7 +389,12 @@ export class SessionManager extends EventEmitter {
 
   // ---- listing ---------------------------------------------------------------
 
-  private rowToSummary(r: Row): SessionSummary {
+  /** Each session's running child sessions (server/children/family.ts): worked out once for a whole list. */
+  private runningHelpers(): Map<string, Set<string>> {
+    return runningChildren(this.db, [...this.lives].map(([k, l]) => [k, l.adapter.state.status]));
+  }
+
+  private rowToSummary(r: Row, helpers: Map<string, Set<string>> = this.runningHelpers()): SessionSummary {
     const live = this.lives.get(r.key);
     const agent = (r.agent ?? r.app_agent) as Agent;
     const title = r.app_title || r.title || r.first_prompt || r.app_first_prompt || 'New session';
@@ -427,6 +432,8 @@ export class SessionManager extends EventEmitter {
         workMs: r.work_ms || undefined,
       },
       live: live ? { ...live.adapter.state } : null,
+      // Set also while the session's own process is stopped between turns: its helpers' work is not over.
+      helpers: helpers.get(r.key)?.size || undefined,
       external: live ? null : this.externalState(r),
       archived: !!r.archived,
       pinned: !!r.pinned,
@@ -482,13 +489,14 @@ export class SessionManager extends EventEmitter {
       .prepare(`${SELECT} where ${where.join(' and ')} order by coalesce(s.updated_at, 0) desc limit ? offset ?`)
       .all(...args, limit, offset) as Row[];
     const total = (this.db.prepare(`select count(*) as n from sessions s left join app_sessions a on a.key = s.key where ${where.join(' and ')}`).get(...args) as { n: number }).n;
-    let sessions = rows.map((r) => this.rowToSummary(r));
+    const helpers = this.runningHelpers();
+    let sessions = rows.map((r) => this.rowToSummary(r, helpers));
     if (offset === 0 && !o.archived) {
       // Sessions started here that the indexer has not seen yet.
       const fresh = (this.db.prepare(SELECT_APP_ONLY).all() as Row[])
         .filter((r) => !o.agent || r.app_agent === o.agent)
         .filter((r) => !r.archived)
-        .map((r) => this.rowToSummary(r));
+        .map((r) => this.rowToSummary(r, helpers));
       sessions = [...fresh, ...sessions];
     }
     // Live sessions float to the top with their current activity time.
@@ -520,15 +528,21 @@ export class SessionManager extends EventEmitter {
     this.flushSummaries();
   }
 
+  /** A child session started, changed status or ended: its parent's (and grandparent's) list entry counts its running helpers again. */
+  private queueAncestors(key: string) {
+    for (const k of ancestorsOf(this.db, key)) this.queueSummary(k);
+  }
+
   private flushSummaries() {
     if (this.summaryTimer) return;
     this.summaryTimer = setTimeout(() => {
       this.summaryTimer = null;
       const out: SessionSummary[] = [];
+      const helpers = this.runningHelpers();
       for (const k of this.pendingSummaries) {
         const r = this.row(k);
         // Subagent transcripts and Codex child threads are indexed, but list under their parent, not on their own.
-        if (r && (!r.parent_key || this.lives.has(k))) out.push(this.rowToSummary(r));
+        if (r && (!r.parent_key || this.lives.has(k))) out.push(this.rowToSummary(r, helpers));
       }
       this.pendingSummaries.clear();
       if (out.length) this.emit('sessions', out, []);
@@ -628,10 +642,7 @@ export class SessionManager extends EventEmitter {
   private helpersAtWork(s: SessionSummary): boolean {
     // Its own helpers alone ("local_agent"): a command left running in the background (a dev server) may never end.
     if ((s.live?.backgroundTasks ?? []).some((t) => (t.kind ?? '').includes('agent') && t.status === 'running')) return true;
-    return childKeys(this.db, s.key).some((k) => {
-      const st = this.lives.get(k)?.adapter.state.status;
-      return st === 'working' || st === 'starting';
-    });
+    return (this.runningHelpers().get(s.key)?.size ?? 0) > 0;
   }
 
   /** Set by the scheduler: a scheduled run's notice may read differently, or not go out (nothing to report). */
@@ -837,6 +848,7 @@ export class SessionManager extends EventEmitter {
         lastStatus = adapter.state.status;
         lastTasks = tasks;
         this.queueSummary(key);
+        this.queueAncestors(key);
         // Noted for watchStatus, which looks only now and then and could miss a quick turn.
         const busy = (x: string) => x === 'working' || x === 'waiting';
         if (busy(lastStatus) && !busy(was)) turnBegan = Date.now();
@@ -917,6 +929,7 @@ export class SessionManager extends EventEmitter {
           .then(() => tl.finish())
           .catch(() => {});
         this.queueSummary(key);
+        this.queueAncestors(key);
         const snap = this.liveSnapshot(key);
         this.emit('live', key, snap.live, snap.overlay);
       }, 400);
@@ -925,6 +938,7 @@ export class SessionManager extends EventEmitter {
     this.timeline(key).catch(() => {});
     if (adapter.transcriptPath) this.timelines.get(key)?.setPath(adapter.transcriptPath);
     this.queueSummary(key);
+    this.queueAncestors(key);
   }
 
   private touchApp(key: string) {
@@ -1164,6 +1178,8 @@ export class SessionManager extends EventEmitter {
       await l.adapter.sendMessage(await withNotes(l.key, prompt, said || null, takeFirst(l, prompt)), this.saveImages(images));
     }
     this.queueSummary(l.key);
+    // Its settings name its parent only now: the parent's entry counts it as a helper at work.
+    this.queueAncestors(l.key);
     return l.key;
   }
 

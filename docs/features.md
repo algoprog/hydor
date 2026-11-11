@@ -32,7 +32,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
-  agents, commands or monitors are still running, until those end. Pinned comes next, then Projects: a group for each project and each folder you picked
+  agents, commands or monitors, or child sessions, are still running, until those end (a session whose helpers still run shows as working, with no Done marker, and takes messages). Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
   start a new session there, and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's

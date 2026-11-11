@@ -416,7 +416,7 @@ Every Claude Code and Codex session on this computer is listed, also the ones yo
 
 ## Child sessions
 
-An agent can hand parts of a job to new sessions, with any agent and model, and gets their results back. In the sidebar they sit folded under their parent ("3 child sessions · 1 needs you · 2 working"); click the line to see them. It stays open while you look at one of them. A swarm's members show as "swarm members", a campaign's as "campaign members". In the parent's conversation, each child has a card with what it is doing and a way in. A spending cap on the parent covers its children. See [Deep research, second opinions and several agents](/guide/research).
+An agent can hand parts of a job to new sessions, with any agent and model, and gets their results back. In the sidebar they sit folded under their parent ("3 child sessions · 1 needs you · 2 working"); click the line to see them. It stays open while you look at one of them. A swarm's members show as "swarm members", a campaign's as "campaign members". In the parent's conversation, each child has a card with what it is doing and a way in. A parent whose own turn is over while its children still run is not finished: its dot keeps breathing blue, its status reads "Working · 2 helper sessions running", it shows no "Done" marker and stays in Active, and you can still send it a message. A child that waits on helpers of its own counts as running too. A spending cap on the parent covers its children. See [Deep research, second opinions and several agents](/guide/research).
 
 ## Everything in the session's menu
 
