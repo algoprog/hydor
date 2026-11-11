@@ -28,7 +28,7 @@ import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
-import { childKeys, parentOf } from './family.ts';
+import { ancestorsOf, childKeys, parentOf, runningChildren } from './family.ts';
 import { childMode } from './modes.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
@@ -802,6 +802,49 @@ test('as: an agent that keeps a conversation of its own takes the brief in its i
   assert.equal(items[1].reply, 'Done: the Agents topic is updated.');
   assert.equal(items[0].status, 'sent');
   assert.match(sessions.delivered.at(-1)!.text, /And the API topic\.$/);
+});
+
+// ---- running helpers: a lead is not done while its child sessions run ------------------------------------
+
+/** The running-children map as plain arrays, for comparing. */
+const running = (statuses: [string, string | undefined][]) => Object.fromEntries([...runningChildren(db, statuses)].map(([k, v]) => [k, [...v].sort()]));
+
+test('running helpers: starting, working and waiting children count; idle, ended and errored ones do not', () => {
+  setSessionExtra(db, 'claude:hl', {});
+  for (const c of ['c1', 'c2', 'c3', 'c4', 'c5']) setSessionExtra(db, `claude:hl-${c}`, { parent: 'claude:hl' });
+  assert.deepEqual(running([['claude:hl-c1', 'starting'], ['claude:hl-c2', 'working'], ['claude:hl-c3', 'waiting'], ['claude:hl-c4', 'idle'], ['claude:hl-c5', 'exited']]), { 'claude:hl': ['claude:hl-c1', 'claude:hl-c2', 'claude:hl-c3'] });
+  // A child waiting for you is still running; one that errored is not.
+  assert.deepEqual(running([['claude:hl-c3', 'waiting'], ['claude:hl-c1', 'error']]), { 'claude:hl': ['claude:hl-c3'] });
+  assert.deepEqual(running([['claude:hl-c1', 'idle'], ['claude:hl-c3', 'exited'], ['claude:hl-c4', undefined]]), {});
+  // The lead's own status does not matter: its process may have stopped between turns (it is not live at all).
+  assert.deepEqual(running([['claude:hl-c2', 'working'], ['claude:hl', 'idle']]), { 'claude:hl': ['claude:hl-c2'] });
+  // Every running one is among the lead's child sessions.
+  for (const k of ['claude:hl-c1', 'claude:hl-c2', 'claude:hl-c3']) assert.ok(childKeys(db, 'claude:hl').includes(k));
+});
+
+test('running helpers: a child kept working by running children of its own counts, all the way up', () => {
+  setSessionExtra(db, 'claude:g0', {});
+  setSessionExtra(db, 'claude:g1', { parent: 'claude:g0' });
+  setSessionExtra(db, 'claude:g2', { parent: 'claude:g1' });
+  setSessionExtra(db, 'claude:g2b', { parent: 'claude:g1' });
+  assert.deepEqual(ancestorsOf(db, 'claude:g2'), ['claude:g1', 'claude:g0']);
+  // Only the grandchild runs, and its parent is idle: both above it are at work.
+  assert.deepEqual(running([['claude:g2', 'working'], ['claude:g1', 'idle']]), { 'claude:g1': ['claude:g2'], 'claude:g0': ['claude:g1'] });
+  // Two grandchildren: the middle one is still one child of the top one.
+  assert.deepEqual(running([['claude:g2', 'waiting'], ['claude:g2b', 'starting']]), { 'claude:g1': ['claude:g2', 'claude:g2b'], 'claude:g0': ['claude:g1'] });
+  // The middle child works itself and has a running child: counted once.
+  assert.deepEqual(running([['claude:g1', 'working'], ['claude:g2', 'working']]), { 'claude:g1': ['claude:g2'], 'claude:g0': ['claude:g1'] });
+  // Nothing below running: nothing above counts.
+  assert.deepEqual(running([['claude:g0', 'working']]), {});
+});
+
+test('running helpers: a loop in who started whom ends, and a session is never its own helper', () => {
+  setSessionExtra(db, 'claude:x1', { parent: 'claude:x2' });
+  setSessionExtra(db, 'claude:x2', { parent: 'claude:x1' });
+  setSessionExtra(db, 'claude:x3', { parent: 'claude:x3' });
+  assert.deepEqual(ancestorsOf(db, 'claude:x1'), ['claude:x2']);
+  assert.deepEqual(running([['claude:x1', 'working']]), { 'claude:x2': ['claude:x1'] });
+  assert.deepEqual(running([['claude:x3', 'working']]), {});
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

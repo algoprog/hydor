@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MessagesSquare, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
 import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
-import { activityLabel, activityOf, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
+import { activityLabel, activityOf, backgroundLine, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
 import { ago, basename, bytes, compact, dirname, money, prettyPath, tildify } from '../../lib/format';
 import { limitsText, useSessionResources } from '../system/sessionUse';
 import { useSearch } from 'wouter';
@@ -41,7 +41,7 @@ function StatusPill({ s }: { s: SessionSummary }) {
     if (isBusy(a)) [label, tone, dot] = [a.status === 'starting' ? 'Starting' : `Working${where}`, 'text-busy', 'bg-busy'];
     else if (a.status === 'waiting') [label, tone, dot] = [`Needs you${where}`, 'text-warn', 'bg-warn'];
     else if (a.status === 'stopping') [label, tone, dot] = ['Stopping', 'text-fg-3', 'bg-fg-3'];
-    else if (inBackground(a)) [label, tone, dot] = [`Working${where} · ${a.background} in background`, 'text-busy', 'bg-busy'];
+    else if (inBackground(a)) [label, tone, dot] = [backgroundLine(a), 'text-busy', 'bg-busy'];
     else [label, tone, dot] = a.kind === 'external' ? [`Open${where}`, 'text-fg-2', 'bg-fg-3'] : ['Ready', 'text-ok', 'bg-ok'];
   }
   return (

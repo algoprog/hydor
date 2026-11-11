@@ -24,7 +24,7 @@ import { api, del, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
 import { filePath, go, openSession, sessionPath } from '../../lib/nav';
 import { isStartingKey, startingRows, useStarting } from '../../lib/starting';
-import { activityOf, inBackground, isBusy, isWorking } from '../../lib/activity';
+import { activityOf, backgroundLine, inBackground, isBusy, isWorking } from '../../lib/activity';
 import { toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { folderName, givenName, namedFolders, renameFolder, translatable, useFolderNames } from '../../lib/folderNames';
 import type { FolderSource } from '../../lib/origin';
@@ -77,7 +77,7 @@ export function ActivityText({ s, className }: { s: SessionSummary; className?: 
   }
   if (a.status === 'waiting') return <span className={cx('truncate text-warn', className)}>{`Needs you${where}`}</span>;
   if (a.status === 'stopping') return <span className={cx('truncate text-fg-3', className)}>Stopping…</span>;
-  if (inBackground(a)) return <span className={cx('truncate text-busy', className)}>{`Working${where} · ${a.background} in background`}</span>;
+  if (inBackground(a)) return <span className={cx('truncate text-busy', className)}>{backgroundLine(a)}</span>;
   return <span className={cx('truncate text-fg-3', className)}>{a.kind === 'external' ? `Open${where}` : 'Ready'}</span>;
 }
 

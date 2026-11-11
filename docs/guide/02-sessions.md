@@ -56,7 +56,7 @@ Whether a session gets a new task folder by default depends on the agent: most s
 
 - **Effort**: how hard the model thinks. **Default** uses the model's own, then the levels the model offers: **Low** (fast, light reasoning), **Medium** (balanced), **High** (deeper reasoning), **Xhigh** (extra-deep reasoning), **Max** (maximum reasoning), and on some models **Minimal**, **None** or **Ultra**. Not offered for Custom and other ACP agents, or for models without levels.
 - **Permissions**: what the agent may do without asking you first. Each agent has its own modes; see [What each permissions mode means](#what-each-permissions-mode-means). Shift+Tab in the message box moves to the next one.
-- **Account**: only once you have added another account for Claude Code or Codex in [Settings → Accounts](/settings?s=accounts&find=Your%20accounts). **Your sign-in** is the agent's own account; pick another to run this session as it. **Manage accounts** opens Settings.
+- **Account**: only once you have added another account for Claude Code or Codex in [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts). **Your sign-in** is the agent's own account; pick another to run this session as it. **Manage accounts** opens Settings.
 - **Confidential**, a switch with a lock ("Only models on this computer. Nothing leaves it."): for a paper you review, patient data or a client's code. **Runs on** becomes **Custom** and **Model** the best model installed here. See [Keep a session confidential](#keep-a-session-confidential).
 - **Memory**: only while memory is on in Settings. **On** uses and adds to what agents remember; **Off for this session** starts fresh and keeps nothing from it. See [Memory](/guide/memory).
 - **Spending cap**: the most this session may spend, at API prices. Type an amount and press **Set**, or pick $1, $5, $10 or $25; **No cap** removes it. The session stops at the cap until you raise it. See [Usage, limits and costs](/guide/usage).
@@ -307,7 +307,7 @@ A small ring with a percentage by the microphone fills as the conversation uses 
 
 ## Stop a turn, stop the agent or resume
 
-The Stop button by the message box has a rotating ring while the agent is starting or working. The ring pauses when it needs you, and stays still if your device asks for reduced motion.
+The Stop button by the message box has a rotating ring while the agent is starting or working. The ring pauses when it needs you, and stays still if your device asks for reduced motion. Once the turn is over, the ring keeps turning around the send button for as long as background tasks or helper sessions the agent started are still running, such as a helper agent, a command left running or a child session; the box takes your messages as usual. Point at the send button to see what is still running.
 
 - **Stop a turn**: press **Stop** in the header, or the round square button by the message box. (Esc doesn't stop it: it only closes what is open, such as the find bar or a list.) The agent stops what it is doing; the turn shows "Stopped after…". The agent stays ready for your next message, and the queue pauses until you resume it.
 - **Stop the agent process**: the session's menu (⋯) → **More** → **Stop the agent process**, when no turn is running. The agent's program ends; the session and its history stay, and it shows **Stopped**.
@@ -320,7 +320,7 @@ A goal keeps the agent working, turn after turn, until a condition you set holds
 
 - **Claude Code** keeps working; after each turn a quick check decides whether the goal holds yet.
 - **Codex** keeps working until it judges the goal done.
-- **Custom** keeps working; after each turn the helper model checks the evidence and gives it the next step. It pauses when it stops making progress, and runs at most the rounds set in [Settings → Custom → Goals](/settings?s=custom&find=Goals).
+- **Custom** keeps working; after each turn the helper model checks the evidence and gives it the next step. It pauses when it stops making progress, and runs at most the rounds set in [Settings → Custom → Goals → Rounds before a goal pauses](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses).
 
 While a goal is set, a bar above the message box shows it and how it stands (working on it, paused, stuck: the agent needs you, or stopped at a usage or token limit), how many times it was checked, the time and tokens spent, and the last check's reason. **Pause** and **Resume** work for Codex and Custom; **Clear** stops working towards it. A target mark in the sidebar shows which sessions have a goal.
 
@@ -416,7 +416,7 @@ Every Claude Code and Codex session on this computer is listed, also the ones yo
 
 ## Child sessions
 
-An agent can hand parts of a job to new sessions, with any agent and model, and gets their results back. In the sidebar they sit folded under their parent ("3 child sessions · 1 needs you · 2 working"); click the line to see them. It stays open while you look at one of them. A swarm's members show as "swarm members", a campaign's as "campaign members". In the parent's conversation, each child has a card with what it is doing and a way in. A spending cap on the parent covers its children. See [Deep research, second opinions and several agents](/guide/research).
+An agent can hand parts of a job to new sessions, with any agent and model, and gets their results back. In the sidebar they sit folded under their parent ("3 child sessions · 1 needs you · 2 working"); click the line to see them. It stays open while you look at one of them. A swarm's members show as "swarm members", a campaign's as "campaign members". In the parent's conversation, each child has a card with what it is doing and a way in. A parent whose own turn is over while its children still run is not finished: its dot keeps breathing blue, the ring by the message box keeps turning, its status reads "Working · 2 helper sessions running", it shows no "Done" marker and stays in Active, and you can still send it a message. A child that waits on helpers of its own counts as running too. A spending cap on the parent covers its children. See [Deep research, second opinions and several agents](/guide/research).
 
 ## Everything in the session's menu
 

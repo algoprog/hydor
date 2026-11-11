@@ -7,7 +7,8 @@ import { api, del, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { toastError } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
-import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, inputCls, MenuItem, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Notice, Row, Stack } from './kit';
 
 interface TokenView {
   id: string;
@@ -33,10 +34,10 @@ export function ConnectSettings() {
     load();
   };
   return (
-    <div className="space-y-4">
-      <Section
+    <Stack>
+      <Group
         title="Tokens"
-        sub="An agent with a token can start and steer sessions on this machine, as you can here."
+        hint="An agent with a token can start and steer sessions here, as you can"
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMaking(true)}>
             New token
@@ -44,40 +45,49 @@ export function ConnectSettings() {
         }
       >
         {!list ? (
-          <Throbber className="text-fg-3" />
-        ) : !list.length ? (
-          <p className="text-[13px] leading-relaxed text-fg-3">None yet. Make one for each agent or machine, so you can revoke them one at a time.</p>
-        ) : (
-          <div className="-my-1 divide-y divide-line">
-            {list.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 py-2.5">
-                <KeyRound size={15} className="shrink-0 text-fg-3" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13.5px]">{t.name}</div>
-                  <div className="text-[12px] text-fg-3">
-                    Made {ago(t.createdAt)} · {t.lastUsed ? `used ${ago(t.lastUsed)}` : 'not used yet'}
-                  </div>
-                </div>
-                <IconButton label="Revoke" size="sm" onClick={() => revoke(t)}>
-                  <Trash2 size={14} />
-                </IconButton>
-              </div>
-            ))}
+          <div className="px-4 py-5">
+            <Throbber className="text-fg-3" />
           </div>
+        ) : !list.length ? (
+          <EmptyRow>None yet. Make one for each agent or machine, so you can revoke them one at a time.</EmptyRow>
+        ) : (
+          list.map((t) => (
+            <Row
+              key={t.id}
+              icon={<KeyRound size={16} />}
+              label={<span translate="no">{t.name}</span>}
+              hint={`Made ${ago(t.createdAt)} · ${t.lastUsed ? `used ${ago(t.lastUsed)}` : 'not used yet'}`}
+              control={
+                <MoreMenu width={200}>
+                  {(close) => (
+                    <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (close(), revoke(t))}>
+                      Revoke
+                    </MenuItem>
+                  )}
+                </MoreMenu>
+              }
+            />
+          ))
         )}
-      </Section>
-      <Section title="What they can do">
-        <ul className="list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-fg-2">
-          <li>list_sessions and read_session: find a session and catch up on it</li>
-          <li>start_session: a new Claude Code or Codex session, in any folder, optionally in its own worktree</li>
-          <li>send_message: steer a session (it queues while the agent works)</li>
-          <li>list_models</li>
-        </ul>
-        <p className="mt-3 text-[12.5px] leading-relaxed text-fg-3">Sessions started here need nothing: they can already show pages in the conversation (charts, reports, mock-ups) with their show_html tool.</p>
-      </Section>
+        <Row
+          label="What they can do"
+          hint="Find, read, start and steer sessions"
+          info={
+            <>
+              <ul className="list-disc space-y-1 pl-4">
+                <li>list_sessions and read_session: find a session and catch up on it</li>
+                <li>start_session: a new Claude Code or Codex session, in any folder, optionally in its own worktree</li>
+                <li>send_message: steer a session (it queues while the agent works)</li>
+                <li>list_models</li>
+              </ul>
+              <p className="text-fg-3">Sessions started here need nothing: they can already show pages in the conversation (charts, reports, mock-ups) with their show_html tool.</p>
+            </>
+          }
+        />
+      </Group>
       <NewToken open={making} onClose={() => setMaking(false)} onMade={load} />
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -143,7 +153,7 @@ function NewToken({ open, onClose, onMade }: { open: boolean; onClose: () => voi
         </label>
       ) : (
         <div className="space-y-3.5 text-[13px]">
-          <p className="rounded-xl border border-warn/30 bg-warn/8 px-3 py-2 leading-relaxed">Copy it now: it is not shown again.</p>
+          <Notice tone="warn">Copy it now: it is not shown again.</Notice>
           <Snippet label="Token" text={token} />
           <Snippet label="Claude Code" text={`claude mcp add --transport http hydor ${url} --header "Authorization: Bearer ${token}"`} />
           <Snippet label="Codex (~/.codex/config.toml, with HYDOR_TOKEN set to the token)" text={`[mcp_servers.hydor]\nurl = "${url}"\nbearer_token_env_var = "HYDOR_TOKEN"`} />

@@ -56,9 +56,9 @@ Agents pick models by tier instead of by name: **Quick** for small, very clear j
 
 On the start page, **Model** opens on **Automatic**: the session starts on Best, or on Max when your request reads as a hard problem (a proof, a bug nobody can find the cause of, a design whose constraints pull against each other). The helper model sizes the request up while the agent starts, so nothing waits for it, and a line in the conversation says so when Max was picked, with why. The main agent then hands clear parts to helpers on Standard and Quick, and may move itself to Max when a problem proves harder than it looked (the conversation says that too). Pick a model by name instead and the session thinks with that one; its helpers still get tiers. An agent of yours can think with one tier instead (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
 
-[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program, in a table with a column for **Claude Code**, **Codex** and **Custom**: a model and, for Claude Code and Codex, an effort. To start, Quick is Haiku, Standard is Sonnet, Best is Opus and Max is the newest Fable for Claude Code; for Codex, Quick is Luna, Standard is Terra, Best is Sol and Max is Astra (on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). A tier you leave alone follows its program's newest model of that kind. **Back to the defaults** puts them back.
+[Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program: a row for each tier, with a switch beside the group's title to pick the program (**Claude Code**, **Codex** or **Custom**), and in each row a model and, for Claude Code and Codex, an effort. A tier's (i) says more about it. To start, Quick is Haiku, Standard is Sonnet, Best is Opus and Max is the newest Fable for Claude Code; for Codex, Quick is Luna, Standard is Terra, Best is Sol and Max is Astra (on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). A tier you leave alone follows its program's newest model of that kind. **Back to the defaults**, in the **⋯** menu beside the title, puts them back.
 
-Two switches under the table say how sessions use the tiers:
+Two switches in the **Tiers in sessions** group under the tiers say how sessions use them:
 
 - **Lead with helpers** (on to start): a session's main agent is told to plan, hand clear parts to helpers on cheaper tiers and check their work, and a helper asked for with no tier gets Standard. Off, agents work alone unless they choose otherwise, and the start page has no Automatic.
 - **Max for hard problems** (on to start): Automatic starts a hard problem on Max, and a main agent may move itself there. Off, Automatic always starts on Best.
@@ -67,22 +67,22 @@ Two switches under the table say how sessions use the tiers:
 
 Claude Code, Codex, Gemini CLI and the others are programs on this computer. You don't have to install them by hand.
 
-Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and scroll to **Agent programs**. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie and the agents that need an ACP adapter, each with the version the sessions run and where it comes from:
+Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and look at the **Agent programs** group. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie and the agents that need an ACP adapter, each with the version the sessions run and where it comes from:
 
 - **your own install**: you installed it yourself.
 - **installed by the app**: the app installed it in its own folder.
 - **comes with the app**: Codex ships with the app.
-- **not here: installs by itself when you first use it**: missing. Click **Install** to get it now.
+- **Not here: installs by itself when first used**: missing. Click **Install** to get it now.
 
 A row also says "… is out" when a newer version is out. Codex's row adds "yours in the terminal: …" when you have a Codex of your own too: the sessions run the app's, and a terminal runs yours.
 
-A missing program also installs by itself the first time it is needed: Claude Code when you sign in to it or start a Claude Code session, an ACP agent when you add it in Settings → More agents or start a session with it. The app installs them with npm into its own folder, so you need no administrator rights.
+A missing program also installs by itself the first time it is needed: Claude Code when you sign in to it or start a Claude Code session, an ACP agent when you add it in Settings → Agents → More agents or start a session with it. The app installs them with npm into its own folder, so you need no administrator rights.
 
-Goose, Kimi CLI and some other agents aren't in this list: install them yourself (Settings → More agents shows where to get them). An agent that needs an ACP adapter installs in two parts, the adapter and the agent itself; the list shows one row for both.
+Goose, Kimi CLI and some other agents aren't in this list: install them yourself (Settings → Agents → More agents shows where to get them). An agent that needs an ACP adapter installs in two parts, the adapter and the agent itself; the list shows one row for both.
 
 ## Keep the agent programs up to date
 
-With [**Update automatically**](/settings?s=accounts&find=Update%20automatically) on, under **Agent programs** (it is on unless you turn it off), the app brings each agent program up to its newest version once a day. The first run comes about ten minutes after the app starts.
+With [**Update automatically**](/settings?s=accounts&find=Update%20automatically) on, the last row of **Agent programs** (it is on unless you turn it off), the app brings each agent program up to its newest version once a day. The first run comes about ten minutes after the app starts.
 
 - The copies the app installed update with npm, in its own folder. Codex switches to a copy newer than the one the app came with.
 - Your own installs update with their own updater: `claude update` for Claude Code, `codex update` for Codex (the one your terminal runs), `opencode upgrade` for OpenCode.
@@ -90,19 +90,19 @@ With [**Update automatically**](/settings?s=accounts&find=Update%20automatically
 - Claude Code follows its own release line: the stable one when its settings say `"autoUpdatesChannel": "stable"`, else the latest.
 - If you turned Claude Code's own updates off with `DISABLE_AUTOUPDATER=1` (the Docker image does), the app doesn't update your Claude Code by itself either. **Update now** still does.
 
-The app keeps a new version only once it works the way the sessions use it. Claude Code must answer as a session starts and list its models, Codex must start its app server and list its models, and the others must start and say their version. None of this needs a sign-in or uses any of your plan. A version that fails is undone:
+The app keeps a new version only once it works the way the sessions use it. Claude Code must answer as a session starts and list its models, Codex must start its app server and list its models, and the others must start and say their version. None of this needs a sign-in or uses any of your plan. Each gets a minute to answer, and only time the computer is awake counts, so a Mac that goes to sleep in the middle of the check doesn't use the minute up. One that is slow to answer the first time (a Mac looks a new program over before it first runs it) is started again with two more minutes, and fails only if it doesn't answer then either. A version that fails is undone:
 
 - A copy the app installed, or one of yours it updated with npm, goes back to the version before.
 - For your own Claude Code, the sessions keep running the version before, which Claude Code's installer keeps beside the new one. The `claude` command in a terminal stays on the new one. The row says "… did not work here".
 - A version that failed isn't tried again by itself, but the next one is, and **Update now** tries it again.
 
-Under the switch, the section says when the app last looked, like "Up to date · checked 2h ago", with **Check now** to look again. When newer versions are out it says so, with **Update now** to install them at once; it shows which program it is updating while it works. The line below says what the last update changed, like "Claude Code 2.1.308 → 2.1.316", or why a version could not be installed.
+Under that row, it says when the app last looked, like "Up to date · checked 2h ago", with **Check now** to look again. When newer versions are out it says so, with **Update now** to install them all at once (there is no button per program); it shows which program it is updating while it works. The lines below say what the last update changed, like "Claude Code 2.1.308 → 2.1.316", or why a version could not be installed.
 
 Sessions that are running carry on with the version they started with; new sessions use the new one. With **Update automatically** off, the app still looks once a day and shows what is out, but installs nothing until you click **Update now**.
 
 ## Sign Claude Code and Codex in
 
-Claude Code and Codex need a sign-in before they can work. Open [Settings → Agents → Accounts](/settings?s=accounts) (on a phone, Settings is a list of sections: tap **Accounts** under Agents; the title at the top takes you back). **Your accounts** ("The Claude Code and Codex sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session.") lists each agent's own sign-in first, then any accounts you added for it. Each shows a green check with the email, plan and sign-in method, or a red cross with "Not signed in" or what went wrong.
+Claude Code and Codex need a sign-in before they can work. Open [Settings → Agents → Accounts](/settings?s=accounts) (on a phone, Settings is a list of sections: tap **Accounts** under Agents; the title at the top takes you back). The **Accounts** group (its (i) says these are the sign-ins your sessions use, and that you can add another subscription, a work and a personal one say, and pick one when you start a session) lists each agent's own sign-in first, then any accounts you added for it. Each shows a green check with the email, plan and sign-in method, or a red cross with "Not signed in" or what went wrong.
 
 To sign in:
 
@@ -126,8 +126,8 @@ The welcome tour (from **Help** in the sidebar) asks which agents and models you
 
 You can sign in more than one Claude Code or Codex account, for example a work plan and a personal plan, and pick one per session.
 
-1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Your%20accounts).
-2. Click **Add an account**, at the top of **Your accounts**.
+1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts).
+2. Click **Add an account**, beside the title of the **Accounts** group.
 3. Choose **Claude Code** or **Codex**, type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
 4. The sign-in dialog opens for the new account. Sign in as described above.
 
@@ -145,15 +145,15 @@ The [Usage page](/usage) shows a card for every added account, with its own limi
 
 When the agent you picked has added accounts, the start page's **Options** shows an **Account** row. Click it:
 
-- **Your sign-in** is the program's own account (the first one for that agent under Your accounts).
+- **Your sign-in** is the program's own account (the first one for that agent in **Accounts**).
 - Each added account is listed by name.
-- **Manage accounts** opens Settings → Accounts.
+- **Manage accounts** opens Settings → Agents → Accounts.
 
 The start page remembers your choice for that agent. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below).
 
 ## Use all your accounts: switch at a limit
 
-With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and find **Switch accounts at a limit**, at the bottom of **Your accounts** once you have added an account ("When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit."). It is on from the start (turn it off there if you would rather pick the account yourself), and it works while no browser is open.
+With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and find **Switch accounts at a limit**, in the **At a usage limit** group under **Accounts**, which shows once you have added an account (its (i) says that when a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on, and that new sessions skip an account at its limit). It is on from the start (turn it off there if you would rather pick the account yourself), and it works while no browser is open.
 
 - When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A note at the top of the app says which account it moved to.
 - Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex.
@@ -167,9 +167,9 @@ With two or more accounts for the same agent, the app can use them all: when one
 
 If you have an Anthropic API key (from [console.anthropic.com](https://console.anthropic.com) → API keys), your Claude Code sessions can carry on with it when every Claude Code account is at its usage limit, instead of stopping. It costs money: the session is billed by Anthropic at API prices for as long as it runs this way, not covered by your subscription.
 
-1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit). On the row of a Claude Code account in **Your accounts** (your main sign-in, or one you added), click **⋯** and then **Add API key…**.
+1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit). On the row of a Claude Code account in **Accounts** (your main sign-in, or one you added), click **⋯** and then **Add API key…**.
 2. Paste the key in **Anthropic API key** and click **Save key**. The app checks it with Anthropic and keeps it encrypted on this computer. The row then shows an **API credit** tag. **Change API key…** replaces it and **Remove API key** deletes it.
-3. Turn on **Use API credit at a limit** ("When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on."). It shows once Claude Code is signed in or you have added a Claude Code account.
+3. Turn on **Use API credit at a limit**, in the **At a usage limit** group (its (i) says that when every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping, and that it is off until you turn it on). It shows once Claude Code is signed in or you have added a Claude Code account.
 
 What happens then:
 
@@ -184,24 +184,24 @@ What happens then:
 
 Open [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP).
 
-- **Your agents** ("They show next to Claude Code and Codex when you start a session") lists Custom first, then the agents you added. Each shows a check when its program is installed here.
-- **Agents that speak ACP** ("Install one, sign in once in its own CLI, then add it here") lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and others. A row with a cross isn't installed yet, and says how to get it.
+- **Your agents** (they show next to Claude Code and Codex when you start a session) lists Custom first, then the agents you added. Each shows a check when its program is installed here, or a cross and "not installed".
+- **Agents that speak ACP** (install one, sign in once in its own CLI, then add it here) lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and others. The installed ones come first. A row that says "Not installed" says how to get it. The list shows the first few that are not installed; **Show all** shows the rest.
 
 To add one:
 
-1. Click **Add** next to it. The button stands out when the program is already installed.
+1. Click **Add** at the end of its row. The button stands out when the program is already installed.
 2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie and the agents that need an ACP adapter), it installs it now, in the background. Goose, Kimi CLI and the others you install yourself, with the command or address in their row.
 3. Sign in once in the agent's own program: open the [Terminal](/terminal), run its command (for example `gemini`) and follow its sign-in. If you skip this, a session tells you: "Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again."
 
 The agent now shows in the start page's **Runs on** list.
 
-To change an added agent, click **Edit**. To take it out, click the bin icon and confirm: its sessions stay listed, but continuing them needs the agent set up again. Custom is built in: its row says "Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models" and has a **Models** button instead of Edit and Remove.
+To change an added agent, click **Edit**. To take it out, open its **⋯** menu, choose **Remove** and confirm: its sessions stay listed, but continuing them needs the agent set up again. Custom is built in: its row says "Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models" and has a **Models** button instead of Edit and Remove.
 
 ### Add an agent of your own
 
 Any program that speaks ACP can run here.
 
-1. In **Your agents**, click **Add your own**.
+1. Click **Add your own**, beside the title of **Your agents**.
 2. Fill in:
    - **Name**: how it shows in the lists, for example "Gemini CLI".
    - **Command**: the program to start, for example `gemini`, or a full path.
@@ -238,7 +238,7 @@ Custom runs any model you set up in [Settings → Agents → Models](/settings?s
 - **Helper model**: the model for the app's small jobs.
 - **On this machine**: what this computer has, and the models installed here.
 - **Add a model from Hugging Face**: search, check and install open models.
-- **OpenRouter**: hundreds of models through one key.
+- **OpenRouter**: hundreds of models through one key, in three groups: your key, the models you added, and a search to add more.
 - **Runtimes and endpoints**: Ollama, vLLM, other OpenAI-compatible servers, and a Hugging Face token.
 
 In Custom's **Model** menu, hover over a model to see where it runs and how much it reads at once, for example "OpenRouter · 128K context" or "vLLM, on this machine · 32K context · starts when used". The lists refresh by themselves every minute.
@@ -256,7 +256,7 @@ The helper model does small jobs beside your sessions, outside any conversation:
 - drafting an app or a scheduled task from a session;
 - hands-free voice mode.
 
-Open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and click the menu next to **Helper model**:
+Open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and click the **Model** menu in the **Helper model** group (its (i) lists the small jobs):
 
 - **Automatic** (the default): Claude Haiku through Claude Code, or Codex when Claude Code can't answer. An account at its usage limit hands the question to your next signed-in account first (with **Switch accounts at a limit** on). When nothing answers, the error says why for each: "You've hit your weekly limit", a model your Codex plan doesn't offer…
 - Any of Custom's models, with where it runs (openrouter, ollama, vllm or endpoint) and "sees images" for those that can see.
@@ -268,34 +268,33 @@ Automatic can't look at pictures. If you use Custom with a model that doesn't se
 The **On this machine** section of [Settings → Agents → Models](/settings?s=models&find=On%20this%20machine) starts with a summary of this computer:
 
 - **Graphics**: the graphics cards (GPUs) and their memory; on a Mac with Apple silicon, its chip ("Apple M3 Max", whose graphics share the computer's memory); or "No GPU" (models then run on the processor).
-- **Memory**: total and free.
-- **Disk**: free space, and how much the installed models take.
-- Whether **Ollama** and **vLLM** are installed, with their versions, or a link to install them.
+- **Memory and disk**: the computer's memory, total and free, and the disk's free space with how much the installed models take.
+- **Runs with**: whether **Ollama** and **vLLM** are installed, with their versions, or a link to install them.
 - With a graphics card, how big a model fits: "Fits about 30B parameters at 4-bit on one GPU" (on a Mac: "Fits about 40B parameters at 4-bit"). Parameters are a measure of a model's size; 4-bit is a common compressed form that needs about a quarter of the memory.
 
 Below it:
 
 - **Downloads in progress**, each with a progress bar, how much is done, and whether it's for Ollama or vLLM. **Cancel** stops one. A failed or cancelled one shows why, with **Dismiss**.
-- **Installed models**, each with its runtime (Ollama or vLLM), size, details (such as its size and compression for Ollama models), "sees images" where it can, and whether it's running.
+- **Installed models** (the first few, then **Show all**), each with its runtime (Ollama or vLLM), size, details (such as its size and compression for Ollama models), "sees images" where it can, and whether it's running.
   - A vLLM model has **Start** and **Stop**. It starts by itself when a session first uses it (the first start takes a minute or two), on the graphics card with the most free memory (at 8-bit when it would not fit there as it is), or split across 2, 4 or 8 of them when no one card has room for it ("running on GPUs 1, 2"); on a Mac, on its Apple silicon. It keeps running, even when the app restarts, until you click **Stop**. If it can't start, the reason shows under it.
-  - **Remove** deletes the model's files from this computer, after you confirm. You can install it again later.
+  - **Remove**, in the model's **⋯** menu, deletes the model's files from this computer, after you confirm. You can install it again later.
 
 When there are none yet: "No models here yet: add one from Hugging Face below."
 
 ## Add a model from Hugging Face
 
-Hugging Face is the main site for open models. The [Add a model from Hugging Face](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face) section ("The ones suggested for this computer, or search, see how each would run here, and install it") suggests a few, searches it, and tells you, before anything downloads, how each model would run on this computer.
+Hugging Face is the main site for open models. The [Add a model from Hugging Face](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face) group (suggested for this computer, or search all of it) suggests a few, searches it, and tells you, before anything downloads, how each model would run on this computer.
 
 ### Suggested for this computer
 
-Before you search, **Suggested for this computer** lists the models the app recommends that run on this computer, by what it has:
+Before you search, the group lists the models the app recommends that run on this computer, by what it has:
 
 - **LFM3-VL 2B** (Liquid AI): small and quick, and it reads pictures. Runs on almost any computer.
 - **Gemma 4 12B** (Google): a capable all-rounder that reads pictures, for a computer with a good graphics card.
 - **Flint** (Recursive): made for coding agents, for a Mac with Apple silicon and 32 GB or more.
 - **GLM-5.3 Flash** (Z.ai): among the strongest open models, for a server with several large graphics cards.
 
-Each shows whether it runs well or slowly here, how it would run ("vLLM at 8-bit, on GPU 0", "vLLM, split across 2 GPUs", "vLLM, on Apple silicon"), its download size, and **Install**. **Best here** marks the strongest one that runs well. They run with vLLM by default; a computer with neither an NVIDIA graphics card nor Apple silicon gets the small one's version for Ollama instead. A warning follows when what runs them isn't set up yet ("vLLM is not set up", "Ollama is not running"): see [Connect Ollama, vLLM or another endpoint](#connect-ollama-vllm-or-another-endpoint). **2 more for bigger computers** (or however many) shows the others, with what each needs. The welcome tour suggests the same ones.
+Each shows whether it runs well or slowly here, how it would run ("vLLM at 8-bit, on GPU 0", "vLLM, split across 2 GPUs", "vLLM, on Apple silicon"), its download size, and **Install**. **Best here** marks the strongest one that runs well. They run with vLLM by default; a computer with neither an NVIDIA graphics card nor Apple silicon gets the small one's version for Ollama instead. A warning follows when what runs them isn't set up yet ("vLLM is not set up", "Ollama is not running"): see [Connect Ollama, vLLM or another endpoint](#connect-ollama-vllm-or-another-endpoint). The row **2 more for bigger computers** (or however many) shows the others, with what each needs. The welcome tour suggests the same ones.
 
 ### Search and filter
 
@@ -307,7 +306,7 @@ Each shows whether it runs well or slowly here, how it would run ("vLLM at 8-bit
    - **Sees images**: models that also read pictures.
 3. Change the order with the menu on the right: **Most downloaded**, **Trending**, **Most liked** or **Newest**.
 
-You get up to 40 models. A model you named in full shows first, even when the search doesn't list it, and pressing Enter checks it straight away.
+You get up to 40 models, the first eight at first and **Show all** for the rest. A model you named in full shows first, even when the search doesn't list it, and pressing Enter checks it straight away.
 
 Each row shows the maker and name, its form (**GGUF** or **vLLM**), **Images** if it sees pictures, **Gated** if its maker asks you to accept terms first, its size in parameters, downloads in the last 30 days, likes, and when it last changed.
 
@@ -334,7 +333,7 @@ The figures assume a conversation of up to about 32,000 tokens, the length a mod
 
 ### Install, and what happens next
 
-Click **Install** (Ollama) or **Download** (vLLM). The download shows under **On this machine** with its progress. When it finishes, the model appears in Custom's **Model** menu. A vLLM download that was cut off picks up where it stopped when you try again. A vLLM model too big for any one graphics card is stored at 8-bit (FP8) as it starts, which halves the memory its weights take for little loss (cards from NVIDIA's RTX 30 series and A100 on); if it still doesn't fit, it is split across several cards, if together they have room.
+Click **Install** (Ollama) or **Download** (vLLM). The download shows in **On this machine** with its progress. When it finishes, the model appears in Custom's **Model** menu. A vLLM download that was cut off picks up where it stopped when you try again. A vLLM model too big for any one graphics card is stored at 8-bit (FP8) as it starts, which halves the memory its weights take for little loss (cards from NVIDIA's RTX 30 series and A100 on); if it still doesn't fit, it is split across several cards, if together they have room.
 
 ### Gated and private models
 
@@ -347,59 +346,60 @@ OpenRouter (openrouter.ai) gives you hundreds of models from many makers through
 ### Add your key
 
 1. Get a key at openrouter.ai (the section links there).
-2. In [Settings → Agents → Models](/settings?s=models&find=OpenRouter), paste it into **Your OpenRouter key: sk-or-…** and click **Save**.
+2. In [Settings → Agents → Models](/settings?s=models&find=OpenRouter), click **Add key** in the **Your OpenRouter key** row, paste it into **Your OpenRouter key: sk-or-…** in the dialog and click **Save**.
 
-The section then shows **Connected to OpenRouter** with the start and end of your key. **Remove** forgets the key. The key stays on the server and is never shown again.
+The row then shows **Connected to OpenRouter** with the start and end of your key. **Remove key**, in its **⋯** menu, forgets the key. The key stays on the server and is never shown again.
 
 You can also add it when it is first needed: an agent that goes to make a picture, a drawing, a video or a sound without one asks for it on a card in the conversation ([When an agent needs the OpenRouter key](/guide/documents-voice#when-an-agent-needs-the-openrouter-key)), and the editors' AI tools ask in their dialog. Either way it is kept here.
 
 ### Suggested models
 
-Before you search, **Suggested** lists four models for Custom, each with why: **GPT-6 Luna** (Fast and cheap), **Grok 4.7** (Good, with fewer refusals), **GPT-6.1 Sol** (Better) and **Claude Opus 5.5** (Best overall). **Add** puts one in the pickers. For pictures, music, voices and videos, the app's choices are Seedream 5.0 Pro (and Flash, quicker and cheaper), Lyria 3 Pro, Seed Audio 1.0 and Seedance 2.5: see [Settings → Capabilities → Images, video and audio](/settings?s=images).
+Before you search, **Suggested**, in the **Add OpenRouter models** group, lists four models for Custom, each with why: **GPT-6 Luna** (Fast and cheap), **Grok 4.7** (Good, with fewer refusals), **GPT-6.1 Sol** (Better) and **Claude Opus 5.5** (Best overall). **Add** puts one in the pickers. For pictures, music, voices and videos, the app's choices are Seedream 5.0 Pro (and Flash, quicker and cheaper), Lyria 3 Pro, Seed Audio 1.0 and Seedance 2.5: see [Settings → Capabilities → Images, video and audio](/settings?s=images).
 
 ### Search the catalog
 
-Type in **Search OpenRouter: deepseek, qwen, claude…**, or click one of the suggested names, or **see the newest**. Filters:
+In the same group, type in **Search OpenRouter: deepseek, qwen, claude…**, or click one of the suggested names, or **see the newest**. Filters:
 
 - **Tool calls**: models that call tools natively, the way Custom uses them best (Best match puts these first).
 - **Sees images**
 - **Reasoning**: models that think before they answer.
 - **Free**
 
-The menu on the right orders the results: **Best match** (while you search by name), **Newest**, **Cheapest** or **Longest context**. You get up to 50 models.
+The menu on the right orders the results: **Best match** (while you search by name), **Newest**, **Cheapest** or **Longest context**. You get up to 50 models, the first eight at first and **Show all** for the rest.
 
 Each model shows its maker, name and labels: **Latest** (always the maker's newest version), **New** (listed in the last three weeks), **Free**, **Reasoning**, **Images**, and **No native tools** (Custom then describes its tools in the instructions and reads its calls from its text). Below: how much it reads at once ("128K context"), its longest reply ("16K out"), its price per million tokens in and out, the month it was listed, a short description and its OpenRouter name.
 
 ### Add models to the pickers
 
-Click **Add** on a model. Its row then says **Added**, and the model appears under **Your models · in the pickers** at the top of the section and in Custom's **Model** menu. Click the × on one of Your models to take it out of the menus. Until you add at least one, OpenRouter offers no models ("Add at least one model to use OpenRouter.").
+Click **Add** on a model. Its row then says **Added**, and the model appears in the **Your OpenRouter models** group ("In the model pickers") above the search and in Custom's **Model** menu. Click the × on one of them to take it out of the menus. Until you add at least one, OpenRouter offers no models ("Add at least one model to use OpenRouter.").
 
 ## Connect Ollama, vLLM or another endpoint
 
-The **Runtimes and endpoints** section connects the programs that run models. Open it at [Settings → Agents → Models](/settings?s=models&find=Runtimes%20and%20endpoints).
+The **Runtimes and endpoints** group connects the programs that run models. Open it at [Settings → Agents → Models](/settings?s=models&find=Runtimes%20and%20endpoints).
 
 ### Ollama
 
-Ollama is a free program that runs models on your computer, on the graphics card or the processor. The line says "running" with its version, or "not running at this address" with an **Install Ollama** link. Its address is `http://127.0.0.1:11434` unless you change it: type another one and click **Save**. Every model in that Ollama shows in Custom's model list, including ones you pulled outside the app.
+Ollama is a free program that runs models on your computer, on the graphics card or the processor. Its row says "running" with its version, or "not running at this address" with an **Install Ollama** link. Its address is `http://127.0.0.1:11434` unless you change it: type another one in the field, and **Save** shows beside it. Every model in that Ollama shows in Custom's model list, including ones you pulled outside the app.
 
 ### vLLM
 
-vLLM is a fast server for models on NVIDIA graphics cards, and the way models from Hugging Face run here by default. A model too big for one card runs on it at 8-bit, or split across 2, 4 or 8 cards. On a Mac, vLLM runs on Apple silicon with its Metal plugin (vllm-metal). The app finds it by itself on the PATH or in a conda or venv environment, and shows its version and where it is. If it says "not found (pip install vllm), or give its command", install it, or type the full path of its `vllm` command and click **Save**. Leave the field empty to let the app look by itself.
+vLLM is a fast server for models on NVIDIA graphics cards, and the way models from Hugging Face run here by default. A model too big for one card runs on it at 8-bit, or split across 2, 4 or 8 cards. On a Mac, vLLM runs on Apple silicon with its Metal plugin (vllm-metal). The app finds it by itself on the PATH or in a conda or venv environment, and shows its version and where it is. If it says "not found (pip install vllm), or give its command", install it, or type the full path of its `vllm` command in the field and click **Save** (it shows once you type). Leave the field empty to let the app look by itself.
 
 ### Other OpenAI-compatible endpoints
 
 Many programs and services answer the same way OpenAI's API does: LM Studio, llama.cpp's server, other providers. To add one:
 
-1. Type a **Name**, its address (like `http://localhost:1234/v1`), and a **Key (optional)**.
-2. Click **Add**.
+1. Click **Add endpoint**, beside the group's title.
+2. In the dialog, type a **Name**, its address (like `http://localhost:1234/v1`), and a **Key (optional)**.
+3. Click **Add**.
 
-The endpoint shows with its address and how many models it offers. Its models appear in Custom's list as "model (name)". The × removes it. Adding another endpoint with the same name replaces the first.
+The endpoint shows as a row with its address and how many models it offers. Its models appear in Custom's list as "model (name)". The × removes it. Adding another endpoint with the same name replaces the first.
 
 A [confidential session](/guide/sessions#keep-a-session-confidential) may use an endpoint whose address is this computer or your private network: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, `172.16.…` to `172.31.…`, or a name ending in `.local`. Any other address counts as online, even one that leads to your own server: use its private address instead. The same goes for Ollama's address, and Ollama's cloud models (their names end in "cloud") always count as online.
 
 ### Hugging Face token
 
-A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the app download gated or private models ("Only for gated or private models."). Create one in your Hugging Face account settings, paste it into the field (it starts with `hf_`) and click **Save**. The section then shows its start and end, with **Remove**.
+A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the app download gated or private models (the row says "Only for gated or private models"). Create one in your Hugging Face account settings, click **Add token**, paste it into the dialog (it starts with `hf_`) and click **Save**. The row then shows its start and end, with **Remove token** in its **⋯** menu.
 
 ## Ask an agent
 

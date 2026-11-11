@@ -3,6 +3,94 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.2 · 11 November 2026
+
+The prompt bar keeps its spinning ring while a session's background work still runs.
+
+- **When a turn ends while what it started is still running** (a helper agent, a command in the background, a
+  monitor or a child session), the ring by the message box keeps turning, now around the **Send** button, until they
+  finish. Before, it stopped, so the session looked finished although its header said "Working · 2 in background".
+  You can send messages as usual meanwhile, and pointing at the button says what is still running.
+- It also shows when the session's own process has stopped between turns while its child sessions run, on session
+  pages and in Help's ask panel.
+
+## 0.55.1 · 11 November 2026
+
+The desktop apps' notices come as your system's own notifications, such as Mac notifications, even with the window
+closed.
+
+- **When a session finishes, fails or needs you**, the Mac, Windows and Linux apps now show a notification from your
+  system (on a Mac, in Notification Center), whether the window is in front, behind other windows or closed, and also
+  when the app opened at login without its window. Before, they showed only a small card inside the window, so a
+  notice could go unseen while you worked in another app. Click a notification to open its session.
+- The cards inside the window no longer show in a desktop app, so nothing comes twice. They show only when your
+  system doesn't show the app's notifications (on a Mac, when they're not allowed in System Settings → Notifications
+  → Hydor). There is still no notice about the session you're looking at, and a newer notification about a session
+  takes the place of the older one.
+- On a Mac, macOS asks once whether Hydor may send notifications. Notifications left from before the app restarted
+  still open their session.
+- **Settings → Notifications** in a desktop app says how the notifications reach you and whether your system shows
+  them, and **Send a test** shows one right away.
+
+## 0.55.0 · 11 November 2026
+
+Settings, redesigned: every section is calmer and easier to scan, and Memory is rebuilt from the ground up.
+
+- **Every section reads the same way**: short groups of settings, each with its name, at most one short line on what
+  it does, and its switch or button at the end. The longer explanations sit behind an **(i)** beside a setting's
+  name, and the line under each section's title ends with **Learn more**, which opens its part of Help.
+- **The main switch or button sits beside the section's title**: Memory, the browser and computer use turn on and off
+  there, and **Add server**, **New task** or **New skill** are there too. Rarer actions are in a row's **⋯** menu,
+  and forms such as a new password, an API key or a token open in a dialog.
+- **Memory**: your profile first, then your notes as an index of places (about you, each project, sessions, notes no
+  agent needed lately, deleted notes), each opening as a page of its own with its own search. A note opens with
+  everything about it in one place: its whole text, where it came from, how it is known, how often agents needed it,
+  its end date and its history, to edit, delete or restore. The options are grouped as **Learning**, **What agents
+  get** and **Your data**.
+- **Models**: the tiers show one program at a time (Claude Code, Codex or Custom), a row for each tier.
+- **General**: groups for the look, sessions, terminals, starting and updating, and help; the version and its
+  updates are one row.
+- **Long lists show their first few** (projects, agents, examples, models) with **Show all**.
+- **On a phone**, a row's switch or button stays on its line.
+- **The search box** (Ctrl+K) keeps pointing at a setting low on a page while the page fills in above it.
+
+## 0.54.6 · 11 November 2026
+
+Limit resets no longer go missing because the app asked for them too often.
+
+- The app read your Claude limit resets with every usage refresh: every two minutes while a page was open, and more
+  often while a session waited out a limit. Anthropic started refusing those reads, so the list in System → Usage
+  went missing. It now reads them about every ten minutes, waits longer after a refusal, and keeps showing the list
+  it last read in between, even after the app restarts.
+- A reset you use leaves the list at once.
+
+## 0.54.5 · 11 November 2026
+
+Claude limit resets show in the Mac app again, and a session whose helpers are still running shows as working.
+
+- **Limit resets** in System → Usage show for your Claude accounts in the Mac app. On a Mac, Claude Code keeps its
+  sign-in in the Keychain, and the app looked for it only in a file that Claude Code no longer keeps up to date
+  there, so the list went missing once that file's sign-in ran out.
+- A list of limit resets that can't be read for a moment keeps the last one it had, for Claude and Codex, instead of
+  disappearing. A Codex card whose limits can't be read keeps its last limits too, rather than saying "No usage
+  limits reported for this plan".
+- A session whose own turn is over while child sessions it started are still running shows as working: its dot
+  keeps breathing, it shows no Done marker, it stays under Active, and its status says "Working · 2 helper
+  sessions". You can still send it messages.
+
+## 0.54.4 · 11 November 2026
+
+Agent program updates no longer fail because a Mac went to sleep while a new version was being checked.
+
+- Before it keeps a new version of Claude Code, Codex or another agent program, the app checks that it answers, and
+  gives it a minute. That minute used to keep running while a Mac slept, so an update that ran at night could undo a
+  version that works, with "it did not answer within a minute", and not try it again. Now only time the computer is
+  awake counts.
+- A new version that is slow to answer the first time is started again with two more minutes before it counts as
+  not working.
+- The installs behind these updates also count only time awake, so one that a sleep cuts in two carries on after
+  it instead of being stopped half done.
+
 ## 0.54.3 · 11 November 2026
 
 Forks from any Claude Code reply, even one from before the conversation was compacted.

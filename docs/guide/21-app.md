@@ -6,7 +6,7 @@ How the app looks and behaves for you, and how it keeps itself up to date: dark 
 
 ## Pick dark, light or your device's mode
 
-Open [Settings → App → General](/settings?s=general&find=Theme). The **Theme** section has a switch at its top:
+Open [Settings → App → General](/settings?s=general&find=Appearance). The **Appearance** group has a switch beside its title:
 
 - **Dark**: always a dark theme.
 - **Light**: always a light theme.
@@ -16,7 +16,7 @@ The mode is kept in this browser, so your phone and your computer can differ. Th
 
 ## Choose a theme
 
-Under the switch, the themes show as small pictures of the app in their colours, in two rows: **Dark** and **Light**. Four come with the app:
+Under the title, in the group's box, the themes show as small pictures of the app in their colours, in two rows: **Dark** and **Light**. Four come with the app:
 
 - **Hydor Dark**: pure black behind your sessions, cool blue-black panels and a periwinkle accent. The dark theme at first.
 - **Midnight**: pure black behind your sessions, warm near-black panels and a gold accent.
@@ -72,7 +72,7 @@ The theme is added to your own and used at once. If the text isn't a theme, the 
 
 ## Change the language
 
-[Settings → App → General → Language](/settings?s=general&find=Language) shows the app in:
+[Settings → App → General → Appearance → Language](/settings?s=general&find=Language) is a menu with the languages the app is shown in:
 
 - **English**
 - **中文（简体）** (Chinese, Simplified)
@@ -86,7 +86,7 @@ Agents write to you in the language you pick: they are asked to, unless you writ
 
 ## Decide what Enter does while an agent works
 
-[**Sending while an agent works**](/settings?s=general&find=Sending%20while%20an%20agent%20works) decides what happens when you send a message while the agent is in the middle of a turn:
+In the **Sessions** group, [**Sending while an agent works**](/settings?s=general&find=Sending%20while%20an%20agent%20works) decides what happens when you send a message while the agent is in the middle of a turn:
 
 - **Join the turn** (at first): Enter adds your message to the turn in progress, so the agent takes it into account right away. Ctrl+Enter (⌘Enter on a Mac) waits for the turn to end instead.
 - **Wait for it**: Enter puts your message in the queue, and it goes out when the turn ends. Ctrl+Enter (⌘Enter on a Mac) adds it to the turn in progress instead.
@@ -95,7 +95,7 @@ The choice is kept in this browser. More about the queue in [Sessions](/guide/se
 
 ## Turn terminal suggestions on or off
 
-[**Terminal suggestions**](/settings?s=general&find=Terminal%20suggestions) (on at first) shows grey text after the cursor in the app's terminals with the likeliest rest of the command; → takes it. Turning it off hides the grey text only: Ctrl+Space still lists suggestions. It is kept in this browser. See [Grey suggestions](/guide/files-git#grey-suggestions).
+In the **Terminals** group, [**Terminal suggestions**](/settings?s=general&find=Terminal%20suggestions) (on at first) shows grey text after the cursor in the app's terminals with the likeliest rest of the command; → takes it. Turning it off hides the grey text only: Ctrl+Space still lists suggestions. It is kept in this browser. See [Grey suggestions](/guide/files-git#grey-suggestions).
 
 ## Resume sessions after a usage limit
 
@@ -105,7 +105,7 @@ The choice is kept in this browser. More about the queue in [Sessions](/guide/se
 
 The app keeps every session, whatever the agent's own program does (see [Every session is kept](/guide/usage#every-session-is-kept)), until nobody has used it for a long time. [**Delete inactive sessions**](/settings?s=general&find=Delete%20inactive%20sessions) (on at first) deletes sessions inactive for **1 year**, a few hundred a day at most.
 
-- Pick how long a session may stay inactive in the menu beside the switch: **After 3 months**, **After 6 months**, **After 1 year**, **After 2 years** or **After 5 years**.
+- Pick how long a session may stay inactive in the menu beside the switch in its row: **After 3 months**, **After 6 months**, **After 1 year**, **After 2 years** or **After 5 years**.
 - Turn the switch off to keep every session for good.
 - A session counts as inactive from the last time anything happened in it.
 - Some sessions always stay: pinned ones, and ones that are at work, waiting for you, have messages queued, are snoozed, are due to resume after a limit, run in VS Code or a terminal, or have an open pull request.
@@ -120,11 +120,11 @@ It is kept by the app, so it works with no browser open.
 - Limits hold from the next time a session's agent starts; sessions already running keep the ones they started with.
 - Over its memory, the program that asked for more is stopped, not the app and not another session: the agent sees its command end and can go on. The session's Info and System → Monitor say so: "one stopped at its memory limit".
 - At its processors, the session's programs run slower, and the rest of the computer stays free.
-- Limits work on Linux, through your user's systemd: each session runs in a scope of its own. Elsewhere, or with no user systemd running, the menus are off and say why; what each session uses still shows in [Monitor](/system/monitor).
+- Limits work on Linux, through your user's systemd: each session runs in a scope of its own. Elsewhere, or with no user systemd running, the menus are off and the row's (i) says why; what each session uses still shows in [Monitor](/system/monitor).
 
 ## Start the app when the computer starts
 
-[**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts) brings the app back after the computer restarts, and after a crash. It is on at first: the installer sets the app up as a service, and a copy started by hand from a git clone sets one up the first time it runs. What the switch can do depends on how the app runs, and the line under it says which:
+In the **Startup and updates** group, [**Start when this computer starts**](/settings?s=general&find=Start%20when%20this%20computer%20starts) brings the app back after the computer restarts, and after a crash. It is on at first: the installer sets the app up as a service, and a copy started by hand from a git clone sets one up the first time it runs. What the switch can do depends on how the app runs, and the line under it (and its (i)) says which:
 
 - **As a service of your user** (the usual install): the switch turns it on or off. It starts at boot even before anyone logs in; if the line says it starts only once you log in, run `sudo loginctl enable-linger $USER` once on the computer to change that.
 - **As a system service**: changing it needs administrator rights on the computer.
@@ -136,16 +136,16 @@ While the app loads, in a browser or while a desktop app starts, its logo shows 
 
 ## Keep the app up to date
 
-A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the desktop apps look a minute after they open and then every 4 hours. **About**, at the bottom of [Settings → App → General](/settings?s=general&find=Check%20now), shows the version you run and how things stand:
+A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the desktop apps look a minute after they open and then every 4 hours. The version row, the last row of **Startup and updates** in [Settings → App → General](/settings?s=general&find=Check%20now), is named after the version you run (**Hydor …**) and shows how things stand:
 
 - "Up to date · checked … ago", with **Check now** to look again at once.
 - When a newer version is out: "… updates out", the latest change's title, and **Update now**. It gets the new version, builds it and restarts the app; running agents carry on through the restart, and this tab reloads into the new version by itself. If the app can't restart itself, it gets and builds the new version, and you restart the app to use it.
 - While it updates: "Getting the new version…", "Installing packages…", "Building…", then "Restarting, this page reconnects by itself…".
 - For a week afterwards, how the last update went: when it updated (and from which version to which), or why it failed.
 
-When a newer version is out, a dot shows on **Settings** in the sidebar. A copy not installed from git can't check: **Check now** says so.
+When a newer version is out, a dot shows on **Settings** in the sidebar. A copy not installed from git can't check: **Check now** says so. The row's (i) says where sessions run and where their history comes from.
 
-[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the desktop apps as soon as one is out, after a minute's notice (the Linux .deb asks for your password first). Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or a desktop app that can replace itself, such as the Mac app in the Applications folder); otherwise the switch is off and says why.
+[**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first, the row above the version) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the desktop apps as soon as one is out, after a minute's notice (the Linux .deb asks for your password first). Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or a desktop app that can replace itself, such as the Mac app in the Applications folder); otherwise the switch is off and says why.
 
 Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Hydor was updated").
 
@@ -156,21 +156,21 @@ The desktop apps (Mac, Windows and Linux) go by released versions instead. With 
 - A notification: "Hydor … is ready", restarting in a minute to install it. Clicking it opens the app; its **Restart Now** button installs the new version at once.
 - A note in the corner of every open page of the app that counts down the seconds ("Restarting in 42 s to install it"), with **Restart now** and **Later**.
 
-When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon (in the menu bar, the notification area or the system tray, and in the app's own menu) installs it whenever you like, and so does **Restart now** under **About**, which says "Version … is ready to install" and when it asks again.
+When the minute is up, the app restarts into the new version: running agents carry on, and its window comes back by itself. **Later** puts it off for 4 hours, when the notification and the note come back. Until then, **Restart to Update to …** in the menu of the app's icon (in the menu bar, the notification area or the system tray, and in the app's own menu) installs it whenever you like, and so does **Restart now** in the version row, which says "Version … is ready to install" and when it asks again.
 
-With **Update automatically** off, nothing downloads by itself: **About** says "Version … is out", and **Update now** downloads it, checks it and opens it in place of the one you run ("Downloading the new version…", then "Opening the new version, this page reconnects by itself…").
+With **Update automatically** off, nothing downloads by itself: the version row says "Version … is out", and **Update now** downloads it, checks it and opens it in place of the one you run ("Downloading the new version…", then "Opening the new version, this page reconnects by itself…").
 
-A download that breaks off carries on from where it stopped: when the computer goes to sleep, or the connection drops or goes quiet for a minute, it picks up again as soon as it can. If it still gets no further after a couple of minutes, it keeps what it has, the line under **About** says how far it got, and it tries again an hour later, carrying on from there; so does **Update now**.
+A download that breaks off carries on from where it stopped: when the computer goes to sleep, or the connection drops or goes quiet for a minute, it picks up again as soon as it can. If it still gets no further after a couple of minutes, it keeps what it has, the line under the version row says how far it got, and it tries again an hour later, carrying on from there; so does **Update now**.
 
 On Windows, the new version's installer runs without its window, installs over the app and opens it again. The Linux .deb asks for your password to install: a version that downloaded by itself waits, and **Restart to Update** (or **Restart now**) asks for the password and opens the new version.
 
-If the new version of the Mac app or an AppImage does not start, the version before comes back by itself and the line under **About** says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there. An AppImage likewise needs a folder you can write to, such as your home folder.
+If the new version of the Mac app or an AppImage does not start, the version before comes back by itself and the line under the version row says why; that version then installs only when you press **Update now**. The Mac app can update itself only from the Applications folder (or another folder you can write to): opened from the disk image, it says to move it there. An AppImage likewise needs a folder you can write to, such as your home folder.
 
 ## Read the release notes
 
 Every version has release notes: what changed for the people using it.
 
-- In **About** at the bottom of [Settings → App → General](/settings?s=general), click **Release notes** beside the version.
+- In the version row at the bottom of **Startup and updates** in [Settings → App → General](/settings?s=general), click **Release notes**.
 - Or type "release notes" or "what's new" in the search box.
 
 The notes list every version, newest first, each with its date; the one you run is marked "This version", and Settings opens the notes there.
@@ -181,21 +181,21 @@ Once after the app updates, a note in the corner says "Updated to Hydor …" wit
 
 The welcome tour is made for people new to AI. It opens with a short film of a request being done (you ask in your own words, the agent works step by step, the result is ready), then asks what should do the work: **Claude** or **ChatGPT** (with the plan you already pay for), **Pay as you go** (models from every company through OpenRouter), **Free, on this computer** (models that run here), or **Other agents**. It sets each one you pick up on pages that fill the screen, each with its picture and its words in the same place and nothing to scroll: signing in, adding your OpenRouter key and picking the models for your agent, then the models that make pictures, music, voices and videos, or installing one of the models suggested for this computer with one click. The picture beside each page shows what you picked as streams flowing into a pool around the Ω, which fills as you pick more; small dots at the bottom show where you are, over a sea whose waves drift gently. When another agent's folder is on this computer (Claude Code, Codex or another), one more page, **Coming from another agent?**, names what it found and opens [Bring in](/guide/memory#bring-in-from-other-assistants) over the tour; with none of them here, there is no such page. Then it shows you around the app part by part, with something to try on the way: a first task you can put in the message box with one click. It opens by itself the first time you use the app.
 
-To take it again: [Settings → App → General → Welcome tour → **Take the tour**](/settings?s=general&find=Take%20the%20tour), **Take the tour** in the search box, or **Take the tour** at the top of **Help** in the sidebar. More in [Getting started](/guide/start).
+To take it again: [Settings → App → General → Help → Welcome tour → **Take the tour**](/settings?s=general&find=Take%20the%20tour), **Take the tour** in the search box, or **Take the tour** at the top of **Help** in the sidebar. More in [Getting started](/guide/start).
 
 After the tour, tips show you the rest of the app as you come to it. The first time a part of the app is on your screen (the inbox, a session's menu, the Git page, **Settings → Memory**…), a small card beside it says what it is for, and **Learn more** opens this guide where it says more. Tips come one at a time and a while apart, never while you type or have a menu open.
 
 - **Got it**, or using the part it points at, puts a tip away for good, on every device.
 - **Skip tips** stops them all, on every device. **Skip the tour** on the tour's first page does too; closing the tour with ✕ leaves them on.
-- To turn them on or off again: [Settings → App → General → **Tips**](/settings?s=general&find=Tips).
+- To turn them on or off again: [Settings → App → General → Help → **Tips**](/settings?s=general&find=Tips).
 
 ## Change your password
 
-The app has one password, chosen when it was installed. To change it, open [Settings → App → Password](/settings?s=security&find=Change%20password):
+The app has one password, chosen when it was installed. To change it, open [Settings → App → Password](/settings?s=security&find=Change%20password) and click **Change…** in the **Change password** row. A dialog opens:
 
 1. Type your **Current password**.
 2. Type the **New password** (at least 10 characters) and **Repeat new password**.
-3. Click **Change password**.
+3. Click **Change password** (it stays grey until the current password is typed and the new one has 10 characters).
 
 Changing it signs out every other browser: phones, other computers, everywhere but this one. If the current password is wrong, or the two new ones differ, nothing changes and the app says why.
 
@@ -203,7 +203,7 @@ If you have forgotten it, run this on the computer the app runs on, in the app's
 
 ## Sign out of this browser
 
-[Settings → App → Password → Sign out of this browser](/settings?s=security&find=Sign%20out%20of%20this%20browser) → **Sign out** signs this browser out, and only this one. You need the password to come back.
+[Settings → App → Password → This browser → Sign out of this browser](/settings?s=security&find=Sign%20out%20of%20this%20browser) → **Sign out** signs this browser out, and only this one. You need the password to come back.
 
 ## Where the app keeps its data
 
@@ -217,7 +217,7 @@ The app keeps its own data in one folder, its data folder: `~/.hydor` in your ho
 - notebook kernels and the private server the terminals run in;
 - once search by meaning is on, its private Python environment.
 
-Conversations themselves stay where the agents write them, `~/.claude/projects` for Claude Code and `~/.codex/sessions` for Codex: the app reads them there (**About** in Settings → General says so). With Docker, all of this lives in the container's `/home/node`, kept in its data volume.
+Conversations themselves stay where the agents write them, `~/.claude/projects` for Claude Code and `~/.codex/sessions` for Codex: the app reads them there (the (i) beside the version in Settings → General says so). With Docker, all of this lives in the container's `/home/node`, kept in its data volume.
 
 ### What each browser keeps
 

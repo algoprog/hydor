@@ -14,10 +14,11 @@ import { ModelPicker } from '../../components/AgentPickers';
 import { AgentIcon } from '../../components/AgentIcon';
 import { FolderChip } from '../../components/FolderPicker';
 import { go } from '../../lib/nav';
-import { Badge, Button, cx, Dialog, IconButton, inputCls, OptionRow, Picker, Popover, Section, Segmented, Switch, Throbber } from '../../components/ui';
+import { Badge, Button, cx, Dialog, IconButton, inputCls, OptionRow, Picker, Popover, Segmented, Switch, Throbber } from '../../components/ui';
 import { useSpaces } from '../spaces/state';
 import { AssistantIcon, ICONS } from './icons';
 import { OutputEditor } from './OutputEditor';
+import { Group, Row, Stack } from '../settings/kit';
 import { useAssistants, useAssistantsState } from './state';
 
 type Draft = Partial<Assistant>;
@@ -25,70 +26,55 @@ const saved = (r: AssistantsState) => useAssistants.getState().set(r);
 
 export function AssistantsSettings() {
   const st = useAssistantsState();
-  if (!st) return <Throbber className="text-fg-3" />;
-  const mine = st.assistants.filter((a) => !a.builtin).length;
-  return (
-    <div className="space-y-4">
-      <Section
-        title="Your agents"
-        sub="Make and change them on the Agents page: what each does, where and when it works, what it thinks with, and whom it asks"
-        actions={
-          <Button size="sm" variant="secondary" icon={<Bot size={14} />} onClick={() => go('/agents')}>
-            Open Agents
-          </Button>
-        }
-      >
-        <div className="text-[13px] text-fg-3">
-          {mine ? (mine === 1 ? 'You have 1 agent of your own, beside the built-in ones.' : `You have ${mine} agents of your own, beside the built-in ones.`) : 'Only the built-in agents so far.'}
-        </div>
-      </Section>
-      <CleanUpSection on={st.cleanUp} />
-      <TaskFolderSection st={st} />
-    </div>
-  );
-}
-
-// ---- cleaning up after a task ------------------------------------------------------------------------------
-
-function CleanUpSection({ on }: { on: boolean }) {
-  const set = (cleanUp: boolean) =>
+  const home = useApp((s) => s.boot?.home) ?? '';
+  const wait = <Throbber className="text-fg-3" />;
+  const mine = st ? st.assistants.filter((a) => !a.builtin).length : 0;
+  const setCleanUp = (cleanUp: boolean) =>
     put<AssistantsState>('/api/assistants/settings', { cleanUp })
       .then((r) => (saved(r), toast(cleanUp ? 'Agents clean up after a task from their next session' : 'Agents leave what they made in place from their next session', 'ok')), toastError);
+  const setRoot = (taskRoot: string) => put<AssistantsState>('/api/assistants/settings', { taskRoot }).then(saved, toastError);
   return (
-    <Section title="When a task is done" sub="What every agent does at the end of a task, whatever the assistant">
-      <label className="flex cursor-pointer items-start gap-3">
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] text-fg">Clean up after a task</span>
-          <span className="mt-0.5 block text-[12.5px] leading-snug text-fg-3">
-            The agent removes what it made along the way and no longer needs: scratch and test files, temporary data, extra branches and worktrees, processes it started. It keeps
-            the work you asked for, never touches what it did not make, asks first about anything large or unclear, and says what it removed.
-          </span>
-        </span>
-        <Switch on={on} onChange={set} label="Clean up after a task" className="mt-0.5" />
-      </label>
-    </Section>
-  );
-}
-
-// ---- task folders ------------------------------------------------------------------------------------------
-
-function TaskFolderSection({ st }: { st: AssistantsState }) {
-  const home = useApp((s) => s.boot?.home) ?? '';
-  const set = (taskRoot: string) => put<AssistantsState>('/api/assistants/settings', { taskRoot }).then(saved, toastError);
-  return (
-    <Section title="Task folders" sub="A session started without a folder gets a new one here, named by the day and the task">
-      <div className="flex flex-wrap items-center gap-2">
-        <FolderChip value={st.taskRoot} onChange={set} />
-        {st.taskRoot !== st.defaultTaskRoot && (
-          <Button size="sm" variant="ghost" onClick={() => set('')}>
-            Back to {tildify(st.defaultTaskRoot, home)}
-          </Button>
-        )}
-      </div>
-      <p className="mt-2 text-[12.5px] text-fg-3">
-        New ones look like <span className="font-mono text-[12px] text-fg-2">{tildify(st.taskRoot, home)}/2026-10-31-plan-trip-lisbon</span>. Coder works in the folder you pick instead.
-      </p>
-    </Section>
+    <Stack>
+      <Group>
+        <Row
+          icon={<Bot size={16} />}
+          label="Your agents"
+          hint={!st ? undefined : mine ? `${mine} of your own, beside the built-in ones` : 'Only the built-in agents so far'}
+          info="Make and change them on the Agents page: what each does, where and when it works, what it thinks with, and whom it asks."
+          control={!st ? wait : undefined}
+          onClick={() => go('/agents')}
+        />
+      </Group>
+      <Group title="Tasks">
+        <Row
+          label="Clean up after a task"
+          hint="Agents remove what they made along the way"
+          info="The agent removes what it made along the way and no longer needs: scratch and test files, temporary data, extra branches and worktrees, processes it started. It keeps the work you asked for, never touches what it did not make, asks first about anything large or unclear, and says what it removed."
+          control={st ? <Switch on={st.cleanUp} onChange={setCleanUp} label="Clean up after a task" /> : wait}
+        />
+        <Row
+          label="Task folders"
+          hint={st ? <>
+              New ones look like <span translate="no" className="font-mono text-[12px] break-all text-fg-2">{tildify(st.taskRoot, home)}/2026-10-31-plan-trip-lisbon</span>
+            </> : undefined}
+          info="A session started without a folder gets a new one here, named by the day and the task. Coder works in the folder you pick instead."
+          control={
+            st ? (
+              <>
+                {st.taskRoot !== st.defaultTaskRoot && (
+                  <Button size="sm" variant="ghost" onClick={() => setRoot('')}>
+                    Back to <span translate="no">{tildify(st.defaultTaskRoot, home)}</span>
+                  </Button>
+                )}
+                <FolderChip value={st.taskRoot} onChange={setRoot} />
+              </>
+            ) : (
+              wait
+            )
+          }
+        />
+      </Group>
+    </Stack>
   );
 }
 

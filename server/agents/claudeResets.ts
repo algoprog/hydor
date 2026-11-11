@@ -1,16 +1,48 @@
 // Claude limit resets, the ones the CLI offers in /rate-limit-options: the plan's usage read lists
 // reset grants, and a grant is claimed by id. The CLI's stream-json control protocol has neither, so
-// these are the CLI's own two calls, made with its stored claude.ai sign-in. The token is never
-// refreshed here (a refresh rotates it under the running CLIs): a stale one is renewed by asking the
-// CLI for usage first, which refreshes it the CLI's way.
+// these are the CLI's own two calls, made with its stored claude.ai sign-in (on a Mac in the login
+// Keychain, elsewhere in .credentials.json). The token is never refreshed here (a refresh rotates it
+// under the running CLIs): a stale one is renewed by asking the CLI for usage first, which refreshes
+// it the CLI's way.
+import { execFile } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { LimitReset } from '../../shared/types.ts';
+import type { AgentUsage, LimitReset } from '../../shared/types.ts';
 import { config } from '../config.ts';
 
 type Json = Record<string, any>;
+
+/**
+ * How often the resets are read: they change seldom, and Anthropic refuses reads that come too often (HTTP 429), so a
+ * read with every usage refresh (every two minutes on an open page, more while a session waits out a limit) lost
+ * them. After a refusal the next read waits longer each time, up to `longest`. Tests shorten these.
+ */
+export const resetReads = { every: 10 * 60_000, longest: 60 * 60_000 };
+
+type Kept = NonNullable<AgentUsage['resetCredits']>;
+const keptFile = (dir?: string) => path.join(config.dataDir, 'usage', `claude-resets-${dir ? crypto.createHash('sha256').update(dir).digest('hex').slice(0, 12) : 'default'}.json`);
+
+/** The resets as last read for this config folder, kept on disk so that a restart shows them before its first read: expired ones left out, none after three days. */
+export function keptResets(dir?: string): Kept | undefined {
+  try {
+    const k = JSON.parse(fs.readFileSync(keptFile(dir), 'utf8'));
+    if (!(Date.now() - k.at < 3 * 86400_000) || !Array.isArray(k.resetCredits?.items)) return undefined;
+    const items = (k.resetCredits.items as LimitReset[]).filter((i) => !i.expiresAt || i.expiresAt > Date.now());
+    return { ...k.resetCredits, items, available: items.reduce((n, i) => n + (i.left ?? 1), 0) };
+  } catch {
+    return undefined;
+  }
+}
+
+export function keepResets(dir: string | undefined, rc: Kept): void {
+  try {
+    const f = keptFile(dir);
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify({ at: Date.now(), resetCredits: rc }));
+  } catch {}
+}
 
 const API = 'https://api.anthropic.com';
 const GRANT_ID = /^[a-z0-9_-]{1,40}$/;
@@ -29,9 +61,47 @@ function readJson(file: string): Json | null {
   }
 }
 
-/** The CLI's claude.ai access token, while it is good for another minute. */
-function token(dir?: string): string | null {
-  const o = readJson(path.join(configDir(dir), '.credentials.json'))?.claudeAiOauth;
+/** The name Claude Code files its Keychain items under: your user name, as it reads it. */
+function keychainAccount(): string {
+  let user = '';
+  try {
+    user = process.env.USER || os.userInfo().username;
+  } catch {}
+  return /^[a-zA-Z0-9._-]+$/.test(user) ? user : 'claude-code-user';
+}
+
+/**
+ * The Keychain item that holds a config folder's sign-in, named as Claude Code names it: "Claude Code-credentials",
+ * then for a folder other than the default (CLAUDE_CONFIG_DIR, as an added account has) the first 8 hex digits of
+ * its path's SHA-256.
+ */
+export function keychainService(dir?: string): string {
+  const store = process.env.CLAUDE_SECURESTORAGE_CONFIG_DIR;
+  const own = store !== undefined ? store : (dir ?? process.env.CLAUDE_CONFIG_DIR);
+  return `Claude Code-credentials${own ? `-${crypto.createHash('sha256').update(own.normalize('NFC')).digest('hex').slice(0, 8)}` : ''}`;
+}
+
+/** A Keychain item's JSON, read with the same command Claude Code uses; null when there is none. */
+function keychainJson(service: string): Promise<Json | null> {
+  return new Promise((resolve) =>
+    execFile('/usr/bin/security', ['find-generic-password', '-a', keychainAccount(), '-w', '-s', service], { timeout: 10_000 }, (err, stdout) => {
+      if (err) return resolve(null);
+      try {
+        resolve(JSON.parse(String(stdout).trim()));
+      } catch {
+        resolve(null);
+      }
+    }),
+  );
+}
+
+/**
+ * The CLI's claude.ai access token, while it is good for another minute. On a Mac, Claude Code keeps it in the login
+ * Keychain and reads it from there first; a .credentials.json beside it is one it no longer renews.
+ */
+async function token(dir?: string): Promise<string | null> {
+  const mac = process.platform === 'darwin' ? (await keychainJson(keychainService(dir)))?.claudeAiOauth : null;
+  const o = mac?.accessToken ? mac : readJson(path.join(configDir(dir), '.credentials.json'))?.claudeAiOauth;
   if (!o?.accessToken || (o.expiresAt && o.expiresAt - Date.now() < 60_000)) return null;
   return String(o.accessToken);
 }
@@ -58,7 +128,7 @@ function userAgent(): string {
 }
 
 async function signedIn(renew: () => Promise<unknown>, dir?: string): Promise<string | null> {
-  const t = token(dir);
+  const t = await token(dir);
   if (t) return t;
   await renew().catch(() => {});
   return token(dir);

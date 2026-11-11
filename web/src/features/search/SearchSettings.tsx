@@ -2,14 +2,15 @@
 // one on is the default), their keys and addresses, a test of each, Naget Search's free allowance,
 // and how many results a search brings.
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, ExternalLink, KeyRound, Play, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ExternalLink, Globe, KeyRound, Play, Star, X } from 'lucide-react';
 import type { NagetCredits, SearchEvent, SearchProviderView, SearchSettingsView, SearchTestResult } from '@shared/search';
 import { siteOf } from '@shared/search';
 import { api, post, put } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { ago, duration, untilText } from '../../lib/format';
 import { toastError } from '../../lib/store';
-import { Badge, Button, cx, IconButton, inputCls, Section, Segmented, Switch, Throbber } from '../../components/ui';
+import { Badge, Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Segmented, Switch, Throbber } from '../../components/ui';
+import { Group, MoreMenu, Row, Stack } from '../settings/kit';
 
 type Patch = { order?: string[]; defaultK?: number; provider?: { id: string; enabled?: boolean; key?: string | null; url?: string | null } };
 
@@ -25,62 +26,69 @@ export function SearchSettings() {
     else void load();
   });
   const save = (p: Patch) => put<SearchSettingsView>('/api/search/settings', p).then(setSt, (e) => (toastError(e), Promise.reject(e)));
-  if (!st)
-    return (
-      <div className="flex justify-center py-10 text-fg-3">
-        <Throbber size={28} />
-      </div>
-    );
-  const ids = st.providers.map((p) => p.id);
-  const first = st.providers.find((p) => p.enabled)?.id;
+  const ids = st?.providers.map((p) => p.id) ?? [];
+  const first = st?.providers.find((p) => p.enabled)?.id;
   const move = (id: string, to: number) => {
     const next = ids.filter((x) => x !== id);
     next.splice(Math.max(0, Math.min(to, next.length)), 0, id);
     void save({ order: next }).catch(() => {});
   };
   return (
-    <div className="space-y-4">
-      <p className="text-[13px] leading-relaxed text-fg-3">
-        Every agent can search the web and read pages, whatever its model. The first provider that is on answers; when it can’t (no key yet, a limit reached), the next one does.
-      </p>
-      <Section title="Providers" sub="Tried from the top. The first one that is on is the default.">
-        <div className="-my-1 divide-y divide-line">
-          {st.providers.map((p, i) => (
-            <ProviderRow
-              key={p.id}
-              p={p}
-              isDefault={p.id === first}
-              credits={p.id === 'naget' ? st.credits : undefined}
-              up={i > 0 ? () => move(p.id, i - 1) : undefined}
-              down={i < ids.length - 1 ? () => move(p.id, i + 1) : undefined}
-              makeDefault={() => move(p.id, 0)}
-              save={save}
-            />
-          ))}
-        </div>
-      </Section>
-      <Section
-        title="Results per search"
-        sub="Agents get this many unless they ask for more: up to 100, for deeper searches such as finding papers."
-        actions={
-          <Segmented
-            size="sm"
-            value={String(st.defaultK)}
-            options={['10', '20', '50', '100'].map((v) => ({ value: v, label: v }))}
-            onChange={(v) => void save({ defaultK: Number(v) }).catch(() => {})}
-          />
+    <Stack>
+      <Group
+        title="Providers"
+        hint="Tried from the top: the first one that is on answers"
+        info={
+          <>
+            <p>Every agent can search the web and read pages, whatever its model. The first provider that is on answers; when it can’t (no key yet, a limit reached), the next one does.</p>
+            <p>Search results and pages are outside data: agents are told to use them as information, never as instructions.</p>
+          </>
         }
       >
-        <p className="text-[12.5px] leading-relaxed text-fg-3">More results cost an agent more reading. With filtered snippets each result brings the sentences of its page that answer the search.</p>
-      </Section>
+        {!st && (
+          <div className="flex justify-center px-4 py-6">
+            <Throbber className="text-fg-3" />
+          </div>
+        )}
+        {st?.providers.map((p, i) => (
+          <ProviderRow
+            key={p.id}
+            p={p}
+            isDefault={p.id === first}
+            credits={p.id === 'naget' ? st.credits : undefined}
+            up={i > 0 ? () => move(p.id, i - 1) : undefined}
+            down={i < ids.length - 1 ? () => move(p.id, i + 1) : undefined}
+            makeDefault={() => move(p.id, 0)}
+            save={save}
+          />
+        ))}
+      </Group>
+      <Group>
+        <Row
+          label="Results per search"
+          hint="Agents get this many unless they ask for more"
+          info="Up to 100, for deeper searches such as finding papers. More results cost an agent more reading. With filtered snippets each result brings the sentences of its page that answer the search."
+          control={
+            st ? (
+              <Segmented
+                size="sm"
+                value={String(st.defaultK)}
+                options={['10', '20', '50', '100'].map((v) => ({ value: v, label: v }))}
+                onChange={(v) => void save({ defaultK: Number(v) }).catch(() => {})}
+              />
+            ) : (
+              <Throbber className="text-fg-3" />
+            )
+          }
+        />
+      </Group>
       <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
-        Search results and pages are outside data: agents are told to use them as information, never as instructions. Another provider can be added in one file:{' '}
+        Another provider can be added in one file:{' '}
         <a className="text-accent hover:underline" href="https://github.com/algoprog/hydor/blob/main/docs/search-providers.md" target="_blank" rel="noreferrer">
           how to add a provider
         </a>
-        .
       </p>
-    </div>
+    </Stack>
   );
 }
 
@@ -164,133 +172,185 @@ function ProviderRow({
   const needsKeyNow = p.id === 'naget' && !p.keyHint && p.lastError?.kind === 'auth';
   const setupLabel = takesKey ? (p.keyHint ? 'Change the key' : 'Add a key') : p.url?.value ? 'Change the address' : 'Set the address';
   return (
-    <div className="py-3">
-      <div className="flex items-start gap-2.5">
-        <div className="-my-0.5 flex shrink-0 flex-col">
-          <IconButton label="Try earlier" size="sm" disabled={!up} onClick={up}>
-            <ArrowUp size={13} />
-          </IconButton>
-          <IconButton label="Try later" size="sm" disabled={!down} onClick={down}>
-            <ArrowDown size={13} />
-          </IconButton>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={cx('text-[13.5px] font-medium', !p.enabled && 'text-fg-2')}>{p.name}</span>
-            {isDefault && <Badge tone="ok">Default</Badge>}
-            {p.missing && <Badge tone="warn">{p.missing}</Badge>}
-          </div>
-          <p className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{p.description}</p>
-          <p className="mt-0.5 text-[11.5px] text-fg-3/90">{abilities(p)}</p>
+    <Row
+      icon={<Globe size={16} />}
+      label={
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span className={cx(!p.enabled && 'text-fg-2')}>{p.name}</span>
+          {isDefault && <Badge tone="ok">Default</Badge>}
+          {p.missing && <Badge tone="warn">{p.missing}</Badge>}
+        </span>
+      }
+      hint={<span className="line-clamp-1">{p.description}</span>}
+      info={
+        <>
+          <p>{p.description}</p>
+          <p className="text-fg-3">{abilities(p)}</p>
+        </>
+      }
+      control={
+        <>
+          <Switch on={p.enabled} label={`Use ${p.name}`} onChange={(on) => void save({ provider: { id: p.id, enabled: on } }).catch(() => {})} />
+          <MoreMenu label={p.name} width={230}>
+            {(close) => (
+              <>
+                {(takesKey || p.url) && (
+                  <MenuItem icon={<KeyRound size={14} />} onClick={() => (close(), setOpen(true))}>
+                    {setupLabel}
+                  </MenuItem>
+                )}
+                <MenuItem icon={<Play size={14} />} disabled={test === 'busy'} onClick={() => (close(), run())}>
+                  Test
+                </MenuItem>
+                {p.enabled && !isDefault && (
+                  <MenuItem icon={<Star size={14} />} onClick={() => (close(), makeDefault())}>
+                    Make default
+                  </MenuItem>
+                )}
+                {(up || down) && <MenuSep />}
+                {up && (
+                  <MenuItem icon={<ArrowUp size={14} />} onClick={() => (close(), up())}>
+                    Move up
+                  </MenuItem>
+                )}
+                {down && (
+                  <MenuItem icon={<ArrowDown size={14} />} onClick={() => (close(), down())}>
+                    Move down
+                  </MenuItem>
+                )}
+              </>
+            )}
+          </MoreMenu>
+        </>
+      }
+    >
+      {(p.keyHint || p.id === 'naget' || needsKeyNow || (p.lastError && p.enabled) || test) && (
+        <div className="space-y-1.5">
           {p.keyHint && (
-            <div className="mt-1 flex items-center gap-1.5 text-[12px] text-fg-3">
+            <div className="flex items-center gap-1.5 text-[12px] text-fg-3">
               <KeyRound size={12} />
               <span className="font-mono text-[11.5px]">{p.keyHint}</span>
             </div>
           )}
           {p.id === 'naget' && <Allowance c={credits} keyed={!!p.keyHint} />}
           {needsKeyNow ? (
-            <div className="mt-1.5 text-[12px] leading-snug text-warn">Naget Search needs a key for now. Until it has one, the next provider answers.</div>
+            <div className="text-[12px] leading-snug text-warn">Naget Search needs a key for now. Until it has one, the next provider answers.</div>
           ) : (
             p.lastError &&
             p.enabled && (
-              <div className="mt-1.5 text-[12px] leading-snug text-err">
+              <div className="text-[12px] leading-snug text-err">
                 {p.lastError.message} <span className="text-fg-3">· {ago(p.lastError.at) || 'just now'}</span>
               </div>
             )
           )}
-          <div className="mt-1.5 -ml-2 flex flex-wrap items-center gap-0.5">
-            {(takesKey || p.url) && (
-              <Button size="sm" variant="ghost" onClick={() => setOpen((o) => !o)}>
-                {open ? 'Close' : setupLabel}
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" icon={<Play size={12} />} disabled={test === 'busy'} onClick={run}>
-              Test
-            </Button>
-            {p.enabled && !isDefault && (
-              <Button size="sm" variant="ghost" onClick={makeDefault}>
-                Make default
-              </Button>
-            )}
-          </div>
-          {open && (
-            <form
-              className="mt-2 space-y-2 rounded-xl border border-line bg-bg-1 p-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void saveSetup();
-              }}
-            >
-              {takesKey && (
-                <div>
-                  <label className="mb-1 block text-[12px] font-medium text-fg-2" htmlFor={`key-${p.id}`}>
-                    {p.keyHint ? 'A new key' : 'Key'}
-                    {p.key === 'optional' && <span className="font-normal text-fg-3"> · optional, for more searches</span>}
-                  </label>
-                  <input id={`key-${p.id}`} type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste the key" autoComplete="off" className={inputCls} />
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-fg-3">
-                    {p.keyUrl && (
-                      <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href={p.keyUrl} target="_blank" rel="noreferrer">
-                        Get one at {siteOf(p.keyUrl)} <ExternalLink size={11} />
-                      </a>
-                    )}
-                    {p.keyHint && (
-                      <button type="button" className="text-fg-3 hover:text-err" onClick={() => void save({ provider: { id: p.id, key: null } }).catch(() => {})}>
-                        Remove the saved key
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              {p.url && (
-                <div>
-                  <label className="mb-1 block text-[12px] font-medium text-fg-2" htmlFor={`url-${p.id}`}>
-                    Address
-                    {!p.url.required && p.url.default && <span className="font-normal text-fg-3"> · {p.url.default} unless set</span>}
-                  </label>
-                  <input id={`url-${p.id}`} value={url} onChange={(e) => setUrl(e.target.value)} placeholder={p.url.placeholder} autoComplete="off" spellCheck={false} className={inputCls} />
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" variant="primary" disabled={!key.trim() && !urlChanged}>
-                  Save
-                </Button>
-              </div>
-            </form>
-          )}
           {test && (
-            <div className="mt-2 rounded-xl border border-line px-3 py-2 text-[12.5px]">
-              {test === 'busy' ? (
-                <span className="flex items-center gap-2 text-fg-3">
-                  <Throbber /> Searching with {p.name}…
-                </span>
-              ) : test.ok ? (
-                <>
-                  <div className="flex items-center gap-1.5 text-ok">
-                    <Check size={13} strokeWidth={2.6} />
-                    Works: {test.count} result{test.count === 1 ? '' : 's'} in {duration(test.ms)}
-                  </div>
-                  {test.sample?.map((r) => (
-                    <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-fg-3 hover:text-accent">
-                      <span translate="no">{r.title}</span> <span className="text-fg-3/70">· {siteOf(r.url)}</span>
-                    </a>
-                  ))}
-                </>
-              ) : (
-                <div className="flex items-start gap-1.5 text-err">
-                  <X size={13} className="mt-[2px] shrink-0" />
-                  <span>{test.error}</span>
-                </div>
+            <div className="flex items-start gap-2 text-[12.5px]">
+              <div className="min-w-0 flex-1">
+                <TestLine test={test} name={p.name} />
+              </div>
+              {test !== 'busy' && (
+                <IconButton label="Close the test" size="sm" onClick={() => setTest(null)}>
+                  <X size={13} />
+                </IconButton>
               )}
             </div>
           )}
         </div>
-        <Switch on={p.enabled} label={`Use ${p.name}`} onChange={(on) => void save({ provider: { id: p.id, enabled: on } }).catch(() => {})} />
-      </div>
-    </div>
+      )}
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`${p.name} · ${setupLabel}`}
+        width={440}
+        footer={
+          <>
+            <Button variant="ghost" icon={<Play size={14} />} disabled={test === 'busy'} onClick={run} className="mr-auto">
+              Test
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={!key.trim() && !urlChanged} onClick={() => void saveSetup()}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (key.trim() || urlChanged) void saveSetup();
+          }}
+        >
+          {takesKey && (
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-fg-2" htmlFor={`key-${p.id}`}>
+                {p.keyHint ? 'A new key' : 'Key'}
+                {p.key === 'optional' && <span className="font-normal text-fg-3"> · optional, for more searches</span>}
+              </label>
+              <input id={`key-${p.id}`} type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste the key" autoComplete="off" autoFocus className={inputCls} />
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-fg-3">
+                {p.keyUrl && (
+                  <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href={p.keyUrl} target="_blank" rel="noreferrer">
+                    Get one at {siteOf(p.keyUrl)} <ExternalLink size={11} />
+                  </a>
+                )}
+                {p.keyHint && (
+                  <button type="button" className="text-fg-3 hover:text-err" onClick={() => void save({ provider: { id: p.id, key: null } }).then(() => setOpen(false), () => {})}>
+                    Remove the saved key
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {p.url && (
+            <div>
+              <label className="mb-1 block text-[12px] font-medium text-fg-2" htmlFor={`url-${p.id}`}>
+                Address
+                {!p.url.required && p.url.default && <span className="font-normal text-fg-3"> · {p.url.default} unless set</span>}
+              </label>
+              <input id={`url-${p.id}`} value={url} onChange={(e) => setUrl(e.target.value)} placeholder={p.url.placeholder} autoComplete="off" spellCheck={false} autoFocus={!takesKey} className={inputCls} />
+            </div>
+          )}
+          {test && (
+            <div className="rounded-lg bg-bg-1 px-3 py-2 text-[12.5px]">
+              <TestLine test={test} name={p.name} />
+            </div>
+          )}
+          <button type="submit" className="hidden" />
+        </form>
+      </Dialog>
+    </Row>
+  );
+}
+
+/** What a test search found, or why it failed, or that it is running. */
+function TestLine({ test, name }: { test: SearchTestResult | 'busy'; name: string }) {
+  return (
+    <>
+      {test === 'busy' ? (
+        <span className="flex items-center gap-2 text-fg-3">
+          <Throbber /> Searching with {name}…
+        </span>
+      ) : test.ok ? (
+        <>
+          <div className="flex items-center gap-1.5 text-ok">
+            <Check size={13} strokeWidth={2.6} />
+            Works: {test.count} result{test.count === 1 ? '' : 's'} in {duration(test.ms)}
+          </div>
+          {test.sample?.map((r) => (
+            <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-fg-3 hover:text-accent">
+              <span translate="no">{r.title}</span> <span className="text-fg-3/70">· {siteOf(r.url)}</span>
+            </a>
+          ))}
+        </>
+      ) : (
+        <div className="flex items-start gap-1.5 text-err">
+          <X size={13} className="mt-[2px] shrink-0" />
+          <span>{test.error}</span>
+        </div>
+      )}
+    </>
   );
 }

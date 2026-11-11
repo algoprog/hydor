@@ -10,7 +10,7 @@ import { toast, toastError, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { cx, MenuItem, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
-import { confirmResume, takeoverDialog } from '../../lib/activity';
+import { activityLabel, activityOf, confirmResume, inBackground, takeoverDialog } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, releaseSentPictures, sendingPictures, type Attachment } from '../../lib/attachments';
 import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from '../../lib/drafts';
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
@@ -137,6 +137,15 @@ function ContextRing({ pct, title, disabled, onClick }: { pct: number; title: st
   );
 }
 
+/** The ring that turns on the box's round button while the agent is at work; still if the device asks for reduced motion. */
+function WorkRing({ className, opacity = 0.55 }: { className?: string; opacity?: number }) {
+  return (
+    <svg viewBox="0 0 36 36" className={cx('pointer-events-none absolute inset-0 h-full w-full animate-spin motion-reduce:animate-none', className)} aria-hidden>
+      <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="24 71" opacity={opacity} />
+    </svg>
+  );
+}
+
 /**
  * Messages waiting for the turn to end, each sendable now (into the turn), editable or removable. `hint`:
  * what the box suggests while the agent is free, where the page shows the session its own way (an app's result).
@@ -152,6 +161,10 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ext = running ? null : (s.external ?? null);
   const takeover = !!ext && s.agent === 'claude';
   const locked = !!ext && !takeover;
+  // Its turn is over but background tasks or child sessions it started still run (the header says "Working · 2 in
+  // background"): the ring keeps turning, around Send, since the agent takes messages as usual meanwhile.
+  const activity = activityOf({ ...s, live });
+  const background = !working && !ext && inBackground(activity);
   const [confirm, confirmNode] = useConfirm();
   const cat = useCatalog(s.agent, s.acpAgent);
   // Confidential: only models on this computer (server/confidential).
@@ -613,11 +626,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 aria-label="Stop the current turn"
                 className="anim-pop-in relative ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-fg transition duration-150 hover:opacity-90 active:scale-90"
               >
-                {live?.status !== 'waiting' && (
-                  <svg viewBox="0 0 36 36" className="pointer-events-none absolute inset-0 h-full w-full animate-spin motion-reduce:animate-none" aria-hidden>
-                    <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="24 71" opacity="0.55" />
-                  </svg>
-                )}
+                {live?.status !== 'waiting' && <WorkRing />}
                 <Square size={12} fill="currentColor" strokeWidth={0} />
               </button>
             )}
@@ -625,10 +634,13 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
               <button
                 onClick={() => send()}
                 disabled={!canSend}
-                title={running ? 'Send (Enter)' : takeover ? `End it in ${ext!.client} and send here` : 'Resume and send'}
+                // While the ring turns, what is still running ("Working · 2 background tasks running") on a line of its own.
+                title={[running ? 'Send (Enter)' : takeover ? `End it in ${ext!.client} and send here` : 'Resume and send', background && activity && activityLabel(activity)].filter(Boolean).join('\n')}
                 aria-label="Send"
-                className={cx('group ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-90', canSend ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3')}
+                className={cx('group relative ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-90', canSend ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3')}
               >
+                {/* On the grey button the ring takes the accent, as on Stop; on the coloured one, the arrow's colour. */}
+                {background && <WorkRing className={canSend ? undefined : 'text-accent'} opacity={canSend ? 0.55 : 0.9} />}
                 <span className={cx('ico', canSend && 'ico-rise')}>
                   <ArrowUp size={16} strokeWidth={2.4} />
                 </span>
