@@ -4,7 +4,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 
 ## Sessions
 - The prompt bar’s Stop button shows a rotating ring while a session starts or works, paused while
-  waiting for you and respecting reduced-motion preferences.
+  waiting for you and respecting reduced-motion preferences. Once the turn is over, the ring keeps turning
+  around the send button while background tasks or helper sessions it started still run.
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
   separate folder, so several agents can change one repository at once). Pick the model, how hard it
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
