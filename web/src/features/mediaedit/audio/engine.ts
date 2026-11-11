@@ -9,8 +9,10 @@ import {
   activeEffects,
   audibleTracks,
   clipEnd,
+  clipFade,
   dbGain,
   echoTaps,
+  envGainAt,
   effectParams,
   fadeCurve,
   roomResponse,
@@ -294,8 +296,9 @@ export function renderClips(t: SoundTrack, t0: number, n: number, R: number, get
         const u = t - c.at;
         let v = part ? part[ch][i - i0] : sampleAt(x, (c.from + u) * d.rate);
         let e = g;
-        if (c.fadeIn && u < c.fadeIn) e *= u / c.fadeIn;
-        if (c.fadeOut && u > len - c.fadeOut) e *= Math.max(0, (len - u) / c.fadeOut);
+        if (c.env) e *= envGainAt(c.env, u);
+        if (c.fadeIn && u < c.fadeIn) e *= clipFade(c, u / c.fadeIn);
+        if (c.fadeOut && u > len - c.fadeOut) e *= clipFade(c, Math.max(0, (len - u) / c.fadeOut));
         v *= e;
         o[i] += v;
       }
@@ -427,33 +430,91 @@ const maskEnv = (a: number, b: number): Env => [
   { t: b + 0.003, v: 0 },
 ];
 
-function schedule(p: AudioParam, e: Env, t0: number, t1: number, c0: number) {
+/**
+ * An automation along the timeline from `t0`, played from the context's `c0` at rate `k` (1: as it is, 2: twice as fast,
+ * negative: backwards, towards `t1`): the value at `t0`, then each point on the way.
+ */
+function schedule(p: AudioParam, e: Env, t0: number, t1: number, c0: number, k = 1) {
   p.cancelScheduledValues(c0);
   p.setValueAtTime(envAt(e, t0), c0);
-  for (const x of e) if (x.t > t0 && x.t < t1) p.linearRampToValueAtTime(x.v, c0 + (x.t - t0));
+  if (k > 0) {
+    for (const x of e) if (x.t > t0 && x.t < t1) p.linearRampToValueAtTime(x.v, c0 + (x.t - t0) / k);
+  } else if (k < 0) {
+    for (let i = e.length - 1; i >= 0; i--) if (e[i].t < t0 && e[i].t > t1) p.linearRampToValueAtTime(e[i].v, c0 + (t0 - e[i].t) / -k);
+  }
 }
 
 interface Stage {
   input: AudioNode;
   output: AudioNode;
-  /** Its automation for the timeline from `t0` to `t1`, played from the context's `c0`. */
-  at(t0: number, t1: number, c0: number): void;
+  /** Its automation for the timeline from `t0` to `t1`, played from the context's `c0` at rate `k` (negative: backwards). */
+  at(t0: number, t1: number, c0: number, k?: number): void;
+  /**
+   * Its settings changed to those of `e` (the same effect, its settings moved) while it plays: true when it could be done
+   * without making it again (a slider moved heard at once), false when it has to be made again (a room's other
+   * sound, an equalizer band switched on).
+   */
+  update(e: SoundEffect, range: [number, number], gain: number | undefined): boolean;
 }
 
 /** The browser's compressor makes its sound louder by itself: how much (dB), to take back. */
 const autoMakeup = (threshold: number, ratio: number) => -0.6 * (threshold + (0 - threshold) / ratio);
 
-/** An effect in Web Audio, on `range` of the timeline (its gain worked out from `gain` for Normalize and Loudness). */
-function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number], gain: number | undefined): Stage | null {
+/** An effect's gain along the timeline (for the effects that are a gain: its volume, normalized, a fade), on `range`. */
+function gainEnv(e: SoundEffect, range: [number, number], gain: number | undefined): Env {
   const p = effectParams(e);
   const [a, b] = range;
-  const gainStage = (env: Env): Stage => {
-    const g = ctx.createGain();
-    return { input: g, output: g, at: (t0, t1, c0) => schedule(g.gain, env, t0, t1, c0) };
-  };
   const ranged = !!e.range;
+  switch (e.type) {
+    case 'gain':
+      return ranged ? [{ t: a - 0.002, v: 1 }, { t: a, v: dbGain(p.db) }, { t: b, v: dbGain(p.db) }, { t: b + 0.002, v: 1 }] : [{ t: 0, v: dbGain(p.db) }];
+    case 'normalize':
+    case 'loudness': {
+      const g = dbGain(gain ?? 0);
+      return ranged ? [{ t: a - 0.002, v: 1 }, { t: a, v: g }, { t: b, v: g }, { t: b + 0.002, v: 1 }] : [{ t: 0, v: g }];
+    }
+    default: {
+      const [fa, fb] = ranged ? [a, b] : e.type === 'fadeIn' ? [0, Math.min(p.seconds, b)] : [Math.max(0, b - p.seconds), b];
+      const pts: Env = [{ t: fa - 0.0005, v: 1 }];
+      for (let i = 0; i <= 24; i++) {
+        const x = i / 24;
+        const v = fadeCurve(x, !!p.curve);
+        pts.push({ t: fa + (fb - fa) * x, v: e.type === 'fadeIn' ? v : 1 - v });
+      }
+      pts.push({ t: fb + 0.0005, v: 1 });
+      return pts;
+    }
+  }
+}
+
+/** An effect in Web Audio, on `range` of the timeline (its gain worked out from `gain` for Normalize and Loudness). */
+function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number], gain: number | undefined): Stage | null {
+  let p = effectParams(e);
+  let [a, b] = range;
+  const ranged = !!e.range;
+  /** What the stage reads when settings move: the same effect, in the same place on the timeline. */
+  const sameKind = (x: SoundEffect) => x.type === e.type && !!x.range === ranged && !x.bypass;
+  const take = (x: SoundEffect, r: [number, number]) => {
+    p = effectParams(x);
+    [a, b] = r;
+  };
+  const gainStage = (): Stage => {
+    const g = ctx.createGain();
+    let env = gainEnv(e, range, gain);
+    return {
+      input: g,
+      output: g,
+      at: (t0, t1, c0, k) => schedule(g.gain, env, t0, t1, c0, k),
+      update(x, r, gn) {
+        if (!sameKind(x)) return false;
+        env = gainEnv(x, r, gn);
+        return true;
+      },
+    };
+  };
+  const rangeEnv = (): Env => (ranged ? maskEnv(a, b) : [{ t: 0, v: 1 }]);
   /** Nodes made only on the range: what goes through them there, what goes past them elsewhere. */
-  const masked = (inp: AudioNode, out: AudioNode): Stage => {
+  const masked = (inp: AudioNode, out: AudioNode, change: (x: SoundEffect) => boolean = () => true): Stage => {
     const input = ctx.createGain();
     const output = ctx.createGain();
     const dry = ctx.createGain();
@@ -461,18 +522,23 @@ function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number],
     input.connect(dry).connect(output);
     input.connect(inp);
     out.connect(wet).connect(output);
-    const env = ranged ? maskEnv(a, b) : [{ t: 0, v: 1 }];
     return {
       input,
       output,
-      at(t0, t1, c0) {
-        schedule(wet.gain, env, t0, t1, c0);
-        schedule(dry.gain, env.map((x) => ({ t: x.t, v: 1 - x.v })), t0, t1, c0);
+      at(t0, t1, c0, k) {
+        const env = rangeEnv();
+        schedule(wet.gain, env, t0, t1, c0, k);
+        schedule(dry.gain, env.map((x) => ({ t: x.t, v: 1 - x.v })), t0, t1, c0, k);
+      },
+      update(x, r) {
+        if (!sameKind(x)) return false;
+        take(x, r);
+        return change(x);
       },
     };
   };
   /** A sound added to what is there (echo, reverb), only from the range's sound and only on it. */
-  const added = (inp: AudioNode, out: AudioNode, level: number): Stage => {
+  const added = (inp: AudioNode, out: AudioNode, level: () => number, change: (x: SoundEffect) => boolean): Stage => {
     const input = ctx.createGain();
     const output = ctx.createGain();
     const send = ctx.createGain();
@@ -480,19 +546,25 @@ function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number],
     input.connect(output);
     input.connect(send).connect(inp);
     out.connect(back).connect(output);
-    const env = ranged ? maskEnv(a, b) : [{ t: 0, v: 1 }];
     return {
       input,
       output,
-      at(t0, t1, c0) {
-        schedule(send.gain, env, t0, t1, c0);
+      at(t0, t1, c0, k) {
+        const env = rangeEnv();
+        schedule(send.gain, env, t0, t1, c0, k);
         schedule(
           back.gain,
-          env.map((x) => ({ t: x.t, v: x.v * level })),
+          env.map((x) => ({ t: x.t, v: x.v * level() })),
           t0,
           t1,
           c0,
+          k,
         );
+      },
+      update(x, r) {
+        if (!sameKind(x)) return false;
+        take(x, r);
+        return change(x);
       },
     };
   };
@@ -505,72 +577,75 @@ function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number],
     if (o.gain !== undefined) n.gain.value = o.gain;
     return n;
   };
+  const hz = (n: BiquadFilterNode, f: number) => (n.frequency.value = Math.min(f, ctx.sampleRate * 0.45));
   const chain = (nodes: AudioNode[]) => {
     for (let i = 1; i < nodes.length; i++) nodes[i - 1].connect(nodes[i]);
     return [nodes[0], nodes[nodes.length - 1]] as const;
   };
   switch (e.type) {
     case 'gain':
-      return gainStage(ranged ? [{ t: a - 0.002, v: 1 }, { t: a, v: dbGain(p.db) }, { t: b, v: dbGain(p.db) }, { t: b + 0.002, v: 1 }] : [{ t: 0, v: dbGain(p.db) }]);
     case 'normalize':
-    case 'loudness': {
-      const g = dbGain(gain ?? 0);
-      return gainStage(ranged ? [{ t: a - 0.002, v: 1 }, { t: a, v: g }, { t: b, v: g }, { t: b + 0.002, v: 1 }] : [{ t: 0, v: g }]);
-    }
+    case 'loudness':
     case 'fadeIn':
-    case 'fadeOut': {
-      const [fa, fb] = ranged ? [a, b] : e.type === 'fadeIn' ? [0, Math.min(p.seconds, b)] : [Math.max(0, b - p.seconds), b];
-      const pts: Env = [{ t: fa - 0.0005, v: 1 }];
-      for (let i = 0; i <= 24; i++) {
-        const x = i / 24;
-        const v = fadeCurve(x, !!p.curve);
-        pts.push({ t: fa + (fb - fa) * x, v: e.type === 'fadeIn' ? v : 1 - v });
-      }
-      pts.push({ t: fb + 0.0005, v: 1 });
-      return gainStage(pts);
-    }
+    case 'fadeOut':
+      return gainStage();
     case 'eq': {
-      const nodes: AudioNode[] = [];
-      if (p.lowCut > 0) nodes.push(biquad('highpass', p.lowCut, { q: -3.0103 }));
-      if (p.highCut > 0) nodes.push(biquad('lowpass', p.highCut, { q: -3.0103 }));
-      if (p.bass) nodes.push(biquad('lowshelf', 100, { gain: p.bass }));
-      if (p.mid) nodes.push(biquad('peaking', 1500, { q: 0.8, gain: p.mid }));
-      if (p.treble) nodes.push(biquad('highshelf', 6000, { gain: p.treble }));
+      // Each band is a node made only when it is on: moving a band's amount is heard at once, switching one on or off makes it again.
+      const bands = { lowCut: biquad('highpass', p.lowCut, { q: -3.0103 }), highCut: biquad('lowpass', p.highCut, { q: -3.0103 }), bass: biquad('lowshelf', 100, { gain: p.bass }), mid: biquad('peaking', 1500, { q: 0.8, gain: p.mid }), treble: biquad('highshelf', 6000, { gain: p.treble }) };
+      const on = { lowCut: p.lowCut > 0, highCut: p.highCut > 0, bass: !!p.bass, mid: !!p.mid, treble: !!p.treble };
+      const nodes = (Object.keys(bands) as (keyof typeof bands)[]).filter((k) => on[k]).map((k) => bands[k]);
       if (!nodes.length) return null;
       const [i, o] = chain(nodes);
-      return masked(i, o);
+      return masked(i, o, () => {
+        const now = { lowCut: p.lowCut > 0, highCut: p.highCut > 0, bass: !!p.bass, mid: !!p.mid, treble: !!p.treble };
+        if ((Object.keys(on) as (keyof typeof on)[]).some((k) => on[k] !== now[k])) return false;
+        hz(bands.lowCut, p.lowCut || 20);
+        hz(bands.highCut, p.highCut || 20000);
+        bands.bass.gain.value = p.bass;
+        bands.mid.gain.value = p.mid;
+        bands.treble.gain.value = p.treble;
+        return true;
+      });
     }
     case 'highpass':
     case 'lowpass': {
       const n = biquad(e.type, p.hz, { q: -3.0103 });
-      return masked(n, n);
+      return masked(n, n, () => (hz(n, p.hz), true));
     }
     case 'compressor':
     case 'limiter': {
       const c = ctx.createDynamicsCompressor();
       const lim = e.type === 'limiter';
-      c.threshold.value = lim ? p.ceiling : p.threshold;
-      c.ratio.value = lim ? 20 : p.ratio;
-      c.knee.value = lim ? 0 : 6;
-      c.attack.value = lim ? 0.002 : p.attack / 1000;
-      c.release.value = Math.min(1, p.release / 1000);
       const make = ctx.createGain();
-      make.gain.value = dbGain((lim ? 0 : p.makeup) - autoMakeup(c.threshold.value, c.ratio.value));
+      const set = () => {
+        c.threshold.value = lim ? p.ceiling : p.threshold;
+        c.ratio.value = lim ? 20 : p.ratio;
+        c.knee.value = lim ? 0 : 6;
+        c.attack.value = lim ? 0.002 : p.attack / 1000;
+        c.release.value = Math.min(1, p.release / 1000);
+        make.gain.value = dbGain((lim ? 0 : p.makeup) - autoMakeup(c.threshold.value, c.ratio.value));
+      };
+      set();
       c.connect(make);
-      return masked(c, make);
+      return masked(c, make, () => (set(), true));
     }
     case 'echo': {
       const taps = echoTaps(p.delay, p.decay);
       if (!taps.length) return null;
-      const dl = ctx.createDelay(Math.max(1, (p.delay / 1000) * 1.1));
-      dl.delayTime.value = p.delay / 1000;
+      const room = Math.max(1, (p.delay / 1000) * 1.1);
+      const dl = ctx.createDelay(room);
       const fb = ctx.createGain();
-      fb.gain.value = p.decay;
       const out = ctx.createGain();
-      out.gain.value = p.decay;
+      const set = () => {
+        dl.delayTime.value = p.delay / 1000;
+        fb.gain.value = p.decay;
+        out.gain.value = p.decay;
+      };
+      set();
       dl.connect(fb).connect(dl);
       dl.connect(out);
-      return added(dl, out, 1);
+      // A delay longer than the node was made for, or one with no echoes, is made again.
+      return added(dl, out, () => 1, () => p.delay / 1000 <= room && echoTaps(p.delay, p.decay).length > 0 && (set(), true));
     }
     case 'reverb': {
       const conv = ctx.createConvolver();
@@ -580,7 +655,8 @@ function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number],
       buf.copyToChannel(h[0] as Float32Array<ArrayBuffer>, 0);
       buf.copyToChannel(h[1] as Float32Array<ArrayBuffer>, 1);
       conv.buffer = buf;
-      return added(conv, conv, p.mix);
+      const room = p.room;
+      return added(conv, conv, () => p.mix, () => p.room === room);
     }
     case 'mono': {
       const split = ctx.createChannelSplitter(2);
@@ -601,6 +677,8 @@ function stageOf(ctx: BaseAudioContext, e: SoundEffect, range: [number, number],
 
 export interface PlayOptions {
   from: number;
+  /** How fast and which way: 1 as it is, 2 twice as fast, −1 backwards (J, K and L; like a tape, its pitch follows). */
+  rate?: number;
   /** Where it stops (the end of the sound when left out). */
   to?: number;
   /** Play this part again and again. */
@@ -622,13 +700,15 @@ export class SoundPlayer {
   ctx: AudioContext | null = null;
   private stopFn: (() => void) | null = null;
   /** Where on the timeline each stretch played starts, and when in the context's time. */
-  private segs: { c: number; t: number; t1: number }[] = [];
+  private segs: { c: number; t: number; t1: number; k: number }[] = [];
   private analysers: AnalyserNode[] = [];
   private kAnalysers: AnalyserNode[] = [];
   private held: [number, number] = [-Infinity, -Infinity];
   private heldAt = 0;
   playing = false;
   onEnd: (() => void) | null = null;
+  /** What is playing, to change its settings in place: the edit, its stages by effect, its tracks' volume and pan, the Normalize and Loudness gains it has. */
+  private live: { r: SoundRecipe; stages: Map<string, Stage>; tracks: Map<string, { vol: GainNode; pan: StereoPannerNode }>; gains: Record<string, number> } | null = null;
 
   /** The browser's sound, made on the first press of play (browsers start sound only then). */
   context(): AudioContext {
@@ -643,13 +723,84 @@ export class SoundPlayer {
     let seg = this.segs[0];
     for (const s of this.segs) if (s.c <= now) seg = s;
     if (!seg) return null;
-    return Math.min(seg.t1, seg.t + Math.max(0, now - seg.c));
+    const x = seg.t + Math.max(0, now - seg.c) * seg.k;
+    return seg.k < 0 ? Math.max(seg.t1, x) : Math.min(seg.t1, x);
   }
 
   stop() {
     this.stopFn?.();
     this.stopFn = null;
     this.playing = false;
+    this.live = null;
+  }
+
+  /**
+   * The edit changed while it plays: if only settings moved (an effect's slider, a track's volume or pan) they are
+   * changed in the running sound, which goes on without a break, and this says true. Anything else (clips, a track
+   * muted, an effect added, taken out, bypassed or moved, pitch and reverse, a room's other sound) says false, and the
+   * caller plays it again from where it is.
+   */
+  refresh(r: SoundRecipe, gains: Record<string, number>): boolean {
+    const live = this.live;
+    const ctx = this.ctx;
+    if (!live || !ctx || !this.playing) return false;
+    const was = live.r;
+    if (was === r) return true;
+    if (was.length !== r.length || was.tracks.length !== r.tracks.length) return false;
+    for (let i = 0; i < r.tracks.length; i++) {
+      const x = was.tracks[i];
+      const y = r.tracks[i];
+      if (x.id !== y.id || x.clips !== y.clips || !!x.mute !== !!y.mute || !!x.solo !== !!y.solo) return false;
+    }
+    const fx = r.effects ?? [];
+    const old = was.effects ?? [];
+    if (fx.length !== old.length) return false;
+    const changed: Stage[] = [];
+    for (let i = 0; i < fx.length; i++) {
+      const x = old[i];
+      const y = fx[i];
+      if (x === y) continue;
+      if (x.id !== y.id || x.type !== y.type || x.track !== y.track || !!x.bypass !== !!y.bypass) return false;
+      const same = JSON.stringify([x.p, x.range]) === JSON.stringify([y.p, y.range]);
+      if (x.type === 'reverse' || x.type === 'pitch') {
+        if (!same) return false;
+        continue;
+      }
+      if (x.bypass) continue;
+      const st = live.stages.get(y.id);
+      if (!st) {
+        if (!same) return false;
+        continue;
+      }
+      if (!same || gains[y.id] !== live.gains[y.id]) {
+        if (!st.update(y, y.range ?? [0, soundLength(r)], gains[y.id])) return false;
+        changed.push(st);
+      }
+    }
+    // Normalize and Loudness gains that moved with an edit of something else are heard through their stages.
+    for (const e of fx) {
+      if (e.bypass || gains[e.id] === live.gains[e.id] || changed.some((c) => live.stages.get(e.id) === c)) continue;
+      const st = live.stages.get(e.id);
+      if (st && !st.update(e, e.range ?? [0, soundLength(r)], gains[e.id])) return false;
+      if (st) changed.push(st);
+    }
+    for (const t of r.tracks) {
+      const n = live.tracks.get(t.id);
+      const old2 = was.tracks.find((k) => k.id === t.id)!;
+      if (!n) continue;
+      if (t.volume !== old2.volume) n.vol.gain.setTargetAtTime(dbGain(t.volume ?? 0), ctx.currentTime, 0.01);
+      if (t.pan !== old2.pan) n.pan.pan.setTargetAtTime(t.pan ?? 0, ctx.currentTime, 0.01);
+    }
+    // What the changed stages do from here on, along the stretch playing now.
+    const now = ctx.currentTime;
+    let seg = this.segs[0];
+    for (const s of this.segs) if (s.c <= now) seg = s;
+    if (seg) {
+      const t0 = seg.t + Math.max(0, now - seg.c) * seg.k;
+      for (const st of changed) st.at(seg.k < 0 ? Math.max(seg.t1, t0) : Math.min(seg.t1, t0), seg.t1, now, seg.k);
+    }
+    this.live = { ...live, r, gains };
+    return true;
   }
 
   /**
@@ -662,12 +813,17 @@ export class SoundPlayer {
     await ctx.resume().catch(() => {});
     const L = soundLength(r);
     const end = Math.min(L, o.to ?? L);
-    const loop = o.loop && o.loop[1] - o.loop[0] > 0.05 ? o.loop : null;
+    const rate = o.rate && Math.abs(o.rate) !== 1 ? Math.max(-8, Math.min(8, o.rate)) : (o.rate ?? 1) < 0 ? -1 : 1;
+    const back = rate < 0;
+    const speed = Math.abs(rate);
+    // Shuttling plays straight through, once.
+    const loop = rate === 1 && o.loop && o.loop[1] - o.loop[0] > 0.05 ? o.loop : null;
     let t = Math.max(0, Math.min(o.from, loop ? loop[1] : end));
-    if (!loop && t >= end - 0.01) return;
+    if (!loop && (back ? t <= 0.01 : t >= end - 0.01)) return;
     const master = ctx.createGain();
     const mix = ctx.createGain();
     const stages: Stage[] = [];
+    const byId = new Map<string, Stage>();
     const keep: AudioNode[] = [master, mix];
     // The whole sound's effects, after the tracks are mixed.
     let cur: AudioNode = mix;
@@ -677,6 +833,7 @@ export class SoundPlayer {
       cur.connect(s.input);
       cur = s.output;
       stages.push(s);
+      byId.set(e.id, s);
     }
     cur.connect(master);
     master.connect(ctx.destination);
@@ -709,6 +866,7 @@ export class SoundPlayer {
     // Each track: its rendered sound, its own effects, its volume and pan.
     const tracks = audibleTracks(r).filter((x) => x.clips.length);
     const ins = new Map<string, AudioNode>();
+    const trackNodes = new Map<string, { vol: GainNode; pan: StereoPannerNode }>();
     for (const tr of tracks) {
       const input = ctx.createGain();
       let tc: AudioNode = input;
@@ -718,12 +876,14 @@ export class SoundPlayer {
         tc.connect(s.input);
         tc = s.output;
         stages.push(s);
+        byId.set(e.id, s);
       }
       const vol = ctx.createGain();
       vol.gain.value = dbGain(tr.volume ?? 0);
       const pan = ctx.createStereoPanner();
       pan.pan.value = tr.pan ?? 0;
       tc.connect(vol).connect(pan).connect(mix);
+      trackNodes.set(tr.id, { vol, pan });
       ins.set(tr.id, input);
       keep.push(input, vol, pan);
     }
@@ -731,18 +891,18 @@ export class SoundPlayer {
     let c = ctx.currentTime + 0.08;
     this.segs = [];
     const segStart = (t0: number, t1: number, c0: number) => {
-      this.segs.push({ c: c0, t: t0, t1 });
+      this.segs.push({ c: c0, t: t0, t1, k: rate });
       if (this.segs.length > 8) this.segs.shift();
-      for (const s of stages) s.at(t0, t1, c0);
+      for (const s of stages) s.at(t0, t1, c0, rate);
     };
-    let segEnd = loop ? loop[1] : end;
+    let segEnd = loop ? loop[1] : back ? 0 : end;
     if (loop && (t < loop[0] || t >= loop[1])) t = loop[0];
     segStart(t, segEnd, c);
     const sources: AudioBufferSourceNode[] = [];
     let ended = false;
     const pump = () => {
       while (!ended && c < ctx.currentTime + AHEAD) {
-        if (t >= segEnd - 1e-6) {
+        if (back ? t <= segEnd + 1e-6 : t >= segEnd - 1e-6) {
           if (!loop) {
             ended = true;
             const at = c;
@@ -760,10 +920,15 @@ export class SoundPlayer {
           segEnd = loop[1];
           segStart(t, segEnd, c);
         }
-        const len = Math.min(CHUNK, segEnd - t);
+        // A chunk of the timeline (more of it the faster it plays), going back from `t` when playing backwards.
+        const len = back ? Math.min(CHUNK * speed, t - segEnd) : Math.min(CHUNK * speed, segEnd - t);
         const n = Math.max(1, Math.round(len * R));
         for (const tr of tracks) {
-          const x = renderTrack(tr, fx.get(tr.id) ?? [], t, n, R, get);
+          const x = renderTrack(tr, fx.get(tr.id) ?? [], back ? t - n / R : t, n, R, get);
+          if (back) {
+            x[0].reverse();
+            x[1].reverse();
+          }
           let silent = true;
           for (let i = 0; i < n && silent; i += 64) if (x[0][i] !== 0 || x[1][i] !== 0) silent = false;
           if (silent) continue;
@@ -772,13 +937,14 @@ export class SoundPlayer {
           buf.copyToChannel(x[1] as Float32Array<ArrayBuffer>, 1);
           const s = ctx.createBufferSource();
           s.buffer = buf;
+          if (speed !== 1) s.playbackRate.value = speed;
           s.connect(ins.get(tr.id)!);
           s.start(c);
           sources.push(s);
           s.onended = () => sources.splice(sources.indexOf(s), 1);
         }
-        t += n / R;
-        c += n / R;
+        t += (back ? -n : n) / R;
+        c += n / R / speed;
       }
     };
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -802,6 +968,7 @@ export class SoundPlayer {
     };
     this.stopFn = stopper;
     this.playing = true;
+    this.live = { r, stages: byId, tracks: trackNodes, gains };
   }
 
   /** The meter's levels now, in dB (−∞ when nothing plays). */

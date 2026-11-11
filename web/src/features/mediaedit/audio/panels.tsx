@@ -310,6 +310,18 @@ export function Properties(p: PropsProps) {
           <ScrubField label="Fade in" value={c.fadeIn ?? 0} step={0.01} min={0} max={clipLength(c) / 2} unit="s" width={66} begin={begin('Clip fade')} end={p.drag.end} onChange={(v) => p.onClip(t.id, c.id, { fadeIn: v || undefined }, 'Clip fade')} />
           <ScrubField label="Fade out" value={c.fadeOut ?? 0} step={0.01} min={0} max={clipLength(c) / 2} unit="s" width={66} begin={begin('Clip fade')} end={p.drag.end} onChange={(v) => p.onClip(t.id, c.id, { fadeOut: v || undefined }, 'Clip fade')} />
         </div>
+        {(c.fadeIn || c.fadeOut) && (
+          <div className="space-y-1">
+            <div className="text-[12px] text-fg-3">Fade shape</div>
+            <Segmented<string> size="sm" value={c.fadeSmooth ? 'smooth' : 'straight'} onChange={(v) => p.onClip(t.id, c.id, { fadeSmooth: v === 'smooth' ? true : undefined }, 'Fade shape')} options={[{ value: 'straight', label: 'Straight' }, { value: 'smooth', label: 'Smooth' }]} />
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 text-[12px] text-fg-3">{c.env?.length ? `Volume line: ${c.env.length} point${c.env.length === 1 ? '' : 's'}` : 'Volume line: click it on the clip to add a point'}</span>
+          <Button size="sm" variant="ghost" disabled={!c.env?.length} onClick={() => p.onClip(t.id, c.id, { env: undefined }, 'Reset the volume line')}>
+            Reset
+          </Button>
+        </div>
         <p className="text-[11px] leading-snug text-fg-3">{`On the timeline from ${soundClock(c.at, 2)} to ${soundClock(clipEnd(c), 2)}. Drag its name bar to move it, its ends to trim it, the handles at its top corners to fade it.`}</p>
         <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} className="text-err hover:text-err" onClick={() => p.onDeleteClip(t.id, c.id)}>
           Delete the clip
