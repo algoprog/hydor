@@ -344,9 +344,14 @@ export function NotesGroup({ onBringIn }: { onBringIn: () => void }) {
                   icon={<FolderGit2 size={16} />}
                   label={<span translate="no">{p.name}</span>}
                   hint={
-                    <>
-                      <span translate="no">{tildify(p.key, home)}</span> · <span>{notesCount(p.count)}</span>
-                    </>
+                    // The count first; a long folder path is cut short rather than taking a second line.
+                    <span className="flex min-w-0 gap-1">
+                      <span className="shrink-0">{notesCount(p.count)}</span>
+                      <span className="shrink-0">·</span>
+                      <span translate="no" className="min-w-0 truncate">
+                        {tildify(p.key, home)}
+                      </span>
+                    </span>
                   }
                   onClick={() => openPlace({ kind: 'repo', key: p.key })}
                 />
