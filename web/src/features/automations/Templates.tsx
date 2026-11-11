@@ -2,6 +2,7 @@
 // task at once, or opens in the full task form for more options. A webhook example's form says where its
 // address goes once it is made.
 import { useEffect, useState } from 'react';
+import { useSearch } from 'wouter';
 import type { TaskDraft } from '@shared/automations';
 import { hookHelp } from '@shared/engineering';
 import type { Agent } from '@shared/types';
@@ -10,10 +11,11 @@ import { post } from '../../lib/api';
 import { lastAgent } from '../../lib/start';
 import { toast, toastError, useApp } from '../../lib/store';
 import { FolderChip } from '../../components/FolderPicker';
-import { Button, cx, Dialog, inputCls, Section, Switch } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, Switch } from '../../components/ui';
+import { Group, Row } from '../settings/kit';
 import { AgentPicker } from '../home/AgentPicker';
 import { boxCls, Field } from './parts';
-import { GROUPS, TEMPLATES, type Template, type TemplateField } from './taskTemplates';
+import { TEMPLATES, type Template, type TemplateField } from './taskTemplates';
 
 const small = cx(boxCls, 'h-9 text-[13.5px]');
 
@@ -175,40 +177,30 @@ function TemplateDialog({ template, onClose, onMore }: { template: Template; onC
   );
 }
 
-function TemplateCard({ t, onPick }: { t: Template; onPick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onPick}
-      className="group flex items-start gap-3 rounded-xl border border-line px-3 py-2.5 text-left transition-colors hover:border-line-2 hover:bg-bg-1 active:scale-[0.99]"
-    >
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2 transition-colors group-hover:text-accent">
-        <t.icon size={15} />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13.5px] font-medium text-fg">{t.title}</span>
-        <span className="block text-[12px] leading-snug text-fg-3">{t.blurb}</span>
-      </span>
-    </button>
-  );
-}
+/** How many examples show before "Show all examples". */
+const EXAMPLES_SHOWN = 4;
 
 export function TemplateGallery({ onMore }: { onMore: (d: TaskDraft) => void }) {
   const [pick, setPick] = useState<Template | null>(null);
+  const [all, setAll] = useState(false);
+  // The search box points at an example by its name: one past the first few opens the whole list.
+  const find = new URLSearchParams(useSearch()).get('find');
+  useEffect(() => {
+    if (find && TEMPLATES.slice(EXAMPLES_SHOWN).some((t) => t.title === find)) setAll(true);
+  }, [find]);
+  const shown = all ? TEMPLATES : TEMPLATES.slice(0, EXAMPLES_SHOWN);
   return (
-    <Section title="Start from an example" sub="A short form each; change anything later.">
-      <div className="space-y-4">
-        {GROUPS.map((g) => (
-          <div key={g.id}>
-            <h3 className="mb-1.5 text-[12px] font-medium text-fg-3">{g.title}</h3>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {TEMPLATES.filter((t) => t.group === g.id).map((t) => (
-                <TemplateCard key={t.id} t={t} onPick={() => setPick(t)} />
-              ))}
-            </div>
-          </div>
+    <>
+      <Group title="Start from an example" hint="A short form each; change anything later">
+        {shown.map((t) => (
+          <Row key={t.id} icon={<t.icon size={16} />} label={t.title} hint={t.blurb} onClick={() => setPick(t)} />
         ))}
-      </div>
+        {TEMPLATES.length > EXAMPLES_SHOWN && (
+          <button type="button" onClick={() => setAll((a) => !a)} className="w-full rounded-b-[11px] px-4 py-2.5 text-left text-[13px] text-fg-3 transition-colors hover:bg-bg-1 hover:text-fg">
+            {all ? 'Show fewer examples' : 'Show all examples'}
+          </button>
+        )}
+      </Group>
       {pick && (
         <TemplateDialog
           template={pick}
@@ -219,6 +211,6 @@ export function TemplateGallery({ onMore }: { onMore: (d: TaskDraft) => void }) 
           }}
         />
       )}
-    </Section>
+    </>
   );
 }

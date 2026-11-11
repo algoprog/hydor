@@ -1,15 +1,16 @@
 // Settings for the agents themselves: MCP servers, Claude Code's own plugins and the instruction files
 // (CLAUDE.md, AGENTS.md), for one working folder where that matters.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Download, KeyRound, LogIn, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Check, Download, KeyRound, LogIn, Plug, Plus, Search, Trash2 } from 'lucide-react';
 import type { Agent, MarketplaceEntry, McpEntry, McpScope, McpSpec, McpStatus, McpTransport, PluginEntry, SetupResult, SkillEntry } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { compact, tildify } from '../../lib/format';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Badge, Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, Switch, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Dialog, Throbber, IconButton, inputCls, MenuItem, Section, Segmented, Switch, useConfirm } from '../../components/ui';
 import { showTerminal, type TerminalInfo } from '../terminal/TerminalPanel';
 import { EditorDialog, InstructionsEditor } from './Instructions';
+import { EmptyRow, Group, MoreMenu, Row, SectionActions, Stack } from './kit';
 
 const AGENTS: Agent[] = ['claude', 'codex'];
 
@@ -309,52 +310,68 @@ function McpRow({ s, status, onLogin, onRemove }: { s: McpEntry; status?: McpSta
   const target = s.transport === 'stdio' ? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ') : s.url;
   const keys = [...(s.envKeys ?? []), ...(s.headerKeys ?? []), ...(s.bearerEnv ? [`Bearer $${s.bearerEnv}`] : [])];
   const badge = status && STATUS_BADGE[status.state];
+  const failed = status?.state === 'failed';
   return (
-    <div className="flex items-start gap-3 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[14px] font-medium">{s.name}</span>
-          <Badge>{s.transport === 'stdio' ? 'Command' : s.transport.toUpperCase()}</Badge>
+    <Row
+      icon={<Plug size={16} />}
+      label={
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span translate="no">{s.name}</span>
           {s.agent === 'claude' && <Badge>{MCP_SCOPE[s.scope]}</Badge>}
           {s.enabled === false && <Badge tone="warn">Off</Badge>}
+        </span>
+      }
+      hint={
+        <span translate="no" className="block truncate font-mono text-[12px]" title={target}>
+          {target}
+        </span>
+      }
+      control={
+        <>
           {badge && (
             <Badge tone={badge.tone}>
               {badge.label}
               {status?.state === 'connected' && status.tools != null && ` · ${status.tools} tool${status.tools === 1 ? '' : 's'}`}
             </Badge>
           )}
-        </div>
-        <div className="mt-0.5 truncate font-mono text-[12px] text-fg-3" title={target}>
-          {target}
-        </div>
-        {keys.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {keys.map((k) => (
-              <span key={k} title="Set; the value stays on the server" className="inline-flex items-center gap-1 rounded bg-bg-2 px-1.5 py-px font-mono text-[11px] text-fg-2">
-                <KeyRound size={10} className="text-fg-3" />
-                {k}
-              </span>
-            ))}
-          </div>
-        )}
-        {status?.state === 'failed' && <div className="mt-1.5 text-[12px] break-words text-err">{status.error || 'The server did not start or did not answer.'}</div>}
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
-        {s.transport !== 'stdio' &&
-          (status?.state === 'auth' ? (
-            <Button size="sm" icon={<LogIn size={14} />} onClick={onLogin}>
+          {s.transport !== 'stdio' && status?.state === 'auth' && (
+            <Button size="sm" variant="secondary" icon={<LogIn size={14} />} onClick={onLogin}>
               Sign in
             </Button>
-          ) : (
-            <IconButton label="Sign in (OAuth) in a terminal" size="sm" onClick={onLogin}>
-              <LogIn size={15} />
-            </IconButton>
-          ))}
-        <IconButton label="Remove" size="sm" onClick={onRemove}>
-          <Trash2 size={15} />
-        </IconButton>
-      </div>
-    </div>
+          )}
+          <MoreMenu label={`${s.name}: more`} width={240}>
+            {(close) => (
+              <>
+                {s.transport !== 'stdio' && (
+                  <MenuItem icon={<LogIn size={14} />} onClick={() => (close(), onLogin())}>
+                    Sign in (OAuth) in a terminal
+                  </MenuItem>
+                )}
+                <MenuItem danger icon={<Trash2 size={14} />} onClick={() => (close(), onRemove())}>
+                  Remove
+                </MenuItem>
+              </>
+            )}
+          </MoreMenu>
+        </>
+      }
+    >
+      {(keys.length > 0 || failed) && (
+        <div className="space-y-1.5">
+          {keys.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {keys.map((k) => (
+                <span key={k} translate="no" title="Set; the value stays on the server" className="inline-flex items-center gap-1 rounded bg-bg-2 px-1.5 py-px font-mono text-[11px] text-fg-2">
+                  <KeyRound size={10} className="text-fg-3" />
+                  {k}
+                </span>
+              ))}
+            </div>
+          )}
+          {failed && <div className="text-[12px] break-words text-err">{status.error || 'The server did not start or did not answer.'}</div>}
+        </div>
+      )}
+    </Row>
   );
 }
 
@@ -412,52 +429,55 @@ export function McpSettings({ cwd }: { cwd: string }) {
     load();
   };
 
+  const none = !!list && !list.length;
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="min-w-0 flex-1 text-[13px] text-fg-3">New sessions load these servers; sessions already running pick up changes when they restart.</p>
+    <Stack>
+      <SectionActions>
         <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
           Add server
         </Button>
-      </div>
-      {AGENTS.map((a) => {
-        const rows = (list ?? []).filter((s) => s.agent === a);
-        const st = status[a];
-        return (
-          <Section
-            key={a}
-            title={<AgentTitle agent={a} />}
-            actions={
-              rows.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => check(a)} disabled={st === 'busy'} title="Start every server the way a new session would and see which connect">
-                  {st === 'busy' ? (
-                    <>
-                      <Throbber /> Connecting
-                    </>
-                  ) : (
-                    'Check connections'
-                  )}
-                </Button>
-              )
-            }
-          >
-            {!list ? (
-              <Loading />
-            ) : rows.length ? (
-              <div className="-my-1 divide-y divide-line">
-                {rows.map((s) => (
-                  <McpRow key={`${s.scope}:${s.name}`} s={s} status={st && st !== 'busy' ? st[s.name] : undefined} onLogin={() => login(s)} onRemove={() => remove(s)} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-[13px] text-fg-3">No MCP servers yet.</div>
-            )}
-          </Section>
-        );
-      })}
+      </SectionActions>
+      {none ? (
+        <Group>
+          <EmptyRow>No MCP servers yet: add one to give Claude Code and Codex more tools</EmptyRow>
+        </Group>
+      ) : (
+        AGENTS.map((a) => {
+          const rows = (list ?? []).filter((s) => s.agent === a);
+          const st = status[a];
+          return (
+            <Group
+              key={a}
+              title={<AgentTitle agent={a} />}
+              info="New sessions load these servers; sessions already running pick up changes when they restart."
+              actions={
+                rows.length > 0 && (
+                  <Button size="sm" variant="ghost" onClick={() => check(a)} disabled={st === 'busy'} title="Start every server the way a new session would and see which connect">
+                    {st === 'busy' ? (
+                      <>
+                        <Throbber /> Connecting
+                      </>
+                    ) : (
+                      'Check connections'
+                    )}
+                  </Button>
+                )
+              }
+            >
+              {!list ? (
+                <Loading />
+              ) : rows.length ? (
+                rows.map((s) => <McpRow key={`${s.scope}:${s.name}`} s={s} status={st && st !== 'busy' ? st[s.name] : undefined} onLogin={() => login(s)} onRemove={() => remove(s)} />)
+              ) : (
+                <EmptyRow>No MCP servers yet</EmptyRow>
+              )}
+            </Group>
+          );
+        })
+      )}
       <AddMcpDialog open={adding} cwd={cwd} onClose={() => setAdding(false)} onAdded={load} />
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -692,7 +712,7 @@ export function InstructionsSettings({ cwd, agent, onAgent }: { cwd: string; age
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Segmented size="sm" value={agent} onChange={onAgent} options={AGENTS.map((a) => ({ value: a, label: agentName(a), icon: <AgentIcon agent={a} size={13} /> }))} />
-        <span className="w-full text-[12.5px] text-fg-3 sm:w-auto sm:min-w-0 sm:flex-1">
+        <span className="w-full text-[12.5px] leading-snug text-fg-3 sm:w-auto sm:min-w-0 sm:flex-1">
           {agent === 'claude'
             ? 'Claude Code reads all of these at the start of a session, outermost first; later files refine earlier ones.'
             : 'Codex reads its own file, then one file per folder from the repository root down to this one.'}
