@@ -1,14 +1,16 @@
-// The slides in order, small: click one to edit it, drag one to move it, and each one's menu (copy it, skip it in
-// the slideshow, a new slide after it, delete it). Down the side on a wide screen, across under the slide on a
+// The slides in order, small: click one to edit it, drag one to move it, and each one's menu (right-click, the menu key,
+// or its … : a new slide after it, duplicate, copy, cut, paste after it, delete, skip it in the slideshow, move up or
+// down, its background and transition; the editor makes its rows, so they are the Slide menu's words). Down the side on a wide screen, across under the slide on a
 // phone; the slide on view stays in view here. Also the grid of every slide (slide sorter), and the layouts a new
 // slide is made from.
 import { memo, useEffect, useRef, useState } from 'react';
 import { closestCenter, DndContext, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, rectSortingStrategy, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Copy, Ellipsis, EyeOff, Eye, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Ellipsis, EyeOff } from 'lucide-react';
 import { layoutSlide, LAYOUTS, type Deck, type LayoutId } from '@shared/slides';
-import { cx, MenuItem, MenuSep, Popover } from '../../../components/ui';
+import { cx, Popover } from '../../../components/ui';
+import { ContextMenu, isMenuKey, type ContextMenuAt, type MenuEntry } from '../common/menus';
 import { SlideThumb } from './Thumb';
 
 /** The layouts to start a slide from, each drawn in the deck's theme. */
@@ -46,7 +48,7 @@ function ItemInner({
   width: number;
   fonts: number;
   onPick: () => void;
-  onMenu: (anchor: HTMLElement) => void;
+  onMenu: (at: ContextMenuAt) => void;
   horizontal?: boolean;
 }) {
   const s = deck.slides[index];
@@ -74,7 +76,13 @@ function ItemInner({
         onClick={onPick}
         onContextMenu={(e) => {
           e.preventDefault();
-          onMenu(e.currentTarget);
+          onMenu({ x: e.clientX, y: e.clientY });
+        }}
+        onKeyDown={(e) => {
+          if (!isMenuKey(e)) return;
+          e.preventDefault();
+          const r = e.currentTarget.getBoundingClientRect();
+          onMenu({ x: r.left + r.width / 2, y: r.top + r.height / 2, keyed: true });
         }}
         aria-label={`Slide ${index + 1}`}
         aria-current={current}
@@ -93,7 +101,10 @@ function ItemInner({
         type="button"
         aria-label="This slide’s menu"
         title="More"
-        onClick={() => onMenu(more.current!)}
+        onClick={() => {
+          const r = more.current!.getBoundingClientRect();
+          onMenu({ x: r.left, y: r.bottom + 2 });
+        }}
         className={cx('absolute top-1 right-1 grid h-6 w-6 place-items-center rounded-md bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100', current && 'pointer-coarse:opacity-100')}
       >
         <Ellipsis size={13} />
@@ -130,51 +141,27 @@ export interface StripActions {
   toggleHidden(i: number): void;
   /** A slide made with AI after this one (the gallery of kinds), where the editor can ask an agent. */
   aiAfter?(i: number): void;
+  /** The rows of a slide's menu (the editor makes them from the Slide menu's actions); `layouts` opens the gallery of layouts for a new slide after it. */
+  menu(i: number, layouts: () => void): MenuEntry[];
 }
 
-/** The slides' menu and layouts, opened from a slide (its … or a right-click). */
-function SlideMenu({ deck, at, fonts, onClose, act }: { deck: Deck; at: { i: number; el: HTMLElement } | null; fonts: number; onClose: () => void; act: StripActions }) {
-  const anchor = useRef<HTMLElement | null>(null);
-  anchor.current = at?.el ?? null;
-  const [layouts, setLayouts] = useState(false);
-  if (!at) return null;
-  const s = deck.slides[at.i];
-  const close = () => {
-    setLayouts(false);
-    onClose();
-  };
+/** The slides' menu (a right-click, the menu key or its …), and the layouts a new slide after it is made from. */
+function SlideMenu({ deck, at, fonts, onClose, act }: { deck: Deck; at: { i: number; at: ContextMenuAt; layouts?: boolean } | null; fonts: number; onClose: () => void; act: StripActions }) {
+  const [gallery, setGallery] = useState<{ i: number; x: number; y: number } | null>(null);
+  const anchor = useRef<HTMLDivElement>(null);
   return (
-    <Popover anchor={anchor} open={!!at} onClose={close} width={layouts ? 380 : 230} title={layouts ? 'A new slide' : `Slide ${at.i + 1}`}>
-      {layouts ? (
-        <LayoutGrid deck={deck} fonts={fonts} onPick={(l) => (act.add(at.i, l), close())} />
-      ) : (
-        <>
-          <MenuItem icon={<Plus size={14} />} onClick={() => setLayouts(true)}>
-            A new slide after it
-          </MenuItem>
-          {act.aiAfter && (
-            <MenuItem icon={<Sparkles size={14} />} onClick={() => (act.aiAfter!(at.i), close())}>
-              A slide made with AI after it
-            </MenuItem>
-          )}
-          <MenuItem icon={<Copy size={14} />} onClick={() => (act.duplicate(at.i), close())}>
-            Duplicate
-          </MenuItem>
-          <MenuItem icon={s?.hidden ? <Eye size={14} /> : <EyeOff size={14} />} onClick={() => (act.toggleHidden(at.i), close())}>
-            {s?.hidden ? 'Show it in the slideshow' : 'Skip it in the slideshow'}
-          </MenuItem>
-          <MenuSep />
-          <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (act.remove(at.i), close())}>
-            Delete
-          </MenuItem>
-        </>
-      )}
-    </Popover>
+    <>
+      <ContextMenu at={at ? at.at : null} items={at ? act.menu(at.i, () => setGallery({ i: at.i, x: at.at.x, y: at.at.y })) : []} onClose={onClose} title={at ? `Slide ${at.i + 1}` : undefined} />
+      <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: gallery?.x ?? -10, top: gallery?.y ?? -10 }} />
+      <Popover anchor={anchor} open={!!gallery} onClose={() => setGallery(null)} width={380} title="A new slide">
+        {gallery && <LayoutGrid deck={deck} fonts={fonts} onPick={(l) => (act.add(gallery.i, l), setGallery(null))} />}
+      </Popover>
+    </>
   );
 }
 
 export function Strip({ deck, cur, fonts, act, layout, live }: { deck: Deck; cur: number; fonts: number; act: StripActions; layout: 'side' | 'bottom' | 'grid'; live?: boolean }) {
-  const [menu, setMenu] = useState<{ i: number; el: HTMLElement } | null>(null);
+  const [menu, setMenu] = useState<{ i: number; at: ContextMenuAt } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }));
   const ids = deck.slides.map((s) => s.id);
   const onEnd = (e: DragEndEvent) => {
@@ -194,7 +181,7 @@ export function Strip({ deck, cur, fonts, act, layout, live }: { deck: Deck; cur
           >
             {deck.slides.map((s, i) => (
               <div key={s.id} className={cx(layout === 'grid' && 'flex flex-col gap-1')}>
-                <Item deck={deck} index={i} current={i === cur} live={live} width={width} fonts={fonts} onPick={() => act.pick(i)} onMenu={(el) => setMenu({ i, el })} horizontal={horizontal || layout === 'grid'} />
+                <Item deck={deck} index={i} current={i === cur} live={live} width={width} fonts={fonts} onPick={() => act.pick(i)} onMenu={(at) => setMenu({ i, at })} horizontal={horizontal || layout === 'grid'} />
               </div>
             ))}
           </div>
