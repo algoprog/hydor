@@ -415,6 +415,8 @@ export interface CellEditorHandle {
   view: EditorView;
   setDark: (dark: boolean) => void;
   focus: (at: number | 'start' | 'end') => void;
+  /** Where the cursor is in the text (the end of what is picked). */
+  cursor: () => number;
   destroy: () => void;
 }
 
@@ -437,7 +439,9 @@ export async function createCellEditor(
     lang: string;
     dark: boolean;
     onChange: (doc: string) => void;
-    onRun: (how: 'stay' | 'next' | 'insert') => void;
+    onRun: (how: 'stay' | 'next' | 'insert' | 'below') => void;
+    /** Ctrl+Shift+-: the cell split at the cursor. */
+    onSplit?: (at: number) => void;
     onEscape: () => void;
     onSave: () => void;
     onEdge: (dir: -1 | 1) => boolean;
@@ -481,6 +485,8 @@ export async function createCellEditor(
           { key: 'Shift-Enter', run: () => (o.onRun('next'), true) },
           { key: 'Mod-Enter', run: () => (o.onRun('stay'), true) },
           { key: 'Alt-Enter', run: () => (o.onRun('insert'), true) },
+          { key: 'Mod-Shift-Enter', run: () => (o.onRun('below'), true) },
+          ...(o.onSplit ? [{ key: 'Mod-Shift--', preventDefault: true, run: (v: EditorView) => (o.onSplit!(v.state.selection.main.head), true) }, { key: 'Mod-_', preventDefault: true, run: (v: EditorView) => (o.onSplit!(v.state.selection.main.head), true) }] : []),
           { key: 'Escape', run: () => (o.onEscape(), true) },
           { key: 'Mod-s', preventDefault: true, run: () => (o.onSave(), true) },
           { key: 'ArrowUp', run: (v) => atEdge(v, -1) && o.onEdge(-1) },
@@ -511,6 +517,7 @@ export async function createCellEditor(
       view.dispatch({ selection: { anchor: pos } });
       view.focus();
     },
+    cursor: () => view.state.selection.main.head,
     destroy: () => view.destroy(),
   };
 }

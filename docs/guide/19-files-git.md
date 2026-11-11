@@ -414,8 +414,11 @@ Kernels keep running after you close the notebook, and through restarts of the a
 
 A cell is **Code**, **Text** (Markdown) or **Raw**. Click a code cell to edit it, or double-click a text cell. While a cell runs it shows `[*]` and a timer; afterwards its run number, `[3]`.
 
-- Point at a code cell and a run button takes the place of its number ("Run (Ctrl+Enter)"; while the cell runs, it interrupts the kernel). Its tools show in the corner: **Edit** (text cells), the cell type, **Move up**, **Move down**, **Add a cell below** and **Delete the cell**. On a phone, tap a cell: its tools show above it, **Run** included.
+- Point at a code cell and a run button takes the place of its number ("Run (Shift+Enter)": it runs the cell and goes to the next; while the cell runs, it interrupts the kernel). Its tools show in the corner: **Edit** (text cells), the cell type, **Move up**, **Move down**, **Add a cell below**, **Delete the cell** and **More for this cell** (⋯, the cell's menu, below). On a phone, tap a cell: its tools show above it, **Run** included.
 - On a computer, pointing between two cells shows **+ Code** and **+ Text**. The same two buttons sit below the last cell.
+- **The cell's menu**: right-click a cell (or its ⋯ in the corner, which is how it opens on a phone). It has **Run this cell**, **Run all above**, **Run this and below** and **Run all below** (code cells only run), **Cut**, **Copy**, **Paste below**, **Paste above**, **Duplicate**, **Split at the cursor** (while you edit the cell, with the cursor where it should split), **Merge with the next cell**, **Add a cell above** and **below**, **Move up** and **down**, **Cell type**, **Clear the output**, **Fold the output** or **Show the output**, and **Delete the cell**, each with its key. Cut, copied and duplicated cells keep their outputs; a paste may go into another notebook while the app is open. Splitting or merging clears the outputs of the cells it makes.
+- **Several cells together**: Shift+↑ / Shift+↓ (or Shift+click) picks the cells between where you started and where you are, shown tinted; the menu, **Copy**, **Cut**, **Duplicate**, **Merge** and D, D then work on all of them. Esc lets go.
+- **Fold an output**: the small arrows by a cell's number (or **Fold the output** in its menu) hide its output behind "Output hidden"; click that to show it again. It is kept in the notebook's file (as Jupyter does), so it stays folded when you open it again.
 - When code asks for input (Python's `input()`), a field appears under the cell: "Type, then Enter". Passwords stay hidden.
 - While you edit code, Tab after a name asks the running kernel for completions.
 
@@ -428,14 +431,19 @@ While you edit a cell:
 - Shift+Enter: run it and go to the next cell (a new one after the last).
 - Ctrl+Enter (⌘Enter on a Mac): run it and stay.
 - Alt+Enter: run it and add a cell below.
+- Ctrl+Shift+Enter: run it and the cells below it.
+- Ctrl+Shift+- (⌘⇧-): split the cell at the cursor.
 - Esc: stop editing.
 
 When no cell is being edited:
 
-- Enter: edit the selected cell. ↑ / ↓ (or K / J): move between cells.
-- A / B: add a cell above / below. D, D: delete the cell. Z: bring back the last deleted cell.
+- Enter: edit the selected cell. ↑ / ↓ (or K / J): move between cells. Shift+↑ / ↓: pick several.
+- A / B: add a cell above / below. D, D: delete the cell (or the cells picked). Z: bring back the cells deleted last; press it again for the ones before.
+- C / X: copy / cut the cell (or the cells picked). V / Shift+V: paste below / above. Shift+M: merge the cell with the next (or the cells picked together). Ctrl+Shift+Enter: run this cell and the ones below it.
 - M, Y, R: make the cell Text, Code or Raw.
 - I, I: interrupt the kernel. 0, 0: restart it.
+
+**More** (⋯) in the bar above the notebook has **Run all cells**, **Run all above**, **Run this and below** and **Run all below** (those last three for the cell picked), **Restart the kernel**, **Restart and run all**, **Clear all outputs**, **Outline** and **Keyboard shortcuts**. **Outline** shows the headings of the text cells (the lines that start with #) in a list beside the cells (a sheet on a phone): click one to go to its cell. **Keyboard shortcuts** lists every key. A cell run while the kernel is still starting waits for it, and runs when it is ready.
 
 Ctrl+S (⌘S on a Mac) saves. As with other files, if the notebook changes on disk while you have unsaved changes, a bar offers **Reload (discard mine)** or **Overwrite with mine**. **View the notebook file (JSON)** shows the file as text in the editor; **Open as a notebook** goes back.
 
