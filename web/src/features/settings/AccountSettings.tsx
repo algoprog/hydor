@@ -585,10 +585,6 @@ function AgentPrograms() {
               <Button size="sm" variant="secondary" disabled={busy === c.id || c.installing} icon={busy === c.id || c.installing ? <Throbber /> : undefined} onClick={() => install(c)}>
                 Install
               </Button>
-            ) : c.latest && !running ? (
-              <Button size="sm" variant="secondary" onClick={() => start('update')}>
-                Update
-              </Button>
             ) : undefined
           }
         />
