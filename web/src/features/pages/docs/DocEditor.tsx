@@ -276,7 +276,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   /** Words being typed beside the page (a comment, a reply, an edit of one). */
   const [noting, setNoting] = useState(false);
   // The right-click menu: where it is, what was under the pointer, and the selection as it was then.
-  const [ctx, setCtx] = useState<{ at: ContextMenuAt; hit: ContextHit; st: SelState } | null>(null);
+  const [ctx, setCtx] = useState<{ at: ContextMenuAt; hit: ContextHit; st: SelState; touch: boolean } | null>(null);
   // A picture's caption or description asked for in its box (from the menu), and a comment asked to be written in (edited).
   const [pictureAsk, setPictureAsk] = useState<{ id: string; what: 'caption' | 'alt'; n: number } | null>(null);
   const [editAsk, setEditAsk] = useState<{ id: string; n: number } | null>(null);
@@ -416,7 +416,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       onAtom: (a) => atoms.current(a),
       onContext: (c) => {
         const en = engine.current;
-        if (en) setCtx({ at: { x: c.x, y: c.y, keyed: c.keyed }, hit: c.hit, st: en.state() });
+        if (en) setCtx({ at: { x: c.x, y: c.y, keyed: c.keyed }, hit: c.hit, st: en.state(), touch: !!c.touch });
       },
       onNotice: (m) => toast(tr(m)),
       upload: (f) => {
@@ -1275,7 +1275,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       ? docContext({
           ...ctxBase,
           hit: ctx.hit,
-          spellHint: view.spell && !readOnly && !liveOn,
+          spellHint: view.spell && !readOnly && !liveOn && !ctx.touch,
           threads: comments,
           openLink: (u) => (u.startsWith('#') ? e.focusBlock(u.slice(1)) : void window.open(u, '_blank', 'noopener,noreferrer')),
           copyLink: copyText,
