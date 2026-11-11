@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.3 · 11 November 2026
+
+What a session started sits in one tray above its message box, and Stop stops all of it.
+
+- A session's helper sessions and background tasks (subagents, commands and monitors) are listed together in a tray
+  just above the message box. It's folded to one line, like "1 helper session and 2 background tasks running", with
+  **Stop all**. Opened, each one is a row in the same look, with how it stands, **Open** and Stop.
+- A background task opens in a panel on the right, laid out like a session: how it stands, its steps or its output
+  as they come, and **Stop**. It used to open in a plain dialog.
+- While a session's turn, or anything it started, is still running, the button in the message box is **Stop**, and
+  it stops all of it: the turn, the background tasks and the helper sessions, with any they started. Helper sessions
+  stopped this way don't report back and wake the session up again.
+- A helper session's card in the conversation has the same look as the tray's rows.
+
 ## 0.55.2 · 11 November 2026
 
 The prompt bar keeps its spinning ring while a session's background work still runs.
