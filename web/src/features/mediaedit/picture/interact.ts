@@ -7,10 +7,11 @@
 // pixels; the View turns the screen's into them.
 import { CROP_SHAPES, textMetrics, type Mark } from '@shared/mediaedit';
 import { markAt, markBox } from '../render';
-import { flattenDoc, markBounds } from './compose';
+import { flattenDoc, layerInk, markBounds } from './compose';
+import { isCopyDrag, isNoSnap } from '../shell/menus';
 import { activeLayer, layerOf, type Doc, type Layer, type MarkLayer } from './doc';
 import { affineOf, markBoundsUnturned, TEXT_BACKS, type PictureEd, type ToolId } from './editor';
-import { ellipseMask, featherMask, floodMask, moveMask, polygonMask, rectMask, type Box, type MaskOp } from './mask';
+import { ellipseMask, featherMask, floodMask, maskAt, moveMask, polygonMask, rectMask, type Box, type MaskOp } from './mask';
 
 export type Pt = [number, number];
 
@@ -27,6 +28,9 @@ export interface Gesture {
 }
 
 const NONE: Gesture = { move() {}, up() {} };
+
+/** How near, on the screen, a moved box has to come to a line for it to snap. */
+export const SNAP_PX = 6;
 
 const toScreen = (t: ViewT, p: Pt): Pt => [p[0] * t.z + t.ox, p[1] * t.z + t.oy];
 
@@ -230,7 +234,19 @@ function pressTransform(ed: PictureEd, p: Pt, e: PointerEvent, t: ViewT): Gestur
       up: () => {},
     };
   }
-  if (inside) return { move: (q) => ed.setTransform({ tx: x0.tx + q[0] - p[0], ty: x0.ty + q[1] - p[1] }), up: () => {} };
+  if (inside) {
+    // Dragged, its box lines up with the canvas, the guides and the other layers as a moved layer does.
+    const xs = cs.map((c) => c[0]);
+    const ys = cs.map((c) => c[1]);
+    const bb: Box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    return {
+      move: (q, ev) => {
+        const r = ed.dragBy(bb, q[0] - p[0], q[1] - p[1], { except: x0.sel ? [] : [x0.id], shift: ev.shiftKey, noSnap: isNoSnap(ev), tol: SNAP_PX / t.z });
+        ed.setTransform({ tx: x0.tx + r.dx, ty: x0.ty + r.dy });
+      },
+      up: () => ed.clearGuides(),
+    };
+  }
   // Outside: turning, about the middle.
   void e;
   const a0 = Math.atan2(p[1] - C[1], p[0] - C[0]);
@@ -280,6 +296,35 @@ function pressMarquee(ed: PictureEd, p: Pt, e: PointerEvent, kind: 'rect' | 'ell
       let m = kind === 'rect' ? rectMask(box, d.w, d.h) : ellipseMask(box, d.w, d.h);
       if (m && ed.opts.feather > 0) m = featherMask(m, ed.opts.feather, d.w, d.h);
       ed.setSel(m, kind === 'rect' ? 'Rectangle select' : 'Ellipse select', op);
+    },
+  };
+}
+
+/**
+ * A press inside the selection with a selection tool (no Shift or Alt, a new selection each time): the drag moves the
+ * selection's outline (Shift keeps it straight; it lines up as a moved layer does), not what is under it. A click that
+ * goes nowhere is what it always was: the selection dropped. null when the press is not inside one.
+ */
+function pressMoveSelection(ed: PictureEd, p: Pt, e: PointerEvent, t: ViewT): Gesture | null {
+  const sel = ed.doc.sel;
+  if (!sel || e.shiftKey || e.altKey || ed.opts.selMode !== 'replace' || maskAt(sel, p[0], p[1]) === 0) return null;
+  const from = ed.doc;
+  const box: Box = { x: sel.x, y: sel.y, w: sel.w, h: sel.h };
+  let moved = false;
+  const delta = (q: Pt, ev: PointerEvent) => ed.dragBy(box, q[0] - p[0], q[1] - p[1], { except: [], shift: ev.shiftKey, noSnap: isNoSnap(ev), tol: SNAP_PX / t.z });
+  return {
+    move: (q, ev) => {
+      if (!moved && Math.hypot(q[0] - p[0], q[1] - p[1]) * t.z < 3) return;
+      moved = true;
+      const r = delta(q, ev);
+      ed.moveSelection(from, r.dx, r.dy, false);
+    },
+    up: (q, ev) => {
+      if (moved) {
+        const r = delta(q, ev);
+        ed.moveSelection(from, r.dx, r.dy, true);
+      } else ed.deselect();
+      ed.clearGuides();
     },
   };
 }
@@ -421,9 +466,36 @@ function pressText(ed: PictureEd, p: Pt, t: ViewT) {
     return;
   }
   const o = ed.opts;
-  const m: Mark = { type: 'text', x: p[0], y: p[1] - textMetrics(o.textSize).line / 2, text: '', size: o.textSize, color: ed.fg, font: o.font, ...(TEXT_BACKS[o.back] ? { bg: TEXT_BACKS[o.back] } : {}) };
+  const m: Mark = {
+    type: 'text',
+    x: p[0],
+    y: p[1] - textMetrics(o.textSize).line / 2,
+    text: '',
+    size: o.textSize,
+    color: ed.fg,
+    font: o.font,
+    ...(TEXT_BACKS[o.back] ? { bg: TEXT_BACKS[o.back] } : {}),
+    ...(o.bold ? {} : { bold: false }),
+    ...(o.italic ? { italic: true } : {}),
+    ...(o.align !== 'left' ? { align: o.align } : {}),
+  };
   const l = ed.addMark(m, 'Add words', 'Words', false);
   ed.startWriting(l.id);
+}
+
+/** A pen's pressure for the brush (0 to 1) when the pen's pressure is on; a mouse or a finger presses fully. */
+function pressureOf(ed: PictureEd, e: PointerEvent): number {
+  return ed.opts.pressure && e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 1;
+}
+
+/** The eyedropper's drag: the colour under the pointer is the foreground (Alt: the background); with `brush`, Alt took it, so it is the foreground. */
+function pickColour(ed: PictureEd, p: Pt, e: PointerEvent, brush = false): Gesture {
+  const pick = (q: Pt, ev: PointerEvent) => {
+    const c = ed.sample(q[0], q[1]);
+    if (c) (ev.altKey && !brush ? ed.setBg(c, false) : ed.setFg(c, false));
+  };
+  pick(p, e);
+  return { move: pick, up: (q, ev) => (pick(q, ev), ev.altKey && !brush ? ed.setBg(ed.bg) : ed.setFg(ed.fg)) };
 }
 
 // ---- the press -------------------------------------------------------------------------------------------------------
@@ -455,39 +527,48 @@ export function press(ed: PictureEd, p: Pt, e: PointerEvent, t: ViewT, o: { bigH
         ed.pickLayer(hit.id);
         l = hit;
       }
-      if (!l) return 'pan';
+      const ink = l ? layerInk(l) : null;
+      // Nothing to move (no layer, or an adjustment that is everywhere): the drag moves the view.
+      if (!l || !ink) return 'pan';
       const from = ed.doc;
       const id = l.id;
+      const layer = l;
+      // Ctrl (⌥ on a Mac) held as the press began: what is dragged is a copy, the layer stays where it was.
+      const asCopy = isCopyDrag(e);
+      let copy: Layer | undefined;
       let moved = false;
+      const delta = (q: Pt, ev: PointerEvent) => ed.dragBy(ink, q[0] - p[0], q[1] - p[1], { except: copy ? [id, copy.id] : [id], shift: ev.shiftKey, noSnap: isNoSnap(ev), tol: SNAP_PX / t.z });
       return {
-        move: (q) => {
+        move: (q, ev) => {
+          // A click that wobbles a pixel is not a move.
+          if (!moved && Math.hypot(q[0] - p[0], q[1] - p[1]) * t.z < 3) return;
           moved = true;
-          ed.moveLayerBy(from, id, q[0] - p[0], q[1] - p[1], false);
+          if (asCopy && !copy) copy = ed.copyOf(layer);
+          const r = delta(q, ev);
+          ed.moveLayerBy(from, id, r.dx, r.dy, false, copy);
         },
-        up: (q) => {
-          if (moved) ed.moveLayerBy(from, id, q[0] - p[0], q[1] - p[1], true);
+        up: (q, ev) => {
+          if (moved) {
+            const r = delta(q, ev);
+            ed.moveLayerBy(from, id, r.dx, r.dy, true, copy);
+          }
+          ed.clearGuides();
         },
       };
     }
     case 'marquee-rect':
-      return pressMarquee(ed, p, e, 'rect', t);
+      return pressMoveSelection(ed, p, e, t) ?? pressMarquee(ed, p, e, 'rect', t);
     case 'marquee-ellipse':
-      return pressMarquee(ed, p, e, 'ellipse', t);
+      return pressMoveSelection(ed, p, e, t) ?? pressMarquee(ed, p, e, 'ellipse', t);
     case 'lasso':
-      return pressLasso(ed, p, e);
+      return pressMoveSelection(ed, p, e, t) ?? pressLasso(ed, p, e);
     case 'lasso-poly':
       return pressPoly(ed, p, t);
     case 'wand':
       pressWand(ed, p, e);
       return null;
-    case 'eyedropper': {
-      const pick = (q: Pt, ev: PointerEvent) => {
-        const c = ed.sample(q[0], q[1]);
-        if (c) (ev.altKey ? ed.setBg(c, false) : ed.setFg(c, false));
-      };
-      pick(p, e);
-      return { move: pick, up: (q, ev) => (pick(q, ev), ev.altKey ? ed.setBg(ed.bg) : ed.setFg(ed.fg)) };
-    }
+    case 'eyedropper':
+      return pickColour(ed, p, e);
     case 'brush':
     case 'eraser':
     case 'clone':
@@ -501,8 +582,17 @@ export function press(ed: PictureEd, p: Pt, e: PointerEvent, t: ViewT, o: { bigH
         ed.emit();
         return null;
       }
-      if (!ed.beginStroke(ed.tool, p[0], p[1])) return null;
-      return { move: (q) => ed.strokeTo(q[0], q[1]), up: () => ed.endStroke(o.bigHeal) };
+      // Alt held with the brush: the colour under it is taken (as the eyedropper does), while it is held.
+      if (ed.tool === 'brush' && e.altKey) return pickColour(ed, p, e, true);
+      // Shift: a straight line from where the last stroke on this layer ended.
+      const last = ed.lastPaint;
+      if (e.shiftKey && last && last.layer === ed.doc.active && ['brush', 'eraser', 'dodge', 'burn'].includes(ed.tool)) {
+        if (!ed.beginStroke(ed.tool, last.x, last.y, pressureOf(ed, e))) return null;
+        ed.strokeTo(p[0], p[1], pressureOf(ed, e));
+        return { move: () => {}, up: () => ed.endStroke(o.bigHeal) };
+      }
+      if (!ed.beginStroke(ed.tool, p[0], p[1], pressureOf(ed, e))) return null;
+      return { move: (q, ev) => ed.strokeTo(q[0], q[1], pressureOf(ed, ev)), up: () => ed.endStroke(o.bigHeal) };
     }
     case 'gradient': {
       if (!ed.paintTarget()) return null;

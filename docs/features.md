@@ -662,15 +662,22 @@ agents that speak ACP and take MCP servers.
   status bar; on a phone, tools along the bottom and panels in a sheet) and works in layers: pixel layers, words and
   shapes, and adjustment layers, each shown or hidden, locked, renamed, reordered by dragging, with sixteen blend
   modes and an opacity; duplicate, layer via copy or cut, merge down, merge visible, flatten, free transform (move,
-  size, turn). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI, all, invert,
-  feather, grow, shrink; marching ants) keep painting, fills, adjustments and the AI tools inside them, and cut, copy
+  size, turn); a layer snaps to the canvas's edges and middle, the guides and the other layers while it is moved
+  (thin pink lines, gaps in small pills; Shift straight, Ctrl drags a copy, Alt no snap; View → Snap) and Align puts it
+  at the canvas's left, centre, right, top, middle or bottom; right-click menus on the picture and on each layer (and a
+  touch held still); File → New makes a blank picture (Square post, Story, HD, A4 at 300 dpi or any size; white,
+  see-through or a colour). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI,
+  all, invert, feather, grow, shrink; marching ants; dragged to move, Transform selection to size and turn) keep painting, fills, adjustments and the AI tools inside them, and cut, copy
   and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing brush, gradient, paint
-  bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on layers: light and colour,
+  bucket, dodge and burn, eyedropper, foreground and background colours; brushes draw a straight line with Shift+click,
+  take a colour with Alt+click, change hardness with { and }, opacity with the number keys, and size and flow with a pen's
+  pressure. The zoom in the status bar opens a list (fit, 25 to 400%) and takes a size typed in. Adjustments on layers: light and colour,
   curves, levels, hue, saturation and lightness by colour range, colour balance, clarity, dehaze, sharpness, noise
   reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto enhance, with a live
   histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas size,
   rulers, guides and a grid, history with every step by name, Photoshop's keys (a list in Edit → Keyboard shortcuts),
-  pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background, erase, change
+  words in seventy fonts (the app's, Google's and the computer's own where the browser allows) with bold, italic,
+  alignment, line height, an outline and a shadow, the same when an agent edits a picture; pictures added as layers (a file, the Library, the clipboard, dropped). Its AI: remove the background, erase, change
   with AI (a new layer, inside the selection), expand, make it 2× or 4× larger and select the subject, free on this
   computer where the picture tools can do it. It saves at a size and as PNG, JPEG or WebP, over the original (the old
   file to the Trash) or as a copy, and exports to this device. The video editor is laid out as a professional one (a

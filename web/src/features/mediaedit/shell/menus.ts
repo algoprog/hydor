@@ -19,8 +19,10 @@ export function matchKeys(keys: string, e: KeyEvent): boolean {
   const parts = (plus ? k.slice(0, -2) : k).split('+').filter(Boolean);
   const last = plus ? '+' : (parts.pop() ?? '');
   const mods = new Set(parts.map((p) => p.toLowerCase()));
-  if (isMod(e) !== mods.has('ctrl') || e.shiftKey !== mods.has('shift') || e.altKey !== mods.has('alt')) return false;
   const want = last.toLowerCase();
+  // Plus and equals share a key: where + needs Shift, Ctrl+Shift+= is Ctrl++, so Shift does not matter for them.
+  const shiftOk = want === '=' || want === '+' ? true : e.shiftKey === mods.has('shift');
+  if (isMod(e) !== mods.has('ctrl') || !shiftOk || e.altKey !== mods.has('alt')) return false;
   const key = e.key.toLowerCase();
   switch (want) {
     case 'delete':

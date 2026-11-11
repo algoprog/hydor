@@ -7,7 +7,7 @@ import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { applyLook, hideArea, invert, apply, LIMITS, normalizeRecipe, textMetrics, uprightMap, type FontId, type ImageFormat, type ImageRecipe } from '../../shared/mediaedit.ts';
+import { applyLook, fontOf, hideArea, invert, apply, LIMITS, normalizeRecipe, textMetrics, uprightMap, type FontId, type ImageFormat, type ImageRecipe, type TextStyle } from '../../shared/mediaedit.ts';
 import { agentBaseEnv } from '../env.ts';
 import { localTools } from '../images/hooks.ts';
 import { dimensions } from '../images/openrouter.ts';
@@ -28,7 +28,7 @@ export const PLACES = ['top-left', 'top', 'top-right', 'left', 'center', 'right'
 export type Place = (typeof PLACES)[number];
 
 /** Words to write over a picture: at its pixels (their box's top left), or by `place`; before it is made its final size. */
-export interface Words {
+export interface Words extends TextStyle {
   text: string;
   x: number;
   y: number;
@@ -216,7 +216,11 @@ export function render(src: Pixels, r: ImageRecipe): { p: Pixels; words: Words[]
   drawShapes(p.px, p.w, p.h, marks, at);
   const words: Words[] = [];
   const notes: string[] = [];
-  for (const m of marks) if (m.type === 'text') words.push({ text: m.text, x: m.x - at.x, y: m.y - at.y, size: m.size, color: m.color, ...(m.bg ? { bg: m.bg } : {}), ...(m.font ? { font: m.font } : {}) });
+  for (const m of marks)
+    if (m.type === 'text') {
+      const { bold, italic, align, lineHeight, outline, shadow } = m;
+      words.push({ text: m.text, x: m.x - at.x, y: m.y - at.y, size: m.size, color: m.color, ...(m.bg ? { bg: m.bg } : {}), ...(m.font ? { font: m.font } : {}), ...(bold === false ? { bold } : {}), ...(italic ? { italic } : {}), ...(align ? { align } : {}), ...(lineHeight ? { lineHeight } : {}), ...(outline ? { outline } : {}), ...(shadow ? { shadow } : {}) });
+    }
   if (marks.some((m) => m.type === 'emoji')) notes.push('Emoji are not drawn here (they need a colour font): the editor in the app draws them.');
   return { p, words, notes };
 }
@@ -245,27 +249,51 @@ function onWhite(p: Pixels): Pixels {
   return { w: p.w, h: p.h, px };
 }
 
-const FONT_ASK: Record<FontId, string> = { sans: 'sans-serif:bold', serif: 'serif:bold', mono: 'monospace:bold', hand: 'Comic Neue,Comic Sans MS,cursive:bold', heavy: 'Impact,Anton,sans-serif:black' };
+/** What fontconfig is asked for words in each of the editor's own kinds of font (the server has the computer's fonts only). */
+const FONT_ASK: Record<string, string> = { sans: 'sans-serif', serif: 'serif', mono: 'monospace', hand: 'Comic Neue,Comic Sans MS,cursive', heavy: 'Impact,Anton,sans-serif:black' };
+const KIND_ASK: Record<string, string> = { sans: 'sans-serif', serif: 'serif', mono: 'monospace', hand: 'cursive', display: 'Impact,Anton,sans-serif:black' };
 const FONT_FILES: Record<'regular' | 'bold', string[]> = {
   bold: ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf', '/Library/Fonts/Arial Bold.ttf', 'C:\\Windows\\Fonts\\arialbd.ttf'],
   regular: ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/System/Library/Fonts/Supplemental/Arial.ttf', 'C:\\Windows\\Fonts\\arial.ttf'],
 };
-const fonts = new Map<FontId, Promise<string | null>>();
+const fonts = new Map<string, Promise<string | null>>();
 
-/** A font file for words of a kind: fontconfig's pick, else a common one; null when none is found (drawtext then takes its own). */
-function fontFile(kind: FontId): Promise<string | null> {
-  let f = fonts.get(kind);
+/** The fontconfig pattern for words in a font: its family when the computer has it (the editor's Google fonts, or one of its own), else what it looks like; bold unless asked plain, and slanted when asked. */
+export function fontPattern(font: FontId | undefined, bold = true, italic = false): string {
+  const f = fontOf(font);
+  const family = FONT_ASK[f.id] ?? `${f.label.replace(/[:,=\\']/g, '')},${KIND_ASK[f.cat]}`;
+  // A pattern keeps one weight: Impact-like fonts say theirs ("black").
+  const weight = /:/.test(family) ? '' : bold ? ':bold' : '';
+  return `${family}${weight}${italic ? ':italic' : ''}`;
+}
+
+/** A font file for words: fontconfig's pick, else a common one; null when none is found (drawtext then takes its own). */
+function fontFile(font: FontId | undefined, bold = true, italic = false): Promise<string | null> {
+  const ask = fontPattern(font, bold, italic);
+  let f = fonts.get(ask);
   if (!f) {
     f = new Promise((resolve) => {
-      execFile('fc-match', ['-f', '%{file}', FONT_ASK[kind]], { timeout: 5000 }, (err, out) => {
+      execFile('fc-match', ['-f', '%{file}', ask], { timeout: 5000 }, (err, out) => {
         const file = String(out ?? '').trim();
         if (!err && file && fs.existsSync(file) && !/'/.test(file)) return resolve(file);
-        resolve([...FONT_FILES.bold, ...FONT_FILES.regular].find((x) => fs.existsSync(x)) ?? null);
+        resolve([...(bold ? FONT_FILES.bold : FONT_FILES.regular), ...FONT_FILES.regular].find((x) => fs.existsSync(x)) ?? null);
       });
     });
-    fonts.set(kind, f);
+    fonts.set(ask, f);
   }
   return f;
+}
+
+/** Whether this ffmpeg's drawtext has an option (text alignment came with ffmpeg 7). */
+const drawtextHas = new Map<string, Promise<boolean>>();
+function hasDrawtextOption(ff: string, option: string): Promise<boolean> {
+  const key = `${ff}:${option}`;
+  let p = drawtextHas.get(key);
+  if (!p) {
+    p = new Promise((resolve) => execFile(ff, ['-hide_banner', '-h', 'filter=drawtext'], { timeout: 8000, maxBuffer: 1 << 20 }, (err, out) => resolve(!err && new RegExp(`\\b${option}\\b`).test(String(out)))));
+    drawtextHas.set(key, p);
+  }
+  return p;
 }
 
 const ffColor = (c: string) => {
@@ -317,8 +345,8 @@ async function encodeFfmpeg(ff: string, p: Pixels, o: { format: ImageFormat; qua
     for (const [i, w] of o.words.entries()) {
       const file = path.join(dir, `w${i}.txt`);
       fs.writeFileSync(file, w.text.replace(/\r\n?/g, '\n'));
-      const font = await fontFile(w.font ?? 'sans');
-      const { line, pad } = textMetrics(w.size);
+      const font = await fontFile(w.font, w.bold !== false, !!w.italic);
+      const { line, pad } = textMetrics(w.size, w.lineHeight);
       // By place: drawtext measures the words itself (text_w, text_h), its box's padding kept inside the margin.
       const m = marginOf(p.w, p.h) + pad;
       const px = w.place?.endsWith('left') ? `${m}` : w.place?.endsWith('right') ? `w-text_w-${m}` : w.place ? '(w-text_w)/2' : `${Math.round(w.x + pad)}`;
@@ -331,8 +359,12 @@ async function encodeFfmpeg(ff: string, p: Pixels, o: { format: ImageFormat; qua
         `y='${py}'`,
         `fontsize=${Math.round(w.size)}`,
         `fontcolor=${ffColor(w.color)}`,
-        `line_spacing=${Math.max(0, Math.round(line - w.size * 1.17))}`,
+        `line_spacing=${Math.round(line - w.size * 1.17)}`,
         ...(w.bg ? ['box=1', `boxcolor=${ffColor(w.bg)}`, `boxborderw=${pad}`] : []),
+        ...(w.align && w.align !== 'left' && (await hasDrawtextOption(ff, 'text_align')) ? [`text_align=${w.align === 'centre' ? 'center' : 'right'}`] : []),
+        ...(w.outline ? [`borderw=${Math.max(1, Math.round(w.outline.width))}`, `bordercolor=${ffColor(w.outline.color)}`] : []),
+        // drawtext's shadow is hard-edged: a soft one is drawn as a hard one here, as far as it reaches.
+        ...(w.shadow ? [`shadowx=${Math.round(w.shadow.x)}`, `shadowy=${Math.round(w.shadow.y)}`, `shadowcolor=${ffColor(w.shadow.color)}`] : []),
       ];
       filters.push(`drawtext=${parts.join(':')}`);
     }
@@ -360,7 +392,7 @@ async function encodeFfmpeg(ff: string, p: Pixels, o: { format: ImageFormat; qua
 
 const PILLOW_WRITE = `
 import json
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 spec = json.load(open('spec.json'))
 im = Image.open('in.png').convert('RGBA')
 if spec['words']:
@@ -371,6 +403,7 @@ if spec['words']:
             font = ImageFont.truetype(w['fontfile'], w['size']) if w.get('fontfile') else ImageFont.load_default(w['size'])
         except Exception:
             font = ImageFont.load_default()
+        al = w.get('align') or 'left'
         at = (w['x'] + w['pad'], w['y'] + w['pad'])
         place = w.get('place')
         if place:
@@ -384,7 +417,16 @@ if spec['words']:
             b = d.multiline_textbbox(at, w['text'], font=font, spacing=w['spacing'])
             p = w['pad']
             d.rounded_rectangle((b[0] - p, b[1] - p, b[2] + p, b[3] + p), radius=int(p * 0.7), fill=tuple(w['bg']))
-        d.multiline_text(at, w['text'], font=font, fill=tuple(w['color']), spacing=w['spacing'])
+        sw = int(round(w['outline']['width'])) if w.get('outline') else 0
+        sh = w.get('shadow')
+        if sh:
+            shade = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            ImageDraw.Draw(shade).multiline_text((at[0] + sh['x'], at[1] + sh['y']), w['text'], font=font, fill=tuple(sh['color']), spacing=w['spacing'], align=al, stroke_width=sw, stroke_fill=tuple(sh['color']))
+            if sh['blur'] > 0:
+                shade = shade.filter(ImageFilter.GaussianBlur(sh['blur']))
+            layer = Image.alpha_composite(layer, shade)
+            d = ImageDraw.Draw(layer)
+        d.multiline_text(at, w['text'], font=font, fill=tuple(w['color']), spacing=w['spacing'], align=al, stroke_width=sw, stroke_fill=tuple(w['outline']['color']) if sw else None)
     im = Image.alpha_composite(im, layer)
 if spec.get('size'):
     im = im.resize(tuple(spec['size']), Image.LANCZOS)
@@ -402,7 +444,7 @@ async function encodePillow(p: Pixels, o: { format: ImageFormat; quality: number
   try {
     const words = await Promise.all(
       o.words.map(async (w) => {
-        const { line, pad } = textMetrics(w.size);
+        const { line, pad } = textMetrics(w.size, w.lineHeight);
         return {
           text: w.text,
           x: w.x,
@@ -411,10 +453,13 @@ async function encodePillow(p: Pixels, o: { format: ImageFormat; quality: number
           pad,
           margin: marginOf(p.w, p.h),
           place: w.place ?? null,
-          spacing: Math.max(0, Math.round(line - w.size * 1.17)),
+          spacing: Math.round(line - w.size * 1.17),
           color: rgbaOf(w.color),
           ...(w.bg ? { bg: rgbaOf(w.bg) } : {}),
-          fontfile: await fontFile(w.font ?? 'sans'),
+          ...(w.align ? { align: w.align === 'centre' ? 'center' : w.align } : {}),
+          ...(w.outline ? { outline: { width: w.outline.width, color: rgbaOf(w.outline.color) } } : {}),
+          ...(w.shadow ? { shadow: { x: w.shadow.x, y: w.shadow.y, blur: w.shadow.blur, color: rgbaOf(w.shadow.color) } } : {}),
+          fontfile: await fontFile(w.font, w.bold !== false, !!w.italic),
         };
       }),
     );

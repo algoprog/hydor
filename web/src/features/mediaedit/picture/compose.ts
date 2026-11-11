@@ -6,7 +6,7 @@
 // server runs) and mixes it in as far as its mask, its opacity and (clipped) the layer under it say. While a stroke is
 // painted, a layer is moved or turned, or words are written, `live` says so and they show as they will be.
 import { blendOp } from '@shared/blend';
-import { applyLookSettings, hasLook, hideArea, type Affine } from '@shared/mediaedit';
+import { applyLookSettings, hasLook, hideArea, textReach, type Affine } from '@shared/mediaedit';
 import { drawMarks, markBox } from '../render';
 import { canvasOf, intersect, type AdjustLayer, type Doc, type Layer, type MarkLayer, type RasterLayer } from './doc';
 import type { Box } from './mask';
@@ -26,7 +26,7 @@ const isHide = (l: Layer) => l.kind === 'mark' && (l.mark.type === 'blur' || l.m
 /** A mark layer's box on the canvas, turned with it and with room for its line's width. */
 export function markBounds(l: MarkLayer, m?: Affine): Box {
   const b = markBox(l.mark);
-  const pad = 'width' in l.mark ? l.mark.width * 2 + 2 : 4;
+  const pad = 'width' in l.mark ? l.mark.width * 2 + 2 : l.mark.type === 'text' ? 4 + textReach(l.mark) : 4;
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
   const t = (l.angle * Math.PI) / 180;
@@ -68,6 +68,28 @@ export function layerBox(l: Layer): Box | null {
   if (l.kind === 'raster') return { x: l.x, y: l.y, w: l.px.w, h: l.px.h };
   if (l.kind === 'mark') return markBounds(l);
   return l.mask ? { x: l.mask.x, y: l.mask.y, w: l.mask.w, h: l.mask.h } : null;
+}
+
+/**
+ * A layer's own box for lining things up: a pixel layer's pixels' box, a mark's ink turned with it (without the room its
+ * line's width asks for: that is for picking), none for an adjustment without a mask.
+ */
+export function layerInk(l: Layer): Box | null {
+  if (l.kind !== 'mark') return layerBox(l);
+  const b = markBox(l.mark);
+  if (!l.angle) return { x: b.x, y: b.y, w: b.w, h: b.h };
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const t = (l.angle * Math.PI) / 180;
+  const pts = [
+    [b.x, b.y],
+    [b.x + b.w, b.y],
+    [b.x, b.y + b.h],
+    [b.x + b.w, b.y + b.h],
+  ].map(([x, y]) => [cx + (x - cx) * Math.cos(t) - (y - cy) * Math.sin(t), cy + (x - cx) * Math.sin(t) + (y - cy) * Math.cos(t)]);
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
 }
 
 function drawRaster(g: CanvasRenderingContext2D, l: RasterLayer, R: Box, k: number, live?: Live) {

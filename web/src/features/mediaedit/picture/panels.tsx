@@ -5,12 +5,13 @@
 // colour's picker, the background's, the colours used last).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BLEND_MODES, type BlendMode } from '@shared/blend';
-import { histogramOf, MARK_FONTS, type Mark } from '@shared/mediaedit';
-import { ArrowDown, Copy, Eye, EyeOff, ImagePlus, Layers2, Lock, LockOpen, Merge, Plus, SlidersHorizontal, Trash2, Type, Shapes, Droplets, Grid3x3, Smile, History as HistoryIcon, Check as CheckIcon } from 'lucide-react';
+import { histogramOf, type Mark } from '@shared/mediaedit';
+import { AlignCenter, AlignLeft, AlignRight, ArrowDown, Bold as BoldIcon, Copy, Ellipsis, Italic as ItalicIcon, Eye, EyeOff, ImagePlus, Layers2, Lock, LockOpen, Merge, Plus, SlidersHorizontal, Trash2, Type, Shapes, Droplets, Grid3x3, Smile, History as HistoryIcon, Check as CheckIcon } from 'lucide-react';
 import { viaLink } from '../../../lib/machine';
 import { cx, IconButton, MenuItem, Popover } from '../../../components/ui';
-import { Check, ColorButton, ColorPicker, FieldRow, MiniSelect, ScrubNumber, Seg, SliderRow } from '../shell';
+import { Check, ColorButton, ColorPicker, FieldRow, MiniSelect, parseHex, ScrubNumber, Seg, SliderRow } from '../shell';
 import { layerThumb, renderDoc } from './compose';
+import { FontPicker } from './fonts';
 import { activeLayer, indexOf, type Doc, type Layer } from './doc';
 import { TEXT_BACKS, type PictureEd } from './editor';
 import { useEd } from './View';
@@ -46,11 +47,31 @@ function KindIcon({ l }: { l: Layer }) {
 
 // ---- Layers ----------------------------------------------------------------------------------------------------------
 
-export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture: (from: 'device' | 'library' | 'clipboard') => void }) {
+export function LayersPanel({
+  ed,
+  onAddPicture,
+  onContext,
+}: {
+  ed: PictureEd;
+  onAddPicture: (from: 'device' | 'library' | 'clipboard') => void;
+  /** The layer's right-click menu asked for (a right-click or a touch held on its row, or its ⋯ button): where. */
+  onContext?: (at: { x: number; y: number }, id: string) => void;
+}) {
   useEd(ed);
   const doc = ed.doc;
   const a = activeLayer(doc);
-  const [renaming, setRenaming] = useState<string | null>(null);
+  const renaming = ed.renaming;
+  const setRenaming = (id: string | null) => {
+    ed.renaming = id;
+    ed.emit(false);
+  };
+  // A touch held still on a row opens its menu where the browser sends no contextmenu event (Safari).
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const stopPress = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  const moreRef = useRef<HTMLButtonElement>(null);
   const [drag, setDrag] = useState<{ id: string; from: number; to: number; y0: number } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
@@ -70,15 +91,18 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
         aria-label="Layers"
         className="min-h-0 flex-1 overflow-y-auto py-1"
         onPointerMove={(e) => {
+          if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > 8) stopPress();
           if (!drag) return;
           const steps = Math.round((e.clientY - drag.y0) / rowH);
           const to = Math.max(0, Math.min(doc.layers.length - 1, drag.from - steps));
           if (to !== drag.to) setDrag({ ...drag, to });
         }}
         onPointerUp={() => {
+          stopPress();
           if (drag && drag.to !== drag.from) ed.moveLayer(drag.from, drag.to);
           setDrag(null);
         }}
+        onPointerCancel={() => (stopPress(), setDrag(null))}
       >
         {list.map((l) => {
           const i = indexOf(doc, l.id);
@@ -91,8 +115,30 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
               role="option"
               aria-selected={on}
               onClick={() => ed.pickLayer(l.id)}
+              onContextMenu={(e) => {
+                if (!onContext) return;
+                e.preventDefault();
+                stopPress();
+                setDrag(null);
+                ed.pickLayer(l.id);
+                onContext({ x: e.clientX, y: e.clientY }, l.id);
+              }}
               onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest('button,input')) return;
+                if (e.button !== 0 || (e.target as HTMLElement).closest('button,input')) return;
+                if (e.pointerType === 'touch' && onContext) {
+                  const x = e.clientX;
+                  const y = e.clientY;
+                  press.current = {
+                    x,
+                    y,
+                    timer: window.setTimeout(() => {
+                      press.current = null;
+                      setDrag(null);
+                      ed.pickLayer(l.id);
+                      onContext({ x, y }, l.id);
+                    }, 550),
+                  };
+                }
                 (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId);
                 setDrag({ id: l.id, from: i, to: i, y0: e.clientY });
               }}
@@ -176,6 +222,20 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
         <IconButton label="Delete the layer" size="sm" disabled={!a || doc.layers.length < 2} onClick={() => ed.deleteLayer()}>
           <Trash2 size={14} />
         </IconButton>
+        {onContext && (
+          <IconButton
+            ref={moreRef}
+            label="More for this layer"
+            size="sm"
+            disabled={!a}
+            onClick={() => {
+              const r = moreRef.current?.getBoundingClientRect();
+              if (a && r) onContext({ x: r.right, y: r.top }, a.id);
+            }}
+          >
+            <Ellipsis size={14} />
+          </IconButton>
+        )}
       </div>
     </div>
   );
@@ -196,6 +256,12 @@ export function EmojiGrid({ value, onPick }: { value: string; onPick: (e: string
     </div>
   );
 }
+
+/** Black for light colours and white for dark ones: what an outline of words in this colour shows against. */
+const contrastOf = (c: string) => {
+  const p = parseHex(c);
+  return p && (0.299 * p.r + 0.587 * p.g + 0.114 * p.b) / 255 > 0.55 ? '#000000' : '#ffffff';
+};
 
 export function PropertiesPanel({ ed }: { ed: PictureEd }) {
   useEd(ed);
@@ -269,8 +335,48 @@ export function PropertiesPanel({ ed }: { ed: PictureEd }) {
           {m.type === 'text' && (
             <>
               <FieldRow label="Font">
-                <MiniSelect label="Font" value={m.font ?? 'sans'} options={MARK_FONTS.map((f) => ({ value: f.id, label: f.label }))} onChange={(v) => setMark({ font: v })} width={140} />
+                <FontPicker value={m.font} onChange={(v) => setMark({ font: v })} width={150} />
               </FieldRow>
+              <FieldRow label="Style">
+                <IconButton label="Bold" size="sm" active={m.bold !== false} onClick={() => setMark({ bold: m.bold === false ? undefined : false })}>
+                  <BoldIcon size={14} />
+                </IconButton>
+                <IconButton label="Italic" size="sm" active={!!m.italic} onClick={() => setMark({ italic: m.italic ? undefined : true })}>
+                  <ItalicIcon size={14} />
+                </IconButton>
+                <Seg
+                  value={m.align ?? 'left'}
+                  options={[
+                    { value: 'left' as const, label: <AlignLeft size={13} />, title: 'Align left' },
+                    { value: 'centre' as const, label: <AlignCenter size={13} />, title: 'Centre' },
+                    { value: 'right' as const, label: <AlignRight size={13} />, title: 'Align right' },
+                  ]}
+                  onChange={(v) => setMark({ align: v === 'left' ? undefined : v })}
+                />
+              </FieldRow>
+              <SliderRow label="Line height" value={Math.round((m.lineHeight ?? 1.22) * 100)} min={80} max={300} zero={122} unit="%" onChange={(v, done) => setMark({ lineHeight: v === 122 ? undefined : v / 100 }, done)} />
+              <FieldRow label="Outline">
+                <Check on={!!m.outline} onChange={(v) => setMark({ outline: v ? { color: contrastOf(m.color), width: Math.max(1, Math.round(m.size / 14)) } : undefined })}>
+                  Outlined
+                </Check>
+                {m.outline && <ColorButton value={m.outline.color} label="Outline colour" alpha onChange={(c, done) => setMark({ outline: { ...m.outline!, color: c } }, done)} />}
+              </FieldRow>
+              {m.outline && <SliderRow label="Outline width" value={m.outline.width} min={1} max={Math.max(4, Math.round(m.size / 3))} onChange={(v, done) => setMark({ outline: { ...m.outline!, width: v } }, done)} />}
+              <FieldRow label="Shadow">
+                <Check on={!!m.shadow} onChange={(v) => setMark({ shadow: v ? { color: '#00000099', blur: Math.round(m.size / 12), x: Math.round(m.size / 16), y: Math.round(m.size / 16) } : undefined })}>
+                  Shadow
+                </Check>
+                {m.shadow && <ColorButton value={m.shadow.color} label="Shadow colour" alpha onChange={(c, done) => setMark({ shadow: { ...m.shadow!, color: c } }, done)} />}
+              </FieldRow>
+              {m.shadow && (
+                <>
+                  <SliderRow label="Shadow blur" value={m.shadow.blur} min={0} max={Math.max(8, Math.round(m.size / 2))} onChange={(v, done) => setMark({ shadow: { ...m.shadow!, blur: v } }, done)} />
+                  <FieldRow label="Shadow place">
+                    <ScrubNumber label="X" value={m.shadow.x} min={-200} max={200} width={58} onChange={(v, done) => setMark({ shadow: { ...m.shadow!, x: v } }, done)} />
+                    <ScrubNumber label="Y" value={m.shadow.y} min={-200} max={200} width={58} onChange={(v, done) => setMark({ shadow: { ...m.shadow!, y: v } }, done)} />
+                  </FieldRow>
+                </>
+              )}
               <SliderRow label="Size" value={m.size} min={6} max={Math.max(200, Math.round(Math.max(doc.w, doc.h) / 3))} zero={Math.max(14, Math.round(Math.max(doc.w, doc.h) / 16))} onChange={(v, done) => setMark({ size: v }, done)} />
               <FieldRow label="Behind it">
                 <Seg value={m.bg === TEXT_BACKS.dark ? 'dark' : m.bg === TEXT_BACKS.light ? 'light' : m.bg ? 'other' : 'none'} options={[{ value: 'none', label: 'Nothing' }, { value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} onChange={(v) => setMark({ bg: TEXT_BACKS[v as 'none' | 'dark' | 'light'] })} />
