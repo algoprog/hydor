@@ -85,11 +85,12 @@ const QUICK_REWRITES: RewriteHow[] = ['shorter', 'longer', 'simpler', 'formal', 
 export function docContext(c: DocContextCtx): MenuEntry[] {
   const { engine: e, st, hit } = c;
   if (c.readOnly) return [{ label: 'Copy', icon: <Copy size={15} />, keys: 'Ctrl+C', disabled: st.collapsed, run: () => c.copy(false) }, { label: 'Select all', keys: 'Ctrl+A', run: () => document.execCommand('selectAll') }, '-', { label: 'Find', icon: <Search size={15} />, keys: 'Ctrl+F', run: () => c.find(false) }];
+  const pastePlain: MenuEntry = { label: 'Paste without formatting', icon: <ClipboardPaste size={15} />, keys: 'Ctrl+Shift+V', also: 'plain text', run: () => c.paste(true) };
   const clip = (cutOk: boolean, both = true): MenuEntry[] => [
     { label: 'Cut', icon: <Scissors size={15} />, keys: 'Ctrl+X', disabled: !cutOk, run: () => c.copy(true) },
     { label: 'Copy', icon: <Copy size={15} />, keys: 'Ctrl+C', disabled: !cutOk, run: () => c.copy(false) },
     { label: 'Paste', icon: <ClipboardPaste size={15} />, keys: 'Ctrl+V', run: () => c.paste(false) },
-    both && { label: 'Paste without formatting', icon: <ClipboardPaste size={15} />, keys: 'Ctrl+Shift+V', also: 'plain text', run: () => c.paste(true) },
+    both && pastePlain,
   ];
 
   // A picture: its alignment, caption, description, editing, another in its place, changing it with AI.
@@ -180,13 +181,14 @@ export function docContext(c: DocContextCtx): MenuEntry[] {
     { label: 'Paragraph styles', icon: <Heading size={15} />, items: styleEntries(c, false) },
     { label: 'Clear the formatting', icon: <Eraser size={15} />, keys: 'Ctrl+\\', run: () => e.clear() },
   ];
-  const spell: MenuEntry = c.spellHint && !inTable ? { label: 'Spelling suggestions: Shift+right-click', disabled: true } : null;
+  // Where the browser's spelling suggestions are: a muted last row (its key at its end, as the others have theirs).
+  const spell: MenuEntry = c.spellHint ? { label: 'Spelling suggestions', keys: 'Shift+right-click', disabled: true } : null;
   const ask: MenuEntry = words && c.askWords ? { label: 'Ask the agent about it', icon: <Sparkles size={15} className="text-accent" />, run: c.askWords } : null;
 
   // In a table: the clipboard, the table's own rows, columns and cells, and the rest of the words' actions in one list.
   if (inTable) {
-    const rest: MenuEntry[] = [{ label: 'Select all', keys: 'Ctrl+A', run: () => document.execCommand('selectAll') }, ...link, ...comment, ...suggestion, ...writing, ...(words ? [...textOnWords, rewrite, ask] : []), ...style, spell];
-    return [...clip(words, false), '-', ...tableEntries(c), '-', { label: 'Text', icon: <Type size={15} />, items: rest }];
+    const rest: MenuEntry[] = [pastePlain, { label: 'Select all', keys: 'Ctrl+A', run: () => document.execCommand('selectAll') }, '-', ...link, ...comment, ...suggestion, ...writing, ...(words ? [...textOnWords, rewrite, ask] : []), '-', ...style];
+    return [...clip(words, false), '-', ...tableEntries(c), '-', { label: 'Text', icon: <Type size={15} />, items: rest }, spell ? '-' : null, spell];
   }
   return [
     ...clip(words),
