@@ -97,11 +97,11 @@
 
 ### 更多智能体
 
-[设置 → 更多智能体](/settings?s=agents)：Gemini CLI、OpenCode、Qwen Code、Goose、Hermes Agent、Pi 以及其他支持 ACP 的智能体。详见[智能体、账户和模型](/guide/agents-models)。
+[设置 → 更多智能体](/settings?s=agents)：Gemini CLI、OpenCode、Qwen Code、Goose 以及其他支持 ACP 的智能体。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**你的智能体**](/settings?s=agents&find=Your%20agents)：显示在 Claude Code 和 Codex 旁边的智能体。
 - [**添加你自己的**](/settings?s=agents&find=Add%20your%20own)：任何支持 ACP 的智能体（通过其命令）。
-- [**支持 ACP 的智能体**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、OpenCode、Qwen Code、Goose、Hermes Agent 和 Pi，可随时添加。
+- [**支持 ACP 的智能体**](/settings?s=agents&find=Agents%20that%20speak%20ACP)：Gemini CLI、OpenCode、Qwen Code 和 Goose，可随时添加。
 
 ### 模型
 
@@ -231,7 +231,7 @@
 - [**备注**](/settings?s=memory&find=Notes)：所有已保存的笔记，按位置分类。
 - [**添加笔记**](/settings?s=memory&find=Add%20a%20note)：写一条笔记让智能体记住，关于你或某个项目。
 - [**已删除的笔记**](/settings?s=memory&find=Deleted%20notes)：最近 30 天内删除的笔记，可以恢复。
-- [**导入…**](/settings?s=memory&find=Bring%20in%E2%80%A6)：把其他助手对你的了解变成笔记，也包括你在其中做的技能：Claude Code、Codex、Hermes、OpenClaw、pi、Atomic Agent，或 ChatGPT、Claude 的导出文件。
+- [**导入…**](/settings?s=memory&find=Bring%20in%E2%80%A6)：把其他助手对你的了解变成笔记，也包括你在其中做的技能：Claude Code、Codex、其他智能体，或 ChatGPT、Claude 的导出文件。
 - [**导出**](/settings?s=memory&find=Export)：把所有笔记导出为便于阅读的 Markdown，或含更改历史的 JSON。
 - [**全部清除…**](/settings?s=memory&find=Clear%20all%E2%80%A6)：删除所有笔记及其历史记录。
 
