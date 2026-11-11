@@ -40,6 +40,7 @@ import {
   Upload,
   UsersRound,
   Wallet,
+  Image as ImageIcon,
   Workflow,
   X,
   type LucideIcon,
@@ -70,9 +71,11 @@ import { myThemeDeck, useMyThemeList, useMyThemes } from './slides/MyThemes';
 import { TexTemplateTiles } from './latex/TemplatePicker';
 import { fontsOf, NewDesign, paletteOf, type Colours } from './design/NewDesign';
 import { useBrand } from './design/brand';
-import { AutoWidth, BlankArt, OpenTile, StarterArt, Tile } from './newArt';
+import { AutoWidth, BlankArt, OpenTile, PictureArt, StarterArt, Tile } from './newArt';
+import { fitNewSize, NEW_PRESETS, newPictureName, blankSrc, presetOf, type NewBackground } from '../mediaedit/picture/newpicture';
+import { openEditor, pageName } from '../mediaedit/host';
 
-export type NewKind = 'page' | 'design' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
+export type NewKind = 'page' | 'design' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'picture';
 
 const KINDS: { value: NewKind; label: string; icon: LucideIcon; colour: string }[] = [
   { value: 'page', label: 'Page', icon: AppWindow, colour: 'var(--accent)' },
@@ -83,6 +86,7 @@ const KINDS: { value: NewKind; label: string; icon: LucideIcon; colour: string }
   { value: 'tex', label: 'LaTeX', icon: Sigma, colour: 'var(--viz-7)' },
   { value: 'notebook', label: 'Notebook', icon: NotebookText, colour: 'var(--viz-4)' },
   { value: 'diagram', label: 'Diagram', icon: Workflow, colour: 'var(--viz-8)' },
+  { value: 'picture', label: 'Picture', icon: ImageIcon, colour: 'var(--viz-6)' },
 ];
 const kindOf = (k: NewKind) => KINDS.find((x) => x.value === k)!;
 
@@ -95,6 +99,7 @@ const HEAD: Record<NewKind, string> = {
   tex: 'A new LaTeX document',
   notebook: 'A new notebook',
   diagram: 'A new diagram',
+  picture: 'A new picture',
 };
 const ABOUT: Record<NewKind, string> = {
   page: 'A page or a small tool of your own: notes, a checklist, a tracker, a wiki. What you enter in it is kept, on every device.',
@@ -105,10 +110,11 @@ const ABOUT: Record<NewKind, string> = {
   tex: 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.',
   notebook: 'A Jupyter notebook: text and code cells you run here, with their outputs, to save as an .ipynb file, a Python script or a PDF.',
   diagram: 'A diagram to draw and edit as in draw.io, and save as a picture, a PDF or a draw.io file.',
+  picture: 'A blank picture to paint and edit as in Photoshop, in a size you pick, saved in your Library as a PNG, JPEG or WebP.',
 };
-const NEW_TITLE: Record<NewKind, string> = { page: '', design: 'Design', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook', diagram: 'Diagram' };
+const NEW_TITLE: Record<NewKind, string> = { page: '', design: 'Design', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook', diagram: 'Diagram', picture: 'Picture' };
 /** What an agent is asked for a LaTeX document or a notebook, which the gallery has no kinds of: these words, then the person's. */
-const ASK_FOR: Partial<Record<NewKind, string>> = { tex: 'Write me a LaTeX document and keep it in my Library: ', notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ' };
+const ASK_FOR: Partial<Record<NewKind, string>> = { tex: 'Write me a LaTeX document and keep it in my Library: ', notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ', picture: 'Make me a picture and keep it in my Library: ' };
 const EXAMPLE: Record<NewKind, string> = {
   page: 'A packing list for a week of hiking',
   design: 'A poster for our summer street party',
@@ -118,6 +124,7 @@ const EXAMPLE: Record<NewKind, string> = {
   tex: 'A two-page paper on my results, with equations',
   notebook: 'A notebook that charts my monthly spending from a CSV',
   diagram: 'A flowchart of how we handle a refund',
+  picture: 'A watercolour of a lighthouse at dusk',
 };
 /** The gallery's kinds for each (shared/content-types.ts): its chips pick one, as More kinds does from all of them. */
 const TYPES_FOR: Partial<Record<NewKind, ContentKind>> = { page: 'page', design: 'design', slides: 'deck', doc: 'doc', sheet: 'sheet', diagram: 'diagram' };
@@ -250,6 +257,11 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   const [dSize, setDSize] = useState<DesignSize>(() => designSize('instagram-post')!);
   const [dTpl, setDTpl] = useState<string | null>(() => templatesFor(designSize('instagram-post')!)[0]?.id ?? null);
   const [dColours, setDColours] = useState<Colours>('own');
+  // A picture: its size (a preset, or any: Custom), and what it starts as.
+  const [pSize, setPSize] = useState({ w: 1080, h: 1080 });
+  const [pCustom, setPCustom] = useState(false);
+  const [pBg, setPBg] = useState<NewBackground>('white');
+  const [pColor, setPColor] = useState('#1f2937');
   const kindNow = useRef(kind);
   kindNow.current = kind;
   const rail = useRef<Partial<Record<NewKind, HTMLButtonElement | null>>>({});
@@ -269,6 +281,9 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
     setAsk('');
     setType(null);
     setWhere(space ?? null);
+    setPSize({ w: 1080, h: 1080 });
+    setPCustom(false);
+    setPBg('white');
     // The gallery's kinds, so a chip or More kinds answers at once.
     preloadTypes();
   }, [open, startKind, space]);
@@ -295,6 +310,14 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
   const aiReady = !!type || !!ask.trim();
 
   const make = async () => {
+    if (kind === 'picture') {
+      // Not a page: the picture editor opens on a blank picture, and its Save keeps it in the Library here.
+      const f = fitNewSize(pSize.w, pSize.h);
+      const fill = pBg === 'transparent' ? null : pBg === 'white' ? '#ffffff' : pColor.slice(0, 7);
+      onClose();
+      openEditor({ kind: 'image', src: blankSrc(f.w, f.h, fill), title: title.trim() || newPictureName(f.w, f.h), from: { label: pageName() }, fresh: { space: where, folder: inFolder }, save: (r) => void (r.media && toast('Saved to your Library', 'ok')) });
+      return;
+    }
     setBusy(true);
     try {
       const t = title.trim() || defaultTitle;
@@ -503,6 +526,59 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
           busy={busy}
         />
       );
+    if (kind === 'picture') {
+      const shown = pCustom ? NEW_PRESETS[NEW_PRESETS.length - 1] : presetOf(pSize.w, pSize.h);
+      const fit = fitNewSize(pSize.w, pSize.h);
+      const num = (v: string) => Math.max(1, Math.round(Number(v) || 1));
+      return (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-5" role="radiogroup" aria-label="Size">
+            {NEW_PRESETS.map((p) => (
+              <Tile
+                key={p.id}
+                on={shown.id === p.id}
+                onClick={() => {
+                  if (p.w && p.h) (setPSize({ w: p.w, h: p.h }), setPCustom(false));
+                  else setPCustom(true);
+                }}
+                onOpen={makeNow}
+                art={<PictureArt w={p.w ?? pSize.w} h={p.h ?? pSize.h} bg={pBg} color={pColor} />}
+                label={p.label}
+                hint={p.w && p.h ? `${p.w} × ${p.h}` : 'Any size'}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-[13px]">
+            <label className="flex items-center gap-2">
+              <span className="text-fg-3">Width</span>
+              <input type="number" min={1} max={8192} value={pSize.w} aria-label="Width in pixels" onChange={(e) => (setPSize((s) => ({ ...s, w: num(e.target.value) })), setPCustom(true))} className={cx(inputCls, 'w-24')} />
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="text-fg-3">Height</span>
+              <input type="number" min={1} max={8192} value={pSize.h} aria-label="Height in pixels" onChange={(e) => (setPSize((s) => ({ ...s, h: num(e.target.value) })), setPCustom(true))} className={cx(inputCls, 'w-24')} />
+            </label>
+            <Button size="sm" variant="ghost" onClick={() => (setPSize((s) => ({ w: s.h, h: s.w })), setPCustom(!NEW_PRESETS.some((p) => p.w === pSize.h && p.h === pSize.w)))}>
+              Swap
+            </Button>
+            <span className="flex items-center gap-2">
+              <span className="text-fg-3">Background</span>
+              <Segmented<NewBackground>
+                size="sm"
+                value={pBg}
+                onChange={setPBg}
+                options={[
+                  { value: 'white', label: 'White' },
+                  { value: 'transparent', label: 'See-through' },
+                  { value: 'colour', label: 'Colour' },
+                ]}
+              />
+              {pBg === 'colour' && <input type="color" value={pColor.slice(0, 7)} aria-label="Background colour" onChange={(e) => setPColor(e.target.value)} className="h-7 w-9 cursor-pointer rounded border border-line-2 bg-transparent p-0.5" />}
+            </span>
+          </div>
+          <p className={cx('text-[12.5px]', fit.cut ? 'text-err' : 'text-fg-3')}>{fit.cut ? tr(`That is more than the editor holds: it will be ${fit.w} × ${fit.h} pixels.`) : tr(`${fit.w} × ${fit.h} pixels. It opens in the picture editor; Save keeps it in your Library.`)}</p>
+        </div>
+      );
+    }
     // A document, a spreadsheet, a notebook or a diagram: blank, or from a file of yours.
     const k = kind as 'doc' | 'sheet' | 'notebook' | 'diagram';
     return (

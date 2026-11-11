@@ -23,7 +23,7 @@ import { still } from '../media/frames.ts';
 import { keepFile } from '../media/index.ts';
 import { filesOf, getMedia, MEDIA_DIR, mustMedia } from '../media/store.ts';
 import { keepEarlierVersion } from '../media/versions.ts';
-import { putInFolder } from '../pages/folders.ts';
+import { mustFolder, putInFolder } from '../pages/folders.ts';
 import { MAX_ASSET, putAsset } from '../pages/assets.ts';
 import { convert, decode, EditError, encode, extOf, formatOfData, MIMES, PLACES, render, type Place, type Words } from './image.ts';
 
@@ -91,8 +91,12 @@ export async function replaceInLibrary(d: Deps, id: string, data: Buffer, fmt: I
   return item;
 }
 
-/** A new Library picture: from a Library item (its project and folder kept, "(edited)" after its name), or simply named. */
-async function copyToLibrary(d: Deps, data: Buffer, fmt: ImageFormat, from: MediaItem | null, title: string): Promise<MediaItem> {
+/**
+ * A new Library picture: from a Library item (its project and folder kept, "(edited)" after its name), or simply named.
+ * `where`: the project and Library folder it goes in when it is not from an item (a new picture made in a folder of the
+ * Library, with `plain` its name left as it is, with no "(edited)").
+ */
+async function copyToLibrary(d: Deps, data: Buffer, fmt: ImageFormat, from: MediaItem | null, title: string, where: { space?: unknown; folder?: unknown; plain?: boolean } = {}): Promise<MediaItem> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-edited-'));
   try {
     const stem =
@@ -100,11 +104,15 @@ async function copyToLibrary(d: Deps, data: Buffer, fmt: ImageFormat, from: Medi
         .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
         .trim()
         .slice(0, 80) || 'Picture';
-    const file = path.join(dir, `${stem.replace(/\.(png|jpe?g|webp|gif|avif|bmp|svg)$/i, '')} (edited).${extOf(fmt)}`);
+    const file = path.join(dir, `${stem.replace(/\.(png|jpe?g|webp|gif|avif|bmp|svg)$/i, '')}${where.plain && !from ? '' : ' (edited)'}.${extOf(fmt)}`);
     fs.writeFileSync(file, data);
-    const { item } = await keepFile(d, { path: file, ...(from?.space ? { space: from.space } : {}) }, { move: true });
-    if (from?.folder && !item.folder) {
-      putInFolder(d.db, 'media', item.id, from.folder);
+    // A folder that is not there is said before anything is kept.
+    if (!from && typeof where.folder === 'string' && where.folder) mustFolder(d.db, where.folder);
+    const space = from ? from.space : typeof where.space === 'string' ? where.space : undefined;
+    const { item, existed } = await keepFile(d, { path: file, ...(space ? { space } : {}) }, { move: true });
+    const folder = from ? from.folder : !existed && typeof where.folder === 'string' && where.folder ? where.folder : null;
+    if (folder && !item.folder) {
+      putInFolder(d.db, 'media', item.id, folder);
       const moved = getMedia(d.db, item.id)!;
       d.broadcast({ t: 'feature', id: 'media', data: { what: 'media', item: moved } });
       return moved;
@@ -170,7 +178,7 @@ export async function saveEdited(d: Deps, b: Record<string, unknown>, who?: stri
     return { media: item.id, replaced: true, item, ...base };
   }
   const from = id ? mustMedia(d.db, id) : null;
-  const item = await copyToLibrary(d, data, fmt, from, typeof to.title === 'string' ? to.title : '');
+  const item = await copyToLibrary(d, data, fmt, from, typeof to.title === 'string' ? to.title : '', from ? {} : { space: to.space, folder: to.folder, plain: to.plain === true });
   return { media: item.id, replaced: false, item, ...base };
 }
 

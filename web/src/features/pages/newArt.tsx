@@ -568,6 +568,25 @@ export function TexArt({ id }: { id: string }) {
 
 // ---- a blank one of each other kind ---------------------------------------------------------
 
+/** A blank picture as it will be: its shape on a quiet card, white, a checkerboard (see-through) or its colour. */
+export function PictureArt({ w, h, bg, color }: { w: number; h: number; bg: 'white' | 'transparent' | 'colour'; color: string }) {
+  const wide = w >= h;
+  return (
+    <span aria-hidden className="absolute inset-0 grid place-items-center bg-bg-2">
+      <span
+        className="block rounded-[3px] shadow-[0_1px_4px_rgba(0,0,0,0.25)] ring-1 ring-black/10"
+        style={{
+          aspectRatio: `${Math.max(1, w)} / ${Math.max(1, h)}`,
+          ...(wide ? { width: '62%' } : { height: '66%' }),
+          maxWidth: '62%',
+          maxHeight: '66%',
+          background: bg === 'white' ? '#ffffff' : bg === 'colour' ? color : 'repeating-conic-gradient(var(--bg-3) 0% 25%, var(--bg-1) 0% 50%) 50% / 12px 12px',
+        }}
+      />
+    </span>
+  );
+}
+
 export function BlankArt({ kind }: { kind: 'doc' | 'sheet' | 'notebook' | 'diagram' }) {
   if (kind === 'doc')
     return (

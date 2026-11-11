@@ -32,6 +32,11 @@ export interface OpenEditor {
   to?: SaveTo;
   /** What to do with the result: put it back where it came from. Called after the editor wrote it where `to` says. */
   save: (r: Saved) => Promise<void> | void;
+  /**
+   * A new picture (File → New, the Library's New): Save keeps it in the Library under the name it has, in this project
+   * (`space`, null for none) and Library folder, when it is not saved over anything.
+   */
+  fresh?: { space?: string | null; folder?: string };
   /** Offer "Save a copy" (to the Library; for a file, beside it). */
   copy?: boolean;
   /** The session it is from (a video of the conversation): a copy kept in the Library is noted as from it. */

@@ -665,8 +665,8 @@ agents that speak ACP and take MCP servers.
   size, turn); a layer snaps to the canvas's edges and middle, the guides and the other layers while it is moved
   (thin pink lines, gaps in small pills; Shift straight, Ctrl drags a copy, Alt no snap; View → Snap) and Align puts it
   at the canvas's left, centre, right, top, middle or bottom; right-click menus on the picture and on each layer (and a
-  touch held still); File → New makes a blank picture (Square post, Story, HD, A4 at 300 dpi or any size; white,
-  see-through or a colour). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI,
+  touch held still); File → New (and the Library's New → Picture, which saves it in the project and folder it was made in) makes a
+  blank picture (Square post, Story, HD, A4 at 300 dpi or any size; white, see-through or a colour). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI,
   all, invert, feather, grow, shrink; marching ants; dragged to move, Transform selection to size and turn) keep painting, fills, adjustments and the AI tools inside them, and cut, copy
   and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing brush, gradient, paint
   bucket, dodge and burn, eyedropper, foreground and background colours; brushes draw a straight line with Shift+click,

@@ -264,7 +264,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   /** File → New: a blank picture, opened in a tab of its own (Save keeps it in the Library). */
   const newPicture = (w: number, h: number, bg: NewBackground, color: string) => {
     const fill = bg === 'transparent' ? null : bg === 'white' ? '#ffffff' : color.slice(0, 7);
-    openEditor({ kind: 'image', src: blankSrc(w, h, fill), title: newPictureName(w, h), from: { label: pageName() }, save: (r) => void (r.media && toast('Saved to your Library', 'ok')) });
+    openEditor({ kind: 'image', src: blankSrc(w, h, fill), title: newPictureName(w, h), from: { label: pageName() }, fresh: {}, save: (r) => void (r.media && toast('Saved to your Library', 'ok')) });
   };
 
   // ---- menus and keys ----
