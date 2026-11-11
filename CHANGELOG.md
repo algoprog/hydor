@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.1 · 11 November 2026
+
+The desktop apps' notices come as your system's own notifications, such as Mac notifications, even with the window
+closed.
+
+- **When a session finishes, fails or needs you**, the Mac, Windows and Linux apps now show a notification from your
+  system (on a Mac, in Notification Center), whether the window is in front, behind other windows or closed, and also
+  when the app opened at login without its window. Before, they showed only a small card inside the window, so a
+  notice could go unseen while you worked in another app. Click a notification to open its session.
+- The cards inside the window no longer show in a desktop app, so nothing comes twice. They show only when your
+  system doesn't show the app's notifications (on a Mac, when they're not allowed in System Settings → Notifications
+  → Hydor). There is still no notice about the session you're looking at, and a newer notification about a session
+  takes the place of the older one.
+- On a Mac, macOS asks once whether Hydor may send notifications. Notifications left from before the app restarted
+  still open their session.
+- **Settings → Notifications** in a desktop app says how the notifications reach you and whether your system shows
+  them, and **Send a test** shows one right away.
+
 ## 0.55.0 · 11 November 2026
 
 Settings, redesigned: every section is calmer and easier to scan, and Memory is rebuilt from the ground up.
