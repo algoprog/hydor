@@ -9,6 +9,8 @@
 import {
   adjustForDelete,
   adjustForInsert,
+  adjustForMove,
+  adjustForMoveLines,
   aiKey,
   bookText,
   CellError,
@@ -402,6 +404,64 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   ok(sx.includes('orientation="landscape"') && sx.includes('fitToHeight="1"') && !sx.includes('gridLines="1"') && wb.includes('_xlnm.Print_Area') && wb.includes('P!$A$2:$B$3'), 'Excel: its page setup and print area');
   const back = importBook(xlsxOfBook(b, 'P'), 'P.xlsx').book.sheets[0].print;
   ok(back?.orient === 'landscape' && back.area === 'A2:B3' && back.grid === false && back.fit === 'page', 'and read back');
+}
+
+// ---- cells and lines moved (Cut and Paste, drag) ---------------------------------------------------------------------
+{
+  const mk = () =>
+    normalizeBook({
+      sheets: [
+        { name: 'Sheet1', cells: { A1: 5, A2: 7, A3: '=A1+A2', B1: '=SUM(A1:A2)', B2: '=SUM(A1:A3)', C1: '=Sheet2!A1', D1: { v: 1, s: { b: true }, note: 'n' }, E1: '=$A$1*2' }, conditional: [{ range: 'A1:A2', when: { op: 'gt', a: '3' }, style: { fill: '#ff0000' } }], charts: [{ range: 'A1:A2', kind: 'column', from: { cell: 'G1' }, to: { cell: 'L9' } }] },
+        { name: 'Sheet2', cells: { A1: 9, B1: '=Sheet1!A1+Sheet1!A2', B2: '=Sheet1!A1:A2' } },
+      ],
+      names: [{ name: 'Pair', ref: 'Sheet1!$A$1:$A$2' }],
+    });
+  const b0 = mk();
+  const [s1, s2] = b0.sheets.map((s) => s.id);
+  // Cut A1:A2 and paste at F1 on the same sheet.
+  const m = adjustForMove(b0, { sheet: s1, x: { r1: 0, c1: 0, r2: 1, c2: 0 } }, { sheet: s1, r: 0, c: 5 });
+  const c = computeBook(m);
+  const cells = m.sheets[0].cells;
+  ok(!cells.A1 && !cells.A2 && cells.F1?.v === 5 && cells.F2?.v === 7, 'cut: the cells leave and arrive where they go');
+  ok(cells.A3.f === 'F1+F2', 'cut: a formula on the cells that moved follows them');
+  ok(cells.B1.f === 'SUM(F1:F2)' && c.get(s1, 'B1') === 12, 'cut: a range all of whose cells moved follows, and still adds them up');
+  ok(cells.B2.f === 'SUM(A1:A3)', 'cut: a range only partly moved stays');
+  ok(cells.E1.f === '$F$1*2' && c.get(s1, 'E1') === 10, 'cut: a fixed ($) reference follows too');
+  ok(m.sheets[1].cells.B1.f === 'Sheet1!F1+Sheet1!F2' && c.get(s2, 'B1') === 12 && m.sheets[1].cells.B2.f === 'Sheet1!F1:F2', 'cut: formulas on other sheets follow');
+  ok(cells.D1.s?.b && cells.D1.note === 'n', 'cut: cells outside stay as they were');
+  ok(m.names?.[0].ref === 'Sheet1!$F$1:$F$2', 'cut: named ranges follow');
+  ok(m.sheets[0].conditional?.[0].range === 'F1:F2', 'cut: a rule covering just the cells follows them');
+  ok(m.sheets[0].charts?.[0].range === 'F1:F2', 'cut: a chart’s range follows');
+  // Cut onto another sheet.
+  const x = adjustForMove(b0, { sheet: s1, x: { r1: 0, c1: 0, r2: 2, c2: 0 } }, { sheet: s2, r: 4, c: 1 });
+  const xc = computeBook(x);
+  ok(x.sheets[1].cells.B5?.v === 5 && x.sheets[1].cells.B7?.f === 'B5+B6', 'cut to another sheet: cells arrive, formulas among them follow');
+  ok(x.sheets[0].cells.B1.f === 'SUM(Sheet2!B5:B6)' && xc.get(s1, 'B1') === 12, 'cut to another sheet: references from the old sheet name the new one');
+  ok(x.sheets[1].cells.B1.f === 'B5+B6' && xc.get(s2, 'B1') === 12, 'cut to another sheet: and from the new one');
+  ok(x.sheets[0].cells.C1.f === 'Sheet2!A1', 'cut to another sheet: other references stay');
+  const carried = adjustForMove(b0, { sheet: s1, x: { r1: 0, c1: 1, r2: 0, c2: 1 } }, { sheet: s2, r: 8, c: 0 });
+  ok(carried.sheets[1].cells.A9.f === 'SUM(Sheet1!A1:A2)', 'cut to another sheet: a formula carried keeps pointing at the cells it did');
+  // Over what was there, with comments.
+  const withNotes = normalizeBook({ sheets: [{ name: 'S', cells: { A1: 1, B1: 'old', C1: '=B1' }, comments: [{ id: 'c1', cell: 'A1', by: 'person', text: 'hi', at: 1 }, { id: 'c2', cell: 'B1', by: 'person', text: 'gone', at: 1 }] }] });
+  const over = adjustForMove(withNotes, { sheet: withNotes.sheets[0].id, x: { r1: 0, c1: 0, r2: 0, c2: 0 } }, { sheet: withNotes.sheets[0].id, r: 0, c: 1 });
+  ok(over.sheets[0].cells.B1.v === 1 && !over.sheets[0].cells.A1 && over.sheets[0].cells.C1.f === 'B1', 'cut over a cell: it is replaced (what pointed there now finds the new one)');
+  ok(over.sheets[0].comments?.length === 1 && over.sheets[0].comments[0].cell === 'B1' && over.sheets[0].comments[0].id === 'c1', 'cut: a comment goes with its cell, the one it lands on is replaced');
+  ok(adjustForMove(b0, { sheet: s1, x: { r1: 0, c1: 0, r2: 0, c2: 0 } }, { sheet: s1, r: 0, c: 0 }) === b0, 'cut onto itself changes nothing');
+
+  // Whole rows moved.
+  const rows = normalizeBook({ sheets: [{ name: 'R', cells: { A1: 'a', A2: 'b', A3: 'c', A4: 'd', B1: '=A1', B4: '=SUM(A1:A4)', C1: '=A2' }, rows: { 1: { h: 40 } } }] });
+  const rid = rows.sheets[0].id;
+  const down = adjustForMoveLines(rows, rid, 'row', 1, 1, 4);
+  const dc = down.sheets[0].cells;
+  ok(dc.A1.v === 'a' && dc.A2.v === 'c' && dc.A3.v === 'd' && dc.A4.v === 'b', 'rows moved down: the row goes, those between close up');
+  ok(dc.C1.f === 'A4' && dc.B3.f === 'SUM(A1:A3)' && down.sheets[0].rows?.[3]?.h === 40 && !down.sheets[0].rows?.[1], 'rows moved: formulas follow, and so does its height');
+  const up = adjustForMoveLines(rows, rid, 'row', 2, 2, 0);
+  ok(up.sheets[0].cells.A1.v === 'c' && up.sheets[0].cells.A2.v === 'd' && up.sheets[0].cells.A3.v === 'a' && up.sheets[0].cells.B3.f === 'A3' && up.sheets[0].cells.B2.f === 'SUM(A3:A4)', 'rows moved up: formulas follow, a range keeps the rows that stayed');
+  ok(adjustForMoveLines(rows, rid, 'row', 1, 2, 2) === rows, 'rows moved to where they are changes nothing');
+  const cols = normalizeBook({ sheets: [{ name: 'C', cells: { A1: 1, B1: 2, C1: 3, D1: '=A1+C1' }, cols: { 0: { w: 200 } } }] });
+  const left = adjustForMoveLines(cols, cols.sheets[0].id, 'col', 0, 1, 3);
+  ok(left.sheets[0].cells.A1.v === 2 && left.sheets[0].cells.C1.v === 1 && left.sheets[0].cells.D1.f === 'C1+B1' && left.sheets[0].cols?.[2]?.w === 200, 'columns moved right: formulas follow');
+  ok(computeBook(left).get(cols.sheets[0].id, 'D1') === 4, 'and still work out');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

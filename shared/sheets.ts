@@ -3099,6 +3099,181 @@ export function adjustForDelete(book: Workbook, sheetId: string, axis: 'row' | '
   };
 }
 
+// ---- cells and lines moved ---------------------------------------------------------------------------------------
+
+/** A reference's two corners when it is a cell or a range of cells (whole columns and rows have no cell corners). */
+const cellCorners = (ref: RefTok): [RefPart, RefPart] | null => {
+  if (ref.a.r === undefined || ref.a.c === undefined) return null;
+  if (ref.b && (ref.b.r === undefined || ref.b.c === undefined)) return null;
+  return [ref.a, ref.b ?? ref.a];
+};
+
+/** Cells in the order of their positions (rows first), as sheets keep them. */
+function sortedCells(cells: Record<string, Cell>): Record<string, Cell> {
+  const list = Object.keys(cells)
+    .map((k) => [keyOf(k), k] as const)
+    .filter(([n]) => n >= 0)
+    .sort((a, b) => a[0] - b[0]);
+  const out: Record<string, Cell> = {};
+  for (const [, k] of list) out[k] = cells[k];
+  return out;
+}
+
+/**
+ * Cells moved, as Excel and Google Sheets do for Cut and Paste or a drag: the block `x` of a sheet goes with its
+ * looks, notes and comments to where its top left corner is now `to` (on the same sheet or on another), what was
+ * there is replaced, and every formula, name, chart, rule and list that pointed at the cells (a cell, or a range all
+ * of whose cells moved) points at them where they are now. The formulas in the cells that moved keep pointing where
+ * they did, apart from those that pointed into the block itself. Ranges only partly in the block stay as they were.
+ * Rules, merges and filters follow when they lie wholly in the block, on the same sheet.
+ */
+export function adjustForMove(book: Workbook, from: { sheet: string; x: Rect }, to: { sheet: string; r: number; c: number }): Workbook {
+  const src = book.sheets.find((s) => s.id === from.sheet);
+  const dst = book.sheets.find((s) => s.id === to.sheet);
+  if (!src || !dst) return book;
+  const x = from.x;
+  const dr = to.r - x.r1;
+  const dc = to.c - x.c1;
+  const same = src.id === dst.id;
+  if (same && !dr && !dc) return book;
+  const dest: Rect = { r1: x.r1 + dr, c1: x.c1 + dc, r2: x.r2 + dr, c2: x.c2 + dc };
+  if (dest.r2 >= SHEET_LIMITS.rows || dest.c2 >= SHEET_LIMITS.cols || dest.r1 < 0 || dest.c1 < 0) return book;
+  const inX = (p: RefPart) => p.r! >= x.r1 && p.r! <= x.r2 && p.c! >= x.c1 && p.c! <= x.c2;
+  const shift = (p: RefPart): RefPart => ({ ...p, r: p.r! + dr, c: p.c! + dc });
+  /**
+   * The formula (written on the sheet `on`; `moving` when it is in a cell that goes) with its references to the block
+   * following it. With `named`, only references that carry a sheet's name change (the rules of other sheets).
+   */
+  const retarget = (formula: string, on: Sheet, moving: boolean, named = false): string =>
+    rewrite(formula, (t) => {
+      if (t.k !== 'ref') return undefined;
+      const written = t.ref.sheet !== undefined;
+      if (named && !written) return undefined;
+      const corners = (t.ref.sheet ?? on.name).toLowerCase() === src.name.toLowerCase() ? cellCorners(t.ref) : null;
+      if (!corners || !inX(corners[0]) || !inX(corners[1])) {
+        // A formula carried to another sheet keeps pointing at the cells it did: its references get their sheet's name.
+        return moving && !same && !written ? `${quoteSheet(on.name)}!${formula.slice(t.ps, t.e)}` : undefined;
+      }
+      const next = { a: shift(t.ref.a), ...(t.ref.b ? { b: shift(t.ref.b) } : {}) };
+      const lives = moving ? dst : on;
+      return (same ? prefixOf(formula, t) : lives.id === dst.id ? '' : `${quoteSheet(dst.name)}!`) + refText(next);
+    });
+  // Formulas everywhere (and names).
+  const moved: Workbook = { ...book, sheets: book.sheets.map((s) => ({ ...s, cells: { ...s.cells } })) };
+  for (const s of moved.sheets) {
+    for (const k in s.cells) {
+      const c = s.cells[k];
+      if (c.f === undefined) continue;
+      const n = keyOf(k);
+      const moving = s.id === src.id && n >= 0 && inX({ r: unpackR(n), c: unpackC(n) });
+      const next = retarget(c.f, s, moving);
+      if (next !== c.f) s.cells[k] = { ...c, f: next };
+    }
+  }
+  if (moved.names) moved.names = moved.names.map((n) => {
+    const ref = retarget(n.ref, (n.sheet && book.sheets.find((s) => s.id === n.sheet)) || NO_SHEET, false);
+    return ref === n.ref ? n : { ...n, ref };
+  });
+  // Rules, charts and the rest of every sheet (their comments are moved below).
+  moved.sheets = moved.sheets.map((s0) => {
+    const s = mapSheetRefs({ ...s0, comments: undefined }, (t) => retarget(t, s0, false, !same));
+    if (s0.comments) s.comments = s0.comments;
+    else delete s.comments;
+    return s;
+  });
+  // The cells (and their comments) leave the block, and come to where it goes, over what was there.
+  const out = moved.sheets.find((s) => s.id === src.id)!;
+  const into = moved.sheets.find((s) => s.id === dst.id)!;
+  const carried: [string, Cell][] = [];
+  for (const k in out.cells) {
+    const n = keyOf(k);
+    if (n < 0 || !inX({ r: unpackR(n), c: unpackC(n) })) continue;
+    carried.push([refName(unpackR(n) + dr, unpackC(n) + dc), out.cells[k]]);
+    delete out.cells[k];
+  }
+  for (const k in into.cells) {
+    const n = keyOf(k);
+    if (n < 0) continue;
+    const [r, c] = [unpackR(n), unpackC(n)];
+    if (r >= dest.r1 && r <= dest.r2 && c >= dest.c1 && c <= dest.c2) delete into.cells[k];
+  }
+  for (const [k, c] of carried) into.cells[k] = c;
+  into.cells = sortedCells(into.cells);
+  if (!same) out.cells = sortedCells(out.cells);
+  const within = (cm: SheetComment, r: Rect) => {
+    const p = parseRef(cm.cell);
+    return !!p && p.r >= r.r1 && p.r <= r.r2 && p.c >= r.c1 && p.c <= r.c2;
+  };
+  const going = (src.comments ?? []).filter((cm) => within(cm, x)).map((cm) => {
+    const p = parseRef(cm.cell)!;
+    return { ...cm, cell: refName(p.r + dr, p.c + dc) };
+  });
+  if (going.length || dst.comments?.some((cm) => within(cm, dest))) {
+    const keep = (sh: Sheet, gone: Rect[]) => (sh.comments ?? []).filter((cm) => !gone.some((g) => within(cm, g)));
+    const put = (sh: Sheet, list: SheetComment[]) => {
+      if (list.length) sh.comments = list.sort((a, b) => keyOf(a.cell) - keyOf(b.cell));
+      else delete sh.comments;
+    };
+    if (same) put(out, [...keep(out, [x, dest]), ...going]);
+    else {
+      put(out, keep(out, [x]));
+      put(into, [...keep(into, [dest]), ...going]);
+    }
+  }
+  return moved;
+}
+
+/**
+ * Whole rows (or columns) moved: `count` of them from `from` go to before the row (column) `to`, as dragging their
+ * numbers (letters) does. Their cells, heights (widths) and hidden ones go along, and every formula that pointed at
+ * a cell in them points where it went; ranges follow by their ends, so a range the rows moved out of shrinks.
+ */
+export function adjustForMoveLines(book: Workbook, sheetId: string, axis: 'row' | 'col', from: number, count: number, to: number): Workbook {
+  const sh = book.sheets.find((s) => s.id === sheetId);
+  if (!sh || count <= 0 || (to >= from && to <= from + count)) return book;
+  const row = axis === 'row';
+  const limit = row ? SHEET_LIMITS.rows : SHEET_LIMITS.cols;
+  const end = from + count;
+  if (end > limit || to > limit) return book;
+  /** Where the row (column) `i` goes. */
+  const perm = (i: number): number => {
+    if (i >= from && i < end) return to > end ? i - from + (to - count) : i - from + to;
+    if (to > end && i >= end && i < to) return i - count;
+    if (to < from && i >= to && i < from) return i + count;
+    return i;
+  };
+  const get = (p: RefPart) => (row ? p.r : p.c);
+  const set = (p: RefPart, v: number): RefPart => (row ? { ...p, r: v } : { ...p, c: v });
+  const move = (ref: RefTok): RefTok => {
+    const s = get(ref.a);
+    if (s === undefined) return ref;
+    if (!ref.b) return { ...ref, a: set(ref.a, perm(s)) };
+    const [lo, hi] = [Math.min(s, get(ref.b)!), Math.max(s, get(ref.b)!)];
+    const inside = (i: number) => i >= from && i < end;
+    let [p, q] = [perm(lo), perm(hi)];
+    if (!(inside(lo) && inside(hi))) {
+      // A range follows the rows that are not moved: it keeps the moved ones only when they land between them.
+      const first = inside(lo) ? end : lo;
+      const last = inside(hi) ? from - 1 : hi;
+      [p, q] = [perm(first), perm(last)];
+      const [bp, bq] = [perm(from), perm(end - 1)];
+      if (bp >= p && bq <= q) [p, q] = [Math.min(p, bp), Math.max(q, bq)];
+    }
+    return { ...ref, a: set(ref.a, p), b: set(ref.b, q) };
+  };
+  const moved = mapNames(mapFormulas(book, (f, on) => moveRefs(f, on, sh.name, move)), (f, on) => moveRefs(f, on, sh.name, move));
+  return {
+    ...moved,
+    sheets: moved.sheets.map((s0) => {
+      const mine = s0.id === sheetId;
+      const s = mapSheetRefs(s0, (t) => moveRefs(t, s0, sh.name, move), mine && !row ? perm : undefined, mine ? (k) => moveCorner(k, row, perm, 0) : undefined);
+      if (!mine) return s;
+      const cells = moveCells(s, (r, c) => (row ? [perm(r), c] : [r, perm(c)]));
+      return withSizes({ ...s, cells }, row ? s.cols : moveSizes(s.cols, perm, SHEET_LIMITS.cols), row ? moveSizes(s.rows, perm, SHEET_LIMITS.rows) : s.rows);
+    }),
+  };
+}
+
 /** A sheet renamed, and every formula that names it changed to the new name. */
 export function renameSheet(book: Workbook, sheetId: string, name: string): Workbook {
   const sh = book.sheets.find((s) => s.id === sheetId);

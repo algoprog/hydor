@@ -64,6 +64,8 @@ import {
   type Workbook,
   type CellValue,
   adjustForDelete,
+  adjustForMove,
+  adjustForMoveLines,
   normalizeBook,
   quoteSheet,
   renameName,
@@ -1078,46 +1080,22 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (!b || !sheet || readOnly) return;
     const own = clip && norm(clip.text) === norm(text) ? clip : null;
     const target = rectOf(selRef.current);
-    const got = pasteChanges(sheet, target, own ? { clip: own } : { text });
-    const patches: (Patch | null)[] = [];
     if (own?.cut) {
-      // Cells cut leave where they were (all but those pasted over), their comments going with them.
-      const from = b.sheets.find((s) => s.id === own.sheet);
-      const dr = got.x.r1 - own.x.r1;
-      const dc = got.x.c1 - own.x.c1;
-      const inCut = (cm: SheetComment) => {
-        const p = parseRef(cm.cell)!;
-        return p.r >= own.x.r1 && p.r <= own.x.r2 && p.c >= own.x.c1 && p.c <= own.x.c2;
-      };
-      const going = from?.comments?.filter(inCut) ?? [];
-      if (from && going.length) {
-        const moved = going.map((cm) => {
-          const p = parseRef(cm.cell)!;
-          return { ...cm, cell: refName(p.r + dr, p.c + dc) };
-        });
-        const keep = (list: SheetComment[] | undefined, out: Set<string>) => (list ?? []).filter((cm) => !out.has(cm.cell));
-        const target = new Set(moved.map((m) => m.cell));
-        if (from.id === sheet.id) patches.push(metaPatch(from, { comments: [...keep(from.comments?.filter((cm) => !inCut(cm)), target), ...moved].sort((x, y) => keyOf(x.cell) - keyOf(y.cell)) }));
-        else {
-          const rest = from.comments!.filter((cm) => !inCut(cm));
-          patches.push(metaPatch(from, { comments: rest.length ? rest : undefined }));
-          patches.push(metaPatch(sheet, { comments: [...keep(sheet.comments, target), ...moved].sort((x, y) => keyOf(x.cell) - keyOf(y.cell)) }));
-        }
-      }
-      if (from) {
-        const empty: Record<string, Cell | null> = {};
-        for (let r = own.x.r1; r <= own.x.r2; r++)
-          for (let c = own.x.c1; c <= own.x.c2; c++) {
-            const k = refName(r, c);
-            if (from.id !== sheet.id || !(k in got.changes)) empty[k] = null;
-          }
-        patches.push(cellsPatch(b, b.sheets.indexOf(from), empty));
-      }
+      // Cells cut move (looks, notes and comments too) and everything that pointed at them points where they went:
+      // formulas, names, charts, rules.
+      const w = own.x.c2 - own.x.c1;
+      const h = own.x.r2 - own.x.r1;
       clip = null;
       setCutMark(null);
+      if (target.r1 + h >= SHEET_LIMITS.rows || target.c1 + w >= SHEET_LIMITS.cols) return void toast(tr('That would go past the end of the sheet.'));
+      const after = adjustForMove(b, { sheet: own.sheet, x: own.x }, { sheet: sheet.id, r: target.r1, c: target.c1 });
+      if (after === b) return;
+      change({ k: 'book', before: b, after });
+      setSel(rectSel({ r1: target.r1, c1: target.c1, r2: target.r1 + h, c2: target.c1 + w }), true);
+      return;
     }
-    patches.push(cellsPatch(b, sheetIx, got.changes));
-    change(together(patches));
+    const got = pasteChanges(sheet, target, own ? { clip: own } : { text });
+    change(cellsPatch(b, sheetIx, got.changes));
     setSel(rectSel(got.x), true);
   };
   const onPaste = (e: React.ClipboardEvent) => {
