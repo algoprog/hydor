@@ -16,6 +16,7 @@ import {
   CellError,
   computeBook,
   excelFormula,
+  FUNCTION_NAMES,
   formulaFromFile,
   isRangeName,
   normalizeBook,
@@ -27,9 +28,11 @@ import {
 import { bookPage, importBook, xlsxOfBook } from './sheets.ts';
 import { addGroup, foldGroup, guardOf, protectionAt, removeGroup, spansOf } from '../../shared/sheet-groups.ts';
 import { chartData, chartSvg, histogramOf } from '../../shared/sheet-chart.ts';
+import '../../shared/sheet-rules.ts';
 import { dependents, goalSeek, precedents } from '../../shared/sheet-whatif.ts';
 import { pivotSheet, pivotValues } from '../../shared/sheet-pivot.ts';
 import { Zip } from '../documents/zip.ts';
+import { FUNCTION_INFO } from '../../web/src/features/pages/sheets/functions.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -462,6 +465,83 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
   const left = adjustForMoveLines(cols, cols.sheets[0].id, 'col', 0, 1, 3);
   ok(left.sheets[0].cells.A1.v === 2 && left.sheets[0].cells.C1.v === 1 && left.sheets[0].cells.D1.f === 'C1+B1' && left.sheets[0].cols?.[2]?.w === 200, 'columns moved right: formulas follow');
   ok(computeBook(left).get(cols.sheets[0].id, 'D1') === 4, 'and still work out');
+}
+
+// ---- functions added later: SUBTOTAL, money, statistics, number systems, text, Google Sheets' own ----------------------------
+{
+  const one = (formula: string, cells: Record<string, unknown> = {}) => sheet({ ...cells, Z1: `=${formula}` }).v('Z1');
+  const col = (name: string, xs: unknown[], at = 0) => Object.fromEntries(xs.map((x, i) => [`${name}${i + 1 + at}`, x]));
+  // SUBTOTAL: 1 to 11 leave out the rows a filter hides, 101 to 111 those hidden by hand too; other SUBTOTALs inside are left out.
+  const nums = { ...col('A', ['n', 1, 2, 3, 4, 5]), A7: '=SUBTOTAL(9,A2:A6)' };
+  ok(one('SUBTOTAL(9,A2:A6)', nums) === 15 && one('SUBTOTAL(9,A2:A7)', nums) === 15, 'SUBTOTAL: a sum, a SUBTOTAL inside its range left out');
+  ok(one('SUBTOTAL(1,A2:A6)', nums) === 3 && one('SUBTOTAL(2,A2:A6)', nums) === 5 && one('SUBTOTAL(3,A2:A6)', nums) === 5 && one('SUBTOTAL(4,A2:A6)', nums) === 5 && one('SUBTOTAL(5,A2:A6)', nums) === 1 && one('SUBTOTAL(6,A2:A6)', nums) === 120, 'SUBTOTAL: average, count, counta, max, min, product');
+  ok(near(one('SUBTOTAL(10,A2:A6)', nums), 2.5) && near(one('SUBTOTAL(11,A2:A6)', nums), 2) && near(one('SUBTOTAL(7,A2:A6)', nums), Math.sqrt(2.5)) && near(one('SUBTOTAL(8,A2:A6)', nums), Math.sqrt(2)), 'SUBTOTAL: variance and deviation, sample and population');
+  ok(err(one('SUBTOTAL(12,A2:A6)', nums)) === '#VALUE!', 'SUBTOTAL: a function number that is none is #VALUE!');
+  const hid = sheet({ ...nums, Z1: '=SUBTOTAL(9,A2:A6)' });
+  const withHidden = normalizeBook({ sheets: [{ name: 'S', cells: { ...nums, Z1: '=SUBTOTAL(9,A2:A6)', Z2: '=SUBTOTAL(109,A2:A6)', Z3: '=SUBTOTAL(103,A2:A6)' }, rows: { 2: { hidden: true } }, filter: { range: 'A1:A6', cols: { A: { hide: ['4'] } } } }] });
+  const hc = computeBook(withHidden);
+  const hid0 = withHidden.sheets[0].id;
+  ok(hc.get(hid0, 'Z1') === 11 && hc.get(hid0, 'Z2') === 9 && hc.get(hid0, 'Z3') === 3 && hid.v('Z1') === 15, 'SUBTOTAL: a filter hides rows for 9; hand-hidden rows too for 109; counts the same way');
+  ok(one('COUNTUNIQUE(A1:A5,6)', col('A', [1, 2, 2, 'a', 'A'])) === 4 && one('COUNTUNIQUE(A1:A3)', col('A', [1, null, 1])) === 1, 'COUNTUNIQUE counts what is different, not what is empty');
+
+  // Dates.
+  ok(near(one('YEARFRAC(DATE(2012,1,1),DATE(2012,7,30))'), 0.58055556, 1e-7) && near(one('YEARFRAC(DATE(2012,1,1),DATE(2012,7,30),3)'), 211 / 365) && near(one('YEARFRAC(DATE(2012,1,1),DATE(2012,7,30),1)'), 211 / 366) && near(one('YEARFRAC(DATE(2012,1,1),DATE(2012,7,30),2)'), 211 / 360) && near(one('YEARFRAC(DATE(2012,7,30),DATE(2012,1,1),4)'), 0.58055556, 1e-7), 'YEARFRAC: its five bases, either way round');
+  ok(near(one('YEARFRAC(DATE(2010,3,1),DATE(2012,3,1),1)'), 731 / ((365 + 365 + 366) / 3)) && err(one('YEARFRAC(DATE(2012,1,1),DATE(2012,7,30),5)')) === '#NUM!', 'YEARFRAC: years apart by their average length; a basis that is none is #NUM!');
+  ok(one('DAYS360(DATE(2011,1,30),DATE(2011,2,1))') === 1 && one('DAYS360(DATE(2011,1,1),DATE(2011,12,31))') === 360 && one('DAYS360(DATE(2011,1,31),DATE(2011,3,31),TRUE)') === 60 && one('DAYS360(DATE(2011,3,31),DATE(2011,1,31))') === -60, 'DAYS360: the American and the European way');
+
+  // Money (the examples in Excel's own help).
+  const flows = { ...col('A', [-10000, 2750, 4250, 3250, 2750]), ...col('B', [39448, 39508, 39751, 39859, 39904]) };
+  ok(near(one('XNPV(0.09,A1:A5,B1:B5)', flows), 2086.647602, 1e-7) && near(one('XIRR(A1:A5,B1:B5)', flows), 0.373362535, 1e-6), 'XNPV and XIRR as Excel’s examples');
+  ok(err(one('XIRR(A2:A3,B2:B3)', flows)) === '#NUM!' && err(one('XNPV(0.1,A1:A2,C1:C2)', { ...flows, C1: 39508, C2: 39448 })) === '#NUM!', 'XIRR with no loss, XNPV with dates before the first: #NUM!');
+  ok(near(one('MIRR(A1:A6,0.1,0.12)', col('A', [-120000, 39000, 30000, 21000, 37000, 46000])), 0.126094, 1e-5) && err(one('MIRR(A1:A2,0.1,0.1)', col('A', [1, 2]))) === '#DIV/0!', 'MIRR as Excel’s example; with no loss #DIV/0!');
+  ok(one('SLN(30000,7500,10)') === 2250 && err(one('SLN(1,0,0)')) === '#DIV/0!', 'SLN');
+  const db = [186083.33, 259639.42, 176814.44, 120410.64, 81999.64, 55841.76, 15845.1];
+  ok(db.every((x, i) => near(one(`DB(1000000,100000,6,${i + 1},7)`), x, 1e-7)), 'DB: the seven periods of Excel’s example');
+  ok(near(one('DDB(2400,300,10,1,2)'), 480) && near(one('DDB(2400,300,10,10)'), 22.1225, 1e-4) && near(one('DDB(2400,300,120,1,2)'), 40) && err(one('DDB(2400,300,10,11)')) === '#NUM!', 'DDB as Excel’s examples');
+  ok(near(one('CUMIPMT(0.09/12,360,125000,13,24,0)'), -11135.23213, 1e-8) && near(one('CUMPRINC(0.09/12,360,125000,13,24,0)'), -934.1071, 1e-6) && err(one('CUMIPMT(0.09/12,360,125000,0,24,0)')) === '#NUM!', 'CUMIPMT and CUMPRINC as Excel’s examples');
+  ok(near(one('EFFECT(0.0525,4)'), 0.053543, 1e-5) && near(one('NOMINAL(0.053543,4)'), 0.0525, 1e-4) && err(one('EFFECT(0.05,0)')) === '#NUM!', 'EFFECT and NOMINAL');
+
+  // The normal distribution, skew, kurtosis, counting.
+  ok(near(one('NORM.DIST(42,40,1.5,TRUE)'), 0.908789, 1e-6) && near(one('NORM.DIST(42,40,1.5,FALSE)'), 0.10934, 1e-4) && near(one('NORM.S.DIST(1.333333,TRUE)'), 0.908789, 1e-6) && near(one('NORM.S.DIST(0)'), 0.5) && near(one('NORM.S.DIST(0,FALSE)'), 0.3989422804), 'NORM.DIST and NORM.S.DIST');
+  ok(near(one('NORM.INV(0.908789,40,1.5)'), 42, 1e-5) && near(one('NORM.S.INV(0.975)'), 1.959963984540054, 1e-12) && near(one('NORM.S.INV(0.5)'), 0) && near(one('NORM.S.INV(0.0001)'), -3.719016485455709, 1e-10) && err(one('NORM.S.INV(1)')) === '#NUM!' && err(one('NORM.DIST(1,0,0,TRUE)')) === '#NUM!', 'NORM.INV and NORM.S.INV, to full precision, even in the tails');
+  ok(near(one('NORMSDIST(-8)'), 6.220960574271785e-16, 1e-9) && near(one('NORM.S.DIST(5)'), 0.9999997133484281, 1e-12), 'the tails of the normal distribution');
+  const sk = col('A', [3, 4, 5, 2, 3, 4, 5, 6, 4, 7]);
+  ok(near(one('SKEW(A1:A10)', sk), 0.359543, 1e-5) && near(one('KURT(A1:A10)', sk), -0.151799, 1e-5) && err(one('SKEW(A1:A2)', sk)) === '#DIV/0!' && err(one('KURT(A1:A3)', sk)) === '#DIV/0!', 'SKEW and KURT as Excel’s examples');
+  ok(one('COMBIN(8,2)') === 28 && one('COMBIN(52,5)') === 2598960 && one('PERMUT(100,3)') === 970200 && err(one('COMBIN(3,5)')) === '#NUM!', 'COMBIN and PERMUT');
+  ok(near(one('TRIMMEAN(A1:A11,0.2)', col('A', [4, 5, 6, 7, 2, 3, 4, 5, 1, 2, 3])), 3.777778, 1e-6) && err(one('TRIMMEAN(A1:A3,1)', sk)) === '#NUM!', 'TRIMMEAN as Excel’s example');
+
+  // Words, numbers.
+  ok(one('FORMULATEXT(A1)', { A1: '=SUM(1,2)' }) === '=SUM(1,2)' && err(one('FORMULATEXT(A1)', { A1: 5 })) === '#N/A', 'FORMULATEXT, and #N/A for a cell with none');
+  ok(one('ISURL("https://example.com/a?b=1")') === true && one('ISURL("www.example.com")') === true && one('ISURL("nope")') === false && one('ISEMAIL("a.b@x.org")') === true && one('ISEMAIL("a@b")') === false && one('ISURL(5)') === false, 'ISURL and ISEMAIL');
+  ok(near(one('NUMBERVALUE("2.500,27",",",".")'), 2500.27) && near(one('NUMBERVALUE("3.5%")'), 0.035) && one('NUMBERVALUE("1,234.5")') === 1234.5 && one('NUMBERVALUE("")') === 0 && err(one('NUMBERVALUE("abc")')) === '#VALUE!', 'NUMBERVALUE');
+  ok(one('DOLLAR(1234.567,2)') === '$1,234.57' && one('DOLLAR(-1234.567,-2)') === '($1,200)' && one('DOLLAR(99.888)') === '$99.89', 'DOLLAR');
+  ok(one('UNICODE("A")') === 65 && one('UNICODE("€")') === 8364 && one('UNICHAR(9731)') === '☃' && err(one('UNICHAR(0)')) === '#VALUE!' && err(one('UNICODE("")')) === '#VALUE!', 'UNICODE and UNICHAR');
+  ok(one('ROMAN(499)') === 'CDXCIX' && one('ROMAN(499,1)') === 'LDVLIV' && one('ROMAN(499,2)') === 'XDIX' && one('ROMAN(499,3)') === 'VDIV' && one('ROMAN(499,4)') === 'ID' && one('ROMAN(1999)') === 'MCMXCIX' && one('ROMAN(0)') === '' && one('ROMAN(499,FALSE)') === 'ID' && err(one('ROMAN(4000)')) === '#VALUE!', 'ROMAN: its forms, as Excel’s example');
+  ok(one('ARABIC("LVII")') === 57 && one('ARABIC("mcmxii")') === 1912 && one('ARABIC("-IV")') === -4 && one('ARABIC("")') === 0 && err(one('ARABIC("ABC")')) === '#VALUE!', 'ARABIC');
+  ok(one('DEC2BIN(9,4)') === '1001' && one('DEC2BIN(-100)') === '1110011100' && err(one('DEC2BIN(512)')) === '#NUM!' && err(one('DEC2BIN(9,2)')) === '#NUM!' && one('BIN2DEC(1100100)') === 100 && one('BIN2DEC("1110011100")') === -100 && err(one('BIN2DEC("102")')) === '#NUM!', 'DEC2BIN and BIN2DEC, negatives in ten digits');
+  ok(one('DEC2HEX(100,4)') === '0064' && one('DEC2HEX(-54)') === 'FFFFFFFFCA' && one('HEX2DEC("A5")') === 165 && one('HEX2DEC("FFFFFFFF5B")') === -165 && one('DEC2OCT(58)') === '72' && one('OCT2DEC(7777777000)') === -512 && one('OCT2DEC(144)') === 100, 'DEC2HEX, HEX2DEC, DEC2OCT and OCT2DEC');
+  ok(one('ENCODEURL("a b&c=é!")') === 'a%20b%26c%3D%C3%A9%21', 'ENCODEURL');
+  const lifted = sheet({ A1: '=ARRAYFORMULA(DEC2BIN({1;2;3}))' });
+  ok(same(lifted.spill('A1'), ['1', '10', '11']), 'the number system functions work on each value of an array');
+
+  // Google Sheets' FLATTEN and SORTN.
+  const fl = sheet({ ...col('A', [1, 3]), ...col('B', [2, 4]), D1: '=FLATTEN(A1:B2)' });
+  ok(same(fl.spill('D1'), [1, 2, 3, 4]), 'FLATTEN: a range as one column, row by row');
+  const sn = { A1: 'b', B1: 2, A2: 'a', B2: 1, A3: 'c', B3: 3, A4: 'a', B4: 1 };
+  ok(same(sheet({ ...sn, D1: '=SORTN(A1:B4,2)' }).spill('D1'), ['a', 1, 'a', 1]) && same(sheet({ ...sn, D1: '=SORTN(A1:B4,2,2)' }).spill('D1'), ['a', 1, 'b', 2]) && same(sheet({ ...sn, D1: '=SORTN(A1:B4,1,1)' }).spill('D1'), ['a', 1, 'a', 1]) && same(sheet({ ...sn, D1: '=SORTN(A1:B4,2,0,2,FALSE)' }).spill('D1'), ['c', 3, 'b', 2]), 'SORTN: the first rows, ties kept or not, duplicates left out, another column and order');
+
+  // In Excel's files.
+  const names = new Set<string>();
+  ok(excelFormula('NORM.S.DIST(1,TRUE)+NORM.DIST(1,0,1,TRUE)+ARABIC("V")+ENCODEURL(A1)', names) === '_xlfn.NORM.S.DIST(1,TRUE)+_xlfn.NORM.DIST(1,0,1,TRUE)+_xlfn.ARABIC("V")+_xlfn.ENCODEURL(A1)', 'Excel: the functions it added in 2010 and 2013 written with their prefix');
+  ok(excelFormula('XIRR(A1:A5,B1:B5)+SUBTOTAL(9,A1:A5)+DB(1,1,1,1)+YEARFRAC(A1,B1)', names) === 'XIRR(A1:A5,B1:B5)+SUBTOTAL(9,A1:A5)+DB(1,1,1,1)+YEARFRAC(A1,B1)', 'Excel: the older ones as they are');
+  ok(excelFormula('COUNTUNIQUE(A1:A5)', names) === null && excelFormula('SORTN(A1:A5)', names) === null && excelFormula('ISURL(A1)', names) === null, 'Excel: Google Sheets’ own functions are written as the values they show');
+  ok(formulaFromFile('_xlfn.NORM.S.DIST(1,TRUE)+_xlfn.FORMULATEXT(A1)') === 'NORM.S.DIST(1,TRUE)+FORMULATEXT(A1)', 'and read back from a file');
+  const book = normalizeBook({ sheets: [{ name: 'X', cells: { A1: 1, A2: '=NORM.S.INV(0.9)', A3: '=COUNTUNIQUE(A1:A2)', A4: '=DEC2HEX(255)' } }] });
+  const back = importBook(xlsxOfBook(book, 'X', computeBook(book)), 'X.xlsx').book.sheets[0].cells;
+  ok(back.A2.f === 'NORM.S.INV(0.9)' && back.A3.f === undefined && back.A3.v === 2 && back.A4.f === 'DEC2HEX(255)', 'an Excel file kept: the formulas Excel knows stay formulas, Google Sheets’ own become their values');
+  ok(FUNCTION_NAMES.length >= 286, 'the list of functions has all the newer ones');
+  const bare = FUNCTION_NAMES.filter((n) => !FUNCTION_INFO[n]);
+  ok(bare.length === 0, `every function has its help (missing: ${bare.join(', ')})`);
 }
 
 console.log(`${passed} passed, ${failed} failed`);
