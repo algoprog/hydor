@@ -4,16 +4,17 @@
 // moving (guides line shapes up with the others, with the gaps they share, and say how far the nearest shape is on each
 // side; the grid takes them otherwise; Ctrl drags a copy, Alt snaps to nothing, Shift keeps it straight; dropped in a
 // container, a shape goes in it), resizing (its edges line up with the others' too, or make it as wide or high as
-// another, with the same pink guides and pills; Shift keeps its shape) and turning; the blue arrows round a shape pointed at, which add a shape
-// joined to it in a click or draw a connector where they are dragged; a connector's ends dragged to other shapes (or a
-// fixed point of one), its bends and runs moved, its words slid along it; words typed in place. What changes is handed
-// up when a gesture ends: the editor keeps it, for Undo.
+// another, with the same pink guides and pills; Shift keeps its shape) and turning, one shape or several together (a
+// frame goes round several picked, to size and turn them as one); the blue arrows round a shape pointed at, which add
+// a shape joined to it in a click or draw a connector where they are dragged; a connector's ends dragged to other
+// shapes (or a fixed point of one), its bends and runs moved, its words slid along it; words typed in place. What
+// changes is handed up when a gesture ends: the editor keeps it, for Undo.
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { CONTAINER_KINDS, DARK, descendants, fontCss, inkOn, isEdge, isShape, LIGHT, newId, ROW_KINDS, type Diagram, type DiagramEdge, type DiagramEnd, type DiagramItem, type DiagramPage, type DiagramShape } from '@shared/diagram';
 import { KINDS, labelBox, lookOf, pageBox, perimeterPoint, portPoint, shapeGeom, shapePorts, toLocal, toPage, type Box, type Pt } from '@shared/diagram-shapes';
 import { alongWalk, edgeGeom, type EdgeGeom } from '@shared/diagram-route';
 import { DEFS, edgeSvg, FLOW_CSS, shapeSvg, themeCss } from '@shared/diagram-render';
-import { boundsOf, cloneItems, hitItem, itemsIn, moveItems, movingSet, reparent, snapTo, updateItem } from '@shared/diagram-ops';
+import { boundsOf, cloneItems, hitItem, itemsIn, moveItems, movingSet, reparent, scaleItems, snapTo, turnItems, updateItem } from '@shared/diagram-ops';
 import { GUIDE_COLOUR, SNAP, type SnapBox, type SnapGap, type SnapGuide } from '@shared/snap';
 import { lineHeight, textSize } from '@shared/diagram-text';
 import { cx } from '../../../components/ui';
@@ -79,6 +80,8 @@ type Drag =
   | { kind: 'move'; p0: Pt; ids: Set<string>; base: DiagramPage; moved: boolean; copy: boolean; hit: string; wasSel: boolean }
   | { kind: 'resize'; id: string; h: Handle; base: DiagramPage; s0: DiagramShape }
   | { kind: 'rotate'; id: string; base: DiagramPage; s0: DiagramShape }
+  | { kind: 'mresize'; h: Handle; base: DiagramPage; ids: Set<string>; box0: Box; box: Box }
+  | { kind: 'mrotate'; base: DiagramPage; ids: Set<string>; box0: Box; c: Pt; a0: number; deg: number }
   | { kind: 'end'; id: string; which: 'from' | 'to'; base: DiagramPage }
   | { kind: 'connect'; from: DiagramEnd; p: Pt; base: DiagramPage; dir?: 'n' | 'e' | 's' | 'w'; sx: number; sy: number; went: boolean }
   | { kind: 'seg'; id: string; i: number; base: DiagramPage; pts: Pt[]; p0: Pt }
@@ -114,6 +117,11 @@ function equalPills(box: SnapBox, same: SnapBox[], horizontal: boolean, k: numbe
   return same.length ? [at(box), ...same.map(at)] : [];
 }
 
+/** The size of a box being sized, in a pill under it (under its "=", when it is as wide as another). */
+function sizePill(box: SnapBox, underEqual: boolean, k: number): { x: number; y: number; text: string } {
+  return { x: box.x + box.w / 2, y: box.y + box.h + (underEqual ? 34 : 20) / k, text: `${Math.round(box.w)} × ${Math.round(box.h)}` };
+}
+
 /** An item drawn: its SVG, made again only when it (or, for a connector, a shape it joins) changes. */
 const ItemView = memo(function ItemView({ svg }: { svg: string }) {
   return <g dangerouslySetInnerHTML={{ __html: svg }} />;
@@ -136,6 +144,24 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
   const shown = preview ?? page;
   const shapes = useMemo(() => new Map(shown.items.filter(isShape).map((s) => [s.id, s])), [shown]);
   const selSet = useMemo(() => new Set(sel), [sel]);
+  /**
+   * Several picked (shapes among them): one frame round them, to size or turn them together. What it holds is what moves
+   * with them (what their containers hold, the connectors between them); locked ones stay out of it.
+   */
+  const multi = useMemo(() => {
+    if (readOnly || sel.length < 2) return null;
+    const byId = new Map(page.items.map((it) => [it.id, it]));
+    const free = sel.filter((id) => {
+      const it = byId.get(id);
+      return it && !it.locked && (isShape(it) || (isEdge(it) && (!it.from.id || !it.to.id)));
+    });
+    if (!free.some((id) => isShape(byId.get(id)!))) return null;
+    const ids = movingSet(page, free);
+    for (const id of [...ids]) if (byId.get(id)?.locked) ids.delete(id);
+    // The frame goes round the shapes (and the loose connectors picked), not round the courses between them.
+    const box = boundsOf(page, new Set([...ids].filter((id) => isShape(byId.get(id)!) || free.includes(id))));
+    return box && box.w > 0 && box.h > 0 ? { ids, box } : null;
+  }, [page, sel, readOnly]);
   const setD = (d: Drag | null) => {
     dragRef.current = d;
     setDrag(d);
@@ -333,6 +359,11 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
         return setD({ kind: 'resize', id, h: extra as Handle, base: page, s0: s });
       }
       if (kind === 'rot') return setD({ kind: 'rotate', id, base: page, s0: page.items.find((x) => x.id === id) as DiagramShape });
+      if (kind === 'msize' && multi) return setD({ kind: 'mresize', h: extra as Handle, base: page, ids: multi.ids, box0: multi.box, box: multi.box });
+      if (kind === 'mrot' && multi) {
+        const c = { x: multi.box.x + multi.box.w / 2, y: multi.box.y + multi.box.h / 2 };
+        return setD({ kind: 'mrotate', base: page, ids: multi.ids, box0: multi.box, c, a0: Math.atan2(p.y - c.y, p.x - c.x), deg: 0 });
+      }
       if (kind === 'end') return setD({ kind: 'end', id, which: extra as 'from' | 'to', base: page });
       if (kind === 'seg') {
         const g = geomOf(page.items.find((x) => x.id === id) as DiagramEdge).geom!;
@@ -477,7 +508,7 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
         m = {
           guides: r.guides,
           gaps: [],
-          pills: [{ x: r.box.x + r.box.w / 2, y: r.box.y + r.box.h + 20 / view.k, text: `${Math.round(r.box.w)} × ${Math.round(r.box.h)}` }, ...equalPills(r.box, r.sameW, true, view.k), ...equalPills(r.box, r.sameH, false, view.k)],
+          pills: [sizePill(r.box, r.sameW.length > 0, view.k), ...equalPills(r.box, r.sameW, true, view.k), ...equalPills(r.box, r.sameH, false, view.k)],
         };
       } else if (e.shiftKey && hx !== 0.5 && hy !== 0.5) {
         // A corner of a turned shape keeps its shape (and the opposite corner where it was).
@@ -500,6 +531,54 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
       const c0 = toPage(s, nb.x + nb.w / 2, nb.y + nb.h / 2);
       const next: DiagramShape = { ...s, x: r2(c0.x - nb.w / 2), y: r2(c0.y - nb.h / 2), w: r2(nb.w), h: r2(nb.h) };
       setPreview(updateItem(d.base, d.id, () => next));
+      return;
+    }
+    if (d.kind === 'mresize') {
+      // The frame round several: its edges that move line up with the other shapes' (or make it as wide or high as one),
+      // else go to the grid; Shift keeps its shape. What it holds is sized with it.
+      const b = d.box0;
+      const [hx, hy] = HPOS[d.h];
+      let x0 = b.x;
+      let y0 = b.y;
+      let x1 = b.x + b.w;
+      let y1 = b.y + b.h;
+      if (hx === 0) x0 = Math.min(p.x, x1 - 8);
+      if (hx === 1) x1 = Math.max(p.x, x0 + 8);
+      if (hy === 0) y0 = Math.min(p.y, y1 - 8);
+      if (hy === 1) y1 = Math.max(p.y, y0 + 8);
+      const on = snap && !isNoSnap(e);
+      const r = SNAP.snapResize({
+        box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 },
+        from: b,
+        edges: { l: hx === 0, r: hx === 1, t: hy === 0, b: hy === 1 },
+        others: on ? othersInView(d.ids) : [],
+        tol: on ? tol : 0,
+        grid: on && grid ? grid : 0,
+        ratio: e.shiftKey,
+        min: 8,
+      });
+      setMarks({
+        guides: r.guides,
+        gaps: [],
+        pills: [sizePill(r.box, r.sameW.length > 0, view.k), ...equalPills(r.box, r.sameW, true, view.k), ...equalPills(r.box, r.sameH, false, view.k)],
+      });
+      setPreview(scaleItems(d.base, d.ids, b, r.box));
+      setD({ ...d, box: r.box });
+      return;
+    }
+    if (d.kind === 'mrotate') {
+      // Turned together about the frame's middle: by 15° steps near them (Shift: freely).
+      let deg = ((Math.atan2(p.y - d.c.y, p.x - d.c.x) - d.a0) * 180) / Math.PI;
+      deg = ((deg % 360) + 540) % 360 - 180;
+      if (!e.shiftKey) {
+        const step = Math.round(deg / 15) * 15;
+        if (Math.abs(step - deg) < 5) deg = step;
+      }
+      deg = Math.round(deg);
+      // The angle by the pointer, clear of the shapes it turns.
+      setMarks({ guides: [], gaps: [], pills: [{ x: p.x + 28 / view.k, y: p.y + 22 / view.k, text: `${deg}°` }] });
+      setPreview(turnItems(d.base, d.ids, d.c, deg));
+      setD({ ...d, deg });
       return;
     }
     if (d.kind === 'rotate') {
@@ -751,6 +830,27 @@ export const DiagramCanvas = forwardRef<CanvasApi, CanvasProps>(function Diagram
     const rh = toPage(single, single.w / 2, -24 / k);
     overlay.push(<line key="rl" x1={top.x} y1={top.y} x2={rh.x} y2={rh.y} stroke={blue} strokeWidth={1 / k} />);
     overlay.push(<circle key="rc" data-h={`rot:${single.id}`} cx={rh.x} cy={rh.y} r={5 / k} fill="#fff" stroke={blue} strokeWidth={1.25 / k} style={{ cursor: 'grab' }} />);
+  }
+  // Several picked: the frame round them, its handles to size them together and the round one to turn them.
+  if (drag?.kind === 'mrotate') {
+    const { box0: b, c, deg } = drag;
+    const a = (deg * Math.PI) / 180;
+    const turn = (x: number, y: number) => `${c.x + (x - c.x) * Math.cos(a) - (y - c.y) * Math.sin(a)},${c.y + (x - c.x) * Math.sin(a) + (y - c.y) * Math.cos(a)}`;
+    overlay.push(<polygon key="mframe" points={[turn(b.x, b.y), turn(b.x + b.w, b.y), turn(b.x + b.w, b.y + b.h), turn(b.x, b.y + b.h)].join(' ')} fill="none" stroke={blue} strokeWidth={1 / k} strokeDasharray={`${5 / k} ${3 / k}`} />);
+  } else if (multi && !single && (!drag || drag.kind === 'mresize')) {
+    const b = drag?.kind === 'mresize' ? drag.box : multi.box;
+    overlay.push(<rect key="mframe" x={b.x} y={b.y} width={b.w} height={b.h} fill="none" stroke={blue} strokeWidth={1 / k} strokeDasharray={`${5 / k} ${3 / k}`} />);
+    if (!drag) {
+      for (const h of HANDLES) {
+        if ((h === 'n' || h === 's') && b.h * k < 24) continue;
+        if ((h === 'e' || h === 'w') && b.w * k < 24) continue;
+        const q = { x: b.x + HPOS[h][0] * b.w, y: b.y + HPOS[h][1] * b.h };
+        overlay.push(<rect key={`mh${h}`} data-h={`msize::${h}`} x={q.x - hs / 2} y={q.y - hs / 2} width={hs} height={hs} rx={1.5 / k} fill="#fff" stroke={blue} strokeWidth={1.25 / k} style={{ cursor: CURSOR[h] }} />);
+      }
+      const top = { x: b.x + b.w / 2, y: b.y };
+      overlay.push(<line key="mrl" x1={top.x} y1={top.y} x2={top.x} y2={top.y - 24 / k} stroke={blue} strokeWidth={1 / k} />);
+      overlay.push(<circle key="mrc" data-h="mrot:" cx={top.x} cy={top.y - 24 / k} r={5 / k} fill="#fff" stroke={blue} strokeWidth={1.25 / k} style={{ cursor: 'grab' }} />);
+    }
   }
   // A picked connector: its course traced, its ends to drag, its bends and runs to move, its words to slide.
   for (const ed of pickedEdges) {
