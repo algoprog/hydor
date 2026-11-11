@@ -113,7 +113,7 @@ The quick check sees only your own messages in the session (the first one and th
 
 In the session, a step Auto let through carries a small **Auto** label; hover over it for the reason. A step Auto stopped shows the label in red; hover over it for "Auto stopped this: …" and the reason. A card Auto sends to you starts with "Auto:" and the reason.
 
-[Settings → Capabilities → Custom](/settings?s=custom&find=Auto%20mode) describes Auto mode in the same words; there is nothing to switch there.
+[Settings → Capabilities → Custom](/settings?s=custom&find=Auto%20mode) has an **Auto mode** row whose (i) describes Auto mode in the same words; there is nothing to switch there.
 
 ## The sandbox for commands
 
@@ -123,7 +123,7 @@ When a command runs into the sandbox's walls, Custom is told it ran in a sandbox
 
 To turn it on or off, open [Settings → Capabilities → Custom](/settings?s=custom&find=Sandbox%20for%20commands) and use the switch by **Sandbox for commands**. It's on by default. Turn it off if a tool must write elsewhere, for example to install something for the whole system. The change applies to running sessions within about 15 seconds.
 
-The sandbox uses bubblewrap, a Linux tool. If it isn't installed, or can't run (as in some containers), the switch is greyed out and the section says so; commands then run without a sandbox. In Ask and Accept edits, commands don't use the sandbox: there, every command that does more than look around waits for your OK, or for a rule you saved with **Always allow**.
+The sandbox uses bubblewrap, a Linux tool. If it isn't installed, or can't run (as in some containers), the switch is greyed out and the row says so; commands then run without a sandbox. In Ask and Accept edits, commands don't use the sandbox: there, every command that does more than look around waits for your OK, or for a rule you saved with **Always allow**.
 
 In a [confidential session](/guide/sessions#keep-a-session-confidential) every command runs without network, in every mode and whatever this switch says: in a network of its own with nothing in it, so it can't reach the internet, your other computers or this one's servers. Its files stay as the mode has them. Where bubblewrap can't do that, each command asks you first, in every mode, with no **Always allow**. Custom is told, and a command that tries the network hears why it failed.
 
@@ -148,13 +148,13 @@ Your own messages go first: a check waits until the queue is empty.
 
 The goal pauses, and tells you why, when:
 
-- it has sent as many next steps as **Goals** in Settings allows (30 unless you change it);
+- it has sent as many next steps as **Rounds before a goal pauses** in Settings allows (30 unless you change it);
 - three rounds in a row made no progress;
 - you stopped the agent, a turn failed, the agent wasn't running, or the check itself failed.
 
 The goal bar above the message box shows the goal, how it stands ("working on it", "paused", "stuck: the agent needs you"), how many times it was checked and for how long, and the last check's reason. **Pause** sends no more next steps (a turn already running finishes), **Resume** carries on from the last next step (the count of rounds starts again), and **Clear** stops working towards it. While a goal runs, you get one notice when it's met rather than one after every turn.
 
-To change how many rounds a goal may run, open [Settings → Capabilities → Custom](/settings?s=custom&find=Goals) and pick **10**, **30** or **100** next to **Goals**.
+To change how many rounds a goal may run, open [Settings → Capabilities → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) and pick **10**, **30** or **100** in the **Rounds before a goal pauses** row of the **Goals** group.
 
 ## Long conversations and long output
 
@@ -190,7 +190,7 @@ When Custom stops a turn for one of these reasons, the reply ends with "(Stopped
 
 A model that sees images gets your pictures directly. Pictures are made smaller first when this computer has ffmpeg or ImageMagick.
 
-For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" under **Helper model**. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see. In a confidential session only a helper model on this computer describes pictures.
+For a model that doesn't see images, the helper model describes each picture in words: what it shows, where things are, and any text in it, copied exactly. This needs a helper model that sees images: open [Settings → Agents → Models](/settings?s=models&find=Helper%20model) and pick one marked "sees images" in the **Model** menu of the **Helper model** group. "Automatic" can't. Without one, Custom tells the model there is a picture it can't see. In a confidential session only a helper model on this computer describes pictures.
 
 ## Forks and Edit from here
 
@@ -210,11 +210,11 @@ A [spending cap](/guide/usage#cap-what-a-session-spends) works for Custom sessio
 
 ## Settings → Capabilities → Custom
 
-[Settings → Capabilities → Custom](/settings?s=custom) ("Auto mode, a sandbox for commands, and how long goals run") has three parts:
+[Settings → Capabilities → Custom](/settings?s=custom) ("Auto mode, a sandbox for commands, and how long goals run") has three rows:
 
-- **Auto mode** ("One of Custom's modes, beside Ask, Accept edits, Full access and Plan."): what Auto lets through, what always asks, and that the helper model does the check. Nothing to switch: you pick Auto per session under **Permissions**.
-- **Sandbox for commands** ("In Auto mode, commands can change files only in the session's folder and /tmp. Full access runs without this sandbox or approval prompts."): a switch, on by default. Greyed out when bubblewrap can't run here.
-- **Goals** ("With /goal, Custom keeps working, turn after turn, until the goal holds. After this many rounds it pauses for you."): **10**, **30** (the default) or **100** rounds. It also pauses after three rounds without progress.
+- **Auto mode** (one of Custom's modes, beside Ask, Accept edits, Full access and Plan): its (i) says what Auto lets through, what always asks, and that the helper model does the check. Nothing to switch: you pick Auto per session under **Permissions**.
+- **Sandbox for commands** (in Auto mode, commands change files only in the session's folder and /tmp; Full access runs without this sandbox or approval prompts): a switch, on by default. Greyed out when bubblewrap can't run here.
+- **Rounds before a goal pauses**, in the **Goals** group (with /goal, Custom works turn after turn until the goal holds; after this many rounds it pauses for you): **10**, **30** (the default) or **100** rounds. It also pauses after three rounds without progress.
 
 Custom's models are in [Settings → Agents → Models](/settings?s=models), and the model that does the checks is the **Helper model** there.
 

@@ -7,6 +7,7 @@ import { Check, Cpu, Gpu } from 'lucide-react';
 import { api, post, put } from '../../../lib/api';
 import { toastError } from '../../../lib/store';
 import { Button, Segmented, Throbber } from '../../../components/ui';
+import { Row } from '../../settings/kit';
 
 interface GpuState {
   mode: 'auto' | 'off';
@@ -42,42 +43,43 @@ export function GpuSetting() {
             ? 'No graphics card that makes videos was found: they are made on the processor.'
             : 'Not tried yet: the first video you make tries it.';
   return (
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-      <Gpu size={16} className="mt-0.5 shrink-0 text-fg-3" />
-      <div className="min-w-[min(100%,15rem)] flex-1 space-y-1">
-        <div className="text-[12.5px] font-medium text-fg-2">Use the graphics card for videos</div>
-        <p className="text-[12.5px] leading-snug text-fg-3">
-          The video editor and agents’ video edits make MP4 and MOV videos on the graphics card when there is one that works (NVIDIA, Intel, AMD or Apple): much faster, and the processor stays free. If the card fails, the processor makes the video at once.
-        </p>
-        {!s || checking ? (
-          <div className="flex items-center gap-2 text-[12.5px] text-fg-3">
+    <Row
+      icon={<Gpu size={16} />}
+      label="Use the graphics card for videos"
+      hint={
+        !s || checking ? (
+          <span className="flex items-center gap-2">
             <Throbber /> {checking ? 'Trying the graphics card' : 'Looking'}
-          </div>
+          </span>
         ) : (
-          <div className="flex items-start gap-1.5 text-[12.5px] text-fg-2">
-            {s.found && s.mode === 'auto' && !s.forcedOff ? <Check size={14} className="mt-px shrink-0 text-ok" strokeWidth={2.6} /> : <Cpu size={14} className="mt-px shrink-0 text-fg-3" />}
+          <span className="flex items-start gap-1.5">
+            {s.found && s.mode === 'auto' && !s.forcedOff ? <Check size={14} className="mt-px shrink-0 text-ok" strokeWidth={2.6} /> : <Cpu size={14} className="mt-px shrink-0" />}
             <span translate="no">{words}</span>
-          </div>
-        )}
-      </div>
-      {s && !s.forcedOff && (
-        <div className="flex items-center gap-2">
-          {s.mode === 'auto' && (
-            <Button size="sm" variant="ghost" disabled={checking} onClick={check}>
-              Check now
-            </Button>
-          )}
-          <Segmented<'auto' | 'off'>
-            size="sm"
-            value={s.mode}
-            onChange={(m) => void set(m)}
-            options={[
-              { value: 'auto', label: 'Automatic' },
-              { value: 'off', label: 'Off' },
-            ]}
-          />
-        </div>
-      )}
-    </div>
+          </span>
+        )
+      }
+      info="The video editor and agents’ video edits make MP4 and MOV videos on the graphics card when there is one that works (NVIDIA, Intel, AMD or Apple): much faster, and the processor stays free. If the card fails, the processor makes the video at once."
+      control={
+        s &&
+        !s.forcedOff && (
+          <>
+            {s.mode === 'auto' && (
+              <Button size="sm" variant="ghost" disabled={checking} onClick={check}>
+                Check now
+              </Button>
+            )}
+            <Segmented<'auto' | 'off'>
+              size="sm"
+              value={s.mode}
+              onChange={(m) => void set(m)}
+              options={[
+                { value: 'auto', label: 'Automatic' },
+                { value: 'off', label: 'Off' },
+              ]}
+            />
+          </>
+        )
+      }
+    />
   );
 }

@@ -28,7 +28,7 @@ An agent is a role a session takes on. Text that every agent should follow in ev
 
 ## The Agents page
 
-Open **Agents** in the sidebar, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first.
+Open **Agents** in the sidebar, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first. [Settings → Capabilities → Your agents](/settings?s=assistants&find=Your%20agents) has a **Your agents** row that opens this page too (it says how many agents are your own); the rest of that section is about task folders and clean-up, below.
 
 - **New agent**, at the top, makes one (see [Make an agent](#make-an-agent)); **Import** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)).
 - Your agents show as cards. Each card has the agent's name, its line, how it is doing (**Working**, **Needs you** when one of its sessions waits for your answer, **Budget spent**, or **Idle**), the projects it works in (or **Everywhere**), its tier, when it runs next, how many messages wait in its inbox, and what it spent this month.
@@ -406,14 +406,14 @@ Task folders don't crowd the folder menu: the folders used lately that it lists 
 
 ### Move task folders
 
-1. In [Settings → Capabilities → Your agents](/settings?s=assistants&find=Task%20folders), find **Task folders** ("A session started without a folder gets a new one here, named by the day and the task").
+1. In [Settings → Capabilities → Your agents](/settings?s=assistants&find=Task%20folders), find **Task folders** in the **Tasks** group (its (i) says that a session started without a folder gets a new one here, named by the day and the task, and that Coder works in the folder you pick instead).
 2. Click the folder's name. Under **Folder to work in**, type a path (it suggests folders as you type, and folders you used lately) and click **Use this folder**. Give a full path, or one starting with `~` for your home folder.
 
 New task folders go there from then on; folders already made stay where they are. **Back to ~/Hydor** appears once you've changed it, to go back to the default. The line under it shows what new ones look like. New projects that get a folder of their own get it here too, in a **Projects** folder inside (see [Projects](/guide/projects)).
 
 ## Clean up after a task
 
-[Settings → Capabilities → Your agents](/settings?s=assistants&find=Clean%20up%20after%20a%20task), **When a task is done**, has one switch: **Clean up after a task**. It is on unless you turn it off, and it applies to every session, whatever agent it works as.
+[Settings → Capabilities → Your agents](/settings?s=assistants&find=Clean%20up%20after%20a%20task), has a switch in the **Tasks** group: **Clean up after a task** (its (i) says what the agent removes). It is on unless you turn it off, and it applies to every session, whatever agent it works as.
 
 With it on, an agent's last step in a task is to remove what it made along the way and no longer needs:
 

@@ -22,7 +22,7 @@ import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Button, cx, Throbber, useIsMobile } from '../../components/ui';
 import { Wordmark } from '../../components/Logo';
-import { LoginDialog } from '../settings/SettingsPage';
+import { LoginDialog } from '../settings/AccountSettings';
 import { BringIn } from '../memory/BringIn';
 import { shortGpu } from '../settings/ModelsSettings';
 import { TourLocal, TourMedia, TourOpenRouter } from './TourModels';

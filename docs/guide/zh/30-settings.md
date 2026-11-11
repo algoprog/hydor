@@ -14,7 +14,7 @@
 
 [设置 → 通用](/settings?s=general)：主题，以及智能体工作时 Enter 键的作用。详见[外观、语言和更新](/guide/app)。
 
-- [**主题**](/settings?s=general&find=Theme)：深色、浅色或跟随你的设备；也可以是你自己的主题。
+- [**外观**](/settings?s=general&find=Appearance)：深色、浅色或跟随你的设备；也可以是你自己的主题。
 - [**新建主题**](/settings?s=general&find=New%20theme)：以其中任意一个为基础，制作你自己的主题。
 - [**导入**](/settings?s=general&find=Import)：添加别人分享的主题。
 - [**语言**](/settings?s=general&find=Language)：应用显示所用的语言，也是智能体写作所用的语言。
@@ -89,7 +89,7 @@
 
 [设置 → 账户](/settings?s=accounts)：每个会话都使用的 Claude Code 和 Codex 登录。详见[智能体、账户和模型](/guide/agents-models)。
 
-- [**你的账户**](/settings?s=accounts&find=Your%20accounts)：会话使用的 Claude Code 和 Codex 登录，以及你添加的更多账户。
+- [**账户**](/settings?s=accounts&find=Accounts)：会话使用的 Claude Code 和 Codex 登录，以及你添加的更多账户。
 - [**达到限额时切换账户**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit)：用量耗尽的会话会换另一个账户继续。
 - [**达到限额时使用 API 额度**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit)：所有 Claude Code 账户都达到上限时，会话继续运行，费用记在一个 Anthropic API 密钥上。
 - [**智能体程序**](/settings?s=accounts&find=Agent%20programs)：已安装哪些智能体程序，以及安装其他程序。
@@ -124,7 +124,7 @@
 - [**适用于所有会话**](/settings?s=guidelines&find=For%20every%20session)：每个智能体在每个会话中都遵循的内容。
 - [**适用于某个项目**](/settings?s=guidelines&find=For%20a%20project)：项目中的会话所遵循的准则。
 - [**适用于单个会话**](/settings?s=guidelines&find=For%20one%20session)：单个会话的准则，可在开始页或会话菜单中设置。
-- [**Claude Code 和 Codex 也会读取的文件**](/settings?s=guidelines&find=Files%20Claude%20Code%20and%20Codex%20read%20too)：CLAUDE.md 和 AGENTS.md，由 Claude Code 和 Codex 自行读取。
+- [**指令文件**](/settings?s=guidelines&find=Instruction%20files)：CLAUDE.md 和 AGENTS.md，由 Claude Code 和 Codex 自行读取。
 
 ### MCP 服务器
 
@@ -212,7 +212,7 @@
 
 [设置 → 电脑操控](/settings?s=computer)：智能体能看到你的屏幕，并使用鼠标和键盘，仅限桌面应用。详见[搜索和浏览器](/guide/web)。
 
-- [**允许智能体使用这台电脑**](/settings?s=computer&find=Let%20agents%20use%20this%20computer)：智能体能看到屏幕，并在任何应用中使用鼠标和键盘（网站的事它们仍交给浏览器）。每个会话都会先问你。
+- [**电脑操控**](/settings?s=computer&find=Computer%20use)：智能体能看到屏幕，并在任何应用中使用鼠标和键盘（网站的事它们仍交给浏览器）。每个会话都会先问你。
 - [**辅助功能**](/settings?s=computer&find=Accessibility)：macOS 允许 Hydor 使用鼠标和键盘的权限。
 - [**屏幕录制**](/settings?s=computer&find=Screen%20Recording)：macOS 允许 Hydor 查看屏幕的权限。
 
@@ -271,7 +271,7 @@
 
 [设置 → 你的智能体](/settings?s=assistants)：任务文件夹的位置，以及任务完成后的清理；你的智能体本身在“智能体”页面上。详见[智能体](/guide/agents)。
 
-- [**打开智能体**](/settings?s=assistants&find=Open%20Agents)：你的智能体在“智能体”页面上。
+- [**你的智能体**](/settings?s=assistants&find=Your%20agents)：你的智能体在“智能体”页面上。
 - [**任务完成后清理**](/settings?s=assistants&find=Clean%20up%20after%20a%20task)：智能体会删除过程中创建且不再需要的内容。
 - [**任务文件夹**](/settings?s=assistants&find=Task%20folders)：新任务文件夹的位置，用于未选文件夹而开始的会话。
 
@@ -281,7 +281,7 @@
 
 - [**自动模式**](/settings?s=custom&find=Auto%20mode)：Custom 会自行批准安全的步骤。
 - [**命令沙盒**](/settings?s=custom&find=Sandbox%20for%20commands)：自动模式的命令在沙盒中运行；完全访问不使用沙盒。
-- [**目标**](/settings?s=custom&find=Goals)：一个目标最多可运行的轮数。
+- [**目标暂停前的轮数**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses)：一个目标最多运行多少轮后会暂停，等你处理。
 
 ## 问问智能体
 

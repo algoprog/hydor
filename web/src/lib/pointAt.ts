@@ -39,6 +39,13 @@ export function flash(el: HTMLElement) {
   el.classList.add('find-point');
 }
 
+/** Where an element is laid out on the page, whatever is scrolled: its offsets, up to the top. */
+function layoutTop(el: HTMLElement): number {
+  let y = 0;
+  for (let x: HTMLElement | null = el; x; x = x.offsetParent as HTMLElement | null) y += x.offsetTop;
+  return y;
+}
+
 /** Waits up to `ms` for the words to show under `root`, then points at them. Whether it found them. */
 export function pointAt(root: () => ParentNode | null, words: string, ms = 5000): Promise<boolean> {
   return new Promise((resolve) => {
@@ -50,6 +57,19 @@ export function pointAt(root: () => ParentNode | null, words: string, ms = 5000)
         const row = rowOf(el);
         row.scrollIntoView({ block: 'center', behavior: 'smooth' });
         flash(row);
+        // What loads above it after (a profile, a list) pushes it down: follow it for a moment.
+        let top = layoutTop(row);
+        const settle = Date.now() + 2000;
+        const follow = () => {
+          if (!row.isConnected || Date.now() > settle) return;
+          const now = layoutTop(row);
+          if (Math.abs(now - top) > 8) {
+            top = now;
+            row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          }
+          setTimeout(follow, 150);
+        };
+        setTimeout(follow, 150);
         return resolve(true);
       }
       if (Date.now() > until) return resolve(false);

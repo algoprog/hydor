@@ -2,13 +2,14 @@
 // take a bot or app of your own: its token (or tokens) goes to the server's vault and never comes back here; then each
 // chat you link with a one-time code can start sessions, get their replies and answer what agents ask. One row each;
 // the one you open shows its steps, or its chats, with the rest of its options behind one menu.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ChevronRight, Copy, ExternalLink, Hash, Link2, MessageCircle, MoreHorizontal, Send, Trash2, type LucideIcon } from 'lucide-react';
+import { Copy, ExternalLink, Hash, Link2, MessageCircle, Send, Trash2, type LucideIcon } from 'lucide-react';
 import { slackManifest, SLACK_MANIFEST } from '@shared/chat-apps';
 import { api, del, put, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, IconButton, inputCls, MenuItem, MenuSep, Popover, Section, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, IconButton, inputCls, MenuItem, MenuSep, Switch, Throbber, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Notice, Row, Select, Stack } from './kit';
 import { LOCALE } from '../../i18n/locale';
 
 type AppId = 'telegram' | 'discord' | 'slack';
@@ -33,18 +34,6 @@ const APPS: { id: AppId; name: string; icon: LucideIcon; line: string }[] = [
   { id: 'discord', name: 'Discord', icon: MessageCircle, line: 'A bot of your own, made in the Developer Portal' },
   { id: 'slack', name: 'Slack', icon: Hash, line: 'An app of your own, made from a manifest' },
 ];
-
-function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-      <div className="min-w-[200px] flex-1">
-        <div className="text-[13.5px] text-fg">{label}</div>
-        {hint && <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">{hint}</div>}
-      </div>
-      {children}
-    </div>
-  );
-}
 
 function Steps({ children }: { children: ReactNode[] }) {
   return (
@@ -77,8 +66,6 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
   const [fields, setFields] = useState({ token: '', appToken: '' });
   const [changing, setChanging] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [confirm, confirmNode] = useConfirm();
   const name = APPS.find((a) => a.id === id)!.name;
   const slack = id === 'slack';
@@ -144,7 +131,7 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
 
   if (!v.connected) {
     return (
-      <div className="space-y-3 pb-4">
+      <div className="space-y-3 px-4 py-4">
         {id === 'telegram' && (
           <>
             <Steps>{['In Telegram, open @BotFather, send it /newbot and give the bot a name.', 'Paste the token it gives you here.']}</Steps>
@@ -180,10 +167,11 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
                 Copy manifest
               </button>
             </div>
-            <p className="text-[12px] leading-snug text-fg-3">{`The manifest turns on Socket Mode and asks for these scopes: ${SLACK_MANIFEST.oauth_config.scopes.bot.join(', ')}.`}</p>
+            <p className="text-[12.5px] leading-snug text-fg-3">{`The manifest turns on Socket Mode and asks for these scopes: ${SLACK_MANIFEST.oauth_config.scopes.bot.join(', ')}.`}</p>
           </>
         )}
         {tokenBox}
+        {confirmNode}
       </div>
     );
   }
@@ -198,96 +186,86 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
         ? 'Send the bot this code in a direct message, or mention it with the code in a channel:'
         : 'Send the app this code in a direct message, or mention it with the code in a channel:';
   return (
-    <div className="pb-2">
-      <Row label={v.state === 'error' ? 'Not connected' : v.state === 'running' ? 'Listening for messages' : 'Connecting…'} hint={v.state === 'error' ? <span className="text-err">{v.error}</span> : v.state !== 'running' && v.note ? `${name} has not answered yet (${v.note}). Hydor keeps trying, and connects by itself when it does.` : undefined}>
-        <div className="flex items-center gap-1">
-          {id === 'telegram' && v.bot && (
-            <a href={`https://t.me/${v.bot.username}`} target="_blank" rel="noreferrer" className="rounded-md p-1.5 text-fg-3 hover:bg-bg-2 hover:text-fg" title="Open in Telegram">
-              <ExternalLink size={14} />
-            </a>
-          )}
-          <Button size="sm" variant="secondary" icon={<Link2 size={14} />} onClick={pair}>
-            Link a chat
-          </Button>
-          <IconButton ref={setAnchor} label="More" size="sm" onClick={() => setMenu((m) => !m)}>
-            <MoreHorizontal size={16} />
-          </IconButton>
-          <Popover anchor={{ current: anchor }} open={menu} onClose={() => setMenu(false)} align="end" width={300}>
-            <MenuItem checked={v.notify} onClick={() => (setMenu(false), change({ notify: !v.notify }))}>
-              Notices from every session
-            </MenuItem>
-            <MenuItem checked={v.agent === 'claude'} onClick={() => (setMenu(false), change({ agent: 'claude' }))}>
-              New sessions use Claude Code
-            </MenuItem>
-            <MenuItem checked={v.agent === 'codex'} onClick={() => (setMenu(false), change({ agent: 'codex' }))}>
-              New sessions use Codex
-            </MenuItem>
-            <MenuSep />
-            {invite && (
-              <MenuItem icon={<ExternalLink size={14} />} onClick={() => (setMenu(false), window.open(invite, '_blank', 'noreferrer'))}>
-                Add the bot to a server
-              </MenuItem>
+    <>
+      <Row
+        label={v.state === 'error' ? 'Not connected' : v.state === 'running' ? 'Listening for messages' : 'Connecting…'}
+        hint={v.state === 'error' ? <span className="text-err">{v.error}</span> : v.state !== 'running' && v.note ? `${name} has not answered yet (${v.note}). Hydor keeps trying, and connects by itself when it does.` : undefined}
+        control={
+          <>
+            {id === 'telegram' && v.bot && (
+              <a href={`https://t.me/${v.bot.username}`} target="_blank" rel="noreferrer" className="rounded-md p-1.5 text-fg-3 hover:bg-bg-2 hover:text-fg" title="Open in Telegram">
+                <ExternalLink size={14} />
+              </a>
             )}
-            {slack && (
-              <MenuItem icon={<Copy size={14} />} onClick={() => (setMenu(false), copyManifest())}>
-                Copy the app’s manifest
-              </MenuItem>
-            )}
-            <MenuItem onClick={() => (setMenu(false), setChanging((c) => !c))}>{slack ? 'Change tokens' : 'Change token'}</MenuItem>
-            <MenuItem danger icon={<Trash2 size={14} />} onClick={() => (setMenu(false), remove())}>
-              Disconnect
-            </MenuItem>
-          </Popover>
-        </div>
+            <MoreMenu width={220}>
+              {(close) => (
+                <>
+                  <MenuItem onClick={() => (close(), setChanging((c) => !c))}>{slack ? 'Change tokens' : 'Change token'}</MenuItem>
+                  <MenuSep />
+                  <MenuItem danger icon={<Trash2 size={14} />} onClick={() => (close(), remove())}>
+                    Disconnect
+                  </MenuItem>
+                </>
+              )}
+            </MoreMenu>
+          </>
+        }
+      >
+        {changing && tokenBox}
       </Row>
-      {v.warning && <p className="pb-2 text-[12.5px] leading-snug text-warn">{v.warning}</p>}
-      {changing && <div className="pb-3">{tokenBox}</div>}
-      {v.pairing && (
-        <div className="mb-2 space-y-2 rounded-lg border border-line bg-bg-2 p-3 text-[13px] leading-relaxed text-fg-2">
-          {v.pairing.link && (
-            <a href={v.pairing.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-accent hover:underline">
-              <ExternalLink size={13} />
-              Open in Telegram
-            </a>
-          )}
-          <div>
-            {pairText} <span className="font-mono text-[14px] font-semibold tracking-wider text-fg">{v.pairing.code}</span>
-          </div>
-          <div className="text-[12px] text-fg-3">Good for ten minutes, once. Waiting for it…</div>
+      {v.warning && (
+        <div className="px-4 py-3">
+          <Notice tone="warn">{v.warning}</Notice>
         </div>
       )}
-      {!v.chats.length ? (
-        !v.pairing && (
-          <div className="space-y-1 py-1 text-[13px] text-fg-3">
-            <p>None yet. Link the chat you will use: Link a chat gives it a code.</p>
-            {invite && (
-              <p>
-                Discord only lets you message a bot you share a server with. {ext(invite, 'Add the bot to a server')}
-              </p>
-            )}
-          </div>
-        )
-      ) : (
-        <div className="divide-y divide-line border-t border-line">
-          {v.chats.map((c) => (
-            <div key={String(c.id)} className="flex items-center gap-3 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div translate="no" className="truncate text-[13.5px] text-fg">
-                  {c.name}
-                </div>
-                <div className="text-[12px] text-fg-3">
-                  {c.kind === 'channel' ? `In a channel · linked ${linkedOn(c.at)}` : `Linked ${linkedOn(c.at)}`}
-                </div>
+      <Row icon={<Link2 size={16} />} label="Link a chat" hint="Lets a chat use your agents, with a code that works once" onClick={pair}>
+        {v.pairing && (
+          <Notice icon={<Link2 size={15} />}>
+            <div className="space-y-1.5 leading-relaxed">
+              {v.pairing.link && (
+                <a href={v.pairing.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-accent hover:underline">
+                  <ExternalLink size={13} />
+                  Open in Telegram
+                </a>
+              )}
+              <div>
+                {pairText} <span className="font-mono text-[14px] font-semibold tracking-wider text-fg">{v.pairing.code}</span>
               </div>
-              <IconButton label="Unlink" size="sm" onClick={() => unlink(c)}>
-                <Trash2 size={14} />
-              </IconButton>
+              <div className="text-[12px] text-fg-3">Good for ten minutes, once. Waiting for it…</div>
             </div>
-          ))}
-        </div>
+          </Notice>
+        )}
+      </Row>
+      {v.chats.map((c) => (
+        <Row
+          key={String(c.id)}
+          icon={<MessageCircle size={16} />}
+          label={<span translate="no">{c.name}</span>}
+          hint={c.kind === 'channel' ? `In a channel · linked ${linkedOn(c.at)}` : `Linked ${linkedOn(c.at)}`}
+          control={
+            <IconButton label="Unlink" size="sm" onClick={() => unlink(c)}>
+              <Trash2 size={14} />
+            </IconButton>
+          }
+        />
+      ))}
+      {!v.chats.length && !v.pairing && (
+        <EmptyRow>None yet. Link the chat you will use: Link a chat gives it a code.</EmptyRow>
       )}
+      {invite && <Row icon={<ExternalLink size={16} />} label="Add the bot to a server" hint="Discord only lets you message a bot you share a server with" onClick={() => window.open(invite, '_blank', 'noreferrer')} />}
+      {slack && <Row icon={<Copy size={16} />} label="Copy manifest" hint="The app’s manifest, to paste when you create it" onClick={copyManifest} />}
+      <Row
+        label="New sessions use"
+        hint="The agent a message starts when the chat is in no session"
+        control={<Select<'claude' | 'codex'> label="New sessions use" width={200} value={v.agent} onChange={(agent) => void change({ agent })} options={[{ value: 'claude', label: 'Claude Code' }, { value: 'codex', label: 'Codex' }]} />}
+      />
+      <Row
+        label="Notices from every session"
+        hint="Not only those of the sessions a chat started"
+        control={<Switch on={v.notify} label="Notices from every session" onChange={(notify) => void change({ notify })} />}
+      />
       {confirmNode}
-    </div>
+    </>
   );
 }
 
@@ -328,31 +306,30 @@ export function ChatAppsSettings() {
     return () => clearInterval(t);
   }, [waiting.join(), chats]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (Object.keys(views).length < APPS.length) return <Throbber className="text-fg-3" />;
   return (
-    <div className="space-y-4">
-      <Section sub="Hydor asks for messages itself, so none of them needs an address on the internet. Only the chats you link with a code can use your agents.">
-        <div className="-my-1 divide-y divide-line">
-          {APPS.map((a) => {
-            const v = views[a.id]!;
-            const on = open === a.id;
-            return (
-              <div key={a.id}>
-                <button onClick={() => setOpen(on ? null : a.id)} aria-expanded={on} className="flex w-full items-center gap-3 py-3 text-left">
-                  <a.icon size={16} className="shrink-0 text-fg-3" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13.5px] font-medium text-fg">{a.name}</div>
-                    <div className={cx('truncate text-[12.5px]', v.state === 'error' ? 'text-err' : 'text-fg-3')}>{v.connected ? statusOf(a.id, v) : a.line}</div>
-                  </div>
-                  <span className="text-[12.5px] text-fg-3">{v.connected ? '' : on ? '' : 'Set up'}</span>
-                  <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform', on && 'rotate-90')} />
-                </button>
-                {on && <Panel id={a.id} v={v} setV={(n) => setViews((all) => ({ ...all, [a.id]: n }))} />}
-              </div>
-            );
-          })}
-        </div>
-      </Section>
-    </div>
+    <Stack>
+      <Group title="Bots" info="Hydor asks for messages itself, so none of them needs an address on the internet. Only the chats you link with a code can use your agents.">
+        {APPS.map((a) => {
+          const v = views[a.id];
+          const on = open === a.id;
+          return (
+            <Fragment key={a.id}>
+              <Row
+                icon={<a.icon size={16} />}
+                label={a.name}
+                hint={v ? <span className={cx(v.state === 'error' && 'text-err')}>{v.connected ? <span translate="no">{statusOf(a.id, v)}</span> : a.line}</span> : a.line}
+                control={v ? !v.connected && !on ? 'Set up' : undefined : <Throbber className="text-fg-3" />}
+                onClick={v ? () => setOpen(on ? null : a.id) : undefined}
+              />
+              {v && on && (
+                <div className="divide-y divide-line bg-bg-1/60">
+                  <Panel id={a.id} v={v} setV={(n) => setViews((all) => ({ ...all, [a.id]: n }))} />
+                </div>
+              )}
+            </Fragment>
+          );
+        })}
+      </Group>
+    </Stack>
   );
 }

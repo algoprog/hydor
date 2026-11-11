@@ -191,9 +191,9 @@ test('with search by meaning: what ships found in other words; sessions and task
   dropLists();
   const r = await findAll(d, 'night colours');
   assert.equal(r.meaning, true);
-  const theme = catalogItems().find((it) => it.id === 'opt:general:Theme')!;
+  const theme = catalogItems().find((it) => it.id === 'opt:general:Appearance')!;
   assert.ok(catalogText(theme).includes('dark mode'));
-  assert.ok(r.alike.slice(0, 8).some((a) => a.id === 'opt:general:Theme'), '"night colours" is about the theme, in other words');
+  assert.ok(r.alike.slice(0, 8).some((a) => a.id === 'opt:general:Appearance'), '"night colours" is about the theme, in other words');
   assert.match(r.alike[0].id, /theme|Theme/, 'and what is about themes comes first');
   assert.ok(!r.alike.some((a) => a.id === 'go:git'), 'what is not alike stays out');
   // A new session: its vector is made when the pages are told of it, before anyone searches.
