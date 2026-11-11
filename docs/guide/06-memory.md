@@ -73,7 +73,7 @@ Each agent starts with a short explanation of memory, your profile, an index of 
 - **Skills that fit**: the same kind of search names the skills that fit your first message, when any clearly do (see [Skills](/guide/skills#skills-that-fit-a-new-session)).
 - **How it treats them**: as background. The agent is told the notes may be out of date, which of them are not checked yet, that what you say now always comes first, and not to mention them unless they help.
 
-The notes an agent got because they bear on your request count as **needed**. Settings shows how often each note was needed and when last (**Needed**, in the note), and lists the ones no agent has needed for months under **Not needed lately**, so you can keep or delete them (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)). Which notes come first another time weighs only what agents looked up themselves: being given a note at the start does not make it come first again.
+The notes an agent got because they bear on your request count as **needed**. Settings shows how often each note was needed and when last (**Needed by agents**, in the note), and lists the ones no agent has needed for months under **Not needed lately**, so you can keep or delete them (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)). Which notes come first another time weighs only what agents looked up themselves: being given a note at the start does not make it come first again.
 
 Agents also get tools for memory: save a note (in a place, with how it is known and an end date if it has one), correct a note, forget one, look notes up by words and meaning (including the notes a topic stands for), update your profile, and search and read past conversations (see [Search earlier sessions](/guide/memory#search-earlier-sessions)). A note found with a lookup counts as needed too.
 
@@ -172,7 +172,7 @@ A note that was deleted opens with **Restore** and **Erase for good** instead (s
 
 When some notes have gone unused for four months, the index has a row **Not needed lately**, with how many: "3 notes no agent needed in four months". Its page says: "No agent has needed these for four months. Keep what still matters, delete the rest." It has no search field.
 
-Only notes about you and projects are suggested, never topics, profiles, notes with an end date, or sessions' notes. Each row has two buttons: **Keep**, which counts the note as needed today, so it leaves the list, and **Delete**, which removes it. Open a note to read it whole first, with its **Needed** line and its history: there **Keep it** and **Delete** do the same. When none are left, "Every note was needed lately", and the row leaves the index.
+Only notes about you and projects are suggested, never topics, profiles, notes with an end date, or sessions' notes. Each row has two buttons: **Keep**, which counts the note as needed today, so it leaves the list, and **Delete**, which removes it. Open a note to read it whole first, with its **Needed by agents** line and its history: there **Keep it** and **Delete** do the same. When none are left, "Every note was needed lately", and the row leaves the index.
 
 ### Deleted notes
 
