@@ -19,6 +19,7 @@ import {
   MessagesSquare,
   Omega,
   Paintbrush,
+  PaintRoller,
   Redo2,
   RemoveFormatting,
   Scissors,
@@ -125,6 +126,9 @@ export interface MenuCtx {
   addSheet(): void;
   setStyle(set: Partial<CellStyle>): void;
   setFormat(fmt: NumFmt | 'custom', cur?: string): void;
+  /** Format → Format painter: copy the look of the cell picked onto what is picked next. */
+  painter(): void;
+  painting: boolean;
   setCode(code: string | undefined): void;
   borders(where: BorderWhere): void;
   setLine(l: { kind: BorderKind; color?: string }): void;
@@ -362,6 +366,7 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
             ],
           },
           { label: 'Conditional formatting', icon: <Paintbrush size={14} />, also: 'colour scale data bars highlight rules', run: m.conditional },
+          { label: 'Format painter', icon: <PaintRoller size={14} />, also: 'copy format style look brush paint', checked: m.painting, run: m.painter },
           { label: 'Clear formatting', icon: <RemoveFormatting size={14} />, keys: 'Ctrl+\\', run: () => m.clear(true) },
         ],
   };

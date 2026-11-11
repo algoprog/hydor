@@ -4,7 +4,7 @@
 // borders and merging; alignment and wrapping; and the filter. Everything else is in the menus. Its buttons keep the
 // focus where it was (a cell being typed into stays so).
 import { useRef, useState, type ReactNode } from 'react';
-import { AlignCenter, AlignLeft, AlignRight, Baseline, Bold, ChevronDown, DecimalsArrowLeft, DecimalsArrowRight, DollarSign, Italic, ListFilter, PaintBucket, Percent, Redo2, Sigma, Strikethrough, TableCellsMerge, Undo2, WrapText } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Baseline, Bold, ChevronDown, DecimalsArrowLeft, DecimalsArrowRight, DollarSign, Italic, PaintRoller, ListFilter, PaintBucket, Percent, Redo2, Sigma, Strikethrough, TableCellsMerge, Undo2, WrapText } from 'lucide-react';
 import { type BorderKind, type CellStyle, type NumFmt } from '@shared/sheets';
 import { cx, MenuItem, MenuSep, Popover } from '../../../components/ui';
 import { MenuBar, type MenuDef } from '../common/menus';
@@ -230,6 +230,9 @@ export interface ToolbarProps {
   onFormat: (fmt: NumFmt | 'custom', cur?: string) => void;
   /** The $ and % buttons. */
   onToggleFormat: (fmt: 'currency' | 'percent') => void;
+  /** The format painter: copy the look of the cell picked onto what is picked next (`keep`: a double click, it stays on). */
+  painting: boolean;
+  onPainter: (keep: boolean) => void;
   /** The Σ button: a function of the numbers beside the cell. */
   onAutoSum: (fn: string) => void;
   onDecimals: (step: 1 | -1) => void;
@@ -302,6 +305,19 @@ export function Toolbar(p: ToolbarProps) {
           ))
         }
       </MenuTool>
+      <button
+        type="button"
+        title="Format painter: copy the look of the cells picked onto others (double-click to paint several times)"
+        aria-label="Format painter"
+        aria-pressed={p.painting}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => p.onPainter(false)}
+        onDoubleClick={() => p.onPainter(true)}
+        className={cx('flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg', p.painting && 'bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent')}
+      >
+        <PaintRoller size={15} />
+      </button>
+      {sep}
       <Tool label="Format as currency (Ctrl+Shift+4)" on={fmt === 'currency'} onClick={() => p.onToggleFormat('currency')}>
         <DollarSign size={15} />
       </Tool>

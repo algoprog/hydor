@@ -584,7 +584,8 @@ agents that speak ACP and take MCP servers.
   SPARKLINE drawn in the cell) with each function's arguments shown, named ranges (and named LAMBDAs) in formulas
   and the name box, references that move as cells are copied, filled, inserted and deleted, the fill handle with
   its series, number formats with Excel's own codes (and Excel's quick keys: Ctrl+Shift+1 to 6, $ and % buttons),
-  AutoSum (Alt+= and a Σ button: sum, average, count, max, min), borders, merged cells, filters, sorting by several columns,
+  AutoSum (Alt+= and a Σ button: sum, average, count, max, min),
+  a format painter (a double click keeps it on), borders, merged cells, filters, sorting by several columns,
   conditional formatting (rules, colour scales, data bars), dropdowns with coloured chips, checkboxes, star ratings
   and a calendar for dates, links on cells, protected ranges and sheets that warn or refuse changes, groups of rows
   and columns folded with + and −, gridlines on or off, notes and comment threads that agents answer, charts (eleven
