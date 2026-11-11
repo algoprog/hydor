@@ -59,6 +59,11 @@ const TONE: Record<string, string> = {
   ai: 'bg-accent/14 text-accent',
 };
 
+/** A plugin's own icon, for a row's tile. */
+export function pluginIcon(p: Pick<PluginView, 'icon'>): LucideIcon {
+  return (p.icon && PLUGIN_ICONS[p.icon]) || Puzzle;
+}
+
 export function PluginTile({ p, size = 38 }: { p: Pick<PluginView, 'icon' | 'category'>; size?: number }) {
   const Icon = (p.icon && PLUGIN_ICONS[p.icon]) || Puzzle;
   return (

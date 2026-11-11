@@ -24,12 +24,12 @@ At the top, three tabs: **Every agent** (the plugins of this app, for every agen
 
 Under **Every agent**:
 
-- a search box, and **Add**, with **Make a plugin**, **Make one with an agent**, **From a link**, **From a .zip file** and **From a folder**;
+- a search box, and the **Add** button beside the section's title, with **Make a plugin**, **Make one with an agent**, **From a link**, **From a .zip file** and **From a folder**;
 - while a plugin is being added or set up, its steps, as they happen;
-- **Your plugins**: the ones you added, each with its switch;
+- **Your plugins**: the ones you added, each with its switch and a **⋯** menu (**Details**, and **Change it** for one you made or use from a folder); the (i) beside the title says these work with every agent. A plugin you made shows **Yours**, one you added from a link, a file or somebody's folder shows **Added by you**;
 - **Come with the app**: the built-in plugins not added yet, each with **Add**.
 
-Each plugin shows its name and version, what it is for, what it brings ("1 skill · 1 tool server"), and anything that stops it from working fully: setting it up failed, a program it needs is missing, a key is not saved. Click a plugin to open it.
+Each plugin shows its name and version, what it is for, what it brings ("1 skill · 1 tool server"), and anything that stops it from working fully: setting it up failed, a program it needs is missing, a key is not saved. Click a plugin's name (or **⋯ → Details**) to open it.
 
 You can also find plugins from the search box (Ctrl+K, ⌘K on a Mac): they show under **Plugins**.
 

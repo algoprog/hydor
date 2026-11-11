@@ -1,4 +1,4 @@
-// Settings → General → Theme: the mode (dark, light, or the device's), a theme for each, picked from
+// Settings → General → Appearance: the mode (dark, light, or the device's), a theme for each, picked from
 // cards that preview them, and an editor for themes of your own (every colour, with the whole app as
 // the preview while you edit).
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -8,7 +8,7 @@ import { BUILT_IN_THEMES, DEFAULT_THEME, THEME_TOKENS, cleanTheme, contrast, nor
 import { put } from '../../lib/api';
 import { toast, toastError, useUI, type Theme } from '../../lib/store';
 import { applyTheme, paintTheme, pickTheme, setCustomThemes, useThemes } from '../../lib/theme';
-import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Section, Segmented, inputCls, useConfirm, useMediaQuery } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, inputCls, useConfirm, useMediaQuery } from '../../components/ui';
 
 /** A miniature of the app in a theme's colours: sidebar, a conversation, code and the composer. */
 export function ThemeThumb({ theme, className }: { theme: AppTheme; className?: string }) {
@@ -88,7 +88,28 @@ async function copyTheme(t: { name: string; base: ThemeBase; colors: Partial<The
   }
 }
 
-export function ThemeSettings() {
+/** Dark, light, or the device's: beside the Appearance group's title. */
+export function ThemeMode() {
+  const mode = useUI((s) => s.theme);
+  return (
+    <Segmented<Theme>
+      size="sm"
+      value={mode}
+      onChange={(m) => {
+        useUI.getState().set({ theme: m });
+        applyTheme();
+      }}
+      options={[
+        { value: 'dark', label: 'Dark', icon: <Moon size={13} /> },
+        { value: 'light', label: 'Light', icon: <Sun size={13} /> },
+        { value: 'system', label: 'System', icon: <Monitor size={13} /> },
+      ]}
+    />
+  );
+}
+
+/** The theme cards, and making or importing one: the content of the Appearance group's box. */
+export function ThemePicker() {
   const mode = useUI((s) => s.theme);
   const picks = { dark: useUI((s) => s.darkTheme), light: useUI((s) => s.lightTheme) };
   const custom = useThemes((s) => s.custom);
@@ -118,25 +139,7 @@ export function ThemeSettings() {
   };
 
   return (
-    <Section
-      title="Theme"
-      sub={mode === 'system' ? 'Follows your device: a dark theme at night, a light one by day' : 'Pick a theme, or make your own from any of them'}
-      actions={
-        <Segmented<Theme>
-          size="sm"
-          value={mode}
-          onChange={(m) => {
-            useUI.getState().set({ theme: m });
-            applyTheme();
-          }}
-          options={[
-            { value: 'dark', label: 'Dark', icon: <Moon size={13} /> },
-            { value: 'light', label: 'Light', icon: <Sun size={13} /> },
-            { value: 'system', label: 'System', icon: <Monitor size={13} /> },
-          ]}
-        />
-      }
-    >
+    <div className="p-4">
       <div className="space-y-4">
         {/* Small cards, dark and light side by side where there is room; on phones two to a row. */}
         <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:gap-x-8">
@@ -197,7 +200,7 @@ export function ThemeSettings() {
       {draft && <ThemeEditor key={draft.id ?? 'new'} start={draft} onClose={() => setDraft(null)} />}
       <ImportTheme open={importing} onClose={() => setImporting(false)} />
       {confirmNode}
-    </Section>
+    </div>
   );
 }
 
@@ -209,7 +212,7 @@ function ThemeCard({ theme, picked, showing, onPick, menu }: { theme: AppTheme; 
       <button type="button" onClick={onPick} aria-pressed={picked} className="block w-full text-left">
         <ThemeThumb theme={theme} className="block aspect-[16/10] w-full overflow-hidden rounded-[7px] ring-1 ring-line" />
         <span className="flex items-center gap-1 px-1 pt-1 pr-6">
-          <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-fg">{theme.name}</span>
+          <span translate="no" className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-fg">{theme.name}</span>
           {picked && <Check size={13} strokeWidth={2.5} className={showing ? 'shrink-0 text-accent' : 'shrink-0 text-fg-3'} />}
         </span>
       </button>

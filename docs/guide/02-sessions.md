@@ -56,7 +56,7 @@ Whether a session gets a new task folder by default depends on the agent: most s
 
 - **Effort**: how hard the model thinks. **Default** uses the model's own, then the levels the model offers: **Low** (fast, light reasoning), **Medium** (balanced), **High** (deeper reasoning), **Xhigh** (extra-deep reasoning), **Max** (maximum reasoning), and on some models **Minimal**, **None** or **Ultra**. Not offered for Custom and other ACP agents, or for models without levels.
 - **Permissions**: what the agent may do without asking you first. Each agent has its own modes; see [What each permissions mode means](#what-each-permissions-mode-means). Shift+Tab in the message box moves to the next one.
-- **Account**: only once you have added another account for Claude Code or Codex in [Settings → Accounts](/settings?s=accounts&find=Your%20accounts). **Your sign-in** is the agent's own account; pick another to run this session as it. **Manage accounts** opens Settings.
+- **Account**: only once you have added another account for Claude Code or Codex in [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts). **Your sign-in** is the agent's own account; pick another to run this session as it. **Manage accounts** opens Settings.
 - **Confidential**, a switch with a lock ("Only models on this computer. Nothing leaves it."): for a paper you review, patient data or a client's code. **Runs on** becomes **Custom** and **Model** the best model installed here. See [Keep a session confidential](#keep-a-session-confidential).
 - **Memory**: only while memory is on in Settings. **On** uses and adds to what agents remember; **Off for this session** starts fresh and keeps nothing from it. See [Memory](/guide/memory).
 - **Spending cap**: the most this session may spend, at API prices. Type an amount and press **Set**, or pick $1, $5, $10 or $25; **No cap** removes it. The session stops at the cap until you raise it. See [Usage, limits and costs](/guide/usage).
@@ -320,7 +320,7 @@ A goal keeps the agent working, turn after turn, until a condition you set holds
 
 - **Claude Code** keeps working; after each turn a quick check decides whether the goal holds yet.
 - **Codex** keeps working until it judges the goal done.
-- **Custom** keeps working; after each turn the helper model checks the evidence and gives it the next step. It pauses when it stops making progress, and runs at most the rounds set in [Settings → Custom → Goals](/settings?s=custom&find=Goals).
+- **Custom** keeps working; after each turn the helper model checks the evidence and gives it the next step. It pauses when it stops making progress, and runs at most the rounds set in [Settings → Custom → Goals → Rounds before a goal pauses](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses).
 
 While a goal is set, a bar above the message box shows it and how it stands (working on it, paused, stuck: the agent needs you, or stopped at a usage or token limit), how many times it was checked, the time and tokens spent, and the last check's reason. **Pause** and **Resume** work for Codex and Custom; **Clear** stops working towards it. A target mark in the sidebar shows which sessions have a goal.
 

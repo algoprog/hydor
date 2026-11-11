@@ -8,18 +8,20 @@ import { api, del, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { go } from '../../lib/nav';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Button, cx, Dialog, Throbber, IconButton, inputCls, Section, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, MenuItem, Throbber, inputCls, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Row, Stack } from './kit';
 
 type Def = AcpAgentDef & { installed: boolean };
+
+/** How many agents that are not installed show before "Show all". */
+const NOT_INSTALLED_SHOWN = 6;
 
 export function AcpSettings() {
   const [data, setData] = useState<{ agents: Def[]; presets: Def[] } | null>(null);
   const [edit, setEdit] = useState<Partial<AcpAgentDef> | null>(null);
+  const [all, setAll] = useState(false);
   const [confirm, confirmNode] = useConfirm();
-  const load = () =>
-    api<{ agents: Def[]; presets: Def[] }>('/api/acp-agents')
-      .then(setData)
-      .catch(toastError);
+  const load = () => api<{ agents: Def[]; presets: Def[] }>('/api/acp-agents').then(setData).catch(toastError);
   useEffect(() => {
     load();
   }, []);
@@ -33,11 +35,16 @@ export function AcpSettings() {
     await del(`/api/acp-agents/${d.id}`).catch(toastError);
     load();
   };
+  // The installed ones first, then the rest in their own order.
+  const presets = data ? [...data.presets.filter((p) => p.installed), ...data.presets.filter((p) => !p.installed)] : [];
+  const installed = presets.filter((p) => p.installed).length;
+  const collapsed = !all && presets.length - installed > NOT_INSTALLED_SHOWN;
+  const shown = collapsed ? presets.slice(0, installed + NOT_INSTALLED_SHOWN) : presets;
   return (
-    <div className="space-y-4">
-      <Section
+    <Stack>
+      <Group
         title="Your agents"
-        sub="They show next to Claude Code and Codex when you start a session"
+        hint="They show next to Claude Code and Codex when you start a session"
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setEdit({ args: [] })}>
             Add your own
@@ -45,69 +52,102 @@ export function AcpSettings() {
         }
       >
         {!data ? (
-          <Throbber className="text-fg-3" />
+          <Row label="Looking for your agents…" control={<Throbber className="text-fg-3" />} />
         ) : !data.agents.length ? (
-          <p className="text-[13px] leading-relaxed text-fg-3">None yet. Pick one below, or add any agent that speaks ACP by the command that starts it.</p>
+          <EmptyRow>None yet. Pick one below, or add any agent that speaks ACP by the command that starts it.</EmptyRow>
         ) : (
-          <div className="-my-1 divide-y divide-line">
-            {data.agents.map((a) => (
-              <AgentRow key={a.id} a={a}>
-                {a.builtin ? (
-                  <Button size="sm" variant="ghost" onClick={() => go('/settings?s=models')}>
+          data.agents.map((a) => (
+            <Row
+              key={a.id}
+              icon={<AgentIcon agent="acp" name={a.name} size={20} />}
+              label={<span translate="no">{a.name}</span>}
+              hint={
+                a.builtin ? (
+                  <span translate="no">Built in: {a.hint?.replace(/^Built in: /, '')}</span>
+                ) : (
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {a.installed ? <CheckCircle2 size={12} className="shrink-0 text-ok" /> : <XCircle size={12} className="shrink-0 text-fg-3" />}
+                    <span className="truncate font-mono text-[11.5px]" title={[a.command, ...a.args].join(' ')} translate="no">
+                      {[a.command, ...a.args].join(' ')}
+                    </span>
+                    {!a.installed && <span className="shrink-0">· not installed</span>}
+                  </span>
+                )
+              }
+              control={
+                a.builtin ? (
+                  <Button size="sm" variant="secondary" onClick={() => go('/settings?s=models')}>
                     Models
                   </Button>
                 ) : (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => setEdit(a)}>
+                    <Button size="sm" variant="secondary" onClick={() => setEdit(a)}>
                       Edit
                     </Button>
-                    <IconButton label="Remove" size="sm" onClick={() => remove(a)}>
-                      <Trash2 size={14} />
-                    </IconButton>
+                    <MoreMenu width={190}>
+                      {(close) => (
+                        <MenuItem
+                          icon={<Trash2 size={14} />}
+                          danger
+                          onClick={() => {
+                            close();
+                            void remove(a);
+                          }}
+                        >
+                          Remove
+                        </MenuItem>
+                      )}
+                    </MoreMenu>
                   </>
-                )}
-              </AgentRow>
-            ))}
-          </div>
+                )
+              }
+            />
+          ))
         )}
-      </Section>
-      {data && data.presets.length > 0 && (
-        <Section title="Agents that speak ACP" sub="Install one, sign in once in its own CLI, then add it here">
-          <div className="-my-1 divide-y divide-line">
-            {data.presets.map((a) => (
-              <AgentRow key={a.id} a={a}>
-                <Button size="sm" variant={a.installed ? 'primary' : 'ghost'} icon={<Plus size={13} />} onClick={() => add(a)}>
+      </Group>
+      {data && presets.length > 0 && (
+        <Group
+          title="Agents that speak ACP"
+          hint="Install one, sign in once in its own CLI, then add it here"
+          info="The app talks to each agent over the Agent Client Protocol: it opens a session in the folder you pick, shows its messages and steps, and asks you before what the agent asks permission for. Goals, forks and hand-offs are for Claude Code and Codex."
+        >
+          {shown.map((a) => (
+            <Row
+              key={a.id}
+              icon={<AgentIcon agent="acp" name={a.name} size={20} />}
+              label={<span translate="no">{a.name}</span>}
+              hint={
+                a.installed ? (
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <CheckCircle2 size={12} className="shrink-0 text-ok" /> <span className="shrink-0">Installed</span>
+                    <span className="truncate font-mono text-[11.5px]" title={[a.command, ...a.args].join(' ')} translate="no">
+                      · {[a.command, ...a.args].join(' ')}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="shrink-0">Not installed</span>
+                    {a.hint && (
+                      <span className="truncate font-mono text-[11.5px]" title={a.hint} translate="no">
+                        · {a.hint}
+                      </span>
+                    )}
+                  </span>
+                )
+              }
+              control={
+                <Button size="sm" variant={a.installed ? 'primary' : 'secondary'} icon={<Plus size={13} />} onClick={() => add(a)}>
                   Add
                 </Button>
-              </AgentRow>
-            ))}
-          </div>
-        </Section>
+              }
+            />
+          ))}
+          {collapsed && <Row label={`Show all ${presets.length}`} onClick={() => setAll(true)} />}
+        </Group>
       )}
-      <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
-        The app talks to each agent over the Agent Client Protocol: it opens a session in the folder you pick, shows its messages and steps, and asks you before what the agent asks
-        permission for. Goals, forks and hand-offs are for Claude Code and Codex.
-      </p>
       <EditAgent value={edit} onClose={() => setEdit(null)} onSaved={load} />
       {confirmNode}
-    </div>
-  );
-}
-
-function AgentRow({ a, children }: { a: Def; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3 py-2.5">
-      <AgentIcon agent="acp" name={a.name} size={22} />
-      <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium">{a.name}</div>
-        <div className="flex items-center gap-1.5 truncate text-[12px] text-fg-3">
-          {a.installed ? <CheckCircle2 size={12} className="text-ok" /> : <XCircle size={12} className="text-fg-3" />}
-          {a.builtin ? <span className="truncate">Built in: {a.hint?.replace(/^Built in: /, '')}</span> : <span className="truncate font-mono text-[11.5px]">{[a.command, ...a.args].join(' ')}</span>}
-          {!a.installed && a.hint && <span className="truncate">· not installed: {a.hint}</span>}
-        </div>
-      </div>
-      {children}
-    </div>
+    </Stack>
   );
 }
 
