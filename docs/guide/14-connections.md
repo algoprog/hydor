@@ -251,7 +251,7 @@ Some services need something from you partway through a task: a date, a choice, 
 
 Open [Settings → Agents → MCP servers](/settings?s=mcp). These are tool servers in Claude Code's and Codex's own settings, for tools the marketplace doesn't have or servers you run yourself. New sessions load them; sessions already running pick up changes when they restart. Custom, the app's own agent, uses them too, all but the SSE ones (see [Custom](/guide/custom)).
 
-The page lists Claude Code's servers and Codex's in two parts. The **Folder** chip at the top picks the folder whose servers you see, since Claude Code can keep servers for one folder as well as for all of them.
+The page lists Claude Code's servers and Codex's in two groups, and **Add server** sits beside the page's title. The **Folder** chip at the top picks the folder whose servers you see, since Claude Code can keep servers for one folder as well as for all of them. The (i) beside each group's name says that new sessions load the servers, and running ones pick up changes when they restart.
 
 Each server shows:
 
@@ -259,7 +259,7 @@ Each server shows:
 - for Claude Code, where it applies: **All folders**, **This folder, only you** or **This folder, shared**;
 - **Off**, for a Codex server turned off in Codex's own settings;
 - its command or address, and the names of its environment variables, headers or bearer token variable. Their values stay on the server and are never shown;
-- after a check, how the server is doing.
+- after a check, how the server is doing (a badge at the end of its row).
 
 ### Add a server
 
@@ -282,11 +282,11 @@ Click [Add server](/settings?s=mcp&find=Add%20server). The **Add an MCP server**
 
   Codex servers always apply to every folder.
 
-Click **Add server**. Hydor adds it through each agent's own command, so their settings stay the way they expect. If an agent refuses, the dialog shows that it did not add the server, with what the agent said. Fix what's wrong and click **Add server** again: only the agents that failed are tried.
+Click **Add server** in the dialog. Hydor adds it through each agent's own command, so their settings stay the way they expect. If an agent refuses, the dialog shows that it did not add the server, with what the agent said. Fix what's wrong and click **Add server** again: only the agents that failed are tried.
 
 ### Check which servers connect
 
-[Check connections](/settings?s=mcp&find=Check%20connections), beside Claude Code or Codex, starts every server the way a new session would and shows how each did:
+[Check connections](/settings?s=mcp&find=Check%20connections), at the end of the Claude Code or Codex group's title, starts every server the way a new session would and shows how each did:
 
 - **Connected**, with its number of tools;
 - **Needs sign-in**;
@@ -298,11 +298,11 @@ No model is used. It can take up to a minute or two. For Claude Code, it runs in
 
 ### Sign in to a server
 
-A server at an address that signs in with OAuth needs signing in once. Click **Sign in** (shown when a check says it needs a sign-in), or the sign-in icon on its row. A terminal opens in the app, running the agent's own sign-in for that server: follow its steps there.
+A server at an address that signs in with OAuth needs signing in once. Click **Sign in** (shown when a check says it needs a sign-in), or open the server's **⋯** menu and pick **Sign in (OAuth) in a terminal**. A terminal opens in the app, running the agent's own sign-in for that server: follow its steps there.
 
 ### Remove a server
 
-Click the bin beside a server and confirm with **Remove**. The agent stops loading it. Sessions already running keep it until they restart.
+Open the server's **⋯** menu, pick **Remove**, and confirm with **Remove**. The agent stops loading it. Sessions already running keep it until they restart.
 
 ## Add plugins to Claude Code
 
@@ -313,7 +313,7 @@ Claude Code has plugins of its own: add-ons that bundle skills, commands, agents
 **Installed** lists Claude Code's plugins on this machine. New Claude Code sessions load them. Each shows its name, its marketplace, its version and what it does.
 
 - The switch turns a plugin off or on without removing it.
-- The bin uninstalls it, once you confirm. New Claude Code sessions stop loading its skills, commands and servers.
+- Its **⋯** menu has **Uninstall**, once you confirm. New Claude Code sessions stop loading its skills, commands and servers.
 
 ### Find and install a plugin
 
@@ -327,8 +327,8 @@ Hydor asks Claude Code for the list of plugins at most every 10 minutes, and aga
 
 **Marketplaces** lists the catalogs Claude Code installs plugins from.
 
-- To add one, type a GitHub owner/repo, a git URL or a folder into the box under the list, and click **Add**.
-- To remove one, click its bin and confirm. Plugins installed from it are uninstalled too.
+- To add one, click **Add** in the group's title, type a GitHub owner/repo, a git URL or a folder in the dialog, and click **Add**.
+- To remove one, click the bin on its row and confirm. Plugins installed from it are uninstalled too.
 
 ## Ask an agent
 
