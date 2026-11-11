@@ -80,6 +80,7 @@ import { dependents, goalSeek, precedents, rectWords } from '@shared/sheet-whati
 import type { AnalyzeIdea, FillAnswer, TableAnswer } from '@shared/sheet-ai';
 import { findIssues, type CleanIssue } from '@shared/sheet-clean';
 import { flashFill } from '@shared/sheet-flash';
+import { htmlText, looksFor, parseHtmlTable, tableText } from '@shared/sheet-html';
 import { allowed, columnValues, CondFormats, filterHidden, listOptions, Merges, Rules } from '@shared/sheet-rules';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
@@ -1156,7 +1157,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     e.clipboardData.setData('text/html', got.html);
   };
   const norm = (t: string) => t.replace(/\r\n?/g, '\n').replace(/\n$/, '');
-  const pasteText = (text: string) => {
+  /** Text pasted (`html`: the table it came with from Excel, Google Sheets or a web page, which gives the cells their looks). */
+  const pasteText = (text: string, html?: string) => {
     const b = bookRef.current;
     if (!b || !sheet || readOnly) return;
     const own = clip && norm(clip.text) === norm(text) ? clip : null;
@@ -1175,15 +1177,27 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       setSel(rectSel({ r1: target.r1, c1: target.c1, r2: target.r1 + h, c2: target.c1 + w }), true);
       return;
     }
-    const got = pasteChanges(sheet, target, own ? { clip: own } : { text });
+    const styles = !own && html ? (looksFor(text, html) ?? undefined) : undefined;
+    const got = pasteChanges(sheet, target, own ? { clip: own } : { text, styles });
     change(cellsPatch(b, sheetIx, got.changes));
     setSel(rectSel(got.x), true);
   };
   const onPaste = (e: React.ClipboardEvent) => {
-    const text = e.clipboardData.getData('text/plain');
-    if (!text) return;
+    const d = e.clipboardData;
+    const html = d.getData('text/html');
+    let text = d.getData('text/plain');
+    // A clipboard with only a table in it (some apps): its words are the cells.
+    const table = !text && html ? parseHtmlTable(html) : null;
+    if (table) text = tableText(table);
+    else if (!text && html) text = htmlText(html);
+    if (!text) {
+      // Only a picture, or something that has no words in it: say so rather than do nothing.
+      e.preventDefault();
+      if (!readOnly) toast(tr(Array.from(d.items ?? []).some((i) => i.type.startsWith('image/')) ? 'A picture can’t be pasted into cells. Insert it with a link or =IMAGE(“address”) instead.' : 'There is nothing in the clipboard that can be pasted into cells.'));
+      return;
+    }
     e.preventDefault();
-    pasteText(text);
+    pasteText(text, html || undefined);
   };
   /** The menu's Copy, Cut and Paste (the keys go through the clipboard events above). */
   const menuCopy = async (cut: boolean) => {
@@ -1208,10 +1222,29 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       return clip ? clip.text : null;
     }
   };
-  const menuPaste = async () => {
+  /** The clipboard's words, with its HTML when the browser lets it be read (the menu's Paste; Ctrl+V gets both with the event). */
+  const readClipboardWithLooks = async (): Promise<{ text: string; html?: string; picture?: boolean } | null> => {
+    try {
+      if (navigator.clipboard.read) {
+        for (const item of await navigator.clipboard.read()) {
+          const html = item.types.includes('text/html') ? await (await item.getType('text/html')).text() : undefined;
+          const text = item.types.includes('text/plain') ? await (await item.getType('text/plain')).text() : undefined;
+          if (text === undefined && !html) return item.types.some((t) => t.startsWith('image/')) ? { text: '', picture: true } : { text: '' };
+          const table = text === undefined && html ? parseHtmlTable(html) : null;
+          return { text: text ?? (table ? tableText(table) : htmlText(html ?? '')), html };
+        }
+      }
+    } catch {
+      // Not allowed, or not there: the plain words, if it will give them.
+    }
     const t = await readClipboard();
-    if (t !== null) pasteText(t);
-    else toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+    return t === null ? null : { text: t };
+  };
+  const menuPaste = async () => {
+    const got = await readClipboardWithLooks();
+    if (got === null) return void toast(tr('This browser keeps its clipboard to itself: press Ctrl+V (or ⌘V) to paste.'));
+    if (!got.text) return void toast(tr(got.picture ? 'A picture can’t be pasted into cells. Insert it with a link or =IMAGE(“address”) instead.' : 'There is nothing in the clipboard that can be pasted into cells.'));
+    pasteText(got.text, got.html);
   };
   /** Paste special: values, looks or formulas alone, or turned on its side. */
   const pasteHow = async (how: PasteHow) => {
