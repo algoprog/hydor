@@ -9,10 +9,40 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { LimitReset } from '../../shared/types.ts';
+import type { AgentUsage, LimitReset } from '../../shared/types.ts';
 import { config } from '../config.ts';
 
 type Json = Record<string, any>;
+
+/**
+ * How often the resets are read: they change seldom, and Anthropic refuses reads that come too often (HTTP 429), so a
+ * read with every usage refresh (every two minutes on an open page, more while a session waits out a limit) lost
+ * them. After a refusal the next read waits longer each time, up to `longest`. Tests shorten these.
+ */
+export const resetReads = { every: 10 * 60_000, longest: 60 * 60_000 };
+
+type Kept = NonNullable<AgentUsage['resetCredits']>;
+const keptFile = (dir?: string) => path.join(config.dataDir, 'usage', `claude-resets-${dir ? crypto.createHash('sha256').update(dir).digest('hex').slice(0, 12) : 'default'}.json`);
+
+/** The resets as last read for this config folder, kept on disk so that a restart shows them before its first read: expired ones left out, none after three days. */
+export function keptResets(dir?: string): Kept | undefined {
+  try {
+    const k = JSON.parse(fs.readFileSync(keptFile(dir), 'utf8'));
+    if (!(Date.now() - k.at < 3 * 86400_000) || !Array.isArray(k.resetCredits?.items)) return undefined;
+    const items = (k.resetCredits.items as LimitReset[]).filter((i) => !i.expiresAt || i.expiresAt > Date.now());
+    return { ...k.resetCredits, items, available: items.reduce((n, i) => n + (i.left ?? 1), 0) };
+  } catch {
+    return undefined;
+  }
+}
+
+export function keepResets(dir: string | undefined, rc: Kept): void {
+  try {
+    const f = keptFile(dir);
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify({ at: Date.now(), resetCredits: rc }));
+  } catch {}
+}
 
 const API = 'https://api.anthropic.com';
 const GRANT_ID = /^[a-z0-9_-]{1,40}$/;
