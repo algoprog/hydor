@@ -93,6 +93,13 @@ Hydor gives its agents tools. The agent decides when to call one, and the call i
 | Showing a source, a picture or a video in a reply or a deck | The sites involved, `i.ytimg.com`, `vimeo.com` | The server fetches the cited site's icon and the pictures a reply or deck shows, so your browser doesn't. Those sites see your server's IP address, not your browser. |
 | Pages and slides the agent makes | `cdn.jsdelivr.net`, `unpkg.com`, `cdnjs.cloudflare.com`, `fonts.googleapis.com`, `fonts.gstatic.com`, `tiles.openfreemap.org`, YouTube and Vimeo players | A page may load a chart library, a font, map tiles or a video from these. They sit in a sandboxed frame, and **your browser** makes the requests, so they see your IP address and the page's address. |
 
+
+**Who runs Naget Search.** Naget (`naget.com`), which by its own privacy policy is a project of the Artificial
+Intelligence Research Translation Initiative (AIX) and the Center for Intelligent Information Retrieval (CIIR) at the
+University of Massachusetts Amherst. Its policy says what it keeps and for how long, and that it does not sell personal
+information: [naget.com/privacy](https://naget.com/privacy). To keep your searches away from it, turn it off (below)
+or put your own SearXNG first.
+
 ## Turning each one off
 
 - **Update checks of the apps.** There is no switch that stops the look itself. **Update automatically**
