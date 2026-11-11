@@ -95,7 +95,7 @@ Notices from your other machines come through this one, so one device hears from
 
 ## Turn on notifications for this device
 
-[Settings → App → Notifications](/settings?s=notifications) has two switches, set on each device (each browser) for itself, and a test:
+[Settings → App → Notifications](/settings?s=notifications) has, in its **This device** group, two switches, set on each device (each browser) for itself, and a test:
 
 - [**Notify this device**](/settings?s=notifications&find=Notify%20this%20device): a notification when a session finishes, fails or needs your answer, even with the app closed. Turning it on asks the browser for permission to show notifications. Each device turns it on for itself: your phone and your computer separately. In a desktop app (Mac, Windows, Linux) it is always on: the app shows the notifications itself while it runs, even with its window closed.
 - [**Sound**](/settings?s=notifications&find=Sound): a short chime with each notice while the app is open, rising when a session finishes and falling when it needs you or failed. Off at first; turning it on plays the chime once.

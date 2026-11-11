@@ -59,7 +59,7 @@ Once usage is back but a session is still due to continue, the notice reads "Con
 
 ## Continue sessions automatically after a limit
 
-To have every session that hits a limit continue by itself, open [Settings → App → General](/settings?s=general&find=Resume%20after%20usage%20limits) and turn on **Resume after usage limits** ("When a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets"). It is off until you turn it on. It works while no browser is open. With it on, a session shows no warning when a limit stops it: a line above the message box says whose limit it hit (as the notice does), which limit and "Continues by itself in …", with **Use a reset** when the account holds one, and **Cancel**.
+To have every session that hits a limit continue by itself, open [Settings → App → General](/settings?s=general&find=Resume%20after%20usage%20limits) and turn on **Resume after usage limits** (when a turn stops because a plan's usage ran out, the session continues by itself a minute after the limit resets). It is off until you turn it on. It works while no browser is open. With it on, a session shows no warning when a limit stops it: a line above the message box says whose limit it hit (as the notice does), which limit and "Continues by itself in …", with **Use a reset** when the account holds one, and **Cancel**.
 
 How the timing works, with the switch or with **Resume at reset**:
 
