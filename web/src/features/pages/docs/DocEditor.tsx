@@ -12,7 +12,10 @@
 // their preview. The page around is told what an agent asked now would be about (the whole document, the section
 // the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
 // font and size are under Page setup. While an agent writes a new version (live.ts), it shows as it comes, read-only,
-// with the agent's caret where its words arrive, kept in view (AgentCaret.tsx).
+// with the agent's caret where its words arrive, kept in view (AgentCaret.tsx). A right-click, the menu key or a long
+// press opens the editor's context menu for what is under it (context.tsx); the handle by each block opens one too
+// (BlockHandle.tsx). Tools has Automatic links and Smart quotes and symbols, kept on the device, and Language, which the
+// document keeps (the page is that language to the browser's spell check, and a text box to a screen reader).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
 import { columnMm, paperOf, docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type Run, type TableBlock } from '@shared/docs';
@@ -37,20 +40,22 @@ import { Select } from '../studio/fields';
 import { CharPicker } from '../common/CharPicker';
 import { FindBar, useFind } from '../common/FindBar';
 import { loadKatex, texHtmlNow } from '../common/katex';
-import { MenuBar } from '../common/menus';
+import { ContextMenu, MenuBar, type ContextMenuAt } from '../common/menus';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { inputCls } from '../../../components/ui';
 import { openTypes } from '../types';
 import { AgentCaret } from './AgentCaret';
 import { BlockHandle } from './BlockHandle';
+import { blockContext, docContext } from './context';
 import { CommentsColumn, CommentsPanel, type CommentActions, type DocCommentAi, type Draft, type Extra } from './CommentsView';
 import { commentsRequest, SUGGEST_NOTE } from '@shared/comment-asks';
 import { CompareView, VersionsDialog } from './Compare';
 import { editorCss, paperPx, useDocFonts } from './css';
-import { BandsDialog, EquationBox, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
-import { DocEngine, type AtomClick, type SelState } from './engine';
+import { BandsDialog, EquationBox, LanguageDialog, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
+import { DocEngine, type AtomClick, type ContextHit, type SelState } from './engine';
 import { useDocFind } from './finding';
-import { docMenus, PAGE_NUMBERS, type Zoom } from './menu';
+import { docMenus, PAGE_NUMBERS, type DocMenuCtx, type Zoom } from './menu';
+import { rewriteWords } from './rewrite';
 import { fixDoc, runsBetween, sameDoc, type Pos } from './ops';
 import { GAP, Paging, type Layout } from './paging';
 import { Bands, Sheets } from './PaperSheets';
@@ -123,15 +128,18 @@ interface ViewPrefs {
   comments: boolean;
   /** Suggest as I type (the helper model's next words, grey after the caret): off unless turned on. */
   ghost: boolean;
+  /** Tools → Automatic links, and Smart quotes and symbols: on unless turned off. */
+  autoLinks: boolean;
+  smart: boolean;
 }
 
 function loadView(): ViewPrefs {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null');
     if (v && typeof v === 'object')
-      return { zoom: v.zoom === 'fit' || (typeof v.zoom === 'number' && v.zoom >= 0.25 && v.zoom <= 4) ? v.zoom : 1, spell: v.spell !== false, count: v.count !== false, comments: v.comments !== false, ghost: v.ghost === true };
+      return { zoom: v.zoom === 'fit' || (typeof v.zoom === 'number' && v.zoom >= 0.25 && v.zoom <= 4) ? v.zoom : 1, spell: v.spell !== false, count: v.count !== false, comments: v.comments !== false, ghost: v.ghost === true, autoLinks: v.autoLinks !== false, smart: v.smart !== false };
   } catch {}
-  return { zoom: 1, spell: true, count: true, comments: true, ghost: false };
+  return { zoom: 1, spell: true, count: true, comments: true, ghost: false, autoLinks: true, smart: true };
 }
 
 /** The editor's keys, for the shortcuts dialog. */
@@ -146,6 +154,8 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+H', 'Find and replace'],
       ['Ctrl+P', 'Print'],
       ['Ctrl+Shift+V', 'Paste without formatting'],
+      ['Right-click', 'The menu for what is under the pointer (Shift+right-click: the browser’s, with spelling suggestions)'],
+      ['Shift+F10', 'The same menu, at the caret (the menu key too)'],
       ['Ctrl+Shift+C', 'Word count'],
       ['Ctrl+/', 'Keyboard shortcuts'],
       ['Alt+/', 'Search the menus'],
@@ -163,6 +173,9 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+K', 'Link'],
       ['Ctrl+J', 'Write with AI (Space on an empty line too)'],
       ['Ctrl+\\', 'Clear the formatting'],
+      ['Ctrl+Shift+>', 'Bigger text (Ctrl+Shift+< smaller)'],
+      ['Ctrl+Alt+C', 'Copy the formatting'],
+      ['Ctrl+Alt+V', 'Paste the formatting'],
       ['Ctrl+Alt+M', 'Comment'],
       ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
       ['Ctrl+Alt+F', 'Footnote'],
@@ -187,6 +200,8 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+Shift+J', 'Justify'],
       ['Tab', 'More indent (in a table: the next cell)'],
       ['Shift+Tab', 'Less indent'],
+      ['Ctrl+]', 'More indent'],
+      ['Ctrl+[', 'Less indent'],
       ['Ctrl+Enter', 'A page break'],
       ['Shift+Enter', 'A new line in the same paragraph'],
     ],
@@ -202,6 +217,16 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['> Space', 'Quote'],
       ['--- Enter', 'A line across'],
       ['``` Enter', 'Code'],
+    ],
+  },
+  {
+    title: 'As you type',
+    items: [
+      ['https://… Space', 'A web address becomes a link (Tools → Automatic links)'],
+      ['" \' -- --- (c) -> ...', 'Curly quotes, dashes, signs, arrows and an ellipsis (Tools → Smart quotes and symbols)'],
+      ['1/2 Space', 'The fraction ½ (¼, ¾)'],
+      ['Ctrl+Z', 'Right after one of these: takes back just that change'],
+      ['Drag selected words', 'Move them (hold Ctrl to copy; ⌥ on a Mac)'],
     ],
   },
 ];
@@ -222,7 +247,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [width, setWidth] = useState(1200);
   const [words, setWords] = useState(0);
   const [float, setFloat] = useState<{ ask?: { x: number; y: number }; link?: { x: number; y: number } } | null>(null);
-  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | 'styles' | null>(null);
+  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | 'styles' | 'language' | null>(null);
   const [counts, setCounts] = useState<Counts & { picked: boolean }>({ words: 0, chars: 0, charsNoSpaces: 0, paragraphs: 0, pages: 1, picked: false });
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
@@ -250,6 +275,11 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [capBox, setCapBox] = useState<{ id: string; kind: 'table' | 'math' } | null>(null);
   /** Words being typed beside the page (a comment, a reply, an edit of one). */
   const [noting, setNoting] = useState(false);
+  // The right-click menu: where it is, what was under the pointer, and the selection as it was then.
+  const [ctx, setCtx] = useState<{ at: ContextMenuAt; hit: ContextHit; st: SelState } | null>(null);
+  // A picture's caption or description asked for in its box (from the menu), and a comment asked to be written in (edited).
+  const [pictureAsk, setPictureAsk] = useState<{ id: string; what: 'caption' | 'alt'; n: number } | null>(null);
+  const [editAsk, setEditAsk] = useState<{ id: string; n: number } | null>(null);
   // The picture editors opened from this document: once it closes, what they save goes to the Library instead.
   const pictureEditors = useRef(new Set<EditorHandle>());
   useEffect(() => () => pictureEditors.current.forEach((h) => h.detach()), []);
@@ -384,6 +414,11 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       onState: (s) => setSt(s),
       onKey: (e) => keys.current(e),
       onAtom: (a) => atoms.current(a),
+      onContext: (c) => {
+        const en = engine.current;
+        if (en) setCtx({ at: { x: c.x, y: c.y, keyed: c.keyed }, hit: c.hit, st: en.state() });
+      },
+      onNotice: (m) => toast(tr(m)),
       upload: (f) => {
         toast(tr('Adding the picture…'));
         return uploadPicture(f);
@@ -419,6 +454,16 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   useEffect(() => {
     if (engine.current) engine.current.root.spellcheck = view.spell;
   }, [view.spell, !!engine.current]);
+  // Tools → Automatic links, Smart quotes and symbols; the document's language and its name for a screen reader.
+  useEffect(() => {
+    engine.current?.setAuto({ links: view.autoLinks, smart: view.smart });
+  }, [view.autoLinks, view.smart, !!engine.current]);
+  useEffect(() => {
+    engine.current?.setLang(model?.lang);
+  }, [model?.lang, !!engine.current]);
+  useEffect(() => {
+    engine.current?.root.setAttribute('aria-label', doc?.title?.trim() || tr('Document'));
+  }, [doc?.title, !!engine.current]);
 
   // KaTeX, once a document with maths opens: its equations drawn again with it.
   const hasMath = !!model && JSON.stringify(model.blocks).includes('"math"');
@@ -1024,6 +1069,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const setComments = (list: Comment[], gone?: string) => engine.current?.setComments(list, gone);
   const ca: CommentActions = {
     active,
+    startEdit: editAsk,
     readOnly: readOnly || liveOn,
     focus: (id) => {
       setActive(id);
@@ -1042,6 +1088,12 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       );
       if (active === id) setActive(null);
     },
+  };
+  /** A comment shown beside the page (or in its panel), picked, its reply box open. */
+  const showComment = (id: string) => {
+    ca.focus(id);
+    if (!columnFits) setPanel(true);
+    else if (!view.comments) setPrefs({ comments: true });
   };
   function startComment() {
     const en = engine.current;
@@ -1094,9 +1146,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       : undefined;
 
   // ---- the menus --------------------------------------------------------------------------------------------------------
-  const menus =
-    e && st
-      ? docMenus({
+  const menuCtx = (st: SelState): DocMenuCtx | null =>
+    e
+      ? {
           engine: e,
           st,
           doc: model,
@@ -1177,7 +1229,12 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               try {
                 const items = await navigator.clipboard.read();
                 const dt = new DataTransfer();
-                for (const it of items) for (const type of it.types) if (type === 'text/html' || type === 'text/plain') dt.setData(type, await (await it.getType(type)).text());
+                for (const it of items)
+                  for (const type of it.types) {
+                    if (type === 'text/html' || type === 'text/plain') dt.setData(type, await (await it.getType(type)).text());
+                    // A copied picture: a file, as Ctrl+V gives it.
+                    else if (type.startsWith('image/')) dt.items.add(new File([await it.getType(type)], `pasted.${type.slice(6).replace(/\+.*/, '') || 'png'}`, { type }));
+                  }
                 e.paste(dt, plain);
               } catch {
                 toast(tr('Press Ctrl+V to paste here.'));
@@ -1199,6 +1256,48 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           voice,
           ghost: view.ghost,
           setGhost: readOnly ? undefined : (on) => setPrefs({ ghost: on }),
+          autoLinks: view.autoLinks,
+          setAutoLinks: (on) => setPrefs({ autoLinks: on }),
+          smart: view.smart,
+          setSmart: (on) => setPrefs({ smart: on }),
+          language: () => setDialog('language'),
+        }
+      : null;
+  const menus = st && menuCtx(st) ? docMenus(menuCtx(st)!) : [];
+
+  /** A link put on the clipboard. */
+  const copyText = (u: string) => void navigator.clipboard?.writeText(u).then(() => toast(tr('Link copied'), 'ok'), () => toast(tr('Press Ctrl+C on the link to copy it.')));
+  // The right-click menu's rows, for what was under the pointer (built from the menus' own actions).
+  const ctxBase = ctx && e ? menuCtx(ctx.st) : null;
+  const ctxItems =
+    ctx && ctxBase && e
+      ? docContext({
+          ...ctxBase,
+          hit: ctx.hit,
+          spellHint: view.spell && !readOnly && !liveOn,
+          threads: comments,
+          openLink: (u) => (u.startsWith('#') ? e.focusBlock(u.slice(1)) : void window.open(u, '_blank', 'noopener,noreferrer')),
+          copyLink: copyText,
+          askWords: onAsk
+            ? () => {
+                const s = scopesOf(e.doc, e.state()).find((x) => x.id === 'words');
+                if (s) onAsk(s.lead);
+              }
+            : undefined,
+          askPicture: onAsk ? askPicture : undefined,
+          replacePicture: (id) => void replacePicture(id),
+          editPicture: openPicture,
+          changePicture: (id, mode) => void changePicture(id, mode),
+          pictureText: (id, what) => setPictureAsk({ id, what, n: Date.now() }),
+          comment_: {
+            reply: showComment,
+            resolve: (id, resolved) => ca.resolve(id, resolved),
+            edit: (id) => (showComment(id), setEditAsk({ id, n: Date.now() })),
+            remove: (id) => ca.remove(id),
+            ai: docAi ? (id) => docAi.one(id) : undefined,
+          },
+          atom: (a) => atoms.current(a),
+          rewrite: (how) => void rewriteWords(e, how),
         })
       : [];
 
@@ -1538,10 +1637,10 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               )}
               {narrow && e && <EndNotes doc={shownDoc ?? model} refs={e.refs} onOpen={(id, r) => !readOnly && !liveOn && (spotAt(r), setNote({ id }))} />}
               {st?.picked && e && st.picked.type !== 'math' && (
-                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAi={(id, mode) => void changePicture(id, mode)} onEdit={openPicture} onAsk={onAsk ? askPicture : undefined} />
+                <Picked engine={e} block={st.picked} host={host} tick={tick} readOnly={readOnly} onReplace={(id) => void replacePicture(id)} onAi={(id, mode) => void changePicture(id, mode)} onEdit={openPicture} onAsk={onAsk ? askPicture : undefined} ask={pictureAsk} />
               )}
               {handlesFor && e && <ColumnHandles engine={e} table={handlesFor} host={host} tick={`${tick}:${model.blocks.length}`} />}
-              {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} />}
+              {e && !readOnly && !liveOn && !narrow && <BlockHandle engine={e} host={host} paper={paper} tick={model.blocks} menu={(id) => blockContext({ engine: e, doc: model, id, comment: startComment, copyLink: copyText })} />}
               {ai.overlay}
               {liveOn && e && <AgentCaret engine={e} mark={live!.mark} host={host} scroller={scroller} tick={`${drawnLive}:${pageLayout?.n ?? 0}:${zoom}:${narrow}`} />}
               {found.boxes.map((b, k) => (
@@ -1879,6 +1978,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           />
         </Suspense>
       )}
+      <LanguageDialog open={dialog === 'language'} onClose={() => (setDialog(null), e?.refocusSoon())} value={model.lang} onApply={(lang) => e?.change(lang ? { ...e.doc, lang } : (({ lang: _l, ...rest }) => rest)(e.doc))} />
+      {/* The right-click menu: for what is under the pointer (or at the caret, from the menu key); a long press on a phone. */}
+      <ContextMenu at={ctx?.at ?? null} items={ctxItems} onClose={() => (setCtx(null), e?.refocusSoon())} />
       {confirmNode}
     </div>
   );

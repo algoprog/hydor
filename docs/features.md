@@ -535,7 +535,7 @@ agents that speak ACP and take MCP servers.
   highlights, links, alignment, line and paragraph spacing, bullets, numbers and checklists, callouts, tables (column
   widths dragged, merged and coloured cells), pictures with captions, equations in LaTeX, a table of contents that
   keeps up, headers and footers with page numbers, lines and page breaks, a "/" menu and Markdown shortcuts as you
-  type, blocks dragged by their handles, the format painter, special characters and emoji, comments with replies
+  type, blocks dragged by their handles (a click on the handle: turn into, duplicate, delete, move, comment, copy a link to a heading), a right-click menu for what is under the pointer (words, links, table cells with the rows and columns picked counted, pictures, comments, suggestions, footnotes and equations), words tidied as you type as in Google Docs (web addresses become links, curly quotes, dashes, signs, arrows, fractions; Undo takes back just that change; Tools turns them off), words dragged to move or copy them, the format painter and Ctrl+Alt+C / Ctrl+Alt+V for the look of words, size and indent keys, the document's language (spell check, Word), special characters and emoji, comments with replies
   that agents read, answer and resolve (a Word file's keep their authors), Suggesting as Word's track changes and
   Google Docs' suggestions (accepted or rejected one by one or all at once, kept as Word's tracked changes both ways,
   and made by agents too), a comparison with any earlier version, paste from Word and Google Docs cleaned, an outline, zoom, a word count and

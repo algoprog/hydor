@@ -161,6 +161,7 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
         cite: v.cite ?? v.citeStyle ?? base?.cite,
         styles: given('styles') ? v.styles : base?.styles,
         watermark: given('watermark') ? v.watermark : base?.mark,
+        lang: given('lang') ? v.lang : base?.lang,
       },
       { src: (s) => (s.length <= 4096 ? s : null) },
     );
@@ -875,8 +876,9 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     heads: (['h1', 'h2', 'h3', 'h4', 'h4', 'h4'] as ParaStyle[]).map((s) => Math.round(doc.size * styleOf(doc, s).k * 2) / 2),
     ...(doc.styles ? { styles: doc.styles } : {}),
     editor: { cjk },
+    ...(doc.lang ? { lang: doc.lang } : {}),
   };
-  return docxFile({ title, lang: '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
+  return docxFile({ title, lang: doc.lang ?? '', blocks, shots: pictures.map(() => ({ x: 0, y: 0, w: 1, h: 1 })) }, pictures, {
     title,
     paper: doc.page.size,
     margin: doc.page.margin,
@@ -1868,6 +1870,8 @@ function wordDoc(buf: Buffer): Doc {
     ...(sources.length ? { sources } : {}),
     ...(mark ? { mark } : {}),
     styles: wordStyles(zip, sroot, font, ctx.size),
+    // The language its text is in: the one its default run properties name.
+    lang: att(kid(kid(all(sroot, 'rPrDefault')[0], 'rPr'), 'lang'), 'val'),
   });
   // Each comment's quote: the words it is on, as they read.
   if (!doc.comments?.length) return doc;
@@ -2135,6 +2139,7 @@ export const SAVE_DOC_SCHEMA = {
     sources: { type: 'array', items: { anyOf: [{ type: 'object' }, { type: 'string' }] }, description: 'Sources to cite as [@key]: {"id": "smith2020", "kind": "article", "title": "…", "authors": [{"family": "Smith", "given": "Jo"}], "year": "2020", "in": "Nature", "volume", "issue", "pages", "publisher", "doi", "url"}, or BibTeX entries. Added to the document’s (by key).' },
     bibtex: { type: 'string', description: 'Instead of sources: BibTeX entries to cite as [@key].' },
     cite: { type: 'string', enum: ['apa', 'mla', 'chicago', 'ieee'], description: 'The citation style (APA unless said).' },
+    lang: { type: 'string', description: 'The language the words are in, as a tag: "en-US", "el", "de". It sets the editor’s spell check and the language Word files say their text is in. Left out, it stays as it was.' },
     watermark: { description: 'Words across every page ("DRAFT"), or {"src": a picture}; "" removes it.', anyOf: [{ type: 'string' }, { type: 'object' }] },
     styles: { type: 'object', description: 'The paragraph styles’ own looks: {"h1": {"font", "size", "color", "bold", "italic", "line", "before", "after", "align"}, "normal": …}. Left out, they stay as they were; {} resets them.' },
     font: { type: 'string', description: 'The body text’s font: "Arial", "Georgia"…' },
