@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { keychainService } from './claudeResets.ts';
+import { keychainService, resetReads } from './claudeResets.ts';
 import { ClaudeControl, claudeUsage, CodexControl } from './control.ts';
 
 const raw = { subscription_type: 'max', rate_limits: { five_hour: { utilization: 21 } } };
@@ -81,21 +81,71 @@ try {
   }
 }
 
-// Limit resets stay when a read cannot get them for a moment: a Claude sign-in that did not renew in time, a Codex
-// limits read that failed.
+// Limit resets: read seldom (Anthropic refuses reads that come too often), kept through a refused read, a sign-in that
+// did not renew in time and a restart; a Codex limits read that failed keeps the last ones too.
 {
   const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-usage-resets-'));
   const creds = (expiresAt?: number) => fs.writeFileSync(path.join(dir2, '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'test-only', expiresAt } }));
   creds();
-  globalThis.fetch = async () => new Response(JSON.stringify({ cedar_ember: { grants: [{ id: 'full-reset-2611', label: 'One full limit reset', resets_left: 1, usable_now: true }] } }), { status: 200 });
+  fs.writeFileSync(path.join(dir2, '.claude.json'), JSON.stringify({ oauthAccount: { organizationUuid: '0b5c4f4e-8a3c-4c1e-9d7e-3f2a1b0c9d8e' } }));
+  const grants = [
+    { id: 'full-reset-2611', label: 'One full limit reset', resets_left: 1, usable_now: true },
+    { id: 'launch-fable', label: 'One Fable reset', resets_left: 2, usable_now: true },
+  ];
+  let reads = 0;
+  let refuse = false;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') return new Response(JSON.stringify({ result: 'reset' }), { status: 200 });
+    reads++;
+    if (refuse) return new Response(JSON.stringify({ error: { type: 'rate_limit_error' } }), { status: 429 });
+    return new Response(JSON.stringify({ cedar_ember: { grants } }), { status: 200 });
+  }) as typeof fetch;
+  const ids = (u: { resetCredits?: { items: { id: string }[] } | null }) => u.resetCredits?.items.map((r) => r.id);
   try {
     const control = new ClaudeControl({ CLAUDE_CONFIG_DIR: dir2 });
     (control as any).probe = async () => ({ init, usage: raw });
     let report = await control.usage();
-    assert.deepEqual(report.resetCredits?.items.map((r) => r.id), ['full-reset-2611'], 'the resets are read');
+    assert.deepEqual(ids(report), ['full-reset-2611', 'launch-fable'], 'the resets are read');
+    report = await control.usage();
+    assert.equal(reads, 1, 'not again within ten minutes');
+    assert.deepEqual(ids(report), ['full-reset-2611', 'launch-fable']);
+
+    // Due again, and refused: the last ones stand, and the next read waits (longer each time).
+    (control as any).resetsNext = 0;
+    refuse = true;
+    report = await control.usage();
+    assert.equal(reads, 2);
+    assert.deepEqual(ids(report), ['full-reset-2611', 'launch-fable'], 'a refused read (HTTP 429) keeps the resets from the last one');
+    await control.usage();
+    assert.equal(reads, 2, 'and the next read waits');
+    assert.equal((control as any).resetsWait, 2 * resetReads.every, 'longer after each refusal');
+
+    // A sign-in that did not renew in time: the same.
+    refuse = false;
+    (control as any).resetsNext = 0;
     creds(Date.now() - 1000);
     report = await control.usage();
-    assert.deepEqual(report.resetCredits?.items.map((r) => r.id), ['full-reset-2611'], 'a sign-in that did not renew keeps the resets from the last read');
+    assert.deepEqual(ids(report), ['full-reset-2611', 'launch-fable'], 'a sign-in that did not renew keeps them too');
+    creds();
+
+    // After a restart, refused at once: the ones kept on disk show.
+    const again = new ClaudeControl({ CLAUDE_CONFIG_DIR: dir2 });
+    (again as any).probe = async () => ({ init, usage: raw });
+    refuse = true;
+    report = await again.usage();
+    assert.deepEqual(ids(report), ['full-reset-2611', 'launch-fable'], 'a restart shows the resets kept from before');
+
+    // Using one takes it off the list at once, and the next usage read asks again.
+    refuse = false;
+    const used = await again.useReset('launch-fable');
+    assert.equal(used.outcome, 'reset');
+    assert.equal(again.lastUsage?.resetCredits?.items.find((r) => r.id === 'launch-fable')?.left, 1, 'one use of it left');
+    assert.equal(again.lastUsage?.resetCredits?.available, 2);
+    await again.useReset('full-reset-2611');
+    assert.deepEqual(ids(again.lastUsage!), ['launch-fable'], 'a reset used up leaves the list');
+    const before = reads;
+    await again.usage();
+    assert.equal(reads, before + 1, 'read again after a reset is used');
 
     const codex = new CodexControl();
     let fail = false;
@@ -118,7 +168,7 @@ try {
     cx = await codex.usage();
     assert.equal(cx.resetCredits?.available, 1, 'a failed limits read keeps the last resets');
     assert.equal(cx.windows[0]?.usedPercent, 40, 'and the last limits, rather than none');
-    console.log('Limit resets kept through a failed read passed');
+    console.log('Limit resets: read seldom, kept through refusals and restarts passed');
   } finally {
     globalThis.fetch = originalFetch;
     fs.rmSync(dir2, { recursive: true, force: true });
