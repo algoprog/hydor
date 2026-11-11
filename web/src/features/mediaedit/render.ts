@@ -4,6 +4,7 @@
 // raster.ts); and a canvas as a data: address. The layers are put together in picture/compose.ts.
 import { arrowHead, MARK_FONTS, textMetrics, type Mark } from '@shared/mediaedit';
 import { mu } from '../../lib/machine';
+import { parseBlank } from './picture/newpicture';
 
 export const canvasOf = (w: number, h: number) => {
   const c = document.createElement('canvas');
@@ -50,6 +51,17 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
  * larger than this device can hold (`note` says so); its kind of file, as it came.
  */
 export async function loadSource(src: string): Promise<{ canvas: HTMLCanvasElement; w: number; h: number; mime: string; note?: string }> {
+  // A new, blank picture (File → New): made here, nothing to read.
+  const blank = parseBlank(src);
+  if (blank) {
+    const c = canvasOf(blank.w, blank.h);
+    if (blank.fill) {
+      const g = ctx2d(c);
+      g.fillStyle = blank.fill;
+      g.fillRect(0, 0, blank.w, blank.h);
+    }
+    return { canvas: c, w: blank.w, h: blank.h, mime: 'image/png' };
+  }
   const url = sourceUrl(src);
   const res = await fetch(url, { credentials: 'same-origin' }).catch(() => null);
   if (!res?.ok) throw new Error(res?.status === 404 ? 'That picture is not there any more' : 'That picture could not be read');

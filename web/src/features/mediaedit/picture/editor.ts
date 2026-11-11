@@ -6,7 +6,7 @@
 import { blendOp, type BlendMode } from '@shared/blend';
 import { autoEnhance, histogramOf, moveMark, straightenZoom, type CropShape, type FontId, type LookSettings, type Mark } from '@shared/mediaedit';
 import { blobData, loadImage } from '../render';
-import { flattenDoc, layerBox, markBounds, renderDoc, type Live } from './compose';
+import { flattenDoc, layerBox, layerInk, markBounds, renderDoc, type Live } from './compose';
 import {
   activeLayer,
   adjustLayer,
@@ -34,6 +34,8 @@ import {
 } from './doc';
 import { allMask, combineMasks, featherMask, growMask, invertMask, maskBounds, maskBytes, maskOutline, moveMask, shrinkMask, trimMask, type Box, type Mask, type MaskOp } from './mask';
 import { healFill } from './heal';
+import { readPersisted, writePersisted } from '../shell/persist';
+import { alignDelta, centredAt, snapMove, straightLock, type AlignHow, type SnapGap, type SnapLine, type SnapTargets } from './snap';
 import { bucketFill, freeStrokeBuffer, gradientCanvas, layOn, selCanvas, Stroke, type GradientKind, type SelClip, type StrokeKind } from './paint';
 
 export type ToolId =
@@ -146,7 +148,9 @@ export interface CropSession {
 
 /** A free transform at work: the layer, its box when it began, and how it is moved, sized and turned about its middle. */
 export interface XformSession {
+  /** The layer (or, with `sel`, the selection's outline) being transformed. */
   id: string;
+  sel?: boolean;
   box: Box;
   tx: number;
   ty: number;
@@ -164,6 +168,8 @@ export interface Overlay {
   gradient?: { a: [number, number]; b: [number, number] };
   /** The clone stamp's source, and where the brush is (to show where it takes from). */
   cloneAt?: [number, number];
+  /** Smart guides while something is moved: the pink lines it lined up with and the gaps to its neighbours (the canvas's pixels). */
+  snap?: { lines: SnapLine[]; gaps: SnapGap[] };
 }
 
 /** A brush stroke over the picture for the AI tools (in the canvas's pixels). */
@@ -269,6 +275,12 @@ export class PictureEd {
   cloneSrc: [number, number] | null = null;
   cloneOffset: [number, number] | null = null;
   guides: { v: number[]; h: number[] } = { v: [], h: [] };
+  /** Moving things lines them up with the canvas, the guides and the other layers (View → Snap; kept on this device). */
+  snap = readPersisted('picture.snap', true);
+  /** The layer whose name is being typed in Layers (Rename, from the layer's menu too). */
+  renaming: string | null = null;
+  /** The picture the system's clipboard was given with Copy (its size), to know it again when pasted back. */
+  clipSize = 0;
   rulers = false;
   grid = false;
   showGuides = true;
@@ -279,7 +291,7 @@ export class PictureEd {
   /** A panel to bring forward, and a count so asking twice does too. */
   focus: { panel: string; n: number } | null = null;
   /** A section of the Adjustments panel asked to show (Levels…, Curves…). */
-  adjustAsk: { section: string; n: number } | null = null;
+  adjustAsk: { section: string; n: number; field?: string } | null = null;
   /** The AI panel asked to start on something (from a menu): its mode. */
   aiAsk: { mode: string; n: number } | null = null;
   /** What was copied (Copy, Cut), with where it was on the canvas. */
@@ -440,8 +452,8 @@ export class PictureEd {
     this.focus = { panel, n: (this.focus?.n ?? 0) + 1 };
     this.emit(false);
   }
-  openAdjust(section: string) {
-    this.adjustAsk = { section, n: (this.adjustAsk?.n ?? 0) + 1 };
+  openAdjust(section: string, field?: string) {
+    this.adjustAsk = { section, n: (this.adjustAsk?.n ?? 0) + 1, ...(field ? { field } : {}) };
     this.showPanel('adjust');
   }
   askAi(mode: string) {
@@ -490,11 +502,12 @@ export class PictureEd {
     const y = at ? Math.round(at.y) : Math.round((d.h - src.height) / 2);
     this.addLayer(rasterLayer(freshName(d, name.replace(/\.[a-z0-9]+$/i, '').slice(0, 40) || 'Picture'), px, x, y), 'Add a picture', px.bytes);
   }
-  duplicateLayer() {
+  /** The picked layer copied (with a selection on a pixel layer, the selected part as a layer: `plain` is the whole layer anyway). */
+  duplicateLayer(plain = false) {
     const d = this.doc;
     const l = activeLayer(d);
     if (!l) return;
-    if (d.sel && l.kind === 'raster') return this.layerViaCopy(false);
+    if (d.sel && l.kind === 'raster' && !plain) return this.layerViaCopy(false);
     const copy: Layer = l.kind === 'raster' ? { ...l, id: newLayerId(), name: `${l.name} copy`, px: new Pixels(copyCanvas(l.px.canvas)) } : { ...l, id: newLayerId(), name: `${l.name} copy` };
     this.addLayer(copy, 'Duplicate layer', copy.kind === 'raster' ? copy.px.bytes : 0);
   }
@@ -565,7 +578,9 @@ export class PictureEd {
     if (i < 1) return this.toast('There is no layer under it to merge with.');
     const top = d.layers[i];
     const under = d.layers[i - 1];
-    const both = { ...d, layers: [{ ...under, visible: true }, { ...top, visible: true }] } as Doc;
+    // A hidden layer does not show, so it would not be in what is merged: it is left alone until it is shown.
+    if (!top.visible || !under.visible) return this.toast('One of the two layers is hidden: show both to merge them.');
+    const both = { ...d, layers: [under, top] } as Doc;
     const boxes = [layerBox(under), layerBox(top)].filter((b): b is Box => !!b);
     const all = boxes.length ? boxes.reduce((a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.max(a.x + a.w, b.x + b.w) - Math.min(a.x, b.x), h: Math.max(a.y + a.h, b.y + b.h) - Math.min(a.y, b.y) })) : { x: 0, y: 0, w: d.w, h: d.h };
     const region = top.kind === 'adjust' || under.kind === 'adjust' ? { x: 0, y: 0, w: d.w, h: d.h } : all;
@@ -577,10 +592,13 @@ export class PictureEd {
   }
   mergeVisible() {
     const d = this.doc;
+    if (!d.layers.some((l) => l.visible)) return this.toast('No layer shows: show the layers to merge first.');
     const c = flattenDoc(d);
     const px = new Pixels(c);
     const merged = rasterLayer('Merged', px);
-    const layers = [...d.layers.filter((l) => !l.visible), merged];
+    // The result takes the place of the lowest layer that showed; hidden layers stay where they were in the stack.
+    const first = d.layers.findIndex((l) => l.visible);
+    const layers = d.layers.flatMap((l, i): Layer[] => (i === first ? [merged] : l.visible ? [] : [l]));
     this.change('Merge visible', { ...d, layers, active: merged.id }, true, { bytes: px.bytes });
   }
   flatten() {
@@ -752,9 +770,11 @@ export class PictureEd {
     if (!got) return;
     this.clip = got;
     // The system's clipboard too, where the browser lets a page write a picture to it.
+    // Its size is kept: pasted back, that picture is known for what it is (the part copied, to go back where it was).
+    this.clipSize = 0;
     got.canvas.toBlob((b) => {
       if (!b || typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) return;
-      navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).catch(() => {});
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(() => void (this.clipSize = b.size), () => {});
     }, 'image/png');
     this.toast(merged ? 'Copied what shows' : 'Copied');
   }
@@ -763,12 +783,21 @@ export class PictureEd {
     this.copy(false);
     this.clearSelected('Cut');
   }
-  /** What was copied here, as a new layer where it was. */
-  pasteHere() {
+  /**
+   * What was copied, as a new layer where it was copied from, or with its middle at `at` (the canvas's pixels: Paste in a
+   * right-click menu puts it where the pointer is).
+   */
+  pasteHere(at?: [number, number]) {
     const c = this.clip;
     if (!c) return this.toast('Nothing has been copied yet: copy a part of a picture, or a picture from elsewhere.');
     const px = new Pixels(copyCanvas(c.canvas));
-    this.addLayer(rasterLayer(freshName(this.doc, 'Layer'), px, c.x, c.y), 'Paste', px.bytes);
+    const d = this.doc;
+    const to = at ? centredAt(at[0], at[1], px.w, px.h, d.w, d.h) : { x: c.x, y: c.y };
+    this.addLayer(rasterLayer(freshName(d, 'Layer'), px, to.x, to.y), 'Paste', px.bytes);
+  }
+  /** Whether a picture arriving from the system's clipboard is the one Copy put there (so Paste puts it back in place). */
+  isOwnClip(file: Blob): boolean {
+    return !!this.clip && this.clipSize > 0 && file.size === this.clipSize;
   }
 
   // ---- strokes (the View drives them) ---------------------------------------------------------------------------------
@@ -896,16 +925,93 @@ export class PictureEd {
 
   // ---- moving and transforming ---------------------------------------------------------------------------------------
 
-  /** A layer moved by (dx, dy) from where it was (`from`: the document when the drag began). */
-  moveLayerBy(from: Doc, id: string, dx: number, dy: number, done: boolean) {
+  /**
+   * A layer moved by (dx, dy) from where it was (`from`: the document when the drag began). With `copy`, a copy of it
+   * (a layer made once for the whole drag: see `copyOf`) is what is moved and the layer stays where it was: one step,
+   * "Move a copy".
+   */
+  moveLayerBy(from: Doc, id: string, dx: number, dy: number, done: boolean, copy?: Layer) {
     const l = layerOf(from, id);
     if (!l) return;
+    if (l.locked && !copy) return this.toast('That layer is locked: unlock it in Layers to move it.');
+    const src = copy ?? l;
+    let next: Layer = src;
+    if (src.kind === 'raster') next = { ...src, x: Math.round(src.x + dx), y: Math.round(src.y + dy) };
+    else if (src.kind === 'mark') next = { ...src, mark: moveMark(src.mark, (x, y) => [Math.round((x + dx) * 10) / 10, Math.round((y + dy) * 10) / 10]) };
+    else if (src.mask) next = { ...src, mask: moveMask(src.mask, dx, dy) };
+    if (!copy) return this.change('Move', { ...from, layers: from.layers.map((x) => (x.id === id ? next : x)) }, done);
+    const at = indexOf(from, id) + 1;
+    this.change('Move a copy', { ...from, layers: [...from.layers.slice(0, at), next, ...from.layers.slice(at)], active: next.id }, done, { bytes: next.kind === 'raster' ? next.px.bytes : 0 });
+  }
+  /** A copy of a layer to be dragged out of it (Ctrl+drag): its own pixels, its own id and name. */
+  copyOf(l: Layer): Layer {
+    const name = freshName(this.doc, `${l.name} copy`);
+    return l.kind === 'raster' ? { ...l, id: newLayerId(), name, locked: false, px: new Pixels(copyCanvas(l.px.canvas)) } : { ...l, id: newLayerId(), name, locked: false };
+  }
+
+  // ---- lining things up --------------------------------------------------------------------------------------------------
+
+  /** What a moving box can line up with: the canvas, the guides and the other visible layers (`except`: not these). */
+  snapTargets(except: string[] = []): SnapTargets {
+    const d = this.doc;
+    const boxes = d.layers.filter((l) => l.visible && !except.includes(l.id)).flatMap((l) => layerInk(l) ?? []);
+    return { w: d.w, h: d.h, guidesV: this.showGuides ? this.guides.v : [], guidesH: this.showGuides ? this.guides.h : [], boxes };
+  }
+  /**
+   * A box dragged by (dx, dy), as the pointer moved it: straight when Shift is held, snapped unless snapping is off or
+   * the no-snap key is held (the smart guides it shows are set in the overlay: cleared when `noGuides`). The move to make.
+   */
+  dragBy(box: Box, dx: number, dy: number, o: { except: string[]; shift: boolean; noSnap: boolean; tol: number }): { dx: number; dy: number } {
+    const lock = o.shift ? straightLock(dx, dy) : null;
+    if (!this.snap || o.noSnap) {
+      this.overlay = { ...this.overlay, snap: undefined };
+      return { dx: lock === 'x' ? 0 : dx, dy: lock === 'y' ? 0 : dy };
+    }
+    const r = snapMove(box, dx, dy, this.snapTargets(o.except), { tol: o.tol, lock });
+    this.overlay = { ...this.overlay, snap: r.lines.length || r.gaps.length ? { lines: r.lines, gaps: r.gaps } : undefined };
+    return { dx: r.dx, dy: r.dy };
+  }
+  /** The smart guides taken down (a drag is over). */
+  clearGuides() {
+    if (!this.overlay.snap) return;
+    this.overlay = { ...this.overlay, snap: undefined };
+    this.emit(false);
+  }
+  setSnap(on: boolean) {
+    this.snap = on;
+    writePersisted('picture.snap', on);
+    this.emit(false);
+  }
+  /** The picked layer lined up with the canvas: its left, middle, right, top, centre or bottom (one step, "Align …"). */
+  alignLayer(how: AlignHow) {
+    const d = this.doc;
+    const l = activeLayer(d);
+    const b = l ? layerInk(l) : null;
+    if (!l || !b) return this.toast('Pick a pixel, words or shape layer to line it up with the canvas.');
     if (l.locked) return this.toast('That layer is locked: unlock it in Layers to move it.');
-    let next: Layer = l;
-    if (l.kind === 'raster') next = { ...l, x: Math.round(l.x + dx), y: Math.round(l.y + dy) };
-    else if (l.kind === 'mark') next = { ...l, mark: moveMark(l.mark, (x, y) => [Math.round((x + dx) * 10) / 10, Math.round((y + dy) * 10) / 10]) };
-    else if (l.mask) next = { ...l, mask: moveMask(l.mask, dx, dy) };
-    this.change('Move', { ...from, layers: from.layers.map((x) => (x.id === id ? next : x)) }, done);
+    const { dx, dy } = alignDelta(b, how, d.w, d.h);
+    if (!dx && !dy) return;
+    const label = { left: 'Align left', centre: 'Align to the centre', right: 'Align right', top: 'Align top', middle: 'Align to the middle', bottom: 'Align bottom' }[how];
+    this.change(label, this.movedLayers(d, l.id, dx, dy));
+  }
+  /** A document with one layer moved by (dx, dy). */
+  private movedLayers(d: Doc, id: string, dx: number, dy: number): Doc {
+    return {
+      ...d,
+      layers: d.layers.map((l): Layer => {
+        if (l.id !== id) return l;
+        if (l.kind === 'raster') return { ...l, x: l.x + dx, y: l.y + dy };
+        if (l.kind === 'mark') return { ...l, mark: moveMark(l.mark, (x, y) => [Math.round((x + dx) * 10) / 10, Math.round((y + dy) * 10) / 10]) };
+        return l.mask ? { ...l, mask: moveMask(l.mask, dx, dy) } : l;
+      }),
+    };
+  }
+  /** The selection moved by (dx, dy) from where it was (`from`: the document when the drag began): one step, "Move selection". */
+  moveSelection(from: Doc, dx: number, dy: number, done: boolean) {
+    if (!from.sel) return;
+    // Kept on the canvas; moved right off it, it stays where it last was.
+    const m = this.inside(moveMask(from.sel, Math.round(dx), Math.round(dy)));
+    if (m) this.change('Move selection', { ...from, sel: trimMask(m) }, done, { bytes: maskBytes(m) });
   }
   startTransform() {
     const d = this.doc;
@@ -919,9 +1025,18 @@ export class PictureEd {
     this.tool = 'move';
     this.emit();
   }
+  /** Select → Transform selection: the selection's outline sized, moved and turned, with the free transform's handles. */
+  startSelectionTransform() {
+    const s = this.doc.sel;
+    if (!s) return this.toast('Select a part first: Transform selection sizes and turns its outline.');
+    this.endSessions(true);
+    this.xform = { id: '', sel: true, box: { x: s.x, y: s.y, w: s.w, h: s.h }, tx: 0, ty: 0, sx: 1, sy: 1, angle: 0 };
+    this.emit(false);
+  }
   setTransform(p: Partial<XformSession>) {
     if (!this.xform) return;
     this.xform = { ...this.xform, ...p };
+    if (this.xform.sel) return this.emit(false);
     this.live = { ...this.live, transform: { layer: this.xform.id, m: affineOf(this.xform) } };
     this.emit();
   }
@@ -936,6 +1051,7 @@ export class PictureEd {
     this.live = { ...this.live, transform: undefined };
     if (!x) return;
     const d = this.doc;
+    if (x.sel) return this.commitSelectionTransform(x);
     const l = layerOf(d, x.id);
     const m = affineOf(x);
     const same = !x.tx && !x.ty && x.sx === 1 && x.sy === 1 && !x.angle;
@@ -977,6 +1093,34 @@ export class PictureEd {
       }
       this.change('Free transform', withLayer(d, l.id, () => ({ ...l, mark, angle: Math.round((((l.angle + x.angle) % 360) + 360) % 360 * 10) / 10 })));
     }
+  }
+
+  /** The selection's outline taken through the transform (its soft edge sized with it): one step, "Transform selection". */
+  private commitSelectionTransform(x: XformSession) {
+    const s = this.doc.sel;
+    const same = !x.tx && !x.ty && x.sx === 1 && x.sy === 1 && !x.angle;
+    if (!s || same) return this.emit(false);
+    const m = affineOf(x);
+    const corners = [
+      [s.x, s.y],
+      [s.x + s.w, s.y],
+      [s.x, s.y + s.h],
+      [s.x + s.w, s.y + s.h],
+    ].map(([X, Y]) => [m[0] * X + m[2] * Y + m[4], m[1] * X + m[3] * Y + m[5]]);
+    const x0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => c[0]))));
+    const y0 = Math.max(0, Math.floor(Math.min(...corners.map((c) => c[1]))));
+    const x1 = Math.min(this.doc.w, Math.ceil(Math.max(...corners.map((c) => c[0]))));
+    const y1 = Math.min(this.doc.h, Math.ceil(Math.max(...corners.map((c) => c[1]))));
+    if (x1 <= x0 || y1 <= y0) return this.toast('That would move the selection right off the picture.');
+    const c = canvasOf(x1 - x0, y1 - y0);
+    const g = c.getContext('2d')!;
+    g.imageSmoothingQuality = 'high';
+    g.setTransform(m[0], m[1], m[2], m[3], m[4] - x0, m[5] - y0);
+    g.drawImage(selCanvas(s), s.x, s.y);
+    const a = g.getImageData(0, 0, c.width, c.height).data;
+    const out: Mask = { x: x0, y: y0, w: c.width, h: c.height, data: new Uint8Array(c.width * c.height) };
+    for (let i = 0; i < out.data.length; i++) out.data[i] = a[i * 4 + 3];
+    this.setSel(out, 'Transform selection');
   }
 
   // ---- the picture: crop, turns, sizes ------------------------------------------------------------------------------

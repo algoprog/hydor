@@ -3,13 +3,46 @@
 // adjustments go on adjustment layers, so each can be changed or taken away later.
 import { BLEND_MODES } from '@shared/blend';
 import { FILTERS, type LookSettings } from '@shared/mediaedit';
-import { Copy, Crop, Download, FlipHorizontal2, ImagePlus, Keyboard, Layers2, Maximize, Redo2, RotateCcw, RotateCw, Save, Scissors, SlidersHorizontal, Sparkles, Trash2, Undo2, Wand2, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  AlignHorizontalJustifyCenter,
+  AlignHorizontalJustifyEnd,
+  AlignHorizontalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
+  ClipboardPaste,
+  Copy,
+  Crop,
+  Download,
+  FilePlus2,
+  FlipHorizontal2,
+  ImagePlus,
+  Keyboard,
+  Layers2,
+  Maximize,
+  Redo2,
+  RotateCcw,
+  RotateCw,
+  Save,
+  Scissors,
+  SlidersHorizontal,
+  Sparkles,
+  Trash2,
+  Undo2,
+  Wand2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import { viaLink } from '../../../lib/machine';
-import type { MenuDef } from '../shell';
+import type { ReactNode } from 'react';
+import type { MenuDef, MenuEntry } from '../shell';
+import type { AlignHow } from './snap';
 import { activeLayer, indexOf } from './doc';
 import type { PictureEd } from './editor';
 
 export interface MenuUi {
+  /** File → New: a blank picture of a size, in a tab of its own. */
+  newPicture(): void;
   openFile(): void;
   openLibrary(): void;
   fromClipboard(): void;
@@ -26,7 +59,118 @@ export interface MenuUi {
   amount(kind: 'feather' | 'grow' | 'shrink' | 'stroke'): void;
   shortcuts(): void;
   /** The Adjustments panel, a section of it open. */
-  adjust(section: string): void;
+  adjust(section: string, field?: string): void;
+  /** The name of a layer typed in Layers. */
+  rename(id: string): void;
+}
+
+/** Align to the canvas: the six ways, for the Layer menu, the layer's right-click menu and the Move tool's options. */
+export const ALIGNS: { how: AlignHow; label: string; icon: ReactNode }[] = [
+  { how: 'left', label: 'Left', icon: <AlignHorizontalJustifyStart size={14} /> },
+  { how: 'centre', label: 'Centre', icon: <AlignHorizontalJustifyCenter size={14} /> },
+  { how: 'right', label: 'Right', icon: <AlignHorizontalJustifyEnd size={14} /> },
+  { how: 'top', label: 'Top', icon: <AlignVerticalJustifyStart size={14} /> },
+  { how: 'middle', label: 'Middle', icon: <AlignVerticalJustifyCenter size={14} /> },
+  { how: 'bottom', label: 'Bottom', icon: <AlignVerticalJustifyEnd size={14} /> },
+];
+
+/** The layer's Align to the canvas list: greyed for what has no box to line up (an adjustment everywhere) or is locked. */
+function alignList(ed: PictureEd): MenuEntry {
+  const l = activeLayer(ed.doc);
+  const none = !l || (l.kind === 'adjust' && !l.mask);
+  return { label: 'Align to the canvas', disabled: none, items: ALIGNS.map((a) => ({ label: a.label, icon: a.icon, run: () => ed.alignLayer(a.how) })) };
+}
+
+/** The picked layer's settings that come as lists: its blend mode, opacity, stacking and lining up. */
+function layerLists(ed: PictureEd): MenuEntry[] {
+  const l = activeLayer(ed.doc);
+  return [
+    {
+      label: 'Blend mode',
+      disabled: !l,
+      items: BLEND_MODES.map((m) => ({ label: m.label, checked: l?.blend === m.id, run: () => l && ed.setLayer(l.id, { blend: m.id }, 'Blend mode') })),
+    },
+    {
+      label: 'Opacity',
+      disabled: !l,
+      items: [100, 75, 50, 25].map((p) => ({ label: `${p}%`, checked: Math.round((l?.opacity ?? 1) * 100) === p, run: () => l && ed.setLayer(l.id, { opacity: p / 100 }, 'Opacity') })),
+    },
+    {
+      label: 'Arrange',
+      disabled: !l,
+      items: [
+        { label: 'Bring to the front', keys: 'Ctrl+Shift+]', run: () => ed.arrange('front') },
+        { label: 'Bring forward', keys: 'Ctrl+]', run: () => ed.arrange('forward') },
+        { label: 'Send backward', keys: 'Ctrl+[', run: () => ed.arrange('backward') },
+        { label: 'Send to the back', keys: 'Ctrl+Shift+[', run: () => ed.arrange('back') },
+      ],
+    },
+    alignList(ed),
+  ];
+}
+
+/**
+ * The right-click menu on a layer's row in Layers (the layer is picked first): the Layer menu's own actions with the
+ * words, keys and ticks they have there.
+ */
+export function layerContextMenu(ed: PictureEd, ui: MenuUi): MenuEntry[] {
+  const d = ed.doc;
+  const l = activeLayer(d);
+  const i = l ? indexOf(d, l.id) : -1;
+  return [
+    { label: 'Duplicate layer', keys: 'Ctrl+J', disabled: !l, run: () => ed.duplicateLayer(true) },
+    { label: 'Merge down', keys: 'Ctrl+E', disabled: i < 1, run: () => ed.mergeDown() },
+    { label: 'Rename…', disabled: !l, run: () => l && ui.rename(l.id) },
+    '-',
+    { label: l?.locked ? 'Unlock the layer' : 'Lock the layer', disabled: !l, run: () => l && ed.setLayer(l.id, { locked: !l.locked }, l.locked ? 'Unlock layer' : 'Lock layer') },
+    { label: l?.visible === false ? 'Show the layer' : 'Hide the layer', disabled: !l, run: () => l && ed.setLayer(l.id, { visible: !l.visible }, l.visible ? 'Hide layer' : 'Show layer') },
+    '-',
+    ...layerLists(ed).slice(0, 1),
+    { label: 'Select the layer’s pixels', disabled: !l || l.kind === 'adjust', run: () => ed.selectLayerPixels() },
+    alignList(ed),
+    '-',
+    { label: 'Delete layer', icon: <Trash2 size={14} />, danger: true, disabled: !l || d.layers.length < 2, run: () => ed.deleteLayer() },
+  ];
+}
+
+/**
+ * The right-click menu on the picture: what Edit and Select do to what is selected and what was copied, Free transform and
+ * Crop to the selection, Fit on screen, and the picked layer's main actions. `at`: where it was pressed (the canvas's pixels),
+ * so Paste puts what was copied there.
+ */
+export function pictureContextMenu(ed: PictureEd, ui: MenuUi, at: [number, number] | null): MenuEntry[] {
+  const d = ed.doc;
+  const l = activeLayer(d);
+  const sel = !!d.sel;
+  const i = l ? indexOf(d, l.id) : -1;
+  return [
+    sel && { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', disabled: l?.kind !== 'raster', run: () => ed.cut() },
+    { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', disabled: !l, run: () => ed.copy(false) },
+    { label: 'Paste', icon: <ClipboardPaste size={14} />, keys: 'Ctrl+V', disabled: !ed.clip, run: () => ed.pasteHere(at ?? undefined) },
+    { label: 'Paste in place', keys: 'Ctrl+Shift+V', disabled: !ed.clip, run: () => ed.pasteHere() },
+    '-',
+    { label: 'Select all', keys: 'Ctrl+A', run: () => ed.selectAll() },
+    { label: 'Deselect', keys: 'Ctrl+D', disabled: !sel, run: () => ed.deselect() },
+    { label: 'Invert selection', keys: 'Ctrl+Shift+I', run: () => ed.invertSelection() },
+    '-',
+    { label: 'Free transform', keys: 'Ctrl+T', disabled: !l || l.kind === 'adjust', run: () => ed.startTransform() },
+    sel && { label: 'Crop to the selection', icon: <Crop size={14} />, run: () => ed.cropToSelection() },
+    { label: 'Fit on screen', icon: <Maximize size={14} />, keys: 'Ctrl+0', run: () => ed.view?.fit() },
+    '-',
+    { label: sel ? 'Layer via copy' : 'Duplicate layer', keys: 'Ctrl+J', disabled: !l, run: () => ed.duplicateLayer() },
+    { label: 'Merge down', keys: 'Ctrl+E', disabled: i < 1, run: () => ed.mergeDown() },
+    {
+      label: 'This layer',
+      disabled: !l,
+      items: [
+        { label: l?.visible === false ? 'Show the layer' : 'Hide the layer', run: () => l && ed.setLayer(l.id, { visible: !l.visible }, l.visible ? 'Hide layer' : 'Show layer') },
+        { label: l?.locked ? 'Unlock the layer' : 'Lock the layer', run: () => l && ed.setLayer(l.id, { locked: !l.locked }, l.locked ? 'Unlock layer' : 'Lock layer') },
+        ...layerLists(ed),
+        '-',
+        { label: 'Delete layer', icon: <Trash2 size={14} />, danger: true, disabled: d.layers.length < 2, run: () => ed.deleteLayer() },
+      ],
+    },
+  ];
 }
 
 export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
@@ -40,6 +184,8 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
     {
       label: 'File',
       items: [
+        { label: 'New…', icon: <FilePlus2 size={14} />, keys: 'Ctrl+Alt+N', also: 'blank picture canvas size preset', run: ui.newPicture },
+        '-',
         { label: 'Open a picture as a layer…', icon: <ImagePlus size={14} />, keys: 'Ctrl+O', run: ui.openFile },
         { label: 'A picture from the Library as a layer…', icon: <Layers2 size={14} />, run: ui.openLibrary },
         { label: 'A picture from the clipboard as a layer', run: ui.fromClipboard },
@@ -71,6 +217,7 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', disabled: !l, run: () => ed.copy(false) },
         { label: 'Copy what shows', keys: 'Ctrl+Shift+C', also: 'copy merged', run: () => ed.copy(true) },
         { label: 'Paste', keys: 'Ctrl+V', run: () => ed.pasteHere() },
+        { label: 'Paste in place', keys: 'Ctrl+Shift+V', also: 'paste where it was copied', disabled: !ed.clip, run: () => ed.pasteHere() },
         { label: 'Clear', icon: <Trash2 size={14} />, keys: 'Delete', also: 'delete erase selected', disabled: !sel && !(l && l.kind !== 'raster'), run: () => ed.deleteKey() },
         '-',
         {
@@ -105,8 +252,8 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
             '-',
             { label: 'Black and white', run: newLook({ filter: { id: 'mono' } }, 'Black and white') },
             { label: 'Invert', keys: 'Ctrl+I', run: newLook({ invert: true }, 'Invert') },
-            { label: 'Posterize…', run: () => ui.adjust('effects') },
-            { label: 'Threshold…', run: () => ui.adjust('effects') },
+            { label: 'Posterize…', run: () => ui.adjust('effects', 'posterize') },
+            { label: 'Threshold…', run: () => ui.adjust('effects', 'threshold') },
           ],
         },
         { label: 'Auto enhance', icon: <Wand2 size={14} />, keys: 'Ctrl+Shift+B', run: () => ed.autoEnhance() },
@@ -136,26 +283,7 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         { label: 'Merge visible', keys: 'Ctrl+Shift+E', disabled: d.layers.length < 2, run: () => ed.mergeVisible() },
         { label: 'Flatten', disabled: d.layers.length < 2, run: () => ed.flatten() },
         '-',
-        {
-          label: 'Blend mode',
-          disabled: !l,
-          items: BLEND_MODES.map((m) => ({ label: m.label, checked: l?.blend === m.id, run: () => l && ed.setLayer(l.id, { blend: m.id }, 'Blend mode') })),
-        },
-        {
-          label: 'Opacity',
-          disabled: !l,
-          items: [100, 75, 50, 25].map((p) => ({ label: `${p}%`, checked: Math.round((l?.opacity ?? 1) * 100) === p, run: () => l && ed.setLayer(l.id, { opacity: p / 100 }, 'Opacity') })),
-        },
-        {
-          label: 'Arrange',
-          disabled: !l,
-          items: [
-            { label: 'Bring to the front', keys: 'Ctrl+Shift+]', run: () => ed.arrange('front') },
-            { label: 'Bring forward', keys: 'Ctrl+]', run: () => ed.arrange('forward') },
-            { label: 'Send backward', keys: 'Ctrl+[', run: () => ed.arrange('backward') },
-            { label: 'Send to the back', keys: 'Ctrl+Shift+[', run: () => ed.arrange('back') },
-          ],
-        },
+        ...layerLists(ed),
         '-',
         { label: l?.visible === false ? 'Show the layer' : 'Hide the layer', disabled: !l, run: () => l && ed.setLayer(l.id, { visible: !l.visible }, l.visible ? 'Hide layer' : 'Show layer') },
         { label: l?.locked ? 'Unlock the layer' : 'Lock the layer', disabled: !l, run: () => l && ed.setLayer(l.id, { locked: !l.locked }, l.locked ? 'Unlock layer' : 'Lock layer') },
@@ -171,6 +299,8 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         '-',
         ...(viaLink ? [] : [{ label: 'Subject', icon: <Sparkles size={14} />, also: 'select subject person object ai', run: () => ed.askAi('subject') }]),
         { label: 'The layer’s pixels', disabled: !l || l.kind === 'adjust', run: () => ed.selectLayerPixels() },
+        '-',
+        { label: 'Transform selection', also: 'scale rotate resize outline', disabled: !sel, run: () => ed.startSelectionTransform() },
         '-',
         { label: 'Feather…', keys: 'Shift+F6', disabled: !sel, run: () => ui.amount('feather') },
         { label: 'Grow…', disabled: !sel, run: () => ui.amount('grow') },
@@ -205,6 +335,7 @@ export function buildMenus(ed: PictureEd, ui: MenuUi): MenuDef[] {
         { label: 'Rulers', keys: 'Ctrl+R', checked: ed.rulers, run: () => ((ed.rulers = !ed.rulers), ed.emit(false)) },
         { label: 'Grid', keys: "Ctrl+'", checked: ed.grid, run: () => ((ed.grid = !ed.grid), ed.emit(false)) },
         { label: 'Guides', keys: 'Ctrl+;', checked: ed.showGuides, run: () => ((ed.showGuides = !ed.showGuides), ed.emit(false)) },
+        { label: 'Snap', also: 'magnet smart guides line up align', checked: ed.snap, run: () => ed.setSnap(!ed.snap) },
         { label: 'Clear the guides', disabled: !ed.guides.v.length && !ed.guides.h.length, run: () => ((ed.guides = { v: [], h: [] }), ed.emit(false)) },
       ],
     },
@@ -263,6 +394,12 @@ export const MORE_KEYS = [
       ['Enter', 'Apply the crop or the free transform'],
       ['Esc', 'Cancel the crop or the free transform'],
       ['Arrow keys', 'Move the picked layer a pixel (with Shift, ten)'],
+      ['Drag', 'Move the picked layer, or with a selection tool the selection: it snaps to the canvas, the guides and the other layers'],
+      ['Shift+drag', 'Keep a move straight'],
+      ['Ctrl+drag', 'Drag a copy of the layer (⌥ on a Mac)'],
+      ['Alt+drag', 'Move without snapping (⌘ on a Mac)'],
+      ['Right-click', 'A menu for what is under the pointer; a right-drag moves the picture around; a touch held still opens it too'],
+      ['Menu key / Shift+F10', 'The right-click menu from the keyboard'],
     ] as [string, string][],
   },
 ];

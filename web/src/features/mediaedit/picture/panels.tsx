@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BLEND_MODES, type BlendMode } from '@shared/blend';
 import { histogramOf, MARK_FONTS, type Mark } from '@shared/mediaedit';
-import { ArrowDown, Copy, Eye, EyeOff, ImagePlus, Layers2, Lock, LockOpen, Merge, Plus, SlidersHorizontal, Trash2, Type, Shapes, Droplets, Grid3x3, Smile, History as HistoryIcon, Check as CheckIcon } from 'lucide-react';
+import { ArrowDown, Copy, Ellipsis, Eye, EyeOff, ImagePlus, Layers2, Lock, LockOpen, Merge, Plus, SlidersHorizontal, Trash2, Type, Shapes, Droplets, Grid3x3, Smile, History as HistoryIcon, Check as CheckIcon } from 'lucide-react';
 import { viaLink } from '../../../lib/machine';
 import { cx, IconButton, MenuItem, Popover } from '../../../components/ui';
 import { Check, ColorButton, ColorPicker, FieldRow, MiniSelect, ScrubNumber, Seg, SliderRow } from '../shell';
@@ -46,11 +46,31 @@ function KindIcon({ l }: { l: Layer }) {
 
 // ---- Layers ----------------------------------------------------------------------------------------------------------
 
-export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture: (from: 'device' | 'library' | 'clipboard') => void }) {
+export function LayersPanel({
+  ed,
+  onAddPicture,
+  onContext,
+}: {
+  ed: PictureEd;
+  onAddPicture: (from: 'device' | 'library' | 'clipboard') => void;
+  /** The layer's right-click menu asked for (a right-click or a touch held on its row, or its ⋯ button): where. */
+  onContext?: (at: { x: number; y: number }, id: string) => void;
+}) {
   useEd(ed);
   const doc = ed.doc;
   const a = activeLayer(doc);
-  const [renaming, setRenaming] = useState<string | null>(null);
+  const renaming = ed.renaming;
+  const setRenaming = (id: string | null) => {
+    ed.renaming = id;
+    ed.emit(false);
+  };
+  // A touch held still on a row opens its menu where the browser sends no contextmenu event (Safari).
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const stopPress = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  const moreRef = useRef<HTMLButtonElement>(null);
   const [drag, setDrag] = useState<{ id: string; from: number; to: number; y0: number } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const addRef = useRef<HTMLButtonElement>(null);
@@ -70,15 +90,18 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
         aria-label="Layers"
         className="min-h-0 flex-1 overflow-y-auto py-1"
         onPointerMove={(e) => {
+          if (press.current && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > 8) stopPress();
           if (!drag) return;
           const steps = Math.round((e.clientY - drag.y0) / rowH);
           const to = Math.max(0, Math.min(doc.layers.length - 1, drag.from - steps));
           if (to !== drag.to) setDrag({ ...drag, to });
         }}
         onPointerUp={() => {
+          stopPress();
           if (drag && drag.to !== drag.from) ed.moveLayer(drag.from, drag.to);
           setDrag(null);
         }}
+        onPointerCancel={() => (stopPress(), setDrag(null))}
       >
         {list.map((l) => {
           const i = indexOf(doc, l.id);
@@ -91,8 +114,30 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
               role="option"
               aria-selected={on}
               onClick={() => ed.pickLayer(l.id)}
+              onContextMenu={(e) => {
+                if (!onContext) return;
+                e.preventDefault();
+                stopPress();
+                setDrag(null);
+                ed.pickLayer(l.id);
+                onContext({ x: e.clientX, y: e.clientY }, l.id);
+              }}
               onPointerDown={(e) => {
-                if ((e.target as HTMLElement).closest('button,input')) return;
+                if (e.button !== 0 || (e.target as HTMLElement).closest('button,input')) return;
+                if (e.pointerType === 'touch' && onContext) {
+                  const x = e.clientX;
+                  const y = e.clientY;
+                  press.current = {
+                    x,
+                    y,
+                    timer: window.setTimeout(() => {
+                      press.current = null;
+                      setDrag(null);
+                      ed.pickLayer(l.id);
+                      onContext({ x, y }, l.id);
+                    }, 550),
+                  };
+                }
                 (e.currentTarget.parentElement as HTMLElement).setPointerCapture(e.pointerId);
                 setDrag({ id: l.id, from: i, to: i, y0: e.clientY });
               }}
@@ -176,6 +221,20 @@ export function LayersPanel({ ed, onAddPicture }: { ed: PictureEd; onAddPicture:
         <IconButton label="Delete the layer" size="sm" disabled={!a || doc.layers.length < 2} onClick={() => ed.deleteLayer()}>
           <Trash2 size={14} />
         </IconButton>
+        {onContext && (
+          <IconButton
+            ref={moreRef}
+            label="More for this layer"
+            size="sm"
+            disabled={!a}
+            onClick={() => {
+              const r = moreRef.current?.getBoundingClientRect();
+              if (a && r) onContext({ x: r.right, y: r.top }, a.id);
+            }}
+          >
+            <Ellipsis size={14} />
+          </IconButton>
+        )}
       </div>
     </div>
   );
