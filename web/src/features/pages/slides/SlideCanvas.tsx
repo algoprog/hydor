@@ -109,6 +109,7 @@ type Drag =
   | { kind: 'rotate'; id: string; cx: number; cy: number; rot: number }
   | { kind: 'end'; id: string; which: 'start' | 'end'; next: { x: number; y: number; w: number; h: number }; stick?: Stick; near?: string }
   | { kind: 'marquee'; start: P; at: P; add: string[] }
+  | { kind: 'draw'; start: P; at: P }
   | { kind: 'guide'; axis: 'x' | 'y'; index: number | null; at: number; off: boolean }
   | { kind: 'crop'; hx: number; hy: number; start: P; box: Box; full: Box };
 
@@ -306,6 +307,9 @@ export const SlideCanvas = forwardRef<
     /** The live part running in place, and Run or Stop on it. */
     running?: string | null;
     onRun?: (id: string | null) => void;
+    /** A part is being drawn (Insert → Text box, Shape, Line): a drag draws it there at that size, a click puts it there at its default size. */
+    drawing?: 'box' | 'line' | null;
+    onDraw?: (a: { from: P; to: P } | { at: P }) => void;
     /** A part is being picked for something: a click picks the part under it (null: none). */
     picking?: boolean;
     onPick?: (id: string | null) => void;
@@ -345,6 +349,8 @@ export const SlideCanvas = forwardRef<
     onPin,
     running,
     onRun,
+    drawing,
+    onDraw,
     picking,
     onPick,
     children,
@@ -840,6 +846,15 @@ export const SlideCanvas = forwardRef<
       if (p.x < f.x || p.y < f.y || p.x > f.x + f.w || p.y > f.y + f.h) return endCrop(true);
       return begin(e, { kind: 'crop', hx: 0, hy: 0, start: p, box: crop.box, full: crop.full });
     }
+    // Drawing a new part: a press starts it, wherever it is on the slide (snapped like a part moved).
+    if (drawing && !readOnly) {
+      if (scope.length) onScope([]);
+      const q = toSlide(e.clientX, e.clientY);
+      const r = snapMove({ x: q.x, y: q.y, w: 0, h: 0 }, { ...snapSet([]), frame: { x: 0, y: 0, w: W, h: H } }, 6 / k, { gaps: false, dist: false, on: !isNoSnap(e) });
+      const start = { x: q.x + r.dx, y: q.y + r.dy };
+      setLines(r.lines);
+      return begin(e, { kind: 'draw', start, at: start });
+    }
     const { id, inside } = hit(e.clientX, e.clientY);
     if (!inside) {
       // Outside the group entered: back to the slide's own parts.
@@ -908,6 +923,27 @@ export const SlideCanvas = forwardRef<
     const p = toLocal(e.clientX, e.clientY);
     const tol = 6 / k;
     if (d.kind === 'marquee') return setDrag({ ...d, at: p });
+    if (d.kind === 'draw') {
+      const q = toSlide(e.clientX, e.clientY);
+      const r = snapMove({ x: q.x, y: q.y, w: 0, h: 0 }, { ...snapSet([]), frame: { x: 0, y: 0, w: W, h: H } }, tol, { gaps: false, dist: false, on: !isNoSnap(e) });
+      let at = { x: q.x + r.dx, y: q.y + r.dy };
+      // Shift: a square (a line: along 45°).
+      if (e.shiftKey) {
+        const dx = at.x - d.start.x;
+        const dy = at.y - d.start.y;
+        if (drawing === 'line') {
+          const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+          const len = Math.hypot(dx, dy);
+          at = { x: d.start.x + Math.cos(ang) * len, y: d.start.y + Math.sin(ang) * len };
+        } else {
+          const m = Math.max(Math.abs(dx), Math.abs(dy));
+          at = { x: d.start.x + Math.sign(dx || 1) * m, y: d.start.y + Math.sign(dy || 1) * m };
+        }
+      }
+      setLines(r.lines);
+      setPointer(e, drawing === 'line' ? `${Math.round(Math.hypot(at.x - d.start.x, at.y - d.start.y))} px` : `${Math.round(Math.abs(at.x - d.start.x))} × ${Math.round(Math.abs(at.y - d.start.y))}`);
+      return setDrag({ ...d, at });
+    }
     if (d.kind === 'guide') {
       const s = toSlide(e.clientX, e.clientY);
       const at = Math.round(d.axis === 'x' ? s.x : s.y);
@@ -1111,6 +1147,12 @@ export const SlideCanvas = forwardRef<
         })
         .map((e) => e.id);
       onSel([...new Set([...d.add, ...ids])]);
+      return;
+    }
+    if (d.kind === 'draw') {
+      // Hardly moved: a click, which puts the part where it was at its default size.
+      if (Math.hypot((d.at.x - d.start.x) * k, (d.at.y - d.start.y) * k) < 4) onDraw?.({ at: d.start });
+      else onDraw?.({ from: d.start, to: d.at });
       return;
     }
     if (d.kind === 'guide') {
@@ -1477,7 +1519,7 @@ export const SlideCanvas = forwardRef<
       tabIndex={-1}
       data-slide-canvas
       data-k={k}
-      className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy', picking && 'cursor-crosshair')}
+      className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy', (picking || drawing) && 'cursor-crosshair')}
       onScroll={pinRulers}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -1582,6 +1624,14 @@ export const SlideCanvas = forwardRef<
                       })
                     : null;
                 })()}
+              {drag?.kind === 'draw' &&
+                (drawing === 'line' ? (
+                  <svg className="pointer-events-none absolute top-0 left-0 overflow-visible" width={1} height={1}>
+                    <line x1={S(drag.start.x)} y1={S(drag.start.y)} x2={S(drag.at.x)} y2={S(drag.at.y)} stroke="var(--accent)" strokeWidth={2} />
+                  </svg>
+                ) : (
+                  <div className="pointer-events-none absolute border-2 border-accent bg-accent/10" style={{ left: S(Math.min(drag.start.x, drag.at.x)), top: S(Math.min(drag.start.y, drag.at.y)), width: S(Math.abs(drag.at.x - drag.start.x)), height: S(Math.abs(drag.at.y - drag.start.y)) }} />
+                ))}
               {m && (
                 <div
                   className="pointer-events-none absolute border border-accent bg-accent/10"
