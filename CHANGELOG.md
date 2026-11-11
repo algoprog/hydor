@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.0 · 11 November 2026
+
+Settings, redesigned: every section is calmer and easier to scan, and Memory is rebuilt from the ground up.
+
+- **Every section reads the same way**: short groups of settings, each with its name, at most one short line on what
+  it does, and its switch or button at the end. The longer explanations sit behind an **(i)** beside a setting's
+  name, and the line under each section's title ends with **Learn more**, which opens its part of Help.
+- **The main switch or button sits beside the section's title**: Memory, the browser and computer use turn on and off
+  there, and **Add server**, **New task** or **New skill** are there too. Rarer actions are in a row's **⋯** menu,
+  and forms such as a new password, an API key or a token open in a dialog.
+- **Memory**: your profile first, then your notes as an index of places (about you, each project, sessions, notes no
+  agent needed lately, deleted notes), each opening as a page of its own with its own search. A note opens with
+  everything about it in one place: its whole text, where it came from, how it is known, how often agents needed it,
+  its end date and its history, to edit, delete or restore. The options are grouped as **Learning**, **What agents
+  get** and **Your data**.
+- **Models**: the tiers show one program at a time (Claude Code, Codex or Custom), a row for each tier.
+- **General**: groups for the look, sessions, terminals, starting and updating, and help; the version and its
+  updates are one row.
+- **Long lists show their first few** (projects, agents, examples, models) with **Show all**.
+- **On a phone**, a row's switch or button stays on its line.
+- **The search box** (Ctrl+K) keeps pointing at a setting low on a page while the page fills in above it.
+
 ## 0.54.4 · 11 November 2026
 
 Agent program updates no longer fail because a Mac went to sleep while a new version was being checked.
