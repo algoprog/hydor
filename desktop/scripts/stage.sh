@@ -3,7 +3,7 @@
 # of computer it is for, or on a GitHub runner of that kind; scripts/dist.sh then packs it):
 #   build/server  the server and the web app, built, with their production packages (native ones for this system)
 #   build/node    Node.js, which runs the server and the agents' npm installs
-#   build/bin     tmux, for the terminals (built from source: macOS has none, and Linux systems differ); on Windows,
+#   build/bin     the `hydor` command's launcher (macOS and Linux; the app links /usr/local/bin/hydor to it) and tmux, for the terminals (built from source: macOS has none, and Linux systems differ); on Windows,
 #                 where the server runs terminals itself, hydor-computer.exe instead: computer use's helper, built
 #                 from server/computer/windows-helper.cs with the C# compiler Windows has
 #   build/BUILD   this build's name: its version, commit and when it was made (the app copies its server once per build)
@@ -23,6 +23,26 @@ case "$os" in
   win32) export PATH="/usr/bin:$PATH" ;;
   *) echo "This stages the desktop app on macOS, Windows or Linux." >&2; exit 1 ;;
 esac
+# The `hydor` command inside the app: a launcher that runs the app's own Node.js on the app's own cli.js, so the command
+# needs no Node.js of the user's and follows the app wherever it is.
+write_launcher() {
+  cat > "$1" <<'LAUNCHER'
+#!/bin/sh
+# The `hydor` command of the Hydor app: runs the app's own Node.js on the app's own command (server/dist/server/cli.js).
+# /usr/local/bin/hydor is a link to this file, so it finds where it is through the links first.
+self="$0"
+while [ -h "$self" ]; do
+  dir="$(cd -P "$(dirname "$self")" && pwd -P)"
+  link="$(readlink "$self")"
+  case "$link" in /*) self="$link" ;; *) self="$dir/$link" ;; esac
+done
+res="$(cd -P "$(dirname "$self")/.." && pwd -P)"
+# Inside the Mac app, `hydor` opens the app rather than starting a server of its own.
+case "$res" in *.app/Contents/Resources) HYDOR_APP_BUNDLE="${res%/Contents/Resources}"; export HYDOR_APP_BUNDLE ;; esac
+exec "$res/node/bin/node" "$res/server/dist/server/cli.js" "$@"
+LAUNCHER
+  chmod 755 "$1"
+}
 # A path as Node.js reads it (Git's bash on Windows writes /d/a/…).
 native() { if [ "$os" = win32 ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 [ -f "$root/dist/server/index.js" ] && [ -f "$root/dist/web/index.html" ] || { echo "Build the app first: npm ci && npm run build" >&2; exit 1; }
@@ -84,6 +104,9 @@ if [ "$os" != win32 ]; then
   echo "== tmux"
   mkdir -p "$out/bin"
   "$here/scripts/build-tmux.sh" "$out/bin"
+  echo "== The hydor command"
+  write_launcher "$out/bin/hydor"
+  sh -n "$out/bin/hydor"
 else
   echo "== Computer use's helper"
   mkdir -p "$out/bin"

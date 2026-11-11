@@ -29,6 +29,10 @@
 // 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
 // and Esc let go while the agent itself presses it; on Linux the app takes the agent's screenshots.
 //
+// The hydor command (a Mac): bin/hydor inside the app runs the app's own Node.js on the app's own cli.js, and
+// /usr/local/bin/hydor links to it (see "the hydor command" below). Under the app the command opens the app when it is
+// not running, rather than starting a server of its own.
+//
 // Notices (a session finished, failed or needs you): the server sends each one here ({ type: 'notice' }), and the app
 // shows it as the system's own notification, even with the window closed; clicking it opens that session. The page in
 // the window shows none itself, only those the system did not show (not allowed in its settings), handed to it here.
@@ -1053,6 +1057,153 @@ function action(what) {
 
 const go = (at) => (serverUrl ? openWindow(at) : openWindow());
 
+// ---- the `hydor` command in Terminal (a Mac) -----------------------------------------------------------------------
+
+// The app carries the command (bin/hydor, which runs the app's own Node.js on the app's own cli.js); /usr/local/bin/hydor
+// is a link to it. At each start the app makes that link when it can without a password (replacing one that points at
+// where the app used to be); otherwise it offers once, and Hydor ▸ Install ‘hydor’ Command… does it whenever you want.
+const CLI_LINK = '/usr/local/bin/hydor';
+const CLI_TARGET = path.join(RES, 'bin/hydor');
+/** Written when the app first offers the command, and when you remove it (the app then leaves the link alone). */
+const CLI_OFFERED = path.join(DATA, 'cli-offered');
+const CLI_REMOVED = path.join(DATA, 'cli-removed');
+const CLI_FROM_AN_APP = '.app/Contents/Resources/bin/hydor';
+
+const cliHere = () => MAC && PACKAGED && exists(CLI_TARGET);
+const realOf = (p) => {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return null;
+  }
+};
+
+/** The link now: `ours` (to this app's launcher), `stale` (to another place's app, as when this one moved), `other` (anything else: never touched), or `none`. */
+function cliState() {
+  let to;
+  try {
+    if (!fs.lstatSync(CLI_LINK).isSymbolicLink()) return 'other';
+    to = path.resolve(path.dirname(CLI_LINK), fs.readlinkSync(CLI_LINK));
+  } catch (e) {
+    return e && e.code === 'ENOENT' ? 'none' : 'other';
+  }
+  if (to === CLI_TARGET || (realOf(CLI_LINK) && realOf(CLI_LINK) === realOf(CLI_TARGET))) return 'ours';
+  return to.endsWith(CLI_FROM_AN_APP) ? 'stale' : 'other';
+}
+
+/** Whether the link can be made without a password: /usr/local/bin is there and yours, or /usr/local is yours to make it in. */
+const cliWithoutPassword = () => (exists('/usr/local/bin') ? writable('/usr/local/bin') : writable('/usr/local'));
+
+/** Makes the link without a password. False when that is not possible, or when it holds something that is not this app's (unless `replaceOther`). */
+function cliLinkQuietly(replaceOther = false) {
+  const state = cliState();
+  if (state === 'ours') return true;
+  if ((state === 'other' && !replaceOther) || !cliWithoutPassword()) return false;
+  try {
+    fs.mkdirSync(path.dirname(CLI_LINK), { recursive: true });
+    if (state !== 'none') fs.unlinkSync(CLI_LINK);
+    fs.symlinkSync(CLI_TARGET, CLI_LINK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The AppleScript that makes the link with the administrator's password; the path is quoted for AppleScript's string and then for the shell. */
+function cliInstallScript(target) {
+  const literal = `"${target.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `do shell script "mkdir -p /usr/local/bin && ln -sfn " & quoted form of ${literal} & " ${CLI_LINK}" with administrator privileges`;
+}
+
+/** Runs AppleScript, which asks for the password. 'cancelled' when you decline it (error -128), else null or the error's words. */
+function cliAsAdmin(script) {
+  return new Promise((resolve) => {
+    execFile('osascript', ['-e', script], { timeout: 300_000 }, (err, _out, stderr) => {
+      if (!err) return resolve(null);
+      const said = String(stderr || err.message || err).trim();
+      resolve(/\(-128\)/.test(said) ? 'cancelled' : said || 'It did not work.');
+    });
+  });
+}
+
+/** A message on the window when it shows, else on its own. */
+const cliSay = (o) => dialog.showMessageBox(...(win && !win.isDestroyed() && win.isVisible() ? [win] : []), { buttons: ['OK'], ...o });
+
+async function installCli() {
+  if (!cliHere()) return;
+  let state = cliState();
+  if (state === 'ours') return void (await cliSay({ type: 'info', message: 'The hydor command is already set up', detail: 'Open a new Terminal window and run hydor.' }));
+  if (state === 'other') {
+    if (fs.lstatSync(CLI_LINK).isDirectory()) return void dialog.showErrorBox('The hydor command could not be installed', `${CLI_LINK} is a folder. Move it away first.`);
+    const { response } = await cliSay({ type: 'question', message: `Replace ${CLI_LINK}?`, detail: 'Something else is installed there as hydor. The command inside this app would take its place.', buttons: ['Replace', 'Cancel'], defaultId: 1, cancelId: 1 });
+    if (response !== 0) return;
+  }
+  fs.rmSync(CLI_REMOVED, { force: true });
+  let failed = null;
+  if (!cliLinkQuietly(state === 'other')) {
+    failed = await cliAsAdmin(cliInstallScript(CLI_TARGET));
+    if (failed === 'cancelled') return;
+  }
+  appMenu();
+  if (failed) return void dialog.showErrorBox('The hydor command could not be installed', failed);
+  await cliSay({ type: 'info', message: 'The hydor command is ready', detail: 'Open a new Terminal window and run hydor. hydor help lists what it does.' });
+}
+
+async function removeCli() {
+  if (!cliHere()) return;
+  const state = cliState();
+  if (state !== 'ours' && state !== 'stale') return;
+  try {
+    fs.writeFileSync(CLI_REMOVED, String(Date.now()));
+  } catch {}
+  let failed = null;
+  try {
+    fs.unlinkSync(CLI_LINK);
+  } catch {
+    failed = await cliAsAdmin(`do shell script "rm -f ${CLI_LINK}" with administrator privileges`);
+    if (failed === 'cancelled') return void fs.rmSync(CLI_REMOVED, { force: true });
+  }
+  appMenu();
+  if (failed) {
+    fs.rmSync(CLI_REMOVED, { force: true });
+    return void dialog.showErrorBox('The hydor command could not be removed', failed);
+  }
+  await cliSay({ type: 'info', message: 'The hydor command was removed', detail: 'Terminal no longer finds hydor. Hydor ▸ Install ‘hydor’ Command… brings it back.' });
+}
+
+/** At the start, in the background: the link where it can be made without a password, else the offer, once. */
+async function cliAtStart() {
+  if (!cliHere()) return;
+  const state = cliState();
+  trace('hydor command', state, CLI_TARGET);
+  if (state === 'ours' || state === 'other' || exists(CLI_REMOVED)) return;
+  if (cliLinkQuietly()) {
+    trace('hydor command linked');
+    return void appMenu();
+  }
+  if (HIDDEN || process.env.CI || exists(CLI_OFFERED)) return;
+  // After the window shows, so the question comes on the app and not on its logo.
+  if (!win || win.isDestroyed()) return;
+  if (!win.isVisible()) await new Promise((resolve) => (win.once('show', resolve), win.once('closed', resolve)));
+  await new Promise((r) => setTimeout(r, 1500));
+  if (!win || win.isDestroyed() || cliState() === 'ours') return;
+  try {
+    fs.writeFileSync(CLI_OFFERED, String(Date.now()));
+  } catch {}
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'question',
+    message: 'Use Hydor in Terminal?',
+    detail: 'Installing the hydor command lets you talk to your agents from Terminal, and macOS asks for your password to add it to /usr/local/bin.',
+    buttons: ['Install…', 'Not Now'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) await installCli();
+}
+
+/** The Hydor menu's item for the command (a Mac, from the packaged app). */
+const cliMenuItem = () => (cliHere() ? [cliState() === 'ours' ? { label: 'Remove ‘hydor’ Command…', click: () => void removeCli() } : { label: 'Install ‘hydor’ Command…', click: () => void installCli() }] : []);
+
 // ---- menus ------------------------------------------------------------------------------------------------------
 
 let tray = null;
@@ -1121,6 +1272,7 @@ function appMenu() {
             update,
             { type: 'separator' },
             { label: 'Settings…', accelerator: 'Cmd+,', click: () => go('/settings') },
+            ...cliMenuItem(),
             { type: 'separator' },
             { role: 'hide' },
             { role: 'hideOthers' },
@@ -1237,6 +1389,8 @@ app.whenReady().then(async () => {
   if (!HIDDEN) openWindow();
   else app.dock?.hide();
   await start();
+  // The hydor command, in the background (a packaged Mac app).
+  void cliAtStart();
 });
 
 app.on('window-all-closed', () => {
