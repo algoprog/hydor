@@ -25,8 +25,8 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   did not start as the app asked for them, why, with Try again), and another assistant applies from your next
   message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
-- Fork a session from any reply, or edit an earlier message and go on from there, with the files put back as
-  they were. Compact a long session, stop a turn, resume an old one.
+- Fork a session from any reply (a Claude Code reply from before a compaction too, with the conversation as it was
+  then), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
@@ -56,7 +56,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   ones it can get with npm by itself (with an ACP adapter when the agent needs one, without install scripts); the
   others show their own install command.
 - Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
-  shows its own usage and limits. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
+  shows its own usage and limits, and an added Claude account trusts the folders the main sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage moves, with its history, to another account with usage left and carries on, and the app's own quick
   questions (the helper model, apps' model steps) go to the next signed-in account too.
   With **Use API credit at a limit** (off by default), Claude Code sessions carry on billed to an Anthropic API key saved for an

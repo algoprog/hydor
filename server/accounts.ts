@@ -5,6 +5,7 @@
 import crypto from 'node:crypto';
 import { linkPath } from './platform.ts';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { Agent, AgentAccount } from '../shared/types.ts';
 import { HttpError } from './auth.ts';
@@ -72,6 +73,45 @@ export function accountEnv(db: DB, agent: Agent, id: string | null | undefined):
   }
   if (a.agent !== agent) throw new HttpError(400, `That is a ${a.agent === 'claude' ? 'Claude Code' : 'Codex'} account`);
   return a.agent === 'claude' ? { CLAUDE_CONFIG_DIR: a.dir } : { CODEX_HOME: a.dir };
+}
+
+/** The default Claude Code account's own settings: ~/.claude.json, or .claude.json in CLAUDE_CONFIG_DIR. */
+const defaultClaudeJson = () => (process.env.CLAUDE_CONFIG_DIR ? path.join(process.env.CLAUDE_CONFIG_DIR, '.claude.json') : path.join(os.homedir(), '.claude.json'));
+
+/**
+ * Claude Code leaves out a folder's own permission rules (its .claude/settings.json) until the folder is trusted,
+ * and each account keeps its own list of trusted folders. Before a session starts in `cwd` as an added account,
+ * a folder trusted with the default account (`cwd` or one it is in) is trusted with this one too, as the person
+ * already said. Nothing changes for a folder the default account does not trust, or an account not signed in.
+ */
+export function shareTrust(accountDir: string, cwd: string, from = defaultClaudeJson()) {
+  const read = (f: string): Record<string, any> | null => {
+    try {
+      return JSON.parse(fs.readFileSync(f, 'utf8'));
+    } catch {
+      return null;
+    }
+  };
+  // The folder (`cwd` or one it is in) a settings file trusts, by its key there (Windows keys may use / or \).
+  const trusted = (cfg: Record<string, any> | null): string | null => {
+    const keys = new Map(Object.entries(cfg?.projects ?? {}).flatMap(([k, v]) => ((v as any)?.hasTrustDialogAccepted === true ? [[k.replace(/\\/g, '/'), k] as const] : [])));
+    for (let d = path.resolve(cwd); ; d = path.dirname(d)) {
+      const k = keys.get(d.replace(/\\/g, '/'));
+      if (k) return k;
+      if (path.dirname(d) === d) return null;
+    }
+  };
+  const folder = trusted(read(from));
+  if (!folder) return;
+  const own = path.join(accountDir, '.claude.json');
+  if (!fs.existsSync(own) || fs.lstatSync(own).isSymbolicLink()) return;
+  const cfg = read(own);
+  if (!cfg || trusted(cfg)) return;
+  cfg.projects = { ...cfg.projects, [folder]: { ...cfg.projects?.[folder], hasTrustDialogAccepted: true } };
+  // Whole, or not at all: Claude Code reads this file at any moment.
+  const tmp = `${own}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, own);
 }
 
 /** The added account whose folder holds a transcript, by its path. */
