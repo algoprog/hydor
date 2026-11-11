@@ -3,6 +3,17 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.2 · 11 November 2026
+
+The prompt bar keeps its spinning ring while a session's background work still runs.
+
+- **When a turn ends while what it started is still running** (a helper agent, a command in the background, a
+  monitor or a child session), the ring by the message box keeps turning, now around the **Send** button, until they
+  finish. Before, it stopped, so the session looked finished although its header said "Working · 2 in background".
+  You can send messages as usual meanwhile, and pointing at the button says what is still running.
+- It also shows when the session's own process has stopped between turns while its child sessions run, on session
+  pages and in Help's ask panel.
+
 ## 0.55.1 · 11 November 2026
 
 The desktop apps' notices come as your system's own notifications, such as Mac notifications, even with the window
