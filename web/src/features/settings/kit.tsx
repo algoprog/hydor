@@ -84,8 +84,10 @@ export function Row({
   disabled?: boolean;
   className?: string;
 }) {
+  // The name and its line keep at least 9rem beside the control: a switch or a small button stays on the row's
+  // line on a phone; a wide control (a Segmented of four) goes under them, lined up with the name.
   const text = (
-    <div className="min-w-[min(100%,13rem)] flex-1">
+    <div className="min-w-[min(100%,9rem)] flex-1">
       <div className="flex min-h-5 items-center gap-1 text-[14px] leading-snug text-fg">
         <span className="min-w-0 break-words">{label}</span>
         {info && <Info>{info}</Info>}
@@ -109,13 +111,15 @@ export function Row({
       </button>
     );
   return (
-    <div className={cx('px-4 py-3', disabled && 'opacity-50', className)}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {tile}
-        {text}
-        {control && <div className="flex shrink-0 items-center gap-2">{control}</div>}
+    <div className={cx('flex gap-3 px-4 py-3', children ? 'items-start' : 'items-center', disabled && 'opacity-50', className)}>
+      {tile}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {text}
+          {control && <div className="flex shrink-0 flex-wrap items-center gap-2">{control}</div>}
+        </div>
+        {children && <div className="mt-2.5">{children}</div>}
       </div>
-      {children && <div className={cx('mt-2.5', icon && 'sm:pl-11')}>{children}</div>}
     </div>
   );
 }
