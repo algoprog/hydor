@@ -145,7 +145,7 @@ Clicking a note opens it in a dialog, titled **Note**, **Topic** or **Profile**,
 - **Where**: **About you**, the project (its folder's name and path), or the session it belongs to (click its name to open the session).
 - **Written**: **Added** or **Changed** and when, **by you**, **by an agent** or **by the helper** (the tidy-up), and the session it came from, which you can click to open. Point at it for the exact dates.
 - **How it is known**: **you said so**, **checked** or **not checked yet** (point at it for what that means). Notes from before this was kept say nothing.
-- **Needed**: **Once**, **N times** (with when last) or **Not yet**.
+- **Needed by agents**: **Once**, **N times** (with when last) or **Not yet**.
 - **End date**: the date, or **None**, with **Change** (see below).
 - **Sums up**, for a topic or profile: how many notes it stands for, with **Show** to list them, deleted ones struck through.
 - **History**: **Show** lists every step in the note's life, newest first: Added, Changed (old text → new text), Deleted, Restored, End date ("Until" a date, or "Taken away"), How it is known, each with when, by whom, in which session, and why. **Hide** closes it.

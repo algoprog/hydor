@@ -162,7 +162,7 @@ export function NoteDialog({ entry, stale, onClose, onChanged }: { entry: Memory
               </span>
             </Fact>
           )}
-          <Fact name="Needed">
+          <Fact name="Needed by agents">
             {e.uses > 0 ? (
               <>
                 <span>{e.uses === 1 ? 'Once' : `${e.uses} times`}</span>
