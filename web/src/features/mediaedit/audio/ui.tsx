@@ -1,123 +1,11 @@
-// The editor's own controls, made to the shell's spec so they can join the picture and video editors' later: a menu
-// bar (menus with their shortcuts, a submenu a level deep), a dock of panels that fold and a width dragged and
+// The editor's own controls, made to the shell's spec so they can join the picture and video editors' later (its menus
+// are the shell's: MenuBar, ContextMenu): a dock of panels that fold and a width dragged and
 // remembered, a number field whose label drags its value (as in pro apps), a slider with its value to type in and a
 // double-click to put it back, and a status line. Dense but legible: 12 to 13 px text, 28 to 32 px controls, the app's
 // own colours.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, ChevronRight } from 'lucide-react';
-import { cx, Popover } from '../../../components/ui';
-
-// ---- the menu bar --------------------------------------------------------------------------------------------------
-
-export type MenuEntry =
-  | 'sep'
-  | { label: string; title?: string }
-  | {
-      label: ReactNode;
-      icon?: ReactNode;
-      keys?: string;
-      onClick?: () => void;
-      disabled?: boolean;
-      checked?: boolean;
-      sub?: MenuEntry[];
-    };
-
-export interface MenuDef {
-  label: string;
-  items: MenuEntry[];
-}
-
-/** Shortcuts as this computer writes them: ⌘ on a Mac. */
-export const keyText = (k: string) => (/Mac|iPhone|iPad/.test(navigator.platform) ? k.replace(/Ctrl\+/g, '⌘').replace(/Shift\+/g, '⇧').replace(/Alt\+/g, '⌥') : k);
-
-function Entries({ items, close }: { items: MenuEntry[]; close: () => void }) {
-  const [sub, setSub] = useState<number | null>(null);
-  const subRef = useRef<HTMLButtonElement | null>(null);
-  return (
-    <div className="min-w-[15rem] py-0.5">
-      {items.map((it, i) => {
-        if (it === 'sep') return <div key={i} className="mx-1.5 my-1 h-px bg-line" />;
-        if ('title' in it || !('onClick' in it || 'sub' in it))
-          return (
-            <div key={i} className="px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium tracking-wide text-fg-3 uppercase">
-              {it.label}
-            </div>
-          );
-        const e = it as Exclude<MenuEntry, 'sep' | { label: string; title?: string }>;
-        return (
-          <div key={i}>
-            <button
-              ref={(el) => void (sub === i && (subRef.current = el))}
-              type="button"
-              disabled={e.disabled}
-              onClick={() => {
-                if (e.sub) return setSub(sub === i ? null : i);
-                close();
-                e.onClick?.();
-              }}
-              className="flex h-7.5 w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] text-fg hover:bg-bg-2 disabled:pointer-events-none disabled:opacity-40"
-            >
-              <span className="flex w-4 shrink-0 items-center justify-center text-fg-3">{e.checked ? <Check size={13} strokeWidth={2.5} className="text-fg" /> : e.icon}</span>
-              <span className="min-w-0 flex-1 truncate">{e.label}</span>
-              {e.keys && <span className="tnum shrink-0 pl-3 text-[11px] text-fg-3">{keyText(e.keys)}</span>}
-              {e.sub && <ChevronRight size={13} className={cx('shrink-0 text-fg-3', sub === i && 'rotate-90')} />}
-            </button>
-            {e.sub && sub === i && (
-              <div className="ml-4 border-l border-line pl-1">
-                <Entries items={e.sub} close={close} />
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Menus across the top: a title opens its menu; with one open, pointing at another opens that one. */
-export function MenuBar({ menus, className }: { menus: MenuDef[]; className?: string }) {
-  const [open, setOpen] = useState<number | null>(null);
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const anchor = useRef<HTMLButtonElement | null>(null);
-  anchor.current = open !== null ? refs.current[open] : null;
-  return (
-    <nav aria-label="Menus" className={cx('flex items-center', className)}>
-      {menus.map((m, i) => (
-        <button
-          key={m.label}
-          ref={(el) => void (refs.current[i] = el)}
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={open === i}
-          onClick={() => setOpen(open === i ? null : i)}
-          onPointerEnter={() => open !== null && open !== i && setOpen(i)}
-          className={cx('h-7 rounded-md px-2 text-[12.5px] font-medium', open === i ? 'bg-bg-2 text-fg' : 'text-fg-2 hover:bg-bg-2 hover:text-fg')}
-        >
-          {m.label}
-        </button>
-      ))}
-      <Popover anchor={anchor} open={open !== null} onClose={() => setOpen(null)} width={290} title={open !== null ? menus[open]?.label : undefined}>
-        {open !== null && <Entries items={menus[open].items} close={() => setOpen(null)} />}
-      </Popover>
-    </nav>
-  );
-}
-
-/** All the menus under one button (a phone). */
-export function MenuButton({ menus, children, label }: { menus: MenuDef[]; children: ReactNode; label: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLButtonElement>(null);
-  return (
-    <>
-      <button ref={ref} type="button" aria-label={label} title={label} onClick={() => setOpen((x) => !x)} className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fg-2 hover:bg-bg-2', open && 'bg-bg-2 text-fg')}>
-        {children}
-      </button>
-      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title={label}>
-        <Entries items={menus.flatMap((m, i): MenuEntry[] => [...(i ? (['sep'] as MenuEntry[]) : []), { label: m.label, title: m.label }, ...m.items])} close={() => setOpen(false)} />
-      </Popover>
-    </>
-  );
-}
+import { ChevronDown } from 'lucide-react';
+import { cx } from '../../../components/ui';
 
 // ---- remembered sizes and folds --------------------------------------------------------------------------------------
 
@@ -160,10 +48,17 @@ export function Splitter({ width, min, max, onSize, side = 'left' }: { width: nu
 }
 
 /** A panel of the dock: its title folds it (remembered), with what it may do at its right. */
-export function DockPanel({ id, title, icon, aside, children, grow }: { id: string; title: string; icon?: ReactNode; aside?: ReactNode; children: ReactNode; grow?: boolean }) {
+export function DockPanel({ id, title, icon, aside, children, grow, reveal }: { id: string; title: string; icon?: ReactNode; aside?: ReactNode; children: ReactNode; grow?: boolean; reveal?: number }) {
   const [open, setOpen] = useRemembered(`panel:${id}`, true);
+  const box = useRef<HTMLElement>(null);
+  // `reveal` counts up each time something asks for the panel to be shown (a menu's Properties…): it opens and scrolls into view.
+  useEffect(() => {
+    if (!reveal) return;
+    setOpen(true);
+    box.current?.scrollIntoView({ block: 'nearest' });
+  }, [reveal]);
   return (
-    <section className={cx('flex flex-col border-b border-line', open && grow ? 'min-h-0 flex-1' : 'shrink-0')}>
+    <section ref={box} className={cx('flex flex-col border-b border-line', open && grow ? 'min-h-0 flex-1' : 'shrink-0')}>
       <div className="flex h-8 shrink-0 items-center gap-1 pr-1.5 pl-2">
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[12px] font-semibold tracking-wide text-fg-2 hover:text-fg">
           <ChevronDown size={13} className={cx('shrink-0 text-fg-3 transition-transform', !open && '-rotate-90')} />

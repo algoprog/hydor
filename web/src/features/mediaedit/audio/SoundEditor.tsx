@@ -1,15 +1,19 @@
 // The sound editor, in a tab of its own (host.tsx), as Audition and Audacity lay theirs out: a menu bar (File, Edit,
-// Effects, Generate, View) with Undo, Redo, Save a copy and Save; the transport (play, stop, record, loop, the time, the
-// part picked, snapping, zoom, the meter); the tracks as lanes (Tracks.tsx); a dock of panels (Effects, Properties,
-// History, AI); and a status line. Nothing of the sounds changes while editing: the edit is a recipe (shared/
+// Effects, Generate, View, Help: the app's own menus, which also make the keys shown beside them work) with Undo, Redo,
+// Save a copy and Save; the transport (play, stop, record, loop, the time, the part picked, snapping, zoom, the meter);
+// the tracks as lanes (Tracks.tsx), each with a right-click menu (a long press on a phone) for what is under the
+// pointer; a dock of panels (Effects, Properties, History, AI); and a status line. Sounds and videos dropped on it come
+// in on the track they fall on, or a new one. J, K and L shuttle; the part picked's edges and splits snap to zero
+// crossings and a time grid; the other tracks and the markers follow a deletion or a paste (as Audacity's sync-lock). Nothing of the sounds changes while editing: the edit is a recipe (shared/
 // mediaedit-audio.ts) the browser plays as it will be (engine.ts) and the server makes with ffmpeg on Save, with its
 // progress and a way to stop; then it goes back where it came from (a file, a Library sound, a video), or as a copy.
 // On a phone: one track at a time, the transport at the bottom, the panels as sheets, the menus under one button.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { AudioLines, ChevronDown, Ellipsis, History as HistoryIcon, Menu, Plus, Redo2, SlidersHorizontal, Sparkles, Undo2, X } from 'lucide-react';
+import { AudioLines, ChevronDown, Ellipsis, History as HistoryIcon, Plus, Redo2, SlidersHorizontal, Sparkles, Undo2, X } from 'lucide-react';
 import {
   changeSpeed,
   clearRange,
+  clipFade,
   clipEnd,
   clipLength,
   copyRange,
@@ -17,11 +21,16 @@ import {
   deleteRanges,
   EFFECT_TYPES,
   EFFECTS,
+  envRemove,
+  envScale,
+  envSlice,
   insertGap,
   isFiller,
   moveClip,
   newId,
   pasteAt,
+  placeClip,
+  rippleTracks,
   shortenPauses,
   silencesIn,
   SOUND_FORMATS,
@@ -34,6 +43,7 @@ import {
   trimClip,
   trimTo,
   wordsOnTrack,
+  type EnvPoint,
   type SoundClip,
   type SoundClipboard,
   type SoundEditJob,
@@ -49,20 +59,23 @@ import {
 } from '@shared/mediaedit-audio';
 import { Button, cx, Dialog, Empty, IconButton, Segmented, Throbber, useIsMobile } from '../../../components/ui';
 import { go } from '../../../lib/nav';
+import { COPY_DRAG_KEY, NO_SNAP_KEY } from '../../pages/common/keys';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { useMedia } from '../../media/state';
 import type { EditorProps, OpenEditor } from '../host';
 import { makeClock } from '../video/clock';
+import { ContextMenu, isMenuKey, isMod, MenuBar, runMenuKeys, shortcutGroups, ShortcutsDialog, type ContextMenuAt, type MenuAction, type MenuDef, type MenuEntry } from '../shell';
 import { viaLink } from '../../../lib/machine';
 import { keepSound, makeSoundEdit, readWords, soundFacts, startWords, stopSoundEdit, type MakeKind } from './api';
 import { decodeBlob, decodeSound, measure, renderTrack, SoundPlayer, timeEffects, type Decoded } from './engine';
 import { AddEffect, AiPanel, EffectsRack, GROUPS, HistoryList, Properties } from './panels';
 import { useStepHistory } from './history';
 import { startRecording, type Recorder } from './record';
-import { HEAD, Tracks, type Marker, type Phase, type Picked, type Recording, type Sel } from './Tracks';
+import { cleanTempo, hop, TEMPO, zeroOnTrack, type Grid } from './snap';
+import { HEAD, Tracks, type Marker, type MenuTarget, type Phase, type Picked, type Recording, type Sel } from './Tracks';
 import { Transport } from './Transport';
-import { DockPanel, MenuBar, MenuButton, Splitter, StatusBar, useRemembered, useWidth, type MenuDef, type MenuEntry } from './ui';
+import { DockPanel, Splitter, StatusBar, useRemembered, useWidth } from './ui';
 
 /** What was copied, shared by every sound editor open (copy in one, paste in another). */
 let clipboard: SoundClipboard | null = null;
@@ -251,10 +264,20 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   const [modes, setModes] = useState<Record<string, 'wave' | 'spectrum'>>({});
   const [amp, setAmp] = useState(1);
   const [snap, setSnap] = useRemembered('snap', true);
+  // The part picked's edges and splits go to the nearest zero crossing (cutting there does not click); a time grid to snap to.
+  const [zero, setZero] = useRemembered('zero', true);
+  const [grid, setGrid] = useRemembered<Grid>('grid', { kind: 'off' });
+  // A deletion or a paste on some tracks moves every track and the markers with it (as Audacity's sync-lock).
+  const [inStep, setInStep] = useRemembered('instep', true);
   const [loop, setLoop] = useState(false);
   const [dockW, setDockW] = useRemembered('dock', 300);
   const [sheet, setSheet] = useState<'effects' | 'props' | 'history' | 'ai' | null>(null);
   const [aiKind, setAiKind] = useState<MakeKind | undefined>(undefined);
+  /** The right-click menu: where it is and what it is on. */
+  const [ctx, setCtx] = useState<{ at: ContextMenuAt; what: MenuTarget } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [revealProps, setRevealProps] = useState(0);
+  const [dropping, setDropping] = useState(false);
 
   // ---- playing -----------------------------------------------------------------------------------------------------
   const [playing, setPlaying] = useState(false);
@@ -273,25 +296,37 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     }
     return out;
   }, [r, version > 0 && !!main?.d]);
+  /** How fast and which way it plays (J and L shuttle: −4 to 4; 1 is as it is). */
+  const [rate, setRate] = useState(1);
   const stop = useCallback((back?: boolean) => {
     player.stop();
     setPlaying(false);
+    setRate(1);
     if (back) clock.set(startedAt.current);
   }, []);
-  const play = async (o2: { sel?: boolean; from?: number } = {}) => {
+  const play = async (o2: { sel?: boolean; from?: number; rate?: number } = {}) => {
     if (!main?.d) return;
     const useSel = o2.sel && sel;
+    const rt = o2.rate ?? 1;
     let from = o2.from ?? (useSel ? sel!.a : clock.get());
-    if (from >= L - 0.01 && !useSel) from = 0;
+    if (from >= L - 0.01 && !useSel && rt > 0) from = 0;
+    if (rt < 0 && from <= 0.01) from = 0;
     startedAt.current = from;
+    setRate(rt);
     player.onEnd = () => {
       setPlaying(false);
       clock.set(useSel ? sel!.b : Math.min(L, clock.get()));
     };
-    await player.play(r, get, R, { from, ...(useSel ? { to: sel!.b } : {}), ...(loop ? { loop: sel ? [sel.a, sel.b] : [0, L] } : {}) }, gains);
+    await player.play(r, get, R, { from, ...(rt !== 1 ? { rate: rt } : {}), ...(useSel ? { to: sel!.b } : {}), ...(loop ? { loop: sel ? [sel.a, sel.b] : [0, L] } : {}) }, gains);
     setPlaying(player.playing);
+    if (!player.playing) setRate(1);
   };
   const toggle = () => (playing ? stop() : void play());
+  /** J (backwards) and L (forwards): faster each press, up to four times, like a tape; K (stop) is `stop`. */
+  const shuttle = (dir: -1 | 1) => {
+    if (!playing || Math.sign(rate) !== dir) return void play({ from: clock.get(), rate: dir });
+    void play({ from: clock.get(), rate: Math.max(-4, Math.min(4, rate * 2)) });
+  };
   // The playhead follows it (and the view, a page at a time).
   useEffect(() => {
     if (!playing) return;
@@ -310,13 +345,15 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [playing, laneW]);
-  // What it plays changed: heard at once.
+  // What it plays changed: heard at once. A setting moved (an effect's slider, a track's volume or pan) is changed in the
+  // running sound, which goes on without a break; anything else plays again from where it is.
   const lastR = useRef(r);
   useEffect(() => {
     if (lastR.current === r) return;
     lastR.current = r;
     if (!playing) return;
-    const t = setTimeout(() => void play({ from: clock.get() }), 120);
+    if (player.refresh(r, gains)) return;
+    const t = setTimeout(() => void play({ from: clock.get(), rate }), 120);
     return () => clearTimeout(t);
   }, [r]);
   useEffect(() => {
@@ -339,6 +376,8 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   /** The tracks an edit is made on: the part picked's, else the track picked, else all of them. */
   const scope = () => sel?.tracks ?? (picked ? [picked.track] : allTracks);
   const ripple = !video;
+  /** The tracks a deletion or a paste on `tracks` moves what follows on: all of them while the tracks are kept in step. */
+  const along = (x: SoundRecipe, tracks: string[]) => rippleTracks(x, tracks, ripple && inStep);
   const need = (what: string) => {
     if (!sel) toast(tr(`Pick a part first: drag across the waveform, then ${what}`), 'info');
     return !!sel;
@@ -347,9 +386,23 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     if (!sel && picked?.clip) return deleteClip(picked.track, picked.clip);
     if (!need('delete it')) return;
     const s = sel!;
-    edited(ripple ? 'Delete' : 'Delete (silence left)', (x) => deleteRange(x, s.tracks, s.a, s.b, ripple));
+    edited(ripple ? 'Delete' : 'Delete (silence left)', (x) => deleteRange(x, along(x, s.tracks), s.a, s.b, ripple));
     clock.set(s.a);
     setSel(null);
+  };
+  /** Ripple delete: the part's time is taken out of every track and the markers, whether or not the tracks are kept in step. */
+  const doRippleDelete = () => {
+    if (video) return;
+    const s = sel ?? (picked?.clip ? clipSpan(picked.track, picked.clip) : null);
+    if (!s) return void need('ripple delete it');
+    edited('Ripple delete', (x) => deleteRange(x, allTracks, s.a, s.b, true));
+    clock.set(s.a);
+    setSel(null);
+  };
+  /** A clip's span as a part picked (for the actions that work on a part). */
+  const clipSpan = (track: string, id: string): Sel | null => {
+    const c = r.tracks.find((t) => t.id === track)?.clips.find((k) => k.id === id);
+    return c ? { a: c.at, b: clipEnd(c), tracks: [track] } : null;
   };
   const doSilence = () => {
     if (!need('make it silent')) return;
@@ -366,35 +419,70 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     if (!sel) return need('cut it');
     clipboard = copyRange(r, sel.tracks, sel.a, sel.b, o.src);
     const s = sel;
-    edited('Cut', (x) => deleteRange(x, s.tracks, s.a, s.b, ripple));
+    edited('Cut', (x) => deleteRange(x, along(x, s.tracks), s.a, s.b, ripple));
     clock.set(s.a);
     setSel(null);
   };
-  const doPaste = () => {
+  /** Paste: over the part picked (which it replaces), else at the playhead on the track picked; `where` (a right-click's place) says another. */
+  const doPaste = (where?: { at: number; tracks: string[] }) => {
     const cb = clipboard;
     if (!cb) return toast(tr('Nothing is copied yet: pick a part, then Copy'), 'info');
-    const s = sel;
-    const at = s ? s.a : clock.get();
-    const tracks = s?.tracks ?? (picked ? [picked.track] : [r.tracks[0].id]);
+    const s = where ? null : sel;
+    const at = where ? where.at : s ? s.a : clock.get();
+    const tracks = where?.tracks ?? s?.tracks ?? (picked ? [picked.track] : [r.tracks[0].id]);
     edited('Paste', (x) => {
-      const cleared = s ? deleteRange(x, s.tracks, s.a, s.b, ripple) : { recipe: x, map: (t: number) => t };
-      const pasted = pasteAt(cleared.recipe, tracks, at, cb, ripple, o.src);
+      const cleared = s ? deleteRange(x, along(x, s.tracks), s.a, s.b, ripple) : { recipe: x, map: (t: number) => t };
+      const pasted = pasteAt(cleared.recipe, tracks, at, cb, ripple, o.src, ripple && inStep);
       return { recipe: pasted.recipe, map: (t) => pasted.map(cleared.map(t)) };
     });
     for (const c of cb.tracks.flatMap((t) => t.clips)) if (c.src && c.src !== o.src) load(c.src);
     setSel({ a: at, b: at + cb.length, tracks });
+    clock.set(at);
   };
   const doDuplicate = () => {
     if (!need('duplicate it') || video) return;
     const s = sel!;
     const cb = copyRange(r, s.tracks, s.a, s.b, o.src);
-    edited('Duplicate', (x) => pasteAt(x, s.tracks, s.b, cb, true, o.src));
+    edited('Duplicate', (x) => pasteAt(x, s.tracks, s.b, cb, true, o.src, inStep));
     setSel({ a: s.b, b: s.b + cb.length, tracks: s.tracks });
   };
+  /** The nearest zero crossing of what a track plays at `t` (within 10 ms), when "Snap to zero crossings" is on. */
+  const zeroOn = (x: SoundRecipe, track: string, t: number) => {
+    const tk = x.tracks.find((k) => k.id === track);
+    return zero && tk ? zeroOnTrack(tk, get, t, 0.01) : t;
+  };
+  /** Split the clips of the tracks in scope at the playhead (each at its own nearest zero crossing). */
   const doSplit = () => {
     const t = clock.get();
-    change('Split', (x) => splitAt(x, scope(), t));
+    change('Split', (x) => scope().reduce((acc, id) => splitAt(acc, [id], zeroOn(acc, id, t)), x));
   };
+  /** Clips: the actions of a right-click on one (the span of the clip is the part they work on). */
+  const copyClip = (track: string, id: string) => {
+    const s = clipSpan(track, id);
+    if (!s) return false;
+    clipboard = copyRange(r, [track], s.a, s.b, o.src);
+    toast(tr(`Copied ${soundClock(s.b - s.a, 2)}`), 'ok');
+    return true;
+  };
+  const cutClip = (track: string, id: string) => {
+    const s = clipSpan(track, id);
+    if (!s || !copyClip(track, id)) return;
+    edited('Cut', (x) => deleteRange(x, along(x, [track]), s.a, s.b, ripple));
+    clock.set(s.a);
+    pick({ track });
+  };
+  const duplicateClip = (track: string, id: string) => {
+    const s = clipSpan(track, id);
+    if (!s || video) return;
+    const cb = copyRange(r, [track], s.a, s.b, o.src);
+    edited('Duplicate', (x) => pasteAt(x, [track], s.b, cb, true, o.src, inStep));
+  };
+  /** A fade made with a click (the clip's menu): 0 takes it away. */
+  const setFade = (track: string, id: string, which: 'in' | 'out', seconds: number) =>
+    change(which === 'in' ? 'Fade in' : 'Fade out', (x) => ({
+      ...x,
+      tracks: x.tracks.map((t) => (t.id !== track ? t : { ...t, clips: t.clips.map((c) => (c.id !== id ? c : strip({ ...c, [which === 'in' ? 'fadeIn' : 'fadeOut']: seconds > 0 ? Math.min(seconds, clipLength(c) / 2) : undefined }))) })),
+    }));
   const doTrim = () => {
     if (!need('trim to it')) return;
     const s = sel!;
@@ -406,10 +494,15 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     change('Delete a clip', (x) => ({ ...x, tracks: x.tracks.map((t) => (t.id === track ? { ...t, clips: t.clips.filter((c) => c.id !== id) } : t)) }));
     pick({ track });
   };
-  const [dialog, setDialog] = useState<'silence' | 'speed' | 'pauses' | 'save' | null>(null);
-  const addMarker = () => {
-    const t = clock.get();
+  const [dialog, setDialog] = useState<'silence' | 'speed' | 'pauses' | 'save' | 'keys' | 'tempo' | null>(null);
+  const addMarker = (at?: number) => {
+    const t = at ?? clock.get();
     h.set('Add a marker', (d) => ({ ...d, markers: [...d.markers, { id: newId(), t, name: tr(`Marker ${d.markers.length + 1}`) }].sort((a, b) => a.t - b.t) }));
+  };
+  /** The playhead to the marker or clip edge before (−1) or after (1) it. */
+  const hopTo = (dir: -1 | 1) => {
+    const t = hop(r, doc.markers.map((m) => m.t), clock.get(), dir, L);
+    if (t !== null) seek(t);
   };
   const selectAll = () => setSel({ a: 0, b: L, tracks: allTracks });
 
@@ -421,13 +514,31 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     }
     return null;
   };
-  const onMoveClip = (_track: string, clip: string, toTrack: string, at: number, phase: Phase) => {
-    if (phase === 'begin') return h.begin('Move a clip');
+  const onMoveClip = (_track: string, clip: string, toTrack: string, at: number, phase: Phase, copyOf?: string) => {
+    const label = copyOf ? 'Copy a clip' : 'Move a clip';
+    if (phase === 'begin') return h.begin(label);
     if (phase === 'end') return h.end();
-    change('Move a clip', (x) => {
+    change(label, (x) => {
       const f = findClip(x, clip);
-      return (f && moveClip(x, f.t.id, clip, toTrack, at)) ?? x;
+      if (f) return moveClip(x, f.t.id, clip, toTrack, at) ?? x;
+      // A copy dragged (Ctrl, or ⌥ on a Mac): made where it is dropped, the original left where it was.
+      const orig = copyOf ? findClip(x, copyOf) : null;
+      const dest = x.tracks.find((t) => t.id === toTrack);
+      if (!orig || !dest) return x;
+      const dup: SoundClip = { ...orig.c, id: clip };
+      const where = placeClip(dest.clips, dup, at, x.length);
+      if (!Number.isFinite(where)) return x;
+      return { ...x, tracks: x.tracks.map((t) => (t.id === toTrack ? { ...t, clips: [...t.clips, { ...dup, at: where }].sort((a, b) => a.at - b.at) } : t)) };
     });
+  };
+  /** A clip's volume line changed: a point added, moved or taken out (`undefined`: no line left); a drag is one step. */
+  const onEnv = (track: string, clip: string, env: EnvPoint[] | undefined, phase: Phase, label: string) => {
+    if (phase === 'begin') return h.begin(label);
+    if (phase === 'end') return h.end();
+    change(label, (x) => ({
+      ...x,
+      tracks: x.tracks.map((t) => (t.id !== track ? t : { ...t, clips: t.clips.map((c) => (c.id !== clip ? c : strip({ ...c, env }))) })),
+    }));
   };
   const onTrimClip = (track: string, clip: string, edge: 'start' | 'end', t: number, phase: Phase) => {
     if (phase === 'begin') return h.begin('Trim a clip');
@@ -461,6 +572,12 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       if (patch.at !== undefined) return moveClip(x, track, id, track, patch.at) ?? x;
       const next = strip({ ...c, ...patch }) as SoundClip;
       if (next.to - next.from < 0.01) return x;
+      // Its volume line follows its length: stretched with its speed, cut to what it plays.
+      if (c.env && !('env' in patch)) {
+        const e = envSlice(envScale(c.env, (c.speed ?? 1) / (next.speed ?? 1)), 0, clipLength(next));
+        if (e) next.env = e;
+        else delete next.env;
+      }
       // A clip made longer (slower) moves the clips after it on its track along.
       const grow = clipEnd(next) - clipEnd(c);
       return {
@@ -522,7 +639,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       }
     }
     const found = silencesIn(levels, per, { threshold: form.threshold, min: form.longer });
-    const e = shortenPauses(r, [t.id], found, { longer: form.longer, keep: form.keep, ripple: true });
+    const e = shortenPauses(r, along(r, [t.id]), found, { longer: form.longer, keep: form.keep, ripple: true });
     if (!e.count) return toast(tr('No pause that long was found'), 'info');
     h.set('Shorten pauses', (d) => ({ recipe: e.recipe, markers: d.markers.map((m) => ({ ...m, t: e.map(m.t) })) }));
     toast(tr(`${e.count} pauses shortened: ${soundClock(e.removed, 1)} taken out`), 'ok');
@@ -562,7 +679,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
     edited(ripple ? 'Remove filler words' : 'Silence filler words', (x) =>
       deleteRanges(
         x,
-        [wordTrack.id],
+        along(x, [wordTrack.id]),
         fillers.map((w) => [Math.max(0, w.a - 0.03), w.b + 0.03] as [number, number]),
         ripple,
       ),
@@ -634,22 +751,40 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   // ---- bringing sounds in ---------------------------------------------------------------------------------------------
   const fileInput = useRef<HTMLInputElement>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const putSound = (src: string, name: string, seconds: number, d?: Decoded) => {
+  /** A sound put on a track of its own at the playhead, or (`where`) on this track at this time, where there is room for it. */
+  const putSound = (src: string, name: string, seconds: number, d?: Decoded, where?: { track: string; at: number }) => {
     if (d) sources.current.set(src, { d, progress: 1, name });
     else load(src);
-    const at = clock.get();
+    const at = where?.at ?? clock.get();
     const len = video ? Math.max(0.05, Math.min(seconds, L - at)) : seconds;
-    addTrack({ id: newId(), src, name, at, from: 0, to: len }, name);
+    const clip: SoundClip = { id: newId(), src, name, at, from: 0, to: len };
+    const dest = where && r.tracks.find((t) => t.id === where.track);
+    if (dest) {
+      const spot = placeClip(dest.clips, clip, at, r.length);
+      if (Number.isFinite(spot)) {
+        change(`Add ${name}`, (x) => ({ ...x, tracks: x.tracks.map((t) => (t.id === dest.id ? { ...t, clips: [...t.clips, { ...clip, at: spot }].sort((a2, b2) => a2.at - b2.at) } : t)) }));
+        return pick({ track: dest.id, clip: clip.id });
+      }
+    }
+    addTrack(clip, name);
   };
-  const fromDevice = async (f: File) => {
+  const fromDevice = async (f: File, where?: { track: string; at: number }) => {
     try {
       const [kept, d] = await Promise.all([keepSound(f, f.name), decodeBlob(f, R).catch(() => undefined)]);
-      putSound(kept.src, f.name.replace(/\.[^.]+$/, ''), kept.duration, d);
+      putSound(kept.src, f.name.replace(/\.[^.]+$/, ''), kept.duration, d, where);
     } catch (e) {
       toastError(e);
     }
   };
-
+  /** Sounds (and videos, for their sound) dropped on the editor: on a track, at that time on it; anywhere else, a new track at the playhead. */
+  const dropFiles = (files: File[], x: number, y: number) => {
+    const ok = files.filter((f) => /^(audio|video)\//.test(f.type) || /\.(mp3|wav|flac|m4a|aac|ogg|opus|oga|webm|mp4|mov)$/i.test(f.name));
+    if (!ok.length) return toast(tr('Only sounds, or videos for their sound, can be dropped here'), 'info');
+    const row = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-track]');
+    const lane = row?.querySelector<HTMLElement>('[data-lane]');
+    const where = row && lane && !video ? { track: row.dataset.track!, at: Math.max(0, view.x0 + (x - lane.getBoundingClientRect().left) / view.pps) } : undefined;
+    ok.forEach((f, i) => void fromDevice(f, i === 0 ? where : undefined));
+  };
   // ---- saving --------------------------------------------------------------------------------------------------------
   const plans = soundPlans(o, detached);
   const ownFormat: SoundFormat = plans.main.fixed ?? (facts.format && !facts.video ? facts.format : 'mp3');
@@ -657,13 +792,17 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   const [saving, setSaving] = useState<{ what: string; job?: SoundEditJob; stopped?: boolean } | null>(null);
   const busy = !!saving;
   const jobRef = useRef<string | null>(null);
-  useEffect(() => setDirty(h.at > 0), [h.at]);
+  // Changed since it was last saved (a copy counts: its work is kept), not since it was opened.
+  const savedDoc = useRef<Doc>(first);
+  const [savedTick, setSavedTick] = useState(0);
+  useEffect(() => setDirty(h.now !== savedDoc.current), [h.now, savedTick]);
   const save = async (what: 'main' | 'copy') => {
     if (busy) return;
     stop();
     const plan = what === 'copy' && plans.copy ? plans.copy : plans.main;
     const o2: SoundOutput = 'sound' in plan.to ? { format: 'm4a', kbps: 256 } : what === 'main' && plans.main.fixed ? { ...out, format: plans.main.fixed } : out;
     setSaving({ what: what === 'copy' ? 'Making a copy' : 'Making the sound' });
+    const saving0 = doc;
     try {
       const j = await makeSoundEdit({ src: o.src, recipe: r, out: o2, to: plan.to, ...(what === 'copy' ? {} : {}) }, (job) => {
         jobRef.current = job.job;
@@ -671,6 +810,8 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       });
       if (j.status === 'stopped') return toast(tr('Stopped: nothing was saved'), 'info');
       if (j.status !== 'done') return toastError(new Error(j.error ?? 'The sound could not be made'));
+      savedDoc.current = saving0;
+      setSavedTick((n) => n + 1);
       if (what === 'copy') return toast(j.path ? tr(`A copy is saved beside it: ${nameOf(j.path)}`) : tr('A copy is in your Library'), 'ok');
       await done({ kind: 'audio', src: j.src, media: j.media, path: j.path, mime: soundFormat(o2.format).mime, seconds: j.seconds, replaced: ('media' in plan.to && plan.to.as === 'replace') || ('file' in plan.to && plan.to.as === 'replace') });
     } catch (e) {
@@ -686,140 +827,292 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
   };
 
   // ---- the menus -------------------------------------------------------------------------------------------------------
-  const noVideo = (x: MenuEntry): MenuEntry => (video && typeof x === 'object' && 'onClick' in x ? { ...x, disabled: true } : x);
+  const noVideo = (x: MenuAction): MenuAction => (video ? { ...x, disabled: true } : x);
+  const canRecord = !busy;
+  /** Each action once: the menu bar and the right-click menus are made from these, so they say the same words, keys and ticks. */
+  const act = {
+    cut: { label: 'Cut', keys: 'Ctrl+X', run: doCut } as MenuAction,
+    copy: { label: 'Copy', keys: 'Ctrl+C', run: () => void doCopy() } as MenuAction,
+    paste: { label: 'Paste', keys: 'Ctrl+V', run: () => doPaste() } as MenuAction,
+    del: { label: video ? 'Delete (leaves silence)' : 'Delete', keys: 'Delete', run: doDelete } as MenuAction,
+    ripple: noVideo({ label: 'Ripple delete', keys: 'Shift+Delete', run: doRippleDelete, also: 'close the gap every track markers' }),
+    silence: { label: 'Silence', keys: 'Ctrl+L', run: doSilence } as MenuAction,
+    duplicate: noVideo({ label: 'Duplicate', keys: 'Ctrl+D', run: doDuplicate }),
+    split: { label: 'Split at the playhead', keys: 'S / Ctrl+I', run: doSplit } as MenuAction,
+    trim: { label: 'Trim to the part picked', keys: 'Ctrl+T', run: doTrim } as MenuAction,
+    zoomSel: { label: 'Zoom to the part picked', keys: 'Ctrl+E', run: zoomSel, disabled: !sel } as MenuAction,
+    marker: { label: 'Add a marker', keys: 'M', run: () => addMarker() } as MenuAction,
+    loop: { label: 'Loop', keys: 'Q', checked: loop, run: () => setLoop(!loop) } as MenuAction,
+  };
+  /** The effects, by group, as lists (for the Effects menu, and the right-click menu on the part picked). */
+  const effectLists = (): MenuAction[] =>
+    GROUPS.map((g) => ({
+      label: g,
+      items: [
+        ...EFFECT_TYPES.filter((t) => EFFECTS[t].group === g).map((t): MenuAction => ({ label: EFFECTS[t].label, run: () => addEffect(t) })),
+        ...(g === 'Time and pitch' ? [noVideo({ label: 'Change speed…', run: () => setDialog('speed') })] : []),
+        ...(g === 'Clean up'
+          ? [
+              noVideo({ label: 'Shorten pauses…', run: () => setDialog('pauses') }),
+              // Reading what is said runs on the owner's computer: not through someone's link.
+              ...(viaLink ? [] : [{ label: 'Remove filler words', run: () => (fillers.length ? removeFillers() : (setAiKind(undefined), mobile ? setSheet('ai') : null, toast(tr('Read what is said first: AI → Read what is said'), 'info'))) }]),
+            ]
+          : []),
+      ],
+    }));
+  const fadeList = (track: string, id: string, which: 'in' | 'out'): MenuAction[] => [
+    { label: 'None', run: () => setFade(track, id, which, 0) },
+    ...[0.1, 0.5, 1, 2, 5].map((sec): MenuAction => ({ label: `${sec} s`, run: () => setFade(track, id, which, sec) })),
+  ];
   const menus: MenuDef[] = [
     {
       label: 'File',
       items: [
-        { label: plans.main.label, keys: 'Ctrl+S', onClick: () => void save('main'), disabled: busy },
-        ...(plans.copy ? [{ label: plans.copy.label, keys: 'Ctrl+Shift+S', onClick: () => void save('copy'), disabled: busy }] : []),
-        { label: 'How it is saved…', onClick: () => setDialog('save') },
-        'sep',
+        { label: plans.main.label, keys: 'Ctrl+S', run: () => void save('main'), disabled: busy },
+        plans.copy && { label: plans.copy.label, keys: 'Ctrl+Shift+S', run: () => void save('copy'), disabled: busy },
+        { label: 'How it is saved…', run: () => setDialog('save') },
+        '-',
         // At someone's link: only what they bring from their own device.
-        ...(viaLink ? [] : [{ label: 'Add a sound from the Library…', onClick: () => setLibraryOpen(true) }]),
-        { label: 'Add a sound from this device…', onClick: () => fileInput.current?.click() },
-        { label: rec ? 'Stop recording' : 'Record', keys: 'R', onClick: () => void record() },
+        !viaLink && { label: 'Add a sound from the Library…', run: () => setLibraryOpen(true) },
+        { label: 'Add a sound from this device…', run: () => fileInput.current?.click() },
+        { label: rec ? 'Stop recording' : 'Record', keys: 'R', run: () => void record() },
       ],
     },
     {
       label: 'Edit',
       items: [
-        { label: 'Undo', keys: 'Ctrl+Z', onClick: h.undo, disabled: !h.canUndo },
-        { label: 'Redo', keys: 'Ctrl+Shift+Z', onClick: h.redo, disabled: !h.canRedo },
-        'sep',
-        { label: 'Cut', keys: 'Ctrl+X', onClick: doCut },
-        { label: 'Copy', keys: 'Ctrl+C', onClick: () => void doCopy() },
-        { label: 'Paste', keys: 'Ctrl+V', onClick: doPaste },
-        { label: video ? 'Delete (leaves silence)' : 'Delete', keys: 'Delete', onClick: doDelete },
-        { label: 'Silence', keys: 'Ctrl+L', onClick: doSilence },
-        noVideo({ label: 'Duplicate', keys: 'Ctrl+D', onClick: doDuplicate }),
-        { label: 'Split at the playhead', keys: 'S', onClick: doSplit },
-        { label: 'Trim to the part picked', keys: 'Ctrl+T', onClick: doTrim },
-        noVideo({ label: 'Insert silence…', onClick: () => setDialog('silence') }),
-        'sep',
-        { label: 'Select all', keys: 'Ctrl+A', onClick: selectAll },
-        { label: 'Select none', keys: 'Esc', onClick: () => (setSel(null), pick(null)) },
-        { label: 'Add a marker', keys: 'M', onClick: addMarker },
-        { label: 'Delete the markers', onClick: () => h.set('Delete the markers', (d) => ({ ...d, markers: [] })), disabled: !doc.markers.length },
-        'sep',
-        { label: 'Add a track', onClick: () => void addTrack() },
+        { label: 'Undo', keys: 'Ctrl+Z', run: h.undo, disabled: !h.canUndo },
+        { label: 'Redo', keys: 'Ctrl+Shift+Z / Ctrl+Y', run: h.redo, disabled: !h.canRedo },
+        '-',
+        act.cut,
+        act.copy,
+        act.paste,
+        act.del,
+        act.ripple,
+        act.silence,
+        act.duplicate,
+        act.split,
+        act.trim,
+        noVideo({ label: 'Insert silence…', run: () => setDialog('silence') }),
+        '-',
+        { label: 'Select all', keys: 'Ctrl+A', run: selectAll },
+        { label: 'Select none', keys: 'Esc', run: () => (setSel(null), pick(null)) },
+        '-',
+        act.marker,
+        { label: 'Previous marker or clip edge', keys: '[', run: () => hopTo(-1) },
+        { label: 'Next marker or clip edge', keys: ']', run: () => hopTo(1) },
+        { label: 'Delete the markers', run: () => h.set('Delete the markers', (d) => ({ ...d, markers: [] })), disabled: !doc.markers.length },
+        '-',
+        { label: 'Add a track', run: () => void addTrack() },
       ],
     },
     {
       label: 'Effects',
-      items: [
-        ...GROUPS.flatMap((g): MenuEntry[] => [
-          { label: g, title: g },
-          ...EFFECT_TYPES.filter((t) => EFFECTS[t].group === g).map((t): MenuEntry => ({ label: EFFECTS[t].label, onClick: () => addEffect(t) })),
-          ...(g === 'Time and pitch' ? [noVideo({ label: 'Change speed…', onClick: () => setDialog('speed') })] : []),
-          ...(g === 'Clean up'
-            ? [
-                noVideo({ label: 'Shorten pauses…', onClick: () => setDialog('pauses') }),
-                // Reading what is said runs on the owner's computer: not through someone's link.
-                ...(viaLink ? [] : [{ label: 'Remove filler words', onClick: () => (fillers.length ? removeFillers() : (setAiKind(undefined), mobile ? setSheet('ai') : null, toast(tr('Read what is said first: AI → Read what is said'), 'info'))) }]),
-              ]
-            : []),
-        ]),
-      ],
+      items: effectLists(),
     },
     {
       label: 'Generate',
       items: [
-        noVideo({ label: 'Silence…', onClick: () => setDialog('silence') }),
+        noVideo({ label: 'Silence…', run: () => setDialog('silence') }),
         // At someone's link, nothing made with AI (it spends the owner's money).
         ...(viaLink
           ? []
           : [
-              { label: 'Music with AI…', onClick: () => (setAiKind('music'), mobile && setSheet('ai')) },
-              { label: 'A voice with AI…', onClick: () => (setAiKind('speech'), mobile && setSheet('ai')) },
-              { label: 'A sound effect with AI…', onClick: () => (setAiKind('sound'), mobile && setSheet('ai')) },
+              { label: 'Music with AI…', run: () => (setAiKind('music'), mobile && setSheet('ai')) },
+              { label: 'A voice with AI…', run: () => (setAiKind('speech'), mobile && setSheet('ai')) },
+              { label: 'A sound effect with AI…', run: () => (setAiKind('sound'), mobile && setSheet('ai')) },
             ]),
-        { label: 'A recording', keys: 'R', onClick: () => void record() },
+        { label: 'A recording', run: () => void record(), disabled: !canRecord },
       ],
     },
     {
       label: 'View',
       items: [
-        { label: 'Zoom in', keys: '+', onClick: () => zoomTo(view.pps * 1.5) },
-        { label: 'Zoom out', keys: '−', onClick: () => zoomTo(view.pps / 1.5) },
-        { label: 'Zoom to the part picked', keys: 'Ctrl+E', onClick: zoomSel, disabled: !sel },
-        { label: 'Zoom to fit', keys: 'Ctrl+F', onClick: fit },
-        'sep',
-        { label: 'Taller waveforms', keys: 'Shift++', onClick: () => setAmp((a) => Math.min(16, a * 1.5)) },
-        { label: 'Shorter waveforms', keys: 'Shift+−', onClick: () => setAmp((a) => Math.max(1, a / 1.5)) },
-        { label: 'Taller tracks', onClick: () => setHeights(Object.fromEntries(r.tracks.map((t) => [t.id, Math.min(360, (heights[t.id] ?? 104) + 32)]))) },
-        { label: 'Shorter tracks', onClick: () => setHeights(Object.fromEntries(r.tracks.map((t) => [t.id, Math.max(56, (heights[t.id] ?? 104) - 32)]))) },
-        { label: 'Spectrogram', checked: (modes[picked?.track ?? r.tracks[0].id] ?? 'wave') === 'spectrum', onClick: () => setModes((m) => ({ ...m, [picked?.track ?? r.tracks[0].id]: (m[picked?.track ?? r.tracks[0].id] ?? 'wave') === 'spectrum' ? 'wave' : 'spectrum' })) },
-        { label: 'Show the words', checked: showWords, onClick: () => setShowWords(!showWords), disabled: !Object.keys(words).length },
-        'sep',
-        { label: 'Snap', checked: snap, onClick: () => setSnap(!snap) },
-        { label: 'Loop', keys: 'L', checked: loop, onClick: () => setLoop(!loop) },
+        { label: 'Zoom in', keys: '+', run: () => zoomTo(view.pps * 1.5) },
+        { label: 'Zoom out', keys: '-', run: () => zoomTo(view.pps / 1.5) },
+        act.zoomSel,
+        { label: 'Zoom to fit', keys: 'Ctrl+F', run: fit },
+        '-',
+        // Taller waveforms are on Alt: Shift and the plus key are the zoom's (where + needs Shift, Shift++ is the zoom).
+        { label: 'Taller waveforms', keys: 'Alt+=', run: () => setAmp((a) => Math.min(16, a * 1.5)) },
+        { label: 'Shorter waveforms', keys: 'Alt+-', run: () => setAmp((a) => Math.max(1, a / 1.5)) },
+        { label: 'Taller tracks', run: () => setHeights(Object.fromEntries(r.tracks.map((t) => [t.id, Math.min(360, (heights[t.id] ?? 104) + 32)]))) },
+        { label: 'Shorter tracks', run: () => setHeights(Object.fromEntries(r.tracks.map((t) => [t.id, Math.max(56, (heights[t.id] ?? 104) - 32)]))) },
+        { label: 'Spectrogram', checked: (modes[picked?.track ?? r.tracks[0].id] ?? 'wave') === 'spectrum', run: () => setModes((m) => ({ ...m, [picked?.track ?? r.tracks[0].id]: (m[picked?.track ?? r.tracks[0].id] ?? 'wave') === 'spectrum' ? 'wave' : 'spectrum' })) },
+        { label: 'Show the words', checked: showWords, run: () => setShowWords(!showWords), disabled: !Object.keys(words).length },
+        '-',
+        { label: 'Snap', checked: snap, run: () => setSnap(!snap), also: 'magnet clips markers playhead' },
+        { label: 'Snap to zero crossings', checked: zero, run: () => setZero(!zero), also: 'click cut edge silence wave' },
+        {
+          label: grid.kind === 'off' ? 'Grid' : grid.kind === 'seconds' ? 'Grid: seconds' : `Grid: beats at ${cleanTempo(grid.bpm)}`,
+          also: 'time lines tempo beats bpm',
+          items: [
+            { label: 'Off', checked: grid.kind === 'off', run: () => setGrid({ kind: 'off' }) },
+            { label: 'Seconds', checked: grid.kind === 'seconds', run: () => setGrid({ kind: 'seconds' }) },
+            { label: 'Beats at a tempo', checked: grid.kind === 'beats', run: () => (setGrid({ kind: 'beats', bpm: grid.kind === 'beats' ? grid.bpm : TEMPO.default }), setDialog('tempo')) },
+            { label: 'Set the tempo…', run: () => (setGrid({ kind: 'beats', bpm: grid.kind === 'beats' ? grid.bpm : TEMPO.default }), setDialog('tempo')) },
+          ],
+        },
+        { label: 'Keep the tracks in step', checked: inStep, run: () => setInStep(!inStep), disabled: video, also: 'sync lock ripple markers follow' },
+        '-',
+        act.loop,
       ],
+    },
+    {
+      label: 'Help',
+      items: [{ label: 'Keyboard shortcuts', keys: 'Ctrl+/', run: () => setDialog('keys'), also: 'keys help' }],
     },
   ];
 
+  // ---- the right-click menus -----------------------------------------------------------------------------------------------
+  /** A right-click or a long press: the thing under it is picked, and its menu opens there. */
+  const openMenu = (at: ContextMenuAt, what: MenuTarget) => {
+    if (what.kind === 'clip') (setSel(null), pick({ track: what.track, clip: what.clip }));
+    else if (what.kind === 'point') pick({ track: what.track, clip: what.clip });
+    else if (what.kind === 'lane') (setSel(null), pick({ track: what.track }));
+    else if (what.kind === 'sel') pick(null);
+    setCtx({ at, what });
+  };
+  const ctxItems = (what: MenuTarget): MenuEntry[] => {
+    switch (what.kind) {
+      case 'clip': {
+        const c = r.tracks.find((t) => t.id === what.track)?.clips.find((k) => k.id === what.clip);
+        if (!c) return [];
+        const inside = clock.get() > c.at + 0.005 && clock.get() < clipEnd(c) - 0.005;
+        return [
+          { label: 'Cut', keys: act.cut.keys, run: () => cutClip(what.track, what.clip) },
+          { label: 'Copy', keys: act.copy.keys, run: () => void copyClip(what.track, what.clip) },
+          { ...act.paste, run: () => doPaste({ at: clipEnd(c), tracks: [what.track] }), label: 'Paste after it', keys: undefined },
+          '-',
+          { ...act.split, disabled: !inside },
+          { label: 'Duplicate', keys: act.duplicate.keys, disabled: video, run: () => duplicateClip(what.track, what.clip) },
+          { label: video ? 'Delete (leaves silence)' : 'Delete', keys: 'Delete', danger: true, run: () => deleteClip(what.track, what.clip) },
+          { ...act.ripple, label: 'Ripple delete', danger: true, run: () => clipSpan(what.track, what.clip) && edited('Ripple delete', (x) => deleteRange(x, allTracks, c.at, clipEnd(c), true)) },
+          '-',
+          { label: 'Fade in', checked: !!c.fadeIn, items: fadeList(what.track, what.clip, 'in') },
+          { label: 'Fade out', checked: !!c.fadeOut, items: fadeList(what.track, what.clip, 'out') },
+          { label: 'Smooth fades', checked: !!c.fadeSmooth, disabled: !c.fadeIn && !c.fadeOut, run: () => onClip(what.track, what.clip, { fadeSmooth: c.fadeSmooth ? undefined : true }, 'Fade shape') },
+          { label: 'Reset the volume line', disabled: !c.env?.length, run: () => onEnv(what.track, what.clip, undefined, 'move', 'Reset the volume line') },
+          '-',
+          { label: 'Properties…', run: () => (mobile ? setSheet('props') : setRevealProps((n) => n + 1)) },
+        ];
+      }
+      case 'point': {
+        const c = r.tracks.find((t) => t.id === what.track)?.clips.find((k) => k.id === what.clip);
+        if (!c?.env) return [];
+        return [
+          { label: 'Take out the point', danger: true, run: () => onEnv(what.track, what.clip, envRemove(c.env!, what.index), 'move', 'Take out a volume point') },
+          { label: 'Reset the volume line', run: () => onEnv(what.track, what.clip, undefined, 'move', 'Reset the volume line') },
+        ];
+      }
+      case 'sel':
+        return [
+          act.cut,
+          act.copy,
+          act.paste,
+          act.del,
+          act.ripple,
+          act.silence,
+          '-',
+          act.trim,
+          { label: 'Effects on it', items: effectLists() },
+          '-',
+          act.zoomSel,
+          { label: 'Loop it', run: () => (setLoop(true), void play({ sel: true })) },
+        ];
+      case 'lane':
+        return [
+          { label: 'Paste here', keys: undefined, disabled: !clipboard, run: () => doPaste({ at: what.t, tracks: [what.track] }) },
+          { label: 'Add a marker here', run: () => addMarker(what.t) },
+          '-',
+          { label: 'Add a track', run: () => void addTrack() },
+        ];
+      case 'ruler':
+        return [
+          { label: 'Add a marker', run: () => addMarker(what.t) },
+          { label: 'Play from here', run: () => (clock.set(what.t), void play({ from: what.t })) },
+        ];
+      case 'marker': {
+        const m = doc.markers.find((k) => k.id === what.id);
+        if (!m) return [];
+        return [
+          { label: 'Rename', run: () => setRenaming(m.id) },
+          { label: 'Delete', danger: true, run: () => h.set('Delete a marker', (d) => ({ ...d, markers: d.markers.filter((k) => k.id !== m.id) })) },
+        ];
+      }
+    }
+  };
+  /** The menu key or Shift+F10: the menu for what is picked, in the middle of the lanes. */
+  const menuFromKeyboard = () => {
+    const el = lanesRef.current?.getBoundingClientRect();
+    const at = { x: (el?.left ?? 200) + (el?.width ?? 400) / 2, y: (el?.top ?? 200) + Math.min(120, (el?.height ?? 200) / 2), keyed: true };
+    if (sel) return setCtx({ at, what: { kind: 'sel', track: sel.tracks[0], t: sel.a } });
+    if (picked?.clip) return setCtx({ at, what: { kind: 'clip', track: picked.track, clip: picked.clip, t: clock.get() } });
+    setCtx({ at, what: { kind: 'lane', track: picked?.track ?? r.tracks[0].id, t: clock.get() } });
+  };
+
   // ---- keys ------------------------------------------------------------------------------------------------------------
   const onKeyDown = (ev: React.KeyboardEvent) => {
-    const mod = ev.ctrlKey || ev.metaKey;
+    const mod = isMod(ev);
     const k = ev.key.toLowerCase();
     if (k === 'escape' && !sel && !picked) return;
     if (mod && !ev.shiftKey && !ev.altKey && (k === 'k' || k === 'b' || k === '`')) return;
     ev.stopPropagation();
     const typing = (ev.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]');
     if (typing) return;
-    const act = (f: () => void) => {
+    if (isMenuKey(ev)) {
+      ev.preventDefault();
+      return menuFromKeyboard();
+    }
+    if (busy) return;
+    // Space on a button presses that button.
+    if (k === ' ' && !mod && (ev.target as HTMLElement).closest('button')) return;
+    // What the menus show beside their actions.
+    if (runMenuKeys(menus, ev)) return;
+    if (mod || ev.altKey) return;
+    const act2 = (f: () => void) => {
       ev.preventDefault();
       f();
     };
-    if (mod && k === 'z') return act(ev.shiftKey ? h.redo : h.undo);
-    if (mod && k === 'y') return act(h.redo);
-    if (mod && k === 's') return act(() => void save(ev.shiftKey && plans.copy ? 'copy' : 'main'));
-    if (busy) return;
-    if (mod && k === 'x') return act(doCut);
-    if (mod && k === 'c') return act(() => void doCopy());
-    if (mod && k === 'v') return act(doPaste);
-    if (mod && k === 'd') return act(doDuplicate);
-    if (mod && k === 'l') return act(doSilence);
-    if (mod && k === 't') return act(doTrim);
-    if (mod && k === 'a') return act(selectAll);
-    if (mod && k === 'e') return act(zoomSel);
-    if (mod && k === 'f') return act(fit);
-    if (mod || ev.altKey) return;
-    // Space on a button presses that button.
-    if (k === ' ' && (ev.target as HTMLElement).closest('button')) return;
-    if (k === ' ') return act(() => (ev.shiftKey ? void play({ sel: true }) : toggle()));
-    if (k === 'delete' || k === 'backspace') return act(doDelete);
-    if (k === 'escape') return act(() => (setSel(null), pick(null)));
-    if (k === 's') return act(doSplit);
-    if (k === 'm') return act(addMarker);
-    if (k === 'r') return act(() => void record());
-    if (k === 'l') return act(() => setLoop((x) => !x));
-    if (k === 'home') return act(() => seek(0));
-    if (k === 'end') return act(() => seek(L));
-    if (k === 'arrowleft' || k === 'arrowright') return act(() => seek(clock.get() + (k === 'arrowleft' ? -1 : 1) * (ev.shiftKey ? 5 : 1)));
-    if (k === '+' || k === '=') return act(() => (ev.shiftKey && k === '+' ? setAmp((a) => Math.min(16, a * 1.5)) : zoomTo(view.pps * 1.5)));
-    if (k === '-' || k === '_') return act(() => (ev.shiftKey ? setAmp((a) => Math.max(1, a / 1.5)) : zoomTo(view.pps / 1.5)));
+    // The keys that are in no menu.
+    if (k === '?') return act2(() => setDialog('keys'));
+    if (k === ' ') return act2(() => (ev.shiftKey ? void play({ sel: true }) : toggle()));
+    if (k === 'j') return act2(() => shuttle(-1));
+    if (k === 'k') return act2(() => stop());
+    if (k === 'l') return act2(() => shuttle(1));
+    if (k === 'home') return act2(() => seek(0));
+    if (k === 'end') return act2(() => seek(L));
+    if (k === 'arrowleft' || k === 'arrowright') return act2(() => seek(clock.get() + (k === 'arrowleft' ? -1 : 1) * (ev.shiftKey ? 5 : 1)));
   };
+  // Shown in the list of keyboard shortcuts after the menus' own.
+  const moreKeys = [
+    {
+      title: 'Playing',
+      items: [
+        ['Space', 'Play or pause'],
+        ['Shift+Space', 'Play the part picked'],
+        ['L', 'Play forwards; again for twice as fast, up to four times'],
+        ['J', 'Play backwards; again for twice as fast, up to four times'],
+        ['K', 'Stop'],
+        ['Home / End', 'To the start or the end'],
+        ['← / →', 'Move the playhead a second (with Shift, five)'],
+      ] as [string, string][],
+    },
+    {
+      title: 'On the tracks',
+      items: [
+        ['Esc', 'Pick nothing'],
+        ['Menu key / Shift+F10', 'The right-click menu of what is picked'],
+        ['Ctrl+wheel', 'Zoom in or out about the pointer'],
+        ['Shift+wheel', 'Move along the time'],
+        ['Shift+click', 'Make the part picked reach to here'],
+        ['Double-click', 'Pick all of a clip, or take out a volume point'],
+        ['Click the volume line', 'Add a point to it (a drag moves it)'],
+        [`${COPY_DRAG_KEY}+drag`, 'Drag a copy of a clip'],
+        [`${NO_SNAP_KEY}+drag`, 'Move, trim or pick without snapping'],
+      ] as [string, string][],
+    },
+  ];
   const root = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (active) root.current?.focus({ preventScroll: true });
@@ -877,12 +1170,17 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
         clock={clock}
         seek={seek}
         snap={snap}
+        zero={zero}
+        grid={grid}
         markers={doc.markers}
+        renaming={renaming}
         onMarkers={(label, f) => h.set(label, (d) => ({ ...d, markers: f(d.markers) }))}
         markerDrag={{ begin: () => h.begin('Move a marker'), end: h.end }}
         onMoveClip={onMoveClip}
         onTrimClip={onTrimClip}
         onFade={onFade}
+        onEnv={onEnv}
+        onMenu={(at, what) => openMenu(at, what)}
         onTrack={onTrack}
         trackDrag={drag}
         onDeleteTrack={deleteTrack}
@@ -934,7 +1232,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       <span className="tnum">{`${soundClock(L, 2)} long${video ? ', as the video' : ''}`}</span>
       <span className="min-w-0 truncate">{video ? 'Saved as M4A, 256 kbps' : `Saved as ${fmt.label}${fmt.kbps ? `, ${out.kbps ?? fmt.kbpsDefault} kbps` : out.bits === 24 ? ', 24-bit' : ''}${out.channels ? `, ${out.channels === 1 ? 'mono' : 'stereo'}` : ''}`}</span>
       <span className="min-w-0 flex-1 truncate">{plans.main.says}</span>
-      {playing && <span className="text-accent">Playing</span>}
+      {playing && <span className="text-accent">{rate === 1 ? 'Playing' : rate < 0 ? `Backwards ×${-rate}` : `Playing ×${rate}`}</span>}
       {rec && <span className="text-err">Recording</span>}
     </StatusBar>
   );
@@ -946,13 +1244,14 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
         {o.title}
       </span>
       {mobile ? (
-        <MenuButton menus={menus} label="Menus">
-          <Menu size={17} />
-        </MenuButton>
+        <>
+          <span className="flex-1" />
+          <MenuBar menus={menus} compact />
+        </>
       ) : (
         <>
-          <MenuBar menus={menus} className="ml-1" />
-          <span className="flex-1" />
+          <MenuBar menus={menus} compact="auto" />
+          <span className="min-w-2 flex-1" />
         </>
       )}
       <IconButton label="Undo (Ctrl+Z)" size="sm" disabled={!h.canUndo || busy} onClick={h.undo}>
@@ -985,10 +1284,27 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       }}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className="flex h-full min-h-0 flex-col bg-bg outline-none"
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        if (!dropping) setDropping(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        setDropping(false);
+        if (!busy) dropFiles([...e.dataTransfer.files], e.clientX, e.clientY);
+      }}
+      className={cx('relative flex h-full min-h-0 flex-col bg-bg outline-none', dropping && 'ring-2 ring-accent ring-inset')}
     >
       {head}
       {saving && <Making saving={saving} onStop={stopSaving} />}
+      <ContextMenu at={ctx?.at ?? null} items={ctx ? ctxItems(ctx.what) : []} onClose={() => setCtx(null)} />
+      <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={shortcutGroups(menus, moreKeys)} />
       {!mobile && transport}
       <div className="flex min-h-0 flex-1">
         {tracks}
@@ -999,7 +1315,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
               <DockPanel id="effects" title="Effects" icon={<SlidersHorizontal size={12} />} aside={addFx}>
                 {rack}
               </DockPanel>
-              <DockPanel id="props" title="Properties" icon={<Ellipsis size={12} />}>
+              <DockPanel id="props" title="Properties" icon={<Ellipsis size={12} />} reveal={revealProps}>
                 {props}
               </DockPanel>
               <DockPanel id="history" title="History" icon={<HistoryIcon size={12} />}>
@@ -1045,7 +1361,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
       <input
         ref={fileInput}
         type="file"
-        accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.webm"
+        accept="audio/*,video/mp4,video/quicktime,video/webm,.mp3,.wav,.m4a,.aac,.ogg,.opus,.flac,.webm,.mp4,.mov"
         hidden
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -1054,7 +1370,7 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
         }}
       />
       <LibraryPicker open={libraryOpen} onClose={() => setLibraryOpen(false)} onPick={(m) => (setLibraryOpen(false), putSound(`media:${m.id}`, m.title, m.duration ?? 0))} />
-      <Dialog open={dialog === 'silence'} onClose={() => setDialog(null)} title="Insert silence" width={360} footer={<DialogButtons onCancel={() => setDialog(null)} onOk={() => (setDialog(null), edited('Insert silence', (x) => insertGap(x, scope(), clock.get(), form.silence)))} ok="Insert" />}>
+      <Dialog open={dialog === 'silence'} onClose={() => setDialog(null)} title="Insert silence" width={360} footer={<DialogButtons onCancel={() => setDialog(null)} onOk={() => (setDialog(null), edited('Insert silence', (x) => insertGap(x, along(x, scope()), clock.get(), form.silence)))} ok="Insert" />}>
         <p className="mb-2 text-[12.5px] text-fg-3">{`At the playhead (${soundClock(clock.get(), 2)}), on ${sel ? 'the tracks picked' : picked ? trackName(picked.track) : 'every track'}: what follows moves on.`}</p>
         <NumberRow label="Length" unit="s" value={form.silence} min={0.01} max={600} step={0.1} onChange={(v) => setForm({ ...form, silence: v })} />
       </Dialog>
@@ -1086,6 +1402,10 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
           <NumberRow label="Keep of each" unit="s" value={form.keep} min={0} max={5} step={0.05} onChange={(v) => setForm({ ...form, keep: Math.min(v, form.longer) })} />
           <NumberRow label="Quieter than" unit="dB" value={form.threshold} min={-80} max={-10} step={1} onChange={(v) => setForm({ ...form, threshold: v })} />
         </div>
+      </Dialog>
+      <Dialog open={dialog === 'tempo'} onClose={() => setDialog(null)} title="Grid tempo" width={360} footer={<DialogButtons onOk={() => setDialog(null)} ok="Done" />}>
+        <p className="mb-2 text-[12.5px] text-fg-3">The grid has a line at every beat (a heavier one at the start of each bar of four); picked parts, clips and markers snap to the lines while Snap is on.</p>
+        <NumberRow label="Tempo" unit="bpm" value={grid.kind === 'beats' ? cleanTempo(grid.bpm) : TEMPO.default} min={TEMPO.min} max={TEMPO.max} step={1} onChange={(v) => setGrid({ kind: 'beats', bpm: cleanTempo(v) })} />
       </Dialog>
       <Dialog open={dialog === 'save'} onClose={() => setDialog(null)} title="How it is saved" width={440} footer={<DialogButtons onOk={() => setDialog(null)} ok="Done" />}>
         <SaveOptions out={out} setOut={setOut} fixed={plans.main.fixed} hasCopy={!!plans.copy} says={[plans.main.says, plans.copy?.says].filter((x): x is string => !!x)} video={video} />

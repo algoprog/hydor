@@ -1,7 +1,7 @@
 // What the sound editor draws on its canvases, in the theme's own colours: a track's clips (their name bar, both
 // channels' waveforms as their gain and fades make them, or the spectrogram), the effects on parts of it, the words
 // heard in it; and the time ruler with its markers.
-import { clipEnd, clipLength, dbGain, effectWords, type SoundEffect, type SoundTrack } from '@shared/mediaedit-audio';
+import { clipEnd, clipFade, clipLength, dbGain, effectWords, envGainAt, type SoundEffect, type SoundTrack } from '@shared/mediaedit-audio';
 import { minMax, type Decoded, type Get } from './engine';
 
 export interface Palette {
@@ -74,6 +74,14 @@ export const tOf = (v: View, x: number) => v.x0 + x / v.pps;
 
 export const HEADER = 15;
 
+/** The loudest a clip's volume line is drawn: its top edge is this multiple, its bottom is silence, and 1 (as it is) is the middle. */
+export const ENV_TOP = 2;
+/** Where a clip's body spans in a lane of height `h` (under its name bar, over the words along the bottom). */
+export const bodyBox = (h: number, words: boolean) => ({ top: 1 + HEADER, bottom: h - 1 - (words ? 16 : 0) });
+/** A volume line's volume as a height in the lane, and back. */
+export const envY = (v: number, box: { top: number; bottom: number }) => box.bottom - (Math.min(ENV_TOP, Math.max(0, v)) / ENV_TOP) * (box.bottom - box.top);
+export const envValue = (y: number, box: { top: number; bottom: number }) => Math.min(ENV_TOP, Math.max(0, ((box.bottom - y) / Math.max(1, box.bottom - box.top)) * ENV_TOP));
+
 /** A track's lane: its clips, the effects on its parts, the words heard. `amp`: how much the waveforms are made taller. */
 export function drawLane(
   c2: CanvasRenderingContext2D,
@@ -90,10 +98,19 @@ export function drawLane(
     effects: SoundEffect[];
     words?: { w: string; a: number; b: number }[];
     loading?: (src: string) => number | null;
+    /** The time grid's lines. */
+    grid?: { t: number; major: boolean }[];
   },
 ) {
   const { w, h, view, track, pal } = o;
   c2.clearRect(0, 0, w, h);
+  // The time grid, under everything.
+  for (const g of o.grid ?? []) {
+    const x = Math.round(xOf(view, g.t)) + 0.5;
+    if (x < 0 || x > w) continue;
+    c2.fillStyle = alpha(pal.fg3, g.major ? 0.28 : 0.13);
+    c2.fillRect(x, 0, 1, h);
+  }
   const t0 = tOf(view, 0);
   const t1 = tOf(view, w);
   const wordsH = o.words?.length ? 16 : 0;
@@ -146,18 +163,25 @@ export function drawLane(
     const len = clipLength(c);
     c2.strokeStyle = alpha(pal.fg, 0.55);
     c2.lineWidth = 1;
-    if (c.fadeIn) {
+    // Straight, or along the half sine a smooth fade follows.
+    const curve = (a: number, b: number, rising: boolean) => {
       c2.beginPath();
-      c2.moveTo(xOf(view, c.at), bottom);
-      c2.lineTo(xOf(view, c.at + Math.min(len, c.fadeIn)), top);
+      const xa2 = xOf(view, a);
+      const xb2 = xOf(view, b);
+      const n = c.fadeSmooth ? Math.max(2, Math.min(24, Math.round((xb2 - xa2) / 4))) : 1;
+      for (let i = 0; i <= n; i++) {
+        const x = i / n;
+        const v = clipFade(c, rising ? x : 1 - x);
+        const px = xa2 + (xb2 - xa2) * x;
+        const py = bottom - v * (bottom - top);
+        if (i) c2.lineTo(px, py);
+        else c2.moveTo(px, py);
+      }
       c2.stroke();
-    }
-    if (c.fadeOut) {
-      c2.beginPath();
-      c2.moveTo(xOf(view, end - Math.min(len, c.fadeOut)), top);
-      c2.lineTo(xOf(view, end), bottom);
-      c2.stroke();
-    }
+    };
+    if (c.fadeIn) curve(c.at, c.at + Math.min(len, c.fadeIn), true);
+    if (c.fadeOut) curve(end - Math.min(len, c.fadeOut), end, false);
+    drawEnv(c2, { view, clip: c, top, bottom, pal, on, w });
   }
   // The effects on a part of it: a slim bar each, along its top.
   let row = 0;
@@ -202,6 +226,40 @@ export function drawLane(
   }
 }
 
+/** A clip's volume line: where it has one, or on the clip picked (a faint line as it is now, to click on and make one); its points show on the clip picked. */
+function drawEnv(c2: CanvasRenderingContext2D, o: { view: View; clip: SoundTrack['clips'][number]; top: number; bottom: number; pal: Palette; on: boolean; w: number }) {
+  const { view, clip: c, pal } = o;
+  if (!c.env?.length && !o.on) return;
+  const box = { top: o.top, bottom: o.bottom };
+  const xa = xOf(view, c.at);
+  const xb = xOf(view, clipEnd(c));
+  c2.save();
+  c2.beginPath();
+  c2.rect(Math.max(0, xa), o.top - 2, Math.min(o.w, xb) - Math.max(0, xa), o.bottom - o.top + 4);
+  c2.clip();
+  c2.strokeStyle = c.env?.length ? pal.info : alpha(pal.info, 0.45);
+  c2.lineWidth = c.env?.length ? 1.75 : 1;
+  c2.setLineDash(c.env?.length ? [] : [4, 4]);
+  c2.beginPath();
+  const pts = c.env?.length ? c.env : [{ t: 0, v: 1 }];
+  c2.moveTo(xa, envY(pts[0].v, box));
+  for (const q of pts) c2.lineTo(xOf(view, c.at + q.t), envY(q.v, box));
+  c2.lineTo(xb, envY(pts[pts.length - 1].v, box));
+  c2.stroke();
+  c2.setLineDash([]);
+  if (o.on && c.env?.length)
+    for (const q of c.env) {
+      c2.beginPath();
+      c2.arc(xOf(view, c.at + q.t), envY(q.v, box), 3.5, 0, Math.PI * 2);
+      c2.fillStyle = pal.bg;
+      c2.fill();
+      c2.strokeStyle = pal.info;
+      c2.lineWidth = 1.75;
+      c2.stroke();
+    }
+  c2.restore();
+}
+
 /** A clip's waveform: each channel in its own half, as tall as its gain and fades make it. */
 function drawWave(c2: CanvasRenderingContext2D, o: { view: View; clip: SoundTrack['clips'][number]; d: Decoded; xa: number; xb: number; top: number; bottom: number; pal: Palette; amp: number }) {
   const { view, clip: c, d } = o;
@@ -223,9 +281,9 @@ function drawWave(c2: CanvasRenderingContext2D, o: { view: View; clip: SoundTrac
       const sb = (c.from + (tb - c.at) * speed) * d.rate;
       let [lo, hi] = minMax(d, ch, sa, Math.max(sa + 1, sb));
       const u = (ta + tb) / 2 - c.at;
-      let e = g;
-      if (c.fadeIn && u < c.fadeIn) e *= u / c.fadeIn;
-      if (c.fadeOut && u > len - c.fadeOut) e *= Math.max(0, (len - u) / c.fadeOut);
+      let e = g * envGainAt(c.env, u);
+      if (c.fadeIn && u < c.fadeIn) e *= clipFade(c, u / c.fadeIn);
+      if (c.fadeOut && u > len - c.fadeOut) e *= clipFade(c, Math.max(0, (len - u) / c.fadeOut));
       lo = Math.max(-1, lo * e);
       hi = Math.min(1, hi * e);
       const y0 = mid - hi * (hh / 2 - 1);
