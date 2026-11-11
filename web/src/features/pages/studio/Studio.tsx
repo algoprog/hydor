@@ -11,7 +11,7 @@
 // emoji, a picture, a video, maths, an icon, a cover) is chosen in the app, beside where it was asked, and it is told
 // the Library's pages, for links to them ("@").
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp, Code2, Eye, Keyboard, Monitor, PenLine, Plus, Redo2, Smartphone, Tablet, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2, Eye, Keyboard, Monitor, PenLine, Plus, Redo2, Search, Smartphone, Tablet, Undo2, ZoomIn } from 'lucide-react';
 import type { PageComment, PageCommentOp } from '@shared/page-comments';
 import type { PagesEvent } from '@shared/pages';
 import { api, enc, post } from '../../../lib/api';
@@ -19,7 +19,8 @@ import { useFeatureEvent } from '../../../lib/featureEvents';
 import { toast, toastError } from '../../../lib/store';
 import { Button, cx, IconButton, MenuItem, Popover, Segmented, Throbber, useConfirm, useMediaQuery } from '../../../components/ui';
 import type { EditorHandle } from '../../../lib/codemirror';
-import { DeviceStage, EditFrame, PageFrame, StreamFrame, withBase, type AppBridge, type Device, type EdAsk, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store } from '../frame';
+import { DeviceStage, EditFrame, PageFrame, StreamFrame, stepZoom, WIDTH_RANGE, withBase, ZOOMS, type AppBridge, type Device, type DroppedKind, type EdAsk, type EdLayer, type EdPage, type EdSel, type EditHandle, type EdState, type Pick, type Store, type Zoom } from '../frame';
+import { FindBar, useFind } from '../common/FindBar';
 import { ShortcutsDialog } from '../common/Shortcuts';
 import { usePagesStore } from '../state';
 import { openTypes } from '../types';
@@ -33,7 +34,8 @@ import { PageComments, type PageCommentAi } from './PageComments';
 import { blockWhere, commentsRequest } from '@shared/comment-asks';
 import type { CommentAi } from '../common/commentAi';
 import { PagePanel } from './PagePanel';
-import { usePageAi } from './pageAi';
+import { uploadVideo } from '../slides/media';
+import { keepPageFile, usePageAi } from './pageAi';
 import { BlockAskPopover } from './BlockAsks';
 import { importInto, useCrumbs } from './pageTools';
 import { isDesignHtml } from '@shared/design';
@@ -145,6 +147,31 @@ function StreamCode({ text }: { text: string }) {
   );
 }
 
+/** A width of its own for the page's view, in pixels (empty: the device's); kept in range. */
+function WidthField({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  const [v, setV] = useState(value ? String(value) : '');
+  useEffect(() => setV(value ? String(value) : ''), [value]);
+  const commit = () => {
+    const n = parseInt(v, 10);
+    if (!v.trim()) onChange(null);
+    else if (Number.isFinite(n)) onChange(Math.min(WIDTH_RANGE.max, Math.max(WIDTH_RANGE.min, n)));
+    else setV(value ? String(value) : '');
+  };
+  return (
+    <input
+      aria-label="Width in pixels"
+      title={`The page's width in pixels, ${WIDTH_RANGE.min} to ${WIDTH_RANGE.max} (empty: the device's)`}
+      inputMode="numeric"
+      value={v}
+      placeholder="Width"
+      onChange={(e) => setV(e.target.value.replace(/[^\d]/g, '').slice(0, 4))}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      className="h-7 w-[62px] min-w-0 rounded-lg border border-line bg-bg-1 px-2 text-center text-[12px] text-fg tabular-nums outline-none placeholder:text-fg-3 focus:border-accent/60"
+    />
+  );
+}
+
 const kb = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10_240 ? 1 : 0)} KB`);
 
 export function Studio({
@@ -200,6 +227,16 @@ export function Studio({
 }) {
   const [mode, setMode] = useState<StudioMode>(initialMode ?? 'view');
   const [device, setDevice] = useState<Device>('desktop');
+  // The view of the page: its zoom (Fit, or 50 to 200 %), and a width of its own (kept for a while, like the device, not saved).
+  const [zoom, setZoom] = useState<Zoom>('fit');
+  const [custom, setCustom] = useState<number | null>(null);
+  const [zoomMenu, setZoomMenu] = useState(false);
+  // Find and replace in the page's words (Ctrl+F, Ctrl+H): the bar asks, the page marks and counts.
+  const find = useFind();
+  const findRef = useRef(find);
+  findRef.current = find;
+  const [found, setFound] = useState({ count: 0, index: -1 });
+  const zoomRef = useRef<HTMLButtonElement>(null);
   // Changed HTML not saved yet (from Code, or the editor's when it was left); null: the page as it is.
   const [pending, setPending] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -346,6 +383,38 @@ export function Studio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docKey]);
   const media = MEDIA_OF[device];
+  const zoomBy = (op: 'in' | 'out' | 'fit') => setZoom((z) => stepZoom(z, op));
+  // Ctrl+= / Ctrl+- / Ctrl+0 and Ctrl+wheel over the page zoom its view, not the whole app (the page's frame says so, through onZoom).
+  useEffect(() => {
+    const el = shell.current;
+    if (!el || mode === 'code' || design) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || !el.offsetParent) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('input,textarea,select,[contenteditable="true"],.cm-editor')) return;
+      if (mode === 'edit' && !e.shiftKey && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'h')) {
+        e.preventDefault();
+        findRef.current.show(e.key.toLowerCase() === 'h');
+        return;
+      }
+      const op = e.key === '0' ? 'fit' : e.key === '-' || e.key === '_' ? 'out' : e.key === '=' || e.key === '+' ? 'in' : null;
+      if (!op) return;
+      e.preventDefault();
+      zoomBy(op);
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 'in' : 'out');
+    };
+    window.addEventListener('keydown', onKey);
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      el.removeEventListener('wheel', onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, design]);
   // Where the inspector's changes go; another part picked starts at the part itself again.
   const selKey = sel ? sel.path.join('.') : '';
   useEffect(() => setCtx({ scope: 'self', state: '' }), [selKey]);
@@ -358,6 +427,19 @@ export function Studio({
   useEffect(() => {
     if (sel && drawer === null) setDrawer('open');
   }, [!!sel]);
+
+  // The page's words are searched as the bar's words change; the marks go when it closes or Edit is left.
+  useEffect(() => {
+    if (mode !== 'edit') return;
+    if (find.open) editRef.current?.cmd('find', { query: find.query, opts: find.options });
+    else {
+      editRef.current?.cmd('findClear');
+      setFound({ count: 0, index: -1 });
+    }
+  }, [find.open, find.query, find.options, mode]);
+  useEffect(() => {
+    if (mode !== 'edit' && find.open) find.close();
+  }, [mode]);
 
   /** What is being changed now, as HTML. */
   const current = async (): Promise<string> => {
@@ -440,6 +522,46 @@ export function Studio({
   }, [code, mode]);
 
   const cmd = (c: string, arg?: unknown) => editRef.current?.cmd(c, arg);
+  /**
+   * The menu's Paste: what the system clipboard holds (HTML and words), read here because the page's frame may not, and handed back
+   * to be pasted where the caret or the part picked is. Where the browser will not let it be read, the part copied in this page goes in
+   * and the keys are suggested.
+   */
+  const readClipboard = async (plain: boolean) => {
+    let html = '';
+    let text = '';
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        if (item.types.includes('text/html')) html = await (await item.getType('text/html')).text();
+        if (item.types.includes('text/plain')) text = await (await item.getType('text/plain')).text();
+      }
+    } catch {
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        toast('Your browser would not let the page read the clipboard: press Ctrl+V to paste', 'info');
+      }
+    }
+    cmd('pasteData', { html, text, plain });
+  };
+  /**
+   * A file dropped on the page, made into its block: a picture is made small enough to live in the page; a video is kept by the app
+   * (it can take a while: a note says so); a PDF, a sound or any other file is kept for pages (up to 50 MB). Each goes where it was dropped.
+   */
+  const keepDropped = async (id: string, f: File, what: DroppedKind) => {
+    try {
+      if (what === 'picture') return cmd('fill', { id, src: await pictureData(f) });
+      if (what === 'video') {
+        toast(`Adding ${f.name}…`, 'info');
+        const kept = await uploadVideo(f, () => {});
+        const r = await post<{ url: string }>('/api/pages/video-address', { src: kept });
+        return cmd('fill', { id, file: r.url });
+      }
+      cmd('fill', { id, ...(await keepPageFile(f)) });
+    } catch (e) {
+      toastError(e);
+    }
+  };
   // The AI on the page, and a database's AI column and files (pageAi.ts).
   const ai = usePageAi(cmd, pageId);
   // Where the page is in the Library, for its breadcrumbs (pageTools.ts).
@@ -465,7 +587,7 @@ export function Studio({
     body = streamCode ? (
       <StreamCode text={draft!.text} />
     ) : (
-      <DeviceStage device={device}>
+      <DeviceStage device={device} zoom={zoom} width={custom}>
         <StreamFrame html={draft!.text} base={doc?.base} />
       </DeviceStage>
     );
@@ -562,7 +684,7 @@ export function Studio({
     body = (
       <div className={cx('flex h-full min-h-0', beside ? 'flex-row' : 'flex-col')}>
         <div className="relative min-h-0 min-w-0 flex-1">
-          <DeviceStage device={device}>
+          <DeviceStage device={device} zoom={zoom} width={custom}>
             <EditFrame
               key={epoch}
               ref={editRef}
@@ -586,10 +708,26 @@ export function Studio({
               onLayers={setLayers}
               onPage={setPage}
               onCopied={(c) => {
-                clipboard = c;
-                setClip(c);
+                clipboard = { html: c.html, name: c.name };
+                setClip(clipboard);
                 toast(c.name ? `${c.name} copied` : 'Copied', 'ok');
+                // The frame puts it on the system clipboard itself when it can; else it is written from here (HTML and words),
+                // so that it pastes in other apps and other pages' tabs too.
+                if (!c.system && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined')
+                  void navigator.clipboard
+                    .write([new ClipboardItem({ 'text/html': new Blob([`<div data-hydor-parts="1">${c.html}</div>`], { type: 'text/html' }), 'text/plain': new Blob([c.text], { type: 'text/plain' }) })])
+                    .catch(() => {});
               }}
+              onClipRead={(plain) => void readClipboard(plain)}
+              onFocusField={(field) => {
+                // Description (a picture's): the part's tab, and its field.
+                setTab('part');
+                setDrawer('open');
+                window.setTimeout(() => document.querySelector<HTMLElement>(`aside [aria-label="${field === 'alt' ? 'Description' : field}"]`)?.focus(), 160);
+              }}
+              onZoom={zoomBy}
+              onFind={(replace) => find.show(replace && !readOnly)}
+              onFound={(count, index) => setFound({ count, index })}
               onEditing={setWordsOn}
               onMenu={setMenuOn}
               store={doc.store}
@@ -606,7 +744,7 @@ export function Studio({
                 if (!beside) setDrawer('open');
               }}
               onAsk={setAsking}
-              onFile={(id, f) => pictureData(f).then((src) => cmd('fill', { id, src }), toastError)}
+              onFile={(id, f, what) => void keepDropped(id, f, what)}
               onAgent={() => void ask()}
               onKeys={() => setKeysOpen(true)}
               onAi={ai.onAi}
@@ -621,6 +759,19 @@ export function Studio({
               }}
             />
           </DeviceStage>
+          {find.open && (
+            <div className="absolute top-2 right-3 z-20">
+              <FindBar
+                find={find}
+                count={found.count}
+                index={found.index}
+                onNext={() => cmd('find', { query: find.query, opts: find.options, step: 1 })}
+                onPrev={() => cmd('find', { query: find.query, opts: find.options, step: -1 })}
+                onReplace={readOnly ? undefined : () => cmd('findReplace', { query: find.query, opts: find.options, replacement: find.replacement, all: false })}
+                onReplaceAll={readOnly ? undefined : () => cmd('findReplace', { query: find.query, opts: find.options, replacement: find.replacement, all: true })}
+              />
+            </div>
+          )}
           <InsertPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} cmd={cmd} onClose={() => setAsking(null)} onError={toastError} />
           <BlockAskPopover ask={asking} frame={() => editRef.current?.frame() ?? null} answer={(payload) => cmd('fill', payload)} onClose={() => setAsking(null)} onError={toastError} />
         </div>
@@ -666,7 +817,7 @@ export function Studio({
       <div className={cx('flex h-full min-h-0', side ? 'flex-row' : 'flex-col')}>
         <CodePane key={`${epoch}:${codeView}`} html={code} onChange={setCode} onSave={() => void saveRef.current()} className={cx('min-h-0 flex-1 bg-bg', side ? 'border-r border-line' : 'border-b border-line')} />
         <div className={cx('relative min-h-0', side ? 'flex-1' : 'h-[45%]')}>
-          <DeviceStage device={device}>
+          <DeviceStage device={device} zoom={zoom} width={custom}>
             <PageFrame key={`${doc.key}:code:${shown?.n ?? 0}`} html={withBase(shown?.html ?? code, doc.base)} title={doc.title} store={doc.store} app={doc.app} />
           </DeviceStage>
         </div>
@@ -674,7 +825,7 @@ export function Studio({
     );
   } else {
     body = (
-      <DeviceStage device={device}>
+      <DeviceStage device={device} zoom={zoom} width={custom}>
         <PageFrame key={`${doc.key}:${epoch}:${pending === null ? 'saved' : pending.length}`} html={withBase(html, doc.base)} title={doc.title} store={doc.store} onPick={onPick} app={doc.app} />
       </DeviceStage>
     );
@@ -716,17 +867,42 @@ export function Studio({
           )
         )}
         {layout === 'page' && roomy && !design && (
-          <Segmented size="sm" value={device} onChange={setDevice} options={DEVICES.map((d) => ({ value: d.value, label: <span title={d.label}>{d.icon}</span> }))} />
+          <Segmented
+            size="sm"
+            value={custom ? ('' as Device) : device}
+            onChange={(d) => (setDevice(d), setCustom(null))}
+            options={DEVICES.map((d) => ({ value: d.value, label: <span title={d.label}>{d.icon}</span> }))}
+          />
         )}
+        {layout === 'page' && roomy && !design && <WidthField value={custom} onChange={setCustom} />}
         {(layout === 'panel' || (layout === 'page' && !roomy)) && !design && (
           <>
-            <IconButton ref={deviceRef} label={`As on a ${DEVICES.find((d) => d.value === device)!.label.toLowerCase()}`} size="sm" active={deviceMenu} onClick={() => setDeviceMenu((o) => !o)}>
+            <IconButton ref={deviceRef} label={custom ? `As ${custom} pixels wide` : `As on a ${DEVICES.find((d) => d.value === device)!.label.toLowerCase()}`} size="sm" active={deviceMenu} onClick={() => setDeviceMenu((o) => !o)}>
               {DEVICES.find((d) => d.value === device)!.icon}
             </IconButton>
-            <Popover anchor={deviceRef} open={deviceMenu} onClose={() => setDeviceMenu(false)} align="end" width={170}>
+            <Popover anchor={deviceRef} open={deviceMenu} onClose={() => setDeviceMenu(false)} align="end" width={190}>
               {DEVICES.map((d) => (
-                <MenuItem key={d.value} icon={d.icon} onClick={() => (setDevice(d.value), setDeviceMenu(false))}>
-                  <span className={cx(device === d.value && 'font-semibold text-fg')}>{d.label}</span>
+                <MenuItem key={d.value} icon={d.icon} onClick={() => (setDevice(d.value), setCustom(null), setDeviceMenu(false))}>
+                  <span className={cx(device === d.value && !custom && 'font-semibold text-fg')}>{d.label}</span>
+                </MenuItem>
+              ))}
+              <div className="flex items-center gap-2 px-2.5 py-1.5">
+                <span className="text-[12.5px] text-fg-2">Width</span>
+                <WidthField value={custom} onChange={setCustom} />
+                <span className="text-[12px] text-fg-3">px</span>
+              </div>
+            </Popover>
+          </>
+        )}
+        {!design && doc && mode !== 'code' && (
+          <>
+            <Button ref={zoomRef} size="sm" variant="ghost" icon={<ZoomIn size={14} />} onClick={() => setZoomMenu((o) => !o)} title="Zoom (Ctrl+wheel, Ctrl+= and Ctrl+-, Ctrl+0 for Fit)">
+              <span className="tabular-nums">{zoom === 'fit' ? 'Fit' : `${zoom}%`}</span>
+            </Button>
+            <Popover anchor={zoomRef} open={zoomMenu} onClose={() => setZoomMenu(false)} align="end" width={150}>
+              {(['fit', ...ZOOMS] as Zoom[]).map((z) => (
+                <MenuItem key={z} onClick={() => (setZoom(z), setZoomMenu(false))}>
+                  <span className={cx('tabular-nums', zoom === z && 'font-semibold text-fg')}>{z === 'fit' ? 'Fit' : `${z}%`}</span>
                 </MenuItem>
               ))}
             </Popover>
@@ -755,9 +931,20 @@ export function Studio({
             </span>
           )}
           <span className="ml-1 min-w-0 flex-1 truncate text-[12px] text-fg-3 max-sm:hidden">
-            {sel?.multi ? `${sel.multi} blocks picked` : sel ? (sel.wordy ? 'Click it again to write in it, type / for blocks' : 'Drag the handle to move it, the edges to size it') : 'Click a part of the page, and again to write in it'}
+            {sel?.multi
+              ? `${sel.multi} blocks picked`
+              : sel
+                ? sel.computed.position && sel.computed.position !== 'static' && sel.computed.position !== 'sticky'
+                  ? 'Drag it to move it, the arrow keys nudge it, the handles size it; right-click for more'
+                  : sel.wordy
+                    ? 'Click it again to write in it, type / for blocks; right-click for more'
+                    : 'Drag the handle to move it in the page, the handles to size it; right-click, then Place freely, to put it anywhere'
+                : 'Click a part of the page, and again to write in it'}
           </span>
-          <IconButton label="Keyboard shortcuts (Ctrl+Shift+/)" size="sm" onClick={() => setKeysOpen(true)} className="ml-auto">
+          <IconButton label="Find and replace (Ctrl+F)" size="sm" active={find.open} onClick={() => (find.open ? find.close() : find.show())} className="ml-auto">
+            <Search size={15} />
+          </IconButton>
+          <IconButton label="Keyboard shortcuts (Ctrl+Shift+/)" size="sm" onClick={() => setKeysOpen(true)}>
             <Keyboard size={15} />
           </IconButton>
           <AddPanel anchor={addRef} open={adding} onClose={() => setAdding(false)} sel={sel} cmd={cmd} app={doc.app?.info} onAi={onRequest && !readOnly ? (where) => openTypes({ kind: 'block', at: blockPlace(where, sel), onDone: onRequest }) : undefined} onImport={readOnly ? undefined : (where) => importInto(cmd, where)} />
