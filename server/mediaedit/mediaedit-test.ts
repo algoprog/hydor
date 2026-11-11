@@ -24,6 +24,7 @@ import { ffmpegBin } from '../media/frames.ts';
 import { media } from '../media/index.ts';
 import { getMedia, listMedia } from '../media/store.ts';
 import { getAsset, initAssets, putAsset } from '../pages/assets.ts';
+import { initFolders, makeFolder } from '../pages/folders.ts';
 import { readPng, writePng } from '../signatures/png.ts';
 import { decode, encode, fontPattern, geometry, render } from './image.ts';
 import { mediaEdit } from './index.ts';
@@ -501,6 +502,13 @@ const dataUrl = (b: Buffer, mime = 'image/png') => `data:${mime};base64,${b.toSt
   const item = n.json().item;
   ok(n.statusCode === 200 && n.json().media && getMedia(db, n.json().media)?.kind === 'image', 'a new picture is kept in the Library');
   ok(/Harbour at dawn \(edited\)/.test(item.title), 'named after what it was, edited');
+  // A new picture made in a Library folder (the Library's New): its name as it is, in the folder asked for.
+  initFolders(db);
+  const fol = makeFolder(db, { name: 'Sketches' });
+  const fresh = await req('POST', '/api/mediaedit/image', { data: dataUrl(png(12, 9)), to: { as: 'copy', title: 'Untitled', plain: true, folder: fol.id } });
+  const fi = fresh.json().item;
+  ok(fresh.statusCode === 200 && fi.title === 'Untitled' && getMedia(db, fi.id)?.folder === fol.id, `a new picture is kept under its own name in the folder asked for: ${fi?.title} ${getMedia(db, fi.id)?.folder}`);
+  ok((await req('POST', '/api/mediaedit/image', { data: dataUrl(png(13, 9)), to: { as: 'copy', title: 'Lost', plain: true, folder: 'nofolder0' } })).statusCode === 404, 'a folder that is not there is said to be');
   const bigger = png(80, 40);
   events.length = 0;
   const rep = await req('POST', '/api/mediaedit/image', { data: dataUrl(bigger), to: { media: item.id, as: 'replace' } });
@@ -509,7 +517,7 @@ const dataUrl = (b: Buffer, mime = 'image/png') => `data:${mime};base64,${b.toSt
   ok(after.title === item.title && after.createdAt === item.createdAt, 'its title and place stay');
   ok(after.updatedAt >= item.updatedAt && events.some((e) => e.t === 'feature' && e.id === 'media' && e.data?.item?.id === item.id), 'the pages hear of it');
   const copy = await req('POST', '/api/mediaedit/image', { data: dataUrl(png(30, 30)), to: { media: item.id, as: 'copy' } });
-  ok(copy.statusCode === 200 && copy.json().media !== item.id && listMedia(db).length === 2, 'a copy of a Library picture is a new one beside it');
+  ok(copy.statusCode === 200 && copy.json().media !== item.id && listMedia(db).length === 3, 'a copy of a Library picture is a new one beside it');
   ok((await req('POST', '/api/mediaedit/image', { data: dataUrl(pic), to: { media: 'ffffffffff', as: 'replace' } })).statusCode === 404, 'a Library picture that is not there is said to be');
 
   // A file: written over (its old version to the Trash), or a copy beside it.

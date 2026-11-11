@@ -21,7 +21,11 @@ const stemOf = (p: string) => nameOf(p).replace(/\.[^.]+$/, '');
 
 /** What Save does, and Save a copy (when offered), for a picture opened as `o` and saved as `format`. */
 export function savePlans(o: OpenEditor, detached: boolean, format: ImageFormat): { main: SavePlan; copy: SavePlan | null } {
-  const lib: SavePlan = { label: 'Save to Library', to: { as: 'copy', title: o.title }, says: 'It is kept in your Library as a new picture.' };
+  const lib: SavePlan = {
+    label: 'Save to Library',
+    to: { as: 'copy', title: o.title, ...(o.fresh ? { plain: true, ...(o.fresh.space ? { space: o.fresh.space } : {}), ...(o.fresh.folder ? { folder: o.fresh.folder } : {}) } : {}) },
+    says: o.fresh ? `It is kept in your Library as “${o.title}”${o.fresh.space || o.fresh.folder ? ', where you made it' : ''}.` : 'It is kept in your Library as a new picture.',
+  };
   if (detached || !o.to) return { main: detached ? { ...lib, says: 'Where it came from is closed, so it is kept in your Library as a new picture.' } : lib, copy: null };
   const to = o.to;
   if ('file' in to) {

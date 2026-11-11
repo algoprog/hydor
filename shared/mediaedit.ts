@@ -57,7 +57,7 @@ export interface SaveImageAsk {
    * Kept by the app for a deck, document or page; a Library item written over (`replace`) or a new one beside it
    * (`copy`: with no `media`, simply a new item, `title` its name); a file written over, or a copy beside it.
    */
-  to: { asset: true } | { media?: string; as: 'replace' | 'copy'; title?: string } | { file: string; as: 'replace' | 'copy' };
+  to: { asset: true } | { media?: string; as: 'replace' | 'copy'; title?: string; space?: string | null; folder?: string; plain?: boolean } | { file: string; as: 'replace' | 'copy' };
   /** The kind of file asked for, when the browser could not make it (some make no WebP): the server makes it. */
   format?: ImageFormat;
   quality?: number;
