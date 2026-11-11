@@ -1680,7 +1680,8 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
               {found.boxes.map((b, k) => (
                 <span key={k} className="pointer-events-none absolute rounded-[2px]" style={{ left: b.x, top: b.y, width: b.w, height: b.h, background: b.now ? 'rgba(255,150,50,.55)' : 'rgba(255,213,79,.45)' }} />
               ))}
-              {float?.ask && (
+              {/* (hidden while the right-click menu is open: the menu holds the same actions) */}
+              {float?.ask && !ctx && (
                 <div
                   ref={askChip}
                   data-keeps-editing
