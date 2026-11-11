@@ -89,6 +89,8 @@ export class Stroke {
   bbox: Box | null = null;
   readonly tiles = new Set<string>();
   private dab: HTMLCanvasElement | null = null;
+  /** Dabs for a lighter press of a pen: the brush's own dab made smaller, by twentieths. */
+  private lighter = new Map<number, HTMLCanvasElement>();
   constructor(
     readonly kind: StrokeKind,
     readonly layer: RasterLayer,
@@ -120,10 +122,15 @@ export class Stroke {
   }
 
   /** The brush moved to (x, y), in the canvas's pixels: its dabs laid down; the part of the layer they changed. */
-  to(X: number, Y: number): Box | null {
+  to(X: number, Y: number, pressure = 1): Box | null {
     const x = X - this.layer.x;
     const y = Y - this.layer.y;
-    const spacing = Math.max(0.5, this.o.size * 0.1);
+    // A pen pressed lightly paints smaller and fainter (a mouse always presses fully).
+    const p = Math.max(0, Math.min(1, pressure));
+    const step = p >= 1 ? 20 : Math.max(2, Math.round((0.1 + 0.9 * p) * 20));
+    const stamp = step === 20 ? this.stamp : this.stampAt(step);
+    const flow = p >= 1 ? this.o.flow : this.o.flow * (0.35 + 0.65 * p);
+    const spacing = Math.max(0.5, this.o.size * 0.1 * (step / 20));
     let pts: number[];
     if (!this.trail) {
       pts = [x, y];
@@ -135,19 +142,29 @@ export class Stroke {
     }
     let changed: Box | null = null;
     for (let i = 0; i < pts.length; i += 2) {
-      const b = this.dabAt(pts[i], pts[i + 1]);
+      const b = this.dabAt(pts[i], pts[i + 1], stamp, flow);
       changed = changed ? union(changed, b) : b;
     }
     return changed;
   }
 
-  private dabAt(x: number, y: number): Box {
-    const s = this.stamp;
+  private stampAt(step: number): HTMLCanvasElement {
+    let c = this.lighter.get(step);
+    if (!c) {
+      const kind = this.kind;
+      const color = kind === 'brush' ? this.o.color : kind === 'dodge' ? '#ffffff' : kind === 'heal' ? '#ff3b6b' : '#000000';
+      c = stampOf((this.o.size * step) / 20, kind === 'heal' ? Math.max(this.o.hardness, 60) : this.o.hardness, kind === 'clone' ? '#000000' : color);
+      this.lighter.set(step, c);
+    }
+    return c;
+  }
+
+  private dabAt(x: number, y: number, s: HTMLCanvasElement, flow: number): Box {
     const left = Math.round(x - s.width / 2);
     const top = Math.round(y - s.height / 2);
     const g = this.g;
     g.save();
-    g.globalAlpha = this.kind === 'heal' ? 1 : this.o.flow / 100;
+    g.globalAlpha = this.kind === 'heal' ? 1 : flow / 100;
     if (this.kind === 'clone' && this.source) {
       // What is at the source, cut to the brush's shape.
       const d = (this.dab ??= canvasOf(s.width, s.height));

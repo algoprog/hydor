@@ -308,6 +308,9 @@ export function ToolOptions({ ed, mobile }: { ed: PictureEd; mobile?: boolean })
                 All layers
               </Check>
             )}
+            <Check on={o.pressure} onChange={(v) => set({ pressure: v })} title="A pen pressed lightly paints smaller and fainter">
+              Pen pressure
+            </Check>
             {t === 'brush' && <ColorButton value={ed.fg} label="Colour" onChange={(c, done) => ed.setFg(c, done)} size={22} />}
             {hint}
           </>

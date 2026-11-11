@@ -100,6 +100,8 @@ export interface Opts {
   emojiSize: number;
   cropShape: CropShape;
   autoSelect: boolean;
+  /** A pen pressed lightly paints smaller and fainter. */
+  pressure: boolean;
 }
 
 export const TEXT_BACKS: Record<Opts['back'], string | undefined> = { none: undefined, dark: '#000000b3', light: '#ffffffd9' };
@@ -132,6 +134,7 @@ export function defaultOpts(long: number): Opts {
     emojiSize: Math.max(24, Math.round(long / 7)),
     cropShape: 'free',
     autoSelect: false,
+    pressure: true,
   };
 }
 
@@ -190,6 +193,8 @@ export interface ViewApi {
   fit(): void;
   actual(): void;
   zoomBy(f: number, at?: [number, number]): void;
+  /** The zoom set (1 is the picture's own pixels), about the middle of what shows. */
+  zoomTo(z: number): void;
   zoom(): number;
 }
 
@@ -460,6 +465,20 @@ export class PictureEd {
     this.fg = '#000000';
     this.bg = '#ffffff';
     this.emit();
+  }
+  /** The brush's hardness softer or harder by ten ({ and }). */
+  hardnessStep(dir: 1 | -1) {
+    this.opts = { ...this.opts, hardness: Math.max(0, Math.min(100, Math.round(this.opts.hardness / 10) * 10 + dir * 10)) };
+    this.emit();
+  }
+  /** A number key sets the tool's opacity (exposure for Dodge and Burn): 1 is 10%, … 9 is 90%, 0 is 100%. False for a tool that has none. */
+  opacityKey(digit: number): boolean {
+    const v = digit === 0 ? 100 : digit * 10;
+    if (['brush', 'eraser', 'clone', 'gradient', 'bucket'].includes(this.tool)) this.opts = { ...this.opts, opacity: v };
+    else if (this.tool === 'dodge' || this.tool === 'burn') this.opts = { ...this.opts, exposure: v };
+    else return false;
+    this.emit();
+    return true;
   }
   /** Brush size up or down a step ([ and ]). */
   brushStep(dir: 1 | -1) {
@@ -823,7 +842,9 @@ export class PictureEd {
   // ---- strokes (the View drives them) ---------------------------------------------------------------------------------
 
   stroke: Stroke | null = null;
-  beginStroke(kind: StrokeKind, x: number, y: number): boolean {
+  /** Where the last stroke on a layer ended (Shift+click draws a straight line from there). */
+  lastPaint: { layer: string; x: number; y: number } | null = null;
+  beginStroke(kind: StrokeKind, x: number, y: number, pressure = 1): boolean {
     const l = this.paintTarget();
     if (!l) return false;
     let source: { canvas: HTMLCanvasElement; dx: number; dy: number } | undefined;
@@ -841,14 +862,16 @@ export class PictureEd {
     }
     const size = this.opts.size;
     this.stroke = new Stroke(kind, l, { size, hardness: this.opts.hardness, opacity: kind === 'dodge' || kind === 'burn' ? this.opts.exposure : kind === 'heal' ? 100 : this.opts.opacity, flow: this.opts.flow, color: this.fg }, this.selClip(), source);
-    this.stroke.to(x, y);
+    this.stroke.to(x, y, pressure);
+    this.lastPaint = { layer: l.id, x, y };
     this.live = { ...this.live, stroke: this.stroke.live };
     this.emit();
     return true;
   }
-  strokeTo(x: number, y: number) {
+  strokeTo(x: number, y: number, pressure = 1) {
     if (!this.stroke) return;
-    this.stroke.to(x, y);
+    this.stroke.to(x, y, pressure);
+    this.lastPaint = { layer: this.stroke.layer.id, x, y };
     if (this.stroke.kind === 'clone' && this.cloneOffset) this.overlay = { ...this.overlay, cloneAt: [x + this.cloneOffset[0], y + this.cloneOffset[1]] };
     this.emit();
   }

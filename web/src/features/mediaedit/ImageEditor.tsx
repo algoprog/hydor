@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Layers as LayersIcon, Redo2, SplitSquareHorizontal, Undo2 } from 'lucide-react';
 import { formatOfMime, formatOfName, type ImageFormat, type Saved } from '@shared/mediaedit';
-import { Button, Empty, IconButton, Popover, Throbber, useIsMobile } from '../../components/ui';
+import { Button, Empty, IconButton, MenuItem, Popover, Throbber, useIsMobile } from '../../components/ui';
 import { toast, toastError } from '../../lib/store';
 import { keepKeys, openEditor, pageName, type EditorProps } from './host';
 import { AiTools } from './picture/AiTools';
@@ -349,9 +349,18 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     }
     if (runMenuKeys(menus, e)) return keepKeys(e);
     if (!mod && !e.altKey) {
-      if (k === '[' || k === ']' || e.code === 'BracketLeft' || e.code === 'BracketRight') {
+      if (!e.shiftKey && (k === '[' || k === ']' || e.code === 'BracketLeft' || e.code === 'BracketRight')) {
         e.preventDefault();
         ed.brushStep(e.code === 'BracketRight' || k === ']' ? 1 : -1);
+        return keepKeys(e);
+      }
+      if (k === '{' || k === '}') {
+        e.preventDefault();
+        ed.hardnessStep(k === '}' ? 1 : -1);
+        return keepKeys(e);
+      }
+      if (/^[0-9]$/.test(k) && !e.shiftKey && ed.opacityKey(Number(k))) {
+        e.preventDefault();
         return keepKeys(e);
       }
       if (k.toLowerCase() === 'x' && !e.shiftKey) {
@@ -471,12 +480,42 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   const tool = ALL_TOOLS.find((t) => t.id === ed.tool);
   const kind = format === 'jpeg' ? 'JPEG' : format === 'webp' ? 'WebP' : 'PNG';
   const [zoomZ, setZoomZ] = useState(1);
+  const zoomRef = useRef<HTMLSpanElement>(null);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomText, setZoomText] = useState('');
+  useEffect(() => {
+    if (zoomOpen) setZoomText(String(Math.round(zoomZ * 100)));
+  }, [zoomOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const zoom = Math.round(zoomZ * 100);
   const status = (
     <StatusBar>
-      <StatusItem title="Fit on screen" onClick={() => ed.view?.fit()}>
-        {zoom}%
-      </StatusItem>
+      <span ref={zoomRef} className="inline-flex">
+        <StatusItem title="Zoom: fit on screen, a size, or type one" onClick={() => setZoomOpen((x) => !x)}>
+          {zoom}%
+        </StatusItem>
+      </span>
+      <Popover anchor={zoomRef} open={zoomOpen} onClose={() => setZoomOpen(false)} width={200} prefer="above" title="Zoom">
+        <MenuItem onClick={() => (setZoomOpen(false), ed.view?.fit())}>Fit on screen</MenuItem>
+        {[25, 50, 100, 200, 400].map((z) => (
+          <MenuItem key={z} onClick={() => (setZoomOpen(false), ed.view?.zoomTo(z / 100))}>
+            {z === 100 ? 'Actual size, 100%' : `${z}%`}
+          </MenuItem>
+        ))}
+        <form
+          className="flex items-center gap-1.5 border-t border-line px-2.5 pt-2 pb-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const v = parseFloat(zoomText.replace(',', '.'));
+            if (Number.isFinite(v) && v > 0) {
+              ed.view?.zoomTo(v / 100);
+              setZoomOpen(false);
+            }
+          }}
+        >
+          <input value={zoomText} onChange={(e) => setZoomText(e.target.value)} onFocus={(e) => e.target.select()} inputMode="decimal" aria-label="Zoom in per cent" placeholder="Type a zoom" className="h-7 min-w-0 flex-1 rounded-md border border-line-2 bg-bg-1 px-2 text-[12px] outline-none focus:border-accent/70" />
+          <span className="text-[12px] text-fg-3">%</span>
+        </form>
+      </Popover>
       <StatusItem title="The picture's size">
         {ed.doc.w} × {ed.doc.h} px
       </StatusItem>

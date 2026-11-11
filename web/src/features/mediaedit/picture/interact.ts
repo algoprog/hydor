@@ -483,6 +483,21 @@ function pressText(ed: PictureEd, p: Pt, t: ViewT) {
   ed.startWriting(l.id);
 }
 
+/** A pen's pressure for the brush (0 to 1) when the pen's pressure is on; a mouse or a finger presses fully. */
+function pressureOf(ed: PictureEd, e: PointerEvent): number {
+  return ed.opts.pressure && e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 1;
+}
+
+/** The eyedropper's drag: the colour under the pointer is the foreground (Alt: the background); with `brush`, Alt took it, so it is the foreground. */
+function pickColour(ed: PictureEd, p: Pt, e: PointerEvent, brush = false): Gesture {
+  const pick = (q: Pt, ev: PointerEvent) => {
+    const c = ed.sample(q[0], q[1]);
+    if (c) (ev.altKey && !brush ? ed.setBg(c, false) : ed.setFg(c, false));
+  };
+  pick(p, e);
+  return { move: pick, up: (q, ev) => (pick(q, ev), ev.altKey && !brush ? ed.setBg(ed.bg) : ed.setFg(ed.fg)) };
+}
+
 // ---- the press -------------------------------------------------------------------------------------------------------
 
 /**
@@ -552,14 +567,8 @@ export function press(ed: PictureEd, p: Pt, e: PointerEvent, t: ViewT, o: { bigH
     case 'wand':
       pressWand(ed, p, e);
       return null;
-    case 'eyedropper': {
-      const pick = (q: Pt, ev: PointerEvent) => {
-        const c = ed.sample(q[0], q[1]);
-        if (c) (ev.altKey ? ed.setBg(c, false) : ed.setFg(c, false));
-      };
-      pick(p, e);
-      return { move: pick, up: (q, ev) => (pick(q, ev), ev.altKey ? ed.setBg(ed.bg) : ed.setFg(ed.fg)) };
-    }
+    case 'eyedropper':
+      return pickColour(ed, p, e);
     case 'brush':
     case 'eraser':
     case 'clone':
@@ -573,8 +582,17 @@ export function press(ed: PictureEd, p: Pt, e: PointerEvent, t: ViewT, o: { bigH
         ed.emit();
         return null;
       }
-      if (!ed.beginStroke(ed.tool, p[0], p[1])) return null;
-      return { move: (q) => ed.strokeTo(q[0], q[1]), up: () => ed.endStroke(o.bigHeal) };
+      // Alt held with the brush: the colour under it is taken (as the eyedropper does), while it is held.
+      if (ed.tool === 'brush' && e.altKey) return pickColour(ed, p, e, true);
+      // Shift: a straight line from where the last stroke on this layer ended.
+      const last = ed.lastPaint;
+      if (e.shiftKey && last && last.layer === ed.doc.active && ['brush', 'eraser', 'dodge', 'burn'].includes(ed.tool)) {
+        if (!ed.beginStroke(ed.tool, last.x, last.y, pressureOf(ed, e))) return null;
+        ed.strokeTo(p[0], p[1], pressureOf(ed, e));
+        return { move: () => {}, up: () => ed.endStroke(o.bigHeal) };
+      }
+      if (!ed.beginStroke(ed.tool, p[0], p[1], pressureOf(ed, e))) return null;
+      return { move: (q, ev) => ed.strokeTo(q[0], q[1], pressureOf(ed, ev)), up: () => ed.endStroke(o.bigHeal) };
     }
     case 'gradient': {
       if (!ed.paintTarget()) return null;
