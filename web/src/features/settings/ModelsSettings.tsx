@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Brain, Check, Cpu, Download, ExternalLink, Eye, HardDrive, Lock, MemoryStick, Play, Plus, Search, Square, Trash2, Wrench, X } from 'lucide-react';
+import { Brain, Check, Cpu, Download, ExternalLink, Eye, HardDrive, KeyRound, Lock, MemoryStick, Play, Plug, Plus, Search, Square, Trash2, Wrench, X } from 'lucide-react';
 import type { HfInspect, HfModel, HfSort, LocalModel, ModelFit, ModelsState, OpenRouterModel, OpenRouterSort } from '@shared/types';
 import type { LocalPickView } from '@shared/model-picks';
 import { api, post, put } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { live } from '../../lib/ws';
-import { Button, cx, inputCls, Section, Throbber, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, Throbber, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Row, Select, Stack } from './kit';
 import { HelperModel } from './HelperModel';
 import { TiersSection } from './TiersSection';
 import { LOCALE } from '../../i18n/locale';
@@ -24,39 +25,40 @@ export function useModels(): ModelsState | null {
   return st;
 }
 
-/** The Custom agent's models: providers and keys, models on this machine, and adding more from Hugging Face. */
+/** The Custom agent’s models: providers and keys, models on this machine, and adding more from Hugging Face. */
 export function ModelsSettings() {
   const st = useModels();
-  if (!st)
-    return (
-      <div className="flex justify-center py-10 text-fg-3">
-        <Throbber size={28} />
-      </div>
-    );
+  const loading = (title: string) => (
+    <Group title={title}>
+      <Row label="Looking…" control={<Throbber className="text-fg-3" />} />
+    </Group>
+  );
   return (
-    <div className="space-y-4">
-      <p className="text-[13px] leading-relaxed text-fg-3">
-        Custom, the app’s own agent, runs any of these models with the same tools, skills and MCP servers as the other agents. Pick Custom on the start page, then the model.
-      </p>
+    <Stack>
       <HelperModel />
       <TiersSection />
-      <LocalModels st={st} />
-      <AddFromHf st={st} />
-      <OpenRouter st={st} />
-      <Runtimes st={st} />
-    </div>
+      {st ? (
+        <>
+          <LocalModels st={st} />
+          <AddFromHf st={st} />
+          <OpenRouterBody st={st} />
+          <Runtimes st={st} />
+        </>
+      ) : (
+        <>
+          {loading('On this machine')}
+          {loading('Add a model from Hugging Face')}
+          {loading('OpenRouter')}
+          {loading('Runtimes and endpoints')}
+        </>
+      )}
+    </Stack>
   );
 }
 
 function Verdict({ fit }: { fit: ModelFit }) {
   const label =
-    fit.verdict === 'good'
-      ? `Runs well on GPU ${fit.gpu}`
-      : fit.verdict === 'slow'
-        ? 'Runs on the CPU, slowly'
-        : fit.verdict === 'tight'
-          ? 'Runs on the CPU, very slowly'
-          : 'Too big for this machine';
+    fit.verdict === 'good' ? `Runs well on GPU ${fit.gpu}` : fit.verdict === 'slow' ? 'Runs on the CPU, slowly' : fit.verdict === 'tight' ? 'Runs on the CPU, very slowly' : 'Too big for this machine';
   return (
     <span
       className={cx(
@@ -86,85 +88,103 @@ function FitLine({ fit }: { fit: ModelFit }) {
 function LocalModels({ st }: { st: ModelsState }) {
   const [confirm, confirmNode] = useConfirm();
   const remove = async (m: LocalModel) => {
-    if (
-      !(await confirm({
-        title: `Remove ${m.repo}?`,
-        body: <>Its files ({size(m.sizeBytes)}) are deleted from this machine. You can install it again later.</>,
-        confirm: 'Remove',
-        danger: true,
-      }))
-    )
+    if (!(await confirm({ title: `Remove ${m.repo}?`, body: <>Its files ({size(m.sizeBytes)}) are deleted from this machine. You can install it again later.</>, confirm: 'Remove', danger: true })))
       return;
     post('/api/models/remove', { id: m.id }).then(() => toast(`Removed ${m.repo}`, 'ok'), toastError);
   };
   const running = st.downloads.filter((d) => d.status !== 'done');
   return (
-    <Section title="On this machine">
+    <Group title="On this machine">
       {confirmNode}
-      <div className="mb-3">
-        <MachineCard st={st} />
-      </div>
+      <MachineRows st={st} />
       {running.map((d) => (
-        <div key={d.key} className="flex items-center gap-3 border-t border-line py-2.5">
-          <Download size={15} className="shrink-0 text-fg-3" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px]">{d.name.replace(/^hf\.co\//, '')}</div>
-            {d.status === 'running' ? (
+        <Row
+          key={d.key}
+          icon={<Download size={16} />}
+          label={<span translate="no">{d.name.replace(/^hf\.co\//, '')}</span>}
+          hint={d.status === 'running' ? undefined : <span className={d.status === 'failed' ? 'text-err' : undefined}>{d.status === 'failed' ? d.error : 'Cancelled'}</span>}
+          control={
+            <Button size="sm" variant="secondary" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
+              {d.status === 'running' ? 'Cancel' : 'Dismiss'}
+            </Button>
+          }
+        >
+          {d.status === 'running' && (
+            <>
+              <div className="h-1.5 overflow-hidden rounded-full bg-fg/10">
+                <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${d.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 5}%` }} />
+              </div>
+              <div className="tnum mt-1 text-[12px] text-fg-3">
+                {size(d.doneBytes)} of {d.totalBytes ? size(d.totalBytes) : '…'} · {d.target === 'ollama' ? 'with Ollama' : 'for vLLM'}
+              </div>
+            </>
+          )}
+        </Row>
+      ))}
+      {!st.local.length && !running.length && <EmptyRow>No models here yet: add one from Hugging Face below.</EmptyRow>}
+      <Limited
+        items={st.local.map((m) => (
+          <Row
+            key={m.id}
+            icon={<Cpu size={16} />}
+            label={<span translate="no">{m.repo}</span>}
+            hint={
               <>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
-                  <div
-                    className="h-full rounded-full bg-accent transition-[width] duration-500"
-                    style={{
-                      width: `${d.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 5}%`,
-                    }}
-                  />
-                </div>
-                <div className="mt-1 text-[11.5px] text-fg-3">
-                  {size(d.doneBytes)} of {d.totalBytes ? size(d.totalBytes) : '…'} · {d.target === 'ollama' ? 'with Ollama' : 'for vLLM'}
-                </div>
+                {m.runtime === 'ollama' ? 'Ollama' : 'vLLM'} · {size(m.sizeBytes)}
+                {m.detail ? ` · ${m.detail}` : ''}
+                {m.vision ? ' · sees images' : ''}
+                {m.server?.state === 'ready' && (m.server.gpus?.length ? ` · running on GPUs ${m.server.gpus.join(', ')}` : m.server.gpu < 0 ? ' · running' : ` · running on GPU ${m.server.gpu}`)}
+                {m.server?.state === 'starting' && ' · starting…'}
+                {m.supported === false && m.reason ? ` · ${m.reason}` : ''}
               </>
-            ) : (
-              <div className={cx('text-[12px]', d.status === 'failed' ? 'text-err' : 'text-fg-3')}>{d.status === 'failed' ? d.error : 'Cancelled'}</div>
-            )}
-          </div>
-          <Button size="sm" variant="ghost" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
-            {d.status === 'running' ? 'Cancel' : 'Dismiss'}
-          </Button>
-        </div>
-      ))}
-      {!st.local.length && !running.length && <div className="border-t border-line py-3 text-[13px] text-fg-3">No models here yet: add one from Hugging Face below.</div>}
-      {st.local.map((m) => (
-        <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line py-2.5">
-          <Cpu size={15} className="shrink-0 text-fg-3" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] text-fg">{m.repo}</div>
-            <div className="text-[12px] text-fg-3">
-              {m.runtime === 'ollama' ? 'Ollama' : 'vLLM'} · {size(m.sizeBytes)}
-              {m.detail ? ` · ${m.detail}` : ''}
-              {m.vision ? ' · sees images' : ''}
-              {m.server?.state === 'ready' && (m.server.gpus?.length ? ` · running on GPUs ${m.server.gpus.join(', ')}` : m.server.gpu < 0 ? ' · running' : ` · running on GPU ${m.server.gpu}`)}
-              {m.server?.state === 'starting' && ' · starting…'}
-              {m.supported === false && m.reason ? ` · ${m.reason}` : ''}
-            </div>
-            {m.server?.state === 'failed' && <div className="mt-1 line-clamp-3 font-mono text-[11px] text-err">{m.server.error}</div>}
-          </div>
-          {m.runtime === 'vllm' &&
-            m.supported &&
-            (m.server && m.server.state !== 'failed' ? (
-              <Button size="sm" variant="ghost" icon={<Square size={12} />} onClick={() => post('/api/models/stop', { repo: m.repo }).catch(toastError)}>
-                Stop
-              </Button>
-            ) : (
-              <Button size="sm" variant="ghost" icon={<Play size={12} />} onClick={() => post('/api/models/start', { repo: m.repo }).catch(toastError)}>
-                Start
-              </Button>
-            ))}
-          <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => remove(m)}>
-            Remove
-          </Button>
-        </div>
-      ))}
-    </Section>
+            }
+            control={
+              <>
+                {m.runtime === 'vllm' &&
+                  m.supported &&
+                  (m.server && m.server.state !== 'failed' ? (
+                    <Button size="sm" variant="secondary" icon={<Square size={12} />} onClick={() => post('/api/models/stop', { repo: m.repo }).catch(toastError)}>
+                      Stop
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" icon={<Play size={12} />} onClick={() => post('/api/models/start', { repo: m.repo }).catch(toastError)}>
+                      Start
+                    </Button>
+                  ))}
+                <MoreMenu width={190}>
+                  {(close) => (
+                    <MenuItem
+                      icon={<Trash2 size={14} />}
+                      danger
+                      onClick={() => {
+                        close();
+                        void remove(m);
+                      }}
+                    >
+                      Remove
+                    </MenuItem>
+                  )}
+                </MoreMenu>
+              </>
+            }
+          >
+            {m.server?.state === 'failed' && <div className="line-clamp-3 font-mono text-[11px] text-err">{m.server.error}</div>}
+          </Row>
+        ))}
+      />
+    </Group>
+  );
+}
+
+/** The first few of a long list, then a row that shows all of it. */
+function Limited({ items, limit = 6 }: { items: React.ReactNode[]; limit?: number }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, limit);
+  return (
+    <>
+      {shown}
+      {shown.length < items.length && <Row label={`Show all ${items.length}`} onClick={() => setAll(true)} />}
+    </>
   );
 }
 
@@ -270,7 +290,12 @@ function Starters({ words, onWord, browse, onBrowse, note }: { words: string[]; 
       {note && <span className="w-full text-fg-2">{note}</span>}
       Try
       {words.map((w) => (
-        <button key={w} type="button" onClick={() => onWord(w)} className="rounded-md bg-bg-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg-2 ring-1 ring-line transition-colors hover:bg-bg-3 hover:text-fg">
+        <button
+          key={w}
+          type="button"
+          onClick={() => onWord(w)}
+          className="rounded-md bg-bg-2 px-1.5 py-0.5 font-mono text-[11.5px] text-fg-2 ring-1 ring-line transition-colors hover:bg-bg-3 hover:text-fg"
+        >
           {w}
         </button>
       ))}
@@ -287,26 +312,13 @@ function Starters({ words, onWord, browse, onBrowse, note }: { words: string[]; 
 /** "42 models", and their order. */
 function ResultsHead({ n, limit, order, value, onChange }: { n: number; limit: number; order: { id: string; label: string }[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="mb-1.5 flex items-center gap-2 text-[12px] text-fg-3">
+    <div className="flex items-center gap-2 px-4 py-2 text-[12.5px] text-fg-3">
       <span>{n ? `${n === limit ? `First ${limit}` : n} model${n === 1 ? '' : 's'}` : 'No model matches'}</span>
       <span className="flex-1" />
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Order"
-        className="h-7 shrink-0 rounded-lg bg-bg-2 px-2 text-[12px] font-medium text-fg-2 ring-1 ring-line outline-none hover:bg-bg-3"
-      >
-        {order.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <Select label="Order" value={value} onChange={onChange} width={200} options={order.map((o) => ({ value: o.id, label: o.label }))} />
     </div>
   );
 }
-
-const resultList = 'max-h-[min(520px,60vh)] divide-y divide-line overflow-y-auto overscroll-contain rounded-xl border border-line';
 
 // ---- this computer ---------------------------------------------------------------------------------
 
@@ -315,21 +327,6 @@ export const shortGpu = (name: string) => name.replace(/^NVIDIA\s+/i, '').replac
 export function aboutParams(free: number): number {
   const b = free / (0.61 * 1.5 * 1e9);
   return b >= 20 ? Math.floor(b / 10) * 10 : b >= 10 ? Math.floor(b / 5) * 5 : Math.max(1, Math.floor(b));
-}
-
-function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub: string }) {
-  return (
-    <div className="min-w-0 rounded-lg bg-bg-2/70 px-2.5 py-2 max-sm:flex max-sm:items-baseline max-sm:gap-2">
-      <div className="flex items-center gap-1.5 text-[11.5px] text-fg-3 max-sm:w-[72px] max-sm:shrink-0">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-0.5 truncate text-[13px] font-medium text-fg" title={value}>
-        {value}
-      </div>
-      <div className="truncate text-[11.5px] text-fg-3 max-sm:ml-auto">{sub}</div>
-    </div>
-  );
 }
 
 function RuntimePill({ name, version, install }: { name: string; version?: string; install: string }) {
@@ -353,8 +350,8 @@ function RuntimePill({ name, version, install }: { name: string; version?: strin
   );
 }
 
-/** This computer at a glance: graphics, memory, disk, the runtimes, and how big a model fits. */
-export function MachineCard({ st }: { st: ModelsState }) {
+/** This computer at a glance, as rows: graphics, memory and disk, the runtimes, and how big a model fits. */
+function MachineRows({ st }: { st: ModelsState }) {
   const m = st.machine;
   const kinds = new Map<string, number>();
   for (const g of m.gpus) kinds.set(shortGpu(g.name), (kinds.get(shortGpu(g.name)) ?? 0) + 1);
@@ -364,28 +361,50 @@ export function MachineCard({ st }: { st: ModelsState }) {
   const hi = Math.max(...mem);
   const best = [...m.gpus].sort((a, b) => b.freeBytes - a.freeBytes)[0];
   const per = hi - lo > 1.5 * GiB ? `${size(lo)}–${size(hi)}` : size(hi);
+  const sub = m.gpus.length > 1 ? `${per} each` : m.gpus.length ? per : m.apple ? 'shares the memory with its graphics' : 'models run on the processor';
   return (
-    <div className="rounded-xl border border-line bg-bg-1 p-2.5">
-      <div className="grid grid-cols-3 gap-2 max-sm:grid-cols-1 max-sm:gap-1.5">
-        <Stat
-          icon={<Cpu size={12} />}
-          label="Graphics"
-          value={gpus || m.apple?.chip || 'No GPU'}
-          sub={m.gpus.length > 1 ? `${per} each` : m.gpus.length ? per : m.apple ? 'shares the memory with its graphics' : 'models run on the processor'}
-        />
-        <Stat icon={<MemoryStick size={12} />} label="Memory" value={size(m.ramBytes)} sub={`${size(m.ramFreeBytes)} free`} />
-        <Stat icon={<HardDrive size={12} />} label="Disk" value={`${size(st.storage.freeBytes)} free`} sub={st.storage.usedBytes ? `models take ${size(st.storage.usedBytes)}` : 'for downloads'} />
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 px-0.5">
-        <RuntimePill name="Ollama" version={st.ollama.version} install="https://ollama.com/download" />
-        <RuntimePill name="vLLM" version={st.vllm.path ? (st.vllm.version ?? 'found') : undefined} install="pip install vllm (NVIDIA GPUs)" />
-        {best ? (
-          <span className="ml-auto text-[12px] text-fg-3">Fits about {aboutParams(best.freeBytes)}B parameters at 4-bit on one GPU</span>
-        ) : m.apple ? (
-          <span className="ml-auto text-[12px] text-fg-3">Fits about {aboutParams(m.ramBytes * 0.7)}B parameters at 4-bit</span>
-        ) : null}
-      </div>
-    </div>
+    <>
+      <Row
+        icon={<Cpu size={16} />}
+        label="Graphics"
+        hint={
+          <>
+            <div>
+              <span translate="no">{gpus || m.apple?.chip || 'No GPU'}</span> · {sub}
+            </div>
+            {best ? (
+              <div className="mt-0.5">Fits about {aboutParams(best.freeBytes)}B parameters at 4-bit on one GPU</div>
+            ) : m.apple ? (
+              <div className="mt-0.5">Fits about {aboutParams(m.ramBytes * 0.7)}B parameters at 4-bit</div>
+            ) : null}
+          </>
+        }
+      />
+      <Row
+        icon={<MemoryStick size={16} />}
+        label="Memory and disk"
+        hint={
+          <>
+            <div>
+              {size(m.ramBytes)} memory · {size(m.ramFreeBytes)} free
+            </div>
+            <div className="mt-0.5">
+              {size(st.storage.freeBytes)} disk free · {st.storage.usedBytes ? `models take ${size(st.storage.usedBytes)}` : 'for downloads'}
+            </div>
+          </>
+        }
+      />
+      <Row
+        icon={<HardDrive size={16} />}
+        label="Runs with"
+        control={
+          <>
+            <RuntimePill name="Ollama" version={st.ollama.version} install="https://ollama.com/download" />
+            <RuntimePill name="vLLM" version={st.vllm.path ? (st.vllm.version ?? 'found') : undefined} install="pip install vllm (NVIDIA GPUs)" />
+          </>
+        }
+      />
+    </>
   );
 }
 
@@ -393,10 +412,10 @@ export function MachineCard({ st }: { st: ModelsState }) {
 
 function AddFromHf({ st }: { st: ModelsState }) {
   return (
-    <Section title="Add a model from Hugging Face" sub="The ones suggested for this computer, or search, see how each would run here, and install it">
+    <Group title="Add a model from Hugging Face" hint="Suggested for this computer, or search all of it">
       <SuggestedLocal st={st} />
       <HfSearch st={st} />
-    </Section>
+    </Group>
   );
 }
 
@@ -428,37 +447,32 @@ function SuggestedLocal({ st }: { st: ModelsState }) {
   const shown = picks.filter((p) => p.runs || more);
   const hidden = picks.length - picks.filter((p) => p.runs).length;
   return (
-    <div className="mb-4">
-      <div className="mb-1.5 flex items-center gap-2 text-[12px] font-medium text-fg-2">
-        Suggested for this computer
-        <span className="flex-1" />
-        {hidden > 0 && (
-          <button type="button" onClick={() => setMore((x) => !x)} className="font-normal text-fg-3 hover:text-fg">
-            {more ? 'Only those that run here' : `${hidden} more for bigger computers`}
-          </button>
-        )}
-      </div>
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-        {shown.map((p) => {
-          const d = p.coming ? st.downloads.find((x) => x.key === p.coming) : undefined;
-          const pct = d?.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 0;
-          return (
-            <div key={p.repo} className={cx('flex items-start gap-3 px-3 py-2.5', !p.runs && 'opacity-60')}>
-              <OrgMark name={p.maker} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                  <a href={`https://huggingface.co/${p.repo}`} target="_blank" rel="noreferrer" className="text-[13.5px] leading-5 font-medium text-fg hover:underline">
-                    {p.name}
-                  </a>
-                  {p.best && <Tag tone="accent">Best here</Tag>}
-                  {p.vision && (
-                    <Tag icon={<Eye size={11} />} title="Sees images">
-                      <span className="max-sm:hidden">Images</span>
-                    </Tag>
-                  )}
-                </div>
-                <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{p.blurb}</div>
-                <div className="tnum mt-0.5 text-[12px] text-fg-3">
+    <>
+      {shown.map((p) => {
+        const d = p.coming ? st.downloads.find((x) => x.key === p.coming) : undefined;
+        const pct = d?.totalBytes ? Math.min(100, (d.doneBytes / d.totalBytes) * 100) : 0;
+        return (
+          <Row
+            key={p.repo}
+            className={cx(!p.runs && 'opacity-60')}
+            icon={<OrgMark name={p.maker} />}
+            label={
+              <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <a href={`https://huggingface.co/${p.repo}`} target="_blank" rel="noreferrer" className="hover:underline" translate="no">
+                  {p.name}
+                </a>
+                {p.best && <Tag tone="accent">Best here</Tag>}
+                {p.vision && (
+                  <Tag icon={<Eye size={11} />} title="Sees images">
+                    <span className="max-sm:hidden">Images</span>
+                  </Tag>
+                )}
+              </span>
+            }
+            hint={
+              <>
+                <div>{p.blurb}</div>
+                <div className="tnum mt-0.5">
                   {p.runs ? (
                     <>
                       <span className={p.fit.verdict === 'good' ? 'text-ok' : 'text-warn'}>{p.fit.verdict === 'good' ? 'Runs well' : 'Runs slowly'}</span>
@@ -469,38 +483,37 @@ function SuggestedLocal({ st }: { st: ModelsState }) {
                     `Needs ${p.needs ? p.needs[0].toLowerCase() + p.needs.slice(1) : 'more than this computer has'}`
                   )}
                 </div>
-                {d && (
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-fg/10">
-                      <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct || 3}%` }} />
-                    </div>
-                    <span className="tnum text-[11.5px] text-fg-3">{d.totalBytes ? `${Math.floor(pct)}%` : size(d.doneBytes)}</span>
-                  </div>
-                )}
+              </>
+            }
+            control={
+              p.have ? (
+                <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
+                  <Check size={14} /> Installed
+                </span>
+              ) : d ? (
+                <Button size="sm" variant="secondary" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
+                  Cancel
+                </Button>
+              ) : p.runs && p.install ? (
+                <Button size="sm" variant={p.best ? 'primary' : 'secondary'} icon={<Download size={13} />} onClick={() => post('/api/models/install', p.install).catch(toastError)}>
+                  Install
+                </Button>
+              ) : undefined
+            }
+          >
+            {d && (
+              <div className="flex items-center gap-2">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-fg/10">
+                  <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct || 3}%` }} />
+                </div>
+                <span className="tnum text-[11.5px] text-fg-3">{d.totalBytes ? `${Math.floor(pct)}%` : size(d.doneBytes)}</span>
               </div>
-              <div className="shrink-0">
-                {p.have ? (
-                  <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
-                    <Check size={14} /> Installed
-                  </span>
-                ) : d ? (
-                  <Button size="sm" variant="ghost" onClick={() => post('/api/models/cancel', { key: d.key }).catch(toastError)}>
-                    Cancel
-                  </Button>
-                ) : (
-                  p.runs &&
-                  p.install && (
-                    <Button size="sm" variant={p.best ? 'primary' : 'secondary'} icon={<Download size={13} />} onClick={() => post('/api/models/install', p.install).catch(toastError)}>
-                      Install
-                    </Button>
-                  )
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+            )}
+          </Row>
+        );
+      })}
+      {hidden > 0 && <Row label={more ? 'Only those that run here' : `${hidden} more for bigger computers`} onClick={() => setMore((x) => !x)} />}
+    </>
   );
 }
 
@@ -533,7 +546,7 @@ function InspectPanel({ info, st, onCheck, onInstalled }: { info: HfInspect; st:
       onInstalled();
     }, toastError);
   return (
-    <div className="rounded-xl border border-line bg-bg-1 p-3">
+    <div>
       <div className="flex flex-wrap items-baseline gap-x-2">
         <a href={`https://huggingface.co/${info.repo}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-medium text-fg hover:underline">
           {info.repo} <ExternalLink size={11} />
@@ -546,7 +559,8 @@ function InspectPanel({ info, st, onCheck, onInstalled }: { info: HfInspect; st:
       {info.kind === 'gguf' && (
         <div className="mt-2">
           <div className="text-[12px] text-fg-3">
-            Runs with Ollama{st.ollama.version ? '' : ', which is not running here'}. Smaller files trade a little quality for speed and memory.
+            Runs with Ollama
+            {st.ollama.version ? '' : ', which is not running here'}. Smaller files trade a little quality for speed and memory.
           </div>
           {info.quants.map((x) => (
             <div key={x.tag} className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-2">
@@ -599,47 +613,45 @@ function InspectPanel({ info, st, onCheck, onInstalled }: { info: HfInspect; st:
 function HfModelRow({ m, open, onCheck, children }: { m: HfModel; open: boolean; onCheck: () => void; children?: React.ReactNode }) {
   const [org, name] = m.id.split('/');
   return (
-    <div className={cx('px-3 py-2.5 transition-colors', open && 'bg-bg-1/60')}>
-      <div className="flex items-start gap-3">
-        <OrgMark name={org} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <span className="text-[13.5px] leading-5 break-all">
-              <span className="text-fg-3">{org}/</span>
-              <span className="font-medium text-fg">{name}</span>
-            </span>
-            {m.kind !== 'other' && (
-              <Tag title={m.kind === 'gguf' ? 'GGUF weights: they run with Ollama' : 'Safetensors weights: they run with vLLM'}>{m.kind === 'gguf' ? 'GGUF' : 'vLLM'}</Tag>
-            )}
-            {m.vision && (
-              <Tag icon={<Eye size={11} />} title="Sees images">
-                <span className="max-sm:hidden">Images</span>
-              </Tag>
-            )}
-            {m.gated && (
-              <Tag tone="warn" icon={<Lock size={10} />} title="Accept its terms on Hugging Face, and add a token, first">
-                Gated
-              </Tag>
-            )}
-          </div>
-          <div className="tnum mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-fg-3">
-            {m.params ? <span className="text-fg-2">{paramsShort(m.params)} parameters</span> : null}
-            {m.downloads ? <span title="Downloads in the last 30 days">{count(m.downloads)} downloads</span> : null}
-            {m.likes ? <span>{count(m.likes)} likes</span> : null}
-            {m.updated ? <span>{month(m.updated)}</span> : null}
-          </div>
-          {m.fit && (
-            <div className="mt-1.5">
-              <FitPill fit={m.fit} gguf={m.fitGguf} kind={m.kind} />
-            </div>
+    <Row
+      className={cx(open && 'bg-bg-1/60')}
+      icon={<OrgMark name={org} />}
+      label={
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1" translate="no">
+          <span className="break-all">
+            <span className="text-fg-3">{org}/</span>
+            <span className="font-medium">{name}</span>
+          </span>
+          {m.kind !== 'other' && <Tag title={m.kind === 'gguf' ? 'GGUF weights: they run with Ollama' : 'Safetensors weights: they run with vLLM'}>{m.kind === 'gguf' ? 'GGUF' : 'vLLM'}</Tag>}
+          {m.vision && (
+            <Tag icon={<Eye size={11} />} title="Sees images">
+              <span className="max-sm:hidden">Images</span>
+            </Tag>
           )}
-        </div>
-        <Button size="sm" variant={open ? 'ghost' : 'secondary'} onClick={onCheck} aria-expanded={open} className="shrink-0">
+          {m.gated && (
+            <Tag tone="warn" icon={<Lock size={10} />} title="Accept its terms on Hugging Face, and add a token, first">
+              Gated
+            </Tag>
+          )}
+        </span>
+      }
+      hint={
+        <span className="tnum flex flex-wrap gap-x-3 gap-y-0.5">
+          {m.params ? <span className="text-fg-2">{paramsShort(m.params)} parameters</span> : null}
+          {m.downloads ? <span title="Downloads in the last 30 days">{count(m.downloads)} downloads</span> : null}
+          {m.likes ? <span>{count(m.likes)} likes</span> : null}
+          {m.updated ? <span>{month(m.updated)}</span> : null}
+        </span>
+      }
+      control={
+        <Button size="sm" variant="secondary" onClick={onCheck} aria-expanded={open}>
           {open ? 'Close' : 'Check'}
         </Button>
-      </div>
-      {open && <div className="mt-2.5 pl-11 max-sm:pl-0">{children}</div>}
-    </div>
+      }
+    >
+      {m.fit && <FitPill fit={m.fit} gguf={m.fitGguf} kind={m.kind} />}
+      {open && <div className={cx(m.fit && 'mt-2.5')}>{children}</div>}
+    </Row>
   );
 }
 
@@ -727,50 +739,109 @@ export function HfSearch({ st }: { st: ModelsState }) {
   // A model named in full is offered first, even when the search does not list it.
   const named = direct && !list.some((m) => m.id.toLowerCase() === direct.toLowerCase()) ? direct : null;
   const toggle = (f: string) => setFilters((l) => (l.includes(f) ? l.filter((x) => x !== f) : [...l, f]));
+  const items = [
+    ...(named
+      ? [
+          <HfModelRow key={named} m={{ id: named, kind: 'other' }} open={open === named} onCheck={() => (open === named ? setOpen(null) : void check(named))}>
+            {open === named && detail(named)}
+          </HfModelRow>,
+        ]
+      : []),
+    ...list.map((m) => (
+      <HfModelRow key={m.id} m={m} open={open === m.id} onCheck={() => (open === m.id ? setOpen(null) : void check(m.id))}>
+        {open === m.id && detail(m.id)}
+      </HfModelRow>
+    )),
+  ];
   return (
-    <div>
-      <SearchBox
-        value={q}
-        onChange={(v) => {
-          setQ(v);
-          setOpen(null);
-        }}
-        placeholder="Search Hugging Face, or paste org/name"
-        busy={busy}
-        onEnter={() => direct && void check(direct)}
-      />
-      <FilterChips items={HF_FILTERS} on={filters} toggle={toggle} />
-      {!browsing && <Starters words={HF_STARTERS} onWord={setQ} browse="see the most downloaded" onBrowse={() => setBrowse(true)} />}
+    <>
+      <div className="px-4 py-3">
+        <SearchBox
+          value={q}
+          onChange={(v) => {
+            setQ(v);
+            setOpen(null);
+          }}
+          placeholder="Search Hugging Face, or paste org/name"
+          busy={busy}
+          onEnter={() => direct && void check(direct)}
+        />
+        <FilterChips items={HF_FILTERS} on={filters} toggle={toggle} />
+        {!browsing && <Starters words={HF_STARTERS} onWord={setQ} browse="see the most downloaded" onBrowse={() => setBrowse(true)} />}
+      </div>
       {browsing && (hits || named) && (
-        <div className="mt-2.5">
+        <>
           <ResultsHead n={list.length} limit={40} order={HF_ORDER} value={sort} onChange={(v) => setSort(v as HfSort)} />
-          {(list.length > 0 || named) && (
-            <div className={resultList}>
-              {named && (
-                <HfModelRow m={{ id: named, kind: 'other' }} open={open === named} onCheck={() => (open === named ? setOpen(null) : void check(named))}>
-                  {open === named && detail(named)}
-                </HfModelRow>
-              )}
-              {list.map((m) => (
-                <HfModelRow key={m.id} m={m} open={open === m.id} onCheck={() => (open === m.id ? setOpen(null) : void check(m.id))}>
-                  {open === m.id && detail(m.id)}
-                </HfModelRow>
-              ))}
-            </div>
-          )}
-        </div>
+          <Limited key={`${words}|${filters.join()}|${sort}`} items={items} limit={8} />
+        </>
       )}
-    </div>
+    </>
   );
 }
 
 // ---- OpenRouter ------------------------------------------------------------------------------------
 
-function OpenRouter({ st }: { st: ModelsState }) {
+/** One key or token typed in a dialog (a password field, and where to get it). */
+function KeyDialog({
+  open,
+  onClose,
+  title,
+  placeholder,
+  note,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  placeholder: string;
+  note: React.ReactNode;
+  onSave: (key: string) => Promise<unknown>;
+}) {
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (open) setKey('');
+  }, [open]);
+  const save = async () => {
+    if (!key.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onSave(key);
+      onClose();
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <Section title="OpenRouter">
-      <OpenRouterBody st={st} />
-    </Section>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      width={460}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={save} disabled={!key.trim() || busy}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <form
+        className="space-y-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <input autoFocus type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={placeholder} autoComplete="off" className={cx(inputCls, 'w-full font-mono text-[12.5px]')} />
+        <p className="text-[12px] leading-snug text-fg-3">{note}</p>
+      </form>
+    </Dialog>
   );
 }
 
@@ -798,57 +869,66 @@ function OrModelRow({ m, action, compact, note }: { m: OpenRouterModel; action: 
   const free = !!m.price && m.price.input === 0 && m.price.output === 0;
   const fresh = !!m.created && Date.now() - m.created < 21 * DAY;
   return (
-    <div className={cx('px-3', compact ? 'py-2' : 'py-2.5')}>
-      <div className="flex items-start gap-3">
-        <OrgMark name={m.org ?? slug.split('/')[0]} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <span className="text-[13.5px] leading-5 font-medium text-fg">{m.label}</span>
-            {note && <Tag tone="accent">{note}</Tag>}
-            {latest && (
-              <Tag tone="accent" title="Always the maker’s latest version">
-                Latest
-              </Tag>
-            )}
-            {fresh && !latest && <Tag tone="accent">New</Tag>}
-            {free && <Tag tone="ok">Free</Tag>}
-            {m.reasoning && (
-              <Tag icon={<Brain size={11} />} title="Thinks before it answers">
-                <span className="max-sm:hidden">Reasoning</span>
-              </Tag>
-            )}
-            {m.vision && (
-              <Tag icon={<Eye size={11} />} title="Sees images">
-                <span className="max-sm:hidden">Images</span>
-              </Tag>
-            )}
-            {m.tools && m.tools !== 'native' && (
-              <Tag tone="warn" title="Custom tells it about its tools in the prompt and reads its calls from the text">
-                No native tools
-              </Tag>
-            )}
-          </div>
-          <div className="tnum mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-fg-3">
-            {m.org && !compact && <span className="text-fg-2">{m.org}</span>}
-            {m.contextLength ? <span title="How much it reads at once">{tokens(m.contextLength)} context</span> : null}
-            {m.maxOutput ? <span title="Its longest reply">{tokens(m.maxOutput)} out</span> : null}
-            {m.price && !free && (
-              <span title="Per million tokens">
-                {dollars(m.price.input)} in · {dollars(m.price.output)} out
-              </span>
-            )}
-            {m.created && !compact && <span>{month(m.created)}</span>}
-          </div>
+    <Row
+      icon={<OrgMark name={m.org ?? slug.split('/')[0]} />}
+      label={
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span translate="no">{m.label}</span>
+          {note && <Tag tone="accent">{note}</Tag>}
+          {latest && (
+            <Tag tone="accent" title="Always the maker’s latest version">
+              Latest
+            </Tag>
+          )}
+          {fresh && !latest && <Tag tone="accent">New</Tag>}
+          {free && <Tag tone="ok">Free</Tag>}
+          {m.reasoning && (
+            <Tag icon={<Brain size={11} />} title="Thinks before it answers">
+              <span className="max-sm:hidden">Reasoning</span>
+            </Tag>
+          )}
+          {m.vision && (
+            <Tag icon={<Eye size={11} />} title="Sees images">
+              <span className="max-sm:hidden">Images</span>
+            </Tag>
+          )}
+          {m.tools && m.tools !== 'native' && (
+            <Tag tone="warn" title="Custom tells it about its tools in the prompt and reads its calls from the text">
+              No native tools
+            </Tag>
+          )}
+        </span>
+      }
+      hint={
+        <span className="tnum flex flex-wrap gap-x-3 gap-y-0.5">
+          {m.org && !compact && (
+            <span className="text-fg-2" translate="no">
+              {m.org}
+            </span>
+          )}
+          {m.contextLength ? <span title="How much it reads at once">{tokens(m.contextLength)} context</span> : null}
+          {m.maxOutput ? <span title="Its longest reply">{tokens(m.maxOutput)} out</span> : null}
+          {m.price && !free && (
+            <span title="Per million tokens">
+              {dollars(m.price.input)} in · {dollars(m.price.output)} out
+            </span>
+          )}
+          {m.created && !compact && <span>{month(m.created)}</span>}
+        </span>
+      }
+      control={action}
+    >
+      {!compact && (m.description || slug) && (
+        <div className="space-y-1 text-[12px] leading-snug text-fg-3" translate="no">
+          {m.description && (
+            <p className="line-clamp-2" title={m.description}>
+              {m.description}
+            </p>
+          )}
+          <div className="truncate font-mono text-[11px] text-fg-3/80">{slug}</div>
         </div>
-        <div className="shrink-0">{action}</div>
-      </div>
-      {!compact && m.description && (
-        <p className="mt-1.5 line-clamp-2 pl-11 text-[12px] leading-snug text-fg-3 max-sm:pl-0" title={m.description}>
-          {m.description}
-        </p>
       )}
-      {!compact && <div className="mt-1 truncate pl-11 font-mono text-[11px] text-fg-3/80 max-sm:pl-0">{slug}</div>}
-    </div>
+    </Row>
   );
 }
 
@@ -863,36 +943,34 @@ function OrSuggested({ pinned, onPin }: { pinned: Set<string>; onPin: (id: strin
   }, []);
   if (!list?.length) return null;
   return (
-    <div>
-      <div className="mb-1.5 text-[12px] font-medium text-fg-2">Suggested</div>
-      <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-        {list.map((m) => (
-          <OrModelRow
-            key={m.id}
-            m={m}
-            compact
-            note={m.note}
-            action={
-                pinned.has(m.id) ? (
-                  <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
-                    <Check size={14} /> Added
-                  </span>
-                ) : (
-                <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => onPin(m.id)} aria-label={`Add ${m.label}`}>
-                  <span className="max-sm:hidden">Add</span>
-                </Button>
-              )
-            }
-          />
-        ))}
-      </div>
-    </div>
+    <>
+      <div className="px-4 pt-3 pb-1 text-[12px] font-medium text-fg-2">Suggested</div>
+      {list.map((m) => (
+        <OrModelRow
+          key={m.id}
+          m={m}
+          compact
+          note={m.note}
+          action={
+            pinned.has(m.id) ? (
+              <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
+                <Check size={14} /> Added
+              </span>
+            ) : (
+              <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => onPin(m.id)} aria-label={`Add ${m.label}`}>
+                <span className="max-sm:hidden">Add</span>
+              </Button>
+            )
+          }
+        />
+      ))}
+    </>
   );
 }
 
 /** The OpenRouter key, and the models it brings into the pickers: the suggested ones, or search by name, filter, order. */
 export function OpenRouterBody({ st }: { st: ModelsState }) {
-  const [key, setKey] = useState('');
+  const [keyDialog, setKeyDialog] = useState(false);
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState<string[]>([]);
   const [sort, setSort] = useState<OpenRouterSort | ''>('');
@@ -922,111 +1000,128 @@ export function OpenRouterBody({ st }: { st: ModelsState }) {
   const pinned = new Set(st.openrouter.pinned.map((p) => p.id));
   const save = (body: Record<string, unknown>) => put('/api/models', body).catch(toastError);
   const toggle = (f: string) => setFilters((l) => (l.includes(f) ? l.filter((x) => x !== f) : [...l, f]));
-  if (!st.openrouter.keyHint)
-    return (
-      <div>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save({ openrouterKey: key }).then(() => setKey(''));
-          }}
-        >
-          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Your OpenRouter key: sk-or-…" autoComplete="off" className={cx(inputCls, 'min-w-0 flex-1')} />
-          <Button type="submit" size="sm" variant="primary" disabled={!key.trim()}>
-            Save
-          </Button>
-        </form>
-        <p className="mt-1.5 text-[12px] text-fg-3">
-          One key for hundreds of models, paid per token.{' '}
-          <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
-            Get one at openrouter.ai <ExternalLink size={11} />
-          </a>
-        </p>
-      </div>
-    );
+  const added = (
+    <span className="flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
+      <Check size={14} /> Added
+    </span>
+  );
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 py-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ok/12 text-ok">
-          <Check size={14} strokeWidth={2.6} />
-        </span>
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="text-[13px] font-medium text-fg">Connected to OpenRouter</div>
-          <div className="truncate font-mono text-[11.5px] text-fg-3">{st.openrouter.keyHint}</div>
-        </div>
-        <Button size="sm" variant="ghost" onClick={() => save({ openrouterKey: null })}>
-          Remove
-        </Button>
-      </div>
-      {st.openrouter.pinned.length > 0 && (
-        <div>
-          <div className="mb-1.5 text-[12px] font-medium text-fg-2">
-            Your models <span className="font-normal text-fg-3">· in the pickers</span>
-          </div>
-          <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-            {st.openrouter.pinned.map((m) => (
-              <OrModelRow
-                key={m.id}
-                m={m}
-                compact
-                action={
-                  <button className="rounded-md p-1 text-fg-3 hover:bg-bg-2 hover:text-fg" aria-label={`Remove ${m.label}`} title="Remove from the pickers" onClick={() => save({ unpin: m.id })}>
-                    <X size={14} />
-                  </button>
-                }
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      {!browsing && <OrSuggested pinned={pinned} onPin={(id) => void save({ pin: id })} />}
-      <div>
-        <SearchBox value={q} onChange={setQ} placeholder="Search OpenRouter: deepseek, qwen, claude…" busy={busy} />
-        <FilterChips items={FILTERS} on={filters} toggle={toggle} />
-        {!browsing && (
-          <Starters
-            words={STARTERS}
-            onWord={setQ}
-            browse="see the newest"
-            onBrowse={() => setSort('new')}
-            note={st.openrouter.pinned.length ? undefined : 'Add at least one model to use OpenRouter.'}
+    <>
+      <Group title="OpenRouter">
+        {!st.openrouter.keyHint ? (
+          <Row
+            icon={<KeyRound size={16} />}
+            label="Your OpenRouter key"
+            hint="One key for hundreds of models, paid per token"
+            control={
+              <Button size="sm" variant="primary" onClick={() => setKeyDialog(true)}>
+                Add key
+              </Button>
+            }
+          />
+        ) : (
+          <Row
+            icon={<Check size={16} className="text-ok" />}
+            label="Connected to OpenRouter"
+            hint={
+              <span className="font-mono text-[11.5px]" translate="no">
+                {st.openrouter.keyHint}
+              </span>
+            }
+            control={
+              <MoreMenu width={190}>
+                {(close) => (
+                  <MenuItem
+                    icon={<Trash2 size={14} />}
+                    danger
+                    onClick={() => {
+                      close();
+                      void save({ openrouterKey: null });
+                    }}
+                  >
+                    Remove key
+                  </MenuItem>
+                )}
+              </MoreMenu>
+            }
           />
         )}
-        {hits && (
-          <div className="mt-2.5">
-            <ResultsHead
-              n={hits.length}
-              limit={50}
-              order={SORTS.filter((x) => words || x.id !== 'match')}
-              value={sort || (words ? 'match' : 'new')}
-              onChange={(v) => setSort(v as OpenRouterSort)}
+      </Group>
+      <KeyDialog
+        open={keyDialog}
+        onClose={() => setKeyDialog(false)}
+        title="Your OpenRouter key"
+        placeholder="Your OpenRouter key: sk-or-…"
+        note={
+          <>
+            One key for hundreds of models, paid per token.{' '}
+            <a className="inline-flex items-center gap-0.5 text-accent hover:underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
+              Get one at openrouter.ai <ExternalLink size={11} />
+            </a>
+          </>
+        }
+        onSave={(key) => put('/api/models', { openrouterKey: key })}
+      />
+      {st.openrouter.keyHint && (
+        <>
+          <Group title="Your OpenRouter models" hint="In the model pickers">
+            {st.openrouter.pinned.length === 0 && <EmptyRow>Add at least one model to use OpenRouter.</EmptyRow>}
+            <Limited
+              items={st.openrouter.pinned.map((m) => (
+                <OrModelRow
+                  key={m.id}
+                  m={m}
+                  compact
+                  action={
+                    <IconButton size="sm" label={`Remove ${m.label}`} onClick={() => save({ unpin: m.id })}>
+                      <X size={14} />
+                    </IconButton>
+                  }
+                />
+              ))}
             />
-            {hits.length > 0 && (
-              <div className={resultList}>
-                {hits.map((m) => (
-                  <OrModelRow
-                    key={m.id}
-                    m={m}
-                    action={
-                      pinned.has(m.id) ? (
-                        <span className="anim-pop-in flex items-center gap-1 px-1 text-[12.5px] font-medium text-ok">
-                          <Check size={14} /> Added
-                        </span>
-                      ) : (
-                        <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => save({ pin: m.id })} aria-label={`Add ${m.label}`}>
-                          <span className="max-sm:hidden">Add</span>
-                        </Button>
-                      )
-                    }
-                  />
-                ))}
-              </div>
+          </Group>
+          <Group title="Add OpenRouter models" hint="Suggested ones, or search the catalog">
+            <div className="px-4 py-3">
+              <SearchBox value={q} onChange={setQ} placeholder="Search OpenRouter: deepseek, qwen, claude…" busy={busy} />
+              <FilterChips items={FILTERS} on={filters} toggle={toggle} />
+              {!browsing && <Starters words={STARTERS} onWord={setQ} browse="see the newest" onBrowse={() => setSort('new')} />}
+            </div>
+            {!browsing && <OrSuggested pinned={pinned} onPin={(id) => void save({ pin: id })} />}
+            {hits && (
+              <>
+                <ResultsHead
+                  n={hits.length}
+                  limit={50}
+                  order={SORTS.filter((x) => words || x.id !== 'match')}
+                  value={sort || (words ? 'match' : 'new')}
+                  onChange={(v) => setSort(v as OpenRouterSort)}
+                />
+                <Limited
+                  key={`${words}|${filters.join()}|${sort}`}
+                  limit={8}
+                  items={hits.map((m) => (
+                    <OrModelRow
+                      key={m.id}
+                      m={m}
+                      action={
+                        pinned.has(m.id) ? (
+                          added
+                        ) : (
+                          <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => save({ pin: m.id })} aria-label={`Add ${m.label}`}>
+                            <span className="max-sm:hidden">Add</span>
+                          </Button>
+                        )
+                      }
+                    />
+                  ))}
+                />
+              </>
             )}
-          </div>
-        )}
-      </div>
-    </div>
+          </Group>
+        </>
+      )}
+    </>
   );
 }
 
@@ -1035,112 +1130,171 @@ export function OpenRouterBody({ st }: { st: ModelsState }) {
 function Runtimes({ st }: { st: ModelsState }) {
   const [ollama, setOllama] = useState(st.ollama.url);
   const [vllm, setVllm] = useState(st.vllm.command ?? '');
-  const [hf, setHf] = useState('');
-  const [ep, setEp] = useState({ name: '', baseUrl: '', apiKey: '' });
+  const [ep, setEp] = useState<{ name: string; baseUrl: string; apiKey: string } | null>(null);
+  const [tokenDialog, setTokenDialog] = useState(false);
   const save = (body: Record<string, unknown>) => put('/api/models', body).then(() => toast('Saved', 'ok'), toastError);
+  const addEndpoint = async () => {
+    if (!ep) return;
+    await save({ endpoint: ep });
+    setEp(null);
+  };
   return (
-    <Section title="Runtimes and endpoints">
-      <div className="space-y-3 text-[13px]">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Ollama</span>
-            <span className={cx('text-[12px]', st.ollama.version ? 'text-ok' : 'text-fg-3')}>
-              {st.ollama.version ? `running, ${st.ollama.version}` : 'not running at this address'}
-            </span>
-            {!st.ollama.version && (
-              <a className="text-[12px] text-accent hover:underline" href="https://ollama.com/download" target="_blank" rel="noreferrer">
+    <Group
+      title="Runtimes and endpoints"
+      info="Ollama and vLLM run models on this computer; any other program or service that answers the way OpenAI’s API does (LM Studio, llama.cpp’s server…) can be added as an endpoint. Its models show in Custom’s list as “model (name)”."
+      actions={
+        <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setEp({ name: '', baseUrl: '', apiKey: '' })}>
+          Add endpoint
+        </Button>
+      }
+    >
+      <Row
+        label="Ollama"
+        hint={
+          st.ollama.version ? (
+            <span className="text-ok">{`running, ${st.ollama.version}`}</span>
+          ) : (
+            <>
+              not running at this address ·{' '}
+              <a className="text-accent hover:underline" href="https://ollama.com/download" target="_blank" rel="noreferrer">
                 Install Ollama
               </a>
-            )}
-          </div>
-          <div className="mt-1 flex gap-2">
-            <input value={ollama} onChange={(e) => setOllama(e.target.value)} className={cx(inputCls, 'min-w-0 flex-1 font-mono text-[12.5px]')} />
-            {ollama !== st.ollama.url && (
-              <Button size="sm" variant="secondary" onClick={() => save({ ollamaUrl: ollama })}>
-                Save
-              </Button>
-            )}
-          </div>
+            </>
+          )
+        }
+      >
+        <div className="flex gap-2">
+          <input value={ollama} onChange={(e) => setOllama(e.target.value)} aria-label="Ollama address" className={cx(inputCls, 'min-w-0 flex-1 font-mono text-[12.5px]')} />
+          {ollama !== st.ollama.url && (
+            <Button size="sm" variant="secondary" onClick={() => save({ ollamaUrl: ollama })}>
+              Save
+            </Button>
+          )}
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">vLLM</span>
-            <span className={cx('text-[12px]', st.vllm.path ? 'text-ok' : 'text-fg-3')}>
-              {st.vllm.path ? `${st.vllm.version} · ${st.vllm.path}` : 'not found (pip install vllm), or give its command'}
-            </span>
-          </div>
-          <div className="mt-1 flex gap-2">
-            <input
-              value={vllm}
-              onChange={(e) => setVllm(e.target.value)}
-              placeholder="found by itself: on the PATH or in a conda or venv environment"
-              className={cx(inputCls, 'min-w-0 flex-1 font-mono text-[12.5px]')}
-            />
-            {vllm !== (st.vllm.command ?? '') && (
-              <Button size="sm" variant="secondary" onClick={() => save({ vllmCommand: vllm || null })}>
-                Save
-              </Button>
-            )}
-          </div>
+      </Row>
+      <Row label="vLLM" hint={st.vllm.path ? <span className="text-ok break-all">{`${st.vllm.version} · ${st.vllm.path}`}</span> : 'not found (pip install vllm), or give its command'}>
+        <div className="flex gap-2">
+          <input
+            value={vllm}
+            onChange={(e) => setVllm(e.target.value)}
+            aria-label="vLLM command"
+            placeholder="found by itself: on the PATH or in a conda or venv environment"
+            className={cx(inputCls, 'min-w-0 flex-1 font-mono text-[12.5px]')}
+          />
+          {vllm !== (st.vllm.command ?? '') && (
+            <Button size="sm" variant="secondary" onClick={() => save({ vllmCommand: vllm || null })}>
+              Save
+            </Button>
+          )}
         </div>
-        <div>
-          <div className="font-medium">Other OpenAI-compatible endpoints</div>
-          {st.endpoints.map((e) => (
-            <div key={e.id} className="mt-1 flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate">
-                {e.name} <span className="font-mono text-[12px] text-fg-3">{e.baseUrl}</span> <span className="text-[12px] text-fg-3">· {e.models.length} models</span>
+      </Row>
+      {st.endpoints.map((e) => (
+        <Row
+          key={e.id}
+          icon={<Plug size={16} />}
+          label={<span translate="no">{e.name}</span>}
+          hint={
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-mono text-[11.5px]" title={e.baseUrl} translate="no">
+                {e.baseUrl}
               </span>
-              <button className="rounded p-1 text-fg-3 hover:bg-bg-2 hover:text-fg" aria-label={`Remove ${e.name}`} onClick={() => save({ endpoint: { id: e.id, remove: true } })}>
-                <X size={14} />
-              </button>
-            </div>
-          ))}
+              <span className="shrink-0">· {e.models.length} models</span>
+            </span>
+          }
+          control={
+            <IconButton size="sm" label={`Remove ${e.name}`} onClick={() => save({ endpoint: { id: e.id, remove: true } })}>
+              <X size={14} />
+            </IconButton>
+          }
+        />
+      ))}
+      <Row
+        label="Hugging Face token"
+        hint={
+          st.hfTokenHint ? (
+            <span className="font-mono text-[11.5px]" translate="no">
+              {st.hfTokenHint}
+            </span>
+          ) : (
+            'Only for gated or private models'
+          )
+        }
+        control={
+          st.hfTokenHint ? (
+            <MoreMenu width={190}>
+              {(close) => (
+                <MenuItem
+                  icon={<Trash2 size={14} />}
+                  danger
+                  onClick={() => {
+                    close();
+                    void save({ hfToken: null });
+                  }}
+                >
+                  Remove token
+                </MenuItem>
+              )}
+            </MoreMenu>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setTokenDialog(true)}>
+              Add token
+            </Button>
+          )
+        }
+      />
+      <KeyDialog
+        open={tokenDialog}
+        onClose={() => setTokenDialog(false)}
+        title="Hugging Face token"
+        placeholder="hf_…"
+        note="Only for gated or private models."
+        onSave={(key) => put('/api/models', { hfToken: key })}
+      />
+      <Dialog
+        open={!!ep}
+        onClose={() => setEp(null)}
+        title="Add an endpoint"
+        width={460}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEp(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => void addEndpoint()} disabled={!ep?.name.trim() || !ep?.baseUrl.trim()}>
+              Add
+            </Button>
+          </>
+        }
+      >
+        {ep && (
           <form
-            className="mt-1 flex flex-wrap gap-2"
+            className="space-y-3 text-[13px]"
             onSubmit={(e) => {
               e.preventDefault();
-              void save({ endpoint: ep }).then(() => setEp({ name: '', baseUrl: '', apiKey: '' }));
+              if (ep.name.trim() && ep.baseUrl.trim()) void addEndpoint();
             }}
           >
-            <input value={ep.name} onChange={(e) => setEp({ ...ep, name: e.target.value })} placeholder="Name" className={cx(inputCls, 'w-28')} />
+            <p className="text-[12px] leading-snug text-fg-3">Any OpenAI-compatible endpoint: LM Studio, llama.cpp’s server, other providers.</p>
+            <input value={ep.name} onChange={(e) => setEp({ ...ep, name: e.target.value })} placeholder="Name" aria-label="Name" autoFocus className={inputCls} />
             <input
               value={ep.baseUrl}
               onChange={(e) => setEp({ ...ep, baseUrl: e.target.value })}
               placeholder="http://localhost:1234/v1"
-              className={cx(inputCls, 'min-w-0 flex-1 font-mono text-[12.5px]')}
+              aria-label="Address"
+              className={cx(inputCls, 'font-mono text-[12.5px]')}
             />
-            <input type="password" value={ep.apiKey} onChange={(e) => setEp({ ...ep, apiKey: e.target.value })} placeholder="Key (optional)" className={cx(inputCls, 'w-32')} />
-            <Button type="submit" size="sm" variant="secondary" disabled={!ep.name.trim() || !ep.baseUrl.trim()}>
-              Add
-            </Button>
+            <input
+              type="password"
+              value={ep.apiKey}
+              onChange={(e) => setEp({ ...ep, apiKey: e.target.value })}
+              placeholder="Key (optional)"
+              aria-label="Key (optional)"
+              autoComplete="off"
+              className={inputCls}
+            />
           </form>
-        </div>
-        <div>
-          <div className="font-medium">Hugging Face token</div>
-          <div className="text-[12px] text-fg-3">Only for gated or private models.</div>
-          {st.hfTokenHint ? (
-            <div className="mt-1 flex items-center gap-2">
-              <span className="font-mono text-fg-2">{st.hfTokenHint}</span>
-              <Button size="sm" variant="ghost" onClick={() => save({ hfToken: null })}>
-                Remove
-              </Button>
-            </div>
-          ) : (
-            <form
-              className="mt-1 flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void save({ hfToken: hf }).then(() => setHf(''));
-              }}
-            >
-              <input type="password" value={hf} onChange={(e) => setHf(e.target.value)} placeholder="hf_…" autoComplete="off" className={cx(inputCls, 'min-w-0 flex-1')} />
-              <Button type="submit" size="sm" variant="secondary" disabled={!hf.trim()}>
-                Save
-              </Button>
-            </form>
-          )}
-        </div>
-      </div>
-    </Section>
+        )}
+      </Dialog>
+    </Group>
   );
 }
