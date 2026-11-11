@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.54.3 · 11 November 2026
+
+Forks from any Claude Code reply, even one from before the conversation was compacted.
+
+- **Fork from this reply** works on a Claude Code reply from before the conversation was compacted. It used to stop
+  with "Claude Code did not start: session ended". The fork now starts with the whole conversation up to that reply,
+  as it was before it was compacted.
+- **When an agent does not start**, the message ends with the reason the agent gave. Claude Code's note about a folder
+  that is not trusted yet no longer hides it.
+- **Added Claude Code accounts trust the folders your main sign-in trusts**, so a folder's own permission rules (its
+  .claude/settings.json) apply in their sessions too.
+
 ## 0.54.2 · 11 November 2026
 
 Other agents, described more briefly in the guide and Settings.
