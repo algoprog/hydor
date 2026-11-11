@@ -25,6 +25,20 @@ Settings, redesigned: every section is calmer and easier to scan, and Memory is 
 - **On a phone**, a row's switch or button stays on its line.
 - **The search box** (Ctrl+K) keeps pointing at a setting low on a page while the page fills in above it.
 
+## 0.54.5 · 11 November 2026
+
+Claude limit resets show in the Mac app again, and a session whose helpers are still running shows as working.
+
+- **Limit resets** in System → Usage show for your Claude accounts in the Mac app. On a Mac, Claude Code keeps its
+  sign-in in the Keychain, and the app looked for it only in a file that Claude Code no longer keeps up to date
+  there, so the list went missing once that file's sign-in ran out.
+- A list of limit resets that can't be read for a moment keeps the last one it had, for Claude and Codex, instead of
+  disappearing. A Codex card whose limits can't be read keeps its last limits too, rather than saying "No usage
+  limits reported for this plan".
+- A session whose own turn is over while child sessions it started are still running shows as working: its dot
+  keeps breathing, it shows no Done marker, it stays under Active, and its status says "Working · 2 helper
+  sessions". You can still send it messages.
+
 ## 0.54.4 · 11 November 2026
 
 Agent program updates no longer fail because a Mac went to sleep while a new version was being checked.
