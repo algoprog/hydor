@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.4 · 11 November 2026
+
+The welcome tour turns on the desktop apps' notifications, and opens System Settings when your Mac isn't allowing them.
+
+- **Hear when it's done**, the welcome tour's step on notifications, has **Turn on notifications** in the Mac and
+  Windows apps too. It shows a test notification; if your system isn't showing Hydor's notifications yet, it opens
+  System Settings right at Hydor's notifications (on Windows, Settings → System → Notifications), and when you come
+  back it checks again and says when they're on.
+- **Settings → Notifications** does the same: when your system isn't showing them, the **Notify this device** switch
+  is off, and turning it on opens those settings.
+- On a Mac, notifications are still yours to allow: macOS asks once when the app starts, and clicking **Allow** is
+  all it takes. System Settings is only needed if that question was missed or declined, since macOS never asks twice.
+
 ## 0.55.3 · 11 November 2026
 
 What a session started sits in one tray above its message box, and Stop stops all of it.
