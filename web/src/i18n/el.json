@@ -22321,5 +22321,8 @@
 "sk-ant-…":"sk-ant-…",
 "That is not an Anthropic API key (they start with sk-ant-)":"Αυτό δεν είναι κλειδί API της Anthropic (αρχίζουν με sk-ant-)",
 "Use API credit at a limit":"Χρήση πίστωσης API στο όριο",
-"When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on.":"Όταν όλοι οι λογαριασμοί Claude Code είναι στο όριο χρήσης, οι συνεδρίες συνεχίζουν χρεωμένες στο κλειδί API της Anthropic ενός λογαριασμού αντί να σταματούν. Ανενεργό μέχρι να το ενεργοποιήσετε."
+"When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on.":"Όταν όλοι οι λογαριασμοί Claude Code είναι στο όριο χρήσης, οι συνεδρίες συνεχίζουν χρεωμένες στο κλειδί API της Anthropic ενός λογαριασμού αντί να σταματούν. Ανενεργό μέχρι να το ενεργοποιήσετε.",
+"{0} has not answered yet ({1}). Hydor keeps trying, and connects by itself when it does.":"Το {0} δεν έχει απαντήσει ακόμη ({1}). Το Hydor συνεχίζει να προσπαθεί και συνδέεται μόνο του μόλις απαντήσει.",
+"Another program is getting this bot’s messages ({0}). A bot gets them in one place only: disconnect it there, or make another bot for this Hydor.":"Ένα άλλο πρόγραμμα παίρνει τα μηνύματα αυτού του bot ({0}). Ένα bot τα παίρνει σε ένα μόνο μέρος: αποσυνδέστε το εκεί ή φτιάξτε άλλο bot για αυτό το Hydor.",
+"Telegram does not take this bot’s token ({0}): copy the current one from @BotFather and paste it under More → Change token.":"Το Telegram δεν δέχεται το token αυτού του bot ({0}): αντιγράψτε το τρέχον από το @BotFather και επικολλήστε το στο Περισσότερα → Αλλαγή token."
 }

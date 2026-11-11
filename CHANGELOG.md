@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.54.1 · 11 November 2026
+
+Chat apps connect even when Telegram, Discord or Slack is slow to answer.
+
+- **Connect keeps a good token.** Settings → Chat apps turned a token down whenever Telegram, Discord or Slack was slow
+  to answer or briefly out of reach (as can happen in a new Telegram bot's first minutes), saying it "did not take that
+  token". Now only a token the service itself refuses is turned down. Otherwise Hydor keeps it, the row says
+  **Connecting…** and why, and the bot connects by itself as soon as the service answers.
+- **Clearer when something is wrong.** A Telegram bot whose token was revoked, or that another copy of Hydor or another
+  program is using, now says so in plain words, and a webhook another program left on a Telegram bot is taken off so
+  its messages come here. The row also notices by itself when a problem clears.
+
 ## 0.54.0 · 10 November 2026
 
 Keep the agent you use and bring it into Hydor: Hermes Agent, Pi and OpenClaw run here, what other agents know comes

@@ -210,10 +210,12 @@ export class Gateway {
   /** Connects, and again after each close, until stopped or told it is no use. */
   async run() {
     let wait = tuning.retryMs;
+    // Why the last try failed, said in Settings while it goes on trying.
+    let why: string | undefined;
     while (!this.done) {
       let code = 0;
       try {
-        this.o.onState({ state: 'connecting' });
+        this.o.onState({ state: 'connecting', error: why });
         const url = this.session && this.resumeUrl ? this.resumeUrl : (await rest<{ url: string }>(this.o.token, 'GET', '/gateway/bot')).url;
         code = await this.connect(url);
       } catch (e) {
@@ -222,7 +224,9 @@ export class Gateway {
           this.o.onState({ state: 'error', error: FATAL[4004] });
           return;
         }
-        this.o.onState({ state: 'error', error: (e as Error).message });
+        // Not answering, rate limits and Discord's own faults pass: stay connecting and try again.
+        why = (e as Error).message;
+        this.o.onState({ state: 'connecting', error: why });
         await this.sleep(wait);
         wait = Math.min(wait * 2, tuning.maxRetryMs);
         continue;
@@ -235,7 +239,8 @@ export class Gateway {
       if (NEW_SESSION.has(code)) this.session = this.resumeUrl = this.seq = null;
       // A connection that got as far as being ready starts the waits over.
       wait = this.ready ? tuning.retryMs : Math.min(wait * 2, tuning.maxRetryMs);
-      this.o.onState({ state: 'connecting', error: `Disconnected (${code}); connecting again` });
+      why = `Disconnected (${code})`;
+      this.o.onState({ state: 'connecting', error: why });
       await this.sleep(wait);
     }
   }
@@ -461,6 +466,10 @@ async function supervise(d: Deps) {
         botId = ready.user?.id ?? botId;
         state = { ...state, bot: { id: ready.user?.id ?? '', username: ready.user?.username ?? '' } };
         const app = ready.application?.id ?? ready.user?.id;
+        // A token saved without a check is known now.
+        if (kvGet(d.db, 'discord.unchecked') && ready.user?.id) {
+          known(d, token, { id: ready.user.id, username: ready.user.username }, { id: app && String(app), flags: ready.application?.flags });
+        }
         if (app) {
           kvSet(d.db, 'discord.app', String(app));
           registerCommands(d, token, String(app)).catch((e) => console.warn(`[discord] commands: ${(e as Error).message}`));
@@ -485,12 +494,29 @@ export function stopDiscord() {
   for (const chat of [...typing.keys()]) stopTyping(chat);
 }
 
+/** What a bot's token tells once Discord has answered: whose it is, its application, and what its settings lack. */
+function known(d: Deps, token: string, me: DiscordUser, application: { id?: string; flags?: number } | null) {
+  kvSet(d.db, 'discord.unchecked', '');
+  saveSecret(d.db, { name: TOKEN_NAME, value: token, domains: ['discord.com'], note: `The Discord bot ${me.username ?? ''} (Settings → Chat apps → Discord)` });
+  // Another bot: the chats linked to the old one link again (a new token for the same bot changes nothing).
+  const before = kvGet(d.db, 'discord.bot');
+  if (before && before !== me.id) discordApp.unlinkAll(d);
+  kvSet(d.db, 'discord.bot', me.id);
+  kvSet(d.db, 'discord.app', String(application?.id ?? me.id));
+  // Said in Settings while the connection has nothing else to say.
+  const off = application?.flags !== undefined && !(application.flags & MESSAGE_CONTENT_FLAGS);
+  kvSet(d.db, 'discord.warn', off ? 'Message Content Intent is off for this bot: turn it on in the Developer Portal (Bot → Privileged Gateway Intents), or it cannot read what you send.' : '');
+  botId = me.id;
+}
+
 function view(d: Deps) {
   const app = kvGet(d.db, 'discord.app');
   return {
     ...discordApp.view(d),
     state: state.state,
     error: state.state === 'error' ? state.error : undefined,
+    // Why the last try to connect failed, while it keeps trying.
+    note: state.state === 'connecting' ? state.error : undefined,
     warning: kvGet(d.db, 'discord.warn') || undefined,
     bot: state.bot ? { username: state.bot.username } : undefined,
     invite: app ? discordInvite(app) : undefined,
@@ -507,24 +533,25 @@ export const discord: Feature = {
         if (typeof b.token === 'string') {
           const token = b.token.trim();
           if (!/^[\w-]{18,}\.[\w-]{5,}\.[\w-]{20,}$/.test(token)) throw new HttpError(400, 'That does not look like a bot’s token: the Developer Portal’s Bot page gives one in three parts joined by dots.');
-          let me: DiscordUser;
+          let me: DiscordUser | null = null;
           let application: { id?: string; flags?: number } | null = null;
           try {
             me = await rest<DiscordUser>(token, 'GET', '/users/@me', undefined, { ms: 15_000 });
             application = await rest(token, 'GET', '/oauth2/applications/@me', undefined, { ms: 15_000 }).catch(() => null);
           } catch (e) {
-            throw new HttpError(400, `Discord did not take that token: ${(e as Error).message}`);
+            // Only a token Discord answered no to (401) is turned down; with no answer, a busy Discord or a block in front of
+            // it (a 403 can be one) the token is kept and the connection takes over.
+            if (e instanceof DiscordError && e.code === 401) throw new HttpError(400, `Discord did not take that token: ${e.message}`);
           }
-          saveSecret(d.db, { name: TOKEN_NAME, value: token, domains: ['discord.com'], note: `The Discord bot ${me.username ?? ''} (Settings → Chat apps → Discord)` });
-          // Another bot: the chats linked to the old one link again (a new token for the same bot changes nothing).
-          const before = kvGet(d.db, 'discord.bot');
-          if (before && before !== me.id) discordApp.unlinkAll(d);
-          kvSet(d.db, 'discord.bot', me.id);
-          kvSet(d.db, 'discord.app', String(application?.id ?? me.id));
-          // Said in Settings while the connection has nothing else to say.
-          const off = application?.flags !== undefined && !(application.flags & MESSAGE_CONTENT_FLAGS);
-          kvSet(d.db, 'discord.warn', off ? 'Message Content Intent is off for this bot: turn it on in the Developer Portal (Bot → Privileged Gateway Intents), or it cannot read what you send.' : '');
-          botId = me.id;
+          if (me) known(d, token, me, application);
+          else {
+            // Whose it is, and the rest, come when the connection gets through.
+            saveSecret(d.db, { name: TOKEN_NAME, value: token, domains: ['discord.com'], note: 'A Discord bot (Settings → Chat apps → Discord)' });
+            kvSet(d.db, 'discord.unchecked', '1');
+            kvSet(d.db, 'discord.app', '');
+            kvSet(d.db, 'discord.warn', '');
+            botId = '';
+          }
           restart();
           return 'connected';
         }

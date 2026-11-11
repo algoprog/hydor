@@ -14,7 +14,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { SLACK_MANIFEST, discordInvite } from '../../shared/chat-apps.ts';
 import type { NotifyEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { readSecret } from '../connections/vault.ts';
-import { kvSet, openDb } from '../db.ts';
+import { kvGet, kvSet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { MAX_PARTS, tuning } from './core.ts';
 import { discord, INTENTS, linkedChats as discordChats, notice as discordNotice, stopDiscord, TOKEN_NAME as DISCORD_TOKEN } from './discord.ts';
@@ -32,6 +32,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function until(what: string, ok: () => boolean, ms = 4000) {
   for (let t = 0; t < ms && !ok(); t += 20) await sleep(20);
   assert.ok(ok(), `waited for ${what}`);
+}
+/** Asks for a view again and again until it says what is waited for. */
+async function viewUntil(what: string, url: string, ok: (v: any) => boolean, ms = 6000) {
+  let v: any;
+  for (let t = 0; t < ms; t += 25) {
+    v = await get(url);
+    if (ok(v)) return v;
+    await sleep(25);
+  }
+  assert.fail(`waited for ${what}: ${JSON.stringify(v)}`);
 }
 const readBody = (req: http.IncomingMessage) =>
   new Promise<any>((resolve) => {
@@ -123,9 +133,16 @@ const dcCommands: any[] = [];
 const gwLog: { conn: number; op: number; d: any }[] = [];
 const gw = { conns: [] as WebSocket[], seq: 0, ack: true, beatMs: 100, count: 0, gatewayCalls: 0 };
 let dcSlow = 0;
+/** What the stand-in does to every call: answer as it should, say 502, or drop the connection. */
+let dcRefuse = 0;
+let dcMode: '' | '502' | '429' | 'drop' = '';
 const dc = http.createServer(async (req, res) => {
   const body = await readBody(req);
   const url = req.url ?? '';
+  if (dcRefuse) return json(res, dcRefuse, { message: `${dcRefuse}: no`, code: 0 });
+  if (dcMode === 'drop') return req.socket.destroy();
+  if (dcMode === '502') return json(res, 502, { message: 'Bad Gateway' });
+  if (dcMode === '429') return json(res, 429, { message: 'You are being rate limited.', retry_after: 60 });
   if (url.startsWith('/interactions/')) {
     dcCalls.push({ id: url.split('/')[2], body });
     return (res.writeHead(204), res.end());
@@ -156,7 +173,7 @@ dcWss.on('connection', (ws) => {
   ws.on('message', (raw) => {
     const m = JSON.parse(String(raw));
     gwLog.push({ conn, op: m.op, d: m.d });
-    if (m.op === 2) ws.send(JSON.stringify({ op: 0, t: 'READY', s: ++gw.seq, d: { session_id: 'sess1', resume_gateway_url: `ws://127.0.0.1:${(dc.address() as { port: number }).port}`, user: { id: '900', username: 'hydor-bot' }, application: { id: '901' } } }));
+    if (m.op === 2) ws.send(JSON.stringify({ op: 0, t: 'READY', s: ++gw.seq, d: { session_id: 'sess1', resume_gateway_url: `ws://127.0.0.1:${(dc.address() as { port: number }).port}`, user: { id: '900', username: 'hydor-bot' }, application: { id: '901', flags: dcFlags } } }));
     if (m.op === 6) ws.send(m.d.session_id === 'sess1' ? JSON.stringify({ op: 0, t: 'RESUMED', s: ++gw.seq, d: {} }) : JSON.stringify({ op: 9, d: false }));
     if (m.op === 1 && gw.ack) ws.send(JSON.stringify({ op: 11 }));
   });
@@ -464,24 +481,80 @@ test('Discord: unlinking a chat, and removing the bot', async () => {
   assert.equal(readSecret(db, DISCORD_TOKEN), null);
 });
 
+test('Discord: a token is turned down only when Discord says no; with no answer it is kept, and the connection takes over', async () => {
+  assert.equal(readSecret(db, DISCORD_TOKEN), null);
+  dcRefuse = 401;
+  const wrong = await put('/api/discord', { token: DTOKEN });
+  assert.equal(wrong.statusCode, 400);
+  assert.match(wrong.json().message, /^Discord did not take that token: /);
+  dcRefuse = 0;
+  assert.equal(readSecret(db, DISCORD_TOKEN), null, 'nothing saved');
+  assert.equal((await get('/api/discord')).connected, false);
+  // A 403 can be a block in front of Discord, not its word on the token: kept, and connected once it passes.
+  dcRefuse = 403;
+  const blocked = await put('/api/discord', { token: DTOKEN });
+  assert.equal(blocked.statusCode, 200, blocked.body);
+  assert.equal(blocked.json().state, 'connecting');
+  dcRefuse = 0;
+  await viewUntil('running once the block passes', '/api/discord', (x) => x.state === 'running');
+  assert.equal((await put('/api/discord', { token: null })).json().connected, false);
+  for (const [mode, note] of [
+    ['502', /Bad Gateway/],
+    ['429', /rate limited/],
+    ['drop', /^Discord could not be reached \(/],
+  ] as const) {
+    dcMode = mode;
+    dcFlags = 0;
+    const put1 = await put('/api/discord', { token: DTOKEN });
+    assert.equal(put1.statusCode, 200, put1.body);
+    const v = put1.json();
+    assert.equal(v.connected, true, mode);
+    assert.equal(v.state, 'connecting');
+    assert.match(v.note, note);
+    assert.equal(v.error, undefined, 'not an error');
+    assert.ok(!JSON.stringify(v).includes(DTOKEN), 'the token is never said');
+    assert.equal(readSecret(db, DISCORD_TOKEN)?.value, DTOKEN, 'saved');
+    await sleep(200);
+    const still = await get('/api/discord');
+    assert.equal(still.state, 'connecting', 'still trying');
+    assert.match(still.note, note);
+    dcMode = '';
+    const ok = await viewUntil('running once Discord answers', '/api/discord', (x) => x.state === 'running');
+    assert.equal(ok.note, undefined);
+    assert.equal(ok.error, undefined);
+    assert.equal(ok.bot.username, 'hydor-bot');
+    assert.equal(ok.invite, discordInvite('901'), 'the application is known now');
+    assert.match(ok.warning, /Message Content Intent is off/, 'and what its settings lack');
+    assert.equal(kvGet(db, 'discord.bot'), '900');
+    assert.equal(kvGet(db, 'discord.unchecked'), '');
+    assert.equal((await put('/api/discord', { token: null })).json().connected, false);
+  }
+  dcFlags = 1 << 18;
+});
+
 // ---- a stand-in for Slack -------------------------------------------------------------------------
 const BOT = 'xoxb-fake-test-bot-token';
 const APP = 'xapp-fake-test-app-token';
 const slSent: { method: string; body: any }[] = [];
 const slResponses: any[] = [];
-const sl = { count: 0, opens: 0, scopes: 'app_mentions:read,chat:write,commands,im:history,reactions:write,users:read', slow: 0 };
+let slRefuse = '';
+const sl = { mode: '' as '' | '502' | 'internal_error' | 'drop' | 'bot502', count: 0, opens: 0, scopes: 'app_mentions:read,chat:write,commands,im:history,reactions:write,users:read', slow: 0 };
 let sockets: WebSocket[] = [];
 const acks: any[] = [];
 const slServer = http.createServer(async (req, res) => {
   const body = await readBody(req);
   const method = (req.url ?? '').replace(/^\//, '');
   if (method === 'response') return (slResponses.push(body), json(res, 200, {}));
+  if (sl.mode === 'drop') return req.socket.destroy();
+  if (sl.mode === '502' || (sl.mode === 'bot502' && method === 'auth.test')) return (res.writeHead(502, { 'content-type': 'text/html' }), res.end('Bad Gateway'));
+  if (sl.mode === 'internal_error') return json(res, 200, { ok: false, error: 'internal_error' });
   const auth = req.headers.authorization;
   if (method === 'apps.connections.open') {
     if (auth !== `Bearer ${APP}`) return json(res, 200, { ok: false, error: 'invalid_auth' });
     sl.opens++;
     return json(res, 200, { ok: true, url: `ws://127.0.0.1:${(slServer.address() as { port: number }).port}/link` });
   }
+  if (slRefuse) return json(res, 200, { ok: false, error: slRefuse });
   if (auth !== `Bearer ${BOT}`) return json(res, 200, { ok: false, error: 'invalid_auth' });
   if (method === 'auth.test') return json(res, 200, { ok: true, user_id: 'UBOT', user: 'hydor', team: 'Test Team' }, { 'x-oauth-scopes': sl.scopes });
   if (method === 'users.info') return json(res, 200, { ok: true, user: { id: body.user, name: 'ada', real_name: 'Ada Lovelace', profile: { display_name: '' } } });
@@ -777,6 +850,59 @@ test('Slack: a token Slack no longer takes is said in Settings and not tried aga
   assert.equal(readSecret(db, APP_TOKEN), null);
   await sleep(300);
   assert.equal(sl.opens, opens, 'no connection without tokens');
+});
+
+test('Slack: tokens are turned down only when Slack says no; with no answer they are kept, and the connection takes over', async () => {
+  assert.equal(readSecret(db, BOT_TOKEN), null);
+  for (const error of ['invalid_auth', 'not_authed', 'token_revoked']) {
+    slRefuse = error;
+    const wrong = await put('/api/slack', { botToken: BOT, appToken: APP });
+    assert.equal(wrong.statusCode, 400, error);
+    assert.match(wrong.json().message, /^Slack did not take the bot token: /);
+  }
+  slRefuse = '';
+  // The app-level token is refused while the bot token cannot be checked: still refused.
+  sl.mode = 'bot502';
+  const wrongApp = await put('/api/slack', { botToken: BOT, appToken: APP.replace('fake', 'oops') });
+  assert.equal(wrongApp.statusCode, 400);
+  assert.match(wrongApp.json().message, /^Slack did not take the app-level token/);
+  sl.mode = '';
+  assert.equal(readSecret(db, BOT_TOKEN), null, 'nothing saved');
+  assert.equal(readSecret(db, APP_TOKEN), null, 'nothing saved');
+  assert.equal((await get('/api/slack')).connected, false);
+  for (const [mode, note] of [
+    ['502', /Slack answered 502/],
+    ['internal_error', /internal_error/],
+    ['bot502', /Slack answered 502/],
+    ['drop', /^Slack could not be reached \(/],
+  ] as const) {
+    sl.mode = mode;
+    sl.scopes = 'chat:write,im:history';
+    const put1 = await put('/api/slack', { botToken: BOT, appToken: APP });
+    assert.equal(put1.statusCode, 200, put1.body);
+    const v = put1.json();
+    assert.equal(v.connected, true, mode);
+    assert.equal(v.state, 'connecting');
+    assert.match(v.note, note);
+    assert.equal(v.error, undefined, 'not an error');
+    assert.ok(!JSON.stringify(v).includes(BOT) && !JSON.stringify(v).includes(APP), 'the tokens are never said');
+    assert.equal(readSecret(db, BOT_TOKEN)?.value, BOT, 'saved');
+    assert.equal(readSecret(db, APP_TOKEN)?.value, APP, 'saved');
+    await sleep(200);
+    const still = await get('/api/slack');
+    assert.equal(still.state, 'connecting', 'still trying');
+    assert.match(still.note, note);
+    sl.mode = '';
+    const ok = await viewUntil('running once Slack answers', '/api/slack', (x) => x.state === 'running');
+    assert.equal(ok.note, undefined);
+    assert.equal(ok.error, undefined);
+    assert.deepEqual(ok.bot, { username: 'hydor', name: 'Test Team' });
+    assert.match(ok.warning, /lacks scopes it needs/, 'and what its scopes lack');
+    assert.equal(kvGet(db, 'slack.bot'), 'UBOT');
+    assert.equal(kvGet(db, 'slack.unchecked'), '');
+    assert.equal((await put('/api/slack', { token: null })).json().connected, false);
+  }
+  sl.scopes = 'app_mentions:read,chat:write,commands,im:history,reactions:write,users:read';
 });
 
 for (const [name, fn] of tests) {

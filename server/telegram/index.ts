@@ -64,6 +64,11 @@ class TelegramError extends Error {
   }
 }
 
+/** Telegram saying no to a token: a wrong one, or one revoked (or its bot deleted) in @BotFather. Not an answer slow to
+ *  come, a busy moment (429) or a fault of Telegram's own (5xx): those pass, and asking again gets through. */
+const refused = (e: unknown) => e instanceof TelegramError && (e.code === 401 || e.code === 404);
+const passing = (e: unknown) => e instanceof TelegramError && (e.code === 0 || e.code === 429 || e.code >= 500);
+
 // ---- what is kept ---------------------------------------------------------------------------------
 
 const readJson = <T>(db: DB, k: string, fallback: T): T => {
@@ -392,10 +397,25 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 // ---- asking Telegram for what was sent ------------------------------------------------------------
 
-let state: { state: 'off' | 'running' | 'error'; error?: string; bot?: Bot } = { state: 'off' };
+// While connecting, error is why the last try did not get through (Settings shows it as a note, not as an error).
+let state: { state: 'off' | 'connecting' | 'running' | 'error'; error?: string; bot?: Bot } = { state: 'off' };
 let stopped = false;
 let polling: AbortController | null = null;
 let wakeUp: (() => void) | null = null;
+/** The bot whose menu of commands is set; and whether a webhook was taken off the bot connected last. */
+let commandsFor = 0;
+let webhookOff = false;
+
+const botOf = (me: TgUser): Bot => ({ id: me.id, username: me.username ?? '', name: me.first_name ?? '' });
+
+/** How a round that failed shows in Settings: what needs the user is an error; what passes leaves it connecting. */
+function trouble(e: unknown): { state: 'connecting' | 'error'; error: string } {
+  const why = (e as Error).message;
+  if (passing(e)) return { state: 'connecting', error: why };
+  if (refused(e)) return { state: 'error', error: new Error(`Telegram does not take this bot’s token (${why}): copy the current one from @BotFather and paste it under More → Change token.`).message };
+  if (e instanceof TelegramError && e.code === 409) return { state: 'error', error: new Error(`Another program is getting this bot’s messages (${why}). A bot gets them in one place only: disconnect it there, or make another bot for this Hydor.`).message };
+  return { state: 'error', error: why };
+}
 
 const pause = (ms: number) =>
   new Promise<void>((resolve) => {
@@ -407,6 +427,7 @@ const pause = (ms: number) =>
 /** The token changed (or went): what is being asked of Telegram stops, and asking starts again with the new one. */
 function restart() {
   state = { state: 'off' };
+  webhookOff = false;
   polling?.abort();
   wakeUp?.();
 }
@@ -423,14 +444,18 @@ async function poll(d: Deps) {
     // Each round its own: a restart stops this one only, and the next round's failures still wait before trying again.
     const round = (polling = new AbortController());
     try {
-      if (!state.bot) {
-        const me = await call<TgUser>(token, 'getMe', {}, { signal: round.signal });
-        state = { state: 'running', bot: { id: me.id, username: me.username ?? '', name: me.first_name ?? '' } };
-        await call(token, 'setMyCommands', { commands: COMMANDS }, { signal: round.signal }).catch(() => {});
+      // The bot, unless Connect already asked Telegram for it.
+      let bot = state.bot;
+      if (!bot) {
+        bot = botOf(await call<TgUser>(token, 'getMe', {}, { signal: round.signal }));
+        state = { state: 'running', bot };
       }
+      // Its menu of commands, once a bot, without holding up its messages (tried again next round if it fails).
+      const id = bot.id;
+      if (commandsFor !== id) call(token, 'setMyCommands', { commands: COMMANDS }).then(() => (commandsFor = id), () => {});
       const offset = Number(kvGet(d.db, 'telegram.offset')) || 0;
       const updates = await call<TgUpdate[]>(token, 'getUpdates', { offset, timeout: 50, allowed_updates: ['message', 'callback_query'] }, { signal: round.signal, ms: 65_000 });
-      state = { ...state, state: 'running', error: undefined };
+      state = { state: 'running', bot };
       wait = 2000;
       for (const u of updates) {
         kvSet(d.db, 'telegram.offset', String(u.update_id + 1));
@@ -439,8 +464,15 @@ async function poll(d: Deps) {
     } catch (e) {
       if (stopped) break;
       if (round.signal.aborted) continue;
-      state = { ...state, state: 'error', error: (e as Error).message };
-      // Another copy asking with the same bot, or a token Telegram no longer takes: said in Settings, tried again later.
+      // A webhook (an address another program gave the bot for its messages) stops Hydor asking for them: taken off
+      // once for each bot connected here, since the user connected it to have its messages here.
+      if (e instanceof TelegramError && e.code === 409 && /webhook/i.test(e.message) && !webhookOff) {
+        webhookOff = true;
+        if (await call(token, 'deleteWebhook', {}, { signal: round.signal }).then(() => true, () => false)) continue;
+      }
+      // Telegram slow or busy: still connecting, tried again soon. A token it no longer takes, or another program
+      // asking with the same bot: said in Settings, and tried again later all the same.
+      state = { ...state, ...trouble(e) };
       await pause(wait);
       wait = Math.min(wait * 2, 60_000);
     }
@@ -461,7 +493,9 @@ function view(d: Deps) {
   return {
     connected: !!readSecret(d.db, TOKEN_NAME),
     state: state.state,
-    error: state.error,
+    error: state.state === 'error' ? state.error : undefined,
+    // Why it is still connecting (Telegram slow to answer, or not reached): Hydor keeps trying.
+    note: state.state === 'connecting' ? state.error : undefined,
     bot: bot ? { username: bot.username, name: bot.name } : undefined,
     chats: linkedChats(d.db),
     notify: notifyOn(d.db),
@@ -482,18 +516,24 @@ export const telegram: Feature = {
       if (typeof b.token === 'string') {
         const token = b.token.trim();
         if (!/^\d{5,16}:[A-Za-z0-9_-]{30,64}$/.test(token)) throw new HttpError(400, 'That does not look like a bot’s token: @BotFather gives one like 123456789:AA…');
-        let me: TgUser;
+        // Only Telegram saying no turns a token down. When it is slow to answer (a new bot's first minutes), busy or
+        // not reached, the token is kept all the same: the bot connects by itself as soon as Telegram answers, and
+        // Settings says it is connecting meanwhile, and why.
+        let me: TgUser | undefined;
+        let failed: unknown;
         try {
-          me = await call<TgUser>(token, 'getMe', {}, { ms: 15_000 });
+          me = await call<TgUser>(token, 'getMe', {}, { ms: 10_000 });
         } catch (e) {
-          throw new HttpError(400, `Telegram did not take that token: ${(e as Error).message}`);
+          if (refused(e)) throw new HttpError(400, `Telegram did not take that token: ${(e as Error).message}`);
+          failed = e;
         }
         const before = readSecret(db, TOKEN_NAME)?.value;
-        saveSecret(db, { name: TOKEN_NAME, value: token, domains: ['api.telegram.org'], note: `The Telegram bot @${me.username ?? ''} (Settings → Chat apps → Telegram)` });
+        saveSecret(db, { name: TOKEN_NAME, value: token, domains: ['api.telegram.org'], note: `The Telegram bot${me?.username ? ` @${me.username}` : ''} (Settings → Chat apps → Telegram)` });
         // Another bot: the chats linked to the old one link again, and its place in Telegram's queue starts over.
         if (before && before !== token) setChats(db, []);
         if (before !== token) kvSet(db, 'telegram.offset', '0');
         restart();
+        state = me ? { state: 'running', bot: botOf(me) } : { state: 'connecting', error: (failed as Error).message };
       } else if (b.token === null) {
         deleteSecret(db, TOKEN_NAME);
         setChats(db, []);
@@ -503,8 +543,6 @@ export const telegram: Feature = {
       }
       if (typeof b.notify === 'boolean') kvSet(db, 'telegram.notify', b.notify ? '1' : '0');
       if (b.agent === 'claude' || b.agent === 'codex') kvSet(db, 'telegram.agent', b.agent);
-      // Asked again a moment later, the bot's name is there.
-      if (typeof b.token === 'string') await new Promise((r) => setTimeout(r, 300));
       return view(d);
     });
     app.post('/api/telegram/pair', async () => {

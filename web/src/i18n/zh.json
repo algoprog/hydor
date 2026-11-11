@@ -22336,5 +22336,8 @@
 "sk-ant-…":"sk-ant-…",
 "That is not an Anthropic API key (they start with sk-ant-)":"这不是 Anthropic API 密钥（它们以 sk-ant- 开头）",
 "Use API credit at a limit":"达到限额时使用 API 额度",
-"When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on.":"当所有 Claude Code 账户都达到使用限额时，会话不会停止，而是改按某个账户的 Anthropic API 密钥计费，继续运行。开启前默认关闭。"
+"When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on.":"当所有 Claude Code 账户都达到使用限额时，会话不会停止，而是改按某个账户的 Anthropic API 密钥计费，继续运行。开启前默认关闭。",
+"{0} has not answered yet ({1}). Hydor keeps trying, and connects by itself when it does.":"{0} 还没有响应（{1}）。Hydor 会继续尝试，一有响应就会自动连上。",
+"Another program is getting this bot’s messages ({0}). A bot gets them in one place only: disconnect it there, or make another bot for this Hydor.":"另一个程序正在接收这个机器人的消息（{0}）。一个机器人只能在一个地方接收消息：请在那边断开连接，或为这个 Hydor 另建一个机器人。",
+"Telegram does not take this bot’s token ({0}): copy the current one from @BotFather and paste it under More → Change token.":"Telegram 不接受这个机器人的令牌（{0}）：请从 @BotFather 复制当前的令牌，粘贴到 更多 → 更换令牌 下。"
 }

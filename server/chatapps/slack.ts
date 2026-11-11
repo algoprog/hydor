@@ -17,7 +17,7 @@ const api = () => (process.env.SLACK_API ?? 'https://slack.com/api').replace(/\/
 /** What the app's scopes must hold for all it does (the manifest in shared/chat-apps.ts asks for them). */
 const SCOPES = ['app_mentions:read', 'chat:write', 'commands', 'im:history', 'reactions:write', 'users:read'];
 /** Answers that no waiting will mend: the person must give other tokens. */
-const FATAL = new Set(['invalid_auth', 'token_revoked', 'token_expired', 'account_inactive', 'not_allowed_token_type', 'missing_scope', 'no_permission']);
+const FATAL = new Set(['invalid_auth', 'not_authed', 'token_revoked', 'token_expired', 'account_inactive', 'not_allowed_token_type', 'missing_scope', 'no_permission']);
 
 class SlackError extends Error {
   constructor(
@@ -172,9 +172,11 @@ export class SocketMode {
 
   async run() {
     let wait = tuning.retryMs;
+    // Why the last try failed, said in Settings while it goes on trying.
+    let why: string | undefined;
     while (!this.done) {
       try {
-        this.o.onState({ state: 'connecting' });
+        this.o.onState({ state: 'connecting', error: why });
         const { url } = await web<{ url: string }>(this.o.appToken, 'apps.connections.open');
         await this.connect(url);
       } catch (e) {
@@ -183,12 +185,15 @@ export class SocketMode {
           this.o.onState({ state: 'error', error: `Slack did not take the app-level token (${e.code}): make a new one with the connections:write scope.` });
           return;
         }
-        this.o.onState({ state: 'error', error: (e as Error).message });
+        // Not answering, rate limits and Slack's own faults pass: stay connecting and try again.
+        why = (e as Error).message;
+        this.o.onState({ state: 'connecting', error: why });
         await this.sleep(wait);
         wait = Math.min(wait * 2, tuning.maxRetryMs);
         continue;
       }
       if (this.done) break;
+      why = this.ready ? undefined : 'Disconnected before hello';
       // A connection that got as far as hello starts the waits over; Slack asking for a new one needs no wait at all.
       wait = this.ready ? tuning.retryMs : Math.min(wait * 2, tuning.maxRetryMs);
       await this.sleep(this.ready ? Math.min(wait, 250) : wait);
@@ -375,6 +380,7 @@ async function whoAmI(token: string) {
 }
 
 async function supervise(d: Deps) {
+  let wait = tuning.retryMs;
   while (!stopped) {
     const bot = botToken(d);
     const app = appToken(d);
@@ -388,15 +394,25 @@ async function supervise(d: Deps) {
       botUser = me.user_id;
       scopesMissing = missing;
       state = { state: 'connecting', bot: { id: me.user_id, username: me.user ?? '', team: me.team ?? '' } };
+      // Tokens saved without a check are known now.
+      if (kvGet(d.db, 'slack.unchecked')) known(d, bot, app, me);
+      wait = tuning.retryMs;
     } catch (e) {
-      state = { state: 'error', error: `Slack did not take the bot token: ${(e as Error).message}` };
-      await pause(e instanceof SlackError && FATAL.has(e.code) ? 10 * 60_000 : tuning.retryMs);
+      if (e instanceof SlackError && FATAL.has(e.code)) {
+        state = { state: 'error', error: `Slack did not take the bot token: ${e.message}` };
+        await pause(10 * 60_000);
+      } else {
+        // Not answering, rate limits and Slack's own faults pass: stay connecting and try again.
+        state = { state: 'connecting', error: (e as Error).message };
+        await pause(wait);
+        wait = Math.min(wait * 2, tuning.maxRetryMs);
+      }
       continue;
     }
     const sm = (current = new SocketMode({
       appToken: app,
       onState: (s) => {
-        if (current === sm) state = { ...state, ...s };
+        if (current === sm) state = { ...state, ...s, error: s.error };
       },
       // One at a time, in the order they came.
       onEnvelope: (type, payload) => {
@@ -416,11 +432,24 @@ export function stopSlack() {
   for (const chat of [...reacting.keys()]) reacting.delete(chat);
 }
 
+/** What the tokens tell once Slack has answered: whose app it is, kept with them. */
+function known(d: Deps, bot: string, app: string, me: { user_id: string; user?: string; team?: string }) {
+  kvSet(d.db, 'slack.unchecked', '');
+  saveSecret(d.db, { name: BOT_TOKEN, value: bot, domains: ['slack.com'], note: `The Slack app ${me.user ?? ''} in ${me.team ?? 'a workspace'} (Settings → Chat apps → Slack)` });
+  saveSecret(d.db, { name: APP_TOKEN, value: app, domains: ['slack.com'], note: 'The Slack app’s app-level token for Socket Mode (Settings → Chat apps → Slack)' });
+  // Another app: the chats linked to the old one link again (new tokens for the same app change nothing).
+  const before = kvGet(d.db, 'slack.bot');
+  if (before && before !== me.user_id) slackApp.unlinkAll(d);
+  kvSet(d.db, 'slack.bot', me.user_id);
+}
+
 function view(d: Deps) {
   return {
     ...slackApp.view(d),
     state: state.state,
     error: state.state === 'error' ? state.error : undefined,
+    // Why the last try to connect failed, while it keeps trying.
+    note: state.state === 'connecting' ? state.error : undefined,
     warning: scopesMissing.length ? `The app lacks scopes it needs (${scopesMissing.join(', ')}): add them under OAuth & Permissions, then reinstall the app.` : undefined,
     bot: state.bot ? { username: state.bot.username, name: state.bot.team } : undefined,
   };
@@ -447,26 +476,30 @@ export const slack: Feature = {
         if (!bot || !app) throw new HttpError(400, 'Slack needs both tokens: the Bot User OAuth Token (xoxb-…) and the App-Level Token (xapp-…).');
         if (!/^xoxb-[\w-]{10,}$/.test(bot)) throw new HttpError(400, 'That does not look like a Bot User OAuth Token: Install App in Slack’s settings gives one that starts with xoxb-.');
         if (!/^xapp-[\w-]{10,}$/.test(app)) throw new HttpError(400, 'That does not look like an App-Level Token: Basic Information → App-Level Tokens gives one that starts with xapp-.');
-        let who: Awaited<ReturnType<typeof whoAmI>>;
+        // Only tokens Slack answered no to are turned down; with no answer (or a busy Slack) the connection takes over.
+        let who: Awaited<ReturnType<typeof whoAmI>> | null = null;
         try {
           who = await whoAmI(bot);
         } catch (e) {
-          throw new HttpError(400, `Slack did not take the bot token: ${(e as Error).message}`);
+          if (e instanceof SlackError && FATAL.has(e.code)) throw new HttpError(400, `Slack did not take the bot token: ${e.message}`);
         }
         try {
           // Opening a connection is the way to see that the app-level token works (the address it gives is not used).
           await web(app, 'apps.connections.open', {}, { ms: 15_000 });
         } catch (e) {
-          throw new HttpError(400, `Slack did not take the app-level token (it needs the connections:write scope): ${(e as Error).message}`);
+          if (e instanceof SlackError && FATAL.has(e.code)) throw new HttpError(400, `Slack did not take the app-level token (it needs the connections:write scope): ${e.message}`);
+          who = null;
         }
-        saveSecret(d.db, { name: BOT_TOKEN, value: bot, domains: ['slack.com'], note: `The Slack app ${who.me.user ?? ''} in ${who.me.team ?? 'a workspace'} (Settings → Chat apps → Slack)` });
-        saveSecret(d.db, { name: APP_TOKEN, value: app, domains: ['slack.com'], note: 'The Slack app’s app-level token for Socket Mode (Settings → Chat apps → Slack)' });
-        // Another app: the chats linked to the old one link again (new tokens for the same app change nothing).
-        const before = kvGet(d.db, 'slack.bot');
-        if (before && before !== who.me.user_id) slackApp.unlinkAll(d);
-        kvSet(d.db, 'slack.bot', who.me.user_id);
-        botUser = who.me.user_id;
-        scopesMissing = who.missing;
+        if (who) {
+          known(d, bot, app, who.me);
+          botUser = who.me.user_id;
+          scopesMissing = who.missing;
+        } else {
+          // Whose app it is comes when the connection gets through.
+          saveSecret(d.db, { name: BOT_TOKEN, value: bot, domains: ['slack.com'], note: 'A Slack app (Settings → Chat apps → Slack)' });
+          saveSecret(d.db, { name: APP_TOKEN, value: app, domains: ['slack.com'], note: 'The Slack app’s app-level token for Socket Mode (Settings → Chat apps → Slack)' });
+          kvSet(d.db, 'slack.unchecked', '1');
+        }
         restart();
         return 'connected';
       },
