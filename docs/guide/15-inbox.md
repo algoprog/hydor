@@ -72,6 +72,7 @@ When a session finishes, fails or needs you, the app tells you in the way that f
 - **The app is in view**: a small card slides in at the bottom of the screen (bottom right on a computer). It shows the agent's icon with a coloured dot (green when finished, amber when it needs you, red when it failed), the session's name, and the status with the start of the reply. Click it to open the session, or ✕ to close it. It leaves after a few seconds, but stays while the pointer rests on it. A newer notice about the same session takes the place of the older card.
 - **The app is open in a tab you are not looking at**: a notification from your system, once you turned on **Notify this device**.
 - **The app is closed**, or the phone is in your pocket: a push notification, once you turned on **Notify this device** on that device.
+- **A desktop app (Mac, Windows, Linux)**: your computer's own notification (on a Mac, in Notification Center), whether the app's window is in front, behind other windows or closed (the app stays in the menu bar, the notification area or the system tray), and also when the app started at login without opening its window. Click it to open that session in the app's window. A newer one about the same session takes the place of the older one. The small cards inside the window show only when your system is not showing the app's notifications.
 
 You get no notice about the session you are looking at right now. A session you snoozed that needs you comes back from its snooze at once. In hands-free mode, the app also says out loud when the session it follows finishes or needs you ([Documents, images, videos and voice](/guide/documents-voice)).
 
@@ -97,9 +98,9 @@ Notices from your other machines come through this one, so one device hears from
 
 [Settings → App → Notifications](/settings?s=notifications) has, in its **This device** group, two switches, set on each device (each browser) for itself, and a test:
 
-- [**Notify this device**](/settings?s=notifications&find=Notify%20this%20device): a notification when a session finishes, fails or needs your answer, even with the app closed. Turning it on asks the browser for permission to show notifications. Each device turns it on for itself: your phone and your computer separately. In a desktop app (Mac, Windows, Linux) it is always on: the app shows the notifications itself while it runs, even with its window closed.
-- [**Sound**](/settings?s=notifications&find=Sound): a short chime with each notice while the app is open, rising when a session finishes and falling when it needs you or failed. Off at first; turning it on plays the chime once.
-- [**Send a test**](/settings?s=notifications&find=Send%20a%20test) (the **Try it** row, shown once **Notify this device** is on): sends a notification to every device that turned notifications on. It says "Notifications work on this device." and shows when the app is not in view, so switch away from it to see it. A message tells you how many devices it was sent to, or "No device got it."
+- [**Notify this device**](/settings?s=notifications&find=Notify%20this%20device): a notification when a session finishes, fails or needs your answer, even with the app closed. Turning it on asks the browser for permission to show notifications. Each device turns it on for itself: your phone and your computer separately. In a desktop app (Mac, Windows, Linux) it is always on: they come as Mac, Windows or your desktop's notifications while the app runs, even with its window closed. On a Mac, macOS asks once whether Hydor may send notifications: allow it, and use **System Settings → Notifications → Hydor** to choose how they show. When the system is not showing them, the row says so, and meanwhile they show inside the app; its **(i)** says where to allow them (on Windows, **Settings → System → Notifications**).
+- [**Sound**](/settings?s=notifications&find=Sound): a short chime with each notice while the app is open, rising when a session finishes and falling when it needs you or failed. Off at first; turning it on plays the chime once. In a desktop app the chime plays only with notices the app shows inside its window; the system's notifications make their own sound.
+- [**Send a test**](/settings?s=notifications&find=Send%20a%20test) (the **Try it** row, shown once **Notify this device** is on): sends a notification to every device that turned notifications on. It says "Notifications work on this device." and shows when the app is not in view, so switch away from it to see it. A message tells you how many devices it was sent to, or "No device got it." In a desktop app, **Try it** shows from the start: **Send a test** shows a notification on this computer right away, even with the app in front. If the system does not show it, a message says "It didn’t show. Allow notifications for Hydor in the system’s settings."
 
 To set it up on a phone:
 
@@ -121,6 +122,7 @@ When a session waits on a plain yes-or-no approval (a command, a file change or 
 - Tap one to answer without opening the app. A quiet notification confirms it, such as "Allow: Run a command".
 - If the answer can't go through (the browser was signed out, or you already answered elsewhere), the session opens so you can answer there.
 - Tap the notification itself to open the session, in a window of the app that is already open when there is one.
+- A desktop app's notifications have no buttons: click one to open the session, and answer there.
 
 Approvals from your other machines can be answered the same way: the answer goes to that machine through this one.
 

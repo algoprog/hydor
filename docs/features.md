@@ -980,10 +980,12 @@ programs shows each program's version and what is out, with Check now, Update no
   correction until the turn ends instead. Quote any part of a reply, or of your own
   messages, into your next message.
 - Notifications when a session finishes, fails or needs you: in the app, as a system notification, or as a push
-  notification on your phone with the app closed; agents and apps' steps can also send you one themselves
-  (notify_user) for what cannot wait. A plain yes-or-no approval has Approve and Deny right on the notification
-  (where the browser shows buttons), and the Inbox lists everything waiting on you across sessions, scheduled
-  tasks and machines, with approvals, questions and forms answered right there.
+  notification on your phone with the app closed (a desktop app shows the system's own notifications, with its window
+  in front, behind or closed, none for the session you are looking at, and a click opens the session); agents and
+  apps' steps can also send you one themselves (notify_user) for what cannot wait. A plain yes-or-no approval has
+  Approve and Deny right on the notification (where the browser shows buttons; a desktop app's have none: click to
+  open the session), and the Inbox lists everything waiting on you across sessions, scheduled tasks and machines,
+  with approvals, questions and forms answered right there.
 - Chat apps (Settings → Chat apps): your agents in Telegram, Discord or Slack, each through a bot or app of your own
   (a Telegram bot from @BotFather, a Discord bot from the Developer Portal, a Slack app from a manifest the app gives
   you, with the exact scopes). Only the chats you link with a one-time code can use it. A message starts a session or
@@ -1111,8 +1113,9 @@ programs shows each program's version and what is out, with Check now, Update no
 - Desktop apps for Mac (macOS 12+, Apple silicon or Intel), Windows (10 and 11, x64) and Linux (x64 and ARM: a .deb
   for Ubuntu and Debian, an AppImage for the others): the server and Node.js in one app (and tmux on a Mac and on
   Linux), in a window of its own, in the menu bar (the notification area, the system tray) when the window is closed,
-  opening at login. They show notifications themselves, find your programs through your login shell's PATH (on
-  Windows, your own environment), and update themselves release by release: they look every 4 hours, download and
+  opening at login. They show a session's notices as the system's own notifications (Notification Center on a Mac,
+  which asks once to allow them), even with the window closed, and click one to open its session; they find your
+  programs through your login shell's PATH (on Windows, your own environment), and update themselves release by release: they look every 4 hours, download and
   check a new build as soon as it is out (a download that breaks off, as when the computer sleeps, carries on from where
   it stopped, and one that gets nowhere tries again an hour later), say so (a notification, and a note in every open
   page that counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the

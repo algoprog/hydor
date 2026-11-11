@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { Button, Switch, Throbber } from '../../components/ui';
-import { chime, desktopSystem, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, type PushState } from '../../lib/notify';
+import { chime, desktopSystem, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, systemNotices, systemNoticesState, testSystemNotice, type PushState, type SystemNotices } from '../../lib/notify';
 import { Group, Row, Stack } from './kit';
 
 /** Notices when a session finishes, fails or needs you: pushed to this device, with or without a chime. */
@@ -11,10 +11,13 @@ export function NotificationSettings() {
   const [state, setState] = useState<PushState | null>(null);
   const [sound, setSound] = useState(() => notifyPrefs().sound);
   const [busy, setBusy] = useState(false);
+  // In a desktop app: whether the system shows its notifications (false: not allowed in the system's settings).
+  const [system, setSystem] = useState<SystemNotices | null>(null);
   useEffect(() => {
     pushState()
       .then(setState)
       .catch(() => setState('unsupported'));
+    if (systemNotices) void systemNoticesState().then(setSystem);
   }, []);
   const appleNotInstalled = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator as Navigator & { standalone?: boolean }).standalone;
   const toggle = async (on: boolean) => {
@@ -29,11 +32,17 @@ export function NotificationSettings() {
   };
   const hint =
     state === 'app'
-      ? desktopSystem === 'windows'
-        ? 'The app shows them itself while it runs, even with its window closed (it stays in the notification area).'
-        : desktopSystem === 'linux'
-          ? 'The app shows them itself while it runs, even with its window closed (it stays in the system tray).'
-          : 'The Mac app shows them itself while it runs, even with its window closed (it stays in the menu bar).'
+      ? system?.shows === false
+        ? desktopSystem === 'windows'
+          ? 'Windows isn’t showing them, so they show inside the app'
+          : desktopSystem === 'linux'
+            ? 'Your desktop isn’t showing them, so they show inside the app'
+            : 'macOS isn’t showing them, so they show inside the app'
+        : desktopSystem === 'windows'
+          ? 'As Windows notifications, even with the window closed'
+          : desktopSystem === 'linux'
+            ? 'As your desktop’s notifications, even with the window closed'
+            : 'As Mac notifications, even with the window closed'
       : state === 'unsupported'
       ? appleNotInstalled
         ? 'On iPhone or iPad: Share → Add to Home Screen, open Hydor from there, then turn this on.'
@@ -41,17 +50,28 @@ export function NotificationSettings() {
       : state === 'denied'
         ? 'Blocked for this site in the browser settings; allow notifications there first.'
         : 'Even with the app closed, like on a phone in your pocket. Each device turns it on for itself.';
+  // In a desktop app, the longer story: where the app goes when its window closes, and where the system's settings are.
+  const appInfo =
+    state !== 'app'
+      ? undefined
+      : desktopSystem === 'windows'
+        ? 'The app keeps running in the notification area when you close its window, and its notifications keep coming. To allow them or change how they show: Settings → System → Notifications → Hydor.'
+        : desktopSystem === 'linux'
+          ? 'The app keeps running in the system tray when you close its window, and its notifications keep coming. Your desktop’s settings say how they show.'
+          : 'The app keeps running in the menu bar when you close its window, and its notifications keep coming. To allow them or change how they show: System Settings → Notifications → Hydor.';
   return (
     <Stack>
       <Group title="This device">
         <Row
           label="Notify this device"
           hint={hint}
+          info={appInfo}
           control={state === null || busy ? <Throbber className="text-fg-3" /> : <Switch on={state === 'on' || state === 'app'} disabled={state === 'unsupported' || state === 'denied' || state === 'app'} onChange={toggle} label="Notify this device" />}
         />
         <Row
           label="Sound"
           hint="A short chime with each notice while the app is open"
+          info={systemNotices ? 'Only with notices the app shows inside its window: the system’s notifications make their own sound.' : undefined}
           control={
             <Switch
               on={sound}
@@ -75,6 +95,25 @@ export function NotificationSettings() {
                 onClick={async () => {
                   const r = await post<{ sent: number }>('/api/push/test').catch((e) => (toastError(e), null));
                   if (r) toast(r.sent ? `Sent to ${r.sent} device${r.sent === 1 ? '' : 's'}. It shows when the app is not in view.` : 'No device got it.', r.sent ? 'ok' : 'error');
+                }}
+              >
+                Send a test
+              </Button>
+            }
+          />
+        )}
+        {state === 'app' && systemNotices && (
+          <Row
+            label="Try it"
+            hint="Shows a notification on this computer right away"
+            control={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  const r = await testSystemNotice();
+                  setSystem(await systemNoticesState());
+                  if (r && !r.ok) toast('It didn’t show. Allow notifications for Hydor in the system’s settings.', 'error');
                 }}
               >
                 Send a test
