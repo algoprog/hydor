@@ -97,6 +97,24 @@ export async function localBase(): Promise<string> {
 
 /** Starts this computer's server in the background (its output to logs/terminal-server.log) and waits for it. */
 export async function startServer(base: string, say: (s: string) => void): Promise<string> {
+  // Inside the Mac app (its `hydor` sets HYDOR_APP_BUNDLE) the app owns the server, its restarts and its updates:
+  // a server of this command's own would hold the port. Opening the app (in the background) starts it.
+  const bundle = process.env.HYDOR_APP_BUNDLE;
+  if (bundle && process.platform === 'darwin') {
+    spawn('open', ['-g', '-a', bundle], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    const t0 = Date.now();
+    let told = false;
+    while (Date.now() - t0 < 90_000) {
+      const v = await health(base, 1500);
+      if (v) return v;
+      if (!told && Date.now() - t0 > 1000) {
+        say('Opening Hydor…');
+        told = true;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    throw new ApiError(0, 'Hydor did not start in time: open the Hydor app, then try again.');
+  }
   const { APP_ROOT, config, ensureDirs, paths } = await import('../config.ts');
   const entry = path.join(APP_ROOT, 'dist/server/index.js');
   if (!fs.existsSync(entry)) throw new ApiError(0, `Hydor is not running here, and it is not built yet: npm ci && npm run build (in ${APP_ROOT})`);
