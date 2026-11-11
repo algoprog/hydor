@@ -489,7 +489,8 @@ agents that speak ACP and take MCP servers.
   size or angle by the pointer, every resize snapping, a turned part by the box it shows, Alt to move freely, Ctrl to drag
   a copy, View → Snap to parts and guides), alignment (with each other or the slide), stacking, lock, undo, copy and paste
   through the system clipboard (words, pictures), right-click menus on a part, the empty slide, a table's cell (rows and
-  columns put in or taken out anywhere, merging, fills) and a slide in the list; animations in order (on a click, with or after the one before, a
+  columns put in or taken out anywhere, merging, fills) and a slide in the list (several slides picked together); parts
+  drawn on the slide at the size you drag (text boxes, shapes, lines), several parts sized and turned together; animations in order (on a click, with or after the one before, a
   paragraph at a time) and transitions, Morph among them (what two slides share glides into place); slide numbers
   and a footer; themes of colours and fonts; speaker notes; a slideshow (keys, swipes, black and white screens,
   every slide at once, a laser pointer, a pen and live captions) and a presenter's view with notes, the next slide,
