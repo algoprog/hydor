@@ -4,7 +4,7 @@
 // row of filters and one menu; each skill opens to read, switch off, change or remove. A switch here is for
 // every session; a space's Skills tab shows the same list for its own sessions (`space`), where a switch
 // turns a skill on or off for them alone, with the space's own skills and those of the spaces it brings together.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   BookPlus,
   BrainCircuit,
@@ -18,7 +18,6 @@ import {
   Globe,
   Info,
   ListChecks,
-  MoreHorizontal,
   Palette,
   PenLine,
   Plus,
@@ -54,9 +53,9 @@ import { go, openSession, showInFiles } from '../../lib/nav';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { Markdown } from '../../components/Markdown';
-import { Badge, Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Segmented, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { EditorDialog } from '../settings/Instructions';
-import { SpaceMark } from '../spaces/parts';
+import { EmptyRow, Group, MoreMenu, Notice, Row, SectionActions, Stack } from '../settings/kit';
 import { loadSpaces } from '../spaces/state';
 import { ProposalPanel } from './ProposalCard';
 import { SkillHistory, Triggers } from './SkillView';
@@ -219,95 +218,97 @@ function From({ i }: { i: Item }) {
 /** A switch a space set the other way from how the skill is without it: "On here", "Off here". */
 const switchedHere = (i: Item) => !!i.here?.set && i.on !== i.here.usual;
 
-function Row({ i, onOpen, onToggle }: { i: Item; onOpen: () => void; onToggle?: (on: boolean) => void }) {
+/** A skill's icon for a row's tile. */
+function iconOf(i: Item): ReactNode {
+  if (i.source === 'claude' || i.source === 'codex') return <AgentIcon agent={i.source} size={16} />;
+  const C = i.source === 'plugin' && !i.category ? Puzzle : categoryOf(i.category).icon;
+  return <C size={16} />;
+}
+
+/** The first rows a long group shows; the rest wait behind "Show all". */
+const FIRST = 8;
+
+function SkillRow({ i, onOpen, onToggle }: { i: Item; onOpen: () => void; onToggle?: (on: boolean) => void }) {
   const meta = [i.lib ? used(i.lib) : i.own ? used(i.own) : '', i.projects?.length ? inProjects(i.projects) : ''].filter(Boolean);
   const from = i.source !== 'bundled' && !i.own;
   return (
-    <div className={cx('group flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-bg-1 sm:px-4', !i.on && 'opacity-60')}>
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-        <Tile i={i} />
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span translate="no" className="truncate text-[14px] font-medium text-fg">
-              {i.name}
-            </span>
-            {i.source === 'learned' && <Badge tone="ok">Yours</Badge>}
-            {i.source === 'plugin' && <Badge tone="info">Plugin</Badge>}
-            {i.own?.overrides && <Badge tone="info">In place of the library’s</Badge>}
-            {switchedHere(i) ? <Badge tone={i.on ? 'ok' : 'neutral'}>{i.on ? 'On here' : 'Off here'}</Badge> : !i.on && <Badge>Off</Badge>}
-          </span>
-          <span translate={i.source === 'bundled' ? undefined : 'no'} className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">
-            {i.description}
-          </span>
-          {(from || meta.length > 0) && (
-            <span className="mt-0.5 block truncate text-[11.5px] text-fg-3">
-              {from && <From i={i} />}
-              {from && meta.length ? ' · ' : ''}
-              {meta.join(' · ')}
-            </span>
-          )}
+    <Row
+      icon={iconOf(i)}
+      label={
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <button type="button" onClick={onOpen} translate="no" className={cx('min-w-0 text-left font-medium hover:underline', !i.on && 'text-fg-2')}>
+            {i.name}
+          </button>
+          {i.source === 'learned' && <Badge tone="ok">Yours</Badge>}
+          {i.source === 'plugin' && <Badge tone="info">Plugin</Badge>}
+          {i.own?.overrides && <Badge tone="info">In place of the library’s</Badge>}
+          {switchedHere(i) ? <Badge tone={i.on ? 'ok' : 'neutral'}>{i.on ? 'On here' : 'Off here'}</Badge> : !i.on && <Badge>Off</Badge>}
         </span>
-      </button>
-      {onToggle && <Switch on={i.on} onChange={onToggle} label={i.on ? `Turn ${i.name} off` : `Turn ${i.name} on`} className="shrink-0" />}
-    </div>
+      }
+      hint={
+        <button type="button" onClick={onOpen} translate={i.source === 'bundled' ? undefined : 'no'} className="line-clamp-1 w-full text-left">
+          {i.description}
+        </button>
+      }
+      info={
+        (from || meta.length > 0) && (
+          <p>
+            {from && <From i={i} />}
+            {from && meta.length ? ' · ' : ''}
+            {meta.join(' · ')}
+          </p>
+        )
+      }
+      control={onToggle && <Switch on={i.on} onChange={onToggle} label={i.on ? `Turn ${i.name} off` : `Turn ${i.name} on`} />}
+    />
   );
 }
 
-function Group({ icon, title, count, children, note }: { icon: ReactNode; title: ReactNode; count: number; children: ReactNode; note?: ReactNode }) {
-  return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-panel">
-      <header className="flex items-center gap-2 px-3 pt-3 pb-1.5 sm:px-4">
-        <span className="text-fg-3">{icon}</span>
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-fg-2">{title}</h3>
-        <span className="tnum text-[12px] text-fg-3">{count}</span>
-      </header>
-      {note && <p className="px-3 pb-1.5 text-[12px] leading-snug text-fg-3 sm:px-4">{note}</p>}
-      <div className="divide-y divide-line">{children}</div>
-    </section>
-  );
-}
+/** A group's title with how many it holds. */
+const titled = (title: ReactNode, n: number) => (
+  <>
+    <span>{title}</span> <span className="tnum font-normal text-fg-3">{n}</span>
+  </>
+);
 
 /** Skills agents suggested, waiting for your yes. */
 function Waiting({ list, onReview }: { list: SkillProposal[]; onReview: (p: SkillProposal) => void }) {
   const titles = useSessions((x) => x.byKey);
   return (
-    <section className="overflow-hidden rounded-2xl border border-accent/35 bg-accent/6">
-      <header className="flex items-center gap-2 px-4 pt-3 pb-1">
-        <Sparkles size={15} className="text-accent" />
-        <h3 className="flex-1 text-[13.5px] font-semibold">
-          {list.length === 1 ? 'An agent suggests a skill' : `Agents suggest ${list.length} skills`}
-        </h3>
-      </header>
-      <p className="px-4 pb-2 text-[12.5px] text-fg-3">After hard tasks, agents can offer to keep what they learned. Nothing is saved until you approve.</p>
-      <div className="divide-y divide-accent/15">
-        {list.map((p) => {
-          const Icon = p.kind === 'new' ? BookPlus : FilePen;
-          return (
-            <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">
-                <Icon size={15} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-medium">
-                  {p.kind === 'new' ? 'New skill: ' : 'Change to '}
-                  <span translate="no">{p.name}</span>
-                </div>
-                <div className="truncate text-[12px] text-fg-3">
-                  {ago(p.createdAt)} ·{' '}
-                  <button type="button" onClick={() => openSession(p.key)} className="hover:text-fg hover:underline" translate="no">
-                    {titles[p.key]?.title || 'its conversation'}
-                  </button>
-                  {p.findings.length ? ' · has warnings' : ''}
-                </div>
-              </div>
+    <Group
+      title={list.length === 1 ? 'An agent suggests a skill' : `Agents suggest ${list.length} skills`}
+      info="After hard tasks, agents can offer to keep what they learned. Nothing is saved until you approve."
+    >
+      {list.map((p) => {
+        const Icon = p.kind === 'new' ? BookPlus : FilePen;
+        return (
+          <Row
+            key={p.id}
+            icon={<Icon size={16} />}
+            label={
+              <>
+                {p.kind === 'new' ? 'New skill: ' : 'Change to '}
+                <span translate="no">{p.name}</span>
+              </>
+            }
+            hint={
+              <>
+                {ago(p.createdAt)} ·{' '}
+                <button type="button" onClick={() => openSession(p.key)} className="hover:text-fg hover:underline" translate="no">
+                  {titles[p.key]?.title || 'its conversation'}
+                </button>
+                {p.findings.length ? ' · has warnings' : ''}
+              </>
+            }
+            control={
               <Button size="sm" variant="primary" onClick={() => onReview(p)}>
                 Review
               </Button>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+            }
+          />
+        );
+      })}
+    </Group>
   );
 }
 
@@ -838,8 +839,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
   const [file, setFile] = useState<string | null>(null);
   const [review, setReview] = useState<SkillProposal | null>(null);
   const [how, setHow] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const menuAt = useRef<HTMLButtonElement>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirm, confirmNode] = useConfirm();
 
   const loadLib = useCallback(() => api<SkillLibrary>('/api/skillpack').then(setLib, toastError), []);
@@ -884,17 +884,21 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
   // Grouped: on a space's page its own first, then those of the spaces it brings together; the library's by what
   // they are for; each agent's own; in Settings, each space's own.
   const groups = useMemo(() => {
-    const out: { key: string; icon: ReactNode; title: ReactNode; items: Item[]; note?: ReactNode; empty?: boolean }[] = [];
+    const out: { key: string; title: ReactNode; items: Item[]; info?: ReactNode; empty?: boolean }[] = [];
     if (sp) {
       const own = shown.filter((i) => i.own);
       const empty = !own.length && !words.length && (filter === 'all' || filter === 'spaces');
       if (own.length || empty)
         out.push({
           key: 'own',
-          icon: <SpaceMark s={sp} size={15} />,
           title: 'Its own',
           items: own,
-          note: own.length ? 'Only this project’s sessions get these, each in place of any skill of the same name.' : undefined,
+          info: (
+            <>
+              <p>Only this project’s sessions get these, each in place of any skill of the same name.</p>
+              <p>To change a skill below for this project alone, open it and click Change for this project. Agents working in the project can propose one too, after a task that took real effort.</p>
+            </>
+          ),
           empty,
         });
       const members = new Map<string, Item[]>();
@@ -902,10 +906,9 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       for (const [id, list] of members)
         out.push({
           key: `m:${id}`,
-          icon: <FolderOpen size={15} />,
           title: <span translate="no">{list[0].space!.name}</span>,
           items: list,
-          note: 'A project this one brings together: its own skills, which this project’s sessions get too. Change them on its page.',
+          info: 'A project this one brings together: its own skills, which this project’s sessions get too. Change them on its page.',
         });
     }
     const library = shown.filter((i) => i.lib);
@@ -913,18 +916,16 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
     for (const c of order) {
       const list = library.filter((i) => (i.category && i.category in SKILL_CATEGORIES ? i.category : '') === c).sort((a, b) => a.name.localeCompare(b.name));
       if (!list.length) continue;
-      const C = categoryOf(c);
-      out.push({ key: `c:${c}`, icon: <C.icon size={15} />, title: categoryLabel(c), items: list });
+      out.push({ key: `c:${c}`, title: categoryLabel(c), items: list });
     }
     for (const a of ['claude', 'codex'] as const) {
       const list = shown.filter((i) => i.source === a);
       if (list.length)
         out.push({
           key: a,
-          icon: <AgentIcon agent={a} size={15} />,
           title: `${agentName(a)}’s own`,
           items: list.sort((x, y) => x.name.localeCompare(y.name)),
-          note: sp
+          info: sp
             ? a === 'claude'
               ? 'In Claude Code’s own folder and this project’s folder: only Claude Code sessions get them.'
               : 'Codex’s own for this project’s folder, and the ones it comes with: only Codex sessions get them.'
@@ -937,7 +938,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       const spaces = new Map<string, Item[]>();
       for (const i of shown.filter((x) => x.space)) spaces.set(i.space!.id, [...(spaces.get(i.space!.id) ?? []), i]);
       for (const [id, list] of spaces)
-        out.push({ key: `s:${id}`, icon: <FolderOpen size={15} />, title: <span translate="no">{list[0].space!.name}</span>, items: list, note: 'Only this project’s sessions get these. Change them on the project’s page.' });
+        out.push({ key: `s:${id}`, title: <span translate="no">{list[0].space!.name}</span>, items: list, info: 'Only this project’s sessions get these. Change them on the project’s page.' });
     }
     return out;
   }, [shown, sp, filter, words.length]);
@@ -1076,29 +1077,78 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
     put('/api/skillpack/settings', { suggest: on }).catch((e) => (toastError(e), loadLib()));
   };
 
-  if (!lib || (sp && !mine))
-    return (
-      <div className="flex justify-center py-10 text-fg-3">
-        <Throbber size={28} />
-      </div>
-    );
-
-  const removed = sp ? (mine?.removed ?? []) : lib.removed;
+  const loading = !lib || (sp && !mine);
+  const removed = sp ? (mine?.removed ?? []) : (lib?.removed ?? []);
   const removedShown = removed.length > 0 && (filter === 'all' || filter === (sp ? 'spaces' : 'yours')) && !words.length;
+  const newSkill = (
+    <Button size="sm" variant="primary" icon={<Plus size={14} />} disabled={loading} onClick={() => (sp ? setOwnEdit({}) : setEditing({}))}>
+      New skill
+    </Button>
+  );
+  const more = (
+    <MoreMenu width={290}>
+      {(close) =>
+        sp ? (
+          <>
+            <MenuItem icon={<Undo2 size={14} />} disabled={!switched} onClick={() => (close(), void resetAll())}>
+              Reset every switch here
+            </MenuItem>
+            <MenuItem icon={<Settings2 size={14} />} onClick={() => (close(), go('/settings?s=skills'))}>
+              Skills for every project
+            </MenuItem>
+            <MenuSep />
+            <MenuItem icon={<Info size={14} />} onClick={() => (close(), setHow(true))}>
+              How a project’s skills work
+            </MenuItem>
+          </>
+        ) : (
+          lib && (
+            <>
+              <MenuItem icon={<Lightbulb size={14} />} checked={lib.suggest} onClick={() => (close(), setSuggest(!lib.suggest))}>
+                Suggest skills that fit
+              </MenuItem>
+              <MenuItem icon={<Sparkles size={14} />} checked={lib.triggers} onClick={() => (close(), setTriggers(!lib.triggers))}>
+                Bring skills in by keywords
+              </MenuItem>
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), go(`/files?dir=${enc(lib.folders.learned)}`))}>
+                Your skills folder
+              </MenuItem>
+              <MenuItem icon={<Puzzle size={14} />} onClick={() => (close(), go('/settings?s=plugins'))}>
+                Get more with plugins
+              </MenuItem>
+              <MenuSep />
+              <MenuItem icon={<Info size={14} />} onClick={() => (close(), setHow(true))}>
+                How agents get skills
+              </MenuItem>
+            </>
+          )
+        )
+      }
+    </MoreMenu>
+  );
+  const shownFilters = filters.filter((f) => f.value === 'all' || counts[f.value] > 0 || filter === f.value || (sp && f.value === 'spaces'));
 
   return (
-    <div className="space-y-4">
-      {!sp && lib.pending.length > 0 && <Waiting list={lib.pending} onReview={setReview} />}
-      {sp && (
-        <p className="text-[13px] leading-snug text-fg-3">
-          The skills this project’s sessions get. A switch here turns one on or off for this project alone; the switches in Settings → Skills are for every other session.
-        </p>
+    <Stack>
+      {!sp && (
+        <SectionActions>
+          {newSkill}
+          {more}
+        </SectionActions>
       )}
+      {!sp && lib && lib.pending.length > 0 && <Waiting list={lib.pending} onReview={setReview} />}
+      {sp && <p className="text-[13px] leading-snug text-fg-3">The skills this project’s sessions get. A switch here is for this project alone.</p>}
 
-      <div className="flex items-center gap-2">
-        <div className="relative min-w-0 flex-1">
-          <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQ('')} placeholder={`Search ${all.length} skills`} className={cx(inputCls, 'pr-8 pl-9')} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setQ('')}
+            placeholder={loading ? 'Search skills' : `Search ${all.length} skills`}
+            className={cx(inputCls, 'h-8 pr-8 pl-9 text-[13px]')}
+          />
           {q && (
             <span className="absolute top-1/2 right-1 -translate-y-1/2">
               <IconButton label="Clear search" size="sm" onClick={() => setQ('')}>
@@ -1107,108 +1157,78 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
             </span>
           )}
         </div>
-        <Button variant="primary" icon={<Plus size={15} />} onClick={() => (sp ? setOwnEdit({}) : setEditing({}))}>
-          <span className="hidden sm:inline">New skill</span>
-          <span className="sm:hidden">New</span>
-        </Button>
-        <IconButton ref={menuAt} label="More" onClick={() => setMenu((o) => !o)}>
-          <MoreHorizontal size={17} />
-        </IconButton>
-        <Popover anchor={menuAt} open={menu} onClose={() => setMenu(false)} align="end" width={290}>
-          {sp ? (
-            <>
-              <MenuItem icon={<Undo2 size={14} />} disabled={!switched} onClick={() => (setMenu(false), void resetAll())}>
-                Reset every switch here
-              </MenuItem>
-              <MenuItem icon={<Settings2 size={14} />} onClick={() => (setMenu(false), go('/settings?s=skills'))}>
-                Skills for every project
-              </MenuItem>
-              <MenuSep />
-              <MenuItem icon={<Info size={14} />} onClick={() => (setMenu(false), setHow(true))}>
-                How a project’s skills work
-              </MenuItem>
-            </>
-          ) : (
-            <>
-              <MenuItem icon={<Lightbulb size={14} />} checked={lib.suggest} onClick={() => (setMenu(false), setSuggest(!lib.suggest))}>
-                Suggest skills that fit
-              </MenuItem>
-              <MenuItem icon={<Sparkles size={14} />} checked={lib.triggers} onClick={() => (setMenu(false), setTriggers(!lib.triggers))}>
-                Bring skills in by keywords
-              </MenuItem>
-              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), go(`/files?dir=${enc(lib.folders.learned)}`))}>
-                Your skills folder
-              </MenuItem>
-              <MenuItem icon={<Puzzle size={14} />} onClick={() => (setMenu(false), go('/settings?s=plugins'))}>
-                Get more with plugins
-              </MenuItem>
-              <MenuSep />
-              <MenuItem icon={<Info size={14} />} onClick={() => (setMenu(false), setHow(true))}>
-                How agents get skills
-              </MenuItem>
-            </>
-          )}
-        </Popover>
-      </div>
-
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Show">
-        {filters
-          .filter((f) => f.value === 'all' || counts[f.value] > 0 || filter === f.value || (sp && f.value === 'spaces'))
-          .map((f) => (
-            <button
-              key={f.value}
-              role="tab"
-              aria-selected={filter === f.value}
-              onClick={() => setFilter(f.value)}
-              className={cx(
-                'flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors',
-                filter === f.value ? 'bg-fg text-bg' : 'bg-bg-2 text-fg-2 hover:bg-bg-3 hover:text-fg',
-              )}
-            >
-              {f.label}
-              <span className={cx('tnum text-[11.5px]', filter === f.value ? 'text-bg/70' : 'text-fg-3')}>{counts[f.value]}</span>
-            </button>
-          ))}
-      </div>
-
-      {groups.length ? (
-        groups.map((g) => (
-          <Group key={g.key} icon={g.icon} title={g.title} count={g.items.length} note={g.note}>
-            {g.empty && sp ? (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-3 pt-0.5 pb-3 sm:px-4">
-                <p className="min-w-0 flex-1 basis-72 text-[12.5px] leading-relaxed text-fg-3">
-                  None yet. Skills only this project’s sessions get: how its work is done, step by step. To change a skill below for this project alone, open it and click Change for this project. Agents
-                  working in the project can propose one too, after a task that took real effort.
-                </p>
-                <Button size="sm" icon={<Plus size={14} />} onClick={() => setOwnEdit({})}>
-                  New skill
-                </Button>
-              </div>
-            ) : (
-              g.items.map((i) => <Row key={i.key} i={i} onOpen={() => setOpenKey(i.key)} onToggle={sp ? (i.here ? (on) => void toggle(i, on) : undefined) : i.lib || i.agent ? (on) => void toggle(i, on) : undefined} />)
-            )}
-          </Group>
-        ))
-      ) : (
-        <div className="rounded-2xl border border-line bg-panel px-5 py-10 text-center text-[13.5px] text-fg-3">
-          {words.length
-            ? 'No skills match.'
-            : filter === 'changed'
-              ? 'Nothing switched here yet: every skill is as Settings → Skills has it.'
-              : filter === 'yours'
-                ? 'None of your own yet. Write one with New skill, or approve one an agent suggests.'
-                : 'No skills here yet.'}
+        <div className="max-w-full overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div className="w-max">
+            <Segmented size="sm" value={filter} onChange={setFilter} options={shownFilters.map((f) => ({ value: f.value, label: f.label }))} />
+          </div>
         </div>
+        {sp && (
+          <div className="flex items-center gap-1">
+            {newSkill}
+            {more}
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <Group>
+          <div className="flex justify-center px-4 py-6">
+            <Throbber className="text-fg-3" />
+          </div>
+        </Group>
+      ) : groups.length ? (
+        groups.map((g) => {
+          const full = !!words.length || expanded.has(g.key);
+          const list = full ? g.items : g.items.slice(0, FIRST);
+          return (
+            <Group key={g.key} title={titled(g.title, g.items.length)} info={g.info}>
+              {g.empty && sp ? (
+                <EmptyRow
+                  action={
+                    <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setOwnEdit({})}>
+                      New skill
+                    </Button>
+                  }
+                >
+                  None yet: skills only this project’s sessions get, for how its work is done.
+                </EmptyRow>
+              ) : (
+                <>
+                  {list.map((i) => (
+                    <SkillRow key={i.key} i={i} onOpen={() => setOpenKey(i.key)} onToggle={sp ? (i.here ? (on) => void toggle(i, on) : undefined) : i.lib || i.agent ? (on) => void toggle(i, on) : undefined} />
+                  ))}
+                  {list.length < g.items.length && (
+                    <button type="button" onClick={() => setExpanded((e) => new Set(e).add(g.key))} className="block w-full rounded-b-[11px] px-4 py-2.5 text-center text-[13px] text-fg-2 transition-colors hover:bg-bg-1 hover:text-fg">
+                      Show all {g.items.length}
+                    </button>
+                  )}
+                </>
+              )}
+            </Group>
+          );
+        })
+      ) : (
+        <Group>
+          <EmptyRow>
+            {words.length
+              ? 'No skills match.'
+              : filter === 'changed'
+                ? 'Nothing switched here yet: every skill is as Settings → Skills has it.'
+                : filter === 'yours'
+                  ? 'None of your own yet. Write one with New skill, or approve one an agent suggests.'
+                  : 'No skills here yet.'}
+          </EmptyRow>
+        </Group>
       )}
-      {!agents && (filter === 'all' || filter === 'agents') && (
+      {!loading && !agents && (filter === 'all' || filter === 'agents') && (
         <div className="flex items-center gap-2 px-1 text-[12.5px] text-fg-3">
           <Throbber /> Looking for Claude Code’s and Codex’s own skills…
         </div>
       )}
       {!!agents?.errors.length && (filter === 'all' || filter === 'agents') && (
-        <p className="px-1 text-[12px] leading-snug break-words text-fg-3" title={agents.errors.join('\n')}>
-          Some of the agents’ own skills could not be read: {agents.errors[0]}
-        </p>
+        <Notice tone="warn">
+          <span title={agents.errors.join('\n')}>Some of the agents’ own skills could not be read: {agents.errors[0]}</span>
+        </Notice>
       )}
 
       {removedShown && (
@@ -1249,7 +1269,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       )}
       {sp && ownEdit && <ProjectSkillEditor sp={sp} name={ownEdit.name} onClose={() => setOwnEdit(null)} onSaved={ownChanged} />}
       <EditorDialog path={file} onClose={() => (setFile(null), loadAgents())} />
-      {how && <HowItWorks lib={lib} sp={sp} onClose={() => setHow(false)} />}
+      {how && lib && <HowItWorks lib={lib} sp={sp} onClose={() => setHow(false)} />}
       {review && (
         <Dialog open onClose={() => setReview(null)} width={760} title={`${review.kind === 'new' ? 'New skill' : 'Change to'} ${review.name}`}>
           <ProposalPanel
@@ -1264,6 +1284,6 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
         </Dialog>
       )}
       {confirmNode}
-    </div>
+    </Stack>
   );
 }

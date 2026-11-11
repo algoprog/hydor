@@ -1,9 +1,9 @@
 // Settings → Plugins. Plugins for every agent come first: the ones you added (on and off, with what they
 // need), the ones that come with the app, a menu to add one from a link, a file or a folder, or to make
 // your own. Claude Code's and Codex's own plugins, which only they use, have a tab each.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { Bot, ChevronDown, FileArchive, FolderOpen, Link2, Plus, Puzzle, Search, Sparkles, Trash2, X } from 'lucide-react';
+import { Bot, ChevronDown, FileArchive, FolderOpen, Link2, PenLine, Plus, Puzzle, Search, Sparkles, Trash2, X } from 'lucide-react';
 import type { PluginJob, PluginList, PluginView } from '@shared/plugins';
 import type { MarketplaceEntry, PluginEntry, SetupResult } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
@@ -12,70 +12,111 @@ import { compact } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Badge, Button, cx, IconButton, inputCls, MenuItem, MenuSep, Popover, Section, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, Throbber, useConfirm } from '../../components/ui';
 import { ClaudePluginsSettings } from '../settings/AgentSettings';
+import { EmptyRow, Group, MoreMenu, Row, SectionActions, Stack } from '../settings/kit';
 import { AddPluginDialog, NewPluginDialog } from './AddPlugin';
 import { PluginDetail } from './PluginDetail';
 import { PluginEditor } from './PluginEditor';
-import { brings, JobView, PluginTile, trouble } from './parts';
+import { brings, JobView, pluginIcon, trouble } from './parts';
 
 type Tab = 'every' | 'claude' | 'codex';
 
-/** A plugin as a card: what it is, what it brings, what stops it, and its switch (or Add). */
-function Card({ p, titles, job, onOpen, onToggle, onAdd }: { p: PluginView; titles: Record<string, string>; job?: PluginJob; onOpen: () => void; onToggle?: (on: boolean) => void; onAdd?: () => void }) {
+/** A plugin as a row: what it is, what it brings, what stops it, and its switch (or Add). */
+function PluginRow({ p, titles, job, onOpen, onToggle, onAdd, onEdit }: { p: PluginView; titles: Record<string, string>; job?: PluginJob; onOpen: () => void; onToggle?: (on: boolean) => void; onAdd?: () => void; onEdit?: () => void }) {
   const t = trouble(p, titles);
   const running = job?.state === 'running';
+  const Icon = pluginIcon(p);
+  const made = brings(p);
   return (
-    <div className={cx('flex items-start gap-3 px-3 py-3 transition-colors hover:bg-bg-1 sm:px-4', p.installed && !p.enabled && 'opacity-60')}>
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-start gap-3 text-left">
-        <PluginTile p={p} />
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span translate="no" className="truncate text-[14px] font-medium text-fg">
-              {p.title}
-            </span>
-            {p.version && <span className="text-[11.5px] text-fg-3">{p.version}</span>}
-            {p.source.kind === 'folder' && p.source.mine && <Badge tone="ok">Yours</Badge>}
-            {(p.source.kind === 'git' || p.source.kind === 'file' || (p.source.kind === 'folder' && !p.source.mine)) && <Badge>Added by you</Badge>}
-          </span>
+    <Row
+      icon={<Icon size={16} />}
+      label={
+        <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <button type="button" onClick={onOpen} translate="no" className={cx('min-w-0 text-left font-medium hover:underline', p.installed && !p.enabled && 'text-fg-2')}>
+            {p.title}
+          </button>
+          {p.version && <span className="text-[11.5px] text-fg-3">{p.version}</span>}
+          {p.source.kind === 'folder' && p.source.mine && <Badge tone="ok">Yours</Badge>}
+          {(p.source.kind === 'git' || p.source.kind === 'file' || (p.source.kind === 'folder' && !p.source.mine)) && <Badge>Added by you</Badge>}
+        </span>
+      }
+      hint={
+        <>
           {p.description && (
-            <span translate={p.source.kind === 'builtin' ? undefined : 'no'} className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">
+            <span translate={p.source.kind === 'builtin' ? undefined : 'no'} className="line-clamp-1">
               {p.description}
             </span>
           )}
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 text-[11.5px] text-fg-3">
-            {brings(p) && <span>{brings(p)}</span>}
-            {running ? (
-              <span className="inline-flex items-center gap-1 text-fg-2">
-                <Throbber className="h-3" /> {job!.steps.at(-1)?.label ?? 'Setting up'}…
-              </span>
-            ) : (
-              t && <span className={t.tone === 'err' ? 'text-err' : t.tone === 'warn' ? 'text-warn' : 'text-fg-3'}>{t.text}</span>
-            )}
-          </span>
-        </span>
-      </button>
-      {onToggle && <Switch on={p.enabled} onChange={onToggle} label={p.enabled ? `Turn ${p.title} off` : `Turn ${p.title} on`} className="mt-2.5 shrink-0" />}
-      {onAdd && (
-        <Button size="sm" onClick={onAdd} disabled={running} className="mt-1.5 shrink-0">
-          {running ? <Throbber /> : 'Add'}
-        </Button>
-      )}
-    </div>
+          {(made || running || t) && (
+            <span className="flex flex-wrap items-center gap-x-2 text-[11.5px]">
+              {made && <span>{made}</span>}
+              {running ? (
+                <span className="inline-flex items-center gap-1 text-fg-2">
+                  <Throbber className="h-3" /> {job!.steps.at(-1)?.label ?? 'Setting up'}…
+                </span>
+              ) : (
+                t && <span className={t.tone === 'err' ? 'text-err' : t.tone === 'warn' ? 'text-warn' : 'text-fg-3'}>{t.text}</span>
+              )}
+            </span>
+          )}
+        </>
+      }
+      control={
+        <>
+          {onToggle && <Switch on={p.enabled} onChange={onToggle} label={p.enabled ? `Turn ${p.title} off` : `Turn ${p.title} on`} />}
+          {onAdd && (
+            <Button size="sm" variant="secondary" onClick={onAdd} disabled={running}>
+              {running ? <Throbber /> : 'Add'}
+            </Button>
+          )}
+          {onToggle && (
+            <MoreMenu label={p.title} width={200}>
+              {(close) => (
+                <>
+                  <MenuItem icon={<Puzzle size={14} />} onClick={() => (close(), onOpen())}>
+                    Details
+                  </MenuItem>
+                  {onEdit && (
+                    <MenuItem icon={<PenLine size={14} />} onClick={() => (close(), onEdit())}>
+                      Change it
+                    </MenuItem>
+                  )}
+                </>
+              )}
+            </MoreMenu>
+          )}
+        </>
+      }
+    />
   );
 }
 
-function EveryAgent() {
+/** The section's main button: Add, with a menu of the ways to bring a plugin in. */
+function AddMenu({ children }: { children: (close: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const at = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={at} size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setOpen((o) => !o)}>
+        Add
+        <ChevronDown size={13} className="-mr-0.5 opacity-70" />
+      </Button>
+      <Popover anchor={at} open={open} onClose={() => setOpen(false)} align="end" width={270}>
+        {children(() => setOpen(false))}
+      </Popover>
+    </>
+  );
+}
+
+function EveryAgent({ q }: { q: string }) {
   const search = useSearch();
   const [list, setList] = useState<PluginList | null>(null);
   const [jobs, setJobs] = useState<Record<string, PluginJob>>({});
-  const [q, setQ] = useState('');
   const [open, setOpen] = useState<string | null>(() => new URLSearchParams(search).get('plugin'));
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState<'link' | 'file' | 'folder' | null>(null);
   const [making, setMaking] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const menuAt = useRef<HTMLButtonElement>(null);
   const [confirm, confirmNode] = useConfirm();
 
   const load = useCallback(
@@ -131,98 +172,72 @@ function EveryAgent() {
       toastError(e);
     }
   };
-  const withAgent = () => {
-    setMenu(false);
-    go(`/?prompt=${encodeURIComponent('Help me make a plugin for Hydor that ')}`);
-  };
+  const withAgent = () => go(`/?prompt=${encodeURIComponent('Help me make a plugin for Hydor that ')}`);
 
-  if (!list)
-    return (
-      <div className="flex justify-center py-10 text-fg-3">
-        <Throbber size={28} />
-      </div>
-    );
   const running = Object.values(jobs).filter((j) => j.state === 'running' || (j.state === 'failed' && Date.now() - (j.endedAt ?? 0) < 120_000));
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative min-w-0 flex-1">
-          <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQ('')} placeholder="Search plugins" className={cx(inputCls, 'pr-8 pl-9')} />
-          {q && (
-            <span className="absolute top-1/2 right-1 -translate-y-1/2">
-              <IconButton label="Clear search" size="sm" onClick={() => setQ('')}>
-                <X size={14} />
-              </IconButton>
-            </span>
+    <Stack>
+      <SectionActions>
+        <AddMenu>
+          {(close) => (
+            <>
+              <MenuItem icon={<Sparkles size={14} />} onClick={() => (close(), setMaking(true))}>
+                Make a plugin
+              </MenuItem>
+              <MenuItem icon={<Bot size={14} />} onClick={() => (close(), withAgent())}>
+                Make one with an agent
+              </MenuItem>
+              <MenuSep />
+              <MenuItem icon={<Link2 size={14} />} onClick={() => (close(), setAdding('link'))}>
+                From a link
+              </MenuItem>
+              <MenuItem icon={<FileArchive size={14} />} onClick={() => (close(), setAdding('file'))}>
+                From a .zip file
+              </MenuItem>
+              <MenuItem icon={<FolderOpen size={14} />} onClick={() => (close(), setAdding('folder'))}>
+                From a folder
+              </MenuItem>
+            </>
           )}
-        </div>
-        <Button ref={menuAt} variant="primary" icon={<Plus size={15} />} onClick={() => setMenu((o) => !o)}>
-          Add
-          <ChevronDown size={14} className="-mr-1 opacity-70" />
-        </Button>
-        <Popover anchor={menuAt} open={menu} onClose={() => setMenu(false)} align="end" width={270}>
-          <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(false), setMaking(true))}>
-            Make a plugin
-          </MenuItem>
-          <MenuItem icon={<Bot size={14} />} onClick={withAgent}>
-            Make one with an agent
-          </MenuItem>
-          <MenuSep />
-          <MenuItem icon={<Link2 size={14} />} onClick={() => (setMenu(false), setAdding('link'))}>
-            From a link
-          </MenuItem>
-          <MenuItem icon={<FileArchive size={14} />} onClick={() => (setMenu(false), setAdding('file'))}>
-            From a .zip file
-          </MenuItem>
-          <MenuItem icon={<FolderOpen size={14} />} onClick={() => (setMenu(false), setAdding('folder'))}>
-            From a folder
-          </MenuItem>
-        </Popover>
-      </div>
+        </AddMenu>
+      </SectionActions>
 
       {running.map((j) => (
         <JobView key={j.id} job={j} title={titles[j.plugin]} />
       ))}
 
-      <section className="overflow-hidden rounded-2xl border border-line bg-panel">
-        <header className="flex items-center gap-2 px-3 pt-3 pb-1.5 sm:px-4">
-          <Puzzle size={15} className="text-fg-3" />
-          <h3 className="flex-1 text-[13px] font-semibold text-fg-2">Your plugins</h3>
-          <span className="tnum text-[12px] text-fg-3">{list.installed.length}</span>
-        </header>
-        {installed.length ? (
-          <div className="divide-y divide-line">
-            {installed.map((p) => (
-              <Card key={p.name} p={p} titles={titles} job={jobs[p.name]} onOpen={() => setOpen(p.name)} onToggle={(on) => turn(p, on)} />
-            ))}
+      <Group
+        title={
+          <>
+            <span>Your plugins</span> {list && <span className="tnum font-normal text-fg-3">{list.installed.length}</span>}
+          </>
+        }
+        info="Plugins work with every agent the app starts: Claude Code, Codex, Custom and the others. They use the open Agent Plugins format, and Claude Code’s plugins can be added here too, from their link."
+      >
+        {!list ? (
+          <div className="flex justify-center px-4 py-6">
+            <Throbber className="text-fg-3" />
           </div>
+        ) : installed.length ? (
+          installed.map((p) => <PluginRow key={p.name} p={p} titles={titles} job={jobs[p.name]} onOpen={() => setOpen(p.name)} onToggle={(on) => turn(p, on)} onEdit={p.editable ? () => setEditing(p.name) : undefined} />)
         ) : (
-          <p className="px-4 pt-1 pb-4 text-[13px] leading-relaxed text-fg-3">
-            {words.length ? 'None match.' : 'None yet. A plugin brings skills, tools and instructions to every agent at once: add one that comes with the app below, or make your own.'}
-          </p>
+          <EmptyRow>{words.length ? 'None match.' : 'None yet. A plugin brings skills, tools and instructions to every agent: add one below, or make your own.'}</EmptyRow>
         )}
-      </section>
+      </Group>
 
       {available.length > 0 && (
-        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
-          <header className="flex items-center gap-2 px-3 pt-3 pb-1.5 sm:px-4">
-            <Sparkles size={15} className="text-fg-3" />
-            <h3 className="flex-1 text-[13px] font-semibold text-fg-2">Come with the app</h3>
-            <span className="tnum text-[12px] text-fg-3">{available.length}</span>
-          </header>
-          <div className="divide-y divide-line">
-            {available.map((p) => (
-              <Card key={p.name} p={p} titles={titles} job={jobs[p.name]} onOpen={() => setOpen(p.name)} onAdd={() => add(p)} />
-            ))}
-          </div>
-        </section>
+        <Group
+          title={
+            <>
+              <span>Come with the app</span> <span className="tnum font-normal text-fg-3">{available.length}</span>
+            </>
+          }
+        >
+          {available.map((p) => (
+            <PluginRow key={p.name} p={p} titles={titles} job={jobs[p.name]} onOpen={() => setOpen(p.name)} onAdd={() => add(p)} />
+          ))}
+        </Group>
       )}
-
-      <p className="px-1 text-[12px] leading-relaxed text-fg-3">
-        Plugins work with every agent the app starts: Claude Code, Codex, Custom and the others. They use the open Agent Plugins format, and Claude Code’s plugins can be added here too, from their
-        link.
-      </p>
 
       {open && (
         <PluginDetail
@@ -269,7 +284,7 @@ function EveryAgent() {
         />
       )}
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -277,9 +292,12 @@ function EveryAgent() {
 
 const PAGE = 40;
 
-function CodexPlugins() {
-  const [q, setQ] = useState('');
-  const [limit, setLimit] = useState(PAGE);
+function CodexPlugins({ q }: { q: string }) {
+  // The page size starts again with each new search.
+  const [more, setMore] = useState({ q, n: PAGE });
+  const limit = more.q === q ? more.n : PAGE;
+  const setLimit = (f: (l: number) => number) => setMore({ q, n: f(limit) });
+  const [adding, setAdding] = useState(false);
   const [data, setData] = useState<{ installed: PluginEntry[]; available: PluginEntry[]; marketplaces: MarketplaceEntry[]; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -328,7 +346,7 @@ function CodexPlugins() {
       const r = await post<SetupResult>(`/api/setup/codex-marketplaces/${action}`, { target });
       if (!r.ok) throw new Error(r.output.split('\n').filter(Boolean).at(-1) || 'It did not work');
       toast(action === 'add' ? `Added ${target}` : action === 'upgrade' ? `Refreshed ${target}` : `Removed ${target}`, 'ok');
-      if (action === 'add') setMarket('');
+      if (action === 'add') (setMarket(''), setAdding(false));
     } catch (e) {
       toastError(e);
     } finally {
@@ -336,123 +354,179 @@ function CodexPlugins() {
       load(q, limit);
     }
   };
+  const addMarket = async () => {
+    if (market.trim()) await marketAct('add', market.trim());
+  };
   const row = (p: PluginEntry, action: 'add' | 'remove') => (
-    <div key={p.id} className="flex items-center gap-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span translate="no" className="text-[14px] font-medium">
+    <Row
+      key={p.id}
+      icon={<Puzzle size={16} />}
+      label={
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span translate="no" className="font-medium">
             {p.name}
           </span>
           {p.marketplace && <Badge>{p.marketplace}</Badge>}
           {p.version && <span className="text-[11.5px] text-fg-3">{p.version}</span>}
           {!p.installed && p.installCount != null && <span className="text-[11.5px] text-fg-3">{compact(p.installCount)} installs</span>}
-        </div>
-        {p.description && <div className="mt-0.5 line-clamp-2 text-[12.5px] text-fg-3">{p.description}</div>}
-      </div>
-      {busy === p.id ? (
-        <Throbber className="px-3 text-fg-3" />
-      ) : action === 'remove' ? (
-        <IconButton label="Remove" size="sm" onClick={() => act('remove', p)}>
-          <Trash2 size={14} />
-        </IconButton>
-      ) : (
-        <Button size="sm" variant="ghost" onClick={() => act('add', p)} disabled={!!busy}>
-          Add
-        </Button>
-      )}
-    </div>
+        </span>
+      }
+      hint={p.description && <span translate="no" className="line-clamp-1">{p.description}</span>}
+      control={
+        busy === p.id ? (
+          <Throbber className="px-3 text-fg-3" />
+        ) : action === 'remove' ? (
+          <IconButton label="Remove" size="sm" onClick={() => act('remove', p)}>
+            <Trash2 size={14} />
+          </IconButton>
+        ) : (
+          <Button size="sm" variant="secondary" onClick={() => act('add', p)} disabled={!!busy}>
+            Add
+          </Button>
+        )
+      }
+    />
   );
   return (
-    <div className="space-y-4">
-      <Section title="Added to Codex" sub="Only Codex sessions use these">
+    <Stack>
+      <Group title="Added to Codex" hint="Only Codex sessions use these">
         {!data ? (
-          <div className="flex justify-center py-4">
-            <Throbber />
+          <div className="flex justify-center px-4 py-6">
+            <Throbber className="text-fg-3" />
           </div>
         ) : data.installed.length ? (
-          <div className="-my-1 divide-y divide-line">{data.installed.map((p) => row(p, 'remove'))}</div>
+          data.installed.map((p) => row(p, 'remove'))
         ) : (
-          <div className="text-[13px] text-fg-3">None yet.</div>
+          <EmptyRow>None yet.</EmptyRow>
         )}
-      </Section>
-      <Section
-        title="Find more"
-        sub={data ? `${data.total.toLocaleString()} ${q ? 'matching' : 'in Codex’s marketplaces'}` : 'Loading Codex’s marketplaces…'}
-        actions={<input value={q} onChange={(e) => (setQ(e.target.value), setLimit(PAGE))} placeholder="Search Codex plugins" className={cx(inputCls, 'h-8.5 w-full sm:w-64')} />}
-      >
+      </Group>
+      <Group title="Find more" hint={data ? `${data.total.toLocaleString()} ${q ? 'matching' : 'in Codex’s marketplaces'}` : 'Loading Codex’s marketplaces…'}>
         {!data ? (
-          <div className="flex justify-center py-4">
-            <Throbber />
+          <div className="flex justify-center px-4 py-6">
+            <Throbber className="text-fg-3" />
           </div>
         ) : data.available.length ? (
-          <>
-            <div className={cx('-my-1 divide-y divide-line transition-opacity', loading && 'opacity-60')}>{data.available.map((p) => row(p, 'add'))}</div>
+          <div className={cx('divide-y divide-line transition-opacity', loading && 'opacity-60')}>
+            {data.available.map((p) => row(p, 'add'))}
             {data.available.length < data.total && (
-              <div className="mt-3 flex justify-center">
+              <div className="flex justify-center px-4 py-2.5">
                 <Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + PAGE)} disabled={loading}>
                   {loading ? <Throbber /> : `Show more (${(data.total - data.available.length).toLocaleString()} left)`}
                 </Button>
               </div>
             )}
-          </>
-        ) : (
-          <div className="text-[13px] text-fg-3">{q ? 'None match.' : 'Nothing to add: add a marketplace below.'}</div>
-        )}
-      </Section>
-      <Section title="Marketplaces" sub="Catalogs Codex adds plugins from">
-        {data?.marketplaces.map((m) => (
-          <div key={m.name} className="flex items-center gap-3 py-2">
-            <div className="min-w-0 flex-1">
-              <div className="text-[14px] font-medium">{m.name}</div>
-              {m.source && <div className="truncate font-mono text-[12px] text-fg-3">{m.source}</div>}
-            </div>
-            {busy === `market:${m.name}` ? (
-              <Throbber className="px-3 text-fg-3" />
-            ) : (
-              <>
-                <Button size="sm" variant="ghost" onClick={() => marketAct('upgrade', m.name)} disabled={!!busy}>
-                  Refresh
-                </Button>
-                <IconButton label="Remove" size="sm" onClick={() => marketAct('remove', m.name)} disabled={!!busy}>
-                  <Trash2 size={14} />
-                </IconButton>
-              </>
-            )}
           </div>
-        ))}
-        <form
-          className="mt-3 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (market.trim()) marketAct('add', market.trim());
-          }}
-        >
-          <input className={cx(inputCls, 'h-8.5 font-mono text-[13px]')} value={market} onChange={(e) => setMarket(e.target.value)} placeholder="owner/repo, a git URL or a folder" spellCheck={false} />
-          <Button size="sm" type="submit" disabled={!market.trim() || !!busy}>
+        ) : (
+          <EmptyRow>{q ? 'None match.' : 'Nothing to add: add a marketplace below.'}</EmptyRow>
+        )}
+      </Group>
+      <Group
+        title="Marketplaces"
+        hint="Catalogs Codex adds plugins from"
+        actions={
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
             Add
           </Button>
+        }
+      >
+        {!data ? (
+          <div className="flex justify-center px-4 py-6">
+            <Throbber className="text-fg-3" />
+          </div>
+        ) : data.marketplaces.length ? (
+          data.marketplaces.map((m) => (
+            <Row
+              key={m.name}
+              icon={<Link2 size={16} />}
+              label={<span translate="no">{m.name}</span>}
+              hint={m.source && <span translate="no" className="block truncate font-mono text-[12px]">{m.source}</span>}
+              control={
+                busy === `market:${m.name}` ? (
+                  <Throbber className="px-3 text-fg-3" />
+                ) : (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => marketAct('upgrade', m.name)} disabled={!!busy}>
+                      Refresh
+                    </Button>
+                    <IconButton label="Remove" size="sm" onClick={() => marketAct('remove', m.name)} disabled={!!busy}>
+                      <Trash2 size={14} />
+                    </IconButton>
+                  </>
+                )
+              }
+            />
+          ))
+        ) : (
+          <EmptyRow>None yet.</EmptyRow>
+        )}
+      </Group>
+      <Dialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add a marketplace"
+        width={460}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={!market.trim() || !!busy} onClick={() => void addMarket()}>
+              Add
+            </Button>
+          </>
+        }
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void addMarket();
+          }}
+        >
+          <input autoFocus className={cx(inputCls, 'font-mono text-[13px]')} value={market} onChange={(e) => setMarket(e.target.value)} placeholder="owner/repo, a git URL or a folder" spellCheck={false} />
         </form>
-      </Section>
+      </Dialog>
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
 export function PluginsSettings() {
   const [tab, setTab] = useState<Tab>('every');
+  const [q, setQ] = useState('');
   return (
-    <div className="space-y-4">
-      <Segmented
-        size="sm"
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'every', label: 'Every agent', icon: <Puzzle size={13} /> },
-          { value: 'claude', label: 'Claude Code', icon: <AgentIcon agent="claude" size={13} /> },
-          { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={13} /> },
-        ]}
-      />
-      {tab === 'every' ? <EveryAgent /> : tab === 'claude' ? <ClaudePluginsSettings /> : <CodexPlugins />}
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented
+          size="sm"
+          value={tab}
+          onChange={(t) => (setTab(t), setQ(''))}
+          options={[
+            { value: 'every', label: 'Every agent', icon: <Puzzle size={13} /> },
+            { value: 'claude', label: 'Claude Code', icon: <AgentIcon agent="claude" size={13} /> },
+            { value: 'codex', label: 'Codex', icon: <AgentIcon agent="codex" size={13} /> },
+          ]}
+        />
+        {tab !== 'claude' && (
+          <div className="relative min-w-[10rem] flex-1">
+            <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-fg-3" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setQ('')}
+              placeholder={tab === 'every' ? 'Search plugins' : 'Search Codex plugins'}
+              className={cx(inputCls, 'h-8 pr-8 pl-9 text-[13px]')}
+            />
+            {q && (
+              <span className="absolute top-1/2 right-1 -translate-y-1/2">
+                <IconButton label="Clear search" size="sm" onClick={() => setQ('')}>
+                  <X size={14} />
+                </IconButton>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      {tab === 'every' ? <EveryAgent q={q} /> : tab === 'claude' ? <ClaudePluginsSettings /> : <CodexPlugins q={q} />}
     </div>
   );
 }
