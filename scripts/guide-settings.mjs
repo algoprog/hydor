@@ -21,35 +21,11 @@ function rows(name) {
 const SECTIONS = rows('SECTIONS'); // [id, label, tab, sub]
 const OPTIONS = rows('OPTIONS'); // [section, words, keywords, text, title?]
 
-/** The guide topic that explains each section. */
-const TOPIC = {
-  general: 'app',
-  notifications: 'inbox',
-  chat: 'devices',
-  security: 'app',
-  signatures: 'library',
-  scm: 'devices',
-  connect: 'devices',
-  machines: 'devices',
-  accounts: 'agents-models',
-  agents: 'agents-models',
-  models: 'agents-models',
-  guidelines: 'guidelines',
-  mcp: 'connections',
-  skills: 'skills',
-  plugins: 'connections',
-  tasks: 'tasks',
-  search: 'web',
-  browser: 'web',
-  computer: 'web',
-  memory: 'memory',
-  children: 'research',
-  images: 'documents-voice',
-  voice: 'documents-voice',
-  assistants: 'agents',
-  skillpack: 'skills',
-  custom: 'custom',
-};
+/** The guide topic that explains each section (SECTION_TOPIC in shared/find-catalog.ts, which the sections' "Learn more" opens too). */
+const TOPIC = (() => {
+  const at = src.indexOf('export const SECTION_TOPIC');
+  return Object.fromEntries([...src.slice(at, src.indexOf('};', at)).matchAll(/^\s+([a-z-]+): '([a-z-]+)',$/gm)].map((m) => [m[1], m[2]]));
+})();
 
 const TEXT = {
   en: {

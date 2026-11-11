@@ -1,31 +1,20 @@
 // Settings → Computer use: on or off (off at first); on a Mac, macOS's two permissions with a button to ask for each;
 // what keeps it from working on this computer (a Linux desktop on Wayland, a library missing); and Stop while an agent
 // is at the computer. Only the desktop apps (Mac, Windows, Linux) can do it: elsewhere the section says so.
-import { useEffect, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CheckCircle2, Hand, Keyboard, MonitorUp, MousePointer2, Square } from 'lucide-react';
 import type { ComputerState } from '@shared/computer';
 import { post, put } from '../../lib/api';
 import { toastError } from '../../lib/store';
-import { Button, Section, Switch } from '../../components/ui';
+import { Button, Switch, Throbber } from '../../components/ui';
+import { Group, Notice, Row, SectionActions, Stack } from '../settings/kit';
 import { listenComputer, loadComputer, stopComputer, useComputer } from './store';
 
-function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-      <div className="min-w-[200px] flex-1">
-        <div className="text-[13.5px] text-fg">{label}</div>
-        {hint && <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{hint}</div>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 /** How to stop an agent, as each desktop app has it. */
-const STOP_HINT = {
-  mac: 'To stop an agent at any time, press Esc (or ⌘⇧Esc), or choose Stop in the menu bar. While an agent works, a glow lines the edges of your screen; agents never see it.',
-  windows: 'To stop an agent at any time, press Esc, or choose Stop from Hydor’s icon in the notification area. While an agent works, a glow lines the edges of your screen; agents never see it.',
-  linux: 'To stop an agent at any time, press Esc, or choose Stop from Hydor’s icon in the system tray. While an agent works, a glow lines the edges of your screen; agents never see it.',
+const STOP = {
+  mac: { hint: 'Press Esc (or ⌘⇧Esc), or choose Stop in the menu bar', where: 'choose Stop in the menu bar' },
+  windows: { hint: 'Press Esc, or choose Stop from Hydor’s notification-area icon', where: 'choose Stop from Hydor’s icon in the notification area' },
+  linux: { hint: 'Press Esc, or choose Stop from Hydor’s system tray icon', where: 'choose Stop from Hydor’s icon in the system tray' },
 } as const;
 
 const AT_WORK = { mac: 'An agent is using your Mac', windows: 'An agent is using your PC', linux: 'An agent is using your computer' } as const;
@@ -42,14 +31,28 @@ export function ComputerSettings() {
     window.addEventListener('focus', again);
     return () => window.removeEventListener('focus', again);
   }, []);
-  if (!st) return null;
+  if (!st)
+    return (
+      <Stack>
+        <Group>
+          <Row label="Looking at this computer" control={<Throbber className="text-fg-3" />} />
+        </Group>
+      </Stack>
+    );
   if (!st.available || !st.system)
     return (
-      <Section>
-        <div className="py-1 text-[13px] leading-relaxed text-fg-2">
-          Computer use needs the Hydor desktop app, for Mac, Windows or Linux: there, agents can see the screen and use the mouse and keyboard, in any app. This copy of Hydor does not run in it.
-        </div>
-      </Section>
+      <Stack>
+        <Notice
+          icon={<MonitorUp size={15} />}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => window.open('https://github.com/algoprog/hydor/releases/latest', '_blank', 'noreferrer')}>
+              Get the app
+            </Button>
+          }
+        >
+          Computer use needs the Hydor desktop app, for Mac, Windows or Linux. This copy of Hydor does not run in it.
+        </Notice>
+      </Stack>
     );
   const system = st.system;
   const call = async (what: string, fn: () => Promise<ComputerState>) => {
@@ -70,42 +73,59 @@ export function ComputerSettings() {
     </span>
   );
   return (
-    <div className="space-y-4">
-      {st.problem && (
-        <div className="flex gap-2.5 rounded-xl border border-warn/40 bg-warn/10 px-3.5 py-3 text-[12.5px] leading-relaxed text-fg-2">
-          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warn" />
-          <div>{st.problem}</div>
-        </div>
+    <Stack>
+      <SectionActions>
+        <Switch on={st.enabled} label="Let agents use this computer" disabled={busy === 'enabled'} onChange={(on) => call('enabled', () => put<ComputerState>('/api/computer/settings', { enabled: on }))} />
+      </SectionActions>
+      {st.problem && <Notice tone="warn">{st.problem}</Notice>}
+      {!st.enabled && !st.problem && (
+        <Notice>Agents cannot use this computer while this is off</Notice>
       )}
-      <Section>
-        <div className="-my-2 divide-y divide-line">
-          <Row label="Let agents use this computer" hint="Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.">
-            <Switch on={st.enabled} label="Let agents use this computer" disabled={busy === 'enabled'} onChange={(on) => call('enabled', () => put<ComputerState>('/api/computer/settings', { enabled: on }))} />
-          </Row>
-          {system === 'mac' && (
-            <>
-              <Row label="Accessibility" hint="macOS’s permission for Hydor to use the mouse and keyboard.">
-                {p?.accessibility ? granted : <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => allow('accessibility')}>Allow…</Button>}
-              </Row>
-              <Row label="Screen Recording" hint="macOS’s permission for Hydor to see the screen. If macOS asks to quit and reopen Hydor, do: running agents carry on.">
-                {p?.screen === 'granted' ? granted : <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => allow('screen')}>Allow…</Button>}
-              </Row>
-            </>
-          )}
-          {active && (
-            <Row label={AT_WORK[system]} hint={<span translate="no">{active.title}</span>}>
-              <Button size="sm" variant="danger" onClick={() => void stopComputer()}>
+      {system === 'mac' && p === null && <Notice tone="warn">The Mac app did not say what macOS allows: quit and open Hydor again.</Notice>}
+      {active && (
+        <Group>
+          <Row
+            icon={<MonitorUp size={16} />}
+            label={AT_WORK[system]}
+            hint={<span translate="no">{active.title}</span>}
+            control={
+              <Button size="sm" variant="danger" icon={<Square size={12} />} onClick={() => void stopComputer()}>
                 Stop
               </Button>
-            </Row>
-          )}
-        </div>
-      </Section>
-      <div className="px-1 text-[12px] leading-relaxed text-fg-3">
-        {system === 'mac' && p === null ? 'The Mac app did not say what macOS allows: quit and open Hydor again. ' : ''}
-        {system === 'mac' ? 'Allow… shows macOS’s own question, then its System Settings at the right place: turn on Hydor there. ' : ''}
-        {STOP_HINT[system]}
-      </div>
-    </div>
+            }
+          />
+        </Group>
+      )}
+      {system === 'mac' && (
+        <Group title="macOS permissions" info="Allow… shows macOS’s own question, then its System Settings at the right place: turn on Hydor there. If macOS asks to quit and reopen Hydor, do: running agents carry on.">
+          <Row
+            icon={<Keyboard size={16} />}
+            label="Accessibility"
+            hint="Lets Hydor use the mouse and keyboard"
+            control={p?.accessibility ? granted : <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => allow('accessibility')}>Allow…</Button>}
+          />
+          <Row
+            icon={<MonitorUp size={16} />}
+            label="Screen Recording"
+            hint="Lets Hydor see the screen"
+            control={p?.screen === 'granted' ? granted : <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => allow('screen')}>Allow…</Button>}
+          />
+        </Group>
+      )}
+      <Group title="While it is on">
+        <Row
+          icon={<MousePointer2 size={16} />}
+          label="Each session asks you first"
+          hint="Agents see the screen and use the mouse and keyboard"
+          info="In any app. For websites they keep to the browser."
+        />
+        <Row
+          icon={<Hand size={16} />}
+          label="Stop at any time"
+          hint={STOP[system].hint}
+          info={`While an agent works, a glow lines the edges of your screen; agents never see it. To stop it, press Esc${system === 'mac' ? ' (or ⌘⇧Esc)' : ''}, or ${STOP[system].where}.`}
+        />
+      </Group>
+    </Stack>
   );
 }

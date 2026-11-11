@@ -29,6 +29,37 @@ export interface CatalogItem {
 export const catalogText = (it: { title: string; keywords?: string; text?: string; where?: string }) =>
   [it.title, it.keywords, it.text, it.where].filter(Boolean).join('. ').replace(/\s+/g, ' ').trim().slice(0, 400);
 
+/** The guide topic that explains each Settings section: the section's "Learn more" opens it, and the guide's "Every
+ * setting" (scripts/guide-settings.mjs) links it. */
+export const SECTION_TOPIC: Record<string, string> = {
+  general: 'app',
+  notifications: 'inbox',
+  chat: 'devices',
+  security: 'app',
+  signatures: 'library',
+  scm: 'devices',
+  connect: 'devices',
+  machines: 'devices',
+  accounts: 'agents-models',
+  agents: 'agents-models',
+  models: 'agents-models',
+  guidelines: 'guidelines',
+  mcp: 'connections',
+  skills: 'skills',
+  plugins: 'connections',
+  tasks: 'tasks',
+  search: 'web',
+  browser: 'web',
+  computer: 'web',
+  memory: 'memory',
+  children: 'research',
+  images: 'documents-voice',
+  voice: 'documents-voice',
+  assistants: 'agents',
+  skillpack: 'skills',
+  custom: 'custom',
+};
+
 /** Every Settings section: id, label, tab, the line under its title (as SettingsPage.tsx and the features say). */
 export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', string][] = [
   ['general', 'General', 'App', 'Theme, and what Enter does while an agent works'],
@@ -64,7 +95,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
  */
 export const OPTIONS: [string, string, string, string, string?][] = [
   // App › General
-  ['general', 'Theme', 'dark mode light system appearance colours colors look', 'Dark, light, or following your device; or a theme of your own'],
+  ['general', 'Appearance', 'theme dark mode light system colours colors look', 'Dark, light, or following your device; or a theme of your own'],
   ['general', 'New theme', 'custom colours colors make create theme editor', 'Make a theme of your own from any of them'],
   ['general', 'Import', 'import share theme', 'Add a theme someone shared', 'Import a theme'],
   ['general', 'Language', 'language translate translation chinese greek 中文 简体 ελληνικά english', 'The language the app is shown in, and agents write in'],
@@ -103,7 +134,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['machines', 'Add a machine', 'remote ssh server computer connect', 'Another machine running Hydor, to use from here'],
   ['machines', 'Access from other machines', 'access token remote', 'Tokens other machines use to reach this one'],
   // Agents › Accounts
-  ['accounts', 'Your accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
+  ['accounts', 'Accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
   ['accounts', 'Switch accounts at a limit', 'auto switch rotate use all accounts usage limit continue other account', 'A session that runs out of usage carries on with another account'],
   ['accounts', 'Use API credit at a limit', 'api credit key anthropic billing console usage limit every claude account carry on pay', 'When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key'],
   ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie pi version', 'Which agent programs are installed, and installing the others'],
@@ -126,7 +157,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['guidelines', 'For every session', 'rules instructions preferences system prompt always never how to talk to you tone style claude.md agents.md', 'What every agent follows, in every session', 'Agent Guidelines for every session'],
   ['guidelines', 'For a project', 'project space guidelines instructions', 'Guidelines the sessions in a project follow', 'Guidelines for a project'],
   ['guidelines', 'For one session', 'session guidelines instructions start page', 'Guidelines for one session, from the start page or the session’s menu', 'Guidelines for one session'],
-  ['guidelines', 'Files Claude Code and Codex read too', 'claude.md agents.md instruction files project folder', 'CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own', 'CLAUDE.md and AGENTS.md'],
+  ['guidelines', 'Instruction files', 'claude.md agents.md instruction files project folder', 'CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own', 'CLAUDE.md and AGENTS.md'],
   // Agents › MCP servers
   ['mcp', 'Add server', 'mcp tools server add', 'A tool server for Claude Code or Codex', 'Add an MCP server'],
   ['mcp', 'Check connections', 'mcp status connected failed', 'See whether each MCP server answers', 'Check MCP servers'],
@@ -176,7 +207,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['search', 'DuckDuckGo', 'duckduckgo ddg search', 'Web search without a key'],
   ['search', 'Results per search', 'results count number', 'How many results a search gives'],
   // Capabilities › Computer use
-  ['computer', 'Let agents use this computer', 'computer use control mac windows pc linux desktop apps screen mouse keyboard click type screenshot glow esc stop', 'Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first'],
+  ['computer', 'Computer use', 'computer use control mac windows pc linux desktop apps screen mouse keyboard click type screenshot glow esc stop', 'Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first'],
   ['computer', 'Accessibility', 'accessibility permission mouse keyboard control macos privacy', 'macOS’s permission for Hydor to use the mouse and keyboard', 'Accessibility permission'],
   ['computer', 'Screen Recording', 'screen recording permission screenshot see screen macos privacy', 'macOS’s permission for Hydor to see the screen', 'Screen Recording permission'],
   // Capabilities › Browser
@@ -224,13 +255,13 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['voice', 'Speech recognition on the server', 'whisper speech recognition server transcription', 'Recognize speech on this computer or with a service'],
   ['voice', 'Read aloud', 'text to speech tts read replies voice speak', 'Have replies read aloud'],
   // Capabilities › Assistants
-  ['assistants', 'Open Agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],
+  ['assistants', 'Your agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
-  ['custom', 'Goals', 'goals rounds autonomous long running', 'How many rounds a goal may run'],
+  ['custom', 'Rounds before a goal pauses', 'goals rounds autonomous long running', 'How many rounds a goal may run before it pauses for you'],
 ];
 
 /** The themes that come with the app: name, and whether it is dark or light. */

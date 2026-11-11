@@ -32,7 +32,7 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 
 ## See your scheduled tasks
 
-[Settings → Scheduled tasks](/settings?s=tasks) starts with a line naming your time zone, then lists your tasks, oldest first. The list updates by itself as runs start and end. Each row shows:
+[Settings → Scheduled tasks](/settings?s=tasks) has a group, **Your tasks**, whose line names your time zone (its (i) adds that a run that could not start, because the computer was off, runs at the next chance), and lists your tasks, oldest first. The list updates by itself as runs start and end. Each row shows:
 
 - An icon for the trigger (a calendar, an eye for a watcher, a webhook sign), the task's name and its agent's icon.
 - When it runs and where, such as "Weekdays at 09:00 · new session in reports · next in 14 h 20 min", or "posts into a session".
@@ -43,11 +43,11 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 
 At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
 
-With no tasks yet, the list says "No scheduled tasks yet" and points you to the examples below it.
+With no tasks yet, the list says "No scheduled tasks yet: start from an example below, or ask an agent to set one up".
 
 ## Make a new task
 
-1. Open [Settings → Scheduled tasks](/settings?s=tasks) and select [**New task**](/settings?s=tasks&find=New%20task) at the top right. The **New scheduled task** form opens.
+1. Open [Settings → Scheduled tasks](/settings?s=tasks) and select [**New task**](/settings?s=tasks&find=New%20task), the button beside the page's title. The **New scheduled task** form opens.
 2. Type a name, pick the agent and the folder, and write the prompt.
 3. Under **When**, pick when it runs.
 4. Under **Each run**, pick where each run goes and its limits.
@@ -156,7 +156,7 @@ If the address leaked, or a service should stop calling it: the task's menu (⋯
 
 ## Start from an example
 
-Below the list, [**Start from an example**](/settings?s=tasks&find=Start%20from%20an%20example) ("A short form each; change anything later.") holds ready-made tasks, under three small headings: **Everyday**, **Watch** and **Engineering**. Select one to open its short form, fill it in, pick who runs it under **Run by**, and select **Create task**. **More options…** opens the full task form with everything filled in instead. Fields marked (optional) can stay empty; the others are needed. Switches (such as **Open pull requests**) say what the agent may do: on or off, as you like.
+Below the list, [**Start from an example**](/settings?s=tasks&find=Start%20from%20an%20example) ("A short form each; change anything later") holds ready-made tasks as rows, the first four showing and the rest behind **Show all examples** (**Show fewer examples** folds them again). Here they are in three groups: **Everyday**, **Watch** and **Engineering**. Select one to open its short form, fill it in, pick who runs it under **Run by**, and select **Create task**. **More options…** opens the full task form with everything filled in instead. Fields marked (optional) can stay empty; the others are needed. Switches (such as **Open pull requests**) say what the agent may do: on or off, as you like.
 
 **Everyday**
 
@@ -275,7 +275,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 
 ## On a phone
 
-[Settings → Scheduled tasks](/settings?s=tasks) works the same on a phone. The task form, the examples' forms and the confirmations (before **Delete** or **New address**) open as sheets from the bottom of the screen. The choices under **When** and a watcher's kinds scroll sideways when they do not fit, and the examples are listed in one column under their headings. To hear from your tasks with the app closed, turn on notifications for the phone (see [Inbox and notifications](/guide/inbox)).
+[Settings → Scheduled tasks](/settings?s=tasks) works the same on a phone. The task form, the examples' forms and the confirmations (before **Delete** or **New address**) open as sheets from the bottom of the screen. The choices under **When** and a watcher's kinds scroll sideways when they do not fit, and the examples are one column of rows. To hear from your tasks with the app closed, turn on notifications for the phone (see [Inbox and notifications](/guide/inbox)).
 
 ## Ask an agent
 

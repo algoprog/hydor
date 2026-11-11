@@ -2,11 +2,12 @@
 // what you can do with them: draw a new one, rename one, draw one again, keep one you gave an agent for now only, or
 // delete it. Also the dialog that draws a signature and keeps it, which other parts of the app open too.
 import { useCallback, useRef, useState } from 'react';
-import { Check, Ellipsis, Pencil, PenLine, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { defaultSignatureName, signatureName, type SignatureKind, type SignatureView } from '@shared/signatures';
 import { del, enc, patch } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
-import { Button, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Section, Segmented, Throbber, useConfirm } from '../../components/ui';
+import { Button, Dialog, inputCls, MenuItem, MenuSep, Segmented, Throbber, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Stack } from '../settings/kit';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
 import { SignaturePad, type PadHandle } from './Pad';
@@ -119,24 +120,18 @@ export function SignatureDialog({
   );
 }
 
-function Row({ s, onRename, onRedraw, onDelete, onKeep }: { s: SignatureView; onRename: () => void; onRedraw: () => void; onDelete: () => void; onKeep: () => void }) {
-  const [menu, setMenu] = useState(false);
-  const more = useRef<HTMLButtonElement>(null);
-  const run = (f: () => void) => () => {
-    setMenu(false);
-    f();
-  };
+function SignatureRow({ s, onRename, onRedraw, onDelete, onKeep }: { s: SignatureView; onRename: () => void; onRedraw: () => void; onDelete: () => void; onKeep: () => void }) {
   // This year's dates without their year, so a row fits a phone.
   const date = (t: number) => new Date(t).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
   const note = s.until ? `Kept until ${new Date(s.until).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : s.usedAt ? `Last placed ${date(s.usedAt)}` : `Added ${date(s.createdAt)}`;
   return (
-    <div className="flex items-center gap-3 py-2.5">
+    <div className="flex items-center gap-3 px-4 py-3">
       <SignatureTile s={s} className="h-12 w-28 shrink-0 max-md:w-24" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13.5px] text-fg" translate="no">
+        <div className="truncate text-[14px] leading-snug text-fg" translate="no">
           {s.name}
         </div>
-        <div className="truncate text-[12px] text-fg-3">
+        <div className="mt-0.5 truncate text-[12.5px] leading-snug text-fg-3">
           {s.kind === 'initials' ? 'Initials' : 'Signature'} · {note}
         </div>
       </div>
@@ -146,26 +141,33 @@ function Row({ s, onRename, onRedraw, onDelete, onKeep }: { s: SignatureView; on
           Keep it
         </Button>
       )}
-      <IconButton ref={more} label="More" active={menu} onClick={() => setMenu((m) => !m)}>
-        <Ellipsis size={16} />
-      </IconButton>
-      <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={220}>
-        {s.until && (
-          <MenuItem icon={<Check size={14} />} onClick={run(onKeep)}>
-            Keep it for later
-          </MenuItem>
-        )}
-        <MenuItem icon={<Pencil size={14} />} onClick={run(onRename)}>
-          Rename
-        </MenuItem>
-        <MenuItem icon={<RefreshCw size={14} />} onClick={run(onRedraw)}>
-          Draw it again
-        </MenuItem>
-        <MenuSep />
-        <MenuItem icon={<Trash2 size={14} />} danger onClick={run(onDelete)}>
-          Delete
-        </MenuItem>
-      </Popover>
+      <MoreMenu width={220}>
+        {(close) => {
+          const run = (f: () => void) => () => {
+            close();
+            f();
+          };
+          return (
+            <>
+              {s.until && (
+                <MenuItem icon={<Check size={14} />} onClick={run(onKeep)}>
+                  Keep it for later
+                </MenuItem>
+              )}
+              <MenuItem icon={<Pencil size={14} />} onClick={run(onRename)}>
+                Rename
+              </MenuItem>
+              <MenuItem icon={<RefreshCw size={14} />} onClick={run(onRedraw)}>
+                Draw it again
+              </MenuItem>
+              <MenuSep />
+              <MenuItem icon={<Trash2 size={14} />} danger onClick={run(onDelete)}>
+                Delete
+              </MenuItem>
+            </>
+          );
+        }}
+      </MoreMenu>
     </div>
   );
 }
@@ -190,40 +192,35 @@ export function SignatureSettings() {
     reload();
   };
   return (
-    <div className="space-y-4">
-      <Section
+    <Stack>
+      <Group
         title="Your signatures"
+        info={
+          <p>
+            A signature here is a picture of your signature, as ink on paper is: it shows that you signed, but it is not a cryptographic digital signature, which proves who signed a file and that nothing in it changed since. Agents never see it:
+            they place it by its name, and only once you allow each placement on a card.
+          </p>
+        }
         actions={
-          <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setEdit({ mode: 'new' })}>
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setEdit({ mode: 'new' })}>
             New signature
           </Button>
         }
       >
         {list === null ? (
-          <Throbber className="text-fg-3" />
+          <div className="px-4 py-5">
+            <Throbber className="text-fg-3" />
+          </div>
         ) : list.length === 0 ? (
-          <div className="flex items-center gap-3 py-1">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bg-2 text-fg-3">
-              <PenLine size={18} />
-            </span>
-            <p className="text-[13px] leading-relaxed text-fg-3">
-              None yet. Draw your signature or your initials once, with a mouse, a finger or a pen, or type your name in handwriting; then put it into a document with <b>Insert → Signature</b>, or let an agent place it for you.
-            </p>
-          </div>
+          <EmptyRow>
+            None yet. Draw your signature or your initials once, with a mouse, a finger or a pen, or type your name in handwriting; then put it into a document with <b>Insert → Signature</b>, or let an agent place it for you.
+          </EmptyRow>
         ) : (
-          <div className="-my-1 divide-y divide-line">
-            {list.map((s) => (
-              <Row key={s.id} s={s} onRename={() => setEdit({ mode: 'rename', s })} onRedraw={() => setEdit({ mode: 'redraw', s })} onDelete={() => void remove(s)} onKeep={() => void keep(s)} />
-            ))}
-          </div>
+          list.map((s) => <SignatureRow key={s.id} s={s} onRename={() => setEdit({ mode: 'rename', s })} onRedraw={() => setEdit({ mode: 'redraw', s })} onDelete={() => void remove(s)} onKeep={() => void keep(s)} />)
         )}
-      </Section>
-      <p className="px-1 text-[12.5px] leading-relaxed text-fg-3">
-        A signature here is a picture of your signature, as ink on paper is: it shows that you signed, but it is not a cryptographic digital signature, which proves who signed a file and that nothing in it changed since. Agents never see it: they
-        place it by its name, and only once you allow each placement on a card.
-      </p>
+      </Group>
       {edit && <SignatureDialog open onClose={() => setEdit(null)} onSaved={reload} redraw={edit.mode === 'redraw' ? edit.s : undefined} rename={edit.mode === 'rename' ? edit.s : undefined} />}
       {confirmNode}
-    </div>
+    </Stack>
   );
 }

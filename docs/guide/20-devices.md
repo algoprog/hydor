@@ -38,30 +38,30 @@ From a chat in Telegram, Discord or Slack, on any phone or computer, you can sta
 
 ### Connect a bot or app
 
-Open [Chat apps](/settings?s=chat) and press the row of the one you want: its steps are there. What you paste is kept in the vault, encrypted, and never shows in the app again.
+Open [Chat apps](/settings?s=chat) and press the row of the one you want in the **Bots** group (it says **Set up** until it is connected): its steps open under it. What you paste is kept in the vault, encrypted, and never shows in the app again.
 
-- **Telegram**: in Telegram, open @BotFather, send `/newbot` and give the bot a name and a username. Paste the token it answers with, like `123456789:AA…`, under [Telegram](/settings?s=chat&find=Telegram), and press **Connect**.
-- **Discord**: in the Developer Portal (discord.com/developers/applications) make a **New Application**. Under **Bot**, press **Reset Token** and copy it, and turn on **Message Content Intent** so the bot can read what you write. Paste the token under [Discord](/settings?s=chat&find=Discord) and press **Connect**. Then add the bot to a server of yours with **More → Add the bot to a server** (Discord only lets you message a bot you share a server with, so a small server of your own does). The invitation asks for View Channels, Send Messages and Read Message History, and Hydor makes its slash commands known.
-- **Slack**: at api.slack.com/apps choose **Create New App → From a manifest**, pick your workspace and paste the manifest that **Copy manifest** (under [Slack](/settings?s=chat&find=Slack)) copies: it turns on Socket Mode, subscribes to direct messages and mentions, adds the `/hydor` command and asks for the bot scopes `app_mentions:read`, `chat:write`, `commands`, `im:history`, `reactions:write` and `users:read`. Under **Basic Information → App-Level Tokens** generate a token with the `connections:write` scope (it starts with `xapp-`); under **Install App** install the app to your workspace and copy the Bot User OAuth Token (it starts with `xoxb-`). Paste both and press **Connect**.
+- **Telegram**: in Telegram, open @BotFather, send `/newbot` and give the bot a name and a username. Paste the token it answers with, like `123456789:AA…`, in the box of the [Telegram](/settings?s=chat&find=Telegram) row, and press **Connect**.
+- **Discord**: in the Developer Portal (discord.com/developers/applications) make a **New Application**. Under **Bot**, press **Reset Token** and copy it, and turn on **Message Content Intent** so the bot can read what you write. Paste the token in the [Discord](/settings?s=chat&find=Discord) row and press **Connect**. Then add the bot to a server of yours with its **Add the bot to a server** row (Discord only lets you message a bot you share a server with, so a small server of your own does). The invitation asks for View Channels, Send Messages and Read Message History, and Hydor makes its slash commands known.
+- **Slack**: at api.slack.com/apps choose **Create New App → From a manifest**, pick your workspace and paste the manifest that **Copy manifest** (in the [Slack](/settings?s=chat&find=Slack) row's steps, and a row of its own once connected) copies: it turns on Socket Mode, subscribes to direct messages and mentions, adds the `/hydor` command and asks for the bot scopes `app_mentions:read`, `chat:write`, `commands`, `im:history`, `reactions:write` and `users:read`. Under **Basic Information → App-Level Tokens** generate a token with the `connections:write` scope (it starts with `xapp-`); under **Install App** install the app to your workspace and copy the Bot User OAuth Token (it starts with `xoxb-`). Paste both and press **Connect**.
 
-Connected, a row shows the bot's name and what it is doing ("Listening for messages", or what is wrong: Discord's Message Content Intent off, a scope Slack's app lacks). **Connect** turns a token down only when the service itself says no to it: when Telegram, Discord or Slack is slow to answer or can't be reached just then (as can happen in a new bot's first minutes), Hydor keeps the token, the row says **Connecting…** and why, and the bot connects by itself as soon as the service answers. A Telegram bot gets its messages in one place only, so when another copy of Hydor or another program uses the same bot, the row says so. **More → Change token** (**Change tokens** for Slack) puts in others (another bot's chats link again); **More → Disconnect** takes it out of Hydor, and the bot or app stays yours.
+Connected, the first row under it shows the bot's name and what it is doing ("Listening for messages", or what is wrong: Discord's Message Content Intent off, a scope Slack's app lacks). **Connect** turns a token down only when the service itself says no to it: when Telegram, Discord or Slack is slow to answer or can't be reached just then (as can happen in a new bot's first minutes), Hydor keeps the token, the row says **Connecting…** and why, and the bot connects by itself as soon as the service answers. A Telegram bot gets its messages in one place only, so when another copy of Hydor or another program uses the same bot, the row says so. The row's **⋯** menu has **Change token** (**Change tokens** for Slack), which puts in others (another bot's chats link again), and **Disconnect**, which takes it out of Hydor, and the bot or app stays yours.
 
 ### Link a chat
 
 Only the chats you link can use the bot: anyone else who finds it is told it is someone's own.
 
-1. Open the row and press [Link a chat](/settings?s=chat&find=Link%20a%20chat). It shows a code that works once, for ten minutes.
+1. Open the row and press its [Link a chat](/settings?s=chat&find=Link%20a%20chat) row. It shows a code that works once, for ten minutes.
 2. In Telegram, press **Open in Telegram** and then **Start** in the chat that opens, or send the bot the code. In Discord and Slack, send the bot or app the code in a direct message, or mention it with the code in a channel. The chat shows in the row with its name.
 
-A channel links to the person who sent the code: only they are heard there, and only when they mention the bot. **Unlink** beside a chat takes its use of your agents away.
+A channel links to the person who sent the code: only they are heard there, and only when they mention the bot. The trash button (**Unlink**) beside a chat takes its use of your agents away.
 
 ### What a chat can do
 
-- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set under **More** (**New sessions use Claude Code** or **New sessions use Codex**). What you send while the agent works waits in the session's queue.
+- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set in the **New sessions use** row (**Claude Code** or **Codex**). What you send while the agent works waits in the session's queue.
 - **The reply** comes back when the agent's turn ends, formatted for the app (Telegram's formatting; Discord's Markdown, in messages of 2,000 characters; Slack's mrkdwn in blocks), in up to ten messages when it is long (the rest stays in the session). Telegram and Discord show "typing…" while it works; Slack puts an hourglass on your message. **Open in Hydor** opens the session in the app, when the app has an address on the internet.
 - **What an agent asks**: a plain yes-or-no question comes with buttons that answer it; anything more (a form, a plan) comes with a link to answer it in the app.
 - **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them. Discord lists them as slash commands; in Slack they come after `/hydor` (`/hydor new`, and `/hydor` with other words is a message to the session); in Discord and Slack `!new`, `!status` and the rest also work typed as a message.
-- **Notices**: with **Notices from every session** on under **More**, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
+- **Notices**: with the **Notices from every session** row on, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
 
 Pictures, files and voice messages don't reach the agents from a chat yet: send words.
 
@@ -89,11 +89,11 @@ Behind one of the proxies above, the address counted is the visitor's own, as th
 
 If Hydor runs on more than one machine (a desktop, a GPU server, a cloud computer), you can use them all from one of them. Each machine keeps its own sessions, files, terminals, sign-ins and settings; the app you open shows one machine at a time, and the sidebar switches between them.
 
-This is set up in [Settings → App → Machines](/settings?s=machines). Its **Machines** list starts with this machine ("This server", with its version), followed by the ones you added, each with:
+This is set up in [Settings → App → Machines](/settings?s=machines). Its **Machines** group (with **Add a machine** beside its title) starts with this machine ("This server", with its version), followed by the ones you added, each with:
 
 - a dot: green when it answers, grey while connecting, red when it doesn't;
 - how it is reached (`ssh gpu-box` or its address) and how it is doing: "Online", "2 need you · 1 working", "Connecting…" or "Not reachable" (with the reason);
-- **Open** (its pages), **Edit**, and **Remove**. A machine that doesn't answer also has **Try again now**.
+- **Open** (its pages), and a **⋯** menu with **Edit** and **Remove**. A machine that doesn't answer also has a **Try again now** button.
 
 ### Add a machine
 
@@ -129,13 +129,13 @@ On another machine's pages the row is highlighted, so you know where you are, an
 
 ### Let other machines use this one
 
-Under **Access from other machines** (on another machine's pages: **Access to** that machine), you make the tokens other machines use to reach this one. Another Hydor with one of these tokens can do all you can here, running commands included, so make one for each machine that connects.
+In the **Access from other machines** group (on another machine's pages: **Access to** that machine), you make the tokens other machines use to reach this one. Another Hydor with one of these tokens can do all you can here, running commands included, so make one for each machine that connects.
 
-1. Click **New token**.
+1. Click **New token** beside the group's title.
 2. Say **Which machine will use it?** ("My laptop") and click **Make token**.
 3. Copy the token and paste it into the other machine's Settings → Machines. It is shown only now.
 
-Each token shows when it was made and last used. **Revoke** (after a question) cuts that machine off at once.
+Each token shows when it was made and last used. **Revoke**, in its **⋯** menu (after a question), cuts that machine off at once.
 
 ## Share a session with a read-only link
 
@@ -157,7 +157,7 @@ They don't see command output, the agent's thinking, the images you attached (on
 
 Agents running elsewhere (Claude Code on your laptop, Codex, Cursor or any client that speaks MCP, the protocol agents use to call tools) can list, read, start and steer sessions on this machine through the app's own MCP server. Each needs a token, made in [Settings → App → Connect other agents](/settings?s=connect). An agent with a token can start and steer sessions here, as you can.
 
-1. Click [**New token**](/settings?s=connect&find=New%20token).
+1. Click [**New token**](/settings?s=connect&find=New%20token), beside the title of the **Tokens** group.
 2. Under **Name it after where it goes**, type something like "Claude Code on my laptop" and click **Make token**.
 3. Copy what you need now (it is not shown again):
    - **Token**, the token itself.
@@ -167,11 +167,11 @@ Agents running elsewhere (Claude Code on your laptop, Codex, Cursor or any clien
 
 The address is the one your browser has open, so an agent on another machine must reach the app the same way your browser does (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
 
-The **Tokens** list shows each token's name, when it was made and when it was last used. Make one for each agent or machine, so you can **Revoke** them one at a time; revoking cuts that agent off at once.
+The **Tokens** list shows each token's name, when it was made and when it was last used. Make one for each agent or machine, so you can **Revoke** them one at a time (in a token's **⋯** menu); revoking cuts that agent off at once.
 
 ### What they can do
 
-[**What they can do**](/settings?s=connect&find=What%20they%20can%20do) lists the tools an agent with a token gets:
+The [**What they can do**](/settings?s=connect&find=What%20they%20can%20do) row, under the tokens, has an (i) that lists the tools an agent with a token gets:
 
 - **list_sessions** and **read_session**: find a session and catch up on it (its messages, and its steps by name).
 - **start_session**: a new Claude Code or Codex session with a first message, in any folder, optionally in a worktree of its own. It answers with a link you can open.
@@ -186,13 +186,13 @@ Sessions started in this app need none of this. The section shows only on the ma
 
 Pull requests open with an account in [Settings → App → Source control](/settings?s=scm). Each account covers the repositories on its server: GitHub, a GitHub Enterprise server or a Gitea server. Pushing itself uses this computer's own git setup (its SSH keys or saved credentials); the account is for opening the pull request and following its checks.
 
-1. Click [**Add an account**](/settings?s=scm&find=Add%20an%20account).
+1. Click [**Add an account**](/settings?s=scm&find=Add%20an%20account), beside the title of the **Accounts** group. A dialog opens.
 2. Pick **GitHub** or **Gitea**.
 3. For GitHub: if the GitHub CLI on this computer is signed in, **Use its sign-in** adds the account in one click and you're done. Otherwise paste an **Access token**: a fine-grained token with Pull requests (read and write), Contents (read) and Commit statuses (read) on your repositories (**Make one** opens the page on GitHub). Fill in **Server address** only for GitHub Enterprise.
 4. For Gitea: the **Server address** (`https://gitea.example.com`) and an **Access token** made in Gitea under Settings → Applications → Generate token, with repository read and write.
 5. Click **Add**. The app checks the token by asking the server who it belongs to, then lists the account under that user name.
 
-A second account for the same server replaces the first. Each account shows its user name, the server and "through the GitHub CLI" where that applies, with a link to open the server. **Remove** asks first: pull requests already linked to sessions stay linked, but their state stops updating.
+A second account for the same server replaces the first. Each account is a row with its user name, the server and "through the GitHub CLI" where that applies. Its **⋯** menu has **Open the server** and **Remove**, which asks first: pull requests already linked to sessions stay linked, but their state stops updating.
 
 How pull requests are opened and followed: [Open a pull request from a session](/guide/files-git#open-a-pull-request-from-a-session).
 

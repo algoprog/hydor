@@ -45,7 +45,9 @@ Download `Hydor-<version>-arm64-mac.dmg` (Apple silicon) or `…-x64-mac.dmg` (I
 **Applications**. Open it from there: its window opens on the page where you choose a password, and the welcome
 tour does the rest. Until the releases are signed with an Apple Developer ID, macOS asks the first time whether
 to open an app from an unidentified developer: right-click the app, choose **Open**, then **Open** again (or
-**System Settings → Privacy & Security → Open Anyway**).
+**System Settings → Privacy & Security → Open Anyway**). macOS also asks once whether Hydor may send
+notifications: allow it to get one when a session finishes or needs you (**System Settings → Notifications →
+Hydor** sets how they show).
 
 The app runs the server inside it, with the Node.js and tmux that come with it, and shows Hydor in its own
 window. Closing the window keeps it running, with its icon in the menu bar (**Open Hydor**, **Open in

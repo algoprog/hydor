@@ -195,7 +195,7 @@ export const SHOTS = [
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 900 }),
   // The list's card, by the first of the demo's tasks there: those due within three hours are left out (demo.mjs).
-  settingsShot('tasks', 'tasks', { until: cardWithAny(['Water the greenhouse reminder', 'Weekly shop report', 'Ridge E5 price watch', 'Morning brief']) }),
+  settingsShot('tasks', 'tasks', { until: cardWithAny(['Water the greenhouse reminder', 'Weekly shop report', 'Ridge E5 price watch', 'Morning brief'], '.rounded-xl') }),
   settingsShot('skills', 'skills'),
   settingsShot('plugins', 'plugins'),
   {

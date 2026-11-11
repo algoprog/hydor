@@ -10,7 +10,7 @@ import { agentBaseEnv } from '../env.ts';
 import { LineSplitter } from '../runner/frames.ts';
 import { claudeModels } from './claude.ts';
 import { ensureClaude } from '../clients.ts';
-import { claimClaudeReset, claudeOauthAccount, claudeResets } from './claudeResets.ts';
+import { claimClaudeReset, claudeOauthAccount, claudeResets, keepResets, keptResets, resetReads } from './claudeResets.ts';
 import { codexEnv, codexModels } from './codex.ts';
 import { RpcPeer } from './rpc.ts';
 import { execProgram, launch, spawnProgram } from '../platform.ts';
@@ -184,6 +184,10 @@ export class CodexControl extends EventEmitter {
         windows: [],
       };
       applyCodexLimits(u, limits);
+      // The limits did not come this time (a moment's network trouble, say): the same account's last ones stand, resets
+      // and all, rather than none ("No usage limits reported").
+      const last = this.lastUsage;
+      if (!limits && last?.ok && last.account?.email === u.account?.email) Object.assign(u, { windows: last.windows, limited: last.limited, resetCredits: last.resetCredits, credits: last.credits });
       if (usage?.dailyUsageBuckets) u.daily = (usage.dailyUsageBuckets as Json[]).slice(-60).map((b) => ({ date: b.startDate, tokens: b.tokens }));
       if (usage?.summary?.lifetimeTokens) u.lifetimeTokens = usage.summary.lifetimeTokens;
       this.lastUsage = u;
@@ -336,6 +340,10 @@ export class ClaudeControl extends EventEmitter {
   private env = () => ({ ...agentBaseEnv(), ...this.extraEnv });
   private initCache: { at: number; init: Json } | null = null;
   private usageCache: AgentUsage | null = null;
+  /** When the resets may be read again (resetReads), how long the wait after the next refusal is, and whether the last read found the account at a limit. */
+  private resetsNext = 0;
+  private resetsWait = resetReads.every;
+  private atLimit = false;
   private inflight: Promise<{ init: Json | null; usage: Json | null }> | null = null;
   /** Why the last probe got no answer, in Claude Code's own words (EACCES: permission denied, mkdir …). */
   private probeError: string | null = null;
@@ -453,12 +461,30 @@ export class ClaudeControl extends EventEmitter {
       if (!raw && this.probeError) throw new Error(`Claude Code did not start: ${this.probeError}`);
       if (!raw) throw new Error('Claude Code did not report usage (signed out?)');
       const prev = this.usageCache;
+      const dir = this.extraEnv.CLAUDE_CONFIG_DIR;
       const u = this.report(raw);
-      try {
-        const r = await claudeResets(() => this.probe(), this.extraEnv.CLAUDE_CONFIG_DIR);
-        u.resetCredits = r && { available: r.available, items: r.items, nextAvailableAt: r.nextAvailableAt, cooldownUntil: r.cooldownUntil };
-        if (r?.atLimit && !u.limited) u.limited = prev?.limited ?? { label: 'Usage limit', resetsAt: null };
-      } catch {} // keep the resets from the last read
+      // Until the first read since the app started, the ones kept from before.
+      u.resetCredits ??= keptResets(dir);
+      if (Date.now() >= this.resetsNext) {
+        try {
+          const r = await claudeResets(() => this.probe(), dir);
+          this.resetsNext = Date.now() + resetReads.every;
+          this.resetsWait = resetReads.every;
+          this.atLimit = !!r?.atLimit;
+          // No claude.ai sign-in to read them with just now: the resets from the last read stand (report() kept them).
+          if (r) {
+            u.resetCredits = { available: r.available, items: r.items, nextAvailableAt: r.nextAvailableAt, cooldownUntil: r.cooldownUntil };
+            keepResets(dir, u.resetCredits);
+          }
+        } catch {
+          // Refused (HTTP 429: asked too often) or out of reach: the last ones stand, and each try after waits longer.
+          this.resetsNext = Date.now() + this.resetsWait;
+          this.resetsWait = Math.min(this.resetsWait * 2, resetReads.longest);
+        }
+      }
+      // At a limit by the last read of the resets, until that limit's own reset time passes.
+      const held = prev?.limited;
+      if (this.atLimit && !u.limited && (!held?.resetsAt || held.resetsAt > Date.now())) u.limited = held ?? { label: 'Usage limit', resetsAt: null };
       this.usageCache = u;
       return u;
     } catch (e) {
@@ -492,8 +518,19 @@ export class ClaudeControl extends EventEmitter {
   }
 
   /** Claims a reset grant (the CLI's /rate-limit-options). */
-  useReset(id: string): Promise<ResetOutcome> {
-    return claimClaudeReset(id, () => this.probe(), this.extraEnv.CLAUDE_CONFIG_DIR);
+  async useReset(id: string): Promise<ResetOutcome> {
+    const r = await claimClaudeReset(id, () => this.probe(), this.extraEnv.CLAUDE_CONFIG_DIR);
+    // The list has changed: the next usage read asks for it again, and meanwhile the one used is gone from it.
+    this.resetsNext = 0;
+    this.resetsWait = resetReads.every;
+    const rc = this.usageCache?.resetCredits;
+    if (rc && (r.outcome === 'reset' || r.outcome === 'already_used')) {
+      if (r.outcome === 'reset') this.atLimit = false;
+      const items = rc.items.flatMap((i) => (i.id !== id ? [i] : (i.left ?? 1) > 1 ? [{ ...i, left: (i.left ?? 1) - 1 }] : []));
+      this.usageCache!.resetCredits = { ...rc, items, available: items.reduce((n, i) => n + (i.left ?? 1), 0) };
+      keepResets(this.extraEnv.CLAUDE_CONFIG_DIR, this.usageCache!.resetCredits);
+    }
+    return r;
   }
 
   async account(): Promise<AccountStatus> {

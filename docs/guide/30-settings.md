@@ -14,7 +14,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → General](/settings?s=general): theme, and what Enter does while an agent works. More in [Look, language and updates](/guide/app).
 
-- [**Theme**](/settings?s=general&find=Theme): Dark, light, or following your device; or a theme of your own.
+- [**Appearance**](/settings?s=general&find=Appearance): Dark, light, or following your device; or a theme of your own.
 - [**New theme**](/settings?s=general&find=New%20theme): Make a theme of your own from any of them.
 - [**Import**](/settings?s=general&find=Import): Add a theme someone shared.
 - [**Language**](/settings?s=general&find=Language): The language the app is shown in, and agents write in.
@@ -89,7 +89,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → Accounts](/settings?s=accounts): the Claude Code and Codex sign-ins every session uses. More in [Agents, accounts and models](/guide/agents-models).
 
-- [**Your accounts**](/settings?s=accounts&find=Your%20accounts): The Claude Code and Codex sign-ins sessions use, and more you add.
+- [**Accounts**](/settings?s=accounts&find=Accounts): The Claude Code and Codex sign-ins sessions use, and more you add.
 - [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): A session that runs out of usage carries on with another account.
 - [**Use API credit at a limit**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key.
 - [**Agent programs**](/settings?s=accounts&find=Agent%20programs): Which agent programs are installed, and installing the others.
@@ -124,7 +124,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**For every session**](/settings?s=guidelines&find=For%20every%20session): What every agent follows, in every session.
 - [**For a project**](/settings?s=guidelines&find=For%20a%20project): Guidelines the sessions in a project follow.
 - [**For one session**](/settings?s=guidelines&find=For%20one%20session): Guidelines for one session, from the start page or the session’s menu.
-- [**Files Claude Code and Codex read too**](/settings?s=guidelines&find=Files%20Claude%20Code%20and%20Codex%20read%20too): CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own.
+- [**Instruction files**](/settings?s=guidelines&find=Instruction%20files): CLAUDE.md and AGENTS.md, which Claude Code and Codex read on their own.
 
 ### MCP servers
 
@@ -212,7 +212,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → Computer use](/settings?s=computer): agents see your screen and use the mouse and keyboard, in the desktop app. More in [Search and the browser](/guide/web).
 
-- [**Let agents use this computer**](/settings?s=computer&find=Let%20agents%20use%20this%20computer): Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.
+- [**Computer use**](/settings?s=computer&find=Computer%20use): Agents see the screen and use the mouse and keyboard, in any app (for websites they keep to the browser). Each session asks you first.
 - [**Accessibility**](/settings?s=computer&find=Accessibility): macOS’s permission for Hydor to use the mouse and keyboard.
 - [**Screen Recording**](/settings?s=computer&find=Screen%20Recording): macOS’s permission for Hydor to see the screen.
 
@@ -271,7 +271,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 [Settings → Your agents](/settings?s=assistants): where task folders go, and cleaning up after a task; your agents themselves are on the Agents page. More in [Agents](/guide/agents).
 
-- [**Open Agents**](/settings?s=assistants&find=Open%20Agents): Your agents are on the Agents page.
+- [**Your agents**](/settings?s=assistants&find=Your%20agents): Your agents are on the Agents page.
 - [**Clean up after a task**](/settings?s=assistants&find=Clean%20up%20after%20a%20task): Agents remove what they made along the way and no longer need.
 - [**Task folders**](/settings?s=assistants&find=Task%20folders): Where new task folders go, for sessions started without a folder.
 
@@ -281,7 +281,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 - [**Auto mode**](/settings?s=custom&find=Auto%20mode): Custom approves safe steps by itself.
 - [**Sandbox for commands**](/settings?s=custom&find=Sandbox%20for%20commands): Auto mode commands run in a sandbox; Full access runs without it.
-- [**Goals**](/settings?s=custom&find=Goals): How many rounds a goal may run.
+- [**Rounds before a goal pauses**](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses): How many rounds a goal may run before it pauses for you.
 
 ## Ask an agent
 

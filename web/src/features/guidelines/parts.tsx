@@ -2,15 +2,16 @@
 // every session, a space or one session. Settings → Agents → Agent Guidelines holds every session's (and the
 // files Claude Code and Codex read on their own, folded away); a session's menu and the start page's Options
 // open the three levels in one dialog.
-import { useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, ScrollText } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ChevronDown, FolderKanban, ScrollText } from 'lucide-react';
 import { MAX_GUIDELINES, type GuidelinesPut, type GuidelinesView } from '@shared/guidelines';
 import type { SessionExtra } from '@shared/features';
 import { api, enc, put } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, Dialog, inputCls, Section, Segmented, SettingChip, Throbber } from '../../components/ui';
+import { Button, cx, Dialog, inputCls, MenuItem, Popover, Segmented, SettingChip, Throbber } from '../../components/ui';
+import { EmptyRow, Group, Row, Stack } from '../settings/kit';
 import { useSpaces } from '../spaces/state';
 
 /** Ways to talk to you, to add with a click. */
@@ -53,11 +54,42 @@ function Editor({ value, onChange, rows = 9, autoFocus }: { value: string; onCha
 
 // ---- Settings → Agents → Agent Guidelines ---------------------------------------------------------------
 
+/** "Start from…": adds one of the ready-made ways to talk to you to the text. */
+function StartFrom({ onPick }: { onPick: (tone: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={ref} size="sm" variant="ghost" title="Add how agents talk to you" onClick={() => setOpen((o) => !o)}>
+        Start from…
+        <ChevronDown size={14} className={cx('transition-transform duration-200', open && 'rotate-180')} />
+      </Button>
+      <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Start from…">
+        {TONES.map((t) => (
+          <MenuItem
+            key={t}
+            onClick={() => {
+              setOpen(false);
+              onPick(t);
+            }}
+          >
+            {t}
+          </MenuItem>
+        ))}
+      </Popover>
+    </>
+  );
+}
+
+/** How many projects show before "Show all". */
+const PROJECTS_SHOWN = 6;
+
 export function GuidelinesSettings({ files }: { files: ReactNode }) {
   const [v] = useGuidelines({});
   const [text, setText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
+  const [allProjects, setAllProjects] = useState(false);
   const spaces = useSpaces();
   const cur = text ?? v?.global ?? '';
   const save = async () => {
@@ -73,81 +105,104 @@ export function GuidelinesSettings({ files }: { files: ReactNode }) {
     }
   };
   const withText = (spaces ?? []).filter((s) => s.instructions?.trim());
+  const shown = allProjects ? withText : withText.slice(0, PROJECTS_SHOWN);
+  const dirty = !!v && text !== null && text !== v.global;
   return (
-    <div className="space-y-4">
-      <Section title="For every session" sub="Claude Code, Codex, Custom and every other agent follow these, in every session">
+    <Stack>
+      <Group title="For every session" hint="Every agent follows these, in every session">
         {!v ? (
-          <div className="flex justify-center py-6 text-fg-3">
+          <div className="flex justify-center py-8 text-fg-3">
             <Throbber />
           </div>
         ) : (
           <>
-            <Editor value={cur} onChange={setText} rows={10} />
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              {TONES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  title="Add how agents talk to you"
-                  onClick={() => setText(`${cur.trim() ? `${cur.trimEnd()}\n` : ''}How to talk to me: ${t}.`)}
-                  className="h-7 rounded-full bg-bg-2 px-2.5 text-[12px] text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg"
-                >
-                  {t}
-                </button>
-              ))}
+            <div className="px-1.5 pt-1.5">
+              <textarea
+                rows={9}
+                maxLength={MAX_GUIDELINES}
+                value={cur}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={PLACEHOLDER}
+                aria-label="Guidelines for every session"
+                className="block w-full resize-y rounded-lg bg-transparent px-2.5 py-2 text-[13.5px] leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:bg-bg-1"
+              />
             </div>
-            <div className="mt-2.5 flex items-center justify-end gap-2">
-              {text !== null && text !== v.global && (
-                <Button size="sm" variant="ghost" onClick={() => setText(null)}>
-                  Undo changes
-                </Button>
+            <div className="flex flex-wrap items-center gap-2 px-2.5 py-2">
+              <StartFrom onPick={(t) => setText(`${cur.trim() ? `${cur.trimEnd()}\n` : ''}How to talk to me: ${t}.`)} />
+              {cur.length > MAX_GUIDELINES * 0.8 && (
+                <span className="text-[11.5px] text-fg-3">
+                  {cur.length.toLocaleString()} of {MAX_GUIDELINES.toLocaleString()}
+                </span>
               )}
-              <Button size="sm" variant="primary" disabled={busy || text === null || text === v.global} onClick={save}>
-                Save
-              </Button>
+              <span className="ml-auto flex items-center gap-2">
+                {dirty && (
+                  <Button size="sm" variant="ghost" onClick={() => setText(null)}>
+                    Undo changes
+                  </Button>
+                )}
+                <Button size="sm" variant="primary" disabled={busy || !dirty} onClick={save}>
+                  Save
+                </Button>
+              </span>
             </div>
           </>
         )}
-      </Section>
-      <Section title="For a project" sub="Each project has guidelines of its own, which its sessions follow as well">
-        {!withText.length ? (
-          <p className="text-[13px] leading-relaxed text-fg-3">
-            None of your projects has guidelines yet. Open a project in{' '}
-            <button className="text-accent hover:underline" onClick={() => go('/projects')}>
-              Projects
-            </button>{' '}
-            to give it some.
-          </p>
+      </Group>
+      <Group title="For a project" hint="Each project’s own guidelines, which its sessions follow too">
+        {!spaces ? (
+          <div className="flex justify-center py-6 text-fg-3">
+            <Throbber />
+          </div>
+        ) : !withText.length ? (
+          <EmptyRow
+            action={
+              <Button size="sm" variant="secondary" onClick={() => go('/projects')}>
+                Open Projects
+              </Button>
+            }
+          >
+            None of your projects has guidelines yet
+          </EmptyRow>
         ) : (
-          <div className="-mx-2 divide-y divide-line">
-            {withText.map((s) => (
-              <button key={s.id} onClick={() => go(`/projects/${enc(s.id)}`)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-bg-1">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-medium">{s.name}</span>
-                  <span translate="no" className="block truncate text-[12.5px] text-fg-3">
+          <>
+            {shown.map((s) => (
+              <Row
+                key={s.id}
+                icon={<FolderKanban size={16} />}
+                label={<span translate="no">{s.name}</span>}
+                hint={
+                  <span translate="no" className="line-clamp-1">
                     {s.instructions!.trim().split('\n')[0]}
                   </span>
-                </span>
-                <ChevronRight size={15} className="shrink-0 text-fg-3" />
-              </button>
+                }
+                onClick={() => go(`/projects/${enc(s.id)}`)}
+              />
             ))}
-          </div>
+            {withText.length > PROJECTS_SHOWN && (
+              <button type="button" onClick={() => setAllProjects((a) => !a)} className="w-full rounded-b-[11px] px-4 py-2.5 text-left text-[13px] text-fg-3 transition-colors hover:bg-bg-1 hover:text-fg">
+                {allProjects ? 'Show fewer' : `Show all ${withText.length}`}
+              </button>
+            )}
+          </>
         )}
-      </Section>
-      <Section title="For one session" sub="On the start page: Options → Guidelines. In a session: its menu → Guidelines">
-        <p className="text-[13px] leading-relaxed text-fg-3">Where two levels disagree, the more specific one wins: a session’s over its project’s, a project’s over these. What you ask in the conversation comes first of all.</p>
-      </Section>
-      <div className="rounded-2xl border border-line">
-        <button onClick={() => setFilesOpen((o) => !o)} aria-expanded={filesOpen} className="flex w-full items-center gap-2.5 px-5 py-3.5 text-left">
-          <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform', filesOpen && 'rotate-90')} />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-medium">Files Claude Code and Codex read too</span>
-            <span className="block text-[12.5px] text-fg-3">CLAUDE.md and AGENTS.md in a project’s folder, for people who keep them there. The guidelines above work for every agent.</span>
-          </span>
-        </button>
-        {filesOpen && <div className="border-t border-line px-5 pt-4 pb-5">{files}</div>}
+      </Group>
+      <Group title="For one session" info="Where two levels disagree, the more specific one wins: a session’s over its project’s, a project’s over the ones for every session. What you ask in the conversation comes first of all.">
+        <Row label="On the start page" hint="Options → Guidelines" />
+        <Row label="In a session" hint="Its menu → Guidelines" />
+      </Group>
+      <div>
+        <Group>
+          <Row
+            label="Instruction files"
+            hint="CLAUDE.md and AGENTS.md in a project’s folder"
+            info="Claude Code and Codex read these files on their own, for people who keep them in a repository. The guidelines above work for every agent."
+            control={<ChevronDown size={16} className={cx('text-fg-3 transition-transform duration-200', filesOpen && 'rotate-180')} />}
+            onClick={() => setFilesOpen((o) => !o)}
+          />
+        </Group>
+        {filesOpen && <div className="mt-3">{files}</div>}
       </div>
-    </div>
+    </Stack>
   );
 }
 

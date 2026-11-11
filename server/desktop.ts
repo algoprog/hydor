@@ -3,7 +3,8 @@
 // service), and installs the new versions the server downloads (updates.ts). Elsewhere `desktop` is null.
 //
 // The channel both ways: the server tells the app what to show (a new version ready, an agent using the computer, with
-// the glow around the screen and its pointer over the real one) and what to do (install), asks it what only it can find out or do (macOS's permissions
+// the glow around the screen and its pointer over the real one, a session's notice as the system's own notification)
+// and what to do (install), asks it what only it can find out or do (macOS's permissions
 // for computer use, and asking for them; hiding the glow for a moment while it looks at the screen; letting go of Esc
 // while the agent itself presses it; on Linux, a picture of the screen), and hears what you chose in its menus
 // (Restart to Update, Stop, Esc) and, on Windows, that it should stop (quit: Windows has no signal a program can catch
@@ -11,6 +12,7 @@
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import type { NotifyEvent } from '../shared/types.ts';
 import type { Show } from './computer/plan.ts';
 
 export type DesktopPlatform = 'mac' | 'windows' | 'linux';
@@ -109,6 +111,12 @@ export type ToDesktop =
   | { type: 'glow'; show: true }
   /** Esc stops the agent again, after it pressed Esc itself. */
   | { type: 'esc'; on: true }
+  /**
+   * A session finished, failed or needs you (`n`, the notice the pages hear): the app shows it as the system's own
+   * notification, with this title and body in the user's language, a click on it opening `path`; one the system does
+   * not show (not allowed in its settings) goes to the window's page, which shows it inside the app.
+   */
+  | { type: 'notice'; n: NotifyEvent; title: string; body: string; path: string }
   | ({ type: 'ask'; id: string } & DesktopAsk);
 
 /** Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, Esc, ⌘⇧Esc), quit (Windows), and answers. */
