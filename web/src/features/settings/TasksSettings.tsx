@@ -3,7 +3,7 @@
 // starts a new session (or posts into one you pick) with the task's prompt, and the task's history
 // keeps how each run went. Examples start common ones from a short form.
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Clock, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MoreHorizontal, Pencil, Play, Plus, Trash2, TriangleAlert, Webhook } from 'lucide-react';
+import { CalendarClock, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
 import { hookHelp } from '@shared/engineering';
 import type { AppDef } from '@shared/apps';
@@ -15,7 +15,7 @@ import { toast, toastError, useApp, useSessions } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, ModelPicker, ModePicker } from '../../components/AgentPickers';
 import { FolderChip } from '../../components/FolderPicker';
-import { Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Section, Segmented, Switch, useConfirm } from '../../components/ui';
+import { Button, cx, Dialog, Throbber, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, useConfirm } from '../../components/ui';
 import { RefreshIcon } from '../../components/RefreshIcon';
 import { FeatureStartOptions } from '../registry';
 import { AgentPicker } from '../home/AgentPicker';
@@ -25,6 +25,7 @@ import { boxCls, browserZone, localTime, OutcomeBadge, RunDots } from '../automa
 import { defaultMode, lastAgent, TemplateGallery } from '../automations/Templates';
 import { blankWatch, WatchForm } from '../automations/WatchForm';
 import { LOCALE } from '../../i18n/locale';
+import { EmptyRow, Group, Notice, Row, SectionActions, Stack } from './kit';
 
 export { scheduleText };
 
@@ -39,7 +40,7 @@ export function draftOf(t: ScheduledTask): TaskDraft {
   return { name, prompt, schedule, agent, acpAgent, cwd, model, effort, mode, target, extra, failLimit, app };
 }
 
-export function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTask; onEdit: () => void; onDuplicate: () => void; onChanged: () => void }) {
+export function TaskRow({ t, onEdit, onDuplicate, onChanged, flush }: { t: ScheduledTask; onEdit: () => void; onDuplicate: () => void; onChanged: () => void; flush?: boolean }) {
   const home = useApp((s) => s.boot?.home);
   const acpName = useApp((s) => (t.agent === 'acp' ? s.boot?.acpAgents?.find((a) => a.id === t.acpAgent)?.name : undefined));
   const [menu, setMenu] = useState(false);
@@ -49,45 +50,122 @@ export function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTas
   const [history, setHistory] = useState(false);
   const failed = t.lastStatus && t.lastStatus !== 'ok';
   const Icon = t.schedule.kind === 'webhook' ? Webhook : t.schedule.kind === 'watch' ? Eye : CalendarClock;
+  const hasMore = !!(t.schedule.kind === 'watch' && t.check) || !!(t.pausedReason && !t.enabled) || !!(t.lastAt || t.recent?.length) || !!(t.schedule.kind === 'webhook' && t.hookPath) || history;
   return (
-    <div className="py-3">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2">
-          <Icon size={15} />
+    <Row
+      className={flush ? 'px-0!' : undefined}
+      icon={<Icon size={16} />}
+      label={
+        <span className="flex min-w-0 items-center gap-2">
+          <span translate="no" className="truncate">
+            {t.name}
+          </span>
+          {!t.app && <AgentIcon agent={t.agent} name={acpName} size={13} />}
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span translate="no" className="truncate text-[13.5px] font-medium text-fg">
-              {t.name}
-            </span>
-            {!t.app && <AgentIcon agent={t.agent} name={acpName} size={13} />}
-          </div>
-          <div className="mt-0.5 truncate text-[12px] text-fg-3">
-            {scheduleText(t.schedule, undefined, LOCALE)} ·{' '}
-            {t.app ? (
-              <>
-                runs <span translate="no">{t.appName ?? 'an app that is gone'}</span>
-              </>
-            ) : t.target ? (
-              'posts into a session'
-            ) : (
-              `new session in ${t.cwd === home ? '~' : basename(t.cwd)}`
+      }
+      hint={
+        <>
+          {scheduleText(t.schedule, undefined, LOCALE)} ·{' '}
+          {t.app ? (
+            <>
+              runs <span translate="no">{t.appName ?? 'an app that is gone'}</span>
+            </>
+          ) : t.target ? (
+            'posts into a session'
+          ) : (
+            <>
+              new session in <span translate="no">{t.cwd === home ? '~' : basename(t.cwd)}</span>
+            </>
+          )}
+          {t.enabled && t.nextAt ? ` · next ${untilText(t.nextAt)}` : ''}
+        </>
+      }
+      control={
+        <>
+          <Switch
+            on={t.enabled}
+            label={t.enabled ? 'Pause' : 'Turn on'}
+            onChange={(on) =>
+              post('/api/tasks', { ...t, enabled: on })
+                .then(onChanged)
+                .catch(toastError)
+            }
+          />
+          <IconButton ref={setAnchor} label="Task menu" size="sm" onClick={() => setMenu((m) => !m)}>
+            {running ? <Throbber /> : <MoreHorizontal size={16} />}
+          </IconButton>
+          <Popover anchor={{ current: anchor }} open={menu} onClose={() => setMenu(false)} align="end" width={210}>
+            <MenuItem
+              icon={<Play size={14} />}
+              onClick={async () => {
+                setMenu(false);
+                setRunning(true);
+                try {
+                  const r = await post<{ key?: string }>(`/api/tasks/${enc(t.id)}/run`);
+                  toast(`Started ${t.name}`, 'ok');
+                  if (r.key) openSession(r.key);
+                } catch (e) {
+                  toastError(e);
+                } finally {
+                  setRunning(false);
+                  onChanged();
+                }
+              }}
+            >
+              Run now
+            </MenuItem>
+            <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), onEdit())}>
+              Edit
+            </MenuItem>
+            <MenuItem icon={<ListChecks size={14} />} onClick={() => (setMenu(false), setHistory((h) => !h))}>
+              {history ? 'Hide history' : 'History'}
+            </MenuItem>
+            <MenuItem icon={<CopyPlus size={14} />} onClick={() => (setMenu(false), onDuplicate())}>
+              Duplicate
+            </MenuItem>
+            {t.schedule.kind === 'webhook' && (
+              <MenuItem
+                icon={<RefreshIcon size={14} />}
+                onClick={async () => {
+                  setMenu(false);
+                  if (!(await confirm({ title: 'Make a new webhook address?', body: 'The current address stops working. Update the services that call it.', confirm: 'New address' }))) return;
+                  post(`/api/tasks/${enc(t.id)}/rotate`).then(onChanged, toastError);
+                }}
+              >
+                New address
+              </MenuItem>
             )}
-            {t.enabled && t.nextAt ? ` · next ${untilText(t.nextAt)}` : ''}
-          </div>
+            <MenuSep />
+            <MenuItem
+              danger
+              icon={<Trash2 size={14} />}
+              onClick={async () => {
+                setMenu(false);
+                if (!(await confirm({ title: `Delete ${t.name}?`, body: 'It stops running, and its history goes. Sessions it started stay.', confirm: 'Delete', danger: true }))) return;
+                del(`/api/tasks/${enc(t.id)}`).then(onChanged, toastError);
+              }}
+            >
+              Delete
+            </MenuItem>
+          </Popover>
+          {confirmNode}
+        </>
+      }
+    >
+      {hasMore && (
+        <div className="space-y-1.5">
           {t.schedule.kind === 'watch' && t.check && (
-            <div className={cx('mt-0.5 truncate text-[12px]', t.check.ok ? 'text-fg-3' : 'text-warn')}>
+            <div className={cx('text-[12px]', t.check.ok ? 'text-fg-3' : 'text-warn')}>
               Looked {timeAgo(t.check.at)} ago: {t.check.note}
             </div>
           )}
           {t.pausedReason && !t.enabled && (
-            <div className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-warn/10 px-2 py-1.5 text-[12px] leading-snug text-warn">
-              <TriangleAlert size={13} className="mt-px shrink-0" />
-              <span>{t.pausedReason} Turn it on to try again.</span>
-            </div>
+            <Notice tone="warn" className="px-2.5 py-1.5">
+              <span className="text-[12px]">{t.pausedReason} Turn it on to try again.</span>
+            </Notice>
           )}
           {(t.lastAt || t.recent?.length) && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px]">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px]">
               {t.recent?.length ? (
                 <button type="button" onClick={() => setHistory((h) => !h)} className="inline-flex items-center gap-1.5 text-fg-3 transition-colors hover:text-fg" aria-expanded={history}>
                   <RunDots recent={t.recent} />
@@ -107,92 +185,23 @@ export function TaskRow({ t, onEdit, onDuplicate, onChanged }: { t: ScheduledTas
             </div>
           )}
           {t.schedule.kind === 'webhook' && t.hookPath && (
-            <>
-              <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
-                <code className="min-w-0 flex-1 truncate rounded-md bg-bg-1 px-2 py-1 font-mono text-[11.5px] text-fg-2">{hookUrl(t)}</code>
+            <div>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <code translate="no" className="min-w-0 flex-1 truncate rounded-md bg-bg-1 px-2 py-1 font-mono text-[11.5px] text-fg-2">
+                  {hookUrl(t)}
+                </code>
                 <IconButton label="Copy the address" size="sm" onClick={() => navigator.clipboard.writeText(hookUrl(t)).then(() => toast('Copied the webhook address', 'ok'))}>
                   <Copy size={13} />
                 </IconButton>
               </div>
               {/* An example's task: where its address goes. */}
               {hookHelp(t.origin, t.schedule) && <p className="mt-1 text-[12px] leading-snug text-fg-3">{hookHelp(t.origin, t.schedule)}</p>}
-            </>
+            </div>
           )}
-        </div>
-        <Switch
-          on={t.enabled}
-          label={t.enabled ? 'Pause' : 'Turn on'}
-          onChange={(on) =>
-            post('/api/tasks', { ...t, enabled: on })
-              .then(onChanged)
-              .catch(toastError)
-          }
-        />
-        <IconButton ref={setAnchor} label="Task menu" size="sm" onClick={() => setMenu((m) => !m)}>
-          {running ? <Throbber /> : <MoreHorizontal size={16} />}
-        </IconButton>
-        <Popover anchor={{ current: anchor }} open={menu} onClose={() => setMenu(false)} align="end" width={210}>
-          <MenuItem
-            icon={<Play size={14} />}
-            onClick={async () => {
-              setMenu(false);
-              setRunning(true);
-              try {
-                const r = await post<{ key?: string }>(`/api/tasks/${enc(t.id)}/run`);
-                toast(`Started ${t.name}`, 'ok');
-                if (r.key) openSession(r.key);
-              } catch (e) {
-                toastError(e);
-              } finally {
-                setRunning(false);
-                onChanged();
-              }
-            }}
-          >
-            Run now
-          </MenuItem>
-          <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), onEdit())}>
-            Edit
-          </MenuItem>
-          <MenuItem icon={<ListChecks size={14} />} onClick={() => (setMenu(false), setHistory((h) => !h))}>
-            {history ? 'Hide history' : 'History'}
-          </MenuItem>
-          <MenuItem icon={<CopyPlus size={14} />} onClick={() => (setMenu(false), onDuplicate())}>
-            Duplicate
-          </MenuItem>
-          {t.schedule.kind === 'webhook' && (
-            <MenuItem
-              icon={<RefreshIcon size={14} />}
-              onClick={async () => {
-                setMenu(false);
-                if (!(await confirm({ title: 'Make a new webhook address?', body: 'The current address stops working. Update the services that call it.', confirm: 'New address' }))) return;
-                post(`/api/tasks/${enc(t.id)}/rotate`).then(onChanged, toastError);
-              }}
-            >
-              New address
-            </MenuItem>
-          )}
-          <MenuSep />
-          <MenuItem
-            danger
-            icon={<Trash2 size={14} />}
-            onClick={async () => {
-              setMenu(false);
-              if (!(await confirm({ title: `Delete ${t.name}?`, body: 'It stops running, and its history goes. Sessions it started stay.', confirm: 'Delete', danger: true }))) return;
-              del(`/api/tasks/${enc(t.id)}`).then(onChanged, toastError);
-            }}
-          >
-            Delete
-          </MenuItem>
-        </Popover>
-        {confirmNode}
-      </div>
-      {history && (
-        <div className="pl-11">
-          <History task={t} />
+          {history && <History task={t} />}
         </div>
       )}
-    </div>
+    </Row>
   );
 }
 
@@ -621,34 +630,33 @@ export function TasksSettings() {
     return () => window.removeEventListener('wa:tasks', load);
   }, []);
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="min-w-0 flex-1 text-[13px] text-fg-3">Times are in your time zone ({browserZone()}). A run that cannot start (the computer was off) runs at the next chance.</p>
+    <Stack>
+      <SectionActions>
         <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setEditing({ task: null })}>
           New task
         </Button>
-      </div>
-      <Section>
+      </SectionActions>
+      <Group
+        title="Your tasks"
+        hint={
+          <>
+            Times are in your time zone (<span translate="no">{browserZone()}</span>)
+          </>
+        }
+        info="A run that cannot start (the computer was off) runs at the next chance."
+      >
         {!tasks ? (
-          <div className="flex justify-center py-4 text-fg-3">
+          <div className="flex justify-center py-6 text-fg-3">
             <Throbber />
           </div>
         ) : tasks.length ? (
-          <div className="-my-2 divide-y divide-line">
-            {tasks.map((t) => (
-              <TaskRow key={t.id} t={t} onEdit={() => setEditing({ task: t })} onDuplicate={() => setEditing({ task: null, draft: { ...draftOf(t), name: `${t.name} (copy)` } })} onChanged={load} />
-            ))}
-          </div>
+          tasks.map((t) => <TaskRow key={t.id} t={t} onEdit={() => setEditing({ task: t })} onDuplicate={() => setEditing({ task: null, draft: { ...draftOf(t), name: `${t.name} (copy)` } })} onChanged={load} />)
         ) : (
-          <Empty icon={<Clock size={20} />} title="No scheduled tasks yet">
-            Run a prompt every morning, once at a set time, whenever a service such as GitHub calls a webhook, or when a page, a feed or a folder changes. Or start from an example below; agents can also set one up when you ask them in a
-            conversation.
-          </Empty>
+          <EmptyRow>No scheduled tasks yet: start from an example below, or ask an agent to set one up</EmptyRow>
         )}
-      </Section>
+      </Group>
       <TemplateGallery onMore={(draft) => setEditing({ task: null, draft })} />
       <TaskEditor open={!!editing} task={editing?.task ?? null} initial={editing?.draft} onClose={() => setEditing(null)} onSaved={load} />
-    </div>
+    </Stack>
   );
 }
-
