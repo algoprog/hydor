@@ -678,14 +678,19 @@ agents that speak ACP and take MCP servers.
   (videos, pictures and sounds from this device, the Library or Files, a voice-over recorded), a WebGL viewer
   (timecode, In and Out, safe areas and a grid, J/K/L), an inspector, and a multi-track timeline (T1 words, V3 and V2
   overlays, V1 clips with transitions, A1 their sound with its shape, A2 music, A3 voice; show, mute, solo, lock;
-  Select, Blade, Trim and Hand tools, snapping, markers, right-click menus). Clips have their own part, speed (pitch
+  Select, Blade, Trim and Hand tools, snapping by a part's start or end, markers with a menu, right-click menus built
+  from the menu bar's own lists, several things picked at once with a box or Shift/Ctrl-click and moved, cut and
+  deleted together, cut, copy, paste, duplicate and paste attributes, trim to the playhead and jump between cuts,
+  files dropped from the desktop onto the panel or a track, a list of keyboard shortcuts; the viewer's pink guides
+  while words or an overlay are moved or sized, Shift/Alt/Ctrl while dragging; locked tracks left alone by every
+  command). Clips have their own part, speed (pitch
   kept or not), backwards, steadied, held frames, crop and turn, fitted or filling the output's shape (16:9, 9:16,
   1:1, 4:5), a picture's slow zoom and pan, their own sound or another in its place, unlinked (J and L cuts) and
   linked again; every sound (clips' own, music, voice-over) with its shape, trimmed, cut, silenced in parts, faded by
   handles (crossfades where two overlap), a volume line to click and drag, its channels (left or right only, one side
   on both, mono, swapped: a lapel microphone) and its own clean-up, evening out and normalizing, the sound editor for
   the rest; fourteen transitions; overlays placed, sized, see-through, keyed (green screen) and faded; words and
-  captions made from what is said (whisper.cpp here), in five styles, saved as .srt. Colour as Resolve's Color page:
+  captions made from what is said (whisper.cpp here) or imported from .srt and .vtt files, in five styles, saved as .srt or .vtt. Colour as Resolve's Color page:
   wheels (lift, gamma, gain, offset), primaries, curves, twelve looks, vignette, sharpen, denoise, grain, before and
   after, and scopes (waveform, vectorscope, histogram), the preview exactly as made (one 3D table for the browser and
   ffmpeg). Audio: a mixer (levels, meters, pan, mute, solo) and quick fixes (clean up voices, even out the loudness,

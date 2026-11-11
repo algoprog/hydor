@@ -9,6 +9,10 @@ import {
   clampView,
   isStill,
   levelAt,
+  MAX_AUDIO,
+  MAX_CLIPS,
+  MAX_OVERLAYS,
+  MAX_TEXTS,
   MIN_PART,
   overlayLength,
   PICTURE_SECONDS,
@@ -23,6 +27,7 @@ import {
   type VideoRecipe,
   type VideoSize,
   type VideoText,
+  type VideoTrackId,
 } from '@shared/mediaedit-video';
 
 /** What the editor keeps a step of undo for: the recipe, and the markers on the timeline. */
@@ -190,8 +195,9 @@ export function splitClip(r: VideoRecipe, f: VideoFactsOf, id: string, t: number
     b = { ...c, id: videoId(), trim: c.reverse ? [x, s] : [s, y] };
   }
   const [sa, sb] = splitSound(c, u, span.length);
+  // The sound's halves are whole copies of the clip: the second half keeps its own id.
   a = { ...a, ...sa, soundFadeOut: undefined };
-  b = { ...b, ...sb, soundFadeIn: undefined };
+  b = { ...b, ...sb, id: b.id, soundFadeIn: undefined };
   delete a.transition;
   const out = [...clips];
   out.splice(i, 1, a, b);
@@ -238,7 +244,8 @@ export function trimClip(c: VideoClip, facts: VideoSize | undefined, edge: 'star
   const next: VideoClip = { ...c, trim: x <= 0.001 && y >= d - 0.001 ? undefined : [ms(x), ms(y)] };
   if (edge !== 'start') return next;
   const moved = (clipLength(next, facts) - clipLength(c, facts));
-  return { ...next, ...shiftSound(c, moved, clipLength(next, facts)) };
+  // Its volume line and silenced parts move with its start (only those: the part just trimmed is kept).
+  return c.levels || c.silence ? { ...next, ...shiftSound({ levels: c.levels, silence: c.silence }, moved, clipLength(next, facts)) } : next;
 }
 
 /** The frame at a moment held for `seconds`: the clip split there, the held frame between its halves. */
@@ -352,13 +359,15 @@ export function deleteItem(r: VideoRecipe, f: VideoFactsOf, kind: 'overlay' | 't
 }
 
 /** The times things snap to: the playhead, the clips' and the other items' ends, the markers, In and Out. */
-export function snapTimes(r: VideoRecipe, f: VideoFactsOf, o: { playhead: number; markers: number[]; inOut: [number | null, number | null]; except?: string }): number[] {
+export function snapTimes(r: VideoRecipe, f: VideoFactsOf, o: { playhead: number; markers: number[]; inOut: [number | null, number | null]; except?: string | string[] }): number[] {
   const out = [0, o.playhead, ...o.markers, ...o.inOut.filter((x): x is number => x !== null)];
   const { spans } = spansOf(r, f);
-  (r.clips ?? []).forEach((c, i) => c.id !== o.except && out.push(spans[i].start, spans[i].end));
-  for (const x of r.overlays ?? []) if (x.id !== o.except) out.push(x.start, x.start + overlayLength(x, f(x.src)));
-  for (const x of r.audio ?? []) if (x.id !== o.except) out.push(x.start, x.start + audioLength(x, f(x.src)));
-  for (const x of r.texts ?? []) if (x.id !== o.except) out.push(x.from, x.to);
+  // The thing (or things, for a group) being moved is not something to line up with.
+  const skip = (id: string | undefined) => (Array.isArray(o.except) ? o.except.includes(id ?? '') : id === o.except);
+  (r.clips ?? []).forEach((c, i) => !skip(c.id) && out.push(spans[i].start, spans[i].end));
+  for (const x of r.overlays ?? []) if (!skip(x.id)) out.push(x.start, x.start + overlayLength(x, f(x.src)));
+  for (const x of r.audio ?? []) if (!skip(x.id)) out.push(x.start, x.start + audioLength(x, f(x.src)));
+  for (const x of r.texts ?? []) if (!skip(x.id)) out.push(x.from, x.to);
   return out;
 }
 
@@ -380,3 +389,328 @@ export function pickedThing(r: VideoRecipe, p: Picked): VideoClip | VideoOverlay
 
 /** A clip's length on the timeline, for what is shown of it. */
 export const lengthOf = (c: VideoClip, f: VideoFactsOf) => clipLength(c, f(c.src));
+
+
+// ---- which track a thing is on, and what is picked ---------------------------------------------------------------------
+
+/** One thing picked. */
+export type Pick1 = NonNullable<Picked>;
+
+/** The track a picked thing is on (a locked track's things are left as they are by every command). */
+export function trackOf(r: VideoRecipe, p: Pick1): VideoTrackId {
+  if (p.kind === 'clip' || p.kind === 'transition') return 'v1';
+  if (p.kind === 'clipsound') return 'a1';
+  if (p.kind === 'text') return 't1';
+  if (p.kind === 'overlay') return r.overlays?.find((o) => o.id === p.id)?.track === 3 ? 'v3' : 'v2';
+  return r.audio?.find((a) => a.id === p.id)?.track === 'voice' ? 'a3' : 'a2';
+}
+
+export const samePick = (a: Picked, b: Picked) => !!a && !!b && a.kind === b.kind && a.id === b.id;
+
+/** A thing added to what is picked, or taken out of it when it already is (Shift or Ctrl and a click). */
+export function togglePick(picks: Pick1[], p: Pick1): Pick1[] {
+  return picks.some((x) => samePick(x, p)) ? picks.filter((x) => !samePick(x, p)) : [...picks, p];
+}
+
+/** Every thing whose box on the timeline touches the rectangle of the marquee: times from `t0` to `t1`, tracks `rows`. */
+export function pickedIn(r: VideoRecipe, f: VideoFactsOf, t0: number, t1: number, rows: Set<VideoTrackId>): Pick1[] {
+  const lo = Math.min(t0, t1);
+  const hi = Math.max(t0, t1);
+  const hit = (a: number, b: number) => b > lo && a < hi;
+  const out: Pick1[] = [];
+  const { spans } = spansOf(r, f);
+  (r.clips ?? []).forEach((c, i) => {
+    if (rows.has('v1') && hit(spans[i].start, spans[i].end)) out.push({ kind: 'clip', id: c.id! });
+    else if (rows.has('a1') && hit(spans[i].start, spans[i].end)) out.push({ kind: 'clipsound', id: c.id! });
+  });
+  for (const o of r.overlays ?? []) if (rows.has(o.track === 3 ? 'v3' : 'v2') && hit(o.start, o.start + overlayLength(o, f(o.src)))) out.push({ kind: 'overlay', id: o.id! });
+  for (const x of r.texts ?? []) if (rows.has('t1') && hit(x.from, x.to)) out.push({ kind: 'text', id: x.id! });
+  for (const a of r.audio ?? []) if (rows.has(a.track === 'voice' ? 'a3' : 'a2') && hit(a.start, a.start + audioLength(a, f(a.src)))) out.push({ kind: 'audio', id: a.id! });
+  return out;
+}
+
+// ---- the clipboard: copy, cut, paste, duplicate and paste attributes -----------------------------------------------------
+
+/** What Copy keeps: the clips, overlays, words and sounds picked, as they were (their ids made new when pasted). */
+export interface Board {
+  clips: VideoClip[];
+  overlays: VideoOverlay[];
+  texts: VideoText[];
+  audio: VideoAudio[];
+  /** Where the earliest of the overlays, words and sounds began on the timeline: what pasting measures from. */
+  at: number;
+}
+
+const copy = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+
+/** The picked things copied (a clip's sound picked on A1 copies the clip); null when there is nothing to copy. */
+export function copyPicks(r: VideoRecipe, picks: Pick1[]): Board | null {
+  const has = (kinds: string[], id: string | undefined) => picks.some((p) => kinds.includes(p.kind) && p.id === id);
+  const board: Board = {
+    clips: (r.clips ?? []).filter((c) => has(['clip', 'clipsound'], c.id)).map(copy),
+    overlays: (r.overlays ?? []).filter((o) => has(['overlay'], o.id)).map(copy),
+    texts: (r.texts ?? []).filter((t) => has(['text'], t.id)).map(copy),
+    audio: (r.audio ?? []).filter((a) => has(['audio'], a.id)).map(copy),
+    at: 0,
+  };
+  if (!board.clips.length && !board.overlays.length && !board.texts.length && !board.audio.length) return null;
+  const starts = [...board.overlays.map((o) => o.start), ...board.texts.map((t) => t.from), ...board.audio.map((a) => a.start)];
+  board.at = starts.length ? Math.min(...starts) : 0;
+  return board;
+}
+
+/** Where a pasted board goes: its clips at `index` of the main track, the rest from the time `at`. */
+export interface PasteAt {
+  index?: number;
+  at: number;
+  /** Overlays go on this track (2 or 3) instead of the one they came from. */
+  overlayTrack?: number;
+  /** Sounds go on this track instead of the one they came from. */
+  audioTrack?: 'music' | 'voice';
+}
+
+/** A board put in the recipe, every part with an id of its own; the things made are returned picked. Null when it would pass a limit. */
+export function pasteBoard(r: VideoRecipe, f: VideoFactsOf, board: Board, to: PasteAt): { recipe: VideoRecipe; picks: Pick1[] } | null {
+  if ((r.clips ?? []).length + board.clips.length > MAX_CLIPS || (r.overlays ?? []).length + board.overlays.length > MAX_OVERLAYS || (r.audio ?? []).length + board.audio.length > MAX_AUDIO || (r.texts ?? []).length + board.texts.length > MAX_TEXTS) return null;
+  const picks: Pick1[] = [];
+  let next = r;
+  if (board.clips.length) {
+    const fresh = board.clips.map((c, i) => {
+      const x = { ...copy(c), id: videoId() };
+      // The last of them goes into whatever comes after, with a cut.
+      if (i === board.clips.length - 1) delete x.transition;
+      picks.push({ kind: 'clip', id: x.id! });
+      return x;
+    });
+    const clips = [...(next.clips ?? [])];
+    clips.splice(Math.max(0, Math.min(clips.length, to.index ?? clips.length)), 0, ...fresh);
+    next = { ...next, clips };
+  }
+  if (board.overlays.length || board.texts.length || board.audio.length) {
+    // From the time asked, but not so late that the earliest starts after the end of the video.
+    const room = Math.max(0, spansOf(next, f).length - 0.5);
+    const dt = Math.max(-board.at, Math.min(to.at, room) - board.at);
+    const late = (n: number) => ms(Math.max(0, n + dt));
+    const overlays = board.overlays.map((o) => {
+      const x: VideoOverlay = { ...copy(o), id: videoId(), start: late(o.start), ...(to.overlayTrack ? { track: to.overlayTrack } : {}) };
+      picks.push({ kind: 'overlay', id: x.id! });
+      return x;
+    });
+    const texts = board.texts.map((t) => {
+      const x: VideoText = { ...copy(t), id: videoId(), from: late(t.from), to: ms(late(t.from) + (t.to - t.from)) };
+      picks.push({ kind: 'text', id: x.id! });
+      return x;
+    });
+    const audio = board.audio.map((a) => {
+      const x: VideoAudio = { ...copy(a), id: videoId(), start: late(a.start), ...(to.audioTrack ? { track: to.audioTrack } : {}) };
+      delete x.clip;
+      picks.push({ kind: 'audio', id: x.id! });
+      return x;
+    });
+    next = { ...next, ...(overlays.length ? { overlays: [...(next.overlays ?? []), ...overlays] } : {}), ...(texts.length ? { texts: [...(next.texts ?? []), ...texts] } : {}), ...(audio.length ? { audio: [...(next.audio ?? []), ...audio] } : {}) };
+  }
+  return { recipe: next, picks };
+}
+
+/** The picked things copied and pasted straight after themselves: clips after the last picked clip, the rest where the group ends. */
+export function duplicatePicks(r: VideoRecipe, f: VideoFactsOf, picks: Pick1[]): { recipe: VideoRecipe; picks: Pick1[] } | null {
+  const board = copyPicks(r, picks);
+  if (!board) return null;
+  const ids = new Set(board.clips.map((c) => c.id));
+  const last = (r.clips ?? []).reduce((n, c, i) => (ids.has(c.id) ? i : n), -1);
+  const ends = [...board.overlays.map((o) => o.start + overlayLength(o, f(o.src))), ...board.texts.map((t) => t.to), ...board.audio.map((a) => a.start + audioLength(a, f(a.src)))];
+  return pasteBoard(r, f, board, { index: last + 1, at: ends.length ? Math.max(...ends) : 0 });
+}
+
+/** What Paste attributes carries from one thing to another, by kind: the look, the speed, the colour, the sound and its fades. */
+const CLIP_ATTRS = ['fit', 'rotate', 'flipH', 'flipV', 'stabilize', 'grade', 'speed', 'keepPitch', 'volume', 'mute', 'channels', 'clean', 'even', 'soundFadeIn', 'soundFadeOut'] as const;
+const OVERLAY_ATTRS = ['x', 'y', 'w', 'opacity', 'key', 'fadeIn', 'fadeOut'] as const;
+const AUDIO_ATTRS = ['volume', 'channels', 'clean', 'even', 'fadeIn', 'fadeOut'] as const;
+const TEXT_ATTRS = ['size', 'color', 'background', 'outline', 'bold'] as const;
+
+/** A sound's settings by their names on a sound of A2 or A3, whichever kind of thing they are of (a clip's fades are its sound's). */
+const soundSet = (x: Record<string, unknown>, clip: boolean) => ({ volume: x.volume, channels: x.channels, clean: x.clean, even: x.even, fadeIn: clip ? x.soundFadeIn : x.fadeIn, fadeOut: clip ? x.soundFadeOut : x.fadeOut });
+
+/**
+ * The attributes of the copied things put on the picked ones: a clip's look, speed, colour, volume and fades onto the
+ * clips picked, an overlay's place, size and fades onto the overlays, words' style onto the words, a sound's level, channels,
+ * clean-up and fades onto the sounds (a clip's own sound and a sound of A2 or A3 swap those). What is not an attribute
+ * (its part, its place in time, its words, its crop) is kept. `changed` is how many things took something.
+ */
+export function pasteAttributes(r: VideoRecipe, board: Board, picks: Pick1[]): { recipe: VideoRecipe; changed: number } {
+  let changed = 0;
+  const src = { clip: board.clips[0], overlay: board.overlays[0], text: board.texts[0], audio: board.audio[0] };
+  const ids = (kinds: string[]) => new Set<string | undefined>(picks.filter((p) => kinds.includes(p.kind)).map((p) => p.id));
+  const take = <T extends object>(target: T, from: Record<string, unknown>, keys: readonly string[]): T => {
+    const out = { ...target } as Record<string, unknown>;
+    for (const k of keys) out[k] = from[k];
+    changed++;
+    return out as T;
+  };
+  const clipIds = ids(['clip', 'clipsound']);
+  const clips = (r.clips ?? []).map((c) => {
+    if (!clipIds.has(c.id)) return c;
+    if (src.clip) {
+      // A picture or a held frame has no speed of its own to take.
+      const still = isStill(c) || c.picture;
+      return take(c, { ...src.clip, ...(still ? { speed: c.speed, keepPitch: c.keepPitch } : {}) } as Record<string, unknown>, CLIP_ATTRS);
+    }
+    if (src.audio) {
+      const s = soundSet(src.audio as unknown as Record<string, unknown>, false);
+      return take(c, { volume: s.volume, channels: s.channels, clean: s.clean, even: s.even, soundFadeIn: s.fadeIn, soundFadeOut: s.fadeOut }, ['volume', 'channels', 'clean', 'even', 'soundFadeIn', 'soundFadeOut']);
+    }
+    return c;
+  });
+  const overlayIds = ids(['overlay']);
+  const overlays = (r.overlays ?? []).map((o) => (overlayIds.has(o.id) && src.overlay ? take(o, src.overlay as unknown as Record<string, unknown>, OVERLAY_ATTRS) : o));
+  const textIds = ids(['text']);
+  const texts = (r.texts ?? []).map((t) => (textIds.has(t.id) && src.text ? take(t, src.text as unknown as Record<string, unknown>, TEXT_ATTRS) : t));
+  const audioIds = ids(['audio']);
+  const audio = (r.audio ?? []).map((a) => {
+    if (!audioIds.has(a.id)) return a;
+    if (src.audio) return take(a, src.audio as unknown as Record<string, unknown>, AUDIO_ATTRS);
+    if (src.clip) return take(a, soundSet(src.clip as unknown as Record<string, unknown>, true), AUDIO_ATTRS);
+    return a;
+  });
+  if (!changed) return { recipe: r, changed };
+  return { recipe: { ...r, ...(r.clips ? { clips } : {}), ...(r.overlays ? { overlays } : {}), ...(r.texts ? { texts } : {}), ...(r.audio ? { audio } : {}) }, changed };
+}
+
+// ---- commands on several things at once -------------------------------------------------------------------------------
+
+/** What is picked taken out in one step (a clip's own sound silenced, a transition made a cut); the last clip stays, and things on locked tracks. */
+export function deletePicks(r: VideoRecipe, f: VideoFactsOf, picks: Pick1[], o: { ripple?: boolean; locked?: (t: VideoTrackId) => boolean } = {}): { recipe: VideoRecipe; done: number } {
+  let next = r;
+  let done = 0;
+  for (const p of picks) {
+    if (o.locked?.(trackOf(r, p))) continue;
+    let after = next;
+    if (p.kind === 'clip') after = deleteClip(next, f, p.id, { ripple: o.ripple });
+    else if (p.kind === 'clipsound') after = setClip(next, p.id, (c) => ({ ...c, mute: true, volume: undefined, sound: undefined }));
+    else if (p.kind === 'transition') after = setClip(next, p.id, (c) => ({ ...c, transition: undefined }));
+    else after = deleteItem(next, f, p.kind, p.id, { ripple: o.ripple });
+    if (after !== next) done++;
+    next = after;
+  }
+  return { recipe: next, done };
+}
+
+/** Everything picked that the moment `t` falls inside, cut there, in one step; things on locked tracks are left whole. */
+export function splitPicks(r: VideoRecipe, f: VideoFactsOf, picks: Pick1[], t: number, o: { locked?: (t: VideoTrackId) => boolean } = {}): { recipe: VideoRecipe; done: number } {
+  let next = r;
+  let done = 0;
+  for (const p of picks) {
+    if (p.kind === 'transition' || o.locked?.(trackOf(r, p))) continue;
+    const after = p.kind === 'clip' || p.kind === 'clipsound' ? splitClip(next, f, p.id, t) : splitItem(next, f, p.kind, p.id, t);
+    if (after !== next) done++;
+    next = after;
+  }
+  return { recipe: next, done };
+}
+
+/** Several clips of the main track moved together to before the clip at index `to`, keeping their order; the last has no transition. */
+export function moveClips(r: VideoRecipe, ids: string[], to: number): VideoRecipe {
+  const clips = r.clips ?? [];
+  const moving = clips.filter((c) => ids.includes(c.id!));
+  if (!moving.length) return r;
+  const before = clips.slice(0, Math.max(0, Math.min(clips.length, to))).filter((c) => ids.includes(c.id!)).length;
+  const rest = clips.filter((c) => !ids.includes(c.id!));
+  const at = Math.max(0, Math.min(rest.length, to - before));
+  const out = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
+  return { ...r, clips: out.map((x, j) => (j === out.length - 1 && x.transition ? { ...x, transition: undefined } : x)) };
+}
+
+/** Overlays, words and sounds picked moved `dt` seconds together (not before the start of the timeline); the rest as they were. */
+export function shiftPicks(r: VideoRecipe, picks: Pick1[], dt: number): VideoRecipe {
+  const ids = (k: string) => new Set<string | undefined>(picks.filter((p) => p.kind === k).map((p) => p.id));
+  const o = ids('overlay');
+  const t = ids('text');
+  const a = ids('audio');
+  const starts = [...(r.overlays ?? []).filter((x) => o.has(x.id)).map((x) => x.start), ...(r.texts ?? []).filter((x) => t.has(x.id)).map((x) => x.from), ...(r.audio ?? []).filter((x) => a.has(x.id)).map((x) => x.start)];
+  if (!starts.length) return r;
+  const d = Math.max(dt, -Math.min(...starts));
+  return {
+    ...r,
+    ...(r.overlays ? { overlays: r.overlays.map((x) => (o.has(x.id) ? { ...x, start: ms(x.start + d) } : x)) } : {}),
+    ...(r.texts ? { texts: r.texts.map((x) => (t.has(x.id) ? { ...x, from: ms(x.from + d), to: ms(x.to + d) } : x)) } : {}),
+    ...(r.audio ? { audio: r.audio.map((x) => (a.has(x.id) ? { ...x, start: ms(x.start + d) } : x)) } : {}),
+  };
+}
+
+// ---- trimming to a time, and moving between cuts -----------------------------------------------------------------------
+
+/**
+ * An overlay, words or a sound with one of its ends brought to the moment `s` of the timeline (`first` is the thing as it
+ * was before the change: a drag keeps asking from it). A picture's or words' length, a video's or sound's part kept.
+ */
+export function trimItemTo(r: VideoRecipe, f: VideoFactsOf, kind: 'overlay' | 'text' | 'audio', first: VideoOverlay | VideoText | VideoAudio, edge: 'start' | 'end', s: number): VideoRecipe {
+  const id = first.id!;
+  if (kind === 'text') {
+    const x = first as VideoText;
+    return setText(r, id, (y) => (edge === 'start' ? { ...y, from: ms(Math.min(s, x.to - 0.1)) } : { ...y, to: ms(Math.max(s, x.from + 0.1)) }));
+  }
+  // An overlay or a sound: what they share (a source, a start, a part kept, a picture) read from either.
+  const it = first as { src: string; start: number; trim?: [number, number]; picture?: boolean };
+  const facts = f(it.src);
+  const len = kind === 'overlay' ? overlayLength(first as VideoOverlay, facts) : audioLength(first as VideoAudio, facts);
+  const [a, b] = it.trim ?? [0, facts?.duration ?? len];
+  const still = kind === 'overlay' && (it.picture || facts?.picture);
+  if (edge === 'end') {
+    const nl = Math.max(0.1, s - it.start);
+    if (still) return setOverlay(r, id, (o) => ({ ...o, length: ms(nl) }));
+    const nb = Math.min(facts?.duration ?? a + nl, a + nl);
+    return kind === 'overlay' ? setOverlay(r, id, (o) => ({ ...o, trim: [a, ms(nb)] })) : setAudio(r, id, (m) => ({ ...m, trim: [a, ms(nb)] }));
+  }
+  const d = Math.max(-it.start, Math.min(len - 0.1, s - it.start));
+  if (still) return setOverlay(r, id, (o) => ({ ...o, start: ms(it.start + d), length: ms(len - d) }));
+  const na = Math.max(0, a + d);
+  const nd = na - a;
+  return kind === 'overlay' ? setOverlay(r, id, (o) => ({ ...o, start: ms(it.start + nd), trim: [ms(na), b] })) : setAudio(r, id, () => ({ ...(first as VideoAudio), ...shiftSound(first as VideoAudio, -nd, len - nd), start: ms(it.start + nd), trim: [ms(na), b] }));
+}
+
+/**
+ * The picked thing's start (Q) or end (W) brought to the playhead, what was before it (or after it) cut away. Nothing
+ * when the playhead is not inside it. A clip of the main track closes up, as that track does; others stay where they are.
+ */
+export function trimToPlayhead(r: VideoRecipe, f: VideoFactsOf, p: Pick1, edge: 'start' | 'end', t: number): VideoRecipe {
+  if (p.kind === 'transition') return r;
+  if (p.kind === 'clip' || p.kind === 'clipsound') {
+    const i = (r.clips ?? []).findIndex((c) => c.id === p.id);
+    if (i < 0) return r;
+    const span = spansOf(r, f).spans[i];
+    if (t <= span.start + MIN_PART * 2 || t >= span.end - MIN_PART * 2) return r;
+    return setClip(r, p.id, (c) => trimClip(c, f(c.src), edge, edge === 'start' ? t - span.start : t - span.end));
+  }
+  const x = pickedThing(r, p) as VideoOverlay | VideoText | VideoAudio | null;
+  if (!x) return r;
+  const from = p.kind === 'text' ? (x as VideoText).from : (x as VideoOverlay).start;
+  const len = p.kind === 'text' ? (x as VideoText).to - from : p.kind === 'overlay' ? overlayLength(x as VideoOverlay, f((x as VideoOverlay).src)) : audioLength(x as VideoAudio, f((x as VideoAudio).src));
+  if (t <= from + MIN_PART || t >= from + len - MIN_PART) return r;
+  return trimItemTo(r, f, p.kind, x, edge, t);
+}
+
+/** The times the playhead jumps between with ↑ and ↓: the start, each cut between clips, and the end. */
+export function cutTimes(spans: ClipSpan[], length: number): number[] {
+  const all = [0, ...spans.flatMap((s) => [s.start, s.end]), length].sort((a, b) => a - b);
+  return all.filter((t, i) => i === 0 || t - all[i - 1] > 1e-3);
+}
+
+/** The cut after (`dir` 1) or before (-1) the time `t`; null when there is none. */
+export function neighbourCut(cuts: number[], t: number, dir: 1 | -1): number | null {
+  if (dir > 0) return cuts.find((c) => c > t + 1e-3) ?? null;
+  for (let i = cuts.length - 1; i >= 0; i--) if (cuts[i] < t - 1e-3) return cuts[i];
+  return null;
+}
+
+/**
+ * A thing of `len` seconds that starts at `start`, pulled so that its start or its end (whichever is nearer something)
+ * lies on one of `times`, within `px` pixels at `pps` pixels a second; `to` is the time it lined up with.
+ */
+export function snapSpan(start: number, len: number, times: number[], pps: number, px = 8): { start: number; to: number | null } {
+  const a = snap(start, times, pps, px);
+  const b = snap(start + len, times, pps, px);
+  if (a.to === null && b.to === null) return { start, to: null };
+  const da = a.to === null ? Infinity : Math.abs(a.t - start);
+  const db = b.to === null ? Infinity : Math.abs(b.t - (start + len));
+  return da <= db ? { start: a.t, to: a.to } : { start: b.t - len, to: b.to };
+}

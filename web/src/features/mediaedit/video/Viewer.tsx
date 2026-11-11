@@ -1,17 +1,22 @@
 // The viewer: the timeline at the playhead as the edit will make it, in the output's shape. The clips showing (one, or
 // two in a transition, which the browser draws as ffmpeg's xfade does: dissolving, through black or white, wiping,
 // sliding, a circle, a zoom) are each drawn in WebGL with their colour and effects (gl.ts); the overlays over them
-// (keyed, see-through, fading), the words over those, the fades of the whole. A picked overlay or words can be moved
-// (and an overlay sized by its corner); with the crop on, the picked clip's whole frame shows with its crop box. Safe
-// areas and a grid of thirds can show over it. The transport under it: play, J/K/L, frame steps, In and Out, the
-// timecode, the zoom and the guides.
+// (keyed, see-through, fading), the words over those, the fades of the whole. A picked overlay or words can be moved and
+// sized by their corner (about their middle), with pink guides while it goes: lines where an edge or the middle meets the
+// frame's, the title-safe area's or another part's, the distance to the parts beside it, and a pill with the size
+// (guides.ts; Shift keeps a move straight, Alt or ⌘ snaps to nothing, Ctrl or ⌥ drags a copy). With the crop on, the
+// picked clip's whole frame shows with its crop box. Safe areas and a grid of thirds can show over it. The transport
+// under it: play, J/K/L, frame steps, In and Out, the timecode, the zoom and the guides.
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronFirst, ChevronLast, Grid3x3, Pause, Play, Scan, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 import { clipsAt, editedSize, fitBox, isStill, overlayLength, shapeRatio, timecode, turnedSize, viewAt, type VideoClip, type VideoCrop, type VideoFactsOf, type VideoOverlay, type VideoRecipe, type VideoText } from '@shared/mediaedit-video';
+import { GUIDE_COLOUR, type SnapBox, type SnapGap } from '@shared/snap';
 import { cx } from '../../../components/ui';
+import { isCopyDrag, isNoSnap } from '../shell/menus';
 import { useClock, type Clock } from './clock';
 import { fadeAt, type Engine } from './engine';
 import { GradeCanvas, uvMap } from './gl';
+import { gapPill, moveBox, NO_MARKS, pullOf, sizeBox, type Marks } from './guides';
 import type { Picked } from './model';
 import { Choices, Tool } from './shell';
 import { drawText } from './text';
@@ -29,6 +34,10 @@ export interface ViewerProps {
   onPick(p: Picked): void;
   onMoveText(id: string, x: number, y: number, phase: Phase): void;
   onMoveOverlay(id: string, o: Partial<VideoOverlay>, phase: Phase): void;
+  /** Words sized (their letters' height as a share of the picture's). */
+  onSizeText(id: string, size: number, phase: Phase): void;
+  /** A drag with Ctrl (⌥ on a Mac): a copy of it is made in the same step and picked, and its id returned; the drag goes on with the copy. */
+  onCopyDrag(thing: { kind: 'overlay' | 'text'; id: string }): string | null;
   /** The crop box of a clip, while cropping. */
   crop: { id: string; shape: string } | null;
   onCrop(c: VideoCrop, phase: Phase): void;
@@ -82,8 +91,9 @@ function Picture(p: ViewerProps & { box: { w: number; h: number; k: number } }) 
   const r = p.recipe;
   const { box } = p;
   const spans = p.engine.spans;
-  const showing = clipsAt(spans, t);
   const clips = r.clips ?? [];
+  // The engine learns of a changed edit just after it is drawn: for that one frame its spans may name clips that are gone.
+  const showing = clipsAt(spans, t).filter((i) => clips[i] && spans[i]);
   const k = box.w / p.out.w;
   // Two clips in a transition: how far it is, and its kind.
   let progress = 0;
@@ -98,6 +108,14 @@ function Picture(p: ViewerProps & { box: { w: number; h: number; k: number } }) 
   const overlays = (r.overlays ?? []).filter((o) => !r.tracks?.[o.track === 3 ? 'v3' : 'v2']?.hidden && t >= o.start && t < o.start + overlayLength(o, p.factsOf(o.src))).sort((x, y) => (x.track ?? 2) - (y.track ?? 2) || x.start - y.start);
   const texts = r.tracks?.t1?.hidden ? [] : (r.texts ?? []);
   const under = kind === 'circleclose' || kind === 'zoomin';
+  // What a drag lines up with: every overlay and words showing now, as boxes of the output (pixels of the edit).
+  const drawn = useDrawnTexts(texts, p.out.w, p.out.h);
+  const [marks, setMarks] = useState<Marks>(NO_MARKS);
+  const boxes: (SnapBox & { id?: string })[] = [
+    ...overlays.map((o) => ({ id: o.id, ...overlayBox(o, p.factsOf(o.src), p.out) })),
+    ...texts.flatMap((x, i) => (t >= x.from && t < x.to && drawn[i] ? [{ id: x.id, x: x.x * p.out.w - drawn[i].w / 2, y: x.y * p.out.h - drawn[i].h / 2, w: drawn[i].w, h: drawn[i].h }] : [])),
+  ];
+  const others = (id?: string) => boxes.filter((b) => b.id !== id);
   return (
     <div className="relative shrink-0 overflow-hidden bg-black" style={{ width: box.w, height: box.h }} onPointerDown={(e) => e.target === e.currentTarget && p.onPick(null)}>
       {!r.tracks?.v1?.hidden &&
@@ -122,9 +140,10 @@ function Picture(p: ViewerProps & { box: { w: number; h: number; k: number } }) 
         })}
       {(kind === 'black' || kind === 'white') && showing.length === 2 && <div className={cx('pointer-events-none absolute inset-0', kind === 'white' ? 'bg-white' : 'bg-black')} style={{ zIndex: 0 }} />}
       {overlays.map((o) => (
-        <OverlayLayer key={o.id} {...p} o={o} t={t} k={k} />
+        <OverlayLayer key={o.id} {...p} o={o} t={t} k={k} others={others} onMarks={setMarks} />
       ))}
-      <Words texts={texts} t={t} out={p.out} k={k} picked={p.picked} onPick={p.onPick} onMove={p.onMoveText} />
+      <Words texts={texts} drawn={drawn} t={t} out={p.out} k={k} picked={p.picked} onPick={p.onPick} onMove={p.onMoveText} onSize={p.onSizeText} onCopyDrag={p.onCopyDrag} others={others} onMarks={setMarks} />
+      <GuideMarks marks={marks} k={k} />
       {dark > 0 && <div className="pointer-events-none absolute inset-0 z-30 bg-black" style={{ opacity: dark }} />}
       {p.safe && (
         <div className="pointer-events-none absolute inset-0 z-40">
@@ -279,7 +298,7 @@ const ClipLayer = memo(function ClipLayer({
 });
 
 /** An overlay in its place: drawn as it is made (keyed, see-through, faded); picked, it moves and sizes. */
-function OverlayLayer(p: ViewerProps & { o: VideoOverlay; t: number; k: number }) {
+function OverlayLayer(p: ViewerProps & { o: VideoOverlay; t: number; k: number; others: (id?: string) => SnapBox[]; onMarks: (m: Marks) => void }) {
   const { o, k, engine } = p;
   const facts = p.factsOf(o.src);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -319,12 +338,13 @@ function OverlayLayer(p: ViewerProps & { o: VideoOverlay; t: number; k: number }
     draw();
   });
   const picked = p.picked?.kind === 'overlay' && p.picked.id === o.id;
-  const drag = useRef<{ x: number; y: number; o: VideoOverlay; mode: 'move' | 'size'; moved: boolean } | null>(null);
+  // A drag: where it began, the overlay as it was, and (with Ctrl or ⌥) the id of the copy it is dragging instead.
+  const drag = useRef<{ x: number; y: number; o: VideoOverlay; mode: 'move' | 'size'; moved: boolean; copy: boolean; id: string } | null>(null);
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const start = (mode: 'move' | 'size') => (e: React.PointerEvent) => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, o, mode, moved: false };
+    drag.current = { x: e.clientX, y: e.clientY, o, mode, moved: false, copy: mode === 'move' && isCopyDrag(e), id: o.id! };
     p.onPick({ kind: 'overlay', id: o.id! });
   };
   const move = (e: React.PointerEvent) => {
@@ -333,16 +353,29 @@ function OverlayLayer(p: ViewerProps & { o: VideoOverlay; t: number; k: number }
     if (!d.moved) {
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 3) return;
       d.moved = true;
-      p.onMoveOverlay(o.id!, {}, 'begin');
+      p.onMoveOverlay(d.id, {}, 'begin');
+      // A copy is dragged: it is made now, in this step, and the overlay stays where it was.
+      if (d.copy) d.id = p.onCopyDrag({ kind: 'overlay', id: d.id }) ?? d.id;
     }
-    const dx = (e.clientX - d.x) / k / W;
-    const dy = (e.clientY - d.y) / k / p.out.h;
-    if (d.mode === 'move') p.onMoveOverlay(o.id!, { x: Math.round((d.o.x + dx) * 1000) / 1000, y: Math.round((d.o.y + dy) * 1000) / 1000 }, 'move');
-    else p.onMoveOverlay(o.id!, { w: Math.round(Math.max(0.03, Math.min(2, d.o.w + dx * 2)) * 1000) / 1000 }, 'move');
+    // Pixels of the output, from the overlay as it was when the drag began.
+    const dx = (e.clientX - d.x) / k;
+    const dy = (e.clientY - d.y) / k;
+    const box = overlayBox(d.o, facts, p.out);
+    const tol = pullOf(k);
+    if (d.mode === 'move') {
+      const m = moveBox(box, dx, dy, p.others(d.id), p.out, { tol, shift: e.shiftKey, noSnap: isNoSnap(e) });
+      p.onMarks(m.marks);
+      p.onMoveOverlay(d.id, { x: Math.round((d.o.x + m.dx / W) * 1000) / 1000, y: Math.round((d.o.y + m.dy / p.out.h) * 1000) / 1000 }, 'move');
+    } else {
+      const s = sizeBox(box, box.w + dx * 2, p.others(d.id), p.out, { tol, noSnap: isNoSnap(e), k, min: 0.03 * W });
+      p.onMarks(s.marks);
+      p.onMoveOverlay(d.id, { w: Math.round(Math.max(0.03, Math.min(2, s.w / W)) * 1000) / 1000 }, 'move');
+    }
   };
   const stop = () => {
-    if (drag.current?.moved) p.onMoveOverlay(o.id!, {}, 'end');
+    if (drag.current?.moved) p.onMoveOverlay(drag.current.id, {}, 'end');
     drag.current = null;
+    p.onMarks(NO_MARKS);
   };
   return (
     <div className={cx('absolute z-10', picked && 'outline-2 outline-offset-1 outline-white/90 outline-dashed')} style={{ left, top, width: ow * k, height: oh * k, touchAction: 'none' }} onPointerDown={start('move')} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop}>
@@ -352,10 +385,72 @@ function OverlayLayer(p: ViewerProps & { o: VideoOverlay; t: number; k: number }
   );
 }
 
-/** The words that show at the playhead (and the picked one), each drawn as the edit makes it; picked, they move. */
-function Words({ texts, t, out, k, picked, onPick, onMove }: { texts: VideoText[]; t: number; out: { w: number; h: number }; k: number; picked: Picked; onPick(p: Picked): void; onMove: ViewerProps['onMoveText'] }) {
-  const drawn = useDrawnTexts(texts, out.w, out.h);
-  const drag = useRef<{ id: string; px: number; py: number; x: number; y: number; moved: boolean } | null>(null);
+/** The words that show at the playhead (and the picked one), each drawn as the edit makes it; picked, they move (and are sized by their corner). */
+function Words({
+  texts,
+  drawn,
+  t,
+  out,
+  k,
+  picked,
+  onPick,
+  onMove,
+  onSize,
+  onCopyDrag,
+  others,
+  onMarks,
+}: {
+  texts: VideoText[];
+  drawn: { url: string; w: number; h: number }[];
+  t: number;
+  out: { w: number; h: number };
+  k: number;
+  picked: Picked;
+  onPick(p: Picked): void;
+  onMove: ViewerProps['onMoveText'];
+  onSize: ViewerProps['onSizeText'];
+  onCopyDrag: ViewerProps['onCopyDrag'];
+  others: (id?: string) => SnapBox[];
+  onMarks: (m: Marks) => void;
+}) {
+  const drag = useRef<{ id: string; px: number; py: number; x: number; y: number; size: number; box: SnapBox; mode: 'move' | 'size'; moved: boolean; copy: boolean } | null>(null);
+  const move = (e: React.PointerEvent) => {
+    const dd = drag.current;
+    if (!dd) return;
+    if (!dd.moved) {
+      if (Math.hypot(e.clientX - dd.px, e.clientY - dd.py) < 3) return;
+      dd.moved = true;
+      onMove(dd.id, dd.x, dd.y, 'begin');
+      if (dd.copy) dd.id = onCopyDrag({ kind: 'text', id: dd.id }) ?? dd.id;
+    }
+    // Pixels of the output, from the words as they were when the drag began.
+    const dx = (e.clientX - dd.px) / k;
+    const dy = (e.clientY - dd.py) / k;
+    const tol = pullOf(k);
+    if (dd.mode === 'move') {
+      const m = moveBox(dd.box, dx, dy, others(dd.id), out, { tol, shift: e.shiftKey, noSnap: isNoSnap(e) });
+      onMarks(m.marks);
+      const nx = Math.min(1, Math.max(0, dd.x + m.dx / out.w));
+      const ny = Math.min(1, Math.max(0, dd.y + m.dy / out.h));
+      onMove(dd.id, Math.round(nx * 1000) / 1000, Math.round(ny * 1000) / 1000, 'move');
+    } else {
+      const s = sizeBox(dd.box, dd.box.w + dx * 2, others(dd.id), out, { tol, noSnap: isNoSnap(e), k });
+      onMarks(s.marks);
+      onSize(dd.id, Math.round(Math.min(0.4, Math.max(0.02, (dd.size * s.w) / dd.box.w)) * 1000) / 1000, 'move');
+    }
+  };
+  const stop = () => {
+    const dd = drag.current;
+    drag.current = null;
+    onMarks(NO_MARKS);
+    if (dd?.moved) onMove(dd.id, dd.x, dd.y, 'end');
+  };
+  const start = (x: VideoText, d: { w: number; h: number }, mode: 'move' | 'size') => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { id: x.id!, px: e.clientX, py: e.clientY, x: x.x, y: x.y, size: x.size, box: { x: x.x * out.w - d.w / 2, y: x.y * out.h - d.h / 2, w: d.w, h: d.h }, mode, moved: false, copy: mode === 'move' && isCopyDrag(e) };
+    onPick({ kind: 'text', id: x.id! });
+  };
   return (
     <>
       {texts.map((x, i) => {
@@ -366,40 +461,68 @@ function Words({ texts, t, out, k, picked, onPick, onMove }: { texts: VideoText[
         const w = d.w * k;
         const h = d.h * k;
         return (
-          <img
-            key={x.id ?? i}
-            src={d.url}
-            alt=""
-            draggable={false}
-            className={cx('absolute z-20 max-w-none cursor-move select-none', sel && 'outline-2 outline-offset-2 outline-white/90 outline-dashed', sel && !on && 'opacity-50')}
-            style={{ left: x.x * out.w * k - w / 2, top: x.y * out.h * k - h / 2, width: w, height: h, touchAction: 'none' }}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              e.currentTarget.setPointerCapture(e.pointerId);
-              drag.current = { id: x.id!, px: e.clientX, py: e.clientY, x: x.x, y: x.y, moved: false };
-              onPick({ kind: 'text', id: x.id! });
-            }}
-            onPointerMove={(e) => {
-              const dd = drag.current;
-              if (!dd) return;
-              if (!dd.moved) {
-                if (Math.hypot(e.clientX - dd.px, e.clientY - dd.py) < 3) return;
-                dd.moved = true;
-                onMove(dd.id, dd.x, dd.y, 'begin');
-              }
-              const nx = Math.min(1, Math.max(0, dd.x + (e.clientX - dd.px) / (out.w * k)));
-              const ny = Math.min(1, Math.max(0, dd.y + (e.clientY - dd.py) / (out.h * k)));
-              onMove(dd.id, Math.round(nx * 1000) / 1000, Math.round(ny * 1000) / 1000, 'move');
-            }}
-            onPointerUp={() => {
-              const dd = drag.current;
-              drag.current = null;
-              if (dd?.moved) onMove(dd.id, dd.x, dd.y, 'end');
-            }}
-          />
+          <div key={x.id ?? i} className="absolute z-20" style={{ left: x.x * out.w * k - w / 2, top: x.y * out.h * k - h / 2, width: w, height: h }}>
+            <img
+              src={d.url}
+              alt=""
+              draggable={false}
+              className={cx('h-full w-full max-w-none cursor-move select-none', sel && 'outline-2 outline-offset-2 outline-white/90 outline-dashed', sel && !on && 'opacity-50')}
+              style={{ touchAction: 'none' }}
+              onPointerDown={start(x, d, 'move')}
+              onPointerMove={move}
+              onPointerUp={stop}
+              onPointerCancel={stop}
+            />
+            {sel && <span className="absolute -right-3 -bottom-3 h-4 w-4 cursor-nwse-resize rounded-full border-2 border-white bg-black/40" title="Size the words" style={{ touchAction: 'none' }} onPointerDown={start(x, d, 'size')} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} />}
+          </div>
         );
       })}
     </>
+  );
+}
+
+/** An overlay's box in pixels of the output (its middle, its width, and the height its picture's shape gives). */
+function overlayBox(o: VideoOverlay, facts: { width: number; height: number } | undefined, out: { w: number; h: number }): SnapBox {
+  const w = o.w * out.w;
+  const h = facts && facts.width ? (w * facts.height) / facts.width : w;
+  return { x: o.x * out.w - w / 2, y: o.y * out.h - h / 2, w, h };
+}
+
+/** The pink of a drag's guides: thin lines, the gaps between parts, and small pills with a distance or a size. */
+function GuideMarks({ marks, k }: { marks: Marks; k: number }) {
+  const pills = [...marks.gaps.map(gapPill), ...marks.pills];
+  if (!marks.guides.length && !pills.length) return null;
+  return (
+    <svg className="pointer-events-none absolute inset-0 z-[45] h-full w-full overflow-visible" aria-hidden>
+      {marks.guides.map((g, i) => (g.axis === 'x' ? <line key={`g${i}`} x1={g.at * k} x2={g.at * k} y1={g.from * k} y2={g.to * k} stroke={GUIDE_COLOUR} strokeWidth={1} /> : <line key={`g${i}`} y1={g.at * k} y2={g.at * k} x1={g.from * k} x2={g.to * k} stroke={GUIDE_COLOUR} strokeWidth={1} />))}
+      {marks.gaps.map((g: SnapGap, i) => (
+        <g key={`p${i}`} stroke={GUIDE_COLOUR} strokeWidth={1}>
+          <line x1={g.x * k} y1={g.y * k} x2={(g.x + g.w) * k} y2={(g.y + g.h) * k} />
+          {g.vertical ? (
+            <>
+              <line x1={g.x * k - 4} x2={g.x * k + 4} y1={g.y * k} y2={g.y * k} />
+              <line x1={g.x * k - 4} x2={g.x * k + 4} y1={(g.y + g.h) * k} y2={(g.y + g.h) * k} />
+            </>
+          ) : (
+            <>
+              <line y1={g.y * k - 4} y2={g.y * k + 4} x1={g.x * k} x2={g.x * k} />
+              <line y1={g.y * k - 4} y2={g.y * k + 4} x1={(g.x + g.w) * k} x2={(g.x + g.w) * k} />
+            </>
+          )}
+        </g>
+      ))}
+      {pills.map((q, i) => {
+        const w = q.text.length * 6.2 + 10;
+        return (
+          <g key={`t${i}`} transform={`translate(${q.x * k} ${q.y * k})`}>
+            <rect x={-w / 2} y={-8} width={w} height={16} rx={5} fill={GUIDE_COLOUR} />
+            <text y={3.8} textAnchor="middle" fontSize={10.5} fontWeight={600} fill="#fff" fontFamily="system-ui, sans-serif">
+              {q.text}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 

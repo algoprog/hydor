@@ -3,15 +3,20 @@
 // titles and captions, V3 and V2 overlays, V1 the clips one after another with their frames and the transitions between
 // them, A1 the clips' own sound with its shape, A2 music, A3 the voice-over. The tools: Select (move, reorder the main
 // track, trim by the ends), Blade (cut where clicked), Trim (roll the cut between two clips) and Hand (move the view).
-// Snapping (N) pulls to the playhead, ends, markers, In and Out. Things of the media panel are dropped on a track.
+// Snapping (N) pulls to the playhead, ends, markers, In and Out: a thing moved lines up by its start or its end,
+// whichever is nearer. Things of the media panel are dropped on a track, and so are files from the desktop (imported,
+// then placed where they were dropped). More than one thing can be picked (Shift or Ctrl and a click, or a box dragged
+// across empty space): they move together, clips as a block in the main track and the rest in time. Right-clicking
+// a marker opens a menu for it.
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeftRight, Eye, EyeOff, Hand, Lock, LockOpen, Magnet, MousePointer2, Plus, Scissors, SeparatorHorizontal, UnfoldHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { audioLength, isStill, overlapFades, overlayLength, sourceAt, timecode, VIDEO_TRANSITIONS, type ClipSpan, type VideoClip, type VideoFactsOf, type VideoRecipe, type VideoTrackId } from '@shared/mediaedit-video';
 import { cx } from '../../../components/ui';
+import { isMod } from '../shell/menus';
 import { playUrl, soundShape, stripUrl } from './api';
 import { useClock, type Clock } from './clock';
 import type { Engine } from './engine';
-import { deleteClip, moveClip, setAudio, setClip, setOverlay, setText, shiftSound, snap, snapTimes, splitClip, splitItem, spansOf, trimClip, type Picked, type PoolItem, type SoundRange } from './model';
+import { moveClip, moveClips, pickedIn, samePick, setAudio, setClip, setOverlay, setText, shiftPicks, snap, snapSpan, snapTimes, splitClip, splitItem, spansOf, trackOf, trimClip, trimItemTo, type Pick1, type Picked, type PoolItem, type SoundRange } from './model';
 import { SoundItem, Wave, type Phase as SoundPhase } from './SoundItem';
 import { Tool } from './shell';
 
@@ -51,6 +56,9 @@ const HEAD = 164;
 const PAD = 10;
 const RULER = 24;
 
+/** Pixels a second that make the whole timeline fit a view `viewW` wide: what Zoom to fit and Shift+Z do. */
+const fitPps = (viewW: number, length: number, compact?: boolean) => Math.max(2, Math.min(600, (viewW - (compact ? 0 : HEAD) - PAD * 3) / Math.max(1, length)));
+
 export interface TimelineProps {
   recipe: VideoRecipe;
   factsOf: VideoFactsOf;
@@ -59,8 +67,13 @@ export interface TimelineProps {
   /** The video being edited: what clips without a src play. */
   main: string;
   fps: number;
-  picked: Picked;
+  /** What is picked: the last is the one the inspector shows. */
+  picks: Pick1[];
   onPick(p: Picked): void;
+  /** Shift or Ctrl and a click: add it to what is picked, or take it out when it is. */
+  onToggle(p: Pick1): void;
+  /** A box dragged across empty space: everything it has crossed so far (and what was picked before, with Shift or Ctrl) is picked. */
+  onPickMany(list: Pick1[]): void;
   change: Change;
   markers: number[];
   onMarkers(m: number[]): void;
@@ -74,7 +87,13 @@ export interface TimelineProps {
   trackUi: Partial<Record<VideoTrackId, TrackUi>>;
   onTrackUi(id: VideoTrackId, u: TrackUi): void;
   onMenu(at: { x: number; y: number }, p: Picked, t: number): void;
+  /** A marker was right-clicked: its menu, for the marker at this index. */
+  onMarkerMenu(at: { x: number; y: number }, index: number): void;
   onDrop(item: PoolItem, row: VideoTrackId, t: number, index: number): void;
+  /** Files dropped from the desktop on a track: to be imported and placed from the time and index of the drop. */
+  onDropFiles(files: File[], row: VideoTrackId, t: number, index: number): void;
+  /** Where Zoom to fit is kept for the keyboard's Shift+Z: the timeline sets it to its own fit, the toolbar's. */
+  fitRef?: { current: (() => void) | null };
   /** A part of one sound picked (Shift and a drag on it): Delete silences it. */
   range: SoundRange;
   onRange(r: SoundRange): void;
@@ -127,6 +146,16 @@ export function Timeline(p: TimelineProps) {
     p.onPps(Math.max(2, Math.min(200, (view.w - (p.compact ? 0 : HEAD) - PAD * 3) / Math.max(4, length))));
   }, [view.w, length]); // eslint-disable-line react-hooks/exhaustive-deps
   const [insertAt, setInsertAt] = useState<number | null>(null);
+  // Shift+Z (the editor's key) asks the timeline for the same fit its button gives.
+  useEffect(() => {
+    if (!p.fitRef) return;
+    p.fitRef.current = () => p.onPps(fitPps(view.w, length, p.compact));
+    return () => {
+      if (p.fitRef) p.fitRef.current = null;
+    };
+  });
+  const [over, setOver] = useState<VideoTrackId | null>(null);
+  const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
 
   /** Seconds at a pointer's x. */
   const tAt = (clientX: number) => {
@@ -134,11 +163,18 @@ export function Timeline(p: TimelineProps) {
     const box = el.getBoundingClientRect();
     return Math.max(0, (clientX - box.left - (p.compact ? 0 : HEAD) + el.scrollLeft - PAD) / pps);
   };
-  const snapped = (t: number, except?: string) => {
+  const snapped = (t: number, except?: string | string[]) => {
     if (!p.snapOn) return t;
     const s = snap(t, snapTimes(r, p.factsOf, { playhead: p.clock.get(), markers: p.markers, inOut: p.inOut, except }), pps);
     setSnapLine(s.to);
     return s.t;
+  };
+  /** A thing of `len` seconds moved to start at `t`: lined up by its start or by its end, whichever is nearer something. */
+  const snappedSpan = (t: number, len: number, except: string | string[]) => {
+    if (!p.snapOn) return t;
+    const s = snapSpan(t, len, snapTimes(r, p.factsOf, { playhead: p.clock.get(), markers: p.markers, inOut: p.inOut, except }), pps);
+    setSnapLine(s.to);
+    return s.start;
   };
 
   // Ctrl (or ⌘) and the wheel zoom about the pointer.
@@ -180,6 +216,7 @@ export function Timeline(p: TimelineProps) {
   };
 
   const locked = (id: VideoTrackId) => !!p.trackUi[id]?.locked;
+  const isPicked = (kind: Pick1['kind'], id: string) => p.picks.some((x) => x.kind === kind && x.id === id);
   const soundStep = (phase: SoundPhase, apply: () => void) => {
     if (phase === 'begin') return p.change.begin();
     apply();
@@ -198,8 +235,17 @@ export function Timeline(p: TimelineProps) {
       p.change((x0) => (pk.kind === 'clip' || pk.kind === 'clipsound' ? splitClip(x0, p.factsOf, pk.id, t) : pk.kind === 'transition' ? x0 : splitItem(x0, p.factsOf, pk.kind, pk.id, t)));
       return;
     }
-    p.onPick(pk);
+    // Shift or Ctrl and a click: it joins what is picked (or leaves it); nothing is dragged.
+    if (e.shiftKey || isMod(e)) {
+      e.stopPropagation();
+      p.onToggle(pk);
+      return;
+    }
+    // One of several picked, pressed: they stay picked and move together; a click without a drag picks just it.
+    const group = p.picks.length > 1 && p.picks.some((x) => samePick(x, pk));
+    if (!group) p.onPick(pk);
     if (locked(row)) return;
+    const move = group ? groupMove(pk, moveBy) : moveBy;
     let t0 = 0;
     let moved = false;
     dragging((t, phase) => {
@@ -209,11 +255,15 @@ export function Timeline(p: TimelineProps) {
       }
       if (!moved && phase === 'move' && Math.abs(t - t0) * pps < 3) return;
       if (!moved) {
+        if (phase === 'end') {
+          if (group) p.onPick(pk);
+          return;
+        }
         moved = true;
         p.change.begin();
-        moveBy(0, t0, 'begin', t0);
+        move(0, t0, 'begin', t0);
       }
-      moveBy(t - t0, t0, phase, t);
+      move(t - t0, t0, phase, t);
       if (phase === 'end') p.change.end();
     })(e);
   };
@@ -229,6 +279,51 @@ export function Timeline(p: TimelineProps) {
     else if (to !== at && to !== at + 1) p.change((x0) => moveClip(x0, id, to));
     void dt;
     void t0;
+  };
+  /** Several clips pressed together: they go as a block to the place dropped on, keeping their order. */
+  const reorderMany = (ids: string[]) => (dt: number, t0: number, phase: Phase, t: number) => {
+    const at = clips.map((c, i) => (ids.includes(c.id!) ? i : -1)).filter((i) => i >= 0);
+    let to = spans.findIndex((s) => t < s.start + s.length / 2);
+    if (to < 0) to = clips.length;
+    // Dropped within a block that is already together: nothing changes.
+    const same = at.every((v, i) => i === 0 || v === at[i - 1] + 1) && to >= at[0] && to <= at[at.length - 1] + 1;
+    if (phase !== 'end') setInsertAt(same ? null : to);
+    else if (!same) p.change((x0) => moveClips(x0, ids, to));
+    void dt;
+    void t0;
+  };
+  /**
+   * What a drag does when the thing pressed is one of several picked (and not on a locked track): clips go as a block in
+   * the main track; overlays, words and sounds move together in time, the group lined up by its start or its end.
+   */
+  const groupMove = (pk: Pick1, alone: (dt: number, t0: number, phase: Phase, t: number) => void) => {
+    const open = p.picks.filter((x) => !locked(trackOf(r, x)));
+    if (pk.kind === 'clip') return reorderMany(open.filter((x) => x.kind === 'clip' || x.kind === 'clipsound').map((x) => x.id));
+    const items = open.filter((x) => x.kind === 'overlay' || x.kind === 'text' || x.kind === 'audio');
+    if (pk.kind === 'clipsound' || !items.some((x) => samePick(x, pk))) return alone;
+    let r0 = r;
+    let from = 0;
+    let len = 0;
+    return (dt: number, t0: number, phase: Phase) => {
+      if (phase === 'begin') {
+        r0 = r;
+        const ext = items.map((x) => {
+          if (x.kind === 'text') {
+            const t = r0.texts?.find((y) => y.id === x.id);
+            return [t?.from ?? 0, t?.to ?? 0];
+          }
+          const o = x.kind === 'overlay' ? r0.overlays?.find((y) => y.id === x.id) : r0.audio?.find((y) => y.id === x.id);
+          const f = p.factsOf(o?.src);
+          return [o?.start ?? 0, (o?.start ?? 0) + (x.kind === 'overlay' ? overlayLength(o as never, f) : audioLength(o as never, f))];
+        });
+        from = Math.min(...ext.map((v) => v[0]));
+        len = Math.max(...ext.map((v) => v[1])) - from;
+        return;
+      }
+      const s = Math.max(0, snappedSpan(from + dt, len, items.map((x) => x.id)));
+      p.change(() => shiftPicks(r0, items, s - from));
+      void t0;
+    };
   };
   const trimEdge = (id: string, edge: 'start' | 'end') => {
     let first: VideoClip | null = null;
@@ -274,7 +369,9 @@ export function Timeline(p: TimelineProps) {
       const it = r0.item;
       if (!it) return;
       const start = kind === 'text' ? it.from : it.start;
-      const s = Math.max(0, snapped(start + dt, id));
+      const f = p.factsOf(it.src);
+      const len = kind === 'text' ? it.to - it.from : kind === 'overlay' ? overlayLength(it, f) : audioLength(it, f);
+      const s = Math.max(0, snappedSpan(start + dt, len, id));
       p.change((x0) =>
         kind === 'overlay' ? setOverlay(x0, id, (o) => ({ ...o, start: Math.round(s * 1000) / 1000 })) : kind === 'audio' ? setAudio(x0, id, (a) => ({ ...a, start: Math.round(s * 1000) / 1000 })) : setText(x0, id, (x1) => ({ ...x1, from: Math.round(s * 1000) / 1000, to: Math.round((s + (it.to - it.from)) * 1000) / 1000 })),
       );
@@ -292,25 +389,8 @@ export function Timeline(p: TimelineProps) {
         return;
       }
       if (!first) return;
-      const s = snapped(t, id);
-      const ms = (v: number) => Math.round(v * 1000) / 1000;
-      p.change((x0) => {
-        if (kind === 'text') return setText(x0, id, (x1) => (edge === 'start' ? { ...x1, from: ms(Math.min(s, first.to - 0.1)) } : { ...x1, to: ms(Math.max(s, first.from + 0.1)) }));
-        const f = p.factsOf(first.src);
-        const len = kind === 'overlay' ? overlayLength(first, f) : audioLength(first, f);
-        const [a, b] = first.trim ?? [0, f?.duration ?? len];
-        if (edge === 'end') {
-          const nl = Math.max(0.1, s - first.start);
-          if (kind === 'overlay' && (first.picture || f?.picture)) return setOverlay(x0, id, (o) => ({ ...o, length: ms(nl) }));
-          const nb = Math.min(f?.duration ?? a + nl, a + nl);
-          return kind === 'overlay' ? setOverlay(x0, id, (o) => ({ ...o, trim: [a, ms(nb)] })) : setAudio(x0, id, (m) => ({ ...m, trim: [a, ms(nb)] }));
-        }
-        const d = Math.max(-first.start, Math.min(len - 0.1, s - first.start));
-        if (kind === 'overlay' && (first.picture || f?.picture)) return setOverlay(x0, id, (o) => ({ ...o, start: ms(first.start + d), length: ms(len - d) }));
-        const na = Math.max(0, a + d);
-        const nd = na - a;
-        return kind === 'overlay' ? setOverlay(x0, id, (o) => ({ ...o, start: ms(first.start + nd), trim: [ms(na), b] })) : setAudio(x0, id, () => ({ ...first, ...shiftSound(first, -nd, len - nd), start: ms(first.start + nd), trim: [ms(na), b] }));
-      });
+      const s0 = snapped(t, id);
+      p.change((x0) => trimItemTo(x0, p.factsOf, kind, first, edge, s0));
       if (phase === 'end') p.change.end();
     })(e);
   };
@@ -318,7 +398,8 @@ export function Timeline(p: TimelineProps) {
   const menu = (pk: Picked) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (pk) p.onPick(pk);
+    // Right-clicking one of several picked keeps them picked: the menu is for all of them.
+    if (pk && !isPicked(pk.kind, pk.id)) p.onPick(pk);
     p.onMenu({ x: e.clientX, y: e.clientY }, pk, tAt(e.clientX));
   };
 
@@ -345,16 +426,62 @@ export function Timeline(p: TimelineProps) {
 
   // Things of the media panel dropped on a track.
   const drop = (row: Row) => (e: React.DragEvent) => {
+    setOver(null);
     const raw = e.dataTransfer.getData('application/x-hydor-media');
-    if (!raw) return;
+    const files = raw ? [] : Array.from(e.dataTransfer.files);
+    if (!raw && !files.length) return;
     e.preventDefault();
-    const it = p.pool.find((x0) => x0.src === raw);
-    if (!it) return;
+    if (locked(row.id)) return;
     const t = tAt(e.clientX);
     let index = spans.findIndex((s) => t < s.start + s.length / 2);
     if (index < 0) index = clips.length;
-    p.onDrop(it, row.id, snapped(t), index);
     setSnapLine(null);
+    // Files from the desktop are imported, then placed here; a thing of the media panel is placed at once.
+    if (files.length) return p.onDropFiles(files, row.id, snapped(t), index);
+    const it = p.pool.find((x0) => x0.src === raw);
+    if (it) p.onDrop(it, row.id, snapped(t), index);
+    setSnapLine(null);
+  };
+  const droppable = (e: React.DragEvent) => e.dataTransfer.types.includes('application/x-hydor-media') || e.dataTransfer.types.includes('Files');
+
+  /** A drag from empty space: a box that picks what it crosses (a click without a drag moves the playhead there). */
+  const marquee = (e: React.PointerEvent) => {
+    const el = scroller.current!;
+    const target = e.currentTarget as HTMLElement;
+    const add = e.shiftKey || isMod(e);
+    const base = add ? p.picks : [];
+    const down = { x: e.clientX, y: e.clientY, t: tAt(e.clientX) };
+    let moved = false;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 4) return;
+      moved = true;
+      const b = el.getBoundingClientRect();
+      setBox({ x0: down.x - b.left + el.scrollLeft, y0: down.y - b.top + el.scrollTop, x1: ev.clientX - b.left + el.scrollLeft, y1: ev.clientY - b.top + el.scrollTop });
+      // The tracks the box reaches down to, and the times it spans.
+      const lo = Math.min(down.y, ev.clientY);
+      const hi = Math.max(down.y, ev.clientY);
+      const rows = new Set<VideoTrackId>();
+      el.querySelectorAll<HTMLElement>('[data-track]').forEach((n) => {
+        const q = n.getBoundingClientRect();
+        if (q.bottom > lo && q.top < hi) rows.add(n.dataset.track as VideoTrackId);
+      });
+      const found = pickedIn(r, p.factsOf, down.t, tAt(ev.clientX), rows);
+      p.onPickMany([...base, ...found.filter((x) => !base.some((y) => samePick(x, y)))]);
+    };
+    const up = (ev: PointerEvent) => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+      setBox(null);
+      if (moved || ev.type === 'pointercancel') return;
+      if (!add) p.onPick(null);
+      p.engine.seek(snapped(down.t));
+      setSnapLine(null);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
   };
 
   const ph = (h: Row) => h.h[p.trackUi[h.id]?.tall ? 1 : 0];
@@ -374,16 +501,19 @@ export function Timeline(p: TimelineProps) {
               {!p.compact && <TrackHead row={row} {...p} />}
               <div
                 data-track={row.id}
-                className={cx('relative min-w-0 flex-1', row.kind === 'clip' ? 'bg-bg-1' : 'bg-bg', locked(row.id) && 'opacity-60')}
+                className={cx('relative min-w-0 flex-1', row.kind === 'clip' ? 'bg-bg-1' : 'bg-bg', locked(row.id) && 'opacity-60', over === row.id && 'bg-accent/10')}
                 style={{ width }}
                 onPointerDown={(e) => {
                   if (e.button !== 0 || p.tool === 'hand' || e.target !== e.currentTarget) return;
-                  p.onPick(null);
-                  p.engine.seek(snapped(tAt(e.clientX)));
-                  setSnapLine(null);
+                  marquee(e);
                 }}
                 onContextMenu={menu(null)}
-                onDragOver={(e) => e.dataTransfer.types.includes('application/x-hydor-media') && e.preventDefault()}
+                onDragOver={(e) => {
+                  if (!droppable(e)) return;
+                  e.preventDefault();
+                  setOver(row.id);
+                }}
+                onDragLeave={() => setOver((o) => (o === row.id ? null : o))}
                 onDrop={drop(row)}
               >
                 {row.kind === 'clip' &&
@@ -397,7 +527,7 @@ export function Timeline(p: TimelineProps) {
                       h={ph(row)}
                       main={p.main}
                       factsOf={p.factsOf}
-                      picked={p.picked?.kind === 'clip' && p.picked.id === c.id}
+                      picked={isPicked('clip', c.id!)}
                       hidden={!!r.tracks?.v1?.hidden}
                       onPress={press({ kind: 'clip', id: c.id! }, 'v1', reorder(c.id!))}
                       onStart={trimEdge(c.id!, 'start')}
@@ -415,7 +545,7 @@ export function Timeline(p: TimelineProps) {
                         x={x}
                         pps={pps}
                         h={ph(row)}
-                        picked={p.picked?.kind === 'transition' && p.picked.id === c.id}
+                        picked={isPicked('transition', c.id!)}
                         onPick={() => p.onPick({ kind: 'transition', id: c.id! })}
                         onAdd={() => p.change((x0) => setClip(x0, c.id!, (y) => ({ ...y, transition: { kind: 'dissolve', length: Math.min(1, Math.floor((Math.min(spans[i].length, spans[i + 1].length) / 2) * 10) / 10) } })))}
                         onMenu={menu({ kind: 'transition', id: c.id! })}
@@ -450,7 +580,7 @@ export function Timeline(p: TimelineProps) {
                         fadeIn={c.soundFadeIn}
                         fadeOut={c.soundFadeOut}
                         channels={c.channels}
-                        picked={(p.picked?.kind === 'clipsound' || p.picked?.kind === 'clip') && p.picked.id === id}
+                        picked={isPicked('clipsound', id) || isPicked('clip', id)}
                         dim={!!r.tracks?.a1?.mute}
                         tone="clip"
                         locked={locked('a1')}
@@ -480,7 +610,7 @@ export function Timeline(p: TimelineProps) {
                           left={x(o.start)}
                           width={len * pps}
                           tone="overlay"
-                          picked={p.picked?.kind === 'overlay' && p.picked.id === o.id}
+                          picked={isPicked('overlay', o.id!)}
                           label={o.name ?? 'Overlay'}
                           thumb={o.picture || f?.picture ? playUrl(o.src) : f ? stripUrl(o.src, 1, 64, o.trim?.[0] ?? 0, (o.trim?.[0] ?? 0) + 0.2) : undefined}
                           onPress={press({ kind: 'overlay', id: o.id! }, row.id, moveItem('overlay', o.id!))}
@@ -497,7 +627,7 @@ export function Timeline(p: TimelineProps) {
                       left={x(t.from)}
                       width={(t.to - t.from) * pps}
                       tone={t.caption ? 'caption' : 'text'}
-                      picked={p.picked?.kind === 'text' && p.picked.id === t.id}
+                      picked={isPicked('text', t.id!)}
                       label={<span translate="no">{t.text.split('\n')[0]}</span>}
                       onPress={press({ kind: 'text', id: t.id! }, 't1', moveItem('text', t.id!))}
                       onStart={itemEdge('text', t.id!, 'start', 't1')}
@@ -530,7 +660,7 @@ export function Timeline(p: TimelineProps) {
                           fadeOut={a.fadeOut}
                           cross={cross.get(id)}
                           channels={a.channels}
-                          picked={p.picked?.kind === 'audio' && p.picked.id === id}
+                          picked={isPicked('audio', id)}
                           dim={!!r.tracks?.[row.id]?.mute}
                           tone={a.track === 'voice' ? 'voice' : 'music'}
                           label={<span translate="no">{a.name ?? 'Sound'}</span>}
@@ -554,6 +684,7 @@ export function Timeline(p: TimelineProps) {
           ))}
           {/* The playhead, the snap line, In and Out across every track. */}
           <Overlay {...p} x={x} snapLine={snapLine} />
+          {box && <div className="pointer-events-none absolute z-30 rounded-[2px] border border-accent bg-accent/15" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} />}
         </div>
       </div>
     </div>
@@ -592,7 +723,7 @@ function TimelineBar(p: TimelineProps & { length: number; viewW: number }) {
       <Tool label="Zoom in" keys="+" onClick={() => zoom(1.5)}>
         <ZoomIn size={15} />
       </Tool>
-      <Tool label="Zoom to fit" keys="Shift+Z" onClick={() => p.onPps(Math.max(2, Math.min(600, (p.viewW - HEAD - PAD * 3) / Math.max(1, p.length))))}>
+      <Tool label="Zoom to fit" keys="Shift+Z" onClick={() => p.onPps(fitPps(p.viewW, p.length))}>
         <UnfoldHorizontal size={15} />
       </Tool>
     </div>
@@ -636,12 +767,13 @@ function Ruler(p: TimelineProps & { width: number; length: number; x: (t: number
         <button
           key={i}
           type="button"
-          title={`Marker at ${clockLabel(m, 0.1)}: click to go there, right-click to remove it`}
+          title={`Marker at ${clockLabel(m, 0.1)}: click to go there, right-click for more`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => p.engine.seek(m)}
           onContextMenu={(e) => {
             e.preventDefault();
-            p.onMarkers(p.markers.filter((_, j) => j !== i));
+            e.stopPropagation();
+            p.onMarkerMenu({ x: e.clientX, y: e.clientY }, i);
           }}
           className="absolute bottom-0 h-3 w-3 -translate-x-1/2 bg-warn [clip-path:polygon(0_0,100%_0,100%_60%,50%_100%,0_60%)]"
           style={{ left: p.x(m) }}
@@ -865,14 +997,4 @@ function Junction({ c, next, x, pps, h, picked, onPick, onAdd, onMenu }: { c: Vi
       <span className="truncate px-0.5">{t.length * pps > 60 ? label : '⧓'}</span>
     </button>
   );
-}
-
-/** A clip or an item removed by the keyboard's Delete (and Shift for a ripple), as the timeline's menu does. */
-export function deletePicked(r: VideoRecipe, f: VideoFactsOf, p: Picked, ripple: boolean): VideoRecipe {
-  if (!p) return r;
-  if (p.kind === 'clip') return deleteClip(r, f, p.id, { ripple });
-  if (p.kind === 'transition') return setClip(r, p.id, (c) => ({ ...c, transition: undefined }));
-  if (p.kind === 'overlay') return { ...r, overlays: (r.overlays ?? []).filter((o) => o.id !== p.id) };
-  if (p.kind === 'audio') return { ...r, audio: (r.audio ?? []).filter((a) => a.id !== p.id) };
-  return { ...r, texts: (r.texts ?? []).filter((t) => t.id !== p.id) };
 }

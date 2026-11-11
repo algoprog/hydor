@@ -13,6 +13,8 @@ import { AudioLines, Clapperboard, Download, Film, Palette, Plus, Redo2, Scissor
 import { viaLink } from '../../lib/machine';
 import {
   captionsSrt,
+  captionsVtt,
+  parseCaptions,
   CAPTION_STYLES,
   clipSpans,
   isPlainRecipe,
@@ -31,9 +33,10 @@ import {
   type VideoSaveTo,
   type VideoText,
   type VideoTrackId,
+  MAX_TEXTS,
   SOUND_CHANNELS,
 } from '@shared/mediaedit-video';
-import { Button, cx, Empty, IconButton, Throbber, useIsMobile } from '../../components/ui';
+import { Button, cx, Empty, IconButton, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
@@ -47,32 +50,44 @@ import { Engine } from './video/engine';
 import { ExportPage, type ExportSettings, type Making } from './video/ExportPage';
 import { useHistory } from './video/history';
 import { Inspector } from './video/Inspector';
-import { MediaPanel } from './video/MediaPanel';
+import { importFile, kindOfFile, MediaPanel } from './video/MediaPanel';
 import {
   canDetach,
   clipAtTime,
   clipFor,
-  deleteClip,
-  deleteItem,
-  linkSound,
-  silenceClips,
-  silencePart,
-  type SoundRange,
+  copyPicks,
+  cutTimes,
+  deletePicks,
   detachSound,
+  duplicatePicks,
   freezeFrame,
   insertClip,
+  linkSound,
+  neighbourCut,
+  pasteAttributes,
+  pasteBoard,
   pickedThing,
   setClip,
   setOverlay,
+  silenceClips,
+  silencePart,
   splitClip,
-  splitItem,
+  splitPicks,
   tidy,
+  togglePick,
+  trackOf,
+  trimToPlayhead,
   withIds,
+  type Board,
   type Edit,
+  type Pick1,
   type Picked,
   type PoolItem,
+  type SoundRange,
 } from './video/model';
-import { ContextMenu, MenuBar, StatusBar, Splitter, StepsContext, useRemembered, WorkspaceTabs, type MenuDef, type MenuEntry } from './video/shell';
+import { ContextMenu, isMenuKey, MenuBar, runMenuKeys, shortcutGroups, ShortcutsDialog, type ContextMenuAt, type MenuDef, type MenuEntry, type ShortcutGroup } from './shell';
+import { COPY_DRAG_KEY, NO_SNAP_KEY } from '../pages/common/keys';
+import { StatusBar, Splitter, StepsContext, useRemembered, WorkspaceTabs } from './video/shell';
 import { soundEditor } from './video/soundHook';
 import { drawText } from './video/text';
 import { Timeline, type Change, type TimelineTool, type TrackUi } from './video/Timeline';
@@ -214,7 +229,15 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
 
   // ---- what the editor shows ------------------------------------------------------------------------------------------
   const [workspace, setWorkspace] = useState<Workspace>('edit');
-  const [picked, setPicked] = useState<Picked>(null);
+  // What is picked: the last one is what the inspector shows. Shift or Ctrl and a click adds one, a box dragged across empty
+  // space picks what it crosses, and the commands (copy, delete, split, move…) work on all of them.
+  const [picks, setPicks] = useState<Pick1[]>([]);
+  const picked: Picked = picks.length ? picks[picks.length - 1] : null;
+  const setPicked = useCallback((p: Picked) => setPicks(p ? [p] : []), []);
+  // What Copy and Cut keep, for Paste and Paste attributes.
+  const [board, setBoard] = useState<Board | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [confirm, confirmNode] = useConfirm();
   const [tool, setTool] = useState<TimelineTool>('select');
   const [snapOn, setSnapOn] = useRemembered('snap', true);
   const [pps, setPps] = useState(40);
@@ -230,7 +253,10 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   const [last, setLast] = useState<VideoEditJob | null>(null);
   const [captionsBusy, setCaptionsBusy] = useState<string | null>(null);
   const [range, setRange] = useState<SoundRange>(null);
-  const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuEntry[] } | null>(null);
+  const [menu, setMenu] = useState<{ at: ContextMenuAt; items: MenuEntry[] } | null>(null);
+  const [sending, setSending] = useState<{ name: string; share: number }[]>([]);
+  const captionFile = useRef<HTMLInputElement>(null);
+  const fitRef = useRef<(() => void) | null>(null);
   const [sheet, setSheet] = useState<'inspector' | 'media' | 'colour' | 'audio' | 'export' | null>(null);
   const [mediaW, setMediaW] = useRemembered('media', 260);
   const [inspW, setInspW] = useRemembered('inspector', 300);
@@ -251,9 +277,12 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   }, [picked]); // eslint-disable-line react-hooks/exhaustive-deps
   // A picked thing that is gone is no longer picked; nothing is cropped once its clip is gone.
   useEffect(() => {
-    if (picked && !pickedThing(r, picked)) setPicked(null);
+    setPicks((x) => {
+      const kept = x.filter((q) => pickedThing(r, q));
+      return kept.length === x.length ? x : kept;
+    });
     if (cropping && !r.clips?.some((c) => c.id === cropping.id)) setCropping(null);
-  }, [r, picked, cropping]);
+  }, [r, cropping]);
 
   const addPool = (it: PoolItem) => setPool((x) => (x.some((y) => y.src === it.src) ? x : [...x, it]));
   const use = (it: PoolItem, row?: VideoTrackId, t?: number, index?: number) => {
@@ -276,26 +305,126 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   };
 
   // ---- the commands ---------------------------------------------------------------------------------------------------
-  const splitHere = () => {
+  /** Whether a track is locked (its header's lock): every command leaves what is on it as it is. */
+  const locked = (t: VideoTrackId) => !!trackUi[t]?.locked;
+  /** What is picked, without what is on a locked track. */
+  const unlocked = (ps: Pick1[] = picks) => ps.filter((q) => !locked(trackOf(r, q)));
+  const lockedNote = () => toast(tr('That track is locked: unlock it in its header first'), 'info');
+  /** Cuts what is picked at the playhead (the ones it falls inside); with nothing picked, the clip under the playhead. */
+  const splitHere = (ps: Pick1[] = picks) => {
     const t = clock.get();
-    if (picked && picked.kind !== 'clip' && picked.kind !== 'clipsound' && picked.kind !== 'transition') return change((x) => splitItem(x, factsOf, picked.kind as 'overlay' | 'text' | 'audio', picked.id, t));
+    if (ps.length) {
+      const live = unlocked(ps);
+      if (!live.length) return lockedNote();
+      if (!splitPicks(r, factsOf, live, t).done) return toast(tr('The playhead is not on what is picked: move it onto it first'), 'info');
+      return change((x) => splitPicks(x, factsOf, live, t).recipe);
+    }
+    if (locked('v1')) return lockedNote();
     const at = clipAtTime(r, factsOf, t, true);
     if (at) change((x) => splitClip(x, factsOf, at.clip.id!, t));
   };
-  const remove = (ripple: boolean) => {
-    // A part of a sound picked: silenced, the picture kept.
+  /** What is picked taken out in one step (not what is on a locked track); a part of a sound picked is silenced instead. */
+  const remove = (ripple: boolean, ps: Pick1[] = picks) => {
     if (range) {
+      if (locked(range.kind === 'clip' ? 'a1' : trackOf(r, { kind: 'audio', id: range.id }))) return lockedNote();
       change((x) => silencePart(x, factsOf, range.kind, range.id, range.from, range.to));
       return setRange(null);
     }
-    if (!picked) return;
-    if (picked.kind === 'clipsound') return change((x) => setClip(x, picked.id, (c) => ({ ...c, mute: true, volume: undefined, sound: undefined })));
-    if (picked.kind === 'clip') {
-      if ((r.clips ?? []).length < 2) return toast(tr('That is the only clip: add another first, or split it and delete a part'), 'info');
-      change((x) => deleteClip(x, factsOf, picked.id, { ripple }));
-    } else if (picked.kind === 'transition') change((x) => setClip(x, picked.id, (c) => ({ ...c, transition: undefined })));
-    else change((x) => deleteItem(x, factsOf, picked.kind as 'overlay' | 'text' | 'audio', picked.id, { ripple }));
-    setPicked(null);
+    if (!ps.length) return;
+    const live = unlocked(ps);
+    if (!live.length) return lockedNote();
+    if (!deletePicks(r, factsOf, live, { ripple }).done) return toast(tr(live.every((q) => q.kind === 'clip') ? 'That is the only clip: add another first, or split it and delete a part' : 'There is nothing there to delete'), 'info');
+    change((x) => deletePicks(x, factsOf, live, { ripple }).recipe);
+    // A clip's sound only silenced stays picked, as its clip is; what is on a locked track stays too.
+    setPicks(ps.filter((q) => q.kind === 'clipsound' || !live.some((l) => l.kind === q.kind && l.id === q.id)));
+  };
+  const copyPicked = (ps: Pick1[] = picks) => {
+    const b = copyPicks(r, ps);
+    if (!b) return toast(tr('Pick something on the timeline to copy'), 'info');
+    setBoard(b);
+  };
+  const cutPicked = (ps: Pick1[] = picks) => {
+    const live = unlocked(ps);
+    if (!ps.length) return toast(tr('Pick something on the timeline to cut'), 'info');
+    if (!live.length) return lockedNote();
+    const b = copyPicks(r, live);
+    if (!b) return;
+    if (!deletePicks(r, factsOf, live).done) return toast(tr('That is the only clip: add another first, or split it and delete a part'), 'info');
+    setBoard(b);
+    change((x) => deletePicks(x, factsOf, live).recipe);
+    setPicks(ps.filter((q) => !live.some((l) => l.kind === q.kind && l.id === q.id)));
+  };
+  /** The copied things put at the playhead: clips at the cut nearest it, the rest from it, on the picked part's track or the track they came from. */
+  const pasteHere = (ps: Pick1[] = picks) => {
+    if (!board) return toast(tr('Nothing is copied yet: pick something and copy it first'), 'info');
+    const t = clock.get();
+    let index = spans.findIndex((s) => t < s.start + s.length / 2);
+    if (index < 0) index = (r.clips ?? []).length;
+    const last = ps[ps.length - 1];
+    const ov = last?.kind === 'overlay' ? (r.overlays ?? []).find((o) => o.id === last.id) : undefined;
+    const au = last?.kind === 'audio' ? (r.audio ?? []).find((a) => a.id === last.id) : undefined;
+    const overlayTrack = ov ? (ov.track === 3 ? 3 : 2) : undefined;
+    const audioTrack = au?.track;
+    const rows: VideoTrackId[] = [
+      ...(board.clips.length ? (['v1'] as const) : []),
+      ...(board.texts.length ? (['t1'] as const) : []),
+      ...board.overlays.map((o): VideoTrackId => ((overlayTrack ?? o.track) === 3 ? 'v3' : 'v2')),
+      ...board.audio.map((a): VideoTrackId => ((audioTrack ?? a.track) === 'voice' ? 'a3' : 'a2')),
+    ];
+    if (rows.some(locked)) return lockedNote();
+    const res = pasteBoard(r, factsOf, board, { index, at: t, overlayTrack, audioTrack });
+    if (!res) return toast(tr('That is more than the timeline can hold'), 'info');
+    change(() => res.recipe);
+    setPicks(res.picks);
+  };
+  /** The picked things copied and put right after themselves. */
+  const duplicatePicked = (ps: Pick1[] = picks) => {
+    const live = unlocked(ps);
+    if (!ps.length) return toast(tr('Pick something on the timeline to duplicate'), 'info');
+    if (!live.length) return lockedNote();
+    const res = duplicatePicks(r, factsOf, live);
+    if (!res) return toast(tr('That is more than the timeline can hold'), 'info');
+    if (locked('v1') && res.picks.some((q) => q.kind === 'clip')) return lockedNote();
+    change(() => res.recipe);
+    setPicks(res.picks);
+  };
+  /** The look, speed, colour, volume and fades of the copied clip (or part) put on what is picked. */
+  const pasteAttrs = (ps: Pick1[] = picks) => {
+    if (!board) return toast(tr('Nothing is copied yet: pick something and copy it first'), 'info');
+    const live = unlocked(ps);
+    if (!live.length) return ps.length ? lockedNote() : toast(tr('Pick what to paste the attributes onto'), 'info');
+    const res = pasteAttributes(r, board, live);
+    if (!res.changed) return toast(tr('Those do not fit: copy a clip, overlay, words or sound of the same kind as what is picked'), 'info');
+    change(() => res.recipe);
+  };
+  /** The start (Q) or the end (W) of what is picked brought to the playhead, what was before (or after) it cut away. */
+  const trimTo = (edge: 'start' | 'end', ps: Pick1[] = picks) => {
+    const live = unlocked(ps);
+    if (!ps.length) return toast(tr('Pick a clip or part on the timeline to trim'), 'info');
+    if (!live.length) return lockedNote();
+    const t = clock.get();
+    let next = r;
+    for (const q of live) next = trimToPlayhead(next, factsOf, q, edge, t);
+    if (next === r) return toast(tr('The playhead is not inside what is picked: move it onto it first'), 'info');
+    change(() => next);
+  };
+  const selectAll = () => setPicks([...(r.clips ?? []).map((c): Pick1 => ({ kind: 'clip', id: c.id! })), ...(r.overlays ?? []).map((o): Pick1 => ({ kind: 'overlay', id: o.id! })), ...(r.texts ?? []).map((x): Pick1 => ({ kind: 'text', id: x.id! })), ...(r.audio ?? []).map((a): Pick1 => ({ kind: 'audio', id: a.id! }))]);
+  /** The playhead to the cut before (-1) or after (1) it: the start, each cut between clips, the end. */
+  const goCut = (dir: 1 | -1) => {
+    const to = neighbourCut(cutTimes(spans, length), clock.get(), dir);
+    if (to !== null) engine.seek(to);
+  };
+  const markIn = () => setInOut([clock.get(), inOut[1] !== null && inOut[1] <= clock.get() ? null : inOut[1]]);
+  const markOut = () => setInOut([inOut[0] !== null && inOut[0] >= clock.get() ? null : inOut[0], clock.get()]);
+  const addMarker = (t = clock.get()) => h.set((x) => ({ ...x, markers: [...x.markers.filter((m) => Math.abs(m - t) > 1e-3), t].sort((a, b) => a - b) }));
+  /** What a drag with Ctrl (⌥ on a Mac) in the viewer does at its start: a copy of the overlay or words, picked, made in the step the drag began. */
+  const copyDragged = (thing: { kind: 'overlay' | 'text'; id: string }): string | null => {
+    const id = videoId();
+    const has = thing.kind === 'overlay' ? (r.overlays ?? []).some((o) => o.id === thing.id) : (r.texts ?? []).some((x) => x.id === thing.id);
+    if (!has) return null;
+    change((x) => (thing.kind === 'overlay' ? { ...x, overlays: (x.overlays ?? []).flatMap((o) => (o.id === thing.id ? [o, { ...o, id }] : [o])) } : { ...x, texts: (x.texts ?? []).flatMap((q) => (q.id === thing.id ? [q, { ...q, id }] : [q])) }));
+    setPicks([{ kind: thing.kind, id }]);
+    return id;
   };
   const addText = () => {
     const t = Math.min(clock.get(), Math.max(0, length - 0.5));
@@ -318,18 +447,50 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
     const open = soundEditor();
     if (open) open({ ...s, label: o.title });
   };
-  const downloadSrt = () => {
+  /** The captions (or, with none, all the words) as a file to download: .srt or .vtt. */
+  const downloadCaptions = (kind: 'srt' | 'vtt') => {
     const caps = (r.texts ?? []).filter((t) => t.caption);
-    const text = captionsSrt(caps.length ? caps : (r.texts ?? []));
+    const list = caps.length ? caps : (r.texts ?? []);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type: 'application/x-subrip' }));
-    a.download = `${stemOf(o.title) || 'captions'}.srt`;
+    a.href = URL.createObjectURL(new Blob([kind === 'srt' ? captionsSrt(list) : captionsVtt(list)], { type: kind === 'srt' ? 'application/x-subrip' : 'text/vtt' }));
+    a.download = `${stemOf(o.title) || 'captions'}.${kind}`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+  const downloadSrt = () => downloadCaptions('srt');
+  const downloadVtt = () => downloadCaptions('vtt');
+  /** Captions put on T1 (the style of those already there, or Classic), taking the place of the ones there, if any. */
+  const putCaptions = (list: { from: number; to: number; text: string }[]) => {
+    const old = (r.texts ?? []).filter((t) => t.caption);
+    const style = old[0] ?? { ...CAPTION_STYLES[0].set };
+    const room = MAX_TEXTS - (r.texts ?? []).length + old.length;
+    const made = list.slice(0, Math.max(0, room));
+    change((x) => ({ ...x, texts: [...(x.texts ?? []).filter((t) => !t.caption), ...made.map((c) => ({ id: videoId(), text: c.text, from: c.from, to: c.to, x: 0.5, y: style.y, size: style.size, color: style.color, background: style.background, outline: style.outline, bold: style.bold || undefined, caption: true }))] }));
+    return made.length;
+  };
+  /** Whether the captions on T1 may be replaced: yes when there are none; else the person is asked, as they may have changed them. */
+  const mayReplaceCaptions = async (what: string) => {
+    const n = (r.texts ?? []).filter((t) => t.caption).length;
+    if (!n) return true;
+    return confirm({ title: tr('Replace the captions?'), body: tr(`The ${n} caption${n === 1 ? '' : 's'} on T1 will be replaced by ${what}, including any you changed. Undo brings them back.`), confirm: tr('Replace them'), danger: true });
+  };
+  /** Captions from an .srt or .vtt file, on T1. */
+  const importCaptions = async (file: File) => {
+    let list: ReturnType<typeof parseCaptions>;
+    try {
+      list = parseCaptions(await file.text());
+    } catch (err) {
+      return toastError(err);
+    }
+    if (!list.length) return toast(tr('No captions were found in that file: it should be an .srt or .vtt file with times and words'), 'info');
+    if (!(await mayReplaceCaptions(tr(`the ${list.length} in the file`)))) return;
+    const n = putCaptions(list);
+    toast(n < list.length ? tr(`${n} of the ${list.length} captions were added: the most the timeline holds`) : tr(`${n} captions added: change them on the T1 track`), 'ok');
   };
   const captionsCtl = useRef<AbortController | null>(null);
   const makeCaps = async () => {
     if (captionsBusy) return;
+    if (!(await mayReplaceCaptions(tr('the ones made from what is said')))) return;
     setCaptionsBusy(tr('Listening to the video…'));
     const ac = new AbortController();
     captionsCtl.current = ac;
@@ -337,15 +498,50 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       const recipe = normalizeVideoRecipe(r, factsOf);
       const res = await makeCaptions({ src: o.src, recipe, lang: navigator.language }, ac.signal);
       if (!res.captions.length) return toast(tr('No speech was heard in it, so there are no captions to make'), 'info');
-      const style = CAPTION_STYLES[0].set;
-      change((x) => ({ ...x, texts: [...(x.texts ?? []).filter((t) => !t.caption), ...res.captions.map((c) => ({ id: videoId(), text: c.text, from: c.from, to: c.to, x: 0.5, y: style.y, size: style.size, color: style.color, background: style.background, bold: style.bold || undefined, caption: true }))] }));
-      toast(tr(`${res.captions.length} captions made: change them on the T1 track`), 'ok');
+      const n = putCaptions(res.captions);
+      toast(tr(`${n} captions made: change them on the T1 track`), 'ok');
     } catch (err) {
       if (!ac.signal.aborted) toastError(err);
     } finally {
       setCaptionsBusy(null);
       captionsCtl.current = null;
     }
+  };
+
+  // ---- files from this device: the media panel's picker, or dropped on it or on the timeline ----------------------------------
+  /** Files imported (sent, read, added to the media panel), then given to `place` to put on the timeline; captions files become captions. */
+  const bring = async (files: File[], place?: (it: PoolItem, n: number) => void) => {
+    let n = 0;
+    for (const f of files) {
+      const kind = kindOfFile(f);
+      if (kind === 'captions') {
+        await importCaptions(f);
+        continue;
+      }
+      if (!kind) {
+        toast(tr(`${f.name} is not a video, picture, sound or captions file, so it cannot be added`), 'info');
+        continue;
+      }
+      const row = { name: f.name.replace(/\.[^.]+$/, ''), share: 0 };
+      setSending((x) => [...x, row]);
+      try {
+        const it = await importFile(f, kind, (share) => setSending((x) => x.map((y) => (y === row ? { ...y, share } : y))));
+        addPool(it);
+        place?.(it, n++);
+      } catch (err) {
+        toastError(err);
+      } finally {
+        setSending((x) => x.filter((y) => y !== row));
+      }
+    }
+  };
+  /** Files dropped on a track: each placed from where they were dropped (clips one after another, others one after another in time). */
+  const dropFiles = (files: File[], row: VideoTrackId, t: number, index: number) => {
+    let at = t;
+    void bring(files, (it, n) => {
+      use(it, row, at, index + n);
+      at += it.kind === 'picture' ? 4 : it.facts.duration;
+    });
   };
 
   // ---- saving ---------------------------------------------------------------------------------------------------------
@@ -406,25 +602,42 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
 
   // ---- menus ------------------------------------------------------------------------------------------------------------
   const pc = picked?.kind === 'clip' ? (r.clips ?? []).find((c) => c.id === picked.id) : undefined;
-  const pcFacts = pc ? factsOf(pc.src) : undefined;
-  const setPc = (patch: Record<string, unknown>) => pc && change((x) => setClip(x, pc.id!, (c) => ({ ...c, ...patch })));
-  const clipMenu = (c: NonNullable<typeof pc>): MenuEntry[] => {
+  /** The commands on what is picked (`ps`), as the Edit menu and every right-click menu have them: one list, so the words, keys and ticks match. */
+  const actions = (ps: Pick1[]) => {
+    const n = ps.length;
+    return {
+      cut: { label: 'Cut', keys: 'Ctrl+X', disabled: !n, run: () => cutPicked(ps) },
+      copy: { label: 'Copy', keys: 'Ctrl+C', disabled: !n, run: () => copyPicked(ps) },
+      paste: { label: 'Paste', keys: 'Ctrl+V', disabled: !board, run: () => pasteHere(ps) },
+      pasteAttrs: { label: 'Paste attributes', keys: 'Ctrl+Alt+V', disabled: !board || !n, run: () => pasteAttrs(ps) },
+      duplicate: { label: 'Duplicate', keys: 'Ctrl+D', disabled: !n, run: () => duplicatePicked(ps) },
+      selectAll: { label: 'Select all', keys: 'Ctrl+A', run: selectAll },
+      split: { label: 'Split at the playhead', keys: 'S', run: () => splitHere(ps) },
+      trimStart: { label: 'Trim start to playhead', keys: 'Q', disabled: !n, run: () => trimTo('start', ps) },
+      trimEnd: { label: 'Trim end to playhead', keys: 'W', disabled: !n, run: () => trimTo('end', ps) },
+      del: { label: 'Delete', keys: 'Delete', disabled: !n && !range, run: () => remove(false, ps) },
+      ripple: { label: 'Ripple delete', keys: 'Shift+Delete', disabled: !n && !range, run: () => remove(true, ps) },
+    };
+  };
+  const act = actions(picks);
+  /** What a clip's right-click menu has beyond the commands: its speed, direction, held frame, sound, fit and colour. */
+  const clipItems = (c: NonNullable<typeof pc>): MenuEntry[] => {
     const f = factsOf(c.src);
     const still = isStill(c) || !!f?.picture;
+    const set = (patch: Record<string, unknown>) => change((x) => setClip(x, c.id!, (y) => ({ ...y, ...patch })));
     return [
-      { label: 'Split at the playhead', keys: 'S', onClick: splitHere },
-      { label: 'Delete', keys: 'Del', onClick: () => remove(false) },
-      { label: 'Ripple delete', keys: 'Shift+Del', onClick: () => remove(true) },
-      { label: 'Half speed', sep: true, disabled: still, checked: c.speed === 0.5, onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, speed: 0.5 }))) },
-      { label: 'Normal speed', disabled: still, checked: !c.speed, onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, speed: undefined }))) },
-      { label: 'Twice as fast', disabled: still, checked: c.speed === 2, onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, speed: 2 }))) },
-      { label: 'Play it backwards', disabled: still, checked: !!c.reverse, onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, reverse: !y.reverse || undefined }))) },
-      { label: 'Hold this frame', disabled: still, onClick: () => change((x) => freezeFrame(x, factsOf, c.id!, clock.get())) },
-      { label: 'Steady it (stabilize)', disabled: still, checked: !!c.stabilize, onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, stabilize: !y.stabilize || undefined }))) },
-      { label: 'Detach the sound', sep: true, disabled: !canDetach(c, f), onClick: () => change((x) => detachSound(x, factsOf, c.id!, main)) },
-      { label: 'Edit the sound…', disabled: !soundEditor() || still || (!f?.audio && !c.sound), onClick: () => editSound({ src: c.sound ?? c.src ?? main, title: c.name ?? 'Clip', from: c.trim?.[0], to: c.trim?.[1], save: (src) => change((x) => setClip(x, c.id!, (y) => ({ ...y, sound: src, mute: undefined }))) }) },
-      { label: c.fit === 'fill' ? 'Fit it in the frame' : 'Fill the frame with it', sep: true, onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, fit: y.fit === 'fill' ? undefined : 'fill' }))) },
-      { label: 'Colour…', onClick: () => setWorkspace('colour') },
+      { label: 'Half speed', disabled: still, checked: c.speed === 0.5, run: () => set({ speed: 0.5 }) },
+      { label: 'Normal speed', disabled: still, checked: !c.speed, run: () => set({ speed: undefined }) },
+      { label: 'Twice as fast', disabled: still, checked: c.speed === 2, run: () => set({ speed: 2 }) },
+      { label: 'Play it backwards', disabled: still, checked: !!c.reverse, run: () => set({ reverse: !c.reverse || undefined }) },
+      { label: 'Hold this frame', disabled: still, run: () => change((x) => freezeFrame(x, factsOf, c.id!, clock.get())) },
+      { label: 'Steady it (stabilize)', disabled: still, checked: !!c.stabilize, run: () => set({ stabilize: !c.stabilize || undefined }) },
+      '-',
+      { label: 'Detach the sound', disabled: !canDetach(c, f), run: () => change((x) => detachSound(x, factsOf, c.id!, main)) },
+      { label: 'Edit the sound…', disabled: !soundEditor() || still || (!f?.audio && !c.sound), run: () => editSound({ src: c.sound ?? c.src ?? main, title: c.name ?? 'Clip', from: c.trim?.[0], to: c.trim?.[1], save: (src) => set({ sound: src, mute: undefined }) }) },
+      '-',
+      { label: c.fit === 'fill' ? 'Fit it in the frame' : 'Fill the frame with it', run: () => set({ fit: c.fit === 'fill' ? undefined : 'fill' }) },
+      { label: 'Colour…', run: () => setWorkspace('colour') },
     ];
   };
   /** What a right-click on a sound offers: its channels, its fixes, a part silenced, its volume line, linked or not. */
@@ -435,17 +648,19 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
     const inOutSet = inOut[0] !== null || inOut[1] !== null;
     const a = kind === 'audio' ? (x as NonNullable<VideoRecipe['audio']>[number]) : null;
     return [
-      ...SOUND_CHANNELS.map((c, i) => ({ label: c.label, sep: i === 0, checked: (x.channels ?? 'stereo') === c.id, onClick: () => set({ channels: c.id === 'stereo' ? undefined : c.id }) })),
-      { label: 'Clean up the voice', sep: true, checked: !!x.clean, onClick: () => set({ clean: x.clean ? undefined : 0.5 }) },
-      { label: 'Even out the loudness', checked: !!x.even, onClick: () => set({ even: x.even ? undefined : true }) },
-      { label: 'Normalize', onClick: () => void normalizeSound(kind, id) },
-      { label: 'Silence the part picked', keys: 'Del', sep: true, disabled: !range || range.id !== id, onClick: () => range && (change((rr) => silencePart(rr, factsOf, range.kind, range.id, range.from, range.to)), setRange(null)) },
-      { label: 'Silence from In to Out', disabled: !inOutSet, onClick: () => change((rr) => silencePart(rr, factsOf, kind, id, inOut[0] ?? 0, inOut[1] ?? length)) },
-      { label: 'Flatten the volume line', disabled: !x.levels?.length, onClick: () => set({ levels: undefined }) },
+      ...SOUND_CHANNELS.map((c) => ({ label: c.label, checked: (x.channels ?? 'stereo') === c.id, run: () => set({ channels: c.id === 'stereo' ? undefined : c.id }) })),
+      '-',
+      { label: 'Clean up the voice', checked: !!x.clean, run: () => set({ clean: x.clean ? undefined : 0.5 }) },
+      { label: 'Even out the loudness', checked: !!x.even, run: () => set({ even: x.even ? undefined : true }) },
+      { label: 'Normalize', run: () => void normalizeSound(kind, id) },
+      '-',
+      { label: 'Silence the part picked', keys: 'Delete', disabled: !range || range.id !== id, run: () => range && (change((rr) => silencePart(rr, factsOf, range.kind, range.id, range.from, range.to)), setRange(null)) },
+      { label: 'Silence from In to Out', disabled: !inOutSet, run: () => change((rr) => silencePart(rr, factsOf, kind, id, inOut[0] ?? 0, inOut[1] ?? length)) },
+      { label: 'Flatten the volume line', disabled: !x.levels?.length, run: () => set({ levels: undefined }) },
       ...(kind === 'clip'
-        ? [{ label: 'Unlink the sound', sep: true, disabled: !canDetach(x as NonNullable<typeof pc>, factsOf((x as NonNullable<typeof pc>).src)), onClick: () => change((rr) => detachSound(rr, factsOf, id, main)) }]
+        ? ['-' as const, { label: 'Unlink the sound', disabled: !canDetach(x as NonNullable<typeof pc>, factsOf((x as NonNullable<typeof pc>).src)), run: () => change((rr) => detachSound(rr, factsOf, id, main)) }]
         : a?.clip && (r.clips ?? []).some((c) => c.id === a.clip)
-          ? [{ label: 'Link it to its clip again', sep: true, onClick: () => change((rr) => linkSound(rr, id)) }]
+          ? ['-' as const, { label: 'Link it to its clip again', run: () => change((rr) => linkSound(rr, id)) }]
           : []),
     ];
   };
@@ -463,116 +678,198 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       toastError(err);
     }
   };
-  const onMenu = (at: { x: number; y: number }, p: Picked, t: number) => {
+  /** A right-click (or the menu key, or a long press): the menu for the thing pointed at, or for the empty timeline; the things picked stay picked when it is one of them. */
+  const onMenu = (at: ContextMenuAt, p: Picked, t: number) => {
+    const ps: Pick1[] = p && !picks.some((q) => q.kind === p.kind && q.id === p.id) ? [p] : picks;
+    const a = actions(ps);
+    const edit: MenuEntry[] = [a.cut, a.copy, a.paste, a.pasteAttrs, a.duplicate];
     let items: MenuEntry[] = [];
     if (p?.kind === 'clipsound') {
       const c = (r.clips ?? []).find((x) => x.id === p.id);
       if (c)
         items = [
-          { label: 'Split at the playhead', keys: 'S', onClick: () => change((x) => splitClip(x, factsOf, c.id!, clock.get())) },
-          { label: 'Without its sound', keys: 'Del', onClick: () => change((x) => setClip(x, c.id!, (y) => ({ ...y, mute: true, volume: undefined, sound: undefined }))) },
+          ...edit,
+          '-',
+          a.split,
+          { label: 'Without its sound', keys: 'Delete', run: () => remove(false, ps) },
+          '-',
           ...soundMenu('clip', c.id!),
-          { label: 'Edit the sound…', sep: true, disabled: !soundEditor(), onClick: () => editSound({ src: c.sound ?? c.src ?? main, title: c.name ?? 'Clip', from: c.trim?.[0], to: c.trim?.[1], save: (src) => change((x) => setClip(x, c.id!, (y) => ({ ...y, sound: src, mute: undefined }))) }) },
+          '-',
+          { label: 'Edit the sound…', disabled: !soundEditor(), run: () => editSound({ src: c.sound ?? c.src ?? main, title: c.name ?? 'Clip', from: c.trim?.[0], to: c.trim?.[1], save: (src) => change((x) => setClip(x, c.id!, (y) => ({ ...y, sound: src, mute: undefined }))) }) },
         ];
     } else if (p?.kind === 'clip') {
       const c = (r.clips ?? []).find((x) => x.id === p.id);
-      if (c) items = clipMenu(c);
+      if (c) items = [...edit, '-', a.split, a.trimStart, a.trimEnd, '-', a.del, a.ripple, '-', ...clipItems(c)];
     } else if (p?.kind === 'transition')
-      items = [...VIDEO_TRANSITIONS.map((k) => ({ label: k.label, checked: (r.clips ?? []).find((c) => c.id === p.id)?.transition?.kind === k.id, onClick: () => change((x) => setClip(x, p.id, (c) => ({ ...c, transition: { kind: k.id, length: c.transition?.length ?? 1 } }))) })), { label: 'A cut (no transition)', sep: true, onClick: () => change((x) => setClip(x, p.id, (c) => ({ ...c, transition: undefined }))) }];
+      items = [...VIDEO_TRANSITIONS.map((k) => ({ label: k.label, checked: (r.clips ?? []).find((c) => c.id === p.id)?.transition?.kind === k.id, run: () => change((x) => setClip(x, p.id, (c) => ({ ...c, transition: { kind: k.id, length: c.transition?.length ?? 1 } }))) })), '-' as const, { label: 'A cut (no transition)', run: () => change((x) => setClip(x, p.id, (c) => ({ ...c, transition: undefined }))) }];
     else if (p) {
       const kind = p.kind as 'overlay' | 'text' | 'audio';
-      items = [
-        { label: 'Split at the playhead', keys: 'S', onClick: () => change((x) => splitItem(x, factsOf, kind, p.id, clock.get())) },
-        { label: 'Delete', keys: 'Del', onClick: () => (change((x) => deleteItem(x, factsOf, kind, p.id)), setPicked(null)) },
-        { label: 'Ripple delete', keys: 'Shift+Del', onClick: () => (change((x) => deleteItem(x, factsOf, kind, p.id, { ripple: true })), setPicked(null)) },
-      ];
+      items = [...edit, '-', a.split, a.trimStart, a.trimEnd, '-', a.del, a.ripple];
       if (kind === 'overlay') {
         const ov = (r.overlays ?? []).find((x) => x.id === p.id);
-        items.push({ label: ov?.key ? 'No green screen' : 'Green screen: take the green out', sep: true, onClick: () => change((x) => setOverlay(x, p.id, (y) => ({ ...y, key: y.key ? undefined : { color: '#00ff00', similarity: 0.3, blend: 0.1 } }))) });
+        items.push('-', { label: ov?.key ? 'No green screen' : 'Green screen: take the green out', run: () => change((x) => setOverlay(x, p.id, (y) => ({ ...y, key: y.key ? undefined : { color: '#00ff00', similarity: 0.3, blend: 0.1 } }))) });
       }
       if (kind === 'audio') {
-        const a = (r.audio ?? []).find((x) => x.id === p.id);
-        if (a) items.push(...soundMenu('audio', a.id!));
-        if (a) items.push({ label: 'Edit the sound…', sep: true, disabled: !soundEditor(), onClick: () => editSound({ src: a.src, title: a.name ?? 'Sound', from: a.trim?.[0], to: a.trim?.[1], save: (src) => change((x) => ({ ...x, audio: (x.audio ?? []).map((y) => (y.id === a.id ? { ...y, src } : y)) })) }) });
+        const au = (r.audio ?? []).find((x) => x.id === p.id);
+        if (au) items.push('-', ...soundMenu('audio', au.id!), '-', { label: 'Edit the sound…', disabled: !soundEditor(), run: () => editSound({ src: au.src, title: au.name ?? 'Sound', from: au.trim?.[0], to: au.trim?.[1], save: (src) => change((x) => ({ ...x, audio: (x.audio ?? []).map((y) => (y.id === au.id ? { ...y, src } : y)) })) }) });
       }
     } else
       items = [
-        { label: 'Add a marker here', keys: 'M', onClick: () => h.set((x) => ({ ...x, markers: [...x.markers, t].sort((a, b) => a - b) })) },
-        { label: 'Add words here', onClick: () => (engine.seek(t), addText()) },
-        { label: 'Mark In here', keys: 'I', onClick: () => setInOut([t, inOut[1]]) },
-        { label: 'Mark Out here', keys: 'O', onClick: () => setInOut([inOut[0], t]) },
+        a.paste,
+        a.selectAll,
+        '-',
+        { label: 'Add a marker here', keys: 'M', run: () => addMarker(t) },
+        { label: 'Add words here', run: () => (engine.seek(t), addText()) },
+        { label: 'Mark In here', keys: 'I', run: () => setInOut([t, inOut[1]]) },
+        { label: 'Mark Out here', keys: 'O', run: () => setInOut([inOut[0], t]) },
       ];
     setMenu({ at, items });
   };
+  /** A marker's menu: go to it, take it away, or make it In or Out. */
+  const onMarkerMenu = (at: ContextMenuAt, i: number) => {
+    const m = e.markers[i];
+    if (m === undefined) return;
+    setMenu({
+      at,
+      items: [
+        { label: 'Go to the marker', run: () => engine.seek(m) },
+        { label: 'Mark In here', run: () => setInOut([m, inOut[1]]) },
+        { label: 'Mark Out here', run: () => setInOut([inOut[0], m]) },
+        '-',
+        { label: 'Delete the marker', danger: true, run: () => h.set((x) => ({ ...x, markers: x.markers.filter((_, j) => j !== i) })) },
+      ],
+    });
+  };
 
+  /** On a phone, which has no right-click: the commands of what is picked, from the sheet's More button. */
+  const moreMenu = (el: HTMLElement) => {
+    const b = el.getBoundingClientRect();
+    setMenu({
+      at: { x: b.left, y: b.bottom },
+      items: [act.cut, act.copy, act.paste, act.pasteAttrs, act.duplicate, '-', act.trimStart, act.trimEnd, act.ripple, '-', act.selectAll, { label: 'Add a marker', run: () => addMarker() }, { label: 'Import captions (.srt, .vtt)…', run: () => captionFile.current?.click() }, { label: 'Keyboard shortcuts', run: () => setKeysOpen(true) }],
+    });
+  };
+  const hasCaptions = (r.texts ?? []).length > 0;
   const menus: MenuDef[] = [
     {
       label: 'File',
       items: [
-        { label: plans.main.label, keys: 'Ctrl+S', disabled: busy, onClick: () => void run('main') },
-        ...(plans.copy ? [{ label: plans.copy.label, disabled: busy, onClick: () => void run('copy') }] : []),
-        { label: 'Export…', keys: 'Alt+4', onClick: () => setWorkspace('export') },
+        { label: plans.main.label, keys: 'Ctrl+S', disabled: busy, run: () => void run('main') },
+        plans.copy && { label: plans.copy.label, disabled: busy, run: () => void run('copy') },
+        { label: 'Export…', keys: 'Alt+4', run: () => setWorkspace('export') },
         // At someone's link it is saved over the video alone: no frames or GIFs beside it.
         ...(viaLink
           ? []
-          : [
-              { label: 'Take this frame as a picture', sep: true, disabled: busy, onClick: () => void run('frame') },
-              { label: 'Save as a GIF', disabled: busy, onClick: () => void run('gif') },
-            ]),
-        ...(o.to && 'asset' in o.to && !detached ? [{ label: 'Use this frame as its still', onClick: () => h.set((x) => ({ ...x, stillAt: clock.get() })) }] : []),
-        { label: 'Save the captions as .srt', disabled: !(r.texts ?? []).length, onClick: downloadSrt },
-        { label: 'Close', sep: true, onClick: close },
+          : ['-' as const, { label: 'Take this frame as a picture', disabled: busy, run: () => void run('frame') }, { label: 'Save as a GIF', disabled: busy, run: () => void run('gif') }]),
+        o.to && 'asset' in o.to && !detached && { label: 'Use this frame as its still', run: () => h.set((x) => ({ ...x, stillAt: clock.get() })) },
+        '-',
+        { label: 'Import captions (.srt, .vtt)…', run: () => captionFile.current?.click() },
+        { label: 'Save the captions as .srt', disabled: !hasCaptions, run: downloadSrt },
+        { label: 'Save the captions as .vtt', disabled: !hasCaptions, run: downloadVtt },
+        '-',
+        { label: 'Close', run: close },
       ],
     },
     {
       label: 'Edit',
       items: [
-        { label: 'Undo', keys: 'Ctrl+Z', disabled: !h.canUndo || busy, onClick: h.undo },
-        { label: 'Redo', keys: 'Ctrl+Shift+Z', disabled: !h.canRedo || busy, onClick: h.redo },
-        { label: 'Split at the playhead', keys: 'S', sep: true, onClick: splitHere },
-        { label: 'Delete', keys: 'Del', disabled: !picked, onClick: () => remove(false) },
-        { label: 'Ripple delete', keys: 'Shift+Del', disabled: !picked, onClick: () => remove(true) },
-        { label: 'Back to the original', sep: true, disabled: !changed, onClick: () => (setPicked(null), setCropping(null), h.set({ recipe: withIds({ clips: [{ name: o.title }] }), markers: [] })) },
+        { label: 'Undo', keys: 'Ctrl+Z', disabled: !h.canUndo || busy, run: h.undo },
+        { label: 'Redo', keys: 'Ctrl+Shift+Z / Ctrl+Y', disabled: !h.canRedo || busy, run: h.redo },
+        '-',
+        act.cut,
+        act.copy,
+        act.paste,
+        act.pasteAttrs,
+        act.duplicate,
+        '-',
+        act.selectAll,
+        '-',
+        act.split,
+        act.trimStart,
+        act.trimEnd,
+        '-',
+        act.del,
+        act.ripple,
+        '-',
+        { label: 'Back to the original', disabled: !changed, run: () => (setPicked(null), setCropping(null), h.set({ recipe: withIds({ clips: [{ name: o.title }] }), markers: [] })) },
       ],
     },
     {
       label: 'Clip',
       items: pc
-        ? clipMenu(pc)
+        ? [act.split, act.del, act.ripple, '-', ...clipItems(pc)]
         : [
-            { label: 'Add words at the playhead', onClick: addText },
-            { label: 'Make captions from what is said', onClick: () => void makeCaps() },
+            { label: 'Add words at the playhead', run: addText },
+            { label: 'Make captions from what is said', run: () => void makeCaps() },
+            { label: 'Import captions (.srt, .vtt)…', run: () => captionFile.current?.click() },
             { label: 'Pick a clip on the timeline for more', disabled: true },
           ],
     },
     {
       label: 'Timeline',
       items: [
-        { label: 'Add a marker', keys: 'M', onClick: () => h.set((x) => ({ ...x, markers: [...x.markers, clock.get()].sort((a, b) => a - b) })) },
-        { label: 'Mark In', keys: 'I', onClick: () => setInOut([clock.get(), inOut[1]]) },
-        { label: 'Mark Out', keys: 'O', onClick: () => setInOut([inOut[0], clock.get()]) },
-        { label: 'Clear In and Out', keys: 'Alt+X', disabled: inOut[0] === null && inOut[1] === null, onClick: () => setInOut([null, null]) },
-        { label: 'Silence the clips’ sound from In to Out', disabled: inOut[0] === null && inOut[1] === null, onClick: () => change((x) => silenceClips(x, factsOf, inOut[0] ?? 0, inOut[1] ?? length)) },
-        { label: 'Add a transition at the nearest cut', keys: 'Ctrl+T', sep: true, onClick: addTransition },
-        { label: 'Add words at the playhead', onClick: addText },
-        { label: 'Snapping', keys: 'N', sep: true, checked: snapOn, onClick: () => setSnapOn(!snapOn) },
-        { label: 'Select', keys: 'A', checked: tool === 'select', onClick: () => setTool('select') },
-        { label: 'Blade', keys: 'B', checked: tool === 'blade', onClick: () => setTool('blade') },
-        { label: 'Trim (roll)', keys: 'T', checked: tool === 'trim', onClick: () => setTool('trim') },
-        { label: 'Hand', keys: 'H', checked: tool === 'hand', onClick: () => setTool('hand') },
-        { label: 'Zoom in', keys: '+', sep: true, onClick: () => setPps(Math.min(600, pps * 1.5)) },
-        { label: 'Zoom out', keys: '−', onClick: () => setPps(Math.max(2, pps / 1.5)) },
+        { label: 'Add a marker', keys: 'M', run: () => addMarker() },
+        { label: 'Mark In', keys: 'I', run: markIn },
+        { label: 'Mark Out', keys: 'O', run: markOut },
+        { label: 'Clear In and Out', keys: 'Alt+X', disabled: inOut[0] === null && inOut[1] === null, run: () => setInOut([null, null]) },
+        { label: 'Silence the clips’ sound from In to Out', disabled: inOut[0] === null && inOut[1] === null, run: () => change((x) => silenceClips(x, factsOf, inOut[0] ?? 0, inOut[1] ?? length)) },
+        '-',
+        { label: 'Previous cut', keys: '↑', run: () => goCut(-1) },
+        { label: 'Next cut', keys: '↓', run: () => goCut(1) },
+        { label: 'Add a transition at the nearest cut', keys: 'Ctrl+T', run: addTransition },
+        { label: 'Add words at the playhead', run: addText },
+        '-',
+        { label: 'Snapping', keys: 'N', checked: snapOn, run: () => setSnapOn(!snapOn) },
+        { label: 'Select', keys: 'A', checked: tool === 'select', run: () => setTool('select') },
+        { label: 'Blade', keys: 'B', checked: tool === 'blade', run: () => setTool('blade') },
+        { label: 'Trim (roll)', keys: 'T', checked: tool === 'trim', run: () => setTool('trim') },
+        { label: 'Hand', keys: 'H', checked: tool === 'hand', run: () => setTool('hand') },
+        '-',
+        { label: 'Zoom in', keys: '+', run: () => setPps(Math.min(600, pps * 1.5)) },
+        { label: 'Zoom out', keys: '−', run: () => setPps(Math.max(2, pps / 1.5)) },
+        { label: 'Zoom to fit', keys: 'Shift+Z', run: () => fitRef.current?.() },
       ],
     },
     {
       label: 'View',
       items: [
-        ...WORKSPACES.map((w) => ({ label: w.label, keys: w.keys, checked: workspace === w.id, onClick: () => setWorkspace(w.id) })),
-        { label: 'Safe areas', sep: true, checked: safe, onClick: () => setSafe(!safe) },
-        { label: 'Grid of thirds', checked: grid, onClick: () => setGrid(!grid) },
-        { label: 'Before and after', checked: split !== null, onClick: () => setSplit(split === null ? 0.5 : null) },
-        { label: 'Fit in the viewer', sep: true, checked: zoom === 'fit', onClick: () => setZoom('fit') },
-        { label: '100%', checked: zoom === 1, onClick: () => setZoom(1) },
+        ...WORKSPACES.map((w) => ({ label: w.label, keys: w.keys, checked: workspace === w.id, run: () => setWorkspace(w.id) })),
+        '-',
+        { label: 'Safe areas', checked: safe, run: () => setSafe(!safe) },
+        { label: 'Grid of thirds', checked: grid, run: () => setGrid(!grid) },
+        { label: 'Before and after', checked: split !== null, run: () => setSplit(split === null ? 0.5 : null) },
+        '-',
+        { label: 'Fit in the viewer', checked: zoom === 'fit', run: () => setZoom('fit') },
+        { label: '100%', checked: zoom === 1, run: () => setZoom(1) },
+      ],
+    },
+    { label: 'Help', items: [{ label: 'Keyboard shortcuts', keys: 'Ctrl+/', run: () => setKeysOpen(true) }] },
+  ];
+  /** The keys that are not in the menus, for the list of shortcuts. */
+  const moreKeys: ShortcutGroup[] = [
+    {
+      title: 'Playback',
+      items: [
+        ['Space', 'Play or pause'],
+        ['K', 'Stop'],
+        ['L', 'Play forwards, faster at each press'],
+        ['J', 'Play backwards, faster at each press'],
+        ['← / →', 'A frame back or on'],
+        ['Shift+← / Shift+→', 'A second back or on'],
+        ['Home / End', 'To the start or the end'],
+      ],
+    },
+    {
+      title: 'On the timeline and the viewer',
+      items: [
+        ['Shift+click / Ctrl+click', 'Add a thing to what is picked, or take it out (on a sound, Ctrl+click: Shift and a drag picks a part of it)'],
+        ['Drag on empty space', 'Pick what the box crosses (with Shift or Ctrl, add to what is picked)'],
+        ['Esc', 'Pick nothing'],
+        [`${COPY_DRAG_KEY}+drag`, 'Drag a copy of words or an overlay in the viewer'],
+        [`${NO_SNAP_KEY}+drag`, 'Move or size in the viewer without snapping'],
+        ['Shift+drag', 'Keep a move in the viewer straight'],
+        ['V', 'The Select tool'],
+        ['?', 'This list'],
       ],
     },
   ];
@@ -581,24 +878,23 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
   const onKeyDown = (ev: React.KeyboardEvent) => {
     const mod = ev.ctrlKey || ev.metaKey;
     const k = ev.key.toLowerCase();
+    const typing = !!(ev.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]');
+    // A dialog or a menu open over the editor has its own keys (they reach here through the page's tree).
+    if ((ev.target as HTMLElement).closest('[role="dialog"], [role="menu"]')) return;
     if (k === 'escape') {
+      // In a field, Esc leaves the field and keeps what is picked.
+      if (typing) {
+        (ev.target as HTMLElement).blur();
+        ev.stopPropagation();
+        return;
+      }
       if (cropping) setCropping(null);
       else setPicked(null);
       return;
     }
     if (mod && !ev.shiftKey && !ev.altKey && (k === 'k' || k === 'b' || k === '`')) return;
     ev.stopPropagation();
-    const typing = (ev.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]');
-    if (mod && k === 'z') {
-      if (typing) return;
-      ev.preventDefault();
-      return ev.shiftKey ? h.redo() : h.undo();
-    }
-    if (mod && k === 'y') {
-      if (typing) return;
-      ev.preventDefault();
-      return h.redo();
-    }
+    // These work in a field too.
     if (mod && k === 's') {
       ev.preventDefault();
       return void run('main');
@@ -612,7 +908,21 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       return setWorkspace(WORKSPACES[Number(ev.key) - 1].id);
     }
     if (ev.altKey && k === 'x') return setInOut([null, null]);
-    if (typing || mod || ev.altKey || busy) return;
+    if (typing) return;
+    // The menu key (or Shift+F10) opens the right-click menu of what is picked, over the timeline.
+    if (isMenuKey(ev)) {
+      ev.preventDefault();
+      const box = (root.current?.querySelector('[data-track]') ?? root.current)?.getBoundingClientRect();
+      return onMenu({ x: (box?.left ?? 0) + Math.min(240, (box?.width ?? 0) / 2), y: (box?.top ?? 0) + 8, keyed: true }, picked, clock.get());
+    }
+    // Copy and cut leave the browser's own to words selected somewhere on the page.
+    if (mod && !ev.shiftKey && !ev.altKey && (k === 'c' || k === 'x') && (window.getSelection()?.toString() ?? '')) return;
+    if (ev.key === '?' && !mod) {
+      ev.preventDefault();
+      return setKeysOpen(true);
+    }
+    if (runMenuKeys(menus, ev)) return;
+    if (mod || ev.altKey || busy) return;
     const frame = 1 / fps;
     const step = (n: number) => {
       engine.pause();
@@ -627,24 +937,14 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
     else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
       ev.preventDefault();
       step((ev.key === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 1 : frame));
+    } else if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+      ev.preventDefault();
+      goCut(ev.key === 'ArrowUp' ? -1 : 1);
     } else if (ev.key === 'Home') engine.seek(0);
     else if (ev.key === 'End') engine.seek(length);
-    else if (k === 'i') setInOut([clock.get(), inOut[1] !== null && inOut[1] <= clock.get() ? null : inOut[1]]);
-    else if (k === 'o') setInOut([inOut[0] !== null && inOut[0] >= clock.get() ? null : inOut[0], clock.get()]);
-    else if (k === 'm') h.set((x) => ({ ...x, markers: [...x.markers, clock.get()].sort((a, b) => a - b) }));
-    else if (k === 'n') setSnapOn(!snapOn);
-    else if (k === 'a' || k === 'v') setTool('select');
-    else if (k === 'b') setTool('blade');
-    else if (k === 't') setTool('trim');
-    else if (k === 'h') setTool('hand');
-    else if (k === 's') splitHere();
+    else if (k === 'v') setTool('select');
     else if (ev.key === '+' || ev.key === '=') setPps(Math.min(600, pps * 1.5));
     else if (ev.key === '-' || ev.key === '_') setPps(Math.max(2, pps / 1.5));
-    else if (ev.key === 'Z') setPps(Math.max(2, Math.min(600, ((root.current?.clientWidth ?? 1000) - 200) / Math.max(1, length))));
-    else if (ev.key === 'Delete' || ev.key === 'Backspace') {
-      ev.preventDefault();
-      remove(ev.shiftKey);
-    }
   };
   useEffect(() => {
     if (active) root.current?.focus({ preventScroll: true });
@@ -679,6 +979,8 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
           onPick={setPicked}
           onMoveText={(id, x, y, phase) => (phase === 'begin' ? h.begin() : phase === 'end' ? h.end() : change((rr) => ({ ...rr, texts: (rr.texts ?? []).map((t) => (t.id === id ? { ...t, x, y } : t)) })))}
           onMoveOverlay={(id, patch, phase) => (phase === 'begin' ? h.begin() : phase === 'end' ? h.end() : change((rr) => setOverlay(rr, id, (y) => ({ ...y, ...patch }))))}
+          onSizeText={(id, size, phase) => (phase === 'begin' ? h.begin() : phase === 'end' ? h.end() : change((rr) => ({ ...rr, texts: (rr.texts ?? []).map((t) => (t.id === id ? { ...t, size } : t)) })))}
+          onCopyDrag={copyDragged}
           crop={workspace === 'edit' ? cropping : null}
           onCrop={onCrop}
           safe={safe}
@@ -717,8 +1019,10 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       clock={clock}
       main={main}
       fps={fps}
-      picked={picked}
+      picks={picks}
       onPick={setPicked}
+      onToggle={(q) => setPicks((x) => togglePick(x, q))}
+      onPickMany={setPicks}
       change={change}
       markers={e.markers}
       onMarkers={(m) => h.set((x) => ({ ...x, markers: m }))}
@@ -732,7 +1036,10 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       trackUi={trackUi}
       onTrackUi={(id, u) => setTrackUi({ ...trackUi, [id]: u })}
       onMenu={onMenu}
+      onMarkerMenu={onMarkerMenu}
       onDrop={(it, row, t, index) => use(it, row, t, index)}
+      onDropFiles={dropFiles}
+      fitRef={fitRef}
       range={range}
       onRange={setRange}
       pool={pool}
@@ -760,6 +1067,8 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       onCaptions={() => void makeCaps()}
       captionsBusy={captionsBusy}
       onSrt={downloadSrt}
+      onVtt={downloadVtt}
+      onImportCaptions={() => captionFile.current?.click()}
       onAddText={addText}
       label={o.title}
     />
@@ -770,6 +1079,8 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       onAdd={addPool}
       onUse={(it) => use(it, it.kind === 'sound' ? 'a2' : 'v1', undefined, undefined)}
       onRecorded={(it) => use(it, 'a3', clock.get())}
+      sending={sending}
+      onFiles={(files) => void bring(files)}
     />
   );
   const exportPage = (
@@ -792,6 +1103,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
       onStop={stop}
       hasCaptions={(r.texts ?? []).some((t) => t.caption)}
       onSrt={downloadSrt}
+      onVtt={downloadVtt}
     />
   );
   const saveButtons = (
@@ -832,11 +1144,37 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
               Stop
             </button>
           </span>
+        ) : sending.length ? (
+          <span className="flex items-center gap-1.5 text-fg-2">
+            <Throbber size={11} />
+            <span translate="no">{`${sending[0].name}${sending[0].share > 0 ? ` · ${Math.round(sending[0].share * 100)}%` : ''}`}</span>
+            {sending.length > 1 && <span>{`and ${sending.length - 1} more`}</span>}
+          </span>
         ) : last?.status === 'done' ? (
           <span>{last.made?.gpu ? `Made on the graphics card (${last.made.by})` : 'Made on the processor'}</span>
         ) : undefined
       }
     />
+  );
+
+  // What floats over the editor: the right-click menu, the list of shortcuts, a question, and the picker for a captions file.
+  const floating = (
+    <>
+      <ContextMenu at={menu?.at ?? null} items={menu?.items ?? []} onClose={() => setMenu(null)} />
+      <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={shortcutGroups(menus, moreKeys)} part="media" />
+      {confirmNode}
+      <input
+        ref={captionFile}
+        type="file"
+        accept=".srt,.vtt,text/vtt,application/x-subrip"
+        className="hidden"
+        onChange={(ev) => {
+          const f = ev.target.files?.[0];
+          ev.target.value = '';
+          if (f) void importCaptions(f);
+        }}
+      />
+    </>
   );
 
   // ---- a phone: the viewer, the main track, and the rest in sheets ----------------------------------------------------
@@ -849,6 +1187,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
             <span translate="no" className="min-w-0 flex-1 truncate px-1 text-[14px] font-semibold">
               {o.title}
             </span>
+            <MenuBar menus={menus} compact />
             {saveButtons}
           </header>
           {making && (
@@ -883,10 +1222,10 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
               ) : sheet === 'inspector' ? (
                 <div className="flex max-h-[55dvh] flex-col">
                   <div className="flex gap-1.5 border-b border-line p-2">
-                    <Button size="sm" variant="secondary" icon={<Scissors size={13} />} onClick={splitHere}>
+                    <Button size="sm" variant="secondary" icon={<Scissors size={13} />} onClick={() => splitHere()}>
                       Split
                     </Button>
-                    <Button size="sm" variant="secondary" disabled={!picked} onClick={() => remove(true)}>
+                    <Button size="sm" variant="secondary" disabled={!picked} onClick={() => remove(false)}>
                       Delete
                     </Button>
                     <Button size="sm" variant="secondary" onClick={addText}>
@@ -895,12 +1234,15 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
                     <Button size="sm" variant="secondary" onClick={addTransition}>
                       Transition
                     </Button>
+                    <Button size="sm" variant="secondary" onClick={(ev) => moreMenu(ev.currentTarget)}>
+                      More
+                    </Button>
                   </div>
                   {inspector}
                 </div>
               ) : sheet === 'colour' ? (
                 <div className="max-h-[55dvh] overflow-y-auto p-3">
-                  {pc ? <Inspector {...{ recipe: r, factsOf, picked, change, now, out, pool, main, fps, cropping, onCropping: setCropping, onColour: () => {}, onEditSound: editSound, onCaptions: () => void makeCaps(), captionsBusy, onSrt: downloadSrt, onAddText: addText, label: o.title }} /> : <p className="text-[12.5px] text-fg-3">Pick a clip on the timeline to colour it.</p>}
+                  {pc ? <Inspector {...{ recipe: r, factsOf, picked, change, now, out, pool, main, fps, cropping, onCropping: setCropping, onColour: () => {}, onEditSound: editSound, onCaptions: () => void makeCaps(), captionsBusy, onSrt: downloadSrt, onVtt: downloadVtt, onImportCaptions: () => captionFile.current?.click(), onAddText: addText, label: o.title }} /> : <p className="text-[12.5px] text-fg-3">Pick a clip on the timeline to colour it.</p>}
                 </div>
               ) : sheet === 'audio' ? (
                 <div className="max-h-[55dvh] overflow-y-auto">
@@ -911,7 +1253,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
               )}
             </Sheet>
           )}
-          <ContextMenu at={menu?.at ?? null} items={menu?.items ?? []} onClose={() => setMenu(null)} />
+          {floating}
         </div>
       </StepsContext.Provider>
     );
@@ -923,7 +1265,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
         <header className="flex h-10 shrink-0 items-center gap-2 border-b border-line bg-bg px-2 pt-[var(--safe-top)]">
           {lead}
           <Clapperboard size={15} className="shrink-0 text-accent" />
-          <MenuBar menus={menus} />
+          <MenuBar menus={menus} compact="auto" />
           <span translate="no" className="min-w-0 flex-1 truncate text-center text-[12.5px] text-fg-3">
             {o.title}
           </span>
@@ -971,7 +1313,7 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
           {workspace === 'export' && exportPage}
         </div>
         {status}
-        <ContextMenu at={menu?.at ?? null} items={menu?.items ?? []} onClose={() => setMenu(null)} />
+        {floating}
       </div>
     </StepsContext.Provider>
   );

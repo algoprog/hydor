@@ -1,8 +1,9 @@
 // The pieces of a professional editor's window, generic (the video editor uses them; the picture editor has its own
-// to the same plan, to be made one): a menu bar with each item's shortcut, panels whose sizes are dragged and
-// remembered, number fields that scrub when their label is dragged, sliders with a value field (a double click puts
-// them back), sections that fold, a context menu at the pointer, workspace tabs and a status line. Dense but legible:
-// 12–13px words, 28–32px controls, the app's own colours, no fades.
+// to the same plan, to be made one): panels whose sizes are dragged and remembered, number fields that scrub when their
+// label is dragged, sliders with a value field (a double click puts them back), sections that fold, a small list of
+// items at a point (the media panel's Add), workspace tabs and a status line. The menu bar and the right-click menus are
+// the app's own (mediaedit/shell/menus.ts). Dense but legible: 12–13px words, 28–32px controls, the app's own colours,
+// no fades.
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, ChevronRight } from 'lucide-react';
@@ -64,7 +65,7 @@ export function Splitter({ dir, size, onSize, min, max, side = 'before' }: { dir
   );
 }
 
-// ---- the menu bar ----------------------------------------------------------------------------------------------------
+// ---- a list of items -------------------------------------------------------------------------------------------------
 
 export interface MenuEntry {
   label: string;
@@ -75,72 +76,6 @@ export interface MenuEntry {
   checked?: boolean;
   /** A line before it. */
   sep?: boolean;
-}
-
-export interface MenuDef {
-  label: string;
-  items: MenuEntry[];
-}
-
-/** File, Edit, Clip… across the top: click one to open it, then move across the others; Escape or a click outside closes. */
-export function MenuBar({ menus, className }: { menus: MenuDef[]; className?: string }) {
-  const [open, setOpen] = useState<number | null>(null);
-  const bar = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (open === null) return;
-    const away = (e: PointerEvent) => !bar.current?.contains(e.target as Node) && !(e.target as HTMLElement).closest?.('[data-menu-pop]') && setOpen(null);
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), setOpen(null));
-    document.addEventListener('pointerdown', away, true);
-    document.addEventListener('keydown', key, true);
-    return () => {
-      document.removeEventListener('pointerdown', away, true);
-      document.removeEventListener('keydown', key, true);
-    };
-  }, [open]);
-  return (
-    <div ref={bar} role="menubar" className={cx('flex items-center', className)}>
-      {menus.map((m, i) => (
-        <MenuButton key={m.label} m={m} open={open === i} onOpen={() => setOpen(open === i ? null : i)} onHover={() => open !== null && setOpen(i)} onClose={() => setOpen(null)} />
-      ))}
-    </div>
-  );
-}
-
-function MenuButton({ m, open, onOpen, onHover, onClose }: { m: MenuDef; open: boolean; onOpen: () => void; onHover: () => void; onClose: () => void }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  useLayoutEffect(() => {
-    if (!open || !ref.current) return setPos(null);
-    const r = ref.current.getBoundingClientRect();
-    setPos({ x: r.left, y: r.bottom + 2 });
-  }, [open]);
-  return (
-    <>
-      <button
-        ref={ref}
-        type="button"
-        role="menuitem"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={onOpen}
-        onPointerEnter={onHover}
-        className={cx('h-7 rounded-md px-2 text-[12.5px] text-fg-2 hover:bg-bg-2 hover:text-fg', open && 'bg-bg-2 text-fg')}
-      >
-        {m.label}
-      </button>
-      {open && pos && (
-        <MenuList
-          items={m.items}
-          x={pos.x}
-          y={pos.y}
-          onPick={(it) => {
-            onClose();
-            it.onClick?.();
-          }}
-        />
-      )}
-    </>
-  );
 }
 
 /** A list of menu items floating at a point (kept on the screen). */
@@ -173,33 +108,6 @@ export function MenuList({ items, x, y, onPick, width = 248 }: { items: MenuEntr
       ))}
     </div>,
     document.body,
-  );
-}
-
-/** A menu that opens where the pointer was (a right-click), closed by Escape, a pick, or a click elsewhere. */
-export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number } | null; items: MenuEntry[]; onClose: () => void }) {
-  useEffect(() => {
-    if (!at) return;
-    const away = (e: PointerEvent) => !(e.target as HTMLElement).closest?.('[data-menu-pop]') && onClose();
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), onClose());
-    document.addEventListener('pointerdown', away, true);
-    document.addEventListener('keydown', key, true);
-    return () => {
-      document.removeEventListener('pointerdown', away, true);
-      document.removeEventListener('keydown', key, true);
-    };
-  }, [at, onClose]);
-  if (!at) return null;
-  return (
-    <MenuList
-      items={items}
-      x={at.x}
-      y={at.y}
-      onPick={(it) => {
-        onClose();
-        it.onClick?.();
-      }}
-    />
   );
 }
 
