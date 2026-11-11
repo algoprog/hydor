@@ -866,6 +866,42 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     restyle((s) => withStyle(s, { fmt: fmt === 'general' ? undefined : fmt, dp: undefined, code: undefined, cur: (fmt === 'currency' || fmt === 'accounting') && cur && cur !== '$' ? cur : undefined }));
   };
   const setCode = (code: string | undefined) => restyle((s) => withStyle(s, { code, dp: undefined, cur: undefined, fmt: undefined }));
+  /** Ctrl+Shift+1 to 6: number, time, date, currency, percent, scientific (Excel's quick formats). */
+  const quickFormat = (n: number) => {
+    const fmt = (['number', 'time', 'date', 'currency', 'percent', 'scientific'] as const)[n - 1];
+    if (fmt) setFormat(fmt, '$');
+  };
+  /** The $ and % buttons: the format on, or back to automatic when the cell has it already. */
+  const toggleFormat = (fmt: 'currency' | 'percent') => setFormat(active?.s?.fmt === fmt && !active.s.code ? 'general' : fmt, '$');
+  /**
+   * AutoSum (Alt+=, Insert → AutoSum, the Σ button): `fn` of the numbers above the cell (else to its left); with several
+   * cells picked, of each column under them (of the row, for one row). Where there are no numbers it starts the formula.
+   */
+  const autoSum = (fn: string) => {
+    if (!book || !sheet || !calc || readOnly) return;
+    const b = rectOf(selRef.current);
+    const num = (r: number, c: number) => r >= 0 && c >= 0 && typeof calc.value(sheetIx, r, c) === 'number';
+    const changes: Record<string, Cell | null> = {};
+    const put = (r: number, c: number, range: string) => {
+      const k = refName(r, c);
+      changes[k] = typedInto(sheet.cells[k], `=${fn}(${range})`);
+    };
+    if (!single(selRef.current)) {
+      if (b.r2 > b.r1) for (let c = b.c1; c <= b.c2; c++) put(b.r2 + 1, c, `${refName(b.r1, c)}:${refName(b.r2, c)}`);
+      else put(b.r1, b.c2 + 1, `${refName(b.r1, b.c1)}:${refName(b.r1, b.c2)}`);
+    } else {
+      const { r, c } = selRef.current;
+      let top = r;
+      while (num(top - 1, c)) top--;
+      let left = c;
+      while (num(r, left - 1)) left--;
+      if (top < r) put(r, c, `${refName(top, c)}:${refName(r - 1, c)}`);
+      else if (left < c) put(r, c, `${refName(r, left)}:${refName(r, c - 1)}`);
+      else return typeIn(`=${fn}(`);
+    }
+    change(cellsPatch(book, sheetIx, changes));
+    grid.current?.focus();
+  };
   const stepDecimals = (d: 1 | -1) => {
     if (!calc) return;
     const s = active?.s;
@@ -2135,6 +2171,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       const key = lower as 'b' | 'i' | 'u';
       return setStyle({ [key]: !active?.s?.[key] || undefined });
     }
+    // Ctrl+Shift+1 to 6 set the number, time, date, currency, percent and scientific formats; Alt+= is AutoSum.
+    if (mod && e.shiftKey && !e.altKey && !readOnly && /^Digit[1-6]$/.test(e.code)) return void (e.preventDefault(), e.stopPropagation(), quickFormat(Number(e.code.slice(5))));
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (k === '=' || e.code === 'Equal') && !readOnly) return void (e.preventDefault(), autoSum('SUM'));
     if (e.altKey && e.shiftKey && e.code === 'Digit5' && !readOnly) return void (e.preventDefault(), setStyle({ s: !active?.s?.s || undefined }));
     if (mod && k === '\\' && !readOnly) return void (e.preventDefault(), clear(true));
     if (mod && e.shiftKey && lower === 'l' && !readOnly) return void (e.preventDefault(), toggleFilter());
@@ -2436,6 +2475,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     comment: () => openComments(!readOnly),
     comments: () => openComments(false),
     func: (name) => typeIn(`=${name}(`),
+    autoSum,
     chars: openChars,
     addSheet: () => addSheet(),
     setStyle,
@@ -2547,6 +2587,13 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         ['Ctrl+U', 'Underline'],
         ['Alt+Shift+5', 'Strikethrough'],
         ['Ctrl+\\', 'Clear formatting'],
+        ['Ctrl+Shift+1', 'Number format (1,234.00)'],
+        ['Ctrl+Shift+2', 'Time format'],
+        ['Ctrl+Shift+3', 'Date format'],
+        ['Ctrl+Shift+4', 'Currency format'],
+        ['Ctrl+Shift+5', 'Percent format'],
+        ['Ctrl+Shift+6', 'Scientific format'],
+        ['Alt+=', 'AutoSum'],
         ['Ctrl+Shift+L', 'Create or remove a filter'],
         ['Ctrl+`', 'Show formulas'],
         ['Alt+/', 'Search the menus'],
@@ -2590,6 +2637,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           onRedo={redo}
           onStyle={setStyle}
           onFormat={setFormat}
+          onToggleFormat={toggleFormat}
+          onAutoSum={autoSum}
           onDecimals={stepDecimals}
           onBorders={borders}
           onMerge={(h2) => void merge(h2)}
