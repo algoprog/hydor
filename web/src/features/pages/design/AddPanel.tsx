@@ -1,9 +1,10 @@
 // A design's Add panel: words (a heading, a subheading, body text, pairs of fonts), elements (shapes, lines, frames to
 // drop a picture in, stickers, icons and emoji, a QR code), pictures and videos (from this device, the Library, free
 // photos, made with AI, a drawing, collages), the artboard's background (a colour, a gradient, a pattern, a picture, one
-// made with AI) and the brand kit. What it adds goes in the middle of what shows of the artboard, picked.
-import { useRef, useState, type ReactNode } from 'react';
-import { Brush, Clapperboard, Film, Images, ImageUp, LibraryBig, Palette as PaletteIcon, QrCode, Shapes, Smile, Sparkles, Type, WandSparkles } from 'lucide-react';
+// made with AI) and the brand kit. What it adds goes in the middle of what shows of the artboard, picked. Its last tab,
+// Layers, lists the artboard's parts front to back (Layers.tsx).
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Brush, Clapperboard, Film, Images, ImageUp, Layers as LayersIcon, LibraryBig, Palette as PaletteIcon, QrCode, Shapes, Smile, Sparkles, Type, WandSparkles } from 'lucide-react';
 import { DESIGN_FONTS, FONT_PAIRS, fontStack } from '@shared/design-fonts';
 import { FRAME_IDS, FRAME_NAMES, SHAPE_IDS, SHAPE_NAMES, frameCss, shapePath } from '@shared/design-shapes';
 import type { BrandKit } from '@shared/design-brand';
@@ -20,14 +21,17 @@ import { boxHtml, COLLAGES, collageHtml, emojiHtml, frameHtml, GRADIENTS, iconHt
 import { BrandDialog } from './BrandDialog';
 import { MediaPick, QrDialog } from './dialogs';
 import { deviceVideo, sizeOfPicture, videoAddress, type DCmd } from './DesignEdit';
+import { DesignLayers, type DLayer } from './Layers';
 
-type Tab = 'text' | 'elements' | 'pictures' | 'background' | 'brand';
+export type AddTab = 'text' | 'elements' | 'pictures' | 'background' | 'brand' | 'layers';
+type Tab = AddTab;
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'text', label: 'Text', icon: <Type size={15} /> },
   { id: 'elements', label: 'Elements', icon: <Shapes size={15} /> },
   { id: 'pictures', label: 'Pictures', icon: <Images size={15} /> },
   { id: 'background', label: 'Background', icon: <Brush size={15} /> },
   { id: 'brand', label: 'Brand', icon: <PaletteIcon size={15} /> },
+  { id: 'layers', label: 'Layers', icon: <LayersIcon size={15} /> },
 ];
 
 /** Google's fonts for the previews of the panel (and the inspector's font list), loaded in the app once. */
@@ -53,8 +57,35 @@ const Wide = ({ icon, children, onClick, hint }: { icon: ReactNode; children: Re
   </button>
 );
 
-export function DesignAdd({ cmd, board, look, palette, brand, onFont, onDone }: { cmd: DCmd; board: { w: number; h: number }; look: Look; palette: string[]; brand: BrandKit | null; onFont: (name: string) => void; onDone: () => void }) {
-  const [tab, setTab] = useState<Tab>('text');
+export function DesignAdd({
+  cmd,
+  board,
+  look,
+  palette,
+  brand,
+  onFont,
+  onDone,
+  layers,
+  picked,
+  show,
+}: {
+  cmd: DCmd;
+  board: { w: number; h: number };
+  look: Look;
+  palette: string[];
+  brand: BrandKit | null;
+  onFont: (name: string) => void;
+  onDone: () => void;
+  /** The artboard's parts, front to back, for Layers; and the paths of those picked. */
+  layers: DLayer[] | null;
+  picked: number[][];
+  /** A tab to show, asked for from elsewhere (the right-click menu's Layers): each new `n` shows it. */
+  show?: { tab: Tab; n: number };
+}) {
+  const [tab, setTab] = useState<Tab>(show?.tab ?? 'text');
+  useEffect(() => {
+    if (show) setTab(show.tab);
+  }, [show?.n]);
   const [icons, setIcons] = useState<'icons' | 'emoji' | null>(null);
   const [qr, setQr] = useState(false);
   const [media, setMedia] = useState<'image' | 'video' | null>(null);
@@ -81,7 +112,8 @@ export function DesignAdd({ cmd, board, look, palette, brand, onFont, onDone }: 
   const bg = (css: string | null) => cmd('board', { props: { background: css, 'background-image': null, 'background-color': null } });
 
   let body: ReactNode;
-  if (tab === 'text')
+  if (tab === 'layers') body = <DesignLayers list={layers} picked={picked} cmd={cmd} />;
+  else if (tab === 'text')
     body = (
       <>
         <div className="space-y-1.5 pt-2">
@@ -378,7 +410,7 @@ export function DesignAdd({ cmd, board, look, palette, brand, onFont, onDone }: 
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={cx('flex min-w-[54px] flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1 text-[11px] transition-colors', tab === t.id ? 'bg-accent-soft font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
+            className={cx('flex min-w-[40px] flex-auto flex-col items-center gap-0.5 rounded-lg px-1 py-1 text-[10.5px] transition-colors', tab === t.id ? 'bg-accent-soft font-medium text-fg' : 'text-fg-3 hover:bg-bg-2 hover:text-fg')}
           >
             <span className={tab === t.id ? 'text-accent' : undefined}>{t.icon}</span>
             {t.label}

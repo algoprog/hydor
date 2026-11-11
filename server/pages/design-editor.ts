@@ -7,10 +7,13 @@
 // Alt, ⌘ on a Mac, snaps to nothing; Ctrl, ⌥ on a Mac, drags a copy), nudged with the arrow keys (Shift: by ten),
 // picked several at a time (Shift+click, or a box dragged round them), grouped (Ctrl+G), lined up, spread out, brought
 // forward or sent back (Ctrl+] and Ctrl+[), locked, duplicated (Ctrl+D), copied with its look (Ctrl+Alt+C, Ctrl+Alt+V),
-// flipped, zoomed to what is picked (Shift+2) and panned with Space and a drag. A double-click writes in words, crops a picture inside its frame (drag it, size it by its corners), or goes
-// into a group. Pictures dropped on the canvas come in where they fall (on a frame: in it). The app's panels change the
-// rest through messages (`wa-ed`), as the page editor's do, and hear what is picked (`wa-ed-sel`), what can be undone
-// (`wa-ed-state`) and the design's own news (`wa-ed-design`: its zoom, its artboards, a resized copy…).
+// flipped, hidden (Ctrl+Shift+H), named, zoomed to what is picked (Shift+2) and panned with Space and a drag. The app's
+// Layers panel hears the artboard's parts, front to back (`wa-ed-design` layers), and picks, hides, locks, names and
+// reorders them by their paths. A double-click writes in words, crops a picture inside its frame (drag it, size it by
+// its corners), or goes into a group. Pictures dropped on the canvas come in where they fall (on a frame: in it). The
+// app's panels change the rest through messages (`wa-ed`), as the page editor's do, and hear what is picked
+// (`wa-ed-sel`), what can be undone (`wa-ed-state`) and the design's own news (`wa-ed-design`: its zoom, its artboards,
+// a resized copy…).
 //
 // Like editor.ts, the function runs in the browser: its source is sent as text, so it uses only its arguments and the
 // browser's own globals. What it gives back is the page's HTML with the changes, its scripts as they were.
@@ -82,7 +85,10 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     line: ['dLine', 'Line'],
     box: ['dBox', 'Box'],
   };
+  /** What a part is called: the name given it in Layers, else what it is (Text, Picture…). */
   const nameOf = (el: Element) => {
+    const own = el.getAttribute('data-name')?.trim();
+    if (own) return own;
     const t = typeOf(el);
     const n = NAMES[t] ?? NAMES.box;
     return L(n[0], n[1]);
@@ -90,6 +96,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   /** Text that is written in place (not curved words, which change in the panel). */
   const writable = (el: Element) => typeOf(el) === 'text';
   const locked = (el: Element) => el.getAttribute('data-locked') === '1';
+  /** Hidden in Layers: kept in the design, but not shown, picked by a click or downloaded. */
+  const hidden = (el: Element) => el.getAttribute('data-hidden') === '1';
 
   // ---- the editor's own look, and the layer over the page --------------------------------------------------------
   const own = document.createElement('style');
@@ -624,10 +632,52 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         canGroup: sel.length > 1 && sel.every((x) => x.parentElement === sel[0].parentElement),
         scope: !!scope,
         canLook: !!lookClip,
+        paths: sel.map(pathOf),
       },
     });
+    tellLayersSoon();
   };
-  const tellBoards = () => send({ type: 'wa-ed-design', what: 'boards', list: boards().map(sizeOfBoard), current: board ? boards().indexOf(board) : 0 });
+  const tellBoards = () => {
+    send({ type: 'wa-ed-design', what: 'boards', list: boards().map(sizeOfBoard), current: board ? boards().indexOf(board) : 0 });
+    // Another artboard: its own layers.
+    tellLayersSoon();
+  };
+  /**
+   * The artboard's parts for the app's Layers panel, front to back as the panel lists them (the last in the page is on
+   * top), groups with what they hold: each part's place (its path), its name, its kind, a few of its words, and whether it
+   * is locked or hidden. Told when it changes (not more than a few times a second).
+   */
+  type Layer = { p: number[]; n: string; t: string; x: string; own: boolean; l: boolean; h: boolean; c: Layer[] };
+  const layerOf = (el: HTMLElement): Layer => {
+    const t = typeOf(el);
+    const words = t === 'curve' ? (el.getAttribute('data-text') ?? '') : t === 'text' ? (el.textContent ?? '') : t === 'pic' ? (imgOf(el)?.getAttribute('alt') ?? '') : '';
+    return {
+      p: pathOf(el),
+      n: nameOf(el),
+      t,
+      x: cut(words.replace(/\s+/g, ' ').trim(), 48),
+      own: !!el.getAttribute('data-name')?.trim(),
+      l: locked(el),
+      h: hidden(el),
+      c: isGroup(el) ? partsOf(el).map(layerOf) : [],
+    };
+  };
+  const partsOf = (box: HTMLElement) => [...box.children].filter((k): k is HTMLElement => k instanceof HTMLElement && !k.hasAttribute('data-n-own') && !/^(SCRIPT|STYLE|TEMPLATE|LINK|META)$/.test(k.tagName)).reverse();
+  let layersSent = '';
+  let layersTimer = 0;
+  const tellLayers = (force = false) => {
+    clearTimeout(layersTimer);
+    layersTimer = 0;
+    const b = board && board.isConnected ? board : (boards()[0] ?? null);
+    const msg = { what: 'layers', board: b ? boards().indexOf(b) : -1, list: b ? partsOf(b).map(layerOf) : [] };
+    const key = JSON.stringify(msg);
+    if (!force && key === layersSent) return;
+    layersSent = key;
+    send({ type: 'wa-ed-design', ...msg });
+  };
+  const tellLayersSoon = () => {
+    if (!layersTimer) layersTimer = window.setTimeout(() => tellLayers(), dragging ? 400 : 120);
+  };
   const COLOUR = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi;
   const hexOf = (c: string): string | null => {
     const s = c.trim().toLowerCase();
@@ -773,8 +823,9 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         h.style.top = `${POS[k][1]}%`;
         h.style.cursor = `${k}-resize`;
       }
+      // While it is sized or turned, the handle to turn it would hide the size pill under it.
       const rot = selBox.querySelector<HTMLElement>('.rot')!;
-      rot.style.display = editing || lockedNow ? 'none' : 'grid';
+      rot.style.display = editing || lockedNow || dragging ? 'none' : 'grid';
       rot.style.top = `calc(100% + ${coarse ? 16 : 12}px)`;
       badge.hidden = !lockedNow;
     } else if (sel.length > 1 || (cropping && sel.length === 1)) {
@@ -923,7 +974,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   };
   /**
    * What an element being moved or sized can line up with: every visible part of the artboard, those inside groups too
-   * (not the parts being moved, nor what they hold), as boxes in `parent`'s pixels as they show (turned ones by the box
+   * (not the parts being moved, nor what they hold, nor those hidden in Layers), as boxes in `parent`'s pixels as they show (turned ones by the box
    * round them).
    */
   const targetsFor = (parent: HTMLElement, skip: HTMLElement[]): Geom[] => {
@@ -936,7 +987,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     }
     const walk = (box: HTMLElement, ox: number, oy: number, turned: boolean) => {
       for (const k of box.children) {
-        if (!(k instanceof HTMLElement) || k.hasAttribute('data-n-own') || skip.includes(k) || getComputedStyle(k).display === 'none') continue;
+        if (!(k instanceof HTMLElement) || k.hasAttribute('data-n-own') || skip.includes(k) || hidden(k) || getComputedStyle(k).display === 'none') continue;
         let g: Geom;
         if (turned) {
           // Inside a turned group: as it shows on the screen.
@@ -1258,9 +1309,12 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     const corner = sx !== 0 && sy !== 0;
     const edges = { l: sx < 0, r: sx > 0, t: sy < 0, b: sy > 0 };
     const frame = frameOf(parent);
-    /** The pills of a size drag, in the parent's pixels: the size under the box, and "=" on each as wide or high. */
+    /**
+     * The pills of a size drag, in the parent's pixels: the size under the box (under its "=", when it has one), and "="
+     * on each as wide or high.
+     */
     const sizeMarks = (res: ReturnType<typeof SNAP.snapResize>, box: Geom): Marks => {
-      const pills: Marks['pills'] = [{ x: box.x + box.w / 2, y: box.y + box.h + 20 / zoom, text: `${Math.round(box.w)} × ${Math.round(box.h)}` }];
+      const pills: Marks['pills'] = [{ x: box.x + box.w / 2, y: box.y + box.h + (res.sameW.length ? 34 : 20) / zoom, text: `${Math.round(box.w)} × ${Math.round(box.h)}` }];
       for (const b of [box, ...res.sameW]) if (res.sameW.length) pills.push({ x: b.x + b.w / 2, y: b.y + b.h + 12 / zoom, text: '=' });
       for (const b of [box, ...res.sameH]) if (res.sameH.length) pills.push({ x: b.x + b.w + 12 / zoom, y: b.y + b.h / 2, text: '=' });
       return { guides: res.guides, gaps: [], pills };
@@ -1525,7 +1579,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         });
         if (!parent) return;
         const hit = [...parent.children].filter((k): k is HTMLElement => {
-          if (!(k instanceof HTMLElement) || k.hasAttribute('data-n-own') || locked(k)) return false;
+          if (!(k instanceof HTMLElement) || k.hasAttribute('data-n-own') || locked(k) || hidden(k)) return false;
           const r = k.getBoundingClientRect();
           return r.width > 0 && r.left < x + w && r.right > x && r.top < y + h && r.bottom > y;
         });
@@ -1699,6 +1753,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       case 'select': {
         const el = byPath(arg?.path ?? arg);
         if (el && boardOf(el)) {
+          // Shift or Ctrl in Layers: one more picked (or one taken away), of those beside the first.
+          if (arg?.add && sel.length && sel[0].parentElement === el.parentElement) return select(sel.includes(el) ? sel.filter((x) => x !== el) : [...sel, el]);
           scope = el.parentElement && isGroup(el.parentElement) ? el.parentElement : null;
           select([el]);
         }
@@ -1709,7 +1765,56 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       case 'selectAll': {
         const b = scope ?? currentBoard();
         if (!b) return;
-        return select([...b.children].filter((x): x is HTMLElement => x instanceof HTMLElement && !locked(x)));
+        return select([...b.children].filter((x): x is HTMLElement => x instanceof HTMLElement && !x.hasAttribute('data-n-own') && !locked(x) && !hidden(x)));
+      }
+      case 'layers':
+        // The Layers panel opened: the list now, even if it has not changed.
+        return tellLayers(true);
+      case 'hover': {
+        // A row of Layers pointed at: its part outlined on the page.
+        const el = arg ? byPath(arg?.path ?? arg) : null;
+        hover = el && boardOf(el) ? el : null;
+        return redraw();
+      }
+      case 'layer': {
+        // From Layers (or the menu): a part (or what is picked) hidden or shown, locked or unlocked, or named.
+        const one1 = arg?.path ? byPath(arg.path) : null;
+        const list = arg?.path ? (one1 && boardOf(one1) ? [one1] : []) : sel;
+        if (!list.length) return;
+        remember();
+        for (const el of list) {
+          if (typeof arg?.hide === 'boolean') {
+            if (editing === el) endText();
+            if (arg.hide) {
+              el.setAttribute('data-hidden', '1');
+              el.style.visibility = 'hidden';
+            } else {
+              el.removeAttribute('data-hidden');
+              el.style.removeProperty('visibility');
+              if (!el.getAttribute('style')) el.removeAttribute('style');
+            }
+          }
+          if (typeof arg?.lock === 'boolean') {
+            if (arg.lock) el.setAttribute('data-locked', '1');
+            else el.removeAttribute('data-locked');
+          }
+          if (typeof arg?.name === 'string') {
+            const n = arg.name.replace(/\s+/g, ' ').trim().slice(0, 80);
+            if (n) el.setAttribute('data-name', n);
+            else el.removeAttribute('data-name');
+          }
+        }
+        return changed();
+      }
+      case 'reorder': {
+        // A row of Layers dragged above or below another beside it: in front of it, or behind it.
+        const el = byPath(arg?.path);
+        const to = byPath(arg?.to);
+        if (!el || !to || el === to || el.parentElement !== to.parentElement || !boardOf(el)) return;
+        remember();
+        if (arg?.place === 'above') to.after(el);
+        else to.before(el);
+        return changed();
       }
       case 'insert': {
         const b = currentBoard();
@@ -2795,6 +2900,11 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       if (e.altKey && e.shiftKey && k.toLowerCase() === 'l') {
         e.preventDefault();
         return act('lock');
+      }
+      // Ctrl+Shift+H: hidden (or shown again), as in Layers.
+      if (mod && e.shiftKey && (k.toLowerCase() === 'h' || e.code === 'KeyH')) {
+        e.preventDefault();
+        return act('layer', { hide: !sel.every(hidden) });
       }
       if (k === 'Delete' || k === 'Backspace') {
         e.preventDefault();

@@ -1,9 +1,10 @@
 // What the diagram editor does to a page, as plain functions of the page (each gives a new page; the one given stays as
 // it was): moving shapes (what is in them with them, and the bends of connectors between moved shapes), resizing,
-// turning and flipping, aligning, spacing out, matching sizes, grouping, bringing forward and sending back, copying and
-// pasting (new ids, connectors among what was copied joined to the copies), taking out (with the connectors left
-// hanging), the shapes that hold a point, where guides line a moving box up with the others, a look copied from one item
-// to others (a shape's to shapes, a line's to lines, what both have to both), and a connector's course and ends.
+// turning and flipping (several together, by the frame round them), aligning, spacing out, matching sizes, grouping,
+// bringing forward and sending back, copying and pasting (new ids, connectors among what was copied joined to the
+// copies), taking out (with the connectors left hanging), the shapes that hold a point, where guides line a moving box
+// up with the others, a look copied from one item to others (a shape's to shapes, a line's to lines, what both have to
+// both), and a connector's course and ends.
 import { CONTAINER_KINDS, descendants, isEdge, isShape, newId, type DiagramEdge, type DiagramItem, type DiagramPage, type DiagramShape, type DiagramStyle, type RouteKind } from './diagram.ts';
 import { inShape, pageBox, type Box } from './diagram-shapes.ts';
 import { distanceTo, edgeGeom } from './diagram-route.ts';
@@ -48,6 +49,68 @@ export function moveItems(p: DiagramPage, ids: Set<string>, dx: number, dy: numb
       if (!e.to.id) e.to = { x: r2((e.to.x ?? 0) + dx), y: r2((e.to.y ?? 0) + dy) };
       if (e.points) e.points = e.points.map(([x, y]) => [r2(x + dx), r2(y + dy)]);
       return e;
+    }),
+  };
+}
+
+/** A connector's free ends and bends, each taken to where `f` puts it (its joined ends follow their shapes). */
+const edgePoints = (e: DiagramEdge, f: (x: number, y: number) => { x: number; y: number }): DiagramEdge => {
+  const out: DiagramEdge = { ...e };
+  const at = (x: number, y: number) => {
+    const q = f(x, y);
+    return { x: r2(q.x), y: r2(q.y) };
+  };
+  if (!e.from.id) out.from = at(e.from.x ?? 0, e.from.y ?? 0);
+  if (!e.to.id) out.to = at(e.to.x ?? 0, e.to.y ?? 0);
+  if (e.points)
+    out.points = e.points.map(([x, y]) => {
+      const q = at(x, y);
+      return [q.x, q.y] as [number, number];
+    });
+  return out;
+};
+
+/**
+ * Items sized together by the frame round them (several picked): `from` (the box round them) becomes `to`, and each
+ * shape's middle goes to the same place in it, its size growing as the box does (a turned shape's by how much its own
+ * sides stretch); connectors' free ends and bends go with them. Locked shapes stay; words keep their size.
+ */
+export function scaleItems(p: DiagramPage, ids: Set<string>, from: Box, to: Box): DiagramPage {
+  const kx = from.w > 0 ? to.w / from.w : 1;
+  const ky = from.h > 0 ? to.h / from.h : 1;
+  const map = (x: number, y: number) => ({ x: to.x + (x - from.x) * kx, y: to.y + (y - from.y) * ky });
+  return {
+    ...p,
+    items: p.items.map((it) => {
+      if (!ids.has(it.id)) return it;
+      if (!isShape(it)) return edgePoints(it, map);
+      if (it.locked) return it;
+      const a = ((it.rot ?? 0) * Math.PI) / 180;
+      const c = Math.abs(Math.cos(a));
+      const n = Math.abs(Math.sin(a));
+      const w = Math.max(1, it.w * Math.hypot(kx * c, ky * n));
+      const h = Math.max(1, it.h * Math.hypot(kx * n, ky * c));
+      const m = map(it.x + it.w / 2, it.y + it.h / 2);
+      return { ...it, x: r2(m.x - w / 2), y: r2(m.y - h / 2), w: r2(w), h: r2(h) };
+    }),
+  };
+}
+
+/** Items turned together by `deg` degrees about a point (the middle of the frame round them): shapes, free ends, bends. */
+export function turnItems(p: DiagramPage, ids: Set<string>, c: { x: number; y: number }, deg: number): DiagramPage {
+  if (!deg) return p;
+  const a = (deg * Math.PI) / 180;
+  const [cos, sin] = [Math.cos(a), Math.sin(a)];
+  const turn = (x: number, y: number) => ({ x: c.x + (x - c.x) * cos - (y - c.y) * sin, y: c.y + (x - c.x) * sin + (y - c.y) * cos });
+  return {
+    ...p,
+    items: p.items.map((it) => {
+      if (!ids.has(it.id)) return it;
+      if (!isShape(it)) return edgePoints(it, turn);
+      if (it.locked) return it;
+      const m = turn(it.x + it.w / 2, it.y + it.h / 2);
+      const rot = r2(((((it.rot ?? 0) + deg) % 360) + 360) % 360);
+      return { ...it, x: r2(m.x - it.w / 2), y: r2(m.y - it.h / 2), rot: rot && rot !== 360 ? rot : undefined };
     }),
   };
 }

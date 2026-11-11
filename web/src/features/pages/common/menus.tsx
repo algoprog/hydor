@@ -156,28 +156,24 @@ export const isMenuKey = (e: { key: string; shiftKey: boolean; ctrlKey?: boolean
  * An editor's right-click menu: the rows of its menus (the same MenuEntry lists, so a right-click offers an action with
  * the words, keys and ticks the menu bar gives it), opened at the point pressed, or by what is picked when the keyboard
  * opens it (the menu key, Shift+F10: it starts on its first row). A list inside opens in its place, with the way back at
- * its top; ↑ ↓ ← → and Enter move through it, Esc or a press outside closes it, and on a phone it is a sheet from the
- * bottom. Pressing a row never takes the focus from what is edited, so the words or parts picked stay picked for the
- * action. Put it inside the editor's own part of the page (its data-i18n), so its words are translated as they mean there.
+ * its top; ↑ ↓ ← → and Enter move through it, Esc or a press outside closes it; too tall for the room below the point,
+ * it moves up to show whole (as a computer's own menus do), and on a phone it is a sheet from the bottom. Pressing a row
+ * never takes the focus from what is edited, so the words or parts picked stay picked for the action. Put it inside the
+ * editor's own part of the page (its data-i18n), so its words are translated as they mean there.
  */
 export function ContextMenu({ at, items, onClose, title, width = 248 }: { at: ContextMenuAt | null; items: MenuEntry[]; onClose: () => void; title?: string; width?: number }) {
   const anchor = useRef<HTMLDivElement>(null);
   // A new point is a new menu: its lists start from the top again.
   const key = at ? `${at.x},${at.y}` : '';
-  // As a computer's own menus do, it opens higher up when it would not fit under the point, rather than scroll.
-  const top = at ? Math.max(8, Math.min(at.y, window.innerHeight - menuHeight(items) - 16)) : -10;
   return (
     <>
-      <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: at?.x ?? -10, top }} />
-      <Popover anchor={anchor} open={!!at && shown(items).length > 0} onClose={onClose} width={width} title={title}>
+      <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: at?.x ?? -10, top: at?.y ?? -10 }} />
+      <Popover anchor={anchor} open={!!at && shown(items).length > 0} onClose={onClose} width={width} title={title} slide>
         {at && <MenuList key={key} items={items} close={onClose} title={title} keyed={at.keyed} />}
       </Popover>
     </>
   );
 }
-
-/** About how tall a menu of these rows is: 34 pixels a row, 9 a line between rows, and its frame. */
-const menuHeight = (items: MenuEntry[]) => shown(items).reduce((h, it) => h + (it === '-' ? 9 : 34), 10);
 
 /** Every action in the menus with where it is ("Format › Text"), for Search the menus. */
 function allActions(menus: MenuDef[]): { a: MenuAction; path: string[] }[] {
