@@ -102,7 +102,7 @@ A child that needs your approval or an answer waits for you like any session, an
 
 ### Set how many work at once
 
-In [Settings → Capabilities → Child sessions](/settings?s=children), set **Working at once, per session** with − and + ([go there](/settings?s=children&find=Working%20at%20once%2C%20per%20session)): from 1 to 12, 4 to start. It counts each session's children separately, not the whole app's. A deep research uses its own **Researchers at a time** instead, and a swarm its **Swarm size**.
+In [Settings → Capabilities → Child sessions](/settings?s=children), set **Working at once, per session** with − and + (in the **Child sessions** group; its (i) lists the limits that hold for children) ([go there](/settings?s=children&find=Working%20at%20once%2C%20per%20session)): from 1 to 12, 4 to start. It counts each session's children separately, not the whole app's. A deep research uses its own **Researchers at a time** instead, and a swarm its **Swarm size**.
 
 ## Set a swarm on a hard problem
 
@@ -144,7 +144,7 @@ The lead's session has a bar above the message box: **Swarm** · "choosing its a
 
 ### Set the swarm size
 
-In [Settings → Capabilities → Child sessions](/settings?s=children), **Swarm size** ([go there](/settings?s=children&find=Swarm%20size)) sets how many members of one swarm or campaign work at once: from 1 to 16, 5 to start. Each member costs about what one agent does; the lead starts more as some finish.
+In [Settings → Capabilities → Child sessions](/settings?s=children), **Swarm size** (in the **Swarm** group; [go there](/settings?s=children&find=Swarm%20size)) sets how many members of one swarm or campaign work at once: from 1 to 16, 5 to start. Each member costs about what one agent does; the lead starts more as some finish.
 
 ## Make one big change with a campaign
 

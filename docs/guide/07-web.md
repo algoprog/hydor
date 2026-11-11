@@ -22,15 +22,15 @@ Claude Code and Codex also have web tools of their own. When a reply cites the p
 
 Open [Settings → Capabilities → Search](/settings?s=search). On a phone, Settings is a list: tap **Search** under Capabilities.
 
-Under [Providers](/settings?s=search&find=Providers) ("Tried from the top. The first one that is on is the default."), each provider has a row:
+Under [Providers](/settings?s=search&find=Providers) ("Tried from the top: the first one that is on answers"), each provider has a row:
 
-- two arrows on the left, **Try earlier** and **Try later**, move it up or down the order;
 - its name, with **Default** on the first one that is on, and a warning such as **Needs a key** or **Needs your instance’s address** when it can't answer as it is set up;
-- a line on what it is, and what it can keep a search to, like "Up to 100 results · categories · dates · home pages · the parts of pages that answer";
+- a line on what it is; the (i) beside its name adds what it can keep a search to, like "Up to 100 results · categories · dates · home pages · the parts of pages that answer";
 - a hint of its saved key, if it has one (like "sk-ab…12cd": never the key itself);
 - its last error, in red, with how long ago;
-- buttons: **Add a key** (or **Change the key**), **Set the address** (or **Change the address**), **Test**, and **Make default** on a provider that is on but not first;
-- a switch on the right that turns it on or off.
+- a switch on the right that turns it on or off, and a **⋯** menu with **Add a key** (or **Change the key**), **Set the address** (or **Change the address**), **Test**, **Make default** (on a provider that is on but not first), and **Move up** and **Move down** to change its place in the order.
+
+The (i) beside **Providers** says that agents can search the web and read pages whatever their model, and that search results and pages are outside data, which agents use as information, never as instructions.
 
 **Make default** moves the provider to the top of the list. Out of the box the order is Naget Search, SearXNG, Brave Search, DuckDuckGo. Naget Search and DuckDuckGo start on; SearXNG and Brave Search start off, until you give them what they need.
 
@@ -44,11 +44,11 @@ Its form also has an **Address**: https://naget.com unless you set another. Leav
 
 ### SearXNG
 
-[SearXNG](/settings?s=search&find=SearXNG) is a search engine you run yourself, which asks many search engines at once and keeps no record of you. It needs no key, only your instance's address: press **Set the address**, type it (like https://searx.example.org), and press **Save**. Giving it an address turns it on. It brings up to 100 results.
+[SearXNG](/settings?s=search&find=SearXNG) is a search engine you run yourself, which asks many search engines at once and keeps no record of you. It needs no key, only your instance's address: open its **⋯** menu, pick **Set the address**, type it (like https://searx.example.org), and press **Save**. Giving it an address turns it on. It brings up to 100 results.
 
 ### Brave Search
 
-[Brave Search](/settings?s=search&find=Brave%20Search) searches Brave's own independent index, through its Search API. It needs a key; Brave has a free plan. **Add a key** shows a link, **Get one at api-dashboard.search.brave.com**. Adding a key turns it on. It brings up to 100 results.
+[Brave Search](/settings?s=search&find=Brave%20Search) searches Brave's own independent index, through its Search API. It needs a key; Brave has a free plan. **⋯ → Add a key** opens a form with a link, **Get one at api-dashboard.search.brave.com**. Adding a key turns it on. It brings up to 100 results.
 
 ### DuckDuckGo
 
@@ -56,7 +56,7 @@ Its form also has an **Address**: https://naget.com unless you set another. Leav
 
 ### Add or change a key or an address
 
-1. On the provider's row, press **Add a key** (or **Change the key**, **Set the address**, **Change the address**).
+1. On the provider's row, open the **⋯** menu and pick **Add a key** (or **Change the key**, **Set the address**, **Change the address**).
 2. Paste the key under **Key** (it shows as dots), or type the **Address**. For Naget Search the key is marked "optional, for more searches".
 3. Press **Save**. **Cancel** closes the form and keeps things as they were.
 
@@ -64,13 +64,13 @@ Giving a provider the key or address it needs turns it on. Keys stay on the serv
 
 ### Test a provider
 
-Press **Test** on a row. The app runs a small search with that provider alone, without falling back to the next one, and with what you typed in its form even before you save it. You see "Works:", the number of results and how long it took, with the first three results as links, or the reason it failed. Testing a provider as it is saved also clears its old error once it works again.
+Open a row's **⋯** menu and pick **Test**. The app runs a small search with that provider alone, without falling back to the next one, and with what you typed in its form even before you save it. You see "Works:", the number of results and how long it took, with the first three results as links, or the reason it failed. Testing a provider as it is saved also clears its old error once it works again.
 
 ### Results per search
 
 [Results per search](/settings?s=search&find=Results%20per%20search) sets how many results a search brings when the agent doesn't ask for a number: **10**, **20** (the default), **50** or **100**. Agents can still ask for more, up to 100, for deeper searches such as finding papers. More results cost an agent more reading.
 
-A note at the bottom of the page reminds you that results and pages are outside data, and links to how a developer can add another provider.
+A note at the bottom of the page links to how a developer can add another provider.
 
 ### When no provider can answer
 
@@ -239,13 +239,13 @@ Open [Settings → Capabilities → Browser](/settings?s=browser) ("A web browse
 
 ### A browser for agents
 
-[A browser for agents](/settings?s=browser&find=A%20browser%20for%20agents) turns the browser on or off for every agent. It is on by itself once a Chromium is found, and can't be turned on until one is. When it is off, agents don't get the browser's tools.
+[A browser for agents](/settings?s=browser&find=A%20browser%20for%20agents) is the switch beside the section's title. It turns the browser on or off for every agent. It is on by itself once a Chromium is found, and can't be turned on until one is. When it is off, agents don't get the browser's tools.
 
 ### Chromium
 
-[Chromium](/settings?s=browser&find=Chromium) shows the one in use, with its version and where it is. The app picks, in this order: a Chrome or Chromium installed on this computer, one it downloaded, then one that Playwright (a browser-testing tool) installed. When it finds more than one, a picker lets you choose: **The best one found**, or a particular one.
+[Chromium](/settings?s=browser&find=Chromium) shows the one in use, with its version, and where it is in its (i). The app picks, in this order: a Chrome or Chromium installed on this computer, one it downloaded, then one that Playwright (a browser-testing tool) installed. When it finds more than one, a picker lets you choose: **The best one found**, or a particular one.
 
-When none is found, the row says so. Press **Download Chrome** to download Chrome for Testing (about 170 MB) into the app's data folder; a bar shows the progress, and if it fails, the row says why. The button stays while no downloaded copy exists, even when another Chromium was found.
+When none is found, the row says so, and offers to download Chrome for Testing (about 170 MB) into the app's data folder: press **Download Chrome**; a bar shows the progress, and if it fails, the row says why. The button stays while no downloaded copy exists, even when another Chromium was found.
 
 If Chrome's own sandbox (the wall between pages and the rest of the computer) can't run on this computer, a note says so. Pages still can't reach this machine's network, but keep profiles to the sites you need.
 
@@ -268,7 +268,7 @@ Under [Sites](/settings?s=browser&find=Sites), two lists apply to every session'
 - **Only these sites**: when it has any, the browser opens pages only on these sites. Empty means any site.
 - **Never these sites**: nothing from these sites loads.
 
-Press **Save sites** after changing them. You can paste whole addresses: the app keeps only the site ("https://www.example.com/page" becomes example.com). Each session can add its own in its browser's menu (**Sites for this session**).
+**Save sites** appears beside the group's title once you change them: press it. You can paste whole addresses: the app keeps only the site ("https://www.example.com/page" becomes example.com). Each session can add its own in its browser's menu (**Sites for this session**).
 
 ### Keep sign-ins with profiles
 
@@ -281,7 +281,7 @@ A profile is a browser folder of its own that keeps logins between sessions, so 
 
 To use it, open a session's browser, then **Browser options** (⋯) → pick the profile under **Profile**. Picking it closes the browser; it opens again, logged in, the next time the agent or you open it, and the panel shows the profile's name. Sessions that use the same profile share its logins.
 
-Each profile in the list has **Log in to sites** (to log in to more), the pencil (**Rename**), and the bin (**Delete**), which also deletes its logins and everything the browser kept for it, and closes the browsers using it. With no profiles yet, the list says each session's browser starts fresh, logged in nowhere.
+Each profile in the list has **Log in to sites** (to log in to more), and a **⋯** menu with **Rename** and **Delete**, which also deletes its logins and everything the browser kept for it, and closes the browsers using it. With no profiles yet, the list says each session's browser starts fresh, logged in nowhere.
 
 ## Let agents use your computer
 
@@ -289,13 +289,13 @@ In the desktop app, on a Mac, on Windows and on Linux, agents can also use the c
 
 ### Turn on computer use
 
-Open [Settings → Capabilities → Computer use](/settings?s=computer) ("Agents see your screen and use the mouse and keyboard, in the desktop app") and turn on [**Let agents use this computer**](/settings?s=computer&find=Let%20agents%20use%20this%20computer). Then, as your system needs:
+Open [Settings → Capabilities → Computer use](/settings?s=computer) ("Agents see your screen and use the mouse and keyboard, in the desktop app") and turn on the [**Computer use**](/settings?s=computer&find=Computer%20use) switch beside the section's title. Then, as your system needs:
 
 - **On a Mac**, give Hydor macOS's two permissions. Beside [**Accessibility**](/settings?s=computer&find=Accessibility), macOS's permission to use the mouse and keyboard, press **Allow…**. macOS asks whether Hydor may control this computer, and its System Settings open at **Privacy & Security → Accessibility**: turn on **Hydor** there. Beside [**Screen Recording**](/settings?s=computer&find=Screen%20Recording), macOS's permission to see the screen, press **Allow…**, and turn on **Hydor** under **Screen Recording** (**Screen & System Audio Recording** on macOS 15). If macOS asks to quit and reopen Hydor, do: running agents carry on. A permission macOS gave shows **Allowed**, and keeps when the app updates. If System Settings shows **Hydor** on but Settings still says **Allow…**, that switch is from an earlier version (before 0.28.1, each update needed the permissions again): press **Allow…**, which clears it, and turn **Hydor** on once more.
 - **On Windows** there is nothing to allow. Programs running as administrator are out of the agent's reach, and so is the screen while it is locked.
 - **On Linux** it works on an X11 (Xorg) desktop with Python 3, which nearly every system has. A desktop on Wayland, as GNOME and KDE are on most systems now, lets no app see the screen or use the mouse and keyboard of the others: the section says so, and how to log in to an X11 session instead (on Ubuntu, the gear on the login screen → **Ubuntu on Xorg**).
 
-When something keeps computer use from working on this computer, the section says what, in a yellow box at its top. The section is in Settings everywhere, but only the desktop app can do this: elsewhere it says so.
+When something keeps computer use from working on this computer, the section says what, in a yellow box at its top (with the switch off, a note says agents cannot use this computer). The section is in Settings everywhere, but only the desktop app can do this: elsewhere it says so.
 
 ### What agents do on your computer
 
@@ -330,7 +330,7 @@ While an agent uses the computer, the glow and its note show, the app's icon say
 - choose **Stop** in the menu of the app's icon: in the menu bar on a Mac, the notification area on Windows, the system tray on Linux;
 - or press **Stop** above the session's message box, or in Settings → Computer use.
 
-Stopping ends what the agent is doing and takes back every session's allowance: an agent that wants the computer again asks again on the card ("You stopped the agent using your Mac. Let it go on?"). Turning **Let agents use this computer** off does the same.
+Stopping ends what the agent is doing and takes back every session's allowance: an agent that wants the computer again asks again on the card ("You stopped the agent using your Mac. Let it go on?"). Turning **Computer use** off does the same.
 
 ## Ask an agent
 

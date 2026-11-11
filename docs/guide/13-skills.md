@@ -55,13 +55,13 @@ Go to **Settings → Agents → Skills** ([open it](/settings?s=skills)). On a p
 
 From the top, the page has:
 
-- a box with the skills agents suggested, when there are some (see [Approve, edit or dismiss a proposed skill](#approve-edit-or-dismiss-a-proposed-skill));
-- a search box, **New skill**, and the **⋯** menu: **Suggest skills that fit**, **Bring skills in by keywords**, **Your skills folder** (opens it in Files), **Get more with plugins** (opens [Settings → Plugins](/settings?s=plugins)) and **How agents get skills**;
-- a row of filters: **All**, **Built in**, **Yours**, **From plugins**, **Claude Code and Codex** and **In projects**, each with how many skills it holds. Only the ones with skills show;
-- the skills, in groups by what they are for: **Ways of working**, **Writing**, **Documents**, **Research and the web**, **Planning and decisions**, **Data and numbers**, **Design and pictures**, **Coding**, **AI models** and **This app**; then **Claude Code's own**, **Codex's own**, and a group for each project with skills of its own;
+- beside the page's title, **New skill** and the **⋯** menu: **Suggest skills that fit**, **Bring skills in by keywords**, **Your skills folder** (opens it in Files), **Get more with plugins** (opens [Settings → Plugins](/settings?s=plugins)) and **How agents get skills**;
+- a group with the skills agents suggested, when there are some (see [Approve, edit or dismiss a proposed skill](#approve-edit-or-dismiss-a-proposed-skill)); its (i) says nothing is saved until you approve;
+- a search box, and a row of filters: **All**, **Built in**, **Yours**, **From plugins**, **Claude Code and Codex** and **In projects**. Only the ones with skills show;
+- the skills, in groups by what they are for (each group's title says how many it holds, and a long group shows its first eight with **Show all**): **Ways of working**, **Writing**, **Documents**, **Research and the web**, **Planning and decisions**, **Data and numbers**, **Design and pictures**, **Coding**, **AI models** and **This app**; then **Claude Code's own**, **Codex's own**, and a group for each project with skills of its own;
 - at the bottom, your skills you removed, to bring back.
 
-Claude Code's and Codex's own skills are listed as every folder has them: yours, and those that come with the agents. A project folder's own (in its `.claude/skills`) are on that project's **Skills** tab.
+Each skill is a row: its name (click it to open the skill), what it is for in one line, its switch, and an (i) that says where it comes from and how often it was used. Claude Code's and Codex's own skills are listed as every folder has them: yours, and those that come with the agents. A project folder's own (in its `.claude/skills`) are on that project's **Skills** tab.
 
 ## Find a skill
 
@@ -71,7 +71,7 @@ You can also find a skill from the app's search box (Ctrl+K, ⌘K on a Mac): typ
 
 ## Turn a skill on or off
 
-Every skill of the library and of Claude Code and Codex has a switch at the end of its row. A skill turned off stays where it is, but agents no longer get it; its row is greyed and says **Off**. Turn it back on with the same switch. You can also switch it in its window.
+Every skill of the library and of Claude Code and Codex has a switch at the end of its row. A skill turned off stays where it is, but agents no longer get it; its name is greyed and a badge says **Off**. Turn it back on with the same switch. You can also switch it in its window.
 
 - A library skill (built in, yours or a plugin's) turned off is left out for every agent, in every project that doesn't switch it on for itself.
 - Claude Code keeps its own choice in its settings, by the skill's name; Codex keeps it in its own configuration.
@@ -82,7 +82,7 @@ A project's own skills have no switch here: change them on the project's **Skill
 
 ## Read a skill and its history
 
-Click a skill's row, or a **Using skill** pill in a conversation. A window opens with:
+Click a skill's name, or a **Using skill** pill in a conversation. A window opens with:
 
 - where it comes from, its group, and how often agents used it;
 - its switch: **Agents get it**, or **Off: agents do not get it**;
@@ -109,7 +109,7 @@ The app comes with these skills, in the groups the page shows them in. Open any 
 **Ways of working**
 
 - **clarify-first**: for a big or open-ended request (a website, a trip, a renovation, a talk, a business plan). The agent first reads what is already there, asks one question at a time and says why, plays back what it understood, offers two or three ways to do it, and writes a short brief for you to approve before it builds anything.
-- **clean-up**: at the end of a task. The agent lists what it made along the way, removes what is no longer needed (scratch files, test data, temporary folders, merged or abandoned branches, worktrees, processes it started), never removes what it didn't make, asks first about anything big or shared, and says in a line what it removed and what it left. While **Clean up after a task** is on in [Settings → Assistants](/settings?s=assistants&find=Clean%20up%20after%20a%20task) (it is unless you turn it off), every agent is told to do this at the end of a task.
+- **clean-up**: at the end of a task. The agent lists what it made along the way, removes what is no longer needed (scratch files, test data, temporary folders, merged or abandoned branches, worktrees, processes it started), never removes what it didn't make, asks first about anything big or shared, and says in a line what it removed and what it left. While **Clean up after a task** is on in [Settings → Your agents](/settings?s=assistants&find=Clean%20up%20after%20a%20task) (it is unless you turn it off), every agent is told to do this at the end of a task.
 - **decisions-log**: for work without you at hand (a goal, a scheduled task, "don't wait for me"). The agent settles ordinary questions itself, writes each decision down with why and what it costs if wrong, and carries on. It stops only before steps that can't be undone (sending, paying, deleting, publishing), anything touching passwords or access, or anything outside the work; its final message lists every decision it made.
 - **evidence-before-done**: before the agent says something is done, fixed, saved, sent or true. It names the check that would prove it, runs it, reads the result, and reports the claim with its evidence, or says plainly what it could not check.
 - **troubleshooting**: for anything that doesn't work as it should (an error, a device, a home network, a formula, a recipe). The agent makes the problem happen on purpose, gathers facts, tests one idea at a time, fixes the cause and shows that it is fixed.
@@ -303,7 +303,7 @@ Approving a proposal with warnings asks once more: **Save it with these warnings
 A proposal waits in three places, and an answer in any one of them shows everywhere, on every device:
 
 - the card in its conversation;
-- the box at the top of [Settings → Skills](/settings?s=skills), "An agent suggests a skill" (or how many it suggests). Each row says **New skill** or **Change to** and the name, how long ago, which conversation it came from (click to open it), and "has warnings" when it has any. **Review** opens the same card in a window;
+- the group at the top of [Settings → Skills](/settings?s=skills), "An agent suggests a skill" (or how many it suggests). Each row says **New skill:** or **Change to** and the name, how long ago, which conversation it came from (click to open it), and "has warnings" when it has any. **Review** opens the same card in a window;
 - the [inbox](/inbox), as "Suggests a new skill: …" or "Suggests a change to the … skill". **Open** takes you to its conversation, where the card is. See [Inbox and notifications](/guide/inbox).
 
 ### Limits

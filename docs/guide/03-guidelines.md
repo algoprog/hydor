@@ -20,7 +20,7 @@ Guidelines come at three levels, from the most general to the most specific:
 2. **For a project**: every session in that [project](/guide/projects). Set on the project's page, in its **Agent Guidelines** field.
 3. **For one session**: only that session. Set on the start page (**Options → Guidelines**) before it starts, or later from the session's menu (⋯) → **Session settings → Guidelines**.
 
-An agent gets all the levels that apply to its session, in that order. Where two disagree, the more specific one wins: a session's guidelines over its project's, a project's over the ones for every session.
+An agent gets all the levels that apply to its session, in that order. Where two disagree, the more specific one wins: a session's guidelines over its project's, a project's over the ones for every session. (The (i) beside **For one session** in Settings says the same.)
 
 ## Write guidelines for every session
 
@@ -28,7 +28,7 @@ An agent gets all the levels that apply to its session, in that order. Where two
 2. Under **For every session**, write what every agent should know about you and how you work.
 3. Click **Save**.
 
-Below the box are a few ready-made ways for agents to talk to you (**Plain English, short answers, explain jargon**, **Warm and encouraging: I am new to this**, **Brief and technical**). A click adds one as a line ("How to talk to me: …"), which you can change before saving.
+Under the box, **Start from…** offers a few ready-made ways for agents to talk to you (**Plain English, short answers, explain jargon**, **Warm and encouraging: I am new to this**, **Brief and technical**). Picking one adds it as a line ("How to talk to me: …"), which you can change before saving. **Save** stays dim until you change something; **Undo changes** puts back what was saved.
 
 Each level holds up to 20,000 characters. Keep them short where you can: every session reads all of it, and a few clear lines work better than pages.
 
@@ -40,7 +40,7 @@ Every project has guidelines of its own, for the work you keep in it: who it is 
 2. Write in the **Agent Guidelines: what every agent in it follows** field.
 3. Save the project.
 
-You can also write them when you make a project: in the **New project** window, click **More options**, then write in **Agent Guidelines**. **Settings → Agents → Agent Guidelines → For a project** lists every project that has guidelines; click one to open it.
+You can also write them when you make a project: in the **New project** window, click **More options**, then write in **Agent Guidelines**. **Settings → Agents → Agent Guidelines → For a project** lists every project that has guidelines, with the first line of each (**Show all** when there are many); click one to open that project.
 
 In a group (a project that brings several projects together), its sessions follow the group's own guidelines, and read what each project in the group asks as part of working with that project.
 
@@ -83,7 +83,7 @@ The setting that used to be **How the agents talk to you** (in Settings → Capa
 Claude Code and Codex also read instruction files of their own: CLAUDE.md (Claude Code) and AGENTS.md (Codex), in your home folder for every session, and in a project's folder for the sessions that work there. They keep working as before. People who keep such files in a repository, to share them with everyone working on it, can still edit them here:
 
 1. Open [Settings → Agents → Agent Guidelines](/settings?s=guidelines).
-2. Open **Files Claude Code and Codex read too** at the bottom.
+2. Open **Instruction files** in the last group, below **For one session** (its hint reads "CLAUDE.md and AGENTS.md in a project's folder"; its (i) says why they are here).
 3. Pick the folder, then **Claude Code** or **Codex**, and the file to edit (or **Create** it).
 
 The list shows every file the agent reads for a session in that folder, in the order it reads them. For most people the guidelines are simpler: they work for every agent and need no files.

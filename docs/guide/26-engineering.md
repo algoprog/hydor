@@ -6,7 +6,7 @@ Agents can look after a codebase while you do something else: look into a failed
 
 ## How the engineering tasks work
 
-The four tasks are examples in [Settings → Scheduled tasks](/settings?s=tasks) (**Settings → Agents → Scheduled tasks**), under **Start from an example** → **Engineering**, beside [**Review new pull requests**](/settings?s=tasks&find=Review%20new%20pull%20requests). Each opens a short form; fill it in, pick who runs it under **Run by**, and select **Create task** (or **More options…** for the full task form). See [Scheduled tasks](/guide/tasks) for everything a task can do.
+The four tasks are examples in [Settings → Scheduled tasks](/settings?s=tasks) (**Settings → Agents → Scheduled tasks**), in **Start from an example** (press **Show all examples** to see them), beside [**Review new pull requests**](/settings?s=tasks&find=Review%20new%20pull%20requests). Each opens a short form; fill it in, pick who runs it under **Run by**, and select **Create task** (or **More options…** for the full task form). See [Scheduled tasks](/guide/tasks) for everything a task can do.
 
 What they have in common:
 
@@ -23,7 +23,7 @@ A failed run on GitHub Actions, GitLab CI, Buildkite or CircleCI wakes an agent.
 
 ### Set it up
 
-1. In [Settings → Scheduled tasks](/settings?s=tasks), select [**CI doctor**](/settings?s=tasks&find=CI%20doctor) under **Engineering**.
+1. In [Settings → Scheduled tasks](/settings?s=tasks), select [**CI doctor**](/settings?s=tasks&find=CI%20doctor) in **Start from an example** (**Show all examples**).
 2. Pick the **Repository folder** and the **CI**: **GitHub Actions**, **GitLab CI**, **Buildkite** or **CircleCI**.
 3. Choose what it may do:
    - **Re-run jobs that look flaky** (on to start with): once, when the evidence says the run failed rather than the code (a time-out, a download that failed, a test known to come and go).
@@ -42,7 +42,7 @@ Only a failed run starts it (on GitHub a workflow run whose conclusion is failur
 
 Each issue opened on GitHub (or Gitea) wakes an agent that triages it: it reads the issue and the project's contributing guide, labels it with labels the repository has, looks for the same problem among open and recently closed issues in several wordings (saying how sure it is), asks the reporter in a kind comment for what the report lacks (the version, the steps, the logs), and, when the fix is small and clear, tries it in a worktree and opens a draft pull request that refers to the issue.
 
-1. Select [**Issue triage**](/settings?s=tasks&find=Issue%20triage) under **Engineering**.
+1. Select [**Issue triage**](/settings?s=tasks&find=Issue%20triage) in **Start from an example** (**Show all examples**).
 2. Pick the **Repository folder**, and what it may do: **Label it**, **Comment on it** and **Try easy ones as draft pull requests** (all on to start with).
 3. Select **Create task**, then copy its address into the repository's **Settings → Webhooks → Add webhook** on GitHub, with only **Issues** under the individual events (on Gitea: Issues events).
 
@@ -52,7 +52,7 @@ Only a newly opened issue starts a run. The agent never closes, locks, transfers
 
 Once a week the agent looks after the repository's dependencies (npm, pnpm, yarn, pip, uv, poetry, cargo and go): what is outdated, and which have security advisories. Security fixes come first; then patch, minor and major upgrades, each group apart and majors never mixed with the rest. Each group is made in a worktree of its own, with the release notes of what changed read for breaking changes and the tests run. An upgrade that breaks the tests is held back, with the reason in the task's notes so it is not proposed again every week.
 
-1. Select [**Dependency gardener**](/settings?s=tasks&find=Dependency%20gardener) under **Engineering**.
+1. Select [**Dependency gardener**](/settings?s=tasks&find=Dependency%20gardener) in **Start from an example** (**Show all examples**).
 2. Pick the **Repository folder**, the day under **On** (Monday to start with) and the time under **At** (09:00).
 3. **Open pull requests** (on): one draft pull request per group whose tests pass, with the highlights, the advisories it fixes and what to watch. Off, it pushes nothing and reports each group with the commands that apply it.
 4. Select **Create task**.
@@ -63,7 +63,7 @@ A week with everything up to date and no advisory open stays quiet.
 
 An alert from Sentry, Grafana, Datadog, Better Stack or another service wakes an agent. Within minutes it tells you what is wrong, since when and how bad, with a notification. Then it puts the errors, logs, recent deploys and the changes since the last good release on one timeline, finds the likely cause with its evidence, and proposes the safest step, usually a rollback. It never rolls back, restarts or deploys anything without your yes: it asks on a card in the run's session, and when nobody answers in time, the run reports that it needs you, with the command waiting. Once it is over, ask it in the same session for the postmortem.
 
-1. Select [**Incident first responder**](/settings?s=tasks&find=Incident%20first%20responder) under **Engineering**.
+1. Select [**Incident first responder**](/settings?s=tasks&find=Incident%20first%20responder) in **Start from an example** (**Show all examples**).
 2. Pick **The service’s repository folder** and where **Alerts come from**: **Sentry**, **Grafana**, **Datadog**, **Better Stack** or **Another service**.
 3. **How to roll back** (optional): a command the agent may run once you say yes, such as `kubectl rollout undo deployment/web`. Left empty, it asks you how.
 4. Select **Create task**, then point the service's alerts at its address, as its row says:
