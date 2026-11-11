@@ -614,7 +614,10 @@ agents that speak ACP and take MCP servers.
   comments agents answer (on .tex files opened from Files too), Track changes as in Overleaf (an agent's
   edits too, each accepted or rejected), versions compared, dark pages, the pages presented full screen, and a jump between a place
   on a page and its line; Find in the typeset pages (the matches marked, each taking the source to its line) and words picked on
-  a page going to their place in the source; Vim and Emacs keys; Tidy the source (environments indented, table columns lined
+  a page going to their place in the source; right-click menus in the source and on the pages; Go to definition (Ctrl+click or F12 on a
+  \ref, \cite, \input or \includegraphics name); citation and label completions that say who wrote it and what it is ("Knuth 1984 — The
+  TeXbook", "Figure: The model"); Find and replace in every file of the document (regular expressions, one change); editor settings (text
+  size, line wrap, line numbers); Vim and Emacs keys; Tidy the source (environments indented, table columns lined
   up at &); labels and citation keys that point nowhere marked as you type; Draft (pictures as boxes), Stop on the first
   error, Clear the cached files and the time each typesetting took; named versions ("Sent to ICML", kept past the newest
   40); and Tidy the bibliography (sorted, duplicates merged, keys fixed, fields filled from DOIs, unused entries out).
