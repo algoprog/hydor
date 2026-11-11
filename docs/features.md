@@ -594,7 +594,8 @@ agents that speak ACP and take MCP servers.
   special, removing duplicates, splitting text into columns, summaries and a pivot table editor (rows, columns,
   values, filters) of formulas that keep up, Goal seek, Trace precedents and dependents, a row opened as a card,
   a Kanban board kept with its sheet (what it groups by, its cards' fields, its lanes' order), several sheets, copy
-  and paste with Excel and Google Sheets (cells cut move for real: the formulas, names, charts and rules that used
+  and paste with Excel, Google Sheets and web tables (their bold, italic, underline, colours, alignment and number
+  formats come along; cells cut move for real: the formulas, names, charts and rules that used
   them follow), cells, rows and columns moved by dragging (Ctrl to copy; references follow), and the sum, average and
   count of what is picked. AI in them uses the
   helper model, saying what it costs: the AI function (=AI(prompt, cells…), as Google Sheets has it: each answer
