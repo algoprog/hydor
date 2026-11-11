@@ -4,7 +4,7 @@
 // fills and widths following). Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/pages/slides/ops-test.ts && node dist/dev/ops-test.js
 import type { Deck, El, TableEl } from '@shared/slides';
-import { align, deleteCol, deleteRow, distribute, insertCol, insertRow, lockEls, TABLE_MAX } from './ops';
+import { align, moveSlides, scalePicked, spinPicked, deleteCol, deleteRow, distribute, insertCol, insertRow, lockEls, TABLE_MAX } from './ops';
 
 let failed = 0;
 let passed = 0;
@@ -96,6 +96,27 @@ const table = (over: Partial<TableEl> = {}): TableEl => ({ id: 't', type: 'table
   ok(w.cols?.join() === '1,2,2,3' && w.aligns?.length === 4, 'widths and alignments get the new column');
   const wd = deleteCol(table({ cols: [1, 2, 3], aligns: ['left', 'center', 'right'] }), 0)!;
   ok(wd.cols?.join() === '2,3' && wd.aligns?.join() === 'center,right', 'and lose the one taken out');
+}
+
+// ---- parts picked together -------------------------------------------------------------------------------------------
+{
+  const a = shape('a', 100, 100, 100, 50);
+  const s = scalePicked(a, { x: 100, y: 100, w: 400, h: 200 }, { x: 0, y: 0, w: 800, h: 100 }) as El;
+  ok(s.x === 0 && s.y === 0 && s.w === 200 && s.h === 25, `sized with the others: ${JSON.stringify([s.x, s.y, s.w, s.h])}`);
+  const t = spinPicked(shape('b', 100, 0, 100, 100), { x: 0, y: 0 }, 90) as El;
+  ok(t.rot === 90 && close(t.x + 50, -50) && close(t.y + 50, 150), `turned about a point: its middle goes round (${t.x}, ${t.y}, ${t.rot})`);
+  const ln = spinPicked({ id: 'l', type: 'line', x: 10, y: 0, w: 100, h: 0, width: 2 } as unknown as El, { x: 0, y: 0 }, 90) as El;
+  ok(ln.x === 0 && ln.y === 10 && close(ln.w, 0) && ln.h === 100, 'a line’s ends go round');
+}
+
+// ---- slides ----------------------------------------------------------------------------------------------------------
+{
+  const dk = { ratio: '16:9', theme: {}, slides: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, els: [] })) } as unknown as Deck;
+  const order = (x: Deck) => x.slides.map((s) => s.id).join('');
+  ok(order(moveSlides(dk, ['a', 'b'], 'd')) === 'cdabe', 'slides picked move together to after the one they were dropped on (from before it)');
+  ok(order(moveSlides(dk, ['d', 'e'], 'b')) === 'adebc', 'or before it (from after it)');
+  ok(order(moveSlides(dk, ['b', 'd'], 'e')) === 'acebd', 'not next to each other: they come together');
+  ok(moveSlides(dk, ['b'], 'b') === dk, 'dropped on themselves: nothing');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

@@ -15,6 +15,7 @@ import {
   SLIDE_W,
   slideH,
   ungroupEls,
+  scaleEls,
   cleanEmbedUrl,
   type Anim,
   type AnimFx,
@@ -161,6 +162,42 @@ export function duplicateSlides(d: Deck, list: number[]): { deck: Deck; at: numb
   const last = sorted[sorted.length - 1];
   slides.splice(last + 1, 0, ...sorted.map((i) => fresh(d.slides[i])));
   return { deck: { ...d, slides }, at: last + 1 };
+}
+
+/**
+ * A part sized with others picked together: the box they fill (`from`) is made `to`, and each part keeps its place and size
+ * in it (a group's parts sized with it, a line's two ends moved). Whole pixels.
+ */
+export function scalePicked(e: El, from: { x: number; y: number; w: number; h: number }, to: { x: number; y: number; w: number; h: number }): El {
+  const sx = to.w / Math.max(1, from.w);
+  const sy = to.h / Math.max(1, from.h);
+  const out = { ...e, x: Math.round(to.x + (e.x - from.x) * sx), y: Math.round(to.y + (e.y - from.y) * sy), w: Math.round(e.w * sx), h: Math.round(e.h * sy) } as El;
+  return e.type === 'group' ? ({ ...out, els: scaleEls(e.els, sx, sy) } as El) : out;
+}
+
+/** A part turned with others picked together, by `deg` about a point: its middle goes round it, and it turns as much (a line's two ends go round). */
+export function spinPicked(e: El, c: { x: number; y: number }, deg: number): El {
+  const a = (deg * Math.PI) / 180;
+  const at = (x: number, y: number) => ({ x: c.x + (x - c.x) * Math.cos(a) - (y - c.y) * Math.sin(a), y: c.y + (x - c.x) * Math.sin(a) + (y - c.y) * Math.cos(a) });
+  if (e.type === 'line') {
+    const p = at(e.x, e.y);
+    const q = at(e.x + e.w, e.y + e.h);
+    return { ...e, x: Math.round(p.x), y: Math.round(p.y), w: Math.round(q.x - p.x), h: Math.round(q.y - p.y) };
+  }
+  const m = at(e.x + e.w / 2, e.y + e.h / 2);
+  const rot = ((((e.rot ?? 0) + deg) % 360) + 360) % 360;
+  return { ...e, x: Math.round(m.x - e.w / 2), y: Math.round(m.y - e.h / 2), rot: Math.round(rot * 10) / 10 || undefined };
+}
+
+/** Slides moved together (they keep their order) to where `over` is: after it when they came from before it, else before it. */
+export function moveSlides(d: Deck, ids: string[], over: string): Deck {
+  const from = d.slides.findIndex((s) => ids.includes(s.id));
+  const target = d.slides.findIndex((s) => s.id === over);
+  if (from < 0 || target < 0 || ids.includes(over)) return d;
+  const moved = d.slides.filter((s) => ids.includes(s.id));
+  const rest = d.slides.filter((s) => !ids.includes(s.id));
+  const at = rest.findIndex((s) => s.id === over) + (from < target ? 1 : 0);
+  return { ...d, slides: [...rest.slice(0, at), ...moved, ...rest.slice(at)] };
 }
 
 export function removeSlides(d: Deck, list: number[]): Deck {
