@@ -712,9 +712,10 @@ agents that speak ACP and take MCP servers.
   with locked parts moves the rest), group and ungroup, line up (with each other or with the page) and spread out,
   bring forward and send back, lock, duplicate, copy and paste the look, flip, see-through, zoom from 25% to 400% or to
   what is picked (Shift+2), pan with Space and a drag, words pasted from elsewhere become a text box, a right-click
-  menu with every action, a list of every key (Ctrl+/), pages to add, move and duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54
-  Google fonts), shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and
-  emoji, QR codes, collages, pictures from this device, the Library, free photos or made with AI, drawings, videos
+  menu with every action, a list of every key (Ctrl+/), Layers (the page's parts front to back, groups with what
+  they hold: click to pick, drag to reorder, hide, lock, rename; Ctrl+Shift+H hides), pages to add, move and
+  duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54 Google fonts),
+  shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and emoji, QR codes, collages, pictures from this device, the Library, free photos or made with AI, drawings, videos
   (from this device, the Library or made with AI, moving and silent or with controls) and backgrounds (colours,
   gradients, patterns, a picture, one made with AI). Words get effects (shadow, lift, hollow, outline, glow, neon,
   echo, splice, gradient), a highlight, a curve, spacing and capitals, and new words written by the helper model;

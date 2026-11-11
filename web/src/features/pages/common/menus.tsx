@@ -156,8 +156,8 @@ export const isMenuKey = (e: { key: string; shiftKey: boolean; ctrlKey?: boolean
  * An editor's right-click menu: the rows of its menus (the same MenuEntry lists, so a right-click offers an action with
  * the words, keys and ticks the menu bar gives it), opened at the point pressed, or by what is picked when the keyboard
  * opens it (the menu key, Shift+F10: it starts on its first row). A list inside opens in its place, with the way back at
- * its top; ↑ ↓ ← → and Enter move through it, Esc or a press outside closes it, and on a phone it is a sheet from the
- * bottom. Pressing a row never takes the focus from what is edited, so the words or parts picked stay picked for the
+ * its top; ↑ ↓ ← → and Enter move through it, Esc or a press outside closes it, too tall for the room below the point
+ * it moves up to show whole, and on a phone it is a sheet from the bottom. Pressing a row never takes the focus from what is edited, so the words or parts picked stay picked for the
  * action. Put it inside the editor's own part of the page (its data-i18n), so its words are translated as they mean there.
  */
 export function ContextMenu({ at, items, onClose, title, width = 248 }: { at: ContextMenuAt | null; items: MenuEntry[]; onClose: () => void; title?: string; width?: number }) {
@@ -167,7 +167,7 @@ export function ContextMenu({ at, items, onClose, title, width = 248 }: { at: Co
   return (
     <>
       <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: at?.x ?? -10, top: at?.y ?? -10 }} />
-      <Popover anchor={anchor} open={!!at && shown(items).length > 0} onClose={onClose} width={width} title={title}>
+      <Popover anchor={anchor} open={!!at && shown(items).length > 0} onClose={onClose} width={width} title={title} slide>
         {at && <MenuList key={key} items={items} close={onClose} title={title} keyed={at.keyed} />}
       </Popover>
     </>
