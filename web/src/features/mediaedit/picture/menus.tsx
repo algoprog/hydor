@@ -385,6 +385,10 @@ export const MORE_KEYS = [
     title: 'Working',
     items: [
       ['[ / ]', 'Brush size smaller or larger'],
+      ['{ / }', 'Brush hardness softer or harder'],
+      ['1 … 0', 'The brush’s opacity (or Dodge and Burn’s exposure): 1 is 10%, 0 is 100%'],
+      ['Shift+click', 'With a brush or the eraser: a straight line from where the last stroke ended'],
+      ['Alt+click', 'With the brush: take the colour under it'],
       ['X', 'Swap the foreground and background colours'],
       ['D', 'Default colours (black and white)'],
       ['Space', 'Hold and drag to move around'],

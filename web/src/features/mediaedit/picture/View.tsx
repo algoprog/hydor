@@ -100,6 +100,7 @@ export function View({
         zoomAt(1 / c.z, r + W / 2, r + H / 2);
       },
       zoomBy: (f, at) => zoomAt(f, at?.[0] ?? r + W / 2, at?.[1] ?? r + H / 2),
+      zoomTo: (z) => zoomAt(Math.max(MIN_Z, Math.min(MAX_Z, z)) / tRef.current.z, r + W / 2, r + H / 2),
       zoom: () => tRef.current.z,
     };
   }, [ed, zoomAt, W, H, r]);

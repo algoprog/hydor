@@ -653,7 +653,9 @@ agents that speak ACP and take MCP servers.
   see-through or a colour). Selections (rectangle, ellipse, lasso, polygon lasso, magic wand, the subject found by AI,
   all, invert, feather, grow, shrink; marching ants; dragged to move, Transform selection to size and turn) keep painting, fills, adjustments and the AI tools inside them, and cut, copy
   and paste to new layers. Painting and retouching: brush, eraser, clone stamp, spot healing brush, gradient, paint
-  bucket, dodge and burn, eyedropper, foreground and background colours. Adjustments on layers: light and colour,
+  bucket, dodge and burn, eyedropper, foreground and background colours; brushes draw a straight line with Shift+click,
+  take a colour with Alt+click, change hardness with { and }, opacity with the number keys, and size and flow with a pen's
+  pressure. The zoom in the status bar opens a list (fit, 25 to 400%) and takes a size typed in. Adjustments on layers: light and colour,
   curves, levels, hue, saturation and lightness by colour range, colour balance, clarity, dehaze, sharpness, noise
   reduction, blur, vignette, grain, invert, posterize, threshold, thirteen looks and Auto enhance, with a live
   histogram. Crop (eight shapes, straighten, turns, mirror), crop to the selection, image size and canvas size,
