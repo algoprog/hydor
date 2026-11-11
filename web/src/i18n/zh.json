@@ -22647,5 +22647,8 @@
 "Stops {0} helper session{1}":"会停止 {0} 个辅助会话",
 "Stops this turn and {0} background task{1}":"会停止当前这一轮和 {0} 个后台任务",
 "Stops this turn and {0} helper session{1}":"会停止当前这一轮和 {0} 个辅助会话",
-"Stops this turn, {0} background task{1} and {2} helper session{3}":"会停止当前这一轮、{0} 个后台任务和 {2} 个辅助会话"
+"Stops this turn, {0} background task{1} and {2} helper session{3}":"会停止当前这一轮、{0} 个后台任务和 {2} 个辅助会话",
+"In Settings, turn on notifications for Hydor, then come back here.":"在设置中为 Hydor 打开通知，然后回到这里。",
+"In System Settings, turn on Allow notifications for Hydor, then come back here.":"在系统设置中为 Hydor 打开“允许通知”，然后回到这里。",
+"Your desktop isn’t showing Hydor’s notifications, so they show inside the app.":"你的桌面没有显示 Hydor 的通知，所以它们会显示在应用里。"
 }

@@ -22632,5 +22632,8 @@
 "Stops {0} helper session{1}":"Διακόπτει βοηθητικές συνεδρίες: {0}",
 "Stops this turn and {0} background task{1}":"Διακόπτει αυτόν τον γύρο και εργασίες στο παρασκήνιο ({0})",
 "Stops this turn and {0} helper session{1}":"Διακόπτει αυτόν τον γύρο και βοηθητικές συνεδρίες ({0})",
-"Stops this turn, {0} background task{1} and {2} helper session{3}":"Διακόπτει αυτόν τον γύρο, εργασίες στο παρασκήνιο ({0}) και βοηθητικές συνεδρίες ({2})"
+"Stops this turn, {0} background task{1} and {2} helper session{3}":"Διακόπτει αυτόν τον γύρο, εργασίες στο παρασκήνιο ({0}) και βοηθητικές συνεδρίες ({2})",
+"In Settings, turn on notifications for Hydor, then come back here.":"Στις Ρυθμίσεις, ενεργοποιήστε τις ειδοποιήσεις για το Hydor και μετά επιστρέψτε εδώ.",
+"In System Settings, turn on Allow notifications for Hydor, then come back here.":"Στις Ρυθμίσεις συστήματος, επιτρέψτε τις ειδοποιήσεις για το Hydor και μετά επιστρέψτε εδώ.",
+"Your desktop isn’t showing Hydor’s notifications, so they show inside the app.":"Η επιφάνεια εργασίας σας δεν δείχνει τις ειδοποιήσεις του Hydor, οπότε εμφανίζονται μέσα στην εφαρμογή."
 }

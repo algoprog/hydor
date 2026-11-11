@@ -574,10 +574,25 @@ const sessionNotices = createNotices({
   showApp: () => go(),
 });
 
+/**
+ * Where the system lets you allow the app's notifications: on a Mac, Hydor's own page in System Settings →
+ * Notifications (its bundle id, electron-builder.cjs appId); on Windows, Settings → System → Notifications.
+ */
+const NOTICE_SETTINGS = MAC ? 'x-apple.systempreferences:com.apple.preference.notifications?id=com.hydor.app' : WIN ? 'ms-settings:notifications' : null;
+
 // What the page in the window asks (preload.cjs): only the app's own pages.
 const fromOwnPage = (e) => sameOrigin((e.senderFrame && e.senderFrame.url) || '');
 ipcMain.handle('hydor:notices', (e) => (fromOwnPage(e) ? sessionNotices.state() : null));
 ipcMain.handle('hydor:notice-test', (e, t) => (fromOwnPage(e) ? sessionNotices.test(t) : null));
+ipcMain.handle('hydor:notice-settings', async (e) => {
+  if (!fromOwnPage(e) || !NOTICE_SETTINGS) return false;
+  try {
+    await shell.openExternal(NOTICE_SETTINGS);
+    return true;
+  } catch {
+    return false;
+  }
+});
 
 const SYSTEM_USING = MAC ? 'An agent is using your Mac' : WIN ? 'An agent is using your PC' : 'An agent is using your computer';
 
