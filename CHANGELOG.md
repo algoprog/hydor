@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.54.4 · 11 November 2026
+
+Agent program updates no longer fail because a Mac went to sleep while a new version was being checked.
+
+- Before it keeps a new version of Claude Code, Codex or another agent program, the app checks that it answers, and
+  gives it a minute. That minute used to keep running while a Mac slept, so an update that ran at night could undo a
+  version that works, with "it did not answer within a minute", and not try it again. Now only time the computer is
+  awake counts.
+- A new version that is slow to answer the first time is started again with two more minutes before it counts as
+  not working.
+- The installs behind these updates also count only time awake, so one that a sleep cuts in two carries on after
+  it instead of being stopped half done.
+
 ## 0.54.3 · 11 November 2026
 
 Forks from any Claude Code reply, even one from before the conversation was compacted.
