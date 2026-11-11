@@ -25,7 +25,7 @@ import { reuseSlides } from '../../shared/slides-reuse.ts';
 import { chartRefreshed } from '../../shared/slides-sheet.ts';
 import { TURN_INTO, turnAsk, type TurnTo } from '../../shared/content-asks.ts';
 import { ASSET, everyEl, isWebDeck, plainText, powerPointNote, richFeatures, slideTitle, THEMES, toPowerPoint, type ChartEl, type Deck, type El, type Theme } from '../../shared/slides.ts';
-import { cleanStyles, CITE_STYLES, docColor, docFont, PAPERS, PARA_STYLES, ptOf, resolveSuggestion, STYLES as DOC_STYLES, type Band, type CiteStyle, type Doc, type ParaStyle } from '../../shared/docs.ts';
+import { cleanStyles, CITE_STYLES, docColor, docFont, PAPER_SIZES, PAPERS, PARA_STYLES, ptOf, resolveSuggestion, STYLES as DOC_STYLES, type Band, type CiteStyle, type Doc, type PaperSize, type ParaStyle } from '../../shared/docs.ts';
 import {
   adjustForDelete,
   adjustForInsert,
@@ -381,8 +381,8 @@ const pageSetup: Act<Doc> = (doc, a) => {
   const d: Doc = { ...doc, page: { ...doc.page } };
   if (a.paper !== undefined) {
     const p = str(a.paper).toLowerCase().replace(/^us\s*/, '');
-    if (p !== 'a4' && p !== 'letter') throw new Error('paper: a4 or letter.');
-    d.page.size = p;
+    if (!(PAPER_SIZES as string[]).includes(p)) throw new Error('paper: a4, letter, legal, a3 or a5.');
+    d.page.size = p as PaperSize;
   }
   if (a.margin !== undefined) {
     const m = typeof a.margin === 'number' ? a.margin : Number(str(a.margin).replace(/\s*mm$/i, ''));
@@ -1222,7 +1222,7 @@ const SCHEMA = {
     keep_look: { type: 'boolean', description: 'reuse_slides: false to give them this deck’s theme (they keep their own when left out).' },
     ratio: { type: 'string', enum: ['16:9', '4:3'], description: 'slide_shape.' },
     ids: { type: 'array', items: { type: 'string' }, description: 'accept_suggestions, reject_suggestions: suggestions by id; all when left out.' },
-    paper: { type: 'string', enum: ['a4', 'letter'] },
+    paper: { type: 'string', enum: ['a4', 'letter', 'legal', 'a3', 'a5'] },
     orientation: { type: 'string', enum: ['portrait', 'landscape'], description: 'page_setup.' },
     color: { type: ['string', 'null'], description: 'page_setup: the paper’s colour, or none; paragraph_style: the words’ colour.' },
     watermark: { type: ['string', 'null'], description: 'page_setup: words across every page, or null for none.' },

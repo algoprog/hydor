@@ -1769,6 +1769,13 @@ export class DocEngine {
     this.commit(ops.toggleList(this.doc, s, e, kind), this.sel);
   }
 
+  /** The numbered items picked: how their list counts, where it starts, or that it goes on from the one before (one change). */
+  numbering(patch: ops.NumberingPatch) {
+    this.before = this.sel;
+    const [s, e] = this.range();
+    this.commit(ops.setNumbering(this.doc, s, e, patch), this.sel);
+  }
+
   indent(by: 1 | -1) {
     this.before = this.sel;
     const [s, e] = this.range();

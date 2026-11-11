@@ -74,7 +74,7 @@ import {
   WholeWord,
   ZoomIn,
 } from 'lucide-react';
-import { CALLOUT_TINTS, CITE_STYLES, LINE_SPACINGS, PARA_STYLES, STYLES, type CiteStyle, type Doc } from '@shared/docs';
+import { CALLOUT_TINTS, CITE_STYLES, LINE_SPACINGS, listInfo, NUM_FMTS, PARA_STYLES, STYLES, type CiteStyle, type Doc, type NumFmt } from '@shared/docs';
 import { CITE_STYLE_NAMES } from '@shared/doc-cite';
 import { tr } from '../../../i18n/runtime';
 import type { MenuDef, MenuEntry } from '../common/menus';
@@ -181,6 +181,8 @@ export interface DocMenuCtx {
   smart: boolean;
   setSmart: (on: boolean) => void;
   language: () => void;
+  /** Format → Bullets and numbering → Start at: a box for the number the list starts from. */
+  numberStart: () => void;
   /** Tools → Voice typing and Read aloud. */
   voice?: { dictate: () => void; typing: boolean; read: () => void; reading: boolean; canDictate: boolean; canRead: boolean };
 }
@@ -243,6 +245,32 @@ export function styleEntries(c: DocMenuCtx, more = true): MenuEntry[] {
           { label: 'Reset the styles', also: 'style styles default', disabled: c.readOnly || !c.doc.styles, run: c.styles.reset },
         ] as MenuEntry[])
       : []),
+  ];
+}
+
+/** How a numbered list counts, in words, with the first marks it makes. */
+const NUM_FMT_LABELS: Record<NumFmt, string> = {
+  decimal: 'Numbers: 1. 2. 3.',
+  'lower-alpha': 'Small letters: a. b. c.',
+  'lower-roman': 'Small Roman numerals: i. ii. iii.',
+  'upper-alpha': 'Capital letters: A. B. C.',
+  'upper-roman': 'Capital Roman numerals: I. II. III.',
+};
+
+/**
+ * What the caret's numbered list offers (Format → Bullets and numbering, and the right-click menu on a list item): how it
+ * counts (1. a. i. A. I.), Restart numbering, Continue numbering (from the list before it) and Start at a number.
+ */
+export function numberingEntries(c: DocMenuCtx): MenuEntry[] {
+  const { engine: e, st } = c;
+  const b = st.block;
+  if (b?.type !== 'li' || b.list !== 'number') return [];
+  const fmt = listInfo(c.doc.blocks).fmts[st.index];
+  return [
+    { label: 'Number format', icon: <ListOrdered size={15} />, also: 'numbering letters roman numerals alphabet', items: NUM_FMTS.map((k) => ({ label: NUM_FMT_LABELS[k], checked: fmt === k, run: () => e.numbering({ fmt: k }) })) },
+    { label: 'Restart numbering', also: 'start again one', checked: b.start === 1, disabled: c.readOnly, run: () => e.numbering({ start: 1 }) },
+    { label: 'Continue numbering', also: 'go on from the list before', checked: !!b.cont, disabled: c.readOnly, run: () => e.numbering({ cont: true }) },
+    { label: 'Start at', also: 'numbering start number', disabled: c.readOnly, run: c.numberStart },
   ];
 }
 
@@ -436,6 +464,7 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         { label: 'Bulleted list', icon: <List size={15} />, keys: 'Ctrl+Shift+8', checked: st.list === 'bullet', run: () => e.list('bullet') },
         { label: 'Numbered list', icon: <ListOrdered size={15} />, keys: 'Ctrl+Shift+7', checked: st.list === 'number', run: () => e.list('number') },
         { label: 'Checklist', icon: <ListChecks size={15} />, keys: 'Ctrl+Shift+9', checked: st.list === 'check', run: () => e.list('check') },
+        ...(st.list === 'number' ? (['-', ...numberingEntries(c)] as MenuEntry[]) : []),
       ],
     },
     t && { label: 'Table', icon: <Table2 size={15} />, items: table },

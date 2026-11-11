@@ -52,7 +52,7 @@ import { isMine } from '../common/Comments';
 import type { ImageBlock } from '@shared/docs';
 import type { MenuEntry } from '../common/menus';
 import type { AtomClick, ContextHit, DocEngine } from './engine';
-import { caseEntries, styleEntries, tableEntries, type DocMenuCtx } from './menu';
+import { caseEntries, numberingEntries, styleEntries, tableEntries, type DocMenuCtx } from './menu';
 
 /** What the right-click menu needs beyond what the menus do: what was hit, and the editor's own boxes, panels and dialogs. */
 export interface DocContextCtx extends DocMenuCtx {
@@ -176,6 +176,7 @@ export function docContext(c: DocContextCtx): MenuEntry[] {
     { label: 'Format painter', icon: <PaintRoller size={15} />, checked: !!e.paint, also: 'copy formatting', run: c.painter },
   ];
   const style: MenuEntry[] = [
+    ...numberingEntries(c),
     { label: 'Paragraph styles', icon: <Heading size={15} />, items: styleEntries(c, false) },
     { label: 'Clear the formatting', icon: <Eraser size={15} />, keys: 'Ctrl+\\', run: () => e.clear() },
   ];
