@@ -671,7 +671,7 @@ export function Library() {
     if (!newAsked) return;
     if (newAsked === 'folder') setFolderAsk(true);
     else if (newAsked === 'import') setImporting(true);
-    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' || newAsked === 'diagram' ? newAsked : 'page');
+    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' || newAsked === 'diagram' || newAsked === 'picture' ? newAsked : 'page');
     go('/library', true);
   }, [newAsked]);
   // A space that is gone: everything again.
@@ -772,6 +772,7 @@ export function Library() {
     ['tex', 'LaTeX document', <Sigma size={14} />],
     ['notebook', 'Notebook', <NotebookText size={14} />],
     ['diagram', 'Diagram', <Workflow size={14} />],
+    ['picture', 'Picture', <ImageIcon size={14} />],
   ];
   const newButton = (
     <>
