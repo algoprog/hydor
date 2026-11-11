@@ -1,15 +1,16 @@
 // Settings for the agents themselves: MCP servers, Claude Code's own plugins and the instruction files
 // (CLAUDE.md, AGENTS.md), for one working folder where that matters.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Download, KeyRound, LogIn, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import type { Agent, MarketplaceEntry, McpEntry, McpScope, McpSpec, McpStatus, McpTransport, PluginEntry, SetupResult, SkillEntry } from '@shared/types';
+import { Check, KeyRound, Link2, LogIn, Plug, Plus, Puzzle, Search, Trash2 } from 'lucide-react';
+import type { Agent, MarketplaceEntry, McpEntry, McpScope, McpSpec, McpStatus, McpTransport, PluginEntry, SetupResult } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { compact, tildify } from '../../lib/format';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
-import { Badge, Button, cx, Dialog, Throbber, IconButton, inputCls, Section, Segmented, Switch, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Dialog, Throbber, IconButton, inputCls, MenuItem, Segmented, Switch, useConfirm } from '../../components/ui';
 import { showTerminal, type TerminalInfo } from '../terminal/TerminalPanel';
-import { EditorDialog, InstructionsEditor } from './Instructions';
+import { InstructionsEditor } from './Instructions';
+import { EmptyRow, Group, MoreMenu, Row, SectionActions, Stack } from './kit';
 
 const AGENTS: Agent[] = ['claude', 'codex'];
 
@@ -49,15 +50,6 @@ function AgentTitle({ agent }: { agent: Agent }) {
       <AgentIcon agent={agent} size={16} />
       {agentName(agent)}
     </span>
-  );
-}
-
-function SearchBox({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
-  return (
-    <div className={cx('relative', className)}>
-      <Search size={14} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-3" />
-      <input value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && onChange('')} placeholder={placeholder} className={cx(inputCls, 'h-8.5 pl-8 text-[13.5px]')} />
-    </div>
   );
 }
 
@@ -309,52 +301,68 @@ function McpRow({ s, status, onLogin, onRemove }: { s: McpEntry; status?: McpSta
   const target = s.transport === 'stdio' ? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ') : s.url;
   const keys = [...(s.envKeys ?? []), ...(s.headerKeys ?? []), ...(s.bearerEnv ? [`Bearer $${s.bearerEnv}`] : [])];
   const badge = status && STATUS_BADGE[status.state];
+  const failed = status?.state === 'failed';
   return (
-    <div className="flex items-start gap-3 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[14px] font-medium">{s.name}</span>
-          <Badge>{s.transport === 'stdio' ? 'Command' : s.transport.toUpperCase()}</Badge>
+    <Row
+      icon={<Plug size={16} />}
+      label={
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span translate="no">{s.name}</span>
           {s.agent === 'claude' && <Badge>{MCP_SCOPE[s.scope]}</Badge>}
           {s.enabled === false && <Badge tone="warn">Off</Badge>}
+        </span>
+      }
+      hint={
+        <span translate="no" className="block truncate font-mono text-[12px]" title={target}>
+          {target}
+        </span>
+      }
+      control={
+        <>
           {badge && (
             <Badge tone={badge.tone}>
               {badge.label}
               {status?.state === 'connected' && status.tools != null && ` · ${status.tools} tool${status.tools === 1 ? '' : 's'}`}
             </Badge>
           )}
-        </div>
-        <div className="mt-0.5 truncate font-mono text-[12px] text-fg-3" title={target}>
-          {target}
-        </div>
-        {keys.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {keys.map((k) => (
-              <span key={k} title="Set; the value stays on the server" className="inline-flex items-center gap-1 rounded bg-bg-2 px-1.5 py-px font-mono text-[11px] text-fg-2">
-                <KeyRound size={10} className="text-fg-3" />
-                {k}
-              </span>
-            ))}
-          </div>
-        )}
-        {status?.state === 'failed' && <div className="mt-1.5 text-[12px] break-words text-err">{status.error || 'The server did not start or did not answer.'}</div>}
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
-        {s.transport !== 'stdio' &&
-          (status?.state === 'auth' ? (
-            <Button size="sm" icon={<LogIn size={14} />} onClick={onLogin}>
+          {s.transport !== 'stdio' && status?.state === 'auth' && (
+            <Button size="sm" variant="secondary" icon={<LogIn size={14} />} onClick={onLogin}>
               Sign in
             </Button>
-          ) : (
-            <IconButton label="Sign in (OAuth) in a terminal" size="sm" onClick={onLogin}>
-              <LogIn size={15} />
-            </IconButton>
-          ))}
-        <IconButton label="Remove" size="sm" onClick={onRemove}>
-          <Trash2 size={15} />
-        </IconButton>
-      </div>
-    </div>
+          )}
+          <MoreMenu label={`${s.name}: more`} width={240}>
+            {(close) => (
+              <>
+                {s.transport !== 'stdio' && (
+                  <MenuItem icon={<LogIn size={14} />} onClick={() => (close(), onLogin())}>
+                    Sign in (OAuth) in a terminal
+                  </MenuItem>
+                )}
+                <MenuItem danger icon={<Trash2 size={14} />} onClick={() => (close(), onRemove())}>
+                  Remove
+                </MenuItem>
+              </>
+            )}
+          </MoreMenu>
+        </>
+      }
+    >
+      {(keys.length > 0 || failed) && (
+        <div className="space-y-1.5">
+          {keys.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {keys.map((k) => (
+                <span key={k} translate="no" title="Set; the value stays on the server" className="inline-flex items-center gap-1 rounded bg-bg-2 px-1.5 py-px font-mono text-[11px] text-fg-2">
+                  <KeyRound size={10} className="text-fg-3" />
+                  {k}
+                </span>
+              ))}
+            </div>
+          )}
+          {failed && <div className="text-[12px] break-words text-err">{status.error || 'The server did not start or did not answer.'}</div>}
+        </div>
+      )}
+    </Row>
   );
 }
 
@@ -412,52 +420,55 @@ export function McpSettings({ cwd }: { cwd: string }) {
     load();
   };
 
+  const none = !!list && !list.length;
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="min-w-0 flex-1 text-[13px] text-fg-3">New sessions load these servers; sessions already running pick up changes when they restart.</p>
+    <Stack>
+      <SectionActions>
         <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
           Add server
         </Button>
-      </div>
-      {AGENTS.map((a) => {
-        const rows = (list ?? []).filter((s) => s.agent === a);
-        const st = status[a];
-        return (
-          <Section
-            key={a}
-            title={<AgentTitle agent={a} />}
-            actions={
-              rows.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => check(a)} disabled={st === 'busy'} title="Start every server the way a new session would and see which connect">
-                  {st === 'busy' ? (
-                    <>
-                      <Throbber /> Connecting
-                    </>
-                  ) : (
-                    'Check connections'
-                  )}
-                </Button>
-              )
-            }
-          >
-            {!list ? (
-              <Loading />
-            ) : rows.length ? (
-              <div className="-my-1 divide-y divide-line">
-                {rows.map((s) => (
-                  <McpRow key={`${s.scope}:${s.name}`} s={s} status={st && st !== 'busy' ? st[s.name] : undefined} onLogin={() => login(s)} onRemove={() => remove(s)} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-[13px] text-fg-3">No MCP servers yet.</div>
-            )}
-          </Section>
-        );
-      })}
+      </SectionActions>
+      {none ? (
+        <Group>
+          <EmptyRow>No MCP servers yet: add one to give Claude Code and Codex more tools</EmptyRow>
+        </Group>
+      ) : (
+        AGENTS.map((a) => {
+          const rows = (list ?? []).filter((s) => s.agent === a);
+          const st = status[a];
+          return (
+            <Group
+              key={a}
+              title={<AgentTitle agent={a} />}
+              info="New sessions load these servers; sessions already running pick up changes when they restart."
+              actions={
+                rows.length > 0 && (
+                  <Button size="sm" variant="ghost" onClick={() => check(a)} disabled={st === 'busy'} title="Start every server the way a new session would and see which connect">
+                    {st === 'busy' ? (
+                      <>
+                        <Throbber /> Connecting
+                      </>
+                    ) : (
+                      'Check connections'
+                    )}
+                  </Button>
+                )
+              }
+            >
+              {!list ? (
+                <Loading />
+              ) : rows.length ? (
+                rows.map((s) => <McpRow key={`${s.scope}:${s.name}`} s={s} status={st && st !== 'busy' ? st[s.name] : undefined} onLogin={() => login(s)} onRemove={() => remove(s)} />)
+              ) : (
+                <EmptyRow>No MCP servers yet</EmptyRow>
+              )}
+            </Group>
+          );
+        })
+      )}
       <AddMcpDialog open={adding} cwd={cwd} onClose={() => setAdding(false)} onAdded={load} />
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -472,25 +483,33 @@ interface PluginsData {
 
 const PAGE = 40;
 
-function PluginRow({ p, busy, actions }: { p: PluginEntry; busy: boolean; actions: ReactNode }) {
+function PluginRow({ p, busy, control }: { p: PluginEntry; busy: boolean; control: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-2.5">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={cx('text-[14px] font-medium', p.installed && p.enabled === false && 'text-fg-3')}>{p.name}</span>
+    <Row
+      icon={<Puzzle size={16} />}
+      label={
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span translate="no" className={cx('font-medium', p.installed && p.enabled === false && 'text-fg-3')}>
+            {p.name}
+          </span>
           {p.marketplace && <Badge>{p.marketplace}</Badge>}
           {p.version && <span className="text-[11.5px] text-fg-3">v{p.version}</span>}
           {!p.installed && p.installCount != null && (
-            <span className="inline-flex items-center gap-0.5 text-[11.5px] text-fg-3" title={`${p.installCount.toLocaleString()} installs`}>
-              <Download size={11} />
-              {compact(p.installCount)}
+            <span className="text-[11.5px] text-fg-3" title={`${p.installCount.toLocaleString()} installs`}>
+              {compact(p.installCount)} installs
             </span>
           )}
-        </div>
-        {p.description && <div className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-fg-3">{p.description}</div>}
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">{busy ? <Throbber className="px-3 text-fg-3" /> : actions}</div>
-    </div>
+        </span>
+      }
+      hint={
+        p.description && (
+          <span translate="no" className="line-clamp-1">
+            {p.description}
+          </span>
+        )
+      }
+      control={busy ? <Throbber className="px-3 text-fg-3" /> : control}
+    />
   );
 }
 
@@ -502,6 +521,7 @@ export function ClaudePluginsSettings() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [market, setMarket] = useState('');
+  const [adding, setAdding] = useState(false);
   const [confirm, confirmNode] = useConfirm();
   const seq = useRef(0);
 
@@ -560,7 +580,7 @@ export function ClaudePluginsSettings() {
       const r = await post<SetupResult>(`/api/setup/marketplaces/${action}`, { target });
       if (!r.ok) throw new Error(gist(r.output) || `Could not ${action} the marketplace`);
       toast(action === 'add' ? `Added ${target}` : `Removed ${target}`, 'ok');
-      if (action === 'add') setMarket('');
+      if (action === 'add') (setMarket(''), setAdding(false));
     } catch (e) {
       toastError(e);
     } finally {
@@ -568,120 +588,153 @@ export function ClaudePluginsSettings() {
       load(q, limit);
     }
   };
+  const addMarket = async () => {
+    if (market.trim()) await marketAct('add', market.trim());
+  };
 
+  const loadingRow = (
+    <div className="flex justify-center px-4 py-6">
+      <Throbber className="text-fg-3" />
+    </div>
+  );
   return (
-    <div className="space-y-4">
-      <Section title="Installed" sub="Claude Code’s own plugins on this machine: only its sessions load them.">
+    <Stack>
+      <Group title="Installed" hint="Only Claude Code sessions use these">
         {!data ? (
-          <Loading />
+          loadingRow
         ) : data.installed.length ? (
-          <div className="-my-1 divide-y divide-line">
-            {data.installed.map((p) => (
+          data.installed.map((p) => (
+            <PluginRow
+              key={p.id}
+              p={p}
+              busy={busy === p.id}
+              control={
+                <>
+                  <Switch on={p.enabled !== false} onChange={(on) => act(on ? 'enable' : 'disable', p)} label={p.enabled !== false ? `Turn ${p.name} off` : `Turn ${p.name} on`} />
+                  <MoreMenu label={`${p.name}: more`} width={200}>
+                    {(close) => (
+                      <MenuItem danger icon={<Trash2 size={14} />} onClick={() => (close(), act('uninstall', p))}>
+                        Uninstall
+                      </MenuItem>
+                    )}
+                  </MoreMenu>
+                </>
+              }
+            />
+          ))
+        ) : (
+          <EmptyRow>None yet: find one below</EmptyRow>
+        )}
+      </Group>
+
+      <Group title="Browse" hint={data ? `${data.total.toLocaleString()} ${q ? 'matching' : 'available'}, most installed first` : 'Loading the marketplaces…'}>
+        <label className="relative block">
+          <Search size={14} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-fg-3" />
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setLimit(PAGE);
+            }}
+            onKeyDown={(e) => e.key === 'Escape' && (setQ(''), setLimit(PAGE))}
+            placeholder="Search plugins"
+            aria-label="Search plugins"
+            className="block h-10 w-full rounded-t-[11px] bg-transparent pr-4 pl-10 text-[13.5px] outline-none placeholder:text-fg-3 focus:bg-bg-1"
+          />
+        </label>
+        {!data ? (
+          loadingRow
+        ) : data.available.length ? (
+          <div className={cx('divide-y divide-line transition-opacity', loading && 'opacity-60')}>
+            {data.available.map((p) => (
               <PluginRow
                 key={p.id}
                 p={p}
                 busy={busy === p.id}
-                actions={
-                  <>
-                    <IconButton label="Uninstall" size="sm" onClick={() => act('uninstall', p)}>
-                      <Trash2 size={14} />
-                    </IconButton>
-                    <Switch on={p.enabled !== false} onChange={(on) => act(on ? 'enable' : 'disable', p)} label={p.enabled !== false ? `Turn ${p.name} off` : `Turn ${p.name} on`} className="ml-1.5" />
-                  </>
+                control={
+                  <Button size="sm" variant="secondary" onClick={() => act('install', p)} disabled={!!busy}>
+                    Install
+                  </Button>
                 }
               />
             ))}
-          </div>
-        ) : (
-          <div className="text-[13px] text-fg-3">No plugins installed yet. Find one below.</div>
-        )}
-      </Section>
-
-      <Section
-        title="Browse"
-        sub={data ? `${data.total.toLocaleString()} ${q ? 'matching' : 'available'}, most installed first` : 'Loading the marketplaces…'}
-        actions={
-          <SearchBox
-            value={q}
-            onChange={(v) => {
-              setQ(v);
-              setLimit(PAGE);
-            }}
-            placeholder="Search plugins"
-            className="w-full sm:w-64"
-          />
-        }
-      >
-        {!data ? (
-          <Loading />
-        ) : data.available.length ? (
-          <>
-            <div className={cx('-my-1 divide-y divide-line transition-opacity', loading && 'opacity-60')}>
-              {data.available.map((p) => (
-                <PluginRow
-                  key={p.id}
-                  p={p}
-                  busy={busy === p.id}
-                  actions={
-                    <Button size="sm" variant="ghost" onClick={() => act('install', p)} disabled={!!busy}>
-                      Install
-                    </Button>
-                  }
-                />
-              ))}
-            </div>
             {data.available.length < data.total && (
-              <div className="mt-3 flex justify-center">
+              <div className="flex justify-center px-4 py-2.5">
                 <Button size="sm" variant="ghost" onClick={() => setLimit((l) => l + PAGE)} disabled={loading}>
                   {loading ? <Throbber /> : `Show more (${(data.total - data.available.length).toLocaleString()} left)`}
                 </Button>
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <div className="text-[13px] text-fg-3">{q ? 'No plugins match.' : 'Nothing to install: add a marketplace below.'}</div>
+          <EmptyRow>{q ? 'None match' : 'Nothing to install: add a marketplace below'}</EmptyRow>
         )}
-      </Section>
+      </Group>
 
-      <Section title="Marketplaces" sub="Catalogs Claude Code installs plugins from">
+      <Group
+        title="Marketplaces"
+        hint="Catalogs Claude Code installs plugins from"
+        actions={
+          <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
+            Add
+          </Button>
+        }
+      >
         {!data ? (
-          <Loading />
+          loadingRow
+        ) : data.marketplaces.length ? (
+          data.marketplaces.map((m) => (
+            <Row
+              key={m.name}
+              icon={<Link2 size={16} />}
+              label={<span translate="no">{m.name}</span>}
+              hint={
+                <span translate="no" className="block truncate font-mono text-[12px]">
+                  {m.repo ?? m.url ?? m.source}
+                </span>
+              }
+              control={
+                busy === `market:${m.name}` ? (
+                  <Throbber className="px-3 text-fg-3" />
+                ) : (
+                  <IconButton label="Remove" size="sm" onClick={() => marketAct('remove', m.name)} disabled={!!busy}>
+                    <Trash2 size={14} />
+                  </IconButton>
+                )
+              }
+            />
+          ))
         ) : (
-          <>
-            <div className="-my-1 divide-y divide-line">
-              {data.marketplaces.map((m) => (
-                <div key={m.name} className="flex items-center gap-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-medium">{m.name}</div>
-                    <div className="truncate font-mono text-[12px] text-fg-3">{m.repo ?? m.url ?? m.source}</div>
-                  </div>
-                  {busy === `market:${m.name}` ? (
-                    <Throbber className="px-3 text-fg-3" />
-                  ) : (
-                    <IconButton label="Remove" size="sm" onClick={() => marketAct('remove', m.name)} disabled={!!busy}>
-                      <Trash2 size={14} />
-                    </IconButton>
-                  )}
-                </div>
-              ))}
-            </div>
-            <form
-              className="mt-3 flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (market.trim()) marketAct('add', market.trim());
-              }}
-            >
-              <input className={cx(inputCls, 'h-8.5 font-mono text-[13px]')} value={market} onChange={(e) => setMarket(e.target.value)} placeholder="owner/repo, a git URL or a folder" spellCheck={false} />
-              <Button size="sm" type="submit" disabled={!market.trim() || !!busy}>
-                {busy === `market:${market.trim()}` ? <Throbber /> : 'Add'}
-              </Button>
-            </form>
-          </>
+          <EmptyRow>None yet</EmptyRow>
         )}
-      </Section>
+      </Group>
+      <Dialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        title="Add a marketplace"
+        width={460}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={!market.trim() || !!busy} onClick={() => void addMarket()}>
+              Add
+            </Button>
+          </>
+        }
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void addMarket();
+          }}
+        >
+          <input autoFocus className={cx(inputCls, 'font-mono text-[13px]')} value={market} onChange={(e) => setMarket(e.target.value)} placeholder="owner/repo, a git URL or a folder" spellCheck={false} />
+        </form>
+      </Dialog>
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
@@ -692,7 +745,7 @@ export function InstructionsSettings({ cwd, agent, onAgent }: { cwd: string; age
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <Segmented size="sm" value={agent} onChange={onAgent} options={AGENTS.map((a) => ({ value: a, label: agentName(a), icon: <AgentIcon agent={a} size={13} /> }))} />
-        <span className="w-full text-[12.5px] text-fg-3 sm:w-auto sm:min-w-0 sm:flex-1">
+        <span className="w-full text-[12.5px] leading-snug text-fg-3 sm:w-auto sm:min-w-0 sm:flex-1">
           {agent === 'claude'
             ? 'Claude Code reads all of these at the start of a session, outermost first; later files refine earlier ones.'
             : 'Codex reads its own file, then one file per folder from the repository root down to this one.'}
