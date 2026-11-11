@@ -49,6 +49,7 @@ export interface ExportProps {
   onStop(): void;
   hasCaptions: boolean;
   onSrt(): void;
+  onVtt(): void;
 }
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -232,9 +233,14 @@ export function ExportPage(p: ExportProps) {
                 </Button>
               )}
               {p.hasCaptions && (
-                <Button variant="ghost" icon={<Download size={14} />} onClick={p.onSrt}>
-                  The captions as .srt
-                </Button>
+                <>
+                  <Button variant="ghost" icon={<Download size={14} />} onClick={p.onSrt}>
+                    The captions as .srt
+                  </Button>
+                  <Button variant="ghost" icon={<Download size={14} />} onClick={p.onVtt}>
+                    The captions as .vtt
+                  </Button>
+                </>
               )}
             </div>
           )}
