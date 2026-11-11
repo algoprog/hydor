@@ -7,13 +7,16 @@
 // its thirds, a free transform's handles, the picked mark's outline, the gradient's line, the AI tools' paint, the clone
 // stamp's source), the brush's ring at the pointer, and the box words are written in.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { MARK_FONTS, straightenZoom, textMetrics, type Mark } from '@shared/mediaedit';
+import { straightenZoom, textFont, textMetrics, type Mark } from '@shared/mediaedit';
 import { cx } from '../../../components/ui';
-import { markBox } from '../render';
+import { loadFont, markBox } from '../render';
 import { renderDoc } from './compose';
 import { activeLayer, layerOf } from './doc';
 import { PAINT_TOOLS, type PictureEd } from './editor';
-import { doubleClick, handlesOf, HANDLES, pickedOutline, press, xformCorners, type Gesture, type Pt, type ViewT } from './interact';
+import { isApple, isNoSnap, type ContextMenuAt } from '../shell/menus';
+import { affineOf } from './editor';
+import { doubleClick, handlesOf, HANDLES, layerAt, pickedOutline, press, SNAP_PX, xformCorners, type Gesture, type Pt, type ViewT } from './interact';
+import { snapGuide } from './snap';
 
 const PREVIEW = 2048;
 const FAST = 1024;
@@ -30,7 +33,25 @@ function themeColors() {
   return { c1: v('--bg-2', '#1b1f27'), c2: v('--bg-3', '#242a34'), line: v('--line-2', '#3a4150'), fg3: v('--fg-3', '#8f99ab'), accent: v('--accent', '#8aa8ff'), panel: v('--bg-1', '#13161c') };
 }
 
-export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: PictureEd; onCursor?: (p: Pt | null, color: string | null) => void; onZoom?: (z: number) => void; bigHeal?: Parameters<PictureEd['endStroke']>[0]; className?: string }) {
+/** The tools whose press does nothing until the pointer moves, so a touch held still can open the right-click menu instead. */
+const HOLD_TOOLS = ['move', 'hand', 'marquee-rect', 'marquee-ellipse', 'lasso'];
+
+export function View({
+  ed,
+  onCursor,
+  onZoom,
+  onContext,
+  bigHeal,
+  className,
+}: {
+  ed: PictureEd;
+  onCursor?: (p: Pt | null, color: string | null) => void;
+  onZoom?: (z: number) => void;
+  /** The right-click menu asked for: where (the screen's pixels) and the canvas's point under it (null off the canvas). */
+  onContext?: (at: ContextMenuAt, p: Pt | null) => void;
+  bigHeal?: Parameters<PictureEd['endStroke']>[0];
+  className?: string;
+}) {
   useEd(ed);
   const box = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLCanvasElement>(null);
@@ -79,9 +100,16 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
         zoomAt(1 / c.z, r + W / 2, r + H / 2);
       },
       zoomBy: (f, at) => zoomAt(f, at?.[0] ?? r + W / 2, at?.[1] ?? r + H / 2),
+      zoomTo: (z) => zoomAt(Math.max(MIN_Z, Math.min(MAX_Z, z)) / tRef.current.z, r + W / 2, r + H / 2),
       zoom: () => tRef.current.z,
     };
   }, [ed, zoomAt, W, H, r]);
+
+  // Words in a font that is yet to load show in the nearest one, and again once it is there.
+  useEffect(() => {
+    const marks = doc.layers.flatMap((l) => (l.kind === 'mark' && l.mark.type === 'text' ? [l.mark] : []));
+    for (const m of marks) void loadFont(m).then(() => ed.fontReady(m));
+  }, [doc, ed]);
 
   // ---- the picture, put together --------------------------------------------------------------------------------
   const fx = doc.layers.some((l) => l.visible && (l.kind === 'adjust' || (l.kind === 'mark' && (l.mark.type === 'blur' || l.mark.type === 'pixelate'))));
@@ -235,11 +263,14 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
         const lines = ed.outline(step);
         g.lineWidth = 1;
         g.beginPath();
+        // Transform selection: the outline goes through the transform as it is dragged.
+        const m = ed.xform?.sel ? affineOf(ed.xform) : null;
+        const T = (x: number, y: number): Pt => (m ? S(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]) : S(x, y));
         for (const p of lines) {
-          const [ax, ay] = S(p[0], p[1]);
+          const [ax, ay] = T(p[0], p[1]);
           g.moveTo(Math.round(ax) + 0.5, Math.round(ay) + 0.5);
           for (let i = 2; i + 1 < p.length; i += 2) {
-            const [bx, by] = S(p[i], p[i + 1]);
+            const [bx, by] = T(p[i], p[i + 1]);
             g.lineTo(Math.round(bx) + 0.5, Math.round(by) + 0.5);
           }
         }
@@ -337,6 +368,40 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
           g.stroke();
         }
         g.restore();
+      }
+      // Smart guides while something is moved: thin pink lines to what it lines up with, and the gaps as small pink pills.
+      if (o.snap) {
+        g.strokeStyle = SMART;
+        g.lineWidth = 1;
+        g.setLineDash([]);
+        g.beginPath();
+        for (const l of o.snap.lines) {
+          if (l.axis === 'v') {
+            const sx = Math.round(tt.ox + l.pos * tt.z) + 0.5;
+            g.moveTo(sx, tt.oy + l.from * tt.z);
+            g.lineTo(sx, tt.oy + l.to * tt.z);
+          } else {
+            const sy = Math.round(tt.oy + l.pos * tt.z) + 0.5;
+            g.moveTo(tt.ox + l.from * tt.z, sy);
+            g.lineTo(tt.ox + l.to * tt.z, sy);
+          }
+        }
+        for (const gp of o.snap.gaps) {
+          const [ax, ay] = S(gp.x1, gp.y1);
+          const [bx, by] = S(gp.x2, gp.y2);
+          g.moveTo(Math.round(ax) + 0.5, Math.round(ay) + 0.5);
+          g.lineTo(Math.round(bx) + 0.5, Math.round(by) + 0.5);
+        }
+        g.stroke();
+        g.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        for (const gp of o.snap.gaps) {
+          const [ax, ay] = S(gp.x1, gp.y1);
+          const [bx, by] = S(gp.x2, gp.y2);
+          pill(g, gp.text, (ax + bx) / 2, (ay + by) / 2);
+        }
+        g.textAlign = 'start';
       }
       // The crop: outside it dimmed, its box, its thirds and handles.
       if (ed.crop) {
@@ -456,6 +521,28 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
   const guideDrag = useRef<{ axis: 'v' | 'h'; i: number } | null>(null);
   const space = useRef(false);
   const aiStroke = useRef<{ size: number; pts: number[] } | null>(null);
+  // A right press, not yet a drag: it opens the menu when released where it was pressed, and pans once it has moved a few pixels.
+  const rightPress = useRef<{ cx: number; cy: number; x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const lastRight = useRef(0);
+  // A touch held still on the picture opens the menu too.
+  const hold = useRef<{ timer: number; cx: number; cy: number } | null>(null);
+  const lastType = useRef('mouse');
+  const stopHold = () => {
+    if (hold.current) window.clearTimeout(hold.current.timer);
+    hold.current = null;
+  };
+
+  /** The right-click menu at a point of the screen: the layer under it picked first (a crop or transform under way is left alone). */
+  const openMenu = (cx: number, cy: number, keyed = false) => {
+    const rc = box.current!.getBoundingClientRect();
+    const p = toDoc([cx - rc.left, cy - rc.top]);
+    const inside = p[0] >= 0 && p[1] >= 0 && p[0] < ed.doc.w && p[1] < ed.doc.h;
+    if (!ed.crop && !ed.xform && !ed.busy) {
+      const hit = layerAt(ed.doc, p[0], p[1], 6 / tRef.current.z);
+      if (hit && hit.id !== ed.doc.active) ed.pickLayer(hit.id);
+    }
+    onContext?.({ x: cx, y: cy, keyed }, inside ? p : null);
+  };
 
   const local = (e: { clientX: number; clientY: number }): Pt => {
     const rc = box.current!.getBoundingClientRect();
@@ -499,6 +586,7 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
       gesture.current = null;
       aiStroke.current = null;
       panning.current = null;
+      stopHold();
       const [a, b] = [...pointers.current.values()];
       const c = tRef.current;
       pinch.current = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2, z: c.z, ox: c.ox, oy: c.oy };
@@ -507,7 +595,15 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
     if (pointers.current.size > 2) return;
     const c = tRef.current;
     // Out of a ruler: a new guide.
-    if (ed.rulers && (s[0] < RULER || s[1] < RULER)) {
+    lastType.current = e.pointerType;
+    // A right press (Ctrl and a click on a Mac): the menu if it does not move, else it pans.
+    const right = e.button === 2 || (isApple && e.button === 0 && e.ctrlKey && e.pointerType === 'mouse');
+    if (right) {
+      rightPress.current = { cx: e.clientX, cy: e.clientY, x: s[0], y: s[1], ox: c.ox, oy: c.oy, moved: false };
+      lastRight.current = performance.now();
+      return;
+    }
+    if (ed.rulers && e.button === 0 && (s[0] < RULER || s[1] < RULER)) {
       const axis = s[1] < RULER && s[0] >= RULER ? 'h' : 'v';
       const p = toDoc(s);
       const list = axis === 'v' ? ed.guides.v : ed.guides.h;
@@ -517,7 +613,7 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
       ed.emit(false);
       return;
     }
-    if (e.button === 1 || e.button === 2 || space.current) {
+    if (e.button === 1 || space.current) {
       panning.current = { x: s[0], y: s[1], ox: c.ox, oy: c.oy };
       return;
     }
@@ -539,6 +635,22 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
     else if (g) {
       gesture.current = g;
       setGestureOn(true);
+    }
+    // A touch held still where nothing has happened yet: the menu, and what the press began is dropped.
+    if (e.pointerType === 'touch' && onContext && HOLD_TOOLS.includes(ed.tool) && !ed.crop && !ed.xform && !ed.writing) {
+      const cx = e.clientX;
+      const cy = e.clientY;
+      hold.current = {
+        cx,
+        cy,
+        timer: window.setTimeout(() => {
+          hold.current = null;
+          gesture.current = null;
+          panning.current = null;
+          setGestureOn(false);
+          openMenu(cx, cy);
+        }, 500),
+      };
     }
   };
 
@@ -574,10 +686,18 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
       setView({ z, ox: mx - ((pc.mx - pc.ox) / pc.z) * z, oy: my - ((pc.my - pc.oy) / pc.z) * z });
       return;
     }
+    if (hold.current && Math.hypot(e.clientX - hold.current.cx, e.clientY - hold.current.cy) > 8) stopHold();
+    const rp = rightPress.current;
+    if (rp && !rp.moved && Math.hypot(e.clientX - rp.cx, e.clientY - rp.cy) >= 4) {
+      rp.moved = true;
+      panning.current = { x: rp.x, y: rp.y, ox: rp.ox, oy: rp.oy };
+    }
     if (guideDrag.current) {
       const gd = guideDrag.current;
       const list = gd.axis === 'v' ? ed.guides.v : ed.guides.h;
-      list[gd.i] = Math.round(gd.axis === 'v' ? p[0] : p[1]);
+      // A guide lines up with the canvas's edges and middle, the other guides and the layers' edges.
+      const raw = gd.axis === 'v' ? p[0] : p[1];
+      list[gd.i] = Math.round(ed.snap && !isNoSnap(e.nativeEvent) ? snapGuide(raw, gd.axis, ed.snapTargets(), SNAP_PX / tRef.current.z, gd.i) : raw);
       return drawOver(performance.now());
     }
     if (panning.current) {
@@ -609,6 +729,14 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
       return;
     }
     panning.current = null;
+    stopHold();
+    const rp = rightPress.current;
+    rightPress.current = null;
+    if (rp) {
+      lastRight.current = performance.now();
+      if (!rp.moved && e.type === 'pointerup') openMenu(e.clientX, e.clientY);
+      return;
+    }
     const s = local(e);
     if (guideDrag.current) {
       const gd = guideDrag.current;
@@ -682,7 +810,13 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
         setRing(null);
         onCursor?.(null, null);
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        // A mouse's right press is handled as it comes (it may be a drag); a touch's long press by its own timer. This is
+        // for the rest (the menu key, a pen's barrel button).
+        if ((e.target as HTMLElement).closest('[data-over]') || rightPress.current || performance.now() - lastRight.current < 700 || lastType.current === 'touch') return;
+        openMenu(e.clientX, e.clientY, e.detail === 0);
+      }}
       onDoubleClick={(e) => {
         if ((e.target as HTMLElement).closest('[data-over]')) return;
         doubleClick(ed, toDoc(local(e)), tRef.current);
@@ -702,6 +836,21 @@ export function View({ ed, onCursor, onZoom, bigHeal, className }: { ed: Picture
       {ed.comparing && <span className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-lg bg-black/65 px-2.5 py-1 text-[12px] font-medium text-white">The original</span>}
     </div>
   );
+}
+
+/** The smart guides' colour, the same in every editor. */
+const SMART = '#ff3b8b';
+
+/** A small pink pill with white words in its middle, centred at (x, y). */
+function pill(g: CanvasRenderingContext2D, text: string, x: number, y: number) {
+  const w = g.measureText(text).width + 10;
+  const h = 16;
+  g.fillStyle = SMART;
+  g.beginPath();
+  g.roundRect(Math.round(x - w / 2), Math.round(y - h / 2), w, h, 8);
+  g.fill();
+  g.fillStyle = '#ffffff';
+  g.fillText(text, Math.round(x), Math.round(y) + 0.5);
 }
 
 /** A round step for lines and ticks: 1, 2 or 5 times a power of ten, at least `min`. */
@@ -724,8 +873,7 @@ function Words({ t, mark, onChange, onDone }: { t: ViewT; mark: Extract<Mark, { 
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
-  const f = MARK_FONTS.find((x) => x.id === (mark.font ?? 'sans')) ?? MARK_FONTS[0];
-  const { line, pad } = textMetrics(mark.size);
+  const { line, pad } = textMetrics(mark.size, mark.lineHeight);
   const b = markBox(mark.text ? mark : { ...mark, text: 'M' });
   return (
     <textarea
@@ -752,7 +900,8 @@ function Words({ t, mark, onChange, onDone }: { t: ViewT; mark: Extract<Mark, { 
         width: Math.max(b.w * t.z + 24, 60),
         height: Math.max(b.h * t.z, line * t.z) + 2,
         padding: pad * t.z,
-        font: `${f.id === 'heavy' ? 400 : 600} ${mark.size * t.z}px ${f.css}`,
+        font: textFont({ ...mark, size: mark.size * t.z }),
+        textAlign: mark.align === 'centre' ? 'center' : (mark.align ?? 'left'),
         lineHeight: `${line * t.z}px`,
         color: mark.color,
         background: mark.bg ?? 'transparent',

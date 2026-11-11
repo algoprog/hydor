@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { MediaItem } from '../../shared/media.ts';
-import { ADJUSTMENTS, autoEnhance, boxToUpright, colorOf, FILTERS, histogramOf, HSL_RANGES, IMAGE_FORMATS, LIMITS, normalizeRecipe, toUpright, type Box, type ImageFormat, type ImageRecipe, type Mark, type Quarter, type SaveImageAnswer } from '../../shared/mediaedit.ts';
+import { ADJUSTMENTS, autoEnhance, boxToUpright, colorOf, FILTERS, histogramOf, HSL_RANGES, IMAGE_FORMATS, isFontId, LIMITS, normalizeRecipe, textStyleOf, toUpright, type Box, type ImageFormat, type ImageRecipe, type Mark, type Quarter, type SaveImageAnswer } from '../../shared/mediaedit.ts';
 import { ASSET } from '../../shared/slides.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -298,6 +298,13 @@ export function editImageTool(d: Deps): RunTool {
               size: { type: 'number', description: 'Letter height in pixels (default: a sixteenth of the picture’s longer side).' },
               color: { type: 'string', description: 'A colour: #rrggbb, or white, black, red… (default white).' },
               background: { type: 'string', description: 'A box behind the words, its colour (#rrggbbaa for see-through, as #000000b3); none for no box (default: a dark box).' },
+              font: { type: 'string', description: 'sans (default), serif, mono, hand, heavy, or the name of a font the editor offers in lower case with dashes (montserrat, playfair-display, bebas-neue, dancing-script…). Here the computer’s nearest font of that kind is used.' },
+              bold: { type: 'boolean', description: 'Heavy letters (default true); false for plain ones.' },
+              italic: { type: 'boolean' },
+              align: { type: 'string', enum: ['left', 'centre', 'right'], description: 'Where each line sits in the box of several lines (default left).' },
+              line_height: { type: 'number', minimum: 0.8, maximum: 3, description: 'How far apart the lines are, in times the letters’ height (default 1.22).' },
+              outline: { type: 'object', properties: { color: { type: 'string' }, width: { type: 'number', description: 'Pixels.' } }, description: 'A line round the letters.' },
+              shadow: { type: 'object', properties: { color: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' }, blur: { type: 'number', description: 'Soft edge in pixels (drawn hard with ffmpeg alone).' } }, description: 'A shadow behind the letters, moved by x and y pixels.' },
             },
             required: ['text'],
           },
@@ -398,7 +405,8 @@ export function editImageTool(d: Deps): RunTool {
         // Placed in the result (a caption at the bottom), unless a point of the picture is given.
         const place: Place | undefined = typeof t.place === 'string' && (PLACES as readonly string[]).includes(t.place) ? (t.place as Place) : given ? undefined : 'bottom';
         const [ux, uy] = given && !place ? up(num(t.x)!, num(t.y)!) : [at.x, at.y];
-        return { text: String(t.text).slice(0, LIMITS.text), x: ux - at.x, y: uy - at.y, size: sizePx, color: colorOf(t.color, '#ffffff'), ...(bg ? { bg } : {}), ...(place ? { place } : {}) };
+        const style = textStyleOf({ bold: t.bold, italic: t.italic, align: t.align, lineHeight: t.line_height, outline: t.outline, shadow: t.shadow }, sizePx);
+        return { text: String(t.text).slice(0, LIMITS.text), x: ux - at.x, y: uy - at.y, size: sizePx, color: colorOf(t.color, '#ffffff'), ...(bg ? { bg } : {}), ...(isFontId(t.font) ? { font: t.font } : {}), ...style, ...(place ? { place } : {}) };
       });
       const format = recipe.format ?? formatOfData(pic.data) ?? 'png';
       let made;

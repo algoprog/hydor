@@ -1,9 +1,13 @@
 // Script tests for the picture editor's pure parts: selections as masks (a rectangle, an ellipse and a lasso's shape
 // made masks with smooth edges, added, taken away, crossed and inverted, feathered, grown and shrunk, their outline for
 // the marching ants), the magic wand's and the paint bucket's flood fill (by tolerance, touching or anywhere), where a
-// stroke's dabs go, and the spot healing brush's fill. Build and run:
+// stroke's dabs go, the spot healing brush's fill, snapping and smart guides (a box lining up with the canvas, the guides
+// and other layers; guides snapping; Align; where a paste at a point goes) and File → New's sizes. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/mediaedit/picture/picture-test.ts && node dist/dev/picture-test.js
 import { dabsTo, healFill } from './heal';
+import { blankSrc, fitNewSize, NEW_PRESETS, parseBlank, presetOf } from './newpicture';
+import { fontOf, isFontId, MARK_FONTS, textFont, textMetrics, textReach, textWeight } from '@shared/mediaedit';
+import { alignDelta, centredAt, snapGuide, snapMove, straightLock, type SnapTargets } from './snap';
 import { allMask, combineMasks, coversAll, ellipseMask, featherMask, floodMask, growMask, invertMask, maskArea, maskAt, maskBounds, maskOutline, polygonMask, rectMask, shrinkMask, type Mask } from './mask';
 
 let failed = 0;
@@ -145,6 +149,96 @@ const box = (m: Mask | null) => (m ? JSON.stringify(maskBounds(m)) : 'none');
   for (let i = 0; i < 256; i++) if (fh[i]) flat.set([255, 0, 0, 255], i * 4);
   healFill(flat, 16, 16, fh);
   ok(close(flat[(8 * 16 + 8) * 4], 90, 2) && close(flat[(8 * 16 + 8) * 4 + 1], 90, 2), 'on a plain colour, the plain colour');
+}
+
+// ---- snapping and smart guides ---------------------------------------------------------------------------------------
+{
+  const T: SnapTargets = { w: 1000, h: 600, guidesV: [250], guidesH: [], boxes: [{ x: 600, y: 410, w: 100, h: 90 }] };
+  // A 100 × 100 box at (3, 40), moved 2 px left: its left edge is within 3 px of the canvas's: snaps to 0.
+  const a = snapMove({ x: 3, y: 40, w: 100, h: 100 }, -2, 0, T, { tol: 4 });
+  ok(a.x && a.dx === -3 && !a.y && a.dy === 0, `snaps its left edge to the canvas's: dx ${a.dx}`);
+  ok(a.lines.some((l) => l.axis === 'v' && l.pos === 0 && l.from === 0 && l.to === 600), 'a line to the canvas runs the whole canvas');
+  // Out of reach: nothing.
+  const b = snapMove({ x: 30, y: 40, w: 100, h: 100 }, 0, 0, T, { tol: 4 });
+  ok(!b.x && !b.y && b.lines.length === 0 && b.gaps.length === 0, 'far from everything: no snap, no lines');
+  // Middle to the canvas's middle (x 500): a box 100 wide at x 448 has its middle at 498.
+  const c = snapMove({ x: 448, y: 10, w: 100, h: 100 }, 0, 0, T, { tol: 4 });
+  ok(c.dx === 2 && c.lines.some((l) => l.axis === 'v' && l.pos === 500), 'its middle to the canvas middle');
+  // The nearest line wins: the guide at 250 and the box's left edge at 600: a box whose right edge is at 252 goes to the guide.
+  const d = snapMove({ x: 152, y: 10, w: 100, h: 50 }, 0, 0, T, { tol: 5 });
+  ok(d.dx === -2 && d.lines.some((l) => l.pos === 250), 'to a guide');
+  // To another layer's box: top edges 410 and 413 line up; the line joins the two boxes.
+  const e = snapMove({ x: 400, y: 413, w: 60, h: 20 }, 0, 0, T, { tol: 4 });
+  ok(e.dy === -3 && e.lines.some((l) => l.axis === 'h' && l.pos === 410 && l.from === 400 && l.to === 700), `to a layer's edge, the line joining them: ${JSON.stringify(e.lines)}`);
+  // Gaps on the axes that lined up (here both: its middle is on the layer's middle across, and on the canvas's centre down):
+  // to the canvas's edge on the left (a guide is not a neighbour), to the layer on the right, and up and down to the edges.
+  const f = snapMove({ x: 448, y: 450, w: 100, h: 100 }, 0, 0, T, { tol: 4 });
+  const left = f.gaps.find((g) => g.x1 === 0);
+  const right = f.gaps.find((g) => g.x1 === 600);
+  ok(left?.text === '450' && left.x2 === 450 && right?.text === '50' && right.x2 === 550, `the gaps left and right: ${JSON.stringify(f.gaps)}`);
+  ok(f.gaps.filter((g) => g.y1 !== g.y2).length === 2, 'and the two up and down, to the canvas');
+  // Shift: a straight move; the locked axis is neither moved nor snapped.
+  ok(straightLock(30, 5) === 'y' && straightLock(2, -9) === 'x', 'Shift locks the shorter way');
+  const g = snapMove({ x: 3, y: 98, w: 100, h: 100 }, -2, 3, T, { tol: 4, lock: 'y' });
+  ok(g.dy === 0 && g.dx === -3 && !g.y, 'a straight move does not snap the locked axis');
+  // Snapping off (the caller does not call it) is plain; a zero tolerance only snaps on the line itself.
+  const h = snapMove({ x: 1, y: 40, w: 100, h: 100 }, 0, 0, T, { tol: 0 });
+  ok(!h.x, 'a tolerance of 0 does not snap 1 px away');
+  // Guides snap to the canvas's edges and middle, other guides and layers' edges.
+  ok(snapGuide(498, 'v', T, 4) === 500 && snapGuide(3, 'v', T, 4) === 0 && snapGuide(602, 'v', T, 4) === 600 && snapGuide(300, 'v', T, 4) === 300, 'a guide dragged near the middle, an edge or a layer lines up');
+  ok(snapGuide(252, 'v', T, 4, 0) === 252 && snapGuide(252, 'v', T, 4) === 250, 'a guide does not snap to itself');
+  ok(snapGuide(298, 'h', T, 4) === 300 && snapGuide(411, 'h', T, 4) === 410, 'horizontal guides: the middle and a layer top');
+}
+
+// ---- align and paste at a point -------------------------------------------------------------------------------------------
+{
+  const b = { x: 100, y: 50, w: 200, h: 100 };
+  ok(alignDelta(b, 'left', 1000, 600).dx === -100 && alignDelta(b, 'right', 1000, 600).dx === 700 && alignDelta(b, 'centre', 1000, 600).dx === 300, 'left, right and centre');
+  ok(alignDelta(b, 'top', 1000, 600).dy === -50 && alignDelta(b, 'bottom', 1000, 600).dy === 450 && alignDelta(b, 'middle', 1000, 600).dy === 200, 'top, bottom and middle');
+  ok(alignDelta(b, 'left', 1000, 600).dy === 0 && alignDelta(b, 'top', 1000, 600).dx === 0, 'one axis at a time');
+  const odd = alignDelta({ x: 0.4, y: 0, w: 99.5, h: 10 }, 'centre', 1000, 600);
+  ok(Number.isInteger(odd.dx), 'whole pixels');
+  const c = centredAt(500, 300, 200, 100, 1000, 600);
+  ok(c.x === 400 && c.y === 250, 'centred on the point');
+  const e = centredAt(10, 10, 200, 100, 1000, 600);
+  ok(e.x === 0 && e.y === 0, 'kept on the canvas near an edge');
+  const big = centredAt(10, 10, 2000, 100, 1000, 600);
+  ok(big.x === -500, 'larger than the canvas: centred');
+}
+
+// ---- File → New ----------------------------------------------------------------------------------------------------------
+{
+  ok(NEW_PRESETS.map((p) => p.id).join() === 'square,story,hd,a4,custom', 'the presets');
+  const a4 = NEW_PRESETS.find((p) => p.id === 'a4')!;
+  ok(a4.w === 2480 && a4.h === 3508, 'A4 at 300 dpi is 2480 × 3508');
+  ok(presetOf(1080, 1920).id === 'story' && presetOf(1000, 700).id === 'custom', 'a size is its preset, or Custom');
+  const ok1 = fitNewSize(1080, 1080);
+  ok(ok1.w === 1080 && !ok1.cut, 'a size that fits is kept');
+  const huge = fitNewSize(20000, 100);
+  ok(huge.cut && huge.w <= 8192 && huge.h >= 1, `a side beyond the limit is cut: ${huge.w} × ${huge.h}`);
+  const wide = fitNewSize(8192, 8192);
+  ok(wide.cut && wide.w * wide.h <= 40_000_000, `all the pixels within the limit: ${wide.w} × ${wide.h}`);
+  const zero = fitNewSize(0, -5);
+  const s1 = blankSrc(1080, 1920, '#ffffff');
+  const s2 = blankSrc(1080, 1920, '#ffffff');
+  ok(s1 !== s2, 'two blank pictures of one size are two sources (two tabs)');
+  const pb = parseBlank(s1);
+  ok(pb?.w === 1080 && pb.h === 1920 && pb.fill === '#ffffff', `a blank picture's source says its size and colour: ${s1}`);
+  ok(parseBlank(blankSrc(10, 10, null))?.fill === null && parseBlank('/api/media/x/file') === null && parseBlank('naget-new:abc') === null, 'see-through, and what is not a blank picture');
+  ok(parseBlank('naget-new:99999x10:ffffff:1')!.w <= 8192, 'a size past the limit is cut when read');
+  ok(zero.w === 1 && zero.h === 1 && !Number.isNaN(fitNewSize(NaN, 3).w), 'at least one pixel, never a number that is not');
+}
+
+// ---- words: fonts and their style ---------------------------------------------------------------------------------------
+{
+  ok(MARK_FONTS.length > 40 && new Set(MARK_FONTS.map((f) => f.id)).size === MARK_FONTS.length, `a long list of fonts, each its own id (${MARK_FONTS.length})`);
+  ok(MARK_FONTS.slice(0, 5).map((f) => f.id).join() === 'sans,serif,mono,hand,heavy', 'the five kinds there always were come first');
+  ok(isFontId('montserrat') && isFontId('local:Helvetica Neue') && !isFontId('local:a;b') && !isFontId('nope') && !isFontId(3), 'an id is a font of the list or one of the computer’s');
+  ok(fontOf('local:Helvetica Neue').css.startsWith('"Helvetica Neue"') && fontOf('nope').id === 'sans' && fontOf(undefined).id === 'sans', 'a font of the computer’s own by its name; Sans when unknown');
+  ok(textWeight({}) === 600 && textWeight({ bold: false }) === 400 && textWeight({ font: 'heavy' }) === 400 && textWeight({ font: 'montserrat' }) === 700 && textWeight({ font: 'bebas-neue' }) === 400, 'weights: 600 as always, plain 400, 700 where a font has it, its only one else');
+  ok(textFont({ size: 20 }) === `600 20px ${fontOf('sans').css}` && textFont({ size: 20, italic: true, bold: false }).startsWith('italic 400 20px '), 'the canvas font as it always was, italic in front');
+  ok(textMetrics(100).line === 122 && textMetrics(100, 1.5).line === 150 && textMetrics(100, 1.5).pad === textMetrics(100).pad, 'line height scales the lines, not the padding');
+  ok(textReach({}) === 0 && textReach({ outline: { color: '#000', width: 4 } }) === 4 && textReach({ shadow: { color: '#000', blur: 5, x: 3, y: -8 } }) === 18, 'what an outline or a shadow reaches past the box');
 }
 
 console.log(`${passed} passed, ${failed} failed`);

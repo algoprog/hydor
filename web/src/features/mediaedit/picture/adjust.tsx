@@ -4,7 +4,7 @@
 // makes adjustment layers). Auto enhance is one click. Curves has a point for each place the line bends (dragged; a click
 // on the line adds one, a double click takes it away), for RGB or one channel, over the picture's histogram; Levels has
 // the input's black, grey and white and the output's black and white, over the histogram, with Auto.
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RotateCcw, Sparkles, Wand2 } from 'lucide-react';
 import { ADJUSTMENTS, applyLook, autoLevels, curveTable, FILTERS, HSL_RANGES, TONES, type AdjustKey, type Channel, type CurvePoints, type FilterId, type LevelsOne, type LookSettings, type Tone } from '@shared/mediaedit';
 import { cx } from '../../../components/ui';
@@ -41,9 +41,28 @@ export function AdjustPanel({ ed }: { ed: PictureEd }) {
       return { ...l, adjust: Object.keys(n).length ? n : undefined };
     }, done);
   const sig = (id: string) => (ed.adjustAsk?.section === id ? ed.adjustAsk.n : undefined);
+  // A menu that names one setting (Posterize…, Threshold…): the section opens, that setting scrolls into view and shows with a ring a moment.
+  const root = useRef<HTMLDivElement>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const asked = ed.adjustAsk;
+  useEffect(() => {
+    if (!asked?.field) return;
+    const field = asked.field;
+    const id = window.setTimeout(() => {
+      root.current?.querySelector(`[data-adjust-field="${field}"]`)?.scrollIntoView({ block: 'nearest' });
+      setFlash(field);
+    }, 120);
+    const off = window.setTimeout(() => setFlash(null), 1800);
+    return () => (window.clearTimeout(id), window.clearTimeout(off));
+  }, [asked?.n, asked?.field]);
+  const field = (id: string, node: ReactNode) => (
+    <div data-adjust-field={id} className={cx('rounded-md transition-shadow', flash === id && 'shadow-[0_0_0_2px_var(--accent)]')}>
+      {node}
+    </div>
+  );
   const slider = (k: AdjustKey) => <SliderRow key={k} label={ADJ[k].label} value={a[k] ?? 0} min={ADJ[k].min} max={100} onChange={(v, done) => adj(k, v, done)} />;
   return (
-    <div className="pb-2 text-[12.5px]">
+    <div ref={root} className="pb-2 text-[12.5px]">
       <div className="space-y-2 border-b border-line px-3 py-2.5">
         <p className="text-[12px] leading-snug text-fg-3">
           {t ? (
@@ -105,8 +124,8 @@ export function AdjustPanel({ ed }: { ed: PictureEd }) {
         <Check on={!!look.invert} onChange={(v) => set((l) => ({ ...l, invert: v || undefined }), true, 'Invert')}>
           Invert (a negative)
         </Check>
-        <SliderRow label="Posterize (levels)" value={look.posterize ?? 0} min={0} max={32} hint="Only this many levels of each colour: flat bands, as a poster (0: off)" onChange={(v, done) => set((l) => ({ ...l, posterize: v >= 2 ? v : undefined }), done, 'Posterize')} />
-        <SliderRow label="Threshold" value={look.threshold ?? 0} min={0} max={255} hint="Pure black and white: lighter than this becomes white (0: off)" onChange={(v, done) => set((l) => ({ ...l, threshold: v || undefined }), done, 'Threshold')} />
+        {field('posterize', <SliderRow label="Posterize (levels)" value={look.posterize ?? 0} min={0} max={32} hint="Only this many levels of each colour: flat bands, as a poster (0: off)" onChange={(v, done) => set((l) => ({ ...l, posterize: v >= 2 ? v : undefined }), done, 'Posterize')} />)}
+        {field('threshold', <SliderRow label="Threshold" value={look.threshold ?? 0} min={0} max={255} hint="Pure black and white: lighter than this becomes white (0: off)" onChange={(v, done) => set((l) => ({ ...l, threshold: v || undefined }), done, 'Threshold')} />)}
       </Section>
       <Section id="picture.adjust.looks" openSignal={sig('looks')} title="Looks" defaultOpen={false}>
         <Looks ed={ed} look={look} onPick={(id) => set((l) => ({ ...l, filter: id ? { id } : undefined }), true, 'Look')} onStrength={(v, done) => set((l) => (l.filter ? { ...l, filter: v >= 100 ? { id: l.filter.id } : { id: l.filter.id, strength: v } } : l), done, 'Look')} />

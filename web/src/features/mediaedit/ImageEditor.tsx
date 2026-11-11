@@ -9,18 +9,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Layers as LayersIcon, Redo2, SplitSquareHorizontal, Undo2 } from 'lucide-react';
 import { formatOfMime, formatOfName, type ImageFormat, type Saved } from '@shared/mediaedit';
-import { Button, Empty, IconButton, Popover, Throbber, useIsMobile } from '../../components/ui';
+import { Button, Empty, IconButton, MenuItem, Popover, Throbber, useIsMobile } from '../../components/ui';
 import { toast, toastError } from '../../lib/store';
-import { keepKeys, type EditorProps } from './host';
+import { keepKeys, openEditor, pageName, type EditorProps } from './host';
 import { AiTools } from './picture/AiTools';
 import { viaLink } from '../../lib/machine';
 import { AdjustPanel } from './picture/adjust';
-import { AmountDialog, CanvasSizeDialog, ImageSizeDialog, LibraryPicker, SaveOptions } from './picture/dialogs';
+import { AmountDialog, CanvasSizeDialog, ImageSizeDialog, LibraryPicker, NewPictureDialog, SaveOptions } from './picture/dialogs';
+import { blankSrc, newPictureName, type NewBackground } from './picture/newpicture';
 import { canvasOf, Pixels, rasterLayer, shrinkTo, type Doc, type RasterLayer } from './picture/doc';
 import { canvasOfFile, PictureEd } from './picture/editor';
 import { polyClose } from './picture/interact';
 import type { Mask } from './picture/mask';
-import { buildMenus, MORE_KEYS } from './picture/menus';
+import { buildMenus, layerContextMenu, MORE_KEYS, pictureContextMenu, type MenuUi } from './picture/menus';
 import { ColourPanel, HistogramPanel, HistoryPanel, LayersPanel, PropertiesPanel } from './picture/panels';
 import { ALL_TOOLS, TOOL_GROUPS, ToolOptions, toolForKey } from './picture/tools';
 import { useEd, View } from './picture/View';
@@ -28,7 +29,7 @@ import { blobData, loadSource } from './render';
 import { saveImage, savePlans } from './save';
 import { erase as eraseRoute, localState } from '../images/studio/api';
 import { readKept } from './ai';
-import { ColorSwatches, Dock, EditorShell, isMod, MenuBar, PanelSheet, runMenuKeys, shortcutGroups, ShortcutsDialog, StatusBar, StatusItem, ToolRail, useRailPicks, type DockPanel } from './shell';
+import { ColorSwatches, ContextMenu, Dock, EditorShell, isMenuKey, isMod, MenuBar, PanelSheet, runMenuKeys, shortcutGroups, ShortcutsDialog, StatusBar, StatusItem, ToolRail, useRailPicks, type ContextMenuAt, type DockPanel } from './shell';
 import type { ToolId } from './picture/editor';
 
 interface Start {
@@ -174,7 +175,11 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
       const items = await navigator.clipboard.read();
       for (const it of items) {
         const t = it.types.find((x) => x.startsWith('image/'));
-        if (t) return ed.addPicture(await canvasOfFile(await it.getType(t)), 'Pasted');
+        if (t) {
+          const blob = await it.getType(t);
+          // The part copied in the editor comes back where it was, not as a new picture in the middle.
+          return ed.isOwnClip(blob) ? ed.pasteHere() : ed.addPicture(await canvasOfFile(blob), 'Pasted');
+        }
       }
       if (ed.clip) return ed.pasteHere();
       toast('There is no picture in the clipboard.');
@@ -187,7 +192,8 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   const [library, setLibrary] = useState(false);
 
   // ---- dialogs ----
-  const [dialog, setDialog] = useState<'size' | 'canvas' | 'keys' | null>(null);
+  const [dialog, setDialog] = useState<'size' | 'canvas' | 'keys' | 'new' | null>(null);
+  const [ctx, setCtx] = useState<{ at: ContextMenuAt; kind: 'picture' | 'layer'; p: [number, number] | null } | null>(null);
   const [amount, setAmount] = useState<Parameters<typeof AmountDialog>[0]['ask']>(null);
   const askAmount = (kind: 'feather' | 'grow' | 'shrink' | 'stroke') => {
     const long = Math.max(ed.doc.w, ed.doc.h);
@@ -255,8 +261,15 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     [ed],
   );
 
+  /** File → New: a blank picture, opened in a tab of its own (Save keeps it in the Library). */
+  const newPicture = (w: number, h: number, bg: NewBackground, color: string) => {
+    const fill = bg === 'transparent' ? null : bg === 'white' ? '#ffffff' : color.slice(0, 7);
+    openEditor({ kind: 'image', src: blankSrc(w, h, fill), title: newPictureName(w, h), from: { label: pageName() }, save: (r) => void (r.media && toast('Saved to your Library', 'ok')) });
+  };
+
   // ---- menus and keys ----
-  const menus = buildMenus(ed, {
+  const ui: MenuUi = {
+    newPicture: () => !viaLink && setDialog('new'),
     openFile: () => fileInput.current?.click(),
     openLibrary: () => !viaLink && setLibrary(true),
     fromClipboard: () => void fromClipboard(),
@@ -272,8 +285,14 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     canvasSize: () => setDialog('canvas'),
     amount: askAmount,
     shortcuts: () => setDialog('keys'),
-    adjust: (s) => ed.openAdjust(s),
-  });
+    adjust: (s, f) => ed.openAdjust(s, f),
+    rename: (id) => {
+      ed.renaming = id;
+      ed.emit(false);
+      ed.showPanel('layers');
+    },
+  };
+  const menus = buildMenus(ed, ui);
   useEffect(() => {
     if (!active) return;
     const el = root.current;
@@ -305,11 +324,20 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     }
     // Paste: the browser's own paste event brings what is copied (a picture from elsewhere too).
     if (mod && !e.shiftKey && k.toLowerCase() === 'v') return keepKeys(e);
-    if (k === 'Enter') {
-      if (ed.crop) (ed.commitCrop(), ed.setTool('move'));
-      else if (ed.xform) ed.commitTransform();
-      else if (ed.overlay.poly) polyClose(ed);
+    // A button, a menu row or a list a key was pressed on is theirs: Enter presses it, the arrows move in it.
+    const onControl = e.target !== root.current && !!(e.target as HTMLElement).closest?.('button, a[href], summary, [role=button], [role=menuitem], [role=menuitemcheckbox], [role=option], [role=tab], [role=switch], [role=checkbox], [role=radio], [role=slider], [role=listbox], [role=combobox]');
+    if (isMenuKey(e)) {
+      // The right-click menu from the keyboard: for the picked layer, in the middle of the picture.
       e.preventDefault();
+      const r = root.current?.getBoundingClientRect();
+      if (r) setCtx({ at: { x: r.left + r.width / 2, y: r.top + r.height / 2, keyed: true }, kind: 'picture', p: null });
+      return keepKeys(e);
+    }
+    if (k === 'Enter') {
+      if (onControl) return keepKeys(e);
+      if (ed.crop) (ed.commitCrop(), ed.setTool('move'), e.preventDefault());
+      else if (ed.xform) (ed.commitTransform(), e.preventDefault());
+      else if (ed.overlay.poly) (polyClose(ed), e.preventDefault());
       return keepKeys(e);
     }
     if (k === 'Escape') {
@@ -321,9 +349,18 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     }
     if (runMenuKeys(menus, e)) return keepKeys(e);
     if (!mod && !e.altKey) {
-      if (k === '[' || k === ']' || e.code === 'BracketLeft' || e.code === 'BracketRight') {
+      if (!e.shiftKey && (k === '[' || k === ']' || e.code === 'BracketLeft' || e.code === 'BracketRight')) {
         e.preventDefault();
         ed.brushStep(e.code === 'BracketRight' || k === ']' ? 1 : -1);
+        return keepKeys(e);
+      }
+      if (k === '{' || k === '}') {
+        e.preventDefault();
+        ed.hardnessStep(k === '}' ? 1 : -1);
+        return keepKeys(e);
+      }
+      if (/^[0-9]$/.test(k) && !e.shiftKey && ed.opacityKey(Number(k))) {
+        e.preventDefault();
         return keepKeys(e);
       }
       if (k.toLowerCase() === 'x' && !e.shiftKey) {
@@ -334,7 +371,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
         ed.resetColors();
         return keepKeys(e);
       }
-      if (k.startsWith('Arrow') && ed.doc.active) {
+      if (k.startsWith('Arrow') && ed.doc.active && !onControl) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
         const dx = k === 'ArrowLeft' ? -step : k === 'ArrowRight' ? step : 0;
@@ -363,7 +400,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
     { id: 'adjust', label: PANELS.adjust, render: () => <AdjustPanel ed={ed} /> },
     { id: 'properties', label: PANELS.properties, render: () => <PropertiesPanel ed={ed} /> },
     { id: 'ai', label: PANELS.ai, render: () => <AiTools ed={ed} /> },
-    { id: 'layers', label: PANELS.layers, render: () => <LayersPanel ed={ed} onAddPicture={(from) => (from === 'device' ? fileInput.current?.click() : from === 'library' ? setLibrary(true) : void fromClipboard())} /> },
+    { id: 'layers', label: PANELS.layers, render: () => <LayersPanel ed={ed} onContext={(at) => setCtx({ at, kind: 'layer', p: null })} onAddPicture={(from) => (from === 'device' ? fileInput.current?.click() : from === 'library' ? setLibrary(true) : void fromClipboard())} /> },
     { id: 'history', label: PANELS.history, render: () => <HistoryPanel ed={ed} /> },
     // At someone's link, no AI tools (they spend the owner's money or their computer's time).
   ].filter((x) => !viaLink || x.id !== 'ai');
@@ -443,12 +480,42 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   const tool = ALL_TOOLS.find((t) => t.id === ed.tool);
   const kind = format === 'jpeg' ? 'JPEG' : format === 'webp' ? 'WebP' : 'PNG';
   const [zoomZ, setZoomZ] = useState(1);
+  const zoomRef = useRef<HTMLSpanElement>(null);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomText, setZoomText] = useState('');
+  useEffect(() => {
+    if (zoomOpen) setZoomText(String(Math.round(zoomZ * 100)));
+  }, [zoomOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const zoom = Math.round(zoomZ * 100);
   const status = (
     <StatusBar>
-      <StatusItem title="Fit on screen" onClick={() => ed.view?.fit()}>
-        {zoom}%
-      </StatusItem>
+      <span ref={zoomRef} className="inline-flex">
+        <StatusItem title="Zoom: fit on screen, a size, or type one" onClick={() => setZoomOpen((x) => !x)}>
+          {zoom}%
+        </StatusItem>
+      </span>
+      <Popover anchor={zoomRef} open={zoomOpen} onClose={() => setZoomOpen(false)} width={200} prefer="above" title="Zoom">
+        <MenuItem onClick={() => (setZoomOpen(false), ed.view?.fit())}>Fit on screen</MenuItem>
+        {[25, 50, 100, 200, 400].map((z) => (
+          <MenuItem key={z} onClick={() => (setZoomOpen(false), ed.view?.zoomTo(z / 100))}>
+            {z === 100 ? 'Actual size, 100%' : `${z}%`}
+          </MenuItem>
+        ))}
+        <form
+          className="flex items-center gap-1.5 border-t border-line px-2.5 pt-2 pb-1.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const v = parseFloat(zoomText.replace(',', '.'));
+            if (Number.isFinite(v) && v > 0) {
+              ed.view?.zoomTo(v / 100);
+              setZoomOpen(false);
+            }
+          }}
+        >
+          <input value={zoomText} onChange={(e) => setZoomText(e.target.value)} onFocus={(e) => e.target.select()} inputMode="decimal" aria-label="Zoom in per cent" placeholder="Type a zoom" className="h-7 min-w-0 flex-1 rounded-md border border-line-2 bg-bg-1 px-2 text-[12px] outline-none focus:border-accent/70" />
+          <span className="text-[12px] text-fg-3">%</span>
+        </form>
+      </Popover>
       <StatusItem title="The picture's size">
         {ed.doc.w} × {ed.doc.h} px
       </StatusItem>
@@ -485,7 +552,7 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
   );
   const stage = (
     <>
-      <View ed={ed} className="absolute inset-0" onCursor={(p, c) => setCursor({ p, c })} onZoom={setZoomZ} bigHeal={bigHeal} />
+      <View ed={ed} className="absolute inset-0" onCursor={(p, c) => setCursor({ p, c })} onZoom={setZoomZ} onContext={(at, p) => setCtx({ at, kind: 'picture', p })} bigHeal={bigHeal} />
       {start.note && <p className="pointer-events-none absolute top-2 left-1/2 max-w-[80%] -translate-x-1/2 rounded-lg bg-black/65 px-2.5 py-1 text-center text-[12px] text-white">{start.note}</p>}
     </>
   );
@@ -498,7 +565,9 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
         if ((e.target as HTMLElement).closest?.('input, textarea')) return;
         const f = [...(e.clipboardData?.files ?? [])].filter((x) => x.type.startsWith('image/'));
         e.preventDefault();
-        if (f.length) void addFiles(f);
+        // What Copy put on the system's clipboard is the part copied, to go back where it was (not a picture to centre).
+        if (f.length === 1 && ed.isOwnClip(f[0])) ed.pasteHere();
+        else if (f.length) void addFiles(f);
         else ed.pasteHere();
       }}
       onDragOver={(e) => {
@@ -560,6 +629,8 @@ function Editing({ o, active, detached, setDirty, done, lead, close, start }: Ed
           )
         }
       />
+      <ContextMenu at={ctx?.at ?? null} onClose={() => setCtx(null)} items={ctx ? (ctx.kind === 'layer' ? layerContextMenu(ed, ui) : pictureContextMenu(ed, ui, ctx.p)) : []} />
+      <NewPictureDialog open={dialog === 'new'} onClose={() => setDialog(null)} onCreate={newPicture} />
       <ImageSizeDialog open={dialog === 'size'} w={ed.doc.w} h={ed.doc.h} onClose={() => setDialog(null)} onApply={(w, h) => ed.imageSize(w, h)} />
       <CanvasSizeDialog open={dialog === 'canvas'} w={ed.doc.w} h={ed.doc.h} bg={ed.bg} onClose={() => setDialog(null)} onApply={(w, h, a, c) => ed.canvasSize(w, h, a, c)} />
       <AmountDialog ask={amount} onClose={() => setAmount(null)} />
