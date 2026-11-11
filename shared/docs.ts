@@ -312,6 +312,15 @@ export interface Doc {
   styles?: Partial<Record<ParaStyle, StyleLook>>;
   /** A watermark on every page. */
   mark?: Watermark;
+  /** The language its words are in (a tag such as "en-US" or "el"): the editor's spell check, and the language Word files say their text is in. Left out: not said. */
+  lang?: string;
+}
+
+/** A language tag as a document keeps it ("en-us" → "en-US", "EL" → "el"), or undefined when it is not one. */
+export function docLang(v: unknown): string | undefined {
+  if (typeof v !== 'string' || !/^[a-z]{2,3}([-_][a-z0-9]{2,8}){0,3}$/i.test(v.trim())) return undefined;
+  const [first, ...rest] = v.trim().split(/[-_]/);
+  return [first.toLowerCase(), ...rest.map((p) => (p.length === 2 ? p.toUpperCase() : p.length === 4 ? p[0].toUpperCase() + p.slice(1).toLowerCase() : p))].join('-');
 }
 
 // ---- how documents look --------------------------------------------------------------------------------
@@ -1145,6 +1154,8 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   if (cite && cite !== 'apa') d.cite = cite;
   const styles = cleanStyles(v.styles);
   if (styles) d.styles = styles;
+  const lang = docLang(v.lang ?? v.language);
+  if (lang) d.lang = lang;
   const given = Array.isArray(v.notes) ? v.notes : [];
   return withNotes(withSuggestions(withComments(d, v.comments), v.suggestions), [...[...written].map(([id, runs]) => ({ id, runs })), ...given]);
 }
@@ -1510,7 +1521,7 @@ export function newDoc(title = ''): Doc {
  */
 export function docText(d: Doc): string {
   const bands = `${d.header ? `,"header":${JSON.stringify(d.header)}` : ''}${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.titlePage ? ',"titlePage":true' : ''}`;
-  const more = `${d.mark ? `,"mark":${JSON.stringify(d.mark)}` : ''}${d.cite ? `,"cite":${JSON.stringify(d.cite)}` : ''}${d.styles ? `,"styles":${JSON.stringify(d.styles)}` : ''}`;
+  const more = `${d.mark ? `,"mark":${JSON.stringify(d.mark)}` : ''}${d.cite ? `,"cite":${JSON.stringify(d.cite)}` : ''}${d.styles ? `,"styles":${JSON.stringify(d.styles)}` : ''}${d.lang ? `,"lang":${JSON.stringify(d.lang)}` : ''}`;
   const out: string[] = [`{"v":1,"page":${JSON.stringify(d.page)},"font":${JSON.stringify(d.font)},"size":${d.size}${bands}${more},"blocks":[`];
   d.blocks.forEach((b, i) => {
     const end = i < d.blocks.length - 1 ? ',' : '';

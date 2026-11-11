@@ -161,6 +161,7 @@ export function CommentThread({
   aiBusy,
   readOnly,
   className,
+  startEdit,
 }: {
   comment: Comment;
   /** The one picked (its words are picked in the page): drawn raised, with its reply field open. */
@@ -177,6 +178,8 @@ export function CommentThread({
   aiBusy?: boolean;
   readOnly?: boolean;
   className?: string;
+  /** Changes (a time) when the comment is asked to open for editing from elsewhere (an editor's right-click menu). */
+  startEdit?: number;
 }) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -187,6 +190,10 @@ export function CommentThread({
   useEffect(() => {
     if (!active) setReplying(false);
   }, [active]);
+  useEffect(() => {
+    if (startEdit && onEdit && isMine(c) && !c.author) setEditing(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startEdit]);
   return (
     <div
       onClick={onFocus}

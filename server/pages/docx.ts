@@ -158,6 +158,8 @@ export interface DocLook {
    * Japanese or Korean words (given an East Asian font).
    */
   editor?: { cjk?: boolean };
+  /** The language its text is in (a tag: "en-US", "el"): its default run properties say so, for Word's proofing. */
+  lang?: string;
 }
 
 export interface Extracted {
@@ -1726,7 +1728,7 @@ export function editorStylesXml(look: DocLook, cjk: boolean): string {
   const wide = Math.round(-0.01 * title.sz * 20);
   return (
     `${XML_HEAD}<w:styles xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14">` +
-    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${(look.styles?.normal?.color ?? `#${ED.ink}`).slice(1).toUpperCase()}"/><w:kern w:val="2"/>${size(half(S))}` +
+    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${(look.styles?.normal?.color ?? `#${ED.ink}`).slice(1).toUpperCase()}"/><w:kern w:val="2"/>${size(half(S))}${langXml(look.lang ?? '')}` +
     '<w14:ligatures w14:val="standardContextual"/></w:rPr></w:rPrDefault>' +
     `<w:pPrDefault><w:pPr><w:widowControl/>${spOf('Normal')}</w:pPr></w:pPrDefault></w:docDefaults>` +
     `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/>${jcOwn('normal') ? `<w:pPr>${jcOwn('normal')}</w:pPr>` : ''}${look.styles?.normal?.b || look.styles?.normal?.i ? `<w:rPr>${look.styles.normal.b ? '<w:b/><w:bCs/>' : ''}${look.styles.normal.i ? '<w:i/><w:iCs/>' : ''}</w:rPr>` : ''}</w:style>` +

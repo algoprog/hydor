@@ -20,6 +20,8 @@ export interface CommentActions {
   edit: (id: string, text: string) => void;
   remove: (id: string) => void;
   readOnly?: boolean;
+  /** A comment asked to open for editing (the right-click menu's Edit): its id, and a time that changes with each ask. */
+  startEdit?: { id: string; n: number } | null;
 }
 
 /** Resolve with AI: on a comment, on all the open ones, on a new one as it is written; and the ones an agent is at work on. */
@@ -156,6 +158,7 @@ export function CommentsColumn({
               onReply={(t) => a.reply(it.id, t)}
               onResolve={(r) => a.resolve(it.id, r)}
               onEdit={(t) => a.edit(it.id, t)}
+              startEdit={a.startEdit?.id === it.id ? a.startEdit.n : undefined}
               onDelete={() => a.remove(it.id)}
               onAi={ai ? () => ai.one(it.id) : undefined}
               aiBusy={ai?.busy.has(it.id)}
@@ -236,6 +239,7 @@ export function CommentsPanel({
               onReply={(t) => a.reply(c.id, t)}
               onResolve={(r) => a.resolve(c.id, r)}
               onEdit={(t) => a.edit(c.id, t)}
+              startEdit={a.startEdit?.id === c.id ? a.startEdit.n : undefined}
               onDelete={() => a.remove(c.id)}
               onAi={ai ? () => ai.one(c.id) : undefined}
               aiBusy={ai?.busy.has(c.id)}

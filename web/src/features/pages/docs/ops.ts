@@ -666,6 +666,16 @@ const mapBlocks = (doc: Doc, idx: number[], f: (b: TextBlock) => Block): Doc => 
   return withBlocks(doc, blocks);
 };
 
+/** The sizes (points) Ctrl+Shift+> and Ctrl+Shift+< step through, as Google Docs' do. */
+export const SIZE_STEPS = [8, 9, 10, 11, 12, 14, 18, 24, 30, 36, 48, 60, 72, 96];
+
+/** The next size up (or down) from `cur` in the usual sizes; beyond them, twelve points at a time (between 1 and 400). */
+export function stepSize(cur: number, dir: 1 | -1): number {
+  const next = dir > 0 ? SIZE_STEPS.find((x) => x > cur + 0.01) : [...SIZE_STEPS].reverse().find((x) => x < cur - 0.01);
+  if (next !== undefined) return next;
+  return Math.max(1, Math.min(400, dir > 0 ? Math.max(cur, 96) + 12 : Math.min(cur, 8) - 1));
+}
+
 /** A paragraph style for the text blocks between two places (a list's items become paragraphs, but for normal text). */
 export function setStyle(doc: Doc, s: Pos, e: Pos, style: ParaStyle): Doc {
   const idx = textBlocksIn(doc, s, e);
@@ -830,6 +840,60 @@ export function tableOp(doc: Doc, id: string, cell: [number, number], op: TableO
       break;
   }
   return { doc: withBlock(doc, i, next), at };
+}
+
+/**
+ * A change to a table's rows or columns for all of those the cells picked (from `a` to `f`) are in: as many rows or
+ * columns put in as are picked (above or below the picked ones, left or right of them), every one picked taken out
+ * (the table with them when all are). One cell picked is `tableOp`. Each row or column is dealt with at a cell of its
+ * own, so a merged cell passing through does not stand for the row it begins in.
+ */
+export function tableOps(doc: Doc, id: string, a: [number, number], f: [number, number], op: TableOp): Edit {
+  const t = blockOf(doc, id);
+  if (t?.type !== 'table') return { doc, at: firstPos(doc) };
+  const [r0, r1] = [Math.min(a[0], f[0]), Math.max(a[0], f[0])];
+  const [c0, c1] = [Math.min(a[1], f[1]), Math.max(a[1], f[1])];
+  const rows = r1 - r0 + 1;
+  const cols = c1 - c0 + 1;
+  if ((rows === 1 && cols === 1) || op === 'head' || op === 'delTable') return tableOp(doc, id, a, op);
+  let e: Edit = { doc, at: { b: id, c: a, o: 0 } };
+  const again = (n: number, cell: [number, number], o: TableOp) => {
+    for (let k = 0; k < n; k++) e = tableOp(e.doc, id, cell, o);
+  };
+  switch (op) {
+    case 'rowAbove':
+      again(rows, [r0, c0], op);
+      break;
+    case 'rowBelow':
+      again(rows, [r1, c0], op);
+      break;
+    case 'colLeft':
+      again(cols, [r0, c0], op);
+      break;
+    case 'colRight':
+      again(cols, [r0, c1], op);
+      break;
+    case 'delRow': {
+      if (rows >= t.rows.length) return removeBlock(doc, id);
+      // From the last row up, so those still to go keep their places; each at a cell that starts in its own row.
+      for (let r = r1; r >= r0; r--) {
+        const cur = blockOf(e.doc, id) as TableBlock;
+        const c = cur.rows[r].findIndex((_, ci) => cellOwner(cur, [r, ci])[0] === r);
+        e = tableOp(e.doc, id, [r, Math.max(0, c)], op);
+      }
+      break;
+    }
+    case 'delCol': {
+      if (cols >= (t.rows[0]?.length ?? 0)) return removeBlock(doc, id);
+      for (let c = c1; c >= c0; c--) {
+        const cur = blockOf(e.doc, id) as TableBlock;
+        const r = cur.rows.findIndex((_, ri) => cellOwner(cur, [ri, c])[1] === c);
+        e = tableOp(e.doc, id, [Math.max(0, r), c], op);
+      }
+      break;
+    }
+  }
+  return e;
 }
 
 /** Tab in a table: the next cell (a new row after the last), or with Shift the one before. */

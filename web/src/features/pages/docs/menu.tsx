@@ -3,6 +3,9 @@
 // picture, a table's size, zoom, line spacing, a table's cells…) open in the menu's place. What a menu does is the
 // engine's, or the editor's (a dialog, a panel): this file only says what is where.
 import {
+  ArrowDown,
+  ArrowUp,
+  CopyPlus,
   ChartScatter,
   CheckCheck,
   GitCompareArrows,
@@ -73,6 +76,7 @@ import {
 } from 'lucide-react';
 import { CALLOUT_TINTS, CITE_STYLES, LINE_SPACINGS, PARA_STYLES, STYLES, type CiteStyle, type Doc } from '@shared/docs';
 import { CITE_STYLE_NAMES } from '@shared/doc-cite';
+import { tr } from '../../../i18n/runtime';
 import type { MenuDef, MenuEntry } from '../common/menus';
 import type { DocEngine, SelState } from './engine';
 
@@ -171,8 +175,85 @@ export interface DocMenuCtx {
   ai?: { write: () => void; proofread: () => void; tone: () => void; translate: () => void; ask: boolean; toggleAsk: () => void; busy: boolean };
   ghost?: boolean;
   setGhost?: (on: boolean) => void;
+  /** Tools → Automatic links, and Smart quotes and symbols (remembered on this device); Tools → Language. */
+  autoLinks: boolean;
+  setAutoLinks: (on: boolean) => void;
+  smart: boolean;
+  setSmart: (on: boolean) => void;
+  language: () => void;
   /** Tools → Voice typing and Read aloud. */
   voice?: { dictate: () => void; typing: boolean; read: () => void; reading: boolean; canDictate: boolean; canRead: boolean };
+}
+
+/** A sentence with its number put in ("Delete {n} rows" → "Delete 3 rows"); the words are translated first, as the app is read in. */
+const nth = (words: string, n: number) => tr(words).replace('{n}', String(n));
+
+/**
+ * What the caret's table offers (the Format → Table list, and the right-click menu in a cell): rows and columns put in
+ * or taken out (as many as the cells picked are in, said by their number), cells merged, their colour and where the
+ * words sit, the header row, a plot of it, the table itself taken out.
+ */
+export function tableEntries(c: DocMenuCtx): MenuEntry[] {
+  const { engine: e, st } = c;
+  const t = st.block?.type === 'table' ? st.block : null;
+  if (!t) return [];
+  const cellOf = st.cell ? t.rows[st.cell[0]]?.[st.cell[1]] : null;
+  const merged = !!cellOf && !!(cellOf.rs || cellOf.cs);
+  const many = !!st.cells && (st.cells.a[0] !== st.cells.f[0] || st.cells.a[1] !== st.cells.f[1]);
+  const { rows, cols } = st.cells ? { rows: Math.abs(st.cells.a[0] - st.cells.f[0]) + 1, cols: Math.abs(st.cells.a[1] - st.cells.f[1]) + 1 } : { rows: 1, cols: 1 };
+  return [
+    { label: rows > 1 ? nth('Insert {n} rows above', rows) : 'Insert a row above', run: () => e.table('rowAbove') },
+    { label: rows > 1 ? nth('Insert {n} rows below', rows) : 'Insert a row below', run: () => e.table('rowBelow') },
+    { label: cols > 1 ? nth('Insert {n} columns on the left', cols) : 'Insert a column on the left', run: () => e.table('colLeft') },
+    { label: cols > 1 ? nth('Insert {n} columns on the right', cols) : 'Insert a column on the right', run: () => e.table('colRight') },
+    '-',
+    { label: 'Merge cells', disabled: !many, run: () => e.mergeCells() },
+    { label: 'Unmerge cells', disabled: !merged, run: () => e.unmergeCell() },
+    {
+      label: 'Cell colour',
+      items: [{ label: 'No colour', checked: !cellOf?.fill, run: () => e.cells({ fill: undefined }) }, ...FILLS.map(([v, l]) => ({ label: l, checked: cellOf?.fill === v, also: 'fill shading', run: () => e.cells({ fill: v }) }))],
+    },
+    {
+      label: 'Vertical alignment',
+      items: [
+        { label: 'At the top of the cell', checked: !cellOf?.va, run: () => e.cells({ va: undefined }) },
+        { label: 'In the middle of the cell', checked: cellOf?.va === 'middle', run: () => e.cells({ va: 'middle' }) },
+        { label: 'At the bottom of the cell', checked: cellOf?.va === 'bottom', run: () => e.cells({ va: 'bottom' }) },
+      ],
+    },
+    { label: 'Header row', checked: !!t.head, run: () => e.table('head') },
+    { label: 'Make a plot of this table', icon: <ChartScatter size={15} />, also: 'chart graph', disabled: c.readOnly, run: c.plot },
+    '-',
+    { label: rows > 1 ? nth('Delete {n} rows', rows) : 'Delete the row', run: () => e.table('delRow') },
+    { label: cols > 1 ? nth('Delete {n} columns', cols) : 'Delete the column', run: () => e.table('delCol') },
+    { label: 'Delete the table', icon: <Trash2 size={15} />, danger: true, run: () => e.table('delTable') },
+  ];
+}
+
+/** The paragraph styles as a list (Format → Paragraph styles, and the right-click menu): the caret's ticked, and the styles' own settings below when the editor has them. */
+export function styleEntries(c: DocMenuCtx, more = true): MenuEntry[] {
+  const { engine: e, st } = c;
+  return [
+    ...PARA_STYLES.map((k) => ({ label: STYLES[k].label, checked: st.style === k && !st.list, run: () => e.style(k) })),
+    ...(more && c.styles
+      ? ([
+          '-',
+          { label: `Update “${(STYLES[st.style] ?? STYLES.normal).label}” to match`, disabled: c.readOnly || !!st.list || !!st.cell || st.block?.type !== 'p', also: 'style match update heading look', run: c.styles.match },
+          { label: 'Change the styles', also: 'style styles font size colour heading look modify', disabled: c.readOnly, run: c.styles.open },
+          { label: 'Reset the styles', also: 'style styles default', disabled: c.readOnly || !c.doc.styles, run: c.styles.reset },
+        ] as MenuEntry[])
+      : []),
+  ];
+}
+
+/** The words' case, as a list: UPPERCASE, lowercase, Title Case, Sentence case. */
+export function caseEntries(e: DocEngine): MenuEntry[] {
+  return [
+    { label: 'UPPERCASE', also: 'capital letters case', run: () => e.setCase('upper') },
+    { label: 'lowercase', also: 'small letters case', run: () => e.setCase('lower') },
+    { label: 'Title Case', also: 'capitalise case', run: () => e.setCase('title') },
+    { label: 'Sentence case', also: 'case', run: () => e.setCase('sentence') },
+  ];
 }
 
 /** The editor's menus, for what is where the caret is now. */
@@ -182,9 +263,6 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
   const inCallout = st.block?.type === 'p' && st.block.style === 'callout' ? st.block : null;
   const sp = st.block && (st.block.type === 'p' || st.block.type === 'li') ? st.block : null;
   const lh = sp?.lh;
-  const cellOf = t && st.cell ? t.rows[st.cell[0]]?.[st.cell[1]] : null;
-  const merged = !!cellOf && !!(cellOf.rs || cellOf.cs);
-  const many = !!st.cells && (st.cells.a[0] !== st.cells.f[0] || st.cells.a[1] !== st.cells.f[1]);
 
   const edit: MenuEntry[] = [
     { label: 'Undo', icon: <Undo2 size={15} />, keys: 'Ctrl+Z', disabled: !st.canUndo, run: () => e.undo() },
@@ -198,6 +276,11 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Select all', keys: 'Ctrl+A', run: () => document.execCommand('selectAll') },
     { label: 'Find', icon: <Search size={15} />, keys: 'Ctrl+F', also: 'search', run: () => c.find(false) },
     { label: 'Find and replace', icon: <Search size={15} />, keys: 'Ctrl+H', also: 'search replace', run: () => c.find(true) },
+    '-',
+    // What the handle by a block does, for where the caret is (a phone has no handle).
+    { label: 'Duplicate the paragraph', icon: <CopyPlus size={15} />, also: 'copy block', disabled: c.readOnly || !st.block, run: () => st.block && e.duplicateBlock(st.block.id) },
+    { label: 'Move the paragraph up', icon: <ArrowUp size={15} />, also: 'block', disabled: c.readOnly || !st.block || st.index === 0, run: () => st.block && e.moveBlockBy(st.block.id, -1) },
+    { label: 'Move the paragraph down', icon: <ArrowDown size={15} />, also: 'block', disabled: c.readOnly || !st.block, run: () => st.block && e.moveBlockBy(st.block.id, 1) },
   ];
 
   const view: MenuEntry[] = [
@@ -311,11 +394,10 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'Superscript', icon: <Superscript size={15} />, keys: 'Ctrl+.', checked: st.on.sup, run: () => e.toggle('sup') },
     { label: 'Subscript', icon: <Subscript size={15} />, keys: 'Ctrl+,', checked: st.on.sub, run: () => e.toggle('sub') },
     { label: 'Code', checked: st.on.code, also: 'monospace', run: () => e.toggle('code') },
+    { label: 'Bigger text', keys: 'Ctrl+Shift+>', also: 'font size larger increase', run: () => e.bigger(1) },
+    { label: 'Smaller text', keys: 'Ctrl+Shift+<', also: 'font size decrease reduce', run: () => e.bigger(-1) },
     '-',
-    { label: 'UPPERCASE', also: 'capital letters case', run: () => e.setCase('upper') },
-    { label: 'lowercase', also: 'small letters case', run: () => e.setCase('lower') },
-    { label: 'Title Case', also: 'capitalise case', run: () => e.setCase('title') },
-    { label: 'Sentence case', also: 'case', run: () => e.setCase('sentence') },
+    ...caseEntries(e),
   ];
 
   const spacing: MenuEntry[] = [
@@ -328,53 +410,11 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     { label: 'As the style has it', disabled: lh === undefined && sp?.sb === undefined && sp?.sa === undefined, also: 'reset spacing', run: () => e.spacing({ lh: undefined, sb: undefined, sa: undefined }) },
   ];
 
-  const table: MenuEntry[] = t
-    ? [
-        { label: 'Insert a row above', run: () => e.table('rowAbove') },
-        { label: 'Insert a row below', run: () => e.table('rowBelow') },
-        { label: 'Insert a column on the left', run: () => e.table('colLeft') },
-        { label: 'Insert a column on the right', run: () => e.table('colRight') },
-        '-',
-        { label: 'Merge cells', disabled: !many, run: () => e.mergeCells() },
-        { label: 'Unmerge cells', disabled: !merged, run: () => e.unmergeCell() },
-        {
-          label: 'Cell colour',
-          items: [{ label: 'No colour', checked: !cellOf?.fill, run: () => e.cells({ fill: undefined }) }, ...FILLS.map(([v, l]) => ({ label: l, checked: cellOf?.fill === v, also: 'fill shading', run: () => e.cells({ fill: v }) }))],
-        },
-        {
-          label: 'Vertical alignment',
-          items: [
-            { label: 'At the top of the cell', checked: !cellOf?.va, run: () => e.cells({ va: undefined }) },
-            { label: 'In the middle of the cell', checked: cellOf?.va === 'middle', run: () => e.cells({ va: 'middle' }) },
-            { label: 'At the bottom of the cell', checked: cellOf?.va === 'bottom', run: () => e.cells({ va: 'bottom' }) },
-          ],
-        },
-        { label: 'Header row', checked: !!t.head, run: () => e.table('head') },
-        { label: 'Make a plot of this table', icon: <ChartScatter size={15} />, also: 'chart graph', disabled: c.readOnly, run: c.plot },
-        '-',
-        { label: 'Delete the row', run: () => e.table('delRow') },
-        { label: 'Delete the column', run: () => e.table('delCol') },
-        { label: 'Delete the table', icon: <Trash2 size={15} />, danger: true, run: () => e.table('delTable') },
-      ]
-    : [];
+  const table: MenuEntry[] = tableEntries(c);
 
   const format: MenuEntry[] = [
     { label: 'Text', icon: <Type size={15} />, items: text },
-    {
-      label: 'Paragraph styles',
-      icon: <Heading size={15} />,
-      items: [
-        ...PARA_STYLES.map((k) => ({ label: STYLES[k].label, checked: st.style === k && !st.list, run: () => e.style(k) })),
-        ...(c.styles
-          ? ([
-              '-',
-              { label: `Update “${(STYLES[st.style] ?? STYLES.normal).label}” to match`, disabled: c.readOnly || !!st.list || !!st.cell || st.block?.type !== 'p', also: 'style match update heading look', run: c.styles.match },
-              { label: 'Change the styles', also: 'style styles font size colour heading look modify', disabled: c.readOnly, run: c.styles.open },
-              { label: 'Reset the styles', also: 'style styles default', disabled: c.readOnly || !c.doc.styles, run: c.styles.reset },
-            ] as MenuEntry[])
-          : []),
-      ],
-    },
+    { label: 'Paragraph styles', icon: <Heading size={15} />, items: styleEntries(c) },
     {
       label: 'Align and indent',
       icon: <AlignLeft size={15} />,
@@ -384,8 +424,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
         { label: 'Align right', icon: <AlignRight size={15} />, keys: 'Ctrl+Shift+R', checked: st.align === 'right', run: () => e.align('right') },
         { label: 'Justify', icon: <AlignJustify size={15} />, keys: 'Ctrl+Shift+J', checked: st.align === 'justify', run: () => e.align('justify') },
         '-',
-        { label: 'Less indent', icon: <IndentDecrease size={15} />, keys: 'Shift+Tab', run: () => e.indent(-1) },
-        { label: 'More indent', icon: <IndentIncrease size={15} />, keys: 'Tab', run: () => e.indent(1) },
+        { label: 'Less indent', icon: <IndentDecrease size={15} />, keys: 'Ctrl+[', run: () => e.indent(-1) },
+        { label: 'More indent', icon: <IndentIncrease size={15} />, keys: 'Ctrl+]', run: () => e.indent(1) },
       ],
     },
     { label: 'Line and paragraph spacing', icon: <Pilcrow size={15} />, also: 'line height', items: spacing },
@@ -416,6 +456,8 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
     },
     '-',
     { label: 'Format painter', icon: <PaintRoller size={15} />, checked: !!e.paint, also: 'copy formatting', run: c.painter },
+    { label: 'Copy the formatting', keys: 'Ctrl+Alt+C', also: 'format painter copy look style', run: () => e.copyFormat() },
+    { label: 'Paste the formatting', keys: 'Ctrl+Alt+V', also: 'format painter paste look style', disabled: c.readOnly, run: () => e.pasteFormat() },
     { label: 'Clear the formatting', icon: <Eraser size={15} />, keys: 'Ctrl+\\', run: () => e.clear() },
     '-',
     { label: 'Page setup', icon: <FileCog size={15} />, also: 'paper margins font size', run: c.pageSetup },
@@ -432,6 +474,11 @@ export function docMenus(c: DocMenuCtx): MenuDef[] {
           { label: 'Ask about this document', icon: <MessageCircleQuestion size={15} />, checked: c.ai.ask, also: 'ai question answer', run: c.ai.toggleAsk },
         ] as MenuEntry[])
       : []),
+    '-',
+    { label: 'Automatic links', checked: c.autoLinks, also: 'preferences typed web address url link automatically', run: () => c.setAutoLinks(!c.autoLinks) },
+    { label: 'Smart quotes and symbols', checked: c.smart, also: 'preferences curly quotes dashes arrows ellipsis copyright automatic substitution', run: () => c.setSmart(!c.smart) },
+    { label: 'Language', icon: <Languages size={15} />, also: 'spelling spell check proofing document language', disabled: c.readOnly, run: c.language },
+    '-',
     { label: 'Keyboard shortcuts', icon: <Keyboard size={15} />, keys: 'Ctrl+/', run: c.shortcuts },
     ...(c.voice
       ? ([
