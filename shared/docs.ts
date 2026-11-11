@@ -30,7 +30,12 @@ export const ASSET = 'naget-asset:';
 export type Align = 'left' | 'center' | 'right' | 'justify';
 export type ParaStyle = 'normal' | 'title' | 'subtitle' | 'h1' | 'h2' | 'h3' | 'h4' | 'quote' | 'code' | 'callout';
 export type ListKind = 'bullet' | 'number' | 'check';
-export type PaperSize = 'a4' | 'letter';
+/** How a numbered list counts: 1. 2. 3., a. b. c., i. ii. iii., A. B. C. or I. II. III. */
+export type NumFmt = 'decimal' | 'lower-alpha' | 'lower-roman' | 'upper-alpha' | 'upper-roman';
+export const NUM_FMTS: NumFmt[] = ['decimal', 'lower-alpha', 'lower-roman', 'upper-alpha', 'upper-roman'];
+export type PaperSize = 'a4' | 'letter' | 'legal' | 'a3' | 'a5';
+/** The paper sizes a document can be on, the usual one first. */
+export const PAPER_SIZES: PaperSize[] = ['a4', 'letter', 'legal', 'a3', 'a5'];
 
 export interface Run {
   t: string;
@@ -125,6 +130,12 @@ export interface ItemBlock extends Spacing, Suggested {
   list: ListKind;
   /** A checklist's item, ticked. */
   checked?: boolean;
+  /** A numbered item: how its list counts (the first item's, for the whole list); left out: by its level, 1. then a. then i. */
+  fmt?: NumFmt;
+  /** A numbered item: the number it has, which starts a list of its own from there (Restart numbering is 1, Start at N). */
+  start?: number;
+  /** A numbered item: its list goes on from the number the one before it left off at (Continue numbering). */
+  cont?: boolean;
   /** How deep in the list, 0–4. */
   lvl?: number;
   align?: Align;
@@ -312,6 +323,15 @@ export interface Doc {
   styles?: Partial<Record<ParaStyle, StyleLook>>;
   /** A watermark on every page. */
   mark?: Watermark;
+  /** The language its words are in (a tag such as "en-US" or "el"): the editor's spell check, and the language Word files say their text is in. Left out: not said. */
+  lang?: string;
+}
+
+/** A language tag as a document keeps it ("en-us" → "en-US", "EL" → "el"), or undefined when it is not one. */
+export function docLang(v: unknown): string | undefined {
+  if (typeof v !== 'string' || !/^[a-z]{2,3}([-_][a-z0-9]{2,8}){0,3}$/i.test(v.trim())) return undefined;
+  const [first, ...rest] = v.trim().split(/[-_]/);
+  return [first.toLowerCase(), ...rest.map((p) => (p.length === 2 ? p.toUpperCase() : p.length === 4 ? p[0].toUpperCase() + p.slice(1).toLowerCase() : p))].join('-');
 }
 
 // ---- how documents look --------------------------------------------------------------------------------
@@ -320,6 +340,9 @@ export interface Doc {
 export const PAPERS: Record<PaperSize, { w: number; h: number; label: string }> = {
   a4: { w: 210, h: 297, label: 'A4' },
   letter: { w: 215.9, h: 279.4, label: 'US Letter' },
+  legal: { w: 215.9, h: 355.6, label: 'US Legal' },
+  a3: { w: 297, h: 420, label: 'A3' },
+  a5: { w: 148, h: 210, label: 'A5' },
 };
 
 /** A document's sheet as it lies, in millimetres: its paper, on its side when landscape. */
@@ -444,16 +467,26 @@ function letters(n: number): string {
   return s;
 }
 
-/** A numbered item's mark at a level: 1. a. i. as Word numbers them. */
-export const numberLabel = (n: number, lvl: number) => `${lvl % 3 === 0 ? n : lvl % 3 === 1 ? letters(n) : roman(n)}.`;
+/** The format a numbered list has at a level when it names none: 1. then a. then i., as Word numbers them. */
+export const defaultNumFmt = (lvl: number): NumFmt => (lvl % 3 === 0 ? 'decimal' : lvl % 3 === 1 ? 'lower-alpha' : 'lower-roman');
+
+/** A numbered item's mark: 1. a. i. A. I. (by its level, as Word numbers them, unless a format is given). */
+export function numberLabel(n: number, lvl: number, fmt: NumFmt = defaultNumFmt(lvl)): string {
+  const s = fmt === 'decimal' ? String(n) : fmt === 'lower-alpha' ? letters(n) : fmt === 'lower-roman' ? roman(n) : fmt === 'upper-alpha' ? letters(n).toUpperCase() : roman(n).toUpperCase();
+  return `${s}.`;
+}
 
 /**
  * Each block's list mark ("3.", "b.", "•"; '' for others and checklists) and, for numbered items, which list it
  * counts in (a list starts again after anything that is not a list item, and where another kind of item comes
  * at its level).
  */
-export function listInfo(blocks: Block[]): { labels: string[]; groups: number[]; counts: number[] } {
+export function listInfo(blocks: Block[]): { labels: string[]; groups: number[]; counts: number[]; fmts: NumFmt[] } {
   const labels: string[] = new Array(blocks.length).fill('');
+  const fmts: NumFmt[] = new Array(blocks.length).fill('decimal');
+  // The last numbered list at each level, kept across what breaks lists (Continue numbering goes on from it).
+  const memo: { count: number; group: number; fmt: NumFmt }[] = [];
+  const fmt: NumFmt[] = [];
   const groups: number[] = new Array(blocks.length).fill(0);
   const counts: number[] = new Array(blocks.length).fill(0);
   const count: number[] = [];
@@ -471,17 +504,32 @@ export function listInfo(blocks: Block[]): { labels: string[]; groups: number[];
     count.length = Math.min(count.length, L + 1);
     kind.length = Math.min(kind.length, L + 1);
     group.length = Math.min(group.length, L + 1);
-    if (kind[L] !== b.list || count[L] === undefined) {
-      count[L] = 0;
+    fmt.length = Math.min(fmt.length, L + 1);
+    const numbered = b.list === 'number';
+    if (kind[L] !== b.list || count[L] === undefined || (numbered && b.start !== undefined)) {
+      // An item that goes on from the list before it (Continue numbering) is in that list; else a new list starts here, from 1 or from its own number.
+      const back = numbered && b.cont && b.start === undefined ? memo[L] : undefined;
+      if (back) {
+        count[L] = back.count;
+        group[L] = back.group;
+        fmt[L] = back.fmt;
+      } else {
+        count[L] = numbered && b.start !== undefined ? b.start - 1 : 0;
+        group[L] = ++next;
+        fmt[L] = (numbered && b.fmt) || defaultNumFmt(L);
+      }
       kind[L] = b.list;
-      group[L] = ++next;
     }
     count[L]++;
-    labels[i] = b.list === 'number' ? numberLabel(count[L], L) : b.list === 'bullet' ? BULLETS[L % 3] : '';
+    labels[i] = numbered ? numberLabel(count[L], L, fmt[L]) : b.list === 'bullet' ? BULLETS[L % 3] : '';
     groups[i] = group[L];
     counts[i] = count[L];
+    if (numbered) {
+      fmts[i] = fmt[L];
+      memo[L] = { count: count[L], group: group[L], fmt: fmt[L] };
+    }
   });
-  return { labels, groups, counts };
+  return { labels, groups, counts, fmts };
 }
 
 // ---- checking values ---------------------------------------------------------------------------------------
@@ -853,6 +901,13 @@ function item(v: Obj, list: ListKind, used: Set<string>, words: unknown): ItemBl
   spacingOf(v, b);
   const bm = bookmarkOf(v.bm ?? v.bookmark);
   if (bm) b.bm = bm;
+  if (list === 'number') {
+    const fmt = pick(v.fmt ?? v.format, NUM_FMTS);
+    if (fmt) b.fmt = fmt;
+    const start = Math.round(num(v.start, 0, 9999, -1));
+    if (start >= 0) b.start = start;
+    else if (v.cont === true || v.continue === true) b.cont = true;
+  }
   b.runs = cleanRuns(words);
   // "[x] Done" written into a checklist's item.
   if (list === 'check' && b.runs[0]) {
@@ -1117,7 +1172,7 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   }
   if (!isObj(v) || (typeof v.markdown !== 'string' && !Array.isArray(v.blocks))) throw new Error('A document needs markdown (a string) or blocks (an array).');
   const pg = typeof v.page === 'string' ? { size: v.page } : isObj(v.page) ? v.page : {};
-  const size = pick(String(pg.size ?? pg.paper ?? v.paper ?? '').toLowerCase(), ['a4', 'letter'] as const) ?? DOC_DEFAULTS.page.size;
+  const size = pick(String(pg.size ?? pg.paper ?? v.paper ?? '').toLowerCase(), PAPER_SIZES) ?? DOC_DEFAULTS.page.size;
   const margin = Math.min(60, Math.max(5, Math.round((mmOf(pg.margin ?? v.margin) ?? DOC_DEFAULTS.page.margin) * 10) / 10));
   const used = new Set<string>();
   // Footnotes written in the Markdown or among the blocks, then those given as notes.
@@ -1145,6 +1200,8 @@ export function normalizeDoc(input: unknown, o: NormalizeOpts = {}): Doc {
   if (cite && cite !== 'apa') d.cite = cite;
   const styles = cleanStyles(v.styles);
   if (styles) d.styles = styles;
+  const lang = docLang(v.lang ?? v.language);
+  if (lang) d.lang = lang;
   const given = Array.isArray(v.notes) ? v.notes : [];
   return withNotes(withSuggestions(withComments(d, v.comments), v.suggestions), [...[...written].map(([id, runs]) => ({ id, runs })), ...given]);
 }
@@ -1510,7 +1567,7 @@ export function newDoc(title = ''): Doc {
  */
 export function docText(d: Doc): string {
   const bands = `${d.header ? `,"header":${JSON.stringify(d.header)}` : ''}${d.footer ? `,"footer":${JSON.stringify(d.footer)}` : ''}${d.titlePage ? ',"titlePage":true' : ''}`;
-  const more = `${d.mark ? `,"mark":${JSON.stringify(d.mark)}` : ''}${d.cite ? `,"cite":${JSON.stringify(d.cite)}` : ''}${d.styles ? `,"styles":${JSON.stringify(d.styles)}` : ''}`;
+  const more = `${d.mark ? `,"mark":${JSON.stringify(d.mark)}` : ''}${d.cite ? `,"cite":${JSON.stringify(d.cite)}` : ''}${d.styles ? `,"styles":${JSON.stringify(d.styles)}` : ''}${d.lang ? `,"lang":${JSON.stringify(d.lang)}` : ''}`;
   const out: string[] = [`{"v":1,"page":${JSON.stringify(d.page)},"font":${JSON.stringify(d.font)},"size":${d.size}${bands}${more},"blocks":[`];
   d.blocks.forEach((b, i) => {
     const end = i < d.blocks.length - 1 ? ',' : '';

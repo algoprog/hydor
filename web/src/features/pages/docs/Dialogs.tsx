@@ -1,7 +1,8 @@
 // The documents editor's dialogs and small boxes: the word count (of the document, or of the words picked: words,
 // characters with and without spaces, paragraphs, pages and reading time), custom line and paragraph spacing, the
-// header and footer (with the page's number and count, and a first page without them), and the box an equation is
-// written in, LaTeX with its preview drawn as it is typed.
+// header and footer (with the page's number and count, and a first page without them), the language the words are in
+// (the browser's spell check and Word's proofing go by it), and the box an equation is written in, LaTeX with its
+// preview drawn as it is typed.
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Hash } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
@@ -9,6 +10,7 @@ import { Button, cx, Dialog, inputCls, Segmented, Switch } from '../../../compon
 import type { Band } from '@shared/docs';
 import { useTexHtml } from '../common/katex';
 import { NumInput } from '../slides/controls';
+import { Select } from '../studio/fields';
 
 export interface Counts {
   words: number;
@@ -277,5 +279,102 @@ export function EquationBox({ initial, display, onDone, onRemove, onCancel }: { 
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Format → Bullets and numbering → Start at: the number the picked item's list is to start from (from that item on). */
+export function NumberStartDialog({ open, onClose, value, onApply }: { open: boolean; onClose: () => void; value: number; onApply: (n: number) => void }) {
+  const [n, setN] = useState(value);
+  useEffect(() => {
+    if (open) setN(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Start at"
+      width={340}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => (onApply(n), onClose())}>
+            Apply
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-center gap-3">
+        <span className="min-w-0 flex-1 text-[13.5px] text-fg-2">The number this item has</span>
+        <NumInput value={n} onChange={setN} min={0} max={9999} step={1} label="The number this item has" className="w-[120px]" />
+      </div>
+    </Dialog>
+  );
+}
+
+/** The languages the document's words can be said to be in: their tags, and their names in their own words. */
+export const DOC_LANGUAGES: [string, string][] = [
+  ['en-US', 'English (US)'],
+  ['en-GB', 'English (UK)'],
+  ['el', 'Ελληνικά'],
+  ['de', 'Deutsch'],
+  ['fr', 'Français'],
+  ['es', 'Español'],
+  ['it', 'Italiano'],
+  ['pt', 'Português'],
+  ['nl', 'Nederlands'],
+  ['sv', 'Svenska'],
+  ['pl', 'Polski'],
+  ['cs', 'Čeština'],
+  ['tr', 'Türkçe'],
+  ['ru', 'Русский'],
+  ['uk', 'Українська'],
+  ['ar', 'العربية'],
+  ['he', 'עברית'],
+  ['hi', 'हिन्दी'],
+  ['zh-CN', '简体中文'],
+  ['zh-TW', '繁體中文'],
+  ['ja', '日本語'],
+  ['ko', '한국어'],
+];
+
+/** Tools → Language: the language the document's words are in (none: not said; the browser then guesses by its own). */
+export function LanguageDialog({ open, onClose, value, onApply }: { open: boolean; onClose: () => void; value: string | undefined; onApply: (lang: string | undefined) => void }) {
+  const [lang, setLang] = useState(value ?? '');
+  useEffect(() => {
+    if (open) setLang(value ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  // A tag of a language not in the list (an agent's, a Word file's) stays choosable as it is.
+  const known = !lang || DOC_LANGUAGES.some(([t]) => t === lang);
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Language"
+      width={380}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => (onApply(lang || undefined), onClose())}>
+            Apply
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-[13px] leading-relaxed text-fg-3">The language the words are in. The browser checks the spelling by it, and Word files say their text is in it.</p>
+        <Select
+          value={lang}
+          title="The document’s language"
+          onChange={setLang}
+          options={[{ value: '', label: 'Not set' }, ...(known ? [] : [{ value: lang, label: lang }]), ...DOC_LANGUAGES.map(([t, name]) => ({ value: t, label: name }))]}
+        />
+      </div>
+    </Dialog>
   );
 }

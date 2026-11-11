@@ -25,7 +25,19 @@ import { XML_HEAD, coreXml, esc, imageSize, relsXml, zipParts, type ZipPart } fr
 import { altNameOf, fontInfo, fontKey, obfuscate, wordLine, type EmbeddedFont } from './word-fonts.ts';
 import { CAPTION, CELL, LIST_TEXT, STEP, TOC_PAD, wordLineOf, type WordLine } from './word-layout.ts';
 import { bookmarked, citationXml, fieldXml, footnoteRefXml, footnotesXml, notesStylesXml, seqName, sourcesPropsXml, sourcesXml, watermarkRun } from './docx-parts.ts';
-import { styleOf, type CiteStyle, type Doc, type Source } from '../../shared/docs.ts';
+import { styleOf, type CiteStyle, type Doc, type NumFmt, type PaperSize, type Source } from '../../shared/docs.ts';
+
+/** Word's names for how a list counts. */
+const WORD_FMT: Record<NumFmt, string> = { decimal: 'decimal', 'lower-alpha': 'lowerLetter', 'lower-roman': 'lowerRoman', 'upper-alpha': 'upperLetter', 'upper-roman': 'upperRoman' };
+
+/** Paper sizes in twentieths of a point, as Word's page size has them. */
+export const PAPER_TWIPS: Record<PaperSize, { w: number; h: number }> = {
+  a4: { w: 11906, h: 16838 },
+  letter: { w: 12240, h: 15840 },
+  legal: { w: 12240, h: 20160 },
+  a3: { w: 16838, h: 23811 },
+  a5: { w: 8391, h: 11906 },
+};
 
 export interface DocRun {
   t: string;
@@ -103,7 +115,7 @@ export type DocBlock =
   /** `style`: the document's title or subtitle; `indent`: steps of half an inch; `shade`: a callout's tint (`icon` its emoji). */
   | { k: 'p'; runs: DocRun[]; align?: Jc; quote?: boolean; style?: 'title' | 'subtitle'; indent?: number; keep?: boolean; space?: DocSpace; shade?: string; icon?: string; mark?: DocRev; bm?: string }
   /** `list`: which list it belongs to (numbering restarts per list); `check`: a checklist's item (ticked: `checked`). */
-  | { k: 'li'; ordered: boolean; lvl: number; list: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace; mark?: DocRev; bm?: string }
+  | { k: 'li'; ordered: boolean; lvl: number; list: number; fmt?: NumFmt; start?: number; runs: DocRun[]; check?: boolean; checked?: boolean; align?: Jc; keep?: boolean; space?: DocSpace; mark?: DocRev; bm?: string }
   /** A bibliography: its entries (Word's BIBLIOGRAPHY field, showing them until it works them out again). */
   | { k: 'bib'; entries: DocRun[][]; space?: DocSpace }
   | { k: 'pre'; text: string; space?: DocSpace }
@@ -158,6 +170,8 @@ export interface DocLook {
    * Japanese or Korean words (given an East Asian font).
    */
   editor?: { cjk?: boolean };
+  /** The language its text is in (a tag: "en-US", "el"): its default run properties say so, for Word's proofing. */
+  lang?: string;
 }
 
 export interface Extracted {
@@ -1376,6 +1390,8 @@ function cleanDoc(v: unknown): Extracted {
         blocks.push(h);
       } else if (b.k === 'li') {
         const li: Extract<DocBlock, { k: 'li' }> = { k: 'li', ordered: b.ordered === true, lvl: int(b.lvl, 0, 8, 0), list: int(b.list, 0, 1e9, 0), runs };
+        if (typeof b.fmt === 'string' && b.fmt in WORD_FMT) li.fmt = b.fmt as NumFmt;
+        if (typeof b.start === 'number' && Number.isInteger(b.start) && b.start >= 0 && b.start <= 9999) li.start = b.start;
         if (b.check === true) {
           li.check = true;
           if (b.checked === true) li.checked = true;
@@ -1726,7 +1742,7 @@ export function editorStylesXml(look: DocLook, cjk: boolean): string {
   const wide = Math.round(-0.01 * title.sz * 20);
   return (
     `${XML_HEAD}<w:styles xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14">` +
-    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${(look.styles?.normal?.color ?? `#${ED.ink}`).slice(1).toUpperCase()}"/><w:kern w:val="2"/>${size(half(S))}` +
+    `<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${esc(F)}" w:hAnsi="${esc(F)}" w:cs="${esc(F)}"${cjk ? ` w:eastAsia="${EAST_ASIAN}"` : ''}/><w:color w:val="${(look.styles?.normal?.color ?? `#${ED.ink}`).slice(1).toUpperCase()}"/><w:kern w:val="2"/>${size(half(S))}${langXml(look.lang ?? '')}` +
     '<w14:ligatures w14:val="standardContextual"/></w:rPr></w:rPrDefault>' +
     `<w:pPrDefault><w:pPr><w:widowControl/>${spOf('Normal')}</w:pPr></w:pPrDefault></w:docDefaults>` +
     `<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/>${jcOwn('normal') ? `<w:pPr>${jcOwn('normal')}</w:pPr>` : ''}${look.styles?.normal?.b || look.styles?.normal?.i ? `<w:rPr>${look.styles.normal.b ? '<w:b/><w:bCs/>' : ''}${look.styles.normal.i ? '<w:i/><w:iCs/>' : ''}</w:rPr>` : ''}</w:style>` +
@@ -1801,17 +1817,17 @@ const editorTableBorders = ['top', 'left', 'bottom', 'right', 'insideH', 'inside
 const editorCellMargins = (S: number) => `<w:top w:w="${tw(CELL.v * S)}" w:type="dxa"/><w:left w:w="${tw(CELL.h * S)}" w:type="dxa"/><w:bottom w:w="${tw(CELL.v * S)}" w:type="dxa"/><w:right w:w="${tw(CELL.h * S)}" w:type="dxa"/>`;
 
 /** One list of bullets for every bulleted list, and a numbering of its own for each numbered list (so each starts at 1). */
-function numberingXml(numbered: number, S?: number): string {
+function numberingXml(numbered: number, S?: number, specs: ({ lvl: number; fmt?: NumFmt; start?: number } | undefined)[] = []): string {
   // A document's (size S): each level a step (36pt) further in, its words 1.6em after the mark's place, a number at
   // that place, a bullet centred in its first .55em each side, as the editor draws them; a page's: Word's usual.
-  const levels = (fmt: (i: number) => [string, string]) =>
+  const levels = (fmt: (i: number) => [string, string], start: (i: number) => number | undefined = () => undefined) =>
     Array.from({ length: 9 }, (_, i) => {
       const [kind, text] = fmt(i);
       const box = S ? editorBoxes(S).list : null;
       const bullet = kind === 'bullet';
       const ind = box ? `<w:ind w:left="${tw(STEP * i + box.text)}" w:hanging="${tw(bullet ? box.text - box.bullet : box.text)}"/>` : `<w:ind w:left="${720 + 360 * i}" w:hanging="360"/>`;
       return (
-        `<w:lvl w:ilvl="${i}"><w:start w:val="1"/><w:numFmt w:val="${kind}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="${box && bullet ? 'center' : 'left'}"/>` +
+        `<w:lvl w:ilvl="${i}"><w:start w:val="${start(i) ?? 1}"/><w:numFmt w:val="${kind}"/><w:lvlText w:val="${text}"/><w:lvlJc w:val="${box && bullet ? 'center' : 'left'}"/>` +
         `<w:pPr>${ind}</w:pPr></w:lvl>`
       );
     }).join('');
@@ -1824,7 +1840,7 @@ function numberingXml(numbered: number, S?: number): string {
   for (let k = 1; k <= numbered; k++)
     out += abstract(
       k,
-      levels((i) => [['decimal', 'lowerLetter', 'lowerRoman'][i % 3], `%${i + 1}.`]),
+      levels((i) => [specs[k - 1]?.lvl === i && specs[k - 1]?.fmt ? WORD_FMT[specs[k - 1]!.fmt!] : ['decimal', 'lowerLetter', 'lowerRoman'][i % 3], `%${i + 1}.`], (i) => (specs[k - 1]?.lvl === i ? specs[k - 1]?.start : undefined)),
     );
   out += '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>';
   for (let k = 1; k <= numbered; k++) out += `<w:num w:numId="${k + 1}"><w:abstractNumId w:val="${k}"/></w:num>`;
@@ -1973,7 +1989,7 @@ export function docxFile(
   pictures: (Buffer | null)[],
   o: {
     title: string;
-    paper: 'a4' | 'letter';
+    paper: PaperSize;
     margin?: number;
     look?: DocLook;
     titled?: boolean;
@@ -2005,7 +2021,7 @@ export function docxFile(
   const ed = editor ? editorBoxes(S) : null;
   const cjk = !!look.editor?.cjk;
   if (editor) namedFonts.add(look.font ?? 'Arial');
-  const paper = o.paper === 'letter' ? { w: 12240, h: 15840 } : { w: 11906, h: 16838 };
+  const paper = PAPER_TWIPS[o.paper] ?? PAPER_TWIPS.a4;
   const page = o.landscape ? { w: paper.h, h: paper.w } : paper;
   // In columns, pictures and tables are a column wide at most.
   const ncols = o.cols && o.cols > 1 ? Math.min(3, o.cols) : 1;
@@ -2103,11 +2119,14 @@ export function docxFile(
 
   // Each numbered list its own numbering (numIds from 2; 1 is the bullets), up to a thousand of them.
   const numIds = new Map<number, number>();
-  const numOf = (list: number) => {
+  // How each numbered list counts and where it starts (its first paragraph says), in the order the numberings are made.
+  const numSpecs: ({ lvl: number; fmt?: NumFmt; start?: number } | undefined)[] = [];
+  const numOf = (list: number, spec?: { lvl: number; fmt?: NumFmt; start?: number }) => {
     let id = numIds.get(list);
     if (id === undefined) {
       id = Math.min(numIds.size, 999) + 2;
       numIds.set(list, id);
+      numSpecs[id - 2] = spec;
     }
     return id;
   };
@@ -2316,7 +2335,7 @@ export function docxFile(
     } else if (b.k === 'li')
       body.push(
         para(
-          pPrXml({ style: 'ListParagraph', pageBreak, keepLines: ncols > 1, numPr: `<w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list) : 1}"/></w:numPr>`, spacing: spaceXml(b.space, 'ListParagraph'), jc: jcOf(b.align), rPr: markXml(b.mark) }),
+          pPrXml({ style: 'ListParagraph', pageBreak, keepLines: ncols > 1, numPr: `<w:numPr><w:ilvl w:val="${b.lvl}"/><w:numId w:val="${b.ordered ? numOf(b.list, { lvl: b.lvl, fmt: b.fmt, start: b.start }) : 1}"/></w:numPr>`, spacing: spaceXml(b.space, 'ListParagraph'), jc: jcOf(b.align), rPr: markXml(b.mark) }),
           b.bm ? bookmarked(++bookmarks, b.bm, runs(b.runs)) : runs(b.runs),
         ),
       );
@@ -2518,7 +2537,7 @@ export function docxFile(
     { name: 'word/document.xml', data: document },
     { name: 'word/_rels/document.xml.rels', data: relsXml(rels) },
     { name: 'word/styles.xml', data: editor ? editorStylesXml(look, cjk) : stylesXml(d.lang, look) },
-    { name: 'word/numbering.xml', data: numberingXml(Math.min(numIds.size, 1000), editor ? S : undefined) },
+    { name: 'word/numbering.xml', data: numberingXml(Math.min(numIds.size, 1000), editor ? S : undefined, numSpecs) },
     { name: 'word/settings.xml', data: settingsXml(fontsUsed, { background: !!o.color, notes: !!o.notes?.length }) },
     ...extra,
     ...media,

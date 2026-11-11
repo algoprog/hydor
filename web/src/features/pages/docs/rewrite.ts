@@ -3,6 +3,10 @@
 // a line in each paragraph it stands for, as one change to undo (a suggestion while suggesting). An equation among them
 // is not words to rewrite: the words around it are picked instead.
 import { isAtom, runsText } from '@shared/docs';
+import type { RewriteAnswer, RewriteHow } from '@shared/write';
+import { post } from '../../../lib/api';
+import { toast, toastError } from '../../../lib/store';
+import { tr } from '../../../i18n/runtime';
 import type { RewriteTarget } from '../slides/Rewrite';
 import type { DocEngine } from './engine';
 import * as ops from './ops';
@@ -49,3 +53,15 @@ export function docsTarget(engine: DocEngine): RewriteTarget | null {
 }
 
 const runsLen = (runs: { t: string }[]) => runs.reduce((n, r) => n + r.t.length, 0);
+
+/** The words picked rewritten with AI in one of the quick ways (the right-click menu's Rewrite with AI): the helper model's answer takes their place, one step to undo. */
+export async function rewriteWords(engine: DocEngine, how: RewriteHow): Promise<void> {
+  const t = docsTarget(engine);
+  if (!t || !t.text.trim()) return void toast(tr('Pick some words to rewrite'));
+  try {
+    const r = await post<RewriteAnswer>('/api/write/rewrite', { text: t.text, how, context: t.context });
+    if (!t.put(r.text)) toast(tr('The words changed while they were rewritten, so they were left as they are'));
+  } catch (e) {
+    toastError(e);
+  }
+}

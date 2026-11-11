@@ -1,12 +1,29 @@
 // The handle by each block, as Notion has one: pointing at a paragraph, a list item, a table or a picture shows ⋮⋮ in
 // the margin to its left; dragged up or down, a line shows where the block will go, and letting go moves it there (one
-// step to undo). Not on phones, where there is no pointing.
+// step to undo). Pressed without dragging (or with Enter), it opens a menu for the block: turn it into another style,
+// duplicate it, delete it, move it up or down, comment on it, copy a link to a heading (the editor says what it
+// offers). Not on phones, where there is no pointing (the Edit menu and a long press have the same).
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { GripVertical } from 'lucide-react';
+import { ContextMenu, type ContextMenuAt, type MenuEntry } from '../common/menus';
 import type { DocEngine } from './engine';
 
-export function BlockHandle({ engine, host, paper, tick }: { engine: DocEngine; host: RefObject<HTMLDivElement | null>; paper: RefObject<HTMLDivElement | null>; tick: unknown }) {
+export function BlockHandle({
+  engine,
+  host,
+  paper,
+  tick,
+  menu,
+}: {
+  engine: DocEngine;
+  host: RefObject<HTMLDivElement | null>;
+  paper: RefObject<HTMLDivElement | null>;
+  tick: unknown;
+  /** The rows of the menu a click on the handle opens, for the block it is by. */
+  menu?: (id: string) => MenuEntry[];
+}) {
   const [at, setAt] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [open, setOpen] = useState<{ at: ContextMenuAt; id: string } | null>(null);
   const [line, setLine] = useState<{ x: number; y: number; w: number } | null>(null);
   const dragging = useRef(false);
   // The block under the pointer: its handle at its first line, in the paper's left margin.
@@ -35,7 +52,8 @@ export function BlockHandle({ engine, host, paper, tick }: { engine: DocEngine; 
     };
   }, [host, paper]);
   useEffect(() => setAt(null), [tick]);
-  if (!at) return null;
+  const menuNode = <ContextMenu at={open?.at ?? null} items={open && menu ? menu(open.id) : []} onClose={() => (setOpen(null), engine.refocusSoon())} />;
+  if (!at) return menuNode;
 
   const drag = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -45,9 +63,15 @@ export function BlockHandle({ engine, host, paper, tick }: { engine: DocEngine; 
     if (!h || !p) return;
     dragging.current = true;
     const id = at.id;
+    const handle = e.currentTarget.getBoundingClientRect();
+    const [x0, y0] = [e.clientX, e.clientY];
+    let moved = false;
     let to = -1;
     const kids = () => Array.from(p.children) as HTMLElement[];
     const move = (ev: PointerEvent) => {
+      // A press that hardly moves is a click, not a drag.
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+      moved = true;
       const hr = h.getBoundingClientRect();
       const pr = p.getBoundingClientRect();
       const list = kids();
@@ -69,6 +93,7 @@ export function BlockHandle({ engine, host, paper, tick }: { engine: DocEngine; 
       window.removeEventListener('pointercancel', up);
       dragging.current = false;
       setLine(null);
+      if (!moved) return setOpen({ at: { x: handle.right + 4, y: handle.top }, id });
       setAt(null);
       if (to >= 0) engine.moveBlock(id, to);
     };
@@ -82,9 +107,17 @@ export function BlockHandle({ engine, host, paper, tick }: { engine: DocEngine; 
         type="button"
         data-handle
         data-keeps-editing
-        title="Drag to move"
-        aria-label="Drag to move"
+        title="Drag to move, click for more"
+        aria-label="Drag to move, click for more"
+        aria-haspopup="menu"
         onPointerDown={drag}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) {
+            e.preventDefault();
+            const r = e.currentTarget.getBoundingClientRect();
+            setOpen({ at: { x: r.right + 4, y: r.top, keyed: true }, id: at.id });
+          }
+        }}
         onMouseDown={(e) => e.preventDefault()}
         className="absolute z-10 flex h-6 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded text-[#9aa0a6] hover:bg-black/5 hover:text-[#5f6368] active:cursor-grabbing"
         style={{ left: at.x, top: at.y, touchAction: 'none' }}
@@ -92,6 +125,7 @@ export function BlockHandle({ engine, host, paper, tick }: { engine: DocEngine; 
         <GripVertical size={15} />
       </button>
       {line && <span className="pointer-events-none absolute z-20 h-[3px] rounded-full bg-[#1a73e8]" style={{ left: line.x, top: line.y, width: line.w }} />}
+      {menuNode}
     </>
   );
 }
