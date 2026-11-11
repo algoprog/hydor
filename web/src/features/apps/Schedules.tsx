@@ -46,7 +46,7 @@ export function Schedules({ app }: { app: AppDef }) {
       </div>
       <div className="divide-y divide-line">
         {tasks.map((t) => (
-          <TaskRow key={t.id} t={t} onEdit={() => setEditing({ task: t })} onDuplicate={() => setEditing({ task: null, initial: { ...draftOf(t), name: `${t.name} copy` } })} onChanged={load} />
+          <TaskRow key={t.id} flush t={t} onEdit={() => setEditing({ task: t })} onDuplicate={() => setEditing({ task: null, initial: { ...draftOf(t), name: `${t.name} copy` } })} onChanged={load} />
         ))}
       </div>
       {!tasks.length && <div className="pb-2" />}
