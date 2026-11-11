@@ -3,9 +3,10 @@
 # of computer it is for, or on a GitHub runner of that kind; scripts/dist.sh then packs it):
 #   build/server  the server and the web app, built, with their production packages (native ones for this system)
 #   build/node    Node.js, which runs the server and the agents' npm installs
-#   build/bin     the `hydor` command's launcher (macOS and Linux; the app links /usr/local/bin/hydor to it) and tmux, for the terminals (built from source: macOS has none, and Linux systems differ); on Windows,
-#                 where the server runs terminals itself, hydor-computer.exe instead: computer use's helper, built
-#                 from server/computer/windows-helper.cs with the C# compiler Windows has
+#   build/bin     the `hydor` command's launcher (macOS and Linux; the Mac app links it into a folder on your PATH:
+#                 desktop/cli-link.cjs) and tmux, for the terminals (built from source: macOS has none, and Linux
+#                 systems differ); on Windows, where the server runs terminals itself, hydor-computer.exe instead:
+#                 computer use's helper, built from server/computer/windows-helper.cs with the C# compiler Windows has
 #   build/BUILD   this build's name: its version, commit and when it was made (the app copies its server once per build)
 # The repository must be built first: npm ci && npm run build, at its top. On Windows, run it with Git's bash.
 # Settings (environment): NODE_VERSION (default below; the same major version as the one running this script)
@@ -29,7 +30,7 @@ write_launcher() {
   cat > "$1" <<'LAUNCHER'
 #!/bin/sh
 # The `hydor` command of the Hydor app: runs the app's own Node.js on the app's own command (server/dist/server/cli.js).
-# /usr/local/bin/hydor is a link to this file, so it finds where it is through the links first.
+# The hydor on your PATH is a link to this file, so it finds where it is through the links first.
 self="$0"
 while [ -h "$self" ]; do
   dir="$(cd -P "$(dirname "$self")" && pwd -P)"

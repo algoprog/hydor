@@ -1065,14 +1065,17 @@ const go = (at) => (serverUrl ? openWindow(at) : openWindow());
 
 /**
  * Puts the command on the PATH of Terminal (cli-link.cjs), with nothing asked and nothing shown: a link to bin/hydor
- * inside the app, in a folder of your PATH you can write to, or in ~/.local/bin with a line in your shell's startup file.
+ * inside the app, in ~/.local/bin, ~/bin, /usr/local/bin or /opt/homebrew/bin when that is on your PATH and yours to write
+ * in, else in ~/.local/bin with a line in your shell's startup file.
  */
 function linkCommand() {
   if (!MAC || !PACKAGED) return;
+  // From a disk image or a translocated copy the app's files go away, and the link would point at nothing.
+  if (BUNDLE.includes('/AppTranslocation/') || BUNDLE.startsWith('/Volumes/')) return trace('hydor command', 'skipped: the app runs from a disk image or a translocated copy', BUNDLE);
   try {
     // Only a PATH the login shell really gave counts (loginEnv's guess does not say what Terminal has).
     const loginPath = loginEnvRead && baseEnv ? baseEnv.PATH : null;
-    const did = require('./cli-link.cjs').linkCommand({ launcher: path.join(RES, 'bin/hydor'), loginPath, shell: os.userInfo().shell });
+    const did = require('./cli-link.cjs').linkCommand({ launcher: path.join(RES, 'bin/hydor'), loginPath, shell: os.userInfo().shell, env: baseEnv || process.env });
     trace('hydor command', did);
     console.log(`[hydor] the hydor command: ${did}`);
   } catch (e) {
