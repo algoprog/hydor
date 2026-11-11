@@ -101,7 +101,7 @@ export function Row({
     // of those, or in its (i)'s popover (React passes that up through the portal, from outside the row), is theirs.
     const own = (e: { target: EventTarget; currentTarget: HTMLElement }) => {
       const t = e.target as HTMLElement;
-      const inner = t.closest?.('button, a, input, select, textarea');
+      const inner = t.closest?.('button,a,input,select,textarea');
       return e.currentTarget.contains(t) && (!inner || inner === e.currentTarget);
     };
     const button = (
