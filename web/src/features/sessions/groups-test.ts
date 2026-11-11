@@ -146,6 +146,15 @@ test('sessions with background agents or commands still running stay Active, her
   assert.deepEqual(gs.find((g) => g.kind === 'active')?.items.map((s) => s.key), [here.key, elsewhere.key]);
 });
 
+test('a session whose child sessions still run stays Active, also when its own process has stopped', () => {
+  n = 0;
+  const led = ses(HOME, H, { helpers: 2 });
+  const stopped = ses(HOME, H, { live: { status: 'idle', startedAt: now.getTime() - 2 * H, pendingApprovals: 0 } as SessionSummary['live'], helpers: 1 });
+  const done = ses(HOME, H, { helpers: undefined });
+  const gs = group([led, stopped, done]);
+  assert.deepEqual(gs.find((g) => g.kind === 'active')?.items.map((s) => s.key), [led.key, stopped.key]);
+});
+
 test('recent starts, turns, completions and external activity count; seen sessions do not', () => {
   const ts = now.getTime() - 1000;
   const live = { status: 'idle', startedAt: now.getTime() - H, pendingApprovals: 0 } as const;

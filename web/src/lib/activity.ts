@@ -9,26 +9,42 @@ export interface Activity {
   detail?: string;
   /** Background commands, agents and monitors still running. */
   background: number;
+  /** Child sessions it started that are still running (starting, working or waiting, or kept working by helpers of their own). */
+  helpers: number;
 }
 
 /** Whether (and how) a session is running right now, here or elsewhere. */
 export function activityOf(s: SessionSummary | undefined | null): Activity | null {
   if (!s) return null;
   const l = s.live;
-  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0 };
+  const helpers = s.helpers ?? 0;
+  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0, helpers };
   const e = s.external;
-  if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: e.backgroundTasks?.length ?? 0 };
+  if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: e.backgroundTasks?.length ?? 0, helpers };
+  // Its own process has stopped between turns, but its child sessions still run: it is not done.
+  if (helpers > 0) return { kind: 'app', status: 'idle', background: 0, helpers };
   return null;
 }
 
 /** A turn is running. */
 export const isBusy = (a: Activity | null) => !!a && (a.status === 'working' || a.status === 'starting');
 
-/** Between turns, but background tasks still run: the agent picks up again when they finish. */
-export const inBackground = (a: Activity | null) => !!a && a.status === 'idle' && a.background > 0;
+/**
+ * Between turns, but background tasks or child sessions still run: the agent picks up again when they finish.
+ * It takes your messages all the same: its own turn is over.
+ */
+export const inBackground = (a: Activity | null) => !!a && a.status === 'idle' && (a.background > 0 || a.helpers > 0);
 
-/** Not done yet: a turn is running, or background tasks are. */
+/** Not done yet: a turn is running, or background tasks or child sessions are. */
 export const isWorking = (a: Activity | null) => isBusy(a) || inBackground(a);
+
+/** Between turns, as one short line for a list: "Working · 2 in background", "Working · 1 helper session", or both. */
+export function backgroundLine(a: Activity): string {
+  const where = a.kind === 'external' ? ` in ${a.client}` : '';
+  if (a.background && a.helpers) return `Working${where} · ${a.background} in background, ${a.helpers} helper session${a.helpers === 1 ? '' : 's'}`;
+  if (a.helpers) return `Working${where} · ${a.helpers} helper session${a.helpers === 1 ? '' : 's'}`;
+  return `Working${where} · ${a.background} in background`;
+}
 
 export function activityLabel(a: Activity): string {
   const where = a.kind === 'external' ? ` in ${a.client}` : '';
@@ -42,6 +58,8 @@ export function activityLabel(a: Activity): string {
     case 'stopping':
       return 'Stopping';
     default:
+      if (a.background && a.helpers) return `Working${where} · ${a.background} background task${a.background === 1 ? '' : 's'} and ${a.helpers} helper session${a.helpers === 1 ? '' : 's'} running`;
+      if (a.helpers) return `Working${where} · ${a.helpers} helper session${a.helpers === 1 ? '' : 's'} running`;
       if (a.background) return `Working${where} · ${a.background} background task${a.background === 1 ? '' : 's'} running`;
       return a.kind === 'external' ? `Open${where}` : 'Running, idle';
   }

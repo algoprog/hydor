@@ -184,6 +184,10 @@ export class CodexControl extends EventEmitter {
         windows: [],
       };
       applyCodexLimits(u, limits);
+      // The limits did not come this time (a moment's network trouble, say): the same account's last ones stand, resets
+      // and all, rather than none ("No usage limits reported").
+      const last = this.lastUsage;
+      if (!limits && last?.ok && last.account?.email === u.account?.email) Object.assign(u, { windows: last.windows, limited: last.limited, resetCredits: last.resetCredits, credits: last.credits });
       if (usage?.dailyUsageBuckets) u.daily = (usage.dailyUsageBuckets as Json[]).slice(-60).map((b) => ({ date: b.startDate, tokens: b.tokens }));
       if (usage?.summary?.lifetimeTokens) u.lifetimeTokens = usage.summary.lifetimeTokens;
       this.lastUsage = u;
@@ -456,7 +460,8 @@ export class ClaudeControl extends EventEmitter {
       const u = this.report(raw);
       try {
         const r = await claudeResets(() => this.probe(), this.extraEnv.CLAUDE_CONFIG_DIR);
-        u.resetCredits = r && { available: r.available, items: r.items, nextAvailableAt: r.nextAvailableAt, cooldownUntil: r.cooldownUntil };
+        // No claude.ai sign-in to read them with just now: the resets from the last read stand (report() kept them).
+        if (r) u.resetCredits = { available: r.available, items: r.items, nextAvailableAt: r.nextAvailableAt, cooldownUntil: r.cooldownUntil };
         if (r?.atLimit && !u.limited) u.limited = prev?.limited ?? { label: 'Usage limit', resetsAt: null };
       } catch {} // keep the resets from the last read
       this.usageCache = u;
