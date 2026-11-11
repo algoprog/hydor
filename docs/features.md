@@ -1123,8 +1123,10 @@ programs shows each program's version and what is out, with Check now, Update no
   for Ubuntu and Debian, an AppImage for the others): the server and Node.js in one app (and tmux on a Mac and on
   Linux), in a window of its own, in the menu bar (the notification area, the system tray) when the window is closed,
   opening at login. They show a session's notices as the system's own notifications (Notification Center on a Mac,
-  which asks once to allow them), even with the window closed, and click one to open its session; they find your
-  programs through your login shell's PATH (on Windows, your own environment), and update themselves release by release: they look every 4 hours, download and
+  which asks once to allow them; when they are not allowed, the welcome tour's Turn on notifications and the Notify this
+  device switch open System Settings at Hydor's notifications), even with the window closed, and click one to open its
+  session; they find your programs through your login shell's PATH (on Windows, your own environment), and update
+  themselves release by release: they look every 4 hours, download and
   check a new build as soon as it is out (a download that breaks off, as when the computer sleeps, carries on from where
   it stopped, and one that gets nowhere tries again an hour later), say so (a notification, and a note in every open
   page that counts down a minute, with Restart now and Later, which puts it off for 4 hours; Restart to Update in the
