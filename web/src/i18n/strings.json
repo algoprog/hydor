@@ -11102,6 +11102,7 @@
 "Need words":"server/apps/views.ts",
 "Needed":"web/src/features/apps/Builder.tsx",
 "needed {0} times":"web/src/features/memory/MemoryNotes.tsx",
+"Needed by agents":"web/src/features/memory/NoteDialog.tsx",
 "needed once":"web/src/features/memory/MemoryNotes.tsx",
 "Needed to run it":"web/src/features/apps/AppKeys.tsx",
 "needs":"web/src/features/settings/ModelsSettings.tsx",
