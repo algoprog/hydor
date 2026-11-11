@@ -589,6 +589,29 @@ const server = http.createServer((req, res) => {
     const f = m ? fakes.get(decodeURIComponent(m[1])) : undefined;
     const rest = m?.[2] ?? '';
     if (p === '/api/bootstrap') return send(200, { version: '9.9.9', home: '/home/u', defaultCwd: '/home/u', start: { agent: 'claude', runs: { claude: { mode: 'default' } } }, acpAgents: [{ id: 'console', name: 'Custom', command: '', args: [], builtin: true }] });
+    if (p === '/api/git/repo-info') return send(200, { info: { repo: '/home/u', branch: 'main', sub: '' } });
+    if (p === '/api/fs/find') {
+      const q = url.searchParams.get('q') ?? '';
+      // A slow answer for 'slo', to arrive after the one for 'slow'.
+      if (q === 'slo') await sleep(700);
+      const all = ['src/chat.ts', 'src/client.ts', 'src/sub/deep.ts', 'README.md', 'docs/guide.md'];
+      const subseq = (f: string) => {
+        let at = 0;
+        for (const ch of q.toLowerCase()) {
+          at = f.toLowerCase().indexOf(ch, at) + 1;
+          if (!at) return false;
+        }
+        return true;
+      };
+      const root = url.searchParams.get('root') ?? '/home/u';
+      const hit = q === 'slo' ? [`${root}/STALE.txt`] : q === 'slow' ? [`${root}/fresh.txt`] : all.filter(subseq).map((f) => `${root}/${f}`);
+      return send(200, { files: hit });
+    }
+    if (p === '/api/fs/list') {
+      const dir = url.searchParams.get('path') ?? '';
+      const entries = /\/src\/?$/.test(dir) ? [{ name: 'chat.ts', type: 'file' }, { name: 'sub', type: 'dir' }] : [{ name: 'docs', type: 'dir' }, { name: 'src', type: 'dir' }, { name: 'README.md', type: 'file' }];
+      return send(200, { entries });
+    }
     if (p === '/api/models/tiers' && req.method === 'GET') return send(200, tiersState);
     if (p === '/api/models/tiers' && req.method === 'PUT') {
       if (body.tiers) tiersState = { ...tiersState, tiers: Object.keys(body.tiers).length ? body.tiers : tiersState.defaults };
@@ -831,12 +854,13 @@ test('tiers: shown, set, the team switched', async () => {
 // ---- the chat, in a pseudo-terminal ------------------------------------------------------------------------------------
 
 /** The chat in a pseudo-terminal, its screen kept in a headless xterm. */
-async function chatIn(cols: number) {
+async function chatIn(cols: number, o: { args?: string[]; env?: Record<string, string | undefined> } = {}) {
   const { default: xterm } = (await import('@xterm/xterm')) as any;
   const term = new (xterm?.Terminal ?? (await import('@xterm/xterm')).Terminal)({ cols, rows: 30, allowProposedApi: true, scrollback: 500 });
-  const env = { ...ENV, NO_COLOR: '', TERM: 'xterm-256color' } as Record<string, string>;
+  const env = { ...ENV, NO_COLOR: '', TERM: 'xterm-256color', ...o.env } as Record<string, string>;
   delete env.NO_COLOR;
-  const p = pty.spawn(process.execPath, [CLI], { cols, rows: 30, env, cwd: DATA });
+  for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
+  const p = pty.spawn(process.execPath, [CLI, ...(o.args ?? [])], { cols, rows: 30, env, cwd: DATA });
   let raw = '';
   let exit: number | null = null;
   p.onData((d) => {
@@ -879,6 +903,9 @@ for (const cols of [80, 120]) {
     c.p.write('y');
     await c.until(/✓ Allow/);
     await c.until(/Hello there\./);
+    // The working line: the spinner shaded across the logo's colours (256 here), a bright band across the word, the rest dim.
+    assert.match(c.raw(), /\x1b\[38;[25];[\d;]+m[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]\x1b\[39m/);
+    assert.match(c.raw(), /\x1b\[2mW\x1b\[22m\x1b\[2mo|\x1b\[1mW\x1b\[22m/);
     // While it works, a message is queued.
     c.p.write('and then this\r');
     await c.until(/queued: and then this/);
@@ -915,7 +942,7 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   const c = await chatIn(100);
   await c.until(/What should the agent do\?/);
   c.p.write('/he\t');
-  await c.until(/\/help {2}\/helpers\n› \/help$/m);
+  await c.until(/› \/help $/m);
   c.p.write('\x15/ti\t');
   await c.until(/› \/tiers $/m);
   c.p.write('\x15');
@@ -966,6 +993,218 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   const tail = (await c.screen()).split('\n').slice(-6);
   for (const l of tail) assert.ok(strWidth(l) <= 70, l);
 });
+
+
+test('the chat: the welcome box, the rules and the status line, and none of it wider than the terminal at 60, 100 and 140 columns', async () => {
+  for (const cols of [60, 100, 140]) {
+    const c = await chatIn(cols);
+    await c.until(/What should the agent do\?/);
+    const s = await c.screen();
+    // (A long scratch folder name cuts the lines on a narrow terminal: its text is looked at from 100 columns.)
+    if (cols >= 100) assert.match(s, /╭─+╮\n│ HYDΩR 9\.9\.9 +│\n│ \S+ +⎇ main +│\n│ Claude Code · Opus 5\.5 · Ask +│\n│ on http:\/\/127\.0\.0\.1:\d+ +│\n╰─+╯\n {2}\/ commands · @ files/, `${cols}`);
+    else assert.match(s, /╭─+╮\n│ HYDΩR 9\.9\.9 +│\n/);
+    const lines = s.split('\n');
+    const rules = lines.map((l, i) => (/^─+$/.test(l) ? i : -1)).filter((i) => i >= 0);
+    assert.equal(rules.length, 2, 'a rule above and one below the input');
+    assert.equal(rules[1] - rules[0], 2);
+    assert.equal(lines[rules[0] + 1].startsWith('› '), true);
+    assert.equal(lines[rules[0]].length, cols - 1);
+    assert.match(lines[rules[1] + 1], /^ {2}\S+/);
+    if (cols >= 100) assert.match(lines[rules[1] + 1], /^ {2}\S+ ⎇ main · Opus 5\.5 · Ask/);
+    assert.equal(/\/help$/.test(lines[rules[1] + 1]), 2 + DATA.length + ' ⎇ main · Opus 5.5 · Ask'.length + 5 + 3 <= cols - 1, 'the right part goes when there is no room for it');
+    c.p.write('/');
+    await c.until(/❯ \/help/);
+    for (const l of (await c.screen()).split('\n').slice(-12)) assert.ok(strWidth(l) <= cols - 1, `${cols}: ${l}`);
+    c.p.write('\x15\x04');
+    const t0 = Date.now();
+    while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+    assert.equal(c.exit(), 0);
+  }
+});
+
+test('the chat: the menu opens as you type, Esc closes it, Tab completes, Enter runs a command or puts a file in', async () => {
+  const c = await chatIn(100, { env: { PATH: '/nonexistent', DISPLAY: undefined, WAYLAND_DISPLAY: undefined } });
+  await c.until(/What should the agent do\?/);
+  c.p.write('/');
+  await c.until(/❯ \/help +these commands and the keys/);
+  c.p.write('comp');
+  await c.until(/❯ \/compact/);
+  c.p.write('\x7f\x7f\x7f\x7f');
+  c.p.write('mdl');
+  await c.until(/❯ \/model +\[name\|auto\] +the model/);
+  assert.doesNotMatch((await c.screen()).split('\n').slice(-6).join('\n'), /\/mode /, 'mdl does not match mode');
+  // Esc closes it and keeps the text; it stays closed until the text changes.
+  c.p.write('\x1b');
+  await c.until(/› \/mdl\n─+\n {2}\S+/);
+  c.p.write('\x7f');
+  await c.until(/❯ \/(model|mode)/);
+  c.p.write('\x15');
+  await c.until(/ {2}\S+ ⎇ main/);
+  // Tab on an empty line opens the commands.
+  c.p.write('\t');
+  await c.until(/› \/\n─+\n❯ \/help/);
+  c.p.write('\x15');
+  // ↑ wraps to the last row, ↓ back to the first; Tab puts it in.
+  c.p.write('/');
+  await c.until(/❯ \/help/);
+  c.p.write('\x1b[A');
+  await c.until(/❯ \/compact/);
+  assert.doesNotMatch(await c.screen(), /❯ \/help/);
+  c.p.write('\x1b[B');
+  await c.until(/❯ \/help/);
+  c.p.write('\x15');
+  // A value: /model then a name runs it.
+  c.p.write('/model ha');
+  await c.until(/❯ haiku +Haiku 4\.5/);
+  assert.match(await c.screen(), /\n {2}.*\n?/);
+  c.p.write('\r');
+  await c.until(/Model: Haiku 4\.5/);
+  // A command that needs no argument runs at once; /clear clears the screen.
+  c.p.write('/cop');
+  await c.until(/❯ \/copy/);
+  c.p.write('\r');
+  await c.until(/No reply to copy yet/);
+  c.p.write('/ke\r');
+  await c.until(/Alt\+Enter \/ Ctrl\+J/);
+  assert.doesNotMatch(await c.screen(), /Commands\n/, '/keys shows just the keys');
+  // Files: the folder part dim, the name normal; a folder opens, a file goes in with a space.
+  c.p.write('look at @');
+  await c.until(/❯ docs\/\n {2}src\/\n {2}README\.md/);
+  c.p.write('\x1b[B\r');
+  await c.until(/› look at @src\/\n─+\n❯ src\/sub\/\n {2}src\/chat\.ts/m);
+  c.p.write('\x7f\x7f\x7f\x7fch');
+  await c.until(/❯ src\/chat\.ts/);
+  c.p.write('\r');
+  await c.until(/› look at @src\/chat\.ts $/m);
+  assert.doesNotMatch(await c.screen(), /❯/, 'the menu is closed once the file is in');
+  assert.ok(calls.some((x) => x.path.startsWith('/api/fs/find?root=') && x.path.endsWith('&q=ch')));
+  c.p.write('\x15');
+  // What arrives out of order is dropped: the answer for "slo" comes after the one for "slow".
+  c.p.write('@slo');
+  await sleep(150);
+  c.p.write('w');
+  await c.until(/❯ fresh\.txt/);
+  await sleep(1000);
+  assert.doesNotMatch(await c.screen(), /STALE/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+});
+
+test('the chat: a grey suggestion from history, Ctrl+R searches it, ! runs a shell command, /copy copies the last reply', async () => {
+  fs.writeFileSync(path.join(DATA, 'terminal-history'), ['deploy the site to staging', 'fix the tests', 'line one\nline two', 'review the plan'].map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const c = await chatIn(100, { env: { PATH: '/nonexistent', DISPLAY: undefined, WAYLAND_DISPLAY: undefined } });
+  await c.until(/What should the agent do\?/);
+  // The suggestion shows after the cursor; → takes it (Home and a letter show where the cursor was).
+  c.p.write('deplo');
+  await c.until(/› deploy the site to staging/);
+  assert.match(c.raw(), /deplo\x1b\[0m\r\n|deplo\x1b\[2m y the site to staging\x1b\[22m|\x1b\[2my the site to staging\x1b\[22m/);
+  c.p.write('\x1b[C\x01X');
+  await c.until(/› Xdeploy the site to staging/);
+  // Alt+→ takes one word of it.
+  c.p.write('\x05\x15de');
+  await c.until(/› deploy the site to staging/);
+  c.p.write('\x1b[1;3C\x01X');
+  await c.until(/› Xdeploy$/m);
+  // Ctrl+R: newest first, line breaks as ↵, filtered by what is typed.
+  c.p.write('\x05\x15\x12');
+  await c.until(/Search earlier messages/);
+  await c.until(/❯ review the plan\n {2}line one↵line two\n {2}fix the tests\n {2}deploy the site to staging/);
+  c.p.write('\x12');
+  await c.until(/ {2}review the plan\n❯ line one↵line two/);
+  c.p.write('fx');
+  await c.until(/❯ fix the tests/);
+  c.p.write('\r');
+  // In the input, not sent.
+  await c.until(/› fix the tests\n─+\n {2}\/tmp/);
+  assert.ok(!calls.some((x) => x.method === 'POST' && x.body?.prompt === 'fix the tests'));
+  // Esc closes the search and keeps the text.
+  c.p.write('\x15\x12');
+  await c.until(/❯ review the plan/);
+  c.p.write('r\x1b');
+  await c.until(/› r\n─+\n {2}\/tmp/);
+  c.p.write('\x15');
+  // A shell command: its output, then the chat again; a failure says its exit code.
+  c.p.write('!echo hi there');
+  await c.until(/^! !echo hi there$/m);
+  c.p.write('\r');
+  await c.until(/\$ echo hi there\nhi there\n/);
+  c.p.write('!false\r');
+  await c.until(/\$ false\nexit 1/);
+  c.p.write('!pwd\r');
+  await c.until(/\$ pwd\n\/\S+/);
+  // /copy: nothing before a reply, the reply after (OSC 52).
+  c.p.write('say hello for the copy\r');
+  await c.until(/I looked at the README\./);
+  await c.until(/✓ 900 ms/);
+  c.p.write('/copy\r');
+  await c.until(/Copied the last reply \(3 lines\)/);
+  assert.ok(c.raw().includes(`\x1b]52;c;${Buffer.from('Hello there.\n\nI looked at the README.').toString('base64')}\x07`), 'OSC 52');
+  // The status line has the session now; its cost comes once there is one.
+  assert.match(await c.screen(), /Opus 5\.5 · Ask/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+});
+
+test('the chat: a list to pick from filters as you type, Enter picks the highlighted row, a number still picks, Esc cancels', async () => {
+  const c = await chatIn(100);
+  await c.until(/What should the agent do\?/);
+  c.p.write('/effort\r');
+  await c.until(/How hard should it think\?\n❯ 1 low\n {2}2 high/);
+  c.p.write('\x1b');
+  await c.until(/› What should the agent do\?/);
+  assert.doesNotMatch((await c.screen()).split('\n').slice(-5).join('\n'), /How hard/);
+  c.p.write('/model\r');
+  await c.until(/Which model\?\n❯ 1 Automatic +picked by the job[^\n]*\n {2}2 Opus 5\.5 +opus · default\n {2}3 Haiku 4\.5 +haiku/);
+  c.p.write('\x1b[B');
+  await c.until(/ {2}1 Automatic[^\n]*\n❯ 2 Opus 5\.5/);
+  c.p.write('\x1b[A\x1b[A');
+  await c.until(/ {2}1 Automatic[^\n]*\n {2}2 Opus[^\n]*\n❯ 3 Haiku/);
+  c.p.write('\x1b[B');
+  await c.until(/❯ 1 Automatic/);
+  c.p.write('hai');
+  await c.until(/Which model\?\n❯ 3 Haiku 4\.5 +haiku/);
+  c.p.write('\r');
+  await c.until(/Model: Haiku 4\.5/);
+  // A digit alone on an empty line picks that row at once (with 9 or fewer).
+  c.p.write('/mode\r');
+  await c.until(/What may it do without asking\?/);
+  c.p.write('3');
+  await c.until(/Mode: Full access/);
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+});
+
+test('hydor resume with no session named: the chat opens with the sessions to pick from, Esc leaves a new chat', async () => {
+  const f = newFake('an earlier session');
+  const c = await chatIn(100, { args: ['resume'] });
+  await c.until(/Carry on with which session\?/);
+  assert.match(await c.screen(), /❯ {2}1 an earlier session/);
+  assert.doesNotMatch(await c.screen(), /╭/, 'no head yet');
+  c.p.write('\x1b');
+  await c.until(/╭─+╮[\s\S]*What should the agent do\?/);
+  assert.doesNotMatch(await c.screen(), /Carry on with which/);
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+  // Picked instead: its head with its title, and its history.
+  const d = await chatIn(100, { args: ['resume'] });
+  await d.until(/Carry on with which session\?/);
+  d.p.write('\r');
+  await d.until(/│ an earlier session +│/);
+  d.p.write('\x04');
+  const t1 = Date.now();
+  while (d.exit() === null && Date.now() - t1 < 5000) await sleep(50);
+  assert.equal(d.exit(), 0);
+  fakes.delete(f.key);
+});
+
 
 test('the chat with stdout not a terminal: no colour and no region, each line typed sent', async () => {
   const out = path.join(DATA, 'plain-out.txt');
