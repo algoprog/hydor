@@ -1,0 +1,19 @@
+{
+ "one case, N = 10^18, n = 1, m = 10^12 (N/m = 1,000,000)": "987ffbeb2d84a066dbee0a4e7e8291410587a3ae47b14e2b176a30a19d465ba1",
+ "one case, N = 10^18, n = 0, m = 10^12": "e3595791f2faf3d69de21b0b024c0ada011e5d20e5513461fd0a039ef9ebc91c",
+ "one case, N = 10^18, n = m - 1, m = 10^12": "2bce334bf61fafb8b68881be6a38be4c0a8048942441467c9459339ad0731678",
+ "one case, N = 10^18, m = 10^12, n about 0.37 m": "c53666782a23c6db84a5abf2c0ddc104f2f7c6dce2cd5b71a584aea7c3594ae5",
+ "one case, N = 10^18 - 1, m = 10^12 + 1 (N/m = 999,999), n about 0.8 m": "035e08d7723f2f06ad67c953325c64092ef7def78bc3dc45fe9974b7aa78810e",
+ "two cases with N exactly c n + d m and one less, d = 400,000": "e741bfce51bdd2c482fe59aaa815c70a6d9f71337df3d54996beff429b973206",
+ "N = 1,000,000, n = 0, m = 1": "e3595791f2faf3d69de21b0b024c0ada011e5d20e5513461fd0a039ef9ebc91c",
+ "N = 1,000,000, n = 1, m = 2 (small numbers, N/m = 500,000)": "ca6aa88ff30103c89857926ddbd71e4f6b9daf6cdcff115645b0fd7d88789bda",
+ "100,000 cases, N/m = 1, N up to 10^18, n of every kind": "27612e77732520f5d8f7684388d94742dd0ff5336e0fc2f88df8370641a0e0a1",
+ "100,000 cases, N/m = 10, N up to 10^18, n of every kind": "69139260d5c68232e0b38fecb0eb2ffdf7dad4ca11252cf64847a4e8c892c248",
+ "2,000 cases, N/m = 500, m about 10^15, n of every kind": "d2983be4c4bf145fd891af1280748f2da4cfa799bac1aed0c473698258c955b9",
+ "1,000 cases, N/m = 1,000, n = m - 1 or any n": "38b2a3dee23a8e748ce92696534c4712141049e29567f53f5523a2259dfab927",
+ "100,000 cases with N/m from 1 to 30, most of them small": "989d4e61093ccc8c9ae6b50312c00828f07d6fb7a2f6977608f94635b98813b8",
+ "one case with N/m = 500,000 and 50,000 cases with N/m = 10": "83f60259c816ab9177c61916a15b12a0c3f3c7b18fd21f18a10172975af32fcb",
+ "100,000 cases with N exactly c n + d m (or one less), d up to 5, numbers near 10^18": "7b76ae564d4942f0c9fc22f93ab71a4ce1305fff95c2b5cedc08535f1f3304e9",
+ "100,000 cases with n up to 50 and N within 2 of c n + d m, d up to 5, m about 10^16": "3299b4172e2782a7fe56d3ad178b6f0f2a87c0a078da284b860e001e3b43344b",
+ "300 cases, N up to 300,000 (below 2^53), any n and m": "60c3e8970987baa892980600c341879daa25d27577a70ae41d2c2fa15c1bd977"
+}

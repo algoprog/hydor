@@ -1,0 +1,17 @@
+{
+ "20,000 random sensors": 114708431,
+ "50,000 random sensors": 180357519,
+ "20,000 sensors in 40 clusters of different sizes and spreads": 35987552,
+ "50,000 sensors: clusters, long lines and dust": 61634630,
+ "200,000 random sensors": 361359864,
+ "200,000 sensors in 12 clusters from 100 to 40,800 sensors": 60903692,
+ "200,000 sensors on 30 long lines, horizontal, vertical and diagonal": 33945684,
+ "200,000 sensors: clusters, long lines and a sparse background": 174106770,
+ "200,000 sensors at 5,000 places, 40 at each": 57452318,
+ "200,000 sensors on a 447 by 447 grid, spacing 2,000": 399616000,
+ "200,000 sensors in a 1,000 by 1,000 square, many in the same place": 341525,
+ "200,000 sensors in two tight clusters at opposite corners": 2122024,
+ "200,000 sensors on one diagonal, many in the same place": 2000000,
+ "200,000 sensors, dense near a corner, thinning out geometrically": 201051817,
+ "200,000 sensors on a diamond, a cross and a square, with dust": 164028972
+}

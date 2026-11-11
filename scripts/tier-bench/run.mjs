@@ -1,6 +1,7 @@
 // Runs the benchmark: the same tasks done several ways on one server, and how each came out.
 //   solo:     one agent on the Best tier's model, with the team off (how sessions worked before tiers led by default)
 //   team:     Automatic, the team on: the main agent leads on Best (or Max for a hard problem) and hands parts to helpers
+//   lead:     Automatic with Max for hard problems off: the main agent always leads on Best and hands parts to helpers
 //   max:      one agent on the Max tier's model alone, the team off (the strongest model for everything)
 //   standard: one agent on the Standard tier's model alone, the team off (what that tier can do with no lead)
 //   quick:    one agent on the Quick tier's model alone, the team off
@@ -10,13 +11,17 @@
 //   node scripts/tier-bench/run.mjs [--bench /tmp/hydor-bench/data/bench.json] [--tasks utils4,expr] [--ways solo,team]
 //                                   [--repeat 1] [--parallel 3] [--out results.json] [--work /tmp/hydor-bench/work]
 //                                   [--limit 30] (minutes a run may take)   [--recost] (read the costs again)
+//                                   [--min-free 16] (GB of memory the machine must have available for a run to start)
+//                                   [--tasks-dir dir] (tasks from another folder, such as LiveCodeBench's from lcb/make-tasks.py)
 //
 // serve.mjs starts the server it runs against. Results go to --out as they come (a run already there is not run
 // again), and a table is printed at the end: report.mjs prints it again from the file.
 import { execFile, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { capped } from './capped.mjs';
 import { table } from './report.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -24,16 +29,23 @@ const arg = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : fallback;
 };
-const bench = JSON.parse(fs.readFileSync(arg('bench', '/tmp/hydor-bench/data/bench.json'), 'utf8'));
-const all = fs.readdirSync(path.join(here, 'tasks'), { withFileTypes: true }).filter((d) => d.isDirectory() && fs.existsSync(path.join(here, 'tasks', d.name, 'task.md'))).map((d) => d.name);
+const benchFile = path.resolve(arg('bench', '/tmp/hydor-bench/data/bench.json'));
+const bench = JSON.parse(fs.readFileSync(benchFile, 'utf8'));
+/** Where the tasks are: this folder's own, or another one (LiveCodeBench's are made outside the repository). */
+const TASKS = path.resolve(arg('tasks-dir', path.join(here, 'tasks')));
+const all = fs.readdirSync(TASKS, { withFileTypes: true }).filter((d) => d.isDirectory() && fs.existsSync(path.join(TASKS, d.name, 'task.md'))).map((d) => d.name);
 const tasks = (arg('tasks') ?? all.join(',')).split(',').filter(Boolean);
 const ways = arg('ways', 'solo,team').split(',');
+/** The ways that start on Automatic with the team on; only `team` may start on Max. */
+const LED = new Set(['team', 'lead']);
 const repeat = Number(arg('repeat', 1));
 const parallel = Number(arg('parallel', 3));
 const out = path.resolve(arg('out', 'tier-bench-results.json'));
 const work = path.resolve(arg('work', '/tmp/hydor-bench/work'));
 /** The longest one run may take; past it the session is stopped and the run counts as timed out. */
 const LIMIT_MS = Number(arg('limit', 30)) * 60_000;
+/** The memory the machine must have available before a run starts, in GB: its agents and checkers need some, other work on the machine more. */
+const MIN_FREE_GB = Number(arg('min-free', 16));
 
 const api = async (method, p, body) => {
   const r = await fetch(bench.server + p, { method, headers: { authorization: `Bearer ${bench.token}`, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
@@ -42,6 +54,23 @@ const api = async (method, p, body) => {
   return j;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** The memory the machine has available now, in GB: MemAvailable on Linux, what the system calls free elsewhere. */
+function availableGb() {
+  try {
+    const m = /MemAvailable:\s+(\d+) kB/.exec(fs.readFileSync('/proc/meminfo', 'utf8'));
+    if (m) return Number(m[1]) / 1048576;
+  } catch {}
+  return os.freemem() / 1073741824;
+}
+
+/** Waits until the machine has MIN_FREE_GB available, so that the benchmark never pushes it out of memory. */
+async function roomToRun() {
+  for (let said = false; availableGb() < MIN_FREE_GB; said = true) {
+    if (!said) console.log(`waiting for memory: ${availableGb().toFixed(1)} GB available, a run starts at ${MIN_FREE_GB} GB`);
+    await sleep(30_000);
+  }
+}
 const enc = encodeURIComponent;
 const BUSY = new Set(['starting', 'working', 'waiting', 'stopping']);
 
@@ -57,7 +86,7 @@ if (process.argv.includes('--recost')) {
 const tiers = await api('GET', '/api/models/tiers');
 /** The model one agent alone runs on, by way. */
 const MODEL_OF = { solo: tiers.tiers.claude.best.model, max: tiers.tiers.claude.max.model, standard: tiers.tiers.claude.standard.model, quick: tiers.tiers.claude.quick.model };
-for (const w of ways) if (w !== 'team' && !MODEL_OF[w]) throw new Error(`No way called ${w}: solo, team, max, standard or quick`);
+for (const w of ways) if (!LED.has(w) && !MODEL_OF[w]) throw new Error(`No way called ${w}: solo, team, lead, max, standard or quick`);
 
 const results = fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, 'utf8')) : [];
 const save = () => fs.writeFileSync(out, JSON.stringify(results, null, 1));
@@ -143,10 +172,33 @@ async function collect(key) {
   };
 }
 
-/** The task's hidden checker on a folder: how many of its cases pass. */
+/**
+ * Whether a run's agents read the task's hidden files (its checker, reference or expected answers): any mention of
+ * the task's own folder in the transcripts of the benchmark account's sessions for this run (its lead's and those of
+ * the helpers it ran in its turns). The agents run as you do, so nothing stops them looking; this says when one did.
+ */
+function peeked(task, key) {
+  if (!key) return false;
+  const projects = path.join(path.dirname(benchFile), 'accounts', `claude-${bench.account}`, 'projects');
+  const id = key.replace(/^claude:/, '');
+  const hidden = path.join(TASKS, task);
+  try {
+    for (const d of fs.readdirSync(projects)) {
+      const dir = path.join(projects, d);
+      const files = fs.readdirSync(dir).filter((f) => f.startsWith(id));
+      const sub = path.join(dir, id, 'subagents');
+      if (fs.existsSync(sub)) files.push(...fs.readdirSync(sub).map((f) => path.join(id, 'subagents', f)));
+      for (const f of files) if (fs.readFileSync(path.join(dir, f), 'utf8').includes(hidden)) return true;
+    }
+  } catch {}
+  return false;
+}
+
+/** The task's hidden checker on a folder (with at most 8 GB of memory for it and what it starts): how many of its cases pass. */
 function check(task, dir) {
   return new Promise((resolve) => {
-    execFile(process.execPath, [path.join(here, 'tasks', task, 'check.mjs'), dir], { timeout: 180_000, maxBuffer: 8 << 20, env: { ...process.env, CUDA_VISIBLE_DEVICES: '' } }, (err, stdout) => {
+    const [command, argv] = capped(process.execPath, [path.join(TASKS, task, 'check.mjs'), dir], 8);
+    execFile(command, argv, { timeout: 180_000, maxBuffer: 8 << 20, env: { ...process.env, CUDA_VISIBLE_DEVICES: '' } }, (err, stdout) => {
       try {
         const line = stdout.trim().split('\n').pop();
         const j = JSON.parse(line);
@@ -162,10 +214,10 @@ async function run(task, way, rep) {
   const id = `${task}/${way}/${rep}`;
   const dir = path.join(work, `${task}-${way}-${rep}`);
   fs.rmSync(dir, { recursive: true, force: true });
-  fs.cpSync(path.join(here, 'tasks', task, 'seed'), dir, { recursive: true });
+  fs.cpSync(path.join(TASKS, task, 'seed'), dir, { recursive: true });
   // A repository, as most work folders are.
   for (const a of [['init', '-q'], ['add', '-A'], ['-c', 'user.name=bench', '-c', 'user.email=bench@localhost', 'commit', '-qm', 'start']]) execFileSync('git', a, { cwd: dir });
-  const prompt = fs.readFileSync(path.join(here, 'tasks', task, 'task.md'), 'utf8').trim();
+  const prompt = fs.readFileSync(path.join(TASKS, task, 'task.md'), 'utf8').trim();
   const t0 = Date.now();
   const rec = { id, task, way, rep, startedAt: t0 };
   try {
@@ -174,7 +226,7 @@ async function run(task, way, rep) {
       cwd: dir,
       prompt,
       // The team starts on Automatic; the others name one tier's model.
-      model: way === 'team' ? 'auto' : MODEL_OF[way],
+      model: LED.has(way) ? 'auto' : MODEL_OF[way],
       mode: 'bypassPermissions',
       account: bench.account,
       title: `bench ${id}`,
@@ -194,6 +246,7 @@ async function run(task, way, rep) {
     rec.ms = Date.now() - t0;
   }
   rec.check = await check(task, dir);
+  rec.peeked = peeked(task, rec.key);
   results.push(rec);
   save();
   console.log(`${rec.end.padEnd(7)} ${id}: ${rec.check.passed}/${rec.check.total}, $${(rec.usd ?? 0).toFixed(2)}, ${Math.round(rec.ms / 1000)} s, ${rec.helpers?.length ?? 0} helpers${rec.inTurn?.length ? ` + ${rec.inTurn.length} in its turns` : ''}${rec.moved?.length ? `, ${rec.moved.map((m) => `${m.event} → ${m.tier}`).join(', ')}` : ''}`);
@@ -202,13 +255,16 @@ async function run(task, way, rep) {
 console.log(`Claude Code's tiers: ${['quick', 'standard', 'best', 'max'].map((t) => `${t} ${tiers.tiers.claude[t].model ?? 'default'}`).join(', ')}`);
 // One way at a time: the team is a setting of the whole server.
 for (const way of ways) {
-  await api('PUT', '/api/models/tiers', { team: { on: way === 'team', hard: way === 'team' } });
+  await api('PUT', '/api/models/tiers', { team: { on: LED.has(way), hard: way === 'team' } });
   const todo = [];
   for (let rep = 1; rep <= repeat; rep++) for (const task of tasks) if (!results.some((r) => r.id === `${task}/${way}/${rep}`)) todo.push([task, way, rep]);
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(parallel, todo.length) }, async () => {
-      while (next < todo.length) await run(...todo[next++]);
+      while (next < todo.length) {
+        await roomToRun();
+        if (next < todo.length) await run(...todo[next++]);
+      }
     }),
   );
 }

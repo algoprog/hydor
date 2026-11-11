@@ -1,0 +1,1 @@
+We are about to put our small file-sharing service on the internet. Please review it for security problems and fix every one you find, without breaking anything it does: README.md describes the service and test/ shows how it is used (`node --test` must still pass). Then write what you found and how you fixed it in SECURITY-REVIEW.md. Plain Node.js 22, no packages.

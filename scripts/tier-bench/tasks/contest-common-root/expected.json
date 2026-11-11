@@ -1,0 +1,22 @@
+{
+ "large: 500x500 powers of a Q whose cycle lengths are the first primes": "18f5384d58bcb1bba0bcd9e6a6781d1a6ac2cc280c330ecbab6cb7931b721552",
+ "large: 500x500 each permutation keeps one prime power of the order": "18f5384d58bcb1bba0bcd9e6a6781d1a6ac2cc280c330ecbab6cb7931b721552",
+ "large: 500x500 prime powers 256, 81, 125 in the cycle lengths": "18f5384d58bcb1bba0bcd9e6a6781d1a6ac2cc280c330ecbab6cb7931b721552",
+ "large: 500x500 one permutation is a power of a different Q (primes)": "8ce86a6ae65d3692e7305e2c58ac62eebd97d3d943e093f577da25c36988246b",
+ "large: 500x500 one permutation rotates each cycle by its own amount (shared factors)": "8ce86a6ae65d3692e7305e2c58ac62eebd97d3d943e093f577da25c36988246b",
+ "large: 500x500 powers of a Q with many shared factors in its cycle lengths": "18f5384d58bcb1bba0bcd9e6a6781d1a6ac2cc280c330ecbab6cb7931b721552",
+ "large: 500x500 powers of one 500-cycle, none a generator": "18f5384d58bcb1bba0bcd9e6a6781d1a6ac2cc280c330ecbab6cb7931b721552",
+ "large: 500x500 half the permutations are powers of one Q, half of another": "8ce86a6ae65d3692e7305e2c58ac62eebd97d3d943e093f577da25c36988246b",
+ "large: 500x500 every permutation is the identity": "18f5384d58bcb1bba0bcd9e6a6781d1a6ac2cc280c330ecbab6cb7931b721552",
+ "large: 500x500 random permutations": "8ce86a6ae65d3692e7305e2c58ac62eebd97d3d943e093f577da25c36988246b",
+ "large: 500x1 a single random permutation, 500 times": "40cdeafcbc6552ca7555d77dc18fde6dc3314d214360cbb3415a706ab7e7de75",
+ "large: 250000 tests of 1x1": "7cbba2cb3b2c0ef63e6982313f2ec41f12def415f00ed86d4188cd8dbcb2178c",
+ "large: 41666 tests of 3x2, every mode": "989ca680d86801d3211b14bfa2d5dea4d02c073fb911bb7885e00ba90fc68509",
+ "large: 25000 tests of 5x2, every mode": "55b7a32657b9509b6c3137e94191da5320ea30fc0ae2a25a4895d31aa133df55",
+ "large: 2500 tests of 10x10, planted and spoiled": "c26a431b3d4275200139cd083219c911bfe57ec8ded2c86f4df1f565fbbb2f83",
+ "large: 500 tests of 50x10, planted and spoiled": "c40307c90849ec83775ae6bfa36a699564230a2f012b3c678c1f2c6318d76054",
+ "large: 250 tests of 100x10, long cycle lengths": "49cece961a4c12bafe3be26d829a239210425aded8a60695e717f395b9d72198",
+ "large: 125 tests of 500x2, rotations of cycles that cannot share one exponent": "788871383aa77610b83bc6c8d1d222d28c7db2ea7ce6560cb6eec19dccf3109e",
+ "large: 5000 tests of 25x2, rotations of cycles that cannot share one exponent": "4d53ea083eb35943b25ad3f1319a40dda12e1b9705b98819f14f329b01e501a2",
+ "large: 100 tests of 500x5, planted and spoiled": "5a3348f31c7aa4016b96d1d1d1ba22cf86f9900f7b70650e8d6a0ff6aac094a6"
+}
