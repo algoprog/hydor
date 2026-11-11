@@ -21,6 +21,7 @@ import { CODE_COLOURS_SRC, codeColours, hasCode } from '../../shared/code-colour
 import { dbBlocks, dbsForAgent, PAGE_DB_SRC, pageDatabases, pageDbScript } from '../../shared/page-db.ts';
 import { extractText } from '../documents/extract.ts';
 import { EDITOR_SRC } from './editor.ts';
+import { geometry } from './editor-geometry.ts';
 import { pages } from './index.ts';
 import { BRIDGE_SRC, injectHead, kitHead } from './kit.ts';
 
@@ -1112,6 +1113,320 @@ if (canCapture()) {
       same(note, 'Its rows can be changed in Use.|0|Kept', 'in the editor, a database whose rows the app does not give stays as its block says, to read, saying where they change');
     });
   }
+  // ---- the Studio's placing: right-click, free moving with guides, arrows, sizing from every side, the clipboard, dropped files ----
+  /** A drag with the mouse (Alt 1, Ctrl 2, ⌘ 4, Shift 8 as `mods`), in six steps, with the buttons down as a real one has them. */
+  const dragTo = async (d: Drive, x0: number, y0: number, x1: number, y1: number, mods = 0) => {
+    const s = d.tab.s;
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0, y: y0, modifiers: mods });
+    await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button: 'left', clickCount: 1, modifiers: mods, buttons: 1 });
+    for (let i = 1; i <= 6; i++) await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0 + ((x1 - x0) * i) / 6, y: y0 + ((y1 - y0) * i) / 6, buttons: 1, modifiers: mods });
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y: y1, button: 'left', clickCount: 1, modifiers: mods });
+    await sleep(100);
+  };
+  /** Picks a part by a selector (the editor knows parts by their place in the page). */
+  const pick = async (d: Drive, sel: string) =>
+    d.cmd('select', await d.js<number[]>(`const o = []; for (let x = document.querySelector(${JSON.stringify(sel)}); x !== document.documentElement; x = x.parentElement) o.unshift([...x.parentElement.children].indexOf(x)); return o;`));
+  const rectOfEl = (d: Drive, sel: string) => d.js<{ l: number; t: number; r: number; b: number; w: number; h: number }>(`const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height };`);
+  const placedPage =
+    '<div id="wrap" style="position:relative;height:320px"><div id="a" style="position:absolute;left:100px;top:40px;width:120px;height:60px;background:#ccd"></div><div id="b" style="position:absolute;left:330px;top:170px;width:80px;height:50px;background:#dcc"></div></div>';
+  await drive(
+    placedPage,
+    async (d) => {
+      await d.click('#b');
+      const A = await rectOfEl(d, '#a');
+      const B = await rectOfEl(d, '#b');
+      // Dragged to 3 px short of #a's left edge (and well apart from its other lines): it snaps onto it, with guides drawn.
+      await dragTo(d, B.l + 40, B.t + 25, B.l + 40 + (A.l + 3 - B.l), B.t + 25 + 30);
+      const after = await rectOfEl(d, '#b');
+      same(Math.round(after.l), Math.round(A.l), 'a placed part dragged near another’s edge snaps onto it');
+      same(Math.round(after.t - B.t), 30, 'and moves freely the other way');
+      same(await d.js<string>('return document.querySelector("#b").style.left'), '100px', 'writing the offset its place uses (left, from its block)');
+      await d.press('z', { ctrl: true });
+      same(await d.js<string>('return document.querySelector("#b").style.left + "," + document.querySelector("#b").style.top'), '330px,170px', 'one Ctrl+Z puts it back (the whole drag is one step)');
+      // Alt: no snapping for this drag.
+      await dragTo(d, B.l + 40, B.t + 25, B.l + 40 + (A.l + 3 - B.l), B.t + 25 + 30, 1);
+      const free = await rectOfEl(d, '#b');
+      ok(Math.abs(free.l - (A.l + 3)) < 1.5, `Alt turns snapping off (${free.l} against ${A.l + 3})`);
+      await d.press('z', { ctrl: true });
+      // Shift: straight.
+      await dragTo(d, B.l + 40, B.t + 25, B.l + 100, B.t + 45, 8);
+      const straight = await rectOfEl(d, '#b');
+      ok(Math.abs(straight.t - B.t) < 1.5 && straight.l > B.l + 40, 'Shift keeps the move straight');
+      await d.press('z', { ctrl: true });
+      // Ctrl: a copy is dragged; the part stays.
+      await dragTo(d, B.l + 40, B.t + 25, B.l + 40, B.t - 80, 2);
+      same(await d.js<number>('return document.querySelectorAll("#wrap > div").length'), 3, 'Ctrl drags a copy');
+      same(await d.js<string>('return document.querySelector("#b").style.top'), '170px', 'and the part stays');
+      ok(await d.js<boolean>('return !document.querySelector("#wrap > div:nth-child(3)").id'), 'the copy has no id of its own (ids are for one part)');
+      await d.press('z', { ctrl: true });
+      same(await d.js<number>('return document.querySelectorAll("#wrap > div").length'), 2, 'and Ctrl+Z takes the copy back');
+      // The arrow keys: one pixel, ten with Shift; a run of them is one step.
+      await pick(d, '#b');
+      await d.press('ArrowRight');
+      await d.press('ArrowRight');
+      await d.press('ArrowRight');
+      await d.press('ArrowDown', { shift: true });
+      same(await d.js<string>('const b = document.querySelector("#b"); return b.style.left + "," + b.style.top'), '333px,180px', 'the arrow keys move a placed part by 1 px, Shift by 10');
+      await d.press('z', { ctrl: true });
+      same(await d.js<string>('const b = document.querySelector("#b"); return b.style.left + "," + b.style.top'), '330px,170px', 'and a run of presses is one step to undo');
+    },
+    '',
+  );
+  // Place freely, and back in the flow; the menu's rows.
+  await drive(
+    '<p id="p1">First</p><p id="p2" style="margin-top:30px">Second, <a id="lk" href="https://example.com">a link</a></p>',
+    async (d) => {
+      await pick(d, '#p2');
+      await d.cmd('place', 'free');
+      same(await d.js<string>('return getComputedStyle(document.querySelector("#p2")).position'), 'relative', 'Place freely makes a part one that is moved from where it falls (nothing jumps)');
+      const before = await d.js<string>('return document.querySelector("#p2").getBoundingClientRect().top + ""');
+      await d.cmd('place', 'flow');
+      same((await d.js<string>('return document.querySelector("#p2").getAttribute("style")')).replace(/[\s;]/g, ''), 'margin-top:30px', 'Back in the flow takes its offsets and place away, nothing else');
+      same(await d.js<string>('return document.querySelector("#p2").getBoundingClientRect().top + ""'), before, 'where it sits does not change with either');
+      await d.press('z', { ctrl: true });
+      await d.press('z', { ctrl: true });
+      ok(!(await d.js<string>('return document.querySelector("#p2").getAttribute("style")')).includes('relative'), 'each is a step to undo');
+      // Right-click: picks the part under the pointer and opens its menu, with what is under it.
+      const s = d.tab.s;
+      const click = async (sel: string, mods = 0) => {
+        const r = await rectOfEl(d, sel);
+        await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.l + 6, y: r.t + r.h / 2 });
+        await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.l + 6, y: r.t + r.h / 2, button: 'right', clickCount: 1, modifiers: mods, buttons: 2 });
+        await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.l + 6, y: r.t + r.h / 2, button: 'right', clickCount: 1, modifiers: mods });
+        await sleep(120);
+      };
+      await d.cmd('deselect');
+      await click('#p1');
+      const menus = (await d.msgs('wa-ed-menu')).filter((m) => m.on);
+      ok(menus.length === 1, 'a right-click opens the menu of the part under it');
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'p', 'having picked it');
+      const rows = (menus[0].rows ?? []) as string[];
+      for (const row of ['Place freely', 'Cut', 'Copy', 'Paste', 'Duplicate', 'Delete', 'Colour']) ok(rows.includes(row), `the menu has ${row} (${rows.join(', ')})`);
+      ok(!rows.includes('Open the link'), 'and no link’s rows where there is no link');
+      await d.press('Escape');
+      await d.cmd('deselect');
+      await click('#lk');
+      const withLink = ((await d.msgs('wa-ed-menu')).filter((m) => m.on).at(-1)?.rows ?? []) as string[];
+      for (const row of ['Open the link', 'Change the link', 'Remove the link']) ok(withLink.includes(row), `on a link: ${row}`);
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag, 'a', 'the link is what was picked');
+      await d.cmd('unlink');
+      same(await d.js<string>('return document.querySelector("#p2").innerHTML'), 'Second, a link', 'Remove the link takes the link off and leaves its words');
+      await d.press('z', { ctrl: true });
+      // Shift+right-click: the browser's own menu (the editor leaves it alone).
+      const count = (await d.msgs('wa-ed-menu')).filter((m) => m.on).length;
+      await d.js('window.__ctxPrevented = null; addEventListener("contextmenu", function(e){ window.__ctxPrevented = e.defaultPrevented; });');
+      await click('#p1', 8);
+      same((await d.msgs('wa-ed-menu')).filter((m) => m.on).length, count, 'Shift+right-click opens no menu of the editor');
+    },
+    '',
+  );
+  // A placed part on a picture: its rows (Back in the flow, Bring forward, Send backward).
+  await drive('<div style="position:relative;height:200px"><img id="im" alt="x" style="position:absolute;left:40px;top:40px;width:80px;height:60px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="><div id="o" style="position:absolute;left:60px;top:50px;width:50px;height:50px;background:#ccc;z-index:3"></div></div>', async (d) => {
+    const s = d.tab.s;
+    const r = await rectOfEl(d, '#im');
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.l + 5, y: r.t + 5 });
+    await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.l + 5, y: r.t + 5, button: 'right', clickCount: 1, buttons: 2 });
+    await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.l + 5, y: r.t + 5, button: 'right', clickCount: 1 });
+    await sleep(120);
+    const rows = ((await d.msgs('wa-ed-menu')).filter((m) => m.on).at(-1)?.rows ?? []) as string[];
+    for (const row of ['Replace the picture', 'Edit picture', 'Description', 'Back in the flow', 'Bring forward', 'Send backward']) ok(rows.includes(row), `on a placed picture: ${row} (${rows.join(', ')})`);
+    await d.press('Escape');
+    await pick(d, '#im');
+    await d.cmd('layer', 'front');
+    same(await d.js<string>('return document.querySelector("#im").style.zIndex'), '4', 'Bring forward puts a part one above the highest beside it');
+    await d.cmd('layer', 'back');
+    same(await d.js<string>('return document.querySelector("#im").style.zIndex'), '-1', 'Send backward, below the lowest');
+  }, '');
+  // Sizing: from every side, by the box the page uses, a flex cell that keeps its size, Shift in proportion, edges that snap.
+  await drive(
+    '<div id="c" style="box-sizing:content-box;width:200px;height:50px;padding:20px;border:2px solid #888;background:#eef;margin-bottom:20px"></div>' +
+      '<div id="row" style="display:flex;width:480px;margin-bottom:20px"><div id="fa" style="flex:1;height:40px;background:#cde"></div><div id="fb" style="flex:1;height:40px;background:#edc"></div></div>' +
+      '<div id="ref" style="box-sizing:border-box;width:300px;height:30px;background:#ccc;margin-bottom:10px"></div><div id="sz" style="box-sizing:border-box;width:200px;height:40px;background:#cdc"></div>',
+    async (d) => {
+      const handle = async (sel: string, h: 'se' | 'e' | 'w' | 's' | 'n' | 'sw' | 'nw' | 'ne') => {
+        await d.cmd('deselect');
+        await d.click(sel, { dx: 0 });
+        const r = await rectOfEl(d, sel);
+        const at = { se: [r.r + 1, r.b + 1], e: [r.r + 1, (r.t + r.b) / 2], w: [r.l - 5.5, (r.t + r.b) / 2], s: [(r.l + r.r) / 2, r.b + 1], n: [(r.l + r.r) / 2, r.t - 5.5], sw: [r.l - 6, r.b + 1], nw: [r.l - 6, r.t - 6], ne: [r.r + 1, r.t - 6] }[h];
+        return { x: at[0], y: at[1], r };
+      };
+      // The first drag does not jump by the padding and the border of a content-box part.
+      let h = await handle('#c', 'se');
+      await dragTo(d, h.x, h.y, h.x + 30, h.y + 10, 1);
+      let r = await rectOfEl(d, '#c');
+      ok(Math.abs(r.w - (h.r.w + 30)) < 1.5 && Math.abs(r.h - (h.r.h + 10)) < 1.5, `a part is sized by what is drawn (${r.w}×${r.h} from ${h.r.w}×${h.r.h}, asked for +30 and +10)`);
+      await d.press('z', { ctrl: true });
+      // From the left: the right edge stays where it is.
+      h = await handle('#c', 'w');
+      await dragTo(d, h.x, h.y, h.x - 30, h.y, 1);
+      r = await rectOfEl(d, '#c');
+      ok(Math.abs(r.r - h.r.r) < 1.5 && Math.abs(r.w - (h.r.w + 30)) < 1.5, `the left handle grows it to the left, its right edge staying (${r.l}…${r.r} from ${h.r.l}…${h.r.r})`);
+      await d.press('z', { ctrl: true });
+      // From the top.
+      h = await handle('#c', 'n');
+      await dragTo(d, h.x, h.y, h.x, h.y - 20, 1);
+      r = await rectOfEl(d, '#c');
+      ok(Math.abs(r.b - h.r.b) < 1.5 && Math.abs(r.h - (h.r.h + 20)) < 1.5, 'the top handle grows it upward, its bottom edge staying');
+      await d.press('z', { ctrl: true });
+      // Shift keeps its shape.
+      h = await handle('#c', 'se');
+      await dragTo(d, h.x, h.y, h.x + 60, h.y, 8 | 1);
+      r = await rectOfEl(d, '#c');
+      ok(Math.abs(r.w / r.h - h.r.w / h.r.h) < 0.03, `Shift keeps the proportions (${(r.w / r.h).toFixed(3)} from ${(h.r.w / h.r.h).toFixed(3)})`);
+      await d.press('z', { ctrl: true });
+      // A cell of a flex row takes the size it is given (flex: 1 would have ignored a width).
+      h = await handle('#fa', 'se');
+      await dragTo(d, h.x, h.y, h.x + 60, h.y, 1);
+      r = await rectOfEl(d, '#fa');
+      ok(Math.abs(r.w - (h.r.w + 60)) < 1.5, `a flex cell keeps the size it is sized to (${r.w} from ${h.r.w}, +60)`);
+      await d.press('z', { ctrl: true });
+      // Its edge snaps to the edge of another part: 4 px short of #ref's right edge it lands on it.
+      h = await handle('#sz', 'e');
+      const ref = await rectOfEl(d, '#ref');
+      await dragTo(d, h.x, h.y, ref.r - 4 + 1, h.y);
+      r = await rectOfEl(d, '#sz');
+      ok(Math.abs(r.r - ref.r) < 0.6, `a side snaps to another part’s edge (${r.r} against ${ref.r})`);
+      same(await d.js<string>('return document.querySelector("#sz").style.width'), '300px', 'and its width is written in whole pixels');
+    },
+    '',
+  );
+  // Addresses an attribute may have (the Part tab's Link): bare sites made links that go somewhere; code refused.
+  await drive('<p><a id="lk" href="https://a.example">link</a></p><img id="im" src="https://x.example/a.png" alt="">', async (d) => {
+    await pick(d, '#lk');
+    await d.cmd('attr', { name: 'href', value: 'example.com' });
+    same(await d.js<string>('return document.querySelector("#lk").getAttribute("href")'), 'https://example.com', 'a link typed as "example.com" goes to the site, not to a page beside this one');
+    await d.cmd('attr', { name: 'href', value: 'javascript:alert(1)' });
+    await d.cmd('attr', { name: 'href', value: 'data:text/html,<script>alert(1)</script>' });
+    await d.cmd('attr', { name: 'href', value: 'vbscript:x' });
+    same(await d.js<string>('return document.querySelector("#lk").getAttribute("href")'), 'https://example.com', 'javascript:, data: and vbscript: addresses are refused');
+    await d.cmd('attr', { name: 'href', value: 'ann@example.com' });
+    same(await d.js<string>('return document.querySelector("#lk").getAttribute("href")'), 'mailto:ann@example.com', 'an email address becomes a mail link');
+    await pick(d, '#im');
+    await d.cmd('attr', { name: 'src', value: 'data:text/html,hi' });
+    same(await d.js<string>('return document.querySelector("#im").getAttribute("src")'), 'https://x.example/a.png', 'a picture’s source cannot be a page of data');
+    await d.cmd('attr', { name: 'src', value: 'data:image/png;base64,AAAA' });
+    same(await d.js<string>('return document.querySelector("#im").getAttribute("src")'), 'data:image/png;base64,AAAA', 'but a picture of data can');
+  }, '');
+  // The clipboard: a part copied reaches it as HTML and as words; pasted words keep their look and nothing harmful.
+  await drive('<p id="p">Hello there</p><p id="q">Second one</p>', async (d) => {
+    await d.js('window.__copy = null; addEventListener("copy", function(e){ window.__copy = [e.clipboardData.getData("text/html"), e.clipboardData.getData("text/plain")]; });');
+    await pick(d, '#p');
+    // (a real key: a copy needs a person's gesture to reach the clipboard)
+    await d.press('c', { ctrl: true });
+    const got = await d.js<string[] | null>('return window.__copy');
+    ok(!!got && got[0].includes('data-hydor-parts') && got[0].includes('<p id="p">Hello there</p>') && got[1] === 'Hello there', 'a part copied is on the clipboard as HTML (wrapped, so the editor knows it) and as words');
+    const copied = (await d.msgs('wa-ed-copied')).at(-1);
+    ok(copied && copied.text === 'Hello there' && copied.system === true, 'and the app is told its words, and that the frame wrote the clipboard itself');
+    // Pasted back with nothing being written: after the part picked, as it was copied.
+    const paste = (html: string, text = '') =>
+      d.js<boolean>(`const dt = new DataTransfer(); ${html ? `dt.setData('text/html', ${JSON.stringify(html)});` : ''} dt.setData('text/plain', ${JSON.stringify(text)}); const t = document.querySelector('[data-n-ce]') || document.body; const e = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); t.dispatchEvent(e); return e.defaultPrevented;`);
+    await pick(d, '#q');
+    await paste(got![0], got![1]);
+    same(await shape(d), 'p:Hello there|p:Second one|p:Hello there', 'a part pasted goes after the one picked');
+    await d.press('z', { ctrl: true });
+    // Other HTML (a page's, Word's) comes in as blocks of words: its markup is not kept.
+    await pick(d, '#p');
+    await paste('<h2 style="color:red">Title</h2><p class="x">One <b>bold</b> <script>alert(1)</script>two</p><ul><li>A</li><li>B</li></ul>', 'Title\nOne bold two\nA\nB');
+    const blocks = await shape(d);
+    ok(blocks.startsWith('p:Hello there|h2:Title|p:One bold two|ul>li:A|ul>li:B'), `HTML pasted with nothing written comes in as blocks (${blocks})`);
+    ok(!(await d.body()).includes('script') && !(await d.body()).includes('color:red'), 'with no script, style or class of the page it came from');
+    await d.press('z', { ctrl: true });
+    // Words being written: bold, italic, links, kept; scripts, styles, handlers and code addresses dropped.
+    await d.write('#p', 'start');
+    await d.js('const p = document.querySelector("#p"); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r);');
+    const bad = await paste('<meta charset="utf-8"><p style="font-size:30px">A <b>bold</b>, <i>soft</i> and <u>under</u> <a href="https://e.example/p" onclick="x()">link</a> <a href="javascript:alert(1)">trick</a><img src=x onerror=alert(1)><script>alert(2)</script><span style="font-weight:700;color:red">heavy</span></p>', 'A bold, soft and under link trick heavy');
+    ok(bad, 'pasted HTML is taken by the editor (the browser’s own paste is stopped)');
+    const html = await d.js<string>('return document.querySelector("[data-n-ce]").innerHTML');
+    ok(html.includes('<strong>bold</strong>') && html.includes('<em>soft</em>') && html.includes('<u>under</u>'), `bold, italic and underline survive a paste (${html})`);
+    ok(html.includes('<a href="https://e.example/p">link</a>'), 'a link survives, with its address and nothing else');
+    ok(!/javascript|onclick|onerror|<script|<img|font-size|color:/.test(html) && html.includes('trick'), 'and nothing that runs: its words stay, its handlers, scripts, pictures and styles go');
+    ok(html.includes('<strong>heavy</strong>'), 'a span styled bold, as Word and Docs write it, is bold');
+    await d.press('z', { ctrl: true });
+    // Without formatting: Ctrl+Shift+V.
+    await d.js('const p = document.querySelector("[data-n-ce]") || document.querySelector("#p"); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r);');
+    // (the key as an event of its own: a real one would also paste what this page copied above, on its own)
+    await d.js('const t = document.querySelector("[data-n-ce]") || document.body; t.dispatchEvent(new KeyboardEvent("keydown", { key: "V", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));');
+    await paste('<p>Some <b>bold</b> words</p>', 'Some bold words');
+    const plain = await d.js<string>('return document.querySelector("[data-n-ce]").innerHTML');
+    ok(!plain.includes('<strong>') && plain.includes('Some bold words'), `Ctrl+Shift+V pastes only the words (${plain})`);
+    await d.press('z', { ctrl: true });
+    // A lone address pasted over selected words links them.
+    await d.js('const p = document.querySelector("[data-n-ce]") || document.querySelector("#p"); const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r);');
+    await paste('', 'https://example.org/page');
+    same(await d.js<string>('return document.querySelector("[data-n-ce]").innerHTML'), '<a href="https://example.org/page">Hello there</a>', 'a web address pasted over selected words makes them a link to it');
+    // The pieces: what pasteWords makes of HTML (as the page runs it).
+    const pieces = await d.js<{ kind: string; html: string }[]>(`const g = (${geometry.toString()})(); return g.pasteWords('<h1>Big</h1><p>x <b>y</b></p><ol><li>one<ul><li>nested</li></ul></li></ol><blockquote>q</blockquote><pre>a\\nb</pre><table><tr><td>c1</td><td>c2</td></tr></table>');`);
+    same(pieces.map((p) => `${p.kind}:${p.html}`).join('|'), 'h1:Big|:x <strong>y</strong>|number:one|bullet:nested|quote:q|code:a<br>b|:c1 c2', 'pasted HTML is told into pieces by its blocks: headings, lists (nested items too), quotes, code, table rows');
+  });
+  // Ctrl+A picks every part; Delete takes them all, as one step.
+  await drive('<h1>One</h1><p>Two</p><p>Three</p>', async (d) => {
+    await d.cmd('deselect');
+    await d.press('a', { ctrl: true });
+    same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.multi, 3, 'Ctrl+A picks every part of the page');
+    await d.press('Delete');
+    same(await shape(d), '', 'Delete takes them all out');
+    await d.press('z', { ctrl: true });
+    same(await shape(d), 'h1:One|p:Two|p:Three', 'and one Ctrl+Z brings them all back');
+  });
+  // Any file dropped on the page: a PDF, a video, a sound, another file; kept in the order dropped; where it fell; the line's side in a grid.
+  await drive('<h1>Drop</h1><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><p id="ga">A</p><p id="gb">B</p></div><p id="end">End</p>', async (d) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-drops-'));
+    const files = ['a.pdf', 'b.mp4', 'c.mp3', 'd.zip', 'e.png'].map((n) => {
+      const f = path.join(dir, n);
+      fs.writeFileSync(f, n.endsWith('.png') ? Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') : 'x');
+      return f;
+    });
+    // Over #gb's left half, in its lower half: before #gb (its row is a grid's: the line stands beside it), not after it.
+    const r = await rectOfEl(d, '#gb');
+    const at = { x: r.l + 6, y: r.b - 3 };
+    const data = { items: [], files, dragOperationsMask: 1 };
+    for (const type of ['dragEnter', 'dragOver', 'drop'] as const) await d.tab.s.send('Input.dispatchDragEvent', { type, x: at.x, y: at.y, data });
+    await sleep(200);
+    // (the files themselves cannot be read back as JSON: their names and kinds are)
+    const sent = await d.js<{ id: string; what?: string; name: string }[]>('return window.__msgs.filter(function(m){return m.type==="wa-ed-file"}).map(function(m){return { id: m.id, what: m.what, name: m.file.name }});');
+    same(sent.map((m) => `${m.what ?? 'picture'}:${m.name}`).sort().join(' '), 'audio:c.mp3 file:d.zip pdf:a.pdf picture:e.png video:b.mp4', 'files dropped on the page are sorted by kind (a PDF, a video, a sound, a picture, any other file) and each is sent to the app');
+    const by = (n: string) => sent.find((m) => m.name === n)!;
+    // Answered in the order opposite to the one dropped: they are kept in the order they were dropped in.
+    const hex = 'a'.repeat(64);
+    await d.cmd('fill', { id: by('d.zip').id, src: `/pg/file/${hex}/abcdef0123456789/d.zip`, name: 'd.zip', size: 1 });
+    await d.cmd('fill', { id: by('c.mp3').id, src: `/pg/file/${hex}/abcdef0123456789/c.mp3`, name: 'c.mp3', size: 1 });
+    await d.cmd('fill', { id: by('b.mp4').id, file: `/pg/video/${'b'.repeat(32)}/${'c'.repeat(24)}` });
+    await d.cmd('fill', { id: by('a.pdf').id, src: `/pg/file/${hex}/abcdef0123456789/a.pdf`, name: 'a.pdf', size: 1 });
+    const order = await d.js<string>('return [...document.querySelector("div").children].map(function(c){ return c.id || c.className.split(" ").filter(function(x){return /^n-(pdf|vidfile|audio|file)$/.test(x)}).join("") || c.tagName.toLowerCase(); }).join(",")');
+    ok(/^ga,(n-pdf,n-vidfile,n-audio,n-file,)?gb$/.test(order) || /^ga,.*gb$/.test(order), `they land at the drop line, before the part beside it in a grid (${order})`);
+    const kinds = await d.js<string>('return ["div.n-pdf", "video.n-vidfile", "div.n-audio", "a.n-file"].map(function(s){ return document.querySelectorAll(s).length }).join("")');
+    same(kinds, '1111', 'each file became its block: a PDF, a video, a sound, a file to download');
+    const seq = await d.js<string>('return [...document.body.querySelectorAll(".n-pdf, .n-vidfile, .n-audio, .n-file")].map(function(x){ return x.className.replace(/.*n-(pdf|vidfile|audio|file).*/, "$1") }).join(",")');
+    same(seq, 'pdf,vidfile,audio,file', 'in the order they were dropped');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  // Find and replace in the page's words: matches counted (through bold too), words only changed, one step to undo.
+  await drive('<p id="a" title="apples">Apples and apples</p><p id="b">Go <b>app</b>les<script>var apples = 1;</script></p><p id="c">Pears</p>', async (d) => {
+    const found = async () => (await d.msgs('wa-ed-found')).at(-1) as { count: number; index: number };
+    await d.cmd('find', { query: 'apples', opts: { matchCase: false, wholeWord: false, regex: false } });
+    same(`${(await found()).count}/${(await found()).index}`, '3/0', 'find counts every match in the page’s words (a match may run through bold), and starts on the first');
+    await d.cmd('find', { query: 'apples', opts: {}, step: 1 });
+    same((await found()).index, 1, 'the next match is on view');
+    await d.cmd('find', { query: 'apples', opts: { matchCase: true } });
+    same((await found()).count, 2, 'Match case leaves out “Apples”');
+    await d.cmd('find', { query: 'app', opts: { wholeWord: true } });
+    same((await found()).count, 0, 'Whole words leaves out “apples”');
+    await d.cmd('find', { query: 'a(p+)les', opts: { regex: true } });
+    same((await found()).count, 3, 'a regular expression finds the same');
+    await d.cmd('find', { query: 'apples', opts: {} });
+    await d.cmd('findReplace', { query: 'apples', opts: {}, replacement: 'pears', all: false });
+    same(await d.js<string>('return document.querySelector("#a").innerHTML'), 'pears and apples', 'Replace changes the match on view, in its words');
+    same(await d.js<string>('return document.querySelector("#a").getAttribute("title")'), 'apples', 'and never an attribute');
+    await d.cmd('findReplace', { query: 'apples', opts: {}, replacement: 'pears', all: true });
+    same(await d.js<string>('return document.querySelector("#a").innerHTML + "|" + document.querySelector("#b").innerHTML.replace(/<script>.*<\\/script>/, "")'), 'pears and pears|Go <b>pears</b>', 'Replace all changes every match, even one through bold, and no tag');
+    ok((await d.body()).includes('var apples = 1;'), 'and a script’s text is not the page’s words');
+    await d.press('z', { ctrl: true });
+    same(await d.js<string>('return document.querySelector("#a").innerHTML'), 'pears and apples', 'Replace all is one step to undo');
+    await d.cmd('find', { query: '(\\w+) and', opts: { regex: true } });
+    await d.cmd('findReplace', { query: '(\\w+) and', opts: { regex: true }, replacement: 'and $1', all: false });
+    same(await d.js<string>('return document.querySelector("#a").innerHTML'), 'and pears apples', 'a regular expression’s groups go in the replacement');
+    await d.cmd('findClear');
+  });
   closeCapture();
 } else console.log('(no Chromium here: the editor’s browser tests were skipped)');
 

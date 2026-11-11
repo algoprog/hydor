@@ -28,6 +28,9 @@
 import type { CodeColours } from '../../shared/code-colours.ts';
 import type { DbAppHooks, DbStore, PageDatabases } from '../../shared/page-db.ts';
 
+/** A row the editor adds to a block's menu: `icon` names one of the writing's own icons. */
+export type CtxRow = { icon: string; label: string; keys?: string; run: () => void; off?: boolean; danger?: boolean; on?: boolean } | '-';
+
 /** What a block is, for writing in it. */
 export type Kind = 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'bullet' | 'number' | 'todo' | 'quote' | 'code' | 'toggle' | 'callout';
 
@@ -73,6 +76,19 @@ export interface Core {
   offset: (h: Element) => number | null;
   length: (h: Element) => number;
   copy: (html: string, name: string) => void;
+  /** What a right-click (or a block's menu) offers for the part under it, from the editor: a link's, a picture's, a placed part's, or words'. */
+  contextRows: (target: Element | null, words: boolean) => CtxRow[];
+  /** Does what the editor's own commands do (cut, paste, place…): the same as the app's buttons ask for. */
+  command: (a: string, arg?: unknown) => void;
+  /** A placed part dragged by its handle moves where the pointer goes (true: the editor took the gesture); `tap` is for a press that did not move. */
+  freeMove: (e: PointerEvent, el: Element, tap: () => void) => boolean;
+  /** Whether a part has others beside it on its line (a flex row, a grid, running words): a drop line beside it is vertical. */
+  sideBySide: (el: Element) => boolean;
+  /** Pasted HTML as lines of safe words with their kinds (editor-geometry.ts), and the address a link may have. */
+  pasteWords: (html: string) => { kind: string; html: string }[];
+  linkAddress: (raw: unknown) => string | null;
+  /** Whether the paste being made is "without formatting" (Ctrl+Shift+V, or the menu's). */
+  plainPaste: (used?: boolean) => boolean;
   canAsk: () => boolean;
   /** The code blocks' colours (shared/code-colours.ts). */
   code: CodeColours;
@@ -104,6 +120,9 @@ export interface Writing {
   info(el: Element): Record<string, unknown>;
   page(): Record<string, unknown>;
   picked(): Element[];
+  /** Every block of the page's flow (Ctrl+A), and a list of blocks picked together. */
+  all(): Element[];
+  pick(list: Element[]): void;
   unitOf(h: Element): Element;
   css: string;
 }
@@ -1180,6 +1199,21 @@ export function writing(E: Core): Writing {
     right: '<path d="m9 6 6 6-6 6"/>',
     left: '<path d="m15 6-6 6 6 6"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    cut: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9"/><path d="m14.5 14.5 5.5 5.5"/><path d="M8.1 8.1 12 12"/>',
+    paste: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
+    pastePlain: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M8 12h8"/><path d="M8 16h5"/>',
+    selectAll: '<path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+    unlink: '<path d="m18.8 13.4 1.7-1.7a5 5 0 0 0-7.1-7.1l-1.7 1.7"/><path d="m5.2 10.6-1.7 1.7a5 5 0 0 0 7.1 7.1l1.7-1.7"/><path d="m8 2v3"/><path d="M2 8h3"/><path d="M16 22v-3"/><path d="M22 16h-3"/>',
+    external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    bold: '<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z"/>',
+    italic: '<path d="M14 5h-4"/><path d="M14 19h-4"/><path d="M14 5 10 19"/>',
+    move: '<path d="m5 9-3 3 3 3"/><path d="m9 5 3-3 3 3"/><path d="m15 19-3 3-3-3"/><path d="m19 9 3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/>',
+    flow: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/>',
+    front: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11" stroke-dasharray="2 3"/>',
+    back: '<rect x="3" y="3" width="13" height="13" rx="2" stroke-dasharray="2 3"/><rect x="8" y="8" width="13" height="13" rx="2"/>',
+    alt: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15v-3.5a1.5 1.5 0 0 1 3 0V15"/><path d="M7 13.5h3"/><path d="M14 10v5"/><path d="M14 12h3"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
     comment: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     // a page of the Library, by its kind (for links to it)
@@ -1508,7 +1542,8 @@ export function writing(E: Core): Writing {
   // ---- the block menu (the ⋮⋮, Ctrl+/) ------------------------------------------------------------------------------
   type View = 'main' | 'turn' | 'colour' | 'lang';
   type Row = { icon: string; label: string; keys?: string; run?: () => void; to?: Exclude<View, 'main'>; danger?: boolean; on?: boolean; off?: boolean } | '-' | { head: string };
-  let menu: { blocks: Element[]; view: View; i: number; at: { left: number; top: number; bottom: number } } | null = null;
+  /** `target`: the part under the pointer of a right-click (its link, picture, place… add rows); `words`: words are being written, and the menu starts with theirs. */
+  let menu: { blocks: Element[]; view: View; i: number; at: { left: number; top: number; bottom: number }; target?: Element | null; words?: boolean } | null = null;
   const TURNS: [Kind, string, string, string][] = [
     ['p', 'text', 'Text', 'text'],
     ['h1', 'h1', 'Heading 1', 'H1'],
@@ -1557,8 +1592,13 @@ export function writing(E: Core): Writing {
       ];
     }
     const n = list.length;
+    // What the editor offers for what is under the pointer: words' own commands, a link's, a picture's, a placed part's.
+    const mine = (menu.target !== undefined || menu.words ? E.contextRows(menu.target ?? list[0] ?? null, !!menu.words) : E.contextRows(list[0] ?? null, false)).map((r): Row => (r === '-' ? r : { icon: svg(r.icon), label: r.label, keys: r.keys, off: r.off, danger: r.danger, on: r.on, run: () => (closeMenu(), r.run()) }));
+    if (!n) return [{ head: L('page', 'Page') }, ...mine];
     return [
       { head: n > 1 ? L('nBlocks', '{n} blocks').replace('{n}', String(n)) : E.nameOf(list[0]) },
+      ...mine,
+      ...(mine.length ? (['-'] as Row[]) : []),
       ...XS.flatMap((x) => x.menu?.(list) ?? []).map((r): Row => ({ icon: r.icon, label: r.label, keys: r.keys, run: () => (closeMenu(), r.run()) })),
       ...(texty ? [{ icon: svg('turn'), label: L('turnInto', 'Turn into'), to: 'turn' as const, keys: 'Ctrl+/' }] : []),
       ...(n === 1 && codeOf(list[0]) ? [{ icon: svg('code'), label: L('language', 'Language'), to: 'lang' as const }] : []),
@@ -1569,7 +1609,9 @@ export function writing(E: Core): Writing {
       { icon: svg('dup'), label: L('duplicate', 'Duplicate'), keys: 'Ctrl+D', run: () => (closeMenu(), duplicate(list)) },
       { icon: svg('up'), label: L('upTip', 'Move up'), keys: 'Ctrl+Shift+↑', run: () => (closeMenu(), moveBy(list, -1)), off: !list.length || !prevSib(inOrder(list)[0]) },
       { icon: svg('down'), label: L('downTip', 'Move down'), keys: 'Ctrl+Shift+↓', run: () => (closeMenu(), moveBy(list, 1)), off: !list.length || !nextSib(inOrder(list)[n - 1]) },
+      { icon: svg('cut'), label: L('cut', 'Cut'), keys: 'Ctrl+X', run: () => (closeMenu(), copyBlocks(list), removeBlocks(list)) },
       { icon: svg('copy'), label: L('copy', 'Copy'), keys: 'Ctrl+C', run: () => (closeMenu(), copyBlocks(list)) },
+      { icon: svg('paste'), label: L('paste', 'Paste'), keys: 'Ctrl+V', run: () => (closeMenu(), E.command('pasteMenu', { plain: false })) },
       { icon: svg('del'), label: L('delete', 'Delete'), keys: 'Del', danger: true, run: () => (closeMenu(), removeBlocks(list)) },
       ...(E.canAsk() ? (['-', { icon: svg('ask'), label: L('askAgent', 'Ask the agent'), run: () => (closeMenu(), E.send({ type: 'wa-ed-agent' })) }] as Row[]) : []),
     ];
@@ -1612,12 +1654,12 @@ export function writing(E: Core): Writing {
     menuEl.style.display = 'flex';
     placeAt(menuEl, menu.at);
   };
-  const openMenu = (blocks: Element[], at: { left: number; top: number; bottom: number }, v: View = 'main') => {
+  const openMenu = (blocks: Element[], at: { left: number; top: number; bottom: number }, v: View = 'main', more: { target?: Element | null; words?: boolean } = {}) => {
     closeSlash();
-    menu = { blocks, view: v, i: v === 'main' ? -1 : 0, at };
+    menu = { blocks, view: v, i: v === 'main' ? -1 : 0, at, ...more };
     renderMenu();
     // On a phone the app folds the drawer under the page meanwhile, so the menu has the page's height to show in.
-    E.send({ type: 'wa-ed-menu', on: true });
+    E.send({ type: 'wa-ed-menu', on: true, rows: menuRows().flatMap((r) => (r === '-' || 'head' in r ? [] : [r.label])) });
   };
   const closeMenu = () => {
     if (!menu) return;
@@ -2164,6 +2206,22 @@ export function writing(E: Core): Writing {
   };
   /** Puts what came back where it was asked for: after a block, in an empty block's place, or at the end of the page. */
   const placeBlock = (el: HTMLElement, where: Record<string, unknown>) => {
+    // Several files dropped at once keep their order, whichever is ready first: after the one before it, or before the one after it.
+    const group = where.group as { done: (Element | undefined)[] } | undefined;
+    const n = Number(where.n) || 0;
+    if (group) {
+      const before = group.done
+        .slice(0, n)
+        .filter((x): x is Element => !!x && x.isConnected)
+        .pop();
+      const later = group.done.slice(n + 1).find((x): x is Element => !!x && x.isConnected);
+      if (before || later) {
+        if (before) before.after(el);
+        else later!.before(el);
+        group.done[n] = el;
+        return el;
+      }
+    }
     const ref = where.ref ? E.byPath(where.ref) : null;
     const u = ref && ref.isConnected ? ref : null;
     if (u && where.replace && u.tagName !== 'LI' && kindOf(u) && emptyHost(hostOf(u) ?? u)) u.replaceWith(el);
@@ -2176,6 +2234,7 @@ export function writing(E: Core): Writing {
       if (last) last.after(el);
       else f.append(el);
     }
+    if (group) group.done[n] = el;
     return el;
   };
   const sanitize = (html: string) => {
@@ -2218,6 +2277,15 @@ export function writing(E: Core): Writing {
     if (what === 'picture') {
       const src = safeSrc(arg.src);
       if (!src) return;
+      const swap = where.swap ? E.byPath(where.swap) : null;
+      if (swap && swap.tagName === 'IMG') {
+        E.change(() => {
+          swap.setAttribute('src', src);
+          swap.removeAttribute('srcset');
+          return { pick: swap };
+        });
+        return;
+      }
       E.change(() => {
         const img = make('img', 'n-pic');
         img.src = src;
@@ -2694,7 +2762,7 @@ export function writing(E: Core): Writing {
   let hoverBlock: Element | null = null;
   let handleBlock: Element | null = null;
   let dragging = false;
-  let drop: { ref: Element; after: boolean; into?: boolean } | null = null;
+  let drop: { ref: Element; after: boolean; into?: boolean; row?: boolean } | null = null;
   const showDrop = (d: typeof drop) => {
     if (!d) {
       dl.style.display = 'none';
@@ -2702,6 +2770,15 @@ export function writing(E: Core): Writing {
     }
     const r = d.ref.getBoundingClientRect();
     dl.style.display = 'block';
+    if (d.row) {
+      // Beside others on its line (a flex row, a grid's row, running words): the line stands at the side it lands on.
+      dl.style.left = `${(d.after ? r.right : r.left) - 1}px`;
+      dl.style.top = `${r.top}px`;
+      dl.style.width = '3px';
+      dl.style.height = `${Math.max(24, r.height)}px`;
+      return;
+    }
+    dl.style.height = '';
     dl.style.left = `${r.left}px`;
     dl.style.width = `${Math.max(24, r.width)}px`;
     dl.style.top = `${(d.into ? r.top + 6 : d.after ? r.bottom : r.top) - 1}px`;
@@ -2731,7 +2808,8 @@ export function writing(E: Core): Writing {
     while (b && moving.some((m) => m.contains(b!))) b = b.parentElement;
     if (!b || b === doc.body) return null;
     const r = b.getBoundingClientRect();
-    return { ref: b, after: y > r.top + r.height / 2 };
+    const row = E.sideBySide(b);
+    return { ref: b, after: row ? x > r.left + r.width / 2 : y > r.top + r.height / 2, row };
   };
   /** Items moved out of their lists, each run of them in a list of their old one's kind (blocks stay as they are). */
   const asBlocks = (all: Element[]): Element[] => {
@@ -2838,6 +2916,16 @@ export function writing(E: Core): Writing {
     const y0 = e.clientY;
     let moved = false;
     const list = picked.includes(b) ? picked.slice() : [b];
+    // A placed part is moved where the pointer goes (the editor's: snapping, guides), not dropped in the flow; a tap is the menu's.
+    const tap = () => {
+      if (!picked.includes(b)) {
+        E.finish();
+        E.select(b);
+      }
+      const r = grip.getBoundingClientRect();
+      openMenu(list, { left: r.left, top: r.top, bottom: r.bottom });
+    };
+    if (list.length === 1 && E.freeMove(e, b, tap)) return;
     const move = (m: PointerEvent) => {
       if (!moved && Math.hypot(m.clientX - x0, m.clientY - y0) < 5) return;
       if (!moved) {
@@ -3408,6 +3496,28 @@ export function writing(E: Core): Writing {
       E.send({ type: 'wa-ed-file', id, file: f });
     });
   };
+  /**
+   * What a file dropped on the page becomes, by its kind: a PDF is a PDF block, a video a video the app keeps, a sound a
+   * sound player, anything else a file to download (the same blocks Add's Media makes). The app keeps the file and sends
+   * its address back (`fill`), each to its place, in the order they were dropped.
+   */
+  const blockFor = (f: File): 'picture' | 'pdf' | 'video' | 'audio' | 'file' =>
+    isPicture(f) ? 'picture' : f.type === 'application/pdf' || /\.pdf$/i.test(f.name) ? 'pdf' : /^video\//.test(f.type) || /\.(mp4|m4v|mov|webm|ogv)$/i.test(f.name) ? 'video' : /^audio\//.test(f.type) || /\.(mp3|m4a|wav|ogg|oga|flac|aac|opus)$/i.test(f.name) ? 'audio' : 'file';
+  const sendFiles = (files: File[], where: Record<string, unknown>) => {
+    const pics = files.filter((f) => blockFor(f) === 'picture');
+    if (pics.length) sendPictures(pics, where);
+    // (the rest keep the order they were dropped in, whichever is kept first)
+    const group = { done: [] as (Element | undefined)[] };
+    files
+      .filter((f) => blockFor(f) !== 'picture')
+      .slice(0, 12)
+      .forEach((f, n) => {
+        const id = `a${++asks}`;
+        const what = blockFor(f);
+        asked.set(id, { what, ...where, group, n });
+        E.send({ type: 'wa-ed-file', id, file: f, what });
+      });
+  };
   addEventListener(
     'dragover',
     (e) => {
@@ -3429,11 +3539,11 @@ export function writing(E: Core): Writing {
       e.preventDefault();
       e.stopPropagation();
       showDrop(null);
-      const files = [...(e.dataTransfer?.files ?? [])].filter(isPicture);
+      const files = [...(e.dataTransfer?.files ?? [])].slice(0, 24);
       const d = dropSpot(e.clientX, e.clientY, []);
       drop = null;
       if (!files.length) return;
-      sendPictures(files, d ? { ref: E.pathOf(d.ref), before: !d.after && !d.into, into: d.into } : {});
+      sendFiles(files, d ? { ref: E.pathOf(d.ref), before: !d.after && !d.into, into: d.into } : {});
     },
     true,
   );
@@ -3450,17 +3560,117 @@ export function writing(E: Core): Writing {
         sendPictures(files, s && s !== doc.body ? { ref: E.pathOf(s) } : {});
         return;
       }
-      // Lines of words pasted into a paragraph or a list become blocks of their own.
-      if (!w) return;
+      if (!w || !(e.target instanceof Node) || !w.contains(e.target)) return;
+      const html = e.clipboardData?.getData('text/html') ?? '';
       const text = (e.clipboardData?.getData('text/plain') ?? '').replace(/\r\n?/g, '\n');
-      const k = kindOf(unitOf(w));
-      if (!text.includes('\n') || !k || k === 'code') return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      pasteLines(w, text);
+      if (pasteWords(w, html, text, E.plainPaste(!!(html || text)))) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
     },
     true,
   );
+  /** A web address alone, as copied from a browser's bar: pasted over selected words it makes them a link. */
+  const LONE_URL = /^\s*((?:https?:\/\/|www\.|mailto:)[^\s<>"']+)\s*$/i;
+  /**
+   * Words pasted while writing in `h`: over selected words, a lone address makes them a link. HTML (from a page, Word, Docs)
+   * keeps its bold, italic, underline, strike, code, links, headings and lists (editor-geometry.ts: no scripts, styles,
+   * classes or sizes); lines of words become blocks of their own. `plain`: only the words. True when it handled the paste
+   * (else the editor inserts the plain text as the browser would).
+   */
+  const pasteWords = (h: HTMLElement, html: string, text: string, plain: boolean): boolean => {
+    const k = kindOf(unitOf(h));
+    const r = caret();
+    const lone = LONE_URL.exec(text.trim());
+    if (lone && r && !r.collapsed && h.contains(r.commonAncestorContainer) && !plain && k !== 'code') {
+      const url = E.linkAddress(lone[1]);
+      if (url) {
+        E.noteTyping();
+        doc.execCommand('createLink', false, url);
+        return true;
+      }
+    }
+    // Words only: in code, from a copy of plain words, or when asked for.
+    if (plain || k === 'code' || !html.trim()) {
+      if (plain) {
+        E.noteTyping();
+        if (text.includes('\n') && k && k !== 'code') pasteLines(h, text);
+        else doc.execCommand('insertText', false, text);
+        return true;
+      }
+      if (!text.includes('\n') || !k || k === 'code') return false;
+      pasteLines(h, text);
+      return true;
+    }
+    const pieces = E.pasteWords(html);
+    if (!pieces.length) return false;
+    // One line of words: in place, as they are. In a part that holds no blocks (a button, a cell), all of it as lines.
+    if (pieces.length === 1 || !k) {
+      E.noteTyping();
+      doc.execCommand('insertHTML', false, pieces.map((x) => x.html).join('<br>'));
+      return true;
+    }
+    pasteBlocks(h, pieces);
+    return true;
+  };
+  /** The block a piece of pasted words becomes: what it was where it came from, else the kind of the block pasted into. */
+  const kindOfPiece = (kind: string, into: Kind | null): Kind => {
+    if (kind === 'h1' || kind === 'h2' || kind === 'h3' || kind === 'bullet' || kind === 'number' || kind === 'quote' || kind === 'code') return kind;
+    return isListKind(into) ? into! : 'p';
+  };
+  /** A piece's words as nodes: its safe HTML (strong, em, u, s, code, sub, sup, a, br), parsed in an inert template. */
+  const fragOf = (htmlText: string): DocumentFragment => {
+    const t = make('template');
+    t.innerHTML = htmlText;
+    return t.content;
+  };
+  /**
+   * Pieces of pasted words in the block `h` written in: the first at the caret, in the words already there, the rest as
+   * blocks after it (what follows the caret goes after the last), each as a step of one change to undo.
+   */
+  const pasteBlocks = (h: HTMLElement, pieces: { kind: string; html: string }[]) => {
+    dropSelected(h);
+    E.change(() => {
+      const u = unitOf(h);
+      const k = kindOf(u)!;
+      const rest = takeTail(h);
+      dropFiller(h);
+      putOwn(h, fragOf(pieces[0].html));
+      let cur = h;
+      let curU = u;
+      pieces.slice(1).forEach((p) => {
+        const kind = kindOfPiece(p.kind, k);
+        const { unit, host } = newUnit(kind, fragOf(p.html));
+        putAfter(unit, curU, kind);
+        cur = host;
+        curU = unit;
+      });
+      dropFiller(cur);
+      const off = E.length(cur);
+      putOwn(cur, rest);
+      fillEmpty(cur);
+      return writeIn(cur, { off });
+    });
+  };
+  /** Pieces of pasted words as blocks after the part picked (or at the end of the page): nothing is being written. */
+  const pastePieces = (pieces: { kind: string; html: string }[], where: string) => {
+    if (!pieces.length) return;
+    const s = E.sel();
+    const u = s && s !== doc.body ? unitOf(s) : null;
+    E.change(() => {
+      let prev: Element | null = null;
+      let first: Element | null = null;
+      for (const p of pieces) {
+        const kind = kindOfPiece(p.kind, null);
+        const { unit } = newUnit(kind, fragOf(p.html));
+        if (!prev) placeBlock(unit, where === 'end' || !u ? {} : where === 'inside' ? { ref: E.pathOf(u), into: true } : { ref: E.pathOf(u) });
+        else putAfter(unit, prev, kind);
+        prev = unit;
+        if (!first) first = unit;
+      }
+      return first ? { pick: first } : null;
+    });
+  };
   const pasteLines = (h: HTMLElement, text: string) => {
     dropSelected(h);
     const lines = text.replace(/\n+$/, '').split(/\n/);
@@ -3708,6 +3918,33 @@ export function writing(E: Core): Writing {
           });
           return true;
         }
+        case 'pasteWords': {
+          // The menu's Paste (and Paste without formatting) while writing: what the app read from the clipboard.
+          const w = E.editing();
+          if (!w) return true;
+          const text = String(arg?.text ?? '').replace(/\r\n?/g, '\n');
+          if (!pasteWords(w, String(arg?.html ?? ''), text, !!arg?.plain) && text) {
+            E.noteTyping();
+            doc.execCommand('insertText', false, text);
+          }
+          return true;
+        }
+        case 'pastePieces':
+          pastePieces(Array.isArray(arg?.pieces) ? arg.pieces.slice(0, 500) : [], String(arg?.where ?? 'after'));
+          return true;
+        case 'replacePicture': {
+          // A picture picked again: asked for as a new one is, its answer goes in its place (keeping its description and size).
+          const img = E.sel();
+          if (img && img.tagName === 'IMG') ask('picture', img.getBoundingClientRect(), { swap: E.pathOf(img) });
+          return true;
+        }
+        case 'context': {
+          // A right-click (or the menu key): the block menu where the pointer is, with what is under it.
+          const r = arg?.at;
+          if (!r) return true;
+          openMenu(blocksNow(), { left: Number(r.left) || 0, top: Number(r.top) || 0, bottom: Number(r.bottom) || 0 }, 'main', { target: arg.target instanceof Element ? arg.target : null, words: !!arg.words });
+          return true;
+        }
         case 'menu': {
           const list = blocksNow();
           const r = arg?.at;
@@ -3846,6 +4083,8 @@ export function writing(E: Core): Writing {
       return { icon: (iconEl()?.textContent ?? '').trim().slice(0, 16), cover: coverInfo() };
     },
     picked: () => picked.filter((x) => x.isConnected),
+    all: () => [...flow().children].filter((x) => !skip(x) && !/^(HEAD|N-EDITOR-UI)$/.test(x.tagName) && (x as HTMLElement).getBoundingClientRect().height > 0),
+    pick: (list) => pickMany(list, list[0] ?? null),
     unitOf,
   };
 }

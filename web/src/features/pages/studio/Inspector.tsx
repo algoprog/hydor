@@ -781,6 +781,13 @@ export function PartPanel({
             title="Place"
           />
         </Row>
+        {sel.tag !== 'body' && c.position !== 'sticky' && (
+          <div className="pl-[92px]">
+            <button type="button" onClick={() => cmd('place', c.position && c.position !== 'static' ? 'flow' : 'free')} className="rounded-md py-0.5 text-[12px] text-accent hover:underline">
+              {c.position && c.position !== 'static' ? 'Back in the flow' : 'Place freely, then drag it'}
+            </button>
+          </div>
+        )}
         {c.position && c.position !== 'static' && (
           <div className="grid grid-cols-2 gap-1 pl-[92px]">
             {(['top', 'right', 'bottom', 'left'] as const).map((p) => (
