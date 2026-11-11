@@ -26,6 +26,8 @@ import {
   Italic,
   Lock,
   LockOpen,
+  PaintBucket,
+  Brush,
   RotateCw,
   SendToBack,
   Shapes,
@@ -36,6 +38,7 @@ import {
 } from 'lucide-react';
 import { CONTAINER_KINDS, FONTS, isEdge, isShape, ROW_KINDS, SHAPE_KINDS, STYLE_SETS, type ArrowKind, type Dash, type Diagram, type DiagramEdge, type DiagramItem, type DiagramPage, type DiagramShape, type DiagramStyle, type LabelPos, type RouteKind, type ShapeKind } from '@shared/diagram';
 import { KINDS, lookOf } from '@shared/diagram-shapes';
+import { setRoute, swapEnds } from '@shared/diagram-ops';
 import type { LayoutKind } from '@shared/diagram-spec';
 import { cx } from '../../../components/ui';
 import { Field, NumInput, Section, Tool } from '../slides/controls';
@@ -52,6 +55,12 @@ export interface FormatActions {
   icon: () => void;
   picture: () => void;
   matchSize: (how: 'w' | 'h' | 'both') => void;
+  /** Takes the look of the item picked, to put on others (Ctrl+Alt+C). */
+  copyStyle: () => void;
+  /** Puts the look taken on what is picked (Ctrl+Alt+V). */
+  pasteStyle: () => void;
+  /** A look was taken. */
+  canPasteStyle: boolean;
 }
 
 interface Props {
@@ -241,7 +250,7 @@ export function FormatPanel({ d, page, sel, readOnly, change, changeDiagram, sna
         <Field label="Course">
           <Choices<RouteKind>
             value={e0.route ?? 'orthogonal'}
-            onChange={(r) => setEdges((x) => ({ ...x, route: r === 'orthogonal' ? undefined : r, points: undefined }))}
+            onChange={(r) => change((p) => setRoute(p, ids, r))}
             options={[
               { value: 'orthogonal', label: 'Right angles', icon: <Waypoints size={14} /> },
               { value: 'straight', label: 'Straight', icon: <span className="block h-px w-4 rotate-[-30deg] bg-current" /> },
@@ -252,7 +261,7 @@ export function FormatPanel({ d, page, sel, readOnly, change, changeDiagram, sna
         <Field label="Ends">
           <ArrowPick label="Start" start value={(st.start ?? 'none') as ArrowKind} onChange={(k) => setStyle({ start: k === 'none' ? undefined : k }, undefined, 'edge')} />
           <ArrowPick label="End" value={(st.end ?? 'arrow') as ArrowKind} onChange={(k) => setStyle({ end: k === 'arrow' ? undefined : k }, undefined, 'edge')} />
-          <Tool label="Swap the ends" onClick={() => setEdges((x) => ({ ...x, from: x.to, to: x.from, points: x.points ? [...x.points].reverse() : undefined, fromText: x.toText, toText: x.fromText, style: patched(x.style, { start: x.style?.end ?? 'arrow', end: x.style?.start ?? 'none' }) }))}>
+          <Tool label="Swap the ends" onClick={() => change((p) => swapEnds(p, ids))}>
             <ArrowLeftRight size={15} />
           </Tool>
         </Field>
@@ -488,6 +497,14 @@ export function FormatPanel({ d, page, sel, readOnly, change, changeDiagram, sna
         )}
         <Tool label={lock ? 'Unlock' : 'Lock'} on={lock} onClick={() => change((p) => ({ ...p, items: p.items.map((it) => (ids.has(it.id) ? ({ ...it, locked: lock ? undefined : true } as DiagramItem) : it)) }))}>
           {lock ? <Lock size={15} /> : <LockOpen size={15} />}
+        </Tool>
+        {items.length === 1 && (
+          <Tool label="Copy style" onClick={act.copyStyle}>
+            <Brush size={15} />
+          </Tool>
+        )}
+        <Tool label="Paste style" disabled={!act.canPasteStyle} onClick={act.pasteStyle}>
+          <PaintBucket size={15} />
         </Tool>
       </div>
       {shapes.length > 1 && (
