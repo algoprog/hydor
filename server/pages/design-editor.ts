@@ -218,6 +218,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   let zoom = 1;
   let fitting = true;
   let dirty = false;
+  /** Space held: a drag pans the canvas. */
+  let spaceDown = false;
 
   // ---- geometry -------------------------------------------------------------------------------------------------
   const num = (v: string | null | undefined, d: number) => {
@@ -499,6 +501,21 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     tellZoom();
     redraw();
   };
+  /** Zooms to what is picked, as big as fits the window, and puts it in the middle (the artboard when nothing is). */
+  const fitSel = () => {
+    if (!sel.length) return fit();
+    const box = () => {
+      const rs = sel.map((x) => x.getBoundingClientRect());
+      return { l: Math.min(...rs.map((r) => r.left)), r: Math.max(...rs.map((r) => r.right)), t: Math.min(...rs.map((r) => r.top)), b: Math.max(...rs.map((r) => r.bottom)) };
+    };
+    const a = box();
+    const w = Math.max(1, (a.r - a.l) / zoom);
+    const h = Math.max(1, (a.b - a.t) / zoom);
+    setZoom(Math.min((innerWidth - 200) / w, (innerHeight - 240) / h), { x: (a.l + a.r) / 2, y: (a.t + a.b) / 2 });
+    const c = box();
+    scrollBy((c.l + c.r) / 2 - innerWidth / 2, (c.t + c.b) / 2 - innerHeight / 2);
+    redraw();
+  };
   const showBoard = (b: HTMLElement) => {
     const r = b.getBoundingClientRect();
     if (r.bottom < 60 || r.top > innerHeight - 60) scrollBy(0, r.top - 80);
@@ -606,6 +623,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         many: many ? { x: r1(many.x), y: r1(many.y), w: r1(many.w), h: r1(many.h), types: [...new Set(sel.map(typeOf))], locked: sel.some(locked) } : null,
         canGroup: sel.length > 1 && sel.every((x) => x.parentElement === sel[0].parentElement),
         scope: !!scope,
+        canLook: !!lookClip,
       },
     });
   };
@@ -1474,6 +1492,22 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     );
   };
 
+  /** The canvas dragged with Space held (or the middle button): it scrolls with the pointer. */
+  const panStart = (e: PointerEvent) => {
+    let lx = e.clientX;
+    let ly = e.clientY;
+    drag(
+      e,
+      (ev) => {
+        scrollBy(lx - ev.clientX, ly - ev.clientY);
+        lx = ev.clientX;
+        ly = ev.clientY;
+      },
+      () => {},
+      0,
+    );
+  };
+
   /** A box dragged over the canvas picks what it touches (on its artboard, or in the group gone into). */
   const marqueeStart = (e: PointerEvent, b: HTMLElement | null, add: boolean) => {
     const keep = add ? [...sel] : [];
@@ -1605,6 +1639,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   };
   let lookClip: ReturnType<typeof lookOf> | null = null;
   let clip = '';
+  /** The words this editor last put on the computer's clipboard (null: none, or it could not). */
+  let ownText: string | null = null;
   let pasted = 0;
   const KEEP = /^(left|top|right|bottom|width|height|transform|position|margin.*)$/;
 
@@ -1836,23 +1872,27 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         return changed();
       }
       case 'align': {
+        // arg: 'left'…'bottom', or { how, to: 'page' } to line several up with the page (an artboard, or a group gone into)
+        // each, not with one another.
+        const how = typeof arg === 'string' ? arg : String(arg?.how ?? '');
+        const toPage = typeof arg === 'object' && arg?.to === 'page';
         const list = sel.filter((x) => !locked(x));
         if (!list.length) return;
         const parent = list[0].parentElement as HTMLElement;
         remember();
         settle(parent);
-        const target = list.length > 1 ? union(list.map(aabb)) : isBoard(parent) ? { x: 0, y: 0, ...sizeOfBoard(parent) } : { x: 0, y: 0, w: parent.offsetWidth, h: parent.offsetHeight };
+        const target = list.length > 1 && !toPage ? union(list.map(aabb)) : isBoard(parent) ? { x: 0, y: 0, ...sizeOfBoard(parent) } : { x: 0, y: 0, w: parent.offsetWidth, h: parent.offsetHeight };
         for (const el of list) {
           const b = aabb(el);
           const g = boxOf(el);
           let dx = 0;
           let dy = 0;
-          if (arg === 'left') dx = target.x - b.x;
-          if (arg === 'center') dx = target.x + target.w / 2 - (b.x + b.w / 2);
-          if (arg === 'right') dx = target.x + target.w - (b.x + b.w);
-          if (arg === 'top') dy = target.y - b.y;
-          if (arg === 'middle') dy = target.y + target.h / 2 - (b.y + b.h / 2);
-          if (arg === 'bottom') dy = target.y + target.h - (b.y + b.h);
+          if (how === 'left') dx = target.x - b.x;
+          if (how === 'center') dx = target.x + target.w / 2 - (b.x + b.w / 2);
+          if (how === 'right') dx = target.x + target.w - (b.x + b.w);
+          if (how === 'top') dy = target.y - b.y;
+          if (how === 'middle') dy = target.y + target.h / 2 - (b.y + b.h / 2);
+          if (how === 'bottom') dy = target.y + target.h - (b.y + b.h);
           setBox(el, { x: g.x + dx, y: g.y + dy });
         }
         return changed();
@@ -1986,6 +2026,10 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         if (!sel.length) return;
         clip = sel.map((x) => x.outerHTML).join('\n');
         pasted = 0;
+        // Its words go to the computer's clipboard too, so a paste can tell this copy from words copied elsewhere since.
+        ownText = null;
+        const words = sel.map((x) => (writable(x) ? x.innerText.trim() : '')).filter(Boolean).join('\n');
+        if (words) navigator.clipboard?.writeText(words).then(() => (ownText = words), () => {});
         send({ type: 'wa-ed-copied', html: clip, name: sel.length > 1 ? L('dMany', '{0} elements').replace('{0}', String(sel.length)) : nameOf(sel[0]) });
         if (a === 'cut') act('del');
         return;
@@ -2027,6 +2071,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       }
       case 'zoom': {
         if (arg === 'fit') return fit();
+        if (arg === 'sel') return fitSel();
         if (arg === 'in') return setZoom(zoom * 1.25);
         if (arg === 'out') return setZoom(zoom / 1.25);
         if (typeof arg === 'number') return setZoom(arg);
@@ -2448,6 +2493,12 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     'pointerdown',
     (e) => {
       if (fromUi(e) || inEditing(e)) return;
+      if (e.button === 1 || (e.button === 0 && spaceDown)) {
+        e.preventDefault();
+        window.focus();
+        if (editing) endText();
+        return panStart(e);
+      }
       if (e.button !== 0 && e.button !== 2) return;
       e.preventDefault();
       window.focus();
@@ -2611,6 +2662,13 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         askFile(pics[0], b, visibleMiddle(b), target);
         return;
       }
+      // Words from elsewhere (not this editor's own copy, which came with its own words): a text box, as in Canva.
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (text.trim() && b && !(ownText !== null && text === ownText) && (!clip || ownText !== null)) {
+        e.preventDefault();
+        send({ type: 'wa-ed-design', what: 'text', text: text.slice(0, 5000) });
+        return;
+      }
       if (clip) {
         e.preventDefault();
         act('paste');
@@ -2678,6 +2736,30 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       if (mod && k.toLowerCase() === 'a') {
         e.preventDefault();
         return act('selectAll');
+      }
+      if (mod && (k === '/' || k === '?')) {
+        e.preventDefault();
+        return send({ type: 'wa-ed-design', what: 'keys' });
+      }
+      // Shift+2: zoom to what is picked (the key by its place, as it is "@" on some keyboards).
+      if (e.shiftKey && !mod && !e.altKey && e.code === 'Digit2') {
+        e.preventDefault();
+        return act('zoom', 'sel');
+      }
+      // The menu key, or Shift+F10: the right-click menu, by what is picked.
+      if (k === 'ContextMenu' || (k === 'F10' && e.shiftKey && !mod && !e.altKey)) {
+        e.preventDefault();
+        const first = sel[0]?.getBoundingClientRect() ?? board?.getBoundingClientRect();
+        return send({ type: 'wa-ed-design', what: 'menu', x: (first?.left ?? 40) + 12, y: (first?.top ?? 40) + 12, keyed: true });
+      }
+      // Space held: a drag pans the canvas.
+      if (k === ' ' && !mod && !e.altKey) {
+        e.preventDefault();
+        if (!spaceDown) {
+          spaceDown = true;
+          root.classList.add('n-panning');
+        }
+        return;
       }
       if (mod && k.toLowerCase() === 'v') return; // the paste event comes
       if (!sel.length) return;
@@ -2757,11 +2839,18 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     true,
   );
 
+  const letGoOfSpace = () => {
+    spaceDown = false;
+    root.classList.remove('n-panning');
+  };
+  addEventListener('keyup', (e) => e.key === ' ' && letGoOfSpace(), true);
+  addEventListener('blur', letGoOfSpace);
+
   // ---- the HTML to give back ------------------------------------------------------------------------------------------
   const serialize = (): string => {
     const copy = root.cloneNode(true) as HTMLElement;
     for (const el of copy.querySelectorAll('[data-n-own]')) el.remove();
-    copy.classList.remove('n-editing');
+    copy.classList.remove('n-editing', 'n-panning');
     if (!copy.classList.length) copy.removeAttribute('class');
     copy.removeAttribute('data-n-theme');
     for (const el of [copy, ...copy.querySelectorAll('*')]) {
