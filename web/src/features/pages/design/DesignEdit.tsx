@@ -4,8 +4,9 @@
 // is picked, or the artboard), and a bar on top: undo, redo, Resize (a copy at another size), Download (PNG, JPG or a
 // PDF to print), the keyboard shortcuts (Ctrl+/) and the zoom. A right click (or the bar's ⋯, or the menu key) holds what
 // fits what is picked: cut, copy, paste, duplicate, delete, order, lining up with the page or with one another, lock,
-// group, the look copied from one to another, select all. Words pasted from elsewhere become a text box. In a narrow
-// panel, Add opens over the page and the inspector sits under it.
+// group, hide, the look copied from one to another, select all, and Layers. Words pasted from elsewhere become a text
+// box. The Add panel's Layers tab lists the page's parts front to back, to pick, reorder, hide, lock and name them. In a
+// narrow panel, Add opens over the page and the inspector sits under it.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Download, Keyboard, Maximize, Minus, PanelLeftClose, PanelLeftOpen, Plus, Redo2, Scaling, Undo2 } from 'lucide-react';
 import { designSize, isDesignHtml, type DesignSize } from '@shared/design';
@@ -23,7 +24,8 @@ import { editKeptVideo } from '../../mediaedit/video/open';
 import { pageData } from '../../images/studio';
 import { pictureData } from '../studio/Inspector';
 import { firstFrame, uploadVideo } from '../slides/media';
-import { DesignAdd } from './AddPanel';
+import { DesignAdd, type AddTab } from './AddPanel';
+import { findIn as findLayer, type DLayer } from './Layers';
 import { DesignInspector } from './Inspector';
 import { DownloadDialog, ResizeDialog } from './dialogs';
 import { DEFAULT_LOOK, designLabels, pastedTextHtml, type Look } from './elements';
@@ -76,6 +78,8 @@ export interface DSel {
   scope: boolean;
   /** A look was copied (Copy the look), to paste on another. */
   canLook?: boolean;
+  /** Where each picked part is in the page (for Layers). */
+  paths?: number[][];
 }
 
 export type DCmd = (c: string, arg?: unknown) => void;
@@ -108,6 +112,7 @@ export async function deviceVideo(file: File, onProgress?: (n: number) => void) 
 }
 
 const ZOOMS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+
 
 export function DesignEdit({
   editRef,
@@ -148,6 +153,8 @@ export function DesignEdit({
   const beside = width >= 760;
   const [addShown, setAddShown] = useState(true);
   const [addOver, setAddOver] = useState(false);
+  const [addTab, setAddTab] = useState<{ tab: AddTab; n: number } | undefined>(undefined);
+  const [layers, setLayers] = useState<DLayer[] | null>(null);
   const [menu, setMenu] = useState<ContextMenuAt | null>(null);
   const [keysOpen, setKeysOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -262,6 +269,8 @@ export function DesignEdit({
         return setBoards({ list: (d.list as { w: number; h: number }[]) ?? [], current: Number(d.current) || 0 });
       case 'used':
         return setUsed({ colours: ((d.colours as string[]) ?? []).slice(0, 16), fonts: ((d.fonts as string[]) ?? []).slice(0, 12) });
+      case 'layers':
+        return setLayers(Array.isArray(d.list) ? (d.list as DLayer[]) : []);
       case 'menu': {
         const f = editRef.current?.frame()?.getBoundingClientRect();
         return f && setMenu({ x: f.left + Number(d.x), y: f.top + Number(d.y), keyed: !!d.keyed });
@@ -320,13 +329,23 @@ export function DesignEdit({
       brand={brand}
       onFont={useFont}
       onDone={() => !wide && setAddOver(false)}
+      layers={layers}
+      picked={sel?.paths ?? []}
+      show={addTab}
     />
   );
+  /** The Add panel open on its Layers tab (over the page, in a narrow panel). */
+  const showLayers = () => {
+    setAddTab((t) => ({ tab: 'layers', n: (t?.n ?? 0) + 1 }));
+    if (wide) setAddShown(true);
+    else setAddOver(true);
+  };
 
   // The right-click menu: what fits what is picked (the keys of each are written beside it).
   const pasteIn = () => cmd('paste', designClip ? { html: designClip } : undefined);
   const pickedOne = sel?.kind === 'el' || sel?.kind === 'many';
   const lockedNow = !!(sel?.el?.locked || sel?.many?.locked);
+  const hiddenNow = !!layers && !!sel?.paths?.length && sel.paths.every((p) => findLayer(layers, p)?.h);
   const alignList = (to?: 'page'): MenuEntry[] =>
     (
       [
@@ -364,6 +383,7 @@ export function DesignEdit({
         },
         '-',
         { label: lockedNow ? 'Unlock' : 'Lock', keys: 'Alt+Shift+L', run: () => cmd('lock') },
+        { label: hiddenNow ? 'Show' : 'Hide', also: 'hide show visible layer', keys: 'Ctrl+Shift+H', run: () => cmd('layer', { hide: !hiddenNow }) },
         sel?.canGroup && { label: 'Group', keys: 'Ctrl+G', run: () => cmd('group') },
         sel?.el?.type === 'group' && { label: 'Ungroup', keys: 'Ctrl+Shift+G', run: () => cmd('ungroup') },
         '-',
@@ -371,11 +391,13 @@ export function DesignEdit({
         { label: 'Paste the look', keys: 'Ctrl+Alt+V', disabled: !sel?.canLook || lockedNow, run: () => cmd('pasteStyle') },
         '-',
         { label: 'Select all', keys: 'Ctrl+A', run: () => cmd('selectAll') },
+        { label: 'Layers', also: 'rename hide reorder', run: showLayers },
         !!onAsk && !!sel?.el && { label: 'Ask the agent', run: ask },
       ]
     : [
         { label: 'Paste', keys: 'Ctrl+V', run: pasteIn },
         { label: 'Select all', keys: 'Ctrl+A', run: () => cmd('selectAll') },
+        { label: 'Layers', also: 'rename hide reorder', run: showLayers },
         '-',
         { label: 'Add a page', run: () => cmd('addBoard', {}) },
       ];
@@ -392,6 +414,7 @@ export function DesignEdit({
         ['Ctrl+G', 'Group'],
         ['Ctrl+Shift+G', 'Ungroup'],
         ['Alt+Shift+L', 'Lock or unlock'],
+        ['Ctrl+Shift+H', 'Hide or show'],
         ['Arrow', 'Nudge by one pixel'],
         ['Shift+Arrow', 'Nudge by ten'],
         ['Ctrl+] / Ctrl+[', 'Bring forward or send backward'],

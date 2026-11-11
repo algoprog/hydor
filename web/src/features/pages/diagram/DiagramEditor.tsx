@@ -703,6 +703,12 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       selectAll();
       return;
     }
+    // Ctrl+Alt+C copies the style (before plain Ctrl+C, which would take it).
+    if (mod && e.altKey && (k === 'c' || e.code === 'KeyC')) {
+      e.preventDefault();
+      if (sel.length === 1) act.copyStyle();
+      return;
+    }
     if (mod && k === 'c') {
       e.preventDefault();
       void copy(false);
@@ -719,11 +725,6 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       const b = sel.length ? boundsOf(page, new Set(sel)) : null;
       const r = canvas.current?.el()?.getBoundingClientRect();
       if (r) setCtx({ x: r.left + (b ? view.x + (b.x + b.w) * view.k : 80), y: r.top + (b ? view.y + (b.y + b.h / 2) * view.k : 80), keyed: true, hit: picked[0] ?? null });
-      return;
-    }
-    if (mod && e.altKey && (k === 'c' || e.code === 'KeyC')) {
-      e.preventDefault();
-      if (sel.length === 1) act.copyStyle();
       return;
     }
     if (readOnly) return;

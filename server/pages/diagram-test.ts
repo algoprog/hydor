@@ -24,7 +24,7 @@ import { distanceTo, edgeCourse, edgeGeom } from '../../shared/diagram-route.ts'
 import { layout } from '../../shared/diagram-layout.ts';
 import { LAYOUTS, specPage, sizeFor } from '../../shared/diagram-spec.ts';
 import { applyDiagramEdits, relayoutPage } from '../../shared/diagram-edits.ts';
-import { alignShapes, cloneItems, copyStyle, distributeShapes, hitItem, moveItems, movingSet, pasteStyle, removeItems, reorder, reparent, setRoute, snapBox, swapEnds } from '../../shared/diagram-ops.ts';
+import { alignShapes, boundsOf, cloneItems, copyStyle, distributeShapes, hitItem, moveItems, movingSet, pasteStyle, removeItems, reorder, reparent, scaleItems, setRoute, snapBox, swapEnds, turnItems } from '../../shared/diagram-ops.ts';
 import { pageSvg, sketchPath } from '../../shared/diagram-render.ts';
 import { PALETTE } from '../../shared/diagram-palette.ts';
 import { draftDiagram } from '../../shared/draft-diagram.ts';
@@ -360,6 +360,32 @@ const edge = (id: string, from: string, to: string, more: Partial<DiagramEdge> =
   const sw = byId(swapEnds(st, ['e1']), 'e1') as DiagramEdge;
   ok(sw.from.id === 's2' && sw.to.id === 's1' && sw.fromText === 'N' && sw.toText === '1' && JSON.stringify(sw.points) === '[[20,20],[10,10]]', 'the ends swapped, with the words at them and the bends');
   ok(sw.style?.start === 'diamond' && sw.style?.end === 'none' && swapEnds(swapEnds(st, ['e2']), ['e2']).items[4].style?.start === 'arrow', 'and their arrows (twice, as it was)');
+  // Several sized and turned together, by the frame round them.
+  const two: DiagramPage = {
+    id: 'm',
+    name: 'M',
+    items: [shape('a', 0, 0, 100, 50), shape('b', 200, 100, 100, 100), shape('t', 0, 200, 100, 20, { rot: 90 }), shape('lk', 400, 0, 50, 50, { locked: true }), edge('ab', 'a', 'b', { points: [[150, 25], [150, 150]] }), { id: 'fr', type: 'edge', from: { x: 0, y: 300 }, to: { x: 300, y: 300 } }],
+  };
+  const all = new Set(['a', 'b', 'ab', 'fr', 'lk']);
+  const from = boundsOf(two, new Set(['a', 'b']))!;
+  ok(from.x === 0 && from.y === 0 && from.w === 300 && from.h === 200, 'the frame round two shapes');
+  const big = scaleItems(two, all, from, { x: 0, y: 0, w: 600, h: 200 });
+  const A = byId(big, 'a') as DiagramShape;
+  const B = byId(big, 'b') as DiagramShape;
+  ok(A.x === 0 && A.w === 200 && A.h === 50 && B.x === 400 && B.w === 200 && B.y === 100, 'twice as wide: each shape twice as wide, in the same place of the frame');
+  ok(JSON.stringify((byId(big, 'ab') as DiagramEdge).points) === '[[300,25],[300,150]]' && (byId(big, 'fr') as DiagramEdge).to.x === 600, 'with the bends and free ends of connectors');
+  ok(byId(big, 'lk') === byId(two, 'lk'), 'a locked shape stays');
+  const tall = byId(scaleItems(two, new Set(['t']), pageBox(byId(two, 't') as DiagramShape), { ...pageBox(byId(two, 't') as DiagramShape), h: 200 }), 't') as DiagramShape;
+  ok(Math.abs(tall.w - 200) < 0.01 && Math.abs(tall.h - 20) < 0.01, `a shape turned a quarter grows along its own side that runs up and down (${tall.w} × ${tall.h})`);
+  const round = scaleItems(scaleItems(two, all, from, { x: 50, y: 20, w: 150, h: 400 }), all, { x: 50, y: 20, w: 150, h: 400 }, from);
+  ok(['a', 'b'].every((id) => JSON.stringify(byId(round, id)) === JSON.stringify(byId(two, id))), 'sized and sized back: as they were');
+  const c = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
+  const turned = turnItems(two, all, c, 90);
+  const TA = byId(turned, 'a') as DiagramShape;
+  ok(TA.rot === 90 && Math.abs(TA.x + TA.w / 2 - 225) < 0.01 && Math.abs(TA.y + TA.h / 2) < 0.01, `turned a quarter about the frame’s middle: each shape turned, its middle carried round (${TA.x + TA.w / 2}, ${TA.y + TA.h / 2})`);
+  const back = turnItems(turned, all, c, -90);
+  ok(!(byId(back, 'a') as DiagramShape).rot && (byId(back, 'a') as DiagramShape).x === 0 && JSON.stringify((byId(back, 'ab') as DiagramEdge).points) === '[[150,25],[150,150]]', 'and back: as it was, no turn left');
+  ok((byId(turnItems(two, new Set(['t']), c, 270), 't') as DiagramShape).rot === undefined, 'a full turn is no turn');
 }
 
 // ---- drawn ------------------------------------------------------------------------------------------------------------
