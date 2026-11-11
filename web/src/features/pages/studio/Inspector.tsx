@@ -781,7 +781,7 @@ export function PartPanel({
             title="Place"
           />
         </Row>
-        {sel.tag !== 'body' && c.position !== 'sticky' && (
+        {sel.tag !== 'body' && (
           <div className="pl-[92px]">
             <button type="button" onClick={() => cmd('place', c.position && c.position !== 'static' ? 'flow' : 'free')} className="rounded-md py-0.5 text-[12px] text-accent hover:underline">
               {c.position && c.position !== 'static' ? 'Back in the flow' : 'Place freely, then drag it'}
