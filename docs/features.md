@@ -484,8 +484,12 @@ agents that speak ACP and take MCP servers.
   YouTube and Vimeo videos with their stills and videos from this device (up to 200 MB), connectors that stay joined to
   shapes as they move (straight or elbowed), comments on a slide or a part of it with replies that agents answer and
   resolve; groups (a part in one placed where it is on the slide), find and replace across slides, speaker notes,
-  charts and equations, zoom, the format painter, a grid, rulers and guides, snapping guides and equal
-  gaps, alignment, stacking, undo, copy and paste; animations in order (on a click, with or after the one before, a
+  charts and equations, zoom, the format painter, a grid, rulers and guides, smart guides as in PowerPoint and Keynote (lines
+  between the parts that line up, distances to the parts beside and the slide's edges, equal gaps, equal sizes, the place,
+  size or angle by the pointer, every resize snapping, a turned part by the box it shows, Alt to move freely, Ctrl to drag
+  a copy, View → Snap to parts and guides), alignment (with each other or the slide), stacking, lock, undo, copy and paste
+  through the system clipboard (words, pictures), right-click menus on a part, the empty slide, a table's cell (rows and
+  columns put in or taken out anywhere, merging, fills) and a slide in the list; animations in order (on a click, with or after the one before, a
   paragraph at a time) and transitions, Morph among them (what two slides share glides into place); slide numbers
   and a footer; themes of colours and fonts; speaker notes; a slideshow (keys, swipes, black and white screens,
   every slide at once, a laser pointer, a pen and live captions) and a presenter's view with notes, the next slide,
