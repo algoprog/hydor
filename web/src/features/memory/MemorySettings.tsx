@@ -3,59 +3,51 @@
 // the deleted ones) that open as pages of their own, searchable by words and meaning, and each note whole in a
 // dialog; learning from conversations and the daily tidy-up; what agents get (search by meaning, how many notes,
 // how long the profile may be); and your data (bring in from other assistants, export, clear). On a phone the menus are sheets.
-import { useLayoutEffect, useRef, useState } from "react";
-import { useSearch } from "wouter";
-import { Switch, SheetsOnPhone, Throbber } from "../../components/ui";
-import { Notice, SectionActions, Stack } from "../settings/kit";
-import { BringIn } from "./BringIn";
-import { reloadState } from "./common";
-import { put } from "../../lib/api";
-import { toastError } from "../../lib/store";
-import { LearningGroup } from "./MemoryLearning";
-import { NotesGroup, PlacePage, parsePlace } from "./MemoryNotes";
-import { AgentsGetGroup, YourDataGroup } from "./MemoryOptions";
-import { ProfileGroup } from "./MemoryProfile";
-import { useMemoryState } from "./state";
+import { useLayoutEffect, useRef, useState } from 'react';
+import { useSearch } from 'wouter';
+import { Switch, SheetsOnPhone, Throbber } from '../../components/ui';
+import { Notice, SectionActions, Stack } from '../settings/kit';
+import { BringIn } from './BringIn';
+import { reloadState } from './common';
+import { put } from '../../lib/api';
+import { toastError } from '../../lib/store';
+import { LearningGroup } from './MemoryLearning';
+import { NotesGroup, PlacePage, parsePlace, placeClosed } from './MemoryNotes';
+import { AgentsGetGroup, YourDataGroup } from './MemoryOptions';
+import { ProfileGroup } from './MemoryProfile';
+import { useMemoryState } from './state';
 
 export function MemorySettings() {
   const st = useMemoryState();
-  const notes = new URLSearchParams(useSearch()).get("notes");
+  const notes = new URLSearchParams(useSearch()).get('notes');
   const place = parsePlace(notes);
   const [bringing, setBringing] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  // A place opens (or closes) at the top of the page.
+  /** Where the page was scrolled to, so that coming back from a place lands where you left. */
+  const indexTop = useRef(0);
+  // A place opens at the top of the page; back on the index, where it was.
   useLayoutEffect(() => {
-    root.current?.closest<HTMLElement>(".overflow-y-auto")?.scrollTo(0, 0);
-  }, [notes]);
+    const el = root.current?.closest<HTMLElement>('.overflow-y-auto');
+    if (place) return void el?.scrollTo(0, 0);
+    placeClosed();
+    if (!el) return;
+    el.scrollTo(0, indexTop.current);
+    const on = () => (indexTop.current = el.scrollTop);
+    el.addEventListener('scroll', on, { passive: true });
+    return () => el.removeEventListener('scroll', on);
+  }, [notes]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     // Menus open as sheets from the bottom on a phone.
     <SheetsOnPhone.Provider value>
       <div ref={root}>
         <SectionActions>
-          {st ? (
-            <Switch
-              on={st.enabled}
-              label="Memory"
-              onChange={(enabled) =>
-                put("/api/memory", { enabled })
-                  .then(reloadState)
-                  .catch(toastError)
-              }
-            />
-          ) : (
-            <Throbber className="text-fg-3" />
-          )}
+          {st ? <Switch on={st.enabled} label="Memory" onChange={(enabled) => put('/api/memory', { enabled }).then(reloadState).catch(toastError)} /> : <Throbber className="text-fg-3" />}
         </SectionActions>
         {place ? (
           <PlacePage key={notes} place={place} />
         ) : (
           <Stack>
-            {st && !st.enabled && (
-              <Notice tone="warn">
-                Memory is off: agents get no notes and save nothing new. Your
-                notes stay.
-              </Notice>
-            )}
+            {st && !st.enabled && <Notice tone="warn">Memory is off: agents get no notes and save nothing new. Your notes stay.</Notice>}
             <ProfileGroup />
             <NotesGroup onBringIn={() => setBringing(true)} />
             <LearningGroup />
