@@ -6,9 +6,9 @@ import type { MenuAction, MenuDef, MenuEntry } from '../../pages/common/menus';
 import type { ShortcutGroup } from '../../pages/common/Shortcuts';
 import { isMod } from '../../pages/common/keys';
 
-export { MenuBar, type MenuAction, type MenuDef, type MenuEntry } from '../../pages/common/menus';
+export { ContextMenu, isMenuKey, MenuBar, type ContextMenuAt, type MenuAction, type MenuDef, type MenuEntry } from '../../pages/common/menus';
 export { ShortcutsDialog, type ShortcutGroup } from '../../pages/common/Shortcuts';
-export { isApple, isMod, keyLabel } from '../../pages/common/keys';
+export { isApple, isCopyDrag, isMod, isNoSnap, keyLabel } from '../../pages/common/keys';
 
 type KeyEvent = { key: string; code: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean };
 
