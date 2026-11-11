@@ -106,7 +106,7 @@ export function MachineSettings() {
                 {m.status.state === 'offline' && m.status.error && <div translate="no" className="text-[12.5px] leading-snug text-fg-3">{m.status.error}</div>}
               </Row>
             ))}
-            {!list.length && <EmptyRow>None yet. Install Hydor on the other machine, make an access token there, then add it here: the sidebar then switches between machines, and notices from all of them reach you.</EmptyRow>}
+            {!list.length && <EmptyRow>No other machines yet. Install Hydor on one, make an access token there, then add it here.</EmptyRow>}
           </>
         )}
       </Group>
@@ -270,7 +270,7 @@ function AccessTokens() {
             <Throbber className="text-fg-3" />
           </div>
         ) : !list.length ? (
-          <EmptyRow>None yet</EmptyRow>
+          <EmptyRow>No tokens yet</EmptyRow>
         ) : (
           list.map((t) => (
             <Row
