@@ -90,7 +90,7 @@ With [**Update automatically**](/settings?s=accounts&find=Update%20automatically
 - Claude Code follows its own release line: the stable one when its settings say `"autoUpdatesChannel": "stable"`, else the latest.
 - If you turned Claude Code's own updates off with `DISABLE_AUTOUPDATER=1` (the Docker image does), the app doesn't update your Claude Code by itself either. **Update now** still does.
 
-The app keeps a new version only once it works the way the sessions use it. Claude Code must answer as a session starts and list its models, Codex must start its app server and list its models, and the others must start and say their version. None of this needs a sign-in or uses any of your plan. A version that fails is undone:
+The app keeps a new version only once it works the way the sessions use it. Claude Code must answer as a session starts and list its models, Codex must start its app server and list its models, and the others must start and say their version. None of this needs a sign-in or uses any of your plan. Each gets a minute to answer, and only time the computer is awake counts, so a Mac that goes to sleep in the middle of the check doesn't use the minute up. One that is slow to answer the first time (a Mac looks a new program over before it first runs it) is started again with two more minutes, and fails only if it doesn't answer then either. A version that fails is undone:
 
 - A copy the app installed, or one of yours it updated with npm, goes back to the version before.
 - For your own Claude Code, the sessions keep running the version before, which Claude Code's installer keeps beside the new one. The `claude` command in a terminal stays on the new one. The row says "… did not work here".

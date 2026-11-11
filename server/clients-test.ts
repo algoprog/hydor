@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { acpEnvFor, clients, clientUpdates, clientUpdatesRunning, CLIENTS_BIN, lookup, newer, PACKAGES, pickTag, setClientAutoUpdate, startClientUpdates, updateOwn, versionOf, watchClients, works } from './clients.ts';
+import { acpEnvFor, awakeTimeout, clients, clientUpdates, clientUpdatesRunning, CLIENTS_BIN, limits, lookup, newer, PACKAGES, pickTag, setClientAutoUpdate, startClientUpdates, updateOwn, versionOf, watchClients, works } from './clients.ts';
 import { config } from './config.ts';
 import { kvGet, openDb } from './db.ts';
 
@@ -89,6 +89,32 @@ const main = async () => {
   assert.equal(await works('pi-acp', piAcp), null, 'the Pi adapter answers the ACP handshake');
   assert.match((await works('pi-acp', piAcpBroken)) ?? '', /cannot start pi/);
   assert.match((await works('pi-acp', '/bin/false')) ?? '', /stopped before answering|did not start/);
+
+  // The time to answer counts only while the computer is awake: Node's timers count a Mac's sleep, so a check that
+  // a sleep cut in two used to fail the moment the Mac woke. Here each tick finds the clock an hour on (a sleep
+  // between every two), and each such gap counts as a second and a half: four seconds take three ticks, not one.
+  let reads = 0;
+  const ticks = await new Promise<number>((resolve) => awakeTimeout(4000, () => resolve(reads), () => ++reads * 3_600_000));
+  assert.equal(ticks, 4, 'an hour asleep counts as a second and a half');
+
+  // A first start that does not answer in time gets a second, longer one; one that answers neither time fails, saying so.
+  const was = { ...limits };
+  limits.answer = 1000;
+  limits.again = 2000;
+  const slowOnce = path.join(tmp, 'codex-slow-once');
+  script(slowOnce, [`[ -e ${tmp}/started ] || { touch ${tmp}/started; exec sleep 5; }`, `exec ${codex} "$@"`].join('\n'));
+  assert.equal(await works('codex', slowOnce), null, 'slow the first time only: it works');
+  const silent = path.join(tmp, 'codex-silent');
+  script(silent, 'echo "loading models" >&2; exec sleep 10');
+  assert.equal(await works('codex', silent), 'it did not answer within 1 s, nor within 2 s when started again (loading models)');
+  const silentVersion = path.join(tmp, 'gemini-silent');
+  script(silentVersion, 'exec sleep 10');
+  assert.equal(await works('gemini', silentVersion), 'it did not answer within 1 s, nor within 2 s when started again', 'the others’ --version too');
+  const crashTimes = path.join(tmp, 'crashes');
+  script(path.join(tmp, 'codex-crash'), `echo x >> ${crashTimes}; exit 4`);
+  assert.match((await works('codex', path.join(tmp, 'codex-crash'))) ?? '', /stopped before answering \(exit code 4\)/);
+  assert.equal(fs.readFileSync(crashTimes, 'utf8'), 'x\n', 'one that stops is not started again');
+  Object.assign(limits, was);
 
   // Pi: the adapter and the agent itself, both installed without running their install scripts; the agent stays current as an entry of its own, out of Settings' list.
   assert.deepEqual(PACKAGES['pi-acp'], { pkg: 'pi-acp', name: 'Pi', with: ['pi'], ignoreScripts: true });
