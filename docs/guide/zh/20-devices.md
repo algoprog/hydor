@@ -44,7 +44,7 @@ Hydor 在任何浏览器里都能用：在你的手机上、在另一台电脑�
 - **Discord**：在开发者门户（discord.com/developers/applications）中创建一个 **New Application**。在 **Bot** 下点击 **Reset Token** 并复制它，然后打开 **Message Content Intent**，这样机器人才能读到你写的内容。把令牌粘贴到 [Discord](/settings?s=chat&find=Discord) 下，然后点击**连接**。接着用**更多 → 把机器人添加到服务器**把机器人添加到你自己的服务器（Discord 只允许你给与你共处同一服务器的机器人发消息，所以一个你自己的小服务器就够了）。邀请会请求“查看频道”“发送消息”和“阅读消息历史”权限，Hydor 还会向 Discord 登记它的斜杠命令。
 - **Slack**：在 api.slack.com/apps 选择 **Create New App → From a manifest**，选好你的工作区，并粘贴 **复制清单**（在 [Slack](/settings?s=chat&find=Slack) 下）复制的清单：它会开启 Socket Mode，订阅私信和提及，添加 `/hydor` 命令，并请求这些机器人权限范围：`app_mentions:read`、`chat:write`、`commands`、`im:history`、`reactions:write` 和 `users:read`。在 **Basic Information → App-Level Tokens** 下生成一个带 `connections:write` 权限范围的令牌（以 `xapp-` 开头）；在 **Install App** 下把应用安装到你的工作区，并复制 Bot User OAuth Token（以 `xoxb-` 开头）。把两个令牌都粘贴进去并点击**连接**。
 
-连接后，该行会显示机器人的名字和它的状态（“正在接收消息”，或出了什么问题：Discord 的 Message Content Intent 没开，或 Slack 应用缺少某个权限范围）。**更多 → 更换令牌**（Slack 为**更换令牌**）会换成别的令牌（换成另一个机器人时，聊天需要重新关联）；**更多 → 断开连接**会把它从 Hydor 中移除，机器人或应用本身仍归你所有。
+连接后，该行会显示机器人的名字和它的状态（“正在接收消息”，或出了什么问题：Discord 的 Message Content Intent 没开，或 Slack 应用缺少某个权限范围）。只有在服务本身拒绝令牌时，**连接**才会拒绝它：如果 Telegram、Discord 或 Slack 当时响应缓慢或无法连接（新机器人刚创建的头几分钟可能出现这种情况），Hydor 会保存令牌，该行显示**正在连接…**及原因，服务一有响应，机器人就会自动连上。一个 Telegram 机器人只能在一个地方接收消息，所以当另一个 Hydor 副本或其他程序使用同一个机器人时，该行会告诉你。**更多 → 更换令牌**（Slack 为**更换令牌**）会换成别的令牌（换成另一个机器人时，聊天需要重新关联）；**更多 → 断开连接**会把它从 Hydor 中移除，机器人或应用本身仍归你所有。
 
 ### 关联聊天
 

@@ -993,7 +993,9 @@ programs shows each program's version and what is out, with Check now, Update no
   and /status steer it (slash commands in Discord, /hydor in Slack), and every session's notices can come too. In
   Discord and Slack a channel works too, when the person who linked it mentions the bot. The app connects out (it
   asks Telegram for messages, opens Discord's Gateway and Slack's Socket Mode WebSockets itself), so none needs an
-  address on the internet; the tokens are kept in the vault.
+  address on the internet; the tokens are kept in the vault. Connect refuses a token only when the service says no to
+  it: when Telegram, Discord or Slack is slow or not reached, the token is kept, the row says Connecting… and why, and
+  the bot connects by itself once the service answers (a Telegram bot taken by another program is said too).
 
 ## Shipping the work
 - Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its

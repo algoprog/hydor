@@ -17,6 +17,8 @@ interface ChatView {
   connected: boolean;
   state: 'off' | 'connecting' | 'running' | 'error';
   error?: string;
+  /** While connecting: why the last try did not get through (the service slow to answer, or not reached). */
+  note?: string;
   warning?: string;
   bot?: { username: string; name?: string };
   chats: { id: string | number; name: string; at: number; kind?: 'dm' | 'channel' }[];
@@ -69,7 +71,7 @@ const ext = (href: string, text: string) => (
 /** The bot as it is named in its app: @name in Telegram, name · workspace in Slack. */
 const botLabel = (id: AppId, v: ChatView) => (!v.bot ? 'Connecting…' : id === 'telegram' ? `@${v.bot.username}` : v.bot.name ? `${v.bot.username} · ${v.bot.name}` : v.bot.username);
 /** What is said of a bot that is connected, in a line. */
-const statusOf = (id: AppId, v: ChatView) => (v.state === 'error' ? 'Needs attention' : `${botLabel(id, v)}${v.chats.length ? ` · ${v.chats.length === 1 ? '1 chat' : `${v.chats.length} chats`}` : ''}`);
+const statusOf = (id: AppId, v: ChatView) => (v.state === 'error' ? 'Needs attention' : `${v.state === 'running' ? botLabel(id, v) : 'Connecting…'}${v.chats.length ? ` · ${v.chats.length === 1 ? '1 chat' : `${v.chats.length} chats`}` : ''}`);
 
 function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) => void }) {
   const [fields, setFields] = useState({ token: '', appToken: '' });
@@ -197,7 +199,7 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
         : 'Send the app this code in a direct message, or mention it with the code in a channel:';
   return (
     <div className="pb-2">
-      <Row label={v.state === 'error' ? 'Not connected' : v.state === 'running' ? 'Listening for messages' : 'Starting'} hint={v.state === 'error' ? <span className="text-err">{v.error}</span> : undefined}>
+      <Row label={v.state === 'error' ? 'Not connected' : v.state === 'running' ? 'Listening for messages' : 'Connecting…'} hint={v.state === 'error' ? <span className="text-err">{v.error}</span> : v.state !== 'running' && v.note ? `${name} has not answered yet (${v.note}). Hydor keeps trying, and connects by itself when it does.` : undefined}>
         <div className="flex items-center gap-1">
           {id === 'telegram' && v.bot && (
             <a href={`https://t.me/${v.bot.username}`} target="_blank" rel="noreferrer" className="rounded-md p-1.5 text-fg-3 hover:bg-bg-2 hover:text-fg" title="Open in Telegram">
@@ -306,8 +308,9 @@ export function ChatAppsSettings() {
     setOpen(asked ?? APPS.find((a) => views[a.id]?.connected)?.id ?? null);
   }, [views, asked]);
 
-  // While a code is out, the page looks for the chat it links (and the bot's name, a moment after it connects).
-  const waiting = APPS.filter((a) => views[a.id]?.pairing || (views[a.id]?.connected && !views[a.id]?.bot && views[a.id]?.state !== 'error')).map((a) => a.id);
+  // While a code is out, the page looks for the chat it links; and until a bot listens, for how its connecting goes
+  // (it connects by itself once its service answers, and an error can clear by itself too).
+  const waiting = APPS.filter((a) => views[a.id]?.pairing || (views[a.id]?.connected && (views[a.id]?.state !== 'running' || !views[a.id]?.bot))).map((a) => a.id);
   const chats = waiting.map((id) => views[id]!.chats.length).join();
   useEffect(() => {
     if (!waiting.length) return;

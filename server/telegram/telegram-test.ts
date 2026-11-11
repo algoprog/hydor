@@ -9,6 +9,7 @@ import http from 'node:http';
 import path from 'node:path';
 import Fastify from 'fastify';
 import type { NotifyEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
+import { HttpError } from '../auth.ts';
 import { readSecret } from '../connections/vault.ts';
 import { kvSet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
@@ -29,6 +30,9 @@ const queue: TgUpdate[] = [];
 let meCalls = 0;
 let meFailFrom = Infinity;
 let throttled = 0;
+/** While set, getUpdates answers 409 with this description; conflictOnce clears it after one answer. */
+let updatesConflict: string | null = null;
+let conflictOnce = false;
 const tg = http.createServer((req, res) => {
   let raw = '';
   req.on('data', (c) => (raw += c));
@@ -43,6 +47,14 @@ const tg = http.createServer((req, res) => {
       return answer({ ok: true, result: { id: 42, is_bot: true, first_name: 'Test', username: 'test_hydor_bot' } });
     }
     if (method === 'getUpdates') {
+      if (updatesConflict !== null) {
+        const description = updatesConflict;
+        if (conflictOnce) {
+          conflictOnce = false;
+          updatesConflict = null;
+        }
+        return answer({ ok: false, error_code: 409, description });
+      }
       for (let i = 0; i < 20 && !queue.length; i++) await new Promise((r) => setTimeout(r, 50));
       return answer({ ok: true, result: queue.splice(0) });
     }
@@ -86,6 +98,10 @@ const sessions = {
   timeline: async (key: string) => ({ parser: { items: items.get(key) ?? [] } }),
 };
 const app = Fastify();
+// As the app's server answers errors: their status, and the message in words.
+app.setErrorHandler((err: Error, _req, reply) => {
+  reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message });
+});
 const d = { app, db, sessions, scheduler: {}, models: {}, broadcast() {}, toSubscribers() {}, publicBase: () => 'https://hydor.example.com' } as unknown as Deps;
 telegram.routes!(d);
 await app.ready();
@@ -243,8 +259,70 @@ test('Telegram’s “too many at once” is waited out; a reply longer than ten
   assert.match(String(parts.at(-1)!.body.text), /The rest of this reply is in the session in Hydor/);
 });
 
-test('updates are asked for by the app itself, from where it stopped; a chat removed is no longer heard', async () => {
+test('a token Telegram turns down is refused; one it gives no answer for is kept', async () => {
+  // The asking loop runs from here on, once, for the tests after this one.
   telegram.start!(d);
+  const wrong = await app.inject({ method: 'PUT', url: '/api/telegram', payload: { token: '987654321:AAWrongTokenWrongTokenWrongTokenWrong1' } });
+  assert.equal(wrong.statusCode, 400);
+  assert.match(wrong.json().error, /Telegram did not take that token: Unauthorized/);
+  assert.equal(readSecret(db, TOKEN_NAME)?.value, TOKEN, 'the vault keeps what it had');
+  // Telegram not answering at all: the token is kept, and the asking waits for it.
+  const real = process.env.TELEGRAM_API;
+  let kept;
+  process.env.TELEGRAM_API = 'http://127.0.0.1:9';
+  try {
+    kept = await app.inject({ method: 'PUT', url: '/api/telegram', payload: { token: TOKEN } });
+  } finally {
+    process.env.TELEGRAM_API = real;
+  }
+  assert.equal(kept.statusCode, 200, kept.body);
+  assert.equal(kept.json().state, 'connecting');
+  assert.match(kept.json().note, /could not be reached/);
+  assert.equal(readSecret(db, TOKEN_NAME)?.value, TOKEN, 'the token is saved');
+  let v;
+  for (let i = 0; i < 100; i++) {
+    v = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
+    if (v.state === 'running') break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(v.state, 'running');
+  assert.equal(v.bot.username, 'test_hydor_bot');
+});
+
+test('a webhook is taken off once and asking goes on; another program asking with the same bot is said in Settings, then cleared', async () => {
+  const before = sent.filter((s) => s.method === 'deleteWebhook').length;
+  // A webhook: Telegram says to take it off, which Hydor does once, and carries on.
+  updatesConflict = "Conflict: can't use getUpdates method while webhook is active; use deleteWebhook to delete the webhook first";
+  conflictOnce = true;
+  for (let i = 0; i < 50 && sent.filter((s) => s.method === 'deleteWebhook').length === before; i++) await settle();
+  assert.equal(sent.filter((s) => s.method === 'deleteWebhook').length, before + 1, 'deleteWebhook called once');
+  let v;
+  for (let i = 0; i < 50; i++) {
+    v = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
+    if (v.state === 'running') break;
+    await settle();
+  }
+  assert.equal(v.state, 'running', 'running after the webhook is off');
+  // Another copy of the bot asking: said in Settings, and asked again later until the other one stops.
+  updatesConflict = 'Conflict: terminated by other getUpdates request; make sure that only one bot instance is running';
+  for (let i = 0; i < 50; i++) {
+    v = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
+    if (v.state === 'error') break;
+    await settle();
+  }
+  assert.equal(v.state, 'error');
+  assert.match(v.error, /Another program is getting this bot’s messages/);
+  updatesConflict = null;
+  for (let i = 0; i < 200; i++) {
+    v = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
+    if (v.state === 'running') break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(v.state, 'running', 'running again once the other copy stops');
+  assert.equal(v.error, undefined);
+});
+
+test('updates are asked for by the app itself, from where it stopped; a chat removed is no longer heard', async () => {
   queue.push(msg('/help'));
   for (let i = 0; i < 100 && !texts().some((t) => t.startsWith('Send what you want done')); i++) await settle();
   assert.ok(
@@ -254,14 +332,29 @@ test('updates are asked for by the app itself, from where it stopped; a chat rem
   const v = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
   assert.equal(v.state, 'running');
   assert.equal(v.bot.username, 'test_hydor_bot');
-  // The token given again restarts the asking; Telegram failing then is tried again after a pause, not at once.
+  // The token given again restarts the asking; Telegram answering 502 then is kept, and tried again after a pause, not at once.
   const k = meCalls;
-  meFailFrom = k + 2;
-  assert.equal((await app.inject({ method: 'PUT', url: '/api/telegram', payload: { token: TOKEN } })).statusCode, 200);
+  meFailFrom = k + 1;
+  const put = await app.inject({ method: 'PUT', url: '/api/telegram', payload: { token: TOKEN } });
+  assert.equal(put.statusCode, 200, put.body);
+  assert.equal(put.json().state, 'connecting');
+  assert.equal(put.json().note, 'Bad Gateway');
+  assert.equal(put.json().connected, true);
   await new Promise((r) => setTimeout(r, 500));
   assert.ok(meCalls - k <= 3, `asked Telegram ${meCalls - k} times in half a second`);
-  assert.equal((await app.inject({ method: 'GET', url: '/api/telegram' })).json().state, 'error', 'said in Settings');
+  const waiting = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
+  assert.equal(waiting.state, 'connecting');
+  assert.equal(waiting.note, 'Bad Gateway');
+  assert.equal(waiting.error, undefined);
   meFailFrom = Infinity;
+  let back;
+  for (let i = 0; i < 100; i++) {
+    back = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
+    if (back.state === 'running' && back.bot?.username === 'test_hydor_bot') break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(back.state, 'running');
+  assert.equal(back.bot.username, 'test_hydor_bot');
   await app.inject({ method: 'DELETE', url: `/api/telegram/chats/${CHAT}` });
   assert.equal(linkedChats(db).length, 0);
   const off = await app.inject({ method: 'PUT', url: '/api/telegram', payload: { token: null } });
