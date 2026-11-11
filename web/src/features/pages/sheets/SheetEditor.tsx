@@ -370,7 +370,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const calc = liveCalc ?? calcRef.current;
   // What draws the cells again: each change here, or each draw of the agent's version.
   const shownRev = liveOn ? -agent!.n : rev;
-  const sheetIx = book ? Math.min(si, book.sheets.length - 1) : 0;
+  // A workbook that opens (or comes back from an older version) on a hidden sheet shows the first one that shows.
+  const sheetIx = book ? (book.sheets[Math.min(si, book.sheets.length - 1)]?.hidden ? Math.max(0, book.sheets.findIndex((s) => !s.hidden)) : Math.min(si, book.sheets.length - 1)) : 0;
   const sheet: Sheet | undefined = book?.sheets[sheetIx];
   const size = useMemo(() => (calc ? gridSize(calc, sheetIx, sheet) : { rows: 1000, cols: 26 }), [calc, sheetIx, rev, sheet]); // eslint-disable-line react-hooks/exhaustive-deps
   // The sheet and the cell being written stay in view, unless a sheet was picked or the cells scrolled here lately.
@@ -1266,6 +1267,13 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   };
 
   // ---- sheets -------------------------------------------------------------------------------------------------------------------
+  /** A sheet with its tab's colour or hidden state set (undefined takes it off). */
+  const withTab = (s: Sheet, set: { tabColor?: string; hidden?: true }): Sheet => {
+    const next = { ...s, ...set };
+    if (next.tabColor === undefined) delete next.tabColor;
+    if (next.hidden === undefined) delete next.hidden;
+    return next;
+  };
   const swap = (after: Workbook) => book && change({ k: 'book', before: book, after });
   const addSheet = (made?: Sheet) => {
     if (!book) return;
@@ -1299,6 +1307,30 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if (!ok) return;
     swap(removeSheet(bookRef.current!, book.sheets[i].id));
     setSi(Math.max(0, i - 1));
+  };
+  /** A sheet's tab given a colour (or none). */
+  const tabColor = (i: number, color: string | undefined) => {
+    if (!book || !book.sheets[i]) return;
+    swap({ ...book, sheets: book.sheets.map((s, k) => (k === i ? withTab(s, { tabColor: color }) : s)) });
+  };
+  /** A sheet hidden from the tabs (at least one stays), and shown again. */
+  const hideSheet = (i: number) => {
+    if (!book || !book.sheets[i] || book.sheets.filter((s) => !s.hidden).length < 2) return void toast(tr('At least one sheet has to show.'));
+    swap({ ...book, sheets: book.sheets.map((s, k) => (k === i ? withTab(s, { hidden: true }) : s)) });
+    if (i === sheetIx) {
+      // The sheet being looked at went: the nearest one that shows is picked.
+      const rest = book.sheets.map((_, k) => k).filter((k) => k !== i && !book.sheets[k].hidden);
+      const next = rest.filter((k) => k < i).pop() ?? rest[0];
+      const s = sels.current.get(book.sheets[next].id) ?? cellSel(0, 0);
+      setSi(next);
+      selRef.current = s;
+      setSelState(s);
+    }
+  };
+  const showSheet = (i: number) => {
+    if (!book || !book.sheets[i]?.hidden) return;
+    swap({ ...book, sheets: book.sheets.map((s, k) => (k === i ? withTab(s, { hidden: undefined }) : s)) });
+    pickSheet(i);
   };
   const moveSheet = (from: number, to: number) => {
     if (!book || to < 0 || to >= book.sheets.length || from === to) return;
@@ -2554,6 +2586,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     comment: () => openComments(!readOnly),
     comments: () => openComments(false),
     func: (name) => typeIn(`=${name}(`),
+    hiddenSheets: book ? book.sheets.flatMap((s, i) => (s.hidden ? [{ i, name: s.name }] : [])) : [],
+    showSheet,
     autoSum,
     painter: () => startPainter(false),
     painting: !!painter,
@@ -2941,6 +2975,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       )}
       <SheetTabs
         names={book.sheets.map((s) => s.name)}
+        colors={book.sheets.map((s) => s.tabColor)}
+        hidden={book.sheets.map((s) => !!s.hidden)}
         active={sheetIx}
         readOnly={readOnly}
         onPick={pickSheet}
@@ -2950,6 +2986,9 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         onDuplicate={duplicateSheet}
         onDelete={(i) => void deleteSheet(i)}
         onMove={moveSheet}
+        onColor={tabColor}
+        onHide={hideSheet}
+        onShow={showSheet}
         status={status || undefined}
         last={!(dirty && !readOnly)}
       />
