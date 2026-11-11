@@ -271,12 +271,12 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
     if (current) lastOpen[groupOf(current).label] = current;
     if (scroller.current) scroller.current.scrollTop = 0;
   }, [current]);
-  // From the search box (`find=`): the option that says those words, scrolled to and lit up.
+  // From the search box (`find=`): the option that says those words (in the section, or its switch beside the title), scrolled to and lit up.
   const findWords = new URLSearchParams(useSearch()).get('find');
   useEffect(() => {
     if (!findWords || !current) return;
     let live = true;
-    void pointAt(() => document.querySelector('[data-settings-body]'), findWords).then(() => live && go(url({}), true));
+    void pointAt(() => document.querySelector('[data-settings-section]'), findWords).then(() => live && go(url({}), true));
     return () => {
       live = false;
     };
@@ -293,7 +293,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
           </div>
           {page && (
             <div key={page.id} className="absolute inset-0 overflow-y-auto bg-bg">
-              <div className="space-y-5 px-4 pt-4 pb-10">
+              <div data-settings-section className="space-y-5 px-4 pt-4 pb-10">
                 <div className="flex items-start gap-3">
                   <p data-tip={SECTION_TIPS[page.id]} className="min-w-0 flex-1 text-[13.5px] leading-snug text-fg-3">
                     {page.sub} <LearnMore id={page.id} />
@@ -324,7 +324,7 @@ export function SettingsPage({ section, cwd: cwdParam, agent: agentParam }: { se
         <div className="mx-auto flex max-w-[1280px] items-start gap-9 px-4">
           <SectionMenu items={tab.items} current={current} onOpen={open} />
           {def && (
-            <div key={def.id} className="max-w-[760px] min-w-0 flex-1 pt-7 pb-14">
+            <div key={def.id} data-settings-section className="max-w-[760px] min-w-0 flex-1 pt-7 pb-14">
               <header className="mb-7 flex flex-wrap items-start gap-x-4 gap-y-3">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-[22px] leading-tight font-semibold tracking-tight">
