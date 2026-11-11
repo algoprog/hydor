@@ -1,16 +1,15 @@
 // Settings → Accounts: the Claude Code and Codex sign-ins every session uses, switching accounts and API credit at a
 // limit, and the agents’ programs on this machine.
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { CheckCircle2, ExternalLink, KeyRound, LogIn, LogOut, MoreHorizontal, Pencil, Plus, Trash2, XCircle } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ExternalLink, KeyRound, LogIn, LogOut, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { AccountStatus, Agent, AgentAccount, ClientInfo, ClientUpdateItem, ClientUpdates, LoginFlow } from '@shared/types';
 import { api, del, patch, post, put } from '../../lib/api';
 import { ago } from '../../lib/format';
-import { go } from '../../lib/nav';
 import { toast, toastError, useAppSettings, useLogins } from '../../lib/store';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { CopyButton } from '../../components/Markdown';
-import { Badge, Button, cx, Dialog, IconButton, MenuItem, Popover, Throbber, inputCls, Section, Segmented, Switch, useConfirm } from '../../components/ui';
-import { SettingRow } from './legacy';
+import { Badge, Button, cx, Dialog, MenuItem, MenuSep, Throbber, inputCls, Segmented, Switch, useConfirm } from '../../components/ui';
+import { Group, MoreMenu, Row, Stack } from './kit';
 
 export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: Agent; account?: AgentAccount; open: boolean; onClose: () => void; onDone: () => void }) {
   // An added account signs in into its own folder.
@@ -174,23 +173,46 @@ export function LoginDialog({ agent, account, open, onClose, onDone }: { agent: 
   );
 }
 
-/** Something a row's ⋯ menu does besides signing out. */
+/** Something a row’s ⋯ menu does besides signing out. */
 type RowAction = { label: string; icon?: ReactNode; danger?: boolean; run: () => void };
 
-function AccountRow({ a, account, onChange, actions = [], apiKey }: { a: AccountStatus | null; account?: AgentAccount; onChange: () => void; actions?: RowAction[]; apiKey?: boolean }) {
-  const agent = a?.agent ?? account?.agent;
+/** One sign-in: the agent and the account’s name, how it is signed in (or what is wrong), and Sign in or Switch account. */
+function AccountRow({
+  agent,
+  a,
+  account,
+  onChange,
+  actions = [],
+  apiKey,
+}: {
+  agent: Agent;
+  a: AccountStatus | null;
+  account?: AgentAccount;
+  onChange: () => void;
+  actions?: RowAction[];
+  apiKey?: boolean;
+}) {
   const q = account ? `?account=${encodeURIComponent(account.id)}` : '';
   const [login, setLogin] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const more = useRef<HTMLButtonElement>(null);
   const [confirm, node] = useConfirm();
-  if (!a || !agent) {
-    return (
-      <div className="flex items-center gap-3 py-3 text-fg-3">
-        <Throbber />
-      </div>
-    );
-  }
+  const icon = <AgentIcon agent={agent} size={18} />;
+  const label = (
+    <>
+      {agentName(agent)}
+      {account && (
+        <span className="text-fg-3" translate="no">
+          {' '}
+          · {account.name}
+        </span>
+      )}
+      {apiKey && (
+        <span className="ml-2 align-middle" title="An Anthropic API key is saved for this account: used only when every account is at its usage limit and Use API credit at a limit is on">
+          <Badge>API credit</Badge>
+        </span>
+      )}
+    </>
+  );
+  if (!a) return <Row icon={icon} label={label} control={<Throbber className="text-fg-3" />} />;
   const signOut = async () => {
     if (
       !(await confirm({
@@ -204,73 +226,65 @@ function AccountRow({ a, account, onChange, actions = [], apiKey }: { a: Account
     await post(`/api/accounts/${agent}/logout${q}`).catch(toastError);
     onChange();
   };
-  const items: RowAction[] = [...(a.loggedIn ? [{ label: 'Sign out', icon: <LogOut size={14} />, run: signOut }] : []), ...actions];
-  // The name and sign-in keep their width; on a phone the buttons go under them.
+  // Rename and the API key first; the ones that take the sign-in away last.
+  const rest = actions.filter((x) => !x.danger);
+  const danger = actions.filter((x) => x.danger);
+  const run = (close: () => void, fn: () => void) => () => {
+    close();
+    fn();
+  };
+  const hasMenu = rest.length > 0 || danger.length > 0 || a.loggedIn;
   return (
-    <div className="flex items-start gap-3 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bg-2">
-        <AgentIcon agent={agent} size={18} />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="min-w-[min(100%,14rem)] flex-1">
-          <div className="text-[14px] font-medium">
-            {agentName(agent)}
-            {account && (
-              <span className="font-normal text-fg-3" translate="no">
-                {' '}
-                · {account.name}
-              </span>
+    <>
+      <Row
+        icon={icon}
+        label={label}
+        hint={
+          a.loggedIn ? (
+            <span title={[a.email, a.plan, a.method].filter(Boolean).join(' · ')}>
+              <span translate="no">{a.email ?? 'Signed in'}</span>
+              {a.plan ? ` · ${a.plan}` : ''}
+              {a.method ? ` · ${a.method}` : ''}
+            </span>
+          ) : (
+            <span className="text-err">{a.error ?? a.detail ?? 'Not signed in'}</span>
+          )
+        }
+        control={
+          <>
+            <Button size="sm" variant={a.loggedIn ? 'secondary' : 'primary'} icon={<LogIn size={13} />} onClick={() => setLogin(true)}>
+              {a.loggedIn ? 'Switch account' : 'Sign in'}
+            </Button>
+            {hasMenu && (
+              <MoreMenu width={210}>
+                {(close) => (
+                  <>
+                    {rest.map((it) => (
+                      <MenuItem key={it.label} icon={it.icon} onClick={run(close, it.run)}>
+                        {it.label}
+                      </MenuItem>
+                    ))}
+                    {rest.length > 0 && (a.loggedIn || danger.length > 0) && <MenuSep />}
+                    {a.loggedIn && (
+                      <MenuItem icon={<LogOut size={14} />} danger onClick={run(close, signOut)}>
+                        Sign out
+                      </MenuItem>
+                    )}
+                    {danger.map((it) => (
+                      <MenuItem key={it.label} icon={it.icon} danger onClick={run(close, it.run)}>
+                        {it.label}
+                      </MenuItem>
+                    ))}
+                  </>
+                )}
+              </MoreMenu>
             )}
-            {apiKey && (
-              <span className="ml-2 align-middle" title="An Anthropic API key is saved for this account: used only when every account is at its usage limit and Use API credit at a limit is on">
-                <Badge>API credit</Badge>
-              </span>
-            )}
-          </div>
-          <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-fg-3">
-            {a.loggedIn ? <CheckCircle2 size={12} className="shrink-0 text-ok" /> : <XCircle size={12} className="shrink-0 text-err" />}
-            {a.loggedIn ? (
-              <span className="truncate" title={[a.email, a.plan, a.method].filter(Boolean).join(' · ')}>
-                {a.email ?? 'Signed in'}
-                {a.plan ? ` · ${a.plan}` : ''}
-                {a.method ? ` · ${a.method}` : ''}
-              </span>
-            ) : (
-              <span className="min-w-0 break-words">{a.error ?? a.detail ?? 'Not signed in'}</span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button size="sm" variant={a.loggedIn ? 'secondary' : 'primary'} icon={<LogIn size={13} />} onClick={() => setLogin(true)}>
-            {a.loggedIn ? 'Switch account' : 'Sign in'}
-          </Button>
-          {items.length > 0 && (
-            <>
-              <IconButton label="More" ref={more} onClick={() => setMenu((m) => !m)}>
-                <MoreHorizontal size={17} />
-              </IconButton>
-              <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={180}>
-                {items.map((it) => (
-                  <MenuItem
-                    key={it.label}
-                    icon={it.icon}
-                    danger={it.danger}
-                    onClick={() => {
-                      setMenu(false);
-                      it.run();
-                    }}
-                  >
-                    {it.label}
-                  </MenuItem>
-                ))}
-              </Popover>
-            </>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
       <LoginDialog agent={agent} account={account} open={login} onClose={() => setLogin(false)} onDone={onChange} />
       {node}
-    </div>
+    </>
   );
 }
 
@@ -279,20 +293,25 @@ function AutoSwitchSetting() {
   const on = useAppSettings((s) => s.autoSwitch);
   useEffect(() => void useAppSettings.getState().load(), []);
   return (
-    <SettingRow label="Switch accounts at a limit" hint="When a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on. New sessions skip an account at its limit.">
-      {on === null ? (
-        <Throbber className="text-fg-3" />
-      ) : (
-        <Switch
-          on={on}
-          label="Switch accounts at a limit"
-          onChange={(v) => {
-            useAppSettings.getState().set({ autoSwitch: v });
-            put('/api/app-settings', { autoSwitch: v }).catch((e) => (useAppSettings.getState().set({ autoSwitch: !v }), toastError(e)));
-          }}
-        />
-      )}
-    </SettingRow>
+    <Row
+      label="Switch accounts at a limit"
+      hint="The session moves to another account with usage left"
+      info="When a session’s account runs out of usage, the session moves to another of that agent’s accounts with usage left and carries on. New sessions skip an account at its limit."
+      control={
+        on === null ? (
+          <Throbber className="text-fg-3" />
+        ) : (
+          <Switch
+            on={on}
+            label="Switch accounts at a limit"
+            onChange={(v) => {
+              useAppSettings.getState().set({ autoSwitch: v });
+              put('/api/app-settings', { autoSwitch: v }).catch((e) => (useAppSettings.getState().set({ autoSwitch: !v }), toastError(e)));
+            }}
+          />
+        )
+      }
+    />
   );
 }
 
@@ -301,20 +320,25 @@ function ApiCreditSetting() {
   const on = useAppSettings((s) => s.apiCredit);
   useEffect(() => void useAppSettings.getState().load(), []);
   return (
-    <SettingRow label="Use API credit at a limit" hint="When every Claude Code account is at its usage limit, sessions carry on billed to an account's Anthropic API key instead of stopping. Off until you turn it on.">
-      {on === null ? (
-        <Throbber className="text-fg-3" />
-      ) : (
-        <Switch
-          on={on}
-          label="Use API credit at a limit"
-          onChange={(v) => {
-            useAppSettings.getState().set({ apiCredit: v });
-            put('/api/app-settings', { apiCredit: v }).catch((e) => (useAppSettings.getState().set({ apiCredit: !v }), toastError(e)));
-          }}
-        />
-      )}
-    </SettingRow>
+    <Row
+      label="Use API credit at a limit"
+      hint="Carry on billed to an API key when every account is out"
+      info="When every Claude Code account is at its usage limit, sessions carry on billed to an account’s Anthropic API key instead of stopping. Off until you turn it on."
+      control={
+        on === null ? (
+          <Throbber className="text-fg-3" />
+        ) : (
+          <Switch
+            on={on}
+            label="Use API credit at a limit"
+            onChange={(v) => {
+              useAppSettings.getState().set({ apiCredit: v });
+              put('/api/app-settings', { apiCredit: v }).catch((e) => (useAppSettings.getState().set({ apiCredit: !v }), toastError(e)));
+            }}
+          />
+        )
+      }
+    />
   );
 }
 
@@ -354,7 +378,9 @@ function ApiKeyDialog({ target, onClose, onDone }: { target: { id: string; name:
           <span className="mb-1.5 block text-[12px] font-medium text-fg-2">Anthropic API key</span>
           <input autoFocus type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…" className={cx(inputCls, 'w-full font-mono text-[12.5px]')} />
         </label>
-        <p className="text-[12px] leading-snug text-fg-3">From console.anthropic.com → API keys. Used only when every account is at its usage limit and Use API credit at a limit is on. Kept encrypted on this computer.</p>
+        <p className="text-[12px] leading-snug text-fg-3">
+          From console.anthropic.com → API keys. Used only when every account is at its usage limit and Use API credit at a limit is on. Kept encrypted on this computer.
+        </p>
         {error && <p className="text-[12.5px] text-err">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -376,10 +402,7 @@ export function AccountSettings() {
   const [adding, setAdding] = useState(false);
   const [keyFor, setKeyFor] = useState<{ id: string; name: string } | null>(null);
   const [confirm, confirmNode] = useConfirm();
-  const load = () =>
-    api<AccountsInfo>('/api/accounts')
-      .then(setAccounts)
-      .catch(toastError);
+  const load = () => api<AccountsInfo>('/api/accounts').then(setAccounts).catch(toastError);
   useEffect(() => {
     load();
   }, []);
@@ -409,19 +432,38 @@ export function AccountSettings() {
     await del(`/api/agent-accounts/${a.id}${wipe ? '?wipe=1' : ''}`).catch(toastError);
     load();
   };
-  /** A Claude Code account's API key actions (its API credit): `id` is "main" for the CLI's own sign-in. */
+  /** A Claude Code account’s API key actions (its API credit): `id` is "main" for the CLI’s own sign-in. */
   const keyActions = (id: string, name: string): RowAction[] => [
     { label: accounts?.apiKeys?.[id] ? 'Change API key…' : 'Add API key…', icon: <KeyRound size={14} />, run: () => setKeyFor({ id, name }) },
-    ...(accounts?.apiKeys?.[id] ? [{ label: 'Remove API key', icon: <Trash2 size={14} />, run: () => void del(`/api/accounts/claude/api-keys/${encodeURIComponent(id)}`).catch(toastError).then(load) }] : []),
+    ...(accounts?.apiKeys?.[id]
+      ? [
+          {
+            label: 'Remove API key',
+            icon: <Trash2 size={14} />,
+            run: () =>
+              void del(`/api/accounts/claude/api-keys/${encodeURIComponent(id)}`)
+                .catch(toastError)
+                .then(load),
+          },
+        ]
+      : []),
   ];
-  // Each agent's own sign-in, then the accounts added for it.
+  // Each agent’s own sign-in, then the accounts added for it.
   const rows = (agent: Agent, main: AccountStatus | undefined) => [
-    <AccountRow key={agent} a={main ?? null} onChange={load} apiKey={agent === 'claude' && !!accounts?.apiKeys?.main} actions={agent === 'claude' ? keyActions('main', 'Claude Code') : []} />,
+    <AccountRow
+      key={agent}
+      agent={agent}
+      a={main ?? null}
+      onChange={load}
+      apiKey={agent === 'claude' && !!accounts?.apiKeys?.main}
+      actions={agent === 'claude' ? keyActions('main', 'Claude Code') : []}
+    />,
     ...(accounts?.extra ?? [])
       .filter((x) => x.agent === agent)
       .map((x) => (
         <AccountRow
           key={x.id}
+          agent={x.agent}
           a={x.status}
           account={x}
           onChange={load}
@@ -434,38 +476,36 @@ export function AccountSettings() {
         />
       )),
   ];
+  const limits = !!accounts?.extra.length || !!accounts?.claude.loggedIn || !!accounts?.extra.some((x) => x.agent === 'claude');
   return (
-    <div className="space-y-4">
-      <Section
-        title="Your accounts"
-        sub="The Claude Code and Codex sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
+    <Stack>
+      <Group
+        title="Accounts"
+        info="The Claude Code and Codex sign-ins your sessions use. Add another subscription, a work and a personal one say, and pick one when you start a session."
         actions={
           <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
             Add an account
           </Button>
         }
       >
-        <div className="-my-2 divide-y divide-line">
-          {rows('claude', accounts?.claude)}
-          {rows('codex', accounts?.codex)}
+        {rows('claude', accounts?.claude)}
+        {rows('codex', accounts?.codex)}
+      </Group>
+      {limits && (
+        <Group title="At a usage limit">
           {!!accounts?.extra.length && <AutoSwitchSetting />}
           {(accounts?.claude.loggedIn || accounts?.extra.some((x) => x.agent === 'claude')) && <ApiCreditSetting />}
-        </div>
-      </Section>
+        </Group>
+      )}
       <AgentPrograms />
       <AddAgentAccount open={adding} onClose={() => setAdding(false)} onAdded={load} />
       <ApiKeyDialog target={keyFor} onClose={() => setKeyFor(null)} onDone={load} />
       {confirmNode}
-    </div>
+    </Stack>
   );
 }
 
-const SOURCE: Record<ClientInfo['source'], string> = {
-  yours: 'your own install',
-  app: 'installed by the app',
-  bundled: 'comes with the app',
-  missing: 'not here: installs by itself when you first use it',
-};
+const SOURCE: Record<ClientInfo['source'], string> = { yours: 'your own install', app: 'installed by the app', bundled: 'comes with the app', missing: 'Not here: installs by itself when first used' };
 
 type ClientsState = { clients: ClientInfo[]; updates: ClientUpdates };
 
@@ -473,12 +513,13 @@ type ClientsState = { clients: ClientInfo[]; updates: ClientUpdates };
 function UpdateNote({ i }: { i: ClientUpdateItem }) {
   return (
     <>
-      {i.yours ? <span>{`${i.name} (your own)`}</span> : i.name} <span>{i.ok ? `${i.from ? `${i.from} → ` : ''}${i.to}` : i.kept ? `${i.to} did not work here (${i.error}), so it stays on ${i.kept}` : `${i.to} could not be installed: ${i.error}`}</span>
+      {i.yours ? <span>{`${i.name} (your own)`}</span> : i.name}{' '}
+      <span>{i.ok ? `${i.from ? `${i.from} → ` : ''}${i.to}` : i.kept ? `${i.to} did not work here (${i.error}), so it stays on ${i.kept}` : `${i.to} could not be installed: ${i.error}`}</span>
     </>
   );
 }
 
-/** The agents' programs on this machine: whose they are, which version, and keeping them up to date. */
+/** The agents’ programs on this machine: whose they are, which version, and keeping them up to date. */
 function AgentPrograms() {
   const [st, setSt] = useState<ClientsState | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -504,17 +545,19 @@ function AgentPrograms() {
     }
   };
   const start = (what: 'update' | 'check') => post<ClientsState>(`/api/clients/${what}`).then(setSt, toastError);
-  if (!st) return null;
-  const { clients: list, updates } = st;
+  const list = st?.clients ?? [];
+  const updates = st?.updates;
   const out = list.filter((c) => c.latest).length;
-  const last = updates.last && !running && Date.now() - updates.last.at < 7 * 86_400_000 ? updates.last : undefined;
+  const last = updates?.last && !running && Date.now() - updates.last.at < 7 * 86_400_000 ? updates.last : undefined;
   return (
-    <Section title="Agent programs" sub="The command-line agents the sessions run. Missing ones install by themselves (with npm, in the app’s own folder).">
-      <div className="-my-2 divide-y divide-line">
-        {list.map((c) => (
-          <div key={c.id} className="flex items-center gap-3 py-2.5 text-[13px]">
-            <span className="w-28 shrink-0 font-medium">{c.name}</span>
-            <span className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3" title={c.path}>
+    <Group title="Agent programs" info="The command-line agents the sessions run. Missing ones install by themselves, with npm in the app’s own folder.">
+      {!st && <Row label="Looking at this computer…" control={<Throbber className="text-fg-3" />} />}
+      {list.map((c) => (
+        <Row
+          key={c.id}
+          label={c.name}
+          hint={
+            <span title={c.path}>
               {c.version ? `${c.version} · ` : ''}
               {SOURCE[c.source]}
               {c.yours?.version && c.yours.version !== c.version && (
@@ -536,54 +579,66 @@ function AgentPrograms() {
                 </>
               )}
             </span>
-            {c.source === 'missing' && (
+          }
+          control={
+            c.source === 'missing' ? (
               <Button size="sm" variant="secondary" disabled={busy === c.id || c.installing} icon={busy === c.id || c.installing ? <Throbber /> : undefined} onClick={() => install(c)}>
                 Install
               </Button>
+            ) : c.latest && !running ? (
+              <Button size="sm" variant="secondary" onClick={() => start('update')}>
+                Update
+              </Button>
+            ) : undefined
+          }
+        />
+      ))}
+      {updates && (
+        <Row
+          label="Update automatically"
+          hint="Once a day, and a version that fails is undone"
+          info="Once a day: the app’s copies with npm, your own installs with their own updater (claude update, codex update…). A new version that does not work here is undone."
+          control={<Switch on={updates.auto} label="Update automatically" onChange={(on) => put<ClientsState>('/api/clients/auto', { on }).then(setSt, toastError)} />}
+        >
+          <div className="space-y-1 text-[12.5px] leading-snug text-fg-3">
+            {running ? (
+              <div className="flex items-center gap-2 text-fg-2">
+                <Throbber className="text-fg-3" /> {running === 'check' ? 'Looking for new versions…' : updates.current ? `Updating ${updates.current}…` : 'Updating…'}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                {out > 0 && (
+                  <Button size="sm" variant="primary" onClick={() => start('update')}>
+                    Update now
+                  </Button>
+                )}
+                <span className={cx(updates.error && 'text-warn')}>
+                  {updates.error
+                    ? `Could not look for new versions: ${updates.error}`
+                    : out > 1
+                      ? 'Newer versions are out'
+                      : out === 1
+                        ? 'A newer version is out'
+                        : updates.checkedAt
+                          ? `Up to date · checked ${ago(updates.checkedAt)}`
+                          : 'Not checked yet'}
+                </span>
+                {out === 0 && (
+                  <button onClick={() => start('check')} className="text-accent hover:underline">
+                    Check now
+                  </button>
+                )}
+              </div>
             )}
+            {last?.items.map((i, n) => (
+              <div key={n} className={cx(!i.ok && 'text-warn')}>
+                {n === 0 && <span>{last.auto ? `The automatic update, ${ago(last.at)}:` : `The last update, ${ago(last.at)}:`}</span>} <UpdateNote i={i} />
+              </div>
+            ))}
           </div>
-        ))}
-        <SettingRow label="Update automatically" hint="Once a day: the app’s copies with npm, your own installs with their own updater (claude update, codex update…). A new version that does not work here is undone.">
-          <Switch on={updates.auto} label="Update automatically" onChange={(on) => put<ClientsState>('/api/clients/auto', { on }).then(setSt, toastError)} />
-        </SettingRow>
-        <div className="space-y-1 py-3 text-[12.5px] leading-snug text-fg-3">
-          {running ? (
-            <div className="flex items-center gap-2 text-fg-2">
-              <Throbber className="text-fg-3" /> {running === 'check' ? 'Looking for new versions…' : updates.current ? `Updating ${updates.current}…` : 'Updating…'}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              {out > 0 && (
-                <Button size="sm" variant="primary" onClick={() => start('update')}>
-                  Update now
-                </Button>
-              )}
-              <span className={cx(updates.error && 'text-warn')}>
-                {updates.error
-                  ? `Could not look for new versions: ${updates.error}`
-                  : out > 1
-                    ? 'Newer versions are out'
-                    : out === 1
-                      ? 'A newer version is out'
-                      : updates.checkedAt
-                        ? `Up to date · checked ${ago(updates.checkedAt)}`
-                        : 'Not checked yet'}
-              </span>
-              {out === 0 && (
-                <button onClick={() => start('check')} className="text-accent hover:underline">
-                  Check now
-                </button>
-              )}
-            </div>
-          )}
-          {last?.items.map((i, n) => (
-            <div key={n} className={cx(!i.ok && 'text-warn')}>
-              {n === 0 && <span>{last.auto ? `The automatic update, ${ago(last.at)}:` : `The last update, ${ago(last.at)}:`}</span>} <UpdateNote i={i} />
-            </div>
-          ))}
-        </div>
-      </div>
-    </Section>
+        </Row>
+      )}
+    </Group>
   );
 }
 

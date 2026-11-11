@@ -134,7 +134,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['machines', 'Add a machine', 'remote ssh server computer connect', 'Another machine running Hydor, to use from here'],
   ['machines', 'Access from other machines', 'access token remote', 'Tokens other machines use to reach this one'],
   // Agents › Accounts
-  ['accounts', 'Your accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
+  ['accounts', 'Accounts', 'login sign in claude code codex subscription email plan second account work personal add', 'The Claude Code and Codex sign-ins sessions use, and more you add'],
   ['accounts', 'Switch accounts at a limit', 'auto switch rotate use all accounts usage limit continue other account', 'A session that runs out of usage carries on with another account'],
   ['accounts', 'Use API credit at a limit', 'api credit key anthropic billing console usage limit every claude account carry on pay', 'When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key'],
   ['accounts', 'Agent programs', 'install claude code codex gemini opencode qwen auggie pi version', 'Which agent programs are installed, and installing the others'],
