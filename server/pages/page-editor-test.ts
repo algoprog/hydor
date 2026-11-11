@@ -1172,6 +1172,62 @@ if (canCapture()) {
     },
     '',
   );
+  // A part that sticks when scrolled: dragged to where it sticks on the screen (snapping under a header that stays there), nudged
+  // up and down, one step to undo each, its rows in the menu.
+  await drive(
+    '<header id="hd" style="position:fixed;left:0;top:0;width:100%;height:50px;background:#eee"></header><div id="gap" style="height:120px"></div><nav id="st" style="position:sticky;height:40px;background:#cde">Sticky</nav><div style="height:2000px"></div>',
+    async (d) => {
+      await d.js('scrollTo(0, 0)');
+      await pick(d, '#st');
+      const S = await rectOfEl(d, '#st');
+      // Taken up to 3 px under the header: it snaps under it, and is told to stick there (it stays where it falls until scrolled).
+      await dragTo(d, S.l + 30, S.t + 20, S.l + 30, 53 + 20);
+      same(await d.js<string>('return document.querySelector("#st").style.top'), '50px', 'a part that sticks, dragged near the bottom of a header on the screen, sticks right under it');
+      same(Math.round((await rectOfEl(d, '#st')).t), Math.round(S.t), 'and stays where it falls until the page is scrolled');
+      same((await d.msgs('wa-ed-sel')).at(-1)?.sel?.multi ?? 0, 0, 'a drag that leaves the part picks no blocks on its way (it is not a drag from the margin)');
+      ok(!(await d.js<string>('return document.querySelector("#st").style.left')), 'nothing is written across (its page does not scroll sideways)');
+      await d.js('scrollTo(0, 400)');
+      await sleep(50);
+      same(Math.round((await rectOfEl(d, '#st')).t), 50, 'scrolled, it sticks where it was dragged');
+      // Stuck, dragged lower: it follows the pointer.
+      const T = await rectOfEl(d, '#st');
+      await dragTo(d, T.l + 30, T.t + 20, T.l + 30, T.t + 20 + 30);
+      same(await d.js<string>('return document.querySelector("#st").style.top'), '80px', 'dragged while it is stuck, it sticks lower');
+      same(Math.round((await rectOfEl(d, '#st')).t), 80, 'and is drawn there');
+      await d.press('z', { ctrl: true });
+      same(await d.js<string>('return document.querySelector("#st").style.top'), '50px', 'the drag is one step to undo');
+      // ↑ and ↓ move where it sticks; a run of presses is one step. ← picks the part around it, as for a part in the flow.
+      await pick(d, '#st');
+      await d.press('ArrowDown');
+      await d.press('ArrowDown');
+      await d.press('ArrowDown', { shift: true });
+      same(await d.js<string>('return document.querySelector("#st").style.top'), '62px', 'the arrow keys move where it sticks by 1 px, Shift by 10');
+      await d.press('z', { ctrl: true });
+      same(await d.js<string>('return document.querySelector("#st").style.top'), '50px', 'and a run of presses is one step to undo');
+      await d.press('ArrowLeft');
+      ok(!(await d.js<string>('return document.querySelector("#st").style.left')) && (await d.msgs('wa-ed-sel')).at(-1)?.sel?.tag === 'body', '← does not move it across: it picks the part around it');
+      // Its rows in the menu: back in the flow, in front or behind.
+      const r = await rectOfEl(d, '#st');
+      const s = d.tab.s;
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.l + 6, y: r.t + 10 });
+      await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.l + 6, y: r.t + 10, button: 'right', clickCount: 1, buttons: 2 });
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.l + 6, y: r.t + 10, button: 'right', clickCount: 1 });
+      await sleep(120);
+      const rows = ((await d.msgs('wa-ed-menu')).filter((m) => m.on).at(-1)?.rows ?? []) as string[];
+      for (const row of ['Back in the flow', 'Bring forward', 'Send backward']) ok(rows.includes(row), `on a part that sticks: ${row} (${rows.join(', ')})`);
+      await d.press('Escape');
+      await pick(d, '#st');
+      await d.cmd('place', 'flow');
+      same(await d.js<string>('return getComputedStyle(document.querySelector("#st")).position + "|" + document.querySelector("#st").style.top'), 'static|', 'Back in the flow: it no longer sticks, and its offsets go');
+    },
+    '',
+  );
+  // A part placed by a class of the page's own: Back in the flow says it for that part alone.
+  await drive('<style>.pin{position:absolute;left:20px;top:20px}</style><div id="w" style="position:relative;height:100px"><p id="pp" class="pin">Pinned</p></div>', async (d) => {
+    await pick(d, '#pp');
+    await d.cmd('place', 'flow');
+    same(await d.js<string>('return getComputedStyle(document.querySelector("#pp")).position'), 'static', 'a part placed by its class goes back in the flow too');
+  }, '');
   // Place freely, and back in the flow; the menu's rows.
   await drive(
     '<p id="p1">First</p><p id="p2" style="margin-top:30px">Second, <a id="lk" href="https://example.com">a link</a></p>',

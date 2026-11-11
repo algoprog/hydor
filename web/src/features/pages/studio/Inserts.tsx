@@ -425,10 +425,11 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
     title: 'Placed parts and sizes',
     items: [
       ['Drag', 'A placed part (Place: Moved from there, On its block, On the screen) moves where you drag it, snapping to the parts around it'],
+      ['Drag a sticking part', 'One that Sticks when scrolled is dragged to where it should stick on the screen'],
       ['Shift+drag', 'Move it straight, or keep its shape while sizing it'],
       [`${NO_SNAP_KEY}+drag`, 'No snapping for this drag'],
       [`${COPY_DRAG_KEY}+drag`, 'Drag a copy, and leave the part where it was'],
-      ['← ↑ → ↓', 'Move a placed part by one pixel (Shift: ten)'],
+      ['← ↑ → ↓', 'Move a placed part by one pixel (Shift: ten); ↑ and ↓ move where a sticking part sticks'],
       ['Drag a handle', 'Size it from any side or corner, snapping to the others’ edges and sizes'],
     ],
   },
