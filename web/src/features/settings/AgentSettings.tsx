@@ -589,7 +589,7 @@ export function ClaudePluginsSettings() {
     }
   };
   const addMarket = async () => {
-    if (market.trim()) await marketAct('add', market.trim());
+    if (market.trim() && !busy) await marketAct('add', market.trim());
   };
 
   const loadingRow = (

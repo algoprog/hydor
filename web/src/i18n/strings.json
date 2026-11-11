@@ -4309,6 +4309,7 @@
 "Business model":"shared/content-types.ts",
 "Business plan":"shared/content-types.ts",
 "Button":"web/src/features/pages/studio/blocks.ts",
+"button, a, input, select, textarea":"web/src/features/settings/kit.tsx",
 "button, input, label":"web/src/features/mediaedit/audio/Tracks.tsx",
 "Button: {0}":"web/src/features/pages/studio/AddPanel.tsx",
 "Buttons":"web/src/features/pages/studio/PagePanel.tsx",

@@ -96,20 +96,48 @@ export function Row({
     </div>
   );
   const tile = icon && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bg-2 text-fg-2">{icon}</span>;
-  if (onClick)
-    return (
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onClick}
-        className={cx('flex w-full items-center gap-3 px-4 py-3 text-left transition-colors first:rounded-t-[11px] last:rounded-b-[11px] hover:bg-bg-1 disabled:opacity-50', className)}
+  if (onClick) {
+    // A row that opens something, as a button that may hold buttons of its own (its (i), a control): a click on one
+    // of those, or in its (i)'s popover (React passes that up through the portal, from outside the row), is theirs.
+    const own = (e: { target: EventTarget; currentTarget: HTMLElement }) => {
+      const t = e.target as HTMLElement;
+      const inner = t.closest?.('button, a, input, select, textarea');
+      return e.currentTarget.contains(t) && (!inner || inner === e.currentTarget);
+    };
+    const button = (
+      <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-disabled={disabled || undefined}
+        onClick={(e) => !disabled && own(e) && onClick()}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget && !disabled) {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={cx(
+          'flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors outline-none select-none hover:bg-bg-1 focus-visible:bg-bg-1',
+          disabled && 'pointer-events-none opacity-50',
+          children ? 'group-first/row:rounded-t-[11px]' : 'first:rounded-t-[11px] last:rounded-b-[11px]',
+          !children && className,
+        )}
       >
         {tile}
         {text}
         {control && <span className="flex shrink-0 items-center gap-2 text-[13px] text-fg-3">{control}</span>}
         <ChevronRight size={16} className="shrink-0 text-fg-3" />
-      </button>
+      </div>
     );
+    if (!children) return button;
+    // What it opened shows under it (a chat's pairing code), lined up with its name.
+    return (
+      <div className={cx('group/row', className)}>
+        {button}
+        <div className={cx('pr-4 pb-3', icon ? 'pl-[60px]' : 'pl-4')}>{children}</div>
+      </div>
+    );
+  }
   return (
     <div className={cx('flex gap-3 px-4 py-3', children ? 'items-start' : 'items-center', disabled && 'opacity-50', className)}>
       {tile}
