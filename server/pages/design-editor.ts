@@ -1,11 +1,13 @@
 // The design editor: what edits a design (shared/design.ts: a page of fixed-size artboards) inside the page's sandboxed
 // frame, in place of the page editor (editor.ts), as Canva or Adobe Express do. Its artboards sit on a grey canvas,
 // zoomed to fit or 10% to 400%; anything on them is dragged anywhere, resized by its handles (corners keep a picture's,
-// a group's and words' proportions; Shift keeps any), turned by the handle under it, snapped to the artboard's edges and
-// middle and to the other elements' (pink guides, and equal gaps shown), nudged with the arrow keys (Shift: by ten),
+// a group's and words' proportions; Shift keeps any), turned by the handle under it, snapped (moving and sizing alike) to
+// the artboard's edges and middle and to the other elements' on the artboard, those inside groups too (thin pink lines;
+// equal gaps, the distance to the nearest element on each side, and "same width or height" shown in small pink pills;
+// Alt, ⌘ on a Mac, snaps to nothing; Ctrl, ⌥ on a Mac, drags a copy), nudged with the arrow keys (Shift: by ten),
 // picked several at a time (Shift+click, or a box dragged round them), grouped (Ctrl+G), lined up, spread out, brought
 // forward or sent back (Ctrl+] and Ctrl+[), locked, duplicated (Ctrl+D), copied with its look (Ctrl+Alt+C, Ctrl+Alt+V),
-// flipped. A double-click writes in words, crops a picture inside its frame (drag it, size it by its corners), or goes
+// flipped, zoomed to what is picked (Shift+2) and panned with Space and a drag. A double-click writes in words, crops a picture inside its frame (drag it, size it by its corners), or goes
 // into a group. Pictures dropped on the canvas come in where they fall (on a frame: in it). The app's panels change the
 // rest through messages (`wa-ed`), as the page editor's do, and hear what is picked (`wa-ed-sel`), what can be undone
 // (`wa-ed-state`) and the design's own news (`wa-ed-design`: its zoom, its artboards, a resized copy…).
@@ -13,6 +15,7 @@
 // Like editor.ts, the function runs in the browser: its source is sent as text, so it uses only its arguments and the
 // browser's own globals. What it gives back is the page's HTML with the changes, its scripts as they were.
 import { curveGeom, DESIGN_CSS, DESIGN_FIT_SRC, fitBox } from '../../shared/design.ts';
+import { snapKit } from '../../shared/snap.ts';
 
 export interface DesignEdCfg {
   n: string;
@@ -23,7 +26,7 @@ export interface DesignEdCfg {
 
 type Geom = { x: number; y: number; w: number; h: number };
 
-function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w: number, size: number, curve: number) => { d: string; h: number }, fitBox: (b: Geom, from: { w: number; h: number }, to: { w: number; h: number }) => Geom & { k: number }) {
+function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w: number, size: number, curve: number) => { d: string; h: number }, fitBox: (b: Geom, from: { w: number; h: number }, to: { w: number; h: number }) => Geom & { k: number }, makeSnap: typeof snapKit) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -36,7 +39,12 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   root.classList.add('n-editing');
   const dark = cfg.theme === 'dark';
   const ACCENT = '#8b5cf6';
-  const GUIDE = '#ff3d9a';
+  const GUIDE = '#ff3b8b'; // as in shared/snap.ts: the same in every editor
+  const SNAP = makeSnap();
+  // The keys that copy a drag and stop snapping, as the app's other editors have them (web/.../common/keys.ts).
+  const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const isCopyDrag = (e: { ctrlKey: boolean; altKey: boolean }) => (apple ? e.altKey : e.ctrlKey);
+  const isNoSnap = (e: { metaKey: boolean; altKey: boolean }) => (apple ? e.metaKey : e.altKey);
   const r1 = (v: number) => Math.round(v * 10) / 10;
   const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
@@ -101,6 +109,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     'html.n-editing .n-cropping{overflow:visible!important;-webkit-mask:none!important;mask:none!important;border-radius:0!important}',
     'html.n-editing video{pointer-events:none}',
     'html.n-editing .n-dropping{outline:3px solid #8b5cf6;outline-offset:-3px}',
+    'html.n-panning,html.n-panning *{cursor:grab!important}',
   ].join('\n');
   let zoomCss = '';
   const writeOwn = () => (own.textContent = `${OWN_CSS}\n${zoomCss}\n:root{--n-drop:${JSON.stringify(L('dDrop', 'Drop a picture here'))}}`);
@@ -151,7 +160,8 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     .rot{position:absolute;left:50%;width:24px;height:24px;margin-left:-12px;border-radius:50%;background:#fff;border:1.5px solid ${line};color:#333;display:grid;place-items:center;pointer-events:auto;cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,.25);touch-action:none}
     .g{position:fixed;background:${GUIDE};pointer-events:none}
     .gap{position:fixed;pointer-events:none;border:0 solid ${GUIDE}}
-    .gl{position:fixed;pointer-events:none;background:${GUIDE};color:#fff;font:600 10px/16px system-ui,sans-serif;padding:0 4px;border-radius:4px;white-space:nowrap}
+    .gl{position:fixed;pointer-events:none;background:${GUIDE};color:#fff;font:600 10.5px/16px system-ui,sans-serif;padding:0 6px;border-radius:8px;white-space:nowrap;transform:translate(-50%,-50%)}
+    .note{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);display:none;pointer-events:none;background:#1d1b17;color:#fff;font:500 12.5px/20px system-ui,sans-serif;padding:4px 12px;border-radius:9px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.3)}
     .marq{position:fixed;border:1px solid ${ACCENT};background:${ACCENT}1f;display:none;pointer-events:none}
     .tip{position:fixed;display:none;pointer-events:none;background:#1d1b17;color:#fff;font:600 11px/18px system-ui,sans-serif;padding:1px 7px;border-radius:6px;white-space:nowrap}
     .bar{position:fixed;display:none;pointer-events:auto;align-items:center;gap:1px;padding:3px;border-radius:10px;background:${panel};border:1px solid ${line};box-shadow:0 6px 20px rgba(0,0,0,.2);font:12px system-ui,sans-serif}
@@ -178,6 +188,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   <div class="b sel"><i class="h nw" data-h="nw"></i><i class="h n" data-h="n"></i><i class="h ne" data-h="ne"></i><i class="h e" data-h="e"></i><i class="h se" data-h="se"></i><i class="h s" data-h="s"></i><i class="h sw" data-h="sw"></i><i class="h w" data-h="w"></i><b class="rot" data-h="rot" title="${attr(L('dRotate', 'Turn it (Shift: by 15°)'))}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></b><b class="badge" hidden>${svg('lock', 11)}</b></div>
   <div class="marq"></div>
   <div class="tip"></div>
+  <div class="note"></div>
   <div class="pages"></div>
   <div class="bar" role="toolbar"></div>`;
   const $ = (s: string) => shadow.querySelector(s) as HTMLElement;
@@ -187,6 +198,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   const guides = $('.guides');
   const marq = $('.marq');
   const tip = $('.tip');
+  const note = $('.note');
   const bar = $('.bar');
   const pagesUi = $('.pages');
   const dim = $('.dim');
@@ -848,121 +860,89 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
   };
 
   // ---- guides: snapping to the artboard and to the other elements ---------------------------------------------------
-  type Snap = { d: number; at: number; lines: { x1: number; y1: number; x2: number; y2: number }[] };
-  const drawGuides = (lines: { x1: number; y1: number; x2: number; y2: number }[], gaps: { x: number; y: number; w: number; h: number; label: string; vertical: boolean }[], parent: HTMLElement) => {
+  // What a drag shows: thin pink lines where it lines up, the gaps between elements, and small pink pills (a distance,
+  // "=" for the same width or height, a size). The maths is shared/snap.ts, the same for every editor.
+  type Marks = { guides: { axis: 'x' | 'y'; at: number; from: number; to: number }[]; gaps: { x: number; y: number; w: number; h: number; vertical: boolean; value: number }[]; pills: { x: number; y: number; text: string }[] };
+  const drawMarks = (m: Marks, parent: HTMLElement) => {
     guides.innerHTML = '';
     const toWin = (x: number, y: number) => {
       const r = rectOfBoardBox(boardOf(parent)!, { x, y, w: 0, h: 0 }, parent);
       return { x: r.left, y: r.top };
     };
-    for (const l of lines) {
-      const a = toWin(l.x1, l.y1);
-      const b = toWin(l.x2, l.y2);
+    const line = (x1: number, y1: number, x2: number, y2: number) => {
+      const a = toWin(x1, y1);
+      const b = toWin(x2, y2);
       const g = document.createElement('div');
       g.className = 'g';
       if (Math.abs(a.x - b.x) < 0.5) Object.assign(g.style, { left: `${a.x - 0.5}px`, top: `${Math.min(a.y, b.y)}px`, width: '1px', height: `${Math.abs(b.y - a.y)}px` });
       else Object.assign(g.style, { left: `${Math.min(a.x, b.x)}px`, top: `${a.y - 0.5}px`, width: `${Math.abs(b.x - a.x)}px`, height: '1px' });
       guides.append(g);
-    }
-    for (const q of gaps) {
-      const a = toWin(q.x, q.y);
-      const b = toWin(q.x + q.w, q.y + q.h);
-      const g = document.createElement('div');
-      g.className = 'g';
-      if (q.vertical) Object.assign(g.style, { left: `${a.x - 0.5}px`, top: `${a.y}px`, width: '1px', height: `${b.y - a.y}px` });
-      else Object.assign(g.style, { left: `${a.x}px`, top: `${a.y - 0.5}px`, width: `${b.x - a.x}px`, height: '1px' });
-      guides.append(g);
+    };
+    const pill = (x: number, y: number, text: string) => {
+      const a = toWin(x, y);
       const t = document.createElement('div');
       t.className = 'gl';
-      t.textContent = q.label;
+      t.textContent = text;
+      t.style.left = `${a.x}px`;
+      t.style.top = `${a.y}px`;
       guides.append(t);
-      t.style.left = `${(a.x + b.x) / 2 - t.offsetWidth / 2 + (q.vertical ? 6 + t.offsetWidth / 2 : 0)}px`;
-      t.style.top = `${(a.y + b.y) / 2 - 8 + (q.vertical ? 0 : -12)}px`;
+    };
+    const cap = 4 / zoom;
+    for (const l of m.guides) (l.axis === 'x' ? line(l.at, l.from, l.at, l.to) : line(l.from, l.at, l.to, l.at));
+    for (const q of m.gaps) {
+      line(q.x, q.y, q.x + q.w, q.y + q.h);
+      if (q.vertical) {
+        line(q.x - cap, q.y, q.x + cap, q.y);
+        line(q.x - cap, q.y + q.h, q.x + cap, q.y + q.h);
+      } else {
+        line(q.x, q.y - cap, q.x, q.y + cap);
+        line(q.x + q.w, q.y - cap, q.x + q.w, q.y + cap);
+      }
+      // Its length, where it is long enough to read.
+      if (q.value * zoom >= 18) pill(q.vertical ? q.x + 18 / zoom : q.x + q.w / 2, q.vertical ? q.y + q.h / 2 : q.y - 12 / zoom, `${Math.round(q.value)}`);
     }
+    for (const q of m.pills) pill(q.x, q.y, q.text);
   };
   /**
-   * Where a box moving by (dx, dy) snaps: its edges and middle to the parent's and to the others', within a few screen
-   * pixels; and, in a row or a column of others, to the gap between them. The nudge to apply, and what to draw.
+   * What an element being moved or sized can line up with: every visible part of the artboard, those inside groups too
+   * (not the parts being moved, nor what they hold), as boxes in `parent`'s pixels as they show (turned ones by the box
+   * round them).
    */
-  const snapMove = (m: Geom, others: Geom[], parent: HTMLElement) => {
-    const tol = 6 / zoom;
-    const ps = isBoard(parent) ? sizeOfBoard(parent) : { w: parent.offsetWidth, h: parent.offsetHeight };
-    const xs: { v: number; from: number; to: number }[] = [
-      { v: 0, from: 0, to: ps.h },
-      { v: ps.w / 2, from: 0, to: ps.h },
-      { v: ps.w, from: 0, to: ps.h },
-    ];
-    const ys: { v: number; from: number; to: number }[] = [
-      { v: 0, from: 0, to: ps.w },
-      { v: ps.h / 2, from: 0, to: ps.w },
-      { v: ps.h, from: 0, to: ps.w },
-    ];
-    for (const o of others) {
-      for (const v of [o.x, o.x + o.w / 2, o.x + o.w]) xs.push({ v, from: o.y, to: o.y + o.h });
-      for (const v of [o.y, o.y + o.h / 2, o.y + o.h]) ys.push({ v, from: o.x, to: o.x + o.w });
+  const targetsFor = (parent: HTMLElement, skip: HTMLElement[]): Geom[] => {
+    const out: Geom[] = [];
+    // Where the parent sits on the artboard: the others' boxes (kept in their groups' pixels) are shifted by it.
+    let po = { x: 0, y: 0 };
+    for (let p: HTMLElement | null = parent; p && !isBoard(p); p = p.parentElement) {
+      const pb = boxOf(p);
+      po = { x: po.x + pb.x, y: po.y + pb.y };
     }
-    const best = (mine: number[], cands: { v: number; from: number; to: number }[], vertical: boolean): Snap | null => {
-      let found: Snap | null = null;
-      for (const c of cands)
-        for (const p of mine) {
-          const d = c.v - p;
-          if (Math.abs(d) <= tol && (!found || Math.abs(d) < Math.abs(found.d) - 0.01)) found = { d, at: c.v, lines: [] };
+    const walk = (box: HTMLElement, ox: number, oy: number, turned: boolean) => {
+      for (const k of box.children) {
+        if (!(k instanceof HTMLElement) || k.hasAttribute('data-n-own') || skip.includes(k) || getComputedStyle(k).display === 'none') continue;
+        let g: Geom;
+        if (turned) {
+          // Inside a turned group: as it shows on the screen.
+          const r = k.getBoundingClientRect();
+          const a = toLocal(parent, r.left, r.top);
+          const c = toLocal(parent, r.right, r.bottom);
+          g = { x: a.x, y: a.y, w: c.x - a.x, h: c.y - a.y };
+        } else {
+          const b = aabb(k);
+          g = { x: b.x + ox - po.x, y: b.y + oy - po.y, w: b.w, h: b.h };
         }
-      if (!found) return null;
-      // Every line it now lies on.
-      const f = found;
-      for (const c of cands)
-        for (const p of mine)
-          if (Math.abs(c.v - (p + f.d)) < 0.5) {
-            const lo = Math.min(c.from, vertical ? m.y + 0 : m.x);
-            const hi = Math.max(c.to, vertical ? m.y + m.h : m.x + m.w);
-            f.lines.push(vertical ? { x1: c.v, y1: lo, x2: c.v, y2: hi } : { x1: lo, y1: c.v, x2: hi, y2: c.v });
-          }
-      return f;
+        if (g.w > 0 || g.h > 0) out.push(g);
+        if (isGroup(k)) {
+          const kb = boxOf(k);
+          walk(k, ox + kb.x, oy + kb.y, turned || rotOf(k) !== 0);
+        }
+      }
     };
-    const sx = best([m.x, m.x + m.w / 2, m.x + m.w], xs, true);
-    const sy = best([m.y, m.y + m.h / 2, m.y + m.h], ys, false);
-    let dx = sx?.d ?? 0;
-    let dy = sy?.d ?? 0;
-    const lines = [...(sx?.lines ?? []), ...(sy?.lines ?? [])];
-    // Equal gaps: in the row it is in (others beside it, overlapping it top to bottom), and in its column.
-    const gaps: { x: number; y: number; w: number; h: number; label: string; vertical: boolean }[] = [];
-    const eq = (horizontal: boolean) => {
-      const a0 = horizontal ? m.x + dx : m.y + dy;
-      const size = horizontal ? m.w : m.h;
-      const row = others.filter((o) => (horizontal ? o.y < m.y + dy + m.h && o.y + o.h > m.y + dy : o.x < m.x + dx + m.w && o.x + o.w > m.x + dx));
-      const start = (o: Geom) => (horizontal ? o.x : o.y);
-      const len = (o: Geom) => (horizontal ? o.w : o.h);
-      const before = row.filter((o) => start(o) + len(o) <= a0 + tol).sort((p, q) => start(q) + len(q) - (start(p) + len(p)));
-      const after = row.filter((o) => start(o) >= a0 + size - tol).sort((p, q) => start(p) - start(q));
-      const cands: { pos: number; marks: [number, number][] }[] = [];
-      const L1 = before[0];
-      const R1 = after[0];
-      if (L1 && R1) {
-        const room = start(R1) - (start(L1) + len(L1));
-        const g = (room - size) / 2;
-        if (g > 0) cands.push({ pos: start(L1) + len(L1) + g, marks: [[start(L1) + len(L1), start(L1) + len(L1) + g], [start(L1) + len(L1) + g + size, start(R1)]] });
-      }
-      if (L1 && before[1]) {
-        const g = start(L1) - (start(before[1]) + len(before[1]));
-        if (g > 0) cands.push({ pos: start(L1) + len(L1) + g, marks: [[start(before[1]) + len(before[1]), start(L1)], [start(L1) + len(L1), start(L1) + len(L1) + g]] });
-      }
-      if (R1 && after[1]) {
-        const g = start(after[1]) - (start(R1) + len(R1));
-        if (g > 0) cands.push({ pos: start(R1) - g - size, marks: [[start(R1) + len(R1), start(after[1])], [start(R1) - g, start(R1)]] });
-      }
-      const hit = cands.filter((c) => Math.abs(c.pos - a0) <= tol).sort((p, q) => Math.abs(p.pos - a0) - Math.abs(q.pos - a0))[0];
-      if (!hit) return;
-      if (horizontal) dx += hit.pos - a0;
-      else dy += hit.pos - a0;
-      const mid = horizontal ? m.y + dy + m.h / 2 : m.x + dx + m.w / 2;
-      for (const [p, q] of hit.marks) gaps.push(horizontal ? { x: p, y: mid, w: q - p, h: 0, label: `${Math.round(q - p)}`, vertical: false } : { x: mid, y: p, w: 0, h: q - p, label: `${Math.round(q - p)}`, vertical: true });
-    };
-    if (!sx) eq(true);
-    if (!sy) eq(false);
-    drawGuides(lines, gaps, parent);
-    return { dx, dy };
+    walk(boardOf(parent) ?? parent, 0, 0, false);
+    return out;
   };
+  /** The frame the parent offers (its own edges and middle): the artboard's, or a group gone into. */
+  const frameOf = (parent: HTMLElement) => (isBoard(parent) ? sizeOfBoard(parent) : { w: parent.offsetWidth, h: parent.offsetHeight });
+  const sameGap = (a: Marks['gaps'][number], b: Marks['gaps'][number]) => Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5 && Math.abs(a.w - b.w) < 0.5 && Math.abs(a.h - b.h) < 0.5;
   const clearGuides = () => (guides.innerHTML = '');
   const showTip = (text: string, x: number, y: number) => {
     tip.textContent = text;
@@ -971,6 +951,14 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     tip.style.top = `${clamp(y + 18, 4, innerHeight - 24)}px`;
   };
   const hideTip = () => (tip.style.display = 'none');
+  /** A short word at the foot of the window (a minute or two to read): what a drag did not do, and why. */
+  let noteTimer = 0;
+  const notice = (text: string) => {
+    note.textContent = text;
+    note.style.display = 'block';
+    clearTimeout(noteTimer);
+    noteTimer = window.setTimeout(() => (note.style.display = 'none'), 2600);
+  };
 
   // ---- picking ---------------------------------------------------------------------------------------------------
   const fromUi = (e: Event) => e.composedPath().includes(host);
@@ -1150,24 +1138,53 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     addEventListener('pointercancel', up, true);
   };
 
-  /** Moving what is picked: the first move makes the step to undo; snapped unless Alt is held. */
+  /** A copy of an element as a duplicate or a drag with Ctrl makes it: no ids (an id belongs to one element). */
+  const copyOf = (el: HTMLElement) => {
+    const c = el.cloneNode(true) as HTMLElement;
+    c.removeAttribute('id');
+    for (const x of c.querySelectorAll('[id]')) if (x.tagName.toLowerCase() !== 'path') x.removeAttribute('id');
+    return c;
+  };
+
+  /**
+   * Moving what is picked: the first move makes the step to undo. It snaps to the artboard's edges and middle and to the
+   * other elements' (those in groups too), and to equal gaps, and shows how far the nearest element is on each side;
+   * Alt (⌘ on a Mac) snaps to nothing, Shift keeps it straight, Ctrl (⌥ on a Mac) drags a copy and leaves the original.
+   * Of a pick with locked elements in it, those that are not locked move and the locked stay.
+   */
   const moveStart = (e: PointerEvent) => {
     const list = sel.filter((x) => !locked(x));
-    if (!list.length || list.length !== sel.length) return;
+    if (!list.length) return;
+    const heldBack = list.length !== sel.length;
+    const copying = isCopyDrag(e);
     const parent = list[0].parentElement as HTMLElement;
     let before = '';
+    let moving = list;
     let starts: { el: HTMLElement; g: Geom }[] = [];
     let box0: Geom | null = null;
-    let others: Geom[] = [];
+    let targets: Geom[] = [];
+    let frame = { w: 0, h: 0 };
     drag(
       e,
       (ev) => {
         if (!before) {
           before = snap();
           settle(parent);
-          starts = list.map((el) => ({ el, g: boxOf(el) }));
-          box0 = union(list.map(aabb));
-          others = [...parent.children].filter((x): x is HTMLElement => x instanceof HTMLElement && !list.includes(x) && !x.hasAttribute('data-n-own') && getComputedStyle(x).display !== 'none').map(aabb);
+          if (copying) {
+            moving = list.map((el) => {
+              const c = copyOf(el);
+              el.after(c);
+              if (typeOf(c) === 'curve') redrawCurve(c);
+              return c;
+            });
+            sel = moving;
+            tell();
+          }
+          starts = moving.map((el) => ({ el, g: boxOf(el) }));
+          box0 = union(moving.map(aabb));
+          targets = targetsFor(parent, moving);
+          frame = frameOf(parent);
+          if (heldBack) notice(L('dLockedStay', 'The locked parts stay where they are'));
         }
         let dx = (ev.clientX - e.clientX) / zoom;
         let dy = (ev.clientY - e.clientY) / zoom;
@@ -1175,11 +1192,22 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
           if (Math.abs(dx) > Math.abs(dy)) dy = 0;
           else dx = 0;
         }
-        if (!ev.altKey && box0) {
-          const s = snapMove({ ...box0, x: box0.x + dx, y: box0.y + dy }, others, parent);
-          dx += s.dx;
-          dy += s.dy;
-        } else clearGuides();
+        const marks: Marks = { guides: [], gaps: [], pills: [] };
+        if (box0) {
+          const tol = 6 / zoom;
+          const m = { ...box0, x: box0.x + dx, y: box0.y + dy };
+          if (!isNoSnap(ev)) {
+            const s1 = SNAP.snapMove(m, targets, tol, frame);
+            const s2 = SNAP.snapEqual(m, targets, tol, s1.dx, s1.dy, s1.x, s1.y);
+            dx += s2.dx;
+            dy += s2.dy;
+            marks.guides = s1.guides;
+            marks.gaps = s2.gaps;
+          }
+          // How far the nearest element is on each side (the artboard's edge where none is), unless an equal gap says so.
+          for (const g of SNAP.neighbourGaps({ ...box0, x: box0.x + dx, y: box0.y + dy }, targets, frame)) if (!marks.gaps.some((q) => sameGap(q, g))) marks.gaps.push(g);
+          drawMarks(marks, parent);
+        }
         for (const s of starts) setBox(s.el, { x: s.g.x + dx, y: s.g.y + dy });
         if (box0) showTip(`${Math.round(box0.x + dx)}, ${Math.round(box0.y + dy)}`, ev.clientX, ev.clientY);
         redraw();
@@ -1194,7 +1222,12 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     );
   };
 
-  /** Resizing by a handle: one element in its own (turned) frame, several together (by their corners, keeping their shape). */
+  /**
+   * Resizing by a handle: one element in its own (turned) frame, several together (by their corners, keeping their
+   * shape). What is not turned snaps its moving edges to the other elements' (and the artboard's), or to their width or
+   * height, with guides and "=" and size pills; Alt (⌘ on a Mac) snaps to nothing. Shift, and a picture's or words'
+   * corner, keep the shape: the edge that moved most leads and the other side follows.
+   */
   const resizeStart = (e: PointerEvent, h: string) => {
     if (cropping) return cropResize(e, h);
     const list = sel.filter((x) => !locked(x));
@@ -1205,6 +1238,15 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     const sx = h.includes('e') ? 1 : h.includes('w') ? -1 : 0;
     const sy = h.includes('s') ? 1 : h.includes('n') ? -1 : 0;
     const corner = sx !== 0 && sy !== 0;
+    const edges = { l: sx < 0, r: sx > 0, t: sy < 0, b: sy > 0 };
+    const frame = frameOf(parent);
+    /** The pills of a size drag, in the parent's pixels: the size under the box, and "=" on each as wide or high. */
+    const sizeMarks = (res: ReturnType<typeof SNAP.snapResize>, box: Geom): Marks => {
+      const pills: Marks['pills'] = [{ x: box.x + box.w / 2, y: box.y + box.h + 20 / zoom, text: `${Math.round(box.w)} × ${Math.round(box.h)}` }];
+      for (const b of [box, ...res.sameW]) if (res.sameW.length) pills.push({ x: b.x + b.w / 2, y: b.y + b.h + 12 / zoom, text: '=' });
+      for (const b of [box, ...res.sameH]) if (res.sameH.length) pills.push({ x: b.x + b.w + 12 / zoom, y: b.y + b.h / 2, text: '=' });
+      return { guides: res.guides, gaps: [], pills };
+    };
     if (list.length === 1) {
       const el = list[0];
       const t = typeOf(el);
@@ -1221,6 +1263,9 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
       // The fixed point: the opposite handle's, in the parent's pixels.
       const ax = (-sx * g0.w) / 2;
       const ay = (-sy * g0.h) / 2;
+      // Turned (itself or what it is in): only the shape is kept, nothing snaps.
+      const unturned = totalRot(el) === 0;
+      const targets = unturned ? targetsFor(parent, [el]) : [];
       drag(
         e,
         (ev) => {
@@ -1230,12 +1275,24 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
           const ly = -(p.x - c0.x) * sin + (p.y - c0.y) * cos;
           let w = sx ? Math.max(4, (lx - ax) * sx) : g0.w;
           let hh = sy ? Math.max(4, (ly - ay) * sy) : g0.h;
-          if (corner && (keepType || ev.shiftKey)) {
-            const k = Math.max(w / g0.w, hh / g0.h);
-            w = g0.w * k;
-            hh = g0.h * k;
-          } else if (!corner && ev.shiftKey && (sx || sy)) {
-            const k = sx ? w / g0.w : hh / g0.h;
+          const keep = corner ? keepType || ev.shiftKey : ev.shiftKey && (sx !== 0 || sy !== 0);
+          let res: ReturnType<typeof SNAP.snapResize> | null = null;
+          if (unturned) {
+            const on = !isNoSnap(ev);
+            res = SNAP.snapResize({
+              box: { x: sx > 0 ? g0.x : sx < 0 ? g0.x + g0.w - w : g0.x, y: sy > 0 ? g0.y : sy < 0 ? g0.y + g0.h - hh : g0.y, w, h: hh },
+              from: g0,
+              edges,
+              others: on ? targets : [],
+              frame: on ? frame : null,
+              tol: on ? 6 / zoom : 0,
+              ratio: keep,
+              min: 4,
+            });
+            w = res.box.w;
+            hh = res.box.h;
+          } else if (keep) {
+            const k = corner ? Math.max(w / g0.w, hh / g0.h) : sx ? w / g0.w : hh / g0.h;
             w = g0.w * k;
             hh = g0.h * k;
           }
@@ -1263,7 +1320,10 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
             }
           }
           setTransform(el, r, f.fx, f.fy);
-          showTip(`${Math.round(w)} × ${Math.round(t === 'text' ? el.offsetHeight : hh)}`, ev.clientX, ev.clientY);
+          if (res) {
+            drawMarks(sizeMarks(res, boxOf(el)), parent);
+            // Words have the height their size gives them: the pill says what shows.
+          } else showTip(`${Math.round(w)} × ${Math.round(t === 'text' ? el.offsetHeight : hh)}`, ev.clientX, ev.clientY);
           redraw();
         },
         (moved) => {
@@ -1282,18 +1342,33 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     const fx = sx > 0 ? u0.x : u0.x + u0.w;
     const fy = sy > 0 ? u0.y : u0.y + u0.h;
     const starts = list.map((el) => ({ el, g: boxOf(el), fs: num(getComputedStyle(el).fontSize, 16) }));
+    const targets = targetsFor(parent, list);
     drag(
       e,
       (ev) => {
         const p = toLocal(parent, ev.clientX, ev.clientY);
-        const k = Math.max(0.05, Math.max(((p.x - fx) * sx) / u0.w, ((p.y - fy) * sy) / u0.h));
+        let k = Math.max(0.05, Math.max(((p.x - fx) * sx) / u0.w, ((p.y - fy) * sy) / u0.h));
+        const on = !isNoSnap(ev);
+        const w = u0.w * k;
+        const hh = u0.h * k;
+        const res = SNAP.snapResize({
+          box: { x: sx > 0 ? u0.x : u0.x + u0.w - w, y: sy > 0 ? u0.y : u0.y + u0.h - hh, w, h: hh },
+          from: u0,
+          edges,
+          others: on ? targets : [],
+          frame: on ? frame : null,
+          tol: on ? 6 / zoom : 0,
+          ratio: true,
+          min: 4,
+        });
+        k = Math.max(0.05, res.box.w / u0.w);
         for (const s of starts) {
           setBox(s.el, { x: fx + (s.g.x - fx) * k, y: fy + (s.g.y - fy) * k, w: s.g.w * k, h: s.g.h * k });
           const t = typeOf(s.el);
           if (t === 'text' || t === 'curve' || s.el.style.fontSize) s.el.style.fontSize = `${r1(s.fs * k)}px`;
           if (t === 'curve') redrawCurve(s.el);
         }
-        showTip(`${Math.round(u0.w * k)} × ${Math.round(u0.h * k)}`, ev.clientX, ev.clientY);
+        drawMarks(sizeMarks(res, union(list.map(aabb))), parent);
         redraw();
       },
       (moved) => {
@@ -1887,9 +1962,7 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
         remember();
         endText();
         const copies = list.map((el) => {
-          const c = el.cloneNode(true) as HTMLElement;
-          c.removeAttribute('id');
-          for (const x of c.querySelectorAll('[id]')) if (x.tagName.toLowerCase() !== 'path') x.removeAttribute('id');
+          const c = copyOf(el);
           el.after(c);
           const g = boxOf(el);
           setBox(c, { x: g.x + 16, y: g.y + 16 });
@@ -2770,4 +2843,4 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
 /** The design editor, with the stylesheet and script a design carries and the shared geometry it needs, as one script. */
-export const DESIGN_EDITOR_SRC = scriptSafe(`(cfg) => (${designEditor.toString()})(cfg, ${JSON.stringify(DESIGN_CSS)}, ${JSON.stringify(DESIGN_FIT_SRC)}, ${curveGeom.toString()}, ${fitBox.toString()})`);
+export const DESIGN_EDITOR_SRC = scriptSafe(`(cfg) => (${designEditor.toString()})(cfg, ${JSON.stringify(DESIGN_CSS)}, ${JSON.stringify(DESIGN_FIT_SRC)}, ${curveGeom.toString()}, ${fitBox.toString()}, ${snapKit.toString()})`);
