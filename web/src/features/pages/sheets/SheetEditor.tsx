@@ -1081,6 +1081,36 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     setSel(rectSel(limited, selRef.current.r, selRef.current.c));
     grid.current?.focus();
   };
+  /**
+   * Cells dragged by their border to a new place (the grid says how many rows and columns): moved, with what pointed at
+   * them following, or copied with the copy key held (formulas move along as in any copy).
+   */
+  const moveCells = (from: Rect, dr: number, dc: number, copy: boolean) => {
+    const b = bookRef.current;
+    if (!b || !sheet || !calc || readOnly || (!dr && !dc)) return;
+    const to = { r1: from.r1 + dr, c1: from.c1 + dc, r2: from.r2 + dr, c2: from.c2 + dc };
+    if (to.r1 < 0 || to.c1 < 0 || to.r2 >= SHEET_LIMITS.rows || to.c2 >= SHEET_LIMITS.cols) return void toast(tr('That would go past the end of the sheet.'));
+    if (copy) {
+      const got = pasteChanges(sheet, to, { clip: copyOf(sheet, calc, sheetIx, from).clip });
+      change(cellsPatch(b, sheetIx, got.changes));
+      setSel(rectSel(got.x, got.x.r1, got.x.c1), true);
+      return;
+    }
+    const after = adjustForMove(b, { sheet: sheet.id, x: from }, { sheet: sheet.id, r: to.r1, c: to.c1 });
+    if (after === b) return;
+    change({ k: 'book', before: b, after });
+    setSel(rectSel(to), true);
+  };
+  /** Rows or columns dragged by their numbers (letters) before the row (column) `to`; also Move up, Move down, Move left and Move right. */
+  const moveLines = (axis: 'row' | 'col', from: number, count: number, to: number) => {
+    const b = bookRef.current;
+    if (!b || !sheet || readOnly) return;
+    const after = adjustForMoveLines(b, sheet.id, axis, from, count, to);
+    if (after === b) return;
+    change({ k: 'book', before: b, after });
+    const start = to > from ? to - count : to;
+    setSel(axis === 'row' ? { r: start, c: 0, ar: start, ac: 0, fr: start + count - 1, fc: size.cols - 1 } : { r: 0, c: start, ar: 0, ac: start, fr: size.rows - 1, fc: start + count - 1 }, true);
+  };
   const fillDown = () => {
     if (!sheet || !calc) return;
     const src = rectOf(selRef.current);
@@ -2752,6 +2782,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             onSmart={onSmart}
             onFilter={(c, at) => setFilterMenu({ c, at })}
             onFill={fillTo}
+            onMove={moveCells}
+            onMoveLines={moveLines}
             onFillDown={fillDown}
             onUnhide={unhide}
             onExpand={(r) => setRowCard(r)}

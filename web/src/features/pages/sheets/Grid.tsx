@@ -8,7 +8,9 @@
 // handle, the charts, and the box to type in, which is also what takes the keys and the clipboard while nothing is
 // typed (so typing starts at once, in any language). It is drawn at the zoom asked for.
 // Mouse: click, drag, Shift+click, Ctrl+click and Ctrl+drag (more ranges), the letters and numbers, edges of headers to
-// size columns and rows (a double click fits them), the fill handle (drag it, or double-click it to fill down). Touch: a tap picks, a tap on the
+// size columns and rows (a double click fits them), the fill handle (drag it, or double-click it to fill down), the
+// border of the cells picked (drag it to move them, Ctrl held to copy them) and a picked row's number or column's letter
+// (drag it to move the rows or columns). Touch: a tap picks, a tap on the
 // picked cell types in it, a drag scrolls, the round handle stretches the selection, a long press opens the menu.
 import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2, MessageSquare } from 'lucide-react';
@@ -16,6 +18,7 @@ import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue,
 import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
 import { cx } from '../../../components/ui';
 import { colW, indexAt, offsets, rectOf, rowH, type Sel } from './ops';
+import { isCopyDrag } from '../common/keys';
 import { asksAi, type AiState } from './ai';
 import { AiMark, aiLabel, CellImage, LinkCard, Sparkline } from './CellExtras';
 import type { Span } from '@shared/sheet-groups';
@@ -126,6 +129,10 @@ interface Props {
   /** The fill handle dragged from the selection over `target`; Ctrl held. */
   onFill: (target: Rect, ctrl: boolean) => void;
   onFillDown: () => void;
+  /** The cells picked dragged by whole rows and columns (`dr`, `dc`) and dropped: moved, or copied with the copy key held. */
+  onMove: (x: Rect, dr: number, dc: number, copy: boolean) => void;
+  /** The picked rows (columns) from `from`, `count` of them, dropped before the row (column) `to`. */
+  onMoveLines: (axis: 'row' | 'col', from: number, count: number, to: number) => void;
   onUnhide: (axis: 'row' | 'col', i: number) => void;
   onExpand: (r: number) => void;
   /** A comment's card clicked: its thread opens, to read and answer. */
@@ -232,6 +239,10 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const [sizing, setSizing] = useState<{ axis: 'col' | 'row'; i: number; size: number } | null>(null);
   // The fill handle being dragged: the cells it would fill.
   const [filling, setFilling] = useState<Rect | null>(null);
+  // Cells being dragged to a new place (where they would land), or rows or columns (the boundary they would go before).
+  const [moving, setMoving] = useState<{ x: Rect } | { axis: 'row' | 'col'; at: number } | null>(null);
+  // The mouse is on the border of the cells picked: a drag from there moves them.
+  const [edge, setEdge] = useState(false);
   // The cell the mouse is over (for its note).
   const [hover, setHover] = useState<{ r: number; c: number } | null>(null);
   const touch = useRef(false);
@@ -358,8 +369,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   }));
 
   // ---- pointer: picking, dragging, typing in ----------------------------------------------------------------------------
-  type DragKind = 'cells' | 'cols' | 'rows' | 'point' | 'handle' | 'fill';
-  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number; more?: boolean } | null>(null);
+  type DragKind = 'cells' | 'cols' | 'rows' | 'point' | 'handle' | 'fill' | 'move' | 'moveCols' | 'moveRows';
+  const drag = useRef<{ kind: DragKind; id: number; x: number; y: number; moved: boolean; timer?: number; more?: boolean; from?: [number, number] } | null>(null);
   const auto = useRef<number | null>(null);
 
   /** The cells the fill handle would fill, dragged to (r, c): the selection grown down, up, right or left, whichever the pointer is furthest past. */
@@ -381,6 +392,23 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     const s = cb.current.sel;
     if (kind === 'point') return void cb.current.onPoint(Math.max(0, r), Math.max(0, c), true);
     if (kind === 'fill') return setFilling(fillTarget(Math.max(0, r), Math.max(0, c)));
+    if (kind === 'move') {
+      const from = drag.current?.from;
+      if (!from) return;
+      const x0 = rectOf(s);
+      // Where the cells would land, kept on the sheet.
+      const dr = Math.max(-x0.r1, Math.min(rows - 1 - x0.r2, r - from[0]));
+      const dc = Math.max(-x0.c1, Math.min(cols - 1 - x0.c2, c - from[1]));
+      return setMoving({ x: { r1: x0.r1 + dr, c1: x0.c1 + dc, r2: x0.r2 + dr, c2: x0.c2 + dc } });
+    }
+    if (kind === 'moveCols' || kind === 'moveRows') {
+      const row = kind === 'moveRows';
+      const x0 = rectOf(s);
+      const i = row ? r : c;
+      const [a, b] = row ? [x0.r1, x0.r2] : [x0.c1, x0.c2];
+      // Dropped past the end of the rows picked: after the one pointed at; before it, if before them; on them: nowhere.
+      return setMoving(i > b ? { axis: row ? 'row' : 'col', at: i + 1 } : i < a ? { axis: row ? 'row' : 'col', at: i } : null);
+    }
     if (kind === 'cols') return cb.current.onSel({ ...s, fr: rows - 1, fc: Math.max(0, c) });
     if (kind === 'rows') return cb.current.onSel({ ...s, fr: Math.max(0, r), fc: cols - 1 });
     cb.current.onSel({ ...s, fr: Math.max(0, r), fc: Math.max(0, c) }, !!drag.current?.more);
@@ -426,6 +454,21 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     return null;
   };
 
+  /** Whether a point on screen is on the border of the cells picked (a few px either side of it): a drag from there moves them. */
+  const onEdge = (px: number, py: number): boolean => {
+    const P = cb.current;
+    if (P.readOnly || P.edit || touch.current) return false;
+    const s = rectOf(P.sel);
+    if ((s.r1 === 0 && s.r2 >= rows - 1) || (s.c1 === 0 && s.c2 >= cols - 1)) return false;
+    const a = screenRect(s.r1, s.c1);
+    const b = screenRect(s.r2, s.c2);
+    if (!a || !b) return false;
+    const t = 3;
+    const outer = px >= a.left - t && px <= b.right + t && py >= a.top - t && py <= b.bottom + t;
+    const inner = px > a.left + t && px < b.right - t && py > a.top + t && py < b.bottom - t;
+    return outer && !inner;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     const t = e.target as HTMLElement;
     if (t.closest('[data-sizer],[data-own]') || t === input.current) return;
@@ -460,6 +503,19 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       return;
     }
     const s = P.sel;
+    // The border of the cells picked, or a picked row's number or column's letter: a drag moves them (a click is a click).
+    if (!readOnly && !P.edit && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const x0 = rectOf(s);
+      const allCols = x0.c1 === 0 && x0.c2 >= cols - 1;
+      const allRows = x0.r1 === 0 && x0.r2 >= rows - 1;
+      const kind: DragKind | null = r < 0 && c >= 0 ? (allRows && !allCols && c >= x0.c1 && c <= x0.c2 ? 'moveCols' : null) : c < 0 && r >= 0 ? (allCols && !allRows && r >= x0.r1 && r <= x0.r2 ? 'moveRows' : null) : r >= 0 && c >= 0 && onEdge(e.clientX, e.clientY) ? 'move' : null;
+      if (kind) {
+        drag.current = { kind, id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, from: [r, c] };
+        scroller.current?.setPointerCapture(e.pointerId);
+        input.current?.focus({ preventScroll: true });
+        return;
+      }
+    }
     if (r < 0) {
       const next = e.shiftKey ? { ...s, ar: 0, fr: rows - 1, fc: c } : { r: 0, c, ar: 0, ac: c, fr: rows - 1, fc: c };
       P.onSel(next);
@@ -499,6 +555,8 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       const k = m ? refName(m.r1, m.c1) : '';
       const next = m && (sheet.cells[k]?.note || threads.has(k)) ? { r: m.r1, c: m.c1 } : null;
       if (next?.r !== hover?.r || next?.c !== hover?.c) setHover(next);
+      const on = r >= 0 && c >= 0 && !(e.target as HTMLElement).closest('[data-own]') && onEdge(e.clientX, e.clientY);
+      if (on !== edge) setEdge(on);
       return;
     }
     if (!d || d.id !== e.pointerId) return;
@@ -516,6 +574,24 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
     drag.current = null;
     if (!d || d.id !== e.pointerId) return;
     if (d.timer) clearTimeout(d.timer);
+    if (d.kind === 'move' || d.kind === 'moveCols' || d.kind === 'moveRows') {
+      const m = moving;
+      setMoving(null);
+      const P = cb.current;
+      const [r, c] = cellAt(e.clientX, e.clientY);
+      if (d.moved && m) {
+        const x0 = rectOf(P.sel);
+        if ('axis' in m) P.onMoveLines(m.axis, m.axis === 'row' ? x0.r1 : x0.c1, m.axis === 'row' ? x0.r2 - x0.r1 + 1 : x0.c2 - x0.c1 + 1, m.at);
+        else if (m.x.r1 !== x0.r1 || m.x.c1 !== x0.c1) P.onMove(x0, m.x.r1 - x0.r1, m.x.c1 - x0.c1, isCopyDrag(e));
+        return;
+      }
+      if (d.moved) return;
+      // No drag: it was a click after all.
+      if (d.kind === 'moveCols') return P.onSel({ r: 0, c, ar: 0, ac: c, fr: rows - 1, fc: c });
+      if (d.kind === 'moveRows') return P.onSel({ r, c: 0, ar: r, ac: 0, fr: r, fc: cols - 1 });
+      if (r >= 0 && c >= 0) P.onSel({ r, c, ar: r, ac: c, fr: r, fc: c });
+      return;
+    }
     if (d.kind === 'fill') {
       const target = filling;
       setFilling(null);
@@ -824,6 +900,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         {p.cut && boxes(p.cut, region, 'border-2 border-dashed border-accent', {}, 'cut')}
         {multi && boxes(x, region, 'border border-accent bg-accent/10', {}, 'sel')}
         {filling && boxes(filling, region, 'border-2 border-dashed border-fg-3', {}, 'fill')}
+        {moving && 'x' in moving && boxes(moving.x, region, 'border-2 border-dashed border-accent bg-accent/10', {}, 'moving')}
         {regionOf(am.r1, am.c1) === region && !edit && boxes(am, region, 'border-2 border-accent', {}, 'act')}
         {/* A filter's buttons on its header row. */}
         {fx &&
@@ -1025,6 +1102,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         if (drag.current?.timer) clearTimeout(drag.current.timer);
         drag.current = null;
         setFilling(null);
+        setMoving(null);
       }}
       onTouchEnd={(e) => {
         if (!held.current) return;
@@ -1034,7 +1112,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => e.target === scroller.current && cb.current.onKey(e)}
-      className="relative min-h-0 flex-1 overflow-auto overscroll-contain bg-bg leading-[1.35] text-fg outline-none select-none [-webkit-touch-callout:none]"
+      className={cx('relative min-h-0 flex-1 overflow-auto overscroll-contain bg-bg leading-[1.35] text-fg outline-none select-none [-webkit-touch-callout:none]', (edge || moving) && 'cursor-move')}
       style={{ fontSize: 13.3 * z }}
     >
       <div className="relative" style={{ width: W, height: H }}>
@@ -1052,6 +1130,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
             {fr > 0 && <div className="pointer-events-none absolute left-0 z-20 bg-fg-3/50" style={{ top: HH + FH - 1, height: 2, width: NW + FW }} />}
           </div>
           {heads}
+          {moving && 'axis' in moving && moving.axis === 'col' && <div className="pointer-events-none absolute z-30 bg-accent" style={{ left: NW + colOff[moving.at] - 1, top: GH, width: 3, height: HH - GH }} />}
           {outlineCols}
           {fr > 0 && gridLines('top')}
           {cellsTop}
@@ -1061,6 +1140,7 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
         {/* The numbers down the side, with the frozen columns beside them: they stay at the left. */}
         <div className="sticky left-0 z-20 bg-bg" style={{ width: NW + FW, height: H - HH - FH }}>
           {nums}
+          {moving && 'axis' in moving && moving.axis === 'row' && moving.at >= fr && <div className="pointer-events-none absolute z-30 bg-accent" style={{ top: rowOff[moving.at] - FH - 1, left: GW, height: 3, width: NW - GW }} />}
           {outlineRows}
           {fc > 0 && gridLines('left')}
           {cellsLeft}
