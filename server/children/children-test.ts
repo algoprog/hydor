@@ -28,7 +28,7 @@ import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
-import { ancestorsOf, childKeys, parentOf, runningChildren } from './family.ts';
+import { ancestorsOf, childKeys, parentOf, runningBelow, runningChildren } from './family.ts';
 import { childMode } from './modes.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
@@ -130,8 +130,11 @@ class Sessions extends EventEmitter {
     await budget.beforeSend!(key, deps);
     this.delivered.push({ key, text });
   }
-  enqueue(key: string, text: string) {
+  /** Whether each queued message was put in a held queue. */
+  queuedHeld: boolean[] = [];
+  enqueue(key: string, text: string, _images: unknown[] = [], _files: unknown[] = [], hold = false) {
     this.queued.push({ key, text });
+    this.queuedHeld.push(hold);
   }
   /** Sessions whose last turn their plan's usage limit stopped. */
   limited = new Set<string>();
@@ -845,6 +848,56 @@ test('running helpers: a loop in who started whom ends, and a session is never i
   assert.deepEqual(ancestorsOf(db, 'claude:x1'), ['claude:x2']);
   assert.deepEqual(running([['claude:x1', 'working']]), { 'claude:x2': ['claude:x1'] });
   assert.deepEqual(running([['claude:x3', 'working']]), {});
+});
+
+// ---- stop all ----------------------------------------------------------------------------------------
+
+test('stop all: what it stops below a session is its running children, theirs in turn, each once, after the one that started it', () => {
+  setSessionExtra(db, 'claude:s0', {});
+  setSessionExtra(db, 'claude:s1', { parent: 'claude:s0' });
+  setSessionExtra(db, 'claude:s1b', { parent: 'claude:s0' });
+  setSessionExtra(db, 'claude:s2', { parent: 'claude:s1' });
+  // The middle child is idle, kept at work by its running child; the other child is done.
+  const below = (st: [string, string][]) => runningBelow(runningChildren(db, st), 'claude:s0');
+  assert.deepEqual(below([['claude:s2', 'working'], ['claude:s1', 'idle'], ['claude:s1b', 'idle']]), ['claude:s1', 'claude:s2']);
+  assert.deepEqual(below([['claude:s1b', 'waiting'], ['claude:s2', 'starting']]), ['claude:s1b', 'claude:s1', 'claude:s2']);
+  assert.deepEqual(below([['claude:s0', 'working']]), []);
+  // A loop in who started whom ends, and the session itself is never in the list.
+  setSessionExtra(db, 'claude:l1', { parent: 'claude:l2' });
+  setSessionExtra(db, 'claude:l2', { parent: 'claude:l1' });
+  assert.deepEqual(runningBelow(runningChildren(db, [['claude:l1', 'working'], ['claude:l2', 'working']]), 'claude:l1'), ['claude:l2']);
+});
+
+test('stop all: a child cut short with its parent is not reported back, and a report after the stop waits in the held queue', async () => {
+  sessions.add('claude:sp', { agent: 'claude', live: 'idle', title: 'Stopped parent', items: [user('Go')] });
+  sessions.add('claude:sc', { agent: 'claude', live: 'idle', title: 'Stopped child', items: [user('Do it'), said('Half of it.'), end('interrupted')] });
+  setSessionExtra(db, 'claude:sc', { parent: 'claude:sp' });
+  const started = Date.now() - 1000;
+  const n = { delivered: sessions.delivered.length, queued: sessions.queued.length };
+  // Stopped with its parent after its turn began: nothing is told.
+  setSessionExtra(db, 'claude:sc', { stoppedWithParent: Date.now() });
+  await reportTurn(deps, { key: 'claude:sc', startedAt: started, external: false });
+  assert.equal(sessions.delivered.length, n.delivered);
+  assert.equal(sessions.queued.length, n.queued);
+  // Stopped before its turn began (an older stop): the turn is reported as any other.
+  sessions.all.get('claude:sc')!.items.push(user('Again'), said('Part two.'), end('interrupted'));
+  setSessionExtra(db, 'claude:sc', { stoppedWithParent: started - 5000 });
+  await reportTurn(deps, { key: 'claude:sc', startedAt: started, external: false });
+  assert.equal(sessions.delivered.length, n.delivered + 1);
+  assert.match(sessions.delivered.at(-1)!.text, /was stopped before it finished/);
+  // The parent was stopped after the turn began: even a finished turn's report waits, held, instead of waking it.
+  sessions.all.get('claude:sc')!.items.push(user('Third'), said('All done.'), end());
+  setSessionExtra(db, 'claude:sp', { stoppedAll: Date.now() });
+  await reportTurn(deps, { key: 'claude:sc', startedAt: started, external: false });
+  assert.equal(sessions.delivered.length, n.delivered + 1);
+  assert.equal(sessions.queued.length, n.queued + 1);
+  assert.match(sessions.queued.at(-1)!.text, /All done\.$/);
+  assert.equal(sessions.queuedHeld.at(-1), true);
+  // A turn that began after the stop reports as usual.
+  sessions.all.get('claude:sc')!.items.push(user('Fourth'), said('Later.'), end());
+  await reportTurn(deps, { key: 'claude:sc', startedAt: Date.now() + 1000, external: false });
+  assert.equal(sessions.delivered.length, n.delivered + 2);
+  assert.match(sessions.delivered.at(-1)!.text, /Later\.$/);
 });
 
 // ---- run ---------------------------------------------------------------------------------------------

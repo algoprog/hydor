@@ -525,6 +525,26 @@ async function tell(d: Deps, parent: string, text: string) {
   }
 }
 
+/** Whether a stop-all marked the session (`stoppedAll`, `stoppedWithParent`) at or after `since`, a turn's start. */
+const markedSince = (d: Deps, key: string, field: 'stoppedAll' | 'stoppedWithParent', since: number) => {
+  const at = sessionExtra(d.db, key)[field];
+  return typeof at === 'number' && at > 0 && at >= since;
+};
+
+/**
+ * A child's report to its parent. When the parent was stopped (Stop all) at or after the turn began, the report waits in
+ * its held queue, so it does not wake the parent that was just stopped; the user sees it there and resumes it.
+ */
+async function tellParent(d: Deps, parent: string, startedAt: number, text: string) {
+  if (markedSince(d, parent, 'stoppedAll', startedAt)) {
+    try {
+      d.sessions.enqueue(parent, text, [], [], true);
+    } catch {}
+    return;
+  }
+  await tell(d, parent, text);
+}
+
 /** The turn of a child last reported to its parent (the id of the message that began it). */
 const reportedTurn = (d: Deps, key: string) => parseExtra((d.db.prepare('select extra from app_sessions where key = ?').get(key) as { extra: string | null } | undefined)?.extra).reported;
 
@@ -569,11 +589,13 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   setSessionExtra(d.db, t.key, { reported: turn.prompt.id });
   // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
   if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return;
+  // A child stopped with its parent (Stop all): the stop was the parent's own doing, so it is not told of it.
+  if (turn.status === 'interrupted' && markedSince(d, t.key, 'stoppedWithParent', t.startedAt)) return;
   // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest).
   const up = await stepUpCheck(d, t.key, turn, t.startedAt);
   if (up) {
     try {
-      await tell(d, parent, await stepUpChild(d, parent, t.key, up.next, up.why));
+      await tellParent(d, parent, t.startedAt, await stepUpChild(d, parent, t.key, up.next, up.why));
       return;
     } catch {
       // It could not start again (the most at once, an agent gone): its reply goes as it is.
@@ -594,7 +616,7 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
     stopped: cap ? 'its spending cap was reached' : undefined,
     summary: turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply, t.key) : undefined,
   });
-  await tell(d, parent, msg);
+  await tellParent(d, parent, t.startedAt, msg);
 }
 
 // ---- stepping up ---------------------------------------------------------------------------------
