@@ -1,12 +1,13 @@
 // Settings → Voice: dictation (the language, and whose recognition), speech recognition on the server
 // (off by default; whisper.cpp downloads when turned on, or an OpenAI-compatible service), and how
 // replies are read aloud. What concerns the browser stays in the browser; the server keeps its own.
-import { useState, type ReactNode } from 'react';
-import { AlertTriangle, Check, Cpu, Lock, MicOff, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Cloud, Cpu, Languages, Lock, Mic, MicOff, Play, TriangleAlert } from 'lucide-react';
 import { GPU_API, WHISPER_MODELS, type VoiceEngine, type VoicePatch, type VoiceState, type WhisperSize } from '@shared/voice';
 import { api, post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
-import { Button, cx, inputCls, OptionRow, Picker, Section, Segmented, Throbber, useConfirm } from '../../components/ui';
+import { Button, Dialog, inputCls, MenuItem, Segmented, Throbber, useConfirm } from '../../components/ui';
+import { EmptyRow, Group, MoreMenu, Notice, Row, Select, Stack } from '../settings/kit';
 import { languageName, LANGUAGES } from './languages';
 import { canRecord, canSpeak, SpeechRecognition, speechLang, useServerVoice, useVoicePrefs, useVoiceServer } from './prefs';
 import { readAloud, stopReading, useReading, useVoices } from './speech';
@@ -14,39 +15,13 @@ import { readAloud, stopReading, useReading, useVoices } from './speech';
 const MB = 1024 ** 2;
 const size = (b: number) => (b >= 1024 * MB ? `${(b / 1024 / MB).toFixed(1)} GB` : `${Math.max(1, Math.round(b / MB))} MB`);
 
-function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-      <div className="min-w-[200px] flex-1">
-        <div className="text-[13.5px] text-fg">{label}</div>
-        {hint && <div className="mt-0.5 text-[12px] leading-snug text-fg-3">{hint}</div>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Note({ icon, tone, children }: { icon: ReactNode; tone?: 'ok' | 'warn' | 'err'; children: ReactNode }) {
-  return (
-    <div
-      className={cx(
-        'flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12.5px] leading-relaxed',
-        tone === 'warn' ? 'bg-warn/10 text-fg-2' : tone === 'err' ? 'bg-err/10 text-fg-2' : 'bg-bg-2 text-fg-2',
-      )}
-    >
-      <span className={cx('mt-0.5 shrink-0', tone === 'warn' ? 'text-warn' : tone === 'err' ? 'text-err' : tone === 'ok' ? 'text-ok' : 'text-fg-3')}>{icon}</span>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  );
-}
-
 export function VoiceSettings() {
   return (
-    <div className="space-y-4">
+    <Stack>
       <DictationSettings />
       <ServerSettings />
       <ReadAloudSettings />
-    </div>
+    </Stack>
   );
 }
 
@@ -58,54 +33,64 @@ function DictationSettings() {
   const own = !!SpeechRecognition();
   const both = own && !!server?.ready && canRecord();
   return (
-    <Section title="Dictation" sub="The microphone by the message box: what you say goes into your message, and you send it yourself.">
-      <div className="space-y-2">
-        {!window.isSecureContext && (
-          <Note icon={<Lock size={14} />} tone="warn">
-            The microphone needs a secure connection: HTTPS, or localhost on this computer. This page is at <span className="font-mono text-[12px]">{location.origin}</span>, so dictation cannot
-            start here. Open Hydor through an HTTPS address to use it.
-          </Note>
-        )}
-        {own ? (
-          <Note icon={<Check size={14} />} tone="ok">
-            This browser recognizes speech itself: your words show as you speak. Browsers may send your voice to their maker to do it (Chrome to Google, Safari to Apple); to keep it on
-            your machine, turn on whisper.cpp below and choose the server.
-          </Note>
-        ) : (
-          <Note icon={<MicOff size={14} />}>
-            This browser cannot recognize speech by itself.{' '}
-            {server?.ready ? 'The server does it: the microphone is by the message box.' : 'Turn on speech recognition on the server below, and the microphone shows by the message box.'}
-          </Note>
-        )}
-      </div>
-      <div className="mt-1 -mb-2 divide-y divide-line">
-        <Row label="Language you speak" hint="Dictation listens for it; you can also change it while dictating.">
-          <Picker value={p.lang ? languageName(p.lang) : 'Same as this browser'} title="The language you speak" width={280}>
-            {(close) => (
-              <>
-                <OptionRow label="Same as this browser" hint={languageName(navigator.language || 'en-US')} selected={!p.lang} onClick={() => (close(), p.set({ lang: '' }))} />
-                {LANGUAGES.map((l) => (
-                  <OptionRow key={l} label={languageName(l)} hint={l} selected={p.lang === l} onClick={() => (close(), p.set({ lang: l }))} />
-                ))}
-              </>
-            )}
-          </Picker>
-        </Row>
-        {both && (
-          <Row label="Recognize with" hint={p.use === 'server' ? 'The server: private with whisper.cpp; the words come when you stop.' : 'This browser: the words show as you speak.'}>
-            <Segmented
-              size="sm"
-              value={p.use}
-              onChange={(v) => p.set({ use: v })}
+    <>
+      {!window.isSecureContext && (
+        <Notice tone="warn" icon={<Lock size={15} />}>
+          The microphone needs a secure connection: HTTPS, or localhost on this computer. This page is at <span className="font-mono text-[12px]">{location.origin}</span>, so dictation cannot
+          start here. Open Hydor through an HTTPS address to use it.
+        </Notice>
+      )}
+      <Group title="Dictation" info="The microphone by the message box: what you say goes into your message, and you send it yourself.">
+        <Row
+          icon={own ? <Check size={16} className="text-ok" /> : <MicOff size={16} />}
+          label="This browser"
+          hint={own ? 'Recognizes speech itself: your words show as you speak' : server?.ready ? 'Cannot recognize speech itself: the server does it' : 'Cannot recognize speech itself'}
+          info={
+            own
+              ? 'Browsers may send your voice to their maker to do it (Chrome to Google, Safari to Apple); to keep it on your machine, turn on whisper.cpp below and choose the server.'
+              : server?.ready
+                ? 'The microphone is by the message box.'
+                : 'Turn on speech recognition on the server below, and the microphone shows by the message box.'
+          }
+        />
+        <Row
+          icon={<Languages size={16} />}
+          label="Language you speak"
+          hint="Dictation listens for it"
+          info="You can also change it while dictating."
+          control={
+            <Select
+              label="The language you speak"
+              value={p.lang}
+              width={280}
               options={[
-                { value: 'browser', label: 'This browser' },
-                { value: 'server', label: 'The server' },
+                { value: '', label: 'Same as this browser', hint: languageName(navigator.language || 'en-US') },
+                ...LANGUAGES.map((l) => ({ value: l as string, label: languageName(l), hint: l })),
               ]}
+              onChange={(l) => p.set({ lang: l })}
             />
-          </Row>
+          }
+        />
+        {both && (
+          <Row
+            icon={<Mic size={16} />}
+            label="Recognize with"
+            hint={p.use === 'server' ? 'The server: private with whisper.cpp; the words come when you stop' : 'This browser: the words show as you speak'}
+            control={
+              <Segmented
+                size="sm"
+                value={p.use}
+                onChange={(v) => p.set({ use: v })}
+                options={[
+                  { value: 'browser', label: 'This browser' },
+                  { value: 'server', label: 'The server' },
+                ]}
+              />
+            }
+          />
         )}
-      </div>
-    </Section>
+      </Group>
+    </>
   );
 }
 
@@ -129,39 +114,58 @@ function ServerSettings() {
       setBusy(false);
     }
   };
-  if (!st)
-    return (
-      <Section title="Speech recognition on the server">
-        <div className="flex justify-center py-4 text-fg-3">
-          <Throbber size={22} />
-        </div>
-      </Section>
-    );
-  const shown = pending ?? st.engine;
+  const shown = pending ?? st?.engine ?? 'off';
   const pick = (v: VoiceEngine) => {
+    if (!st) return;
     if (v === 'off') return void (setPending(null), st.engine !== 'off' && put({ engine: 'off' }));
     if (v === st.engine) return setPending(null);
     if (v === 'local') return st.local.needBytes === 0 ? void put({ engine: 'local' }) : setPending('local');
     return st.endpoint ? void put({ engine: 'endpoint' }) : setPending('endpoint');
   };
   return (
-    <Section
-      title="Speech recognition on the server"
-      sub="For browsers that cannot recognize speech themselves, or to keep your voice on your machine. Off until you turn it on: nothing is downloaded before."
-    >
-      <Segmented
-        value={shown}
-        onChange={pick}
-        options={[
-          { value: 'off', label: 'Off' },
-          { value: 'local', label: 'On this machine' },
-          { value: 'endpoint', label: 'A service' },
-        ]}
-      />
-      {shown === 'local' && <LocalEngine st={st} put={put} busy={busy} />}
-      {shown === 'endpoint' && <EndpointEngine st={st} put={put} busy={busy} />}
-      <Downloaded st={st} />
-    </Section>
+    <>
+      <Group
+        title="Speech recognition on the server"
+        info="For browsers that cannot recognize speech themselves, or to keep your voice on your machine. Off until you turn it on: nothing is downloaded before."
+      >
+        <Row
+          label="Where it runs"
+          hint={shown === 'off' ? 'Off: nothing is downloaded' : undefined}
+          control={
+            st ? (
+              <Segmented
+                size="sm"
+                value={shown}
+                onChange={pick}
+                options={[
+                  { value: 'off', label: 'Off' },
+                  { value: 'local', label: 'On this machine' },
+                  { value: 'endpoint', label: 'A service' },
+                ]}
+              />
+            ) : (
+              <Throbber className="text-fg-3" />
+            )
+          }
+        />
+        {st && shown === 'local' && <LocalEngine st={st} put={put} busy={busy} />}
+        {st && shown === 'endpoint' && <EndpointEngine st={st} put={put} busy={busy} />}
+      </Group>
+      {st && <Downloaded st={st} />}
+    </>
+  );
+}
+
+/** A bar and its words, under a row: what is downloading or building. */
+function Bar({ percent, children, note }: { percent: number | null; children: string; note?: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[13px] leading-snug break-words text-fg-2">{children}</div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
+        <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${percent == null ? 4 : Math.max(2, Math.min(100, percent))}%` }} />
+      </div>
+      {note && <div className="tnum mt-1 text-[11.5px] text-fg-3">{note}</div>}
+    </div>
   );
 }
 
@@ -177,21 +181,19 @@ function Progress({ st }: { st: VoiceState }) {
           : `Downloading ${p?.detail ?? 'whisper.cpp'}`;
   const pct = p?.step === 'build' && p.percent ? p.percent : p?.totalBytes ? (p.doneBytes / p.totalBytes) * 100 : null;
   return (
-    <div className="mt-3 flex items-center gap-3 rounded-xl bg-bg-2 px-3 py-2.5">
-      <Throbber size={16} className="shrink-0 text-fg-3" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] leading-snug break-words">{label}</div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
-          <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct == null ? 4 : Math.max(2, Math.min(100, pct))}%` }} />
-        </div>
-        <div className="tnum mt-1 text-[11.5px] text-fg-3">
-          {p?.step === 'build' && !p.totalBytes ? `${Math.round(p.percent ?? 0)}%` : p?.totalBytes ? `${size(p.doneBytes)} of ${size(p.totalBytes)}` : p?.doneBytes ? size(p.doneBytes) : 'Starting…'}
-        </div>
-      </div>
-      <Button size="sm" variant="ghost" onClick={() => post<VoiceState>('/api/voice/cancel').then((s) => useVoiceServer.setState({ st: s }), toastError)}>
-        Cancel
-      </Button>
-    </div>
+    <Row
+      icon={<Throbber size={16} />}
+      label="Getting it ready"
+      control={
+        <Button size="sm" variant="ghost" onClick={() => post<VoiceState>('/api/voice/cancel').then((s) => useVoiceServer.setState({ st: s }), toastError)}>
+          Cancel
+        </Button>
+      }
+    >
+      <Bar percent={pct} note={p?.step === 'build' && !p.totalBytes ? `${Math.round(p.percent ?? 0)}%` : p?.totalBytes ? `${size(p.doneBytes)} of ${size(p.totalBytes)}` : p?.doneBytes ? size(p.doneBytes) : 'Starting…'}>
+        {label}
+      </Bar>
+    </Row>
   );
 }
 
@@ -226,12 +228,16 @@ function LocalEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch) =
           : 'It runs on this machine’s processor.'
         : null;
   return (
-    <div className="mt-2">
-      <div className="-mb-1 divide-y divide-line">
-        <Row label="Model" hint={`${m.note} ${size(m.bytes)}.`}>
-          <Segmented<WhisperSize> size="sm" value={L.size} onChange={(v) => put({ size: v })} options={WHISPER_MODELS.map((x) => ({ value: x.size, label: x.label }))} />
-        </Row>
-        <Row label="Languages" hint={L.english ? 'English only: a little more accurate in English.' : 'Any language: it follows the language you speak (Dictation, above).'}>
+    <>
+      <Row
+        label="Model"
+        hint={`${m.note} ${size(m.bytes)}`}
+        control={<Segmented<WhisperSize> size="sm" value={L.size} onChange={(v) => put({ size: v })} options={WHISPER_MODELS.map((x) => ({ value: x.size, label: x.label }))} />}
+      />
+      <Row
+        label="Languages"
+        hint={L.english ? 'English only: a little more accurate in English' : 'Any language: it follows the language you speak'}
+        control={
           <Segmented
             size="sm"
             value={L.english ? 'en' : 'any'}
@@ -241,51 +247,58 @@ function LocalEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch) =
               { value: 'en', label: 'English only' },
             ]}
           />
-        </Row>
-      </div>
+        }
+      />
       {!on && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Button variant="primary" size="sm" disabled={busy} onClick={() => put({ engine: 'local' })}>
-            {L.needBytes ? `Turn on · download ${size(L.needBytes)}` : 'Turn on'}
-          </Button>
-          <span className="text-[12px] text-fg-3">
-            {L.needBytes ? `${L.program ? 'The model goes' : 'whisper.cpp and the model go'} into the app’s data folder on this machine.` : 'Everything it needs is here already.'}
-          </span>
-        </div>
+        <Row
+          label="Turn it on"
+          hint={L.needBytes ? `Downloads ${size(L.needBytes)} into the app’s data folder` : 'Everything it needs is here already'}
+          info={L.needBytes ? `${L.program ? 'The model goes' : 'whisper.cpp and the model go'} into the app’s data folder on this machine.` : undefined}
+          control={
+            <Button variant="primary" size="sm" disabled={busy} onClick={() => put({ engine: 'local' })}>
+              {L.needBytes ? `Turn on · download ${size(L.needBytes)}` : 'Turn on'}
+            </Button>
+          }
+        />
       )}
       {on && L.status === 'installing' && <Progress st={st} />}
       {on && L.status === 'ready' && (
-        <div className="mt-3 space-y-2">
-          <Note icon={<Check size={14} />} tone="ok">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="min-w-0 flex-1">
-                <span className="block">
-                  Ready: {where} with the {m.label} model{L.english ? ', English only' : ''}. Your voice stays here.
-                  {!st.ffmpeg && ' (Without ffmpeg here, the browser turns recordings into WAV itself; current browsers all can.)'}
-                </span>
-                {runs && <span className="mt-0.5 block text-fg-3">{runs}</span>}
+        <>
+          <Row
+            icon={<Check size={16} className="text-ok" />}
+            label="Ready: your voice stays here"
+            hint={
+              <span translate="no">
+                {where} · {m.label} model{L.english ? ', English only' : ''}
               </span>
+            }
+            info={!st.ffmpeg ? 'Without ffmpeg here, the browser turns recordings into WAV itself; current browsers all can.' : undefined}
+            control={
               <Button size="sm" variant="secondary" disabled={testing} onClick={test}>
                 {testing ? 'Testing…' : 'Test'}
               </Button>
-            </div>
-          </Note>
+            }
+          >
+            {runs && <div className="text-[12.5px] leading-snug text-fg-3">{runs}</div>}
+          </Row>
           <GpuBuild st={st} />
-        </div>
+        </>
       )}
       {on && L.status === 'failed' && (
-        <div className="mt-3">
-          <Note icon={<AlertTriangle size={14} />} tone="err">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="min-w-0 flex-1 break-words">{L.error}</span>
+        <div className="p-3">
+          <Notice
+            tone="err"
+            action={
               <Button size="sm" variant="secondary" disabled={busy} onClick={() => put({ engine: 'local' })}>
                 Try again
               </Button>
-            </div>
-          </Note>
+            }
+          >
+            <span className="break-words">{L.error}</span>
+          </Notice>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -296,35 +309,32 @@ function GpuBuild({ st }: { st: VoiceState }) {
   const again = () => post<VoiceState>('/api/voice/gpu-build').then((s) => useVoiceServer.setState({ st: s }), toastError);
   if (g.status === 'building')
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-bg-2 px-3 py-2.5">
-        <Throbber size={16} className="shrink-0 text-fg-3" />
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] leading-snug break-words">{g.detail ?? 'Building whisper.cpp for the NVIDIA GPU (CUDA)'}</div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/10">
-            <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.max(2, Math.min(100, g.percent ?? 0))}%` }} />
-          </div>
-          <div className="mt-1 text-[11.5px] text-fg-3">Dictation works on the processor meanwhile. The build takes 5 to 20 minutes, then dictation runs on the GPU.</div>
-        </div>
-        <span className="tnum shrink-0 text-[11.5px] text-fg-3">{Math.round(g.percent ?? 0)}%</span>
-      </div>
+      <Row icon={<Throbber size={16} />} label="Building for the NVIDIA GPU" hint={<span className="tnum">{Math.round(g.percent ?? 0)}%</span>} info="Dictation works on the processor meanwhile. The build takes 5 to 20 minutes, then dictation runs on the GPU.">
+        <Bar percent={g.percent ?? 0}>{g.detail ?? 'Building whisper.cpp for the NVIDIA GPU (CUDA)'}</Bar>
+      </Row>
     );
+  const failed = g.status === 'failed';
   return (
-    <Note icon={g.status === 'failed' ? <AlertTriangle size={14} /> : <Cpu size={14} />} tone={g.status === 'failed' ? 'warn' : undefined}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className="min-w-0 flex-1 break-words">
-          {g.status === 'failed'
-            ? `whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor: ${g.error ?? ''}`
-            : 'This computer has an NVIDIA GPU, and whisper.cpp has no ready-made build for it on Linux. With NVIDIA’s CUDA toolkit installed (nvcc), the app builds one, and dictation runs on the GPU.'}
-        </span>
+    <Row
+      icon={failed ? <TriangleAlert size={16} className="text-warn" /> : <Cpu size={16} />}
+      label={failed ? 'Could not build for the NVIDIA GPU' : 'This computer has an NVIDIA GPU'}
+      hint={failed ? <span translate="no">{g.error ?? 'Dictation runs on the processor'}</span> : 'whisper.cpp has no ready-made build for it on Linux'}
+      info={
+        failed
+          ? 'whisper.cpp could not be built for the NVIDIA GPU, so dictation runs on the processor.'
+          : 'With NVIDIA’s CUDA toolkit installed (nvcc), the app builds one, and dictation runs on the GPU.'
+      }
+      control={
         <Button size="sm" variant="secondary" onClick={again}>
-          {g.status === 'failed' ? 'Try again' : 'Check again'}
+          {failed ? 'Try again' : 'Check again'}
         </Button>
-      </div>
-    </Note>
+      }
+    />
   );
 }
 
 function EndpointEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch) => Promise<boolean>; busy: boolean }) {
+  const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(st.endpoint?.url ?? '');
   const [model, setModel] = useState(st.endpoint?.model ?? '');
   const [key, setKey] = useState('');
@@ -333,6 +343,7 @@ function EndpointEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch
   const save = async () => {
     if (await put({ endpoint: { url, model, ...(key.trim() ? { apiKey: key.trim() } : {}) }, engine: 'endpoint' })) {
       setKey('');
+      setOpen(false);
       toast(on ? 'Saved' : 'The service recognizes speech now', 'ok');
     }
   };
@@ -348,49 +359,86 @@ function EndpointEngine({ st, put, busy }: { st: VoiceState; put: (p: VoicePatch
     }
   };
   const field = 'mb-1 block text-[12px] font-medium text-fg-2';
+  const edit = () => {
+    setUrl(st.endpoint?.url ?? '');
+    setModel(st.endpoint?.model ?? '');
+    setKey('');
+    setOpen(true);
+  };
   return (
-    <div className="mt-3 space-y-3">
-      <p className="text-[12.5px] leading-relaxed text-fg-3">
-        Any service with OpenAI’s <span className="font-mono text-[11.5px]">/audio/transcriptions</span>: OpenAI itself, or a server on your network (Speaches, LocalAI, whisper.cpp’s server,
-        one on a GPU). Recordings are sent to it.
-      </p>
-      <label className="block">
-        <span className={field}>Address</span>
-        <input className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api.openai.com/v1" autoComplete="off" spellCheck={false} />
-      </label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className={field}>API key</span>
-          <input
-            className={inputCls}
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder={st.endpoint?.keyHint ? `Saved: ${st.endpoint.keyHint}` : 'Not needed by most servers on your network'}
-            autoComplete="off"
-          />
-        </label>
-        <label className="block">
-          <span className={field}>Model</span>
-          <input className={inputCls} value={model} onChange={(e) => setModel(e.target.value)} placeholder="whisper-1" autoComplete="off" spellCheck={false} />
-        </label>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" size="sm" disabled={!url.trim() || busy} onClick={save}>
-          {on ? 'Save' : 'Save and turn on'}
-        </Button>
-        {on && (
-          <Button variant="secondary" size="sm" disabled={testing} onClick={test}>
-            {testing ? 'Testing…' : 'Test'}
-          </Button>
-        )}
-        {st.endpoint?.keyHint && (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => put({ endpoint: { url: st.endpoint!.url, model: st.endpoint!.model, apiKey: null } })}>
-            Remove the key
-          </Button>
-        )}
-      </div>
-    </div>
+    <>
+      <Row
+        icon={<Cloud size={16} />}
+        label="The service"
+        hint={st.endpoint ? <span translate="no">{[st.endpoint.url, st.endpoint.model].filter(Boolean).join(' · ')}</span> : 'Recordings are sent to it'}
+        info={
+          <>
+            <p>
+              Any service with OpenAI’s <span className="font-mono text-[11.5px]">/audio/transcriptions</span>: OpenAI itself, or a server on your network (Speaches, LocalAI, whisper.cpp’s server, one on a GPU).
+            </p>
+            <p>Recordings are sent to it.</p>
+          </>
+        }
+        control={
+          <>
+            {on && (
+              <Button variant="secondary" size="sm" disabled={testing} onClick={test}>
+                {testing ? 'Testing…' : 'Test'}
+              </Button>
+            )}
+            <Button variant={on || st.endpoint ? 'secondary' : 'primary'} size="sm" onClick={edit}>
+              {st.endpoint ? 'Edit' : 'Set up'}
+            </Button>
+            {st.endpoint?.keyHint && (
+              <MoreMenu label="More about the service">
+                {(close) => (
+                  <MenuItem
+                    disabled={busy}
+                    onClick={() => {
+                      close();
+                      void put({ endpoint: { url: st.endpoint!.url, model: st.endpoint!.model, apiKey: null } });
+                    }}
+                  >
+                    Remove the key
+                  </MenuItem>
+                )}
+              </MoreMenu>
+            )}
+          </>
+        }
+      />
+      <Dialog open={open} onClose={() => setOpen(false)} title="Speech recognition service" width={460}>
+        <div className="space-y-3">
+          <label className="block">
+            <span className={field}>Address</span>
+            <input className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api.openai.com/v1" autoComplete="off" spellCheck={false} autoFocus />
+          </label>
+          <label className="block">
+            <span className={field}>API key</span>
+            <input
+              className={inputCls}
+              type="password"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder={st.endpoint?.keyHint ? `Saved: ${st.endpoint.keyHint}` : 'Not needed by most servers on your network'}
+              autoComplete="off"
+            />
+          </label>
+          <label className="block">
+            <span className={field}>Model</span>
+            <input className={inputCls} value={model} onChange={(e) => setModel(e.target.value)} placeholder="whisper-1" autoComplete="off" spellCheck={false} />
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" disabled={!url.trim() || busy} onClick={save}>
+              {on ? 'Save' : 'Save and turn on'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </>
   );
 }
 
@@ -413,40 +461,62 @@ function Downloaded({ st }: { st: VoiceState }) {
     post<VoiceState>('/api/voice/remove', { all: true }).then(set, toastError);
   };
   return (
-    <div className="mt-4 border-t border-line pt-3">
+    <Group
+      title="On this machine"
+      hint={size(total)}
+      actions={
+        st.engine !== 'local' && (
+          <MoreMenu label="More about what is downloaded">
+            {(close) => (
+              <MenuItem
+                danger
+                onClick={() => {
+                  close();
+                  void removeAll();
+                }}
+              >
+                Remove all
+              </MenuItem>
+            )}
+          </MoreMenu>
+        )
+      }
+    >
       {confirmNode}
-      <div className="mb-1 flex items-center gap-2">
-        <span className="flex-1 text-[12px] font-medium tracking-wide text-fg-3 uppercase">On this machine · {size(total)}</span>
-        {st.engine !== 'local' && (
-          <Button size="sm" variant="ghost" onClick={removeAll}>
-            Remove all
-          </Button>
-        )}
-      </div>
       {own && (
-        <div className="flex items-center gap-2.5 py-1.5 text-[13px]">
-          <Cpu size={14} className="shrink-0 text-fg-3" />
-          <span className="min-w-0 flex-1 truncate">
-            whisper.cpp {own.version ?? ''} {own.source === 'built' ? (own.gpu ? `(built here for ${GPU_API[own.gpu]})` : '(built here)') : ''}
-          </span>
-          <span className="tnum text-[12px] text-fg-3">{size(own.sizeBytes)}</span>
-          <span className="w-7" />
-        </div>
+        <Row
+          icon={<Cpu size={16} />}
+          label={
+            <span translate="no">
+              whisper.cpp {own.version ?? ''} {own.source === 'built' ? (own.gpu ? `(built here for ${GPU_API[own.gpu]})` : '(built here)') : ''}
+            </span>
+          }
+          hint={size(own.sizeBytes)}
+        />
       )}
       {L.models.map((m) => (
-        <div key={`${m.size}${m.english}`} className="flex items-center gap-2.5 py-1 text-[13px]">
-          <span className="w-[14px] shrink-0" />
-          <span className="min-w-0 flex-1 truncate">
-            {label(m)}
-            {inUse(m) && <span className="text-fg-3"> · in use</span>}
-          </span>
-          <span className="tnum text-[12px] text-fg-3">{size(m.sizeBytes)}</span>
-          <button type="button" onClick={() => removeOne(m)} title={`Remove the ${label(m)}`} aria-label={`Remove the ${label(m)}`} className="rounded-md p-1.5 text-fg-3 transition-colors hover:bg-err/10 hover:text-err">
-            <Trash2 size={13} />
-          </button>
-        </div>
+        <Row
+          key={`${m.size}${m.english}`}
+          label={label(m)}
+          hint={`${size(m.sizeBytes)}${inUse(m) ? ' · in use' : ''}`}
+          control={
+            <MoreMenu label={`More about the ${label(m)}`}>
+              {(close) => (
+                <MenuItem
+                  danger
+                  onClick={() => {
+                    close();
+                    void removeOne(m);
+                  }}
+                >
+                  Remove
+                </MenuItem>
+              )}
+            </MoreMenu>
+          }
+        />
       ))}
-    </div>
+    </Group>
   );
 }
 
@@ -460,50 +530,50 @@ function ReadAloudSettings() {
   const playing = useReading((r) => r.id === 'voice-sample' && r.status !== 'idle');
   if (!canSpeak())
     return (
-      <Section title="Read aloud">
-        <p className="text-[13px] text-fg-3">This browser cannot read text aloud.</p>
-      </Section>
+      <Group title="Read aloud">
+        <EmptyRow>This browser cannot read text aloud.</EmptyRow>
+      </Group>
     );
   const lang = speechLang(p.lang).toLowerCase().split('-')[0];
   // Voices for the language you speak first, then the rest.
   const sorted = [...voices].sort((a, b) => Number(b.lang.toLowerCase().startsWith(lang)) - Number(a.lang.toLowerCase().startsWith(lang)) || a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
   const cur = voices.find((v) => v.voiceURI === p.voice);
   return (
-    <Section title="Read aloud" sub="The speaker on a reply reads it to you, leaving out its code. Each browser keeps its own voice and speed.">
-      <div className="-my-2 divide-y divide-line">
-        <Row label="Voice" hint={cur ? `${cur.lang}${cur.localService ? ' · on this device' : ' · online'}` : `The browser’s voice for ${languageName(speechLang(p.lang))}`}>
-          <Picker value={cur?.name ?? 'Automatic'} title="The voice replies are read in" width={300}>
-            {(close) => (
-              <>
-                <OptionRow label="Automatic" hint="The browser’s voice for the language you speak" selected={!cur} onClick={() => (close(), p.set({ voice: '' }))} />
-                {sorted.map((v) => (
-                  <OptionRow key={v.voiceURI} label={v.name} hint={`${v.lang}${v.localService ? '' : ' · online'}`} selected={v.voiceURI === p.voice} onClick={() => (close(), p.set({ voice: v.voiceURI }))} />
-                ))}
-              </>
-            )}
-          </Picker>
-        </Row>
-        <Row label="Speed">
+    <Group title="Read aloud" info="The speaker on a reply reads it to you, leaving out its code. Each browser keeps its own voice and speed.">
+      <Row
+        label="Voice"
+        hint={cur ? `${cur.lang}${cur.localService ? ' · on this device' : ' · online'}` : `The browser’s voice for ${languageName(speechLang(p.lang))}`}
+        control={
+          <Select
+            label="The voice replies are read in"
+            value={cur ? cur.voiceURI : ''}
+            width={300}
+            options={[
+              { value: '', label: 'Automatic', hint: 'The browser’s voice for the language you speak' },
+              ...sorted.map((v) => ({ value: v.voiceURI, label: <span translate="no">{v.name}</span>, hint: `${v.lang}${v.localService ? '' : ' · online'}` })),
+            ]}
+            onChange={(v) => p.set({ voice: v })}
+          />
+        }
+      />
+      <Row
+        label="Speed"
+        control={
           <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={0.5}
-              max={2}
-              step={0.1}
-              value={p.rate}
-              onChange={(e) => p.set({ rate: Number(e.target.value) })}
-              aria-label="Reading speed"
-              className="w-40 accent-accent"
-            />
+            <input type="range" min={0.5} max={2} step={0.1} value={p.rate} onChange={(e) => p.set({ rate: Number(e.target.value) })} aria-label="Reading speed" className="w-40 accent-accent" />
             <span className="tnum w-9 text-right text-[13px] text-fg-2">{p.rate.toFixed(1)}×</span>
           </div>
-        </Row>
-        <Row label="Try it" hint="A sentence in the voice and speed above.">
-          <Button size="sm" variant="secondary" onClick={() => (playing ? stopReading() : readAloud('voice-sample', SAMPLE))}>
+        }
+      />
+      <Row
+        label="Try it"
+        hint="A sentence in the voice and speed above"
+        control={
+          <Button size="sm" variant="secondary" icon={playing ? undefined : <Play size={13} />} onClick={() => (playing ? stopReading() : readAloud('voice-sample', SAMPLE))}>
             {playing ? 'Stop' : 'Play a sample'}
           </Button>
-        </Row>
-      </div>
-    </Section>
+        }
+      />
+    </Group>
   );
 }
