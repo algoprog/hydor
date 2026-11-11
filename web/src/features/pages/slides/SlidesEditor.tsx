@@ -314,6 +314,8 @@ export function SlidesEditor({
   /** Line them up with the slide, also with several parts picked (Arrange → Line them up → Align to the slide). */
   const [alignToSlide, setAlignToSlide] = useState(false);
   /** A link or a description (alt text) being typed for the parts picked. */
+  /** A part being drawn on the slide (Insert → Text box, Shape, Line or arrow): what it is made as; Esc stops. */
+  const [drawing, setDrawing] = useState<{ make: () => El; line?: boolean } | null>(null);
   const [fieldAsk, setFieldAsk] = useState<{ field: 'link' | 'alt'; value: string } | null>(null);
   const [notesOpen, setNotesOpen] = useState(() => localStorage.getItem(PRESET_KEY) !== '0');
   const [drawer, setDrawer] = useState<'open' | 'closed'>('closed');
@@ -579,6 +581,26 @@ export function SlidesEditor({
     setSel(els.map((e) => e.id));
     setTab('format');
     setView('edit');
+  };
+  /** Insert → Text box, Shape, Line or arrow: the pointer is a crosshair, a drag draws it there at that size, a click puts it there at its default size. */
+  const draw = (make: () => El, line?: boolean) => {
+    if (!deck || readOnly) return;
+    canvas.current?.stopEditing();
+    setScope([]);
+    setSel([]);
+    setMenu(null);
+    setView('edit');
+    setDrawing({ make, line });
+  };
+  const drawn = (a: { from: { x: number; y: number }; to: { x: number; y: number } } | { at: { x: number; y: number } }) => {
+    const d = drawing;
+    setDrawing(null);
+    if (!d || !live.current) return;
+    const el = d.make();
+    if ('at' in a) return put([{ ...el, x: Math.round(a.at.x - el.w / 2), y: Math.round(a.at.y - Math.abs(el.h) / 2) }]);
+    const { from, to } = a;
+    if (d.line) return put([{ ...el, x: Math.round(from.x), y: Math.round(from.y), w: Math.round(to.x - from.x), h: Math.round(to.y - from.y) }]);
+    put([{ ...el, x: Math.round(Math.min(from.x, to.x)), y: Math.round(Math.min(from.y, to.y)), w: Math.max(8, Math.round(Math.abs(to.x - from.x))), h: Math.max(8, Math.round(Math.abs(to.y - from.y))) }]);
   };
   const newSlide = (l: LayoutId, after = index) => {
     if (!deck) return;
@@ -1216,7 +1238,8 @@ export function SlidesEditor({
       return;
     }
     if (e.key === 'Escape') {
-      if (pickFor) setPickFor(null);
+      if (drawing) setDrawing(null);
+      else if (pickFor) setPickFor(null);
       else if (painter) setPainter(null);
       else if (cellSel) setCellSel(null);
       else if (scope.length) {
@@ -1515,11 +1538,11 @@ export function SlidesEditor({
       setView(on ? 'grid' : 'edit');
     },
     newSlide: () => setMenu('slide'),
-    textBox: () => put([textBox(deck)]),
+    textBox: () => draw(() => textBox(deck)),
     shape: () => setMenu('shape'),
     picture: () => void addPicture(),
     pictureUrl: () => setUrlAsk({}),
-    line: (arrow) => put([line(deck, arrow)]),
+    line: (arrow) => draw(() => line(deck, arrow), true),
     connector: (elbow) => put([connector(deck, index, elbow, picked)]),
     table: () => put([table(deck)]),
     chart: () => put([chart(deck)]),
@@ -1604,7 +1627,7 @@ export function SlidesEditor({
       <Button ref={anchors.slide} size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMenu(menu === 'slide' ? null : 'slide')} className="shrink-0">
         {mid ? 'New slide' : ''}
       </Button>
-      <IconButton label="Text box" size="sm" onClick={() => put([textBox(deck)])}>
+      <IconButton label="Text box" size="sm" active={!!drawing && !drawing.line} onClick={() => draw(() => textBox(deck))}>
         <Type size={15} />
       </IconButton>
       <IconButton ref={anchors.shape} label="Shape" size="sm" active={menu === 'shape'} onClick={() => setMenu(menu === 'shape' ? null : 'shape')}>
@@ -1702,6 +1725,8 @@ export function SlidesEditor({
           onRun={(id) => setRunning(id)}
           picking={!!pickFor}
           onPick={pickTrigger}
+          drawing={drawing ? (drawing.line ? 'line' : 'box') : null}
+          onDraw={drawn}
         />
         {zoom !== 'fit' && (
           <button
@@ -1715,11 +1740,13 @@ export function SlidesEditor({
             <Shrink size={12} />
           </button>
         )}
-        {(sending !== null || painter || scope.length > 0 || cropping || pickFor) && (
+        {(sending !== null || painter || scope.length > 0 || cropping || pickFor || drawing) && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm">
             {sending !== null
               ? `Adding the video… ${Math.round(sending * 100)}%`
-              : pickFor
+              : drawing
+                ? 'Drag on the slide to draw it, or click to put it there; Esc to stop'
+                : pickFor
                 ? 'Click the part that starts it; Esc to stop'
                 : cropping
                 ? 'Cropping: Enter keeps it, Esc does not'
@@ -2025,7 +2052,7 @@ export function SlidesEditor({
               aria-label={SHAPE_NAMES[k]}
               onClick={() => {
                 setMenu(null);
-                put([shape(deck, k)]);
+                draw(() => shape(deck, k));
               }}
               className="grid h-10 place-items-center rounded-lg text-accent hover:bg-bg-2"
             >
@@ -2035,10 +2062,10 @@ export function SlidesEditor({
         </div>
       </Popover>
       <Popover anchor={anchors.line} open={menu === 'line'} onClose={() => setMenu(null)} width={220}>
-        <MenuItem icon={<Minus size={14} />} onClick={() => (setMenu(null), put([line(deck, false)]))}>
+        <MenuItem icon={<Minus size={14} />} onClick={() => draw(() => line(deck, false), true)}>
           Straight line
         </MenuItem>
-        <MenuItem icon={<MoveRight size={14} />} onClick={() => (setMenu(null), put([line(deck, true)]))}>
+        <MenuItem icon={<MoveRight size={14} />} onClick={() => draw(() => line(deck, true), true)}>
           Arrow
         </MenuItem>
         <MenuSep />
