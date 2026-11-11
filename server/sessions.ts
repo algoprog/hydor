@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
-import { ClaudeLive, CLAUDE_MODES, claudeSpec } from './agents/claude.ts';
+import { ClaudeLive, CLAUDE_MODES, claudeSpec, precompactCopy } from './agents/claude.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
 import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
@@ -32,7 +32,7 @@ import { addNote, dropNotes } from './notes.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from './sessionExtra.ts';
 import type { SessionExtra } from '../shared/features.ts';
 import { approvalKind, quickAnswer, type InboxItem } from '../shared/inbox.ts';
-import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross } from './accounts.ts';
+import { accountById, accountEnv, accountOfPath, accountPool, apiCreditOn, apiKeyOf, autoSwitchOn, claudeTranscriptOf, historyMoves, moveAcross, shareTrust } from './accounts.ts';
 import { AcpLive, acpAgent, acpAgents, acpSessionOf, acpTranscriptPath, ACP_DIR, CONSOLE_ID, findCommand } from './agents/acp.ts';
 import { acpEnvFor, ensureClaude, ensureCommand } from './clients.ts';
 import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custom/fork.ts';
@@ -57,6 +57,20 @@ function parseJson<T>(v: string | null | undefined): T | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * What an agent printed last before it stopped, for the error that says it did not start: its last lines, the end
+ * of them when they are long (the reason comes last). Claude Code's note on a folder's rules it ignores until the
+ * folder is trusted goes: it is never why it stopped, and it hid the reason that came after it.
+ */
+export function lastWords(stderr: string): string {
+  const lines = stderr
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s && !/^Ignoring \d+ .* from .*: this workspace has not been trusted\b/.test(s));
+  const text = lines.slice(-3).join(' ');
+  return text.length > 300 ? `…${text.slice(-300)}` : text;
 }
 
 /** Deletes attachment copies (only ones in the uploads folder), and folders they leave empty. */
@@ -936,6 +950,13 @@ export class SessionManager extends EventEmitter {
     // An added account: the agent's CLI uses that account's folder (sign-in, history).
     const acct = accountEnv(this.db, agent, opts.account);
     const account = opts.account || undefined;
+    if (acct.CLAUDE_CONFIG_DIR) {
+      try {
+        shareTrust(acct.CLAUDE_CONFIG_DIR, cwd);
+      } catch (e) {
+        console.warn(`[accounts] the folder's trust not shared: ${(e as Error).message}`);
+      }
+    }
     // Claude Code keeps a copy of each file it edits, per message, so "Edit from here" can put them back.
     const env: Record<string, string> = agent === 'claude' ? { ...agentBaseEnv(), ...acct, CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1' } : { ...agentBaseEnv(), ...acct };
     // Every account at its limit and Use API credit on: Claude Code bills this run to the account's API key.
@@ -957,9 +978,9 @@ export class SessionManager extends EventEmitter {
       try {
         await adapter.initialize();
       } catch (e) {
-        const tail = runner.stderrTail().trim().split('\n').slice(-3).join(' ');
+        const tail = lastWords(runner.stderrTail());
         adapter.stop();
-        throw new HttpError(500, `Claude Code did not start: ${(e as Error).message}${tail ? ` (${tail.slice(0, 300)})` : ''}`);
+        throw new HttpError(500, `Claude Code did not start: ${(e as Error).message}${tail ? ` (${tail})` : ''}`);
       }
       adapter.emit('identity');
       return l;
@@ -975,9 +996,9 @@ export class SessionManager extends EventEmitter {
     try {
       await adapter.boot();
     } catch (e) {
-      const tail = runner.stderrTail().trim().split('\n').slice(-3).join(' ');
+      const tail = lastWords(runner.stderrTail());
       runner.stop(500);
-      throw new HttpError(500, `Codex did not start: ${(e as Error).message}${tail ? ` (${tail.slice(0, 300)})` : ''}`);
+      throw new HttpError(500, `Codex did not start: ${(e as Error).message}${tail ? ` (${tail})` : ''}`);
     }
     meta.key = `codex:${adapter.sessionId}`;
     meta.opts = { ...o, account, threadId: adapter.sessionId, forkFrom: undefined, forkLastTurn: undefined };
@@ -1015,10 +1036,10 @@ export class SessionManager extends EventEmitter {
       await adapter.boot(!!opts.resume);
       this.acpOffers.set(def.id, { models: adapter.models, modes: adapter.modes.map((m) => ({ value: m.id, label: m.name, description: m.description ?? '' })) });
     } catch (e) {
-      const tail = runner.stderrTail().trim().split('\n').slice(-3).join(' ');
+      const tail = lastWords(runner.stderrTail());
       adapter.stop();
       if (e instanceof HttpError) throw e;
-      throw new HttpError(500, `${def.name} did not start: ${(e as Error).message}${tail ? ` (${tail.slice(0, 300)})` : ''}`);
+      throw new HttpError(500, `${def.name} did not start: ${(e as Error).message}${tail ? ` (${tail})` : ''}`);
     }
     return l;
   }
@@ -1312,7 +1333,15 @@ export class SessionManager extends EventEmitter {
     let l: Live;
     if (from.agent === 'claude') {
       if (o.at && !/^[0-9a-f-]{36}$/i.test(o.at)) throw new HttpError(400, 'Bad message id');
-      l = await this.spawn('claude', cwd, { sessionId: crypto.randomUUID(), forkFrom: from.id, forkAt: o.at, ...cfg, extra });
+      // A reply from before a compaction: forked from the transcript as it was then, a copy Claude Code has
+      // read by the time it has started.
+      const file = this.transcriptFor(key);
+      const copy = o.at && file ? precompactCopy(file, o.at, path.join(config.dataDir, 'forks')) : null;
+      try {
+        l = await this.spawn('claude', cwd, { sessionId: crypto.randomUUID(), forkFrom: copy ?? from.id, forkAt: o.at, ...cfg, extra });
+      } finally {
+        if (copy) fs.rmSync(copy, { force: true });
+      }
     } else if (from.agent === 'acp') {
       // Custom: a copy of its transcript and state up to the end of the turn `at` (a prompt's id), then loaded.
       const id = await prepareCustomFork(key, o.at);

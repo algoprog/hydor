@@ -131,7 +131,7 @@ You can sign in more than one Claude Code or Codex account, for example a work p
 3. Choose **Claude Code** or **Codex**, type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
 4. The sign-in dialog opens for the new account. Sign in as described above.
 
-Each added account signs in on its own and keeps its own session history. Your settings, instructions, skills and plugins are shared with the agent's main sign-in, so changes apply to both. Two accounts of the same agent can't have the same name.
+Each added account signs in on its own and keeps its own session history. Your settings, instructions, skills and plugins are shared with the agent's main sign-in, so changes apply to both. For Claude Code, a folder you trusted with the main sign-in is trusted with an added account too, so the folder's own permission rules apply in its sessions. Two accounts of the same agent can't have the same name.
 
 Each added account has its own row, under the agent's own sign-in, with **Sign in** or **Switch account**; its **⋯** menu has **Sign out**, **Rename** and **Remove**:
 

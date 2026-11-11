@@ -332,7 +332,7 @@ A fork is a new session that starts with this conversation and then tries someth
 2. Write what the fork should do ("What should the fork try instead?").
 3. Press **Fork** (or Ctrl+Enter).
 
-The fork opens, titled "… · fork", with the same agent, model, effort, permissions and account. A line at its top says "Forked from …" with **Open** (a Codex fork shows only what came after; the earlier conversation is in the original). Forks work for Claude Code, Codex and Custom, and not for a session open in another app.
+The fork opens, titled "… · fork", with the same agent, model, effort, permissions and account. A line at its top says "Forked from …" with **Open** (a Codex fork shows only what came after; the earlier conversation is in the original). Forks work for Claude Code, Codex and Custom, and not for a session open in another app. A Claude Code reply from before the conversation was compacted can be forked too: the fork starts with the whole conversation up to that reply, as it was before it was compacted.
 
 ## Edit from here
 

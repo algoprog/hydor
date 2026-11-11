@@ -25,7 +25,7 @@ export interface ClaudeOpts {
   /** Resume this session; otherwise a new one is created with `sessionId`. */
   resume?: boolean;
   sessionId: string;
-  /** Start `sessionId` as a copy of that session (up to the entry `forkAt`, when given). */
+  /** Start `sessionId` as a copy of that session, or of that transcript file (up to the entry `forkAt`, when given). */
   forkFrom?: string;
   forkAt?: string;
   model?: string;
@@ -51,6 +51,57 @@ function mcpConfigFile(sessionId: string, cfg: object): string {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, `${sessionId.replace(/[^\w-]/g, '')}.json`);
   fs.writeFileSync(file, JSON.stringify(cfg), { mode: 0o600 });
+  return file;
+}
+
+/**
+ * Claude Code resumes a session from its last compaction on, so a reply from before a compaction is not there
+ * to fork from ("No message found with message.uuid of"). When the entry `at` comes before one, this writes the
+ * transcript as it was just before that compaction to a new file in `dir` and returns its path: Claude Code
+ * resumes from a transcript's path as well as from a session's id. Null when `at` needs no copy, or is not there.
+ */
+export function precompactCopy(transcript: string, at: string, dir: string): string | null {
+  let buf: Buffer;
+  try {
+    buf = fs.readFileSync(transcript);
+  } catch {
+    return null;
+  }
+  // Lines split on the newline byte, which UTF-8 never uses inside a character: the cut is a byte offset.
+  const lineOf = (i: number): [number, number] => {
+    const end = buf.indexOf(0x0a, i);
+    return [buf.lastIndexOf(0x0a, i) + 1, end < 0 ? buf.length : end];
+  };
+  const entry = ([s, e]: [number, number]): Record<string, unknown> | null => {
+    try {
+      return JSON.parse(buf.toString('utf8', s, e));
+    } catch {
+      return null;
+    }
+  };
+  const find = (needle: string, from: number, is: (e: Record<string, unknown>) => boolean): [number, number] | null => {
+    const n = Buffer.from(needle);
+    for (let i = buf.indexOf(n, from); i >= 0; ) {
+      const line = lineOf(i);
+      const e = entry(line);
+      if (e && is(e)) return line;
+      i = buf.indexOf(n, line[1]);
+    }
+    return null;
+  };
+  const target = find(`"uuid":"${at}"`, 0, (e) => e.uuid === at);
+  const boundary = target && find('"compact_boundary"', target[1], (e) => e.type === 'system' && e.subtype === 'compact_boundary');
+  if (!boundary) return null;
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // A copy left behind by a start that never finished.
+  for (const f of fs.readdirSync(dir)) {
+    const p = path.join(dir, f);
+    try {
+      if (Date.now() - fs.statSync(p).mtimeMs > 3_600_000) fs.rmSync(p, { force: true });
+    } catch {}
+  }
+  const file = path.join(dir, `${crypto.randomUUID()}.jsonl`);
+  fs.writeFileSync(file, buf.subarray(0, boundary[0]), { mode: 0o600 });
   return file;
 }
 
