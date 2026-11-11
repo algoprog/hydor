@@ -2,8 +2,9 @@
 // numbers that are numbers, fonts the designs load, inside its artboard), a design page's own stylesheet and script
 // (once, however often it is saved), resizing's maths, curved words, brand kits, the requests and how_to_make's answer;
 // and, where this computer has a Chromium, the design editor in a real browser (picking, moving with the mouse and
-// snapping to the middle, the inspector's commands, grouping, undo, a resized copy, the HTML it gives back) and the
-// files a design downloads as (PNG at 2×, see-through, JPG, a PDF of its own size). Build and run with a scratch folder:
+// snapping to the middle, the inspector's commands, grouping, undo, Layers, a resized copy, the HTML it gives back)
+// and the files a design downloads as (PNG at 2×, see-through, JPG, a PDF of its own size). Build and run with a
+// scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/design-test.ts
 //   DATA_DIR=/tmp/hydor-test-design node dist/dev/design-test.js
 import fs from 'node:fs';
@@ -326,6 +327,48 @@ else {
     await cmd('zoom', 'fit');
     await cmd('select', { path: await pathOfBox('c') });
     await cmd('del');
+
+    // Layers: the artboard's parts front to back; hidden, named, locked and reordered, each one step to undo.
+    await cmd('insert', { html: boxHtml('d', '#963') });
+    await cmd('insert', { html: boxHtml('e', '#369') });
+    const layers = async () => {
+      await cmd('layers');
+      return (await js<any>(`return window.__msgs.filter(function(m){return m.type==='wa-ed-design'&&m.what==='layers'}).pop() || null;`))?.list as { p: number[]; n: string; t: string; h: boolean; l: boolean; own: boolean; c: unknown[] }[] | undefined;
+    };
+    let ls = await layers();
+    const dPath = await pathOfBox('d');
+    const ePath = await pathOfBox('e');
+    ok(ls?.length === (await kids()) && ls?.[0]?.p.join('.') === ePath.join('.') && ls?.[1]?.p.join('.') === dPath.join('.'), 'Layers lists the parts, the front one first');
+    ok((await last('wa-ed-sel'))?.sel?.paths?.[0]?.join('.') === ePath.join('.'), 'and what is picked is told by its place');
+    await cmd('layer', { path: dPath, hide: true });
+    ls = await layers();
+    ok((await js<string>(`return getComputedStyle(document.querySelector('[data-test="d"]')).visibility`)) === 'hidden' && ls?.[1]?.h === true, 'hidden from Layers: it does not show, and Layers says so');
+    await cmd('selectAll');
+    ok(!(await last('wa-ed-sel'))?.sel?.paths?.some((q: number[]) => q.join('.') === dPath.join('.')), 'Select all leaves out what is hidden');
+    await cmd('undo');
+    ok((await js<string>(`return getComputedStyle(document.querySelector('[data-test="d"]')).visibility`)) === 'visible' && !(await js<string | null>(`return document.querySelector('[data-test="d"]').getAttribute('style')`))?.includes('visibility'), 'shown again in one step');
+    await cmd('layer', { path: dPath, name: '  Brown   box ' });
+    await cmd('select', { path: dPath });
+    ok((await last('wa-ed-sel'))?.sel?.el?.name === 'Brown box' && (await layers())?.[1]?.own === true, 'named in Layers: the name is kept, and shown for it');
+    await cmd('layer', { path: dPath, name: '' });
+    ok((await layers())?.[1]?.n === 'Box', 'an empty name gives it its kind’s name again');
+    await cmd('reorder', { path: dPath, to: ePath, place: 'above' });
+    ok((await js<boolean>(`return document.querySelector('[data-test="d"]').nextElementSibling === null && document.querySelector('[data-test="e"]').nextElementSibling === document.querySelector('[data-test="d"]')`)) && (await layers())?.[0]?.n === 'Box', 'dragged above another in Layers: in front of it');
+    await cmd('undo');
+    ok(await js<boolean>(`return document.querySelector('[data-test="e"]').nextElementSibling === null`), 'and back behind it in one step');
+    await cmd('layer', { path: await pathOfBox('e'), lock: true });
+    ok((await js<string | null>(`return document.querySelector('[data-test="e"]').getAttribute('data-locked')`)) === '1', 'locked from Layers');
+    await cmd('undo');
+    await cmd('select', { path: await pathOfBox('e') });
+    await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'H', code: 'KeyH', windowsVirtualKeyCode: 72, modifiers: 2 | 8 });
+    await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'H', code: 'KeyH', windowsVirtualKeyCode: 72, modifiers: 2 | 8 });
+    await sleep(80);
+    ok((await js<string | null>(`return document.querySelector('[data-test="e"]').getAttribute('data-hidden')`)) === '1', 'Ctrl+Shift+H hides what is picked');
+    await cmd('undo');
+    for (const t of ['d', 'e']) {
+      await cmd('select', { path: await pathOfBox(t) });
+      await cmd('del');
+    }
 
     // A copy at another size, worked out from what shows.
     const id = 'r1';

@@ -205,7 +205,7 @@ function useKeyboardRoom(active: boolean): { bottom: number; height: number } | 
   return room;
 }
 
-/** A floating panel anchored to `anchor`; flips above when there is no room below. */
+/** A floating panel anchored to `anchor`; flips above when there is no room below (`slide`: moves up to fit whole). */
 export function Popover({
   anchor,
   open,
@@ -218,6 +218,7 @@ export function Popover({
   sheet,
   title,
   z,
+  slide,
 }: {
   anchor: RefObject<HTMLElement | null>;
   open: boolean;
@@ -233,6 +234,8 @@ export function Popover({
   title?: ReactNode;
   /** Its stacking order, when it opens from a layer over the popovers' own (the search box). */
   z?: number;
+  /** A menu at a point (a right-click): too tall for the room below, it moves up to show whole rather than scroll. */
+  slide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const bottomSheet = useSheets();
@@ -249,13 +252,17 @@ export function Popover({
     const h = el.scrollHeight;
     const below = vh - a.bottom - 8;
     const above = a.top - 8;
+    if (slide && !full && h > below) {
+      setPos({ top: Math.max(8, vh - h - 8), left: Math.max(8, Math.min(a.left, vw - w - 8)), maxH: vh - 16 });
+      return;
+    }
     const goAbove = prefer === 'above' ? above >= Math.min(h, 220) || above > below : below < Math.min(h, 260) && above > below;
     const maxH = Math.max(140, (goAbove ? above : below) - 6);
     const top = goAbove ? Math.max(8, a.top - Math.min(h, maxH) - 6) : a.bottom + 6;
     let left = align === 'end' ? a.right - w : a.left;
     left = Math.max(8, Math.min(left, vw - w - 8));
     setPos({ top, left, maxH, width: full ? w : undefined });
-  }, [anchor, width, align, prefer, sheet, bottomSheet]);
+  }, [anchor, width, align, prefer, sheet, bottomSheet, slide]);
   useLayoutEffect(() => {
     if (!open) return setPos(null);
     if (bottomSheet) return;
