@@ -710,10 +710,14 @@ agents that speak ACP and take MCP servers.
   places to replace, in their own colours, your theme's, your brand's or a palette's), blank, or described for an
   agent (19 design kinds). Still a page of the Library (versions, its own address fitted to the screen, publishing),
   of one or several fixed-size artboards. Its editor places anything anywhere: drag with smart guides that snap to
-  the page's edges and middle and to the other parts (equal gaps shown), resize by handles (Shift keeps proportions),
-  turn, nudge with the arrows, pick several (Shift+click, a box), group and ungroup, line up and spread out, bring
-  forward and send back, lock, duplicate, copy and paste the look, flip, see-through, zoom from 25% to 400%, pages to
-  add, move and duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54
+  the page's edges and middle and to every other part (those inside groups too; equal gaps and the distance to the
+  nearest part on each side shown in small pink pills), resize by handles that snap to the other parts' edges and
+  middles or to their width and height (an "=" shows, and a size pill; Shift keeps proportions), Ctrl-drag a copy,
+  Alt-drag without snapping (⌥ and ⌘ on a Mac), turn, nudge with the arrows, pick several (Shift+click, a box; a pick
+  with locked parts moves the rest), group and ungroup, line up (with each other or with the page) and spread out,
+  bring forward and send back, lock, duplicate, copy and paste the look, flip, see-through, zoom from 25% to 400% or to
+  what is picked (Shift+2), pan with Space and a drag, words pasted from elsewhere become a text box, a right-click
+  menu with every action, a list of every key (Ctrl+/), pages to add, move and duplicate, undo of every step. It adds words (heading, subheading, body, twelve font pairings, 54
   Google fonts), shapes (27 and boxes), lines and arrows, frames for pictures (14 shapes), stickers, icons and
   emoji, QR codes, collages, pictures from this device, the Library, free photos or made with AI, drawings, videos
   (from this device, the Library or made with AI, moving and silent or with controls) and backgrounds (colours,
@@ -735,13 +739,16 @@ agents that speak ACP and take MCP servers.
   the way, straight or curved, fixed to a point of a shape or to the side that faces the other, with seventeen ends
   (crow's feet too), words in the middle and near each end, rounded bends and flowing dashes. The editor: a searchable
   shapes panel (click, or drag onto the page or into a container), draw.io's blue arrows (a shape like it, joined, in a
-  click; a connector to another shape in a drag), handles to size and turn, smart guides and a grid to snap to, a
+  click; a connector to another shape in a drag; Tab adds a connected shape to the right, Shift+Tab below), handles to
+  size and turn, smart guides (thin pink lines, equal gaps, the distance to the nearest shape, "=" for the same width or
+  height, a size pill; the same while sizing) and a grid to snap to, Ctrl-drag a copy, Alt-drag without snapping, a
   connector's ends, runs, points and words dragged, words typed in place (or over a picked shape), rows of classes and
   tables, a format panel (sixteen ready-made looks, fill, gradient, line, dashes, corners, opacity, shadow, drawn by
   hand, fonts, alignment, where words go, kind of shape, links and notes, position, turn, flip, order, align, space out,
-  same size, group, lock), automatic layouts (layers down or across with few crossings and long edges between, trees,
+  same size, group, lock, copy and paste a style), picture files dropped from the desktop, automatic layouts (layers down or across with few crossings and long edges between, trees,
   mind maps, rings, circles, grids; swimlanes stay lanes; containers grow round what they hold), pages as tabs, menus
-  with their keys, a right-click menu, a double-click to add a shape, find and replace, copy and paste between
+  with their keys, a right-click menu with the same actions (order, align, lock, a connector's course, swap the ends,
+  copy and paste a style), a double-click to add a shape, find and replace, copy and paste between
   diagrams and windows (draw.io's shapes, Mermaid, pictures and words pasted become what they are), undo, light and
   dark themes, and, while an agent writes one, the diagram growing on the page. It exports as PNG, SVG, PDF (each
   page its own size), a draw.io file and a web page to pan and zoom; Download as a picture saves a page or what is

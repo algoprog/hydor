@@ -24,7 +24,7 @@ import { distanceTo, edgeCourse, edgeGeom } from '../../shared/diagram-route.ts'
 import { layout } from '../../shared/diagram-layout.ts';
 import { LAYOUTS, specPage, sizeFor } from '../../shared/diagram-spec.ts';
 import { applyDiagramEdits, relayoutPage } from '../../shared/diagram-edits.ts';
-import { alignShapes, cloneItems, distributeShapes, hitItem, moveItems, movingSet, removeItems, reorder, reparent, snapBox } from '../../shared/diagram-ops.ts';
+import { alignShapes, cloneItems, copyStyle, distributeShapes, hitItem, moveItems, movingSet, pasteStyle, removeItems, reorder, reparent, setRoute, snapBox, swapEnds } from '../../shared/diagram-ops.ts';
 import { pageSvg, sketchPath } from '../../shared/diagram-render.ts';
 import { PALETTE } from '../../shared/diagram-palette.ts';
 import { draftDiagram } from '../../shared/draft-diagram.ts';
@@ -325,7 +325,41 @@ const edge = (id: string, from: string, to: string, more: Partial<DiagramEdge> =
   ok((dropped.items.find((x) => x.id === 'other') as DiagramShape).parent === 'box', 'dropped in a container, a shape goes in it');
   ok(hitItem(p, 100, 85, 4)?.id === 'kid' && hitItem(p, 150, 150, 4) === null, 'a click picks what is under it, not a container’s inside');
   const sn = snapBox({ x: 403, y: 300, w: 120, h: 60 }, [{ x: 400, y: 60, w: 120, h: 60 }], 6);
-  ok(sn.dx === -3 && sn.guides.length === 1, 'a moving box lines up with another');
+  ok(sn.dx === -3 && sn.guides.length === 3 && sn.guides.every((g) => g.axis === 'x'), 'a moving box lines up with another: a guide for each edge and middle it lies on');
+  // A look copied from one item to others, and a connector's course and ends.
+  const mkShape = (id: string, more: Partial<DiagramShape>): DiagramShape => ({ id, type: 'shape', shape: 'rect', x: 0, y: 0, w: 100, h: 50, ...more }) as DiagramShape;
+  const mkEdge = (id: string, more: Partial<DiagramEdge>): DiagramEdge => ({ id, type: 'edge', from: { id: 's1' }, to: { id: 's2' }, ...more });
+  const st: DiagramPage = {
+    id: 'p',
+    name: 'p',
+    items: [
+      mkShape('s1', { style: { fill: '#ff0000', stroke: '#00ff00', width: 3, shadow: true, radius: 12, color: '#111111', bold: true, align: 'left' } }),
+      mkShape('s2', { style: { fill: '#0000ff', italic: true } }),
+      mkShape('s3', { locked: true }),
+      mkEdge('e1', { route: 'curved', style: { stroke: '#123456', width: 4, dash: 'dashed', end: 'diamond', flow: true, radius: 0 }, text: 'a', fromText: '1', toText: 'N', points: [[10, 10], [20, 20]] }),
+      mkEdge('e2', { style: { stroke: '#999999', start: 'arrow' } }),
+    ],
+  };
+  const byId = (p: DiagramPage, id: string) => p.items.find((x) => x.id === id)!;
+  const toShape = pasteStyle(st, ['s2', 's3'], copyStyle(byId(st, 's1')));
+  ok(JSON.stringify(byId(toShape, 's2').style) === JSON.stringify(byId(st, 's1').style) && !byId(toShape, 's2').style?.italic, 'a shape’s look put on another shape: all of it, replacing what the other had');
+  ok(byId(toShape, 's3') === byId(st, 's3'), 'what is locked is left as it was');
+  const shapeToEdge = byId(pasteStyle(st, ['e2'], copyStyle(byId(st, 's1'))), 'e2');
+  ok(shapeToEdge.style?.stroke === '#00ff00' && shapeToEdge.style?.width === 3 && shapeToEdge.style?.color === '#111111' && shapeToEdge.style?.start === 'arrow', 'a shape’s look on a connector: the line and the words, its ends kept');
+  ok(shapeToEdge.style?.fill === undefined && shapeToEdge.style?.shadow === undefined && shapeToEdge.style?.align === undefined && shapeToEdge.style?.radius === undefined, 'but not what only a shape has (fill, shadow, how its words sit, the corners)');
+  const edgeToShape = byId(pasteStyle(st, ['s2'], copyStyle(byId(st, 'e1'))), 's2');
+  ok(edgeToShape.style?.stroke === '#123456' && edgeToShape.style?.dash === 'dashed' && edgeToShape.style?.end === undefined && edgeToShape.style?.flow === undefined && edgeToShape.style?.radius === undefined && edgeToShape.style?.fill === '#0000ff', 'a connector’s look on a shape: its line, not its ends or its bends; the shape keeps its fill');
+  const edgeToEdge = byId(pasteStyle(st, ['e2'], copyStyle(byId(st, 'e1'))), 'e2') as DiagramEdge;
+  ok(edgeToEdge.route === 'curved' && edgeToEdge.style?.end === 'diamond' && edgeToEdge.style?.flow === true && edgeToEdge.style?.start === undefined && edgeToEdge.style?.radius === 0 && !edgeToEdge.text, 'a connector’s on a connector: course, ends and flow, not its words');
+  ok(byId(st, 's1') === st.items[0] && st.items[1].style?.italic === true, 'the page given is left as it was');
+  const bare = byId(pasteStyle(st, ['s1'], { kind: 'shape', style: {} }), 's1');
+  ok(bare.style === undefined, 'a look with nothing in it clears the look (no empty style left)');
+  const straight = setRoute(st, ['e1', 's1', 'e2'], 'straight');
+  ok((byId(straight, 'e1') as DiagramEdge).route === 'straight' && !(byId(straight, 'e1') as DiagramEdge).points && byId(straight, 's1') === st.items[0], 'a connector’s course set, its bends forgotten, shapes left alone');
+  ok(!('route' in (byId(setRoute(st, ['e1'], 'orthogonal'), 'e1') as DiagramEdge)), 'right angles are no route at all');
+  const sw = byId(swapEnds(st, ['e1']), 'e1') as DiagramEdge;
+  ok(sw.from.id === 's2' && sw.to.id === 's1' && sw.fromText === 'N' && sw.toText === '1' && JSON.stringify(sw.points) === '[[20,20],[10,10]]', 'the ends swapped, with the words at them and the bends');
+  ok(sw.style?.start === 'diamond' && sw.style?.end === 'none' && swapEnds(swapEnds(st, ['e2']), ['e2']).items[4].style?.start === 'arrow', 'and their arrows (twice, as it was)');
 }
 
 // ---- drawn ------------------------------------------------------------------------------------------------------------

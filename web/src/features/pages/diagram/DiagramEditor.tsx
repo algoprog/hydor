@@ -2,8 +2,9 @@
 // Lucide's icons too), the page in the middle (diagram canvas: pan, zoom, pick, move with guides, resize, turn, connect
 // with the blue arrows, words typed in place), the format panel on the right (style, text, arrange; a connector's line
 // and ends; the page and its layout), the pages as tabs at the foot. Menus hold everything (Edit, View, Insert,
-// Arrange, Format), with their keys; a right click holds what fits where it was made; a double click on empty space
-// adds a shape there. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. Copy
+// Arrange, Format), with their keys; a right click (or the menu key) holds the same actions for what is picked (or for
+// the page); a double click on empty space adds a shape there; Tab on a picked shape adds a connected copy to its
+// right (Shift+Tab: below), ready to type in; picture files dropped from the desktop come in where they fall. Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. Copy
 // and paste go between diagrams and windows, and take draw.io's shapes, Mermaid, pictures and words. While an agent
 // writes a new version it shows as it comes, read-only, the shape being written marked and kept in view.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -34,7 +35,7 @@ import {
 } from 'lucide-react';
 import { CONTAINER_KINDS, isEdge, isShape, newDiagram, newId, normalizeDiagram, ROW_KINDS, type Diagram, type DiagramEdge, type DiagramItem, type DiagramPage, type DiagramShape } from '@shared/diagram';
 import { KINDS, pageBox } from '@shared/diagram-shapes';
-import { alignShapes, boundsOf, cloneItems, distributeShapes, groupItems, matchSize, moveItems, movingSet, removeItems, reorder, ungroupItems, updateItems, expandGroups } from '@shared/diagram-ops';
+import { alignShapes, boundsOf, cloneItems, copyStyle, distributeShapes, groupItems, matchSize, moveItems, movingSet, pasteStyle, removeItems, reorder, setRoute, swapEnds, ungroupItems, updateItems, expandGroups, type StyleClip } from '@shared/diagram-ops';
 import { relayoutPage } from '@shared/diagram-edits';
 import { specPage, type LayoutKind } from '@shared/diagram-spec';
 import type { PaletteEntry } from '@shared/diagram-palette';
@@ -43,7 +44,8 @@ import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import type { AskScope, ModelEditorProps } from '../kinds';
-import { MenuBar, type MenuDef } from '../common/menus';
+import { ContextMenu, isMenuKey, MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
+import { COPY_DRAG_KEY, NO_SNAP_KEY } from '../common/keys';
 import { FindBar, useFind } from '../common/FindBar';
 import { findIn, replaceAllIn } from '../common/find';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
@@ -64,6 +66,9 @@ function useDark(): boolean {
   }, []);
   return dark;
 }
+
+/** The look taken with Copy style, to put on others (kept while the app is open, so it goes from one diagram to another). */
+let styleClip: StyleClip | null = null;
 
 const PREFS = 'hydor.diagram.view';
 const prefs = (): { snap: boolean; grid: boolean; shapes: boolean; format: boolean } => {
@@ -128,8 +133,8 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
   const [showShapes, setShowShapes] = useState(p0.shapes && layout === 'page');
   const [showFormat, setShowFormat] = useState(p0.format && layout === 'page');
   const [saving, setSaving] = useState(false);
-  const [ctx, setCtx] = useState<{ x: number; y: number; hit: DiagramItem | null } | null>(null);
-  const ctxRef = useRef<HTMLDivElement>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; keyed?: boolean; hit: DiagramItem | null } | null>(null);
+  const [dropping, setDropping] = useState(false);
   const [quick, setQuick] = useState<{ x: number; y: number; at: { x: number; y: number } } | null>(null);
   const quickRef = useRef<HTMLDivElement>(null);
   const [iconFor, setIconFor] = useState<{ id?: string; at?: { x: number; y: number } } | null>(null);
@@ -411,27 +416,32 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       toastError(e);
     }
   };
+  /** Picture files (pasted, or dropped from the desktop) kept and put on the page, the first at `at`, each next a little lower: one step of Undo. */
+  const addPictures = async (files: Blob[], at: { x: number; y: number }) => {
+    try {
+      const made: DiagramShape[] = [];
+      for (const [i, f] of files.entries()) {
+        const src = await keepPicture(f);
+        const img = new Image();
+        img.src = assetUrl(src);
+        await img.decode().catch(() => {});
+        const k = Math.min(1, 480 / Math.max(img.naturalWidth || 240, img.naturalHeight || 160));
+        made.push(makeShape('image', { x: at.x + i * 24, y: at.y + i * 24 }, { src, w: Math.round((img.naturalWidth || 240) * k), h: Math.round((img.naturalHeight || 160) * k) }));
+      }
+      if (!made.length) return;
+      change((p) => ({ ...p, items: [...p.items, ...made] }));
+      setSel(made.map((s) => s.id));
+    } catch (err) {
+      toastError(err);
+    }
+  };
   const paste = async (e?: ClipboardEvent, at?: { x: number; y: number }) => {
     if (!can) return;
     const got = await readPaste(e);
     if (!got) return toast(tr('Nothing to paste: copy shapes first (Ctrl+C).'));
     const where = at ?? canvas.current?.middle() ?? { x: 0, y: 0 };
     if (got.kind === 'items') return placeItems(got.items, at);
-    if (got.kind === 'image') {
-      try {
-        const src = await keepPicture(got.blob);
-        const img = new Image();
-        img.src = assetUrl(src);
-        await img.decode().catch(() => {});
-        const k = Math.min(1, 480 / Math.max(img.naturalWidth || 240, img.naturalHeight || 160));
-        const s = makeShape('image', where, { src, w: Math.round((img.naturalWidth || 240) * k), h: Math.round((img.naturalHeight || 160) * k) });
-        change((p) => ({ ...p, items: [...p.items, s] }));
-        setSel([s.id]);
-      } catch (err) {
-        toastError(err);
-      }
-      return;
-    }
+    if (got.kind === 'image') return void addPictures([got.blob], where);
     const text = got.text.trim();
     if (/<mxGraphModel|<mxfile|%3CmxGraphModel/i.test(text)) return fromDrawio(text, false);
     if (/^\s*(%%.*\n\s*)*(flowchart|graph|mindmap|classDiagram|erDiagram|stateDiagram(-v2)?|sequenceDiagram)\b/.test(text)) return void fromMermaid(text, at);
@@ -461,7 +471,22 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       }
     },
     matchSize: (how: 'w' | 'h' | 'both') => change((p) => matchSize(p, sel, how)),
+    copyStyle: () => {
+      const it = page.items.find((x) => x.id === sel[0]);
+      if (!it) return;
+      styleClip = copyStyle(it);
+      toast(tr('Style copied'));
+      rerender((n) => n + 1);
+    },
+    pasteStyle: () => {
+      if (!can || !sel.length || !styleClip) return;
+      const clip = styleClip;
+      change((p) => pasteStyle(p, sel, clip));
+    },
+    canPasteStyle: !!styleClip && can && sel.length > 0,
   };
+  const toggleLock = () => change((p) => updateItems(p, new Set(sel), (it) => ({ ...it, locked: it.locked ? undefined : true }) as DiagramItem));
+  const setCourse = (r: 'orthogonal' | 'straight' | 'curved') => change((p) => setRoute(p, sel, r));
 
   /** Something of the shapes panel put on the page: at a point, or in the middle of what shows. */
   const insert = async (pk: Pick, at?: { x: number; y: number }) => {
@@ -642,6 +667,12 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       find.show(false);
       return;
     }
+    // Ctrl+Shift+H is Fit the page: Find and replace (Ctrl+H) must not take it.
+    if (mod && e.shiftKey && k === 'h') {
+      e.preventDefault();
+      canvas.current?.fit();
+      return;
+    }
     if (mod && k === 'h') {
       e.preventDefault();
       find.show(true);
@@ -667,11 +698,6 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       setView((v) => ({ ...v, k: 1 }));
       return;
     }
-    if (mod && e.shiftKey && k === 'h') {
-      e.preventDefault();
-      canvas.current?.fit();
-      return;
-    }
     if (mod && k === 'a') {
       e.preventDefault();
       selectAll();
@@ -687,7 +713,25 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       else setSel([]);
       return;
     }
+    // The menu key, or Shift+F10: the right-click menu, by what is picked.
+    if (isMenuKey(e)) {
+      e.preventDefault();
+      const b = sel.length ? boundsOf(page, new Set(sel)) : null;
+      const r = canvas.current?.el()?.getBoundingClientRect();
+      if (r) setCtx({ x: r.left + (b ? view.x + (b.x + b.w) * view.k : 80), y: r.top + (b ? view.y + (b.y + b.h / 2) * view.k : 80), keyed: true, hit: picked[0] ?? null });
+      return;
+    }
+    if (mod && e.altKey && (k === 'c' || e.code === 'KeyC')) {
+      e.preventDefault();
+      if (sel.length === 1) act.copyStyle();
+      return;
+    }
     if (readOnly) return;
+    if (mod && e.altKey && (k === 'v' || e.code === 'KeyV')) {
+      e.preventDefault();
+      act.pasteStyle();
+      return;
+    }
     if (mod && k === 'z') {
       e.preventDefault();
       if (e.shiftKey) redo();
@@ -727,8 +771,22 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
     }
     if (mod && e.shiftKey && k === 'l') {
       e.preventDefault();
-      change((p) => updateItems(p, new Set(sel), (it) => ({ ...it, locked: it.locked ? undefined : true }) as DiagramItem));
+      toggleLock();
       return;
+    }
+    // Tab on a picked shape: a copy of it joined to it, to its right (Shift+Tab: below), picked and ready to type in.
+    if (e.key === 'Tab' && !mod && !e.altKey && sel.length === 1) {
+      const it = page.items.find((x) => x.id === sel[0]);
+      const a2 = document.activeElement as HTMLElement | null;
+      const onCanvas = !a2 || a2 === document.body || !!canvas.current?.el()?.contains(a2);
+      if (it && isShape(it) && onCanvas && !CONTAINER_KINDS.has(it.shape) && it.shape !== 'image') {
+        e.preventDefault();
+        const r = addBeside(page, it, e.shiftKey ? 's' : 'e');
+        change(() => r.page);
+        setSel([r.id]);
+        setTimeout(() => canvas.current?.edit(r.id), 30);
+        return;
+      }
     }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
@@ -827,6 +885,80 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
   // ---- menus --------------------------------------------------------------------------------------------------------------
   const h = hist.current;
   const one = picked.length === 1 ? picked[0] : null;
+  const allLocked = picked.length > 0 && picked.every((x) => x.locked);
+  const orderList: MenuEntry[] = [
+    { label: 'Bring to front', keys: 'Ctrl+Shift+]', disabled: !can || !sel.length, run: () => order('front') },
+    { label: 'Bring forward', keys: 'Ctrl+]', disabled: !can || !sel.length, run: () => order('forward') },
+    { label: 'Send backward', keys: 'Ctrl+[', disabled: !can || !sel.length, run: () => order('backward') },
+    { label: 'Send to back', keys: 'Ctrl+Shift+[', disabled: !can || !sel.length, run: () => order('back') },
+  ];
+  const alignEntry: MenuEntry = {
+    label: 'Align',
+    disabled: !can || pickedShapes.length < 2,
+    items: [
+      { label: 'Left edges', run: () => act.align('left') },
+      { label: 'Centres', run: () => act.align('center') },
+      { label: 'Right edges', run: () => act.align('right') },
+      { label: 'Tops', run: () => act.align('top') },
+      { label: 'Middles', run: () => act.align('middle') },
+      { label: 'Bottoms', run: () => act.align('bottom') },
+    ],
+  };
+  const spaceEntry: MenuEntry = {
+    label: 'Space out',
+    disabled: !can || pickedShapes.length < 3,
+    also: 'distribute',
+    items: [
+      { label: 'Across', run: () => act.distribute('x') },
+      { label: 'Down', run: () => act.distribute('y') },
+    ],
+  };
+  const sameSizeEntry: MenuEntry = { label: 'Same size', disabled: !can || pickedShapes.length < 2, run: () => act.matchSize('both') };
+  const groupEntries: MenuEntry[] = [
+    { label: 'Group', keys: 'Ctrl+G', disabled: !can || sel.length < 2, run: act.group },
+    { label: 'Ungroup', keys: 'Ctrl+Shift+G', disabled: !can || !picked.some((x) => x.group), run: act.ungroup },
+    { label: allLocked ? 'Unlock' : 'Lock', keys: 'Ctrl+Shift+L', disabled: !can || !sel.length, run: toggleLock },
+  ];
+  /** A connector's course and ends: for the connectors picked. */
+  const connectorEntry: MenuEntry = {
+    label: 'Connector',
+    disabled: !can || !picked.some(isEdge),
+    also: 'line course route straight curved right angles swap ends arrow',
+    items: [
+      { label: 'Right angles', checked: picked.filter(isEdge).every((x) => (x.route ?? 'orthogonal') === 'orthogonal'), run: () => setCourse('orthogonal') },
+      { label: 'Straight', checked: picked.filter(isEdge).every((x) => x.route === 'straight'), run: () => setCourse('straight') },
+      { label: 'Curved', checked: picked.filter(isEdge).every((x) => x.route === 'curved'), run: () => setCourse('curved') },
+      '-',
+      { label: 'Swap the ends', run: () => change((p) => swapEnds(p, sel)) },
+    ],
+  };
+  const arrangeItems: MenuEntry[] = [
+    ...orderList,
+    '-',
+    alignEntry,
+    spaceEntry,
+    sameSizeEntry,
+    '-',
+    ...groupEntries,
+    '-',
+    connectorEntry,
+    '-',
+    {
+      label: 'Layout',
+      disabled: !can || !page.items.length,
+      also: 'arrange automatically tidy',
+      items: [
+        { label: 'Flow down', run: () => act.layout('down') },
+        { label: 'Flow right', run: () => act.layout('right') },
+        { label: 'Tree', run: () => act.layout('tree') },
+        { label: 'Tree across', run: () => act.layout('tree-right') },
+        { label: 'Mind map', run: () => act.layout('mindmap') },
+        { label: 'Rings', run: () => act.layout('radial') },
+        { label: 'Circle', run: () => act.layout('circle') },
+        { label: 'Grid', run: () => act.layout('grid') },
+      ],
+    },
+  ];
   const menus: MenuDef[] = [
     {
       label: 'Edit',
@@ -839,6 +971,9 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
         { label: 'Paste', keys: 'Ctrl+V', disabled: !can, run: () => void paste() },
         { label: 'Duplicate', keys: 'Ctrl+D', disabled: !can || !sel.length, run: duplicate },
         { label: 'Delete', keys: 'Delete', disabled: !can || !sel.length, run: del },
+        '-',
+        { label: 'Copy style', keys: 'Ctrl+Alt+C', also: 'format paint look', disabled: sel.length !== 1, run: act.copyStyle },
+        { label: 'Paste style', keys: 'Ctrl+Alt+V', also: 'format paint look', disabled: !act.canPasteStyle, run: act.pasteStyle },
         '-',
         { label: 'Select all', keys: 'Ctrl+A', run: selectAll },
         { label: 'Select the shapes', run: () => setSel(page.items.filter(isShape).map((x) => x.id)) },
@@ -889,58 +1024,7 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
         { label: 'Page', disabled: !can, run: addNewPage },
       ],
     },
-    {
-      label: 'Arrange',
-      items: [
-        { label: 'Bring to front', keys: 'Ctrl+Shift+]', disabled: !can || !sel.length, run: () => order('front') },
-        { label: 'Bring forward', keys: 'Ctrl+]', disabled: !can || !sel.length, run: () => order('forward') },
-        { label: 'Send backward', keys: 'Ctrl+[', disabled: !can || !sel.length, run: () => order('backward') },
-        { label: 'Send to back', keys: 'Ctrl+Shift+[', disabled: !can || !sel.length, run: () => order('back') },
-        '-',
-        {
-          label: 'Align',
-          disabled: !can || pickedShapes.length < 2,
-          items: [
-            { label: 'Left edges', run: () => act.align('left') },
-            { label: 'Centres', run: () => act.align('center') },
-            { label: 'Right edges', run: () => act.align('right') },
-            { label: 'Tops', run: () => act.align('top') },
-            { label: 'Middles', run: () => act.align('middle') },
-            { label: 'Bottoms', run: () => act.align('bottom') },
-          ],
-        },
-        {
-          label: 'Space out',
-          disabled: !can || pickedShapes.length < 3,
-          also: 'distribute',
-          items: [
-            { label: 'Across', run: () => act.distribute('x') },
-            { label: 'Down', run: () => act.distribute('y') },
-          ],
-        },
-        { label: 'Same size', disabled: !can || pickedShapes.length < 2, run: () => act.matchSize('both') },
-        '-',
-        { label: 'Group', keys: 'Ctrl+G', disabled: !can || sel.length < 2, run: act.group },
-        { label: 'Ungroup', keys: 'Ctrl+Shift+G', disabled: !can || !picked.some((x) => x.group), run: act.ungroup },
-        { label: picked.length && picked.every((x) => x.locked) ? 'Unlock' : 'Lock', keys: 'Ctrl+Shift+L', disabled: !can || !sel.length, run: () => change((p) => updateItems(p, new Set(sel), (it) => ({ ...it, locked: it.locked ? undefined : true }) as DiagramItem)) },
-        '-',
-        {
-          label: 'Layout',
-          disabled: !can || !page.items.length,
-          also: 'arrange automatically tidy',
-          items: [
-            { label: 'Flow down', run: () => act.layout('down') },
-            { label: 'Flow right', run: () => act.layout('right') },
-            { label: 'Tree', run: () => act.layout('tree') },
-            { label: 'Tree across', run: () => act.layout('tree-right') },
-            { label: 'Mind map', run: () => act.layout('mindmap') },
-            { label: 'Rings', run: () => act.layout('radial') },
-            { label: 'Circle', run: () => act.layout('circle') },
-            { label: 'Grid', run: () => act.layout('grid') },
-          ],
-        },
-      ],
-    },
+    { label: 'Arrange', items: arrangeItems },
     {
       label: 'File',
       items: [
@@ -952,6 +1036,54 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
     },
   ];
 
+  const hit = ctx?.hit ?? null;
+  const ctxItems: MenuEntry[] = hit
+    ? [
+        can && { label: 'Edit the words', keys: 'Enter', run: () => canvas.current?.edit(hit.id, isShape(hit) && ROW_KINDS.has(hit.shape) ? 'rows' : 'text') },
+        can && '-',
+        { label: 'Cut', keys: 'Ctrl+X', disabled: !can, run: () => void copy(true) },
+        { label: 'Copy', keys: 'Ctrl+C', icon: <Copy size={14} />, run: () => void copy(false) },
+        { label: 'Paste', keys: 'Ctrl+V', disabled: !can, run: () => void paste() },
+        { label: 'Duplicate', keys: 'Ctrl+D', disabled: !can, run: duplicate },
+        { label: 'Delete', keys: 'Delete', icon: <Trash2 size={14} />, danger: true, disabled: !can, run: del },
+        '-',
+        { label: 'Order', disabled: !can, items: orderList },
+        picked.length > 1 && alignEntry,
+        pickedShapes.length > 2 && spaceEntry,
+        pickedShapes.length > 1 && sameSizeEntry,
+        picked.some(isEdge) && connectorEntry,
+        '-',
+        ...groupEntries.filter((x) => x && x !== '-' && (x.label !== 'Group' || sel.length > 1) && (x.label !== 'Ungroup' || picked.some((p) => p.group))),
+        '-',
+        { label: 'Copy style', keys: 'Ctrl+Alt+C', disabled: sel.length !== 1, run: act.copyStyle },
+        { label: 'Paste style', keys: 'Ctrl+Alt+V', disabled: !act.canPasteStyle, run: act.pasteStyle },
+        can && isShape(hit) && {
+          label: 'Add a shape joined to it',
+          run: () => {
+            const r = addBeside(page, hit, 'e');
+            change(() => r.page);
+            setSel([r.id]);
+          },
+        },
+        !!onAsk && !readOnly && '-',
+        !!onAsk && !readOnly && { label: 'Ask the agent about it', icon: <Sparkles size={14} className="text-accent" />, run: askAbout },
+      ]
+    : [
+        { label: 'Paste', keys: 'Ctrl+V', disabled: !can, run: () => void paste(undefined, ctx ? canvas.current?.toPage(ctx.x, ctx.y) : undefined) },
+        {
+          label: 'Add a shape here',
+          icon: <Plus size={14} />,
+          disabled: !can,
+          run: () => {
+            const r = canvas.current?.el()?.getBoundingClientRect();
+            if (r && ctx) setQuick({ x: ctx.x - r.left, y: ctx.y - r.top, at: canvas.current!.toPage(ctx.x, ctx.y) });
+          },
+        },
+        { label: 'Select all', keys: 'Ctrl+A', run: selectAll },
+        { label: 'Fit the page', keys: 'Ctrl+Shift+H', icon: <Maximize size={14} />, run: () => canvas.current?.fit() },
+        { label: 'Lay it out', icon: <LayoutTemplate size={14} />, disabled: !can || !page.items.length, run: () => act.layout('down') },
+      ];
+
   const shortcuts: ShortcutGroup[] = [
     {
       title: 'Shapes',
@@ -962,6 +1094,11 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
         ['Ctrl+G', 'Group'],
         ['Ctrl+Shift+G', 'Ungroup'],
         ['Ctrl+Shift+L', 'Lock or unlock'],
+        ['Tab', 'Add a connected shape to the right'],
+        ['Shift+Tab', 'Add a connected shape below'],
+        ['Ctrl+Alt+C', 'Copy style'],
+        ['Ctrl+Alt+V', 'Paste style'],
+        ['Menu key / Shift+F10', 'The menu for what is picked'],
         ['Arrow', 'Nudge'],
         ['Shift+Arrow', 'Nudge by the grid'],
         ['Ctrl+] / Ctrl+[', 'Forward or backward'],
@@ -972,8 +1109,10 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       title: 'With the mouse',
       items: [
         ['Shift+Click', 'Pick more'],
-        ['Alt+Drag', 'Drag a copy'],
+        [`${COPY_DRAG_KEY}+Drag`, 'Drag a copy'],
+        [`${NO_SNAP_KEY}+Drag`, 'Move or size without snapping'],
         ['Shift+Drag', 'Move straight across or down'],
+        ['Shift+Drag a handle', 'Size in proportion'],
         ['Space+Drag', 'Pan'],
         ['Ctrl+Wheel', 'Zoom'],
       ],
@@ -1155,7 +1294,24 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
       {toolbar}
       <div className="relative flex min-h-0 flex-1">
         {shapesPanel}
-        <div className="relative min-w-0 flex-1">
+        <div
+          className="relative min-w-0 flex-1"
+          onDragOver={(e) => {
+            if (!can || ![...e.dataTransfer.types].includes('Files')) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            setDropping(true);
+          }}
+          onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropping(false)}
+          onDrop={(e) => {
+            setDropping(false);
+            const files = [...e.dataTransfer.files].filter((f) => /^image\//.test(f.type)).slice(0, 10);
+            if (!can || !files.length) return;
+            e.preventDefault();
+            void addPictures(files, canvas.current!.toPage(e.clientX, e.clientY));
+          }}
+        >
+          {dropping && <div className="pointer-events-none absolute inset-1 z-30 rounded-xl border-2 border-dashed border-accent bg-accent-soft/40" />}
           <DiagramCanvas
             ref={canvas}
             diagram={shownD}
@@ -1213,92 +1369,8 @@ export function DiagramEditor({ doc, layout, readOnly: readOnlyProp, onSave, lea
           {ghost.label}
         </div>
       )}
-      {/* The right-click menu. */}
-      <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctx?.x ?? -10, top: ctx?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={!!ctx} onClose={() => setCtx(null)} width={230}>
-        {ctx && (
-          <div onMouseDown={(e) => e.preventDefault()}>
-            {ctx.hit ? (
-              <>
-                {can && (
-                  <MenuItem hint="Enter" onClick={() => (setCtx(null), canvas.current?.edit(ctx.hit!.id, isShape(ctx.hit!) && ROW_KINDS.has(ctx.hit!.shape) ? 'rows' : 'text'))}>
-                    Edit the words
-                  </MenuItem>
-                )}
-                {can && <MenuItem hint="Ctrl+X" onClick={() => (setCtx(null), void copy(true))}>Cut</MenuItem>}
-                <MenuItem icon={<Copy size={14} />} hint="Ctrl+C" onClick={() => (setCtx(null), void copy(false))}>
-                  Copy
-                </MenuItem>
-                {can && <MenuItem hint="Ctrl+D" onClick={() => (setCtx(null), duplicate())}>Duplicate</MenuItem>}
-                {can && <MenuSep />}
-                {can && <MenuItem onClick={() => (setCtx(null), order('front'))}>Bring to front</MenuItem>}
-                {can && <MenuItem onClick={() => (setCtx(null), order('back'))}>Send to back</MenuItem>}
-                {can && sel.length > 1 && <MenuItem onClick={() => (setCtx(null), act.group())}>Group</MenuItem>}
-                {can && picked.some((x) => x.group) && <MenuItem onClick={() => (setCtx(null), act.ungroup())}>Ungroup</MenuItem>}
-                {can && isShape(ctx.hit) && (
-                  <MenuItem
-                    onClick={() => {
-                      setCtx(null);
-                      const r = addBeside(page, ctx.hit as DiagramShape, 'e');
-                      change(() => r.page);
-                      setSel([r.id]);
-                    }}
-                  >
-                    Add a shape joined to it
-                  </MenuItem>
-                )}
-                {onAsk && !readOnly && (
-                  <>
-                    <MenuSep />
-                    <MenuItem icon={<Sparkles size={14} className="text-accent" />} onClick={() => (setCtx(null), askAbout())}>
-                      Ask the agent about it
-                    </MenuItem>
-                  </>
-                )}
-                {can && (
-                  <>
-                    <MenuSep />
-                    <MenuItem icon={<Trash2 size={14} />} danger hint="Delete" onClick={() => (setCtx(null), del())}>
-                      Delete
-                    </MenuItem>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-                {can && (
-                  <MenuItem hint="Ctrl+V" onClick={() => (setCtx(null), void paste(undefined, canvas.current?.toPage(ctx.x, ctx.y)))}>
-                    Paste
-                  </MenuItem>
-                )}
-                {can && (
-                  <MenuItem
-                    icon={<Plus size={14} />}
-                    onClick={() => {
-                      const r = canvas.current?.el()?.getBoundingClientRect();
-                      setCtx(null);
-                      if (r) setQuick({ x: ctx.x - r.left, y: ctx.y - r.top, at: canvas.current!.toPage(ctx.x, ctx.y) });
-                    }}
-                  >
-                    Add a shape here
-                  </MenuItem>
-                )}
-                <MenuItem hint="Ctrl+A" onClick={() => (setCtx(null), selectAll())}>
-                  Select all
-                </MenuItem>
-                <MenuItem icon={<Maximize size={14} />} onClick={() => (setCtx(null), canvas.current?.fit())}>
-                  Fit the page
-                </MenuItem>
-                {can && page.items.length > 0 && (
-                  <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => (setCtx(null), act.layout('down'))}>
-                    Lay it out
-                  </MenuItem>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </Popover>
+      {/* The right-click menu: the menus' own actions, for what is picked (or for the page). */}
+      <ContextMenu at={ctx} items={ctxItems} onClose={() => setCtx(null)} />
       {/* A double click on empty space: a shape to add there. */}
       <div ref={quickRef} className="pointer-events-none fixed h-px w-px" style={{ left: quick ? (canvas.current?.el()?.getBoundingClientRect().left ?? 0) + quick.x : -10, top: quick ? (canvas.current?.el()?.getBoundingClientRect().top ?? 0) + quick.y : -10 }} />
       <Popover anchor={quickRef} open={!!quick} onClose={() => setQuick(null)} width={236} title="Add a shape">
