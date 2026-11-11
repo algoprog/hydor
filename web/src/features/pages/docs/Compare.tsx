@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, History, RotateCcw } from 'lucide-react';
 import { changesOf } from '@shared/doc-changes';
-import { blockHtml, docCss, listInfo, PAPERS, tocEntries, type Doc, type MathDraw } from '@shared/docs';
+import { blockHtml, docCss, listInfo, pageMargins, PAPERS, tocEntries, type Doc, type MathDraw } from '@shared/docs';
 import type { PageVersion } from '@shared/pages';
 import { api } from '../../../lib/api';
 import { ago } from '../../../lib/format';
@@ -69,6 +69,12 @@ export function VersionsDialog({ open, pageId, onClose, onPick }: { open: boolea
     </Dialog>
   );
 }
+
+/** A document's margins as CSS padding: top, right, bottom, left. */
+const marginsCss = (d: Doc) => {
+  const m = pageMargins(d.page);
+  return `${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm`;
+};
 
 /** The document compared with a version: `merged` is compareDocs(that version, the document). */
 export function CompareView({
@@ -157,7 +163,7 @@ export function CompareView({
               ref={paper}
               translate="no"
               className={cx('nd-cmp mx-auto bg-white', phone ? 'px-[18px] py-5' : 'rounded-[2px] shadow-[0_1px_3px_rgba(0,0,0,.12),0_8px_28px_rgba(0,0,0,.08)]')}
-              style={phone ? undefined : { width: `${PAPERS[merged.page.size]?.w ?? 210}mm`, minHeight: '120mm', padding: `${merged.page.margin}mm` }}
+              style={phone ? undefined : { width: `${PAPERS[merged.page.size]?.w ?? 210}mm`, minHeight: '120mm', padding: marginsCss(merged) }}
               dangerouslySetInnerHTML={{ __html: html }}
             />
           </div>

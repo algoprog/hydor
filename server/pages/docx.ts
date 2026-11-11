@@ -1981,7 +1981,7 @@ const JC = { center: 'center', right: 'right', justify: 'both' } as const;
 
 /**
  * The .docx file from what the extractor found and the pictures (PNG buffers, by shot index; null when one could not
- * be taken). A document of Pages gives its `margin` (mm), its `look` (with `editor`: laid out as the editor draws it,
+ * be taken). A document of Pages gives its `margin` (mm; `margins`, each side's), its `look` (with `editor`: laid out as the editor draws it,
  * its blocks' spacing given), `titled: false` (its title is its own), and `fonts`: the faces of its fonts to embed.
  */
 export function docxFile(
@@ -1991,6 +1991,8 @@ export function docxFile(
     title: string;
     paper: PaperSize;
     margin?: number;
+    /** Each side's margin (mm), where they differ: over `margin`. */
+    margins?: { top: number; right: number; bottom: number; left: number };
     look?: DocLook;
     titled?: boolean;
     header?: DocBand;
@@ -2025,12 +2027,15 @@ export function docxFile(
   const page = o.landscape ? { w: paper.h, h: paper.w } : paper;
   // In columns, pictures and tables are a column wide at most.
   const ncols = o.cols && o.cols > 1 ? Math.min(3, o.cols) : 1;
-  const margin = o.margin !== undefined && Number.isFinite(o.margin) ? Math.round(Math.min(60, Math.max(5, o.margin)) * 56.6929) : MARGIN;
-  const fullW = page.w - 2 * margin;
+  // Each side's margin in twips: the document's own (5 to 60 mm), or Word's usual 2 cm.
+  const twOfMm = (mm: number | undefined) => (mm !== undefined && Number.isFinite(mm) ? Math.round(Math.min(60, Math.max(5, mm)) * 56.6929) : undefined);
+  const margin = twOfMm(o.margin) ?? MARGIN;
+  const mar = { top: twOfMm(o.margins?.top) ?? margin, right: twOfMm(o.margins?.right) ?? margin, bottom: twOfMm(o.margins?.bottom) ?? margin, left: twOfMm(o.margins?.left) ?? margin };
+  const fullW = page.w - mar.left - mar.right;
   const textW = ncols > 1 ? Math.round((fullW - (ncols - 1) * 720) / ncols) : fullW;
   const maxW = textW * EMU_TWIP;
   // A picture and the line it sits on fit on one page.
-  const maxH = Math.round((page.h - 2 * margin) * EMU_TWIP * 0.9);
+  const maxH = Math.round((page.h - mar.top - mar.bottom) * EMU_TWIP * 0.9);
 
   const rels: [string, string, string, boolean?][] = [
     ['rId1', 'styles', 'styles.xml'],
@@ -2450,9 +2455,11 @@ export function docxFile(
   if (o.footer) band('footer', o.footer, 'default');
   if (o.titlePage && o.footer) band('footer', undefined, 'first');
   const titlePg = o.titlePage && (o.header || o.footer) ? '<w:titlePg/>' : '';
-  const bandAt = ed ? Math.max(0, Math.round((margin - tw(ed.band.line)) / 2)) : 567;
+  // The header and footer in the middle of the top and bottom margins, as the editor draws them.
+  const headAt = ed ? Math.max(0, Math.round((mar.top - tw(ed.band.line)) / 2)) : 567;
+  const footAt = ed ? Math.max(0, Math.round((mar.bottom - tw(ed.band.line)) / 2)) : 567;
   const sect =
-    `<w:sectPr>${refs}<w:pgSz w:w="${page.w}" w:h="${page.h}"${o.landscape ? ' w:orient="landscape"' : ''}/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="${bandAt}" w:footer="${bandAt}" w:gutter="0"/>` +
+    `<w:sectPr>${refs}<w:pgSz w:w="${page.w}" w:h="${page.h}"${o.landscape ? ' w:orient="landscape"' : ''}/><w:pgMar w:top="${mar.top}" w:right="${mar.right}" w:bottom="${mar.bottom}" w:left="${mar.left}" w:header="${headAt}" w:footer="${footAt}" w:gutter="0"/>` +
     `${ncols > 1 ? `<w:cols w:num="${ncols}" w:space="720"/>` : '<w:cols w:space="708"/>'}${titlePg}<w:docGrid w:linePitch="360"/></w:sectPr>`;
   // Footnotes, a part of their own (their words' runs as the document's).
   if (o.notes?.length) {

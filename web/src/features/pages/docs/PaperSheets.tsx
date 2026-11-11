@@ -32,19 +32,20 @@ export function Sheets({ layout, zoom, width, doc, src }: { layout: Layout; zoom
   );
 }
 
-/** Each sheet's header and footer, over the words' margins. */
+/** Each sheet's header and footer, in the middle of its top and bottom margins, as wide as its words. */
 export function Bands({ layout, zoom, doc, readOnly, onOpen }: { layout: Layout; zoom: number; doc: Doc; readOnly?: boolean; onOpen: () => void }) {
   if (!doc.header && !doc.footer) return null;
   const step = (layout.pageH + GAP) * zoom;
-  const m = layout.margin * zoom;
-  const w = (paperOf(doc.page).w * MM - 2 * layout.margin) * zoom;
+  const { top, bottom, left, right } = layout.margins;
+  const m = left * zoom;
+  const w = (paperOf(doc.page).w * MM - left - right) * zoom;
   const font = FONTS.find((f) => f.name === doc.font)?.css;
   const out: { key: string; kind: 'head' | 'foot'; y: number; text: string; align?: 'center' | 'right' }[] = [];
   for (let i = 0; i < layout.count; i++) {
     if (doc.titlePage && i === 0) continue;
     const words = (t: string) => t.replace(/\{page\}/gi, String(i + 1)).replace(/\{pages\}/gi, String(layout.count));
-    if (doc.header) out.push({ key: `h${i}`, kind: 'head', y: i * step + m / 2, text: words(doc.header.text), align: doc.header.align });
-    if (doc.footer) out.push({ key: `f${i}`, kind: 'foot', y: i * step + layout.pageH * zoom - m / 2, text: words(doc.footer.text), align: doc.footer.align });
+    if (doc.header) out.push({ key: `h${i}`, kind: 'head', y: i * step + (top * zoom) / 2, text: words(doc.header.text), align: doc.header.align });
+    if (doc.footer) out.push({ key: `f${i}`, kind: 'foot', y: i * step + (layout.pageH - bottom / 2) * zoom, text: words(doc.footer.text), align: doc.footer.align });
   }
   return (
     <>

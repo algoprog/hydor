@@ -164,15 +164,20 @@ export function ContextMenu({ at, items, onClose, title, width = 248 }: { at: Co
   const anchor = useRef<HTMLDivElement>(null);
   // A new point is a new menu: its lists start from the top again.
   const key = at ? `${at.x},${at.y}` : '';
+  // As a computer's own menus do, it opens higher up when it would not fit under the point, rather than scroll.
+  const top = at ? Math.max(8, Math.min(at.y, window.innerHeight - menuHeight(items) - 16)) : -10;
   return (
     <>
-      <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: at?.x ?? -10, top: at?.y ?? -10 }} />
+      <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: at?.x ?? -10, top }} />
       <Popover anchor={anchor} open={!!at && shown(items).length > 0} onClose={onClose} width={width} title={title}>
         {at && <MenuList key={key} items={items} close={onClose} title={title} keyed={at.keyed} />}
       </Popover>
     </>
   );
 }
+
+/** About how tall a menu of these rows is: 34 pixels a row, 9 a line between rows, and its frame. */
+const menuHeight = (items: MenuEntry[]) => shown(items).reduce((h, it) => h + (it === '-' ? 9 : 34), 10);
 
 /** Every action in the menus with where it is ("Format › Text"), for Search the menus. */
 function allActions(menus: MenuDef[]): { a: MenuAction; path: string[] }[] {
