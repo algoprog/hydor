@@ -282,6 +282,38 @@ export function EquationBox({ initial, display, onDone, onRemove, onCancel }: { 
   );
 }
 
+/** Format → Bullets and numbering → Start at: the number the picked item's list is to start from (from that item on). */
+export function NumberStartDialog({ open, onClose, value, onApply }: { open: boolean; onClose: () => void; value: number; onApply: (n: number) => void }) {
+  const [n, setN] = useState(value);
+  useEffect(() => {
+    if (open) setN(value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Start at"
+      width={340}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => (onApply(n), onClose())}>
+            Apply
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-center gap-3">
+        <span className="min-w-0 flex-1 text-[13.5px] text-fg-2">The number this item has</span>
+        <NumInput value={n} onChange={setN} min={0} max={9999} step={1} label="The number this item has" className="w-[120px]" />
+      </div>
+    </Dialog>
+  );
+}
+
 /** The languages the document's words can be said to be in: their tags, and their names in their own words. */
 export const DOC_LANGUAGES: [string, string][] = [
   ['en-US', 'English (US)'],

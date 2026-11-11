@@ -18,7 +18,7 @@
 // document keeps (the page is that language to the browser's spell check, and a text box to a screen reader).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
-import { columnMm, paperOf, docHeadings, docWords, FONTS, MARGINS, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type Run, type TableBlock } from '@shared/docs';
+import { columnMm, listInfo, paperOf, docHeadings, docWords, FONTS, MARGINS, PAPER_SIZES, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type PaperSize, type Run, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
 import { api, post } from '../../../lib/api';
@@ -51,7 +51,7 @@ import { CommentsColumn, CommentsPanel, type CommentActions, type DocCommentAi, 
 import { commentsRequest, SUGGEST_NOTE } from '@shared/comment-asks';
 import { CompareView, VersionsDialog } from './Compare';
 import { editorCss, paperPx, useDocFonts } from './css';
-import { BandsDialog, EquationBox, LanguageDialog, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
+import { BandsDialog, EquationBox, LanguageDialog, NumberStartDialog, SpacingDialog, WordCountDialog, type Counts } from './Dialogs';
 import { DocEngine, type AtomClick, type ContextHit, type SelState } from './engine';
 import { useDocFind } from './finding';
 import { docMenus, PAGE_NUMBERS, type DocMenuCtx, type Zoom } from './menu';
@@ -247,7 +247,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [width, setWidth] = useState(1200);
   const [words, setWords] = useState(0);
   const [float, setFloat] = useState<{ ask?: { x: number; y: number }; link?: { x: number; y: number } } | null>(null);
-  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | 'styles' | 'language' | null>(null);
+  const [dialog, setDialog] = useState<'count' | 'spacing' | 'bands' | 'keys' | 'signature' | 'styles' | 'language' | 'start' | null>(null);
   const [counts, setCounts] = useState<Counts & { picked: boolean }>({ words: 0, chars: 0, charsNoSpaces: 0, paragraphs: 0, pages: 1, picked: false });
   const [panel, setPanel] = useState(false);
   const [active, setActive] = useState<string | null>(null);
@@ -1261,6 +1261,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           smart: view.smart,
           setSmart: (on) => setPrefs({ smart: on }),
           language: () => setDialog('language'),
+          numberStart: () => setDialog('start'),
         }
       : null;
   const menus = st && menuCtx(st) ? docMenus(menuCtx(st)!) : [];
@@ -1334,11 +1335,11 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     <div className="space-y-3 p-3">
       <div className="space-y-1.5">
         <div className="text-[12px] text-fg-3">Paper size</div>
-        <Segmented
-          size="sm"
+        <Select
           value={model.page.size}
-          onChange={(v) => e?.setDoc({ page: { ...model.page, size: v } })}
-          options={(Object.keys(PAPERS) as (keyof typeof PAPERS)[]).map((k) => ({ value: k, label: PAPERS[k].label }))}
+          title="Paper size"
+          onChange={(v) => e?.setDoc({ page: { ...model.page, size: v as PaperSize } })}
+          options={PAPER_SIZES.map((k) => ({ value: k, label: `${PAPERS[k].label} · ${PAPERS[k].w} × ${PAPERS[k].h} mm` }))}
         />
       </div>
       <div className="space-y-1.5">
@@ -1978,9 +1979,10 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
           />
         </Suspense>
       )}
+      <NumberStartDialog open={dialog === 'start'} onClose={() => (setDialog(null), e?.refocusSoon())} value={st ? (listInfo(model.blocks).counts[st.index] ?? 1) : 1} onApply={(n) => e?.numbering({ start: n })} />
       <LanguageDialog open={dialog === 'language'} onClose={() => (setDialog(null), e?.refocusSoon())} value={model.lang} onApply={(lang) => e?.change(lang ? { ...e.doc, lang } : (({ lang: _l, ...rest }) => rest)(e.doc))} />
       {/* The right-click menu: for what is under the pointer (or at the caret, from the menu key); a long press on a phone. */}
-      <ContextMenu at={ctx?.at ?? null} items={ctxItems} onClose={() => (setCtx(null), e?.refocusSoon())} />
+      <ContextMenu at={ctx?.at ?? null} items={ctxItems} width={290} onClose={() => (setCtx(null), e?.refocusSoon())} />
       {confirmNode}
     </div>
   );

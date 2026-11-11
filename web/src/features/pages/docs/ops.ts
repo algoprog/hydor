@@ -8,6 +8,7 @@ import {
   docText,
   isAtom,
   fixMerges,
+  defaultNumFmt,
   listInfo,
   lookOf,
   mergeRuns,
@@ -21,6 +22,7 @@ import {
   type ImageBlock,
   type ItemBlock,
   type ListKind,
+  type NumFmt,
   type Look,
   type ParaBlock,
   type ParaStyle,
@@ -708,9 +710,30 @@ export function toggleList(doc: Doc, s: Pos, e: Pos, kind: ListKind): Doc {
   const all = idx.length > 0 && idx.every((i) => doc.blocks[i].type === 'li' && (doc.blocks[i] as ItemBlock).list === kind);
   return mapBlocks(doc, idx, (b) => {
     if (all && b.type === 'li') return toPara(b);
-    if (b.type === 'li') return tidy({ ...b, list: kind, checked: kind === 'check' ? b.checked : undefined });
+    if (b.type === 'li') return tidy({ ...b, list: kind, checked: kind === 'check' ? b.checked : undefined, ...(kind === 'number' ? {} : { fmt: undefined, start: undefined, cont: undefined }) });
     return tidy({ id: b.id, type: 'li', list: kind, lvl: b.style ? undefined : b.lvl, align: b.align, runs: b.runs } as ItemBlock);
   });
+}
+
+/** What Format → Bullets and numbering does to a numbered list: how it counts, where it starts, or that it goes on from the list before. */
+export type NumberingPatch = { fmt: NumFmt } | { start: number } | { cont: true };
+
+/**
+ * A numbered list's numbering changed, for the numbered items between two places: a format (1. a. i. A. I.) is the whole
+ * list's (every item of each list touched), a start (Restart numbering is a start of 1; Start at N) or Continue
+ * numbering is the first item picked's, where the list begins its own count or goes on from the one before.
+ */
+export function setNumbering(doc: Doc, s: Pos, e: Pos, patch: NumberingPatch): Doc {
+  const idx = textBlocksIn(doc, s, e).filter((i) => doc.blocks[i].type === 'li' && (doc.blocks[i] as ItemBlock).list === 'number');
+  if (!idx.length) return doc;
+  if ('fmt' in patch) {
+    const { groups } = listInfo(doc.blocks);
+    const want = new Set(idx.map((i) => groups[i]));
+    const all = doc.blocks.flatMap((b, i) => (b.type === 'li' && b.list === 'number' && want.has(groups[i]) ? [i] : []));
+    return mapBlocks(doc, all, (b) => tidy({ ...b, fmt: patch.fmt === defaultNumFmt((b as ItemBlock).lvl ?? 0) ? undefined : patch.fmt }));
+  }
+  const first = idx[0];
+  return mapBlocks(doc, [first], (b) => tidy('start' in patch ? { ...b, start: Math.max(0, Math.min(9999, Math.round(patch.start))), cont: undefined } : { ...b, cont: true, start: undefined }));
 }
 
 /** A step more (or less) indent: a list's items a level deeper, paragraphs further in. */

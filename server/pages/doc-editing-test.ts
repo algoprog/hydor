@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { docText, normalizeDoc, type Doc, type TableBlock } from '../../shared/docs.ts';
+import { docText, listInfo, normalizeDoc, type Doc, type ItemBlock, type TableBlock } from '../../shared/docs.ts';
 import { openDb } from '../db.ts';
 import { docFromFile, docxOfDoc } from './docs.ts';
 import { fractionBefore, lonelyUrl, replaceTyped, urlBefore } from '../../web/src/features/pages/docs/autoformat.ts';
@@ -140,6 +140,65 @@ ok(ops.stepSize(8, -1) === 7 && ops.stepSize(96, 1) === 108 && ops.stepSize(400,
   const db = openDb(path.join(tmp, 'test.db'));
   const back = docFromFile(docxOfDoc(db, doc, 'Language'), 'Language.docx');
   ok(back.lang === 'el', 'the language goes to a Word file and comes back', back.lang);
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// ---- paper sizes ---------------------------------------------------------------------------------------------------
+{
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-doc-editing-test-')));
+  const db = openDb(path.join(tmp, 'test.db'));
+  for (const size of ['a4', 'letter', 'legal', 'a3', 'a5'] as const) {
+    const d = normalizeDoc({ markdown: 'Paper', page: { size } });
+    ok(d.page.size === size, `paper ${size} is kept`, d.page.size);
+    const back = docFromFile(docxOfDoc(db, d, 'Paper'), 'Paper.docx');
+    ok(back.page.size === size, `paper ${size} goes to a Word file and comes back`, back.page.size);
+    const land = docFromFile(docxOfDoc(db, { ...d, page: { ...d.page, orient: 'landscape' } }, 'Paper'), 'Paper.docx');
+    ok(land.page.size === size && land.page.orient === 'landscape', `landscape ${size} comes back`, land.page);
+  }
+  ok(normalizeDoc({ markdown: 'x', page: { size: 'tabloid' } }).page.size === 'a4', 'a paper the editor does not know is A4');
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// ---- numbered lists: formats, restart, continue, start at ----------------------------------------------------------
+{
+  const li = (id: string, o: Partial<ItemBlock> = {}) => ({ type: 'li', list: 'number', id, runs: [{ t: id }], ...o });
+  const p = (id: string) => ({ type: 'p', id, runs: [{ t: id }] });
+  const doc = (blocks: unknown[]) => normalizeDoc({ blocks });
+  const labels = (d: Doc) => listInfo(d.blocks).labels;
+  ok(labels(doc([li('a'), li('b'), li('c')])).join() === '1.,2.,3.', 'a numbered list counts 1. 2. 3.');
+  ok(labels(doc([li('a', { fmt: 'upper-alpha' }), li('b', { fmt: 'upper-alpha' })])).join() === 'A.,B.', 'a format: A. B.');
+  ok(labels(doc([li('a', { fmt: 'upper-roman' }), li('b'), li('c')])).join() === 'I.,II.,III.', 'the first item’s format is the list’s');
+  ok(labels(doc([li('a', { fmt: 'lower-roman' }), li('b', { fmt: 'lower-roman' }), li('c', { fmt: 'lower-roman' }), li('d', { fmt: 'lower-roman' })])).join() === 'i.,ii.,iii.,iv.', 'small Roman numerals');
+  ok(labels(doc([li('a'), li('b'), p('x'), li('c')])).join() === '1.,2.,,1.', 'a list breaks at a paragraph and starts again');
+  ok(labels(doc([li('a'), li('b'), p('x'), li('c', { cont: true }), li('d')])).join() === '1.,2.,,3.,4.', 'Continue numbering goes on from the list before');
+  ok(labels(doc([li('a'), li('b'), li('c', { start: 1 }), li('d')])).join() === '1.,2.,1.,2.', 'Restart numbering');
+  ok(labels(doc([li('a', { start: 5 }), li('b')])).join() === '5.,6.', 'Start at 5');
+  const g = listInfo(doc([li('a'), p('x'), li('c', { cont: true })]).blocks).groups;
+  ok(g[0] === g[2] && g[0] > 0, 'a continued list is the same list');
+  ok(listInfo(doc([li('a', { lvl: 1 })]).blocks).labels[0] === 'a.', 'the second level counts a. b. c. by itself');
+  // The editor's edit.
+  const base = doc([li('a'), li('b'), li('c'), p('x'), li('d')]);
+  const at = (b: string): ops.Pos => ({ b, o: 0 });
+  const fmted = ops.setNumbering(base, at('b'), at('b'), { fmt: 'upper-alpha' });
+  ok(labels(fmted).join() === 'A.,B.,C.,,1.', 'a format goes to the whole list the item is in, and no other', labels(fmted));
+  const back = ops.setNumbering(fmted, at('a'), at('a'), { fmt: 'decimal' });
+  ok(!(back.blocks[0] as ItemBlock).fmt && labels(back).join() === '1.,2.,3.,,1.', 'the usual format leaves no mark');
+  const restarted = ops.setNumbering(base, at('b'), at('b'), { start: 1 });
+  ok(labels(restarted).join() === '1.,1.,2.,,1.', 'Restart numbering at an item');
+  const started = ops.setNumbering(base, at('d'), at('d'), { start: 7 });
+  ok(labels(started).join() === '1.,2.,3.,,7.', 'Start at 7');
+  const cont = ops.setNumbering(base, at('d'), at('d'), { cont: true });
+  ok(labels(cont).join() === '1.,2.,3.,,4.', 'Continue numbering at an item');
+  const unchanged = ops.setNumbering(base, at('x'), at('x'), { fmt: 'upper-alpha' });
+  ok(unchanged === base, 'a paragraph that is not a numbered item is left alone');
+  const bullets = ops.toggleList(fmted, at('a'), at('c'), 'bullet');
+  ok(!(bullets.blocks[0] as ItemBlock).fmt, 'a list turned into bullets keeps no number format');
+  // Through Word and back.
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-doc-editing-test-')));
+  const db = openDb(path.join(tmp, 'test.db'));
+  const mixed = doc([li('a', { fmt: 'upper-alpha' }), li('b', { fmt: 'upper-alpha' }), p('x'), li('c', { fmt: 'lower-roman' }), li('d', { fmt: 'lower-roman' }), p('y'), li('e', { start: 5 }), li('f'), p('z'), li('g', { cont: true }), li('h')]);
+  const word = docFromFile(docxOfDoc(db, mixed, 'Lists'), 'Lists.docx');
+  ok(labels(word).filter(Boolean).join() === labels(mixed).filter(Boolean).join(), 'numbered lists through a Word file: formats, start and continue', { was: labels(mixed), now: labels(word) });
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
