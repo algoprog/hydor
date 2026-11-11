@@ -13,6 +13,7 @@
 // The editors in tabs (openEditor) hand back what they made as `Saved`; POST /api/mediaedit/image keeps a picture the
 // editor made where it belongs (`SaveImageAsk`). The further adjustments (curves, levels, hue and saturation by range,
 // colour balance, clarity, dehaze, noise reduction, grain, invert, posterize, threshold) are in mediaedit-look.ts.
+import { DESIGN_FONTS, type FontCat } from './design-fonts.ts';
 import { compileMore, clarity as clarityOf, dehaze as dehazeOf, grain as grainOf, normalizeMore, reduceNoise, shadeMore, hasMore, type LookFrame, type LookMore } from './mediaedit-look.ts';
 export * from './mediaedit-look.ts';
 
@@ -155,15 +156,72 @@ export const CROP_SHAPES = [
 ] as const;
 export type CropShape = (typeof CROP_SHAPES)[number]['id'];
 
-/** The fonts words are written in (the browser's own of each kind; the server's nearest). */
-export const MARK_FONTS = [
-  { id: 'sans', label: 'Sans', css: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif' },
-  { id: 'serif', label: 'Serif', css: 'Georgia, "Times New Roman", ui-serif, serif' },
-  { id: 'mono', label: 'Monospace', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
-  { id: 'hand', label: 'Handwritten', css: '"Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive' },
-  { id: 'heavy', label: 'Heavy', css: 'Impact, "Arial Black", "Helvetica Neue", sans-serif' },
-] as const;
-export type FontId = (typeof MARK_FONTS)[number]['id'];
+/**
+ * A font words are written in: `css` is its font-family; `cat` says what the server's nearest looks like (it has none
+ * of these fonts but the computer's own: it takes the nearest kind); `google` is the family to load from Google Fonts
+ * when it is used (the design editor's fonts); `shipped` ones come with the app.
+ */
+export interface MarkFont {
+  id: string;
+  label: string;
+  css: string;
+  cat: 'sans' | 'serif' | 'mono' | 'hand' | 'display';
+  google?: string;
+  /** The weights the family has (Google's), so a bold the font has is asked for. */
+  weights?: number[];
+  /** One of the computer's own fonts, picked by name ("local:Helvetica Neue"). */
+  local?: boolean;
+}
+
+const CAT_OF: Record<FontCat, MarkFont['cat']> = { sans: 'sans', display: 'display', serif: 'serif', script: 'hand', mono: 'mono' };
+const CAT_CSS: Record<MarkFont['cat'], string> = { sans: 'system-ui, sans-serif', display: 'Impact, system-ui, sans-serif', serif: 'Georgia, serif', hand: 'cursive', mono: 'ui-monospace, monospace' };
+
+/** The fonts words are written in: the browser's own of each kind first, then the fonts the app comes with and loads. */
+export const MARK_FONTS: readonly MarkFont[] = [
+  { id: 'sans', label: 'Sans', css: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif', cat: 'sans' },
+  { id: 'serif', label: 'Serif', css: 'Georgia, "Times New Roman", ui-serif, serif', cat: 'serif' },
+  { id: 'mono', label: 'Monospace', css: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', cat: 'mono' },
+  { id: 'hand', label: 'Handwritten', css: '"Segoe Print", "Bradley Hand", "Comic Sans MS", "Chalkboard SE", cursive', cat: 'hand' },
+  { id: 'heavy', label: 'Heavy', css: 'Impact, "Arial Black", "Helvetica Neue", sans-serif', cat: 'display' },
+  // The app's own monospace comes with it.
+  { id: 'jetbrains', label: 'JetBrains Mono', css: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace', cat: 'mono' },
+  ...DESIGN_FONTS.filter((f) => f.name !== 'Inter' && f.name !== 'JetBrains Mono').map(
+    (f): MarkFont => ({ id: f.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), label: f.name, css: `"${f.name}", ${CAT_CSS[CAT_OF[f.cat]]}`, cat: CAT_OF[f.cat], google: f.name, weights: f.w }),
+  ),
+];
+/** A font's id: one of the list, or one of the computer's own, "local:" and its family's name. */
+export type FontId = string;
+
+const LOCAL = /^local:[\p{L}\p{N} ._()'-]{1,60}$/u;
+/** Whether an id is a font words can be written in. */
+export const isFontId = (id: unknown): id is FontId => typeof id === 'string' && (MARK_FONTS.some((f) => f.id === id) || LOCAL.test(id));
+/** A font by its id; the computer's own ("local:Family") made up from its name; Sans when it is none. */
+export function fontOf(id: string | undefined): MarkFont {
+  const known = MARK_FONTS.find((f) => f.id === id);
+  if (known) return known;
+  if (id && LOCAL.test(id)) {
+    const family = id.slice(6).replace(/["\\]/g, '');
+    return { id, label: family, css: `"${family}", system-ui, sans-serif`, cat: 'sans', local: true };
+  }
+  return MARK_FONTS[0];
+}
+
+/**
+ * How words are set, beyond their font, size and colour. All optional, and what they leave out is as it always was: bold
+ * (a heavier weight; `bold: false` the plain one), upright, left-aligned, lines 1.22 times the size apart, no outline or shadow.
+ */
+export interface TextStyle {
+  bold?: boolean;
+  italic?: boolean;
+  /** Each line against the left, the middle or the right of the widest. */
+  align?: 'left' | 'centre' | 'right';
+  /** How far apart the lines are, in times the size (0.8 to 3). */
+  lineHeight?: number;
+  /** A line round the letters, `width` pixels out. */
+  outline?: { color: string; width: number };
+  /** A shadow: moved (`x`, `y`) pixels and softened by `blur` pixels. */
+  shadow?: { color: string; blur: number; x: number; y: number };
+}
 
 /** A mark drawn over the picture, in its upright frame's pixels. `id` keeps it apart while the editor moves it. */
 export type Mark =
@@ -171,7 +229,7 @@ export type Mark =
   | { id?: string; type: 'line' | 'arrow'; x1: number; y1: number; x2: number; y2: number; color: string; width: number }
   | { id?: string; type: 'rect' | 'ellipse'; x: number; y: number; w: number; h: number; color: string; width: number; fill?: string }
   /** Words: `x`, `y` their box's top left; `bg` a colour behind them (none: no box). */
-  | { id?: string; type: 'text'; x: number; y: number; text: string; size: number; color: string; font?: FontId; bg?: string }
+  | { id?: string; type: 'text'; x: number; y: number; text: string; size: number; color: string; font?: FontId; bg?: string } & TextStyle
   | { id?: string; type: 'emoji'; x: number; y: number; size: number; emoji: string }
   /** An area hidden: blurred or pixelated, so a face or a number cannot be read (0 to 100: how much). */
   | { id?: string; type: 'blur' | 'pixelate'; x: number; y: number; w: number; h: number; strength?: number };
@@ -240,6 +298,27 @@ const quarter = (v: unknown): Quarter => {
   return q as Quarter;
 };
 
+/** The text style an agent's or the editor's mark asks for, made safe: what is off or out of reach left out. */
+export function textStyleOf(o: Record<string, unknown>, size: number): TextStyle {
+  const out: TextStyle = {};
+  if (o.bold === false) out.bold = false;
+  if (o.italic === true) out.italic = true;
+  if (o.align === 'centre' || o.align === 'center') out.align = 'centre';
+  else if (o.align === 'right') out.align = 'right';
+  const lh = num(o.lineHeight);
+  if (lh !== null && Math.abs(lh - 1.22) > 0.005) out.lineHeight = Math.round(clamp(lh, 0.8, 3) * 100) / 100;
+  const ol = o.outline && typeof o.outline === 'object' ? (o.outline as Record<string, unknown>) : null;
+  const ow = ol ? num(ol.width) : null;
+  if (ol && ow !== null && ow > 0) out.outline = { color: colorOf(ol.color, '#000000'), width: round1(clamp(ow, 0.5, Math.max(2, size / 3))) };
+  const sh = o.shadow && typeof o.shadow === 'object' ? (o.shadow as Record<string, unknown>) : null;
+  if (sh) {
+    const [sx, sy, sb] = [num(sh.x) ?? 0, num(sh.y) ?? 0, num(sh.blur) ?? 0];
+    const reach = Math.max(4, size);
+    if (sx || sy || sb > 0) out.shadow = { color: colorOf(sh.color, '#000000'), blur: round1(clamp(sb, 0, reach)), x: round1(clamp(sx, -reach, reach)), y: round1(clamp(sy, -reach, reach)) };
+  }
+  return out;
+}
+
 function markOf(m: unknown, W: number, H: number): Mark | null {
   if (!m || typeof m !== 'object') return null;
   const o = m as Record<string, unknown>;
@@ -299,9 +378,10 @@ function markOf(m: unknown, W: number, H: number): Mark | null {
           : '';
       const [x, y] = [X(o.x), Y(o.y)];
       if (!text.trim() || x === null || y === null) return null;
-      const font = MARK_FONTS.some((f) => f.id === o.font) ? { font: o.font as FontId } : {};
+      const font = isFontId(o.font) ? { font: o.font } : {};
       const bg = typeof o.bg === 'string' && o.bg.trim() && o.bg !== 'none' ? { bg: colorOf(o.bg, '#000000') } : {};
-      return { ...id, type: 'text', x, y, text, size: Math.round(clamp(num(o.size) ?? Math.max(16, Math.round(long / 20)), 6, 1200)), color: colorOf(o.color, '#ffffff'), ...font, ...bg };
+      const size = Math.round(clamp(num(o.size) ?? Math.max(16, Math.round(long / 20)), 6, 1200));
+      return { ...id, type: 'text', x, y, text, size, color: colorOf(o.color, '#ffffff'), ...font, ...bg, ...textStyleOf(o, size) };
     }
     case 'emoji': {
       const emoji = typeof o.emoji === 'string' ? o.emoji.trim().slice(0, LIMITS.emoji) : '';
@@ -597,7 +677,27 @@ export function arrowHead(x1: number, y1: number, x2: number, y2: number, width:
 }
 
 /** Words' lines and their box: how high a line is, and the padding a box behind them has, for a size. */
-export const textMetrics = (size: number) => ({ line: Math.round(size * 1.22), pad: Math.round(size * 0.28) });
+export const textMetrics = (size: number, lineHeight?: number) => ({ line: Math.round(size * (lineHeight ?? 1.22)), pad: Math.round(size * 0.28) });
+
+/** The weight words are drawn in: the plain 400 when `bold` is off, else a heavy one (600 for the browser's own fonts, 700 for the others). */
+export function textWeight(m: { font?: string; bold?: boolean }): number {
+  if (m.bold === false) return 400;
+  const f = fontOf(m.font);
+  if (f.id === 'heavy') return 400;
+  const w = f.weights;
+  if (!w) return 600;
+  return w.includes(700) ? 700 : w[w.length - 1];
+}
+
+/** The font a canvas draws words in: "italic 600 32px Inter, …". */
+export const textFont = (m: { font?: string; bold?: boolean; italic?: boolean; size: number }) => `${m.italic ? 'italic ' : ''}${textWeight(m)} ${m.size}px ${fontOf(m.font).css}`;
+
+/** How far an outline or a shadow reaches past the words' box, in pixels (room for the box a picked mark shows). */
+export function textReach(m: TextStyle): number {
+  const o = m.outline ? m.outline.width : 0;
+  const s = m.shadow ? Math.max(Math.abs(m.shadow.x), Math.abs(m.shadow.y)) + m.shadow.blur * 2 : 0;
+  return Math.ceil(Math.max(o, s));
+}
 
 // ---- the look, pixel by pixel ---------------------------------------------------------------------------------
 

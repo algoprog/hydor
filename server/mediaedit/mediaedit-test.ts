@@ -25,7 +25,7 @@ import { media } from '../media/index.ts';
 import { getMedia, listMedia } from '../media/store.ts';
 import { getAsset, initAssets, putAsset } from '../pages/assets.ts';
 import { readPng, writePng } from '../signatures/png.ts';
-import { decode, encode, geometry, render } from './image.ts';
+import { decode, encode, fontPattern, geometry, render } from './image.ts';
 import { mediaEdit } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -129,6 +129,14 @@ const spread = (px: Uint8ClampedArray) => {
   ok(marks[1].type === 'rect' && marks[1].x === 30 && marks[1].y === 30 && marks[1].w === 20 && marks[1].h === 10, 'a box drawn backwards is the same box');
   ok(marks[2].type === 'text' && marks[2].text.length === LIMITS.text && marks[2].color === '#ffffff', 'words are cut to their limit, a colour that is not one replaced');
   ok(marks[3].type === 'pen' && marks[3].pts.length === 4, 'a pen’s points that are not numbers are left out');
+  // Words' style: kept when it means something, left out when it is how words always were.
+  const styledMark = normalizeRecipe({ marks: [{ type: 'text', x: 1, y: 1, text: 'hi', size: 40, font: 'playfair-display', bold: false, italic: true, align: 'center', lineHeight: 1.5, outline: { color: 'red', width: 3 }, shadow: { color: '#000', x: 4, y: 4, blur: 6 } }] }, 100, 50).marks![0];
+  ok(styledMark.type === 'text' && styledMark.font === 'playfair-display' && styledMark.bold === false && styledMark.italic === true && styledMark.align === 'centre' && styledMark.lineHeight === 1.5 && styledMark.outline?.width === 3 && styledMark.shadow?.blur === 6, 'words keep their font, style, line height, outline and shadow');
+  const plainMark = normalizeRecipe({ marks: [{ type: 'text', x: 1, y: 1, text: 'hi', font: 'not-a-font', bold: true, align: 'left', lineHeight: 1.22, outline: { width: 0 }, shadow: { x: 0, y: 0, blur: 0 } }] }, 100, 50).marks![0] as Record<string, unknown>;
+  ok(plainMark.font === undefined && !('bold' in plainMark) && !('align' in plainMark) && !('lineHeight' in plainMark) && !('outline' in plainMark) && !('shadow' in plainMark), 'what is as words always were is left out, an unknown font too');
+  const localMark = normalizeRecipe({ marks: [{ type: 'text', x: 1, y: 1, text: 'hi', font: 'local:Helvetica Neue' }, { type: 'text', x: 1, y: 1, text: 'hi', font: 'local:a;b' }] }, 100, 50).marks as Record<string, unknown>[];
+  ok(localMark[0].font === 'local:Helvetica Neue' && localMark[1].font === undefined, 'a font of the computer’s own is kept by its name; odd names are not');
+  ok(fontPattern('serif') === 'serif:bold' && fontPattern('serif', false, true) === 'serif:italic' && /^Playfair Display,serif:bold$/.test(fontPattern('playfair-display')) && fontPattern('heavy') === 'Impact,Anton,sans-serif:black', 'the font asked of the computer: the family, else its kind');
   ok(normalizeRecipe({ marks: Array.from({ length: 400 }, () => ({ type: 'line', x1: 0, y1: 0, x2: 1, y2: 1 })) }, 10, 10).marks!.length === LIMITS.marks, 'marks stop at their limit');
   const rs = normalizeRecipe({ crop: { x: 0, y: 0, w: 60, h: 30 }, resize: { w: 30 } }, 100, 50);
   ok(rs.resize?.w === 30 && rs.resize.h === 15, 'a size given by its width keeps the shape');
@@ -629,6 +637,16 @@ const dataUrl = (b: Buffer, mime = 'image/png') => `data:${mime};base64,${b.toSt
         }
       ok(diffBottom > 500 && diffTop < 50, 'words placed at the bottom are written there, and nowhere else');
     } else ok(false, 'words are written on a photo');
+    // Words in a style: an outline and a shadow draw beyond the plain letters; an unknown font is the plain sans.
+    const styled = await run({ path: 'photo.jpg', text: [{ text: 'Harbour\nat dawn', place: 'bottom', size: 40, font: 'playfair-display', italic: true, align: 'centre', line_height: 1.5, outline: { color: '#ff0000', width: 3 }, shadow: { color: '#000000', x: 6, y: 6, blur: 0 } }], format: 'png', name: 'styled' });
+    const sf = fileOf(styled.text);
+    ok(!styled.isError && !!sf, `words in a style are written: ${styled.text.split('\n')[0]}`);
+    if (sf && wf) {
+      const a = readPng(fs.readFileSync(sf[1]));
+      let red = 0;
+      for (let i = 0; i < a.data.length; i += 4) if (a.data[i] > 200 && a.data[i + 1] < 60 && a.data[i + 2] < 60) red++;
+      ok(red > 200, `the outline is drawn in its colour (${red} red pixels)`);
+    }
     const hidden = await run({ path: 'photo.jpg', blur_areas: [{ x: 200, y: 150, w: 200, h: 150 }], format: 'png', name: 'hidden' });
     const hf = fileOf(hidden.text);
     if (hf && nf) {

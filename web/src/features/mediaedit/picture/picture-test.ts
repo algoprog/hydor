@@ -6,6 +6,7 @@
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/mediaedit/picture/picture-test.ts && node dist/dev/picture-test.js
 import { dabsTo, healFill } from './heal';
 import { blankSrc, fitNewSize, NEW_PRESETS, parseBlank, presetOf } from './newpicture';
+import { fontOf, isFontId, MARK_FONTS, textFont, textMetrics, textReach, textWeight } from '@shared/mediaedit';
 import { alignDelta, centredAt, snapGuide, snapMove, straightLock, type SnapTargets } from './snap';
 import { allMask, combineMasks, coversAll, ellipseMask, featherMask, floodMask, growMask, invertMask, maskArea, maskAt, maskBounds, maskOutline, polygonMask, rectMask, shrinkMask, type Mask } from './mask';
 
@@ -226,6 +227,18 @@ const box = (m: Mask | null) => (m ? JSON.stringify(maskBounds(m)) : 'none');
   ok(parseBlank(blankSrc(10, 10, null))?.fill === null && parseBlank('/api/media/x/file') === null && parseBlank('naget-new:abc') === null, 'see-through, and what is not a blank picture');
   ok(parseBlank('naget-new:99999x10:ffffff:1')!.w <= 8192, 'a size past the limit is cut when read');
   ok(zero.w === 1 && zero.h === 1 && !Number.isNaN(fitNewSize(NaN, 3).w), 'at least one pixel, never a number that is not');
+}
+
+// ---- words: fonts and their style ---------------------------------------------------------------------------------------
+{
+  ok(MARK_FONTS.length > 40 && new Set(MARK_FONTS.map((f) => f.id)).size === MARK_FONTS.length, `a long list of fonts, each its own id (${MARK_FONTS.length})`);
+  ok(MARK_FONTS.slice(0, 5).map((f) => f.id).join() === 'sans,serif,mono,hand,heavy', 'the five kinds there always were come first');
+  ok(isFontId('montserrat') && isFontId('local:Helvetica Neue') && !isFontId('local:a;b') && !isFontId('nope') && !isFontId(3), 'an id is a font of the list or one of the computer’s');
+  ok(fontOf('local:Helvetica Neue').css.startsWith('"Helvetica Neue"') && fontOf('nope').id === 'sans' && fontOf(undefined).id === 'sans', 'a font of the computer’s own by its name; Sans when unknown');
+  ok(textWeight({}) === 600 && textWeight({ bold: false }) === 400 && textWeight({ font: 'heavy' }) === 400 && textWeight({ font: 'montserrat' }) === 700 && textWeight({ font: 'bebas-neue' }) === 400, 'weights: 600 as always, plain 400, 700 where a font has it, its only one else');
+  ok(textFont({ size: 20 }) === `600 20px ${fontOf('sans').css}` && textFont({ size: 20, italic: true, bold: false }).startsWith('italic 400 20px '), 'the canvas font as it always was, italic in front');
+  ok(textMetrics(100).line === 122 && textMetrics(100, 1.5).line === 150 && textMetrics(100, 1.5).pad === textMetrics(100).pad, 'line height scales the lines, not the padding');
+  ok(textReach({}) === 0 && textReach({ outline: { color: '#000', width: 4 } }) === 4 && textReach({ shadow: { color: '#000', blur: 5, x: 3, y: -8 } }) === 18, 'what an outline or a shadow reaches past the box');
 }
 
 console.log(`${passed} passed, ${failed} failed`);
