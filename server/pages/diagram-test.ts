@@ -325,7 +325,7 @@ const edge = (id: string, from: string, to: string, more: Partial<DiagramEdge> =
   ok((dropped.items.find((x) => x.id === 'other') as DiagramShape).parent === 'box', 'dropped in a container, a shape goes in it');
   ok(hitItem(p, 100, 85, 4)?.id === 'kid' && hitItem(p, 150, 150, 4) === null, 'a click picks what is under it, not a container’s inside');
   const sn = snapBox({ x: 403, y: 300, w: 120, h: 60 }, [{ x: 400, y: 60, w: 120, h: 60 }], 6);
-  ok(sn.dx === -3 && sn.guides.length === 1, 'a moving box lines up with another');
+  ok(sn.dx === -3 && sn.guides.length === 3 && sn.guides.every((g) => g.axis === 'x'), 'a moving box lines up with another: a guide for each edge and middle it lies on');
 }
 
 // ---- drawn ------------------------------------------------------------------------------------------------------------
