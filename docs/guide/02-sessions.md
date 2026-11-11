@@ -307,7 +307,7 @@ A small ring with a percentage by the microphone fills as the conversation uses 
 
 ## Stop a turn, stop the agent or resume
 
-The Stop button by the message box has a rotating ring while the agent is starting or working. The ring pauses when it needs you, and stays still if your device asks for reduced motion.
+The Stop button by the message box has a rotating ring while the agent is starting or working. The ring pauses when it needs you, and stays still if your device asks for reduced motion. Once the turn is over, the ring keeps turning around the send button for as long as background tasks or helper sessions the agent started are still running, such as a helper agent, a command left running or a child session; the box takes your messages as usual. Point at the send button to see what is still running.
 
 - **Stop a turn**: press **Stop** in the header, or the round square button by the message box. (Esc doesn't stop it: it only closes what is open, such as the find bar or a list.) The agent stops what it is doing; the turn shows "Stopped after…". The agent stays ready for your next message, and the queue pauses until you resume it.
 - **Stop the agent process**: the session's menu (⋯) → **More** → **Stop the agent process**, when no turn is running. The agent's program ends; the session and its history stay, and it shows **Stopped**.
@@ -416,7 +416,7 @@ Every Claude Code and Codex session on this computer is listed, also the ones yo
 
 ## Child sessions
 
-An agent can hand parts of a job to new sessions, with any agent and model, and gets their results back. In the sidebar they sit folded under their parent ("3 child sessions · 1 needs you · 2 working"); click the line to see them. It stays open while you look at one of them. A swarm's members show as "swarm members", a campaign's as "campaign members". In the parent's conversation, each child has a card with what it is doing and a way in. A parent whose own turn is over while its children still run is not finished: its dot keeps breathing blue, its status reads "Working · 2 helper sessions running", it shows no "Done" marker and stays in Active, and you can still send it a message. A child that waits on helpers of its own counts as running too. A spending cap on the parent covers its children. See [Deep research, second opinions and several agents](/guide/research).
+An agent can hand parts of a job to new sessions, with any agent and model, and gets their results back. In the sidebar they sit folded under their parent ("3 child sessions · 1 needs you · 2 working"); click the line to see them. It stays open while you look at one of them. A swarm's members show as "swarm members", a campaign's as "campaign members". In the parent's conversation, each child has a card with what it is doing and a way in. A parent whose own turn is over while its children still run is not finished: its dot keeps breathing blue, the ring by the message box keeps turning, its status reads "Working · 2 helper sessions running", it shows no "Done" marker and stays in Active, and you can still send it a message. A child that waits on helpers of its own counts as running too. A spending cap on the parent covers its children. See [Deep research, second opinions and several agents](/guide/research).
 
 ## Everything in the session's menu
 
