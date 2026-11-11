@@ -907,8 +907,9 @@ The agents' own programs install by themselves when first needed (Claude Code, G
 with npm into the app's folder), and stay up to date: once a day each is brought to its newest version, the
 app's copies with npm and your own installs with their own updater (`claude update`, `codex update`,
 `opencode upgrade`, or npm for `npm install -g` ones), Claude Code on its own release line (stable or latest). A
-new version is kept only once it starts and answers the way the sessions use it (no sign-in or usage needed);
-one that does not is undone, and the sessions keep running the version before. Settings → Accounts → Agent
+new version is kept only once it starts and answers the way the sessions use it (no sign-in or usage needed),
+within a minute of the computer being awake or two more on a second start; one that does not is undone, and the
+sessions keep running the version before. Settings → Accounts → Agent
 programs shows each program's version and what is out, with Check now, Update now and Update automatically.
 
 ## Following along

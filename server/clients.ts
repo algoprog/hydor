@@ -4,7 +4,8 @@
 // brought up to its newest version: the app's copies with npm, your own installs with their own updater
 // (claude update, codex update, opencode upgrade) or with npm when that is how they came; with Update
 // automatically off, the daily run only looks. A new version must then start and answer the way the
-// sessions talk to it (Claude Code's and Codex's handshakes, the others' --version). One that does not is
+// sessions talk to it (Claude Code's and Codex's handshakes, the others' --version), within a minute of the
+// computer being awake, or two more on a second start. One that does not is
 // undone: the app's copy goes back to the version before, an npm install of yours too, and the sessions
 // keep running your Claude Code's previous version, which its installer keeps beside the new one. A
 // version that failed is not tried again by itself; the next one is.
@@ -48,13 +49,42 @@ const VERSION = /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/;
 
 type Json = Record<string, any>;
 
-function run(cmd: string, args: string[], timeout: number, env: Record<string, string>): Promise<{ ok: boolean; out: string; stdout: string }> {
+const TICK = 1000;
+/**
+ * setTimeout for time the computer is awake. Node's timers keep counting while a Mac sleeps (libuv reads
+ * mach_continuous_time), so a limit that a sleep cuts in two runs out the moment the Mac wakes, though the program
+ * it was for slept all along. This one reads the clock every second and counts a longer gap (a sleep, or the app
+ * held up) as a second and a half. Returns what stops it; `clock` is for the tests.
+ */
+export function awakeTimeout(ms: number, fn: () => void, clock: () => number = () => performance.now()): () => void {
+  let left = ms;
+  let last = clock();
+  const t = setInterval(() => {
+    const now = clock();
+    left -= Math.min(Math.max(now - last, 0), TICK * 1.5);
+    last = now;
+    if (left > 0) return;
+    clearInterval(t);
+    fn();
+  }, TICK);
+  return () => clearInterval(t);
+}
+
+/** Runs a program to its end, or for `timeout` ms of the computer awake (then it is stopped: `late`). */
+function run(cmd: string, args: string[], timeout: number, env: Record<string, string>): Promise<{ ok: boolean; out: string; stdout: string; late: boolean }> {
   fs.mkdirSync(paths.probe, { recursive: true });
-  return new Promise((resolve) =>
-    execProgram(cmd, args, { env, cwd: paths.probe, timeout, maxBuffer: 16 << 20 }, (err, stdout, stderr) =>
-      resolve({ ok: !err, out: `${stdout}\n${stderr}`.trim(), stdout }),
-    ),
-  );
+  return new Promise((resolve) => {
+    let late = false;
+    const child = execProgram(cmd, args, { env, cwd: paths.probe, maxBuffer: 16 << 20 }, (err, stdout, stderr) => {
+      stop();
+      resolve({ ok: !err, out: `${stdout}\n${stderr}`.trim(), stdout, late });
+    });
+    // An npm install that a sleep cuts in two carries on after it, rather than being stopped half done.
+    const stop = awakeTimeout(timeout, () => {
+      late = true;
+      child.kill('SIGTERM');
+    });
+  });
 }
 
 /** The app's npm, with the dev packages' NODE_ENV left out. */
@@ -187,27 +217,44 @@ export function useNewestCodex() {
 // ---- checking that a version works ---------------------------------------------------------------
 
 /**
- * Starts a program, writes `first` and reads its JSON lines until `answer` settles it: true when it works,
- * else why not. A minute at most; the program is stopped either way. Null: it works.
+ * How long a program has to answer the check, counted while the computer is awake: a minute, then two more on a
+ * second start for one that did not answer in it (tests shorten them).
  */
-function talk(bin: string, args: string[], env: Record<string, string>, first: object, answer: (m: Json, send: (o: object) => void) => true | string | undefined): Promise<string | null> {
+export const limits = { answer: 60_000, again: 120_000 };
+
+/** A time limit in words: "a minute", "2 minutes", "30 s". */
+const span = (ms: number) => (ms === 60_000 ? 'a minute' : ms % 60_000 === 0 ? `${ms / 60_000} minutes` : `${Math.round(ms / 1000)} s`);
+
+/** Why a check failed (null: it works); `late`: only that no answer came in its time, `said` what the program wrote meanwhile. */
+type Verdict = { why: string; late?: boolean; said?: string } | null;
+
+const noAnswer = (limit: number, out: string): Verdict => {
+  const said = out.trim() ? tail(out) : undefined;
+  return { why: `it did not answer within ${span(limit)}${said ? ` (${said})` : ''}`, late: true, said };
+};
+
+/**
+ * Starts a program, writes `first` and reads its JSON lines until `answer` settles it: true when it works,
+ * else why not. `limit` ms awake at most; the program is stopped either way. Null: it works.
+ */
+function talk(bin: string, args: string[], env: Record<string, string>, first: object, answer: (m: Json, send: (o: object) => void) => true | string | undefined, limit: number): Promise<Verdict> {
   fs.mkdirSync(paths.probe, { recursive: true });
   return new Promise((resolve) => {
     let err = '';
     let settled = false;
     const proc = spawnProgram(bin, args, { cwd: paths.probe, env, stdio: ['pipe', 'pipe', 'pipe'] });
-    const finish = (why: string | null) => {
+    const finish = (v: Verdict) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      stop();
       try {
         proc.stdin.end();
       } catch {}
       proc.kill('SIGTERM');
       setTimeout(() => proc.exitCode === null && proc.signalCode === null && proc.kill('SIGKILL'), 3000).unref();
-      resolve(why);
+      resolve(v);
     };
-    const timer = setTimeout(() => finish(`it did not answer within a minute${err.trim() ? ` (${tail(err)})` : ''}`), 60_000);
+    const stop = awakeTimeout(limit, () => finish(noAnswer(limit, err)));
     const send = (o: object) => {
       try {
         proc.stdin.write(JSON.stringify(o) + '\n');
@@ -223,15 +270,15 @@ function talk(bin: string, args: string[], env: Record<string, string>, first: o
           return;
         }
         const r = answer(m, send);
-        if (r !== undefined) finish(r === true ? null : r);
+        if (r !== undefined) finish(r === true ? null : { why: r });
       }),
     );
     proc.stderr.on('data', (b: Buffer) => (err = (err + b.toString()).slice(-4000)));
     proc.stdin.on('error', () => {});
-    proc.on('error', (e) => finish(`it did not start: ${e.message}`));
+    proc.on('error', (e) => finish({ why: `it did not start: ${e.message}` }));
     // What it wrote as it stopped can come in just after.
     proc.on('exit', (code, sig) =>
-      setTimeout(() => finish(`it stopped before answering${code != null ? ` (exit code ${code})` : sig ? ` (${sig})` : ''}${err.trim() ? `: ${tail(err)}` : ''}`), 200),
+      setTimeout(() => finish({ why: `it stopped before answering${code != null ? ` (exit code ${code})` : sig ? ` (${sig})` : ''}${err.trim() ? `: ${tail(err)}` : ''}` }), 200),
     );
     send(first);
   });
@@ -246,9 +293,21 @@ const codexEnvFor = (bin: string) => {
 /**
  * Whether a program works the way the sessions use it: Claude Code answers stream-json's initialize with its
  * models, Codex's app-server initializes and lists its models, the others start and say their version. Null
- * when it works, else why not. Nothing here needs a sign-in or spends any usage.
+ * when it works, else why not. Nothing here needs a sign-in or spends any usage. One that does not answer in
+ * its minute is started once more, with longer: a first start can be slow (macOS looks a new program over before
+ * it first runs, a disk or the network is busy), so only a second start that does not answer either fails it.
  */
-export function works(cmd: string, bin: string): Promise<string | null> {
+export async function works(cmd: string, bin: string): Promise<string | null> {
+  const first = await check(cmd, bin, limits.answer);
+  if (!first?.late) return first?.why ?? null;
+  console.log(`[clients] ${bin} did not answer within ${span(limits.answer)}; starting it again`);
+  const again = await check(cmd, bin, limits.again);
+  if (!again?.late) return again?.why ?? null;
+  return `it did not answer within ${span(limits.answer)}, nor within ${span(limits.again)} when started again${again.said ? ` (${again.said})` : ''}`;
+}
+
+/** One start of works(), with `limit` ms of the computer awake to answer. */
+function check(cmd: string, bin: string, limit: number): Promise<Verdict> {
   if (cmd === 'claude')
     return talk(
       bin,
@@ -260,6 +319,7 @@ export function works(cmd: string, bin: string): Promise<string | null> {
         if (m.response.subtype !== 'success') return `it answered with an error: ${String(m.response.error ?? 'none given').slice(0, 200)}`;
         return Array.isArray(m.response.response?.models) || 'it did not list its models';
       },
+      limit,
     );
   if (cmd === 'codex')
     return talk(
@@ -276,14 +336,22 @@ export function works(cmd: string, bin: string): Promise<string | null> {
         }
         if (m.id === 2) return m.error ? `it could not list its models: ${String(m.error.message ?? '').slice(0, 200)}` : Array.isArray(m.result?.data) || 'it did not list its models';
       },
+      limit,
     );
   // The Pi adapter has no --version: it answers ACP's initialize.
   if (cmd === 'pi-acp')
-    return talk(bin, [], agentBaseEnv(), { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: 1, clientCapabilities: {} } }, (m) => {
-      if (m.id !== 1) return;
-      return m.error ? `it answered with an error: ${String(m.error.message ?? '').slice(0, 200)}` : m.result?.protocolVersion != null || 'it did not answer the ACP handshake';
-    });
-  return run(bin, ['--version'], 30_000, agentBaseEnv()).then((r) => (r.ok && VERSION.test(r.out) ? null : `it did not start: ${tail(r.out)}`));
+    return talk(
+      bin,
+      [],
+      agentBaseEnv(),
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: 1, clientCapabilities: {} } },
+      (m) => {
+        if (m.id !== 1) return;
+        return m.error ? `it answered with an error: ${String(m.error.message ?? '').slice(0, 200)}` : m.result?.protocolVersion != null || 'it did not answer the ACP handshake';
+      },
+      limit,
+    );
+  return run(bin, ['--version'], limit, agentBaseEnv()).then((r) => (r.ok && VERSION.test(r.out) ? null : r.late ? noAnswer(limit, r.out) : { why: `it did not start: ${tail(r.out)}` }));
 }
 
 const versions = new Map<string, { key: string; version: string | null }>();
