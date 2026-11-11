@@ -767,22 +767,22 @@ function TableLook({ el, theme, set, cellSel, onCellSel }: { el: TableEl; theme:
           </div>
           {/* Rows and columns put in or taken out next to the cell picked, not only at the end. */}
           <div className="flex flex-wrap items-center gap-0.5">
-            <Tool label="Insert a row above" disabled={rows.length >= TABLE_MAX.rows} onClick={() => insert(insertRow(el, top))}>
+            <Tool label="Insert row above" disabled={rows.length >= TABLE_MAX.rows} onClick={() => insert(insertRow(el, top))}>
               <ArrowUpToLine size={14} />
             </Tool>
-            <Tool label="Insert a row below" disabled={rows.length >= TABLE_MAX.rows} onClick={() => insert(insertRow(el, bottom + 1))}>
+            <Tool label="Insert row below" disabled={rows.length >= TABLE_MAX.rows} onClick={() => insert(insertRow(el, bottom + 1))}>
               <ArrowDownToLine size={14} />
             </Tool>
-            <Tool label="Insert a column on the left" disabled={cols >= TABLE_MAX.cols} onClick={() => insert(insertCol(el, left))}>
+            <Tool label="Insert column left" disabled={cols >= TABLE_MAX.cols} onClick={() => insert(insertCol(el, left))}>
               <AlignStartVertical size={14} />
             </Tool>
-            <Tool label="Insert a column on the right" disabled={cols >= TABLE_MAX.cols} onClick={() => insert(insertCol(el, right + 1))}>
+            <Tool label="Insert column right" disabled={cols >= TABLE_MAX.cols} onClick={() => insert(insertCol(el, right + 1))}>
               <AlignEndVertical size={14} />
             </Tool>
-            <Tool label="Delete the row" disabled={rows.length <= bottom - top + 1} onClick={() => remove(el, 'row')}>
+            <Tool label="Delete row" disabled={rows.length <= bottom - top + 1} onClick={() => remove(el, 'row')}>
               <Trash2 size={14} />
             </Tool>
-            <Tool label="Delete the column" disabled={cols <= right - left + 1} onClick={() => remove(el, 'col')}>
+            <Tool label="Delete column" disabled={cols <= right - left + 1} onClick={() => remove(el, 'col')}>
               <X size={14} />
             </Tool>
           </div>
