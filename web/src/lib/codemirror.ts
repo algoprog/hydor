@@ -36,6 +36,9 @@ export interface EditorHandle {
   view: EditorView;
   setDark: (dark: boolean) => void;
   setWrap: (wrap: boolean) => void;
+  /** The code's text size in pixels (null: the app's own), and the line numbers on or off. */
+  setFontSize: (px: number | null) => void;
+  setLineNumbers: (on: boolean) => void;
   /**
    * Puts in the text as it is now on disk: only the part that differs changes, so the place you read, the cursor and
    * the scroll stay. `flash`, for a change that came in by itself: those lines show tinted for a moment, and it is not
@@ -227,16 +230,20 @@ function openReplace(view: EditorView) {
 /** `phone`: no fold markers (too small to tap), no completions popping up while typing (Return would take one). */
 export async function createEditor(
   parent: HTMLElement,
-  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; restore?: EditorSnapshot; onChange: (doc: string) => void; onSave: () => void; onStatus?: (s: EditorStatus) => void; onContextMenu?: (at: { x: number; y: number; keyed: boolean }) => void },
+  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; fontSize?: number | null; lineNumbers?: boolean; restore?: EditorSnapshot; onChange: (doc: string) => void; onSave: () => void; onStatus?: (s: EditorStatus) => void; onContextMenu?: (at: { x: number; y: number; keyed: boolean; pos?: number }) => void },
 ): Promise<EditorHandle> {
   const theme = new Compartment();
   const wrap = new Compartment();
   const lang = new Compartment();
   const indent = new Compartment();
+  const gutter = new Compartment();
+  const font = new Compartment();
   const base = o.path.split('/').pop() ?? '';
   const desc = LanguageDescription.matchFilename(languages, base);
   const support = desc ? await desc.load().catch(() => null) : null;
   const themeExt = (dark: boolean) => (dark ? darkExt : lightExt);
+  const gutterExt = (on: boolean) => (on ? [lineNumbers(), highlightActiveLineGutter()] : []);
+  const fontExt = (px: number | null | undefined) => (px ? EditorView.theme({ '.cm-content, .cm-gutters': { fontSize: `${px}px` } }) : []);
   const indentExt = (i: Indent) => [indentUnit.of(i.kind === 'tabs' ? '\t' : ' '.repeat(i.size)), EditorState.tabSize.of(i.size)];
   const startIndent = detectIndent(o.doc);
   let indentNow = startIndent;
@@ -250,8 +257,8 @@ export async function createEditor(
   };
 
   const extensions = [
-    lineNumbers(),
-    highlightActiveLineGutter(),
+    gutter.of(gutterExt(o.lineNumbers !== false)),
+    font.of(fontExt(o.fontSize)),
     highlightSpecialChars(),
     history(),
     o.phone ? [] : foldGutter(),
@@ -299,7 +306,11 @@ export async function createEditor(
       contextmenu: (e, v) => {
         if (!o.onContextMenu) return false;
         e.preventDefault();
-        o.onContextMenu({ x: e.clientX, y: e.clientY, keyed: false });
+        // Right-clicked outside what is picked: the cursor goes there first, as in other editors.
+        const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+        const r = v.state.selection.main;
+        if (pos != null && (r.empty || pos < r.from || pos > r.to)) v.dispatch({ selection: { anchor: pos } });
+        o.onContextMenu({ x: e.clientX, y: e.clientY, keyed: false, pos: pos ?? undefined });
         v.focus();
         return true;
       },
@@ -308,7 +319,7 @@ export async function createEditor(
         e.preventDefault();
         const at = v.coordsAtPos(v.state.selection.main.head);
         const box = v.dom.getBoundingClientRect();
-        o.onContextMenu({ x: at?.left ?? box.left + 40, y: at?.bottom ?? box.top + 40, keyed: true });
+        o.onContextMenu({ x: at?.left ?? box.left + 40, y: at?.bottom ?? box.top + 40, keyed: true, pos: v.state.selection.main.head });
         return true;
       },
     }),
@@ -333,6 +344,8 @@ export async function createEditor(
     view,
     setDark: (dark) => view.dispatch({ effects: theme.reconfigure(themeExt(dark)) }),
     setWrap: (w) => view.dispatch({ effects: wrap.reconfigure(w ? EditorView.lineWrapping : []) }),
+    setFontSize: (px) => view.dispatch({ effects: font.reconfigure(fontExt(px)) }),
+    setLineNumbers: (on) => view.dispatch({ effects: gutter.reconfigure(gutterExt(on)) }),
     setDoc: (doc, so) => {
       const d = diffSpan(view.state.doc.toString(), doc);
       if (!d) return;

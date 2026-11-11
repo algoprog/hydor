@@ -11,7 +11,7 @@
 // where it is, a moment after typing. Ctrl+K asks the editor's AI to write at the cursor, a picture pasted asks what it
 // becomes; Vim's or Emacs's keys go before the editor's own (keys.ts), and edit() makes changes AI's for Track changes.
 // While an agent writes a new version of the file, that shows in its place read-only, with the agent's caret (setLive).
-import { autocompletion, closeCompletion, completionStatus, snippet, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
+import { autocompletion, closeCompletion, completionStatus, snippet, startCompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 import { redo, selectAll, toggleComment, undo } from '@codemirror/commands';
 import { foldAll, indentUnit, unfoldAll } from '@codemirror/language';
 import { gotoLine } from '@codemirror/search';
@@ -19,6 +19,7 @@ import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { Decoration, EditorView, keymap, WidgetType, type DecorationSet } from '@codemirror/view';
 import { texCheck, texRefCheck } from '@shared/latex-check';
+import { targetAt, type CiteNote, type LabelNote, type Target } from '@shared/latex-nav';
 import { keysExtension, saverFor, type KeysMode } from './keys';
 import { tr } from '../../../i18n/runtime';
 import { createEditor, type EditorHandle } from '../../../lib/codemirror';
@@ -67,6 +68,14 @@ export interface CodeHooks {
   onPictures?: (files: File[]) => boolean;
   /** The labels the document defines, and the keys of its bibliographies when they are all its own (else null), for the quick check of references. */
   refs?: () => { labels: Set<string>; keys: Set<string> | null } | null;
+  /** What each label and bibliography key is (a heading or caption, "Author Year — Title"), to show beside them in the lists. */
+  notes?: () => { labels: Map<string, LabelNote>; keys: Map<string, CiteNote> };
+  /** Right-click (or the menu key, at the cursor): where, and the name of a label, key, file or picture the command there takes (null: none). */
+  onContextMenu?: (c: { x: number; y: number; keyed: boolean; target: Target | null }) => void;
+  /** Ctrl+Shift+F: find and replace in every file of the document. */
+  onSearchAll?: () => void;
+  /** Ctrl- or ⌘-click, or F12, on such a name: go to where it is defined. */
+  onDefinition?: (t: Target) => void;
 }
 
 /** Where a comment's words are in the file; `active`: the one picked. */
@@ -113,6 +122,8 @@ export interface Code {
   selectAll: () => void;
   /** Whether the cursor is in maths. */
   inMath: () => boolean;
+  /** The label, key, file or picture a command names at the cursor (null: none there). */
+  targetAtCursor: () => Target | null;
   /** The text, and where the cursor is in it (or what is picked: from, to). */
   text: () => string;
   cursor: () => number;
@@ -166,7 +177,7 @@ const pathFor = (name: string) => (/\.(tex|ltx|sty|cls|clo|def|fd|cfg|bbl|bib|ti
 const isTex = (name: string) => /\.(tex|ltx|sty|cls)$/i.test(name);
 
 /** Completions inside \cite{…}, \ref{…}, \includegraphics{…} and \input{…}: what the document has of each. */
-function completer(words: () => Words) {
+function completer(words: () => Words, notes?: () => { labels: Map<string, LabelNote>; keys: Map<string, CiteNote> }) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const m = ctx.matchBefore(/\\([A-Za-z]*(?:cite|ref)[A-Za-z]*|includegraphics|input|include|subfile|bibliography)\*?(?:\[[^\]\n]*\])*\{[^{}\n]*$/);
     if (!m) return null;
@@ -186,7 +197,14 @@ function completer(words: () => Words) {
             ? w.files.filter((f) => f.endsWith('.bib')).map((f) => f.slice(0, -4))
             : w.files.filter((f) => /\.(tex|ltx)$/.test(f)).map((f) => f.replace(/\.tex$/, ''));
     if (!list.length) return null;
-    return { from, options: [...new Set(list)].map((label) => ({ label, type: /cite/i.test(cmd) ? 'text' : 'constant' })), validFor: /^[^,{}\s]*$/ };
+    // A key says who wrote it and what it is called; a label what it is a heading or caption of.
+    const n = /cite/i.test(cmd) ? notes?.().keys : /ref/i.test(cmd) ? notes?.().labels : undefined;
+    const options = [...new Set(list)].map((label): Completion => {
+      const note = n?.get(label);
+      const said = !note ? '' : 'label' in note ? note.label : [tr(note.kind), note.text].filter(Boolean).join(': ');
+      return { label, detail: said ? (said.length > 64 ? `${said.slice(0, 63)}…` : said) : undefined, info: said || undefined, type: /cite/i.test(cmd) ? 'text' : 'constant' };
+    });
+    return { from, options, validFor: /^[^,{}\s]*$/ };
   };
 }
 
@@ -337,12 +355,21 @@ function differs(a: string, b: string): { from: number; to: number; insert: stri
   return { from: i, to: a.length - j, insert: b.slice(i, b.length - j) };
 }
 
-export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; keys?: KeysMode; hooks: CodeHooks }): Promise<Code> {
+/** The name a command takes at `pos`, read from its line alone (offsets in the whole text). */
+function targetIn(state: EditorState, pos: number): Target | null {
+  const line = state.doc.lineAt(pos);
+  const t = targetAt(line.text, pos - line.from);
+  return t ? { ...t, from: t.from + line.from, to: t.to + line.from } : null;
+}
+
+export async function mountCode(parent: HTMLElement, o: { text: string; name: string; dark: boolean; phone: boolean; readOnly?: boolean; visual?: boolean; spell?: boolean; keys?: KeysMode; /** The editor's settings (Editor settings in the View menu). */ font?: number | null; wrap?: boolean; lineNumbers?: boolean; hooks: CodeHooks }): Promise<Code> {
   const hooks = o.hooks;
   // The file as it was while an agent's version shows in its place (setLive), else null: brought back whole when that
   // version is not kept (its comments' places, tracked changes and undo with it, which the agent's text would move).
   let own: EditorState | null = null;
-  const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: true, phone: o.phone, readOnly: o.readOnly, onChange: (d) => own === null && hooks.onChange(d), onSave: () => hooks.onSave() });
+  const handle = await createEditor(parent, { doc: o.text, path: pathFor(o.name), dark: o.dark, wrap: o.wrap ?? true, fontSize: o.font, lineNumbers: o.lineNumbers, phone: o.phone, readOnly: o.readOnly, onChange: (d) => own === null && hooks.onChange(d), onSave: () => hooks.onSave(),
+    // The source's right-click menu (not on a phone, where a long press is the system's own menu for words).
+    onContextMenu: hooks.onContextMenu && !o.phone ? (c) => hooks.onContextMenu?.({ x: c.x, y: c.y, keyed: c.keyed, target: c.pos == null ? null : targetIn(handle.view.state, c.pos) }) : undefined });
   const view = handle.view;
   const tex = isTex(o.name);
   const visualC = new Compartment();
@@ -476,7 +503,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
   };
 
   const languageData = [
-    { autocomplete: completer(hooks.words) },
+    { autocomplete: completer(hooks.words, hooks.notes) },
     ...(tex ? [{ autocomplete: commandSource(hooks.defs) }, { autocomplete: environmentSource(hooks.defs) }, { autocomplete: packageSource(hooks.installed) }] : []),
     // $ pairs up as brackets do; quotes do not (an apostrophe is a letter here).
     { closeBrackets: { brackets: ['(', '[', '{', '$'], before: ')]}:;>$' } },
@@ -536,8 +563,29 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
         return true;
       },
     }),
+    // Ctrl- or ⌘-click on the name a command takes (a label, a key, a file, a picture): to where it is defined.
+    EditorView.domEventHandlers({
+      mousedown: (e, v) => {
+        if (e.button !== 0 || !(e.ctrlKey || e.metaKey) || !hooks.onDefinition) return false;
+        const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+        const t = pos == null ? null : targetIn(v.state, pos);
+        if (!t) return false;
+        e.preventDefault();
+        hooks.onDefinition(t);
+        return true;
+      },
+      mousemove: (e, v) => {
+        if (!hooks.onDefinition) return false;
+        const pos = e.ctrlKey || e.metaKey ? v.posAtCoords({ x: e.clientX, y: e.clientY }) : null;
+        v.contentDOM.style.cursor = pos != null && targetIn(v.state, pos) ? 'pointer' : '';
+        return false;
+      },
+      keyup: (_e, v) => ((v.contentDOM.style.cursor = ''), false),
+    }),
     Prec.highest(
       keymap.of([
+        { key: 'Mod-Shift-f', preventDefault: true, run: () => (hooks.onSearchAll ? (hooks.onSearchAll(), true) : false) },
+        { key: 'F12', preventDefault: true, run: (v) => { const t = targetIn(v.state, v.state.selection.main.head); if (!t || !hooks.onDefinition) return false; hooks.onDefinition(t); return true; } },
         { key: 'Mod-Enter', preventDefault: true, run: () => (hooks.onCompile(), true) },
         ...(tex && hooks.onWrite ? [{ key: 'Mod-k', preventDefault: true, run: () => (o.readOnly ? false : (hooks.onWrite!(), true)) }] : []),
         { key: 'Mod-b', preventDefault: true, run: () => (toggle('textbf', 'bold'), true) },
@@ -618,6 +666,7 @@ export async function mountCode(parent: HTMLElement, o: { text: string; name: st
       const r = view.state.selection.main;
       return { from: r.from, to: r.to, text: view.state.sliceDoc(r.from, r.to), empty: r.empty };
     },
+    targetAtCursor: () => targetIn(view.state, view.state.selection.main.head),
     markFound: (ranges, current) => view.dispatch({ effects: found.of({ ranges, current }) }),
     setComments: (list) => view.dispatch({ effects: setCommentRanges.of(list) }),
     select: (from, to) => view.dispatch({ selection: EditorSelection.range(from, to), effects: EditorView.scrollIntoView(from, { y: 'center' }) }),
