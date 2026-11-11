@@ -16,25 +16,18 @@
 // toolbar, Animate every slide in the Animate tab, and Tools → Translate the slides asks the agent.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  ChartScatter,
   ChevronDown,
   ChevronUp,
   Clipboard,
   Copy,
   CornerDownRight,
-  Crop,
-  Eraser,
   Grid2x2,
-  Group as GroupIcon,
   Image as ImageIcon,
-  ImageMinus,
   Images,
   Layers,
-  LayoutTemplate,
   Lightbulb,
   Link2,
   MessageSquare,
-  MessageSquarePlus,
   Minus,
   MonitorPlay,
   MoveRight,
@@ -49,7 +42,6 @@ import {
   Scissors,
   Shapes,
   Shrink,
-  SlidersHorizontal,
   Sparkles,
   Spline,
   Table2,
@@ -60,17 +52,19 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
-import { hexColor, isWebDeck, keptVideo, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type ImageEl, type LayoutId, type Slide, type TextEl, type VideoEl } from '@shared/slides';
+import { hexColor, isWebDeck, keptVideo, newId, reconnect, slideTitle, SHAPES, turnedBox, videoSrc, videoStart, type ChartEl, type Deck, type El, type LayoutId, type Slide, type TableEl, type TextEl, type VideoEl } from '@shared/slides';
 import { csvOf, editPicture, makeDrawing, makePicture, makePlot, makeVideo, shownSrc } from '../../images/studio';
 import type { EditorHandle } from '../../mediaedit/host';
 import { editKept } from '../../mediaedit/open';
 import { editKeptVideo } from '../../mediaedit/video/open';
 import { post } from '../../../lib/api';
 import { toast, toastError } from '../../../lib/store';
-import { Button, cx, Dialog, IconButton, inputCls, MenuBack, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
+import { Button, cx, Dialog, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, useConfirm } from '../../../components/ui';
 import { FindBar, useFind } from '../common/FindBar';
-import { isMod, keyLabel } from '../common/keys';
-import { MenuBar } from '../common/menus';
+import { COPY_DRAG_KEY, isMod, keyLabel, NO_SNAP_KEY } from '../common/keys';
+import { ContextMenu, isMenuKey, MenuBar, type ContextMenuAt, type MenuEntry } from '../common/menus';
+import { copied, getClip, holds, readSystem, slideWords, wordsOf, writeSystem } from './clip';
+import { reuseSlides } from '@shared/slides-reuse';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import { Inspector, INSPECTOR_TABS, SHAPE_NAMES, ShapeIcon, type InspectorTab } from './Inspector';
 import {
@@ -81,18 +75,28 @@ import {
   codePart,
   connector,
   copies,
+  deleteCol,
+  deleteRow,
   distribute,
   duplicateSlides,
   embedAddress,
   embedPart,
   findEl,
+  fillCells,
   groupEls,
   HISTORY_MAX,
+  insertCol,
+  insertRow,
+  lockEls,
+  mergeAt,
+  mergeCells,
+  unmergeCell,
   htmlPart,
   image,
   line,
   lookOf,
   moveSlide,
+  moveSlides,
   onSlide,
   partName,
   pickedOf,
@@ -128,7 +132,7 @@ import { useDeckFonts } from './rt';
 import { SlideCanvas, type CanvasHandle, type CellSel, type CommentPin, type FindMark, type GridOpts } from './SlideCanvas';
 import { LayoutGrid, Strip } from './Strip';
 import { textActions, TextBar } from './TextBar';
-import { slidesMenus, type RichKind } from './SlidesMenus';
+import { cellContextMenu, partContextMenu, slideContextMenu, slidesMenus, type MenuArgs, type RichKind, type TableMenu } from './SlidesMenus';
 import { FormatDialog } from './FormatDialog';
 import { IconPicker, type IconDef } from './IconPicker';
 import { FooterDialog } from './FooterDialog';
@@ -149,8 +153,6 @@ import { askToTranslate, TranslateDialog } from './Translate';
 
 export type SlidesDoc = ModelDoc<Deck>;
 
-/** Parts copied (or cut), to paste on another slide or in another deck while the app is open. */
-let clip: El[] | null = null;
 /** A part's look copied (Copy the look), to put on others. */
 let lookClip: Look | null = null;
 
@@ -181,9 +183,9 @@ const chartCsv = (c: ChartEl) => csvOf([[c.title?.trim() || 'Label', ...c.series
 const savedGrid = (): GridOpts => {
   try {
     const g = JSON.parse(localStorage.getItem(GRID_KEY) ?? 'null');
-    if (g && typeof g === 'object') return { show: !!g.show, snap: !!g.snap, size: [10, 20, 40, 80].includes(g.size) ? g.size : 40 };
+    if (g && typeof g === 'object') return { show: !!g.show, snap: !!g.snap, size: [10, 20, 40, 80].includes(g.size) ? g.size : 40, parts: g.parts !== false };
   } catch {}
-  return { show: false, snap: false, size: 40 };
+  return { show: false, snap: false, size: 40, parts: true };
 };
 
 const SHORTCUTS: ShortcutGroup[] = [
@@ -214,8 +216,10 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+Shift+C / Ctrl+Shift+V', 'Copy the look, paste the look'],
       ['Ctrl+Alt+M', 'A comment on it (or on the slide)'],
       ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
-      ['Alt', 'While dragging: no snapping'],
-      ['Shift', 'While dragging: straight across or down; while sizing: keep or lose its shape'],
+      [`${COPY_DRAG_KEY}+drag`, 'Drag a copy of it; the original stays'],
+      [`${NO_SNAP_KEY}+drag`, 'While dragging or sizing: no snapping'],
+      ['Shift', 'While dragging: straight across or down; while sizing: keep or lose its shape; while turning: by 15°'],
+      ['Menu key / Shift+F10', 'The right-click menu of what is picked'],
     ],
   },
   {
@@ -305,10 +309,17 @@ export function SlidesEditor({
   const [tab, setTab] = useState<InspectorTab>('format');
   const [view, setView] = useState<'edit' | 'grid'>('edit');
   const [present, setPresent] = useState<{ from: number; presenter: boolean; how?: ShowHow } | null>(startPresent ? { from: 0, presenter: false } : null);
-  const [menu, setMenu] = useState<'slide' | 'shape' | 'line' | 'picture' | 'present' | 'context' | null>(null);
-  const [ctxAt, setCtxAt] = useState<{ x: number; y: number } | null>(null);
-  /** The right-click menu shows a picture's AI tools in its place (Change it with AI ›). */
-  const [ctxAi, setCtxAi] = useState(false);
+  const [menu, setMenu] = useState<'slide' | 'shape' | 'line' | 'picture' | 'present' | null>(null);
+  /** The right-click menu: where, and on what (a part, the empty slide, a table's cell). */
+  const [ctx, setCtx] = useState<{ at: ContextMenuAt; kind: 'part' | 'slide' | 'cell' } | null>(null);
+  /** Line them up with the slide, also with several parts picked (Arrange → Line them up → Align to the slide). */
+  const [alignToSlide, setAlignToSlide] = useState(false);
+  /** Slides picked together in the list (Ctrl or Shift and a click), by their ids: empty when one is. */
+  const [picks, setPicks] = useState<string[]>([]);
+  /** A link or a description (alt text) being typed for the parts picked. */
+  /** A part being drawn on the slide (Insert → Text box, Shape, Line or arrow): what it is made as; Esc stops. */
+  const [drawing, setDrawing] = useState<{ make: () => El; line?: boolean } | null>(null);
+  const [fieldAsk, setFieldAsk] = useState<{ field: 'link' | 'alt'; value: string } | null>(null);
   const [notesOpen, setNotesOpen] = useState(() => localStorage.getItem(PRESET_KEY) !== '0');
   const [drawer, setDrawer] = useState<'open' | 'closed'>('closed');
   const [saving, setSaving] = useState(false);
@@ -352,7 +363,6 @@ export function SlidesEditor({
   const canvas = useRef<CanvasHandle>(null);
   const root = useRef<HTMLDivElement>(null);
   const anchors = { slide: useRef<HTMLButtonElement>(null), shape: useRef<HTMLButtonElement>(null), line: useRef<HTMLButtonElement>(null), picture: useRef<HTMLButtonElement>(null), present: useRef<HTMLButtonElement>(null) };
-  const ctxRef = useRef<HTMLDivElement>(null);
   const fonts = useDeckFonts(deck);
   const [width, setWidth] = useState(1200);
   useLayoutEffect(() => {
@@ -574,6 +584,26 @@ export function SlidesEditor({
     setSel(els.map((e) => e.id));
     setTab('format');
     setView('edit');
+  };
+  /** Insert → Text box, Shape, Line or arrow: the pointer is a crosshair, a drag draws it there at that size, a click puts it there at its default size. */
+  const draw = (make: () => El, line?: boolean) => {
+    if (!deck || readOnly) return;
+    canvas.current?.stopEditing();
+    setScope([]);
+    setSel([]);
+    setMenu(null);
+    setView('edit');
+    setDrawing({ make, line });
+  };
+  const drawn = (a: { from: { x: number; y: number }; to: { x: number; y: number } } | { at: { x: number; y: number } }) => {
+    const d = drawing;
+    setDrawing(null);
+    if (!d || !live.current) return;
+    const el = d.make();
+    if ('at' in a) return put([{ ...el, x: Math.round(a.at.x - el.w / 2), y: Math.round(a.at.y - Math.abs(el.h) / 2) }]);
+    const { from, to } = a;
+    if (d.line) return put([{ ...el, x: Math.round(from.x), y: Math.round(from.y), w: Math.round(to.x - from.x), h: Math.round(to.y - from.y) }]);
+    put([{ ...el, x: Math.round(Math.min(from.x, to.x)), y: Math.round(Math.min(from.y, to.y)), w: Math.max(8, Math.round(Math.abs(to.x - from.x))), h: Math.max(8, Math.round(Math.abs(to.y - from.y))) }]);
   };
   const newSlide = (l: LayoutId, after = index) => {
     if (!deck) return;
@@ -952,8 +982,9 @@ export function SlidesEditor({
   const picked = pickedOf(slide, sel);
   const copy = () => {
     if (!picked.length || !slide) return;
-    // A part of a group goes as it shows on the slide.
-    clip = picked.map((e) => onSlide(slide, e));
+    // A part of a group goes as it shows on the slide; its words go to the system clipboard too.
+    const parts = picked.map((e) => onSlide(slide, e));
+    void writeSystem(copied({ parts }, wordsOf(parts)));
     toast(picked.length === 1 ? 'Copied' : `${picked.length} parts copied`, 'ok');
   };
   const cut = () => {
@@ -962,10 +993,61 @@ export function SlidesEditor({
     change((d) => removeEls(d, index, sel));
     setSel([]);
   };
-  const paste = () => {
-    if (!clip?.length) return;
-    const fresh = copies(clip, slide?.els.some((e) => clip!.some((c) => c.x === e.x && c.y === e.y)) ? 24 : 0);
+  /** The parts copied, put on this slide (a little aside where they would land on what they were copied from). */
+  const pasteParts = () => {
+    const c = getClip();
+    const parts = c?.parts;
+    if (!parts?.length) return;
+    const fresh = copies(parts, slide?.els.some((e) => parts.some((q) => q.x === e.x && q.y === e.y)) ? 24 : 0);
     put(fresh);
+  };
+  /** The slides copied, put in after slide `after`. */
+  const pasteSlides = (after = index) => {
+    const c = getClip();
+    const d = live.current;
+    if (!c?.slides || !d) return;
+    const made = reuseSlides(c.slides.from, c.slides.picks, d, { keepLook: true });
+    if (!made.length) return;
+    canvas.current?.stopEditing();
+    change((x) => withSlidesAfter(x, after, made));
+    setCur(after + 1);
+    setSel([]);
+    setView('edit');
+  };
+  /**
+   * What the clipboard holds, put in: this app's copy (parts or slides) while it still holds its marker; else what is there
+   * now: a picture, or words (a video's address, else a new text box). Nothing the clipboard holds is ever left unpasted.
+   */
+  const pasteFrom = (html: string, text: string, file?: File | null): boolean => {
+    const c = getClip();
+    if (holds(c, html, text)) {
+      if (c?.slides) pasteSlides();
+      else pasteParts();
+      return true;
+    }
+    const d = live.current;
+    if (!d) return false;
+    if (file) {
+      upload(file)
+        .then((p) => live.current && put([image(live.current, p.src, p.w, p.h)]))
+        .catch(toastError);
+      return true;
+    }
+    if (text.trim()) {
+      const words = text.replace(/\r\n?/g, '\n');
+      // A YouTube or Vimeo address pasted is the video.
+      if (words.trim().length < 300 && videoSrc(words.trim())) void putOnlineVideo(words.trim());
+      else put([{ ...textBox(d), paras: words.split('\n').map((l) => ({ runs: [{ t: l }] })) }]);
+      return true;
+    }
+    return false;
+  };
+  /** Paste from a menu: what the clipboard holds where the browser lets it be read, else this app's copy; Ctrl+V always works. */
+  const paste = async () => {
+    const got = await readSystem();
+    if (got && pasteFrom(got.html, got.text, got.image)) return;
+    if (getClip()) return getClip()?.slides ? pasteSlides() : pasteParts();
+    toast(got ? 'There is nothing to paste' : 'Paste with the keyboard instead: the browser does not let a menu read the clipboard');
   };
   const duplicate = () => {
     if (!picked.length) return;
@@ -1021,7 +1103,8 @@ export function SlidesEditor({
     if (!painter.keep || !id) setPainter(null);
   };
   const restackSel = (how: 'front' | 'back' | 'forward' | 'backward') => sel.length && change((d) => restack(d, index, sel, how));
-  const alignSel = (how: Parameters<typeof align>[3]) => sel.length && change((d) => align(d, index, sel, how));
+  const alignSel = (how: Parameters<typeof align>[3]) => sel.length && change((d) => align(d, index, sel, how, alignToSlide));
+  const lockSel = () => sel.length && change((d) => lockEls(d, index, sel));
   const turn = (by: number) => sel.length && change((d) => setEls(d, index, sel, (e) => (e.type === 'line' ? e : { ...e, rot: ((((e.rot ?? 0) + by) % 360) + 360) % 360 || undefined })));
   const flip = (axis: 'h' | 'v') => sel.length && change((d) => setEls(d, index, sel, (e) => (e.type === 'image' ? ({ ...e, [axis === 'h' ? 'flipH' : 'flipV']: !(axis === 'h' ? e.flipH : e.flipV) || undefined } as El) : e)));
   const zoomBy = (f: number) => {
@@ -1091,6 +1174,13 @@ export function SlidesEditor({
       return;
     }
     if (typing) return;
+    // The menu key (Shift+F10): the right-click menu of what is picked, where it is.
+    if (isMenuKey(e) && !present) {
+      e.preventDefault();
+      const at = canvas.current?.pointOf(picked[0]?.id ?? null);
+      if (at) setCtx({ at: { ...at, keyed: true }, kind: !picked.length ? 'slide' : picked.length === 1 && picked[0].type === 'table' && cellSel?.id === picked[0].id ? 'cell' : 'part' });
+      return;
+    }
     if (mod && e.altKey && (e.key === '=' || e.key === '+' || e.code === 'Equal')) return (e.preventDefault(), zoomBy(1.25));
     if (mod && e.altKey && (e.key === '-' || e.code === 'Minus')) return (e.preventDefault(), zoomBy(0.8));
     if (mod && e.altKey && (e.key === '0' || e.code === 'Digit0')) return (e.preventDefault(), setZoom('fit'));
@@ -1120,7 +1210,6 @@ export function SlidesEditor({
     if (mod && k === 'g') return (e.preventDefault(), e.shiftKey ? unGroup() : group());
     if (mod && k === 'c') return (e.preventDefault(), copy());
     if (mod && k === 'x') return (e.preventDefault(), cut());
-    if (mod && k === 'v' && clip) return (e.preventDefault(), paste());
     if (mod && k === 'd') return (e.preventDefault(), duplicate());
     if (mod && k === 'a') {
       e.preventDefault();
@@ -1152,7 +1241,8 @@ export function SlidesEditor({
       return;
     }
     if (e.key === 'Escape') {
-      if (pickFor) setPickFor(null);
+      if (drawing) setDrawing(null);
+      else if (pickFor) setPickFor(null);
       else if (painter) setPainter(null);
       else if (cellSel) setCellSel(null);
       else if (scope.length) {
@@ -1218,25 +1308,13 @@ export function SlidesEditor({
       const a = document.activeElement as HTMLElement | null;
       if (a && (a.isContentEditable || /^(INPUT|TEXTAREA)$/.test(a.tagName))) return;
       if (a && a !== document.body && !root.current?.contains(a)) return;
+      // The copy of this app while the clipboard still holds it; else what is there (a picture, words): never left unpasted.
       const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
-      if (file) {
-        e.preventDefault();
-        upload(file)
-          .then((p) => live.current && put([image(live.current, p.src, p.w, p.h)]))
-          .catch(toastError);
-        return;
-      }
-      const text = e.clipboardData?.getData('text/plain');
-      if (text && !clip && live.current) {
-        e.preventDefault();
-        // A YouTube or Vimeo address pasted is the video.
-        if (text.trim().length < 300 && videoSrc(text.trim())) {
-          void putOnlineVideo(text.trim());
-          return;
-        }
-        const t = textBox(live.current);
-        put([{ ...t, paras: text.split('\n').map((l) => ({ runs: [{ t: l }] })) }]);
-      }
+      const html = e.clipboardData?.getData('text/html') ?? '';
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      if (!file && !text.trim() && !holds(getClip(), html, text)) return;
+      e.preventDefault();
+      pasteFrom(html, text, file);
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
@@ -1267,11 +1345,16 @@ export function SlidesEditor({
 
   // A slide made with AI after a slide (Insert and the New slide menu: the one on view; a slide's own menu: that one).
   const aiSlideAfter = onRequest && !readOnly ? (i: number) => openTypes({ kind: 'slide', after: { index: i, title: slideTitle(deck.slides[i]) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
+  /** The slides an action on slide `i` is for: the ones picked together when it is one of them, else it alone. */
+  const slidesFor = (i: number) => (picks.length > 1 && picks.includes(deck.slides[i].id) ? deck.slides.flatMap((s, k) => (picks.includes(s.id) ? [k] : [])) : [i]);
   const stripAct = {
     aiAfter: aiSlideAfter ?? undefined,
-    pick: (i: number) => {
+    pick: (i: number, how?: 'toggle' | 'range') => {
       canvas.current?.stopEditing();
       pickedAt.current = performance.now();
+      if (how === 'toggle') setPicks((p) => (p.includes(deck.slides[i].id) ? p.filter((x) => x !== deck.slides[i].id) : [...(p.length ? p : [deck.slides[index].id]), deck.slides[i].id]));
+      else if (how === 'range') setPicks(deck.slides.slice(Math.min(index, i), Math.max(index, i) + 1).map((x) => x.id));
+      else setPicks([]);
       setCur(i);
       setSel([]);
       setView('edit');
@@ -1282,18 +1365,64 @@ export function SlidesEditor({
     },
     add: (after: number, l: LayoutId) => newSlide(l, after),
     duplicate: (i: number) => {
-      const r = duplicateSlides(deck, [i]);
+      const r = duplicateSlides(deck, slidesFor(i));
       change(r.deck);
       setCur(r.at);
+      setPicks([]);
     },
     remove: (i: number) => {
-      change((d) => removeSlides(d, [i]));
-      setCur((c) => Math.max(0, Math.min(c > i ? c - 1 : c, deck.slides.length - 2)));
+      const gone = slidesFor(i);
+      change((d) => removeSlides(d, gone));
+      setCur((c) => Math.max(0, Math.min(c - gone.filter((g) => g < c).length, deck.slides.length - gone.length - 1)));
       setSel([]);
+      setPicks([]);
     },
-    toggleHidden: (i: number) => change((d) => setSlide(d, i, (s) => ({ ...s, hidden: !s.hidden || undefined }))),
+    toggleHidden: (i: number) => {
+      const list = slidesFor(i);
+      const hide = !list.every((k) => deck.slides[k].hidden);
+      change((d) => list.reduce((x, k) => setSlide(x, k, (s) => ({ ...s, hidden: hide || undefined })), d));
+    },
+    moveTogether: (ids: string[], over: string) => {
+      const next = moveSlides(deck, ids, over);
+      change(next);
+      setCur(next.slides.findIndex((s) => s.id === deck.slides[index].id));
+    },
+    /** The rows of a slide's menu: the Slide menu's words, for the slide right-clicked. */
+    menu: (i: number, layouts: () => void): MenuEntry[] => {
+      const ro = readOnly;
+      const list = slidesFor(i);
+      const copySlide = () => {
+        void writeSystem(copied({ slides: { from: deck, picks: list } }, slideWords(list.map((k) => deck.slides[k]))));
+        toast(list.length === 1 ? 'Copied' : `${list.length} slides copied`, 'ok');
+      };
+      return [
+        { label: 'New slide', icon: <Plus size={14} />, disabled: ro, run: layouts },
+        !!aiSlideAfter && { label: 'Slide made with AI', icon: <Sparkles size={14} />, disabled: ro, run: () => aiSlideAfter(i) },
+        { label: 'Duplicate slide', icon: <Copy size={14} />, disabled: ro, run: () => stripAct.duplicate(i) },
+        '-',
+        { label: 'Cut', icon: <Scissors size={14} />, disabled: ro, run: () => (copySlide(), stripAct.remove(i)) },
+        { label: 'Copy', icon: <Copy size={14} />, run: copySlide },
+        { label: 'Paste after it', icon: <Clipboard size={14} />, disabled: ro || !getClip()?.slides, run: () => pasteSlides(i) },
+        { label: 'Delete slide', icon: <Trash2 size={14} />, danger: true, disabled: ro, run: () => stripAct.remove(i) },
+        '-',
+        { label: 'Skip this slide', checked: list.every((k) => !!deck.slides[k].hidden), also: 'hide hidden', disabled: ro, run: () => stripAct.toggleHidden(i) },
+        { label: 'Move up', icon: <ChevronUp size={14} />, disabled: ro || list[0] === 0, run: () => stripAct.moveTogether(list.map((k) => deck.slides[k].id), deck.slides[list[0] - 1].id) },
+        { label: 'Move down', icon: <ChevronDown size={14} />, disabled: ro || list[list.length - 1] === deck.slides.length - 1, run: () => stripAct.moveTogether(list.map((k) => deck.slides[k].id), deck.slides[list[list.length - 1] + 1].id) },
+        '-',
+        { label: 'Background…', disabled: ro, also: 'slide background colour picture', run: () => (stripAct.pick(i), openPanel('slide')) },
+        { label: 'Transition…', disabled: ro, also: 'transition morph fade push', run: () => (stripAct.pick(i), openPanel('slide')) },
+      ];
+    },
   };
 
+  /** The link or the description typed, put on the parts picked (one step to undo; empty: taken away). */
+  const saveField = () => {
+    const f = fieldAsk;
+    setFieldAsk(null);
+    if (!f || !sel.length) return;
+    const v = f.value.trim();
+    change((d) => setEls(d, index, sel, (e) => (f.field === 'alt' && e.type !== 'image' ? e : ({ ...e, [f.field]: v || undefined } as El))));
+  };
   const openPanel = (t: InspectorTab) => {
     setSide(null);
     setTab(t);
@@ -1337,7 +1466,53 @@ export function SlidesEditor({
   for (const p of pins) p.active = !!activeComment && p.ids.includes(activeComment);
   const aiSlide = aiSlideAfter ? () => aiSlideAfter(index) : null;
   const web = isWebDeck(deck);
-  const menus = slidesMenus({
+  // The table cell picked, and what the right-click menu offers there.
+  const tbl = one?.type === 'table' ? one : null;
+  const cs = tbl && cellSel?.id === tbl.id ? cellSel : null;
+  const cells: TableMenu | undefined =
+    tbl && cs
+      ? (() => {
+          const [r0, r1, c0, c1] = [Math.min(cs.r0, cs.r1), Math.max(cs.r0, cs.r1), Math.min(cs.c0, cs.c1), Math.max(cs.c0, cs.c1)];
+          const nCols = Math.max(1, ...tbl.rows.map((r) => r.length));
+          const replace = (t: TableEl | null, pick?: { r: number; c: number }) => {
+            if (!t) return;
+            change((d) => setEls(d, index, [tbl.id], () => t));
+            setCellSel(pick ? { id: tbl.id, r0: pick.r, c0: pick.c, r1: pick.r, c1: pick.c } : null);
+          };
+          const swatch = (k: string) => `#${hexColor(k, deck.theme).hex}`;
+          return {
+            insertRow: (above) => replace(insertRow(tbl, above ? r0 : r1 + 1), { r: above ? r0 : r1 + 1, c: c0 }),
+            insertCol: (left) => replace(insertCol(tbl, left ? c0 : c1 + 1), { r: r0, c: left ? c0 : c1 + 1 }),
+            deleteRow: () => {
+              let t: TableEl | null = tbl;
+              for (let r = r1; r >= r0 && t; r--) t = deleteRow(t, r) ?? t;
+              replace(t === tbl ? null : t);
+            },
+            deleteCol: () => {
+              let t: TableEl | null = tbl;
+              for (let c = c1; c >= c0 && t; c--) t = deleteCol(t, c) ?? t;
+              replace(t === tbl ? null : t);
+            },
+            merge: () => {
+              const t = mergeCells(tbl, r0, c0, r1, c1);
+              const m = t.merges?.find((x) => x.r === r0 && x.c === c0);
+              replace(t, m ? { r: m.r, c: m.c } : undefined);
+            },
+            unmerge: () => replace(unmergeCell(tbl, r0, c0), { r: r0, c: c0 }),
+            canMerge: r0 !== r1 || c0 !== c1,
+            canUnmerge: !!mergeAt(tbl, r0, c0) && r0 === r1 && c0 === c1,
+            canInsertRow: tbl.rows.length < 40,
+            canInsertCol: nCols < 12,
+            canDeleteRow: tbl.rows.length > r1 - r0 + 1,
+            canDeleteCol: nCols > c1 - c0 + 1,
+            fills: [
+              { label: 'The table’s own', swatch: null, run: () => change((d) => setEls(d, index, [tbl.id], (e) => fillCells(e as TableEl, r0, c0, r1, c1, undefined))) },
+              ...['accent', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6'].map((k, n) => ({ label: n ? `Colour ${n}` : 'Accent', swatch: swatch(k), run: () => change((d) => setEls(d, index, [tbl.id], (e) => fillCells(e as TableEl, r0, c0, r1, c1, k))) })),
+            ],
+          };
+        })()
+      : undefined;
+  const menuArgs: MenuArgs = {
     readOnly,
     web,
     setCompatible,
@@ -1346,7 +1521,6 @@ export function SlidesEditor({
     picked,
     canUndo: hist.past.length > 0,
     canRedo: hist.future.length > 0,
-    canPaste: !!clip?.length,
     hasLook: !!lookClip,
     painting: !!painter,
     zoom,
@@ -1385,11 +1559,11 @@ export function SlidesEditor({
       setView(on ? 'grid' : 'edit');
     },
     newSlide: () => setMenu('slide'),
-    textBox: () => put([textBox(deck)]),
+    textBox: () => draw(() => textBox(deck)),
     shape: () => setMenu('shape'),
     picture: () => void addPicture(),
     pictureUrl: () => setUrlAsk({}),
-    line: (arrow) => put([line(deck, arrow)]),
+    line: (arrow) => draw(() => line(deck, arrow), true),
     connector: (elbow) => put([connector(deck, index, elbow, picked)]),
     table: () => put([table(deck)]),
     chart: () => put([chart(deck)]),
@@ -1432,7 +1606,13 @@ export function SlidesEditor({
     spread: (axis) => change((d) => distribute(d, index, sel, axis)),
     turn,
     flip,
-    lock: () => one && change((d) => setEls(d, index, [one.id], (e) => ({ ...e, lock: !e.lock || undefined }))),
+    lock: lockSel,
+    alignToSlide,
+    setAlignToSlide,
+    link: () => setFieldAsk({ field: 'link', value: (one ?? picked[0])?.link ?? '' }),
+    describe: () => one?.type === 'image' && setFieldAsk({ field: 'alt', value: one.alt ?? '' }),
+    cells,
+    askPart: onAsk && one ? () => onAsk(partsLead(index, slide, [one])) : undefined,
     duplicateSlide: () => stripAct.duplicate(index),
     deleteSlide: () => stripAct.remove(index),
     skipSlide: () => stripAct.toggleHidden(index),
@@ -1452,7 +1632,9 @@ export function SlidesEditor({
     designIdeas: readOnlyProp ? undefined : () => openSide('ideas'),
     checkAccess: readOnlyProp ? undefined : () => openSide('check'),
     translate: onAsk && !readOnly ? (lang) => (lang ? askToTranslate(lang) : setLangAsk(true)) : undefined,
-  });
+  };
+  const menus = slidesMenus(menuArgs);
+  const ctxItems = !ctx ? [] : ctx.kind === 'cell' ? cellContextMenu(menuArgs) : ctx.kind === 'part' ? partContextMenu(menuArgs) : slideContextMenu(menuArgs);
 
   const insertBar = !readOnlyProp && (
     <>
@@ -1466,7 +1648,7 @@ export function SlidesEditor({
       <Button ref={anchors.slide} size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setMenu(menu === 'slide' ? null : 'slide')} className="shrink-0">
         {mid ? 'New slide' : ''}
       </Button>
-      <IconButton label="Text box" size="sm" onClick={() => put([textBox(deck)])}>
+      <IconButton label="Text box" size="sm" active={!!drawing && !drawing.line} onClick={() => draw(() => textBox(deck))}>
         <Type size={15} />
       </IconButton>
       <IconButton ref={anchors.shape} label="Shape" size="sm" active={menu === 'shape'} onClick={() => setMenu(menu === 'shape' ? null : 'shape')}>
@@ -1527,10 +1709,7 @@ export function SlidesEditor({
           fonts={fonts}
           readOnly={readOnly}
           agent={mark ? (mark.el ?? '') : null}
-          onMenu={(at) => {
-            setCtxAt(at);
-            setMenu('context');
-          }}
+          onMenu={(at, id, cell) => setCtx({ at, kind: cell ? 'cell' : id ? 'part' : 'slide' })}
           onReplaceImage={(id) => void replacePicture(id)}
           onChartData={(id) => {
             setSel([id]);
@@ -1567,6 +1746,8 @@ export function SlidesEditor({
           onRun={(id) => setRunning(id)}
           picking={!!pickFor}
           onPick={pickTrigger}
+          drawing={drawing ? (drawing.line ? 'line' : 'box') : null}
+          onDraw={drawn}
         />
         {zoom !== 'fit' && (
           <button
@@ -1580,11 +1761,13 @@ export function SlidesEditor({
             <Shrink size={12} />
           </button>
         )}
-        {(sending !== null || painter || scope.length > 0 || cropping || pickFor) && (
+        {(sending !== null || painter || scope.length > 0 || cropping || pickFor || drawing) && (
           <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full border border-line bg-elevated px-3 py-1 text-[12px] text-fg-2 tabular-nums shadow-sm">
             {sending !== null
               ? `Adding the video… ${Math.round(sending * 100)}%`
-              : pickFor
+              : drawing
+                ? 'Drag on the slide to draw it, or click to put it there; Esc to stop'
+                : pickFor
                 ? 'Click the part that starts it; Esc to stop'
                 : cropping
                 ? 'Cropping: Enter keeps it, Esc does not'
@@ -1668,6 +1851,8 @@ export function SlidesEditor({
       onAiBackground={() => void aiBackground()}
       picking={pickFor}
       onPickTrigger={setPickFor}
+      alignToSlide={alignToSlide}
+      onAlignToSlide={setAlignToSlide}
     />
   );
 
@@ -1788,13 +1973,13 @@ export function SlidesEditor({
       <div className={cx('relative flex min-h-0 flex-1', wide ? 'flex-row' : 'flex-col')}>
         {view === 'grid' ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="grid" />
+            <Strip picks={picks} deck={deck} cur={index} fonts={fonts} act={stripAct} layout="grid" />
           </div>
         ) : (
           <>
             {wide && (
               <div className="w-[190px] shrink-0 overflow-y-auto border-r border-line bg-panel">
-                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="side" live={!!mark && mark.slide === index} />
+                <Strip picks={picks} deck={deck} cur={index} fonts={fonts} act={stripAct} layout="side" live={!!mark && mark.slide === index} />
                 {!readOnly && (
                   <button type="button" onClick={() => newSlide('content', deck.slides.length - 1)} className="mx-auto mb-4 flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12.5px] text-fg-3 hover:bg-bg-2 hover:text-fg">
                     <Plus size={13} />A slide
@@ -1805,7 +1990,7 @@ export function SlidesEditor({
             {canvasArea}
             {!wide && (
               <div className="shrink-0 border-t border-line bg-panel">
-                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="bottom" live={!!mark && mark.slide === index} />
+                <Strip picks={picks} deck={deck} cur={index} fonts={fonts} act={stripAct} layout="bottom" live={!!mark && mark.slide === index} />
               </div>
             )}
             {!readOnlyProp && (
@@ -1888,7 +2073,7 @@ export function SlidesEditor({
               aria-label={SHAPE_NAMES[k]}
               onClick={() => {
                 setMenu(null);
-                put([shape(deck, k)]);
+                draw(() => shape(deck, k));
               }}
               className="grid h-10 place-items-center rounded-lg text-accent hover:bg-bg-2"
             >
@@ -1898,10 +2083,10 @@ export function SlidesEditor({
         </div>
       </Popover>
       <Popover anchor={anchors.line} open={menu === 'line'} onClose={() => setMenu(null)} width={220}>
-        <MenuItem icon={<Minus size={14} />} onClick={() => (setMenu(null), put([line(deck, false)]))}>
+        <MenuItem icon={<Minus size={14} />} onClick={() => draw(() => line(deck, false), true)}>
           Straight line
         </MenuItem>
-        <MenuItem icon={<MoveRight size={14} />} onClick={() => (setMenu(null), put([line(deck, true)]))}>
+        <MenuItem icon={<MoveRight size={14} />} onClick={() => draw(() => line(deck, true), true)}>
           Arrow
         </MenuItem>
         <MenuSep />
@@ -1946,120 +2131,38 @@ export function SlidesEditor({
         </MenuItem>
         <PresentMoreItems deck={deck} onPick={(how) => (setMenu(null), setPresent({ from: 0, presenter: false, how }))} />
       </Popover>
-      <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctxAt?.x ?? -10, top: ctxAt?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={menu === 'context'} onClose={() => (setMenu(null), setCtxAi(false))} width={230}>
-        {ctxAi && one?.type === 'image' ? (
-          <>
-            <MenuBack onClick={() => setCtxAi(false)}>Change it with AI</MenuBack>
-            <MenuItem icon={<WandSparkles size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'change'))}>
-              Change with AI
-            </MenuItem>
-            <MenuItem icon={<ImageMinus size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'cutout'))}>
-              Remove the background
-            </MenuItem>
-            <MenuItem icon={<Eraser size={14} />} onClick={() => (setMenu(null), setCtxAi(false), void aiEdit(one.id, 'erase'))}>
-              Erase part of it
-            </MenuItem>
-          </>
-        ) : (
-          <>
-            {picked.length > 0 && !readOnly && (
-              <>
-                <MenuItem icon={<Scissors size={14} />} hint={keyLabel('Ctrl+X')} onClick={() => (setMenu(null), cut())}>
-                  Cut
-                </MenuItem>
-                <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+C')} onClick={() => (setMenu(null), copy())}>
-                  Copy
-                </MenuItem>
-              </>
-            )}
-            {clip && !readOnly && (
-              <MenuItem icon={<Clipboard size={14} />} hint={keyLabel('Ctrl+V')} onClick={() => (setMenu(null), paste())}>
-                Paste
-              </MenuItem>
-            )}
-            {picked.length > 0 && !readOnly && (
-              <>
-                <MenuItem icon={<Copy size={14} />} hint={keyLabel('Ctrl+D')} onClick={() => (setMenu(null), duplicate())}>
-                  Duplicate
-                </MenuItem>
-                {picked.length > 1 && (
-                  <MenuItem icon={<GroupIcon size={14} />} hint={keyLabel('Ctrl+G')} onClick={() => (setMenu(null), group())}>
-                    Group
-                  </MenuItem>
-                )}
-                {one?.type === 'group' && (
-                  <MenuItem icon={<Ungroup size={14} />} hint={keyLabel('Ctrl+Shift+G')} onClick={() => (setMenu(null), unGroup())}>
-                    Ungroup
-                  </MenuItem>
-                )}
-                {one?.type === 'image' && !!(one as ImageEl).src && (
-                  <>
-                    <MenuItem icon={<SlidersHorizontal size={14} />} onClick={() => (setMenu(null), openPicture(one.id))}>
-                      Edit picture
-                    </MenuItem>
-                    <MenuItem icon={<Crop size={14} />} onClick={() => (setMenu(null), crop(one.id))}>
-                      Crop the picture
-                    </MenuItem>
-                    <MenuItem icon={<WandSparkles size={14} />} submenu onClick={() => setCtxAi(true)}>
-                      Change it with AI
-                    </MenuItem>
-                  </>
-                )}
-                {one?.type === 'video' && !!keptVideo((one as VideoEl).src) && (
-                  <MenuItem icon={<SlidersHorizontal size={14} />} onClick={() => (setMenu(null), editVideo(one.id))}>
-                    Edit video
-                  </MenuItem>
-                )}
-                {one?.type === 'chart' && (
-                  <MenuItem icon={<ChartScatter size={14} />} onClick={() => (setMenu(null), void aiPlot(one.id))}>
-                    Make a plot of this
-                  </MenuItem>
-                )}
-                <MenuItem icon={<Paintbrush size={14} />} disabled={!one} onClick={() => (setMenu(null), startPainter(false))}>
-                  Format painter
-                </MenuItem>
-                {picked.length === 1 && (
-                  <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
-                    Comment
-                  </MenuItem>
-                )}
-                {onAsk && picked.length === 1 && (
-                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(partsLead(index, slide, [picked[0]])))}>
-                    Ask the agent about it
-                  </MenuItem>
-                )}
-                <MenuSep />
-                <MenuItem icon={<Trash2 size={14} />} danger onClick={() => (setMenu(null), remove())}>
-                  Delete
-                </MenuItem>
-              </>
-            )}
-            {!picked.length && (
-              <>
-                {!readOnly && (
-                  <MenuItem icon={<LayoutTemplate size={14} />} onClick={() => setMenu('slide')}>
-                    A new slide
-                  </MenuItem>
-                )}
-                {!readOnly && (
-                  <MenuItem icon={<MessageSquarePlus size={14} />} hint={keyLabel('Ctrl+Alt+M')} onClick={() => (setMenu(null), startComment())}>
-                    Comment
-                  </MenuItem>
-                )}
-                {onAsk && (
-                  <MenuItem icon={<Sparkles size={14} />} onClick={() => (setMenu(null), onAsk(slideLead(index, slide)))}>
-                    Ask the agent about this slide
-                  </MenuItem>
-                )}
-                <MenuItem icon={<Play size={14} />} onClick={() => (setMenu(null), setPresent({ from: index, presenter: false }))}>
-                  Present from this slide
-                </MenuItem>
-              </>
-            )}
-          </>
-        )}
-      </Popover>
+      <ContextMenu at={ctx?.at ?? null} items={ctxItems} onClose={() => setCtx(null)} />
+      <Dialog
+        open={!!fieldAsk}
+        onClose={() => setFieldAsk(null)}
+        title={fieldAsk?.field === 'alt' ? 'Description' : 'A link'}
+        width={440}
+        footer={
+          <Button size="sm" variant="primary" onClick={saveField}>
+            Save
+          </Button>
+        }
+      >
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveField();
+          }}
+        >
+          <p className="text-[12.5px] text-fg-3">
+            {fieldAsk?.field === 'alt' ? 'What the picture shows, for people who cannot see it (screen readers read it).' : 'Clicked in the slideshow, it opens the address or goes to the slide: https://… or #3 for slide 3.'}
+          </p>
+          <input
+            autoFocus
+            value={fieldAsk?.value ?? ''}
+            onChange={(e) => setFieldAsk((f) => f && { ...f, value: e.target.value })}
+            placeholder={fieldAsk?.field === 'alt' ? 'A short description' : 'https://… or #3'}
+            aria-label={fieldAsk?.field === 'alt' ? 'The description' : 'The link'}
+            className={inputCls}
+          />
+        </form>
+      </Dialog>
       {urlAsk && (
         <Popover anchor={anchors.picture} open onClose={() => setUrlAsk(null)} width={320} title="A picture from the web">
           <form

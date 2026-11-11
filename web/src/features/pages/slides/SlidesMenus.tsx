@@ -4,7 +4,8 @@
 // made a plot, running a live part in place), Arrange (groups, the stacking order, lining up, turning), Slide (design
 // ideas for it too), and Tools (PowerPoint compatible or the web format too, which the Theme tab has beside the slides'
 // shape; checking accessibility; the slides translated by the agent). Each action with its keys; what does not apply to
-// what is picked is greyed. Search the menus (Alt+/) finds any of them.
+// what is picked is greyed. Search the menus (Alt+/) finds any of them. The right-click menus (on a part, on the empty
+// slide, on a table's cell, on a thumbnail) are made of the same entries, so their words, keys and ticks are the menus'.
 import {
   Accessibility,
   AlignCenter,
@@ -21,6 +22,13 @@ import {
   ArrowDownToLine,
   ArrowUp,
   ArrowUpToLine,
+  Columns2,
+  Link as LinkIcon,
+  Merge,
+  PaintBucket,
+  Rows2,
+  Split,
+  TextCursorInput,
   Bold,
   ChartScatter,
   Box,
@@ -92,12 +100,30 @@ import {
 } from 'lucide-react';
 import { keptVideo, type El, type ElType } from '@shared/slides';
 import { WRITE_LANGS } from '@shared/write';
-import type { MenuDef, MenuEntry } from '../common/menus';
+import type { MenuAction, MenuDef, MenuEntry } from '../common/menus';
 import type { AlignHow } from './ops';
 import type { TextActions } from './TextBar';
 
 /** The web format's parts Insert → Interactive puts on a slide. */
 export type RichKind = Extract<ElType, 'html' | 'embed' | 'quiz' | 'score' | 'scene3d'>;
+
+/** What a table's cell offers in a right-click menu (the cell picked): rows and columns put in or taken out, merging, a fill. */
+export interface TableMenu {
+  insertRow(above: boolean): void;
+  insertCol(left: boolean): void;
+  deleteRow(): void;
+  deleteCol(): void;
+  merge(): void;
+  unmerge(): void;
+  canMerge: boolean;
+  canUnmerge: boolean;
+  canInsertRow: boolean;
+  canInsertCol: boolean;
+  canDeleteRow: boolean;
+  canDeleteCol: boolean;
+  /** The theme's colours a cell can be filled with (a swatch each); null: the table's own. */
+  fills: { label: string; swatch: string | null; run(): void }[];
+}
 
 export interface MenuArgs {
   readOnly?: boolean;
@@ -110,11 +136,10 @@ export interface MenuArgs {
   picked: El[];
   canUndo: boolean;
   canRedo: boolean;
-  canPaste: boolean;
   hasLook: boolean;
   painting: boolean;
   zoom: number | 'fit';
-  grid: { show: boolean; snap: boolean; size: number };
+  grid: { show: boolean; snap: boolean; size: number; parts: boolean };
   rulers: boolean;
   notesOpen: boolean;
   gridView: boolean;
@@ -134,7 +159,7 @@ export interface MenuArgs {
   painter(): void;
   setZoom(z: number | 'fit'): void;
   zoomBy(f: number): void;
-  setGrid(g: Partial<{ show: boolean; snap: boolean; size: number }>): void;
+  setGrid(g: Partial<{ show: boolean; snap: boolean; size: number; parts: boolean }>): void;
   setRulers(on: boolean): void;
   addGuide(axis: 'x' | 'y'): void;
   clearGuides(): void;
@@ -199,6 +224,14 @@ export interface MenuArgs {
   turn(by: number): void;
   flip(axis: 'h' | 'v'): void;
   lock(): void;
+  /** With several parts picked, Line them up is with the slide (not with each other). */
+  alignToSlide: boolean;
+  setAlignToSlide(on: boolean): void;
+  /** A link or a description (alt text) for the part picked, asked for in a small box. */
+  link(): void;
+  describe(): void;
+  /** The cell picked in a table: its rows, columns, merging and fill (only when a right-click was on a cell). */
+  cells?: TableMenu;
   duplicateSlide(): void;
   deleteSlide(): void;
   skipSlide(): void;
@@ -210,6 +243,10 @@ export interface MenuArgs {
   presentMore?: MenuEntry[];
   shortcuts(): void;
   ask?: () => void;
+  /** Ask the agent about the one part picked. */
+  askPart?: () => void;
+  /** Change a slide's layout (the deck's layouts), where there is one. */
+  changeLayout?: () => void;
   /** The writing helpers: design ideas for the slide on view, the accessibility check, every slide translated by the agent (null: a language typed in). */
   designIdeas?: () => void;
   checkAccess?: () => void;
@@ -217,6 +254,150 @@ export interface MenuArgs {
 }
 
 const ZOOMS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+
+/** The stacking order, as a list (the Arrange menu's rows, and a right-click's). */
+function orderList(a: MenuArgs): MenuAction {
+  const dis = !!a.readOnly || !a.picked.length;
+  return {
+    label: 'Order',
+    icon: <Layers size={14} />,
+    disabled: dis,
+    items: [
+      { label: 'Bring to front', icon: <ArrowUpToLine size={14} />, keys: 'Ctrl+Shift+↑', run: () => a.restack('front') },
+      { label: 'Bring forward', icon: <ArrowUp size={14} />, keys: 'Ctrl+↑', run: () => a.restack('forward') },
+      { label: 'Send backward', icon: <ArrowDown size={14} />, keys: 'Ctrl+↓', run: () => a.restack('backward') },
+      { label: 'Send to back', icon: <ArrowDownToLine size={14} />, keys: 'Ctrl+Shift+↓', run: () => a.restack('back') },
+    ],
+  };
+}
+
+/** Lining parts up, as a list: one part with the slide; several with each other, or with the slide when "Align to the slide" is ticked. */
+function alignList(a: MenuArgs): MenuAction {
+  const n = a.picked.length;
+  const many = n > 1;
+  const toSlide = !many || a.alignToSlide;
+  return {
+    label: many ? 'Line them up' : 'On the slide',
+    icon: <AlignStartVertical size={14} />,
+    disabled: !!a.readOnly || !n,
+    items: [
+      many && { label: 'Align to the slide', checked: a.alignToSlide, also: 'line them up with the slide instead of each other', run: () => a.setAlignToSlide(!a.alignToSlide) },
+      many && '-',
+      { label: toSlide ? 'To the left' : 'Left edges', icon: <AlignStartVertical size={14} />, run: () => a.align('left') },
+      { label: toSlide ? 'In the middle, across' : 'Centres across', icon: <AlignCenterVertical size={14} />, run: () => a.align('center') },
+      { label: toSlide ? 'To the right' : 'Right edges', icon: <AlignEndVertical size={14} />, run: () => a.align('right') },
+      { label: toSlide ? 'To the top' : 'Tops', icon: <AlignStartHorizontal size={14} />, run: () => a.align('top') },
+      { label: toSlide ? 'In the middle, down' : 'Middles', icon: <AlignCenterHorizontal size={14} />, run: () => a.align('middle') },
+      { label: toSlide ? 'To the bottom' : 'Bottoms', icon: <AlignEndHorizontal size={14} />, run: () => a.align('bottom') },
+      n > 2 && '-',
+      n > 2 && { label: 'Spread evenly across', run: () => a.spread('h') },
+      n > 2 && { label: 'Spread evenly down', run: () => a.spread('v') },
+    ],
+  };
+}
+
+/** Lock in place, for every part picked (ticked when they all are). */
+const lockEntry = (a: MenuArgs): MenuAction => ({ label: 'Lock in place', icon: <Lock size={14} />, checked: a.picked.length > 0 && a.picked.every((e) => e.lock), also: 'lock unlock', disabled: !!a.readOnly || !a.picked.length, run: a.lock });
+
+/** What a picture, video, chart, equation, icon or live part offers by itself (Format's rows): the same rows in the right-click menu. */
+function partTools(a: MenuArgs): MenuEntry[] {
+  const ro = !!a.readOnly;
+  const one = a.picked.length === 1 ? a.picked[0] : null;
+  const live = one?.type === 'html' || one?.type === 'embed' || one?.type === 'scene3d';
+  return [
+    one?.type === 'image' && !!one.src && !!a.editPicture && { label: 'Edit picture', icon: <SlidersHorizontal size={14} />, also: 'edit picture crop turn adjust filter markup words blur', disabled: ro, run: a.editPicture },
+    one?.type === 'image' && !!one.src && { label: 'Crop the picture', icon: <Crop size={14} />, disabled: ro, run: a.crop },
+    one?.type === 'image' && (!!one.crop || !!one.adjust) && { label: 'Reset the picture', also: 'uncrop colours', disabled: ro, run: a.resetPicture },
+    one?.type === 'image' && !!one.src && !!a.aiEdit && {
+      label: 'Change it with AI',
+      icon: <WandSparkles size={14} />,
+      disabled: ro,
+      items: [
+        { label: 'Change with AI', icon: <WandSparkles size={14} />, also: 'edit picture ai', run: () => a.aiEdit!('change') },
+        { label: 'Remove the background', icon: <ImageMinus size={14} />, also: 'cut out background transparent', run: () => a.aiEdit!('cutout') },
+        { label: 'Erase part of it', icon: <Eraser size={14} />, also: 'erase remove object', run: () => a.aiEdit!('erase') },
+      ],
+    },
+    one?.type === 'video' && !!keptVideo(one.src) && !!a.editVideo && { label: 'Edit video', icon: <SlidersHorizontal size={14} />, also: 'edit video trim cut crop speed text music gif frame', disabled: ro, run: a.editVideo },
+    one?.type === 'chart' && !!a.aiPlotChart && { label: 'Make a plot of this', icon: <ChartScatter size={14} />, also: 'plot chart graph matplotlib', disabled: ro, run: a.aiPlotChart },
+    one?.type === 'math' && { label: 'Edit the equation', icon: <Sigma size={14} />, disabled: ro, run: a.editTex },
+    one?.type === 'icon' && { label: 'Another icon', icon: <Star size={14} />, disabled: ro, run: a.replaceIcon },
+    live && { label: a.running ? 'Stop it' : 'Run it here', icon: a.running ? <CircleStop size={14} /> : <Play size={14} />, also: 'run start live preview stop', run: a.run },
+  ];
+}
+
+/** The right-click menu on a part (or several): Cut, Copy, Paste, Duplicate, Delete; order, lining up, groups, lock, link, description, the look; what the part offers; comment, ask. */
+export function partContextMenu(a: MenuArgs): MenuEntry[] {
+  const ro = !!a.readOnly;
+  const n = a.picked.length;
+  const one = n === 1 ? a.picked[0] : null;
+  const many = n > 1;
+  return [
+    { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', disabled: ro, run: a.cut },
+    { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', run: a.copy },
+    { label: 'Paste', icon: <Clipboard size={14} />, keys: 'Ctrl+V', disabled: ro, run: a.paste },
+    { label: 'Duplicate', icon: <Copy size={14} />, keys: 'Ctrl+D', disabled: ro, run: a.duplicate },
+    { label: 'Delete', icon: <Trash2 size={14} />, keys: 'Delete', danger: true, disabled: ro, run: a.remove },
+    '-',
+    orderList(a),
+    alignList(a),
+    many && { label: 'Group them', icon: <Group size={14} />, keys: 'Ctrl+G', disabled: ro, run: a.group },
+    one?.type === 'group' && { label: 'Ungroup', icon: <Ungroup size={14} />, keys: 'Ctrl+Shift+G', disabled: ro, run: a.ungroup },
+    lockEntry(a),
+    '-',
+    { label: 'Link…', icon: <LinkIcon size={14} />, also: 'hyperlink address url', disabled: ro, run: a.link },
+    one?.type === 'image' && { label: 'Description (alt text)…', icon: <TextCursorInput size={14} />, also: 'alt text accessibility describe', disabled: ro, run: a.describe },
+    { label: 'Copy the look', icon: <Paintbrush size={14} />, keys: 'Ctrl+Shift+C', also: 'copy format style formatting', disabled: !one, run: a.copyLook },
+    { label: 'Paste the look', keys: 'Ctrl+Shift+V', also: 'paste format style formatting', disabled: ro || !a.hasLook, run: a.pasteLook },
+    '-',
+    ...partTools(a),
+    one && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', disabled: ro, run: a.comment },
+    one && !!a.askPart && { label: 'Ask the agent about it', icon: <Sparkles size={14} />, run: a.askPart },
+  ];
+}
+
+/** The right-click menu on the empty slide. */
+export function slideContextMenu(a: MenuArgs): MenuEntry[] {
+  const ro = !!a.readOnly;
+  return [
+    { label: 'Paste', icon: <Clipboard size={14} />, keys: 'Ctrl+V', disabled: ro, run: a.paste },
+    { label: 'Select all', keys: 'Ctrl+A', run: a.selectAll },
+    '-',
+    { label: 'New slide', icon: <Plus size={14} />, keys: 'Ctrl+M', disabled: ro, run: a.newSlide },
+    { label: 'Background…', icon: <PaintBucket size={14} />, also: 'slide background colour picture', disabled: ro, run: () => a.openTab('slide') },
+    !!a.changeLayout && { label: 'Change layout', icon: <LayoutTemplate size={14} />, also: 'layout arrange boxes', disabled: ro, run: a.changeLayout },
+    '-',
+    { label: 'Rulers and guides', icon: <Ruler size={14} />, checked: a.rulers, also: 'ruler guide', run: () => a.setRulers(!a.rulers) },
+    { label: 'Show grid', icon: <Grid3x3 size={14} />, checked: a.grid.show, run: () => a.setGrid({ show: !a.grid.show }) },
+    { label: 'Snap to parts and guides', checked: a.grid.parts, also: 'smart guides snap magnet align', run: () => a.setGrid({ parts: !a.grid.parts }) },
+    { label: 'Add a guide', also: 'guide horizontal vertical', disabled: ro, items: [{ label: 'Add a guide across', run: () => a.addGuide('y') }, { label: 'Add a guide down', run: () => a.addGuide('x') }] },
+    '-',
+    { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', disabled: ro, run: a.comment },
+    !!a.ask && { label: 'Ask the agent about this slide', icon: <Sparkles size={14} />, run: a.ask },
+    { label: 'Present from this slide', icon: <Play size={14} />, keys: 'Shift+F5', run: () => a.present('here') },
+  ];
+}
+
+/** The right-click menu on a table's cell: rows and columns put in or taken out, merging, a fill; then what a part's menu has. */
+export function cellContextMenu(a: MenuArgs): MenuEntry[] {
+  const t = a.cells;
+  const ro = !!a.readOnly;
+  if (!t) return partContextMenu(a);
+  return [
+    { label: 'Insert row above', icon: <Rows2 size={14} />, disabled: ro || !t.canInsertRow, run: () => t.insertRow(true) },
+    { label: 'Insert row below', icon: <Rows2 size={14} />, disabled: ro || !t.canInsertRow, run: () => t.insertRow(false) },
+    { label: 'Insert column left', icon: <Columns2 size={14} />, disabled: ro || !t.canInsertCol, run: () => t.insertCol(true) },
+    { label: 'Insert column right', icon: <Columns2 size={14} />, disabled: ro || !t.canInsertCol, run: () => t.insertCol(false) },
+    { label: 'Delete row', icon: <Trash2 size={14} />, danger: true, disabled: ro || !t.canDeleteRow, run: t.deleteRow },
+    { label: 'Delete column', icon: <Trash2 size={14} />, danger: true, disabled: ro || !t.canDeleteCol, run: t.deleteCol },
+    '-',
+    t.canMerge && { label: 'Merge cells', icon: <Merge size={14} />, disabled: ro, run: t.merge },
+    t.canUnmerge && { label: 'Unmerge cells', icon: <Split size={14} />, disabled: ro, run: t.unmerge },
+    { label: 'Cell fill', icon: <PaintBucket size={14} />, disabled: ro, items: t.fills.map((f) => ({ label: f.label, icon: f.swatch ? <span className="inline-block h-3 w-3 rounded-sm border border-line" style={{ background: f.swatch }} /> : undefined, run: f.run })) },
+    '-',
+    ...partContextMenu(a),
+  ];
+}
 
 export function slidesMenus(a: MenuArgs): MenuDef[] {
   const n = a.picked.length;
@@ -234,7 +415,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         '-',
         { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', disabled: ro || !n, run: a.cut },
         { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', disabled: !n, run: a.copy },
-        { label: 'Paste', icon: <Clipboard size={14} />, keys: 'Ctrl+V', disabled: ro || !a.canPaste, run: a.paste },
+        { label: 'Paste', icon: <Clipboard size={14} />, keys: 'Ctrl+V', disabled: ro, run: a.paste },
         { label: 'Duplicate', icon: <Copy size={14} />, keys: 'Ctrl+D', disabled: ro || !n, run: a.duplicate },
         { label: 'Delete', icon: <Trash2 size={14} />, keys: 'Delete', disabled: ro || !n, run: a.remove },
         '-',
@@ -261,6 +442,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         },
         '-',
         { label: 'Show grid', icon: <Grid3x3 size={14} />, checked: a.grid.show, run: () => a.setGrid({ show: !a.grid.show }) },
+        { label: 'Snap to parts and guides', checked: a.grid.parts, also: 'smart guides snap magnet align lines distances', run: () => a.setGrid({ parts: !a.grid.parts }) },
         { label: 'Snap to grid', checked: a.grid.snap, also: 'grid magnet', run: () => a.setGrid({ snap: !a.grid.snap }) },
         { label: 'Grid size', items: [10, 20, 40, 80].map((s) => ({ label: `${s} px`, checked: a.grid.size === s, also: 'grid size spacing', run: () => a.setGrid({ size: s }) })) },
         '-',
@@ -430,27 +612,8 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
         { label: 'Group them', icon: <Group size={14} />, keys: 'Ctrl+G', disabled: ro || !many, run: a.group },
         { label: 'Ungroup', icon: <Ungroup size={14} />, keys: 'Ctrl+Shift+G', disabled: ro || !(one?.type === 'group'), run: a.ungroup },
         '-',
-        { label: 'Bring to front', icon: <ArrowUpToLine size={14} />, keys: 'Ctrl+Shift+↑', disabled: ro || !n, run: () => a.restack('front') },
-        { label: 'Bring forward', icon: <ArrowUp size={14} />, keys: 'Ctrl+↑', disabled: ro || !n, run: () => a.restack('forward') },
-        { label: 'Send backward', icon: <ArrowDown size={14} />, keys: 'Ctrl+↓', disabled: ro || !n, run: () => a.restack('backward') },
-        { label: 'Send to back', icon: <ArrowDownToLine size={14} />, keys: 'Ctrl+Shift+↓', disabled: ro || !n, run: () => a.restack('back') },
-        '-',
-        {
-          label: many ? 'Line them up' : 'On the slide',
-          icon: <AlignStartVertical size={14} />,
-          disabled: ro || !n,
-          items: [
-            { label: many ? 'Left edges' : 'To the left', icon: <AlignStartVertical size={14} />, run: () => a.align('left') },
-            { label: many ? 'Centres across' : 'In the middle, across', icon: <AlignCenterVertical size={14} />, run: () => a.align('center') },
-            { label: many ? 'Right edges' : 'To the right', icon: <AlignEndVertical size={14} />, run: () => a.align('right') },
-            { label: many ? 'Tops' : 'To the top', icon: <AlignStartHorizontal size={14} />, run: () => a.align('top') },
-            { label: many ? 'Middles' : 'In the middle, down', icon: <AlignCenterHorizontal size={14} />, run: () => a.align('middle') },
-            { label: many ? 'Bottoms' : 'To the bottom', icon: <AlignEndHorizontal size={14} />, run: () => a.align('bottom') },
-            n > 2 && '-',
-            n > 2 && { label: 'Spread evenly across', run: () => a.spread('h') },
-            n > 2 && { label: 'Spread evenly down', run: () => a.spread('v') },
-          ],
-        },
+        orderList(a),
+        alignList(a),
         {
           label: 'Turn',
           icon: <RotateCw size={14} />,
@@ -464,7 +627,7 @@ export function slidesMenus(a: MenuArgs): MenuDef[] {
           ],
         },
         '-',
-        { label: 'Lock in place', icon: <Lock size={14} />, checked: !!one?.lock, disabled: ro || !one, run: a.lock },
+        lockEntry(a),
       ],
     },
     {

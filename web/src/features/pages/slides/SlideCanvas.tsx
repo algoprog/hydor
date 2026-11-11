@@ -1,8 +1,10 @@
 // The slide being edited, as large as there is room for, or zoomed (View → Zoom, Ctrl+scroll, a pinch) and scrolled
 // around: click a part to pick it (Shift adds to the pick, a drag across empty space picks what it touches), drag it
-// to move it (it snaps to the slide's middle and edges, to other parts, to the guides and the grid, with lines that
-// show where, and to gaps as wide as those between other parts, marked; Alt does not snap, Shift keeps it straight),
-// its handles to size or turn it, a line's ends to move them (near a part, an end sticks to the middle of one of its
+// to move it (it snaps to the slide's middle and edges, to other parts, to the guides and the grid, with lines between
+// it and what it lines up with, the distances to what is next to it, gaps as wide as those between other parts, and its
+// place by the pointer; several parts picked have one frame round them, to size or turn them together; Ctrl drags a copy, Alt does not snap, Shift keeps it straight), its handles to size it (every
+// resize snaps too, turned parts by the box they show, and to the width or height of another part; the size by the
+// pointer) or turn it (the angle by the pointer), a line's ends to move them (near a part, an end sticks to the middle of one of its
 // sides: a connector, which follows its parts as they are dragged). A group is picked, moved, sized and turned as one;
 // double-click it to pick a part inside, Esc or a click outside to leave it. Double-click words to change them in
 // place, a table's cell to type in it (Shift-click another to pick the cells between), a picture to crop it (drag the
@@ -18,7 +20,9 @@ import { forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect
 import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
 import { MessageSquare, Play, Square } from 'lucide-react';
 import { cx } from '../../../components/ui';
-import { boxOf, heightOf, isLive, mergeAt, setEls, W } from './ops';
+import { addEls, boxOf, copies, heightOf, isLive, mergeAt, scalePicked, setEls, spinPicked, W } from './ops';
+import { isCopyDrag, isNoSnap } from '../common/keys';
+import { snapMove, snapResize, unionOf, type Gap, type GuideLine, type SnapSet } from './snap';
 import { OfflineFrames } from '../frame';
 import { liveOpts, PICS, RT } from './rt';
 
@@ -33,6 +37,8 @@ export interface CanvasHandle {
   paraOp(f: (paras: Para[], picked: number[]) => Para[]): void;
   /** Ends cropping a picture, keeping the crop or not. */
   endCrop(keep: boolean): void;
+  /** Where a part is on the screen (its middle), or the slide's: where a menu opened from the keyboard goes. */
+  pointOf(id: string | null): { x: number; y: number } | null;
 }
 
 /** A match of Find to mark: in a part's paragraph, a table's cell or a chart's words ([s, e) of their text), or an equation's LaTeX (the equation). */
@@ -76,6 +82,8 @@ export interface GridOpts {
   snap: boolean;
   /** In the slide's pixels. */
   size: number;
+  /** Parts snap to the other parts, the slide's edges and middle and the guides (View → Snap to parts and guides). */
+  parts: boolean;
 }
 
 interface Box {
@@ -96,11 +104,15 @@ interface Frame extends Box {
 }
 
 type Drag =
-  | { kind: 'move'; ids: string[]; start: P; dx: number; dy: number; moved: boolean }
+  | { kind: 'move'; ids: string[]; start: P; dx: number; dy: number; moved: boolean; copy?: boolean }
   | { kind: 'resize'; id: string; hx: number; hy: number; start: P; box: Box; rot: number; next: Box }
   | { kind: 'rotate'; id: string; cx: number; cy: number; rot: number }
   | { kind: 'end'; id: string; which: 'start' | 'end'; next: { x: number; y: number; w: number; h: number }; stick?: Stick; near?: string }
   | { kind: 'marquee'; start: P; at: P; add: string[] }
+  | { kind: 'draw'; start: P; at: P }
+  /** Several parts picked, sized or turned together, as one (the frame round them). */
+  | { kind: 'multi'; ids: string[]; hx: number; hy: number; start: P; box: Box; next: Box }
+  | { kind: 'spin'; ids: string[]; cx: number; cy: number; a0: number; a: number }
   | { kind: 'guide'; axis: 'x' | 'y'; index: number | null; at: number; off: boolean }
   | { kind: 'crop'; hx: number; hy: number; start: P; box: Box; full: Box };
 
@@ -263,8 +275,8 @@ export const SlideCanvas = forwardRef<
     readOnly?: boolean;
     /** An agent writing this slide (live.ts): the part its words are arriving in ('' for the slide as a whole), boxed in its colour. */
     agent?: string | null;
-    /** Right-click (or a long press) on a part or the slide. */
-    onMenu?: (at: { x: number; y: number }, id: string | null) => void;
+    /** Right-click (or a long press) on a part or the slide; on a table's cell, which one (it is picked). */
+    onMenu?: (at: { x: number; y: number }, id: string | null, cell?: { r: number; c: number }) => void;
     /** An empty picture was double-clicked: put one in its place. */
     onReplaceImage?: (id: string) => void;
     /** A chart was double-clicked: its numbers. */
@@ -298,6 +310,9 @@ export const SlideCanvas = forwardRef<
     /** The live part running in place, and Run or Stop on it. */
     running?: string | null;
     onRun?: (id: string | null) => void;
+    /** A part is being drawn (Insert → Text box, Shape, Line): a drag draws it there at that size, a click puts it there at its default size. */
+    drawing?: 'box' | 'line' | null;
+    onDraw?: (a: { from: P; to: P } | { at: P }) => void;
     /** A part is being picked for something: a click picks the part under it (null: none). */
     picking?: boolean;
     onPick?: (id: string | null) => void;
@@ -337,6 +352,8 @@ export const SlideCanvas = forwardRef<
     onPin,
     running,
     onRun,
+    drawing,
+    onDraw,
     picking,
     onPick,
     children,
@@ -351,8 +368,28 @@ export const SlideCanvas = forwardRef<
   const content = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [guides, setGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
-  const [gaps, setGaps] = useState<{ x1: number; y1: number; x2: number; y2: number; n: number }[]>([]);
+  /** What shows while a part is dragged or sized: the lines between it and what it lines up with, the gaps as wide as others, its distances, the widths and heights it shares, and its numbers by the pointer. */
+  const [lines, setLines] = useState<GuideLine[]>([]);
+  const [gaps, setGaps] = useState<Gap[]>([]);
+  const [dist, setDist] = useState<Gap[]>([]);
+  const [equal, setEqual] = useState<{ w: Box[]; h: Box[] }>({ w: [], h: [] });
+  const [readout, setReadout] = useState<{ x: number; y: number; text: string } | null>(null);
+  /** The parts left where they were while a copy of them is dragged (taken away once it lets go). */
+  const ghosts = useRef<HTMLElement[]>([]);
+  const clearMarks = () => {
+    setLines([]);
+    setGaps([]);
+    setDist([]);
+    setEqual({ w: [], h: [] });
+    setReadout(null);
+    ghosts.current.forEach((g) => g.remove());
+    ghosts.current = [];
+  };
+  /** The small pill by the pointer while something is dragged: where it is, how large it is, or the angle it is turned to. */
+  const setPointer = (e: { clientX: number; clientY: number }, text: string) => {
+    const st = stageRef.current?.getBoundingClientRect();
+    if (st) setReadout({ x: e.clientX - st.left, y: e.clientY - st.top, text });
+  };
   const [cell, setCell] = useState<{ id: string; r: number; c: number; box: Box; text: string } | null>(null);
   const [crop, setCrop] = useState<Cropping | null>(null);
   const [hl, setHl] = useState<{ x: number; y: number; w: number; h: number; current: boolean }[]>([]);
@@ -628,6 +665,11 @@ export const SlideCanvas = forwardRef<
     stopEditing: stop,
     paraOp: (f) => paraOp(f),
     endCrop,
+    pointOf: (id) => {
+      const n = id ? nodeOf(id) : stageRef.current;
+      const r = n?.getBoundingClientRect();
+      return r ? { x: r.left + r.width / 2, y: r.top + (id ? r.height / 2 : Math.min(r.height / 2, 40)) } : null;
+    },
   }));
 
   const paraOp = (f: (paras: Para[], picked: number[]) => Para[]) => {
@@ -733,106 +775,20 @@ export const SlideCanvas = forwardRef<
   });
 
   // ---- pointers ---------------------------------------------------------------------------------------------
-  const others = (ids: string[]) => levelEls.filter((e) => !ids.includes(e.id)).map(boxOf);
-  /** What a box moving at this level snaps to: the slide's middle and edges, the other parts, the guides, the grid. */
-  const snapLines = (ids: string[], box?: Box) => {
-    const xs: number[] = [];
-    const ys: number[] = [];
-    if (straight) {
-      xs.push(0 - origin.x, W / 2 - origin.x, W - origin.x);
-      ys.push(0 - origin.y, H / 2 - origin.y, H - origin.y);
-      if (rulers) {
-        for (const g of deck.guides?.x ?? []) xs.push(g - origin.x);
-        for (const g of deck.guides?.y ?? []) ys.push(g - origin.y);
-      }
-    }
-    for (const b of others(ids)) {
-      xs.push(b.x, b.x + b.w / 2, b.x + b.w);
-      ys.push(b.y, b.y + b.h / 2, b.y + b.h);
-    }
-    // The grid's lines near the box.
-    const gx: number[] = [];
-    const gy: number[] = [];
-    if (grid.snap && straight && box && grid.size > 1) {
-      const near = (v: number, o: number) => {
-        const n = Math.round((v + o) / grid.size) * grid.size - o;
-        return [n - grid.size, n, n + grid.size];
-      };
-      gx.push(...near(box.x, origin.x), ...near(box.x + box.w, origin.x));
-      gy.push(...near(box.y, origin.y), ...near(box.y + box.h, origin.y));
-    }
-    return { xs, ys, gx, gy };
-  };
-  const snap = (vals: number[], lines: number[], tol: number): { d: number; at: number[] } => {
-    let best: { d: number; at: number[] } = { d: 0, at: [] };
-    let bestAbs = tol + 1;
-    for (const v of vals)
-      for (const l of lines) {
-        const d = l - v;
-        if (Math.abs(d) < bestAbs - 0.01) {
-          bestAbs = Math.abs(d);
-          best = { d, at: [l] };
-        } else if (Math.abs(Math.abs(d) - bestAbs) < 0.01 && !best.at.includes(l)) best.at.push(l);
-      }
-    return bestAbs <= tol ? best : { d: 0, at: [] };
-  };
-  /** Snapping to the lines and to the grid: whichever is nearer; only the lines' own are drawn. */
-  const snapBoth = (vals: number[], lines: number[], gridLines: number[], tol: number) => {
-    const a = snap(vals, lines, tol);
-    const g = snap(vals, gridLines, tol);
-    if (!g.at.length || (a.at.length && Math.abs(a.d) <= Math.abs(g.d))) return a;
-    return { d: g.d, at: [] };
-  };
-
+  /** The other parts at this level, as they show (a turned part by the box round its turned corners). */
+  const others = (ids: string[]) => levelEls.filter((e) => !ids.includes(e.id)).map(turnedBox);
   /**
-   * Gaps as wide as those between other parts in the same row (or column): the box moved to make another such gap,
-   * or to sit as far from the part on its one side as from the one on its other; and where the gaps are, to mark them.
+   * What a part moving at this level snaps to: the slide's middle and edges and the guides (only where the level is the
+   * slide's own: nothing turned), the other parts, the grid. View → Snap to parts and guides off leaves the grid alone.
    */
-  const spacing = (b: Box, ids: string[], axis: 'x' | 'y', tol: number): { d: number; marks: { a: number; b: number; at: number }[] } | null => {
-    const X = axis === 'x';
-    const pos = (r: Box) => (X ? r.x : r.y);
-    const len = (r: Box) => (X ? r.w : r.h);
-    const across = (r: Box) => (X ? [r.y, r.y + r.h] : [r.x, r.x + r.w]);
-    const [m0, m1] = across(b);
-    const row = others(ids)
-      .filter((r) => {
-        const [a0, a1] = across(r);
-        return a0 < m1 && a1 > m0;
-      })
-      .sort((p, q) => pos(p) - pos(q));
-    if (row.length < 2) return null;
-    const mid = (r: Box) => {
-      const [a0, a1] = across(r);
-      return (Math.max(a0, m0) + Math.min(a1, m1)) / 2;
+  const snapSet = (ids: string[]): SnapSet => {
+    const parts = grid.parts;
+    return {
+      parts: parts ? others(ids) : [],
+      frame: parts && straight ? { x: -origin.x, y: -origin.y, w: W, h: H } : undefined,
+      guides: parts && straight && rulers ? { x: (deck.guides?.x ?? []).map((g) => g - origin.x), y: (deck.guides?.y ?? []).map((g) => g - origin.y) } : { x: [], y: [] },
+      grid: grid.snap && straight && grid.size > 1 ? { size: grid.size, ox: origin.x, oy: origin.y } : undefined,
     };
-    let best: { d: number; marks: { a: number; b: number; at: number }[] } | null = null;
-    const offer = (to: number, marks: { a: number; b: number; at: number }[]) => {
-      const d = to - pos(b);
-      if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, marks };
-    };
-    for (let i = 0; i < row.length - 1; i++) {
-      const A = row[i];
-      const B = row[i + 1];
-      const gap = pos(B) - (pos(A) + len(A));
-      if (gap <= 0) continue;
-      // After B, and before A, with the gap they have.
-      offer(pos(B) + len(B) + gap, [
-        { a: pos(A) + len(A), b: pos(B), at: mid(A) },
-        { a: pos(B) + len(B), b: pos(B) + len(B) + gap, at: mid(B) },
-      ]);
-      offer(pos(A) - gap - len(b), [
-        { a: pos(A) - gap, b: pos(A), at: mid(A) },
-        { a: pos(A) + len(A), b: pos(B), at: mid(B) },
-      ]);
-      // Between them, as far from each.
-      const room = gap - len(b);
-      if (room > 0)
-        offer(pos(A) + len(A) + room / 2, [
-          { a: pos(A) + len(A), b: pos(A) + len(A) + room / 2, at: mid(A) },
-          { a: pos(B) - room / 2, b: pos(B), at: mid(B) },
-        ]);
-    }
-    return best;
   };
 
   /** The connectors stuck to parts being dragged, drawn where they will go (`moved`: those parts as the drag has them now). */
@@ -861,8 +817,7 @@ export const SlideCanvas = forwardRef<
     const d = dragRef.current;
     if (d?.kind === 'move') for (const id of d.ids) nodeOf(id)?.style.removeProperty('translate');
     setDrag(null);
-    setGuides({ x: [], y: [] });
-    setGaps([]);
+    clearMarks();
   };
 
   const onDown = (e: React.PointerEvent) => {
@@ -893,6 +848,15 @@ export const SlideCanvas = forwardRef<
       const f = crop.full;
       if (p.x < f.x || p.y < f.y || p.x > f.x + f.w || p.y > f.y + f.h) return endCrop(true);
       return begin(e, { kind: 'crop', hx: 0, hy: 0, start: p, box: crop.box, full: crop.full });
+    }
+    // Drawing a new part: a press starts it, wherever it is on the slide (snapped like a part moved).
+    if (drawing && !readOnly) {
+      if (scope.length) onScope([]);
+      const q = toSlide(e.clientX, e.clientY);
+      const r = snapMove({ x: q.x, y: q.y, w: 0, h: 0 }, { ...snapSet([]), frame: { x: 0, y: 0, w: W, h: H } }, 6 / k, { gaps: false, dist: false, on: !isNoSnap(e) });
+      const start = { x: q.x + r.dx, y: q.y + r.dy };
+      setLines(r.lines);
+      return begin(e, { kind: 'draw', start, at: start });
     }
     const { id, inside } = hit(e.clientX, e.clientY);
     if (!inside) {
@@ -962,6 +926,27 @@ export const SlideCanvas = forwardRef<
     const p = toLocal(e.clientX, e.clientY);
     const tol = 6 / k;
     if (d.kind === 'marquee') return setDrag({ ...d, at: p });
+    if (d.kind === 'draw') {
+      const q = toSlide(e.clientX, e.clientY);
+      const r = snapMove({ x: q.x, y: q.y, w: 0, h: 0 }, { ...snapSet([]), frame: { x: 0, y: 0, w: W, h: H } }, tol, { gaps: false, dist: false, on: !isNoSnap(e) });
+      let at = { x: q.x + r.dx, y: q.y + r.dy };
+      // Shift: a square (a line: along 45°).
+      if (e.shiftKey) {
+        const dx = at.x - d.start.x;
+        const dy = at.y - d.start.y;
+        if (drawing === 'line') {
+          const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+          const len = Math.hypot(dx, dy);
+          at = { x: d.start.x + Math.cos(ang) * len, y: d.start.y + Math.sin(ang) * len };
+        } else {
+          const m = Math.max(Math.abs(dx), Math.abs(dy));
+          at = { x: d.start.x + Math.sign(dx || 1) * m, y: d.start.y + Math.sign(dy || 1) * m };
+        }
+      }
+      setLines(r.lines);
+      setPointer(e, drawing === 'line' ? `${Math.round(Math.hypot(at.x - d.start.x, at.y - d.start.y))} px` : `${Math.round(Math.abs(at.x - d.start.x))} × ${Math.round(Math.abs(at.y - d.start.y))}`);
+      return setDrag({ ...d, at });
+    }
     if (d.kind === 'guide') {
       const s = toSlide(e.clientX, e.clientY);
       const at = Math.round(d.axis === 'x' ? s.x : s.y);
@@ -999,55 +984,84 @@ export const SlideCanvas = forwardRef<
       let dx = p.x - d.start.x;
       let dy = p.y - d.start.y;
       if (!d.moved && Math.hypot(dx * k, dy * k) < 3) return;
+      // Dragged with the copy key: the parts stay where they were (a ghost of each is left), and copies go with the pointer.
+      const copy = d.moved ? d.copy : isCopyDrag(e);
+      if (copy && !d.moved) {
+        for (const id of d.ids) {
+          const n = nodeOf(id);
+          if (!n?.parentElement) continue;
+          const ghost = n.cloneNode(true) as HTMLElement;
+          ghost.querySelectorAll('[data-id]').forEach((x) => x.removeAttribute('data-id'));
+          ghost.removeAttribute('data-id');
+          n.parentElement.insertBefore(ghost, n);
+          ghosts.current.push(ghost);
+        }
+      }
       if (e.shiftKey) {
         if (Math.abs(dx) > Math.abs(dy)) dy = 0;
         else dx = 0;
       }
-      const boxes = levelEls.filter((x) => d.ids.includes(x.id)).map(boxOf);
-      const x0 = Math.min(...boxes.map((b) => b.x));
-      const y0 = Math.min(...boxes.map((b) => b.y));
-      const bw = Math.max(...boxes.map((b) => b.x + b.w)) - x0;
-      const bh = Math.max(...boxes.map((b) => b.y + b.h)) - y0;
-      let gx: number[] = [];
-      let gy: number[] = [];
-      const marks: typeof gaps = [];
-      if (!e.altKey) {
-        const box = { x: x0 + dx, y: y0 + dy, w: bw, h: bh };
-        const { xs, ys, gx: gridX, gy: gridY } = snapLines(d.ids, box);
-        const sx = snapBoth([box.x, box.x + bw / 2, box.x + bw], xs, gridX, tol);
-        const sy = snapBoth([box.y, box.y + bh / 2, box.y + bh], ys, gridY, tol);
-        if (!e.shiftKey || dx !== 0) dx += sx.d;
-        if (!e.shiftKey || dy !== 0) dy += sy.d;
-        gx = sx.at;
-        gy = sy.at;
-        // Equal gaps, where no line was snapped to across (or down).
-        const moved = { x: x0 + dx, y: y0 + dy, w: bw, h: bh };
-        const hx = !gx.length && (!e.shiftKey || dx !== 0) ? spacing(moved, d.ids, 'x', tol) : null;
-        if (hx) {
-          dx += hx.d;
-          for (const m of hx.marks) marks.push({ x1: m.a, y1: m.at, x2: m.b, y2: m.at, n: Math.round(m.b - m.a) });
-        }
-        const vy = !gy.length && (!e.shiftKey || dy !== 0) ? spacing({ ...moved, x: x0 + dx }, d.ids, 'y', tol) : null;
-        if (vy) {
-          dy += vy.d;
-          for (const m of vy.marks) marks.push({ x1: m.at, y1: m.a, x2: m.at, y2: m.b, n: Math.round(m.b - m.a) });
-        }
-      }
-      setGuides({ x: gx, y: gy });
-      setGaps(marks);
+      const box = unionOf(levelEls.filter((x) => d.ids.includes(x.id)).map(turnedBox));
+      const r = snapMove({ ...box, x: box.x + dx, y: box.y + dy }, snapSet(d.ids), tol, { free: { x: !e.shiftKey || dx !== 0, y: !e.shiftKey || dy !== 0 }, on: !isNoSnap(e) });
+      dx += r.dx;
+      dy += r.dy;
+      setLines(r.lines);
+      setGaps(r.gaps);
+      setDist(r.dist);
+      setPointer(e, `x ${Math.round(box.x + dx + origin.x)}  y ${Math.round(box.y + dy + origin.y)}`);
       for (const id of d.ids) {
         const n = nodeOf(id);
         if (n) n.style.translate = `${dx}px ${dy}px`;
       }
       follow(levelEls.filter((x) => d.ids.includes(x.id)).map((x) => ({ ...x, x: x.x + dx, y: x.y + dy })));
-      return setDrag({ ...d, dx, dy, moved: true });
+      return setDrag({ ...d, dx, dy, moved: true, copy });
+    }
+    if (d.kind === 'multi') {
+      const nw0 = d.hx ? Math.max(8, d.box.w + d.hx * (p.x - d.start.x)) : d.box.w;
+      const nh0 = d.hy ? Math.max(8, d.box.h + d.hy * (p.y - d.start.y)) : d.box.h;
+      // A corner keeps the shape they fill together (Shift: free).
+      const keep = !e.shiftKey && d.hx !== 0 && d.hy !== 0;
+      const sc = Math.max(nw0 / d.box.w, nh0 / d.box.h);
+      const res = snapResize({ box: d.box, rot: 0, hx: d.hx, hy: d.hy, nw: keep ? d.box.w * sc : nw0, nh: keep ? d.box.h * sc : nh0, keep, set: snapSet(d.ids), tol, on: !isNoSnap(e) });
+      setLines(res.lines);
+      setEqual(res.equal);
+      setPointer(e, `${res.box.w} × ${res.box.h}`);
+      const shown: El[] = [];
+      for (const el of levelEls.filter((x) => d.ids.includes(x.id))) {
+        const sh = scalePicked(el, d.box, res.box);
+        shown.push(sh);
+        const n = nodeOf(el.id);
+        if (n) {
+          const fresh = RT.part(deck, slide, sh, { edit: true, ...PICS });
+          n.replaceWith(fresh);
+          RT.fit(fresh);
+        }
+      }
+      follow(shown);
+      return setDrag({ ...d, next: res.box });
+    }
+    if (d.kind === 'spin') {
+      let a = (Math.atan2(p.y - d.cy, p.x - d.cx) * 180) / Math.PI - d.a0;
+      if (e.shiftKey) a = Math.round(a / 15) * 15;
+      a = Math.round(a * 10) / 10;
+      setPointer(e, `${((a % 360) + 360) % 360}°`);
+      const shown: El[] = [];
+      for (const el of levelEls.filter((x) => d.ids.includes(x.id))) {
+        const sh = spinPicked(el, { x: d.cx, y: d.cy }, a);
+        shown.push(sh);
+        const n = nodeOf(el.id);
+        if (n) n.replaceWith(RT.part(deck, slide, sh, { edit: true, ...PICS }));
+      }
+      follow(shown);
+      return setDrag({ ...d, a });
     }
     if (d.kind === 'rotate') {
       let a = (Math.atan2(p.y - d.cy, p.x - d.cx) * 180) / Math.PI + 90;
       a = ((a % 360) + 360) % 360;
       if (e.shiftKey) a = Math.round(a / 15) * 15;
-      else for (const m of [0, 90, 180, 270, 360]) if (Math.abs(a - m) < 3) a = m;
+      else if (!isNoSnap(e)) for (const m of [0, 90, 180, 270, 360]) if (Math.abs(a - m) < 3) a = m;
       a = a % 360;
+      setPointer(e, `${Math.round(a * 10) / 10}°`);
       const n = nodeOf(d.id);
       if (n) n.style.rotate = `${a}deg`;
       const turned = levelEls.find((x) => x.id === d.id);
@@ -1072,44 +1086,13 @@ export const SlideCanvas = forwardRef<
         nw = Math.max(8, d.box.w * s);
         nh = Math.max(8, d.box.h * s);
       }
-      // The side or corner across from the handle stays where it is.
-      const cxl = (d.hx * (nw - d.box.w)) / 2;
-      const cyl = (d.hy * (nh - d.box.h)) / 2;
-      const cx0 = d.box.x + d.box.w / 2 + cxl * Math.cos(r) - cyl * Math.sin(r);
-      const cy0 = d.box.y + d.box.h / 2 + cxl * Math.sin(r) + cyl * Math.cos(r);
-      let next = { x: cx0 - nw / 2, y: cy0 - nh / 2, w: nw, h: nh };
-      // Unturned, its moving edges snap.
-      let gxs: number[] = [];
-      let gys: number[] = [];
-      if (!d.rot && !e.altKey && !keep) {
-        const { xs, ys, gx: gridX, gy: gridY } = snapLines([d.id], next);
-        if (d.hx) {
-          const edge = d.hx > 0 ? next.x + next.w : next.x;
-          const sx = snapBoth([edge], xs, gridX, tol);
-          if (sx.d) {
-            if (d.hx > 0) next.w += sx.d;
-            else {
-              next.x += sx.d;
-              next.w -= sx.d;
-            }
-            gxs = sx.at;
-          }
-        }
-        if (d.hy) {
-          const edge = d.hy > 0 ? next.y + next.h : next.y;
-          const sy = snapBoth([edge], ys, gridY, tol);
-          if (sy.d) {
-            if (d.hy > 0) next.h += sy.d;
-            else {
-              next.y += sy.d;
-              next.h -= sy.d;
-            }
-            gys = sy.at;
-          }
-        }
-      }
-      next = { x: Math.round(next.x), y: Math.round(next.y), w: Math.max(8, Math.round(next.w)), h: Math.max(8, Math.round(next.h)) };
-      setGuides({ x: gxs, y: gys });
+      // The edges that move snap (a turned part by the box it shows), a corner that keeps the shape by the edge that moves most,
+      // and its width or height to another part's; the lines of what it lines up with, and the size by the pointer.
+      const res = snapResize({ box: d.box, rot: d.rot, hx: d.hx, hy: d.hy, nw, nh, keep, set: snapSet([d.id]), tol, on: !isNoSnap(e) });
+      const next = res.box;
+      setLines(res.lines);
+      setEqual(res.equal);
+      setPointer(e, `${next.w} × ${next.h}`);
       // The part drawn again at its new size (its words wrap anew; a group's parts sized with it).
       const n = nodeOf(d.id);
       const shown = (el.type === 'group' ? { ...el, ...next, els: scaleEls(el.els, next.w / el.w, next.h / el.h) } : { ...el, ...next }) as El;
@@ -1131,7 +1114,7 @@ export const SlideCanvas = forwardRef<
       // Near a part (on the slide itself), its sides' middles show, and the end sticks to the nearest within reach (Alt: none).
       let stick: Stick | undefined;
       let near: string | undefined;
-      if (!scoped.length && !e.altKey) {
+      if (!scoped.length && !isNoSnap(e)) {
         const reach = 14 / k;
         let best = Infinity;
         for (const part of levelEls) {
@@ -1160,10 +1143,11 @@ export const SlideCanvas = forwardRef<
         const len = Math.hypot(bx - ax, by - ay);
         bx = ax + Math.cos(ang) * len;
         by = ay + Math.sin(ang) * len;
-      } else if (!e.altKey) {
-        const { xs, ys, gx: gridX, gy: gridY } = snapLines([d.id], { x: bx, y: by, w: 0, h: 0 });
-        bx += snapBoth([bx], xs, gridX, tol).d;
-        by += snapBoth([by], ys, gridY, tol).d;
+      } else if (!isNoSnap(e)) {
+        const r = snapMove({ x: bx, y: by, w: 0, h: 0 }, snapSet([d.id]), tol, { gaps: false, dist: false });
+        bx += r.dx;
+        by += r.dy;
+        setLines(r.lines);
       }
       const r = (v: number) => (stick ? Math.round(v * 100) / 100 : Math.round(v));
       const next = d.which === 'start' ? { x: r(bx), y: r(by), w: r(ax - bx), h: r(ay - by) } : { x: el.x, y: el.y, w: r(bx - el.x), h: r(by - el.y) };
@@ -1190,8 +1174,7 @@ export const SlideCanvas = forwardRef<
     }
     const d = dragRef.current;
     setDrag(null);
-    setGuides({ x: [], y: [] });
-    setGaps([]);
+    clearMarks();
     if (!d) return;
     if (d.kind === 'marquee') {
       const x0 = Math.min(d.start.x, d.at.x);
@@ -1208,6 +1191,12 @@ export const SlideCanvas = forwardRef<
       onSel([...new Set([...d.add, ...ids])]);
       return;
     }
+    if (d.kind === 'draw') {
+      // Hardly moved: a click, which puts the part where it was at its default size.
+      if (Math.hypot((d.at.x - d.start.x) * k, (d.at.y - d.start.y) * k) < 4) onDraw?.({ at: d.start });
+      else onDraw?.({ from: d.start, to: d.at });
+      return;
+    }
     if (d.kind === 'guide') {
       change((dk) => {
         const list = [...(dk.guides?.[d.axis] ?? [])];
@@ -1222,12 +1211,32 @@ export const SlideCanvas = forwardRef<
       return;
     }
     if (d.kind === 'crop') return;
+    if (d.kind === 'multi') {
+      const n = d.next;
+      if (n.x !== d.box.x || n.y !== d.box.y || n.w !== d.box.w || n.h !== d.box.h) change(setEls(deck, index, d.ids, (e) => scalePicked(e, d.box, n)));
+      return;
+    }
+    if (d.kind === 'spin') {
+      if (d.a) change(setEls(deck, index, d.ids, (e) => spinPicked(e, { x: d.cx, y: d.cy }, d.a)));
+      return;
+    }
     if (d.kind === 'move') {
       for (const id of d.ids) {
         const n = nodeOf(id);
         if (n) n.style.translate = '';
       }
       if (!d.moved || (Math.abs(d.dx) < 0.5 && Math.abs(d.dy) < 0.5)) return;
+      if (d.copy) {
+        // The copy key was held as it started: the parts stay, and copies (one step to undo) are where they were let go, picked.
+        const fresh = copies(
+          levelEls.filter((x) => d.ids.includes(x.id)),
+          0,
+        ).map((c) => ({ ...c, x: Math.round(c.x + d.dx), y: Math.round(c.y + d.dy) }));
+        const group = scoped[scoped.length - 1];
+        change(group ? setEls(deck, index, [group.id], (g) => (g.type === 'group' ? { ...g, els: [...g.els, ...fresh] } : g)) : addEls(deck, index, fresh));
+        onSel(fresh.map((c) => c.id));
+        return;
+      }
       // A connector moved lets go of the parts that stay where they are (moved with them, it stays stuck).
       const moving = new Set(everyEl(levelEls.filter((x) => d.ids.includes(x.id))).map((x) => x.id));
       change(
@@ -1351,6 +1360,8 @@ export const SlideCanvas = forwardRef<
     if (d.kind === 'resize' && d.id === e.id) return { ...e, ...d.next };
     if (d.kind === 'rotate' && d.id === e.id) return { ...e, rot: d.rot };
     if (d.kind === 'end' && d.id === e.id) return { ...e, ...d.next };
+    if (d.kind === 'multi' && d.ids.includes(e.id)) return scalePicked(e, d.box, d.next);
+    if (d.kind === 'spin' && d.ids.includes(e.id)) return spinPicked(e, { x: d.cx, y: d.cy }, d.a);
     return e;
   };
   const picked = levelEls.filter((e) => sel.includes(e.id)).map(live);
@@ -1408,6 +1419,41 @@ export const SlideCanvas = forwardRef<
         <div
           title="Turn it (Shift: by 15°)"
           onPointerDown={(ev) => begin(ev, { kind: 'rotate', id: e.id, cx: e.x + e.w / 2, cy: e.y + e.h / 2, rot })}
+          className="pointer-events-auto absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 cursor-grab rounded-full border-[1.5px] border-accent bg-white shadow-sm pointer-coarse:h-5 pointer-coarse:w-5"
+          style={{ top: -27 }}
+        />
+      </div>
+    );
+  };
+
+  /**
+   * Several parts picked: one frame round them all, with handles to size them together (the corners keep the shape they
+   * fill, Shift frees it) and the round handle above to turn them together about its middle.
+   */
+  const multiFrame = () => {
+    if (readOnly || editing || crop || picked.length < 2 || picked.some((e) => e.lock)) return null;
+    const ids = picked.map((e) => e.id);
+    const box = drag?.kind === 'multi' ? drag.next : unionOf(levelEls.filter((e) => ids.includes(e.id)).map(turnedBox));
+    const spin = drag?.kind === 'spin' ? drag : null;
+    const b0 = drag?.kind === 'multi' ? drag.box : box;
+    return (
+      <div className="pointer-events-none absolute" style={{ left: S(box.x), top: S(box.y), width: S(box.w), height: S(box.h), outline: '1px dashed var(--accent)', rotate: spin ? `${spin.a}deg` : undefined, transformOrigin: spin ? `${S(spin.cx - box.x)}px ${S(spin.cy - box.y)}px` : undefined }}>
+        {HANDLES.map(([hx, hy]) => (
+          <div
+            key={`${hx},${hy}`}
+            onPointerDown={(ev) => begin(ev, { kind: 'multi', ids, hx, hy, start: toLocal(ev.clientX, ev.clientY), box: b0, next: b0 })}
+            className="pointer-events-auto absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] border-[1.5px] border-accent bg-white shadow-sm pointer-coarse:h-4 pointer-coarse:w-4"
+            style={{ left: `${((hx + 1) / 2) * 100}%`, top: `${((hy + 1) / 2) * 100}%`, cursor: CURSOR[`${hx},${hy}`] }}
+          />
+        ))}
+        <div className="absolute left-1/2 h-5 w-px -translate-x-1/2 bg-accent" style={{ top: -20 }} />
+        <div
+          title="Turn them together (Shift: by 15°)"
+          onPointerDown={(ev) => {
+            const c = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+            const q = toLocal(ev.clientX, ev.clientY);
+            begin(ev, { kind: 'spin', ids, cx: c.x, cy: c.y, a0: (Math.atan2(q.y - c.y, q.x - c.x) * 180) / Math.PI, a: 0 });
+          }}
           className="pointer-events-auto absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 cursor-grab rounded-full border-[1.5px] border-accent bg-white shadow-sm pointer-coarse:h-5 pointer-coarse:w-5"
           style={{ top: -27 }}
         />
@@ -1544,8 +1590,6 @@ export const SlideCanvas = forwardRef<
 
   const m = drag?.kind === 'marquee' ? drag : null;
   const gd = drag?.kind === 'guide' ? drag : null;
-  // Snap lines go across the slide (in a turned group, well past its box).
-  const span = straight ? { x0: -origin.x, x1: W - origin.x, y0: -origin.y, y1: H - origin.y } : { x0: -2000, x1: 3300, y0: -2000, y1: 3000 };
   const shownGuides = rulers ? { x: deck.guides?.x ?? [], y: deck.guides?.y ?? [] } : { x: [], y: [] };
   // Where an agent's words are arriving: the part (the group it is in, for a part of a group), or the whole slide.
   const agentBox = (sl: Slide | undefined, id: string) => {
@@ -1563,7 +1607,7 @@ export const SlideCanvas = forwardRef<
       tabIndex={-1}
       data-slide-canvas
       data-k={k}
-      className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy', picking && 'cursor-crosshair')}
+      className={cx('relative h-full w-full touch-none bg-bg-2 outline-none select-none', zoomed ? 'overflow-auto' : 'overflow-hidden', painting && 'cursor-copy', (picking || drawing) && 'cursor-crosshair')}
       onScroll={pinRulers}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -1576,7 +1620,13 @@ export const SlideCanvas = forwardRef<
         const { id, inside } = hit(e.clientX, e.clientY);
         if (!inside) onScope([]);
         if (id && !sel.includes(id)) onSel([id]);
-        onMenu({ x: e.clientX, y: e.clientY }, id);
+        // On a table's cell: that cell is picked, for the menu's rows and columns.
+        const el = id ? levelEls.find((x) => x.id === id) : undefined;
+        const td = el?.type === 'table' ? (document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.tagName === 'TD') as HTMLElement | undefined) : undefined;
+        const at = td ? { r: Number(td.dataset.r), c: Number(td.dataset.c) } : undefined;
+        if (el && at && !(cellSel?.id === el.id && at.r >= Math.min(cellSel.r0, cellSel.r1) && at.r <= Math.max(cellSel.r0, cellSel.r1) && at.c >= Math.min(cellSel.c0, cellSel.c1) && at.c <= Math.max(cellSel.c0, cellSel.c1)))
+          onCellSel?.({ id: el.id, r0: at.r, c0: at.c, r1: at.r, c1: at.c });
+        onMenu({ x: e.clientX, y: e.clientY }, id, at);
       }}
     >
       <div className="relative" style={{ width: sheet.w, height: sheet.h }}>
@@ -1642,29 +1692,8 @@ export const SlideCanvas = forwardRef<
             <Nest frames={frames} k={k}>
               {!crop && picked.map((e) => outline(e, picked.length === 1))}
               {one && handles(one)}
+              {multiFrame()}
               {one && !readOnly && runPill(one)}
-              {guides.x.map((x) => (
-                <div key={`sx${x}`} className="pointer-events-none absolute w-px" style={{ left: Math.round(S(x)), top: S(span.y0), height: S(span.y1 - span.y0), background: SNAP }} />
-              ))}
-              {guides.y.map((y) => (
-                <div key={`sy${y}`} className="pointer-events-none absolute h-px" style={{ top: Math.round(S(y)), left: S(span.x0), width: S(span.x1 - span.x0), background: SNAP }} />
-              ))}
-              {gaps.map((g, i) => {
-                const across = g.y1 === g.y2;
-                return (
-                  <div key={`g${i}`} className="pointer-events-none absolute" style={across ? { left: S(g.x1), top: S(g.y1), width: S(g.x2 - g.x1), height: 0 } : { left: S(g.x1), top: S(g.y1), width: 0, height: S(g.y2 - g.y1) }}>
-                    <div className={cx('absolute', across ? 'inset-x-0 top-0 h-px' : 'inset-y-0 left-0 w-px')} style={{ background: SNAP }} />
-                    <div className={cx('absolute', across ? '-top-1 left-0 h-2 w-px' : '-left-1 top-0 h-px w-2')} style={{ background: SNAP }} />
-                    <div className={cx('absolute', across ? '-top-1 right-0 h-2 w-px' : '-left-1 bottom-0 h-px w-2')} style={{ background: SNAP }} />
-                    <span
-                      className="absolute rounded px-1 text-[10.5px] leading-[15px] text-white tabular-nums"
-                      style={{ background: SNAP, ...(across ? { left: '50%', top: 3, transform: 'translateX(-50%)' } : { top: '50%', left: 4, transform: 'translateY(-50%)' }) }}
-                    >
-                      {g.n}
-                    </span>
-                  </div>
-                );
-              })}
               {/* While a line's end is dragged near a part: the middles of its sides, the one it would stick to filled. */}
               {drag?.kind === 'end' &&
                 drag.near &&
@@ -1684,6 +1713,14 @@ export const SlideCanvas = forwardRef<
                       })
                     : null;
                 })()}
+              {drag?.kind === 'draw' &&
+                (drawing === 'line' ? (
+                  <svg className="pointer-events-none absolute top-0 left-0 overflow-visible" width={1} height={1}>
+                    <line x1={S(drag.start.x)} y1={S(drag.start.y)} x2={S(drag.at.x)} y2={S(drag.at.y)} stroke="var(--accent)" strokeWidth={2} />
+                  </svg>
+                ) : (
+                  <div className="pointer-events-none absolute border-2 border-accent bg-accent/10" style={{ left: S(Math.min(drag.start.x, drag.at.x)), top: S(Math.min(drag.start.y, drag.at.y)), width: S(Math.abs(drag.at.x - drag.start.x)), height: S(Math.abs(drag.at.y - drag.start.y)) }} />
+                ))}
               {m && (
                 <div
                   className="pointer-events-none absolute border border-accent bg-accent/10"
@@ -1693,6 +1730,59 @@ export const SlideCanvas = forwardRef<
             </Nest>
           </div>
           {cropView()}
+          {/* What lines a part up while it is dragged or sized, above everything: gone as it is let go. */}
+          {(lines.length > 0 || gaps.length > 0 || dist.length > 0 || equal.w.length > 0 || equal.h.length > 0) && (
+            <div aria-hidden className="pointer-events-none absolute inset-0 z-[9]">
+              <Nest frames={frames} k={k}>
+                {lines.map((l) => {
+                  const X = l.axis === 'x';
+                  return (
+                    <div key={`l${l.axis}${l.at}`} className="pointer-events-none absolute" style={X ? { left: Math.round(S(l.at)), top: S(l.from), width: 0, height: S(l.to - l.from) } : { top: Math.round(S(l.at)), left: S(l.from), height: 0, width: S(l.to - l.from) }}>
+                      <div className={cx('absolute', X ? 'inset-y-0 left-0 w-px' : 'inset-x-0 top-0 h-px')} style={{ background: SNAP }} />
+                      {l.ticks.map((t) => (
+                        <div key={t} className="absolute" style={{ background: SNAP, ...(X ? { top: S(t - l.from), left: -3, width: 7, height: 1 } : { left: S(t - l.from), top: -3, height: 7, width: 1 }) }} />
+                      ))}
+                    </div>
+                  );
+                })}
+                {[...gaps, ...dist].map((g, i) => {
+                  const across = g.y1 === g.y2;
+                  return (
+                    <div key={`g${i}`} className="pointer-events-none absolute" style={across ? { left: S(g.x1), top: S(g.y1), width: S(g.x2 - g.x1), height: 0 } : { left: S(g.x1), top: S(g.y1), width: 0, height: S(g.y2 - g.y1) }}>
+                      <div className={cx('absolute', across ? 'inset-x-0 top-0 h-px' : 'inset-y-0 left-0 w-px')} style={{ background: SNAP }} />
+                      <div className={cx('absolute', across ? '-top-1 left-0 h-2 w-px' : '-left-1 top-0 h-px w-2')} style={{ background: SNAP }} />
+                      <div className={cx('absolute', across ? '-top-1 right-0 h-2 w-px' : '-left-1 bottom-0 h-px w-2')} style={{ background: SNAP }} />
+                      <span
+                        className="absolute rounded px-1 text-[10.5px] leading-[15px] font-medium text-white tabular-nums"
+                        style={{ background: SNAP, ...(across ? { left: '50%', top: 3, transform: 'translateX(-50%)' } : { top: '50%', left: 4, transform: 'translateY(-50%)' }) }}
+                      >
+                        {g.n}
+                      </span>
+                    </div>
+                  );
+                })}
+                {/* The width or height it has in common with other parts: "=" at the middle of the side that is the same. */}
+                {[...equal.w.map((b) => ({ b, w: true })), ...equal.h.map((b) => ({ b, w: false }))].map(({ b, w }, i) => (
+                  <span
+                    key={`e${i}`}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded px-1 text-[10.5px] leading-[15px] font-semibold text-white"
+                    style={{ background: SNAP, left: S(w ? b.x + b.w / 2 : b.x + b.w), top: S(w ? b.y + b.h : b.y + b.h / 2) }}
+                  >
+                    =
+                  </span>
+                ))}
+              </Nest>
+            </div>
+          )}
+          {readout && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute z-[9] rounded px-1.5 text-[11px] leading-[17px] font-medium whitespace-pre text-white tabular-nums shadow-sm"
+              style={{ background: SNAP, left: readout.x > stage.w - 110 ? readout.x - 14 : readout.x + 14, top: readout.y + 18, transform: readout.x > stage.w - 110 ? 'translateX(-100%)' : undefined }}
+            >
+              {readout.text}
+            </span>
+          )}
           {pins?.map((p) => (
             <button
               key={p.key}
