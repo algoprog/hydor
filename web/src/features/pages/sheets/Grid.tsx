@@ -264,8 +264,16 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   const HH = Math.round(HEAD_H * z) + GH;
   const NW = Math.round(NUM_W * z) + GW;
 
-  const fr = Math.min(sheet.freeze?.rows ?? 0, rows - 1);
-  const fc = Math.min(sheet.freeze?.cols ?? 0, cols - 1);
+  // Frozen rows and columns are drawn only as far as they fit in the window (the rest of it stays to scroll in): the sheet
+  // keeps how many were frozen. The sizes here are the sheet's own; hidden ones take no room.
+  const room = (n: number, size: (i: number) => number, limit: number) => {
+    let used = 0;
+    let k = 0;
+    while (k < n && used + size(k) <= limit) used += size(k++);
+    return k;
+  };
+  const fr = Math.min(room(sheet.freeze?.rows ?? 0, (r) => (gv.hidR.has(r) ? 0 : Math.round(rowH(sheet, r) * z)), Math.max(0, view.h * 0.6 - HH)), rows - 1);
+  const fc = Math.min(room(sheet.freeze?.cols ?? 0, (c) => (gv.hidC.has(c) ? 0 : Math.round(colW(sheet, c) * z)), Math.max(0, view.w * 0.6 - NW)), cols - 1);
   // The comments' threads by their cells.
   const threads = useMemo(() => new Map<string, SheetComment>((sheet.comments ?? []).map((c) => [c.cell, c])), [sheet.comments]);
   const colOff = useMemo(

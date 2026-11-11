@@ -232,8 +232,8 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
           { label: 'Nothing frozen', checked: !m.freeze?.rows && !m.freeze?.cols, run: () => m.setFreeze(0, 0) },
           { label: 'The first row', checked: m.freeze?.rows === 1 && !m.freeze?.cols, run: () => m.setFreeze(1, 0) },
           { label: 'The first column', checked: !m.freeze?.rows && m.freeze?.cols === 1, run: () => m.setFreeze(0, 1) },
-          { label: `Rows up to ${m.r + 1}`, disabled: m.r + 1 > 50, run: () => m.setFreeze(m.r + 1, m.freeze?.cols ?? 0) },
-          { label: `Columns up to ${colName(m.c)}`, disabled: m.c + 1 > 20, run: () => m.setFreeze(m.freeze?.rows ?? 0, m.c + 1) },
+          { label: `Rows up to ${m.r + 1}`, run: () => m.setFreeze(m.r + 1, m.freeze?.cols ?? 0) },
+          { label: `Columns up to ${colName(m.c)}`, run: () => m.setFreeze(m.freeze?.rows ?? 0, m.c + 1) },
         ],
       },
       {

@@ -612,5 +612,13 @@ td {color:windowtext; vertical-align:bottom;}
   ok(back.sheets[0].hidden === true && back.sheets[1].tabColor === '#1a73e8' && !back.sheets[1].hidden && back.sheets[2].hidden === true && back.sheets[2].tabColor === '#ff0000', 'and read back: hidden sheets and tab colours');
 }
 
+// ---- frozen rows and columns: no cap but the sheet's own ------------------------------------------------------------------
+{
+  const b = normalizeBook({ sheets: [{ name: 'F', rows: [[1]], freeze: { rows: 200, cols: 30 } }, { name: 'G', rows: [[1]], freeze: 'D120' }] });
+  ok(b.sheets[0].freeze?.rows === 200 && b.sheets[0].freeze.cols === 30 && b.sheets[1].freeze?.rows === 119 && b.sheets[1].freeze.cols === 3, 'freeze: far past 50 rows and 20 columns is kept');
+  const more = adjustForInsert(b, b.sheets[0].id, 'row', 0, 5).sheets[0].freeze;
+  ok(more?.rows === 205, 'freeze: rows put in above grow it, with no cap');
+}
+
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
