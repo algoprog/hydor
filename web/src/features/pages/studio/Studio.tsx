@@ -934,11 +934,13 @@ export function Studio({
             {sel?.multi
               ? `${sel.multi} blocks picked`
               : sel
-                ? sel.computed.position && sel.computed.position !== 'static' && sel.computed.position !== 'sticky'
-                  ? 'Drag it to move it, the arrow keys nudge it, the handles size it; right-click for more'
-                  : sel.wordy
-                    ? 'Click it again to write in it, type / for blocks; right-click for more'
-                    : 'Drag the handle to move it in the page, the handles to size it; right-click, then Place freely, to put it anywhere'
+                ? sel.computed.position === 'sticky'
+                  ? 'Drag it to where it should stick on the screen, ↑ and ↓ nudge it; right-click for more'
+                  : sel.computed.position && sel.computed.position !== 'static'
+                    ? 'Drag it to move it, the arrow keys nudge it, the handles size it; right-click for more'
+                    : sel.wordy
+                      ? 'Click it again to write in it, type / for blocks; right-click for more'
+                      : 'Drag the handle to move it in the page, the handles to size it; right-click, then Place freely, to put it anywhere'
                 : 'Click a part of the page, and again to write in it'}
           </span>
           <IconButton label="Find and replace (Ctrl+F)" size="sm" active={find.open} onClick={() => (find.open ? find.close() : find.show())} className="ml-auto">

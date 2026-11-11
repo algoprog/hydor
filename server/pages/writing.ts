@@ -82,6 +82,8 @@ export interface Core {
   command: (a: string, arg?: unknown) => void;
   /** A placed part dragged by its handle moves where the pointer goes (true: the editor took the gesture); `tap` is for a press that did not move. */
   freeMove: (e: PointerEvent, el: Element, tap: () => void) => boolean;
+  /** Whether the press going on moves a placed part (the editor took it): a drag from the margin then picks no blocks. */
+  moving: () => boolean;
   /** Whether a part has others beside it on its line (a flex row, a grid, running words): a drop line beside it is vertical. */
   sideBySide: (el: Element) => boolean;
   /** Pasted HTML as lines of safe words with their kinds (editor-geometry.ts), and the address a link may have. */
@@ -3303,6 +3305,8 @@ export function writing(E: Core): Writing {
     const move = (m: PointerEvent) => {
       last = { x: m.clientX, y: m.clientY };
       if (!band) {
+        // (the press moves a placed part instead)
+        if (E.moving()) return up();
         if (Math.hypot(m.clientX - x0, m.clientY + scrollY - y0) < 6) return;
         const r = !fromSpace && start ? start.getBoundingClientRect() : null;
         if (r && m.clientY >= r.top && m.clientY <= r.bottom) return;
