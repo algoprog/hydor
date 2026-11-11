@@ -616,6 +616,7 @@ app.post('/api/sessions/:key/interrupt', async (req) => {
   await sessions.interrupt(K(req));
   return { ok: true };
 });
+app.post('/api/sessions/:key/stop-all', async (req) => ({ ok: true, ...(await sessions.stopAll(K(req))) }));
 /** The page's own id for a message it sends: sent again (its answer lost on the way), the message goes once. */
 const SEND_ID = /^send-[a-z0-9]{8,40}$/;
 const sendIdOf = (b: { sendId?: unknown }) => (typeof b.sendId === 'string' && SEND_ID.test(b.sendId) ? b.sendId : undefined);

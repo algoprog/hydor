@@ -4,8 +4,15 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 
 ## Sessions
 - The prompt bar’s Stop button shows a rotating ring while a session starts or works, paused while
-  waiting for you and respecting reduced-motion preferences. Once the turn is over, the ring keeps turning
-  around the send button while background tasks or helper sessions it started still run.
+  waiting for you and respecting reduced-motion preferences. Once the turn is over, it stays, ring and all,
+  while background tasks or helper sessions it started still run, and it stops all of them at once: the turn, the
+  background tasks, and the child sessions with the ones they started (a stopped child does not report back and
+  wake its parent). Pointing at it says what it stops.
+- The work tray, one line above the prompt bar, gathers what a session started: its child sessions and its
+  background tasks (subagents, commands, monitors). Folded, it sums them up (“2 helper sessions and 1 background
+  task running”, “1 needs you”) with a **Stop all**; opened, every one is a row in the same look, with its state,
+  what it cost, **Open** and a stop button. A background task opens in a side panel like a session: its steps or
+  output, refreshed as it runs.
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
   separate folder, so several agents can change one repository at once). Pick the model, how hard it
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
@@ -288,7 +295,8 @@ agents that speak ACP and take MCP servers.
   you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
   whichever agent is working; Codex's own servers ask the same way.
 - **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their
-  results back, each a line in its conversation that opens to the reply; they show under it in the sidebar.
+  results back, each a line in its conversation that opens to the reply; they show under it in the sidebar and in the
+  work tray above the prompt bar.
 - **Tiers and the team** (Settings → Models → Tiers): four tiers name a model and an effort for Claude Code, Codex
   and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
   agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers

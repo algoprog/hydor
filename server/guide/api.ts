@@ -72,7 +72,7 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/pages\/(tex\/(reference|compile)|docs\/print)$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /./, 'always'],
-  ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|interrupt|cancel)(\/|$)/, 'always'],
+  ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|stop-all|interrupt|cancel)(\/|$)/, 'always'],
   ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code or Codex load in every session; an MCP server runs a program on this computer.'],
   ['W', /^\/api\/(custom|browser)\/settings$/, 'always', 'This changes what agents may do without asking.'],
   ['W', /^\/api\/computer\/settings$/, 'always', 'This lets agents see this Mac’s screen and use its mouse and keyboard (each session still asks before its agent starts).'],
