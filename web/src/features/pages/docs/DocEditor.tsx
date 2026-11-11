@@ -10,15 +10,16 @@
 // on a wide screen, level with their words, or in a panel (CommentsView.tsx), with Resolve with AI (commentAi.tsx). "/" at a line's start opens a menu of
 // what to put there (Slash.tsx); Ctrl+F finds and Ctrl+H replaces (finding.ts); equations are written in a box with
 // their preview. The page around is told what an agent asked now would be about (the whole document, the section
-// the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins,
-// font and size are under Page setup. While an agent writes a new version (live.ts), it shows as it comes, read-only,
-// with the agent's caret where its words arrive, kept in view (AgentCaret.tsx). A right-click, the menu key or a long
+// the caret is in, the words picked). Changes stay unsaved until Save (Ctrl+S), as a page's do; the paper, margins (one
+// for every side, or each side's own), font and size are under Page setup. While an agent writes a new version
+// (live.ts), it shows as it comes, read-only, with the agent's caret where its words arrive, kept in view
+// (AgentCaret.tsx). A right-click, the menu key or a long
 // press opens the editor's context menu for what is under it (context.tsx); the handle by each block opens one too
 // (BlockHandle.tsx). Tools has Automatic links and Smart quotes and symbols, kept on the device, and Language, which the
 // document keeps (the page is that language to the browser's spell check, and a text box to a screen reader).
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
-import { columnMm, listInfo, paperOf, docHeadings, docWords, FONTS, MARGINS, PAPER_SIZES, PAPERS, runsText, sectionOf, wordCount, wordsText, type Doc, type ImageBlock, type PaperSize, type Run, type TableBlock } from '@shared/docs';
+import { ChevronDown, ExternalLink, FileCog, Link2, ListTree, MessageSquare, MessageSquarePlus, Sparkles, Unlink } from 'lucide-react';
+import { columnMm, listInfo, docHeadings, docWords, FONTS, MARGINS, pageMargins, PAPER_SIZES, PAPERS, runsText, sectionOf, SIDES, textWidthMm, withMargins, wordCount, wordsText, type Doc, type ImageBlock, type PaperSize, type Run, type TableBlock } from '@shared/docs';
 import { newCommentId, openComments, type Comment } from '@shared/comments';
 import { changesOf, compareDocs, suggestionColor } from '@shared/doc-changes';
 import { api, post } from '../../../lib/api';
@@ -83,6 +84,9 @@ const OUTLINE_KEY = 'wa.docs.outline';
 const VIEW_KEY = 'wa.docs.view';
 /** The comments' column beside the page, and the room around it. */
 const COLUMN = 280;
+
+/** Page setup's Each side: each side's margin, by its name. */
+const SIDE_LABELS = { top: 'Top margin', bottom: 'Bottom margin', left: 'Left margin', right: 'Right margin' } as const;
 
 /** Where a picture of a document shows from in the app (whose own pages load no picture from the web). */
 const pictureSrc = (s: string) =>
@@ -241,6 +245,8 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState<{ url: string; text: string } | null>(null);
   const [menu, setMenu] = useState<'page' | 'outline' | 'url' | null>(null);
+  // Page setup's Each side: a margin for each side of the page (open by itself where the sides differ).
+  const [sidesOpen, setSidesOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [outlineOpen, setOutlineOpen] = useState(() => localStorage.getItem(OUTLINE_KEY) !== '0');
   const [view, setView] = useState<ViewPrefs>(loadView);
@@ -433,7 +439,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
       onLayout: setPageLayout,
       notes: () => {
         const d = engine.current?.doc;
-        return d ? noteRoom(d, { width: ((paperOf(d.page).w - 2 * d.page.margin) * 96) / 25.4 }) : null;
+        return d ? noteRoom(d, { width: (textWidthMm(d.page) * 96) / 25.4 }) : null;
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1331,6 +1337,9 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
     </nav>
   );
 
+  const margins = pageMargins(model.page);
+  const sidesDiffer = SIDES.some((k) => margins[k] !== margins.top);
+  const sidesShown = sidesOpen || sidesDiffer;
   const pageSetup = (
     <div className="space-y-3 p-3">
       <div className="space-y-1.5">
@@ -1343,16 +1352,40 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
         />
       </div>
       <div className="space-y-1.5">
-        <div className="text-[12px] text-fg-3">Margins</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[12px] text-fg-3">Margins</div>
+          <button
+            type="button"
+            aria-expanded={sidesShown}
+            onClick={() => setSidesOpen(!sidesShown)}
+            disabled={sidesDiffer}
+            title={sidesDiffer ? tr('The sides have margins of their own: a preset or a number gives every side the same again') : tr('A margin for each side of the page')}
+            className="-my-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:cursor-default disabled:hover:bg-transparent"
+          >
+            Each side
+            <ChevronDown size={13} className={cx('transition-transform', sidesShown && 'rotate-180')} />
+          </button>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* A preset or a number is every side's margin; Each side gives each its own. */}
           <Segmented
             size="sm"
-            value={String(MARGINS.find((m) => Math.abs(m.mm - model.page.margin) < 0.05)?.mm ?? '')}
-            onChange={(v) => e?.setDoc({ page: { ...model.page, margin: Number(v) } })}
+            value={sidesDiffer ? '' : String(MARGINS.find((m) => Math.abs(m.mm - model.page.margin) < 0.05)?.mm ?? '')}
+            onChange={(v) => e?.setDoc({ page: withMargins(model.page, { top: Number(v), bottom: Number(v), left: Number(v), right: Number(v) }) })}
             options={MARGINS.map((m) => ({ value: String(m.mm), label: m.label }))}
           />
-          <NumInput value={model.page.margin} onChange={(v) => e?.setDoc({ page: { ...model.page, margin: v } })} min={5} max={60} step={1} unit="mm" label="Margins" className="w-[84px] shrink-0" />
+          <NumInput value={model.page.margin} onChange={(v) => e?.setDoc({ page: withMargins(model.page, { top: v, bottom: v, left: v, right: v }) })} min={5} max={60} step={1} unit="mm" label="Margins" className="w-[84px] shrink-0" />
         </div>
+        {sidesShown && (
+          <div className="grid grid-cols-2 gap-x-2 gap-y-2 pt-0.5">
+            {SIDES.map((k) => (
+              <div key={k} className="min-w-0 space-y-1">
+                <div className="text-[11.5px] text-fg-3">{SIDE_LABELS[k]}</div>
+                <NumInput value={margins[k]} onChange={(v) => e?.setDoc({ page: withMargins(model.page, { [k]: v }) })} min={5} max={60} step={1} unit="mm" label={SIDE_LABELS[k]} className="w-full" />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex gap-2">
         <div className="min-w-0 flex-1 space-y-1.5">
@@ -1632,7 +1665,7 @@ export function DocEditor({ doc, pageId, layout, readOnly, onSave, lead, tail, b
                   zoom={zoom}
                   doc={shownDoc ?? model}
                   refs={e.refs}
-                  textW={((paperOf(model.page).w - 2 * model.page.margin) * 96) / 25.4}
+                  textW={(textWidthMm(model.page) * 96) / 25.4}
                   onOpen={(id, r) => !readOnly && !liveOn && (spotAt(r), setNote({ id }))}
                 />
               )}

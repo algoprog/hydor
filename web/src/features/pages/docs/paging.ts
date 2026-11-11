@@ -8,7 +8,7 @@
 // over the words (PaperSheets.tsx). Laid out again after a pause in typing, from the page of the first block that
 // changed; meanwhile a block the editor draws anew keeps what the last layout gave it (a paragraph cut is cut again at
 // once, for its own lines). The rules are the PDF's (server/pages/docs.ts printCss), so the pages come out close to it.
-import { COLUMN_GAP, columnMm, paperOf, type Block, type Doc, type TableBlock } from '@shared/docs';
+import { COLUMN_GAP, columnMm, pageMargins, paperOf, type Block, type Doc, type Side, type TableBlock } from '@shared/docs';
 import type { Pos } from './ops';
 
 /** The gap between two sheets, in the paper's own pixels. */
@@ -20,9 +20,9 @@ export const CUT = 'data-nd-cut';
 export interface Layout {
   /** Pages, one at least. */
   count: number;
-  /** A sheet's height and the margin on it, in the paper's own (unzoomed) pixels. */
+  /** A sheet's height and the margin on each of its sides, in the paper's own (unzoomed) pixels. */
   pageH: number;
-  margin: number;
+  margins: Record<Side, number>;
   /** Changes with each layout (for what is drawn over the page to measure again). */
   n: number;
   /** The footnotes at each page's foot (by page), and the room they take there (pixels, the line over them too). */
@@ -139,10 +139,11 @@ export class Paging {
 
   private geometry(doc: Doc, room?: Map<number, { ids: string[]; h: number }>, vis: (p: number) => number = (p) => p) {
     const pageH = paperOf(doc.page).h * MM;
-    const margin = doc.page.margin * MM;
+    const mm = pageMargins(doc.page);
+    const margins = { top: mm.top * MM, right: mm.right * MM, bottom: mm.bottom * MM, left: mm.left * MM };
     const step = pageH + GAP;
-    // A page's words end over its footnotes (in columns, every column of the page).
-    return { pageH, margin, step, top: (p: number) => p * step + margin, bottom: (p: number) => p * step + pageH - margin - (room?.get(vis(p))?.h ?? 0), contentH: pageH - 2 * margin };
+    // A page's words start under its top margin and end over its bottom one, and over its footnotes (in columns, every column of the page).
+    return { pageH, margins, step, top: (p: number) => p * step + margins.top, bottom: (p: number) => p * step + pageH - margins.bottom - (room?.get(vis(p))?.h ?? 0), contentH: pageH - margins.top - margins.bottom };
   }
 
   /** The model changed: laid out again soon, from the first block that changed. */
@@ -257,7 +258,7 @@ export class Paging {
     // (`shift`), where the last one ends, and the page it ended on. Kept per block, to walk a heading again.
     const states: { shift: number; prevBottom: number; page: number }[] = [];
     let shift = 0;
-    let prevBottom = start > 0 ? (box(start - 1)?.bottom ?? g.margin) : g.margin;
+    let prevBottom = start > 0 ? (box(start - 1)?.bottom ?? g.margins.top) : g.margins.top;
     let page = start > 0 ? (this.pageOf.get(blocks[start - 1].id) ?? 0) : 0;
     let breakPage = -1;
     for (let i = start; i < blocks.length; i++) {
@@ -350,7 +351,7 @@ export class Paging {
       if (plan.push !== undefined || plan.cuts || plan.dx || plan.dy) plans.set(b.id, plan);
       prevBottom = bottom;
       // A block that hangs over its page's end (it could not be cut): what follows starts after it.
-      while (bottom > g.bottom(page) + g.margin + GAP / 2) page++;
+      while (bottom > g.bottom(page) + g.margins.bottom + GAP / 2) page++;
     }
     // Put on the page: the margins that move blocks, and the cuts.
     for (let i = start; i < blocks.length; i++) {
@@ -368,9 +369,9 @@ export class Paging {
     this.pageOf = pages;
     this.laid = blocks;
     let count = Math.max(1, page + 1);
-    while (prevBottom > g.bottom(count - 1) + g.margin + 1) count++;
+    while (prevBottom > g.bottom(count - 1) + g.margins.bottom + 1) count++;
     count = Math.max(1, Math.ceil(count / cols));
-    this.layout = { count, pageH: g.pageH, margin: g.margin, n: ++this.n, notes: room };
+    this.layout = { count, pageH: g.pageH, margins: g.margins, n: ++this.n, notes: room };
     this.o.onLayout(this.layout);
   }
 

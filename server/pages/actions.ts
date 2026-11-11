@@ -25,7 +25,7 @@ import { reuseSlides } from '../../shared/slides-reuse.ts';
 import { chartRefreshed } from '../../shared/slides-sheet.ts';
 import { TURN_INTO, turnAsk, type TurnTo } from '../../shared/content-asks.ts';
 import { ASSET, everyEl, isWebDeck, plainText, powerPointNote, richFeatures, slideTitle, THEMES, toPowerPoint, type ChartEl, type Deck, type El, type Theme } from '../../shared/slides.ts';
-import { cleanStyles, CITE_STYLES, docColor, docFont, PAPER_SIZES, PAPERS, PARA_STYLES, ptOf, resolveSuggestion, STYLES as DOC_STYLES, type Band, type CiteStyle, type Doc, type PaperSize, type ParaStyle } from '../../shared/docs.ts';
+import { cleanStyles, CITE_STYLES, docColor, docFont, marginsText, PAPER_SIZES, PAPERS, PARA_STYLES, ptOf, resolveSuggestion, SIDES, STYLES as DOC_STYLES, withMargins, type Band, type CiteStyle, type Doc, type PaperSize, type ParaStyle } from '../../shared/docs.ts';
 import {
   adjustForDelete,
   adjustForInsert,
@@ -376,18 +376,29 @@ const suggestions =
     return { model: d, notes, said: `${accept ? 'accepted' : 'rejected'} ${what}: ${accept ? 'what they suggest is made' : 'the words are as they were before them'}.${left ? ` ${plural(left, 'suggestion')} still wait${left === 1 ? 's' : ''}.` : ''}` };
   };
 
-/** Format → Page setup: the paper, its margins, the body text's font and size. */
+/** Format → Page setup: the paper, its margins (every side's, or each side's own), the body text's font and size. */
 const pageSetup: Act<Doc> = (doc, a) => {
-  const d: Doc = { ...doc, page: { ...doc.page } };
+  let d: Doc = { ...doc, page: { ...doc.page } };
   if (a.paper !== undefined) {
     const p = str(a.paper).toLowerCase().replace(/^us\s*/, '');
     if (!(PAPER_SIZES as string[]).includes(p)) throw new Error('paper: a4, letter, legal, a3 or a5.');
     d.page.size = p as PaperSize;
   }
+  const mmOf = (v: unknown, what: string) => {
+    const m = typeof v === 'number' ? v : Number(str(v).replace(/\s*mm$/i, ''));
+    if (!Number.isFinite(m) || m < 5 || m > 60) throw new Error(`${what}: in millimetres, 5 to 60 (12.7 narrow, 25.4 medium, 38.1 wide).`);
+    return m;
+  };
   if (a.margin !== undefined) {
-    const m = typeof a.margin === 'number' ? a.margin : Number(str(a.margin).replace(/\s*mm$/i, ''));
-    if (!Number.isFinite(m) || m < 5 || m > 60) throw new Error('margin: in millimetres, 5 to 60 (12.7 narrow, 25.4 medium, 38.1 wide).');
-    d.page.margin = Math.round(m * 10) / 10;
+    const m = mmOf(a.margin, 'margin');
+    d = { ...d, page: withMargins(d.page, { top: m, bottom: m, left: m, right: m }) };
+  }
+  // Each side's own margin (Page setup's Each side), over the one for all.
+  if (a.margins !== undefined) {
+    const o = a.margins && typeof a.margins === 'object' ? (a.margins as Record<string, unknown>) : null;
+    const given = o ? SIDES.filter((k) => o[k] !== undefined) : [];
+    if (!o || !given.length) throw new Error('margins: {"top", "bottom", "left", "right"}, each in millimetres (5 to 60); a side left out stays as it is.');
+    d = { ...d, page: withMargins(d.page, Object.fromEntries(given.map((k) => [k, mmOf(o[k], `margins.${k}`)]))) };
   }
   if (a.font !== undefined) {
     const f = docFont(a.font);
@@ -423,10 +434,10 @@ const pageSetup: Act<Doc> = (doc, a) => {
     if (t) d.mark = { text: t };
     else delete d.mark;
   }
-  if ([a.paper, a.margin, a.font, a.size, a.orientation, a.columns, a.color, a.watermark].every((x) => x === undefined)) throw new Error('Give what to change: paper, margin, font, size, orientation, columns, color or watermark.');
+  if ([a.paper, a.margin, a.margins, a.font, a.size, a.orientation, a.columns, a.color, a.watermark].every((x) => x === undefined)) throw new Error('Give what to change: paper, margin, margins, font, size, orientation, columns, color or watermark.');
   if (JSON.stringify([d.page, d.font, d.size, d.mark]) === JSON.stringify([doc.page, doc.font, doc.size, doc.mark])) return { said: 'The page is set up so already.' };
   const more = [d.page.orient ? 'landscape' : '', d.page.cols ? `${d.page.cols} columns` : '', d.page.color ? `a ${d.page.color} page` : '', d.mark?.text ? `the watermark “${d.mark.text}”` : ''].filter(Boolean).join(', ');
-  return { model: d, said: `set the page up: ${PAPERS[d.page.size].label} paper, ${d.page.margin} mm margins, ${d.font} ${d.size} pt${more ? `, ${more}` : ''}.` };
+  return { model: d, said: `set the page up: ${PAPERS[d.page.size].label} paper, ${marginsText(d.page)}, ${d.font} ${d.size} pt${more ? `, ${more}` : ''}.` };
 };
 
 /** Format → Paragraph styles: a style's look (its font, size, colour, weight, slant, spacing, alignment), or the app's again. */
@@ -1172,7 +1183,7 @@ const DESCRIPTION = [
   '- update_charts {slides?}: every chart made from a spreadsheet of the Library read again from its cells (Update from the spreadsheet), each series keeping its colour.',
   'Documents.',
   '- accept_suggestions, reject_suggestions {ids?}: accept or reject the suggested changes listed (get_page lists them), or every one.',
-  '- page_setup {paper?: a4|letter, margin?: mm, font?, size?: pt, orientation?: portrait|landscape, columns?: 1|2|3, color?: the paper’s colour or none, watermark?: words (DRAFT) or null}: the paper, margins, body text, columns, colour and watermark (Page setup).',
+  '- page_setup {paper?: a4|letter|legal|a3|a5, margin?: mm (every side), margins?: {top?, bottom?, left?, right?: mm} (sides of their own), font?, size?: pt, orientation?: portrait|landscape, columns?: 1|2|3, color?: the paper’s colour or none, watermark?: words (DRAFT) or null}: the paper, margins, body text, columns, colour and watermark (Page setup).',
   '- paragraph_style {style: normal|title|subtitle|h1…h4|quote|code|callout, font?, size?: pt, color?, bold?, italic?, line?: lines, before?: pt, after?: pt, align?, reset?: true}: a style’s look in this document, as Format → Paragraph styles (reset: true alone, every style as the app has them).',
   '- citation_style {style: apa|mla|chicago|ieee}: every citation and the bibliography in that style.',
   '- header_footer {header?, footer?: {text, align?: center|right} or null, title_page?}: the line at the top and foot of each page ({page} its number, {pages} how many), as Insert → Header and footer and Page numbers; title_page: none on the first page.',
@@ -1233,7 +1244,8 @@ const SCHEMA = {
     before: { type: 'number', description: 'paragraph_style: points before.' },
     align: { type: ['string', 'boolean'], description: 'paragraph_style: left, center, right or justify; tidy_source: false to leave tables’ cells as they are.' },
     reset: { type: 'boolean', description: 'paragraph_style: back to the app’s look.' },
-    margin: { type: 'number', description: 'page_setup: millimetres, 5 to 60.' },
+    margin: { type: 'number', description: 'page_setup: millimetres, 5 to 60, on every side.' },
+    margins: { type: 'object', properties: { top: { type: 'number' }, bottom: { type: 'number' }, left: { type: 'number' }, right: { type: 'number' } }, description: 'page_setup: sides with margins of their own, in millimetres (5 to 60); a side left out stays as it is.' },
     font: { type: 'string' },
     size: { type: 'number', description: 'page_setup: the body text in points.' },
     header: { type: ['object', 'string', 'null'], description: 'header_footer: {text, align}, or null for none.' },

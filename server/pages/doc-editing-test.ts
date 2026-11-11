@@ -1,16 +1,19 @@
 // Script tests for how the documents editor tidies words as they are typed (a web address made a link, curly quotes,
 // dashes, signs, arrows, an ellipsis, fractions), for a table's rows and columns put in or taken out as many as the
-// cells picked are in, for the sizes Ctrl+Shift+> steps through, and for the document's language (kept, written to a
-// Word file and read back). The editing logic is pure (web/src/features/pages/docs/autoformat.ts and ops.ts), so it is
+// cells picked are in, for the sizes Ctrl+Shift+> steps through, for the document's language (kept, written to a
+// Word file and read back), for its paper sizes and each side's margin (the pages, print, Word and OpenDocument files,
+// an agent's save), and for numbered lists' formats, restarts, continuations and starts. The editing logic is pure (web/src/features/pages/docs/autoformat.ts and ops.ts), so it is
 // checked here without a page. Build and run with a scratch folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/pages/doc-editing-test.ts
 //   DATA_DIR=/tmp/hydor-test-doc-editing node dist/dev/doc-editing-test.js
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { docText, listInfo, normalizeDoc, type Doc, type ItemBlock, type TableBlock } from '../../shared/docs.ts';
+import { columnMm, docText, listInfo, normalizeDoc, pageMargins, textWidthMm, withMargins, type Doc, type ItemBlock, type TableBlock } from '../../shared/docs.ts';
 import { openDb } from '../db.ts';
-import { docFromFile, docxOfDoc } from './docs.ts';
+import { agentDoc, docFromFile, docPage, docxOfDoc, paginateOptions } from './docs.ts';
+import { odtOfDoc } from './doc-files.ts';
+import { Zip } from '../documents/zip.ts';
 import { fractionBefore, lonelyUrl, replaceTyped, urlBefore } from '../../web/src/features/pages/docs/autoformat.ts';
 import * as ops from '../../web/src/features/pages/docs/ops.ts';
 
@@ -156,6 +159,49 @@ ok(ops.stepSize(8, -1) === 7 && ops.stepSize(96, 1) === 108 && ops.stepSize(400,
     ok(land.page.size === size && land.page.orient === 'landscape', `landscape ${size} comes back`, land.page);
   }
   ok(normalizeDoc({ markdown: 'x', page: { size: 'tabloid' } }).page.size === 'a4', 'a paper the editor does not know is A4');
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+// ---- each side's margin -------------------------------------------------------------------------------------------
+{
+  const sides = (d: Doc) => Object.values(pageMargins(d.page)).join();
+  const one = normalizeDoc({ markdown: 'x', page: { margin: 20 } });
+  ok(sides(one) === '20,20,20,20' && !one.page.margins, 'one margin is every side’s, and nothing more is kept', one.page);
+  const own = normalizeDoc({ markdown: 'x', page: { margin: 20, margins: { top: 30, left: '1in' } } });
+  ok(sides(own) === '30,20,20,25.4' && own.page.margin === 20 && JSON.stringify(own.page.margins) === '{"top":30,"left":25.4}', 'sides of their own over the margin for all (top, right, bottom, left)', own.page);
+  const box = normalizeDoc({ markdown: 'x', page: { margin: { top: 10, bottom: 10, left: 30, right: 30 } } });
+  ok(sides(box) === '10,30,10,30', 'a margin given as each side’s', box.page);
+  const wild = normalizeDoc({ markdown: 'x', page: { margins: { top: 100, bottom: 1, left: 'wide' } } });
+  ok(sides(wild) === '60,25.4,5,25.4', 'a side’s margin kept between 5 and 60 mm; one that is not a length left as it was', wild.page);
+  const same = withMargins(own.page, { top: 20, left: 20 });
+  ok(same.margin === 20 && !same.margins, 'all four the same again: one margin', same);
+  const most = withMargins({ size: 'a4', margin: 25.4 }, { top: 15, right: 15, bottom: 15, left: 30 });
+  ok(most.margin === 15 && JSON.stringify(most.margins) === '{"left":30}', 'the margin most sides have is the one for all', most);
+  const wide = normalizeDoc({ markdown: 'x', page: { size: 'a4', margins: { left: 30, right: 20 } } });
+  ok(textWidthMm(wide.page) === 160 && columnMm({ ...wide.page, cols: 2 }) === (160 - 12.7) / 2, 'the words are as wide as the paper between the left and right margins', textWidthMm(wide.page));
+  ok(JSON.stringify(normalizeDoc(JSON.parse(docText(own))).page) === JSON.stringify(own.page), 'each side’s margin kept as the document is saved and read');
+  // On the pages: the editor's and the print's.
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-doc-editing-test-')));
+  const db = openDb(path.join(tmp, 'test.db'));
+  const d = normalizeDoc({ markdown: 'Margins', page: { size: 'a4', margin: 20, margins: { top: 30, left: 35 } }, header: 'Head', footer: 'Foot' });
+  ok(docPage(db, d, 'Margins', 'print').includes('margin:30mm 20mm 20mm 35mm'), 'printed and as a PDF: each side’s margin');
+  ok(/\.nd-sheet\{[^}]*padding:30mm 20mm 20mm 35mm/.test(docPage(db, d, 'Margins')) && docPage(db, d, 'Margins').includes('.nd-band.nd-head{top:0;height:30mm}'), 'its own page: the sheet’s margins, the header in the top one');
+  const po = paginateOptions(d);
+  ok(Math.abs(po.w - (155 * 96) / 25.4) < 0.02 && Math.abs(po.h - ((297 - 50) * 96) / 25.4 + 1) < 0.02, 'the PDF’s pages are laid out between the four margins', po);
+  // Word and OpenDocument files, both ways.
+  const back = docFromFile(docxOfDoc(db, d, 'Margins'), 'Margins.docx');
+  ok(sides(back) === sides(d), 'each side’s margin goes to a Word file and comes back', { was: pageMargins(d.page), now: pageMargins(back.page) });
+  const plain = docFromFile(docxOfDoc(db, one, 'One'), 'One.docx');
+  ok(plain.page.margin === 20 && !plain.page.margins, 'a Word file with the same margin on every side: one margin');
+  const odt = new Zip(odtOfDoc(db, { ...d, header: undefined, footer: undefined }, 'Margins')).text('styles.xml') ?? '';
+  ok(odt.includes('fo:margin-top="30mm" fo:margin-bottom="20mm" fo:margin-left="35mm" fo:margin-right="20mm"'), 'an OpenDocument file: each side’s margin');
+  // An agent's save: a margin sent alone is every side's again; sides sent are kept.
+  const r = await agentDoc(db, { markdown: 'Margins', page: { margin: 15 } }, tmp, docText(d));
+  ok(sides(r.doc) === '15,15,15,15', 'an agent’s margin alone: every side', r.doc.page);
+  const r2 = await agentDoc(db, { markdown: 'Margins', page: { margins: { bottom: 40 } } }, tmp, docText(d));
+  ok(sides(r2.doc) === '30,20,40,35', 'an agent’s side of its own: the others as they were', r2.doc.page);
+  const r3 = await agentDoc(db, { markdown: 'Margins', font: 'Georgia' }, tmp, docText(d));
+  ok(sides(r3.doc) === sides(d), 'a save that says nothing of the page keeps its margins');
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 

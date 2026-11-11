@@ -230,6 +230,13 @@ let docId = '';
   m = await model<Doc>(docId);
   ok(m.model.page.size === 'letter' && m.model.page.margin === 12.7 && m.model.font === 'Georgia' && m.model.size === 12, 'the page set up: paper, margins, font and size');
   ok((await act({ id: docId, action: 'page_setup', margin: 90 })).error?.includes('5 to 60'), 'a margin too wide: said');
+  const sides = await act({ id: docId, action: 'page_setup', margins: { top: 30, left: 35 } });
+  m = await model<Doc>(docId);
+  ok(m.model.page.margin === 12.7 && m.model.page.margins?.top === 30 && m.model.page.margins?.left === 35 && sides.text?.includes('30 mm at the top'), 'sides with margins of their own, the others as they were');
+  ok((await act({ id: docId, action: 'page_setup', margins: { top: 3 } })).error?.includes('margins.top'), 'a side’s margin too narrow: said');
+  await act({ id: docId, action: 'page_setup', margin: 12.7 });
+  m = await model<Doc>(docId);
+  ok(m.model.page.margin === 12.7 && !m.model.page.margins, 'a margin for all: every side the same again');
   ok((await act({ id: docId, action: 'page_setup', font: 'Fancy<script>' })).error?.includes('font:'), 'a font name a document cannot have: said');
 
   await act({ id: docId, action: 'header_footer', footer: { text: 'Page {page} of {pages}', align: 'center' }, header: 'Allotment society', title_page: true });
