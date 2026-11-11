@@ -5,7 +5,7 @@
 // when, a green screen keyed out, its fades. Words: what they say, how they look, where and when; captions all styled
 // at once and saved as .srt. A sound: its level, where it starts, its part, its fades. Nothing picked: the whole video.
 import type { ReactNode } from 'react';
-import { AudioWaveform, Captions, Download, Link2, Wand2, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink } from 'lucide-react';
+import { AudioWaveform, Captions, Download, Link2, Wand2, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Palette, Plus, RotateCcw, RotateCw, Snowflake, Trash2, Unlink, Upload } from 'lucide-react';
 import { viaLink } from '../../../lib/machine';
 import {
   audioLength,
@@ -61,6 +61,9 @@ export interface InspectorProps {
   onCaptions(): void;
   captionsBusy: string | null;
   onSrt(): void;
+  onVtt(): void;
+  /** Captions from an .srt or .vtt file. */
+  onImportCaptions(): void;
   onAddText(): void;
   label: string;
 }
@@ -477,6 +480,14 @@ function CaptionTools(p: InspectorProps & { caps: VideoText[] }) {
         <Button size="sm" variant="secondary" icon={<Download size={13} />} onClick={p.onSrt} className="flex-1">
           Save as .srt
         </Button>
+        <Button size="sm" variant="secondary" icon={<Download size={13} />} onClick={p.onVtt} className="flex-1">
+          Save as .vtt
+        </Button>
+      </div>
+      <div className="flex gap-1.5">
+        <Button size="sm" variant="secondary" icon={<Upload size={13} />} onClick={p.onImportCaptions} className="flex-1">
+          Import from a file…
+        </Button>
         <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={() => p.change((r) => ({ ...r, texts: (r.texts ?? []).filter((x) => !x.caption) }))} className="text-err hover:text-err">
           Delete them
         </Button>
@@ -639,6 +650,9 @@ function ProjectProps(p: InspectorProps) {
             <Note>Captions are made on this computer by speech recognition (Settings → Voice), from the clips’ sound and the voice-over. Each is words you can change and move on the T1 track.</Note>
           </>
         )}
+        <Button size="sm" variant="secondary" icon={<Upload size={13} />} className="w-full" onClick={p.onImportCaptions}>
+          Import captions from a file…
+        </Button>
         {caps.length > 0 && <CaptionTools {...p} caps={caps} />}
       </Fold>
     </>

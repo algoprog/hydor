@@ -1,7 +1,9 @@
 // The media panel: the videos, pictures and sounds of this edit, each with its frame and its length. More come from
 // this device (sent to the server as a deck's would be), the Library or Files; a voice-over is recorded with the
 // microphone. Drag one onto a track of the timeline (V1 the clips, V2 and V3 overlays, A2 music, A3 voice), or
-// double-click it to put it at the end of the clips (a sound: at the playhead, as music).
+// double-click it to put it at the end of the clips (a sound: at the playhead, as music). Files from the desktop can be
+// dropped on the panel (they are imported and added to it) or on the timeline (imported and placed where dropped); the
+// editor does the importing (VideoEditor.bring), this file knows what a file is and how to send it.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, AudioLines, ChevronRight, Film, Folder, FolderOpen, HardDrive, Image as ImageIcon, Mic, Plus, Square } from 'lucide-react';
 import { viaLink } from '../../../lib/machine';
@@ -19,6 +21,23 @@ import { MenuList, PanelHead } from './shell';
 const VIDEO = /\.(mp4|m4v|mov|webm)$/i;
 const PICTURE = /\.(png|jpe?g|webp|gif|bmp)$/i;
 const SOUND = /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac)$/i;
+const CAPTIONS = /\.(srt|vtt)$/i;
+
+/** What a file from this device is, by its type or its name: a video, a picture, a sound, captions (.srt, .vtt), or none of them. */
+export function kindOfFile(f: File): 'video' | 'picture' | 'sound' | 'captions' | null {
+  if (f.type.startsWith('video/') || VIDEO.test(f.name)) return 'video';
+  if (f.type.startsWith('image/') || PICTURE.test(f.name)) return 'picture';
+  if (f.type.startsWith('audio/') || SOUND.test(f.name)) return 'sound';
+  if (CAPTIONS.test(f.name) || f.type === 'text/vtt' || f.type === 'application/x-subrip') return 'captions';
+  return null;
+}
+
+/** A video, picture or sound from this device sent to the editor and read: what goes in the media panel. `onShare` hears how much of a video is sent. */
+export async function importFile(f: File, kind: 'video' | 'picture' | 'sound', onShare: (share: number) => void): Promise<PoolItem> {
+  const name = f.name.replace(/\.[^.]+$/, '');
+  const src = kind === 'video' ? await uploadVideo(f, onShare) : kind === 'picture' ? await keepPicture(f) : (await keepSound(f)).src;
+  return poolItemOf(src, name);
+}
 
 /** Something of this edit's, read: its facts from the server. */
 export async function poolItemOf(src: string, name: string): Promise<PoolItem> {
@@ -28,33 +47,31 @@ export async function poolItemOf(src: string, name: string): Promise<PoolItem> {
   return { src, kind: f.picture ? 'picture' : f.sound ? 'sound' : 'video', name, facts };
 }
 
-export function MediaPanel({ pool, onAdd, onUse, onRecorded }: { pool: PoolItem[]; onAdd: (it: PoolItem) => void; onUse: (it: PoolItem) => void; onRecorded: (it: PoolItem) => void }) {
+export function MediaPanel({ pool, onAdd, onUse, onRecorded, sending, onFiles }: { pool: PoolItem[]; onAdd: (it: PoolItem) => void; onUse: (it: PoolItem) => void; onRecorded: (it: PoolItem) => void; sending: { name: string; share: number }[]; onFiles: (files: File[]) => void }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [dialog, setDialog] = useState<'library' | 'files' | null>(null);
-  const [sending, setSending] = useState<{ name: string; share: number }[]>([]);
+  // Files dragged over it from the desktop.
+  const [over, setOver] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const addBtn = useRef<HTMLButtonElement>(null);
   const rec = useRecorder(onRecorded);
 
-  const fromDevice = async (files: FileList | null) => {
-    for (const f of Array.from(files ?? [])) {
-      const name = f.name.replace(/\.[^.]+$/, '');
-      const row = { name, share: 0 };
-      setSending((s) => [...s, row]);
-      try {
-        const kind = f.type.startsWith('video/') || VIDEO.test(f.name) ? 'video' : f.type.startsWith('image/') || PICTURE.test(f.name) ? 'picture' : 'sound';
-        const src = kind === 'video' ? await uploadVideo(f, (share) => setSending((s) => s.map((x) => (x === row ? { ...x, share } : x)))) : kind === 'picture' ? await keepPicture(f) : (await keepSound(f)).src;
-        onAdd(await poolItemOf(src, name));
-      } catch (e) {
-        toastError(e);
-      } finally {
-        setSending((s) => s.filter((x) => x !== row));
-      }
-    }
-  };
-
   return (
-    <div className="flex h-full min-h-0 flex-col bg-panel">
+    <div
+      className={cx('flex h-full min-h-0 flex-col bg-panel', over && 'ring-2 ring-accent ring-inset')}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOver(false)}
+      onDrop={(e) => {
+        setOver(false);
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        onFiles(Array.from(e.dataTransfer.files));
+      }}
+    >
       <PanelHead title="Media">
         <button
           type="button"
@@ -97,7 +114,7 @@ export function MediaPanel({ pool, onAdd, onUse, onRecorded }: { pool: PoolItem[
           />
         </>
       )}
-      <input ref={file} type="file" multiple accept="video/mp4,video/quicktime,video/webm,video/x-m4v,image/*,audio/*" className="hidden" onChange={(e) => (void fromDevice(e.target.files), (e.target.value = ''))} />
+      <input ref={file} type="file" multiple accept="video/mp4,video/quicktime,video/webm,video/x-m4v,image/*,audio/*,.srt,.vtt" className="hidden" onChange={(e) => (onFiles(Array.from(e.target.files ?? [])), (e.target.value = ''))} />
       <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2 overflow-y-auto p-2.5">
         {pool.map((it) => (
           <PoolCard key={it.src} it={it} onUse={() => onUse(it)} />
@@ -113,7 +130,7 @@ export function MediaPanel({ pool, onAdd, onUse, onRecorded }: { pool: PoolItem[
         ))}
         {rec.error && <p className="col-span-full text-[11.5px] text-err">{rec.error}</p>}
       </div>
-      <p className="shrink-0 border-t border-line px-2.5 py-1.5 text-[11px] leading-snug text-fg-3">Drag onto a track, or double-click to put it at the end.</p>
+      <p className="shrink-0 border-t border-line px-2.5 py-1.5 text-[11px] leading-snug text-fg-3">Drag onto a track, or double-click to put it at the end. Files from your desktop can be dropped here or on a track.</p>
       {dialog === 'library' && <LibraryPicker onClose={() => setDialog(null)} onPick={(it) => onAdd(it)} />}
       {dialog === 'files' && <FilesPicker start={pool.find((x) => x.main)?.src} onClose={() => setDialog(null)} onPick={(it) => onAdd(it)} />}
     </div>
