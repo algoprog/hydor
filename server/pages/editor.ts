@@ -22,7 +22,8 @@
 // only its argument and the browser's own globals.
 import { codeColours, type CodeColours } from '../../shared/code-colours.ts';
 import { pageDatabases, type PageDatabases } from '../../shared/page-db.ts';
-import { writing, type At, type Core, type Extra, type ExtraCore, type Next, type Writing } from './writing.ts';
+import { geometry, type Geometry } from './editor-geometry.ts';
+import { writing, type At, type Core, type CtxRow, type Extra, type ExtraCore, type Next, type Writing } from './writing.ts';
 import { writingAi } from './writing-ai.ts';
 import { writingBlocks } from './writing-blocks.ts';
 
@@ -35,7 +36,7 @@ export interface EditorCfg {
   labels: Record<string, string>;
 }
 
-function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours, pageDatabases: () => PageDatabases, extras: ((x: ExtraCore) => Extra)[] = []) {
+function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: () => CodeColours, pageDatabases: () => PageDatabases, geometry: () => Geometry, extras: ((x: ExtraCore) => Extra)[] = []) {
   const P = window.parent;
   const L = (k: string, fallback: string) => (typeof cfg.labels?.[k] === 'string' ? cfg.labels[k] : fallback);
   const send = (m: Record<string, unknown>) => {
@@ -271,6 +272,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   };
   const svg = (k: string) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
   const dark = cfg.theme === 'dark';
+  /** The guides and the pills on them, as in the design editor: thin pink lines between what moves and what it lines up with. */
+  const GUIDE = '#ff3b8b';
   const accent = dark ? '#8aa8ff' : '#b07c00';
   const panel = dark ? '#1b1f27' : '#fff';
   const line = dark ? '#3a4150' : '#e2ddd2';
@@ -308,11 +311,21 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     .sp.m{border-color:rgba(246,166,35,.2)}
     .sp.p{border-color:rgba(80,190,120,.2)}
     .h{position:absolute;pointer-events:auto;background:${panel};border:2px solid ${accent};border-radius:4px;touch-action:none;box-sizing:border-box}
-    .h.r{right:-6px;top:50%;width:9px;height:26px;margin-top:-13px;cursor:ew-resize}
-    .h.b{bottom:-6px;left:50%;height:9px;width:26px;margin-left:-13px;cursor:ns-resize}
-    .h.rb{right:-7px;bottom:-7px;width:12px;height:12px;cursor:nwse-resize;border-radius:3px}
+    .h.e{right:-6px;top:50%;width:9px;height:26px;margin-top:-13px;cursor:ew-resize}
+    /* (the left and top handles sit wholly outside the box: a press at the start of its words is a click on them, not a size) */
+    .h.w{left:-10px;top:50%;width:9px;height:26px;margin-top:-13px;cursor:ew-resize}
+    .h.s{bottom:-6px;left:50%;height:9px;width:26px;margin-left:-13px;cursor:ns-resize}
+    .h.n{top:-10px;left:50%;height:9px;width:26px;margin-left:-13px;cursor:ns-resize}
+    .h.se,.h.nw,.h.ne,.h.sw{width:12px;height:12px;border-radius:3px}
+    .h.se{right:-7px;bottom:-7px;cursor:nwse-resize}
+    .h.nw{left:-12px;top:-12px;cursor:nwse-resize}
+    .h.ne{right:-7px;top:-12px;cursor:nesw-resize}
+    .h.sw{left:-12px;bottom:-7px;cursor:nesw-resize}
     .tag,.size{position:fixed;display:none;pointer-events:none;padding:1px 7px;border-radius:6px;background:${accent};color:${dark ? '#1a1306' : '#fff'};font:600 11px/18px system-ui,sans-serif;white-space:nowrap}
-    .size{background:#1d1b17;color:#fff}
+    .size,.gl{background:${GUIDE};color:#fff}
+    .g{position:fixed;background:${GUIDE};pointer-events:none}
+    .gl{position:fixed;pointer-events:none;font:600 10px/16px system-ui,sans-serif;padding:0 4px;border-radius:4px;white-space:nowrap}
+    .size{font-size:10.5px;line-height:16px}
     .bar,.rtb{position:fixed;display:none;pointer-events:auto;align-items:center;gap:1px;padding:3px;border-radius:10px;background:${panel};border:1px solid ${line};box-shadow:0 6px 20px rgba(0,0,0,.18);font:12px system-ui,sans-serif}
     .bar button,.rtb button{all:unset;display:grid;place-items:center;width:30px;height:28px;border-radius:7px;color:${ink};cursor:pointer}
     .bar button:hover,.rtb button:hover,.rtb button.on{background:${line}}
@@ -323,6 +336,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     .rtb.linking form{display:flex}
     .rtb.linking .cmds{display:none}
     .cmds{display:flex;align-items:center;gap:1px}
+    .rtb input[aria-invalid]{outline:2px solid #d44c47;outline-offset:-2px}
     .rtb input{all:unset;width:190px;height:26px;padding:0 8px;border-radius:7px;background:${dark ? '#151412' : '#f5f3ee'};color:${ink};font:13px system-ui,sans-serif}
     .rtb{flex-wrap:wrap;max-width:calc(100vw - 8px);box-sizing:border-box}
     .cmds{flex-wrap:wrap}
@@ -336,11 +350,12 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     .pal .lbl{width:74px;color:${muted};font:11.5px system-ui,sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .rtb .pal button{width:24px;height:24px;border:1px solid ${line};box-sizing:border-box;border-radius:6px;font:700 13px/1 system-ui,sans-serif}
     .drop{position:fixed;display:none;height:3px;border-radius:2px;background:${accent};pointer-events:none;box-shadow:0 0 0 2px ${accent}33}
-    @media (pointer:coarse){.bar button,.rtb button{width:38px;height:36px}.h.r{width:14px;height:34px;margin-top:-17px;right:-9px}.h.b{height:14px;width:34px;margin-left:-17px;bottom:-9px}.h.rb{width:18px;height:18px;right:-10px;bottom:-10px}}
+    @media (pointer:coarse){.bar button,.rtb button{width:38px;height:36px}.h.e,.h.w{width:14px;height:34px;margin-top:-17px}.h.e{right:-9px}.h.w{left:-14px}.h.s,.h.n{height:14px;width:34px;margin-left:-17px}.h.s{bottom:-9px}.h.n{top:-14px}.h.se,.h.nw,.h.ne,.h.sw{width:18px;height:18px}.h.se{right:-10px;bottom:-10px}.h.nw{left:-16px;top:-16px}.h.ne{right:-10px;top:-16px}.h.sw{left:-16px;bottom:-10px}}
   </style>
   <div class="sp m"></div><div class="sp p"></div>
   <div class="box hover"></div>
-  <div class="box sel"><i class="h r" data-h="r"></i><i class="h b" data-h="b"></i><i class="h rb" data-h="rb"></i></div>
+  <div class="box sel">${['n', 'e', 's', 'w', 'ne', 'nw', 'se', 'sw'].map((k) => `<i class="h ${k}" data-h="${k}"></i>`).join('')}</div>
+  <div class="guides"></div>
   <div class="tag"></div><div class="size"></div><div class="drop"></div>
   <div class="bar" role="toolbar">
     <button class="drag" data-a="drag" title="${attr(L('gripTip', 'Drag to move it, click for its menu'))}">${svg('drag')}</button>
@@ -384,6 +399,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   const bar = $('.bar');
   const rtb = $('.rtb');
   const drop = $('.drop');
+  const guidesEl = $('.guides');
   const mBox = $('.sp.m');
   const pBox = $('.sp.p');
 
@@ -551,6 +567,92 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     let x = el.nextElementSibling;
     while (x && (x.tagName === 'SCRIPT' || isUi(x))) x = x.nextElementSibling;
     return x;
+  };
+
+  // ---- keys and measures for moving and sizing parts ------------------------------------------------------------------
+  const G = geometry();
+  const apple = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  /** The app-wide keys for dragging (web/src/features/pages/common/keys.ts, mirrored: the frame cannot import it): a copy, and no snapping. */
+  const isCopyDrag = (e: { ctrlKey: boolean; altKey: boolean }) => (apple ? e.altKey : e.ctrlKey);
+  const isNoSnap = (e: { metaKey: boolean; altKey: boolean }) => (apple ? e.metaKey : e.altKey);
+  /** How close, in pixels of the frame, an edge must come to a line to snap to it. */
+  const SNAP = 6;
+  type Box = { x: number; y: number; w: number; h: number };
+  const boxOfRect = (r: DOMRect): Box => ({ x: r.left, y: r.top, w: r.width, h: r.height });
+  /** A part that is placed by offsets (moved from where it falls, on its block, on the screen, stuck when scrolled), not left where the page puts it. */
+  const isPlaced = (el: Element | null): el is HTMLElement => !!el && el !== document.body && el !== root && el instanceof HTMLElement && getComputedStyle(el).position !== 'static';
+  /** Whether a part has others beside it on its line (a flex row, a grid's row, an inline run): the drop line is then vertical. */
+  const sideBySide = (el: Element): boolean => {
+    const p = el.parentElement;
+    if (!p) return false;
+    const r = el.getBoundingClientRect();
+    if (!r.height) return false;
+    let n = 0;
+    for (const c of p.children) {
+      if (c === el || isUi(c) || SKIP.has(c.tagName)) continue;
+      const q = c.getBoundingClientRect();
+      if (!q.width && !q.height) continue;
+      const over = Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top);
+      // (on the same line: they share more than half of the shorter one's height, and do not sit one over the other)
+      if (over > Math.min(r.height, q.height) / 2 && (q.right <= r.left + 1 || q.left >= r.right - 1)) n++;
+      if (n) return true;
+    }
+    return false;
+  };
+  /** The parts a moved or sized part lines up with: its neighbours (and theirs one level in), the box it is in and the page. */
+  const lineUps = (el: Element): { others: Box[]; frames: Box[] } => {
+    const parent = el.parentElement ?? document.body;
+    const ok = (x: Element): x is HTMLElement => x instanceof HTMLElement && x !== el && !el.contains(x) && !isUi(x) && !SKIP.has(x.tagName) && x.tagName !== 'BR';
+    const others: Box[] = [];
+    const add = (x: HTMLElement) => {
+      if (others.length > 250) return;
+      const r = x.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1 || getComputedStyle(x).visibility === 'hidden') return;
+      others.push(boxOfRect(r));
+    };
+    for (const x of parent.children) if (ok(x)) add(x);
+    for (const x of parent.children) if (ok(x) && !x.matches('p,h1,h2,h3,h4,h5,h6,li,span,a')) for (const c of x.children) if (ok(c)) add(c);
+    const pr = parent.getBoundingClientRect();
+    const cs = getComputedStyle(parent);
+    const bl = parseFloat(cs.borderLeftWidth) || 0;
+    const bt = parseFloat(cs.borderTopWidth) || 0;
+    const inner: Box = { x: pr.left + bl, y: pr.top + bt, w: parent.clientWidth, h: parent.clientHeight };
+    const page = root.getBoundingClientRect();
+    return { others, frames: [inner, { x: page.left, y: page.top, w: root.clientWidth, h: page.height }] };
+  };
+  /** Draws what snapping found: thin pink lines, and the distances between parts as small pills on them. */
+  const drawGuides = (o: { lines: { x1: number; y1: number; x2: number; y2: number }[]; gaps: { x: number; y: number; w: number; h: number; label: string; vertical: boolean }[] }) => {
+    guidesEl.textContent = '';
+    const mk = (cls: string) => {
+      const d = document.createElement('div');
+      d.className = cls;
+      guidesEl.append(d);
+      return d;
+    };
+    for (const l of o.lines) {
+      const g = mk('g');
+      if (Math.abs(l.x1 - l.x2) < 0.5) Object.assign(g.style, { left: `${l.x1 - 0.5}px`, top: `${Math.min(l.y1, l.y2)}px`, width: '1px', height: `${Math.abs(l.y2 - l.y1)}px` });
+      else Object.assign(g.style, { left: `${Math.min(l.x1, l.x2)}px`, top: `${l.y1 - 0.5}px`, width: `${Math.abs(l.x2 - l.x1)}px`, height: '1px' });
+    }
+    for (const q of o.gaps) {
+      const g = mk('g');
+      if (q.vertical) Object.assign(g.style, { left: `${q.x - 0.5}px`, top: `${q.y}px`, width: '1px', height: `${q.h}px` });
+      else Object.assign(g.style, { left: `${q.x}px`, top: `${q.y - 0.5}px`, width: `${q.w}px`, height: '1px' });
+      const t = mk('gl');
+      t.textContent = q.label;
+      const cx = q.x + q.w / 2;
+      const cy = q.y + q.h / 2;
+      t.style.left = `${Math.max(2, Math.min(innerWidth - t.offsetWidth - 2, cx - t.offsetWidth / 2 + (q.vertical ? 6 + t.offsetWidth / 2 : 0)))}px`;
+      t.style.top = `${Math.max(2, Math.min(innerHeight - 18, cy - 8 + (q.vertical ? 0 : -12)))}px`;
+    }
+  };
+  const clearGuides = () => (guidesEl.textContent = '');
+  /** A small pink pill with words beside a point (a part's size while it is sized, where it is while it is moved). */
+  const pill = (text: string, r: { right: number; bottom: number }) => {
+    sizeTag.textContent = text;
+    sizeTag.style.display = 'block';
+    sizeTag.style.left = `${Math.max(2, Math.min(r.right + 8, innerWidth - sizeTag.offsetWidth - 4))}px`;
+    sizeTag.style.top = `${Math.max(2, Math.min(r.bottom + 8, innerHeight - 24))}px`;
   };
 
   // ---- where a part is, as the app names it ------------------------------------------------------------
@@ -1091,6 +1193,10 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   };
   let paletteTimer = 0;
   const changed = (page = false) => {
+    if (findAsk) {
+      clearTimeout(findTimer);
+      findTimer = window.setTimeout(() => findAsk && runFind(findAsk.query, findAsk.opts), 150);
+    }
     W.changed();
     dirty = true;
     state();
@@ -1414,9 +1520,17 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     }
     redraw();
   });
+  linkInput.addEventListener('input', () => linkInput.removeAttribute('aria-invalid'));
   linkForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const url = linkInput.value.trim();
+    // What was typed, as an address that goes somewhere (example.com is a web address, an email address mail): one that runs code is refused.
+    const typed = linkInput.value.trim();
+    const url = G.linkAddress(typed);
+    if (typed && !url) {
+      linkInput.setAttribute('aria-invalid', 'true');
+      linkInput.title = L('badLink', 'That cannot be a link: only web, mail, phone and page addresses');
+      return;
+    }
     rtb.classList.remove('linking');
     if (!editing) return;
     editing.focus({ preventScroll: true });
@@ -1425,7 +1539,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       s.removeAllRanges();
       s.addRange(saved);
     }
-    if (url && !/^\s*javascript:/i.test(url)) {
+    if (url) {
       noteTyping();
       document.execCommand('createLink', false, url);
     }
@@ -1467,7 +1581,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     const el = sel;
     const body = document.body;
     const styleKey = `${a}:${el ? pathOf(el).join('.') : ''}:${JSON.stringify(ctx)}`;
-    if (a !== 'style' && a !== 'pageStyle' && a !== 'setVar') lastStyle = null;
+    if (a !== 'style' && a !== 'pageStyle' && a !== 'setVar' && a !== 'nudge') lastStyle = null;
     // Blocks as Notion has them (Turn into, colours, an icon and a cover, what the app was asked for), and several picked at once.
     if (/^(del|dup|up|down|copy|cut)$/.test(a) && W.picked().length > 1 && W.act(`many:${a}`, arg)) return;
     if (W.act(a, arg)) return;
@@ -1517,14 +1631,26 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       case 'copy':
       case 'cut': {
         if (!el || el === body) return;
-        clip = el.outerHTML;
-        send({ type: 'wa-ed-copied', html: clip, name: nameOf(el) });
+        copyOut(el.outerHTML, nameOf(el));
         if (a === 'cut') return act('del');
         return;
       }
       case 'clip':
         clip = typeof arg?.html === 'string' ? arg.html : clip;
         return;
+      case 'pasteMenu':
+        // The menu's Paste: the system clipboard is the app's to read (this frame has no permission to), and comes back as `pasteData`.
+        if (arg?.plain) plainAt = Date.now();
+        send({ type: 'wa-ed-clip-read', plain: !!arg?.plain });
+        return;
+      case 'pasteData': {
+        // What the app read from the clipboard (or that it could not: the part copied in this page goes in instead).
+        const html = typeof arg?.html === 'string' ? arg.html : '';
+        const text = typeof arg?.text === 'string' ? arg.text : '';
+        if (editing) return void W.act('pasteWords', { html, text, plain: !!arg?.plain });
+        if (!pasteInPage(html, text, !!arg?.plain)) act('paste');
+        return;
+      }
       case 'paste': {
         // Every part copied (several blocks copied together paste together), in their order.
         const t = document.createElement('template');
@@ -1646,9 +1772,13 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         const name = arg.name.toLowerCase();
         // Handlers would only be held back here: they are written in the code view.
         if (!/^[a-z][a-z0-9:_.-]*$/.test(name) || name.startsWith('on') || name === 'contenteditable' || name.startsWith('data-n-') || name === 'style') return;
-        if (name === 'href' || name === 'src') {
-          if (/^\s*javascript:/i.test(String(arg.value ?? ''))) return;
-        }
+        // Addresses that run code or show files are refused; a link's address typed bare is made one that goes somewhere.
+        let value: unknown = arg.value;
+        if (name === 'href' && typeof value === 'string' && value.trim()) {
+          const url = G.linkAddress(value);
+          if (!url) return;
+          value = url;
+        } else if (name === 'src' && /^\s*(javascript|vbscript|data|file|blob):/i.test(String(value ?? '')) && !(el.tagName === 'IMG' && /^\s*data:image\/(png|jpe?g|gif|webp|avif|bmp);/i.test(String(value)))) return;
         remember();
         if (name === 'class') {
           // The editor's own class stays (its rules need it).
@@ -1659,8 +1789,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
           if (own) v.push(own);
           if (v.length) el.setAttribute('class', v.join(' '));
           else el.removeAttribute('class');
-        } else if (arg.value === null) el.removeAttribute(name);
-        else el.setAttribute(name, String(arg.value));
+        } else if (value === null) el.removeAttribute(name);
+        else el.setAttribute(name, String(value));
         break;
       }
       case 'words': {
@@ -1681,6 +1811,53 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         sel = nx;
         break;
       }
+      case 'nudge': {
+        // The arrow keys (and the app's buttons) on a placed part.
+        if (!el || !isPlaced(el) || getComputedStyle(el).position === 'sticky') return;
+        return nudge(el, Number(arg?.dx) || 0, Number(arg?.dy) || 0);
+      }
+      case 'place': {
+        // Place freely: where it falls, now moved from there (nothing jumps), so it can be dragged; or back in the flow.
+        if (!el || el === body) return;
+        remember();
+        if (arg === 'flow') selfStyle(el, { position: null, top: null, right: null, bottom: null, left: null, 'z-index': null });
+        else if (getComputedStyle(el).position === 'static') selfStyle(el, { position: 'relative' });
+        break;
+      }
+      case 'layer': {
+        // In front of the parts beside it, or behind them: a number above or below theirs (a part that is not placed is, first).
+        if (!el || el === body || !el.parentElement) return;
+        const z = [...el.parentElement.children].filter((x) => x !== el && x instanceof HTMLElement && !isUi(x)).map((x) => parseInt(getComputedStyle(x).zIndex, 10) || 0);
+        const to = arg === 'back' ? Math.min(0, ...z) - 1 : Math.max(0, ...z) + 1;
+        remember();
+        if (getComputedStyle(el).position === 'static') selfStyle(el, { position: 'relative' });
+        selfStyle(el, { 'z-index': String(to) });
+        break;
+      }
+      case 'unlink': {
+        const a2 = el?.closest('a');
+        if (!a2 || a2.classList.contains('n-btn')) return;
+        remember();
+        a2.replaceWith(...a2.childNodes);
+        sel = null;
+        break;
+      }
+      case 'selectAll': {
+        // Every part of the page, as if each were picked with Shift.
+        const all = W.all();
+        if (all.length) W.pick(all);
+        return;
+      }
+      case 'find': {
+        const o = arg?.opts ?? {};
+        return runFind(String(arg?.query ?? ''), { matchCase: !!o.matchCase, wholeWord: !!o.wholeWord, regex: !!o.regex }, Number(arg?.step) || 0);
+      }
+      case 'findReplace': {
+        const o = arg?.opts ?? {};
+        return replaceFind(String(arg?.query ?? ''), { matchCase: !!o.matchCase, wholeWord: !!o.wholeWord, regex: !!o.regex }, String(arg?.replacement ?? ''), !!arg?.all);
+      }
+      case 'findClear':
+        return clearFind();
       case 'select':
         return select(byPath(arg) ?? document.body);
       case 'deselect':
@@ -1747,7 +1924,145 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     if (b && b.dataset.a !== 'drag') act(b.dataset.a!);
   });
 
-  // ---- resizing a part by its edges ----------------------------------------------------------------------
+  // ---- placing a part by its offsets: moving it freely, nudging it, sizing it from any side ------------------------------
+  /** A change to this part alone (not to every part of its kind the inspector may be set to), at the screen size shown. */
+  const selfStyle = (el: Element, props: Record<string, string | null>) => {
+    const was = ctx;
+    ctx = { scope: 'self', state: '', media: was.media };
+    try {
+      styleOf(el, props);
+    } finally {
+      ctx = was;
+    }
+  };
+  /** Which offset of each direction a part is placed by: the one it has (right or bottom if only those are set), else left and top. */
+  const anchorsOf = (el: HTMLElement): { x: 'left' | 'right'; y: 'top' | 'bottom' } => {
+    const st = el.style;
+    const cs = getComputedStyle(el);
+    const set = (v: string) => Number.isFinite(parseFloat(v));
+    return {
+      x: (st.right && !st.left) || (!st.left && !set(cs.left) && set(cs.right)) ? 'right' : 'left',
+      y: (st.bottom && !st.top) || (!st.top && !set(cs.top) && set(cs.bottom)) ? 'bottom' : 'top',
+    };
+  };
+  /**
+   * Puts a placed part's border box where `left`, `top` say (the frame's pixels): its offsets are changed by the difference,
+   * measured, and corrected where the page's own rules make them count differently (a part stretched between left and
+   * right keeps its size, a scaled box moves by what shows). Returns where it ended up.
+   */
+  const placeAt = (el: HTMLElement, left: number, top: number): DOMRect => {
+    const a = anchorsOf(el);
+    const size0 = el.getBoundingClientRect();
+    const num = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
+    let freed = false;
+    for (let i = 0; i < 4; i++) {
+      const r = el.getBoundingClientRect();
+      const ex = left - r.left;
+      const ey = top - r.top;
+      if (i && Math.abs(ex) < 0.75 && Math.abs(ey) < 0.75) break;
+      const cs = getComputedStyle(el);
+      const props: Record<string, string | null> = {
+        [a.x]: `${Math.round(num(cs[a.x]) + (a.x === 'left' ? ex : -ex))}px`,
+        [a.y]: `${Math.round(num(cs[a.y]) + (a.y === 'top' ? ey : -ey))}px`,
+      };
+      selfStyle(el, props);
+      // Stretched between two offsets: the other one is let go, so that the size stays what it was.
+      const q = el.getBoundingClientRect();
+      if (!freed && (Math.abs(q.width - size0.width) > 0.75 || Math.abs(q.height - size0.height) > 0.75)) {
+        freed = true;
+        const free: Record<string, string | null> = {};
+        if (Math.abs(q.width - size0.width) > 0.75) free[a.x === 'left' ? 'right' : 'left'] = 'auto';
+        if (Math.abs(q.height - size0.height) > 0.75) free[a.y === 'top' ? 'bottom' : 'top'] = 'auto';
+        selfStyle(el, free);
+      }
+    }
+    return el.getBoundingClientRect();
+  };
+  /** Whether a press just ended a drag: the click that follows it is not one on the page. */
+  let dragged = false;
+  /** A long press with a finger (the right-click of a phone): when it opened the menu, and its timer. */
+  let longAt = 0;
+  let pressTimer = 0;
+  /**
+   * Dragging a placed part moves it where the pointer goes: snapped to the parts around it, its box and the page, with pink
+   * guides and the distances on them (Alt, ⌘ on a Mac: no snapping; Shift: straight; Ctrl, ⌥ on a Mac: a copy is dragged
+   * and the part stays). A tap with no move is the caller's (`tap`). False when the part is not placed (the caller moves it in the flow).
+   */
+  const freeMove = (e: PointerEvent, el0: Element, tap?: () => void): boolean => {
+    if (!isPlaced(el0) || getComputedStyle(el0).position === 'sticky') return false;
+    let el: HTMLElement = el0;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let moved = false;
+    let r0: DOMRect | null = null;
+    let near: { others: Box[]; frames: Box[] } | null = null;
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+      if (!moved) {
+        moved = true;
+        finishEditing();
+        remember();
+        lastStyle = null;
+        if (isCopyDrag(ev)) {
+          const c = el0.cloneNode(true) as HTMLElement;
+          c.removeAttribute('id');
+          for (const x of c.querySelectorAll('[id]')) x.removeAttribute('id');
+          el0.after(c);
+          el = c;
+        }
+        if (sel !== el) select(el);
+        r0 = el.getBoundingClientRect();
+        near = lineUps(el);
+        // (no hover frames over the parts it passes while it moves)
+        hover = null;
+        dragging = { target: el, after: false };
+      }
+      let dx = ev.clientX - x0;
+      let dy = ev.clientY - y0;
+      if (ev.shiftKey) {
+        if (Math.abs(dx) > Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+      const want: Box = { x: r0!.left + dx, y: r0!.top + dy, w: r0!.width, h: r0!.height };
+      if (near) {
+        const s = G.snapMove(want, near.others, near.frames, SNAP, !isNoSnap(ev));
+        dx += s.dx;
+        dy += s.dy;
+        drawGuides(s);
+      }
+      const r = placeAt(el, r0!.left + dx, r0!.top + dy);
+      const c = near?.frames[0];
+      pill(`${Math.round(r.left - (c?.x ?? 0))}, ${Math.round(r.top - (c?.y ?? 0))}`, r);
+      redraw();
+    };
+    const up = () => {
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', up, true);
+      removeEventListener('pointercancel', up, true);
+      clearGuides();
+      sizeTag.style.display = 'none';
+      dragging = null;
+      if (!moved) return tap?.();
+      dragged = true;
+      setTimeout(() => (dragged = false), 0);
+      changed();
+    };
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', up, true);
+    addEventListener('pointercancel', up, true);
+    return true;
+  };
+  /** The arrow keys on a placed part: it moves by `dx`, `dy` pixels; a run of presses is one step to undo. */
+  const nudge = (el: HTMLElement, dx: number, dy: number) => {
+    const key = `nudge:${pathOf(el).join('.')}:${JSON.stringify(ctx)}`;
+    if (!(lastStyle && lastStyle.key === key && Date.now() - lastStyle.at < 1200)) remember();
+    lastStyle = { key, at: Date.now() };
+    const r = el.getBoundingClientRect();
+    placeAt(el, r.left + dx, r.top + dy);
+    changed();
+  };
+
+  // ---- resizing a part by its edges and corners ----------------------------------------------------------------------
   selBox.addEventListener('pointerdown', (e) => {
     const h = (e.composedPath()[0] as HTMLElement).dataset?.h;
     const el = sel as HTMLElement | null;
@@ -1755,24 +2070,108 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     e.preventDefault();
     e.stopPropagation();
     const r0 = el.getBoundingClientRect();
+    // (what the part is like when the drag begins, as numbers: a computed style is live, it would follow what is written)
+    const cs0 = (() => {
+      const c = getComputedStyle(el);
+      return {
+        position: c.position,
+        boxSizing: c.boxSizing,
+        paddingLeft: c.paddingLeft,
+        paddingRight: c.paddingRight,
+        paddingTop: c.paddingTop,
+        paddingBottom: c.paddingBottom,
+        borderLeftWidth: c.borderLeftWidth,
+        borderRightWidth: c.borderRightWidth,
+        borderTopWidth: c.borderTopWidth,
+        borderBottomWidth: c.borderBottomWidth,
+        marginLeft: c.marginLeft,
+        marginTop: c.marginTop,
+        maxWidth: c.maxWidth,
+        minWidth: c.minWidth,
+        maxHeight: c.maxHeight,
+        minHeight: c.minHeight,
+      };
+    })();
+    const edges = { l: h.includes('w'), r: h.includes('e'), t: h.includes('n'), b: h.includes('s') };
+    const corner = (edges.l || edges.r) && (edges.t || edges.b);
+    const pic = el.tagName === 'IMG';
+    const ratio = r0.width / (r0.height || 1);
+    const placed = isPlaced(el) && cs0.position !== 'sticky';
+    const num = (v: string) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
+    // A part of the page's own kind of box: its size is the box's own (padding and border outside it), unless it says otherwise.
+    const extraW = cs0.boxSizing === 'border-box' ? 0 : num(cs0.paddingLeft) + num(cs0.paddingRight) + num(cs0.borderLeftWidth) + num(cs0.borderRightWidth);
+    const extraH = cs0.boxSizing === 'border-box' ? 0 : num(cs0.paddingTop) + num(cs0.paddingBottom) + num(cs0.borderTopWidth) + num(cs0.borderBottomWidth);
+    const parentCs = el.parentElement ? getComputedStyle(el.parentElement) : null;
+    const inFlex = !!parentCs && /flex/.test(parentCs.display);
+    const column = !!parentCs && /column/.test(parentCs.flexDirection);
+    const near = lineUps(el);
     const x0 = e.clientX;
     const y0 = e.clientY;
     remember();
+    lastStyle = null;
     let moved = false;
     const move = (ev: PointerEvent) => {
-      const w = Math.max(8, Math.round(r0.width + ev.clientX - x0));
-      const hh = Math.max(8, Math.round(r0.height + ev.clientY - y0));
+      const dx = ev.clientX - x0;
+      const dy = ev.clientY - y0;
+      let box: Box = { x: r0.left, y: r0.top, w: r0.width, h: r0.height };
+      if (edges.r) box.w = r0.width + dx;
+      if (edges.l) box.w = r0.width - dx;
+      if (edges.b) box.h = r0.height + dy;
+      if (edges.t) box.h = r0.height - dy;
+      box.w = Math.max(8, box.w);
+      box.h = Math.max(8, box.h);
+      // Shift (and a picture's corner) keeps its shape: the other measure follows.
+      const keep = ev.shiftKey;
+      const follow = (b: Box, by: 'x' | 'y') => {
+        if (by === 'x') b.h = b.w / ratio;
+        else b.w = b.h * ratio;
+        if (edges.l) b.x = r0.right - b.w;
+        if (edges.t) b.y = r0.bottom - b.h;
+      };
+      if (keep) {
+        if (corner) {
+          const k = Math.max(box.w / r0.width, box.h / r0.height);
+          box.w = r0.width * k;
+          box.h = r0.height * k;
+        } else if (edges.l || edges.r) box.h = box.w / ratio;
+        else box.w = box.h * ratio;
+      }
+      if (edges.l) box.x = r0.right - box.w;
+      if (edges.t) box.y = r0.bottom - box.h;
+      if (!isNoSnap(ev)) {
+        const by = keep ? (edges.l || edges.r ? 'x' : 'y') : null;
+        const s = G.snapSize(box, edges, near.others, near.frames, SNAP, by ?? 'xy');
+        box = s.box;
+        if (by) follow(box, by);
+        drawGuides(s);
+      } else clearGuides();
       const props: Record<string, string | null> = {};
-      if (h !== 'b') props.width = `${w}px`;
-      if (h !== 'r') props.height = el.tagName === 'IMG' && h === 'rb' ? 'auto' : `${hh}px`;
-      if (h !== 'b' && getComputedStyle(el).maxWidth !== 'none' && parseFloat(getComputedStyle(el).maxWidth) < w) props['max-width'] = 'none';
-      styleOf(el, props);
+      const w = Math.max(0, Math.round(box.w - extraW));
+      const hh = Math.max(0, Math.round(box.h - extraH));
+      if (edges.l || edges.r) {
+        props.width = `${w}px`;
+        // A cell of a flex row keeps the size it is given (its flex settings would shrink or stretch it otherwise).
+        if (inFlex && !column) props.flex = `0 0 ${w}px`;
+        if (parseFloat(cs0.maxWidth) < box.w) props['max-width'] = 'none';
+        if (parseFloat(cs0.minWidth) > w) props['min-width'] = '0px';
+      }
+      if (edges.t || edges.b) {
+        props.height = pic && corner && !keep ? 'auto' : `${hh}px`;
+        if (inFlex && column) props.flex = `0 0 ${hh}px`;
+        if (parseFloat(cs0.maxHeight) < box.h) props['max-height'] = 'none';
+        if (parseFloat(cs0.minHeight) > hh) props['min-height'] = '0px';
+      } else if (keep && !pic) props.height = `${hh}px`;
+      else if (keep && pic) props.height = 'auto';
+      // A side that moves moves the part: by its offsets where it is placed, by its margin where the page puts it.
+      if (!placed) {
+        if (edges.l) props['margin-left'] = `${Math.round(num(cs0.marginLeft) + (box.x - r0.left))}px`;
+        if (edges.t) props['margin-top'] = `${Math.round(num(cs0.marginTop) + (box.y - r0.top))}px`;
+      }
+      selfStyle(el, props);
+      if (placed && (edges.l || edges.t)) placeAt(el, edges.l ? box.x : el.getBoundingClientRect().left, edges.t ? box.y : el.getBoundingClientRect().top);
       moved = true;
       const r = el.getBoundingClientRect();
-      sizeTag.textContent = `${Math.round(r.width)} × ${Math.round(r.height)}`;
-      sizeTag.style.display = 'block';
-      sizeTag.style.left = `${Math.min(r.right + 8, innerWidth - sizeTag.offsetWidth - 4)}px`;
-      sizeTag.style.top = `${Math.min(r.bottom + 8, innerHeight - 24)}px`;
+      pill(`${Math.round(r.width)} × ${Math.round(r.height)}`, r);
       redraw();
     };
     const up = () => {
@@ -1780,6 +2179,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       removeEventListener('pointerup', up, true);
       removeEventListener('pointercancel', up, true);
       sizeTag.style.display = 'none';
+      clearGuides();
       if (moved) changed();
       else undo.pop();
     };
@@ -1796,16 +2196,21 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     host.style.setProperty('display', 'block', 'important');
     return el;
   };
+  /** The bar's ⋮⋮: a placed part is moved where the pointer goes; any other is dragged to another place in the page's flow. */
   function dragStart(e: PointerEvent) {
     const el = sel;
     if (!el || el === document.body) return;
     const x0 = e.clientX;
     const y0 = e.clientY;
     const handle = (e.composedPath()[0] as Element).closest?.('button')?.getBoundingClientRect();
+    const tap = () => handle && void W.act('menu', { at: { left: handle.left, top: handle.top, bottom: handle.bottom } });
+    if (freeMove(e, el, tap)) return;
     let moved = false;
+    let copy = false;
     const move = (ev: PointerEvent) => {
       if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
       moved = true;
+      copy = isCopyDrag(ev);
       let t = under(ev.clientX, ev.clientY);
       // Not into itself; the page's top level parts when pointing at the page.
       while (t && (el.contains(t) || t === root)) t = t.parentElement;
@@ -1815,7 +2220,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         return;
       }
       const r = t.getBoundingClientRect();
-      const row = t.parentElement ? getComputedStyle(t.parentElement).flexDirection === 'row' && getComputedStyle(t.parentElement).display.includes('flex') : false;
+      // Beside others on its line (a flex row, a grid's row, words running on), the line is vertical: before or after by the side.
+      const row = sideBySide(t);
       const after = row ? ev.clientX > r.left + r.width / 2 : ev.clientY > r.top + r.height / 2;
       dragging = { target: t, after };
       drop.style.display = 'block';
@@ -1839,12 +2245,18 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       const d = dragging;
       dragging = null;
       // A tap on the handle (a phone has no pointing at a block): the block's menu, Turn into, Colour and the rest.
-      if (!moved && handle) return void W.act('menu', { at: { left: handle.left, top: handle.top, bottom: handle.bottom } });
+      if (!moved) return tap();
       if (!d || !el.isConnected) return;
       remember();
-      if (d.after) d.target.after(el);
-      else d.target.before(el);
-      sel = el;
+      let part: Element = el;
+      if (copy) {
+        part = el.cloneNode(true) as Element;
+        part.removeAttribute('id');
+        for (const x of part.querySelectorAll('[id]')) x.removeAttribute('id');
+      }
+      if (d.after) d.target.after(part);
+      else d.target.before(part);
+      sel = part;
       changed();
     };
     addEventListener('pointermove', move, true);
@@ -1910,9 +2322,19 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     noteTyping: () => noteTyping(),
     offset: offsetIn,
     length: lengthOf,
-    copy: (html, name) => {
-      clip = html;
-      send({ type: 'wa-ed-copied', html, name });
+    copy: (html, name) => copyOut(html, name),
+    contextRows: (t, words) => contextRows(t, words),
+    command: (a, arg) => act(a, arg),
+    freeMove,
+    sideBySide,
+    pasteWords: (html) => G.pasteWords(html),
+    linkAddress: (raw) => G.linkAddress(raw),
+    // (asked once, by the paste that follows: a later paste is a plain one again)
+    plainPaste: (used = true) => {
+      const on = Date.now() - plainAt < 1500;
+      // (the paste with nothing in it that a Ctrl+Shift+V raises on its own does not use it up)
+      if (used) plainAt = 0;
+      return on;
     },
     canAsk: () => canAskAgent,
     code: codeColours(),
@@ -1931,6 +2353,179 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
   addEventListener('paste', () => clearTimeout(pasteTimer), true);
   // Its listeners come before the editor's own, so the keys it takes (Enter, Backspace, "/"…) go to it first.
   const W: Writing = writing(core);
+
+  // ---- the clipboard: parts copied are on the system's too, words pasted keep their look ---------------------------------
+  /** When "paste without formatting" was asked for (Ctrl+Shift+V, the menu's): the paste that follows brings only words. */
+  let plainAt = 0;
+  /** Wraps parts copied on the system clipboard, so that this editor knows them again (in another app they are an ordinary block of HTML). */
+  const PARTS = 'data-hydor-parts';
+  let sysCopy: { html: string; text: string } | null = null;
+  /** Whether the part copied last reached the system clipboard (else the one kept in this page is what a paste brings). */
+  let clipViaSystem = true;
+  /**
+   * A part (or several) copied: kept in the page for pasting, and put on the system clipboard as HTML and as words, through the
+   * copy event this raises (the frame may not read or write the clipboard on its own, but a copy the person asked for is allowed).
+   * The app hears of it too, to paste in other pages, and to write the clipboard itself where the frame could not.
+   */
+  const copyOut = (html: string, name: string) => {
+    clip = html;
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    const text = [...t.content.children].map((c) => (c.textContent ?? '').replace(/​/g, '').trim()).join('\n');
+    sysCopy = { html: `<div ${PARTS}="1">${html}</div>`, text };
+    let ok = false;
+    // A copy needs something selected to raise its event: a one-character mark out of sight stands in (taken away again at once).
+    const sel0 = getSelection();
+    const was = sel0 && sel0.rangeCount ? sel0.getRangeAt(0).cloneRange() : null;
+    const mark = document.createElement('span');
+    mark.setAttribute('data-n-own', '');
+    mark.setAttribute('style', 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;user-select:text;-webkit-user-select:text');
+    mark.textContent = '.';
+    document.body.append(mark);
+    try {
+      const r = document.createRange();
+      r.selectNodeContents(mark);
+      sel0?.removeAllRanges();
+      sel0?.addRange(r);
+      ok = document.execCommand('copy');
+    } catch {}
+    mark.remove();
+    sel0?.removeAllRanges();
+    if (was && editing) sel0?.addRange(was);
+    sysCopy = null;
+    clipViaSystem = ok;
+    send({ type: 'wa-ed-copied', html, name, text, system: ok });
+  };
+  addEventListener(
+    'copy',
+    (e) => {
+      if (!sysCopy || !e.clipboardData) return;
+      e.clipboardData.setData('text/html', sysCopy.html);
+      e.clipboardData.setData('text/plain', sysCopy.text);
+      e.preventDefault();
+    },
+    true,
+  );
+  /** The parts in HTML that this editor copied (its wrapper), else null. */
+  const partsOf = (html: string): string | null => {
+    if (!html.includes(PARTS)) return null;
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    const w = t.content.querySelector(`[${PARTS}]`);
+    return w ? w.innerHTML : null;
+  };
+  /**
+   * What the system clipboard holds, pasted into the page after the part picked (nothing is being written): parts this editor
+   * copied as they were, other HTML or words as blocks of words. False when there was nothing of either.
+   */
+  const pasteInPage = (html: string, text: string, plain: boolean): boolean => {
+    const parts = plain ? null : partsOf(html);
+    if (parts) {
+      act('paste', { html: parts, where: 'after' });
+      return true;
+    }
+    // The part copied in this page, when it could not reach the clipboard (what is there is older).
+    if (!clipViaSystem && clip) return (act('paste'), true);
+    let pieces = html && !plain ? G.pasteWords(html) : [];
+    if (!pieces.length && text.trim())
+      pieces = text
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => ({ kind: '' as const, html: l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }));
+    if (!pieces.length) return false;
+    W.act('pastePieces', { pieces, where: 'after' });
+    return true;
+  };
+
+  // ---- the right-click menu: the block menu of writing.ts, with what is under the pointer ---------------------------------
+  /**
+   * What a right-click on `t` (or a block's menu) adds at the top of the block menu: while words are written, their own
+   * commands (cut, copy, paste, select all, link, bold, italic); else a link's, a picture's, a placed part's. The rows are
+   * data (an icon of the writing's, words from the labels, what to do): writing.ts draws them with its own menu, so Turn
+   * into, Colour, the language of code and the rest stay one menu, which works the same from the ⋮⋮ on a phone.
+   */
+  const contextRows = (t: Element | null, words: boolean): CtxRow[] => {
+    const rows: CtxRow[] = [];
+    if (words && editing) {
+      const s = getSelection();
+      const has = !!s && !s.isCollapsed;
+      const doIt = (c: string) => () => {
+        editing?.focus({ preventScroll: true });
+        noteTyping();
+        document.execCommand(c, false);
+        redraw();
+      };
+      rows.push(
+        { icon: 'cut', label: L('cut', 'Cut'), keys: 'Ctrl+X', off: !has, run: doIt('cut') },
+        { icon: 'copy', label: L('copy', 'Copy'), keys: 'Ctrl+C', off: !has, run: () => (editing?.focus({ preventScroll: true }), void document.execCommand('copy')) },
+        { icon: 'paste', label: L('paste', 'Paste'), keys: 'Ctrl+V', run: () => act('pasteMenu', { plain: false }) },
+        { icon: 'pastePlain', label: L('pastePlain', 'Paste without formatting'), keys: 'Ctrl+Shift+V', run: () => act('pasteMenu', { plain: true }) },
+        { icon: 'selectAll', label: L('selectAll', 'Select all'), keys: 'Ctrl+A', run: () => (editing?.focus({ preventScroll: true }), void document.execCommand('selectAll')) },
+        '-',
+        { icon: 'link', label: L('link', 'Link'), keys: 'Ctrl+K', off: !has, run: () => (rtb.querySelector('[data-c=link]') as HTMLElement).click() },
+        { icon: 'bold', label: L('bold', 'Bold'), keys: 'Ctrl+B', run: doIt('bold') },
+        { icon: 'italic', label: L('italic', 'Italic'), keys: 'Ctrl+I', run: doIt('italic') },
+      );
+      return rows;
+    }
+    if (!t || t === document.body || t === root) {
+      return [
+        { icon: 'paste', label: L('paste', 'Paste'), keys: 'Ctrl+V', run: () => act('pasteMenu', { plain: false }) },
+        { icon: 'selectAll', label: L('selectParts', 'Select all parts'), keys: 'Ctrl+A', run: () => act('selectAll') },
+      ];
+    }
+    const a = t.closest('a[href]') as HTMLAnchorElement | null;
+    if (a && !a.classList.contains('n-btn') && !a.matches('.n-file,.n-bookmark,.n-video') && !isUi(a)) {
+      rows.push(
+        { icon: 'external', label: L('openLink', 'Open the link'), run: () => void open(a.href, '_blank', 'noopener') },
+        {
+          icon: 'edit',
+          label: L('editLink', 'Change the link'),
+          run: () => {
+            if (wordy(a)) {
+              startEditing(a, { all: true });
+              setTimeout(() => (rtb.querySelector('[data-c=link]') as HTMLElement).click(), 0);
+            } else select(a);
+          },
+        },
+        { icon: 'unlink', label: L('removeLink', 'Remove the link'), run: () => (select(a), act('unlink')) },
+      );
+    }
+    const img = t.tagName === 'IMG' ? t : (sel?.tagName === 'IMG' ? sel : null);
+    if (img) {
+      rows.push(
+        { icon: 'picture', label: L('replacePicture', 'Replace the picture'), run: () => (select(img), void W.act('replacePicture', null)) },
+        { icon: 'media', label: L('mediaTip', 'Edit picture'), run: () => (select(img), send({ type: 'wa-ed-design', what: 'action', action: 'editPicture' })) },
+        { icon: 'alt', label: L('pictureDesc', 'Description'), run: () => (select(img), send({ type: 'wa-ed-focus', field: 'alt' })) },
+      );
+    }
+    // Where it sits: free to be dragged, or where the page puts it.
+    const part = sel && sel !== document.body ? sel : null;
+    if (part && part instanceof HTMLElement && getComputedStyle(part).position !== 'sticky') {
+      if (rows.length) rows.push('-');
+      if (isPlaced(part)) {
+        rows.push(
+          { icon: 'flow', label: L('placeFlow', 'Back in the flow'), run: () => act('place', 'flow') },
+          { icon: 'front', label: L('bringForward', 'Bring forward'), run: () => act('layer', 'front') },
+          { icon: 'back', label: L('sendBackward', 'Send backward'), run: () => act('layer', 'back') },
+        );
+      } else rows.push({ icon: 'move', label: L('placeFree', 'Place freely'), run: () => act('place', 'free') });
+    }
+    return rows;
+  };
+  /** A right-click (or the menu key) on `target` at (x, y): picks the part under it (words written stay so when it is on them), and opens the menu. */
+  const openContext = (target: Element, x: number, y: number) => {
+    const words = !!editing && editing.contains(target);
+    if (!words) {
+      const part = partAt(target);
+      if (editing) finishEditing();
+      // Several picked: a right-click on one of them keeps them.
+      const many = W.picked();
+      if (!(many.length > 1 && many.some((p) => p === part || p.contains(part)))) select(part === root ? document.body : part);
+    }
+    W.act('context', { at: { left: x, top: y, bottom: y }, target, words });
+  };
 
   // ---- the page's own events: held, except while words are being changed -----------------------------------
   const fromUi = (e: Event) => e.composedPath().includes(host);
@@ -1957,6 +2552,38 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
       e.preventDefault();
       // Held, the press would not give the page the keys (Delete, Esc, arrows).
       window.focus();
+      // A long press with a finger is a right-click (a phone has none): the part's menu. Not while words are written (a long press there selects words).
+      if (e.pointerType === 'touch' && !editing) {
+        const x = e.clientX;
+        const y = e.clientY;
+        const target = e.target as Element;
+        const cancel = () => {
+          clearTimeout(pressTimer);
+          removeEventListener('pointermove', away, true);
+          removeEventListener('pointerup', cancel, true);
+          removeEventListener('pointercancel', cancel, true);
+          removeEventListener('scroll', cancel, true);
+        };
+        const away = (m: PointerEvent) => Math.hypot(m.clientX - x, m.clientY - y) > 10 && cancel();
+        pressTimer = window.setTimeout(() => {
+          cancel();
+          longAt = Date.now();
+          // The click that ends the press is not one on the page.
+          dragged = true;
+          setTimeout(() => (dragged = false), 800);
+          openContext(target, x, y);
+        }, 520);
+        addEventListener('pointermove', away, true);
+        addEventListener('pointerup', cancel, true);
+        addEventListener('pointercancel', cancel, true);
+        addEventListener('scroll', cancel, true);
+      }
+      // A placed part is dragged where it is: the one picked, or the one pressed (a finger scrolls the page: its ⋮⋮ moves it).
+      if (e.button === 0 && e.pointerType !== 'touch' && !editing) {
+        const t = partAt(e.target as Element);
+        const el = sel && sel !== document.body && sel.contains(t) && isPlaced(sel) ? sel : isPlaced(t) ? t : null;
+        if (el && W.picked().length < 2) freeMove(e, el);
+      }
     },
     true,
   );
@@ -1965,6 +2592,8 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     (e) => {
       if (fromUi(e) || inEditing(e) || fromDb(e)) return;
       hold(e);
+      // The click that ends a drag is not one on the page.
+      if (dragged) return;
       const t = partAt(e.target as Element);
       // A second click (or tap) on the picked part changes its words: phones have no double tap here.
       if (t === sel && wordy(t)) return startEditing(t, { x: e.clientX, y: e.clientY });
@@ -1981,7 +2610,30 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     },
     true,
   );
-  for (const t of ['submit', 'auxclick', 'contextmenu', 'dragstart']) addEventListener(t, hold, true);
+  for (const t of ['submit', 'auxclick', 'dragstart']) addEventListener(t, hold, true);
+  // A right-click picks the part under it and opens its menu (Shift+right-click leaves the browser's own: spelling, the address of a link…).
+  addEventListener(
+    'contextmenu',
+    (e) => {
+      if (fromDb(e) || e.shiftKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      // (a phone that raises it after a long press as well: the menu is open already)
+      if (fromUi(e) || Date.now() - longAt < 1200) return;
+      openContext(e.target as Element, e.clientX, e.clientY);
+    },
+    true,
+  );
+  // Ctrl+wheel zooms the page's view (the app's, beside the device buttons), not the whole app.
+  addEventListener(
+    'wheel',
+    (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      send({ type: 'wa-ed-zoom', op: e.deltaY < 0 ? 'in' : 'out' });
+    },
+    { passive: false, capture: true },
+  );
   addEventListener(
     'pointermove',
     (e) => {
@@ -2032,17 +2684,25 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     },
     true,
   );
-  // Pasted words come in as words, not as another page's markup; with no words being written, the part copied
-  // goes after the one picked (a picture pasted is writing.ts's).
+  // Pasted words are writing.ts's (it keeps bold, italic, links, headings and lists from pasted HTML, drops all else); what it leaves
+  // goes in as plain words. With no words being written, what the clipboard holds goes after the part picked: the part copied as it
+  // was, or other HTML and words as blocks (a picture pasted is writing.ts's).
   addEventListener(
     'paste',
     (e) => {
       if (fromDb(e)) return;
       if (!inEditing(e)) {
         clearTimeout(pasteTimer);
-        if (!editing && clip && sel) {
-          e.preventDefault();
-          act('paste');
+        if (!editing && sel) {
+          const html = e.clipboardData?.getData('text/html') ?? '';
+          const text = e.clipboardData?.getData('text/plain') ?? '';
+          const plain = Date.now() - plainAt < 1500;
+          if (html || text) plainAt = 0;
+          if (pasteInPage(html, text, plain)) e.preventDefault();
+          else if (clip) {
+            e.preventDefault();
+            act('paste');
+          }
         }
         return;
       }
@@ -2080,6 +2740,27 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         return send({ type: 'wa-ed-save' });
       }
       if (fromDb(e)) return;
+      // Zoom the view of the page (the app's zoom, beside the device buttons), not the whole app.
+      if (mod && !e.altKey && (k === '=' || k === '+' || k === '-' || k === '_' || k === '0')) {
+        e.preventDefault();
+        return send({ type: 'wa-ed-zoom', op: k === '0' ? 'fit' : k === '-' || k === '_' ? 'out' : 'in' });
+      }
+      // Find and replace in the page's words (the app's bar).
+      if (mod && !e.altKey && !e.shiftKey && (k.toLowerCase() === 'f' || k.toLowerCase() === 'h')) {
+        e.preventDefault();
+        return send({ type: 'wa-ed-find', replace: k.toLowerCase() === 'h' });
+      }
+      if (mod && e.shiftKey && k.toLowerCase() === 'v') plainAt = Date.now();
+      // The menu key (and Shift+F10): the block menu, at the part picked or the caret.
+      if (k === 'ContextMenu' || (k === 'F10' && e.shiftKey)) {
+        e.preventDefault();
+        const el = editing ?? sel;
+        if (!el || !el.isConnected) return;
+        const s = editing ? getSelection() : null;
+        const caret = s && s.rangeCount ? s.getRangeAt(0).getBoundingClientRect() : null;
+        const r = caret && (caret.height || caret.width) ? caret : el.getBoundingClientRect();
+        return openContext(editing ? editing : el, Math.max(4, r.left), Math.max(4, r.bottom));
+      }
       if (editing) {
         if (mod && (k.toLowerCase() === 'z' || k.toLowerCase() === 'y')) {
           e.preventDefault();
@@ -2115,6 +2796,11 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         pasteTimer = window.setTimeout(() => act('paste'), 80);
         return;
       }
+      // Every part of the page picked: Delete takes them out, one step to undo.
+      if (mod && !e.shiftKey && k.toLowerCase() === 'a') {
+        e.preventDefault();
+        return act('selectAll');
+      }
       if (!sel) return;
       if (mod && ['c', 'x', 'd', 'g'].includes(k.toLowerCase())) {
         e.preventDefault();
@@ -2136,6 +2822,12 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
         e.preventDefault();
         return act(k === 'ArrowUp' ? 'up' : 'down');
       }
+      // A placed part moves with the arrows, a pixel (Shift: ten): the part beside it is picked only where it is not placed.
+      if (!mod && /^Arrow/.test(k) && isPlaced(sel) && getComputedStyle(sel).position !== 'sticky' && W.picked().length < 2) {
+        e.preventDefault();
+        const n = e.shiftKey ? 10 : 1;
+        return act('nudge', { dx: k === 'ArrowLeft' ? -n : k === 'ArrowRight' ? n : 0, dy: k === 'ArrowUp' ? -n : k === 'ArrowDown' ? n : 0 });
+      }
       if (k === 'ArrowUp' || k === 'ArrowDown') {
         e.preventDefault();
         const x = k === 'ArrowUp' ? sel.previousElementSibling : nextPart(sel);
@@ -2154,6 +2846,155 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     },
     true,
   );
+
+  // ---- find and replace in the page's words (the app's find bar asks; the matches are marked here) ----------------------------
+  type FindOpts = { matchCase: boolean; wholeWord: boolean; regex: boolean };
+  /** A match: the words it covers in each text node (from, to), the range over them, and what a regular expression's groups say. */
+  type FindHit = { parts: { node: Text; s: number; e: number }[]; range: Range; m: RegExpExecArray };
+  let finds: FindHit[] = [];
+  let findNow = -1;
+  /** What is being looked for, kept so that the marks follow the page as it changes. */
+  let findAsk: { query: string; opts: FindOpts } | null = null;
+  let findTimer = 0;
+  const findRe = (query: string, o: FindOpts): RegExp | null => {
+    if (!query) return null;
+    let src = o.regex ? query : query.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+    if (o.wholeWord) src = `(?<![\\p{L}\\p{N}_])(?:${src})(?![\\p{L}\\p{N}_])`;
+    const flags = o.matchCase ? 'g' : 'gi';
+    try {
+      return new RegExp(src, `${flags}u`);
+    } catch {
+      if (o.wholeWord) return null;
+      try {
+        return new RegExp(src, flags);
+      } catch {
+        return null;
+      }
+    }
+  };
+  /** A regular expression's replacement with $1…$99, $&, $<name> and $$ put in from the match. */
+  const expandFind = (rep: string, m: RegExpExecArray) =>
+    rep.replace(/\$(\$|&|\d{1,2}|<([^>]+)>)/g, (all, what: string, name?: string) => {
+      if (what === '$') return '$';
+      if (what === '&') return m[0];
+      if (name !== undefined) return m.groups?.[name] ?? '';
+      const n = Number(what);
+      if (n > 0 && n < m.length) return m[n] ?? '';
+      return all;
+    });
+  /** Where text is not the page's words: the editor's own parts, scripts, styles, drawings. */
+  const NOT_WORDS = 'script,style,template,noscript,textarea,svg,head,[data-n-own],n-editor-ui';
+  /** Every match of the query in the page's words, block by block (a match may run through bold or a link, not from one block into the next). */
+  const scanFind = (query: string, o: FindOpts): FindHit[] => {
+    const re = findRe(query, o);
+    if (!re) return [];
+    const groups = new Map<Element, { node: Text; start: number }[]>();
+    const blocks = new Map<Element, Element>();
+    const blockOf = (p: Element) => {
+      let x: Element | null = p;
+      while (x && x !== document.body) {
+        const d = getComputedStyle(x).display;
+        if (!d.startsWith('inline') && d !== 'contents') return x;
+        x = x.parentElement;
+      }
+      return document.body;
+    };
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode() as Text | null; n; n = w.nextNode() as Text | null) {
+      const p = n.parentElement;
+      if (!n.data || !p || p.closest(NOT_WORDS)) continue;
+      let b = blocks.get(p);
+      if (!b) blocks.set(p, (b = blockOf(p)));
+      const g = groups.get(b);
+      if (g) g.push({ node: n, start: 0 });
+      else groups.set(b, [{ node: n, start: 0 }]);
+    }
+    const out: FindHit[] = [];
+    for (const g of groups.values()) {
+      let text = '';
+      for (const x of g) {
+        x.start = text.length;
+        text += x.node.data;
+      }
+      re.lastIndex = 0;
+      for (let m = re.exec(text); m && out.length < 5000; m = re.exec(text)) {
+        if (!m[0]) {
+          re.lastIndex = m.index + 1;
+          continue;
+        }
+        const s = m.index;
+        const e = s + m[0].length;
+        const parts: FindHit['parts'] = [];
+        for (const x of g) {
+          const a = Math.max(s, x.start);
+          const z = Math.min(e, x.start + x.node.data.length);
+          if (z > a) parts.push({ node: x.node, s: a - x.start, e: z - x.start });
+        }
+        if (!parts.length) continue;
+        const range = document.createRange();
+        range.setStart(parts[0].node, parts[0].s);
+        range.setEnd(parts[parts.length - 1].node, parts[parts.length - 1].e);
+        out.push({ parts, range, m });
+      }
+    }
+    return out;
+  };
+  /** The marks: every match tinted, the one on view stronger (the CSS highlights, which change no part of the page); the app hears how many and which. */
+  const paintFind = (scroll: boolean) => {
+    const css = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+    const Hl = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+    if (css && Hl) {
+      css.set('n-find', new Hl(...finds.filter((_, i) => i !== findNow).map((h) => h.range)));
+      css.set('n-find-now', new Hl(...(findNow >= 0 ? [finds[findNow].range] : [])));
+    } else if (findNow >= 0) {
+      const s = getSelection();
+      s?.removeAllRanges();
+      s?.addRange(finds[findNow].range);
+    }
+    if (scroll && findNow >= 0) finds[findNow].range.startContainer.parentElement?.scrollIntoView({ block: 'center' });
+    send({ type: 'wa-ed-found', count: finds.length, index: findNow });
+  };
+  const runFind = (query: string, opts: FindOpts, step = 0) => {
+    findAsk = query ? { query, opts } : null;
+    finds = findAsk ? scanFind(query, opts) : [];
+    findNow = !finds.length ? -1 : step ? (Math.max(findNow, 0) + step + finds.length) % finds.length : Math.min(Math.max(findNow, 0), finds.length - 1);
+    paintFind(!!step || !!query);
+  };
+  const clearFind = () => {
+    findAsk = null;
+    finds = [];
+    findNow = -1;
+    const css = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+    css?.delete('n-find');
+    css?.delete('n-find-now');
+  };
+  /**
+   * Puts `rep` in the place of the match on view, or of every match: in the words only (a part's tags, classes and addresses are never
+   * touched). One step to undo, whichever. A match that runs through bold or a link puts the new words in its first piece, and takes the rest out.
+   */
+  const replaceFind = (query: string, opts: FindOpts, rep: string, all: boolean) => {
+    finishEditing();
+    const list = scanFind(query, opts);
+    const chosen = all ? list : list.slice(Math.max(0, findNow), Math.max(0, findNow) + 1);
+    if (!chosen.length) return;
+    remember();
+    const literal = !opts.regex;
+    // From the last to the first, so that the places of the ones before are still right.
+    for (const h of [...chosen].reverse()) {
+      const text = literal ? rep : expandFind(rep, h.m);
+      h.parts.forEach((p, i) => {
+        const d = p.node.data;
+        // The first piece keeps what comes before the match and takes the new words, the last keeps what comes after; those between go.
+        p.node.data = (i === 0 ? d.slice(0, p.s) + text : '') + (i === h.parts.length - 1 ? d.slice(p.e) : '');
+      });
+    }
+    changed();
+    const keep = findNow;
+    findAsk = { query, opts };
+    finds = scanFind(query, opts);
+    findNow = !finds.length ? -1 : all ? 0 : Math.min(Math.max(keep, 0), finds.length - 1);
+    paintFind(true);
+  };
 
   // ---- the HTML to give back -------------------------------------------------------------------------------
   const serialize = (): string => {
@@ -2201,7 +3042,7 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
     // Taps don't zoom, a long press doesn't select the page's words (only words being changed).
     const own = document.createElement('style');
     own.setAttribute('data-n-own', '');
-    own.textContent = `html{touch-action:manipulation}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}[data-n-ce]{-webkit-user-select:text;user-select:text;outline:none}${W.css}`;
+    own.textContent = `html{touch-action:manipulation}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}[data-n-ce]{-webkit-user-select:text;user-select:text;outline:none}::highlight(n-find){background-color:#ffd54a99;color:inherit}::highlight(n-find-now){background-color:#ff9f1c;color:#111}${W.css}`;
     // A page narrower than the frame sits in the middle, as it does when it is used (the kit's bridge).
     const b = getComputedStyle(document.body);
     const l = parseFloat(b.marginLeft);
@@ -2226,4 +3067,4 @@ function editor(cfg: EditorCfg, writing: (core: Core) => Writing, codeColours: (
 const scriptSafe = (src: string) => src.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 
 /** The editor, with the writing it hands its insides to, the code blocks' colours and the databases (all run in the page, as one script). */
-export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()}, ${pageDatabases.toString()}, [${writingAi.toString()}, ${writingBlocks.toString()}])`);
+export const EDITOR_SRC = scriptSafe(`(cfg) => (${editor.toString()})(cfg, ${writing.toString()}, ${codeColours.toString()}, ${pageDatabases.toString()}, ${geometry.toString()}, [${writingAi.toString()}, ${writingBlocks.toString()}])`);

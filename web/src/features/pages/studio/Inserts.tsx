@@ -17,6 +17,7 @@ import type { EdAsk } from '../frame';
 import { CharPicker } from '../common/CharPicker';
 import { loadKatex, texHtml, useTexHtml } from '../common/katex';
 import type { ShortcutGroup } from '../common/Shortcuts';
+import { COPY_DRAG_KEY, NO_SNAP_KEY } from '../common/keys';
 import { pictureData } from './Inspector';
 import { choosePhoto } from '../FreePhotos';
 
@@ -382,6 +383,8 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+Shift+S', 'Strike through'],
       ['Ctrl+E', 'Code'],
       ['Ctrl+K', 'Make it a link'],
+      ['Ctrl+Shift+V', 'Paste without formatting (a pasted page keeps bold, italic, links, headings and lists otherwise)'],
+      ['Right-click', 'Cut, copy, paste, link, bold and the block’s menu (Shift+right-click: the browser’s own, for spelling)'],
       ['Ctrl+Alt+M', 'Comment on the block, or the words picked'],
       ['Ctrl+Shift+Enter', 'In a new comment: Ask AI to resolve it'],
     ],
@@ -408,17 +411,33 @@ export const PAGE_SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+D', 'Duplicate'],
       ['Ctrl+Shift+↑ / Ctrl+Shift+↓', 'Move the block up or down'],
       ['Shift+click', 'Pick several blocks'],
-      ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy, cut and paste what is picked'],
+      ['Ctrl+C / Ctrl+X / Ctrl+V', 'Copy, cut and paste what is picked (also in other apps and pages)'],
+      ['Ctrl+A', 'Pick every part of the page'],
       ['Delete', 'Delete what is picked'],
+      ['Right-click', 'The menu of the part under the pointer: its link, picture or place, then the block’s'],
+      ['Menu key / Shift+F10', 'The same menu, at the part picked'],
       ['Enter', 'Write in the part picked'],
       ['Esc', 'Pick the part around it'],
       ['Ctrl+G / Ctrl+Shift+G', 'Wrap it in a block, or take out what is in it'],
     ],
   },
   {
+    title: 'Placed parts and sizes',
+    items: [
+      ['Drag', 'A placed part (Place: Moved from there, On its block, On the screen) moves where you drag it, snapping to the parts around it'],
+      ['Shift+drag', 'Move it straight, or keep its shape while sizing it'],
+      [`${NO_SNAP_KEY}+drag`, 'No snapping for this drag'],
+      [`${COPY_DRAG_KEY}+drag`, 'Drag a copy, and leave the part where it was'],
+      ['← ↑ → ↓', 'Move a placed part by one pixel (Shift: ten)'],
+      ['Drag a handle', 'Size it from any side or corner, snapping to the others’ edges and sizes'],
+    ],
+  },
+  {
     title: 'The page',
     items: [
       ['Ctrl+Z / Ctrl+Shift+Z', 'Undo and redo'],
+      ['Ctrl+F / Ctrl+H', 'Find, and find and replace, words in the page'],
+      ['Ctrl+= / Ctrl+- / Ctrl+0', 'Zoom the view in and out, or back to Fit (also Ctrl+wheel)'],
       ['Ctrl+S', 'Save'],
       ['Ctrl+Shift+/', 'Keyboard shortcuts'],
     ],
