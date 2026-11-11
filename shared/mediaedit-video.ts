@@ -1208,6 +1208,68 @@ export function captionsSrt(texts: Pick<VideoText, 'from' | 'to' | 'text'>[]): s
   );
 }
 
+/** The captions as a WebVTT (.vtt) file: "WEBVTT", then each with its times ("00:00:01.200 --> 00:00:03.900") and words. */
+export function captionsVtt(texts: Pick<VideoText, 'from' | 'to' | 'text'>[]): string {
+  const at = (s: number) => {
+    const t = Math.max(0, Math.round(s * 1000));
+    const h = Math.floor(t / 3_600_000);
+    const m = Math.floor((t % 3_600_000) / 60_000);
+    const sec = Math.floor((t % 60_000) / 1000);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${String(t % 1000).padStart(3, '0')}`;
+  };
+  // A blank line ends a cue, so one inside the words would cut it in two; "-->" inside them would read as times.
+  const safe = (w: string) => w.trim().replace(/\n\s*\n+/g, '\n').replace(/-->/g, '->');
+  return `WEBVTT\n\n${[...texts]
+    .sort((a, b) => a.from - b.from)
+    .map((t) => `${at(t.from)} --> ${at(t.to)}\n${safe(t.text)}\n`)
+    .join('\n')}`;
+}
+
+/** One time of a caption file, "00:01:02,500", "01:02.500" or "1:02": seconds; null when it is not a time. */
+function captionTime(raw: string): number | null {
+  const m = /^(?:(\d+):)?(\d{1,2}):(\d{1,2})(?:[.,](\d{1,3}))?$/.exec(raw.trim());
+  if (!m) return null;
+  const ms = m[4] ? Number(m[4].padEnd(3, '0')) : 0;
+  return Math.round((Number(m[1] ?? 0) * 3600 + Number(m[2]) * 60 + Number(m[3]) + ms / 1000) * 1000) / 1000;
+}
+
+/** The words of a cue as plain text: its tags (<i>, <c.yellow>, <00:01.000>, {\an8}) taken off, its entities read. */
+function captionWords(lines: string[]): string {
+  return lines
+    .join('\n')
+    .replace(/<\/?[a-zA-Z][^>]*>|<\d{1,2}:\d{2}[^>]*>|\{\\[^}]*\}/g, '')
+    .replace(/&(amp|lt|gt|nbsp|quot|apos|lrm|rlm);/g, (_, n: string) => ({ amp: '&', lt: '<', gt: '>', nbsp: ' ', quot: '"', apos: "'", lrm: '', rlm: '' })[n] ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * The captions of an .srt or .vtt file, in time order: each its words (tags taken off, lines kept) and its times in
+ * seconds. Reads what real files have: a byte-order mark, Windows line ends, numbered cues or named ones, times with a
+ * comma or a point and with or without hours, cue settings after the times, and in a WebVTT file the header, NOTE, STYLE
+ * and REGION blocks (skipped). A cue without words, or ending before it starts, is left out.
+ */
+export function parseCaptions(text: string): Pick<VideoText, 'from' | 'to' | 'text'>[] {
+  const out: Pick<VideoText, 'from' | 'to' | 'text'>[] = [];
+  const blocks = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split(/\n[ \t]*\n/);
+  for (const block of blocks) {
+    const lines = block.replace(/^\n+/, '').split('\n');
+    const at = lines.findIndex((l) => l.includes('-->'));
+    if (at < 0 || at > 1) continue;
+    // A NOTE block that mentions an arrow is a note, not a cue.
+    if (/^(NOTE|STYLE|REGION)\b/.test(lines[0].trim())) continue;
+    const [a, b] = lines[at].split('-->');
+    const from = captionTime(a);
+    const to = captionTime((b ?? '').trim().split(/\s+/)[0] ?? '');
+    if (from === null || to === null || to <= from) continue;
+    const words = captionWords(lines.slice(at + 1));
+    if (words) out.push({ from, to, text: words });
+  }
+  return out.sort((x, y) => x.from - y.from);
+}
+
 /** The caption styles offered: what each sets on every caption. */
 export const CAPTION_STYLES = [
   { id: 'classic', label: 'Classic', set: { color: '#ffffff', background: '#000000b3', outline: undefined, bold: false, size: 0.055, y: 0.88 } },
