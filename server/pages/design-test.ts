@@ -236,6 +236,69 @@ else {
     await sleep(150);
     const moved = await js<number>('const e = document.querySelectorAll(".n-text")[1]; return Math.round((parseFloat(e.style.left) + e.offsetWidth / 2) * 10) / 10;');
     ok(Math.abs(moved - 540) < 0.2, `dragged near the middle, it snaps to it (${moved})`);
+    // Sizing and copying with the mouse: two boxes below the quote, and the first one's edge dragged to the second's.
+    const boxHtml = (t: string, c: string) => `<div class="n-el n-box" data-test="${t}" style="left:0px;top:0px;width:200px;height:100px;background:${c}"></div>`;
+    const pathOfBox = (t: string) => js<number[]>(`const el = document.querySelector('[data-test="${t}"]'); const out = []; let x = el; while (x && x !== document.documentElement) { out.unshift([...x.parentElement.children].indexOf(x)); x = x.parentElement; } return out;`);
+    await cmd('insert', { html: boxHtml('a', '#c33') });
+    await cmd('geom', { x: 100, y: 700, w: 200, h: 100 });
+    await cmd('insert', { html: boxHtml('b', '#36c') });
+    await cmd('geom', { x: 600, y: 700, w: 300, h: 100 });
+    const styleOf = (t: string, k: string) => js<string>(`return document.querySelector('[data-test="${t}"]').style.${k}`);
+    const screenBox = (t: string) => js<{ l: number; t: number; r: number; b: number; z: number }>(`const b = document.querySelector('[data-test="${t}"]').getBoundingClientRect(); const a = document.querySelector('.n-artboard').getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, z: a.width / 1080 };`);
+    const mouse = async (steps: { type: string; x: number; y: number; mod?: number }[]) => {
+      for (const m of steps) {
+        await s.send('Input.dispatchMouseEvent', { type: m.type, x: m.x, y: m.y, button: 'left', buttons: m.type === 'mouseReleased' ? 0 : 1, clickCount: 1, modifiers: m.mod ?? 0 });
+      }
+      await sleep(120);
+    };
+    /** The east handle of the first box dragged by `dx` design pixels (with keys held), then let go. */
+    const sizeEast = async (dx: number, mod = 0) => {
+      await cmd('select', { path: await pathOfBox('a') });
+      const r = await screenBox('a');
+      const y = (r.t + r.b) / 2;
+      await mouse([{ type: 'mouseMoved', x: r.r, y }, { type: 'mousePressed', x: r.r, y }]);
+      for (let i = 1; i <= 5; i++) await mouse([{ type: 'mouseMoved', x: r.r + (dx * r.z * i) / 5, y, mod }]);
+      await mouse([{ type: 'mouseReleased', x: r.r + dx * r.z, y, mod }]);
+    };
+    await sizeEast(297);
+    ok((await styleOf('a', 'width')) === '500px', `sized to within a few pixels of the other box’s edge, it meets it: 100 + ${await styleOf('a', 'width')} = 600`);
+    await cmd('undo');
+    ok((await styleOf('a', 'width')) === '200px', 'one step to undo');
+    await sizeEast(97);
+    ok((await styleOf('a', 'width')) === '300px', `nearly as wide as the other box, it is as wide (${await styleOf('a', 'width')}: no edge is near)`);
+    await cmd('undo');
+    await sizeEast(297, 1);
+    ok(Math.abs(parseFloat(await styleOf('a', 'width')) - 497) < 0.6, `with Alt held it snaps to nothing (${await styleOf('a', 'width')})`);
+    await cmd('undo');
+    // Ctrl and a drag: a copy is dragged, the first stays.
+    const n1 = await kids();
+    await cmd('select', { path: await pathOfBox('a') });
+    const c = await screenBox('a');
+    const cy = (c.t + c.b) / 2;
+    await mouse([{ type: 'mouseMoved', x: (c.l + c.r) / 2, y: cy }, { type: 'mousePressed', x: (c.l + c.r) / 2, y: cy, mod: 2 }]);
+    for (let i = 1; i <= 5; i++) await mouse([{ type: 'mouseMoved', x: (c.l + c.r) / 2 + 12 * i, y: cy + 6 * i, mod: 2 }]);
+    await mouse([{ type: 'mouseReleased', x: (c.l + c.r) / 2 + 60, y: cy + 30, mod: 2 }]);
+    ok((await kids()) === n1 + 1 && (await styleOf('a', 'left')) === '100px', 'Ctrl and a drag: a copy is made, the first stays where it was');
+    ok(await js<boolean>(`return document.querySelectorAll('[data-test="a"]').length === 2`), 'the copy is the same element, moved');
+    await cmd('undo');
+    ok((await kids()) === n1, 'a dragged copy is one step to undo');
+    // A pick with a locked element in it: the others move, the locked stays.
+    await cmd('selectAll');
+    await js(`document.querySelector('[data-test="a"]').setAttribute('data-locked', '1');`);
+    const bb = await screenBox('b');
+    const by = (bb.t + bb.b) / 2;
+    const left0 = await styleOf('b', 'left');
+    await mouse([{ type: 'mouseMoved', x: (bb.l + bb.r) / 2, y: by }, { type: 'mousePressed', x: (bb.l + bb.r) / 2, y: by }]);
+    for (let i = 1; i <= 5; i++) await mouse([{ type: 'mouseMoved', x: (bb.l + bb.r) / 2 - 8 * i, y: by + 8 * i, mod: 1 }]);
+    await mouse([{ type: 'mouseReleased', x: (bb.l + bb.r) / 2 - 40, y: by + 40, mod: 1 }]);
+    ok((await styleOf('a', 'left')) === '100px' && (await styleOf('b', 'left')) !== left0, 'of a pick with a locked element, the others move and the locked one stays');
+    await js(`document.querySelector('[data-test="a"]').removeAttribute('data-locked');`);
+    await cmd('undo');
+    for (const t of ['a', 'b']) {
+      await cmd('select', { path: await pathOfBox(t) });
+      await cmd('del');
+    }
+
     // A copy at another size, worked out from what shows.
     const id = 'r1';
     await cmd('resizedCopy', { id, w: 1080, h: 1920, size: 'story' });
