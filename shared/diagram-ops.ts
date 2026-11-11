@@ -6,6 +6,7 @@
 import { CONTAINER_KINDS, descendants, isEdge, isShape, newId, type DiagramEdge, type DiagramItem, type DiagramPage, type DiagramShape } from './diagram.ts';
 import { inShape, pageBox, type Box } from './diagram-shapes.ts';
 import { distanceTo, edgeGeom } from './diagram-route.ts';
+import { SNAP, type SnapGuide } from './snap.ts';
 
 export const shapeMapOf = (p: DiagramPage) => new Map(p.items.filter(isShape).map((s) => [s.id, s]));
 
@@ -311,51 +312,16 @@ export function reparent(p: DiagramPage, moved: Set<string>): DiagramPage {
 
 // ---- guides -------------------------------------------------------------------------------------------------------------
 
-export interface Guide {
-  axis: 'x' | 'y';
-  at: number;
-  from: number;
-  to: number;
-}
+export type Guide = SnapGuide;
 
 /**
  * Where a moving box lines up with the other shapes: its left, middle or right on theirs (and top, middle or bottom),
- * within `tol`. Gives how far to move it to meet them, and the lines that show it.
+ * within `tol`. Gives how far to move it to meet them, and the lines that show it (the maths is shared with designs:
+ * shared/snap.ts).
  */
 export function snapBox(b: Box, others: Box[], tol: number): { dx: number; dy: number; guides: Guide[] } {
-  const xs = [b.x, b.x + b.w / 2, b.x + b.w];
-  const ys = [b.y, b.y + b.h / 2, b.y + b.h];
-  let bestX: { d: number; at: number } | null = null;
-  let bestY: { d: number; at: number } | null = null;
-  for (const o of others) {
-    for (const t of [o.x, o.x + o.w / 2, o.x + o.w])
-      for (const s of xs) {
-        const d = t - s;
-        if (Math.abs(d) <= tol && (!bestX || Math.abs(d) < Math.abs(bestX.d))) bestX = { d, at: t };
-      }
-    for (const t of [o.y, o.y + o.h / 2, o.y + o.h])
-      for (const s of ys) {
-        const d = t - s;
-        if (Math.abs(d) <= tol && (!bestY || Math.abs(d) < Math.abs(bestY.d))) bestY = { d, at: t };
-      }
-  }
-  const dx = bestX?.d ?? 0;
-  const dy = bestY?.d ?? 0;
-  const guides: Guide[] = [];
-  const moved = { x: b.x + dx, y: b.y + dy, w: b.w, h: b.h };
-  if (bestX) {
-    const lined = others.filter((o) => [o.x, o.x + o.w / 2, o.x + o.w].some((t) => Math.abs(t - bestX!.at) < 0.5));
-    const lo = Math.min(moved.y, ...lined.map((o) => o.y));
-    const hi = Math.max(moved.y + moved.h, ...lined.map((o) => o.y + o.h));
-    guides.push({ axis: 'x', at: bestX.at, from: lo, to: hi });
-  }
-  if (bestY) {
-    const lined = others.filter((o) => [o.y, o.y + o.h / 2, o.y + o.h].some((t) => Math.abs(t - bestY!.at) < 0.5));
-    const lo = Math.min(moved.x, ...lined.map((o) => o.x));
-    const hi = Math.max(moved.x + moved.w, ...lined.map((o) => o.x + o.w));
-    guides.push({ axis: 'y', at: bestY.at, from: lo, to: hi });
-  }
-  return { dx, dy, guides };
+  const s = SNAP.snapMove(b, others, tol);
+  return { dx: s.dx, dy: s.dy, guides: s.guides };
 }
 
 export const snapTo = (v: number, grid: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
