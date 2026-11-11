@@ -2,8 +2,9 @@
 // it was): moving shapes (what is in them with them, and the bends of connectors between moved shapes), resizing,
 // turning and flipping, aligning, spacing out, matching sizes, grouping, bringing forward and sending back, copying and
 // pasting (new ids, connectors among what was copied joined to the copies), taking out (with the connectors left
-// hanging), the shapes that hold a point, and where guides line a moving box up with the others.
-import { CONTAINER_KINDS, descendants, isEdge, isShape, newId, type DiagramEdge, type DiagramItem, type DiagramPage, type DiagramShape } from './diagram.ts';
+// hanging), the shapes that hold a point, where guides line a moving box up with the others, a look copied from one item
+// to others (a shape's to shapes, a line's to lines, what both have to both), and a connector's course and ends.
+import { CONTAINER_KINDS, descendants, isEdge, isShape, newId, type DiagramEdge, type DiagramItem, type DiagramPage, type DiagramShape, type DiagramStyle, type RouteKind } from './diagram.ts';
 import { inShape, pageBox, type Box } from './diagram-shapes.ts';
 import { distanceTo, edgeGeom } from './diagram-route.ts';
 import { SNAP, type SnapGuide } from './snap.ts';
@@ -325,6 +326,102 @@ export function snapBox(b: Box, others: Box[], tol: number): { dx: number; dy: n
 }
 
 export const snapTo = (v: number, grid: number) => (grid > 0 ? Math.round(v / grid) * grid : v);
+
+// ---- a look copied from one item to others, and a connector's course ----------------------------------------------------
+
+/** A look taken from an item (Copy style): what it is the look of, its style and, for a connector, its course. */
+export interface StyleClip {
+  kind: 'shape' | 'edge';
+  style: DiagramStyle;
+  route?: RouteKind;
+}
+
+/** What only a shape has (its fill, how its words sit in it), and what only a connector has (its ends, its flow). */
+const SHAPE_ONLY = new Set<string>(['fill', 'gradient', 'shadow', 'align', 'valign', 'label']);
+const LINE_ONLY = new Set<string>(['start', 'end', 'flow']);
+
+/** The look of an item, to put on others. */
+export function copyStyle(it: DiagramItem): StyleClip {
+  return { kind: isShape(it) ? 'shape' : 'edge', style: { ...(it.style ?? {}) }, ...(isEdge(it) && it.route ? { route: it.route } : {}) };
+}
+
+/**
+ * A look put on items (those that are not locked): a field of a shape (fill, shadow, how its words sit) goes only to
+ * shapes, a field of a connector (its ends, its flow, its course) only to connectors; what both have (the line's colour,
+ * width and dashes, the words' font, size and colour, how opaque) goes to both; the corner radius of a box and the bends of
+ * a connector are not the same thing, so each goes to its own kind. On what it goes to, the look replaces: what the item
+ * had of those fields and the copy has not, goes; what the copy cannot have (a connector's ends, when a shape's look
+ * is put on it) stays as it was.
+ */
+export function pasteStyle(p: DiagramPage, ids: Iterable<string>, clip: StyleClip): DiagramPage {
+  const want = new Set(ids);
+  return {
+    ...p,
+    items: p.items.map((it) => {
+      if (!want.has(it.id) || it.locked) return it;
+      const toShape = isShape(it);
+      // A field both have, or one the copy and the item both can have; the rest of the item's own stays.
+      const takes = (k: string) => (SHAPE_ONLY.has(k) ? toShape && clip.kind === 'shape' : LINE_ONLY.has(k) ? !toShape && clip.kind === 'edge' : k === 'radius' ? (clip.kind === 'shape') === toShape : true);
+      const style: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(it.style ?? {})) if (!takes(k)) style[k] = v;
+      for (const [k, v] of Object.entries(clip.style)) if (takes(k) && v !== undefined) style[k] = v;
+      const out = { ...it } as DiagramItem;
+      if (Object.keys(style).length) out.style = style as DiagramStyle;
+      else delete out.style;
+      if (isEdge(out) && clip.kind === 'edge') {
+        if ((out.route ?? 'orthogonal') !== (clip.route ?? 'orthogonal')) delete out.points;
+        if (clip.route) out.route = clip.route;
+        else delete out.route;
+      }
+      return out;
+    }),
+  };
+}
+
+/** Connectors given a course (right angles, straight or curved): their bends forgotten, so it is found afresh. */
+export function setRoute(p: DiagramPage, ids: Iterable<string>, route: RouteKind): DiagramPage {
+  const want = new Set(ids);
+  return {
+    ...p,
+    items: p.items.map((it) => {
+      if (!want.has(it.id) || !isEdge(it) || it.locked) return it;
+      const e: DiagramEdge = { ...it };
+      if (route === 'orthogonal') delete e.route;
+      else e.route = route;
+      delete e.points;
+      return e;
+    }),
+  };
+}
+
+/** Connectors turned about: each end where the other was, its arrows and the words at its ends with them, its bends reversed. */
+export function swapEnds(p: DiagramPage, ids: Iterable<string>): DiagramPage {
+  const want = new Set(ids);
+  return {
+    ...p,
+    items: p.items.map((it) => {
+      if (!want.has(it.id) || !isEdge(it) || it.locked) return it;
+      const e: DiagramEdge = { ...it, from: it.to, to: it.from };
+      if (it.points) e.points = [...it.points].reverse();
+      if (it.fromText || it.toText) {
+        e.fromText = it.toText;
+        e.toText = it.fromText;
+        if (!e.fromText) delete e.fromText;
+        if (!e.toText) delete e.toText;
+      }
+      const st: Record<string, unknown> = { ...it.style };
+      const start = it.style?.end ?? 'arrow';
+      const end = it.style?.start ?? 'none';
+      if (start === 'none') delete st.start;
+      else st.start = start;
+      if (end === 'arrow') delete st.end;
+      else st.end = end;
+      if (Object.keys(st).length) e.style = st as DiagramStyle;
+      else delete e.style;
+      return e;
+    }),
+  };
+}
 
 /** The items whose box meets (or with `whole`, holds wholly) a rectangle of the page: what a drag across the page picks. */
 export function itemsIn(p: DiagramPage, r: Box, whole = true, geom?: (e: DiagramEdge) => { walk: { x: number; y: number }[] }): string[] {
