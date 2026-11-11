@@ -27,3 +27,19 @@ export const isMod = (e: { ctrlKey: boolean; metaKey: boolean }) => (apple ? e.m
 
 /** Whether this is a Mac (or an iPad with a keyboard), where ⌘ does what Ctrl does elsewhere. */
 export const isApple = apple;
+
+type DragKeys = { ctrlKey: boolean; metaKey: boolean; altKey: boolean };
+
+/**
+ * Held while dragging a part in any of the editors that place things (slides, designs, diagrams, pages, pictures, the
+ * video's viewer): a copy is dragged, and the part stays where it was. Ctrl, as PowerPoint has it; ⌥ on a Mac (as
+ * Keynote and PowerPoint for Mac have it), where Ctrl and a click is the right-click.
+ */
+export const isCopyDrag = (e: DragKeys) => (apple ? e.altKey : e.ctrlKey);
+
+/** Held while dragging or sizing a part in those editors: it does not snap to the other parts, the guides or the grid. Alt; ⌘ on a Mac. */
+export const isNoSnap = (e: DragKeys) => (apple ? e.metaKey : e.altKey);
+
+/** The keys for those two, as the editors' shortcut lists and guides write them ("Ctrl+drag", "Alt+drag"; ⌥ and ⌘ on a Mac). */
+export const COPY_DRAG_KEY = apple ? '⌥' : 'Ctrl';
+export const NO_SNAP_KEY = apple ? '⌘' : 'Alt';

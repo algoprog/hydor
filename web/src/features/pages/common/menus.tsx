@@ -74,14 +74,14 @@ function moveFocus(e: ReactKeyboardEvent<HTMLElement>, box: HTMLElement | null) 
   return true;
 }
 
-/** A menu's list: its rows, a list inside it opened in its place, and the way back. */
-function MenuList({ items, close, title }: { items: MenuEntry[]; close: () => void; title?: string }) {
+/** A menu's list: its rows, a list inside it opened in its place, and the way back. `keyed`: opened from the keyboard, it starts on its first row. */
+function MenuList({ items, close, title, keyed: fromKeys = false }: { items: MenuEntry[]; close: () => void; title?: string; keyed?: boolean }) {
   const [path, setPath] = useState<MenuAction[]>([]);
   const box = useRef<HTMLDivElement>(null);
   const inner = path[path.length - 1];
   const rows = shown(inner ? (inner.items ?? []) : items);
   // A list opened from the keyboard starts on its first row, so ↓ and Enter go on from there.
-  const [keyed, setKeyed] = useState(false);
+  const [keyed, setKeyed] = useState(fromKeys);
   useEffect(() => {
     if (keyed) rowsOf(box.current)[path.length ? 1 : 0]?.focus();
   }, [path.length, keyed]);
@@ -137,6 +137,40 @@ function MenuList({ items, close, title }: { items: MenuEntry[]; close: () => vo
         ),
       )}
     </div>
+  );
+}
+
+/** Where a right-click menu opens: a point on the screen (client coordinates), and whether the keyboard opened it. */
+export interface ContextMenuAt {
+  x: number;
+  y: number;
+  /** Opened with the keyboard (the menu key, Shift+F10): it starts on its first row. */
+  keyed?: boolean;
+}
+
+/** The keys that open a right-click menu from the keyboard: the menu key, or Shift+F10. */
+export const isMenuKey = (e: { key: string; shiftKey: boolean; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean }) =>
+  e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey);
+
+/**
+ * An editor's right-click menu: the rows of its menus (the same MenuEntry lists, so a right-click offers an action with
+ * the words, keys and ticks the menu bar gives it), opened at the point pressed, or by what is picked when the keyboard
+ * opens it (the menu key, Shift+F10: it starts on its first row). A list inside opens in its place, with the way back at
+ * its top; ↑ ↓ ← → and Enter move through it, Esc or a press outside closes it, and on a phone it is a sheet from the
+ * bottom. Pressing a row never takes the focus from what is edited, so the words or parts picked stay picked for the
+ * action. Put it inside the editor's own part of the page (its data-i18n), so its words are translated as they mean there.
+ */
+export function ContextMenu({ at, items, onClose, title, width = 248 }: { at: ContextMenuAt | null; items: MenuEntry[]; onClose: () => void; title?: string; width?: number }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  // A new point is a new menu: its lists start from the top again.
+  const key = at ? `${at.x},${at.y}` : '';
+  return (
+    <>
+      <div ref={anchor} aria-hidden className="pointer-events-none fixed h-px w-px" style={{ left: at?.x ?? -10, top: at?.y ?? -10 }} />
+      <Popover anchor={anchor} open={!!at && shown(items).length > 0} onClose={onClose} width={width} title={title}>
+        {at && <MenuList key={key} items={items} close={onClose} title={title} keyed={at.keyed} />}
+      </Popover>
+    </>
   );
 }
 
