@@ -27,9 +27,13 @@ import { sendToSession } from '../pages/common/commentAi';
 import { Starting } from '../pages/AskPage';
 import { quoteBlock } from '../session/QuoteSelection';
 
-/** A part of a PDF picked in its reader to ask about: its page, and its words or a picture of it (an area). */
+/**
+ * A part of a file picked to ask about: a PDF's page, and its words or a picture of it (an area); or, in the text editor,
+ * the words picked (`lines`: the first and last line they are on, `page` 0).
+ */
 export interface AskPick {
   page: number;
+  lines?: [number, number];
   text?: string;
   image?: { blob: Blob; base64: string; url: string };
 }
@@ -51,6 +55,7 @@ export const closeFileAsk = () => useFileAsk.setState({ open: false });
 
 /** A picked part as words to send: the page, then the words as a quote (or the picture's place). */
 function pickBlock(p: AskPick, name: string): string {
+  if (p.lines) return `From ${p.lines[0] === p.lines[1] ? `line ${p.lines[0]}` : `lines ${p.lines[0]}–${p.lines[1]}`} of ${name}:\n${quoteBlock(p.text ?? '').trimEnd()}`;
   if (p.image) return `The part of page ${p.page} of ${name} in the picture${p.text ? ` (its words: “${p.text.slice(0, 600)}”)` : ''}.`;
   return `From page ${p.page} of ${name}:\n${quoteBlock(p.text ?? '').trimEnd()}`;
 }
@@ -132,6 +137,8 @@ const EXAMPLES: Record<Kind, string[]> = {
   code: ['Explain what this file does', 'Find and fix any bugs', 'Add comments where it is hard to follow', 'Make it simpler without changing what it does'],
   pdf: ['Sum up this paper in a few lines', 'What are its main findings?', 'Explain its method in plain words', 'What are its weak points?'],
 };
+/** A text file with words picked in the editor. */
+const PICKED_TEXT = ['Explain this', 'Find and fix the bug in this', 'Make this clearer and shorter', 'Rewrite this more simply'];
 /** A PDF with a part picked in its reader. */
 const PICKED = ['Explain this passage', 'What does this equation say?', 'How does this compare with my approach?', 'Sum up this section'];
 
@@ -208,7 +215,9 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
             <Quote size={14} className="mt-1 shrink-0 text-fg-3" />
           )}
           <div className="min-w-0 flex-1 py-0.5">
-            <div className="text-[11.5px] font-medium text-fg-3">{pick.image ? <>A part of page {pick.page}</> : <>Page {pick.page}</>}</div>
+            <div className="text-[11.5px] font-medium text-fg-3">
+              {pick.lines ? (pick.lines[0] === pick.lines[1] ? <>Line {pick.lines[0]}</> : <>Lines {pick.lines[0]}–{pick.lines[1]}</>) : pick.image ? <>A part of page {pick.page}</> : <>Page {pick.page}</>}
+            </div>
             {!pick.image && (
               <div translate="no" className="mt-0.5 line-clamp-4 text-[13px] leading-snug text-fg-2">
                 {pick.text}
@@ -233,7 +242,7 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
             }
           }}
           rows={3}
-          placeholder={kind === 'pdf' ? 'What would you like to know?' : 'What should change in the file?'}
+          placeholder={kind === 'pdf' ? 'What would you like to know?' : pick ? 'What should change in the part you picked?' : 'What should change in the file?'}
           className="block w-full resize-none bg-transparent px-3.5 pt-3 text-[14.5px] leading-relaxed outline-none placeholder:text-fg-3"
         />
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
@@ -253,7 +262,7 @@ function Start({ path, beforeSend }: { path: string; beforeSend: () => Promise<b
       </div>
       <div className="mt-5 mb-2 text-[12px] font-medium text-fg-3">For example</div>
       <div className="space-y-1.5">
-        {(kind === 'pdf' && pick ? PICKED : EXAMPLES[kind]).map((s) => (
+        {(pick ? (pick.lines ? PICKED_TEXT : PICKED) : EXAMPLES[kind]).map((s) => (
           <button
             key={s}
             onClick={() => (setText(tr(s)), ta.current?.focus())}

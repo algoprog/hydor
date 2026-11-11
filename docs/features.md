@@ -1044,7 +1044,10 @@ programs shows each program's version and what is out, with Check now, Update no
   uploaded), add it to a project (a file is copied into its folder, a folder joins those it works with), rename,
   duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
   and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
-  Markdown and HTML preview and diffs, quick open, and uploads. Ask, beside an open file, has an agent change it
+  Markdown and HTML preview and diffs, quick open, and uploads: changes not saved are kept per file while the app is open
+  (undo history, cursor and scroll too, also across Preview and Changes), a dot on the file's tab and a Save / Don't save /
+  Cancel question before closing it, CRLF files saved as CRLF, a right-click menu, Go to line, a status bar (line and column,
+  language, indentation, line ends, wrap) and a shortcuts list. Ask, beside an open file, has an agent change it
   or answer about it: unsaved changes are saved first, the conversation stays beside the file, and the editor
   takes in each change as it is written (every second while an agent works), the changed lines tinted for a
   moment and your place kept. Word, Excel, CSV and LaTeX files open in the

@@ -217,7 +217,7 @@ Click a file in the folder. It opens in the editor, in a tab of its own. The fir
 
 The editor numbers the lines, colours the text by the file's language, matches brackets and, on a computer, folds blocks and suggests completions as you type. Tab indents.
 
-To save, click **Save** (it lights up once you change something) or press Ctrl+S (⌘S on a Mac). A dot beside the file's name means there are unsaved changes, and leaving the page with unsaved changes makes the browser ask first.
+To save, click **Save** (it lights up once you change something) or press Ctrl+S (⌘S on a Mac). A dot beside the file's name means there are unsaved changes. The app keeps them while it is open: go to another file's tab and come back, and the file is as you left it, with its undo history, cursor and place. A dot on the file's tab shows that it has changes not saved, and closing such a tab (its ✕ or a middle click), or leaving the file with **Back** on a phone, asks **Save the changes?**: **Save**, **Don't save** or **Cancel**. Reloading or closing the page loses what is not saved, and the browser asks first. A file whose lines end the Windows way (CRLF) is saved the same way, not turned into the other.
 
 ### The editor's tools
 
@@ -225,17 +225,21 @@ On a computer, the bar above the file shows its path and these buttons:
 
 - **Preview** (Markdown files): the file as it reads, with headings, tables, its own images (from beside the file) and links to other files. Click it again to edit. Markdown files open as a preview first.
 - **Show as a page** (HTML files): runs the page in a frame sealed off from the app, able to load the files next to it. HTML files open as a page first. The page's link lasts an hour; after that, open the file again.
-- **Changes since the last commit**: the file's differences from its last commit, added lines in green and removed ones in red. It says "No changes" when the file matches its last commit or isn't in a git repository.
+- **Changes since the last commit**: the file's differences from its last commit, added lines in green and removed ones in red. It says "No changes" when the file matches its last commit or isn't in a git repository. Going to **Preview** or **Changes** and back leaves the text as it was, with its undo history, cursor and place.
 - **Word wrap**: wraps long lines instead of scrolling sideways. The choice is remembered.
 - **Ask**: asks an agent to change the file, or about it ([below](#ask-an-agent-about-the-file)).
 - **Terminal in this folder**: a new shell in the file's folder.
 - **Download**.
-- **More** (⋯): **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**.
+- **More** (⋯): **Find**, **Replace**, **Go to line**, **Ask about the selection** and **Keyboard shortcuts**, then **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**.
 - **Save**.
 
-To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace.
+To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace (Ctrl+H, or ⌘⌥F on a Mac). Ctrl+G (⌘⌥G on a Mac) goes to a line.
 
-On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
+Right-click in the text (or press the menu key or Shift+F10 for the menu at the cursor) for **Cut**, **Copy**, **Paste**, **Select all**, **Find**, **Replace**, **Go to line** and **Ask about the selection**, which opens [Ask](#ask-an-agent-about-the-file) with the lines you picked quoted in it. **More** → **Keyboard shortcuts** lists every key.
+
+The strip under the text shows where the cursor is (**Ln 12, Col 5**, with how many characters are picked; click it to go to a line), the file's language, its indentation (**Spaces: 2**, **Spaces: 4**, **Tabs**: read from the file; click to pick another for what you type next), **LF** or **CRLF** (how the file's lines end; click to save it with the other) and **Wrap** or **No wrap** (click to switch).
+
+On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Go to line**, **Ask about the selection**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
 
 ### Ask an agent about the file
 
