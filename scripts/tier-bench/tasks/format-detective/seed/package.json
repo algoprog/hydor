@@ -1,0 +1,8 @@
+{
+  "name": "mlog-reader",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

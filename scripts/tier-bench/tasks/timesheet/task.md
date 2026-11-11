@@ -1,0 +1,1 @@
+Please work through the open issues in ISSUES.md for our time tracker, tt. README.md describes how it is meant to behave. Fix each issue, keep everything else working as README.md describes (`node --test` must still pass), add tests for what you fixed, and add a line for each issue to CHANGELOG.md. Plain Node.js 22, no packages.

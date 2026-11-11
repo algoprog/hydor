@@ -3,7 +3,12 @@
 // the real sign-in; it works until the token runs out, a few hours at most). Nothing here touches the app you use: its
 // data, its sessions and its accounts stay as they are, and it never hears of the benchmark's sessions.
 //
-//   node scripts/tier-bench/serve.mjs --from ~/.claude [--port 8814] [--data /tmp/hydor-bench/data]
+//   node scripts/tier-bench/serve.mjs --from ~/.claude [--port 8814] [--data /tmp/hydor-bench/data] [--memory 24]
+//
+// --memory: the most memory, in GB, the server and everything it starts may use together (on Linux, a scope of their
+// own: past it the kernel ends processes there, never elsewhere on the machine); 0 for no cap.
+// The benchmark's agents work offline: the tasks hold all they need, and a task made from a published problem must
+// not be answered by looking it up. --web lets them search and read the web.
 //
 // Build first (npm run build:server). Writes the server's address, an access token for it and the account's id to
 // <data>/bench.json (run.mjs reads it), and keeps running until it is stopped (Ctrl+C, or kill): then it stops the
@@ -14,6 +19,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { capped } from './capped.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const arg = (name, fallback) => {
@@ -22,6 +28,23 @@ const arg = (name, fallback) => {
 };
 const port = Number(arg('port', 8814));
 const data = path.resolve(arg('data', '/tmp/hydor-bench/data'));
+const memoryGb = Number(arg('memory', 24));
+const web = process.argv.includes('--web');
+
+/** What the benchmark's agents may not use while they work offline: web search and reading, the app's browser and HTTP tools, curl and wget. */
+const OFFLINE = ['WebSearch', 'WebFetch', 'Bash(curl:*)', 'Bash(wget:*)', ...['web_search', 'read_page', 'http_request', 'find_media', 'find_photos', 'browser_open', 'browser_act', 'browser_read', 'browser_tabs', 'browser_upload', 'browser_ask_user'].map((t) => `mcp__hydor__${t}`)];
+
+/** Claude Code's settings for the benchmark's account: the tools above denied (deny rules hold in every permission mode), or none with --web. */
+function offline(dir) {
+  const file = path.join(dir, 'settings.json');
+  let settings = {};
+  try {
+    settings = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {}
+  const deny = (settings.permissions?.deny ?? []).filter((r) => !OFFLINE.includes(r));
+  settings.permissions = { ...settings.permissions, deny: web ? deny : [...deny, ...OFFLINE] };
+  fs.writeFileSync(file, JSON.stringify(settings, null, 2));
+}
 const from = arg('from')?.replace(/^~(?=\/|$)/, os.homedir());
 if (!from || !fs.existsSync(path.join(from, '.credentials.json'))) {
   console.error('Say which signed-in Claude Code folder to take the access token from: --from ~/.claude (it needs a .credentials.json)');
@@ -48,6 +71,7 @@ try {
   const r = await fetch(`${b.server}/api/accounts`, { headers: { authorization: `Bearer ${b.token}` }, signal: AbortSignal.timeout(4000) });
   if (r.ok) {
     const left = copyToken(path.join(data, 'accounts', `claude-${b.account}`));
+    offline(path.join(data, 'accounts', `claude-${b.account}`));
     console.log(`Already up at ${b.server}: account ${b.account} now signs in with the token from ${from}, which works for ${left} more minutes.`);
     process.exit(0);
   }
@@ -60,9 +84,12 @@ try {
 }
 
 fs.mkdirSync(data, { recursive: true, mode: 0o700 });
-// The default accounts are empty folders here: the app's own sign-ins and history are not read.
+// The default accounts are empty folders here: the app's own sign-ins and history are not read. A copy in development
+// sets nothing up on the computer: started by hand from a git checkout, the app would otherwise install a service
+// that starts it with the computer (with this copy's port and data folder) and keep its agent programs updated.
 const env = {
   ...process.env,
+  NODE_ENV: 'development',
   DATA_DIR: data,
   PORT: String(port),
   HOST: '127.0.0.1',
@@ -77,7 +104,8 @@ for (const f of ['model-prices.json', 'openrouter-prices.json']) {
   if (live && !fs.existsSync(path.join(data, f))) fs.copyFileSync(live, path.join(data, f));
 }
 const token = execFileSync(process.execPath, [path.join(root, 'dist/server/cli.js'), 'access-token', 'Benchmark'], { env, encoding: 'utf8' }).trim().split('\n').pop();
-const server = spawn(process.execPath, [path.join(root, 'dist/server/index.js')], { env, stdio: ['ignore', fs.openSync(path.join(data, 'server.log'), 'a'), fs.openSync(path.join(data, 'server.log'), 'a')] });
+const [command, argv] = capped(process.execPath, [path.join(root, 'dist/server/index.js')], memoryGb);
+const server = spawn(command, argv, { env, stdio: ['ignore', fs.openSync(path.join(data, 'server.log'), 'a'), fs.openSync(path.join(data, 'server.log'), 'a')] });
 const stop = () => (server.kill('SIGTERM'), process.exit(0));
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
@@ -105,10 +133,11 @@ const account = accounts.find((a) => a.name === 'Benchmark') ?? (await api('POST
 let left = 0;
 try {
   left = copyToken(path.join(data, 'accounts', `claude-${account.id}`));
+  offline(path.join(data, 'accounts', `claude-${account.id}`));
 } catch (e) {
   console.error(e.message);
   stop();
 }
 // What run.mjs needs, kept beside the data (only you can read it).
 fs.writeFileSync(path.join(data, 'bench.json'), JSON.stringify({ server: base, token, account: account.id }), { mode: 0o600 });
-console.log(`Ready at ${base} (account ${account.id}; its token works for ${left} more minutes). run.mjs reads ${path.join(data, 'bench.json')}.`);
+console.log(`Ready at ${base} (account ${account.id}; its token works for ${left} more minutes; agents ${web ? 'may use the web' : 'work offline'}). run.mjs reads ${path.join(data, 'bench.json')}.`);

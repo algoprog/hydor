@@ -1,0 +1,17 @@
+{
+ "random order, N = 200,000": "714ec5d562a423248f37bfcb694d53f1f73c43672124967124e4fba300e9b643",
+ "increasing heights, N = 200,000 (counts up to N)": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+ "decreasing heights, N = 200,000": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+ "increasing, but the first count is N - 1 (valid, differs from the sum at the 2^-N bit)": "6d0494137e3681eaa923f9909c98aa042a03e413bee025e9c0a85e1c4f09e168",
+ "increasing, but the second count is one less (no row gives it)": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+ "increasing then decreasing, the tallest at about 0.3 N": "ebf28d2a18e7fb9be6477c1e4faa58bc583e93004fb8abbc1ee76c182a1bc03a",
+ "tallest at one end, the next at the other, and so on inward (depth N)": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+ "perfectly balanced, N = 2^17 - 1": "1b61e979bcd9737ecd391db37c5b2e89d60c5291632687dec8defe9a928cfb30",
+ "random uneven splits (deep), N = 200,000": "c4afbb2e0649b86be0adeb9897019312b45f2a846ae59f9f1b02b5a069eabc6f",
+ "random splits, half of them at an end, N = 200,000": "bd841cecaa2eb992fbcfb81cdf8bb37a4a108051824471f9e89796d8d62eaf69",
+ "nearly sorted with noise 3,000, N = 200,000": "351215761fb4edd0caedc31080b052ff492c5326b4a237e4a9463296a41c83c0",
+ "blocks of 447 going up, the blocks going down, N = 200,000": "d990e4b75207f7691edf25e3477d45a98d65ce2421004e0db6f35624f7f43a93",
+ "counts of a deep tree, moved one place along (same sum, no row)": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+ "all counts 17, N = 2^17 (sum is 1 - 2^-17)": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+ "random counts from 30 to N (sum tiny, many bits)": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+}

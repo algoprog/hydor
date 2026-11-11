@@ -1,0 +1,247 @@
+{
+  "rule": "The 30 are drawn from the hard problems of release v6 (22 AtCoder, 8 LeetCode) in the order of Random(2026) over each platform's sorted question ids. A problem is excluded when its official tests contradict its statement or when its statement accepts any one of several answers, because LiveCodeBench compares a solution's output with one exact answer; each excluded problem is replaced by the next of its platform in that order, under the same rule.",
+  "excluded": [
+    {
+      "id": "abc397_d",
+      "reason": "an official test contradicts the statement: N = 27 expects `3 0`, but the statement asks for positive integers"
+    },
+    {
+      "id": "abc398_f",
+      "reason": "the statement says that if multiple solutions exist, any of them is accepted"
+    },
+    {
+      "id": "abc396_e",
+      "reason": "the statement says that if there are multiple good sequences with the same minimum sum, printing any of them is accepted"
+    },
+    {
+      "id": "arc190_a",
+      "reason": "the statement says that if there are multiple ways that minimize the cost, printing any one is accepted"
+    }
+  ],
+  "reviewed": [
+    {
+      "id": "abc394_g",
+      "why": "the matching word is only 'multiple times' of a move; each query has one exact answer"
+    },
+    {
+      "id": "arc192_b",
+      "why": "the judge ignores letter case, but the statement gives the exact form to print (Fennec or Snuke), which is what LiveCodeBench compares"
+    },
+    {
+      "id": "3701",
+      "why": "the statement asks for the lexicographically smallest of the possible captions, so the answer is unique"
+    }
+  ],
+  "problems": [
+    {
+      "id": "3674",
+      "title": "count-non-decreasing-subarrays-after-k-operations",
+      "platform": "leetcode",
+      "date": "2025-01-11",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3696",
+      "title": "count-substrings-divisible-by-last-digit",
+      "platform": "leetcode",
+      "date": "2025-02-08",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3701",
+      "title": "minimum-cost-good-caption",
+      "platform": "leetcode",
+      "date": "2025-02-01",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3739",
+      "title": "manhattan-distances-of-all-arrangements-of-pieces",
+      "platform": "leetcode",
+      "date": "2025-01-18",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3744",
+      "title": "minimum-operations-to-make-array-elements-zero",
+      "platform": "leetcode",
+      "date": "2025-03-22",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3777",
+      "title": "maximum-product-of-subsequences-with-an-alternating-sum-equal-to-k",
+      "platform": "leetcode",
+      "date": "2025-04-05",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3781",
+      "title": "maximize-the-distance-between-points-on-a-square",
+      "platform": "leetcode",
+      "date": "2025-02-22",
+      "difficulty": "hard"
+    },
+    {
+      "id": "3789",
+      "title": "maximize-subarrays-after-removing-one-conflicting-pair",
+      "platform": "leetcode",
+      "date": "2025-03-08",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc387_f",
+      "title": "Count Arrays",
+      "platform": "atcoder",
+      "date": "2025-01-04",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc389_f",
+      "title": "Rated Range",
+      "platform": "atcoder",
+      "date": "2025-01-18",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc389_g",
+      "title": "Odd Even Graph",
+      "platform": "atcoder",
+      "date": "2025-01-18",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc390_e",
+      "title": "Vitamin Balance",
+      "platform": "atcoder",
+      "date": "2025-01-25",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc392_g",
+      "title": "Fine Triplets",
+      "platform": "atcoder",
+      "date": "2025-02-08",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc393_d",
+      "title": "Swap to Gather",
+      "platform": "atcoder",
+      "date": "2025-02-15",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc394_g",
+      "title": "Dense Buildings",
+      "platform": "atcoder",
+      "date": "2025-02-22",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc397_f",
+      "title": "Variety Split Hard",
+      "platform": "atcoder",
+      "date": "2025-03-15",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc398_g",
+      "title": "Not Only Tree Game",
+      "platform": "atcoder",
+      "date": "2025-03-22",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc399_e",
+      "title": "Replace",
+      "platform": "atcoder",
+      "date": "2025-03-29",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc400_e",
+      "title": "Ringo's Favorite Numbers 3",
+      "platform": "atcoder",
+      "date": "2025-04-05",
+      "difficulty": "hard"
+    },
+    {
+      "id": "abc400_g",
+      "title": "Patisserie ABC 3",
+      "platform": "atcoder",
+      "date": "2025-04-05",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc190_c",
+      "title": "Basic Grid Problem with Updates",
+      "platform": "atcoder",
+      "date": "2025-01-12",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc190_d",
+      "title": "Matrix Pow Sum",
+      "platform": "atcoder",
+      "date": "2025-01-12",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc191_d",
+      "title": "Moving Pieces on Graph",
+      "platform": "atcoder",
+      "date": "2025-01-26",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc192_b",
+      "title": "Fennec VS. Snuke 2",
+      "platform": "atcoder",
+      "date": "2025-02-09",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc193_b",
+      "title": "Broken Wheel",
+      "platform": "atcoder",
+      "date": "2025-02-23",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc194_d",
+      "title": "Reverse Brackets",
+      "platform": "atcoder",
+      "date": "2025-03-09",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc194_e",
+      "title": "Swap 0^X and 1^Y",
+      "platform": "atcoder",
+      "date": "2025-03-09",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc195_e",
+      "title": "Random Tree Distance",
+      "platform": "atcoder",
+      "date": "2025-03-23",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc196_b",
+      "title": "Torus Loop",
+      "platform": "atcoder",
+      "date": "2025-04-06",
+      "difficulty": "hard"
+    },
+    {
+      "id": "arc196_d",
+      "title": "Roadway",
+      "platform": "atcoder",
+      "date": "2025-04-06",
+      "difficulty": "hard"
+    }
+  ]
+}

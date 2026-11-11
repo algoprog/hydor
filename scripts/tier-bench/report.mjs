@@ -1,6 +1,6 @@
-// The benchmark's results as a table (Markdown): each task both ways, then the totals.
-//   node scripts/tier-bench/report.mjs [results.json]
-// The first table sets one agent on Best alone beside the team; the second, where they were run, every way.
+// The benchmark's results as tables (Markdown): each task each way, each way over the tasks it ran, and what the leads handed over.
+//   node scripts/tier-bench/report.mjs [results.json ...]
+// Several files are read as one: their runs are put together. The default file is tier-bench-results.json.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,70 +9,126 @@ import { fileURLToPath } from 'node:url';
 const pct = (x) => `${Math.abs(x * 100 - Math.round(x * 100)) < 0.05 ? Math.round(x * 100) : (x * 100).toFixed(1)}%`;
 const usd = (x) => `$${x.toFixed(2)}`;
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+/** A share of the checks a run passed. */
+const score = (r) => r.check.passed / r.check.total;
+
+/** The ways in the order the tables show them, with the names they have in the tables. */
+const WAYS = [
+  ['quick', 'Quick alone'],
+  ['standard', 'Standard alone'],
+  ['solo', 'Best alone'],
+  ['max', 'Max alone'],
+  ['lead', 'Best + helpers'],
+  ['team', 'Team (Automatic)'],
+];
+const NAME = Object.fromEntries(WAYS);
+
+/** A difference from the other way as a signed percentage, with the minus sign −; nothing when it rounds to none. */
+const signed = (d) => (pct(Math.abs(d)) === '0%' ? '0%' : `${d < 0 ? '−' : '+'}${pct(Math.abs(d))}`);
 
 /** One way's runs of one task, summed up: the share of checks passed, the cost and the time (means over its repeats). */
 function cell(runs) {
   if (!runs.length) return null;
-  const tiers = {};
-  for (const r of runs) for (const h of r.helpers ?? []) tiers[h.tier ?? 'named'] = (tiers[h.tier ?? 'named'] ?? 0) + 1;
-  // Those a Claude Code lead ran inside its own turns (its Agent tool), by the model it gave each.
-  for (const r of runs) for (const h of r.inTurn ?? []) tiers[`${h.model} in turn`] = (tiers[`${h.model} in turn`] ?? 0) + 1;
+  const scores = runs.map(score);
   return {
-    score: mean(runs.map((r) => r.check.passed / r.check.total)),
+    score: mean(scores),
+    low: Math.min(...scores),
+    high: Math.max(...scores),
+    spread: new Set(scores).size > 1,
     usd: mean(runs.map((r) => r.usd ?? 0)),
-    helpersUsd: mean(runs.map((r) => r.helpersUsd ?? 0)),
     min: mean(runs.map((r) => r.ms / 60_000)),
-    helpers: Object.entries(tiers).map(([t, n]) => `${(n / runs.length).toFixed(runs.length > 1 ? 1 : 0)} ${t}`).join(', ') || 'none',
-    model: [...new Set(runs.map((r) => r.model).filter(Boolean))].join(', '),
-    moved: [...new Set(runs.flatMap((r) => (r.moved ?? []).map((m) => `${m.event === 'auto' ? 'started' : 'stepped up'} on ${m.tier}`)))].join(', '),
-    ends: [...new Set(runs.map((r) => r.end).filter((e) => e !== 'done'))].join(', '),
+    ends: [...new Set(runs.map((r) => r.end).filter((e) => e !== 'done'))],
+    // Runs whose agents read the task's hidden files (run.mjs looks for them in the transcripts).
+    peeked: runs.filter((r) => r.peeked).length,
     n: runs.length,
   };
 }
 
-export function table(results) {
-  const tasks = [...new Set(results.map((r) => r.task))];
-  const lines = ['| Task | Solo: checks | Solo: cost | Solo: time | Team: checks | Team: cost | Team: time | Team: helpers | Cost |', '|---|---|---|---|---|---|---|---|---|'];
-  const both = [];
-  for (const t of tasks) {
-    const solo = cell(results.filter((r) => r.task === t && r.way === 'solo'));
-    const team = cell(results.filter((r) => r.task === t && r.way === 'team'));
-    const show = (c) => (c ? [`${pct(c.score)}${c.ends ? ` (${c.ends})` : ''}`, usd(c.usd), `${c.min.toFixed(1)} min`] : ['–', '–', '–']);
-    const delta = solo && team && solo.usd > 0 ? `${team.usd <= solo.usd ? '−' : '+'}${pct(Math.abs(team.usd - solo.usd) / solo.usd)}` : '–';
-    lines.push(`| ${t} | ${show(solo).join(' | ')} | ${show(team).join(' | ')} | ${team ? `${team.helpers}${team.moved ? `; ${team.moved}` : ''}` : '–'} | ${delta} |`);
-    if (solo && team) both.push({ solo, team });
-  }
-  if (both.length) {
-    const sum = (k, w) => both.reduce((a, b) => a + b[w][k], 0);
-    const s = sum('usd', 'solo');
-    const t = sum('usd', 'team');
-    lines.push(
-      `| **All ${both.length}** | ${pct(mean(both.map((b) => b.solo.score)))} | ${usd(s)} | ${sum('min', 'solo').toFixed(1)} min | ${pct(mean(both.map((b) => b.team.score)))} | ${usd(t)} | ${sum('min', 'team').toFixed(1)} min | | ${t <= s ? '−' : '+'}${pct(Math.abs(t - s) / (s || 1))} |`,
-    );
-  }
-  // What each tier does alone, where it was tried: the share of checks passed and the cost.
-  const alone = ['quick', 'standard', 'solo', 'max'].filter((w) => results.some((r) => r.way === w));
-  if (alone.some((w) => w !== 'solo')) {
-    const name = { quick: 'Quick alone', standard: 'Standard alone', solo: 'Best alone', max: 'Max alone' };
-    const cols = [...alone, ...(results.some((r) => r.way === 'team') ? ['team'] : [])];
-    lines.push('', `| Task | ${cols.map((w) => name[w] ?? 'Team').join(' | ')} |`, `|---|${cols.map(() => '---').join('|')}|`);
-    const sums = Object.fromEntries(cols.map((w) => [w, { usd: 0, score: 0, min: 0, n: 0 }]));
-    for (const t of tasks) {
-      lines.push(
-        `| ${t} | ${cols
-          .map((w) => {
-            const c = cell(results.filter((r) => r.task === t && r.way === w));
-            if (!c) return '–';
-            const s = sums[w];
-            (s.usd += c.usd), (s.score += c.score), (s.min += c.min), s.n++;
-            return `${pct(c.score)}, ${usd(c.usd)}, ${c.min.toFixed(1)} min`;
-          })
-          .join(' | ')} |`,
-      );
-    }
-    lines.push(`| **All** | ${cols.map((w) => (sums[w].n ? `${pct(sums[w].score / sums[w].n)}, ${usd(sums[w].usd)}, ${sums[w].min.toFixed(1)} min` : '–')).join(' | ')} |`);
-  }
-  return lines.join('\n');
+/** The helpers of some runs, counted by tier (or by the model a Claude Code lead gave them in its turns), as a mean per run. */
+function helpersPerRun(runs) {
+  const counts = {};
+  for (const r of runs) for (const h of r.helpers ?? []) counts[h.tier ?? 'named'] = (counts[h.tier ?? 'named'] ?? 0) + 1;
+  // Those a Claude Code lead ran inside its own turns (its Agent tool), by the model it gave each.
+  for (const r of runs) for (const h of r.inTurn ?? []) counts[`${h.model} in turn`] = (counts[`${h.model} in turn`] ?? 0) + 1;
+  const digits = runs.length > 1 ? 1 : 0;
+  return Object.entries(counts).map(([k, n]) => `${(n / runs.length).toFixed(digits)} ${k}`).join(', ') || 'none';
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) console.log(table(JSON.parse(fs.readFileSync(process.argv[2] ?? 'tier-bench-results.json', 'utf8'))));
+/** A Markdown table from a header row and body rows. */
+const markdown = (header, rows) => [`| ${header.join(' | ')} |`, `|${header.map(() => '---').join('|')}|`, ...rows.map((row) => `| ${row.join(' | ')} |`)];
+
+export function table(results) {
+  const tasks = [...new Set(results.map((r) => r.task))];
+  const ways = WAYS.map(([w]) => w).filter((w) => results.some((r) => r.way === w));
+  const runsOf = (t, w) => results.filter((r) => r.task === t && r.way === w);
+  const cellOf = (t, w) => cell(runsOf(t, w));
+  /** The tasks a way ran, each with its summed-up cell. */
+  const ran = (w) => tasks.map((t) => [t, cellOf(t, w)]).filter(([, c]) => c);
+
+  // The first table: each task, each way, as the share of checks passed, the cost and the time.
+  const first = (c) => {
+    const share = c.spread ? `${pct(c.score)} (${pct(c.low)}–${pct(c.high)})` : pct(c.score);
+    return [share, usd(c.usd), `${c.min.toFixed(1)} min`, ...(c.n > 1 ? [`${c.n} runs`] : []), ...(c.ends.length ? [c.ends.join(', ')] : []), ...(c.peeked ? [`${c.peeked} read the hidden files`] : [])].join(' · ');
+  };
+  const t1 = markdown(
+    ['Task', ...ways.map((w) => NAME[w])],
+    tasks.map((t) => [t, ...ways.map((w) => (cellOf(t, w) ? first(cellOf(t, w)) : '–'))]),
+  );
+
+  // The second table: each way over the tasks it ran, each task weighing the same.
+  const t2rows = ways.map((w) => {
+    const done = ran(w);
+    const cs = done.map(([, c]) => c);
+    const lowest = Math.min(...results.filter((r) => r.way === w).map(score));
+    // Cost beside Best alone: over the tasks that both this way and solo ran.
+    let beside = '–';
+    if (w !== 'solo' && ways.includes('solo')) {
+      const both = done.filter(([t]) => cellOf(t, 'solo'));
+      const mine = both.reduce((a, [, c]) => a + c.usd, 0);
+      const solo = both.reduce((a, [t]) => a + cellOf(t, 'solo').usd, 0);
+      if (both.length && solo > 0) beside = signed(mine / solo - 1);
+    }
+    return [
+      NAME[w],
+      `${done.length}`,
+      pct(mean(cs.map((c) => c.score))),
+      pct(lowest),
+      `${cs.filter((c) => c.score < 1).length} of ${done.length}`,
+      usd(cs.reduce((a, c) => a + c.usd, 0)),
+      `${cs.reduce((a, c) => a + c.min, 0).toFixed(1)} min`,
+      beside,
+    ];
+  });
+  const t2 = markdown(['Way', 'Tasks', 'Checks', 'Lowest run', 'Tasks below 100%', 'Cost', 'Time', 'Cost beside Best alone'], t2rows);
+
+  // The third table, only when a lead ran: what it handed over, per task.
+  const led = ['lead', 'team'].filter((w) => ways.includes(w));
+  const t3rows = [];
+  for (const t of tasks) {
+    for (const w of led) {
+      const runs = runsOf(t, w);
+      if (!runs.length) continue;
+      const moves = [...new Set(runs.flatMap((r) => (r.moved ?? []).map((m) => (m.event === 'auto' ? `started on ${m.tier}` : `stepped up to ${m.tier}`))))];
+      t3rows.push([
+        t,
+        NAME[w],
+        [...new Set(runs.map((r) => r.model).filter(Boolean))].join(', '),
+        helpersPerRun(runs),
+        moves.join(', '),
+      ]);
+    }
+  }
+
+  const blocks = [
+    ['**Each task, each way**', t1],
+    ['**Each way, over the tasks it ran**', t2],
+  ];
+  if (t3rows.length) blocks.push(['**What the leads handed over**', markdown(['Task', 'Way', "Lead's model", 'Helpers per run', 'Moves'], t3rows)]);
+  return blocks.map(([title, lines]) => [title, '', ...lines].join('\n')).join('\n\n');
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const files = process.argv.slice(2);
+  const results = (files.length ? files : ['tier-bench-results.json']).flatMap((f) => JSON.parse(fs.readFileSync(f, 'utf8')));
+  console.log(table(results));
+}

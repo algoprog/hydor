@@ -1,0 +1,8 @@
+{
+  "name": "contest-two-ones",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

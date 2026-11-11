@@ -1,0 +1,17 @@
+{
+ "dense random strings, queries random, from the starts, one character changed": "0fc1c78484f514a129e8ebbcfec53272be811c13c74c65955ca625df6471a337",
+ "sparse strings (3% ones): queries are starts, majorities of three, a start with one character changed, or a few ones": "2edc23541c89a2cf57388bfe8569bba7875e2f7da3523d057d1e165887295a79",
+ "strings that obey 600 hidden rules: queries that obey them, break one, or have one character changed": "664e4b608a7835afb18587251fc4450ee33a7cb4cde2528016da79fcfa4f66a3",
+ "strings that obey 1500 hidden rules at 10% ones (long chains of implications)": "cab0bc412e7b1e45ac52a355437b5d9280c0a161c7ad90128cc95896a0ad6f39",
+ "strings that obey 250 hidden rules (loose) with all characters read the same way": "e8b0786ebd4c50745d15f9f89c5ea3fdbe7d8164aa18bfaf1f030b64fc15e50c",
+ "500 positions in groups of 4 that are each equal to or the opposite of one hidden bit": "fb715d1321c1e0313e12c8f935d3a98484d666e6323f542de4fb569f303da6b0",
+ "one pair of positions at the very end that never both show 1": "41e46013008a50606c242ad8e12d4b1f4d99e8d9096bd9c982cdf9859b191ba0",
+ "three pairs of positions that never both show 1, spread out": "4d3f3d4bd81e23078db5c0da058f1b6428898a2cf8f5975bdd635c8910001447",
+ "strings with an even number of ones: queries with an odd number are just as reachable": "0fc1c78484f514a129e8ebbcfec53272be811c13c74c65955ca625df6471a337",
+ "strings with exactly 250 ones: queries have other numbers of ones": "0fc1c78484f514a129e8ebbcfec53272be811c13c74c65955ca625df6471a337",
+ "500 strings that each have a single 1 in their own position, and the all-zero string among the queries": "ad3f1e9322e4413a9292ff7c6efcbf8c5e7afb885cdd6cdf66a00469f20bc17d",
+ "one string only, copied 500 times: queries are it or differ in one character": "48e8dd2b7c29cddf5e35291aa0fafb57df0ef83e5ec62657cdeb85902860ce94",
+ "a single string of 500 characters": "8c24a6e3348db66fc7dc356b43ecdbeb64c863f67ed48fb9a57d0c5b02529ca6",
+ "random strings and their complements": "0fc1c78484f514a129e8ebbcfec53272be811c13c74c65955ca625df6471a337",
+ "100 characters, 500 strings from 400 hidden rules: many queries to a small table": "e5052e60f2d6775ded6d749d8c4600df0fa92e07564bdd736a7a287fdc404dce"
+}

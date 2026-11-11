@@ -1,0 +1,13 @@
+{
+  "name": "tt",
+  "version": "0.3.0",
+  "description": "A small time tracker: entries in a JSON file, weekly reports, CSV import and export",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tt": "src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

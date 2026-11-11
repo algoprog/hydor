@@ -4,14 +4,24 @@ Does a session led by a strong model, with cheaper helpers for the clear parts, 
 agent alone, and what does each cost? This folder measures it on your own setup: your models, your plan, your tiers.
 Nothing in the app depends on it.
 
-- `tasks/<name>/`: nine coding jobs, each with the request an agent gets (`task.md`), the files it starts with
+- `tasks/<name>/`: fourteen coding jobs, each with the request an agent gets (`task.md`), the files it starts with
   (`seed/`), a hidden checker (`check.mjs`: it prints how many of its cases pass) and a solution the checker was
-  proved against (`reference/`). Six are small and of different kinds (four modules to a specification, a mechanical
-  change across files, a feature in a small program, an expression evaluator, a one-line fix, a bug of timing whose
-  request reads as a hard problem), `kit12` is a larger one (twelve modules), and two are hard on purpose:
-  `regex-linear` (a matcher that must never backtrack) and `invoice-rules` (a rulebook of discounts, rounding and
-  tax whose rules bear on each other). `node tasks/verify.mjs` proves every checker again: the reference passes all
-  its cases, the bare seed does not.
+  proved against (`reference/`). `node tasks/verify.mjs` proves every checker again: the reference passes all its
+  cases, the bare seed does not.
+- **Nine come with their specification written down** (routine work, and every tier passes them): six small ones of
+  different kinds (four modules to a specification, a mechanical change across files, a feature in a small program,
+  an expression evaluator, a one-line fix, a bug of timing whose request reads as a hard problem), `kit12` (twelve
+  modules), and two hard on purpose but fully specified: `regex-linear` (a matcher that must never backtrack) and
+  `invoice-rules` (a rulebook of discounts, rounding and tax).
+- **Five leave the requirements implied**: the request is short, as people write them, and the hidden cases check
+  what a careful engineer makes sure of without being told, though the request and the files imply it. `py-port` (a
+  Python module ported to JavaScript with identical behaviour: Python's own semantics at the edges, 505 cases from
+  the Python itself), `timesheet` (seven issues as users report them in a small program: time zones over daylight
+  saving, money rounded at the right level, overlapping time, one reporter's wrong guess), `stale-cache` (four
+  symptoms, four causes, one of them a race, fixed without more database reads), `slow-report` (a report made fast
+  with every byte of its output kept) and `job-picker` (an exhaustive search that has to become the right algorithm).
+  Hurried solutions written while building them lost 11-70% of the cases, but Haiku 5.5 alone passed every case of
+  all five: it checks its work against whatever can tell it the answer (the Python, the old program, a brute force).
 - `serve.mjs`: a scratch copy of the app for the runs: its own data folder and port, and one Claude Code account
   that signs in with a copy of an account's access token. The app you use never hears of the runs.
 - `run.mjs`: each task done several ways, with what came of it: the share of checks passed, the cost at API
@@ -26,6 +36,7 @@ Nothing in the app depends on it.
 |---|---|
 | `solo` | One agent on the Best tier's model, the team off: how a session worked before tiers led by default. |
 | `team` | Automatic, the team on: the main agent leads on Best (Max for a hard problem) and hands parts to helpers. |
+| `lead` | The team on with Max for hard problems off: the main agent always leads on Best and hands parts to helpers. |
 | `max` | One agent on the Max tier's model, the team off: the strongest model for everything. |
 | `standard`, `quick` | One agent on that tier's model alone, the team off: what the tier can do with no lead. |
 
@@ -42,6 +53,16 @@ node scripts/tier-bench/report.mjs /tmp/hydor-bench/results.json
 OUTDIR=dist/dev node scripts/build-server.mjs scripts/tier-bench/size.ts
 DATA_DIR=/tmp/hydor-bench/data node dist/dev/size.js           # how Automatic sizes requests up
 ```
+
+The benchmark's agents work offline: the tasks hold everything they need, and a task made from a published problem
+must be solved, not looked up. `serve.mjs` gives its account Claude Code settings that deny web search and reading,
+the app's browser and HTTP tools, and curl and wget (`--web` allows them).
+
+Nothing the benchmark starts can take the machine's memory: on Linux `serve.mjs` starts the scratch server in a scope
+of its own with at most 24 GB for it, its agents and what they run (`--memory`, in GB; 0 for no cap), each checker
+runs with at most 8 GB, and `run.mjs` starts a run only while the machine has 16 GB available (`--min-free`). Past a
+cap the kernel ends processes in that scope alone. The scratch server runs as a copy in development, so it sets up
+nothing on the computer (no service that starts it at boot) and leaves the agents' programs as they are.
 
 `--from` names a signed-in Claude Code folder (`~/.claude`, or an added account's folder under the app's data).
 Only its access token is copied, never the token that renews it, so the copy cannot replace the real sign-in; it

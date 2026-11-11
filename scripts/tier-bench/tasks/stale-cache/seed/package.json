@@ -1,0 +1,9 @@
+{
+  "name": "profile-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server.mjs"
+  }
+}
