@@ -88,7 +88,7 @@ import { Button, cx, MenuItem, Popover, Switch } from '../../../components/ui';
 import { useTexHtml } from '../common/katex';
 import { Choice, Select } from '../studio/fields';
 import { ColorButton, Field, NumInput, Section, Swatches, Tool } from './controls';
-import { addAnim, align, distribute, effectDur, transitionDur, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, partsLead, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
+import { addAnim, align, deleteCol, deleteRow, distribute, insertCol, insertRow, lockEls, TABLE_MAX, effectDur, transitionDur, dropMergesPast, fillCells, heightOf, mergeAt, mergeCells, moveAnim, onSlide, partName, partsLead, pathTo, pickedOf, removeAnim, removeEls, restack, setAnim, setEls, setSlide, topOf, unmergeCell, W } from './ops';
 import type { CellSel } from './SlideCanvas';
 import { SlideThumb } from './Thumb';
 import { fetchVideoStill } from './media';
@@ -156,6 +156,9 @@ interface Props {
   onAiBackground?: () => void;
   /** The picture in the picture editor, in a tab of its own (the new picture takes its place). */
   onEditPicture?: (id: string) => void;
+  /** Line several parts up with the slide, not with each other (shared with Arrange → Line them up). */
+  alignToSlide?: boolean;
+  onAlignToSlide?: (on: boolean) => void;
 }
 
 const SHAPE_NAMES: Record<ShapeKind, string> = {
@@ -255,29 +258,37 @@ function SHAPE_PATHS(kind: ShapeKind, w: number, h: number): string {
 
 // ---- Format ------------------------------------------------------------------------------------------------
 
-function Arrange({ deck, index, ids, change }: { deck: Deck; index: number; ids: string[]; change: Change }) {
+function Arrange({ deck, index, ids, change, toSlide, onToSlide }: { deck: Deck; index: number; ids: string[]; change: Change; toSlide?: boolean; onToSlide?: (on: boolean) => void }) {
   const many = ids.length > 1;
-  const al = (how: Parameters<typeof align>[3]) => change((d) => align(d, index, ids, how));
+  const al = (how: Parameters<typeof align>[3]) => change((d) => align(d, index, ids, how, !!toSlide));
+  // With several parts picked, the buttons line them up with each other, or (ticked) with the slide.
+  const withSlide = !many || !!toSlide;
   const inGroup = !many && !!pathTo(deck.slides[index].els, ids[0])?.length;
   return (
     <Section title={many ? 'Line them up' : inGroup ? 'In its group' : 'On the slide'}>
+      {many && onToSlide && (
+        <label className="flex min-h-8 items-center gap-2 text-[12.5px] text-fg-2">
+          <span className="min-w-0 flex-1">Align to the slide</span>
+          <Switch label="Align to the slide" on={!!toSlide} onChange={onToSlide} />
+        </label>
+      )}
       <div className="flex flex-wrap items-center gap-0.5">
-        <Tool label={many ? 'Left edges' : 'To the left'} onClick={() => al('left')}>
+        <Tool label={withSlide ? 'To the left' : 'Left edges'} onClick={() => al('left')}>
           <AlignStartVertical size={15} />
         </Tool>
-        <Tool label={many ? 'Centres across' : 'In the middle, across'} onClick={() => al('center')}>
+        <Tool label={withSlide ? 'In the middle, across' : 'Centres across'} onClick={() => al('center')}>
           <AlignCenterVertical size={15} />
         </Tool>
-        <Tool label={many ? 'Right edges' : 'To the right'} onClick={() => al('right')}>
+        <Tool label={withSlide ? 'To the right' : 'Right edges'} onClick={() => al('right')}>
           <AlignEndVertical size={15} />
         </Tool>
-        <Tool label={many ? 'Tops' : 'To the top'} onClick={() => al('top')}>
+        <Tool label={withSlide ? 'To the top' : 'Tops'} onClick={() => al('top')}>
           <AlignStartHorizontal size={15} />
         </Tool>
-        <Tool label={many ? 'Middles' : 'In the middle, down'} onClick={() => al('middle')}>
+        <Tool label={withSlide ? 'In the middle, down' : 'Middles'} onClick={() => al('middle')}>
           <AlignCenterHorizontal size={15} />
         </Tool>
-        <Tool label={many ? 'Bottoms' : 'To the bottom'} onClick={() => al('bottom')}>
+        <Tool label={withSlide ? 'To the bottom' : 'Bottoms'} onClick={() => al('bottom')}>
           <AlignEndHorizontal size={15} />
         </Tool>
         {ids.length > 2 && (
@@ -711,6 +722,20 @@ function TableLook({ el, theme, set, cellSel, onCellSel }: { el: TableEl; theme:
   const many = !!cs && (cs.r0 !== cs.r1 || cs.c0 !== cs.c1);
   const merged = cs ? mergeAt(el, cs.r0, cs.c0) : undefined;
   const replace = (t: TableEl) => set({ rows: t.rows, merges: t.merges, fills: t.fills } as Partial<El>);
+  // The block of cells picked (rows top..bottom, columns left..right).
+  const [top, bottom, left, right] = cs ? [Math.min(cs.r0, cs.r1), Math.max(cs.r0, cs.r1), Math.min(cs.c0, cs.c1), Math.max(cs.c0, cs.c1)] : [0, 0, 0, 0];
+  /** A table with a row or column put in (or taken out): all of it replaces the table's, its sizes, merges and fills with it. */
+  const insert = (t: TableEl | null, pick?: { r: number; c: number }) => {
+    if (!t) return;
+    set({ rows: t.rows, merges: t.merges, fills: t.fills, h: t.h, cols: t.cols, aligns: t.aligns } as Partial<El>);
+    onCellSel?.(pick ? { id: el.id, r0: pick.r, c0: pick.c, r1: pick.r, c1: pick.c } : null);
+  };
+  const remove = (t: TableEl, what: 'row' | 'col') => {
+    let out: TableEl | null = t;
+    if (what === 'row') for (let r = bottom; r >= top && out; r--) out = deleteRow(out, r) ?? out;
+    else for (let c = right; c >= left && out; c--) out = deleteCol(out, c) ?? out;
+    insert(out === t ? null : out);
+  };
   return (
     <Section title="Table">
       <p className="text-[12px] leading-snug text-fg-3">Double-click a cell to type in it; Tab goes to the next one. Shift-click another cell to pick the cells between.</p>
@@ -739,6 +764,27 @@ function TableLook({ el, theme, set, cellSel, onCellSel }: { el: TableEl; theme:
               </Button>
             )}
             <ColorButton value={el.fills?.[`${cs.r0},${cs.c0}`]} theme={theme} none="The table’s own" onChange={(fill) => replace(fillCells(el, cs.r0, cs.c0, cs.r1, cs.c1, fill))} label="Cell fill" />
+          </div>
+          {/* Rows and columns put in or taken out next to the cell picked, not only at the end. */}
+          <div className="flex flex-wrap items-center gap-0.5">
+            <Tool label="Insert a row above" disabled={rows.length >= TABLE_MAX.rows} onClick={() => insert(insertRow(el, top))}>
+              <ArrowUpToLine size={14} />
+            </Tool>
+            <Tool label="Insert a row below" disabled={rows.length >= TABLE_MAX.rows} onClick={() => insert(insertRow(el, bottom + 1))}>
+              <ArrowDownToLine size={14} />
+            </Tool>
+            <Tool label="Insert a column on the left" disabled={cols >= TABLE_MAX.cols} onClick={() => insert(insertCol(el, left))}>
+              <AlignStartVertical size={14} />
+            </Tool>
+            <Tool label="Insert a column on the right" disabled={cols >= TABLE_MAX.cols} onClick={() => insert(insertCol(el, right + 1))}>
+              <AlignEndVertical size={14} />
+            </Tool>
+            <Tool label="Delete the row" disabled={rows.length <= bottom - top + 1} onClick={() => remove(el, 'row')}>
+              <Trash2 size={14} />
+            </Tool>
+            <Tool label="Delete the column" disabled={cols <= right - left + 1} onClick={() => remove(el, 'col')}>
+              <X size={14} />
+            </Tool>
           </div>
         </div>
       )}
@@ -1074,7 +1120,7 @@ function VideoLook({ el, set, onEdit }: { el: VideoEl; set: (patch: Partial<El>,
   );
 }
 
-function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart, onEditPicture, onEditVideo }: Props) {
+function FormatTab({ alignToSlide, onAlignToSlide, deck, index, sel, change, onSel, onReplaceImage, onAsk, cropping, onCrop, onIcon, onGroup, onUngroup, cellSel, onCellSel, texFocus, running, onRun, pickPicture, pickModel, onAiEdit, onPlotChart, onEditPicture, onEditVideo }: Props) {
   const slide = deck.slides[index];
   const web = isWebDeck(deck);
   const els = pickedOf(slide, sel);
@@ -1091,13 +1137,16 @@ function FormatTab({ deck, index, sel, change, onSel, onReplaceImage, onAsk, cro
       <>
         <div className="flex items-center gap-2 px-3 pt-3">
           <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">{els.length} parts picked</span>
+          <Tool label={els.every((e) => e.lock) ? 'Unlock them' : 'Lock them in place'} on={els.every((e) => e.lock)} onClick={() => change((d) => lockEls(d, index, sel))}>
+            {els.every((e) => e.lock) ? <Lock size={14} /> : <Unlock size={14} />}
+          </Tool>
           {onGroup && (
             <Button size="sm" variant="secondary" icon={<GroupIcon size={14} />} onClick={onGroup}>
               Group them
             </Button>
           )}
         </div>
-        <Arrange deck={deck} index={index} ids={sel} change={change} />
+        <Arrange deck={deck} index={index} ids={sel} change={change} toSlide={alignToSlide} onToSlide={onAlignToSlide} />
         <Section title="Remove">
           <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} className="text-err" onClick={() => (change((d) => removeEls(d, index, sel)), onSel([]))}>
             Delete them
