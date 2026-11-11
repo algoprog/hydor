@@ -8,11 +8,11 @@
 // handle, the charts, and the box to type in, which is also what takes the keys and the clipboard while nothing is
 // typed (so typing starts at once, in any language). It is drawn at the zoom asked for.
 // Mouse: click, drag, Shift+click, Ctrl+click and Ctrl+drag (more ranges), the letters and numbers, edges of headers to
-// size columns and rows (a double click fits them), the fill handle (drag it, or double-click it to fill down), the
+// size columns and rows (a double click fits them), Ctrl+wheel to zoom, the fill handle (drag it, or double-click it to fill down), the
 // border of the cells picked (drag it to move them, Ctrl held to copy them) and a picked row's number or column's letter
 // (drag it to move the rows or columns). Touch: a tap picks, a tap on the
 // picked cell types in it, a drag scrolls, the round handle stretches the selection, a long press opens the menu.
-import { forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronsLeftRight, ChevronsUpDown, ListFilter, Maximize2, MessageSquare } from 'lucide-react';
 import { accountingParts, borderOf, CELL_FONTS, codeColor, colName, formatValue, inputText, isError, refName, textOn, type Calc, type Cell, type CellStyle, type ListOption, type Rect, type Sheet, type SheetComment, type Validation } from '@shared/sheets';
 import { allowed, isTicked, listOptions, type CondFormats, type Merges, type Rules } from '@shared/sheet-rules';
@@ -129,6 +129,8 @@ interface Props {
   /** The fill handle dragged from the selection over `target`; Ctrl held. */
   onFill: (target: Rect, ctrl: boolean) => void;
   onFillDown: () => void;
+  /** Ctrl+wheel (or a pinch on a trackpad) over the grid: the zoom is to change by this factor. */
+  onZoom?: (factor: number) => void;
   /** A pick by the mouse is done (the button let go): the format painter paints what was picked. */
   onPicked?: () => void;
   /** The format painter is on: the pointer shows it. */
@@ -310,6 +312,19 @@ export const Grid = forwardRef<GridHandle, Props>(function Grid(p, ref) {
   }, [view, rowOff, colOff, rows, cols, fr, fc, FH, FW, HH, NW]);
   const rangeKey = `${range.r1}:${range.r2}:${range.c1}:${range.c2}`;
   const stableRange = useMemo(() => range, [rangeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ctrl+wheel zooms (the page itself would zoom otherwise): a listener of its own, as the browser makes wheel events passive.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const on = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || !cb.current.onZoom) return;
+      e.preventDefault();
+      cb.current.onZoom(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)));
+    };
+    el.addEventListener('wheel', on, { passive: false });
+    return () => el.removeEventListener('wheel', on);
+  }, []);
 
   const onScroll = () => {
     const el = scroller.current;
