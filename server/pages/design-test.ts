@@ -365,6 +365,11 @@ else {
     await sleep(80);
     ok((await js<string | null>(`return document.querySelector('[data-test="e"]').getAttribute('data-hidden')`)) === '1', 'Ctrl+Shift+H hides what is picked');
     await cmd('undo');
+    await cmd('addBoard', {});
+    await sleep(200);
+    const other = (await js<any>(`return window.__msgs.filter(function(m){return m.type==='wa-ed-design'&&m.what==='layers'}).pop() || null;`)) as { board: number; list: unknown[] } | null;
+    ok(other?.board === 1 && other.list.length === 0, `another page: its own layers (page ${other?.board}, ${other?.list.length} parts)`);
+    await cmd('undo');
     for (const t of ['d', 'e']) {
       await cmd('select', { path: await pathOfBox(t) });
       await cmd('del');

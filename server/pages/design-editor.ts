@@ -637,7 +637,11 @@ function designEditor(cfg: DesignEdCfg, BASE: string, FIT: string, curveGeom: (w
     });
     tellLayersSoon();
   };
-  const tellBoards = () => send({ type: 'wa-ed-design', what: 'boards', list: boards().map(sizeOfBoard), current: board ? boards().indexOf(board) : 0 });
+  const tellBoards = () => {
+    send({ type: 'wa-ed-design', what: 'boards', list: boards().map(sizeOfBoard), current: board ? boards().indexOf(board) : 0 });
+    // Another artboard: its own layers.
+    tellLayersSoon();
+  };
   /**
    * The artboard's parts for the app's Layers panel, front to back as the panel lists them (the last in the page is on
    * top), groups with what they hold: each part's place (its path), its name, its kind, a few of its words, and whether it
