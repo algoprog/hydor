@@ -39,6 +39,7 @@ function ItemInner({
   onPick,
   onMenu,
   horizontal,
+  picked,
 }: {
   deck: Deck;
   index: number;
@@ -47,8 +48,10 @@ function ItemInner({
   live?: boolean;
   width: number;
   fonts: number;
-  onPick: () => void;
+  onPick: (e: React.MouseEvent) => void;
   onMenu: (at: ContextMenuAt) => void;
+  /** One of several slides picked together (Ctrl or Shift and a click). */
+  picked?: boolean;
   horizontal?: boolean;
 }) {
   const s = deck.slides[index];
@@ -86,7 +89,7 @@ function ItemInner({
         }}
         aria-label={`Slide ${index + 1}`}
         aria-current={current}
-        className={cx('relative overflow-hidden rounded-md outline-none', current ? 'ring-2 ring-accent' : 'ring-1 ring-line hover:ring-line-2', s.hidden && 'opacity-45')}
+        className={cx('relative overflow-hidden rounded-md outline-none', current ? 'ring-2 ring-accent' : picked ? 'ring-2 ring-accent/60' : 'ring-1 ring-line hover:ring-line-2', s.hidden && 'opacity-45')}
       >
         <SlideThumb deck={deck} index={index} slide={s} theme={deck.theme} width={width} fonts={fonts} />
         {s.hidden && (
@@ -124,6 +127,7 @@ const Item = memo(
     (a.deck.slides[a.index] === b.deck.slides[b.index] || (!!b.live && b.current && a.current)) &&
     a.index === b.index &&
     a.current === b.current &&
+    a.picked === b.picked &&
     a.width === b.width &&
     a.fonts === b.fonts &&
     a.horizontal === b.horizontal &&
@@ -133,8 +137,10 @@ const Item = memo(
 );
 
 export interface StripActions {
-  pick(i: number): void;
+  pick(i: number, how?: 'toggle' | 'range'): void;
   move(from: number, to: number): void;
+  /** Slides picked together, moved together to where another was dropped (by their ids). */
+  moveTogether(ids: string[], over: string): void;
   add(after: number, layout: LayoutId): void;
   duplicate(i: number): void;
   remove(i: number): void;
@@ -160,12 +166,14 @@ function SlideMenu({ deck, at, fonts, onClose, act }: { deck: Deck; at: { i: num
   );
 }
 
-export function Strip({ deck, cur, fonts, act, layout, live }: { deck: Deck; cur: number; fonts: number; act: StripActions; layout: 'side' | 'bottom' | 'grid'; live?: boolean }) {
+export function Strip({ deck, cur, fonts, act, layout, live, picks = [] }: { deck: Deck; cur: number; fonts: number; act: StripActions; layout: 'side' | 'bottom' | 'grid'; live?: boolean; picks?: string[] }) {
   const [menu, setMenu] = useState<{ i: number; at: ContextMenuAt } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 280, tolerance: 8 } }));
   const ids = deck.slides.map((s) => s.id);
   const onEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return;
+    // Slides picked together go together.
+    if (picks.length > 1 && picks.includes(String(e.active.id))) return act.moveTogether(picks, String(e.over.id));
     act.move(ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)));
   };
   const horizontal = layout === 'bottom';
@@ -181,7 +189,7 @@ export function Strip({ deck, cur, fonts, act, layout, live }: { deck: Deck; cur
           >
             {deck.slides.map((s, i) => (
               <div key={s.id} className={cx(layout === 'grid' && 'flex flex-col gap-1')}>
-                <Item deck={deck} index={i} current={i === cur} live={live} width={width} fonts={fonts} onPick={() => act.pick(i)} onMenu={(at) => setMenu({ i, at })} horizontal={horizontal || layout === 'grid'} />
+                <Item deck={deck} index={i} current={i === cur} live={live} width={width} fonts={fonts} picked={picks.includes(s.id)} onPick={(e) => act.pick(i, e.shiftKey ? 'range' : e.ctrlKey || e.metaKey ? 'toggle' : undefined)} onMenu={(at) => setMenu({ i, at })} horizontal={horizontal || layout === 'grid'} />
               </div>
             ))}
           </div>

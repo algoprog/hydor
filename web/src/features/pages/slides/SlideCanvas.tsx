@@ -2,7 +2,7 @@
 // around: click a part to pick it (Shift adds to the pick, a drag across empty space picks what it touches), drag it
 // to move it (it snaps to the slide's middle and edges, to other parts, to the guides and the grid, with lines between
 // it and what it lines up with, the distances to what is next to it, gaps as wide as those between other parts, and its
-// place by the pointer; Ctrl drags a copy, Alt does not snap, Shift keeps it straight), its handles to size it (every
+// place by the pointer; several parts picked have one frame round them, to size or turn them together; Ctrl drags a copy, Alt does not snap, Shift keeps it straight), its handles to size it (every
 // resize snaps too, turned parts by the box they show, and to the width or height of another part; the size by the
 // pointer) or turn it (the angle by the pointer), a line's ends to move them (near a part, an end sticks to the middle of one of its
 // sides: a connector, which follows its parts as they are dragged). A group is picked, moved, sized and turned as one;
@@ -20,7 +20,7 @@ import { forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect
 import { elbowPoints, everyEl, reconnect, scaleEls, SIDES, sidePoint, turnedBox, type Crop, type Deck, type El, type GroupEl, type ImageEl, type LineEl, type Para, type Slide, type Stick, type TableEl, type TextProps } from '@shared/slides';
 import { MessageSquare, Play, Square } from 'lucide-react';
 import { cx } from '../../../components/ui';
-import { addEls, boxOf, copies, heightOf, isLive, mergeAt, setEls, W } from './ops';
+import { addEls, boxOf, copies, heightOf, isLive, mergeAt, scalePicked, setEls, spinPicked, W } from './ops';
 import { isCopyDrag, isNoSnap } from '../common/keys';
 import { snapMove, snapResize, unionOf, type Gap, type GuideLine, type SnapSet } from './snap';
 import { OfflineFrames } from '../frame';
@@ -110,6 +110,9 @@ type Drag =
   | { kind: 'end'; id: string; which: 'start' | 'end'; next: { x: number; y: number; w: number; h: number }; stick?: Stick; near?: string }
   | { kind: 'marquee'; start: P; at: P; add: string[] }
   | { kind: 'draw'; start: P; at: P }
+  /** Several parts picked, sized or turned together, as one (the frame round them). */
+  | { kind: 'multi'; ids: string[]; hx: number; hy: number; start: P; box: Box; next: Box }
+  | { kind: 'spin'; ids: string[]; cx: number; cy: number; a0: number; a: number }
   | { kind: 'guide'; axis: 'x' | 'y'; index: number | null; at: number; off: boolean }
   | { kind: 'crop'; hx: number; hy: number; start: P; box: Box; full: Box };
 
@@ -1013,6 +1016,45 @@ export const SlideCanvas = forwardRef<
       follow(levelEls.filter((x) => d.ids.includes(x.id)).map((x) => ({ ...x, x: x.x + dx, y: x.y + dy })));
       return setDrag({ ...d, dx, dy, moved: true, copy });
     }
+    if (d.kind === 'multi') {
+      const nw0 = d.hx ? Math.max(8, d.box.w + d.hx * (p.x - d.start.x)) : d.box.w;
+      const nh0 = d.hy ? Math.max(8, d.box.h + d.hy * (p.y - d.start.y)) : d.box.h;
+      // A corner keeps the shape they fill together (Shift: free).
+      const keep = !e.shiftKey && d.hx !== 0 && d.hy !== 0;
+      const sc = Math.max(nw0 / d.box.w, nh0 / d.box.h);
+      const res = snapResize({ box: d.box, rot: 0, hx: d.hx, hy: d.hy, nw: keep ? d.box.w * sc : nw0, nh: keep ? d.box.h * sc : nh0, keep, set: snapSet(d.ids), tol, on: !isNoSnap(e) });
+      setLines(res.lines);
+      setEqual(res.equal);
+      setPointer(e, `${res.box.w} × ${res.box.h}`);
+      const shown: El[] = [];
+      for (const el of levelEls.filter((x) => d.ids.includes(x.id))) {
+        const sh = scalePicked(el, d.box, res.box);
+        shown.push(sh);
+        const n = nodeOf(el.id);
+        if (n) {
+          const fresh = RT.part(deck, slide, sh, { edit: true, ...PICS });
+          n.replaceWith(fresh);
+          RT.fit(fresh);
+        }
+      }
+      follow(shown);
+      return setDrag({ ...d, next: res.box });
+    }
+    if (d.kind === 'spin') {
+      let a = (Math.atan2(p.y - d.cy, p.x - d.cx) * 180) / Math.PI - d.a0;
+      if (e.shiftKey) a = Math.round(a / 15) * 15;
+      a = Math.round(a * 10) / 10;
+      setPointer(e, `${((a % 360) + 360) % 360}°`);
+      const shown: El[] = [];
+      for (const el of levelEls.filter((x) => d.ids.includes(x.id))) {
+        const sh = spinPicked(el, { x: d.cx, y: d.cy }, a);
+        shown.push(sh);
+        const n = nodeOf(el.id);
+        if (n) n.replaceWith(RT.part(deck, slide, sh, { edit: true, ...PICS }));
+      }
+      follow(shown);
+      return setDrag({ ...d, a });
+    }
     if (d.kind === 'rotate') {
       let a = (Math.atan2(p.y - d.cy, p.x - d.cx) * 180) / Math.PI + 90;
       a = ((a % 360) + 360) % 360;
@@ -1169,6 +1211,15 @@ export const SlideCanvas = forwardRef<
       return;
     }
     if (d.kind === 'crop') return;
+    if (d.kind === 'multi') {
+      const n = d.next;
+      if (n.x !== d.box.x || n.y !== d.box.y || n.w !== d.box.w || n.h !== d.box.h) change(setEls(deck, index, d.ids, (e) => scalePicked(e, d.box, n)));
+      return;
+    }
+    if (d.kind === 'spin') {
+      if (d.a) change(setEls(deck, index, d.ids, (e) => spinPicked(e, { x: d.cx, y: d.cy }, d.a)));
+      return;
+    }
     if (d.kind === 'move') {
       for (const id of d.ids) {
         const n = nodeOf(id);
@@ -1309,6 +1360,8 @@ export const SlideCanvas = forwardRef<
     if (d.kind === 'resize' && d.id === e.id) return { ...e, ...d.next };
     if (d.kind === 'rotate' && d.id === e.id) return { ...e, rot: d.rot };
     if (d.kind === 'end' && d.id === e.id) return { ...e, ...d.next };
+    if (d.kind === 'multi' && d.ids.includes(e.id)) return scalePicked(e, d.box, d.next);
+    if (d.kind === 'spin' && d.ids.includes(e.id)) return spinPicked(e, { x: d.cx, y: d.cy }, d.a);
     return e;
   };
   const picked = levelEls.filter((e) => sel.includes(e.id)).map(live);
@@ -1366,6 +1419,41 @@ export const SlideCanvas = forwardRef<
         <div
           title="Turn it (Shift: by 15°)"
           onPointerDown={(ev) => begin(ev, { kind: 'rotate', id: e.id, cx: e.x + e.w / 2, cy: e.y + e.h / 2, rot })}
+          className="pointer-events-auto absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 cursor-grab rounded-full border-[1.5px] border-accent bg-white shadow-sm pointer-coarse:h-5 pointer-coarse:w-5"
+          style={{ top: -27 }}
+        />
+      </div>
+    );
+  };
+
+  /**
+   * Several parts picked: one frame round them all, with handles to size them together (the corners keep the shape they
+   * fill, Shift frees it) and the round handle above to turn them together about its middle.
+   */
+  const multiFrame = () => {
+    if (readOnly || editing || crop || picked.length < 2 || picked.some((e) => e.lock)) return null;
+    const ids = picked.map((e) => e.id);
+    const box = drag?.kind === 'multi' ? drag.next : unionOf(levelEls.filter((e) => ids.includes(e.id)).map(turnedBox));
+    const spin = drag?.kind === 'spin' ? drag : null;
+    const b0 = drag?.kind === 'multi' ? drag.box : box;
+    return (
+      <div className="pointer-events-none absolute" style={{ left: S(box.x), top: S(box.y), width: S(box.w), height: S(box.h), outline: '1px dashed var(--accent)', rotate: spin ? `${spin.a}deg` : undefined, transformOrigin: spin ? `${S(spin.cx - box.x)}px ${S(spin.cy - box.y)}px` : undefined }}>
+        {HANDLES.map(([hx, hy]) => (
+          <div
+            key={`${hx},${hy}`}
+            onPointerDown={(ev) => begin(ev, { kind: 'multi', ids, hx, hy, start: toLocal(ev.clientX, ev.clientY), box: b0, next: b0 })}
+            className="pointer-events-auto absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-[3px] border-[1.5px] border-accent bg-white shadow-sm pointer-coarse:h-4 pointer-coarse:w-4"
+            style={{ left: `${((hx + 1) / 2) * 100}%`, top: `${((hy + 1) / 2) * 100}%`, cursor: CURSOR[`${hx},${hy}`] }}
+          />
+        ))}
+        <div className="absolute left-1/2 h-5 w-px -translate-x-1/2 bg-accent" style={{ top: -20 }} />
+        <div
+          title="Turn them together (Shift: by 15°)"
+          onPointerDown={(ev) => {
+            const c = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+            const q = toLocal(ev.clientX, ev.clientY);
+            begin(ev, { kind: 'spin', ids, cx: c.x, cy: c.y, a0: (Math.atan2(q.y - c.y, q.x - c.x) * 180) / Math.PI, a: 0 });
+          }}
           className="pointer-events-auto absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 cursor-grab rounded-full border-[1.5px] border-accent bg-white shadow-sm pointer-coarse:h-5 pointer-coarse:w-5"
           style={{ top: -27 }}
         />
@@ -1604,6 +1692,7 @@ export const SlideCanvas = forwardRef<
             <Nest frames={frames} k={k}>
               {!crop && picked.map((e) => outline(e, picked.length === 1))}
               {one && handles(one)}
+              {multiFrame()}
               {one && !readOnly && runPill(one)}
               {/* While a line's end is dragged near a part: the middles of its sides, the one it would stick to filled. */}
               {drag?.kind === 'end' &&

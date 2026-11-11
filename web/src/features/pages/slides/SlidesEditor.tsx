@@ -96,6 +96,7 @@ import {
   line,
   lookOf,
   moveSlide,
+  moveSlides,
   onSlide,
   partName,
   pickedOf,
@@ -313,6 +314,8 @@ export function SlidesEditor({
   const [ctx, setCtx] = useState<{ at: ContextMenuAt; kind: 'part' | 'slide' | 'cell' } | null>(null);
   /** Line them up with the slide, also with several parts picked (Arrange → Line them up → Align to the slide). */
   const [alignToSlide, setAlignToSlide] = useState(false);
+  /** Slides picked together in the list (Ctrl or Shift and a click), by their ids: empty when one is. */
+  const [picks, setPicks] = useState<string[]>([]);
   /** A link or a description (alt text) being typed for the parts picked. */
   /** A part being drawn on the slide (Insert → Text box, Shape, Line or arrow): what it is made as; Esc stops. */
   const [drawing, setDrawing] = useState<{ make: () => El; line?: boolean } | null>(null);
@@ -1342,11 +1345,16 @@ export function SlidesEditor({
 
   // A slide made with AI after a slide (Insert and the New slide menu: the one on view; a slide's own menu: that one).
   const aiSlideAfter = onRequest && !readOnly ? (i: number) => openTypes({ kind: 'slide', after: { index: i, title: slideTitle(deck.slides[i]) }, webDeck: isWebDeck(deck), onDone: onRequest }) : null;
+  /** The slides an action on slide `i` is for: the ones picked together when it is one of them, else it alone. */
+  const slidesFor = (i: number) => (picks.length > 1 && picks.includes(deck.slides[i].id) ? deck.slides.flatMap((s, k) => (picks.includes(s.id) ? [k] : [])) : [i]);
   const stripAct = {
     aiAfter: aiSlideAfter ?? undefined,
-    pick: (i: number) => {
+    pick: (i: number, how?: 'toggle' | 'range') => {
       canvas.current?.stopEditing();
       pickedAt.current = performance.now();
+      if (how === 'toggle') setPicks((p) => (p.includes(deck.slides[i].id) ? p.filter((x) => x !== deck.slides[i].id) : [...(p.length ? p : [deck.slides[index].id]), deck.slides[i].id]));
+      else if (how === 'range') setPicks(deck.slides.slice(Math.min(index, i), Math.max(index, i) + 1).map((x) => x.id));
+      else setPicks([]);
       setCur(i);
       setSel([]);
       setView('edit');
@@ -1357,22 +1365,35 @@ export function SlidesEditor({
     },
     add: (after: number, l: LayoutId) => newSlide(l, after),
     duplicate: (i: number) => {
-      const r = duplicateSlides(deck, [i]);
+      const r = duplicateSlides(deck, slidesFor(i));
       change(r.deck);
       setCur(r.at);
+      setPicks([]);
     },
     remove: (i: number) => {
-      change((d) => removeSlides(d, [i]));
-      setCur((c) => Math.max(0, Math.min(c > i ? c - 1 : c, deck.slides.length - 2)));
+      const gone = slidesFor(i);
+      change((d) => removeSlides(d, gone));
+      setCur((c) => Math.max(0, Math.min(c - gone.filter((g) => g < c).length, deck.slides.length - gone.length - 1)));
       setSel([]);
+      setPicks([]);
     },
-    toggleHidden: (i: number) => change((d) => setSlide(d, i, (s) => ({ ...s, hidden: !s.hidden || undefined }))),
+    toggleHidden: (i: number) => {
+      const list = slidesFor(i);
+      const hide = !list.every((k) => deck.slides[k].hidden);
+      change((d) => list.reduce((x, k) => setSlide(x, k, (s) => ({ ...s, hidden: hide || undefined })), d));
+    },
+    moveTogether: (ids: string[], over: string) => {
+      const next = moveSlides(deck, ids, over);
+      change(next);
+      setCur(next.slides.findIndex((s) => s.id === deck.slides[index].id));
+    },
     /** The rows of a slide's menu: the Slide menu's words, for the slide right-clicked. */
     menu: (i: number, layouts: () => void): MenuEntry[] => {
       const ro = readOnly;
+      const list = slidesFor(i);
       const copySlide = () => {
-        void writeSystem(copied({ slides: { from: deck, picks: [i] } }, slideWords([deck.slides[i]])));
-        toast('Copied', 'ok');
+        void writeSystem(copied({ slides: { from: deck, picks: list } }, slideWords(list.map((k) => deck.slides[k]))));
+        toast(list.length === 1 ? 'Copied' : `${list.length} slides copied`, 'ok');
       };
       return [
         { label: 'New slide', icon: <Plus size={14} />, disabled: ro, run: layouts },
@@ -1384,9 +1405,9 @@ export function SlidesEditor({
         { label: 'Paste after it', icon: <Clipboard size={14} />, disabled: ro || !getClip()?.slides, run: () => pasteSlides(i) },
         { label: 'Delete slide', icon: <Trash2 size={14} />, danger: true, disabled: ro, run: () => stripAct.remove(i) },
         '-',
-        { label: 'Skip this slide', checked: !!deck.slides[i].hidden, also: 'hide hidden', disabled: ro, run: () => stripAct.toggleHidden(i) },
-        { label: 'Move up', icon: <ChevronUp size={14} />, disabled: ro || i === 0, run: () => stripAct.move(i, i - 1) },
-        { label: 'Move down', icon: <ChevronDown size={14} />, disabled: ro || i === deck.slides.length - 1, run: () => stripAct.move(i, i + 1) },
+        { label: 'Skip this slide', checked: list.every((k) => !!deck.slides[k].hidden), also: 'hide hidden', disabled: ro, run: () => stripAct.toggleHidden(i) },
+        { label: 'Move up', icon: <ChevronUp size={14} />, disabled: ro || list[0] === 0, run: () => stripAct.moveTogether(list.map((k) => deck.slides[k].id), deck.slides[list[0] - 1].id) },
+        { label: 'Move down', icon: <ChevronDown size={14} />, disabled: ro || list[list.length - 1] === deck.slides.length - 1, run: () => stripAct.moveTogether(list.map((k) => deck.slides[k].id), deck.slides[list[list.length - 1] + 1].id) },
         '-',
         { label: 'Background…', disabled: ro, also: 'slide background colour picture', run: () => (stripAct.pick(i), openPanel('slide')) },
         { label: 'Transition…', disabled: ro, also: 'transition morph fade push', run: () => (stripAct.pick(i), openPanel('slide')) },
@@ -1952,13 +1973,13 @@ export function SlidesEditor({
       <div className={cx('relative flex min-h-0 flex-1', wide ? 'flex-row' : 'flex-col')}>
         {view === 'grid' ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="grid" />
+            <Strip picks={picks} deck={deck} cur={index} fonts={fonts} act={stripAct} layout="grid" />
           </div>
         ) : (
           <>
             {wide && (
               <div className="w-[190px] shrink-0 overflow-y-auto border-r border-line bg-panel">
-                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="side" live={!!mark && mark.slide === index} />
+                <Strip picks={picks} deck={deck} cur={index} fonts={fonts} act={stripAct} layout="side" live={!!mark && mark.slide === index} />
                 {!readOnly && (
                   <button type="button" onClick={() => newSlide('content', deck.slides.length - 1)} className="mx-auto mb-4 flex h-8 items-center gap-1 rounded-lg px-2.5 text-[12.5px] text-fg-3 hover:bg-bg-2 hover:text-fg">
                     <Plus size={13} />A slide
@@ -1969,7 +1990,7 @@ export function SlidesEditor({
             {canvasArea}
             {!wide && (
               <div className="shrink-0 border-t border-line bg-panel">
-                <Strip deck={deck} cur={index} fonts={fonts} act={stripAct} layout="bottom" live={!!mark && mark.slide === index} />
+                <Strip picks={picks} deck={deck} cur={index} fonts={fonts} act={stripAct} layout="bottom" live={!!mark && mark.slide === index} />
               </div>
             )}
             {!readOnlyProp && (
