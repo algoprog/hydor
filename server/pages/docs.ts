@@ -58,7 +58,7 @@ import { FONTS, googleFamilies } from '../../shared/slides.ts';
 import { docRefs, type Refs } from '../../shared/doc-refs.ts';
 import { bookmarkName, citationOf, sourcesFromXml, watermarkOf } from './docx-parts.ts';
 import { paginateDoc } from '../../shared/doc-paginate.ts';
-import { citeItems, citeOf, cleanSources, COLUMN_GAP, defaultNumFmt, notesHtml, PAPER_SIZES, paperOf, styleOf, type NumFmt, type PaperSize, type Source } from '../../shared/docs.ts';
+import { citeItems, citeOf, cleanSources, COLUMN_GAP, defaultNumFmt, marginsText, notesHtml, pageMargins, PAPER_SIZES, paperOf, styleOf, textWidthMm, withMargins, type NumFmt, type PaperSize, type Source } from '../../shared/docs.ts';
 
 /** Word's names for how a list counts, as this app's. */
 const WORD_NUM_FMT: Record<string, NumFmt> = { decimal: 'decimal', lowerLetter: 'lower-alpha', lowerRoman: 'lower-roman', upperLetter: 'upper-alpha', upperRoman: 'upper-roman' };
@@ -130,7 +130,11 @@ export async function agentDoc(db: DB, input: unknown, cwd: string, prev?: strin
       base = readDoc(prev);
     } catch {}
   }
-  const page = { ...(base?.page ?? {}), ...(typeof v.page === 'string' ? { size: v.page } : v.page && typeof v.page === 'object' ? (v.page as object) : {}) };
+  const page: Record<string, unknown> = { ...(base?.page ?? {}), ...(typeof v.page === 'string' ? { size: v.page } : v.page && typeof v.page === 'object' ? (v.page as object) : {}) };
+  // A margin sent is every side's (the sides' own margins it had go); sides sent alone change those sides, the others as they were.
+  const sent = v.page && typeof v.page === 'object' ? (v.page as Record<string, unknown>) : {};
+  if ('margin' in sent && !('margins' in sent)) delete page.margins;
+  else if (!('margin' in sent) && sent.margins && typeof sent.margins === 'object' && base) page.margins = { ...pageMargins(base.page), ...(sent.margins as object) };
   const notes: string[] = [];
   // Its header, footer and title page as they were, unless they are said; its comments as they were, answered,
   // resolved or added to as `comments` says.
@@ -356,20 +360,20 @@ const PX_MM = 96 / 25.4;
 /** How the sheets of paper sit on the page around them, for each way the page shows. */
 function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
   const paper = paperOf(doc.page);
-  const m = doc.page.margin;
+  const m = pageMargins(doc.page);
   const w = Math.round(paper.w * PX_MM);
   const base = [
     'html,body{margin:0;padding:0}',
     'body{background:var(--n-bg,#eceae6);-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
     'html[data-n-theme=dark] body{background:#000000}',
     '.nd-doc{padding:24px 16px 32px;box-sizing:border-box}',
-    `.nd-sheet{box-sizing:border-box;background:${doc.page.color ?? '#fff'};width:${paper.w}mm;max-width:none;margin:0 auto 20px;padding:${m}mm;` +
+    `.nd-sheet{box-sizing:border-box;background:${doc.page.color ?? '#fff'};width:${paper.w}mm;max-width:none;margin:0 auto 20px;padding:${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm;` +
       'box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 30px rgba(0,0,0,.07);border-radius:2px}',
     '.nd-sheet:last-child{margin-bottom:0}',
     // The header and footer on each sheet's margins (in print, on every page's, below).
     '.nd-sheet{position:relative}',
-    `.nd-band{position:absolute;left:${m}mm;right:${m}mm;height:${m}mm;display:flex;align-items:center;font-family:${fontCss(doc.font)};font-size:${bandPt(doc)}pt;color:#5f6368;white-space:pre;overflow:hidden}`,
-    '.nd-band.nd-head{top:0}.nd-band.nd-foot{bottom:0}.nd-band.nd-center{justify-content:center}.nd-band.nd-right{justify-content:flex-end}',
+    `.nd-band{position:absolute;left:${m.left}mm;right:${m.right}mm;display:flex;align-items:center;font-family:${fontCss(doc.font)};font-size:${bandPt(doc)}pt;color:#5f6368;white-space:pre;overflow:hidden}`,
+    `.nd-band.nd-head{top:0;height:${m.top}mm}.nd-band.nd-foot{bottom:0;height:${m.bottom}mm}.nd-band.nd-center{justify-content:center}.nd-band.nd-right{justify-content:flex-end}`,
     // A sheet's first block starts at the top of its words, as the editor's does, its header and footer before it or not.
     '.nd-sheet>.nd-band+.nd-b,.nd-sheet>.nd-band+.nd-band+.nd-b{margin-top:0}',
     // Words in columns; the footnotes at the end, under a short line; the watermark across the middle of each sheet.
@@ -404,8 +408,9 @@ function pageCss(doc: Doc, mode: 'viewer' | 'print' | 'still'): string {
 
 /** How the document prints: its paper and margins, its header and footer on every page, its sheets as pages, what belongs together kept together. */
 function printCss(doc: Doc): string {
+  const m = pageMargins(doc.page);
   return [
-    `@page{size:${{ a4: 'A4', letter: 'letter', legal: 'legal', a3: 'A3', a5: 'A5' }[doc.page.size] ?? 'A4'}${doc.page.orient === 'landscape' ? ' landscape' : ''};margin:${doc.page.margin}mm;${marginBoxes(doc)}}`,
+    `@page{size:${{ a4: 'A4', letter: 'letter', legal: 'legal', a3: 'A3', a5: 'A5' }[doc.page.size] ?? 'A4'}${doc.page.orient === 'landscape' ? ' landscape' : ''};margin:${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm;${marginBoxes(doc)}}`,
     doc.titlePage ? '@page:first{@top-left{content:none}@top-center{content:none}@top-right{content:none}@bottom-left{content:none}@bottom-center{content:none}@bottom-right{content:none}}' : '',
     '.nd-band{display:none}',
     `html,body{background:${doc.page.color ?? '#fff'}!important}`,
@@ -519,7 +524,8 @@ const PAGINATE_SRC = scriptSafe(paginateDoc.toString());
 /** What the editor's Print lays out a document's pages with (its frame runs no script of the page's own). */
 export function paginateOptions(doc: Doc) {
   const px = (mm: number) => Math.round(mm * PX_MM * 100) / 100;
-  return { w: px(paperOf(doc.page).w - 2 * doc.page.margin), h: px(paperOf(doc.page).h - 2 * doc.page.margin) - 1, cols: doc.page.cols ?? 1, gap: px(COLUMN_GAP), sep: 16 };
+  const m = pageMargins(doc.page);
+  return { w: px(textWidthMm(doc.page)), h: px(paperOf(doc.page).h - m.top - m.bottom) - 1, cols: doc.page.cols ?? 1, gap: px(COLUMN_GAP), sep: 16 };
 }
 
 /** What get_page tells an agent of a document: its outline, then the document as Markdown, and how to change it. */
@@ -546,7 +552,7 @@ export function docForAgent(text: string): string {
     .map(([k, x]) => `${k} ${JSON.stringify(x)}`)
     .join('; ');
   return [
-    `A document of about ${docWords(doc)} words, ${doc.blocks.length} block${doc.blocks.length === 1 ? '' : 's'} (${paper} paper, ${doc.page.margin} mm margins; ${doc.font} ${doc.size} pt${setup ? `; ${setup}` : ''}).${bands ? ` ${bands}` : ''}${styles ? ` Its paragraph styles' own looks: ${styles}.` : ''}`,
+    `A document of about ${docWords(doc)} words, ${doc.blocks.length} block${doc.blocks.length === 1 ? '' : 's'} (${paper} paper, ${marginsText(doc.page)}; ${doc.font} ${doc.size} pt${setup ? `; ${setup}` : ''}).${bands ? ` ${bands}` : ''}${styles ? ` Its paragraph styles' own looks: ${styles}.` : ''}`,
     '',
     'Outline:',
     docOutline(doc),
@@ -625,7 +631,7 @@ function commentsForAgent(doc: Doc): string[] {
 // ---- Word ---------------------------------------------------------------------------------------------------------
 
 const JC: Record<string, 'center' | 'right' | 'justify' | undefined> = { center: 'center', right: 'right', justify: 'justify' };
-const PX_PER_TEXT = (doc: Doc) => (PAPERS[doc.page.size].w - 2 * doc.page.margin) * PX_MM;
+const PX_PER_TEXT = (doc: Doc) => textWidthMm(doc.page) * PX_MM;
 
 /** A suggestion's tracked change for Word: what it is, who made it (by name), when. */
 const revOf = (sgs: Map<string, Suggestion>, id: string | undefined, kind: 'ins' | 'del'): DocRev | undefined => {
@@ -895,6 +901,7 @@ export function docxOfDoc(db: DB, doc: Doc, title: string, picture?: (src: strin
     title,
     paper: doc.page.size,
     margin: doc.page.margin,
+    margins: pageMargins(doc.page),
     look,
     titled: false,
     header: doc.header,
@@ -1821,9 +1828,14 @@ function wordDoc(buf: Buffer): Doc {
   const ph = Number(att(kid(sect, 'pgSz'), 'h')) || 16838;
   // The paper whose size is nearest (within a few millimetres), else A4.
   const paperSize: PaperSize = (PAPER_SIZES.find((k) => Math.abs(Math.min(pw, ph) - PAPER_TWIPS[k].w) < 400 && Math.abs(Math.max(pw, ph) - PAPER_TWIPS[k].h) < 400) ?? 'a4') as PaperSize;
-  const left = Number(att(kid(sect, 'pgMar'), 'left')) || 1440;
-  const right = Number(att(kid(sect, 'pgMar'), 'right')) || left;
-  const margin = Math.round(((left + right) / 2 / 56.6929) * 10) / 10;
+  // Each side's margin, as the file gives it (in millimetres, kept to a tenth: one for all four when they are the same).
+  const pgMar = kid(sect, 'pgMar');
+  const left = Number(att(pgMar, 'left')) || 1440;
+  const right = Number(att(pgMar, 'right')) || left;
+  const top = Math.abs(Number(att(pgMar, 'top'))) || 1440;
+  const bottom = Math.abs(Number(att(pgMar, 'bottom'))) || top;
+  const mmOfTw = (tw: number) => Math.round((tw / 56.6929) * 10) / 10;
+  const sides = withMargins({ size: 'a4', margin: mmOfTw(left) }, { top: mmOfTw(top), bottom: mmOfTw(bottom), left: mmOfTw(left), right: mmOfTw(right) });
 
   // The document's font and size: its defaults', or its Normal style's.
   const defaults = all(sroot, 'rPrDefault')[0];
@@ -1889,7 +1901,7 @@ function wordDoc(buf: Buffer): Doc {
   }
   const notes = [...ctx.notes].map(([id, runs]) => ({ id, runs }));
   const doc = normalizeDoc({
-    page: { size: paperSize, margin, ...(orient ? { orient } : {}), ...(ncols > 1 ? { cols: Math.min(3, ncols) } : {}), ...(color ? { color } : {}) },
+    page: { size: paperSize, margin: sides.margin, ...(sides.margins ? { margins: sides.margins } : {}), ...(orient ? { orient } : {}), ...(ncols > 1 ? { cols: Math.min(3, ncols) } : {}), ...(color ? { color } : {}) },
     font,
     size: ctx.size,
     blocks: out,
@@ -2145,7 +2157,7 @@ const DOC_HELP = [
   'Braces at the end of a paragraph or heading say what Markdown cannot: {.title} makes it the document’s title, {.subtitle} its subtitle, {.center}, {.right} or {.justify} aligns it, {indent=1} indents it a step. Colours, sizes and fonts: <span style="color:#c5221f; background-color:#fde68a; font-size:14pt; font-family:Georgia">words</span>.',
   'Pictures: ![what it shows](src "its caption"){width=50% .left} on a line of their own (centred, the text’s width, unless said); src is a file of this session (a picture you made), a public https address, or a picture the document has already (naget-asset:…).',
   'Instead of markdown you may give blocks: [{"title": "…"}, {"h1": "…"}, {"p": "…"}, {"bullet": "…", "lvl": 1}, {"number": "…"}, {"check": "…", "checked": true}, {"bullets": ["…", ["a level deeper"]]}, {"quote": "…"}, {"code": "…"}, {"table": [["Head", "Head"], ["a", "b"]], "head": true}, {"image": "src", "caption": "…", "width": 0.5}, {"hr": true}, {"pagebreak": true}]; their words are markdown too.',
-  'page: {"size": "a4", "letter", "legal", "a3" or "a5", "margin": millimetres, "orient": "landscape" (portrait unless said), "cols": 2 or 3 (columns of words on every page), "color": "#fef7e0" (the paper’s colour)} (A4 and 25.4 mm unless said); watermark: "DRAFT" (words across every page, faint) or {"src": a picture}, "" for none; styles: the paragraph styles’ own looks, {"h1": {"font": "Georgia", "size": 20, "color": "#1a73e8", "bold": true, "italic": false, "line": 1.15, "before": 18, "after": 6, "align": "center"}, "normal": {…}, "title": …, "subtitle", "h2"–"h4", "quote", "code", "callout"} (sizes and spaces in points, lines in lines), as Format → Paragraph styles sets them; font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
+  'page: {"size": "a4", "letter", "legal", "a3" or "a5", "margin": millimetres (every side), "margins": {"top", "bottom", "left", "right": millimetres} (sides of their own), "orient": "landscape" (portrait unless said), "cols": 2 or 3 (columns of words on every page), "color": "#fef7e0" (the paper’s colour)} (A4 and 25.4 mm unless said); watermark: "DRAFT" (words across every page, faint) or {"src": a picture}, "" for none; styles: the paragraph styles’ own looks, {"h1": {"font": "Georgia", "size": 20, "color": "#1a73e8", "bold": true, "italic": false, "line": 1.15, "before": 18, "after": 6, "align": "center"}, "normal": {…}, "title": …, "subtitle", "h2"–"h4", "quote", "code", "callout"} (sizes and spaces in points, lines in lines), as Format → Paragraph styles sets them; font: the body text’s (Arial unless said; others: Georgia, Times New Roman, Inter, Roboto, Open Sans, Lato, Merriweather, Lora, Source Serif 4…); size: the body text’s in points (11). Headings and the title are sized from it.',
   'More in markdown: > 💡 words {.callout} is a callout, a tinted box with its emoji (tint=#e8f0fe for another tint; GitHub’s > [!NOTE], [!TIP], [!WARNING] work too); {line=1.5 before=12 after=6} at a paragraph’s end sets its line spacing (in lines) and the space before and after it (in points); $$ on lines of their own around LaTeX is an equation, and $x^2$ is maths among words (write a dollar sign as \\$); [TOC] alone on a line is a table of contents, made from the headings and kept up to date. A table with merged or shaded cells is written as HTML: <table><tr><td colspan="2" rowspan="2" style="background-color:#e8f0fe; vertical-align:middle">…</td></tr></table>.',
   'Footnotes: a mark [^1] in the words and, after the document, [^1]: its words (a line that goes on, indented); they are numbered and printed at the foot of their page. Citations: [@key] or [@key1; @key2, p. 4], each key a source in sources (objects {id, kind: article|book|chapter|conference|thesis|report|web|other, title, authors: [{family, given}] or "Family, Given and …", year, in: the journal, book or site, volume, issue, pages, publisher, doi, url}, or BibTeX entries in bibtex), written in the citation style cite: apa (unless said), mla, chicago or ieee; [BIBLIOGRAPHY] alone on a line lists the sources cited, kept up to date (put a heading such as # References before it). Sources sent are added to those the document has (by key).',
   'Numbered captions and cross-references: a picture’s caption numbered as a figure with {label=Figure} after it (![…](src "Its caption"){label=Figure}); a table’s with a line Table: its caption {label=Table} before it; an equation’s with $$ … $$ {label=Equation}. Give what you refer to an id with {#id} (on a heading, a picture, a Table: line, an equation, a paragraph) and refer to it with <ref to="id"/>, which shows “Figure 2”, “Table 1”, “Equation 3” or the heading’s words; [words](#id) links to it; {bookmark="Name"} at a paragraph’s end makes it a bookmark of the document.',
@@ -2167,7 +2179,7 @@ export const SAVE_DOC_SCHEMA = {
     title: { type: 'string', description: 'The document’s name in the Library: "Offer letter".' },
     markdown: { type: 'string', description: 'The whole document, in Markdown (as above).' },
     blocks: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'object' }] }, description: 'Instead of markdown: the document’s blocks, in order.' },
-    page: { description: '{"size": "a4" | "letter" | "legal" | "a3" | "a5", "margin": mm, "orient"?: "landscape", "cols"?: 2 | 3, "color"?: "#rrggbb"}, or just the paper\'s name.', anyOf: [{ type: 'string' }, { type: 'object' }] },
+    page: { description: '{"size": "a4" | "letter" | "legal" | "a3" | "a5", "margin": mm (every side), "margins"?: {"top", "bottom", "left", "right": mm} (sides of their own), "orient"?: "landscape", "cols"?: 2 | 3, "color"?: "#rrggbb"}, or just the paper\'s name.', anyOf: [{ type: 'string' }, { type: 'object' }] },
     sources: { type: 'array', items: { anyOf: [{ type: 'object' }, { type: 'string' }] }, description: 'Sources to cite as [@key]: {"id": "smith2020", "kind": "article", "title": "…", "authors": [{"family": "Smith", "given": "Jo"}], "year": "2020", "in": "Nature", "volume", "issue", "pages", "publisher", "doi", "url"}, or BibTeX entries. Added to the document’s (by key).' },
     bibtex: { type: 'string', description: 'Instead of sources: BibTeX entries to cite as [@key].' },
     cite: { type: 'string', enum: ['apa', 'mla', 'chicago', 'ieee'], description: 'The citation style (APA unless said).' },

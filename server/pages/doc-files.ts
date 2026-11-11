@@ -24,6 +24,7 @@ import {
   MONO,
   MONO_FONT,
   normalizeDoc,
+  pageMargins,
   paperOf,
   runsHtml,
   runsText,
@@ -752,7 +753,7 @@ export function odtOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string
   };
   const textW = columnMm(d.page);
   const paper = paperOf(d.page);
-  const textH = paper.h - 2 * d.page.margin;
+  const textH = paper.h - pageMargins(d.page).top - pageMargins(d.page).bottom;
   let frames = 0;
   const imageXml = (b: ImageBlock) => {
     const p = picFor(b.src);
@@ -917,19 +918,19 @@ export function odtOfDoc(db: DB, doc: Doc, title: string, picture?: (src: string
   ];
 
   // The page: its paper, margins, columns and colour; the header and footer in its top and bottom margins.
-  const m = d.page.margin;
-  const band = (b: Band | undefined) => {
+  const m = pageMargins(d.page);
+  const band = (b: Band | undefined, side: number) => {
     if (!b) return { h: 0, gap: 0 };
     const h = bandPt * 1.25 * PT_MM;
-    return { h, gap: Math.min(5, m / 4) };
+    return { h, gap: Math.min(5, side / 4) };
   };
-  const hd = band(d.header);
-  const ft = band(d.footer);
-  const top = Math.max(4, m - hd.h - hd.gap);
-  const bottom = Math.max(4, m - ft.h - ft.gap);
+  const hd = band(d.header, m.top);
+  const ft = band(d.footer, m.bottom);
+  const top = Math.max(4, m.top - hd.h - hd.gap);
+  const bottom = Math.max(4, m.bottom - ft.h - ft.gap);
   const cols = d.page.cols && d.page.cols > 1 ? `<style:columns fo:column-count="${d.page.cols}" fo:column-gap="${mm(COLUMN_GAP)}"/>` : '';
   const layout = (name: string, bands: boolean) =>
-    `<style:page-layout style:name="${name}"><style:page-layout-properties fo:page-width="${mm(paper.w)}" fo:page-height="${mm(paper.h)}" style:num-format="1" style:print-orientation="${d.page.orient === 'landscape' ? 'landscape' : 'portrait'}" fo:margin-top="${mm(bands && d.header ? top : m)}" fo:margin-bottom="${mm(bands && d.footer ? bottom : m)}" fo:margin-left="${mm(m)}" fo:margin-right="${mm(m)}"${d.page.color ? ` fo:background-color="${d.page.color}"` : ''} style:writing-mode="lr-tb">${cols}<style:footnote-sep style:width="0.5pt" style:distance-before-sep="1mm" style:distance-after-sep="1mm" style:line-style="solid" style:adjustment="left" style:rel-width="33%" style:color="#c8ccd1"/></style:page-layout-properties>` +
+    `<style:page-layout style:name="${name}"><style:page-layout-properties fo:page-width="${mm(paper.w)}" fo:page-height="${mm(paper.h)}" style:num-format="1" style:print-orientation="${d.page.orient === 'landscape' ? 'landscape' : 'portrait'}" fo:margin-top="${mm(bands && d.header ? top : m.top)}" fo:margin-bottom="${mm(bands && d.footer ? bottom : m.bottom)}" fo:margin-left="${mm(m.left)}" fo:margin-right="${mm(m.right)}"${d.page.color ? ` fo:background-color="${d.page.color}"` : ''} style:writing-mode="lr-tb">${cols}<style:footnote-sep style:width="0.5pt" style:distance-before-sep="1mm" style:distance-after-sep="1mm" style:line-style="solid" style:adjustment="left" style:rel-width="33%" style:color="#c8ccd1"/></style:page-layout-properties>` +
     `<style:header-style>${bands && d.header ? `<style:header-footer-properties fo:min-height="${mm(hd.h)}" fo:margin-bottom="${mm(hd.gap)}"/>` : ''}</style:header-style>` +
     `<style:footer-style>${bands && d.footer ? `<style:header-footer-properties fo:min-height="${mm(ft.h)}" fo:margin-top="${mm(ft.gap)}"/>` : ''}</style:footer-style></style:page-layout>`;
   const bandAuto: string[] = [];
