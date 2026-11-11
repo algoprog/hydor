@@ -1304,17 +1304,21 @@ function colSpan(k: string): [number, number] | null {
   return a < 0 || b < 0 ? null : [Math.min(a, b), Math.min(SHEET_LIMITS.cols - 1, Math.max(a, b))];
 }
 
+/**
+ * Rows and columns that stay in view: any number the sheet holds (Freeze up to here may be far down). The editor draws no
+ * more of them than fit in its window, so there is always room left to scroll.
+ */
 function freezeOf(v: unknown): { rows?: number; cols?: number } | undefined {
   let rows: number | undefined;
   let cols: number | undefined;
   if (v === true) rows = 1;
-  else if (typeof v === 'number') rows = intIn(v, 0, 50);
+  else if (typeof v === 'number') rows = intIn(v, 0, SHEET_LIMITS.rows);
   else if (typeof v === 'string') {
     const p = parseRef(v);
-    if (p) [rows, cols] = [Math.min(50, p.r), Math.min(20, p.c)];
+    if (p) [rows, cols] = [Math.min(SHEET_LIMITS.rows, p.r), Math.min(SHEET_LIMITS.cols, p.c)];
   } else if (isObj(v)) {
-    rows = intIn(v.rows ?? v.row ?? v.r, 0, 50);
-    cols = intIn(v.cols ?? v.columns ?? v.col ?? v.c, 0, 20);
+    rows = intIn(v.rows ?? v.row ?? v.r, 0, SHEET_LIMITS.rows);
+    cols = intIn(v.cols ?? v.columns ?? v.col ?? v.c, 0, SHEET_LIMITS.cols);
   }
   const out: { rows?: number; cols?: number } = {};
   if (rows) out.rows = rows;
@@ -3044,8 +3048,8 @@ export function adjustForInsert(book: Workbook, sheetId: string, axis: 'row' | '
       const next = withSizes({ ...s, cells }, row ? s.cols : moveSizes(s.cols, shift, SHEET_LIMITS.cols), row ? moveSizes(s.rows, shift, SHEET_LIMITS.rows) : s.rows);
       if (s.freeze) {
         const fz = { ...s.freeze };
-        if (row && fz.rows && at < fz.rows) fz.rows = Math.min(50, fz.rows + count);
-        if (!row && fz.cols && at < fz.cols) fz.cols = Math.min(20, fz.cols + count);
+        if (row && fz.rows && at < fz.rows) fz.rows = Math.min(SHEET_LIMITS.rows, fz.rows + count);
+        if (!row && fz.cols && at < fz.cols) fz.cols = Math.min(SHEET_LIMITS.cols, fz.cols + count);
         next.freeze = fz;
       }
       return next;

@@ -11,7 +11,7 @@
 // Changes stay unsaved until Save (Ctrl+S), as a page's do; Undo and Redo step through them. While an agent writes a
 // new version (live.ts), it shows as it comes, read-only, the cell its words arrive in boxed and kept in view.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye, MessageCircleQuestionMark, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BetweenHorizontalStart, BetweenVerticalStart, ClipboardPaste, Copy, Eraser, EyeOff, ListTree, Maximize2, MessageSquarePlus, Scissors, Sparkles, StickyNote, Trash2, ArrowDownAZ, ArrowDownZA, Eye, MessageCircleQuestionMark, RefreshCw } from 'lucide-react';
 import { newCommentId } from '@shared/comments';
 import {
   cleanBorder,
@@ -32,6 +32,7 @@ import {
   keyOf,
   MAX_H,
   MAX_W,
+  MIN_H,
   MIN_W,
   newId,
   nowSerial,
@@ -88,7 +89,7 @@ import { Button, cx, MenuBack, MenuItem, MenuSep, Popover, SheetsOnPhone, useCon
 import { CharPicker } from '../common/CharPicker';
 import { FindBar, useFind } from '../common/FindBar';
 import { isMod } from '../common/keys';
-import { MenuBar } from '../common/menus';
+import { ContextMenu, MenuBar, type MenuEntry } from '../common/menus';
 import { useOwnScroll } from '../live';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
@@ -97,7 +98,7 @@ import { ChartLayer, ChartPanel } from './Charts';
 import { CommentsPanel, type SheetCommentAi } from './CommentsPanel';
 import { commentsRequest, sheetWhere } from '@shared/comment-asks';
 import { CondPanel } from './CondPanel';
-import { DupDialog, FormatDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
+import { DupDialog, FormatDialog, SizeDialog, SortDialog, SplitDialog, SummaryDialog, type ColChoice } from './Dialogs';
 import { fillDownTo, fillSeries } from './fill';
 import { FilterMenu } from './FilterMenu';
 import { FormulaBar, formulaHelp } from './FormulaBar';
@@ -290,7 +291,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   const caretRef = useRef(0);
   const [caret, setCaret] = useState(0);
   const [cutMark, setCutMark] = useState<{ sheet: string; x: Rect } | null>(null);
-  const [ctx, setCtx] = useState<{ x: number; y: number; on: 'cell' | 'col' | 'row'; sub?: 'paste' } | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; on: 'cell' | 'col' | 'row'; keyed?: boolean } | null>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [confirm, confirmNode] = useConfirm();
@@ -968,22 +969,27 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   };
 
   // ---- sizes, freezing, zoom --------------------------------------------------------------------------------------------------
-  const setSize = (axis: 'col' | 'row', i: number, sz: number | null) => {
+  /** Several columns' (or rows') sizes set in one step (null: back to the default size). */
+  const setSizes = (axis: 'col' | 'row', sizes: [number, number | null][]) => {
     if (!sheet) return;
     const key = axis === 'col' ? 'cols' : 'rows';
     const next: Record<number, { w?: number; h?: number; hidden?: boolean }> = { ...(sheet[key] ?? {}) };
-    const cur = { ...(next[i] ?? {}) };
-    if (sz === null || sz === (axis === 'col' ? COL_W : ROW_H)) delete cur[axis === 'col' ? 'w' : 'h'];
-    else cur[axis === 'col' ? 'w' : 'h'] = sz;
-    if (Object.keys(cur).length) next[i] = cur;
-    else delete next[i];
+    for (const [i, sz] of sizes) {
+      const cur = { ...(next[i] ?? {}) };
+      if (sz === null || sz === (axis === 'col' ? COL_W : ROW_H)) delete cur[axis === 'col' ? 'w' : 'h'];
+      else cur[axis === 'col' ? 'w' : 'h'] = sz;
+      if (Object.keys(cur).length) next[i] = cur;
+      else delete next[i];
+    }
     change(metaPatch(sheet, { [key]: Object.keys(next).length ? next : undefined }));
   };
-  const fit = (axis: 'col' | 'row', i: number) => {
-    if (!sheet || !calc) return;
+  const setSize = (axis: 'col' | 'row', i: number, sz: number | null) => setSizes(axis, [[i, sz]]);
+  /** The size that fits what a column (or row) holds, or null for the default. */
+  const fitSize = (axis: 'col' | 'row', i: number): number | null => {
+    if (!sheet || !calc) return null;
     if (axis === 'row') {
       const hgt = neededHeight(i);
-      return setSize('row', i, hgt <= ROW_H ? null : Math.min(MAX_H, hgt));
+      return hgt <= ROW_H ? null : Math.min(MAX_H, hgt);
     }
     let most = 0;
     for (const [k, r] of cellsIn(sheet, calc, sheetIx, { r1: 0, c1: i, r2: size.rows - 1, c2: i })) {
@@ -991,7 +997,31 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       if (!holds(cell)) continue;
       most = Math.max(most, textWidth(formatValue(calc.value(sheetIx, r, i), cell.s), cell.s) + 14);
     }
-    setSize('col', i, most ? Math.max(MIN_W + 16, Math.min(MAX_W, Math.ceil(most))) : null);
+    return most ? Math.max(MIN_W + 16, Math.min(MAX_W, Math.ceil(most))) : null;
+  };
+  const fit = (axis: 'col' | 'row', i: number) => setSize(axis, i, fitSize(axis, i));
+  /** The columns (or rows) picked: the whole ones a header was clicked on, else those the cells picked are in. */
+  const pickedLines = (axis: 'col' | 'row'): number[] => {
+    const [a, b] = axis === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    return Array.from({ length: b - a + 1 }, (_, k) => a + k);
+  };
+  const fitSelected = (axis: 'col' | 'row') => setSizes(axis, pickedLines(axis).map((i) => [i, fitSize(axis, i)]));
+  /** Resize column… and Resize row…: the exact size asked for in a dialog, for each one picked. */
+  const [sizeAsk, setSizeAsk] = useState<{ axis: 'col' | 'row'; value: number } | null>(null);
+  const askSize = (axis: 'col' | 'row') => {
+    if (!sheet) return;
+    setSizeAsk({ axis, value: axis === 'col' ? colW(sheet, x.c1) : rowH(sheet, x.r1) });
+  };
+  const sizeSelected = (axis: 'col' | 'row', value: number) => {
+    const sz = Math.max(axis === 'col' ? MIN_W : MIN_H, Math.min(axis === 'col' ? MAX_W : MAX_H, Math.round(value)));
+    setSizes(axis, pickedLines(axis).map((i) => [i, sz]));
+  };
+  /** Move up, Move down, Move left, Move right: the rows (columns) picked go one place over. */
+  const moveStep = (axis: 'row' | 'col', dir: -1 | 1) => {
+    const [a, b] = axis === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    const limit = axis === 'row' ? size.rows : size.cols;
+    if (dir < 0 ? a < 1 : b + 1 >= limit) return;
+    moveLines(axis, a, b - a + 1, dir < 0 ? a - 1 : b + 2);
   };
   const setFreeze = (rows: number, cols: number) => {
     if (!sheet) return;
@@ -2375,7 +2405,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     if ((k === 'ContextMenu' || (k === 'F10' && e.shiftKey)) && root.current) {
       e.preventDefault();
       const b = root.current.getBoundingClientRect();
-      setCtx({ x: b.left + 120, y: b.top + 140, on: 'cell' });
+      setCtx({ x: b.left + 120, y: b.top + 140, on: 'cell', keyed: true });
       return;
     }
     // A key typed on the grid itself (a keyboard with a tablet): typing begins with it.
@@ -2527,6 +2557,69 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
   );
 
   const askNow = onAsk ? () => (setCtx(null), onAsk(leadFor(selRef.current).lead)) : undefined;
+  /** What the right-click menu offers for what was pressed on: cells, a column's letter or a row's number. */
+  const ctxItems = (on: 'cell' | 'col' | 'row'): MenuEntry[] => {
+    const ro = !!readOnly;
+    const done = (f: () => void) => () => (setCtx(null), f());
+    const lines: 'row' | 'col' = on === 'row' ? 'row' : 'col';
+    const [first, last] = lines === 'row' ? [x.r1, x.r2] : [x.c1, x.c2];
+    const frozen = lines === 'row' ? sheet.freeze?.rows : sheet.freeze?.cols;
+    const header: MenuEntry[] =
+      on === 'cell' || ro
+        ? []
+        : [
+            '-',
+            lines === 'row'
+              ? { label: nRows === 1 ? 'Resize row…' : `Resize ${nRows} rows…`, also: 'height size', run: done(() => askSize('row')) }
+              : { label: nCols === 1 ? 'Resize column…' : `Resize ${nCols} columns…`, also: 'width size', run: done(() => askSize('col')) },
+            { label: 'Fit to the data', also: 'auto size best fit', run: done(() => fitSelected(lines)) },
+            lines === 'row'
+              ? { label: `Freeze up to row ${last + 1}`, checked: frozen === last + 1, run: done(() => setFreeze(frozen === last + 1 ? 0 : last + 1, sheet.freeze?.cols ?? 0)) }
+              : { label: `Freeze up to column ${colName(last)}`, checked: frozen === last + 1, run: done(() => setFreeze(sheet.freeze?.rows ?? 0, frozen === last + 1 ? 0 : last + 1)) },
+            { label: lines === 'row' ? 'Group rows' : 'Group columns', icon: <ListTree size={14} />, keys: 'Alt+Shift+Right', run: done(() => group()) },
+            { label: lines === 'row' ? 'Ungroup rows' : 'Ungroup columns', keys: 'Alt+Shift+Left', run: done(() => group(true)) },
+            { label: lines === 'row' ? 'Move up' : 'Move left', icon: lines === 'row' ? <ArrowUp size={14} /> : <ArrowLeft size={14} />, disabled: first < 1, run: done(() => moveStep(lines, -1)) },
+            { label: lines === 'row' ? 'Move down' : 'Move right', icon: lines === 'row' ? <ArrowDown size={14} /> : <ArrowRight size={14} />, disabled: last + 1 >= (lines === 'row' ? size.rows : size.cols), run: done(() => moveStep(lines, 1)) },
+          ];
+    return [
+      !ro && { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', run: done(() => void menuCopy(true)) },
+      { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', run: done(() => void menuCopy(false)) },
+      !ro && { label: 'Paste', icon: <ClipboardPaste size={14} />, keys: 'Ctrl+V', run: done(() => void menuPaste()) },
+      !ro && {
+        label: 'Paste special',
+        icon: <ClipboardPaste size={14} />,
+        items: [
+          { label: 'Values only', keys: 'Ctrl+Shift+V', run: done(() => void pasteHow('values')) },
+          { label: 'Formats only', run: done(() => void pasteHow('formats')) },
+          { label: 'Formulas only', run: done(() => void pasteHow('formulas')) },
+          { label: 'Transposed', run: done(() => void pasteHow('transposed')) },
+        ],
+      },
+      !ro && '-',
+      !ro && on !== 'col' && { label: nRows === 1 ? 'Insert a row above' : `Insert ${nRows} rows above`, icon: <BetweenHorizontalStart size={14} />, run: done(() => insert('row', false)) },
+      !ro && on === 'row' && { label: nRows === 1 ? 'Insert a row below' : `Insert ${nRows} rows below`, icon: <BetweenHorizontalStart size={14} />, run: done(() => insert('row', true)) },
+      !ro && on !== 'row' && { label: nCols === 1 ? 'Insert a column left' : `Insert ${nCols} columns left`, icon: <BetweenVerticalStart size={14} />, run: done(() => insert('col', false)) },
+      !ro && on === 'col' && { label: nCols === 1 ? 'Insert a column right' : `Insert ${nCols} columns right`, icon: <BetweenVerticalStart size={14} />, run: done(() => insert('col', true)) },
+      !ro && on !== 'col' && { label: nRows === 1 ? 'Delete this row' : `Delete ${nRows} rows`, icon: <Trash2 size={14} />, run: done(() => remove('row')) },
+      !ro && on !== 'row' && { label: nCols === 1 ? 'Delete this column' : `Delete ${nCols} columns`, icon: <Trash2 size={14} />, run: done(() => remove('col')) },
+      !ro && on === 'row' && { label: nRows === 1 ? 'Hide this row' : `Hide ${nRows} rows`, icon: <EyeOff size={14} />, run: done(() => hide('row')) },
+      !ro && on === 'col' && { label: nCols === 1 ? 'Hide this column' : `Hide ${nCols} columns`, icon: <EyeOff size={14} />, run: done(() => hide('col')) },
+      !ro && on === 'row' && hasHiddenRows && { label: 'Show all hidden rows', icon: <Eye size={14} />, run: done(() => showAll('row')) },
+      !ro && on === 'col' && hasHiddenCols && { label: 'Show all hidden columns', icon: <Eye size={14} />, run: done(() => showAll('col')) },
+      !ro && on === 'col' && { label: 'Sort A to Z', icon: <ArrowDownAZ size={14} />, run: done(() => sort(true)) },
+      !ro && on === 'col' && { label: 'Sort Z to A', icon: <ArrowDownZA size={14} />, run: done(() => sort(false)) },
+      ...header,
+      !ro && '-',
+      !ro && on === 'cell' && { label: activeNote ? 'Edit note' : 'Insert note', icon: <StickyNote size={14} />, keys: 'Shift+F2', run: done(editNote) },
+      on === 'cell' && { label: 'Comment', icon: <MessageSquarePlus size={14} />, keys: 'Ctrl+Alt+M', run: done(() => openComments(!ro)) },
+      on === 'cell' && !!activeFormula && { label: 'Explain this formula', icon: <MessageCircleQuestionMark size={14} />, run: done(() => setAiPop('explain')) },
+      on === 'cell' && !ro && asksAi(activeFormula || undefined) && { label: 'Refresh the AI answer', icon: <RefreshCw size={14} />, run: done(() => aiCells.refresh([{ sheet: sheet.id, cell: refName(sel.r, sel.c) }])) },
+      on !== 'col' && { label: 'Expand row', icon: <Maximize2 size={14} />, run: done(() => setRowCard(sel.r)) },
+      !ro && { label: 'Clear', icon: <Eraser size={14} />, keys: 'Delete', run: done(() => clear()) },
+      askNow && '-',
+      askNow && { label: 'Ask the agent about it', icon: <Sparkles size={14} />, run: askNow },
+    ];
+  };
   const hasHiddenRows = Object.values(sheet.rows ?? {}).some((v) => v.hidden);
   const hasHiddenCols = Object.values(sheet.cols ?? {}).some((v) => v.hidden);
   const activeNote = !!active?.note;
@@ -3017,144 +3110,8 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
           if (f) void importCsv(f);
         }}
       />
-      {/* The right-click menu, its Paste special list opened in its place. */}
-      <div ref={ctxRef} className="pointer-events-none fixed h-px w-px" style={{ left: ctx?.x ?? -10, top: ctx?.y ?? -10 }} />
-      <Popover anchor={ctxRef} open={!!ctx} onClose={() => setCtx(null)} width={248}>
-        {ctx && (
-          <div onMouseDown={(e) => e.preventDefault()}>
-            {ctx.sub === 'paste' ? (
-              <>
-                <MenuBack onClick={() => setCtx({ ...ctx, sub: undefined })}>Paste special</MenuBack>
-                <MenuItem hint="Ctrl+Shift+V" onClick={() => (setCtx(null), void pasteHow('values'))}>
-                  Values only
-                </MenuItem>
-                <MenuItem onClick={() => (setCtx(null), void pasteHow('formats'))}>Formats only</MenuItem>
-                <MenuItem onClick={() => (setCtx(null), void pasteHow('formulas'))}>Formulas only</MenuItem>
-                <MenuItem onClick={() => (setCtx(null), void pasteHow('transposed'))}>Transposed</MenuItem>
-              </>
-            ) : (
-              <>
-                {!readOnly && (
-                  <MenuItem icon={<Scissors size={14} />} hint="Ctrl+X" onClick={() => (setCtx(null), void menuCopy(true))}>
-                    Cut
-                  </MenuItem>
-                )}
-                <MenuItem icon={<Copy size={14} />} hint="Ctrl+C" onClick={() => (setCtx(null), void menuCopy(false))}>
-                  Copy
-                </MenuItem>
-                {!readOnly && (
-                  <MenuItem icon={<ClipboardPaste size={14} />} hint="Ctrl+V" onClick={() => (setCtx(null), void menuPaste())}>
-                    Paste
-                  </MenuItem>
-                )}
-                {!readOnly && (
-                  <MenuItem icon={<ClipboardPaste size={14} />} submenu onClick={() => setCtx({ ...ctx, sub: 'paste' })}>
-                    Paste special
-                  </MenuItem>
-                )}
-                {!readOnly && <MenuSep />}
-                {!readOnly && ctx.on !== 'col' && (
-                  <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', false))}>
-                    {nRows === 1 ? 'Insert a row above' : `Insert ${nRows} rows above`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'row' && (
-                  <MenuItem icon={<BetweenHorizontalStart size={14} />} onClick={() => (setCtx(null), insert('row', true))}>
-                    {nRows === 1 ? 'Insert a row below' : `Insert ${nRows} rows below`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on !== 'row' && (
-                  <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', false))}>
-                    {nCols === 1 ? 'Insert a column left' : `Insert ${nCols} columns left`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && (
-                  <MenuItem icon={<BetweenVerticalStart size={14} />} onClick={() => (setCtx(null), insert('col', true))}>
-                    {nCols === 1 ? 'Insert a column right' : `Insert ${nCols} columns right`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on !== 'col' && (
-                  <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('row'))}>
-                    {nRows === 1 ? 'Delete this row' : `Delete ${nRows} rows`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on !== 'row' && (
-                  <MenuItem icon={<Trash2 size={14} />} onClick={() => (setCtx(null), remove('col'))}>
-                    {nCols === 1 ? 'Delete this column' : `Delete ${nCols} columns`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'row' && (
-                  <MenuItem icon={<EyeOff size={14} />} onClick={() => (setCtx(null), hide('row'))}>
-                    {nRows === 1 ? 'Hide this row' : `Hide ${nRows} rows`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && (
-                  <MenuItem icon={<EyeOff size={14} />} onClick={() => (setCtx(null), hide('col'))}>
-                    {nCols === 1 ? 'Hide this column' : `Hide ${nCols} columns`}
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'row' && hasHiddenRows && (
-                  <MenuItem icon={<Eye size={14} />} onClick={() => (setCtx(null), showAll('row'))}>
-                    Show all hidden rows
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && hasHiddenCols && (
-                  <MenuItem icon={<Eye size={14} />} onClick={() => (setCtx(null), showAll('col'))}>
-                    Show all hidden columns
-                  </MenuItem>
-                )}
-                {!readOnly && ctx.on === 'col' && (
-                  <>
-                    <MenuItem icon={<ArrowDownAZ size={14} />} onClick={() => (setCtx(null), sort(true))}>
-                      Sort A to Z
-                    </MenuItem>
-                    <MenuItem icon={<ArrowDownZA size={14} />} onClick={() => (setCtx(null), sort(false))}>
-                      Sort Z to A
-                    </MenuItem>
-                  </>
-                )}
-                {!readOnly && <MenuSep />}
-                {!readOnly && ctx.on === 'cell' && (
-                  <MenuItem icon={<StickyNote size={14} />} hint="Shift+F2" onClick={() => (setCtx(null), editNote())}>
-                    {activeNote ? 'Edit note' : 'Insert note'}
-                  </MenuItem>
-                )}
-                {ctx.on === 'cell' && (
-                  <MenuItem icon={<MessageSquarePlus size={14} />} hint="Ctrl+Alt+M" onClick={() => (setCtx(null), openComments(!readOnly))}>
-                    Comment
-                  </MenuItem>
-                )}
-                {ctx.on === 'cell' && activeFormula && (
-                  <MenuItem icon={<MessageCircleQuestionMark size={14} />} onClick={() => (setCtx(null), setAiPop('explain'))}>
-                    Explain this formula
-                  </MenuItem>
-                )}
-                {ctx.on === 'cell' && !readOnly && asksAi(activeFormula || undefined) && (
-                  <MenuItem icon={<RefreshCw size={14} />} onClick={() => (setCtx(null), aiCells.refresh([{ sheet: sheet.id, cell: refName(sel.r, sel.c) }]))}>
-                    Refresh the AI answer
-                  </MenuItem>
-                )}
-                {ctx.on !== 'col' && (
-                  <MenuItem icon={<Maximize2 size={14} />} onClick={() => (setCtx(null), setRowCard(sel.r))}>
-                    Expand row
-                  </MenuItem>
-                )}
-                {!readOnly && (
-                  <MenuItem icon={<Eraser size={14} />} hint="Delete" onClick={() => (setCtx(null), clear())}>
-                    Clear
-                  </MenuItem>
-                )}
-                {askNow && <MenuSep />}
-                {askNow && (
-                  <MenuItem icon={<Sparkles size={14} />} onClick={askNow}>
-                    Ask the agent about it
-                  </MenuItem>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </Popover>
+      {/* The right-click menu: the menus' own actions, built here for what was pressed on (cells, a column's letter, a row's number). */}
+      <ContextMenu at={ctx} items={ctx ? ctxItems(ctx.on) : []} onClose={() => setCtx(null)} />
       {/* A cell's own pickers: a list, a calendar, its note, a character to put in. */}
       <div ref={pickRef} className="pointer-events-none fixed" style={pick ? { left: pick.at.left, top: pick.at.top, width: pick.at.width, height: pick.at.height } : { left: -10, top: -10, width: 1, height: 1 }} />
       <Popover
@@ -3295,6 +3252,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dialog === 'sort' && toolBlock && <SortDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onSort={sortRangeBy} onClose={() => setDialog(null)} />}
       {dialog === 'dups' && toolBlock && <DupDialog cols={colChoices(toolBlock, header)} header={header} onHeader={setHeader} onRemove={removeDups} onClose={() => setDialog(null)} />}
       {dialog === 'summary' && toolBlock && <SummaryDialog cols={colChoices(toolBlock, true)} onMake={summarize} onClose={() => setDialog(null)} />}
+      {sizeAsk && <SizeDialog axis={sizeAsk.axis} count={sizeAsk.axis === 'col' ? nCols : nRows} value={sizeAsk.value} onApply={(px) => sizeSelected(sizeAsk.axis, px)} onClose={() => (setSizeAsk(null), grid.current?.focus())} />}
       {dialog === 'split' && <SplitDialog guess={splitGuess()} onSplit={(sp) => void splitText(sp)} onClose={() => setDialog(null)} />}
       {dialog === 'format' && <FormatDialog code={active?.s?.code ?? ''} sample={calc.value(sheetIx, sel.r, sel.c)} style={active?.s} onApply={(c) => setCode(c)} onClose={() => setDialog(null)} />}
       <ShortcutsDialog open={dialog === 'shortcuts'} onClose={() => setDialog(null)} groups={shortcutGroups} />

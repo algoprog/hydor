@@ -1,10 +1,10 @@
 // The spreadsheet editor's dialogs: Sort range (by several columns in turn, with a header row or not), Remove
 // duplicates (by the columns chosen), Split text to columns (by a separator found or chosen), Summarize by (a table's
-// summary as a sheet of formulas, as a pivot table gives one), and Custom number format (an Excel code, with a
-// preview of the cell picked and codes to start from).
+// summary as a sheet of formulas, as a pivot table gives one), Custom number format (an Excel code, with a
+// preview of the cell picked and codes to start from), Find's helpers, and Resize column / row (an exact size).
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { formatValue, type CellStyle, type Scalar } from '@shared/sheets';
+import { formatValue, MAX_H, MAX_W, MIN_H, MIN_W, type CellStyle, type Scalar } from '@shared/sheets';
 import type { SummaryFn } from './tools';
 import { Button, cx, Dialog, IconButton, Segmented } from '../../../components/ui';
 import { smallInput } from './Panel';
@@ -330,6 +330,56 @@ export function SummaryDialog({ cols, onMake, onClose }: { cols: ColChoice[]; on
         </Button>
       )}
       {across !== null && <p className="mt-2 text-[12px] text-fg-3">With columns too, the first value is summed up for each pair.</p>}
+    </Dialog>
+  );
+}
+
+/** Resize column… and Resize row…: an exact width or height in pixels, for each column or row picked. */
+export function SizeDialog({ axis, count, value, onApply, onClose }: { axis: 'col' | 'row'; count: number; value: number; onApply: (px: number) => void; onClose: () => void }) {
+  const [text, setText] = useState(String(value));
+  const [min, max] = axis === 'col' ? [MIN_W, MAX_W] : [MIN_H, MAX_H];
+  const n = Number(text);
+  const ok = text.trim() !== '' && Number.isFinite(n) && n >= min && n <= max;
+  const go = () => {
+    if (!ok) return;
+    onApply(n);
+    onClose();
+  };
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      width={360}
+      title={axis === 'col' ? (count === 1 ? 'Resize column' : `Resize ${count} columns`) : count === 1 ? 'Resize row' : `Resize ${count} rows`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!ok} onClick={go}>
+            OK
+          </Button>
+        </>
+      }
+    >
+      <label className="flex items-center gap-2 text-[13.5px]">
+        <span className="shrink-0 text-fg-2">{axis === 'col' ? 'Column width' : 'Row height'}</span>
+        <input
+          autoFocus
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          value={text}
+          aria-label={axis === 'col' ? 'Column width in pixels' : 'Row height in pixels'}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => e.key === 'Enter' && go()}
+          className={cx(smallInput, 'w-24')}
+        />
+        <span className="text-fg-3">pixels</span>
+      </label>
+      <p className="mt-2 text-[12.5px] text-fg-3">{`From ${min} to ${max}.`}</p>
     </Dialog>
   );
 }
