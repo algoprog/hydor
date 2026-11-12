@@ -6,7 +6,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ALL_COMMAND_NAMES, commandDef, didYouMean, optionDef, OPTION_TABLE, programOf, UsageError } from './args.ts';
+import { ALL_COMMAND_NAMES, commandDef, describeCommand, didYouMean, optionDef, OPTION_TABLE, programOf, routeOf, UsageError, verbOptions, type Route } from './args.ts';
+import { areaByName, defaultVerb } from './areas/index.ts';
+import { LOADERS, type Candidate, type Loaded } from './areas/loaders.ts';
 import { makePaint, truncate } from './term.ts';
 
 export type Shell = 'bash' | 'zsh' | 'fish';
@@ -29,6 +31,11 @@ _hydor() {
     compopt -o filenames 2>/dev/null
     return 0
   fi
+  if [[ $out == :files ]]; then
+    COMPREPLY=($(compgen -f -- "\${COMP_WORDS[COMP_CWORD]}"))
+    compopt -o filenames 2>/dev/null
+    return 0
+  fi
   [[ -n $out ]] || return 0
   while IFS= read -r line; do COMPREPLY+=("\${line%%$'\\t'*}"); done <<< "$out"
 }
@@ -44,6 +51,10 @@ _hydor() {
   out=$("$words[1]" __complete -- "\${(@)words[2,CURRENT]}" 2>/dev/null)
   if [[ $out == ':dirs' ]]; then
     _files -/
+    return
+  fi
+  if [[ $out == ':files' ]]; then
+    _files
     return
   fi
   for line in "\${(@f)out}"; do
@@ -64,6 +75,8 @@ function __hydor_complete
     set -l out ($words[1] __complete -- $words[2..-1] "$cur" 2>/dev/null)
     if test "$out" = ':dirs'
         __fish_complete_directories "$cur"
+    else if test "$out" = ':files'
+        __fish_complete_path "$cur"
     else
         printf '%s\\n' $out
     end
@@ -165,8 +178,7 @@ function shellMessage(word: string): string {
 
 // ---- the candidates --------------------------------------------------------------------------------------------
 
-/** One candidate: its value and what it is. */
-export type Candidate = [value: string, desc?: string];
+export type { Candidate };
 
 /** Reads the server's API (a GET), or fails: how the candidates that come from the running Hydor are fetched. */
 export type Api = (path: string) => Promise<any>;
@@ -199,12 +211,25 @@ interface Line {
   wants?: string;
   /** Whether the first word is not a command (a message for the chat). */
   message: boolean;
+  /** The area's verb the words name, when the first word is an area. */
+  route: Route | null;
+  /** An option by its long or short name, as this line's command (or area verb) takes it. */
+  find(key: string): { name: string; value: boolean } | undefined;
 }
 
 /** Reads the words before the cursor. */
 function scan(before: string[]): Line {
   const words = before.filter((w, i) => !(w === '=' && i > 0 && before[i - 1].startsWith('--')));
-  const line: Line = { rest: [], opts: new Map(), message: false };
+  const route = routeOf(words);
+  const find = (key: string) => {
+    if (route) {
+      const o = verbOptions(route.area, route.verb).find((x) => x.name === key || (x.short && x.short === key));
+      return o && { name: o.name, value: o.spec ? o.spec.type !== 'boolean' : !!o.def?.value };
+    }
+    const d = optionDef(key);
+    return d && { name: d.name, value: !!d.value };
+  };
+  const line: Line = { rest: [], opts: new Map(), message: false, route, find };
   const pos: string[] = [];
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
@@ -214,7 +239,7 @@ function scan(before: string[]): Line {
     }
     if (w.startsWith('-') && w.length > 1) {
       const eq = w.startsWith('--') ? w.indexOf('=') : -1;
-      const def = optionDef(eq > 0 ? w.slice(2, eq) : w.startsWith('--') ? w.slice(2) : w.slice(1));
+      const def = find(eq > 0 ? w.slice(2, eq) : w.startsWith('--') ? w.slice(2) : w.slice(1));
       if (!def) continue;
       if (eq > 0) line.opts.set(def.name, w.slice(eq + 1));
       else if (def.value) {
@@ -233,8 +258,37 @@ function scan(before: string[]): Line {
 /** Candidates that start with the word under the cursor. */
 const startingWith = (list: Candidate[], cur: string) => list.filter(([v]) => v.startsWith(cur));
 
+/** The first words of an area's verbs (`files` for `files add`), each with what it does. */
+function verbWords(area: NonNullable<ReturnType<typeof areaByName>>): Candidate[] {
+  const seen = new Set<string>();
+  const out: Candidate[] = [];
+  for (const v of area.verbs) {
+    const w = v.name.split(' ')[0];
+    if (seen.has(w)) continue;
+    seen.add(w);
+    out.push([w, (area.verbs.find((x) => x.name === w) ?? v).summary]);
+  }
+  return out;
+}
+
+/** What follows an area's name: its verbs, then the arguments of the verb (by kind) and the second words of its family. */
+async function areaWords(line: Line, cur: string, get: <T>(p: string) => Promise<T | null>): Promise<Loaded> {
+  const { area, verb } = line.route!;
+  const rest = line.rest;
+  if (!area.bare && !verb) return rest.length ? [] : startingWith(verbWords(area), cur);
+  const v = verb ?? defaultVerb(area);
+  const args = area.bare ? rest : rest.slice(line.route!.words - 1);
+  const extra: Candidate[] = [];
+  if (!args.length && verb && !verb.name.includes(' ')) for (const x of area.verbs) if (x.name.startsWith(`${verb.name} `)) extra.push([x.name.slice(verb.name.length + 1), x.summary]);
+  const last = v.args[v.args.length - 1];
+  const a = v.args[args.length] ?? (last?.rest ? last : undefined);
+  const found: Loaded = a ? await LOADERS[a.kind]({ get, cur, opts: line.opts, args }) : [];
+  if (typeof found === 'string') return found;
+  return startingWith([...extra, ...found], cur);
+}
+
 /** The candidates for the word under the cursor, from what the line says (the server asked through `api`). */
-export async function candidates(words: string[], api: Api): Promise<Candidate[] | ':dirs'> {
+export async function candidates(words: string[], api: Api): Promise<Loaded> {
   const cur = words.length ? words[words.length - 1] : '';
   const before = words.slice(0, -1);
   const line = scan(before);
@@ -251,16 +305,20 @@ export async function candidates(words: string[], api: Api): Promise<Candidate[]
   let value = cur;
   let prefix = '';
   const eq = /^--([a-z-]+)=(.*)$/s.exec(cur);
-  if (eq && optionDef(eq[1])?.value) ((name = eq[1]), (value = eq[2]), (prefix = `--${eq[1]}=`));
+  if (eq && line.find(eq[1])?.value) ((name = line.find(eq[1])!.name), (value = eq[2]), (prefix = `--${eq[1]}=`));
   if (name) {
-    const list = await valuesOf(name, line, get);
-    if (list === ':dirs') return list;
+    const list = await valuesOf(name, line, { get, cur: value });
+    if (typeof list === 'string') return list;
     return startingWith(list, value).map(([v, d]) => [prefix + v, d]);
   }
 
   // An option.
   if (cur.startsWith('-')) {
-    const list: Candidate[] = OPTION_TABLE.filter((o) => !line.opts.has(o.name) && o.name !== 'print' && o.name !== 'version').map((o) => [`--${o.name}`, o.desc]);
+    const list: Candidate[] = line.route
+      ? verbOptions(line.route.area, line.route.verb)
+          .filter((o) => !line.opts.has(o.name) || o.spec?.type === 'strings')
+          .map((o) => [`--${o.name}`, o.spec?.desc ?? o.def?.desc ?? ''])
+      : OPTION_TABLE.filter((o) => !line.opts.has(o.name) && o.name !== 'print' && o.name !== 'version').map((o) => [`--${o.name}`, o.desc]);
     return startingWith(list, cur);
   }
 
@@ -268,12 +326,26 @@ export async function candidates(words: string[], api: Api): Promise<Candidate[]
   if (!line.cmd) {
     if (line.message) return [];
     return startingWith(
-      ALL_COMMAND_NAMES.map((n) => [n, commandDef(n)!.desc] as Candidate),
+      ALL_COMMAND_NAMES.map((n) => [n, describeCommand(n)] as Candidate),
       cur,
     );
   }
 
-  // What follows the command.
+  // The words of an area's verb.
+  if (line.route) return areaWords(line, cur, get);
+
+  // What follows a command; one named like an area gets that area's verbs too.
+  const found = await afterCommand(line, cur, get);
+  const area = areaByName(line.cmd);
+  if (area && !area.bare && line.rest.length === 0 && typeof found !== 'string') {
+    const have = new Set(found.map(([v]) => v));
+    return [...found, ...startingWith(verbWords(area), cur).filter(([v]) => !have.has(v))];
+  }
+  return found;
+}
+
+/** What follows one of the commands that existed before the areas (and `help`). */
+async function afterCommand(line: Line, cur: string, get: <T>(p: string) => Promise<T | null>): Promise<Loaded> {
   const n = line.rest.length;
   const subs = (c: string) => (commandDef(c)?.subs ?? []).map(([s, d]) => [s, d] as Candidate);
   switch (line.cmd) {
@@ -282,7 +354,7 @@ export async function candidates(words: string[], api: Api): Promise<Candidate[]
     case 'stop':
     case 'open':
     case 'resume':
-      return n === 0 ? startingWith(await sessionKeys(get), cur) : [];
+      return n === 0 ? startingWith((await LOADERS.session({ get, cur, opts: line.opts, args: [] })) as Candidate[], cur) : [];
     case 'models':
       return n === 0 ? startingWith(PROGRAMS, cur) : [];
     case 'tiers':
@@ -301,38 +373,40 @@ export async function candidates(words: string[], api: Api): Promise<Candidate[]
     case 'tasks': {
       if (n === 0) return startingWith(subs('tasks'), cur);
       if (n !== 1 || line.rest[0] !== 'run') return [];
-      const r = await get<{ tasks?: { id: string; name: string }[] }>('/api/tasks');
-      return startingWith(
-        (r?.tasks ?? []).map((t) => [t.id, t.name] as Candidate),
-        cur,
-      );
+      return startingWith((await LOADERS.task({ get, cur, opts: line.opts, args: [] })) as Candidate[], cur);
     }
     case 'app': {
       if (n === 0) return startingWith(subs('app'), cur);
       if (n !== 1 || !['folder', 'dev', 'try', 'export'].includes(line.rest[0])) return [];
-      const r = await get<{ apps?: { slug: string; name: string }[] }>('/api/apps');
-      return startingWith(
-        (r?.apps ?? []).map((a) => [a.slug, a.name] as Candidate),
-        cur,
-      );
+      return startingWith((await LOADERS.app({ get, cur, opts: line.opts, args: [] })) as Candidate[], cur);
     }
     case 'service':
     case 'completion':
       return n === 0 ? startingWith(subs(line.cmd), cur) : [];
-    case 'help':
-      return n === 0
-        ? startingWith(
-            ALL_COMMAND_NAMES.map((c) => [c, commandDef(c)!.desc] as Candidate),
-            cur,
-          )
-        : [];
+    case 'help': {
+      if (n === 0)
+        return startingWith(
+          ALL_COMMAND_NAMES.map((c) => [c, describeCommand(c)] as Candidate),
+          cur,
+        );
+      const area = areaByName(line.rest[0]);
+      return n === 1 && area ? startingWith(verbWords(area), cur) : [];
+    }
     default:
       return [];
   }
 }
 
 /** The values an option takes (what is not here, a free word: none). */
-async function valuesOf(name: string, line: Line, get: <T>(p: string) => Promise<T | null>): Promise<Candidate[] | ':dirs'> {
+async function valuesOf(name: string, line: Line, c: { get: <T>(p: string) => Promise<T | null>; cur: string }): Promise<Loaded> {
+  const { get } = c;
+  // An option of an area's verb: its fixed values, or what its kind lists.
+  const spec = line.route ? (line.route.verb ?? defaultVerb(line.route.area)).options?.[name] : undefined;
+  if (spec) {
+    if (spec.values) return spec.values.map((v) => [v] as Candidate);
+    return spec.kind ? LOADERS[spec.kind]({ get, cur: c.cur, opts: line.opts, args: [] }) : [];
+  }
+  if (line.route) return [];
   switch (name) {
     case 'agent': {
       const boot = await get<{ acpAgents?: { id: string; name?: string }[] }>('/api/bootstrap');
@@ -348,10 +422,8 @@ async function valuesOf(name: string, line: Line, get: <T>(p: string) => Promise
       return EFFORTS.map((e) => [e] as Candidate);
     case 'mode':
       return MODES;
-    case 'as': {
-      const r = await get<{ assistants?: { id: string; name: string }[] }>('/api/assistants');
-      return (r?.assistants ?? []).map((a) => [a.id, a.name] as Candidate);
-    }
+    case 'as':
+      return LOADERS.agent({ get, cur: c.cur, opts: line.opts, args: [] });
     case 'cwd':
       return ':dirs';
     default:
@@ -359,21 +431,10 @@ async function valuesOf(name: string, line: Line, get: <T>(p: string) => Promise
   }
 }
 
-/** Sessions as `hydor sessions` shows them: the short key, with the title and what it is doing. */
-async function sessionKeys(get: <T>(p: string) => Promise<T | null>): Promise<Candidate[]> {
-  const r = await get<{ sessions?: import('../../shared/types.ts').SessionSummary[] }>('/api/sessions?limit=40');
-  const list = (r?.sessions ?? []).filter((s) => !s.extra?.parent);
-  if (!list.length) return [];
-  const { keyLength, shortKey, statusWord } = await import('./commands.ts');
-  const n = keyLength(list);
-  const plain = makePaint(false);
-  return list.map((s) => [shortKey(s, n), [truncate((s.title || s.firstPrompt || '(untitled)').replace(/\s+/g, ' '), 60), statusWord(s, plain)].filter(Boolean).join(' · ')]);
-}
-
 /** The lines `hydor __complete` prints for the words (the last is the one under the cursor). */
 export async function completeWords(words: string[], api: Api): Promise<string[]> {
   const found = await candidates(words, api);
-  return found === ':dirs' ? [':dirs'] : found.map(lineOf);
+  return typeof found === 'string' ? [found] : found.map(lineOf);
 }
 
 /** The API of the Hydor running here (or the one named on the line): one connection, never starting the server. */

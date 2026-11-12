@@ -2,7 +2,9 @@
 // arguments, reaches the server (starting this computer's when nothing answers), and runs the chat, a run, or one of
 // the listing commands. Exit codes: 0 done, 1 failed or refused, 2 bad usage, 3 an answer is needed (run), 124 timed
 // out, 130 interrupted.
-import { ALL_COMMAND_NAMES, didYouMean, helpText, parseArgv, USAGE, UsageError, type Opts } from './args.ts';
+import { ALL_COMMAND_NAMES, didYouMean, helpText, parseArgv, USAGE, type Opts } from './args.ts';
+import { defaultVerb } from './areas/index.ts';
+import { Cancelled, runVerb, UsageError, usageLine } from './areas/kit.ts';
 import { ApiError, connect, type Conn } from './client.ts';
 import { listCommand } from './commands.ts';
 import type { Look } from './lines.ts';
@@ -34,13 +36,21 @@ export async function tuiCommand(argv: string[]): Promise<number> {
   } catch (e) {
     const message = (e as Error).message;
     fail(message, argv.includes('--no-color'));
-    if (!message.includes('Did you mean')) process.stderr.write(`\n${USAGE}\n`);
+    if (!message.includes('Did you mean') && !message.includes('To send it') && !message.includes('shows what it takes')) process.stderr.write(`\n${USAGE}\n`);
     return 2;
   }
   if (o.help) {
-    // hydor help [command], hydor <command> --help, or hydor --help.
-    const topic = o.cmd === 'help' ? o.args[0] : o.cmd !== 'chat' || argv.includes('chat') ? o.cmd : undefined;
-    const text = helpText(makePaint(colorWanted(process.stdout, o.noColor)), topic);
+    // hydor help [command|area [verb]], hydor <command> --help, hydor <area> [verb] --help, or hydor --help.
+    const topic = o.route ? o.route.area.name : o.cmd === 'help' ? o.args[0] : o.cmd !== 'chat' || argv.includes('chat') ? o.cmd : undefined;
+    const sub = o.route ? (o.route.verb ? o.route.verb.name.split(' ') : []) : o.cmd === 'help' ? o.args.slice(1) : [];
+    let text: string | null;
+    try {
+      text = helpText(makePaint(colorWanted(process.stdout, o.noColor)), topic, sub);
+    } catch (e) {
+      if (!(e instanceof UsageError)) throw e;
+      fail(e.message, o.noColor);
+      return 2;
+    }
     if (text === null) {
       fail(`${unknownCommand(topic!).text}\nhydor help lists the commands.`, o.noColor);
       return 2;
@@ -76,8 +86,15 @@ export async function tuiCommand(argv: string[]): Promise<number> {
       return await chatCommand(conn, o, boot);
     }
     look.home = (await conn.api<{ home: string }>('GET', '/api/bootstrap').catch(() => ({ home: look.home }))).home;
+    if (o.route) {
+      // A verb of an area (server/tui/areas): its words and options are parsed, it runs with the terminal's Ctx.
+      const { terminalCtx } = await import('./areas/terminal.ts');
+      const verb = o.route.verb ?? defaultVerb(o.route.area);
+      return await runVerb(terminalCtx(conn, look, o, usageLine(o.route.area, verb)), o.route.area, verb, o.args, o.route.values);
+    }
     return await listCommand(conn, o, look);
   } catch (e) {
+    if (e instanceof Cancelled) return 130;
     if (e instanceof UsageError) {
       fail(e.message, o.noColor);
       return 2;
