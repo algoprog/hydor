@@ -11,7 +11,7 @@
 - **Mac 应用**每次启动时都会自己把它放进你的 PATH。它把 `hydor` 链接到 `~/.local/bin`、`~/bin`、`/usr/local/bin` 或 `/opt/homebrew/bin` 中第一个既在你的 PATH 里、又是你有权写入的文件夹。如果没有这样的文件夹，它就用 `~/.local/bin`，并在你的 shell 启动文件（zsh 是 `~/.zprofile`）里加上一行标明由 Hydor 添加的内容，让这个文件夹进入你的 PATH。之后请打开一个新的“终端”窗口。这个命令运行的是应用自带的 Node.js，应用关闭时，`hydor` 会把它打开。从磁盘映像里打开时，或在你把应用移到**应用程序**文件夹之前，它不会做这件事。在应用里，`hydor update`、`hydor service install` 和 `hydor serve` 只会告诉你这些由应用自己完成。
 - **Windows 和 Linux 桌面应用**暂时还不会把这个命令放进你的 PATH。在 Linux 上，安装程序仍像上面那样链接它。如果你在另一台电脑上有一份 Hydor，仍然可以使用那一份的：参见[使用另一台电脑上的 Hydor](#use-another-computers-hydor)。
 
-`hydor help` 会按组列出它能做的一切，每个命令一行；`hydor help <命令>` 给出一个命令的用法、选项和示例，`hydor help <命令> <动词>` 给出某个动词的。维护命令用的是同一个名称：`hydor service status`、`hydor setup-token`、`hydor update` 等等（`node dist/server/cli.js …` 也仍然可用）。输错了命令、选项或动词，它会问“Did you mean …?”（你是想输入……吗？）。错误以红色显示。
+`hydor help` 会按组列出它能做的一切，每个命令一行；`hydor help <命令>` 给出一个命令的用法、选项和示例，`hydor help options` 列出所有选项，`hydor help <命令> <动词>` 给出某个动词的。维护命令用的是同一个名称：`hydor service status`、`hydor setup-token`、`hydor update` 等等（`node dist/server/cli.js …` 也仍然可用）。输错了命令、选项或动词，它会问“Did you mean …?”（你是想输入……吗？）。错误以红色显示。
 
 以某个命令的名字开头的消息要放在引号里（`hydor "find the bug in login"`），或者放在 `hydor chat` 后面，这样它就不会被当成命令。
 
@@ -176,47 +176,67 @@ hydor completion install
 - **另一台电脑上的 Hydor**：每个命令都可以与 `--server` 和 `--token` 一起使用。
 - **只有页面才能做的事**：命令会这样说明，并给出该页面的地址。`hydor open … --browser` 会把它打开。
 
-### 你的工作
+### 会话
 
 | 命令 | 作用 |
 | --- | --- |
 | `hydor sessions` | 你最近的会话，每个前面有一个标记：● 工作中、● 需要你处理、✓ 已完成、✗ 出错。它的动词做的是会话菜单所做的事：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`、`share`（只读链接）、`changes`（它修改过的文件）、`commands`（它运行过的命令）、`queue`（正在等待的消息，以及 `queue clear` 和 `queue remove`）、`show`、`send`、`stop` 和 `delete`。 |
-| `hydor projects` | `list`、`show`、`new`、`rename`、`edit`（描述、准则、它以哪个智能体开始、文件夹）、`sessions`、`files`（它读取的文档：`files add` 和 `files remove`）和 `remove`。 |
-| `hydor guidelines` | `show` 和 `edit` 每个智能体都遵循的准则：对每个会话（默认）、对某个项目（`--project`）或对某一个会话（`--session`）。 |
 | `hydor inbox` | 等你处理的事（批准、问题、智能体要的密钥、待审的技能）：`list`，以及 `show` 查看其中一项和在哪里回答它。 |
-| `hydor experiments` | 训练和评估运行：`list`、`show` 和 `stop`。开始一次运行是智能体和页面的事。 |
-| `hydor tasks` | 你的[定时任务](/guide/tasks)：`list`，以及 `run <id>` 立即运行其中一个。<!-- TODO-VERIFY: show, new, edit, pause, resume, runs and remove --> |
-| `hydor apps` | 你的[应用](/guide/apps)：`list`、`show`、`run`（它表单的字段作为选项；它会打印答案）、`runs` 和 `remove`。`hydor app …`（不带 s）用来把应用做成文件：`new`、`dev`、`try`、`export`、`import`。<!-- TODO-VERIFY --> |
-| `hydor library` | [资料库](/guide/library)：`list`、`search`、`show`、`export`（导出为某种格式）、`open` 和 `remove`。<!-- TODO-VERIFY --> |
 
 `hydor show 6f1e2a3b` 与 `hydor sessions show 6f1e2a3b` 相同，`send` 和 `stop` 也是：短的那些仍然保留。
-
-几个例子：
 
 ```bash
 hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
+hydor inbox
+```
+
+### 你的工作
+
+| 命令 | 作用 |
+| --- | --- |
+| `hydor projects` | `list`、`show`、`new`、`rename`、`edit`（描述、准则、它以哪个智能体开始、文件夹）、`sessions`、`files`（它读取的文档：`files add` 和 `files remove`）和 `remove`。 |
+| `hydor tasks` | 你的[定时任务](/guide/tasks)，以及其他自己启动的工作：`list`、`show`、`new`（何时运行：`--every 2h`、`--at 09:00 --days weekdays`、`--cron`、`--once`；或者 `--webhook`、`--watch-feed`、`--watch-page`、`--watch-folder`）、`edit`、`pause`、`resume`、`run`（立即运行，暂停时也可以）、`runs`（最近的几次运行，`--reply` 显示最后一次的回复）和 `remove`。监视某条命令或某个 JSON 地址要在页面上做。 |
+| `hydor apps` | 你的[应用](/guide/apps)和现成的应用：`list`、`show`、`run`（表单的答案写成 `字段=值`，或者用 `--input` 给出 JSON；它会打印答案和花费）、`runs`、`run-show`（查看某一次运行）和 `remove`。`hydor app …`（不带 s）用来把应用做成文件：`new`、`folder`、`dev`、`try`、`export`、`import`。 |
+| `hydor library` | [资料库](/guide/library)：`list`（`--kind`、`--project`）、`search`、`show`（文档的文字，或者这一项是什么）、`export`（`--to pdf`、`docx`、`pptx`……，`-o 文件`）、`open`（它的编辑器的地址）和 `remove`。 |
+| `hydor experiments` | 训练和评估运行：`list`、`show` 和 `stop`。开始一次运行是智能体和页面的事。 |
+
+```bash
 hydor projects new Thesis
 hydor projects edit thesis --file guidelines.md
-hydor guidelines edit --project thesis
-hydor inbox
+hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"
+hydor apps run trip-planner destination=Lisbon days=5
+hydor library export "Q3 report" --to pdf -o q3.pdf
+```
+
+### 智能体和模型
+
+| 命令 | 作用 |
+| --- | --- |
+| `hydor models` 和 `hydor tiers` | 每个程序提供的模型，以及每个[档位](/guide/agents-models#tiers-a-model-for-each-kind-of-job)对应哪个模型（`hydor tiers set claude best opus --effort high`、`hydor tiers reset`；`hydor tiers team off` 和 `hydor tiers hard off` 分别关闭**主智能体带领子智能体**和**难题用最高档位**，`on` 再把它们打开）。 |
+| `hydor usage` | 每个套餐的用量和限额，以及它们何时重置。 |
+| `hydor agents` | [你的智能体](/guide/agents)：`list`、`show`、`new`、`edit` 和 `remove`（内置的可以复制，不能更改）。智能体的输出字段和结果去向在它自己的页面上设置（`hydor open agents`）。 |
+| `hydor accounts` | Claude Code 和 Codex 的登录：`list`、`add <程序> <名称>`（再添加一个账户，并立即登录）、`sign-in`、`sign-out`、`remove` 和 `use`（新会话用哪一个开始）。用于 API 额度的 API 密钥和用量限额时的开关是设置（`accounts.*`）。 |
+
+```bash
+hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor tiers set claude best opus --effort high
+hydor accounts add claude Work
+hydor accounts use work
 ```
 
 ### 智能体知道的和用到的
 
 | 命令 | 作用 |
 | --- | --- |
-| `hydor agents` | [你的智能体](/guide/agents)：`list`、`show`、`new`、`edit` 和 `remove`（内置的可以复制，不能更改）。智能体的输出字段和结果去向在它自己的页面上设置（`hydor open agents`）。 |
 | `hydor memory` | 智能体对你的记忆：`list`、`search`、`show`、`add`、`edit`、`forget`（30 天内可恢复）和 `restore`，以及用于每个智能体最先读到的内容的 `profile` 和 `profile edit`。`--scope`、`--project` 和 `--session` 指明是谁的笔记。 |
+| `hydor guidelines` | `show` 和 `edit` 每个智能体都遵循的准则：对每个会话（默认）、对某个项目（`--project`）或对某一个会话（`--session`）。 |
 | `hydor skills` | 智能体用的技能：`list`、`show`、`on`、`off`、`add`（来自一个 `SKILL.md` 或一个文件夹）和 `remove`。`--agent claude` 或 `--agent codex` 用于这些程序自己的技能。 |
 | `hydor plugins` | 带有技能和工具的附加组件：`list`、`show`、`on`、`off`、`add`（内置的、Git 地址、.zip 或文件夹）和 `remove`。制作你自己的插件在它的页面上（`hydor open plugins`）。 |
 | `hydor mcp` | Claude Code 和 Codex 的工具服务器（MCP）：`list`、`status`（启动每一个并说明哪些在工作）、`add`、`edit` 和 `remove`。 |
+| `hydor connections` | [已连接的应用](/guide/connections)（Notion、GitHub、Gmail……）：`list`、`show`、`services`（可以连接什么）、`connect <服务>`（隐藏地输入密钥，或者在浏览器里登录，命令会等你完成）和 `disconnect`。连接的哪些工具开着，要在它的页面上设置。 |
 | `hydor keys` | [保险库](/guide/connections)：`list` 你的密钥的名称和每个密钥可以发往哪里，`set <NAME>` 和 `remove <NAME>`。值是在你输入时隐藏地询问的，或者从管道输入读取；它绝不会作为选项输入（你的 shell 会把它记下来），也绝不会被打印出来。 |
-| `hydor connections` | 你连接的服务：`list`、`connect <服务>`（打开它的登录页面）和 `disconnect`。<!-- TODO-VERIFY --> |
-| `hydor accounts` | Claude Code 和 Codex 的账户：`list`、`add`、`remove`，以及会话用哪一个。<!-- TODO-VERIFY --> |
-| `hydor models` 和 `hydor tiers` | 每个程序提供的模型，以及每个[档位](/guide/agents-models#tiers-a-model-for-each-kind-of-job)对应哪个模型（`hydor tiers set claude best opus --effort high`、`hydor tiers reset`；`hydor tiers team off` 和 `hydor tiers hard off` 分别关闭**主智能体带领子智能体**和**难题用最高档位**，`on` 再把它们打开）。 |
-| `hydor usage` | 每个套餐的用量和限额，以及它们何时重置。 |
 
 ```bash
 hydor memory add I prefer short answers
@@ -224,7 +244,8 @@ hydor memory forget 42
 hydor skills off research
 hydor mcp add github --env GITHUB_TOKEN -- npx -y gh-mcp
 hydor keys set GITHUB_TOKEN --domain github.com
-hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor guidelines edit --project thesis
+hydor connections connect notion --browser
 ```
 
 ### 设置
@@ -276,7 +297,7 @@ hydor settings run notifications.send-a-test
 hydor --server https://hydor.example.com --token acm_… sessions
 ```
 
-或者一次性设置 `HYDOR_URL` 和 `HYDOR_TOKEN`。文件夹是那台电脑的：会话会在它的默认文件夹里开始，除非你用 `--cwd` 给出那里的一个文件夹（这台电脑自己的地址，例如 `http://localhost:8790`，则保留你当前所在的文件夹）。`!` 命令只在这台电脑上的 Hydor 里有效。在这台电脑上，命令第一次运行时会为自己创建一个令牌，它在[设置 → 应用 → 机器](/settings?s=machines&find=Access%20from%20other%20machines)中列为“This computer's command line”。`hydor machines` 可以像页面那样，在终端里列出、添加和删除这些令牌所对应的机器。<!-- TODO-VERIFY: machines -->
+或者一次性设置 `HYDOR_URL` 和 `HYDOR_TOKEN`。文件夹是那台电脑的：会话会在它的默认文件夹里开始，除非你用 `--cwd` 给出那里的一个文件夹（这台电脑自己的地址，例如 `http://localhost:8790`，则保留你当前所在的文件夹）。`!` 命令只在这台电脑上的 Hydor 里有效。在这台电脑上，命令第一次运行时会为自己创建一个令牌，它在[设置 → 应用 → 机器](/settings?s=machines&find=Access%20from%20other%20machines)中列为“This computer's command line”。要让这个 Hydor 显示另一台电脑的会话和页面，就把它添加为一台机器：`hydor machines` 列出这个 Hydor 在用的机器以及它们是否响应，`hydor machines add Lab --url https://lab.example.com` 添加一台（用 `--ssh <主机>` 代替 `--url` 则通过 SSH 连接；它的访问令牌是隐藏地输入的，或者来自 `--file -`），`hydor machines remove lab` 停止使用它。
 
 ## 颜色和管道
 
