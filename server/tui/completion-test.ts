@@ -134,15 +134,13 @@ test('complete: after a command', async () => {
   assert.deepEqual(await values('tiers', 'set', ''), ['claude', 'codex', 'custom']);
   assert.deepEqual(await values('tiers', 'set', 'claude', ''), ['quick', 'standard', 'best', 'max']);
   assert.deepEqual(await values('tiers', 'team', ''), ['on', 'off']);
-  assert.deepEqual(await values('tasks', ''), ['run']);
-  assert.deepEqual(await complete('tasks', 'run', ''), ['t1\tDaily brief']);
   assert.deepEqual(await values('service', ''), ['install', 'uninstall', 'status', 'logs']);
   assert.deepEqual(await values('service', 'st'), ['status']);
   assert.deepEqual(await values('app', ''), ['list', 'new', 'folder', 'dev', 'try', 'export', 'import']);
   assert.deepEqual(await values('app', 'try', ''), ['reading-list']);
   assert.deepEqual(await values('completion', ''), ['bash', 'zsh', 'fish', 'install']);
   assert.deepEqual(await values('help', 'st'), ['stop', 'status']);
-  assert.deepEqual(await values('help', ''), ALL_COMMAND_NAMES);
+  assert.deepEqual(await values('help', ''), [...ALL_COMMAND_NAMES, 'options']);
   assert.deepEqual(await values('fix', 'the', ''), [], 'a message has none');
   assert.ok((await values('sessions', '')).includes('search') && (await values('sessions', '')).includes('queue'), 'the verbs of the sessions area');
 });
@@ -292,7 +290,7 @@ test('help: grouped, within 80 columns, plain when not on a terminal', () => {
   assert.ok(!plain.includes('\x1b['));
   assert.equal(plain, USAGE);
   assert.ok(widest(plain) <= 80, `${widest(plain)} columns`);
-  const order = ['Talk to an agent', 'Sessions', 'Models and agents', 'This Hydor', 'Maintenance', 'Options', 'Examples'].map((h) => plain.indexOf(`\n${h}\n`));
+  const order = ['Talk to an agent', 'Sessions', 'Your work', 'Agents and models', 'What agents know and use', 'This Hydor', 'Maintenance', 'Examples'].map((h) => plain.indexOf(`\n${h}\n`));
   assert.ok(
     order.every((n, i) => n > 0 && (i === 0 || n > order[i - 1])),
     'the groups come in order',

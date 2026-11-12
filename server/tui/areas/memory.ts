@@ -131,7 +131,7 @@ export const memory: Area = {
   name: 'memory',
   summary: 'What agents remember about you',
   help: 'Notes are things agents keep about you, a project or a session. Name a note by its number (hydor memory lists them). Forgotten notes stay restorable for 30 days. Your profile is what every agent reads first.',
-  group: 'work',
+  group: 'tools',
   verbs: [
     {
       name: 'list',

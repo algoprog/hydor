@@ -2,14 +2,19 @@
 // list, so an area is only its file plus its line here (see kit.ts for what an area is). An area named like a command
 // that exists already (sessions, agents, tasks, open…) takes over only the verbs it names; the command's own code
 // still answers the rest until it is moved into the area.
+import { accounts } from './accounts.ts';
 import { agents } from './agents.ts';
 import { api } from './api.ts';
+import { apps } from './apps.ts';
+import { connections } from './connections.ts';
 import { experiments } from './experiments.ts';
 import { find } from './find.ts';
 import { guide } from './guide.ts';
 import { guidelines } from './guidelines.ts';
 import { inbox } from './inbox.ts';
 import { keys } from './keys.ts';
+import { library } from './library.ts';
+import { machines } from './machines.ts';
 import { mcp } from './mcp.ts';
 import { memory } from './memory.ts';
 import { open } from './open.ts';
@@ -18,9 +23,11 @@ import { projects } from './projects.ts';
 import { sessions } from './sessions.ts';
 import { settings } from './settings.ts';
 import { skills } from './skills.ts';
+import { tasks } from './tasks.ts';
 import type { Area, Verb } from './kit.ts';
 
-export const AREAS: Area[] = [api, experiments, find, guide, guidelines, inbox, open, projects, sessions, settings, agents, memory, skills, plugins, mcp, keys];
+// The order help lists them in, within their groups.
+export const AREAS: Area[] = [projects, tasks, apps, library, experiments, sessions, inbox, agents, accounts, memory, guidelines, skills, plugins, mcp, connections, keys, settings, find, guide, open, api, machines];
 
 /** An area by its name or an alias of it. */
 export const areaByName = (name: string): Area | undefined => AREAS.find((a) => a.name === name || a.aliases?.includes(name));
