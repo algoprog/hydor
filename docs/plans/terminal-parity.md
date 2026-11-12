@@ -49,7 +49,7 @@ well. This plan says how, so that the parts built at the same time fit together.
     route, place, file, dir, or text (nothing to complete).
   - `Ctx { conn, look, o, out(lines), json(value), confirm(question), edit(text, ext), readText(arg) }`. Commands
     write only through `ctx`, never to process.stdout, so the chat can run them too.
-  - `table(rows, { head?, marks? })`, `fields(pairs)`, `pickOne(list, given, { id, names, what })` (the naming rule
+  - `table(rows, { head?, grow?, free?, fixed?, drop?, indent? })` (on a narrow terminal `drop` lists the columns, descriptions and other free text, that go whole, first to first, before the main column is cut), `fields(pairs)`, `pickOne(list, given, { id, names, what })` (the naming rule
     above), `markdown(text)`.
 - `index.ts`: the list of areas, one import a line.
 - `args.ts` gives each area's verb options to the parser after the area and verb are known (strict, so a typo still
@@ -71,10 +71,10 @@ The endpoints are in `docs/guide/90-api.md` (the guide's API topic); each verb u
 | `memory` | list (`--scope`), search, show, add (`--scope`), edit, forget, profile (show, edit) |
 | `skills` | list, show, on, off, add (from a folder or file), remove |
 | `plugins` | list, show, on, off, add (from where the page takes them), remove |
-| `mcp` | list, add, edit, on, off, remove |
+| `mcp` | list, show, status, add, edit, remove |
 | `keys` | list (names only, never values), set `<NAME>` (asked hidden, or from stdin), remove |
 | `connections` | list, connect `<service>` (opens the sign-in page), disconnect |
-| `accounts` | list, add (as the page does it), remove, and which one sessions use |
+| `accounts` | list, show, add (as the page does it), sign-in, sign-out, remove, and which one sessions use |
 | `machines` | list, add, remove (`hydor access-token` stays) |
 | `tasks` | list (as now), show, run (as now), new, edit, pause, resume, runs, remove |
 | `apps` | list, show, run (its form's fields as options, or `--input`; prints the answer), runs, show a run, remove; `hydor app …` (the files: new, folder, dev, try, export, import) stays as it is |
