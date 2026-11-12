@@ -325,7 +325,7 @@ row('models', 'Helper model', 'choice', {
   write: put('/api/helper', (v) => ({ model: v })),
 });
 row('models', 'Tiers', 'command', { command: 'hydor tiers', note: 'hydor tiers shows the model each tier means for each program and changes them.' });
-row('models', 'Lead with helpers', 'switch', { read: rd('/api/models/tiers', 'team.on'), write: put('/api/models/tiers', (v) => ({ team: { on: v } })) });
+row('models', 'Lead with subagents', 'switch', { read: rd('/api/models/tiers', 'team.on'), write: put('/api/models/tiers', (v) => ({ team: { on: v } })) });
 row('models', 'Max for hard problems', 'switch', { read: rd('/api/models/tiers', 'team.hard'), write: put('/api/models/tiers', (v) => ({ team: { hard: v } })) });
 row('models', 'On this machine', 'page', {
   read: { endpoint: '/api/models', pick: (d) => (d.local ?? []).map((m: any) => m.repo ?? m.id) },
