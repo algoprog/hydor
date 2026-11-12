@@ -24,6 +24,13 @@ import { colorWanted, makePaint } from './tui/term.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
+// A reader that stops early (`hydor library show x | head`): what is left to print has nowhere to go, which is no error.
+for (const out of [process.stdout, process.stderr])
+  out.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code === 'EPIPE') process.exit(0);
+    throw e;
+  });
+
 const [cmd, sub] = process.argv.slice(2);
 
 // The service's settings (PORT, DATA_DIR…) apply here too, so commands act on the same data.
