@@ -627,7 +627,7 @@ function generalHelp(p: Paint): string[] {
       if (c.bare) rows.push([`hydor ${p.accent('-c')}`, 'Carry on this folder’s latest session']);
     }
     // An area named like a command has the command's row.
-    for (const a of AREAS.filter((x) => x.group === g.id && !commandDef(x.name))) rows.push([`hydor ${p.accent(a.name)}`, a.summary]);
+    for (const a of AREAS.filter((x) => x.group === g.id && !commandDef(x.name))) rows.push([['hydor', p.accent(a.name), ...(a.bare ? defaultVerb(a).args.map((x) => p.dim(argLabel(x))) : [])].join(' '), a.summary]);
     return { title: g.title, rows };
   }).filter((g) => g.rows.length);
   const more: [string, string][] = [

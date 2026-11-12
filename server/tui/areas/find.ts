@@ -3,9 +3,9 @@
 // its address in the app. `--open <n>` opens one in the browser. The app's own things are named from the catalog
 // shipped with it; yours from their lists.
 import { catalogItems } from '../../../shared/find-catalog.ts';
-import { tildify, timeAgo, truncate } from '../term.ts';
+import { strWidth, tildify, timeAgo, truncate } from '../term.ts';
 import { boldMatches } from './sessions.ts';
-import { num, str, table, UsageError, type Area, type Ctx } from './kit.ts';
+import { flag, num, str, table, UsageError, type Area, type Ctx } from './kit.ts';
 
 interface Result {
   group: string;
@@ -93,8 +93,8 @@ export async function describeAlike(ctx: Pick<Ctx, 'conn'>, alike: { id: string 
 
 export const find: Area = {
   name: 'find',
-  summary: 'Search everything, as the search box does',
-  help: 'Looks in your sessions and what was said in them, your memory, and (by meaning) the app’s pages and settings, your apps, agents, skills, projects and the guide. Each result has its address; --open <n> opens the nth in your browser.',
+  summary: 'Search everything',
+  help: 'Looks in your sessions and what was said in them, your memory, and (by meaning) the app’s pages and settings, your apps, agents, skills, projects and the guide. Each result is one line: its number, what it is, where it is. --open <n> opens the nth in your browser; --urls shows each address.',
   group: 'this',
   bare: true,
   default: 'find',
@@ -105,13 +105,15 @@ export const find: Area = {
       options: {
         in: { type: 'string', value: '<places>', desc: 'Look only here (comma-separated)', values: PLACES },
         open: { type: 'string', value: '<n>', desc: 'Open the nth result in your browser' },
+        urls: { type: 'boolean', desc: 'Show each result’s address under it' },
       },
       summary: 'Search everything the search box does',
-      examples: ['hydor find rate limit', 'hydor find dark mode --in settings', 'hydor find thesis deadline --open 1'],
+      examples: ['hydor find rate limit', 'hydor find dark mode --in settings', 'hydor find thesis deadline --open 1', 'hydor find rate limit --urls'],
       async run(ctx, words, v) {
         const q = words.join(' ').trim();
         const open = num(v, 'open', 1);
         const where = str(v, 'in');
+        const urls = flag(v, 'urls');
         const r = await ctx.conn.api<{
           meaning?: boolean;
           sessions?: { key: string; title: string; firstPrompt?: string; cwd: string; updatedAt: number }[];
@@ -142,10 +144,16 @@ export const find: Area = {
         for (const group of [...new Set(all.map((x) => x.group))]) {
           if (out.length) out.push('');
           out.push(p.bold(group));
-          const rows = all
-            .filter((x) => x.group === group)
-            .map((x) => [p.dim(`${++n}`), group === 'Messages' ? x.title : x.title, p.dim(x.where ?? ''), p.dim(x.path ? `${ctx.conn.base}${x.path}` : '')]);
-          out.push(...table(ctx, rows, { grow: 1 }).map((l) => `  ${l}`));
+          const hits = all.filter((x) => x.group === group);
+          // One line each: its number, what it is (most of the room), where it is (dim). Messages: the words said, then the session (short).
+          const rows = hits.map((x) => [p.dim(`${++n}`), x.title, p.dim(group === 'Messages' ? truncate(x.where ?? '', 24) : (x.where ?? ''))]);
+          const lines = table(ctx, rows, { grow: 1, free: [1], indent: 2 });
+          const numW = Math.max(...rows.map((r) => strWidth(r[0])));
+          lines.forEach((line, i) => {
+            out.push(line);
+            const url = hits[i].path ? `${ctx.conn.base}${hits[i].path}` : '';
+            if (urls && url) out.push(truncate(`${' '.repeat(numW + 4)}${p.dim(url)}`, ctx.fit ? ctx.look.width - 1 : 10_000));
+          });
         }
         ctx.out(out);
         if (open !== undefined) {
