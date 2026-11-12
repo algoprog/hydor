@@ -105,26 +105,49 @@ export async function localBase(): Promise<string> {
   return `http://${host}:${config.port}`;
 }
 
+/**
+ * Opens the Hydor app and waits for its server (90 s): what `hydor` does inside the app, which owns the server, its restarts
+ * and its updates. A Mac's `hydor` opens it with `open -g -a` (in the background). The Linux and Windows apps' command
+ * (HYDOR_APP_OPEN, which the shim the app writes sets) starts the app's program itself, detached and without a shell; if
+ * that stops at once with an error (no screen to open a window on) or is not there, it says to open the app yourself.
+ */
+export async function openApp(base: string, say: (s: string) => void, program: string, args: string[], o: { failFast?: boolean; timeoutMs?: number } = {}): Promise<string> {
+  const env = { ...process.env };
+  delete env.HYDOR_APP_OPEN; // the app (and the server and agents under it) must not take itself for a `hydor` of its own
+  const child = spawn(program, args, { detached: true, stdio: 'ignore', env });
+  let gone: string | null = null;
+  child.on('error', (e) => {
+    if (o.failFast) gone = `could not be started (${(e as NodeJS.ErrnoException).code ?? e.message})`;
+  });
+  // Exit code 0 is a second start handing over to the app that already runs; anything else, soon after the start, is a failure.
+  child.on('exit', (code, signal) => {
+    if (o.failFast && (code !== 0 || signal)) gone = signal ? `stopped at once (${signal})` : `stopped at once (exit code ${code})`;
+  });
+  child.unref();
+  const t0 = Date.now();
+  let told = false;
+  while (Date.now() - t0 < (o.timeoutMs ?? 90_000)) {
+    const v = await health(base, 1500);
+    if (v) return v;
+    if (gone) throw new ApiError(0, `The Hydor app ${gone}, perhaps because there is no screen to open it on: open the Hydor app yourself, then try again.`);
+    if (!told && Date.now() - t0 > 1000) {
+      say('Opening Hydor…');
+      told = true;
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  throw new ApiError(0, 'Hydor did not start in time: open the Hydor app, then try again.');
+}
+
 /** Starts this computer's server in the background (its output to logs/terminal-server.log) and waits for it. */
 export async function startServer(base: string, say: (s: string) => void): Promise<string> {
-  // Inside the Mac app (its `hydor` sets HYDOR_APP_BUNDLE) the app owns the server, its restarts and its updates:
-  // a server of this command's own would hold the port. Opening the app (in the background) starts it.
+  // Inside the app (its `hydor` sets HYDOR_APP_BUNDLE on a Mac, and the shim of the Linux and Windows apps HYDOR_APP_OPEN)
+  // the app owns the server, its restarts and its updates: a server of this command's own would hold the port. Opening the
+  // app starts it (a Mac's in the background, the others' without its window).
   const bundle = process.env.HYDOR_APP_BUNDLE;
-  if (bundle && process.platform === 'darwin') {
-    spawn('open', ['-g', '-a', bundle], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
-    const t0 = Date.now();
-    let told = false;
-    while (Date.now() - t0 < 90_000) {
-      const v = await health(base, 1500);
-      if (v) return v;
-      if (!told && Date.now() - t0 > 1000) {
-        say('Opening Hydor…');
-        told = true;
-      }
-      await new Promise((r) => setTimeout(r, 300));
-    }
-    throw new ApiError(0, 'Hydor did not start in time: open the Hydor app, then try again.');
-  }
+  if (bundle && process.platform === 'darwin') return openApp(base, say, 'open', ['-g', '-a', bundle]);
+  const open = process.env.HYDOR_APP_OPEN;
+  if (open) return openApp(base, say, open, ['--hidden'], { failFast: true });
   const { APP_ROOT, config, ensureDirs, paths } = await import('../config.ts');
   const entry = path.join(APP_ROOT, 'dist/server/index.js');
   if (!fs.existsSync(entry)) throw new ApiError(0, `Hydor is not running here, and it is not built yet: npm ci && npm run build (in ${APP_ROOT})`);

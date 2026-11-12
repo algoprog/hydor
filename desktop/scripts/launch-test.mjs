@@ -29,7 +29,8 @@ const traceFile = path.join(tmp, 'trace.log');
 const env = { ...process.env, PORT: String(port), DATA_DIR: path.join(tmp, 'data'), HYDOR_DESKTOP_READY_FILE: readyFile, HYDOR_DESKTOP_TRACE: traceFile, ELECTRON_ENABLE_LOGGING: '1', HYDOR_EMBED: 'off' };
 // (Windows: the app's runtime copies go in its own LOCALAPPDATA; the profile stays the runner's, whose folders Windows
 // works out from it, and a fresh runner is a first start all the same.)
-if (WIN) Object.assign(env, { LOCALAPPDATA: path.join(home, 'Local') });
+// (And the hydor command is left out there: it would add a scratch folder to the runner's own user Path; desktop/scripts/cli-smoke.mjs checks it.)
+if (WIN) Object.assign(env, { LOCALAPPDATA: path.join(home, 'Local'), HYDOR_DESKTOP_NO_COMMAND: '1' });
 else if (!MAC) Object.assign(env, { HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), XDG_DATA_HOME: path.join(home, '.local/share'), XDG_CACHE_HOME: path.join(home, '.cache'), APPIMAGE_EXTRACT_AND_RUN: '1' });
 for (const d of WIN ? [env.LOCALAPPDATA] : []) fs.mkdirSync(d, { recursive: true });
 // A password, as everyone who uses the app has one (server/auth.ts): without one, the app opens its window at once to

@@ -3,7 +3,7 @@
 # of computer it is for, or on a GitHub runner of that kind; scripts/dist.sh then packs it):
 #   build/server  the server and the web app, built, with their production packages (native ones for this system)
 #   build/node    Node.js, which runs the server and the agents' npm installs
-#   build/bin     the `hydor` command's launcher (macOS and Linux; the Mac app links it into a folder on your PATH:
+#   build/bin     the `hydor` command's launcher (bin/hydor, and bin/hydor.cmd on Windows; the apps put it on your PATH:
 #                 desktop/cli-link.cjs) and tmux, for the terminals (built from source: macOS has none, and Linux
 #                 systems differ); on Windows, where the server runs terminals itself, hydor-computer.exe instead:
 #                 computer use's helper, built from server/computer/windows-helper.cs with the C# compiler Windows has
@@ -43,6 +43,15 @@ case "$res" in *.app/Contents/Resources) HYDOR_APP_BUNDLE="${res%/Contents/Resou
 exec "$res/node/bin/node" "$res/server/dist/server/cli.js" "$@"
 LAUNCHER
   chmod 755 "$1"
+}
+# The same on Windows: bin/hydor.cmd runs the app's own node.exe on the app's own cli.js, wherever the app's folder is (%~dp0 is
+# the folder of this file). Its lines end in CR LF, as cmd.exe reads them best.
+write_cmd_launcher() {
+  printf '%s\r\n' \
+    '@echo off' \
+    'rem The hydor command of the Hydor app: runs the app'"'"'s own Node.js on the app'"'"'s own command (server\dist\server\cli.js).' \
+    '"%~dp0..\node\node.exe" "%~dp0..\server\dist\server\cli.js" %*' \
+    'exit /b %ERRORLEVEL%' > "$1"
 }
 # A path as Node.js reads it (Git's bash on Windows writes /d/a/…).
 native() { if [ "$os" = win32 ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
@@ -109,8 +118,10 @@ if [ "$os" != win32 ]; then
   write_launcher "$out/bin/hydor"
   sh -n "$out/bin/hydor"
 else
-  echo "== Computer use's helper"
   mkdir -p "$out/bin"
+  echo "== The hydor command"
+  write_cmd_launcher "$out/bin/hydor.cmd"
+  echo "== Computer use's helper"
   framework="$(cygpath -u "$WINDIR")/Microsoft.NET/Framework64/v4.0.30319"
   [ -f "$framework/csc.exe" ] || framework="$(cygpath -u "$WINDIR")/Microsoft.NET/Framework/v4.0.30319"
   "$framework/csc.exe" -nologo -optimize+ -target:exe -out:"$(cygpath -w "$out/bin/hydor-computer.exe")" \

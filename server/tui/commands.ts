@@ -424,8 +424,8 @@ async function serve() {
     say(`Hydor ${v} runs at ${base} already.`);
     return 1;
   }
-  // The Mac app's own command (its launcher sets HYDOR_APP_BUNDLE): the app runs the server, a second one would hold its port.
-  if (process.env.HYDOR_APP_BUNDLE) throw new ApiError(0, 'The Hydor app runs the server: open the app (hydor opens it by itself when it is closed).');
+  // The app's own command (its launcher sets HYDOR_APP_BUNDLE on a Mac, the shim on Linux and Windows HYDOR_APP_OPEN): the app runs the server, a second one would hold its port.
+  if (process.env.HYDOR_APP_BUNDLE || process.env.HYDOR_APP_OPEN) throw new ApiError(0, 'The Hydor app runs the server: open the app (hydor opens it by itself when it is closed).');
   const entry = path.join(APP_ROOT, 'dist/server/index.js');
   if (!fs.existsSync(entry)) throw new ApiError(0, `It is not built yet: npm ci && npm run build (in ${APP_ROOT})`);
   const child = spawn(process.execPath, [entry], { cwd: APP_ROOT, stdio: 'inherit', env: { NODE_ENV: 'production', ...process.env } });
