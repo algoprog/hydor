@@ -25,8 +25,9 @@ import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, choiceLine
 import { backgroundEnd, busy, historyLines, lastReply, Printer, SessionView } from './session.ts';
 import { Screen, suspend, takeTerminal } from './screen.ts';
 import { setTerminalPref, terminalPrefs, type TerminalPrefs } from './settings-table.ts';
+import { hydorItems, runHydor, stepAfter, type Host } from './hydor-cmd.ts';
 import { catalogOf, findAssistant, modeFor, modeLabel, modeRisk, newStartId, planStart, programName, startBody, tiersOf, type Boot, type Plan, type TiersState } from './start.ts';
-import { colorLevel, colorWanted, elapsed, gradientAt, makePaint, money, pad, strWidth, tildify, truncate, wrap, type Paint } from './term.ts';
+import { colorLevel, colorWanted, elapsed, gradientAt, graphemes, makePaint, money, pad, strWidth, tildify, truncate, wrap, type Paint } from './term.ts';
 
 const SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 const rgbHex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
@@ -50,6 +51,7 @@ const SLASH: { name: string; args?: string; what: string }[] = [
   { name: 'clear', what: 'clear the screen' },
   { name: 'queue', args: '<message>', what: 'send it when the turn ends' },
   { name: 'now', args: '<message>', what: 'send it into the running turn' },
+  { name: 'hydor', args: '<command>', what: 'any hydor command, e.g. /hydor memory search docker' },
   { name: 'stop', what: 'stop the turn, and the subagents in the background' },
   { name: 'rename', args: '<title>', what: 'rename the session' },
   { name: 'open', args: '[browser]', what: 'its address in the web app' },
@@ -59,6 +61,7 @@ const SLASH: { name: string; args?: string; what: string }[] = [
 type Ui =
   | { kind: 'input' }
   | { kind: 'pick'; title: string; items: Item[]; sel: number; onPick: (v: string) => void | Promise<void>; onCancel?: () => void }
+  | { kind: 'ask'; question: string; hidden: boolean; resolve: (v: string | null) => void }
   | { kind: 'question'; a: ApprovalRequest; qi: number; picks: Record<string, { picks: string[]; other: string }> }
   | { kind: 'form'; a: ApprovalRequest; fi: number; values: Record<string, string> };
 
@@ -131,6 +134,7 @@ export class Chat {
   private hist = false;
   private fileSeq = 0;
   private fileTimer: NodeJS.Timeout | null = null;
+  private hydorCache: { key: string; at: number; items: Item[] } | null = null;
   private assistants: Assistant[] | null = null;
   /** The folder's git branch, asked once for each folder the session is in. */
   private git = { cwd: '', branch: '' };
@@ -479,7 +483,11 @@ export class Chat {
     const ed = this.editor;
     const shell = this.ui.kind === 'input' && ed.text.startsWith('!');
     const ghost = this.ui.kind === 'input' && !this.menu && !this.hist && this.prefs().suggestions ? ghostOf(ed.text, ed.cursor, ed.history) : '';
-    const lay = layout(ed.text, ed.cursor, width, { prompt: `${shell ? p.yellow('›') : p.accent('›')} `, placeholder: this.placeholder(), maxRows: Math.max(3, Math.floor(height / 3)), ghost, p });
+    // A hidden answer (a key) shows a • for each character.
+    const hidden = this.ui.kind === 'ask' && this.ui.hidden;
+    const text = hidden ? '•'.repeat(graphemes(ed.text).length) : ed.text;
+    const cursor = hidden ? graphemes(ed.text.slice(0, ed.cursor)).length : ed.cursor;
+    const lay = layout(text, cursor, width, { prompt: `${shell ? p.yellow('›') : p.accent('›')} `, placeholder: this.placeholder(), maxRows: Math.max(3, Math.floor(height / 3)), ghost, p });
     const top = rows.length;
     rows.push(...lay.rows, rule);
     rows.push(...this.footer(look));
@@ -495,10 +503,11 @@ export class Chat {
       const v = this.pickView(ui);
       return [truncate(`${INDENT}${p.bold(ui.title)}`, width - 1), ...menuRows({ items: v.items, sel: v.sel, top: this.menuTop, rows: Math.max(3, this.screen!.rows - 8), width, p, maxLabel: Math.max(28, Math.floor(width / 2)), empty: 'Nothing matches' })];
     }
+    if (ui.kind === 'ask') return wrap(`${p.bold(ui.question)}`, width - 1, { first: INDENT, indent: INDENT });
     const m = this.menu;
     if (m && ui.kind === 'input') {
       const files = m.ctx.kind === 'files' || m.ctx.kind === 'history';
-      const out = menuRows({ items: m.items, sel: m.sel, top: this.menuTop, rows: this.menuRowCount(), width, p, maxLabel: files ? width : 28, empty: m.ctx.kind === 'history' ? 'No earlier message matches' : m.loading ? 'Searching…' : m.ctx.kind === 'files' ? 'No file matches' : undefined });
+      const out = menuRows({ items: m.items, sel: m.sel, top: this.menuTop, rows: this.menuRowCount(), width, p, maxLabel: files ? width : m.ctx.kind === 'hydor' ? Math.max(28, Math.floor(width / 3)) : 28, empty: m.ctx.kind === 'history' ? 'No earlier message matches' : m.loading ? 'Searching…' : m.ctx.kind === 'files' ? 'No file matches' : undefined });
       if (out.length) return out;
     }
     const c = this.current();
@@ -515,6 +524,7 @@ export class Chat {
     const a = this.view?.overlay.approvals[0];
     if (this.hist) return 'Search earlier messages · ↑↓ · Enter puts one in the input · Esc';
     if (this.ui.kind === 'pick') return 'Type to filter · ↑↓ · Enter picks · Esc cancels';
+    if (this.ui.kind === 'ask') return this.ui.hidden ? 'Hidden as you type · Enter sends it · Esc cancels' : 'Your answer, then Enter · Esc cancels';
     if (this.ui.kind === 'question') return 'A number picks · your own words, then Enter · Esc skips';
     if (this.ui.kind === 'form') return 'Your answer, then Enter · Esc declines';
     if (a) return 'A key above answers · or say what to do instead, then Enter';
@@ -578,6 +588,12 @@ export class Chat {
       while (i < k.text.length && !this.editor.text && this.singleKey(k.text[i])) i++;
       if (i === k.text.length) return;
       if (i > 0) k = { name: 'text', text: k.text.slice(i) };
+    }
+    if (this.ui.kind === 'ask') {
+      // The answer is the input line: nothing of history, the menu or Tab reaches it.
+      if (k.name === 'ctrl-d') return this.cancelAsk();
+      if (k.name === 'up' || k.name === 'down' || k.name === 'tab' || k.name === 'shift-tab' || k.name === 'ctrl-r' || k.name === 'newline') return;
+      if (k.name === 'enter') return this.askEnter();
     }
     if (this.ui.kind === 'pick' && this.moveKey(k)) return;
     if (this.menuOpen() && this.menuKey(k)) return;
@@ -663,6 +679,7 @@ export class Chat {
   /** A key alone that picks or answers (y, n, a digit); true when it did. */
   private singleKey(c: string): boolean {
     const ui = this.ui;
+    if (ui.kind === 'ask') return false;
     if (ui.kind === 'pick') {
       const n = Number(c);
       if (ui.items.length <= 9 && n >= 1 && n <= ui.items.length) {
@@ -771,6 +788,7 @@ export class Chat {
   private ctrlC() {
     if (this.shelling) return;
     if (this.ui.kind === 'pick') return this.cancelPick();
+    if (this.ui.kind === 'ask') return this.cancelAsk();
     if (this.view && busy(this.view.live)) {
       void this.stopTurn();
       return;
@@ -788,6 +806,7 @@ export class Chat {
 
   private escape() {
     if (this.ui.kind === 'pick') return this.cancelPick();
+    if (this.ui.kind === 'ask') return this.cancelAsk();
     // The menu closes (the turn goes on) and stays closed until the text changes.
     if (this.menu || this.hist) {
       this.closeMenu();
@@ -1055,6 +1074,8 @@ export class Chat {
           if (hs.length) lines.push(`Its ${hs.length === 1 ? 'subagent' : `${hs.length} subagents`}: ${money(theirs) || '$0.00'}`, `Together: ${money(own + theirs) || '$0.00'}`);
           return this.say(...lines.map((l) => `${INDENT}${l}`));
         }
+        case 'hydor':
+          return this.hydor(arg);
         case 'queue':
         case 'now':
           if (!arg) return this.flash(p.yellow(`Give the message: /${name} <message>`));
@@ -1215,11 +1236,12 @@ export class Chat {
       this.fileSeq++;
       return;
     }
-    if (ctx.kind === 'commands') return this.setMenu(ctx, rank(commandItems(SLASH, this.cat.commands), ctx.query));
+    if (ctx.kind === 'commands') return this.setMenu(ctx, rank(commandItems(SLASH, this.cat.commands), ctx.query, false));
     if (ctx.kind === 'values') {
       const items = this.valueItems(ctx.cmd);
       return this.setMenu(ctx, items ? rank(items, ctx.query) : [], !items);
     }
+    if (ctx.kind === 'hydor') return this.hydorMenu(ctx);
     this.fileMenu(ctx);
   }
 
@@ -1295,6 +1317,11 @@ export class Chat {
     } else if (ctx.kind === 'values') {
       if (run) return this.runLine(`/${ctx.cmd} ${it.value}`);
       ed.replaceBefore(ctx.from, `${it.value} `);
+    } else if (ctx.kind === 'hydor') {
+      // Enter on the last word a command needs runs it; any other word goes in and the next menu opens.
+      const word = /\s/.test(it.value) ? `"${it.value.replace(/(["\\$`])/g, '\\$1')}"` : it.value;
+      if (run && stepAfter(ctx.before, it.value, it.value === ctx.query) === 'run') return this.runLine(`${ed.text.slice(0, ctx.from)}${word}`);
+      ed.replaceBefore(ctx.from, it.value.endsWith('/') ? word : `${word} `);
     } else ed.replaceBefore(ctx.from, it.kind === 'dir' ? `@${it.value}` : `@${it.value} `);
     this.afterEdit();
   }
@@ -1363,6 +1390,30 @@ export class Chat {
     else this.fileTimer = setTimeout(() => void go(), 80);
   }
 
+  /** After `/hydor `: the areas, the verbs, the arguments and the options, asked for after a short wait (the first two levels are known here, and at once); what comes out of order is dropped. */
+  private hydorMenu(ctx: Extract<Context, { kind: 'hydor' }>) {
+    const key = `${ctx.before.join('\0')}${ctx.query.startsWith('-') ? '\0-' : ''}`;
+    const cached = this.hydorCache && this.hydorCache.key === key && Date.now() - this.hydorCache.at < 10_000 ? this.hydorCache.items : null;
+    const seq = ++this.fileSeq;
+    if (this.fileTimer) clearTimeout(this.fileTimer);
+    if (cached) return this.setMenu(ctx, rank(cached, ctx.query, ctx.before.length >= 2));
+    const prev = this.menu?.ctx.kind === 'hydor' ? this.menu.items : [];
+    this.menu = { ctx, items: prev, sel: 0, loading: true };
+    this.menuTop = 0;
+    const go = async () => {
+      let items: Item[] = [];
+      try {
+        items = await hydorItems(ctx.before, ctx.query, this.conn, this.cwd() ?? this.boot.home);
+      } catch {}
+      if (seq !== this.fileSeq || this.menu?.ctx.kind !== 'hydor') return;
+      this.hydorCache = { key, at: Date.now(), items };
+      this.setMenu(ctx, rank(items, ctx.query, ctx.before.length >= 2));
+      this.render();
+    };
+    if (ctx.before.length < 2) void go();
+    else this.fileTimer = setTimeout(() => void go(), 80);
+  }
+
   /** Files the words are found in (the server's order is the ranking), or a folder's entries, relative to the session's folder. */
   private async fileItems(query: string): Promise<Ranked[]> {
     const cwd = this.cwd() ?? this.boot.home;
@@ -1401,6 +1452,25 @@ export class Chat {
     if (!cmd) return this.flash(p.dim('!command runs it here, in the session’s folder'));
     if (!this.conn.here) return this.flash(p.yellow('Shell commands need this computer’s Hydor'));
     this.write(this.printer.aside([p.dim(`$ ${cmd}`)]));
+    const code = await this.handOver(
+      () =>
+        new Promise<number>((resolve) => {
+          try {
+            const child = spawn(cmd, { shell: true, cwd: this.cwd() ?? process.cwd(), stdio: 'inherit' });
+            child.on('error', (e) => (process.stderr.write(`${e.message}\n`), resolve(127)));
+            child.on('close', (c, sig) => resolve(c ?? (sig ? 128 + (os.constants.signals[sig] ?? 0) : 1)));
+          } catch (e) {
+            process.stderr.write(`${(e as Error).message}\n`);
+            resolve(127);
+          }
+        }),
+    );
+    if (code) this.write([p.red(`exit ${code}`)]);
+    this.render();
+  }
+
+  /** Gives the terminal to something else for as long as `fn` takes (a shell command, an editor), then takes it back and draws the chat again. */
+  private async handOver<T>(fn: () => Promise<T>): Promise<T> {
     const screen = this.screen!;
     screen.clear();
     this.shelling = true;
@@ -1408,25 +1478,79 @@ export class Chat {
     stdin.pause();
     stdin.setRawMode(false);
     process.stdout.write('\x1b[?2004l');
-    const code = await new Promise<number>((resolve) => {
-      try {
-        const child = spawn(cmd, { shell: true, cwd: this.cwd() ?? process.cwd(), stdio: 'inherit' });
-        child.on('error', (e) => (process.stderr.write(`${e.message}\n`), resolve(127)));
-        child.on('close', (c, sig) => resolve(c ?? (sig ? 128 + (os.constants.signals[sig] ?? 0) : 1)));
-      } catch (e) {
-        process.stderr.write(`${(e as Error).message}\n`);
-        resolve(127);
-      }
-    });
-    stdin.setRawMode(true);
-    stdin.resume();
-    process.stdout.write('\x1b[?2004h');
-    // Output that did not end its line: the region starts on a line of its own.
-    if (!(await this.atLineStart())) process.stdout.write('\r\n');
-    screen.forget();
-    this.shelling = false;
-    if (code) this.write([p.red(`exit ${code}`)]);
+    try {
+      return await fn();
+    } finally {
+      stdin.setRawMode(true);
+      stdin.resume();
+      process.stdout.write('\x1b[?2004h');
+      // Output that did not end its line: the region starts on a line of its own.
+      if (!(await this.atLineStart())) process.stdout.write('\r\n');
+      screen.forget();
+      this.shelling = false;
+      this.render();
+    }
+  }
+
+  // ---- /hydor ----------------------------------------------------------------------------------------------------
+
+  /** `/hydor <command…>`: an area command of `hydor`, run here with the chat's own picker, input line and editor. */
+  private async hydor(words: string) {
+    const host: Host = {
+      conn: this.conn,
+      look: () => ({ ...this.look, width: this.screen?.columns ?? this.look.width }),
+      interactive: !this.plain,
+      print: (lines, first) => this.write(first ? this.printer.aside(lines) : lines),
+      pick: (title, items) => this.choose(title, items),
+      ask: (question, hidden) => this.ask(question, hidden),
+      handOver: (fn) => this.handOver(fn),
+      open: (url) => openBrowser(url),
+    };
+    await runHydor(host, words);
     this.render();
+  }
+
+  /** A list to pick from as a promise: the value picked, or null when they back out. */
+  private choose(title: string, items: { label: string; hint?: string; value: string }[]): Promise<string | null> {
+    if (!items.length) return Promise.resolve(null);
+    return new Promise((resolve) =>
+      this.pick(
+        title,
+        items,
+        (v) => resolve(v),
+        () => resolve(null),
+      ),
+    );
+  }
+
+  /** One line typed in the input line (hidden: shown as •, never kept in history or printed): the text, or null when they back out. */
+  private ask(question: string, hidden: boolean): Promise<string | null> {
+    this.editor.clear();
+    this.menu = null;
+    this.hist = false;
+    return new Promise((resolve) => {
+      this.ui = { kind: 'ask', question, hidden, resolve };
+      this.render();
+    });
+  }
+
+  private askEnter() {
+    const ui = this.ui;
+    if (ui.kind !== 'ask') return;
+    const text = this.editor.text.replace(/\r?\n/g, ' ');
+    this.editor.clear();
+    this.ui = { kind: 'input' };
+    this.render();
+    ui.resolve(text);
+  }
+
+  private cancelAsk() {
+    const ui = this.ui;
+    if (ui.kind !== 'ask') return;
+    this.editor.clear();
+    this.ui = { kind: 'input' };
+    this.render();
+    ui.resolve(null);
   }
 
   /** Whether the cursor is in the first column (asked of the terminal; yes when it does not answer). */
@@ -1563,6 +1687,7 @@ function helpLines(look: Look): string[] {
   const also = [
     { head: p.accent('@file'), plain: '@file', what: 'mention a file: the agent reads it (the menu finds it as you type)' },
     { head: p.accent('!command'), plain: '!command', what: 'run it here, in the folder: the agent does not see it' },
+    { head: p.accent('/hydor …'), plain: '/hydor …', what: 'any hydor command, such as /hydor memory search docker (the menu lists the areas, verbs and arguments)' },
     { head: p.accent('/other'), plain: '/other', what: 'any other /command goes to the agent as it is' },
     { head: p.accent('y n 1'), plain: 'y n 1', what: 'answer a card that waits; words deny it with them' },
   ];
