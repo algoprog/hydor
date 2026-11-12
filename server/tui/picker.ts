@@ -6,7 +6,7 @@ import type { PickItem } from './areas/kit.ts';
 import { UsageError } from './areas/kit.ts';
 import { KeyReader, type Key } from './editor.ts';
 import { takeTerminal } from './screen.ts';
-import { graphemes, strWidth, truncate, type Paint } from './term.ts';
+import { asciify, asciiWanted, graphemes, strWidth, truncate, type Paint } from './term.ts';
 
 export interface PickerState {
   items: PickItem[];
@@ -68,7 +68,7 @@ export function pickerKey(s: PickerState, key: Key, rows = 10): 'pick' | 'cancel
 }
 
 /** The picker as lines: the title, the filter, a window of rows with the chosen one marked, and the keys. */
-export function pickerLines(s: PickerState, title: string, p: Paint, width: number, rows = 10): string[] {
+export function pickerLines(s: PickerState, title: string, p: Paint, width: number, rows = 10, ascii = false): string[] {
   const list = visible(s);
   const top = Math.max(0, Math.min(s.index - Math.floor(rows / 2), list.length - rows));
   const shown = list.slice(top, top + rows);
@@ -80,7 +80,8 @@ export function pickerLines(s: PickerState, title: string, p: Paint, width: numb
   if (!list.length) out.push(p.dim('  Nothing fits.'));
   else if (list.length > top + shown.length) out.push(p.dim(`  … ${list.length - top - shown.length} more`));
   out.push(p.dim('↑↓ move · type to filter · Enter picks · Esc cancels'));
-  return out.map((l) => (strWidth(l) > width - 1 ? truncate(l, width - 1) : l));
+  // In ASCII mode the symbols are mapped first, so the widths are those of what is drawn.
+  return (ascii ? out.map(asciify) : out).map((l) => (strWidth(l) > width - 1 ? truncate(l, width - 1, ascii ? '...' : '…') : l));
 }
 
 /** Picks from a list on the terminal: the chosen item's value, or null when the person backs out. */
@@ -91,6 +92,7 @@ export function pickInTerminal(title: string, items: PickItem[], p: Paint, o: { 
   const give = takeTerminal(stdin, out);
   const keys = new KeyReader();
   const state: PickerState = { items, filter: '', index: 0 };
+  const ascii = asciiWanted(process.env, process.platform, out);
   let drawn = 0;
   const clear = () => {
     if (drawn) out.write(`\r${drawn > 1 ? `\x1b[${drawn - 1}A` : ''}\x1b[J`);
@@ -98,7 +100,7 @@ export function pickInTerminal(title: string, items: PickItem[], p: Paint, o: { 
   };
   const draw = () => {
     clear();
-    const lines = pickerLines(state, title, p, out.columns || 80, Math.max(3, Math.min(10, (out.rows || 24) - 5)));
+    const lines = pickerLines(state, title, p, out.columns || 80, Math.max(3, Math.min(10, (out.rows || 24) - 5)), ascii);
     out.write(lines.join('\n'));
     drawn = lines.length;
   };

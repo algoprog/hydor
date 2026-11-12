@@ -15,7 +15,7 @@ import { readStdin, whyNoReply } from './commands.ts';
 import { INDENT, modelLabel, textLines, type Look } from './lines.ts';
 import { busy, lastReply, Printer, SessionView } from './session.ts';
 import { catalogOf, newStartId, planStart, startBody, tiersOf, type Boot } from './start.ts';
-import { colorWanted, makePaint } from './term.ts';
+import { asciify, asciiWanted, colorWanted, makePaint } from './term.ts';
 
 export interface RunResult {
   key: string;
@@ -112,6 +112,10 @@ function resultOf(conn: Conn, view: SessionView, v: Pick<RunResult, 'status' | '
   };
 }
 
+/** What a person reads goes to stderr and stdout as plain ASCII where Unicode cannot show (a terminal or locale that cannot, or HYDOR_ASCII=1); JSON lines are never changed. */
+const toErr = (s: string) => process.stderr.write(asciiWanted(process.env, process.platform, process.stderr) ? asciify(s) : s);
+const toOut = (s: string) => process.stdout.write(asciiWanted(process.env, process.platform, process.stdout) ? asciify(s) : s);
+
 /** A line of --stream-json. */
 const emit = (v: unknown) => process.stdout.write(`${JSON.stringify(v)}\n`);
 
@@ -128,7 +132,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
     const r: RunResult = { key, url: key ? conn.url(key) : '', status, reply: '', costUsd: 0, tokens: { in: 0, out: 0, cached: 0 }, durationMs: Date.now() - t0, turns: 0, children: [], error };
     if (o.json) emit(r);
     else if (o.streamJson) emit({ type: 'result', ...r });
-    else process.stderr.write(`${errLook.p.red('✗')} ${error}\n`);
+    else toErr(`${errLook.p.red('✗')} ${error}\n`);
     return CODES[status];
   };
   let key: string;
@@ -167,14 +171,14 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
   const showProgress = () => {
     if (!progress) return;
     const { lines } = printer.take(view);
-    if (lines.length) process.stderr.write(`${lines.filter((l) => l !== '').join('\n')}\n`);
+    if (lines.length) toErr(`${lines.filter((l) => l !== '').join('\n')}\n`);
   };
   try {
     await view.open();
   } catch (e) {
     return fail(`Could not follow it: ${(e as Error).message}`, 'failed', key);
   }
-  if (progress) process.stderr.write(`${look.p.dim(`${INDENT}Working in ${conn.url(key)}`)}\n`);
+  if (progress) toErr(`${look.p.dim(`${INDENT}Working in ${conn.url(key)}`)}\n`);
   const since: { settled?: number } = {};
   const outcome = await new Promise<Pick<RunResult, 'status' | 'error' | 'asks'>>((resolve) => {
     let over = false;
@@ -207,7 +211,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
         }, o.timeout * 1000)
       : null;
     const onInt = async () => {
-      if (progress) process.stderr.write(`${look.p.dim('Stopping…')}\n`);
+      if (progress) toErr(`${look.p.dim('Stopping…')}\n`);
       await stopAll();
       finish({ status: 'interrupted', error: 'Interrupted: its turn was stopped' });
     };
@@ -235,15 +239,15 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
     if (r.reply) {
       if (process.stdout.isTTY) {
         const outLook: Look = { p: makePaint(colorWanted(process.stdout, o.noColor)), width: process.stdout.columns || 100, home: boot.home, models };
-        process.stdout.write(`${textLines(r.reply, outLook).map((l) => l.replace(/^ {2}/, '')).join('\n')}\n`);
-      } else process.stdout.write(`${r.reply}\n`);
+        toOut(`${textLines(r.reply, outLook).map((l) => l.replace(/^ {2}/, '')).join('\n')}\n`);
+      } else toOut(`${r.reply}\n`);
     }
     const p = errLook.p;
-    if (r.status === 'needs-answer') process.stderr.write(`${p.yellow('?')} It needs an answer: ${r.asks}.\n  Answer it in the app (${r.url}) or here: hydor resume ${key}\n`);
-    else if (r.status !== 'done') process.stderr.write(`${p.red('✗')} ${r.error}\n`);
+    if (r.status === 'needs-answer') toErr(`${p.yellow('?')} It needs an answer: ${r.asks}.\n  Answer it in the app (${r.url}) or here: hydor resume ${key}\n`);
+    else if (r.status !== 'done') toErr(`${p.red('✗')} ${r.error}\n`);
     else if (progress) {
       const bits = [`${Math.round(r.durationMs / 100) / 10} s`, r.costUsd ? `$${r.costUsd.toFixed(2)}` : '', modelLabel(r.model, models), r.children.length ? `${r.children.length} ${r.children.length === 1 ? 'subagent' : 'subagents'}` : ''].filter(Boolean);
-      process.stderr.write(`${p.green('✓')} ${p.dim(bits.join(' · '))}\n`);
+      toErr(`${p.green('✓')} ${p.dim(bits.join(' · '))}\n`);
     }
   }
   return CODES[r.status];
