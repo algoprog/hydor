@@ -95,7 +95,7 @@ const queueOf = async (ctx: Ctx, key: string) => {
 export const sessions: Area = {
   name: 'sessions',
   aliases: ['session'],
-  summary: 'The sessions: find, rename, pin, archive, queue…',
+  summary: 'Find, rename, pin, archive, queue…',
   help: 'Name a session by its key as hydor sessions shows it (the start is enough), its full key, or its title; on a terminal, leave it out to pick from a list. With no verb, the sessions are listed.',
   group: 'sessions',
   verbs: [
@@ -286,7 +286,7 @@ export const sessions: Area = {
             table(
               ctx,
               links.map((l) => [l.id, l.token ? `${ctx.conn.base}/g/${l.token}` : '', ctx.look.p.dim(l.expiresAt ? `until ${new Date(l.expiresAt).toLocaleDateString('en-GB')}` : 'until turned off')]),
-              { head: ['ID', 'LINK', ''], grow: 1 },
+              { head: ['ID', 'LINK', ''], grow: 1, free: [] },
             ),
           );
         }
@@ -314,7 +314,7 @@ export const sessions: Area = {
           table(
             ctx,
             r.files.map((f) => [p.green(`+${f.added}`), p.red(`-${f.removed}`), p.dim(`${f.edits.length} edit${f.edits.length === 1 ? '' : 's'}`), tildify(f.path, ctx.look.home)]),
-            { grow: 3 },
+            { grow: 3, free: [] },
           ),
         );
       },

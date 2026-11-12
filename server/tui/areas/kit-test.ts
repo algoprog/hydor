@@ -4,12 +4,12 @@
 // and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/tui/areas/kit-test.ts && DATA_DIR=/tmp/hydor-test-kit node dist/dev/kit-test.js
 import assert from 'node:assert/strict';
-import { COMMANDS, helpText, parseArgv, routeOf } from '../args.ts';
+import { CMD_TABLE, COMMANDS, helpText, parseArgv, routeOf } from '../args.ts';
 import { completeWords, type Api } from '../completion.ts';
 import { pickerKey, pickerLines, visible, type PickerState } from '../picker.ts';
 import { makePaint, stripAnsi } from '../term.ts';
 import { AREAS, areaByName, defaultVerb, findVerb } from './index.ts';
-import { argLabel, choose, fields, GROUPS, pickOne, table, UsageError, usageLine, type Ctx } from './kit.ts';
+import { argLabel, choose, fields, FREE_TEXT_CAP, GROUPS, pickOne, table, UsageError, usageLine, type Ctx } from './kit.ts';
 import { LOADERS } from './loaders.ts';
 import { fakeConn, testCtx } from './test-kit.ts';
 
@@ -36,7 +36,7 @@ test('registry: every area is well formed', () => {
       names.add(n);
     }
     assert.match(a.name, /^[a-z][a-z-]*$/, a.name);
-    assert.ok(a.summary && a.summary.length <= 70 && !a.summary.endsWith('.'), `${a.name}: a short summary`);
+    assert.ok(a.summary && a.summary.length <= 40 && !a.summary.endsWith('.'), `${a.name}: a summary of 40 characters or fewer (it is one line of hydor help)`);
     assert.ok(
       GROUPS.some((g) => g.id === a.group),
       `${a.name}: a known group`,
@@ -78,6 +78,39 @@ test('registry: every area is well formed', () => {
     assert.ok(widest(h) <= 80, `${a.name}: help in ${widest(h)} columns`);
     for (const v of a.verbs) assert.ok(stripAnsi(h).includes(v.name), `${a.name}: help lists ${v.name}`);
   }
+});
+
+test('hydor help: every command and area is one line of at most 80 columns, its summary on that line', () => {
+  const plain2 = helpText(makePaint(false))!;
+  const lines = plain2.split('\n');
+  const top = lines.slice(
+    0,
+    lines.findIndex((l) => l === 'Options'),
+  );
+  assert.ok(
+    top.every((l) => [...l].length <= 80),
+    'no line wider than 80',
+  );
+  // A row that wrapped would leave a line starting far in, under its summary.
+  assert.ok(!top.some((l) => /^ {30,}\S/.test(l)), 'no summary wraps');
+  assert.ok(top.length <= 60, `one screen: ${top.length} lines before the options`);
+  for (const c of CMD_TABLE)
+    assert.ok(
+      top.some((l) => l.startsWith(`  hydor ${c.bare ? '' : c.name}`.trimEnd()) && l.endsWith(c.desc)),
+      `${c.name}: its row ends with its description`,
+    );
+  for (const a of AREAS.filter((x) => !CMD_TABLE.some((c) => c.name === x.name)))
+    assert.ok(
+      top.some((l) => l.startsWith(`  hydor ${a.name}`) && l.endsWith(`  ${a.summary}`)),
+      `${a.name}: its row ends with its summary`,
+    );
+  // The wide case: coloured, the same widths.
+  assert.ok(
+    helpText(makePaint(true))!
+      .split('\n')
+      .slice(0, top.length)
+      .every((l) => [...stripAnsi(l)].length <= 80),
+  );
 });
 
 test('registry: help and the parser agree on every verb’s options and words', () => {
@@ -207,7 +240,7 @@ test('messages that start with a command’s name: quoted is a message; unknown 
 
 test('help: one line an area in hydor help, the area’s verbs, a verb’s options', () => {
   const general = helpText(plain)!;
-  assert.match(general, /^ {2}hydor projects +Your projects: /m);
+  assert.match(general, /^ {2}hydor projects +Your projects$/m);
   assert.ok(widest(general) <= 80);
   assert.ok(general.split('\n').length < 130, 'compact');
   const a = helpText(plain, 'projects')!;
@@ -315,6 +348,56 @@ test('choose: given, picked on a terminal, or asked for', async () => {
   assert.deepEqual(t2.ran.picked, ['Which thing?']);
   await assert.rejects(choose(make(true, null).ctx, things, undefined, how), (e: Error) => e.constructor.name === 'Cancelled');
   await assert.rejects(choose(t2.ctx, [], undefined, how), /There is no thing to pick/);
+});
+
+const width = (s: string) => [...stripAnsi(s)].length;
+
+test('table: on a terminal no line passes the width; the main column keeps its room, the others shrink first', () => {
+  const mk = (w: number, fit = true) => ({ look: { p: plain, width: w, home: '/h' }, fit });
+  const long = 'x'.repeat(200);
+  const rows = [
+    ['1', 'A title that says what the thing is and is quite long indeed', '~/projects/some/deep/folder · 3 days ago', `http://127.0.0.1:8790/s/claude%3A${'a'.repeat(36)}`],
+    ['2', 'Short', '~ · now', long],
+  ];
+  for (const w of [120, 100, 80, 60, 40, 24]) {
+    for (const t of [table(mk(w), rows, { grow: 1 }), table(mk(w), rows, { grow: 1, indent: 2 }), table(mk(w), rows, { grow: 1, head: ['N', 'TITLE', 'WHERE', 'ADDRESS'] })]) {
+      assert.ok(
+        t.every((l) => width(l) <= w - 1),
+        `${w} columns: ${Math.max(...t.map(width))}`,
+      );
+    }
+  }
+  // The title keeps its room: at 120 columns it is whole, and the address (last, not the main one) gave way.
+  const t120 = table(mk(120), rows, { grow: 1 });
+  assert.match(t120[0], /A title that says what the thing is and is quite long indeed/);
+  assert.match(t120[0], /…$/);
+  // The others shrink the widest first, down to a few characters, before the title is cut.
+  const t50 = table(mk(50), rows, { grow: 1 });
+  assert.match(t50[0], /A title that says what th…/);
+  assert.ok(t50.every((l) => width(l) <= 49));
+  // Short rows are not touched.
+  assert.deepEqual(table(mk(120), [['1', 'a', 'b']], { grow: 1 }), ['1  a  b']);
+  assert.deepEqual(table(mk(120), [['1', 'a', 'b']], { grow: 1, indent: 2 }), ['  1  a  b']);
+});
+
+test('table: piped, nothing is cut to a width, but free-text columns are capped near 80 characters', () => {
+  const piped = { look: { p: plain, width: 40, home: '/h' }, fit: false };
+  const long = 'y'.repeat(300);
+  const rows = [
+    ['1', long, 'where'],
+    ['2', 'short title', 'where'],
+  ];
+  const t = table(piped, rows, { grow: 1 });
+  assert.equal(width(t[0]), 1 + 2 + FREE_TEXT_CAP + 2 + 5, 'the long title is cut to the cap');
+  assert.ok(t[0].includes('…'));
+  assert.equal(t[1], `2  short title${' '.repeat(FREE_TEXT_CAP - 11)}  where`, 'the other rows are padded to the cap at most');
+  // Columns that are not free text (an address) are never cut piped.
+  const addr = `http://x/${'a'.repeat(200)}`;
+  assert.ok(table(piped, [['1', 'title', addr]], { grow: 1 })[0].endsWith(addr));
+  assert.ok(table(piped, [['1', addr, 'w']], { grow: 1, free: [] })[0].includes(addr));
+  // Two free columns, each capped.
+  const two = table(piped, [['1', long, long]], { grow: 1, free: [1, 2] })[0];
+  assert.equal(width(two), 1 + 2 + FREE_TEXT_CAP + 2 + FREE_TEXT_CAP);
 });
 
 test('table and fields: aligned, cut to the width on a terminal only', () => {

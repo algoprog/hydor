@@ -20,7 +20,7 @@ const items = async (ctx: Ctx) => (await ctx.conn.api<{ items: Item[] }>('GET', 
 
 export const inbox: Area = {
   name: 'inbox',
-  summary: 'Everything waiting on you',
+  summary: 'What waits on you',
   help: 'Approvals, questions and forms in sessions, a browser that needs you, a key an agent asked for, a skill to review. Answer them in the session or in the app: each shows its address.',
   group: 'sessions',
   verbs: [

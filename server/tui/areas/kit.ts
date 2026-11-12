@@ -219,22 +219,45 @@ export async function choose<T>(
 
 // ---- looks -----------------------------------------------------------------------------------------------------
 
+/** Free-text columns (titles, snippets, first messages) are cut to this many characters when piped, so one long one does not pad every other row. */
+export const FREE_TEXT_CAP = 80;
+
 /**
- * Rows as aligned columns, with an optional dim head. On a terminal (`ctx.fit`) the column `grow` (default: the
- * longest text, the last) is cut so a line fits the width; piped, nothing is cut.
+ * Rows as aligned columns, with an optional dim head. On a terminal (`ctx.fit`) no line is wider than the width minus
+ * one: the column `grow` (the one that says what the thing is: its title or name; default the last) keeps its room,
+ * and the other columns shrink first, the widest first, down to a few characters. Piped, nothing is cut to the width,
+ * but the `free` columns (default: `grow` only) are cut to FREE_TEXT_CAP characters. `indent` puts that many spaces
+ * before each line, counted in the width.
  */
-export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { head?: string[]; grow?: number } = {}): string[] {
+export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { head?: string[]; grow?: number; free?: number[]; indent?: number } = {}): string[] {
   const { p, width } = ctx.look;
+  const pre = ' '.repeat(o.indent ?? 0);
   const all = o.head ? [o.head.map((h) => p.dim(h)), ...rows] : rows;
-  if (!ctx.fit || !rows.length) return columns(all);
+  if (!rows.length) return columns(all).map((l) => pre + l);
   const gap = 2;
-  const widths: number[] = [];
-  for (const r of all) r.forEach((c, i) => (widths[i] = Math.max(widths[i] ?? 0, strWidth(c))));
-  const grow = o.grow ?? widths.length - 1;
-  const fixed = widths.reduce((a, w, i) => a + (i === grow ? 0 : w + gap), 0);
-  const room = Math.max(12, width - fixed - 1);
-  const cut = all.map((r) => r.map((c, i) => (i === grow ? truncate(c, room) : c)));
-  return columns(cut).map((l) => truncate(l, width - 1));
+  const n = Math.max(...all.map((r) => r.length));
+  const grow = o.grow ?? n - 1;
+  const free = o.free ?? [grow];
+  const w: number[] = Array.from({ length: n }, () => 0);
+  const cap = (i: number) => (!ctx.fit && free.includes(i) ? FREE_TEXT_CAP : Infinity);
+  for (const r of all) r.forEach((c, i) => (w[i] = Math.max(w[i], Math.min(strWidth(c), cap(i)))));
+  if (ctx.fit) {
+    const limit = width - 1 - pre.length;
+    const floor = (i: number) => Math.min(w[i], i === grow ? 12 : 8);
+    let total = w.reduce((a, x) => a + x, 0) + gap * (n - 1);
+    while (total > limit) {
+      // The widest column that is not the main one gives a character; the main one only when none can.
+      let pick = -1;
+      for (let i = 0; i < n; i++) if (i !== grow && w[i] > floor(i) && (pick < 0 || w[i] > w[pick])) pick = i;
+      if (pick < 0 && w[grow] > floor(grow)) pick = grow;
+      if (pick < 0) break;
+      w[pick]--;
+      total--;
+    }
+  }
+  const cut = all.map((r) => r.map((c, i) => (strWidth(c) > w[i] ? truncate(c, w[i]) : c)));
+  const lines = columns(cut).map((l) => pre + l);
+  return ctx.fit ? lines.map((l) => truncate(l, width - 1)) : lines;
 }
 
 /**
