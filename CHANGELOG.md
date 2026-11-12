@@ -5,9 +5,25 @@ Release notes, and says what is new after it updates.
 
 ## 0.61.0 · 12 November 2026
 
-Another machine with an older Hydor no longer opens as an empty window: the app offers to update it from where you
-are. The desktop apps also show on their icon how many sessions have news for you.
+Agents ask before they run one of your apps, steps waiting their turn say so, and Explore a place finds the kinds of
+place you ask for. Another machine with an older Hydor no longer opens as an empty window: the app offers to update it
+from where you are. The desktop apps also show on their icon how many sessions have news for you.
 
+- **Agents ask before running an app**: when an agent wants to run one of your apps for you, the app's card first
+  shows what the app does (its steps, what it took from your message, how long its last run took and what it cost)
+  and asks: **Run it**, **Always run it** or **Don’t run**. The apps you always run are listed in **Settings → Apps**,
+  where you can remove one to be asked again, or add one. A scheduled task's own session runs apps without asking:
+  you set the task up, and nobody is there to answer.
+- **One answer, not two**: when an app's answer turns out not to fit what you asked and the agent answers itself, it
+  takes the app's card out of the conversation, so you don't get both.
+- **Steps waiting their turn say so**: Claude Code runs a command on its own, and the searches and page reads asked
+  for after it wait until it ends. They now show **Waiting** instead of a clock that made them look stuck, and count
+  their time from when they really start. Agents are also told to send a slow command on its own.
+- **Explore a place finds what you ask for**: name a kind of place under **What you like** (dog parks, cafés,
+  playgrounds…) and it looks for those on OpenStreetMap as well as for the sights on Wikipedia and Wikidata, and
+  picks those first.
+- **No empty picture boxes**: in answer UIs and app views, an entry without a picture (or whose picture can't load)
+  shows without one, its words taking the space, instead of an empty, crossed-out box.
 - **Machines with an older Hydor open again**: picking a machine in the sidebar's switcher that runs a Hydor from
   before 0.52 showed an empty window; its start page works again.
 - **Update another machine from here**: the app you open shows another machine's pages in its own version, so a
