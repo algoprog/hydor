@@ -51,7 +51,7 @@ const catalog = { apps: [notion, exa, fsApp, db, ping], categories: {} };
 const conn = (a: any, o: any = {}) => ({ id: a.id, name: a.name, app: a, enabled: true, status: 'ok', fields: {}, secretFields: [], createdAt: 1, updatedAt: 1, ...o });
 const mine = [
   conn(notion, {
-    hint: 'chris@example.com',
+    hint: 'alex@example.com',
     tools: [
       { name: 'search', description: 'Find pages', on: true },
       { name: 'delete', on: false },
@@ -65,7 +65,7 @@ const routes = { 'GET /api/connections': { connections: mine, secrets: [] }, 'GE
 test('list shows what is connected, how it is doing, and tools on', async () => {
   const { conn: c } = fakeConn(routes);
   const t = await run(c, ['connections']);
-  assert.match(t.out, /Notion\s+notion\s+connected\s+1\/2 tools\s+chris@example\.com/);
+  assert.match(t.out, /Notion\s+notion\s+connected\s+1\/2 tools\s+alex@example\.com/);
   assert.match(t.out, /Exa Search\s+exa\s+error\s+off for sessions\s+…f3a9/);
   assert.deepEqual((await run(c, ['connections', 'list', '--json'])).json, [routes['GET /api/connections']]);
   assert.match((await run(fakeConn({ 'GET /api/connections': { connections: [], secrets: [] } }).conn, ['connections'])).out, /Nothing is connected yet/);
