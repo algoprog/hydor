@@ -1,7 +1,6 @@
 # Hydor in a terminal: the `hydor` command
 
-*10 November 2026. The owner: "implement a nice console/cli version of this app without GUI as well". This is the spec
-the first build follows; change it as the build teaches better.*
+*The spec the first build of the `hydor` command followed (10 November 2026); change it as the build teaches better.*
 
 ## What it is
 

@@ -1,13 +1,13 @@
 # Pictures, drawings, plots and videos in the editors, and slides for the web: a plan
 
-*6 November 2026. The owner asked for AI picture making and editing in documents, slides and pages (in the editors
-and as tools agents use by themselves while they make content: pictures, backgrounds, icons), with a better, dearer
-model for complex pictures and a cheaper one for simple ones; video making; a background remover and an object
-eraser; drawings (SVG); plots made by an agent writing code; and slides that are, by default, in a richer format than
-PowerPoint's (custom code, interactive parts, quizzes, 3D, effects), saved as one small web page that opens in any
-browser, with PowerPoint compatibility as a choice. Several builders work on it at once, each in a worktree and
-branch of its own (`mr/<workstream>`, off `mr/int`); the lead merges them, translates, makes the vectors, writes the
-guide and the release notes, and ships one release.*
+*6 November 2026. AI picture making and editing in documents, slides and pages (in the editors and as tools agents use
+by themselves while they make content: pictures, backgrounds, icons), with a better, dearer model for complex pictures
+and a cheaper one for simple ones; video making; a background remover and an object eraser; drawings (SVG); plots made
+by an agent writing code; and slides that are, by default, in a richer format than PowerPoint's (custom code,
+interactive parts, quizzes, 3D, effects), saved as one small web page that opens in any browser, with PowerPoint
+compatibility as a choice. Several builders work on it at once, each in a worktree and branch of its own
+(`mr/<workstream>`, off `mr/int`); the lead merges them, translates, makes the vectors, writes the guide and the release
+notes, and ships one release.*
 
 ## In short
 
@@ -23,8 +23,8 @@ guide and the release notes, and ships one release.*
 - **Local where it is better.** Background removal and erasing run on this computer when the user sets up the
   picture tools (free, private, exact pixels): a private Python with ONNX Runtime, BiRefNet-lite (MIT) for cutouts and
   LaMa (Apache-2.0) for erasing, downloaded once. **Each model loads only when it is needed and unloads after a few
-  idle minutes; the worker quits when idle; nothing loads without enough free memory** (the owner's ask). Without
-  them, the same tools go through OpenRouter, priced on screen.
+  idle minutes; the worker quits when idle; nothing loads without enough free memory**. Without them, the same
+  tools go through OpenRouter, priced on screen.
 - **The web format is the default for decks** (`Deck.format`: `"web"`, left out = web; `"pptx"` = PowerPoint
   compatible). Its parts and effects run only inside sandboxed frames where they run code; nothing from a deck ever
   becomes markup or script in the app itself.
@@ -76,7 +76,7 @@ These names are fixed so the workstreams fit when merged. Add fields if you need
 - `POST /api/videos/make` `MakeVideoAsk` → `VideoJob`; `GET /api/videos/make/:job` → `VideoJob` (A3). Done videos are
   kept as decks' are (`keepVideoFile`-like, in `server/pages/videos.ts`), their first frame a kept picture.
 
-**No OpenRouter key** (the owner's ask, 6 November): a tool that needs a model through OpenRouter asks for the key
+**No OpenRouter key**: a tool that needs a model through OpenRouter asks for the key
 when it needs it, and if the user skips, that model does not run. Agents' tools call
 `openRouterKey(ctx, { why })` from `server/connections/openrouter-key.ts` (on `mr/int`): it returns the key, or after a
 card in the conversation (the key goes from the browser straight to Settings → Models, checked with OpenRouter; never
@@ -86,13 +86,13 @@ Quick drawing written by a model; the picture tools on this computer). The edito
 false, show the key field in place (saved with `PUT /api/models` `{ openrouterKey }`, as Settings → Models does) beside
 **Skip**, and offer what needs no key.
 
-**Every tool for agents too** (the owner, 6 November): each thing the editors do has an agent's way (generate_image,
+**Every tool for agents too**: each thing the editors do has an agent's way (generate_image,
 make_svg, remove_background, erase_from_image, make_plot, generate_video, save_slides' web format, export_page,
 publish_site, app_api for settings and the picture tools' set-up), the tools take pictures already in a deck or
 document (`naget-asset:<sha>`) as well as files, and a spawn instruction tells agents to use them unprompted when they
 make slides, documents and pages. The editors' own routes are refused to agents (app_api points them to their tools).
 
-**AI when the local tools fall short** (the owner, 6 November): cutouts and erasing take `how: auto | local | ai`; on
+**AI when the local tools fall short**: cutouts and erasing take `how: auto | local | ai`; on
 auto a cutout whose mask looks poor is redone by an image model, a large area to erase goes to AI fill; the answers
 tell agents to look and redo with `how: "ai"` (or generate_image) when it is not right; the editors offer **Do it with
 AI instead** under a result made on this computer.

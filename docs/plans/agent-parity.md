@@ -1,9 +1,8 @@
 # Agents can do on every kind of page what people do in its editor: the audit
 
-*6 November 2026. The owner: "agents should be able to do all types of actions on top of all doc types, not just the user
-from the UI", and "especially the agent right next to them when users click Ask the agent". For each kind the Library
-keeps (slides, documents, spreadsheets, pages of HTML, LaTeX, notebooks, its pictures, videos and sounds, the Library
-itself), every action its editor offers in its menus, toolbars, panels and right-click menus, and how an agent does it.
+*6 November 2026. For each kind the Library keeps (slides, documents, spreadsheets, pages of HTML, LaTeX, notebooks,
+its pictures, videos and sounds, the Library itself), every action its editor offers in its menus, toolbars, panels and
+right-click menus, and how an agent does it, so that agents (the one beside an editor included) can do all of it.
 Workstream H of `media-and-rich-slides.md`, written against `mr/int` with every builder of the round merged (A1–A3, B,
 C1, C2, D, E1–E3, F1, F2, G) and main's page descriptions.*
 
