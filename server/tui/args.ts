@@ -4,26 +4,19 @@
 // (`hydor help`, `hydor help <command>`), the descriptions Tab completion shows (completion.ts) and the words "did you
 // mean" suggests from.
 import { parseArgs, type ParseArgsConfig } from 'node:util';
+import { areaByName, AREAS, defaultVerb, findVerb } from './areas/index.ts';
+import { GROUPS, UsageError, usageLine, argLabel, type Area, type Group, type OptionSpec, type Values, type Verb } from './areas/kit.ts';
 import { makePaint, pad, strWidth, wrap, type Paint } from './term.ts';
 
-export class UsageError extends Error {}
+export { GROUPS, UsageError };
+export type { Group };
 
 /** The commands `hydor` knows in the terminal (the maintenance ones in server/cli.ts come before these). */
 export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'agents', 'tasks', 'usage', 'status', 'serve', 'open', 'help'] as const;
-export type Command = (typeof COMMANDS)[number];
+/** A command of COMMANDS, or 'area': a verb of an area (server/tui/areas), with the words in Opts.route. */
+export type Command = (typeof COMMANDS)[number] | 'area';
 
 // ---- the table of commands -----------------------------------------------------------------------------------
-
-export type Group = 'talk' | 'sessions' | 'models' | 'this' | 'maintenance';
-
-/** The groups of `hydor help`, in order. */
-export const GROUPS: { id: Group; title: string }[] = [
-  { id: 'talk', title: 'Talk to an agent' },
-  { id: 'sessions', title: 'Sessions' },
-  { id: 'models', title: 'Models and agents' },
-  { id: 'this', title: 'This Hydor' },
-  { id: 'maintenance', title: 'Maintenance' },
-];
 
 export interface CommandDef {
   name: string;
@@ -346,6 +339,72 @@ const OPTIONS: NonNullable<ParseArgsConfig['options']> = Object.fromEntries(OPTI
 /** An option by its long name, or its short one. */
 export const optionDef = (name: string) => OPTION_TABLE.find((o) => o.name === name || (o.short && o.short === name));
 
+// ---- the areas ------------------------------------------------------------------------------------------------
+
+/** The options every verb of an area takes, besides its own. */
+export const COMMON_OPTIONS = ['server', 'token', 'no-color', 'json', 'yes', 'help', 'quiet', 'verbose', 'limit', 'all'];
+
+/** What the words say about an area's verb. */
+export interface Route {
+  area: Area;
+  /** The verb named (none: the area's default runs, and --help shows the area). */
+  verb?: Verb;
+  /** How many positional words are the area's and the verb's. */
+  words: number;
+  /** A word after the area that is no verb of it. */
+  unknown?: string;
+  /** The options as parsed, the verb's own with the common ones. */
+  values: Values;
+}
+
+/**
+ * The area and verb the words begin with (after any common options), or null when they are a command or a message.
+ * Only the words are read, not the verb's own options: the verb must follow the area directly. An area named like a
+ * command that exists answers only for the verbs it names.
+ */
+export function routeOf(tokens: string[]): Route | null {
+  const pos: string[] = [];
+  for (let i = 0; i < tokens.length && pos.length < 3; i++) {
+    const t = tokens[i];
+    if (t === '--') break;
+    if (t.startsWith('-') && t.length > 1) {
+      const eq = t.indexOf('=');
+      const def = optionDef(t.startsWith('--') ? t.slice(2, eq > 0 ? eq : undefined) : t.slice(1));
+      if (!def) break;
+      if (def.value && eq < 0) i++;
+      continue;
+    }
+    pos.push(t);
+  }
+  const area = pos.length ? areaByName(pos[0]) : undefined;
+  if (!area) return null;
+  const isCommand = (COMMANDS as readonly string[]).includes(area.name);
+  const route = (r: Omit<Route, 'values'>): Route => ({ ...r, values: {} });
+  if (area.bare) return isCommand ? null : route({ area, words: 1 });
+  const hit = findVerb(area, pos.slice(1));
+  if (hit) return route({ area, verb: hit.verb, words: 1 + hit.used });
+  if (isCommand) return null;
+  return route({ area, words: 1, unknown: pos[1] });
+}
+
+/** The options a verb takes: the common ones and its own (which win when they share a name or a short one). */
+export function verbOptions(area: Area, verb: Verb | undefined): { name: string; short?: string; spec?: OptionSpec; def?: OptionDef }[] {
+  const own = Object.entries((verb ?? defaultVerb(area)).options ?? {}).map(([name, spec]) => ({ name, short: spec.short, spec }));
+  const shorts = new Set(own.map((o) => o.short).filter(Boolean));
+  const common = OPTION_TABLE.filter((o) => COMMON_OPTIONS.includes(o.name) && !own.some((x) => x.name === o.name)).map((def) => ({ name: def.name, short: def.short && !shorts.has(def.short) ? def.short : undefined, def }));
+  return [...own, ...common];
+}
+
+/** The same as parseArgs takes them. */
+function verbParseOptions(area: Area, verb: Verb | undefined): NonNullable<ParseArgsConfig['options']> {
+  return Object.fromEntries(
+    verbOptions(area, verb).map((o) => {
+      const boolean = o.spec ? o.spec.type === 'boolean' : !o.def?.value;
+      return [o.name, { type: boolean ? 'boolean' : 'string', ...(o.spec?.type === 'strings' ? { multiple: true } : {}), ...(o.short ? { short: o.short } : {}) }];
+    }),
+  );
+}
+
 // ---- did you mean --------------------------------------------------------------------------------------------
 
 /** The edit distance between two words: insertions, deletions, substitutions and swapping two neighbours each count one. */
@@ -385,7 +444,10 @@ export function didYouMean(word: string, candidates: string[], fmt: (w: string) 
 }
 
 /** The words a first word may be: every command, the terminal's and the maintenance ones. */
-export const ALL_COMMAND_NAMES = CMD_TABLE.map((c) => c.name);
+export const ALL_COMMAND_NAMES = [...CMD_TABLE.map((c) => c.name), ...AREAS.map((a) => a.name).filter((n) => !CMD_TABLE.some((c) => c.name === n))];
+
+/** What a command or an area is, in one line. */
+export const describeCommand = (name: string): string => commandDef(name)?.desc ?? areaByName(name)?.summary ?? '';
 
 /** What to say about a wrong second word of a command with second words (hydor service instal): a sentence, then its usage. */
 export function subCommandError(cmd: string, sub: string | undefined): string {
@@ -428,6 +490,8 @@ export interface Opts {
   limit?: number;
   all: boolean;
   browser: boolean;
+  /** For an area's verb (cmd 'area'): which, and its own options. */
+  route?: Route;
 }
 
 /** A positive number from an option, or a UsageError naming it. */
@@ -439,10 +503,10 @@ function positive(name: string, v: string | undefined): number | undefined {
 }
 
 /** What node:util says about wrong arguments, in plain words, with a suggestion for a mistyped option. */
-function usageMessage(e: Error): string {
+function usageMessage(e: Error, names: string[] = OPTION_TABLE.map((o) => o.name)): string {
   const unknown = /Unknown option '(--?[^'=]+)/.exec(e.message);
   if (unknown?.[1].startsWith('--')) {
-    const maybe = didYouMean(unknown[1].slice(2), OPTION_TABLE.map((o) => o.name), (w) => `--${w}`);
+    const maybe = didYouMean(unknown[1].slice(2), names, (w) => `--${w}`);
     if (maybe) return `Unknown option '${unknown[1]}'.${maybe}`;
   }
   return e.message.replace(/^.*?: /, '').replace(/\. To specify a positional.*$/s, '');
@@ -453,11 +517,17 @@ function usageMessage(e: Error): string {
  * otherwise the words are a message for the chat (`hydor fix the tests`). -p is short for run.
  */
 export function parseArgv(argv: string[]): Opts {
+  const route = routeOf(argv);
+  if (route?.unknown) {
+    const mean = didYouMean(route.unknown, route.area.verbs.map((v) => v.name.split(' ')[0]), (w) => `hydor ${route.area.name} ${w}`);
+    throw new UsageError(`Unknown ${route.area.name} command: ${route.unknown}.${mean}\nTo send it to an agent as a message: hydor chat ${argv.filter((a) => !a.startsWith('-')).join(' ')}`);
+  }
   let parsed: ReturnType<typeof parseArgs>;
   try {
-    parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, strict: true });
+    parsed = parseArgs({ args: argv, options: route ? verbParseOptions(route.area, route.verb) : OPTIONS, allowPositionals: true, strict: true });
   } catch (e) {
-    throw new UsageError(usageMessage(e as Error));
+    const message = usageMessage(e as Error, route ? verbOptions(route.area, route.verb).map((o) => o.name) : undefined);
+    throw new UsageError(route ? `${message}\nhydor help ${route.area.name}${route.verb ? ` ${route.verb.name}` : ''} shows what it takes.` : message);
   }
   const v = parsed.values;
   const str = (k: string) => (typeof v[k] === 'string' ? (v[k] as string) : undefined);
@@ -465,7 +535,11 @@ export function parseArgv(argv: string[]): Opts {
   const words = parsed.positionals;
   let cmd: Command = 'chat';
   let args = words;
-  if (words.length && (COMMANDS as readonly string[]).includes(words[0])) {
+  if (route) {
+    cmd = 'area';
+    args = words.slice(route.words);
+    route.values = v;
+  } else if (words.length && (COMMANDS as readonly string[]).includes(words[0])) {
     cmd = words[0] as Command;
     args = words.slice(1);
   }
@@ -506,6 +580,7 @@ export function parseArgv(argv: string[]): Opts {
     limit: positive('limit', str('limit')),
     all: flag('all'),
     browser: flag('browser'),
+    ...(route ? { route } : {}),
   };
 }
 
@@ -557,8 +632,10 @@ function generalHelp(p: Paint): string[] {
       rows.push([rowLeft(c, p), c.desc]);
       if (c.bare) rows.push([`hydor ${p.accent('-c')}`, 'Carry on this folder’s latest session']);
     }
+    // An area named like a command has the command's row.
+    for (const a of AREAS.filter((x) => x.group === g.id && !commandDef(x.name))) rows.push([`hydor ${p.accent(a.name)}`, a.summary]);
     return { title: g.title, rows };
-  });
+  }).filter((g) => g.rows.length);
   const more: [string, string][] = [
     [`hydor ${p.accent('help')} ${p.dim('<command>')}`, 'A command’s usage, options and examples'],
     [`hydor ${p.accent('completion install')}`, 'Tab completion for bash, zsh and fish'],
@@ -592,14 +669,57 @@ function commandHelp(c: CommandDef, p: Paint): string[] {
   return out;
 }
 
+/** The rows of a verb in a list: `show <project>` and what it does. */
+const verbRow = (v: Verb, p: Paint): [string, string] => [[p.accent(v.name), ...v.args.map((a) => p.dim(argLabel(a)))].join(' '), v.summary];
+
+/** The verbs of an area, the options they share noted, and an example or two of each. */
+function areaHelp(a: Area, p: Paint): string[] {
+  const out = [`Usage: hydor ${p.accent(a.name)} ${p.dim('[verb] [options]')}`, '', ...wrap(a.help ? `${a.summary}. ${a.help}` : `${a.summary}.`, WIDTH - 2)];
+  out.push('', p.bold('Verbs'), ...twoColumns(a.verbs.map((v) => verbRow(v, p)), p, '  ', 34));
+  const examples = a.verbs.flatMap((v) => (v.examples ?? []).slice(0, 1)).slice(0, 6);
+  if (examples.length) out.push('', p.bold('Examples'), ...examples.map((e) => `  ${e}`));
+  out.push('', p.dim(`  hydor help ${a.name} <verb> shows a verb's options and examples.`));
+  return out;
+}
+
+/** One verb's help: usage, what it does, its options (the common ones named), examples. */
+function verbHelp(a: Area, v: Verb, p: Paint): string[] {
+  const usage = ['hydor', p.accent(a.name), p.accent(v.name), ...v.args.map((x) => p.dim(argLabel(x))), v.options ? p.dim('[options]') : ''].filter(Boolean).join(' ');
+  const out = [`Usage: ${usage}`, '', ...wrap(v.help ? `${v.summary}. ${v.help}` : `${v.summary}.`, WIDTH - 2)];
+  const own = Object.entries(v.options ?? {});
+  if (own.length) {
+    const rows = own.map(([name, o]) => [`${o.short ? `${p.accent(`-${o.short}`)}, ` : '    '}${p.accent(`--${name}`)}${o.value ? ` ${p.dim(o.value)}` : ''}`, o.desc] as [string, string]);
+    out.push('', p.bold('Options'), ...twoColumns(rows, p, '  ', 28));
+  }
+  out.push('', p.dim(`  Also --json, --yes, --server, --token, --no-color: hydor help lists them.`));
+  if (v.examples?.length) out.push('', p.bold('Examples'), ...v.examples.map((e) => `  ${e}`));
+  return out;
+}
+
 /**
- * The help as text (no colours when `p` is plain): the commands and options, or with a command's name its own: null
- * when there is no such command.
+ * The help as text (no colours when `p` is plain): the commands and options, or with a command's or an area's name
+ * its own (and with a verb after an area's name, the verb's): null when there is no such command or area. A word that
+ * is no verb of the area is a UsageError.
  */
-export function helpText(p: Paint, topic?: string): string | null {
+export function helpText(p: Paint, topic?: string, sub: string[] = []): string | null {
   if (!topic) return generalHelp(p).join('\n');
   const c = commandDef(topic);
-  return c ? commandHelp(c, p).join('\n') : null;
+  const a = areaByName(topic);
+  if (!c && !a) return null;
+  if (a && sub.length) {
+    const hit = findVerb(a, sub);
+    if (hit) return verbHelp(a, hit.verb, p).join('\n');
+    // The first word of several verbs (`help sessions queue`): those verbs.
+    const family = a.verbs.filter((v) => v.name.split(' ')[0] === sub[0]);
+    if (family.length) return [`Usage: hydor ${p.accent(a.name)} ${p.accent(sub[0])} ${p.dim('<verb>')}`, '', p.bold('Verbs'), ...twoColumns(family.map((v) => verbRow(v, p)), p, '  ', 34)].join('\n');
+    throw new UsageError(`Unknown ${a.name} command: ${sub[0]}.${didYouMean(sub[0], a.verbs.map((x) => x.name.split(' ')[0]), (w) => `hydor ${a.name} ${w}`)}`);
+  }
+  if (c) {
+    const lines = commandHelp(c, p);
+    if (a) lines.push('', p.bold('Verbs'), ...twoColumns(a.verbs.map((v) => verbRow(v, p)), p, '  ', 34));
+    return lines.join('\n');
+  }
+  return areaHelp(a!, p).join('\n');
 }
 
 /** The usage, in plain text. */
