@@ -2,7 +2,8 @@
 // unless the window shows that session, one about a session replaces its older one (and, on a Mac, takes the old one
 // out of Notification Center), a failed one goes to the page in the window, a click opens its session, the last
 // KEEP sessions stay, the notifications from before the app started open their session on a Mac, and the test
-// notification in Settings reports what the system said. Electron's Notification is a stand-in here. Build and run:
+// notification in Settings reports what the system said; while the window is away the app's icon counts the sessions
+// with notices, and the count goes once it is in front. Electron's Notification is a stand-in here. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/desktop-notices-test.ts && node dist/dev/desktop-notices-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -24,6 +25,8 @@ interface Api {
   restore(): Promise<void>;
   test(t: { title?: string; body?: string }): Promise<{ ok: boolean; error: string }>;
   state(): { shows: boolean | null; error: string };
+  inView(): void;
+  unseen(): number;
 }
 type CreateNotices = (o: {
   Notification: typeof Note;
@@ -32,6 +35,7 @@ type CreateNotices = (o: {
   inApp: (n: object) => void;
   open: (at: string) => void;
   showApp: () => void;
+  badge?: (count: number) => void;
 }) => Api;
 
 const { createNotices, KEEP } = createRequire(import.meta.url)('../../desktop/notices.cjs') as {
@@ -89,10 +93,11 @@ function setup(mac: boolean) {
   sys.removed.length = 0;
   sys.history.length = 0;
   sys.historyCalls = 0;
-  const spies = { frontAt: null as string | null, inApp: [] as object[], opened: [] as string[], appShown: 0 };
+  const spies = { frontAt: null as string | null, inApp: [] as object[], opened: [] as string[], appShown: 0, badges: [] as number[] };
   const api = createNotices({
     Notification: Note,
     mac,
+    badge: (n) => spies.badges.push(n),
     front: () => spies.frontAt,
     inApp: (n) => spies.inApp.push(n),
     open: (at) => spies.opened.push(at),
@@ -143,6 +148,44 @@ test('no notification for the session the window is in front showing, but one fo
   assert.equal(sys.made.length, 1);
   assert.equal(last().groupId, '/s/k2');
   assert.deepEqual(spies.inApp, []);
+});
+
+test("while the window is away the app's icon counts the sessions with notices, each once, until it is in front", async () => {
+  const { api, spies } = setup(true);
+  api.show(notice('k1'));
+  api.show(notice('k1'));
+  api.show(notice('k2'));
+  assert.deepEqual(spies.badges, [1, 2]);
+  assert.equal(api.unseen(), 2);
+  assert.equal(sys.made.length, 3);
+  api.inView();
+  assert.deepEqual(spies.badges, [1, 2, 0]);
+  assert.equal(api.unseen(), 0);
+  api.inView();
+  assert.deepEqual(spies.badges, [1, 2, 0]);
+  api.show(notice('k1'));
+  assert.deepEqual(spies.badges, [1, 2, 0, 1]);
+});
+
+test("no count on the app's icon while the window is in front, whichever page it shows", async () => {
+  const { api, spies } = setup(true);
+  spies.frontAt = '/s/other';
+  api.show(notice('k1'));
+  spies.frontAt = '';
+  api.show(notice('k2'));
+  assert.deepEqual(spies.badges, []);
+  assert.equal(sys.made.length, 2);
+});
+
+test("the count comes whether or not the system shows the notification", async () => {
+  const { api, spies } = setup(true);
+  sys.supported = false;
+  api.show(notice('k1'));
+  sys.supported = true;
+  sys.throwOnMake = true;
+  api.show(notice('k2'));
+  assert.deepEqual(spies.badges, [1, 2]);
+  assert.equal(spies.inApp.length, 2);
 });
 
 test('a message without a notice, without a path, or with a path not starting with a slash is ignored', async () => {

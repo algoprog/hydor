@@ -4,8 +4,10 @@
 // (not allowed in its settings) goes to the page in the window, which shows it inside the app (web/src/lib/notify.ts).
 // A newer notice about a session takes the place of its older one. The last ones stay in Notification Center while the
 // app keeps them (macOS takes a notification out when the app lets it go), and on a Mac those still there from before
-// the app started open their session again when clicked. server/desktop-notices-test.ts checks it with a stand-in for
-// Electron's Notification.
+// the app started open their session again when clicked. While the window is away (closed, hidden, minimised or behind
+// another app), the app's icon counts the sessions with notices, whether the system shows them or keeps them quiet (Do
+// Not Disturb, a Focus); the count goes when the window is in front again. server/desktop-notices-test.ts checks it
+// with a stand-in for Electron's Notification.
 'use strict';
 
 /** How many sessions' notifications stay to click. */
@@ -19,8 +21,9 @@ const KEEP = 50;
  * @param {(n: object) => void} o.inApp hands a notice to the window's page, to show inside the app
  * @param {(at: string) => void} o.open opens the window at a page of the app
  * @param {() => void} o.showApp opens the window
+ * @param {(count: number) => void} [o.badge] puts the count on the app's icon (0: none)
  */
-function createNotices({ Notification, mac, front, inApp, open, showApp }) {
+function createNotices({ Notification, mac, front, inApp, open, showApp, badge = () => {} }) {
   /** Whether the system shows the app's notifications: null before the first, then whether the last one showed. */
   let shows = null;
   /** What the system said when it did not show one ("Notifications are not allowed for this application"). */
@@ -29,6 +32,8 @@ function createNotices({ Notification, mac, front, inApp, open, showApp }) {
   const kept = new Map();
   /** Test notifications, kept until clicked or closed. */
   const tests = new Set();
+  /** The pages (sessions) with notices since the window was last in front: the count on the app's icon. */
+  const unseen = new Set();
 
   const seen = (ok, why = '') => {
     shows = ok;
@@ -60,7 +65,14 @@ function createNotices({ Notification, mac, front, inApp, open, showApp }) {
   function show(m) {
     if (!m || !m.n || typeof m.path !== 'string' || !m.path.startsWith('/')) return;
     const at = m.path;
-    if (front() === at) return;
+    const shown = front();
+    if (shown === at) return;
+    if (shown === null && !unseen.has(at)) {
+      unseen.add(at);
+      try {
+        badge(unseen.size);
+      } catch {}
+    }
     if (!Notification.isSupported()) return inApp(m.n);
     let note;
     try {
@@ -142,7 +154,16 @@ function createNotices({ Notification, mac, front, inApp, open, showApp }) {
     });
   }
 
-  return { show, restore, test, state: () => ({ shows, error }) };
+  /** The window is in front: the count on the app's icon goes. */
+  function inView() {
+    if (!unseen.size) return;
+    unseen.clear();
+    try {
+      badge(0);
+    } catch {}
+  }
+
+  return { show, restore, test, inView, unseen: () => unseen.size, state: () => ({ shows, error }) };
 }
 
 module.exports = { createNotices, KEEP };
