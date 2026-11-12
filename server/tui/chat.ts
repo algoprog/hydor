@@ -276,7 +276,8 @@ export class Chat {
     this.git = { cwd, branch: '' };
     try {
       const r = await this.conn.api<{ info: { branch?: string } | null }>('GET', `/api/git/repo-info?path=${encodeURIComponent(cwd)}`, undefined, { timeoutMs: 5000 });
-      if (this.git.cwd === cwd) this.git.branch = r.info?.branch ?? '';
+      // No branch to name (a detached checkout, or no commit yet: git says HEAD): none shown.
+      if (this.git.cwd === cwd) this.git.branch = r.info?.branch && r.info.branch !== 'HEAD' ? r.info.branch : '';
     } catch {}
   }
 
