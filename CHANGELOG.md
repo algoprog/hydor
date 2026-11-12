@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.5 · 12 November 2026
+
+The helpers an agent starts all go by one name, subagents, and each one says who started it.
+
+- What used to be called child sessions or helper sessions are now **subagents** everywhere: their cards in the
+  conversation, the sidebar ("3 subagents · 1 needs you"), the tray above the message box, the status line, the
+  Stop button and the guide.
+- Each one says who started it. A **Hydor subagent** is a session of its own that Hydor runs, on any agent and
+  model ("Hydor subagent · Codex · GPT-5.5"), which you can open and talk to. A **Claude Code subagent** is one the
+  agent's own program runs inside the session, which you can watch and stop. Point at it to see which is which.
+- Both kinds count as subagents in the tray, the status line and the Stop button: "2 subagents and 1 background
+  task running". Background tasks are now just commands, monitors and workflows.
+- **Settings → Capabilities → Child sessions** is now **Subagents**, and **Lead with helpers** in Settings → Models →
+  Tiers is now **Lead with subagents**. The spending cap bar says "with subagents" when they've spent part of it.
+- In the terminal app, `/subagents` lists them (`/helpers` still works), and its lines say "Subagent finished" and
+  "Subagent failed".
+- Agents are told the same names, so what they write about their subagents matches what you see.
+
 ## 0.55.4 · 11 November 2026
 
 The welcome tour turns on the desktop apps' notifications, and opens System Settings when your Mac isn't allowing them.
