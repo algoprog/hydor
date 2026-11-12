@@ -47,7 +47,7 @@ export const keys: Area = {
               p.dim(s.usedAt ? `used ${timeAgo(s.usedAt)}` : 'not used'),
               p.dim(s.note),
             ]),
-            { head: ['KEY', 'MAY GO TO', 'IN COMMANDS', 'USED', ''], grow: 4 },
+            { head: ['KEY', 'MAY GO TO', 'IN COMMANDS', 'USED', ''], grow: 0, fixed: [0, 1], free: [4] },
           ),
         );
       },

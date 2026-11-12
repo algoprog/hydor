@@ -57,7 +57,7 @@ export const machines: Area = {
                   )
                 : p.yellow(m.status.error ?? m.status.state),
             ]),
-            { grow: 4 },
+            { grow: 1, fixed: [2, 3] },
           ),
         );
         ctx.out(lines);

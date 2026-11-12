@@ -61,7 +61,7 @@ export const experiments: Area = {
           table(
             ctx,
             r.runs.map((x) => [markOf(p, x.status), p.dim(x.id), nameOf(x), p.dim(x.group ?? ''), x.status, p.dim(timeAgo(x.endedAt ?? x.startedAt ?? x.createdAt))]),
-            { head: ['', 'ID', 'RUN', 'EXPERIMENT', 'STATE', 'WHEN'], grow: 2 },
+            { head: ['', 'ID', 'RUN', 'EXPERIMENT', 'STATE', 'WHEN'], grow: 2, fixed: [1] },
           ),
         );
       },

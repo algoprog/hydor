@@ -224,34 +224,51 @@ export async function choose<T>(
 /** Free-text columns (titles, snippets, first messages) are cut to this many characters when piped, so one long one does not pad every other row. */
 export const FREE_TEXT_CAP = 80;
 
+/** A column this narrow (a state, an age, a size) is cut only after the wider ones, as a fixed one is. */
+const NARROW = 14;
+
 /**
  * Rows as aligned columns, with an optional dim head. On a terminal (`ctx.fit`) no line is wider than the width minus
  * one: the column `grow` (the one that says what the thing is: its title or name; default the last) keeps its room,
- * and the other columns shrink first, the widest first, down to a few characters. Piped, nothing is cut to the width,
+ * and the other columns shrink first, the widest first, down to their labels (8 characters at least); `fixed` columns
+ * (ids, addresses: no use cut) and narrow ones (up to 14: states, ages, sizes) shrink only after the rest. Piped, nothing is cut to the width,
  * but the `free` columns (default: `grow` only) are cut to FREE_TEXT_CAP characters. `indent` puts that many spaces
  * before each line, counted in the width.
  */
-export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { head?: string[]; grow?: number; free?: number[]; indent?: number } = {}): string[] {
+export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { head?: string[]; grow?: number; free?: number[]; fixed?: number[]; indent?: number } = {}): string[] {
   const { p, width } = ctx.look;
   const pre = ' '.repeat(o.indent ?? 0);
-  const all = o.head ? [o.head.map((h) => p.dim(h)), ...rows] : rows;
-  if (!rows.length) return columns(all).map((l) => pre + l);
+  // A header over nothing is no table: the caller says what is not there.
+  if (!rows.length) return [];
+  // A column with a label and no value in any row is left out (a header over nothing), the others' numbers moving up.
+  const width0 = Math.max(...rows.map((r) => r.length), o.head?.length ?? 0);
+  const empty = new Set(Array.from({ length: width0 }, (_, i) => i).filter((i) => (o.head?.[i] ?? '') !== '' && rows.every((r) => strWidth(r[i] ?? '') === 0)));
+  const keep = (r: string[]) => (empty.size ? r.filter((_, i) => !empty.has(i)) : r);
+  const moved = (i: number | undefined, dflt: number) => (i === undefined ? dflt : i - [...empty].filter((e) => e < i).length);
+  const body = rows.map(keep);
+  const all = o.head ? [keep(o.head).map((h) => p.dim(h)), ...body] : body;
   const gap = 2;
   const n = Math.max(...all.map((r) => r.length));
-  const grow = o.grow ?? n - 1;
-  const free = o.free ?? [grow];
+  const grow = o.grow === undefined ? n - 1 : empty.has(o.grow) ? n - 1 : moved(o.grow, n - 1);
+  const free = o.free ? o.free.filter((i) => !empty.has(i)).map((i) => moved(i, i)) : [grow];
+  const headW = (i: number) => (o.head ? strWidth(keep(o.head)[i] ?? '') : 0);
   const w: number[] = Array.from({ length: n }, () => 0);
   const cap = (i: number) => (!ctx.fit && free.includes(i) ? FREE_TEXT_CAP : Infinity);
   for (const r of all) r.forEach((c, i) => (w[i] = Math.max(w[i], Math.min(strWidth(c), cap(i)))));
+  const fixed = (o.fixed ?? []).filter((i) => !empty.has(i)).map((i) => moved(i, i));
+  const natural = [...w];
   if (ctx.fit) {
     const limit = width - 1 - pre.length;
-    const floor = (i: number) => Math.min(w[i], i === grow ? 12 : 8);
+    // A column never goes below its label, nor (the main one) 12; a fixed one (an id, an address: useless cut) shrinks only when nothing else can.
+    const floor = (i: number) => Math.min(w[i], Math.max(headW(i), i === grow ? 12 : 8));
+    const hold = (i: number) => (fixed.includes(i) || natural[i] <= NARROW ? w[i] : floor(i));
     let total = w.reduce((a, x) => a + x, 0) + gap * (n - 1);
     while (total > limit) {
       // The widest column that is not the main one gives a character; the main one only when none can.
       let pick = -1;
-      for (let i = 0; i < n; i++) if (i !== grow && w[i] > floor(i) && (pick < 0 || w[i] > w[pick])) pick = i;
+      for (let i = 0; i < n; i++) if (i !== grow && w[i] > hold(i) && (pick < 0 || w[i] > w[pick])) pick = i;
       if (pick < 0 && w[grow] > floor(grow)) pick = grow;
+      for (let i = 0; pick < 0 && i < n; i++) if (i !== grow && w[i] > floor(i) && (pick < 0 || w[i] > w[pick])) pick = i;
       if (pick < 0) break;
       w[pick]--;
       total--;
@@ -274,7 +291,7 @@ export function fields(ctx: Pick<Ctx, 'look'>, pairs: [string, string | undefine
 }
 
 /** A long text drawn as Markdown at the terminal's width. */
-export const markdown = (ctx: Pick<Ctx, 'look'>, text: string): string[] => renderMarkdown(text, Math.min(ctx.look.width, 100), ctx.look.p);
+export const markdown = (ctx: Pick<Ctx, 'look'>, text: string): string[] => renderMarkdown(text, Math.max(20, Math.min(ctx.look.width - 1, 100)), ctx.look.p);
 
 /** A mark before a state, as `hydor sessions` has: ● on, · off, ● yellow needs you, ✓ done, ✗ error, ● accent busy. */
 export function mark(p: Paint, kind: 'on' | 'off' | 'attention' | 'done' | 'error' | 'busy'): string {

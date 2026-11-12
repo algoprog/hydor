@@ -9,6 +9,7 @@ import { Writable } from 'node:stream';
 import type { Opts } from '../args.ts';
 import type { Conn } from '../client.ts';
 import type { Look } from '../lines.ts';
+import { strWidth, wrap } from '../term.ts';
 import { Cancelled, UsageError, type Ctx } from './kit.ts';
 
 /** The editor to run: $VISUAL, $EDITOR, else nano, else vi (the command with its own arguments). */
@@ -51,7 +52,13 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
     interactive,
     fit: !!process.stdout.isTTY,
     o,
-    out: (lines) => void process.stdout.write(`${(Array.isArray(lines) ? lines : [lines]).join('\n')}\n`),
+    // On a terminal a line wider than the screen breaks at a word (hanging under its own indent), not in the middle of one.
+    out: (lines) => {
+      const all = Array.isArray(lines) ? lines : [lines];
+      const wide = process.stdout.isTTY ? Math.max(20, look.width - 1) : Infinity;
+      const fitted = all.flatMap((l) => (strWidth(l) <= wide ? [l] : wrap(l, wide, { indent: /^ */.exec(l)![0] })));
+      process.stdout.write(`${fitted.join('\n')}\n`);
+    },
     json: (value) => void process.stdout.write(`${JSON.stringify(value, null, 2)}\n`),
     async confirm(question) {
       if (o.yes) return true;

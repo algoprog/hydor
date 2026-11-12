@@ -5,7 +5,7 @@
 import path from 'node:path';
 import { enc } from '../client.ts';
 import { timeAgo } from '../term.ts';
-import { choose, fields, flag, markdown, mark, str, strs, table, UsageError, type Area, type Ctx, type Values } from './kit.ts';
+import { choose, showLong, fields, flag, markdown, mark, str, strs, table, UsageError, type Area, type Ctx, type Values } from './kit.ts';
 
 interface LibSkill {
   name: string;
@@ -170,7 +170,7 @@ export const skills: Area = {
         }
         if (ctx.o.json) return ctx.json(raw);
         const { p } = ctx.look;
-        ctx.out([
+        await showLong(ctx, [
           p.bold(s.name) + (s.on ? '' : p.dim(' (off)')),
           ...fields(ctx, [
             ['From', kindWord(s)],

@@ -178,7 +178,7 @@ export const accounts: Area = {
               e.status.loggedIn ? p.green(state(e.status)) : p.yellow(state(e.status)),
               p.dim(e.apiKey ? 'API key saved' : ''),
             ]),
-            { head: ['', 'ACCOUNT', 'ID', 'PROGRAM', 'STATE', ''], grow: 4 },
+            { head: ['', 'ACCOUNT', 'ID', 'PROGRAM', 'STATE', ''], grow: 1, fixed: [2] },
           ),
         );
         ctx.out(p.dim('● new sessions start with it (hydor accounts use <account> changes that).'));

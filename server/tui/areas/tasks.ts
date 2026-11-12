@@ -275,13 +275,13 @@ export const tasks: Area = {
         if (ctx.o.json) return ctx.json(r);
         if (!r.tasks.length) return ctx.out('No scheduled tasks yet: hydor tasks new makes one, or ask an agent to.');
         const rows = r.tasks.map((t) => [
-          p.dim(t.id),
+          p.dim(t.id.slice(0, 8)),
           p.bold(t.name),
           scheduleText(t.schedule),
           t.enabled ? (t.nextAt ? p.dim(`next ${whenText(t.nextAt)}`) : '') : p.yellow(t.pausedReason ? `paused: ${t.pausedReason}` : 'paused'),
           t.lastStatus ? (t.lastStatus === 'ok' ? p.green('last ok') : p.red(`last: ${t.lastStatus}`)) : '',
         ]);
-        ctx.out(table(ctx, rows, { grow: 2 }));
+        ctx.out(table(ctx, rows, { head: ['ID', 'TASK', 'WHEN', 'NEXT', 'LAST'], grow: 1, fixed: [0, 2] }));
       },
     },
     {
