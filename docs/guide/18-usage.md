@@ -65,7 +65,7 @@ How the timing works, with the switch or with **Resume at reset**:
 
 - The session is due a minute after the limit resets, as the provider last reported it. The app reads the usage now and then while a session waits, more often as the reset nears, and moves the time if the provider moves the reset.
 - If the limit lifts early (you used a reset, or signed in with another account), the session continues right away. If it was continued early in the last 15 minutes and hit the limit again, it waits for the reset instead.
-- Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn gets through normally. A turn the agent starts by itself while it waits (when a background helper of its own stops at the same limit) does not drop it. A session you stopped with **Stop** is never continued by itself, even when the limit's error came first, until you send it a message.
+- Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn gets through normally. A turn the agent starts by itself while it waits (when a background task or subagent of its own stops at the same limit) does not drop it. A session you stopped with **Stop** is never continued by itself, even when the limit's error came first, until you send it a message.
 - **Cancel** on the notice stops a planned continue.
 
 With more than one account for the agent, [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) carries the session on with another account right away instead, and waits only when every account is at its limit (see [Agents, accounts and models](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)). For Claude Code, [**Use API credit at a limit**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) can carry it on then, billed to an Anthropic API key you saved, instead of waiting (see [Use API credit when every account is at its limit](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit)).
@@ -153,7 +153,7 @@ Conversations Claude Code deleted before this, while the app wasn't keeping them
 
 ## Cap what a session spends
 
-A spending cap stops a session once it has spent a set amount at API prices, whatever plan you pay with. Child sessions it starts count too.
+A spending cap stops a session once it has spent a set amount at API prices, whatever plan you pay with. Subagents it starts count too.
 
 - For a new session: on the start page, **Options** → **Spending cap**. Pick $1, $5, $10 or $25, or type an amount and click **Set**. **No cap** takes it off.
 - For a running session: the session's menu (⋯) → **Session settings** → **Spending cap**. The dialog shows what it has spent so far. Type a cap (from $0.01) and click **Set the cap** or **Change**; **Remove the cap** takes it off.

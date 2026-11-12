@@ -1,5 +1,5 @@
 // What the pages know of swarms: each one's board (and a campaign's parts), loaded when shown and kept up to
-// date by the server's events, and the swarm's size from Settings → Child sessions (for the start page).
+// date by the server's events, and the swarm's size from Settings → Subagents (for the start page).
 import { useEffect } from 'react';
 import { create } from 'zustand';
 import type { ChildSettings } from '@shared/children';
@@ -40,7 +40,7 @@ export function loadBoard(key: string) {
 export const useChildSettings = create<{ st: ChildSettings | null }>(() => ({ st: null }));
 
 let asked = false;
-/** Settings → Child sessions: how many children, and how many swarm members, work at once. */
+/** Settings → Subagents: how many children, and how many swarm members, work at once. */
 export function useChildSettingsState(): ChildSettings | null {
   const st = useChildSettings((s) => s.st);
   useEffect(() => {

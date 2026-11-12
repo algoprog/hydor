@@ -343,9 +343,9 @@ export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null
             onChange={(v) => set({ tier: v === 'auto' ? undefined : v })}
             options={[{ value: 'auto', label: 'Automatic' }, ...TIERS.map((t) => ({ value: t.id, label: t.label }))]}
           />
-          {/* Under the choice it explains, not below the helpers' rows. */}
+          {/* Under the choice it explains, not below the subagents' rows. */}
           <div className="mt-1 text-[12px] leading-snug text-fg-3">Automatic: the model picked where it starts. A tier: its model for the program it runs on (Settings → Models → Tiers).</div>
-          <div className="mt-2.5 mb-1 text-[12.5px] text-fg-2">Helpers it starts, never above</div>
+          <div className="mt-2.5 mb-1 text-[12.5px] text-fg-2">Subagents it starts, never above</div>
           <Segmented<Tier | 'any'>
             size="sm"
             value={d.helperMax ?? 'any'}
@@ -355,7 +355,7 @@ export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null
           <label className="mt-2.5 flex cursor-pointer items-center gap-3">
             <span className="min-w-0 flex-1">
               <span className="block text-[12.5px] text-fg-2">Step up when a check fails</span>
-              <span className="block text-[12px] leading-snug text-fg-3">A helper on a tier whose reply does not pass a quick check runs again one tier up; a scheduled run that fails, too.</span>
+              <span className="block text-[12px] leading-snug text-fg-3">A subagent on a tier whose reply does not pass a quick check runs again one tier up; a scheduled run that fails, too.</span>
             </span>
             <Switch on={d.stepUp !== false} onChange={(on) => set({ stepUp: on ? undefined : false })} label="Step up when a check fails" />
           </label>

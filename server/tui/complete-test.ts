@@ -67,7 +67,7 @@ test('context: a /command, the value after one, an @file; nothing for the rest',
   assert.deepEqual(contextOf('/mo'), { kind: 'commands', from: 0, query: 'mo' });
   assert.deepEqual(contextOf('/model '), { kind: 'values', cmd: 'model', from: 7, query: '' });
   assert.deepEqual(contextOf('/effort hi'), { kind: 'values', cmd: 'effort', from: 8, query: 'hi' });
-  for (const c of ['model', 'mode', 'effort', 'agent', 'helpers', 'open']) assert.equal(contextOf(`/${c} x`)?.kind, 'values', c);
+  for (const c of ['model', 'mode', 'effort', 'agent', 'subagents', 'helpers', 'open']) assert.equal(contextOf(`/${c} x`)?.kind, 'values', c);
   assert.equal(contextOf('/rename new title'), null);
   assert.equal(contextOf('/model opus now'), null);
   assert.deepEqual(contextOf('look at @src/ch'), { kind: 'files', from: 8, query: 'src/ch' });

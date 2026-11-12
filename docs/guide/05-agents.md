@@ -173,7 +173,7 @@ The editor that **All settings** opens has every setting of an agent; on a phone
   - **Plan**: reads and plans only, until you approve.
 
   Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
-- **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**; under it **Helpers it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
+- **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**; under it **Subagents it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **What it may use**: five switches, all on for a new agent (see below).
 - **Skills to favor**: skill names, one at a time (see below).
 - **Connections**: shown when you have connected accounts (see below).
@@ -214,7 +214,7 @@ On an agent's page, its settings read as sentences: what it does, "It works *eve
 
 - **Where it works**: **Everywhere**, or a switch for each project.
 - **When it works**: its schedules, each opening its editor, **Add a schedule**, and **Keeps one conversation, with an inbox**.
-- **What it thinks with**: Automatic or a tier, **Helpers it starts, never above**, and **Step up when a check fails**.
+- **What it thinks with**: Automatic or a tier, **Subagents it starts, never above**, and **Step up when a check fails**.
 - **What it may use**: the five switches.
 - **Whom it asks for help**: a switch for each other agent, and **Other agents may hand it work**.
 - **What it hands back**: its fields and where each result goes.
@@ -248,22 +248,22 @@ Tiers pick a model by the job instead of by its name:
 
 - **Quick**: the cheapest, for small, very clear jobs whose result can be checked, such as a targeted edit, pulling out facts, sorting, formatting and short summaries.
 - **Standard**: clear tasks of medium size: a change that is spelled out, tests, research on a set question, a draft to an outline.
-- **Best**: a session's main agent. It works out what is asked, plans, leads helpers and checks their work.
+- **Best**: a session's main agent. It works out what is asked, plans, leads subagents and checks their work.
 - **Max**: the strongest, for the hardest problems: stubborn bugs, proofs, designs with many constraints.
 
 An agent set to a tier starts on that tier's model for the program it runs on, unless a model was picked for the session; set to **Automatic** (the default), it uses the model picked where it starts: the start page, the scheduled task, or the agent that hands it work. On the start page that pick can itself be **Automatic**: Best, or Max when the request reads as a hard problem (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)).
 
 [Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means, in a table with a column for each program: for **Claude Code** a model (Haiku, Sonnet, Opus and the newest Fable to start) and an effort; for **Codex** a model and an effort (Luna, Terra, Sol and Astra to start; on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); for **Custom** one of your Custom models, or nothing, which keeps the model the session picked. A tier you leave alone follows its program's newest model of that kind. **Back to the defaults** puts them back.
 
-**Helpers it starts, never above** caps the tiers of the helpers an agent starts: asked for a higher one, a helper gets this one. A helper never thinks with a tier above the one its lead thinks with either. A model named outright is used as named.
+**Subagents it starts, never above** caps the tiers of the Hydor subagents an agent starts: asked for a higher one, a subagent gets this one. A subagent never thinks with a tier above the one its lead thinks with either. A model named outright is used as named.
 
-**Step up when a check fails** (on unless you turn it off): a helper the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, as far as Best and never above the highest the agent allows. Only its reply to the brief is checked: a later reply, to a message from its lead or from you, never sends the whole job round again. The lead hears that it did and why, and the new helper is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a helper up itself when it finds the result not good enough.
+**Step up when a check fails** (on unless you turn it off): a Hydor subagent the agent starts on a tier, whose reply does not pass a quick check (the helper model reads its brief and its reply) or that stops with an error, runs again one tier up, as far as Best and never above the highest the agent allows. Only its reply to the brief is checked: a later reply, to a message from its lead or from you, never sends the whole job round again. The lead hears that it did and why, and the new subagent is told why the first fell short. A scheduled run of the agent that fails on its tier runs again one tier up too, up to Best. A lead can also step a subagent up itself when it finds the result not good enough.
 
 ## Agents that hand work to other agents
 
-An agent can hand a part of its work to a new session that works on it beside it: a child session (see [Deep research, second opinions and several agents](/guide/research)). It can start:
+An agent can hand a part of its work to a new session that works on it beside it: a Hydor subagent (see [Deep research, second opinions and several agents](/guide/research)). It can start:
 
-- **a plain helper**, with a tier for its part: Quick for a small, very clear job, Standard for a clear task of medium size (what a helper gets when none is asked for), Best for a hard part that stands on its own;
+- **a plain subagent**, with a tier for its part: Quick for a small, very clear job, Standard for a clear task of medium size (what a subagent gets when none is asked for), Best for a hard part that stands on its own;
 - **one of your agents**, by name: it works with its own instructions, tools, connections, mode and tier, and its reply comes back to the agent that asked.
 
 Who may hand work to whom:
@@ -273,7 +273,7 @@ Who may hand work to whom:
 - An agent with **Other agents may hand it work** off takes work from none.
 - A named agent works in its own projects only, and never with a freer permission mode than the session that asked.
 
-In the conversation, each helper shows as a card under the turn that started it, with the agent it works as (or "Child session"), its tier, program and model, what it is doing, and what it cost, and, when it stepped up, from which tier and why; **Open** opens its conversation. A project's **Agents** tab shows which of its agents hand work to which.
+In the conversation, each Hydor subagent shows as a card under the turn that started it, with the agent it works as (or "Hydor subagent"), its tier, program and model, what it is doing, and what it cost, and, when it stepped up, from which tier and why; **Open** opens its conversation. A project's **Agents** tab shows which of its agents hand work to which.
 
 An agent that keeps a conversation of its own takes the work in its inbox instead of a new session, and its answer comes back when it gets to it (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 
@@ -282,7 +282,7 @@ An agent that keeps a conversation of its own takes the work in its inbox instea
 An agent's **Monthly budget** caps what its sessions spend in a month (from the first of the month, in this computer's time):
 
 - Each session started as it gets a spending cap of what is left of the budget (the lower one, when the session has a cap of its own).
-- What its plain helpers spend counts towards it; a named agent's work counts towards that agent's own budget.
+- What its plain subagents spend counts towards it; a named agent's work counts towards that agent's own budget.
 - Once the budget is spent, no session starts as it until the next month: a scheduled run says why it could not start, and its card says **Budget spent**.
 
 What each session spends is worked out as in [Usage and costs](/guide/usage). Leave the field empty for no limit.

@@ -163,7 +163,7 @@ export function historyItems(history: string[], query: string): Ranked[] {
 export type Context = { kind: 'commands'; from: number; query: string } | { kind: 'values'; cmd: string; from: number; query: string } | { kind: 'files'; from: number; query: string };
 
 /** The commands that take a value from a list. */
-export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'helpers', 'open'];
+export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'subagents', 'helpers', 'open'];
 
 /** What the text before the cursor is completing, and where that starts; null when nothing. */
 export function contextOf(before: string): Context | null {

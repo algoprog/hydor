@@ -1,7 +1,7 @@
 // Swarm mode: a session that leads a team of agents, as a swarm attacking a hard problem from different angles,
 // or as a campaign making one big change in many parts, each in a worktree of its own. On the start page, an
 // option under Options; in the lead's session, a bar over the message box with how it is doing and its board; in
-// a member's, where its posts and report go. Its size is in Settings → Child sessions; members are child
+// a member's, where its posts and report go. Its size is in Settings → Subagents; members are child
 // sessions, so they also nest under the lead in the sidebar.
 import { useEffect, useRef, useState } from 'react';
 import { Settings2, Users } from 'lucide-react';
