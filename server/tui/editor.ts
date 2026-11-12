@@ -184,9 +184,9 @@ function escape(s: string, i: number): [Key | null, number] {
   if (next === 'b' || next === 'B') return [{ name: 'word-left' }, 2];
   if (next === 'f' || next === 'F') return [{ name: 'word-right' }, 2];
   if (next === 'd') return [{ name: 'delete-word-fwd' }, 2];
-  if (next === '\x1b') return [{ name: 'escape' }, 1];
-  // Alt with another key: nothing here.
-  return [null, 2];
+  // Esc, then another key that came in the same read (typed fast, or sent by a program such as tmux): Esc, and the key
+  // read on its own (Alt with a key that means nothing here would otherwise swallow both).
+  return [{ name: 'escape' }, 1];
 }
 
 // ---- the text and its cursor ------------------------------------------------------------------------

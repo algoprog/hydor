@@ -1048,6 +1048,8 @@ export class Chat {
       this.plan.model = m;
       this.say(`${INDENT}Model: ${modelLabel(m, this.cat.models)}`);
     };
+    // A slash command or words are not a model (an Esc and a command typed fast after `/model ` once made one).
+    if (arg && (arg.startsWith('/') || /\s/.test(arg))) return this.flash(p.yellow(`Not a model: ${arg} (/model lists them)`));
     if (arg) return apply(arg);
     const items = [...(this.tiers?.team && !this.view ? [{ label: 'Automatic', hint: 'picked by the job, from your tiers', value: 'auto' }] : []), ...this.cat.models.map((m) => ({ label: m.label, hint: [m.value, m.isDefault ? 'default' : ''].filter(Boolean).join(' · '), value: m.value }))];
     this.pick('Which model?', items, apply);
