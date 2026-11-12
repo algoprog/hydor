@@ -172,7 +172,7 @@ export const library: Area = {
         kind: {
           type: 'string',
           value: '<kind>',
-          desc: 'Only this kind: page, doc, slides, sheet, diagram, latex, notebook, image, video, audio',
+          desc: 'Only this kind (page, doc, slides, sheet, image…)',
           values: ['page', 'doc', 'slides', 'sheet', 'diagram', 'latex', 'notebook', 'image', 'video', 'audio'],
         },
         project: { type: 'string', value: '<project>', desc: 'Only what is in this project', kind: 'project' },
@@ -278,7 +278,7 @@ export const library: Area = {
       name: 'export',
       args: [item],
       options: {
-        to: { type: 'string', value: '<format>', desc: 'The format: pdf, docx, pptx, xlsx, md, csv, png, svg… (what its kind offers)' },
+        to: { type: 'string', value: '<format>', desc: 'The format: pdf, docx, pptx, xlsx, md, csv, png, svg…' },
         output: { type: 'string', short: 'o', value: '<file>', desc: 'Where to write it (default: its title, here)', kind: 'file' },
       },
       summary: 'Save an item as a file',
