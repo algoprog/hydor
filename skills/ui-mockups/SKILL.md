@@ -68,9 +68,11 @@ sentence on who it suits.
 
 ## 4. Look before you show
 
-Write the page to a file and look at it with `ui_screenshot` (phase `check`, viewport `both`):
-nothing overflows or overlaps, text is readable at phone width, the options look clearly
-different, the numbers add up. Fix, then show it.
+Write the page to a file and look at it with `ui_screenshot` (phase `check`, viewport `both`). It
+shows a page made with the kit as the app does, in the dark theme: look once with `theme: "light"`
+too. Nothing overflows or overlaps, every text reads well on what is behind it in both themes, text
+is readable at phone width, the options look clearly different, the numbers add up. Fix, then show
+it.
 
 ## 5. Say what differs, briefly
 

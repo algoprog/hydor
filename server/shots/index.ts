@@ -14,6 +14,7 @@ import { canCapture, capture, setCaptureDb } from '../capture/index.ts';
 import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import type { Feature, RunTool, ToolOutput } from '../features/types.ts';
+import { KIT_CSS } from '../../shared/page-kit.ts';
 
 const DIR = path.join(config.dataDir, 'shots');
 /** All the pictures together stay under this; the oldest go first. */
@@ -105,6 +106,40 @@ export function whereTo(raw: string, cwd: string): string {
   return `file://${p}`;
 }
 
+/** The file a file:// address from whereTo names (its path as given, or percent-encoded from a file:// address). */
+export function pathOf(url: string): string {
+  const raw = url.slice('file://'.length);
+  if (fs.existsSync(raw)) return raw;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * An HTML file made with the page kit (its body is .n-page): a page for show_html or the Library, which the app
+ * shows with the kit's stylesheet and in the app's light or dark, so its screenshot shows it so too.
+ */
+export function kitPage(file: string): boolean {
+  try {
+    if (fs.statSync(file).size > 20 * 1024 * 1024) return false;
+    return /<body\b[^>]*\bclass\s*=\s*["']?[^"'>]*\bn-page\b/i.test(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What the app adds to a kit page before its own styles and scripts: the kit's stylesheet first (the page's own
+ * rules come after it and win), and its light or dark. A page saved as a file that carries the kit already keeps
+ * its own.
+ */
+export function kitScript(theme: 'light' | 'dark'): string {
+  const css = JSON.stringify(KIT_CSS);
+  return `(()=>{if(window.top!==window)return;const put=()=>{const r=document.documentElement;r.setAttribute('data-n-theme',${JSON.stringify(theme)});if(document.getElementById('n-kit'))return;const s=document.createElement('style');s.id='n-kit';s.textContent=${css};(document.head||r).prepend(s)};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',put,{once:true});else put()})()`;
+}
+
 const VIEWPORTS = {
   desktop: { width: 1280, height: 800, scale: 1, mobile: false, max: 6000 },
   phone: { width: 390, height: 844, scale: 2, mobile: true, max: 4000 },
@@ -117,6 +152,8 @@ const SHOT: RunTool = {
     'When you change how a web app looks or works: before your first edit, take phase "before" of each screen you will change (a short label per screen: "Settings page");',
     'when you are done, take phase "after" of the same screens with the same labels. The user sees each pair side by side in the conversation. Start the dev server first if it is not running.',
     'phase "check" just looks (no pair). viewport: "desktop" (1280×800, the default), "phone" (390×844) or "both". full_page: the whole page instead of its first screen.',
+    'theme: "dark" or "light", the colour scheme the page is told the device prefers (the browser’s light when not given).',
+    'An HTML file made with the page kit (<body class="n-page">, a page for show_html or the Library) is shown as the app shows it, with the kit and in its dark theme unless theme is "light": look at a page you wrote before you show it.',
     'You get the picture back to check your work.',
   ].join(' '),
   annotations: { readOnlyHint: true },
@@ -129,6 +166,7 @@ const SHOT: RunTool = {
       viewport: { type: 'string', enum: ['desktop', 'phone', 'both'] },
       full_page: { type: 'boolean' },
       wait_ms: { type: 'number', description: 'Extra time to let the page settle after it loaded (animations, data), up to 10000.' },
+      theme: { type: 'string', enum: ['dark', 'light'], description: 'The colour scheme to show the page in. A page made with the page kit shows in the dark when not given.' },
     },
     required: ['url', 'phase', 'label'],
   },
@@ -140,12 +178,16 @@ const SHOT: RunTool = {
     const label = String(a.label ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'The page';
     const which: UiShot['viewport'][] = a.viewport === 'both' ? ['desktop', 'phone'] : a.viewport === 'phone' ? ['phone'] : ['desktop'];
     const settle = Math.min(10_000, Math.max(300, Number(a.wait_ms) || 800));
+    // A page made with the kit, as the app shows it: the kit's stylesheet and the app's dark (or light) theme.
+    const asked = a.theme === 'dark' || a.theme === 'light' ? a.theme : undefined;
+    const kit = url.startsWith('file://') && kitPage(pathOf(url));
+    const theme = asked ?? (kit ? 'dark' : undefined);
     fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
     const made: UiShot[] = [];
     const images: { data: string; mimeType: string }[] = [];
     for (const v of which) {
       const vp = VIEWPORTS[v];
-      const o = { url, width: vp.width, height: vp.height, scale: vp.scale, mobile: vp.mobile, fullPage: !!a.full_page, maxHeight: vp.max, settleMs: settle };
+      const o = { url, width: vp.width, height: vp.height, scale: vp.scale, mobile: vp.mobile, fullPage: !!a.full_page, maxHeight: vp.max, settleMs: settle, colorScheme: theme, firstScript: kit ? kitScript(theme!) : undefined };
       // The agent's own copy, smaller and of the first screen: enough to check its work.
       const shot = await capture({ ...o, format: 'webp', quality: 82, alt: { format: 'jpeg', quality: 68, outWidth: v === 'phone' ? 390 : 1024 } });
       const id = crypto.randomBytes(6).toString('hex');
@@ -178,7 +220,12 @@ const SHOT: RunTool = {
         : ' The user sees it beside the before one.';
     } else if (phase === 'before') note = ' Take the "after" one with the same label when you are done.';
     const page = made[0]?.title ? ` (the page's title: "${made[0].title}")` : '';
-    return { text: `Took the ${phase} screenshot of "${label}" at ${url}${page}, ${which.join(' and ')} (shot ${ids}).${note}`, images };
+    const look = kit
+      ? ` It shows the page as the app does, with the page kit, in the ${theme} theme${asked ? '' : ' (theme "light" for the light one)'}.`
+      : theme
+        ? ` The page was told the device prefers ${theme}.`
+        : '';
+    return { text: `Took the ${phase} screenshot of "${label}" at ${url}${page}, ${which.join(' and ')} (shot ${ids}).${look}${note}`, images };
   },
 };
 

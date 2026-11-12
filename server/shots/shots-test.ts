@@ -8,10 +8,10 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { canCapture, closeCapture } from '../capture/index.ts';
+import { canCapture, closeCapture, withTab } from '../capture/index.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx, ToolOutput } from '../features/types.ts';
-import { shots, whereTo } from './index.ts';
+import { kitPage, kitScript, pathOf, shots, whereTo } from './index.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -47,6 +47,16 @@ ok(whereTo('index.html', tmp) === `file://${tmp}/index.html`, 'an HTML file is f
 fails(() => whereTo('notes.md', tmp), 'a file that is not HTML is refused');
 fails(() => whereTo('javascript:alert(1)', tmp), 'other kinds of address are refused');
 fails(() => whereTo('missing.html', tmp), 'a file that is not there is refused');
+
+// ---- a page made with the page kit, shown as the app shows it -----------------------------------------------
+// Colours a page names after the kit's at its top, as agents often write them: in the dark they must be the dark ones.
+const kitFile = path.join(tmp, 'menu mockup.html');
+fs.writeFileSync(kitFile, '<!doctype html><title>Menu</title><style>:root{--card:var(--n-card,#123456);--text:var(--n-fg,#000)}.menu{background:var(--card);color:var(--text)}</style><body class="n-page"><div class="menu">web-agent</div></body>');
+const ownFile = path.join(tmp, 'own.html');
+fs.writeFileSync(ownFile, '<!doctype html><title>Own</title><style>:root{--n-card:#abcdef;--card:var(--n-card)}.menu{background:var(--card)}</style><body class="n-page"><div class="menu">web-agent</div></body>');
+ok(kitPage(kitFile) && !kitPage(path.join(tmp, 'index.html')) && !kitPage(path.join(tmp, 'missing.html')), 'a page made with the kit is told from one of its own');
+ok(pathOf(whereTo('menu mockup.html', tmp)) === kitFile && pathOf('file://' + encodeURI(kitFile)) === kitFile, 'the file of a file address is found, its path as given or encoded');
+ok(kitScript('dark').includes('"dark"') && kitScript('light').includes('"light"') && kitScript('dark').includes('--n-card'), 'the kit goes in with the theme asked for');
 
 if (!canCapture()) {
   console.log('No Chromium here: the pictures are not tested.');
@@ -90,6 +100,23 @@ if (!canCapture()) {
   ok(lone.text.includes('no "before" screenshot labelled "Cart drawer"'), 'an after without a before tells the agent to take one first next time');
   const list = (await app.inject({ url: '/api/shots?key=claude:s1' })).json().shots;
   ok(list.length === 5 && events.length === 3 && events[0].key === 'claude:s1', 'the session’s pictures are listed, and its pages hear of each');
+
+  // A page made with the kit, in the app's dark and light: what the page names after the kit's colours follows them.
+  const look = (file: string, theme: 'dark' | 'light') =>
+    withTab({ url: `file://${file}`, width: 400, height: 300, colorScheme: theme, firstScript: kitScript(theme) }, ({ evaluate }) =>
+      evaluate<string>("JSON.stringify((s => [s.backgroundColor, s.color])(getComputedStyle(document.querySelector('.menu'))).concat(matchMedia('(prefers-color-scheme: dark)').matches))"),
+    ).then((j) => JSON.parse(j) as [string, string, boolean]);
+  const [dBg, dFg, dDark] = await look(kitFile, 'dark');
+  ok(dBg === 'rgb(21, 24, 32)' && dFg === 'rgb(233, 237, 245)' && dDark, `in the dark, a page's own names for the kit's colours are the dark ones (${dBg}, ${dFg})`);
+  const [lBg, lFg, lDark] = await look(kitFile, 'light');
+  ok(lBg === 'rgb(255, 255, 255)' && lFg === 'rgb(27, 25, 21)' && !lDark, `in the light, the light ones (${lBg}, ${lFg})`);
+  ok((await look(ownFile, 'dark'))[0] === 'rgb(171, 205, 239)', 'a page’s own colour for the kit’s, at its top, still wins in the dark');
+  const kd = await run({ url: kitFile, phase: 'check', label: 'Menu mockup' });
+  ok(kd.text.includes('with the page kit, in the dark theme') && kd.text.includes('theme "light"'), 'a kit page is pictured as the app shows it, in the dark unless asked');
+  const kl = await run({ url: kitFile, phase: 'check', label: 'Menu mockup', theme: 'light' });
+  ok(kl.text.includes('in the light theme') && !kl.text.includes('theme "light" for'), 'and in the light when asked');
+  const sd = await run({ url, phase: 'check', label: 'Checkout page', theme: 'dark' });
+  ok(sd.text.includes('told the device prefers dark') && !sd.text.includes('page kit'), 'another page is told the theme asked for, without the kit');
   await app.close();
   site.close();
   closeCapture();
