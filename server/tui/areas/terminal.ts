@@ -83,6 +83,15 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
     open(url) {
       void import('../commands.ts').then((m) => m.openBrowser(url));
     },
+    // Longer than the screen, on a terminal: through $PAGER, else less (its colours kept; LESS=FRX as git sets it, so it
+    // ends by itself on a short text and leaves what was read on the screen). Printed when there is no pager.
+    async page(lines) {
+      const text = `${lines.join('\n')}\n`;
+      if (!process.stdout.isTTY || lines.length < (process.stdout.rows || 24) - 1) return void process.stdout.write(text);
+      const [cmd, ...args] = (process.env.PAGER || 'less').trim().split(/\s+/);
+      const r = spawnSync(cmd, cmd === 'less' && !args.length ? ['-R'] : args, { input: text, stdio: ['pipe', 'inherit', 'inherit'], env: { LESS: 'FRX', ...process.env } });
+      if (r.error) process.stdout.write(text);
+    },
     async pick(title, items) {
       const { pickInTerminal } = await import('../picker.ts');
       return pickInTerminal(title, items, look.p);
