@@ -85,7 +85,7 @@ test('hydor help: every command and area is one line of at most 80 columns, its 
   const lines = plain2.split('\n');
   const top = lines.slice(
     0,
-    lines.findIndex((l) => l === 'Options'),
+    lines.findIndex((l) => l === 'Examples'),
   );
   assert.ok(
     top.every((l) => [...l].length <= 80),
@@ -93,7 +93,7 @@ test('hydor help: every command and area is one line of at most 80 columns, its 
   );
   // A row that wrapped would leave a line starting far in, under its summary.
   assert.ok(!top.some((l) => /^ {30,}\S/.test(l)), 'no summary wraps');
-  assert.ok(top.length <= 60, `one screen: ${top.length} lines before the options`);
+  assert.ok(top.length <= 60, `one screen: ${top.length} lines before the examples`);
   for (const c of CMD_TABLE)
     assert.ok(
       top.some((l) => l.startsWith(`  hydor ${c.bare ? '' : c.name}`.trimEnd()) && l.endsWith(c.desc)),

@@ -21,9 +21,9 @@ export type Group = 'talk' | 'sessions' | 'work' | 'models' | 'tools' | 'this' |
 export const GROUPS: { id: Group; title: string }[] = [
   { id: 'talk', title: 'Talk to an agent' },
   { id: 'sessions', title: 'Sessions' },
-  { id: 'work', title: 'Projects and knowledge' },
-  { id: 'models', title: 'Models and agents' },
-  { id: 'tools', title: 'Tools and connections' },
+  { id: 'work', title: 'Your work' },
+  { id: 'models', title: 'Agents and models' },
+  { id: 'tools', title: 'What agents know and use' },
   { id: 'this', title: 'This Hydor' },
   { id: 'maintenance', title: 'Maintenance' },
 ];
@@ -37,6 +37,7 @@ export type ArgKind =
   | 'app'
   | 'run'
   | 'page'
+  | 'goto'
   | 'skill'
   | 'plugin'
   | 'mcp'
@@ -45,6 +46,7 @@ export type ArgKind =
   | 'experiment'
   | 'machine'
   | 'connection'
+  | 'service'
   | 'account'
   | 'setting'
   | 'value'

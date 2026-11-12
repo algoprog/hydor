@@ -114,7 +114,7 @@ export const skills: Area = {
   aliases: ['skill'],
   summary: 'The skills agents use',
   help: 'A skill is a SKILL.md that tells an agent how to do one kind of task. The library is every agent’s; Claude Code and Codex have their own besides (--agent claude, --agent codex). A skill an agent proposed is approved on the Skills page. Name one by its name or the start of it; on a terminal, leave it out to pick from a list.',
-  group: 'work',
+  group: 'tools',
   verbs: [
     {
       name: 'list',

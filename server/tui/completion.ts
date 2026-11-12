@@ -370,11 +370,6 @@ async function afterCommand(line: Line, cur: string, get: <T>(p: string) => Prom
             : [];
       if ((line.rest[0] === 'team' || line.rest[0] === 'hard') && n === 1) return startingWith([['on'], ['off']], cur);
       return [];
-    case 'tasks': {
-      if (n === 0) return startingWith(subs('tasks'), cur);
-      if (n !== 1 || line.rest[0] !== 'run') return [];
-      return startingWith((await LOADERS.task({ get, cur, opts: line.opts, args: [] })) as Candidate[], cur);
-    }
     case 'app': {
       if (n === 0) return startingWith(subs('app'), cur);
       if (n !== 1 || !['folder', 'dev', 'try', 'export'].includes(line.rest[0])) return [];
@@ -386,7 +381,7 @@ async function afterCommand(line: Line, cur: string, get: <T>(p: string) => Prom
     case 'help': {
       if (n === 0)
         return startingWith(
-          ALL_COMMAND_NAMES.map((c) => [c, describeCommand(c)] as Candidate),
+          [...ALL_COMMAND_NAMES.map((c) => [c, describeCommand(c)] as Candidate), ['options', 'Every option, and what it does'] as Candidate],
           cur,
         );
       const area = areaByName(line.rest[0]);

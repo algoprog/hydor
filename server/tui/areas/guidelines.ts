@@ -39,7 +39,7 @@ export const guidelines: Area = {
   aliases: ['guideline'],
   summary: 'What every agent follows',
   help: 'Guidelines are plain words the agent is told when a session starts. They apply to every session, to a project’s sessions, or to one session; a session follows all three.',
-  group: 'work',
+  group: 'tools',
   default: 'show',
   verbs: [
     {
