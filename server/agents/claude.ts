@@ -188,6 +188,8 @@ export class ClaudeLive extends LiveAdapter {
   private toolNames = new Map<string, string>();
   /** A call saving a page again, while the model writes it: the page's id, read as soon as it comes (SAVES_PAGE). */
   private savedIds = new Map<string, JsonFields>();
+  /** Tasks the CLI's list of background tasks has named: only these end by leaving it (a foreground subagent is never on it). */
+  private listed = new Set<string>();
 
   constructor(runner: Runner, opts: ClaudeOpts) {
     super(runner);
@@ -361,7 +363,8 @@ export class ClaudeLive extends LiveAdapter {
             this.tasks.set(t.task_id, { id: t.task_id, description: t.description, kind: t.task_type, status: 'running', startedAt: replay ? undefined : Date.now() });
           }
         }
-        for (const t of this.tasks.values()) if (t.status === 'running' && !running.has(t.id)) t.status = 'completed';
+        for (const id of running) this.listed.add(id);
+        for (const t of this.tasks.values()) if (t.status === 'running' && this.listed.has(t.id) && !running.has(t.id)) t.status = 'completed';
         break;
       }
       case 'api_retry':
@@ -526,6 +529,8 @@ export class ClaudeLive extends LiveAdapter {
         if (b?.type !== 'tool_result') continue;
         // The tool ran (or was refused): any approval for it is settled, and so is a page it was writing.
         for (const [id, a] of this.approvals) if (a.itemId === b.tool_use_id) this.approvals.delete(id);
+        // A foreground subagent ends with its call; one sent to the background has its result at launch instead.
+        for (const t of this.tasks.values()) if (t.status === 'running' && t.toolUseId === b.tool_use_id && (t.kind ?? '').includes('agent') && !this.listed.has(t.id) && !/async_launched|Async agent launched/i.test(JSON.stringify(m.tool_use_result ?? b.content ?? ''))) t.status = 'completed';
         if (typeof b.tool_use_id === 'string' && this.toolNames.has(b.tool_use_id)) this.emit('toolstream', { id: b.tool_use_id, name: this.toolNames.get(b.tool_use_id), at: 'result' });
       }
     }

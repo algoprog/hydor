@@ -125,6 +125,16 @@ tl2.dispose();
   assert.equal(parser.taskStart(docs.id, docs.toolUseId), Date.parse(at('48:42')), 'the agent: when it was called');
   assert.equal(parser.taskStart(cmd.id, cmd.toolUseId), Date.parse(at('50:10')), 'the command, by its id alone: when it was called');
   assert.equal(parser.taskStart('unknown'), undefined, 'a task the transcript does not have');
+
+  // A subagent in the foreground is never on the background list: a command ending there must not end it, its call's result does.
+  out({ type: 'system', subtype: 'task_started', task_id: 'a77', tool_use_id: 'toolu_fg', description: 'Build the harness', task_type: 'local_agent' });
+  out({ type: 'system', subtype: 'background_tasks_changed', tasks: [{ task_id: 'a0566', task_type: 'local_agent', description: 'Documents editor upgrade' }] });
+  const running = () => (agent.state.backgroundTasks ?? []).map((t) => t.id).sort();
+  assert.deepEqual(running(), ['a0566', 'a77'], 'the command ended; the foreground subagent still runs');
+  out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_bg2', content: 'Async agent launched successfully.' }] } });
+  out({ type: 'system', subtype: 'task_started', task_id: 'a88', tool_use_id: 'toolu_bg2', description: 'Later', task_type: 'local_agent' });
+  out({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_fg', content: 'The harness is built.' }] } });
+  assert.deepEqual(running(), ['a0566', 'a88'], 'its result ends the foreground subagent, not one launched in the background');
   tl3.dispose();
 }
 
