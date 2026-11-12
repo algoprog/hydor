@@ -1,21 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Square, X } from 'lucide-react';
 import type { BackgroundTask, TaskLog } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { duration } from '../../lib/format';
-import { toastError } from '../../lib/store';
-import { Button, cx, Dialog, Throbber, useConfirm } from '../../components/ui';
+import { toastError, useSessions } from '../../lib/store';
+import { agentName } from '../../components/AgentIcon';
+import { Button, cx, IconButton, Sheet, Throbber, useConfirm } from '../../components/ui';
+import { taskKindLabel, taskKindOf, taskState } from '../../lib/work';
 import { Elapsed } from './items';
+import { STATE_TONE, StateDot, TaskIcon, TaskKindText } from './WorkRow';
 import { LOCALE } from '../../i18n/locale';
-
-/** "Command", "Agent", "Monitor" for the CLI's task types (local_bash, local_agent, …). */
-export function taskKind(kind?: string): string {
-  const k = (kind ?? '').toLowerCase();
-  if (k.includes('bash') || k.includes('shell') || k === 'command') return 'Command';
-  if (k.includes('agent')) return 'Agent';
-  if (k.includes('monitor')) return 'Monitor';
-  if (k.includes('workflow')) return 'Workflow';
-  return 'Task';
-}
 
 const clock = (ts: number) => new Date(ts).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -24,13 +18,13 @@ export function useStopTask(sessionKey: string) {
   const [confirm, node] = useConfirm();
   const stop = async (t: BackgroundTask): Promise<boolean> => {
     const ok = await confirm({
-      title: 'Stop this background task?',
+      title: taskKindOf(t.kind) === 'subagent' ? 'Stop this subagent?' : 'Stop this background task?',
       body: (
         <>
           <b className="font-medium text-fg">{t.description}</b> stops now{t.startedAt ? `, after ${duration(Date.now() - t.startedAt)}` : ''}, and does not finish. What it has done so far stays.
         </>
       ),
-      confirm: 'Stop task',
+      confirm: taskKindOf(t.kind) === 'subagent' ? 'Stop subagent' : 'Stop task',
       danger: true,
     });
     if (!ok) return false;
@@ -40,37 +34,53 @@ export function useStopTask(sessionKey: string) {
   return { stop, node };
 }
 
-/** A background task in a list: its name (two lines at most) and how long it has run; it opens its output, and can be stopped. */
-export function TaskRow({ t, onOpen, onStop, className }: { t: BackgroundTask; onOpen: () => void; onStop?: () => void; className?: string }) {
+/**
+ * What a list of background tasks needs to open one in its panel and to stop one: `open(task)` shows the panel, `stop(task)`
+ * asks first, and `node` goes anywhere in the page. `tasks` is the list as it stands now, so the panel follows its task
+ * (while it runs, when it ends), and keeps the last it saw if it leaves the list.
+ */
+export function useTaskPanel(sessionKey: string, canStop: boolean, tasks: BackgroundTask[]) {
+  const [shown, setShown] = useState<BackgroundTask | null>(null);
+  const stopper = useStopTask(sessionKey);
+  const task = shown ? (tasks.find((t) => t.id === shown.id) ?? shown) : null;
+  const node: ReactNode = (
+    <>
+      {stopper.node}
+      {task && <TaskPanel sessionKey={sessionKey} task={task} canStop={canStop} onStop={() => void stopper.stop(task)} onClose={() => setShown(null)} />}
+    </>
+  );
+  return { open: setShown, stop: (t: BackgroundTask) => void stopper.stop(t), node };
+}
+
+/** The pill of the panel's header: a state in the tones of the session header's own (blue working, green done, red failed). */
+function StatePill({ task }: { task: BackgroundTask }) {
+  const state = taskState(task);
+  const label = state === 'running' ? 'Working' : state === 'done' ? 'Done' : state === 'stopped' ? 'Stopped' : state === 'failed' ? 'Failed' : 'Needs you';
   return (
-    <div className={cx('flex items-center gap-1 rounded-lg pr-1.5 transition-colors hover:bg-bg-2', className)}>
-      <button className="min-w-0 flex-1 px-2.5 py-1.5 text-left" title="Show its output" onClick={onOpen}>
-        <span className="line-clamp-2 text-[13px] leading-snug">{t.description}</span>
-        <span className="mt-0.5 block text-[11.5px] text-fg-3">
-          {taskKind(t.kind)}
-          {t.startedAt ? (
-            <>
-              {' '}
-              · <Elapsed since={t.startedAt} />
-            </>
-          ) : null}
-        </span>
-      </button>
-      {onStop && (
-        <button className="shrink-0 rounded-md px-2 py-1 text-[12px] text-fg-3 transition-colors hover:bg-err/10 hover:text-err" onClick={onStop}>
-          Stop
-        </button>
-      )}
-    </div>
+    <span className={cx('inline-flex h-5.5 shrink-0 items-center gap-1.5 rounded-full bg-bg-2 px-2 text-[12px] font-medium', STATE_TONE[state].text)}>
+      <StateDot state={state} small />
+      <span>{label}</span>
+    </span>
   );
 }
 
-/** A background task's latest output, refreshed every few seconds while open. */
-export function TaskLogDialog({ sessionKey, task, canStop, onClose }: { sessionKey: string; task: BackgroundTask; canStop: boolean; onClose: () => void }) {
+/**
+ * A background task opened as a session opens: a panel over the right of the page (the whole screen on a phone), with a
+ * header like a session's (its kind's icon, its title, its kind, how it stands, Stop while it runs) and under it what
+ * it did: an agent's steps as the session's own timeline has them, a command's or monitor's output as a terminal shows it.
+ * The latest is fetched every two seconds while it runs; the newest lines stay in view unless you scroll up.
+ */
+export function TaskPanel({ sessionKey, task, canStop, onStop, onClose }: { sessionKey: string; task: BackgroundTask; canStop: boolean; onStop: () => void; onClose: () => void }) {
   const [log, setLog] = useState<TaskLog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const running = task.status === 'running';
+  // Who runs a subagent task: the program of the session it belongs to ("Claude Code subagent").
+  const program = useSessions((x) => {
+    const s = x.byKey[sessionKey];
+    return s ? agentName(s.agent, s.acpName) : undefined;
+  });
 
   useEffect(() => {
     let alive = true;
@@ -85,14 +95,15 @@ export function TaskLogDialog({ sessionKey, task, canStop, onClose }: { sessionK
       } catch (e) {
         if (alive) setError((e as Error).message);
       }
-      if (alive) timer = window.setTimeout(load, 2000);
+      // Once it has ended, this one last look at what it left is the whole of it.
+      if (alive && running) timer = window.setTimeout(load, 2000);
     };
     load();
     return () => {
       alive = false;
       clearTimeout(timer);
     };
-  }, [sessionKey, task.id]);
+  }, [sessionKey, task.id, running]);
 
   // The newest lines stay in view unless the reader scrolled up.
   useLayoutEffect(() => {
@@ -100,33 +111,36 @@ export function TaskLogDialog({ sessionKey, task, canStop, onClose }: { sessionK
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [log]);
 
-  const stopper = useStopTask(sessionKey);
   const empty = log && (log.kind === 'agent' ? !log.entries?.length : !log.text?.trim());
   return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={task.description}
-      width={780}
-      footer={
-        canStop && (
-          <>
-            <Button variant="ghost" className="text-err" onClick={() => stopper.stop(task).then((done) => done && onClose())}>
-              Stop task
-            </Button>
-            {stopper.node}
-          </>
-        )
-      }
-    >
-      <div className="mb-2 flex items-center gap-1.5 text-[12.5px] text-fg-3">
-        <span>{taskKind(task.kind)}</span>
-        {task.startedAt ? (
-          <span>
-            · running for <Elapsed since={task.startedAt} />
-          </span>
-        ) : null}
-        {log?.truncated && <span>· latest output</span>}
+    <Sheet open onClose={onClose} label={taskKindLabel(task.kind, program)}>
+      <div className="flex shrink-0 items-start gap-3 border-b border-line px-4 pt-[max(12px,var(--safe-top))] pb-3">
+        <span className="mt-0.5 shrink-0 text-fg-2">
+          <TaskIcon kind={task.kind} size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div translate="no" className="line-clamp-2 text-[15px] leading-snug font-semibold tracking-tight">
+            {task.description}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-fg-3">
+            <TaskKindText kind={task.kind} program={program} />
+            <StatePill task={task} />
+            {running && task.startedAt ? (
+              <span>
+                · <Elapsed since={task.startedAt} />
+              </span>
+            ) : null}
+            {log?.truncated && <span>· latest output</span>}
+          </div>
+        </div>
+        {canStop && running && (
+          <Button size="sm" variant="ghost" className="shrink-0 text-err" icon={<Square size={12} />} onClick={onStop}>
+            Stop
+          </Button>
+        )}
+        <IconButton label="Close" onClick={onClose}>
+          <X size={17} />
+        </IconButton>
       </div>
       <div
         ref={box}
@@ -134,33 +148,31 @@ export function TaskLogDialog({ sessionKey, task, canStop, onClose }: { sessionK
           const el = e.currentTarget;
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
         }}
-        className="term-out h-[min(60vh,560px)] overflow-auto rounded-xl px-3 py-2"
+        className="min-h-0 flex-1 overflow-auto"
       >
         {!log ? (
-          error ? (
-            <span className="text-fg-3">{error}</span>
-          ) : (
-            <span className="text-fg-3">
-              <Throbber />
-            </span>
-          )
+          <div className="p-4 text-fg-3">{error ? error : <Throbber />}</div>
         ) : empty ? (
-          <span className="text-fg-3">{log.kind === 'agent' ? 'The agent has not done anything yet.' : 'No output yet.'}</span>
+          <div className="p-4 text-[13px] text-fg-3">{log.kind === 'agent' ? 'The agent has not done anything yet.' : 'No output yet.'}</div>
         ) : log.kind === 'agent' ? (
-          // On a phone the time leads each entry's text, which then has the width; wider, the times are a column.
-          log.entries!.map((e, i) => (
-            <div key={i} className="py-px sm:flex sm:gap-3">
-              {e.ts ? <span className="tnum mr-2 text-fg-3 sm:mr-0 sm:shrink-0">{clock(e.ts)}</span> : null}
-              <span className="min-w-0">
-                {e.tool && <span className={e.failed ? 'text-err' : 'text-accent'}>{e.tool} </span>}
-                <span className={e.tool ? '' : 'text-fg'}>{e.text}</span>
-              </span>
-            </div>
-          ))
+          // Steps as the session's timeline has them: the tool in the accent colour, what it did, the time.
+          <div className="space-y-0.5 p-2">
+            {log.entries!.map((e, i) => (
+              <div key={i} className="flex items-baseline gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] hover:bg-bg-2">
+                {e.tool && <span className={cx('shrink-0 font-medium', e.failed ? 'text-err' : 'text-accent')}>{e.tool}</span>}
+                <span translate="no" className={cx('min-w-0 flex-1 break-words whitespace-pre-wrap', e.tool ? 'text-fg-2' : 'text-fg')}>
+                  {e.text}
+                </span>
+                {e.ts ? <span className="tnum shrink-0 text-[11px] text-fg-3">{clock(e.ts)}</span> : null}
+              </div>
+            ))}
+          </div>
         ) : (
-          log.text
+          <div translate="no" className="term-out min-h-full px-4 py-3">
+            {log.text}
+          </div>
         )}
       </div>
-    </Dialog>
+    </Sheet>
   );
 }

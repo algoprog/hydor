@@ -1,6 +1,6 @@
 // What each part of a conversation says in the terminal, as lines: your messages, the agent's text (Markdown), its
 // steps (one line each, from the step's title or its label, with what matters of its result), thoughts, notices, the
-// end of a turn, helpers (child sessions) starting and finishing, tier notes, and approval cards with their choices.
+// end of a turn, subagents (Hydor's child sessions) starting and finishing, tier notes, and approval cards with their choices.
 // The words follow the web app's (web/src/features/session: items.tsx, outline.ts, Timeline.tsx).
 import type { BudgetNote } from '../../shared/budget.ts';
 import { childReplyOf, type ChildNote } from '../../shared/children.ts';
@@ -224,21 +224,21 @@ export function promptLines(text: string, look: Look, queued = false): string[] 
   return wrap(p.bold(words) + (queued ? p.dim('  (queued)') : ''), look.width, { first: `${p.accent('›')} `, indent: '  ' });
 }
 
-/** A helper's reply coming back to its lead: one line, in the colour of how it ended. */
+/** A subagent's reply coming back to its lead: one line, in the colour of how it ended. */
 export function childReplyLines(text: string, look: Look): string[] | null {
   const r = childReplyOf(text);
   if (!r) return null;
   const { p } = look;
   const line =
     r.ended === 'replied'
-      ? `${p.accent('◆')} Helper finished: ${r.title}`
+      ? `${p.accent('◆')} Subagent finished: ${r.title}`
       : r.ended === 'stopped'
-        ? `${p.yellow('◆')} ${p.yellow(`Helper stopped: ${r.title}`)}${r.why ? p.dim(` · ${r.why}`) : ''}`
-        : `${p.red('◆')} ${p.red(`Helper failed: ${r.title}`)}${r.why ? p.dim(` · ${r.why}`) : ''}`;
+        ? `${p.yellow('◆')} ${p.yellow(`Subagent stopped: ${r.title}`)}${r.why ? p.dim(` · ${r.why}`) : ''}`
+        : `${p.red('◆')} ${p.red(`Subagent failed: ${r.title}`)}${r.why ? p.dim(` · ${r.why}`) : ''}`;
   return [truncate(`${INDENT}${line}`, look.width)];
 }
 
-/** A user item: your message, a helper's reply, a message from another session, or a note the app added. */
+/** A user item: your message, a subagent's reply, a message from another session, or a note the app added. */
 export function userLines(item: Extract<TimelineItem, { kind: 'user' }>, look: Look): string[] {
   const { p } = look;
   const child = childReplyLines(item.text, look);
@@ -251,7 +251,7 @@ export function userLines(item: Extract<TimelineItem, { kind: 'user' }>, look: L
 /** A notice: dim, or in the colour of a warning or an error. */
 export function systemLines(item: Extract<TimelineItem, { kind: 'system' }>, look: Look): string[] {
   const { p } = look;
-  // A task in the background that ended: one line, as a helper's reply is.
+  // A task in the background that ended: one line, as a subagent's reply is.
   const bg = /^Background task (\w+): ([\s\S]*)$/.exec(item.text.trim());
   if (bg) {
     const [, status, what] = bg;
@@ -267,7 +267,7 @@ export function systemLines(item: Extract<TimelineItem, { kind: 'system' }>, loo
   return wrap(c(item.text.trim()), look.width, { first: `${INDENT}${c('·')} `, indent: `${INDENT}  ` });
 }
 
-/** The end of a turn: "✓ 1m 04s · $0.31 · Opus 5.5 · 1 helper". */
+/** The end of a turn: "✓ 1m 04s · $0.31 · Opus 5.5 · 1 subagent". */
 export function turnLines(item: TurnItem, look: Look, o: { helpers?: number; costUsd?: number } = {}): string[] {
   const { p } = look;
   const bits: string[] = [];
@@ -276,7 +276,7 @@ export function turnLines(item: TurnItem, look: Look, o: { helpers?: number; cos
   if (cost) bits.push(money(cost));
   if (item.tokens && (item.tokens.input || item.tokens.output) && look.verbose) bits.push(`${compact(item.tokens.input + (item.tokens.cacheRead ?? 0))} in · ${compact(item.tokens.output)} out`);
   if (item.model) bits.push(modelLabel(item.model, look.models));
-  if (o.helpers) bits.push(o.helpers === 1 ? '1 helper' : `${o.helpers} helpers`);
+  if (o.helpers) bits.push(o.helpers === 1 ? '1 subagent' : `${o.helpers} subagents`);
   const rest = bits.join(' · ');
   if (item.status === 'interrupted') return [`${INDENT}${p.yellow('■')} ${p.dim(['Stopped', rest].filter(Boolean).join(' · '))}`];
   if (item.status === 'failed') return [`${INDENT}${p.red('✗')} ${p.red('Failed')}${rest ? p.dim(` · ${rest}`) : ''}`];
@@ -303,7 +303,7 @@ export function itemLines(item: TimelineItem, look: Look): string[] {
 
 // ---- notes ----------------------------------------------------------------------------------------------
 
-/** What a tier note says (kind "tier"): Automatic picked a tier, or a helper stepped up one. */
+/** What a tier note says (kind "tier"): Automatic picked a tier, or a subagent stepped up one. */
 export interface TierNote {
   event: 'auto' | 'stepUp';
   tier: string;
@@ -315,13 +315,13 @@ const TIER_NAMES: Record<string, string> = { quick: 'Quick', standard: 'Standard
 /** A tier's label (Quick, Standard, Best, Max), whether this version knows the tier or not. */
 export const tierName = (t?: string) => (t ? (TIER_NAMES[t] ?? t[0].toUpperCase() + t.slice(1)) : '');
 
-/** A note the app added to the conversation, as lines: helpers starting, tiers, a spending cap; null for kinds not shown here. */
+/** A note the app added to the conversation, as lines: subagents starting, tiers, a spending cap; null for kinds not shown here. */
 export function noteLines(n: SessionNote, look: Look): string[] | null {
   const { p } = look;
   if (n.kind === 'child') {
     const c = n.data as ChildNote;
     const bits = [c.label, c.tier ? tierName(c.tier) : ''].filter(Boolean).join(' · ');
-    const head = c.steppedFrom ? `Helper stepped up to ${tierName(c.tier)}: ${c.title}` : `Helper started: ${c.title}`;
+    const head = c.steppedFrom ? `Subagent stepped up to ${tierName(c.tier)}: ${c.title}` : `Subagent started: ${c.title}`;
     return [truncate(`${INDENT}${p.accent('◆')} ${head}${bits ? p.dim(` · ${bits}`) : ''}`, look.width)];
   }
   if (n.kind === 'tier') {

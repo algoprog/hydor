@@ -34,7 +34,7 @@ const metrics = (m: Record<string, number> | undefined) =>
 export const experiments: Area = {
   name: 'experiments',
   aliases: ['experiment', 'runs'],
-  summary: 'Training and evaluation runs: list, look, stop',
+  summary: 'Training and evaluation runs',
   help: 'Runs wait for a GPU (or a cluster’s queue), run, and are kept as records with their log and metrics. Name one by its id, its name or the start of either. Starting runs and sweeps, and making results tables, are for agents and the page: hydor open experiments.',
   group: 'work',
   verbs: [

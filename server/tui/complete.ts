@@ -165,7 +165,7 @@ export type Context = { kind: 'commands'; from: number; query: string } | { kind
   | { kind: 'hydor'; from: number; before: string[]; query: string };
 
 /** The commands that take a value from a list. */
-export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'helpers', 'open'];
+export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'subagents', 'helpers', 'open'];
 
 /** What the text before the cursor is completing, and where that starts; null when nothing. */
 export function contextOf(before: string): Context | null {

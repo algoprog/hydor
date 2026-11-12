@@ -44,7 +44,7 @@ export const normalizePath = (p: string) => (p.startsWith('/') ? p : p.startsWit
 
 export const api: Area = {
   name: 'api',
-  summary: 'Call any endpoint of the API and print its JSON',
+  summary: 'Call any API endpoint',
   help: 'What the app’s pages call, for scripts: hydor api /api/projects, hydor api POST /api/projects -d \'{"name":"X"}\'. With no method it is GET, or POST when you give a body. A body is JSON text, @file (read from a file) or - (from stdin). Tab completes the routes; hydor guide api lists them.',
   group: 'this',
   bare: true,

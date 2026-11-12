@@ -436,7 +436,7 @@ On the Shared knowledge tab, it searches what a session outside any project sear
 | outside any project | the shared knowledge |
 | in a project | the project's own documents, and the shared knowledge unless the project turns it off |
 | in a group | the group's own documents, the documents of every project it brings together, and the shared knowledge unless the group turns it off |
-| started by another session (a child session) | what the session that started it searches |
+| started by another session (a Hydor subagent) | what the session that started it searches |
 
 The knowledge tools never bring up another project's documents, not even when an agent asks for a file by its path. A knowledge base whose project was deleted is shared.
 

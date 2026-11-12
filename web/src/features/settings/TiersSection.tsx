@@ -1,6 +1,6 @@
 // Settings → Models → Tiers: the model (and effort) Quick, Standard, Best and Max mean for each program, and how
 // sessions use them. A session on Automatic thinks with Best, or with Max for a hard problem, and its main agent
-// hands clear parts to helpers on Standard and Quick; an agent of yours thinks with one tier.
+// hands clear parts to subagents on Standard and Quick; an agent of yours thinks with one tier.
 import { useEffect, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { TIER_PROGRAMS, TIERS, type TeamSettings, type Tier, type TierMap, type TierPick, type TierProgram } from '@shared/tiers';
@@ -25,7 +25,7 @@ interface State {
 const SHORT: Record<Tier, string> = {
   quick: 'Small, clear jobs whose result can be checked',
   standard: 'Clear tasks of medium size',
-  best: 'The main agent: plans, leads helpers, checks',
+  best: 'The main agent: plans, leads subagents, checks',
   max: 'The hardest problems',
 };
 
@@ -47,7 +47,7 @@ export function TiersSection() {
     <>
       <Group
         title="Tiers"
-        info="The model each tier means for each program. A session on Automatic thinks with Best, or with Max for a hard problem; its main agent hands clear parts to helpers on Standard and Quick. A tier you leave alone follows its program’s newest model."
+        info="The model each tier means for each program. A session on Automatic thinks with Best, or with Max for a hard problem; its main agent hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model."
         actions={
           <>
             <Segmented size="sm" value={program} onChange={setProgram} options={TIER_PROGRAMS.map((p) => ({ value: p.id, label: p.label }))} />
@@ -101,10 +101,10 @@ export function TiersSection() {
       {st?.team && (
         <Group title="Tiers in sessions">
           <Row
-            label="Lead with helpers"
-            hint="The main agent plans, hands clear parts to cheaper tiers, checks them"
-            info="A session’s main agent plans, hands clear parts to helpers on cheaper tiers and checks their work, and a helper asked for with no tier gets Standard. Off: agents work alone unless they choose otherwise, and the start page has no Automatic."
-            control={<Switch on={st.team.on} onChange={(on) => save({ team: { on } })} label="Lead with helpers" />}
+            label="Lead with subagents"
+            hint="The main agent plans, hands clear parts to subagents on cheaper tiers, checks them"
+            info="A session’s main agent plans, hands clear parts to subagents on cheaper tiers and checks their work, and a subagent asked for with no tier gets Standard. Off: agents work alone unless they choose otherwise, and the start page has no Automatic."
+            control={<Switch on={st.team.on} onChange={(on) => save({ team: { on } })} label="Lead with subagents" />}
           />
           <Row
             label="Max for hard problems"

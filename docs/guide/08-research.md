@@ -1,6 +1,6 @@
 # Deep research, second opinions and several agents
 
-When one agent working alone is not enough, the app can put several on the job: a deep research that sends researchers after every part of a question and hands back a cited report, child sessions that take parts of a task off an agent's hands, a swarm that attacks a hard problem from several angles at once, and a campaign that makes one big change in many parts. You can also have another company's model check a turn's work, send one prompt to several models and keep the best answer, and cap what a session may spend so none of this runs away with your money.
+When one agent working alone is not enough, the app can put several on the job: a deep research that sends researchers after every part of a question and hands back a cited report, subagents that take parts of a task off an agent's hands, a swarm that attacks a hard problem from several angles at once, and a campaign that makes one big change in many parts. You can also have another company's model check a turn's work, send one prompt to several models and keep the best answer, and cap what a session may spend so none of this runs away with your money.
 
 ![Deep research on the start page: researchers at a time, rounds, searches in all, and the report](images/research.webp)
 
@@ -19,7 +19,7 @@ The Research row now reads "Deep · 60 searches" (your search budget), and the O
 
 On a phone, Options opens as a sheet from the bottom of the screen, and Research opens over it.
 
-A deep research and a swarm (or a campaign) all work through a team of child sessions, so you get one or the other: turning one on turns the other off.
+A deep research and a swarm (or a campaign) all work through a team of Hydor subagents, so you get one or the other: turning one on turns the other off.
 
 A scheduled task can run a deep research each time it runs: its editor has the same **Research** setting ([Scheduled tasks](/guide/tasks)).
 
@@ -35,7 +35,7 @@ This browser remembers the numbers for your next deep research. The mode itself 
 ### What happens, step by step
 
 1. **Plan.** The lead works out what the question really asks and what a complete answer covers. It splits it into sub-questions and writes a few searches for each, in varied wording, in other languages where that helps, and aimed at the sources that settle it (official data, papers, primary documents, reputable reporting). If something crucial is unclear, it asks you once, briefly; otherwise it states its assumptions and goes on.
-2. **First round.** It starts up to your number of researchers, one per sub-question. Each researcher is a child session with a brief of its own: the whole question, its part, the searches to start from, about how many searches are its share, and what to report. The lead then waits; each researcher's report comes back to it as a message.
+2. **First round.** It starts up to your number of researchers, one per sub-question. Each researcher is a Hydor subagent with a brief of its own: the whole question, its part, the searches to start from, about how many searches are its share, and what to report. The lead then waits; each researcher's report comes back to it as a message.
 3. **More rounds.** The lead reads the reports and sends new researchers after the gaps, the contradictions and the claims that rest on a single source. It skips a round when nothing important is left open. After each round it tells you in a line what was found and what comes next.
 4. **Check.** It lists the claims the answer rests on. Each needs two independent sources, or is marked as resting on one, or as disputed. A researcher (or the lead itself) opens the cited pages to confirm that each key claim and number is really there; what fails is corrected or dropped.
 5. **Report.** It writes the report: a clear title, the answer in a few sentences first, then sections, a numbered citation after each claim, and the sources at the end (title, site, date and link). It says what is uncertain or disputed and why, and gives you a short summary in the conversation.
@@ -46,7 +46,7 @@ Researchers search with the app's own web search and read pages with its page re
 
 A bar above the lead session's message box shows what the research is doing: **Deep research** · "Planning", then "Round 1 of 2 · 4 researchers at work", "Reading the reports" between rounds, "Checking the sources" while researchers check the key claims, "Writing the report", and at the end "Report ready" · and how much of the budget is used ("12 of 60 searches"). Once the report is there, **Open report** at the right of the bar opens it: the page in the Library, or the Word document. Point at the bar to see the research's settings and what the report will be.
 
-Each researcher shows as a card marked "Researcher" in the lead's conversation and sits under the lead in the sidebar, like any [child session](/guide/research#follow-child-sessions). What each one reports back shows as a line, "Reply from" and its title, with the start of what it found: click the line to read it. Open a researcher to watch it work: its bar says "Researching for" and the lead's title, with **Lead** to go back.
+Each researcher shows as a card marked "Researcher" in the lead's conversation and sits under the lead in the sidebar, like any [Hydor subagent](/guide/research#follow-subagents). What each one reports back shows as a line, "Reply from" and its title, with the start of what it found: click the line to read it. Open a researcher to watch it work: its bar says "Researching for" and the lead's title, with **Lead** to go back.
 
 ### The report
 
@@ -55,54 +55,56 @@ Each researcher shows as a card marked "Researcher" in the lead's conversation a
 
 A deep research runs many agents at once. Set a spending cap in the same Options menu before you start: it covers the lead and all its researchers ([Put a spending cap on a session](/guide/research#put-a-spending-cap-on-a-session)).
 
-## Let an agent hand work to child sessions
+## Let an agent hand work to subagents
 
-Any agent can hand a self-contained part of its job to a new session, a child session, which works on it at the same time and reports back. There is nothing to switch on: ask in plain words ("have three child sessions each research one supplier", "let Codex write the tests while you do the docs"), or let the agent decide when a job splits well. A session's main agent is told to work this way by itself: it keeps the planning and the checking, and hands clear parts to helpers on cheaper tiers, so the job costs less (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job); **Lead with helpers** there turns it off).
+Any agent can hand a self-contained part of its job to a subagent, which works on it at the same time and reports back. There are two kinds, and the app says which. A **Hydor subagent** is a session of its own that Hydor starts, with any agent and model: it has a card in the conversation, sits under its parent in the sidebar, has its own cost and its own share of the spending cap, you can open it and talk to it, and its reply comes back to the parent as a message. A **Claude Code subagent** is one that Claude Code runs inside the session for a short part of its job (with Codex, a "Codex subagent"): it is a row in the tray above the message box, opens in a panel with its steps, can be stopped but not talked to, and what it spends counts as the session's own. In the tray each row says which ("Hydor subagent · Claude Code · Sonnet 5.5" or "Claude Code subagent"), and pointing at it says who runs it ([Subagents](/guide/sessions#subagents)). The rest of this section is about Hydor subagents.
 
-For each child, the agent picks:
+There is nothing to switch on: ask in plain words ("have three subagents each research one supplier", "let Codex write the tests while you do the docs"), or let the agent decide when a job splits well. A session's main agent is told to work this way by itself: it keeps the planning and the checking, and hands clear parts to subagents on cheaper tiers, so the job costs less (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job); **Lead with subagents** there turns it off).
 
-- **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a child runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part.
-- **A tier** for its part: **Quick** for a small, very clear job, **Standard** for a clear task of medium size (what a child gets when none is asked for), **Best** for a hard part that stands on its own; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). A child never thinks with a tier above its parent's own, and an agent of yours can cap its helpers' tiers lower.
-- **One of your agents**, by name, instead of a plain child: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)). An agent that keeps a conversation of its own gets the work in its inbox instead, and its reply comes back when it gets to it.
+For each Hydor subagent, the agent picks:
+
+- **The agent and model**: Custom with any of its models (from [Settings → Models](/settings?s=models)), Claude Code, Codex, or another agent you added (Gemini CLI, OpenCode…). By default a Hydor subagent runs the same agent as the session that started it. A cheaper or local model suits bulk work; Claude Code or Codex suits a hard part.
+- **A tier** for its part: **Quick** for a small, very clear job, **Standard** for a clear task of medium size (what a Hydor subagent gets when none is asked for), **Best** for a hard part that stands on its own; the tier's model for that program comes from [Settings → Models → Tiers](/settings?s=models&find=Tiers). A Hydor subagent never thinks with a tier above its parent's own, and an agent of yours can cap its subagents' tiers lower.
+- **One of your agents**, by name, instead of a plain subagent: it works with its own instructions, tools and tier (see [Agents that hand work to other agents](/guide/agents#agents-that-hand-work-to-other-agents)). An agent that keeps a conversation of its own gets the work in its inbox instead, and its reply comes back when it gets to it.
 - **The folder**: the parent's, unless it names another.
-- **A worktree** if it wants one: a separate copy of the folder's git repository on a new branch, so the child's changes do not mix with anyone else's.
+- **A worktree** if it wants one: a separate copy of the folder's git repository on a new branch, so the subagent's changes do not mix with anyone else's.
 - **A short title**, which is the name you see.
 
-The child sees nothing of the parent's conversation, so the agent writes it a brief with everything it needs. Nobody watches a child as it works: it decides small questions itself, says what it decided, and stops to ask only when it cannot go on.
+A Hydor subagent sees nothing of the parent's conversation, so the agent writes it a brief with everything it needs. Nobody watches it as it works: it decides small questions itself, says what it decided, and stops to ask only when it cannot go on.
 
 ### How replies come back
 
-When a child's turn ends, its reply goes back to the parent as a message, which wakes the parent. If the parent is busy, the message waits in its queue until its turn ends.
+When a Hydor subagent's turn ends, its reply goes back to the parent as a message, which wakes the parent. If the parent is busy, the message waits in its queue until its turn ends.
 
-In the parent's conversation, the reply shows as one line: "Reply from", the child's title and the start of what it wrote. Click the line to read the reply (its summary, when it was long), then **Open its session** or **Read the whole reply** to go to the child. A child stopped before it finished shows as "… was stopped", and one that failed as "… stopped with an error".
+In the parent's conversation, the reply shows as one line: "Reply from", the subagent's title and the start of what it wrote. Click the line to read the reply (its summary, when it was long), then **Open its session** or **Read the whole reply** to go to the subagent. A subagent stopped before it finished shows as "… was stopped", and one that failed as "… stopped with an error".
 
 - A reply longer than about 4,000 characters arrives as a short summary written by the helper model ([Agents, accounts and models](/guide/agents-models)); the parent can still read it whole.
-- If a child stops with an error, or is stopped before it finishes, the parent is told that too.
-- A child started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, as far as Best and never above the highest its lead allows; the parent is told it happened and why. Only the reply to its brief is checked, not its later replies to messages. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a child up itself when it finds its result not good enough.
-- The parent can check on its children at any time (what each is doing, its agent and model, what it has spent, the start of its latest reply) and send one of them more to do.
+- If a Hydor subagent stops with an error, or is stopped before it finishes, the parent is told that too.
+- A Hydor subagent started on Quick or Standard whose reply does not pass a quick check (the helper model reads its brief and its reply), or that stops with an error, runs again a tier up, as far as Best and never above the highest its lead allows; the parent is told it happened and why. Only the reply to its brief is checked, not its later replies to messages. An agent of yours can turn this off (**Step up when a check fails**). The parent can also step a subagent up itself when it finds its result not good enough.
+- The parent can check on its Hydor subagents at any time (what each is doing, its agent and model, what it has spent, the start of its latest reply) and send one of them more to do.
 - Replies from turns that ended while the app was stopped are passed on when it starts again.
 
-You can open a child and talk to it like any other session. Whatever it replies at the end of a turn goes back to the parent as well.
+You can open a Hydor subagent and talk to it like any other session. Whatever it replies at the end of a turn goes back to the parent as well.
 
-### Follow child sessions
+### Follow subagents
 
-- **In the parent's conversation**: a card for each child, under the turn that started it. It shows the child's title, "Child session" ("Researcher" in a deep research), its agent and model, what it is doing now ("Not running" or "Stopped with an error" when it has stopped), when it was last active, what it has spent and, when it stepped up, "Stepped up from" its first tier and why. Click it (**Open**) to go to the child. While the child works, the square button beside it stops the child's turn.
-- **In the sidebar**: children sit under their parent, folded into one line such as "3 child sessions · 1 needs you · 2 working". Click the line to unfold them; it stays open while you are in one of them. On a phone, where the sidebar is a drawer, tapping the line unfolds it without closing the drawer.
-- **In the child**: a bar above the message box says "Child of" and the parent's title ("its replies go back there"), with **Open parent**.
+- **In the parent's conversation**: a card for each Hydor subagent, under the turn that started it. It shows its title, "Hydor subagent" ("Researcher" in a deep research), its agent and model, what it is doing now ("Not running" or "Stopped with an error" when it has stopped), when it was last active, what it has spent and, when it stepped up, "Stepped up from" its first tier and why. Click it (**Open**) to go to the subagent. While it works, the square button beside it stops its turn.
+- **In the sidebar**: Hydor subagents sit under their parent, folded into one line such as "3 subagents · 1 needs you · 2 working". Click the line to unfold them; it stays open while you are in one of them. On a phone, where the sidebar is a drawer, tapping the line unfolds it without closing the drawer.
+- **In the subagent**: a bar above the message box says "Subagent of" and the parent's title ("its replies go back there"), with **Open parent**.
 
-A child that needs your approval or an answer waits for you like any session, and shows in the Inbox ([Inbox and notifications](/guide/inbox)).
+A Hydor subagent that needs your approval or an answer waits for you like any session, and shows in the Inbox ([Inbox and notifications](/guide/inbox)).
 
-### What child sessions can and cannot do
+### What Hydor subagents can and cannot do
 
-- **One level.** A child cannot start children of its own: it does the part itself and says what else is needed.
-- **Never freer permissions.** A child never gets freer permissions than the session that started it. When it runs another of Claude Code, Codex and Custom, it gets the freest of that agent's permissions that is no freer than the parent's; other agents (Gemini CLI and the like) start with their own default.
-- **A share of the cap.** If the parent has a spending cap, each new child gets a share of what is left of it, and the parent's cap covers them all ([Caps for child sessions](/guide/research#caps-for-child-sessions)).
-- **The same account.** A child that runs the same agent as its parent (Claude Code or Codex) uses the parent's account.
-- **A few at a time.** Only so many of one session's children work at once; the agent waits for one to finish before it starts another.
+- **One level.** A Hydor subagent cannot start Hydor subagents of its own: it does the part itself and says what else is needed.
+- **Never freer permissions.** A Hydor subagent never gets freer permissions than the session that started it. When it runs another of Claude Code, Codex and Custom, it gets the freest of that agent's permissions that is no freer than the parent's; other agents (Gemini CLI and the like) start with their own default.
+- **A share of the cap.** If the parent has a spending cap, each new Hydor subagent gets a share of what is left of it, and the parent's cap covers them all ([Caps for subagents](/guide/research#caps-for-subagents)).
+- **The same account.** A Hydor subagent that runs the same agent as its parent (Claude Code or Codex) uses the parent's account.
+- **A few at a time.** Only so many of one session's Hydor subagents work at once; the agent waits for one to finish before it starts another.
 
 ### Set how many work at once
 
-In [Settings → Capabilities → Child sessions](/settings?s=children), set **Working at once, per session** with − and + (in the **Child sessions** group; its (i) lists the limits that hold for children) ([go there](/settings?s=children&find=Working%20at%20once%2C%20per%20session)): from 1 to 12, 4 to start. It counts each session's children separately, not the whole app's. A deep research uses its own **Researchers at a time** instead, and a swarm its **Swarm size**.
+In [Settings → Capabilities → Subagents](/settings?s=children), set **Working at once, per session** with − and + (in the **Subagents** group; its (i) lists the limits that hold for Hydor subagents) ([go there](/settings?s=children&find=Working%20at%20once%2C%20per%20session)): from 1 to 12, 4 to start. It counts each session's Hydor subagents separately, not the whole app's. A deep research uses its own **Researchers at a time** instead, and a swarm its **Swarm size**.
 
 ## Set a swarm on a hard problem
 
@@ -121,7 +123,7 @@ The Swarm row reads "On · 5 at once", and the Options chip names it. **Swarm si
 ### How a swarm works
 
 1. The lead works out what the task asks and what a checked answer looks like, and chooses up to your swarm size of different angles (for a proof: a direct argument, contradiction, induction, small cases and a computer search, known results).
-2. It starts one member per angle. Each member is a child session with a brief: the whole problem, its angle, what counts as done and how to check it, titled by its angle. Members run the lead's own model and effort unless the lead picks others.
+2. It starts one member per angle. Each member is a Hydor subagent with a brief: the whole problem, its angle, what counts as done and how to check it, titled by its angle. Members run the lead's own model and effort unless the lead picks others.
 3. Members post to the board as they go: **Progress** (what they tried and where they are), **Finding** (a result the others can use now), **Question** (something they need answered) and **Note**. They read the board every few steps, build on each other's findings, skip what someone has ruled out, and answer questions put to them.
 4. The lead hears of the board in batches: a finding, a question or a message for the lead reaches it within about a minute; progress alone, every few minutes. It passes useful findings on, turns a member that is stuck or repeating another to a new angle, asks one member to check another's result, and starts members for ideas nobody has tried as others finish.
 5. Before it concludes, the lead has the answer checked independently: by another member, by a computation, or by its own careful check.
@@ -144,7 +146,7 @@ The lead's session has a bar above the message box: **Swarm** · "choosing its a
 
 ### Set the swarm size
 
-In [Settings → Capabilities → Child sessions](/settings?s=children), **Swarm size** (in the **Swarm** group; [go there](/settings?s=children&find=Swarm%20size)) sets how many members of one swarm or campaign work at once: from 1 to 16, 5 to start. Each member costs about what one agent does; the lead starts more as some finish.
+In [Settings → Capabilities → Subagents](/settings?s=children), **Swarm size** (in the **Swarm** group; [go there](/settings?s=children&find=Swarm%20size)) sets how many members of one swarm or campaign work at once: from 1 to 16, 5 to start. Each member costs about what one agent does; the lead starts more as some finish.
 
 ## Make one big change with a campaign
 
@@ -230,12 +232,12 @@ Below it, **Matches** lists your latest matches (up to 100): the prompt, the mod
 
 ## Put a spending cap on a session
 
-A spending cap is the most a session may spend, at API prices: what its tokens would cost through the API, whatever plan you actually pay with. When it gets there, the agent stops until you raise the cap. It is a good companion to anything that runs many agents: a deep research, a swarm, child sessions, an arena match.
+A spending cap is the most a session may spend, at API prices: what its tokens would cost through the API, whatever plan you actually pay with. When it gets there, the agent stops until you raise the cap. It is a good companion to anything that runs many agents: a deep research, a swarm, subagents, an arena match.
 
 ### What counts
 
-- The session's own model calls, including its agent's own helpers (Claude Code's subagents, for example).
-- The child sessions it started: its cap covers them too.
+- The session's own model calls, including its agent's own subagents (Claude Code subagents, for example).
+- The Hydor subagents it started: its cap covers them too.
 - Models on this computer (through Ollama or vLLM) cost nothing.
 - Tokens with no known price cannot be counted. The cap dialog says so when the session may have spent more for that reason.
 
@@ -249,29 +251,29 @@ Unlike a deep research, a swarm or the arena, the cap you pick stays: your next 
 
 ### Set or change the cap of a session
 
-Open the session's menu (⋯) → **Session settings** → **Spending cap** (the current cap shows beside it). The dialog shows **Spent so far**, split between this session and its child sessions when it has any, and, for a child session, how much of its parent's cap is spent. Type an amount in **Cap** or pick $1.00, $5.00, $10.00 or $25.00, then press **Set the cap** (or **Change**). **Remove the cap** takes it off.
+Open the session's menu (⋯) → **Session settings** → **Spending cap** (the current cap shows beside it). The dialog shows **Spent so far**, split between this session and its Hydor subagents when it has any ("This session $1.20, its Hydor subagents $0.80"; the dialog adds "Subagents it starts count too."), and, for a Hydor subagent, how much of its parent's cap is spent. Type an amount in **Cap** or pick $1.00, $5.00, $10.00 or $25.00, then press **Set the cap** (or **Change**). **Remove the cap** takes it off.
 
 A cap can be from $0.01 to $100,000. If it is not more than the session has already spent, the dialog warns that the session stays stopped. On a phone, the dialog opens from the bottom of the screen.
 
 ### The bar above the message box
 
-While a session has a cap, a bar above its message box shows what it has spent of it ("$1.20 of $5.00") with a line that fills up: amber from 80%, red at the cap, where it says **Cap reached**. When child sessions have spent some of it, it adds "with children" (on a wider screen); point at the amounts to see the split. **Change** (or **Raise**, once it is reached) opens the cap dialog.
+While a session has a cap, a bar above its message box shows what it has spent of it ("$1.20 of $5.00") with a line that fills up: amber from 80%, red at the cap, where it says **Cap reached**. When Hydor subagents have spent some of it, it adds "with subagents" (on a wider screen); point at the amounts to see the split. **Change** (or **Raise**, once it is reached) opens the cap dialog.
 
 ### What happens at the cap
 
 The cap is checked after each model call, so a turn stops right after the call that reaches it (the total can end a little above the cap):
 
 - The agent stops, and a note under the turn says "Stopped at the spending cap" with what was spent of the cap, and **Raise the cap…**. A notice names the session that stopped.
-- Its child sessions that are running stop too. Their note says that the session that started them reached its spending cap, with **Open it** to go there.
+- Its Hydor subagents that are running stop too. Their note says that the session that started them reached its spending cap, with **Open it** to go there.
 - New messages wait. A message you send is not sent: a notice says the cap is reached, and your text stays in the message box. Messages in the queue are held ("The queue is on hold") until you raise or remove the cap.
 
 ### Raise or remove the cap
 
-Click **Raise** on the bar or **Raise the cap…** on the note (or use the session's menu), then set a cap above what the session has spent, or remove it. Messages held in its queue then go out. A child stopped by its parent's cap takes messages again once the parent's cap is raised.
+Click **Raise** on the bar or **Raise the cap…** on the note (or use the session's menu), then set a cap above what the session has spent, or remove it. Messages held in its queue then go out. A Hydor subagent stopped by its parent's cap takes messages again once the parent's cap is raised.
 
-### Caps for child sessions
+### Caps for subagents
 
-Each new child session gets a cap of its own: an equal share of what is left of the parent's cap, kept for the parent and as many children as may work at once. The parent's cap still covers them all, so when it is reached, all of them stop. When nothing is left of it, the agent cannot start more children and is told to finish with what it has.
+Each new Hydor subagent gets a cap of its own: an equal share of what is left of the parent's cap, kept for the parent and as many Hydor subagents as may work at once. The parent's cap still covers them all, so when it is reached, all of them stop. When nothing is left of it, the agent cannot start more Hydor subagents and is told to finish with what it has.
 
 ### Caps on scheduled tasks and apps
 
@@ -283,6 +285,7 @@ Each new child session gets a cap of its own: an equal share of what is left of 
 - "Start a deep research on heat pumps for a 1930s house, with 6 researchers at a time, a Word report and a $10 cap."
 - "How far along is the deep research in my 'EV chargers compared' session?"
 - "Put a $5 spending cap on this session, and tell me what it has spent so far."
-- "Let up to 6 child sessions work at once per session, and make swarms 8 agents."
+- "Let up to 6 subagents work at once per session, and make swarms 8 agents."
+- "Which of these subagents did Hydor start, and which did Claude Code?"
 - "Get a second opinion on the last turn of my 'Billing refactor' session, and tell me what it found."
 - "Which models win in my arena? In the latest match, keep the Claude Code answer."

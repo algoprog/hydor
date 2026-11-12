@@ -126,7 +126,7 @@ export function sessionLines(list: SessionSummary[], look: Look, fit = true, mar
   return columns(rows).map((l) => truncate(l, look.width - 1));
 }
 
-/** `hydor sessions`: the latest sessions (helpers only with --all). */
+/** `hydor sessions`: the latest sessions (subagents only with --all). */
 async function sessions(conn: Conn, o: Opts, look: Look) {
   const limit = o.all ? 300 : (o.limit ?? 25);
   const { sessions: all, total } = await conn.api<{ sessions: SessionSummary[]; total: number }>('GET', `/api/sessions?limit=${o.all ? 300 : Math.min(300, limit * 3)}`);
@@ -263,7 +263,7 @@ export async function tierLines(conn: Conn, look: Look, t?: TiersState | null): 
   };
   const rows = [['', ...TIER_PROGRAMS.map((x) => p.bold(x.label))], ...tierIds(st).map((id) => [p.bold(tierName(id)), ...PROGRAMS.map((x, i) => cell(x.tier, id, i))])];
   const out = columns(rows, '   ');
-  if (st.team) out.push('', `Lead with helpers: ${st.team.on ? p.green('on') : 'off'}    Max for hard problems: ${st.team.hard ? p.green('on') : 'off'}`);
+  if (st.team) out.push('', `Lead with subagents: ${st.team.on ? p.green('on') : 'off'}    Max for hard problems: ${st.team.hard ? p.green('on') : 'off'}`);
   return out;
 }
 
