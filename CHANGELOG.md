@@ -3,6 +3,16 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.60.1 · 12 November 2026
+
+A session's options now have everything the start page offers, so you can change them without leaving the session.
+
+- **All of a session's settings in its options**: the chip in a session's message box now lists, below Permissions,
+  the same options as the start page: **Account**, **Confidential**, **Memory**, **Spending cap**, **Swarm**,
+  **Research**, **Arena** and **Guidelines**. Another account takes the session over from your next message.
+  Confidential and Arena show how the session started: both are picked when it starts, and a click says how to get
+  the other.
+
 ## 0.60.0 · 12 November 2026
 
 Swarm and deep research can be turned on, off or changed inside a session, and the modes that cost several times
