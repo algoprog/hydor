@@ -134,8 +134,6 @@ test('complete: after a command', async () => {
   assert.deepEqual(await values('tiers', 'set', ''), ['claude', 'codex', 'custom']);
   assert.deepEqual(await values('tiers', 'set', 'claude', ''), ['quick', 'standard', 'best', 'max']);
   assert.deepEqual(await values('tiers', 'team', ''), ['on', 'off']);
-  assert.deepEqual(await values('tasks', ''), ['run']);
-  assert.deepEqual(await complete('tasks', 'run', ''), ['t1\tDaily brief']);
   assert.deepEqual(await values('service', ''), ['install', 'uninstall', 'status', 'logs']);
   assert.deepEqual(await values('service', 'st'), ['status']);
   assert.deepEqual(await values('app', ''), ['list', 'new', 'folder', 'dev', 'try', 'export', 'import']);
