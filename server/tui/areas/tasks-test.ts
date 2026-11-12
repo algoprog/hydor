@@ -101,7 +101,7 @@ test('new builds the body from the schedule and the options', async () => {
   let t = await run(conn, ['tasks', 'new', '--at', '9:00', '--days', 'weekdays', 'Summarise', 'my', 'email']);
   assert.deepEqual(post(), { name: 'Summarise my email', prompt: 'Summarise my email', agent: 'claude', cwd: '/home/u/Hydor', schedule: { kind: 'daily', time: '09:00', days: [1, 2, 3, 4, 5] } });
   assert.match(t.out, /^Made “Summarise my email” \(tnew\): .*, next /);
-  await run(conn, ['tasks', 'new', '--every', '90m', '--name', 'Disk', '--agent', 'codex', '--model', 'gpt-x', '--cwd', '/srv', '--cap', '1.5', '--no-memory', 'Check disks']);
+  await run(conn, ['tasks', 'new', '--every', '90m', '--name', 'Disk', '--agent', 'codex', '--model', 'gpt-x', '--cwd', '/srv', '--budget', '1.5', '--no-memory', 'Check disks']);
   assert.deepEqual(post(), { name: 'Disk', prompt: 'Check disks', agent: 'codex', cwd: '/srv', model: 'gpt-x', schedule: { kind: 'every', minutes: 90 }, extra: { capUsd: 1.5, memory: false } });
   await run(conn, ['tasks', 'new', '--cron', '0 9 * * 1-5', '--agent', 'custom', '--project', 'thesis', '--as', 'research', 'Read papers']);
   assert.deepEqual(post(), {
@@ -155,7 +155,7 @@ test('new refuses what does not make sense, and calls nothing', async () => {
   await bad(['--once', '2020-01-01 09:00', 'x'], /has passed/);
   await bad(['--every', '1h'], /Say what the agent is asked/);
   await bad(['--webhook', '--filter', 'nothing', 'x'], /path=value/);
-  await bad(['--every', '1h', '--cap', 'lots', 'x'], /--cap takes a number/);
+  await bad(['--every', '1h', '--budget', 'lots', 'x'], /--budget takes a number/);
   await bad(['--every', '1h', '--fail-limit', '99', 'x'], /0 to 50/);
   await bad(['--every', '1h', '--input', '{}', 'x'], /goes with --app/);
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
@@ -177,7 +177,7 @@ test('edit sends the whole task with only what was named changed; pause and resu
     failLimit: 3,
   });
   assert.match(t.out, /^Changed “Daily brief”/);
-  await run(conn, ['tasks', 'edit', 'daily', '--model', 'sonnet', '--cap', '2']);
+  await run(conn, ['tasks', 'edit', 'daily', '--model', 'sonnet', '--budget', '2']);
   assert.equal(post().model, 'sonnet');
   assert.deepEqual(post().extra, { capUsd: 2 });
   assert.equal(post().schedule.time, '09:00', 'the schedule stays');

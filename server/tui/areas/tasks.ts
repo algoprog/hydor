@@ -136,7 +136,7 @@ const AGENT_OPTIONS = {
   cwd: { type: 'string', value: '<folder>', desc: 'The folder it works in', kind: 'dir' },
   project: { type: 'string', value: '<project>', desc: 'Start its sessions in this project', kind: 'project' },
   as: { type: 'string', value: '<agent>', desc: 'Start its sessions as one of your agents', kind: 'agent' },
-  cap: { type: 'string', value: '<dollars>', desc: 'Stop a run that has spent this much' },
+  budget: { type: 'string', value: '<dollars>', desc: 'Stop a run that has spent this much' },
   'no-memory': { type: 'boolean', desc: 'Keep memory out of its sessions' },
   target: { type: 'string', value: '<session>', desc: 'Post each run into this session', kind: 'session' },
   'fail-limit': { type: 'string', value: '<n>', desc: 'Pause after this many failures in a row (0: never)' },
@@ -198,7 +198,7 @@ async function applyOptions(ctx: Ctx, v: Values, body: Record<string, unknown>) 
     const list = (await ctx.conn.api<{ assistants: { id: string; name: string }[] }>('GET', '/api/assistants')).assistants;
     extra.assistant = pickOne(list, str(v, 'as')!, { id: (x) => x.id, names: (x) => [x.name], what: 'agent', hint: 'hydor agents lists them' }).id;
   }
-  const cap = num(v, 'cap');
+  const cap = num(v, 'budget');
   if (cap !== undefined) {
     if (cap > 0) extra.capUsd = cap;
     else delete extra.capUsd;
@@ -328,9 +328,9 @@ export const tasks: Area = {
       help: 'The prompt is the words after new, --prompt, a file (--file, - for stdin) or, on a terminal, your editor. Say when with one of --every, --at (with --days), --cron, --once, --webhook, --watch-feed, --watch-page or --watch-folder. It works in the default folder with Claude Code unless --cwd, --project, --agent say otherwise. A webhook’s address is printed once it is made. Watching a command or a JSON address is on the page.',
       examples: [
         'hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"',
-        'hydor tasks new --every 6h --name "Disk check" --cwd ~ "Warn me if a disk is over 90% full"',
+        'hydor tasks new --every 6h "Warn me if a disk is over 90% full"',
         'hydor tasks new --once "tomorrow 8:00" "Remind me to call the bank"',
-        'hydor tasks new --webhook --filter body.action=opened --agent codex "Review the pull request in {{body}}"',
+        'hydor tasks new --webhook --filter body.action=opened "Review {{body}}"',
       ],
       async run(ctx, words, v) {
         const schedule = scheduleOf(ctx, v);
@@ -359,7 +359,7 @@ export const tasks: Area = {
       options: { ...TEXT_OPTIONS, ...WHEN_OPTIONS, ...AGENT_OPTIONS },
       summary: 'Change a task’s prompt, schedule or settings',
       help: 'Only what you name changes. With nothing named, on a terminal, the prompt opens in your editor.',
-      examples: ['hydor tasks edit daily-brief --at 08:30', 'hydor tasks edit daily-brief --model opus --cap 2', 'hydor tasks edit daily-brief "A new prompt"'],
+      examples: ['hydor tasks edit daily-brief --at 08:30', 'hydor tasks edit daily-brief --model opus --budget 2', 'hydor tasks edit daily-brief "A new prompt"'],
       async run(ctx, [given, ...words], v) {
         const t = await findTask(ctx, given);
         const body = bodyOf(t);

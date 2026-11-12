@@ -67,18 +67,29 @@ export const LOADERS: Record<ArgKind, Loader> = {
   project: async (c) => ((await c.get<{ spaces?: { id: string; name: string }[] }>('/api/projects'))?.spaces ?? []).map((s) => named(s.id, s.name)),
   agent: async (c) => ((await c.get<{ assistants?: { id: string; name: string }[] }>('/api/assistants'))?.assistants ?? []).map((a) => [a.id, a.name]),
   task: async (c) => ((await c.get<{ tasks?: { id: string; name: string }[] }>('/api/tasks'))?.tasks ?? []).map((t) => [t.id, t.name]),
-  app: async (c) => ((await c.get<{ apps?: { slug: string; name: string }[] }>('/api/apps'))?.apps ?? []).map((a) => [a.slug, a.name]),
-  run: none,
-  page: none,
+  app: async (c) => {
+    const r = await c.get<{ apps?: { slug: string; name: string }[]; templates?: { id: string; name: string; installed?: boolean }[] }>('/api/apps');
+    return [...(r?.apps ?? []).map((a): Candidate => [a.slug, a.name]), ...(r?.templates ?? []).filter((t) => t.installed !== false).map((t): Candidate => [`tpl:${t.id}`, t.name])];
+  },
+  run: async (c) => ((await c.get<{ recent?: { id: string; appName: string; status: string }[] }>('/api/apps'))?.recent ?? []).map((r): Candidate => [r.id, `${r.appName} · ${r.status}`]),
+  page: async (c) => {
+    const [pages, media] = await Promise.all([c.get<{ pages?: { id: string; title: string; kind?: string; app?: string }[] }>('/api/pages'), c.get<{ items?: { id: string; title: string; kind: string }[] }>('/api/media')]);
+    return [...(pages?.pages ?? []).filter((p) => !p.app).map((p): Candidate => [p.id, `${p.title} · ${p.kind ?? 'page'}`]), ...(media?.items ?? []).map((m): Candidate => [m.id, `${m.title} · ${m.kind}`])];
+  },
   skill: none,
   plugin: none,
   mcp: none,
   key: none,
   note: none,
   experiment: none,
-  machine: none,
-  connection: none,
-  account: none,
+  machine: async (c) => ((await c.get<{ machines?: { id: string; name: string }[] }>('/api/machines'))?.machines ?? []).map((m) => named(m.id, m.name)),
+  connection: async (c) => ((await c.get<{ connections?: { id: string; name: string }[] }>('/api/connections'))?.connections ?? []).map((x): Candidate => [x.id, x.name]),
+  service: async (c) => ((await c.get<{ apps?: { id: string; name: string }[] }>('/api/connections/catalog'))?.apps ?? []).map((x): Candidate => [x.id, x.name]),
+  account: async (c) => {
+    const r = await c.get<{ claude?: { email?: string }; codex?: { email?: string }; extra?: { id: string; agent: string; name: string }[] }>('/api/accounts');
+    if (!r) return [];
+    return [['claude', r.claude?.email ?? 'Claude Code'], ['codex', r.codex?.email ?? 'Codex'], ...(r.extra ?? []).map((a): Candidate => [a.id, `${a.name} · ${a.agent}`])] as Candidate[];
+  },
   setting: async () => (await import('../settings-table.ts')).ROWS.map((r): Candidate => [r.id, r.label]),
   value: settingValues,
   section: async () => (await import('../settings-table.ts')).SECTION_LIST.map((s): Candidate => [s.id, s.label]),

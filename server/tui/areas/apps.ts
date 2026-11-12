@@ -335,7 +335,7 @@ export const apps: Area = {
       options: {
         input: { type: 'string', value: '<json>', desc: 'The answers as a JSON object' },
         'no-wait': { type: 'boolean', desc: 'Start it and print its run id, do not wait' },
-        timeout: { type: 'string', value: '<seconds>', desc: 'Stop waiting after this long (default 900)' },
+        wait: { type: 'string', value: '<seconds>', desc: 'Stop waiting after this long (default 900)' },
       },
       summary: 'Run an app and print its answer',
       help: 'The form’s answers are written field=value after the app (a field by its id, its label or the start of either; a file as field=@path), or as --input JSON; on a terminal what a required field still lacks is asked. It starts agent work and costs what it costs (printed with the answer). It waits for the answer: Ctrl+C stops waiting, not the run (hydor apps run-show <run> looks again). A ready-made app runs with Claude Code.',
@@ -345,7 +345,7 @@ export const apps: Area = {
         if (e.ready && !e.installed) throw new UsageError(`“${e.name}” is a ready-made app that is not installed: install it on the Apps page first`);
         const { recipe } = await recipeOf(ctx, e);
         const { inputs, files } = await inputsOf(ctx, words, v, recipe.fields ?? []);
-        const timeout = (num(v, 'timeout', 1) ?? 900) * 1000;
+        const timeout = (num(v, 'wait', 1) ?? 900) * 1000;
         let r: { run: AppRun };
         try {
           r = await ctx.conn.api<{ run: AppRun }>('POST', `/api/apps/${enc(e.id)}/runs`, { inputs, ...(Object.keys(files).length ? { files } : {}) });

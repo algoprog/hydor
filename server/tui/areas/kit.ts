@@ -45,6 +45,7 @@ export type ArgKind =
   | 'experiment'
   | 'machine'
   | 'connection'
+  | 'service'
   | 'account'
   | 'setting'
   | 'value'
