@@ -624,7 +624,10 @@ agents that speak ACP and take MCP servers.
   comments agents answer (on .tex files opened from Files too), Track changes as in Overleaf (an agent's
   edits too, each accepted or rejected), versions compared, dark pages, the pages presented full screen, and a jump between a place
   on a page and its line; Find in the typeset pages (the matches marked, each taking the source to its line) and words picked on
-  a page going to their place in the source; Vim and Emacs keys; Tidy the source (environments indented, table columns lined
+  a page going to their place in the source; right-click menus in the source and on the pages; Go to definition (Ctrl+click or F12 on a
+  \ref, \cite, \input or \includegraphics name); citation and label completions that say who wrote it and what it is ("Knuth 1984 — The
+  TeXbook", "Figure: The model"); Find and replace in every file of the document (regular expressions, one change); editor settings (text
+  size, line wrap, line numbers); Vim and Emacs keys; Tidy the source (environments indented, table columns lined
   up at &); labels and citation keys that point nowhere marked as you type; Draft (pictures as boxes), Stop on the first
   error, Clear the cached files and the time each typesetting took; named versions ("Sent to ICML", kept past the newest
   40); and Tidy the bibliography (sorted, duplicates merged, keys fixed, fields filled from DOIs, unused entries out).
@@ -638,7 +641,9 @@ agents that speak ACP and take MCP servers.
   in its sandbox. They export as the PDF, the main .tex file or the whole project as a .zip. Jupyter notebooks
   (save_notebook, from an .ipynb an agent wrote and ran, or opened from one) show in the notebook page's own view,
   with their outputs: cells edited and run in a kernel of the Python environment picked, in a folder of their own in
-  the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; they export as the
+  the app's data folder, Ask on the whole notebook or a cell, and versions with their outputs; right-click menus on cells
+  (run it, the cells above or below it, copy, cut, paste, duplicate, split, merge, clear or fold an output), cells picked
+  together, an outline of the Markdown headings, a shortcuts list, and a run asked while the kernel starts waiting for it; they export as the
   .ipynb, a Python script with # %% cells, a PDF or a web page.
 - **Resolve comments with AI**: comment on words as you read (a part of a slide, a cell, a block), then Resolve with AI on
   one comment, Resolve N comments with AI at the top of the comments for all the open ones (a LaTeX document's every
@@ -1069,7 +1074,10 @@ programs shows each program's version and what is out, with Check now, Update no
   uploaded), add it to a project (a file is copied into its folder, a folder joins those it works with), rename,
   duplicate, move or copy to a folder, download (a folder or several as one .zip), delete to a trash with Undo
   and Put back. One search finds names and text inside files, under a folder you pick, by kind. An editor with
-  Markdown and HTML preview and diffs, quick open, and uploads. Ask, beside an open file, has an agent change it
+  Markdown and HTML preview and diffs, quick open, and uploads: changes not saved are kept per file while the app is open
+  (undo history, cursor and scroll too, also across Preview and Changes), a dot on the file's tab and a Save / Don't save /
+  Cancel question before closing it, CRLF files saved as CRLF, a right-click menu, Go to line, a status bar (line and column,
+  language, indentation, line ends, wrap) and a shortcuts list. Ask, beside an open file, has an agent change it
   or answer about it: unsaved changes are saved first, the conversation stays beside the file, and the editor
   takes in each change as it is written (every second while an agent works), the changed lines tinted for a
   moment and your place kept. Word, Excel, CSV and LaTeX files open in the

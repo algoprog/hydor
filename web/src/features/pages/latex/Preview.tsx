@@ -2,15 +2,17 @@
 // one under the other, the scroll kept where it was as the document is typeset again. While it typesets, the pages
 // on screen stay, with a quiet "Typesetting…"; the new ones take their place once those in view have loaded, so
 // nothing blinks. When the latest changes do not typeset, the last pages stay with a line saying so. A double click
-// on a page goes to its source (SyncTeX); a line of the source shown in the pages is marked for a moment. The page box
+// on a page goes to its source (SyncTeX), as does Go to this place in the source in its right-click menu (which also
+// copies the words picked, or the one under the pointer); a line of the source shown in the pages is marked for a moment. The page box
 // says which page is in view and goes to the one typed; Dark pages shows them light on dark in the dark theme; the
 // pages can be presented one at a time over the whole screen (Present.tsx). Without TeX here, a note says what to
 // install; without poppler, the PDF shows in the browser's own viewer.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ExternalLink, Minus, MoveHorizontal, Plus, Presentation, Search, TriangleAlert } from 'lucide-react';
+import { Code, Copy, ExternalLink, Minus, MoveHorizontal, Plus, Presentation, Search, TriangleAlert } from 'lucide-react';
 import type { TexCompiled, TexSetup } from '@shared/latex';
 import { Button, cx, IconButton, Throbber } from '../../../components/ui';
-import { toastError } from '../../../lib/store';
+import { toast, toastError } from '../../../lib/store';
+import { ContextMenu, type ContextMenuAt } from '../common/menus';
 import { pageUrl, pdfUrl, sourceAt } from './api';
 import { Present } from './Present';
 import { Marks, PdfFindBar, TextLayer, usePdfFind, usePdfWords } from './PdfText';
@@ -238,16 +240,33 @@ export function Preview({
     } catch {}
   };
 
-  const toSource = async (e: React.MouseEvent<HTMLDivElement>, r: TexCompiled, page: number) => {
-    if (!onSource) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const s = sizeOf(r, page - 1);
+  /** The source of a place on a page (a click's, in points from the page's corner): the editor goes there. */
+  const sourceOf = async (r: TexCompiled, page: number, x: number, y: number) => {
     try {
-      const at = await sourceAt(r.key, page, ((e.clientX - rect.left) / rect.width) * s.w, ((e.clientY - rect.top) / rect.height) * s.h);
-      if (at) onSource(at.file, at.line);
+      const at = await sourceAt(r.key, page, x, y);
+      if (at) onSource?.(at.file, at.line);
+      else toast('That place has no source');
     } catch (err) {
       toastError(err);
     }
+  };
+  const toSource = (e: React.MouseEvent<HTMLDivElement>, r: TexCompiled, page: number) => {
+    if (!onSource) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const s = sizeOf(r, page - 1);
+    void sourceOf(r, page, ((e.clientX - rect.left) / rect.width) * s.w, ((e.clientY - rect.top) / rect.height) * s.h);
+  };
+  // The right-click menu on a page: where it was pressed (to find its source), and the words picked or under the pointer.
+  const [pageMenu, setPageMenu] = useState<(ContextMenuAt & { r: TexCompiled; page: number; px: number; py: number; words: string }) | null>(null);
+  const openPageMenu = (e: React.MouseEvent<HTMLDivElement>, r: TexCompiled, page: number) => {
+    // A touch screen's long press keeps the system's own menu for words.
+    if (matchMedia('(pointer: coarse)').matches) return;
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const s = sizeOf(r, page - 1);
+    const picked = window.getSelection()?.toString().replace(/\s+/g, ' ').trim();
+    const under = (e.target as HTMLElement).closest?.('[data-i]')?.textContent?.trim();
+    setPageMenu({ x: e.clientX, y: e.clientY, r, page, px: ((e.clientX - rect.left) / rect.width) * s.w, py: ((e.clientY - rect.top) / rect.height) * s.h, words: picked || under || '' });
   };
 
   const failed = result && !result.pdf && !result.missing ? result : null;
@@ -350,7 +369,8 @@ export function Preview({
           return (
             <div
               key={n}
-              onDoubleClick={(e) => void toSource(e, shown, n)}
+              onDoubleClick={(e) => toSource(e, shown, n)}
+              onContextMenu={(e) => openPageMenu(e, shown, n)}
               className={cx('relative shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.04)]', darkPages ? 'bg-[#1b1b1d]' : 'bg-white')}
               style={{ width: pageW, height: h }}
             >
@@ -418,6 +438,18 @@ export function Preview({
         </div>
         {find.open && shown && <PdfFindBar find={find} loading={!words} onGo={goMatch} />}
       </div>
+      <ContextMenu
+        at={pageMenu}
+        onClose={() => setPageMenu(null)}
+        items={
+          pageMenu
+            ? [
+                { label: 'Go to this place in the source', icon: <Code size={14} />, disabled: !onSource, also: 'synctex', run: () => void sourceOf(pageMenu.r, pageMenu.page, pageMenu.px, pageMenu.py) },
+                { label: 'Copy the words', icon: <Copy size={14} />, disabled: !pageMenu.words, run: () => void navigator.clipboard?.writeText(pageMenu.words).then(() => toast('Copied', 'ok'), () => toast('Copying is not allowed here')) },
+              ]
+            : []
+        }
+      />
       {presenting !== null && shown && <Present result={shown} start={presenting} onClose={() => setPresenting(null)} />}
     </div>
   );

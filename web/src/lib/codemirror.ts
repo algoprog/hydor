@@ -1,17 +1,18 @@
 // CodeMirror 6 setup, loaded on demand by the file editor.
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, startCompletion, type CompletionContext } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { defaultKeymap, history, historyField, historyKeymap, indentWithTab, selectAll } from '@codemirror/commands';
 import {
   bracketMatching,
   defaultHighlightStyle,
   foldGutter,
   foldKeymap,
   indentOnInput,
+  indentUnit,
   LanguageDescription,
   syntaxHighlighting,
 } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
-import { highlightSelectionMatches, openSearchPanel, search, searchKeymap } from '@codemirror/search';
+import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState, RangeSetBuilder, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import {
@@ -29,11 +30,15 @@ import {
   rectangularSelection,
 } from '@codemirror/view';
 import { tr } from '../i18n/runtime';
+import { detectIndent, type Indent } from './indent';
 
 export interface EditorHandle {
   view: EditorView;
   setDark: (dark: boolean) => void;
   setWrap: (wrap: boolean) => void;
+  /** The code's text size in pixels (null: the app's own), and the line numbers on or off. */
+  setFontSize: (px: number | null) => void;
+  setLineNumbers: (on: boolean) => void;
   /**
    * Puts in the text as it is now on disk: only the part that differs changes, so the place you read, the cursor and
    * the scroll stay. `flash`, for a change that came in by itself: those lines show tinted for a moment, and it is not
@@ -43,7 +48,39 @@ export interface EditorHandle {
   gotoLine: (line: number) => void;
   /** Opens the find bar: phones have no keyboard shortcut for it. */
   find: () => void;
+  /** Opens Go to line: a small bar over the text, to type a line number in. */
+  goto: () => void;
+  /** Opens the find bar with its Replace field in focus. */
+  replace: () => void;
+  selectAll: () => void;
+  /** What is picked (all its parts, joined by line ends), and the lines it is in; `empty` when nothing is picked. */
+  selection: () => { text: string; fromLine: number; toLine: number; empty: boolean };
+  /** Copy, Cut and Paste through the browser's clipboard (false when it was not allowed: the keys still work). */
+  copy: () => Promise<boolean>;
+  cut: () => Promise<boolean>;
+  paste: () => Promise<boolean>;
+  setIndent: (indent: Indent) => void;
+  focus: () => void;
+  /** The editor as it is: its text, selection and undo history as JSON, and how far it is scrolled, to be put back with `restore`. */
+  snapshot: () => EditorSnapshot;
   destroy: () => void;
+}
+
+/** What the file editor's status bar shows of the editor: where the cursor is, what is picked, the language and the indentation. */
+export interface EditorStatus {
+  line: number;
+  col: number;
+  lines: number;
+  /** Characters picked, over all its parts (0 when nothing is). */
+  selected: number;
+  language: string;
+  indent: Indent;
+}
+
+/** What `createEditor` can put back of an editor that was taken down: the undo history, the selection and the scroll. */
+export interface EditorSnapshot {
+  state: unknown;
+  scroll: number;
 }
 
 // Where two themes style the same thing, the one listed first in an editor's extensions wins.
@@ -184,72 +221,131 @@ function diffSpan(a: string, b: string): { from: number; to: number; insert: str
   return { from: start, to: a.length - end, insert: b.slice(start, b.length - end) };
 }
 
+/** The find bar with the cursor in its Replace field. */
+function openReplace(view: EditorView) {
+  openSearchPanel(view);
+  requestAnimationFrame(() => view.dom.querySelector<HTMLInputElement>('.cm-search [name=replace]')?.focus());
+}
+
 /** `phone`: no fold markers (too small to tap), no completions popping up while typing (Return would take one). */
 export async function createEditor(
   parent: HTMLElement,
-  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; onChange: (doc: string) => void; onSave: () => void },
+  o: { doc: string; path: string; dark: boolean; wrap: boolean; phone?: boolean; readOnly?: boolean; fontSize?: number | null; lineNumbers?: boolean; restore?: EditorSnapshot; onChange: (doc: string) => void; onSave: () => void; onStatus?: (s: EditorStatus) => void; onContextMenu?: (at: { x: number; y: number; keyed: boolean; pos?: number }) => void },
 ): Promise<EditorHandle> {
   const theme = new Compartment();
   const wrap = new Compartment();
   const lang = new Compartment();
+  const indent = new Compartment();
+  const gutter = new Compartment();
+  const font = new Compartment();
   const base = o.path.split('/').pop() ?? '';
   const desc = LanguageDescription.matchFilename(languages, base);
   const support = desc ? await desc.load().catch(() => null) : null;
   const themeExt = (dark: boolean) => (dark ? darkExt : lightExt);
+  const gutterExt = (on: boolean) => (on ? [lineNumbers(), highlightActiveLineGutter()] : []);
+  const fontExt = (px: number | null | undefined) => (px ? EditorView.theme({ '.cm-content, .cm-gutters': { fontSize: `${px}px` } }) : []);
+  const indentExt = (i: Indent) => [indentUnit.of(i.kind === 'tabs' ? '\t' : ' '.repeat(i.size)), EditorState.tabSize.of(i.size)];
+  const startIndent = detectIndent(o.doc);
+  let indentNow = startIndent;
+  const language = desc?.name ?? 'Plain text';
+  const status = (st: EditorState): EditorStatus => {
+    const head = st.selection.main.head;
+    const line = st.doc.lineAt(head);
+    let selected = 0;
+    for (const r of st.selection.ranges) selected += r.to - r.from;
+    return { line: line.number, col: head - line.from + 1, lines: st.doc.lines, selected, language, indent: indentNow };
+  };
 
-  const view = new EditorView({
-    parent,
-    state: EditorState.create({
-      doc: o.doc,
-      extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        highlightSpecialChars(),
-        history(),
-        o.phone ? [] : foldGutter(),
-        drawSelection(),
-        dropCursor(),
-        EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
-        bracketMatching(),
-        closeBrackets(),
-        autocompletion({ activateOnTyping: !o.phone }),
-        rectangularSelection(),
-        crosshairCursor(),
-        highlightActiveLine(),
-        highlightSelectionMatches(),
-        search({ top: true }),
-        keymap.of([
-          { key: 'Mod-s', preventDefault: true, run: () => (o.onSave(), true) },
-          ...closeBracketsKeymap,
-          ...defaultKeymap,
-          ...searchKeymap,
-          ...historyKeymap,
-          ...foldKeymap,
-          ...completionKeymap,
-          indentWithTab,
-        ]),
-        EditorState.readOnly.of(!!o.readOnly),
-        lang.of(support ?? []),
-        o.phone ? phoneTheme : [],
-        panelTheme,
-        phrases(),
-        theme.of(themeExt(o.dark)),
-        wrap.of(o.wrap ? EditorView.lineWrapping : []),
-        flashField,
-        flashTheme,
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) o.onChange(u.state.doc.toString());
-        }),
-      ],
+  const extensions = [
+    gutter.of(gutterExt(o.lineNumbers !== false)),
+    font.of(fontExt(o.fontSize)),
+    highlightSpecialChars(),
+    history(),
+    o.phone ? [] : foldGutter(),
+    drawSelection(),
+    dropCursor(),
+    EditorState.allowMultipleSelections.of(true),
+    indentOnInput(),
+    bracketMatching(),
+    closeBrackets(),
+    autocompletion({ activateOnTyping: !o.phone }),
+    rectangularSelection(),
+    crosshairCursor(),
+    highlightActiveLine(),
+    highlightSelectionMatches(),
+    search({ top: true }),
+    keymap.of([
+      { key: 'Mod-s', preventDefault: true, run: () => (o.onSave(), true) },
+      // Go to line on Ctrl+G; ⌘G keeps finding the next match on a Mac (Mod-Alt-G goes to a line anywhere).
+      { key: 'Ctrl-g', preventDefault: true, run: gotoLine },
+      { key: 'Mod-h', mac: 'Mod-Alt-f', preventDefault: true, run: (v) => (openReplace(v), true) },
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...searchKeymap,
+      ...historyKeymap,
+      ...foldKeymap,
+      ...completionKeymap,
+      indentWithTab,
+    ]),
+    EditorState.readOnly.of(!!o.readOnly),
+    lang.of(support ?? []),
+    indent.of(indentExt(startIndent)),
+    o.phone ? phoneTheme : [],
+    panelTheme,
+    phrases(),
+    theme.of(themeExt(o.dark)),
+    wrap.of(o.wrap ? EditorView.lineWrapping : []),
+    flashField,
+    flashTheme,
+    EditorView.updateListener.of((u) => {
+      if (u.docChanged) o.onChange(u.state.doc.toString());
+      if (o.onStatus && (u.docChanged || u.selectionSet)) o.onStatus(status(u.state));
     }),
-  });
+    // Right-click, or the menu key: the editor's own menu, at the point (or at the cursor).
+    EditorView.domEventHandlers({
+      contextmenu: (e, v) => {
+        if (!o.onContextMenu) return false;
+        e.preventDefault();
+        // Right-clicked outside what is picked: the cursor goes there first, as in other editors.
+        const pos = v.posAtCoords({ x: e.clientX, y: e.clientY });
+        const r = v.state.selection.main;
+        if (pos != null && (r.empty || pos < r.from || pos > r.to)) v.dispatch({ selection: { anchor: pos } });
+        o.onContextMenu({ x: e.clientX, y: e.clientY, keyed: false, pos: pos ?? undefined });
+        v.focus();
+        return true;
+      },
+      keydown: (e, v) => {
+        if (!o.onContextMenu || !(e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey))) return false;
+        e.preventDefault();
+        const at = v.coordsAtPos(v.state.selection.main.head);
+        const box = v.dom.getBoundingClientRect();
+        o.onContextMenu({ x: at?.left ?? box.left + 40, y: at?.bottom ?? box.top + 40, keyed: true, pos: v.state.selection.main.head });
+        return true;
+      },
+    }),
+  ];
+  // An editor put back keeps its undo history and selection, when its text is still the text it was taken down with.
+  let state: EditorState | null = null;
+  const saved = o.restore?.state as { doc?: string } | undefined;
+  if (saved && saved.doc === o.doc) {
+    try {
+      state = EditorState.fromJSON(saved, { extensions }, { history: historyField });
+    } catch {}
+  }
+  const view = new EditorView({ parent, state: state ?? EditorState.create({ doc: o.doc, extensions }) });
+  if (state && o.restore?.scroll) {
+    const top = o.restore.scroll;
+    requestAnimationFrame(() => (view.scrollDOM.scrollTop = top));
+  }
 
+  o.onStatus?.(status(view.state));
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
   return {
     view,
     setDark: (dark) => view.dispatch({ effects: theme.reconfigure(themeExt(dark)) }),
     setWrap: (w) => view.dispatch({ effects: wrap.reconfigure(w ? EditorView.lineWrapping : []) }),
+    setFontSize: (px) => view.dispatch({ effects: font.reconfigure(fontExt(px)) }),
+    setLineNumbers: (on) => view.dispatch({ effects: gutter.reconfigure(gutterExt(on)) }),
     setDoc: (doc, so) => {
       const d = diffSpan(view.state.doc.toString(), doc);
       if (!d) return;
@@ -269,6 +365,46 @@ export async function createEditor(
       view.focus();
     },
     find: () => openSearchPanel(view),
+    goto: () => (view.focus(), void gotoLine(view)),
+    replace: () => openReplace(view),
+    selectAll: () => (view.focus(), void selectAll(view)),
+    selection: () => {
+      const r = view.state.selection.ranges.filter((x) => !x.empty);
+      if (!r.length) return { text: '', fromLine: 0, toLine: 0, empty: true };
+      const doc = view.state.doc;
+      return {
+        text: r.map((x) => doc.sliceString(x.from, x.to)).join('\n'),
+        fromLine: doc.lineAt(r[0].from).number,
+        toLine: doc.lineAt(r[r.length - 1].to).number,
+        empty: false,
+      };
+    },
+    copy: async () => {
+      const t = view.state.selection.ranges.map((x) => view.state.sliceDoc(x.from, x.to)).join('\n');
+      if (!t) return false;
+      return navigator.clipboard?.writeText(t).then(() => true, () => false) ?? false;
+    },
+    cut: async () => {
+      const t = view.state.selection.ranges.map((x) => view.state.sliceDoc(x.from, x.to)).join('\n');
+      if (!t || !(await navigator.clipboard?.writeText(t).then(() => true, () => false))) return false;
+      view.dispatch(view.state.replaceSelection(''), { userEvent: 'delete.cut', scrollIntoView: true });
+      view.focus();
+      return true;
+    },
+    paste: async () => {
+      const t = await navigator.clipboard?.readText().catch(() => null);
+      if (t == null) return false;
+      view.dispatch(view.state.replaceSelection(t), { userEvent: 'input.paste', scrollIntoView: true });
+      view.focus();
+      return true;
+    },
+    setIndent: (i) => {
+      indentNow = i;
+      view.dispatch({ effects: indent.reconfigure(indentExt(i)) });
+      o.onStatus?.(status(view.state));
+    },
+    focus: () => view.focus(),
+    snapshot: () => ({ state: view.state.toJSON({ history: historyField }), scroll: view.scrollDOM.scrollTop }),
     destroy: () => (clearTimeout(flashTimer), view.destroy()),
   };
 }
@@ -279,6 +415,8 @@ export interface CellEditorHandle {
   view: EditorView;
   setDark: (dark: boolean) => void;
   focus: (at: number | 'start' | 'end') => void;
+  /** Where the cursor is in the text (the end of what is picked). */
+  cursor: () => number;
   destroy: () => void;
 }
 
@@ -301,7 +439,9 @@ export async function createCellEditor(
     lang: string;
     dark: boolean;
     onChange: (doc: string) => void;
-    onRun: (how: 'stay' | 'next' | 'insert') => void;
+    onRun: (how: 'stay' | 'next' | 'insert' | 'below') => void;
+    /** Ctrl+Shift+-: the cell split at the cursor. */
+    onSplit?: (at: number) => void;
     onEscape: () => void;
     onSave: () => void;
     onEdge: (dir: -1 | 1) => boolean;
@@ -345,6 +485,8 @@ export async function createCellEditor(
           { key: 'Shift-Enter', run: () => (o.onRun('next'), true) },
           { key: 'Mod-Enter', run: () => (o.onRun('stay'), true) },
           { key: 'Alt-Enter', run: () => (o.onRun('insert'), true) },
+          { key: 'Mod-Shift-Enter', run: () => (o.onRun('below'), true) },
+          ...(o.onSplit ? [{ key: 'Mod-Shift--', preventDefault: true, run: (v: EditorView) => (o.onSplit!(v.state.selection.main.head), true) }, { key: 'Mod-_', preventDefault: true, run: (v: EditorView) => (o.onSplit!(v.state.selection.main.head), true) }] : []),
           { key: 'Escape', run: () => (o.onEscape(), true) },
           { key: 'Mod-s', preventDefault: true, run: () => (o.onSave(), true) },
           { key: 'ArrowUp', run: (v) => atEdge(v, -1) && o.onEdge(-1) },
@@ -375,6 +517,7 @@ export async function createCellEditor(
       view.dispatch({ selection: { anchor: pos } });
       view.focus();
     },
+    cursor: () => view.state.selection.main.head,
     destroy: () => view.destroy(),
   };
 }

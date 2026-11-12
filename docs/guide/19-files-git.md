@@ -217,7 +217,7 @@ Click a file in the folder. It opens in the editor, in a tab of its own. The fir
 
 The editor numbers the lines, colours the text by the file's language, matches brackets and, on a computer, folds blocks and suggests completions as you type. Tab indents.
 
-To save, click **Save** (it lights up once you change something) or press Ctrl+S (⌘S on a Mac). A dot beside the file's name means there are unsaved changes, and leaving the page with unsaved changes makes the browser ask first.
+To save, click **Save** (it lights up once you change something) or press Ctrl+S (⌘S on a Mac). A dot beside the file's name means there are unsaved changes. The app keeps them while it is open: go to another file's tab and come back, and the file is as you left it, with its undo history, cursor and place. A dot on the file's tab shows that it has changes not saved, and closing such a tab (its ✕ or a middle click), or leaving the file with **Back** on a phone, asks **Save the changes?**: **Save**, **Don't save** or **Cancel**. Reloading or closing the page loses what is not saved, and the browser asks first. A file whose lines end the Windows way (CRLF) is saved the same way, not turned into the other.
 
 ### The editor's tools
 
@@ -225,17 +225,21 @@ On a computer, the bar above the file shows its path and these buttons:
 
 - **Preview** (Markdown files): the file as it reads, with headings, tables, its own images (from beside the file) and links to other files. Click it again to edit. Markdown files open as a preview first.
 - **Show as a page** (HTML files): runs the page in a frame sealed off from the app, able to load the files next to it. HTML files open as a page first. The page's link lasts an hour; after that, open the file again.
-- **Changes since the last commit**: the file's differences from its last commit, added lines in green and removed ones in red. It says "No changes" when the file matches its last commit or isn't in a git repository.
+- **Changes since the last commit**: the file's differences from its last commit, added lines in green and removed ones in red. It says "No changes" when the file matches its last commit or isn't in a git repository. Going to **Preview** or **Changes** and back leaves the text as it was, with its undo history, cursor and place.
 - **Word wrap**: wraps long lines instead of scrolling sideways. The choice is remembered.
 - **Ask**: asks an agent to change the file, or about it ([below](#ask-an-agent-about-the-file)).
 - **Terminal in this folder**: a new shell in the file's folder.
 - **Download**.
-- **More** (⋯): **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**.
+- **More** (⋯): **Find**, **Replace**, **Go to line**, **Ask about the selection** and **Keyboard shortcuts**, then **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**.
 - **Save**.
 
-To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace.
+To find text in the file, press Ctrl+F (⌘F on a Mac) while the cursor is in it: a find bar opens at the top, with replace (Ctrl+H, or ⌘⌥F on a Mac). Ctrl+G (⌘⌥G on a Mac) goes to a line.
 
-On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
+Right-click in the text (or press the menu key or Shift+F10 for the menu at the cursor) for **Cut**, **Copy**, **Paste**, **Select all**, **Find**, **Replace**, **Go to line** and **Ask about the selection**, which opens [Ask](#ask-an-agent-about-the-file) with the lines you picked quoted in it. **More** → **Keyboard shortcuts** lists every key.
+
+The strip under the text shows where the cursor is (**Ln 12, Col 5**, with how many characters are picked; click it to go to a line), the file's language, its indentation (**Spaces: 2**, **Spaces: 4**, **Tabs**: read from the file; click to pick another for what you type next), **LF** or **CRLF** (how the file's lines end; click to save it with the other) and **Wrap** or **No wrap** (click to switch).
+
+On a phone the bar shows **Back**, the file's name over its folder, **Preview** or **Show as a page**, **Ask an agent** (✨), **Save** (once you change something) and **More** (⋯), which holds **Find**, **Go to line**, **Ask about the selection**, **Word wrap**, **Changes since the last commit**, **Terminal in this folder**, **Download**, **Start a session with it**, **Add to a project**, **Show in its folder** and **Copy path**. Phones wrap long lines unless you turn **Word wrap** off.
 
 ### Ask an agent about the file
 
@@ -410,8 +414,11 @@ Kernels keep running after you close the notebook, and through restarts of the a
 
 A cell is **Code**, **Text** (Markdown) or **Raw**. Click a code cell to edit it, or double-click a text cell. While a cell runs it shows `[*]` and a timer; afterwards its run number, `[3]`.
 
-- Point at a code cell and a run button takes the place of its number ("Run (Ctrl+Enter)"; while the cell runs, it interrupts the kernel). Its tools show in the corner: **Edit** (text cells), the cell type, **Move up**, **Move down**, **Add a cell below** and **Delete the cell**. On a phone, tap a cell: its tools show above it, **Run** included.
+- Point at a code cell and a run button takes the place of its number ("Run (Shift+Enter)": it runs the cell and goes to the next; while the cell runs, it interrupts the kernel). Its tools show in the corner: **Edit** (text cells), the cell type, **Move up**, **Move down**, **Add a cell below**, **Delete the cell** and **More for this cell** (⋯, the cell's menu, below). On a phone, tap a cell: its tools show above it, **Run** included.
 - On a computer, pointing between two cells shows **+ Code** and **+ Text**. The same two buttons sit below the last cell.
+- **The cell's menu**: right-click a cell (or its ⋯ in the corner, which is how it opens on a phone). It has **Run this cell**, **Run all above**, **Run this and below** and **Run all below** (code cells only run), **Cut**, **Copy**, **Paste below**, **Paste above**, **Duplicate**, **Split at the cursor** (while you edit the cell, with the cursor where it should split), **Merge with the next cell**, **Add a cell above** and **below**, **Move up** and **down**, **Cell type**, **Clear the output**, **Fold the output** or **Show the output**, and **Delete the cell**, each with its key. Cut, copied and duplicated cells keep their outputs; a paste may go into another notebook while the app is open. Splitting or merging clears the outputs of the cells it makes.
+- **Several cells together**: Shift+↑ / Shift+↓ (or Shift+click) picks the cells between where you started and where you are, shown tinted; the menu, **Copy**, **Cut**, **Duplicate**, **Merge** and D, D then work on all of them. Esc lets go.
+- **Fold an output**: the small arrows by a cell's number (or **Fold the output** in its menu) hide its output behind "Output hidden"; click that to show it again. It is kept in the notebook's file (as Jupyter does), so it stays folded when you open it again.
 - When code asks for input (Python's `input()`), a field appears under the cell: "Type, then Enter". Passwords stay hidden.
 - While you edit code, Tab after a name asks the running kernel for completions.
 
@@ -424,14 +431,19 @@ While you edit a cell:
 - Shift+Enter: run it and go to the next cell (a new one after the last).
 - Ctrl+Enter (⌘Enter on a Mac): run it and stay.
 - Alt+Enter: run it and add a cell below.
+- Ctrl+Shift+Enter: run it and the cells below it.
+- Ctrl+Shift+- (⌘⇧-): split the cell at the cursor.
 - Esc: stop editing.
 
 When no cell is being edited:
 
-- Enter: edit the selected cell. ↑ / ↓ (or K / J): move between cells.
-- A / B: add a cell above / below. D, D: delete the cell. Z: bring back the last deleted cell.
+- Enter: edit the selected cell. ↑ / ↓ (or K / J): move between cells. Shift+↑ / ↓: pick several.
+- A / B: add a cell above / below. D, D: delete the cell (or the cells picked). Z: bring back the cells deleted last; press it again for the ones before.
+- C / X: copy / cut the cell (or the cells picked). V / Shift+V: paste below / above. Shift+M: merge the cell with the next (or the cells picked together). Ctrl+Shift+Enter: run this cell and the ones below it.
 - M, Y, R: make the cell Text, Code or Raw.
 - I, I: interrupt the kernel. 0, 0: restart it.
+
+**More** (⋯) in the bar above the notebook has **Run all cells**, **Run all above**, **Run this and below** and **Run all below** (those last three for the cell picked), **Restart the kernel**, **Restart and run all**, **Clear all outputs**, **Outline** and **Keyboard shortcuts**. **Outline** shows the headings of the text cells (the lines that start with #) in a list beside the cells (a sheet on a phone): click one to go to its cell. **Keyboard shortcuts** lists every key. A cell run while the kernel is still starting waits for it, and runs when it is ready.
 
 Ctrl+S (⌘S on a Mac) saves. As with other files, if the notebook changes on disk while you have unsaved changes, a bar offers **Reload (discard mine)** or **Overwrite with mine**. **View the notebook file (JSON)** shows the file as text in the editor; **Open as a notebook** goes back.
 
