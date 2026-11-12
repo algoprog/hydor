@@ -328,7 +328,7 @@ test('Tab completion lists option ids with their labels, sections, and a choiceâ
     ids.find(([v]) => v === 'general.resume-after-usage-limits'),
     ['general.resume-after-usage-limits', 'Resume after usage limits'],
   );
-  const secs = (await LOADERS.section(load('', []))) as Candidate[];
+  const secs = (await LOADERS['settings-section'](load('', []))) as Candidate[];
   assert.deepEqual(
     secs.find(([v]) => v === 'chat'),
     ['chat', 'Chat apps'],
