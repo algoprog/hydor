@@ -1,4 +1,8 @@
 {
+"doc::Number format":"Μορφή αρίθμησης",
+"Instagram story":"Ιστορία Instagram",
+"media::Sans serif":"Χωρίς πατούρες",
+"media::Serif":"Με πατούρες",
 ", Col":", Στ",
 "({0} selected)":"({0} επιλεγμένα)",
 "{0} cells copied":"Αντιγράφηκαν {0} κελιά",
@@ -202,7 +206,7 @@
 "Bring to the front or send to the back":"Μεταφορά στο προσκήνιο ή αποστολή στο παρασκήνιο",
 "Brush hardness softer or harder":"Σκληρότητα πινέλου: πιο μαλακό ή πιο σκληρό",
 "Capital letters: A. B. C.":"Κεφαλαία γράμματα: A. B. C.",
-"Capital Roman numerals: I. II. III.":"Κεφαλαίοι λατινικοί αριθμοί: I. II. III.",
+"Capital Roman numerals: I. II. III.":"Μεγάλοι λατινικοί αριθμοί: I. II. III.",
 "Change case":"Αλλαγή πεζών/κεφαλαίων",
 "Change layout":"Αλλαγή διάταξης",
 "Click it again to write in it, type / for blocks; right-click for more":"Κάντε ξανά κλικ για να γράψετε μέσα, πληκτρολογήστε / για μπλοκ· δεξί κλικ για περισσότερα",

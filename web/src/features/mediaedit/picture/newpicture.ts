@@ -15,10 +15,10 @@ export interface NewPreset {
 
 export const NEW_PRESETS: NewPreset[] = [
   { id: 'square', label: 'Square post', w: 1080, h: 1080, about: '1080 × 1080' },
-  { id: 'story', label: 'Story', w: 1080, h: 1920, about: '1080 × 1920' },
+  { id: 'story', label: 'Instagram story', w: 1080, h: 1920, about: '1080 × 1920' },
   { id: 'hd', label: 'HD', w: 1920, h: 1080, about: '1920 × 1080' },
   { id: 'a4', label: 'A4 at 300 dpi', w: 2480, h: 3508, about: '2480 × 3508' },
-  { id: 'custom', label: 'Custom', about: 'Any size' },
+  { id: 'custom', label: 'Custom size', about: 'Any size' },
 ];
 
 /** What a new picture starts as: white, see-through or a colour. */

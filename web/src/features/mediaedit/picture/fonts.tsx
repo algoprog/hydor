@@ -11,11 +11,11 @@ import { Seg } from '../shell';
 import { localFamilies } from '../render';
 
 const KINDS = [
-  { value: 'sans', label: 'Sans' },
+  { value: 'sans', label: 'Sans serif' },
   { value: 'serif', label: 'Serif' },
   { value: 'display', label: 'Display' },
   { value: 'hand', label: 'Script' },
-  { value: 'mono', label: 'Mono' },
+  { value: 'mono', label: 'Monospace' },
   { value: 'local', label: 'This computer' },
 ] as const;
 type Kind = (typeof KINDS)[number]['value'];
