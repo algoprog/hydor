@@ -1054,9 +1054,10 @@ programs shows each program's version and what is out, with Check now, Update no
   is kept on that device; an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data** and
   **Copy as text** sit on each. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
-  beside it on a wide screen.
+  beside it on a wide screen. Before showing one, an agent can picture it as the app shows it, in the dark theme or
+  the light, to see what would not read well.
 - Before and after: when an agent changes how a web app looks, it shows screenshots of each screen it changed
-  from before and after, on a computer's or a phone's screen: a reply's screenshots as one card of small
+  from before and after, on a computer's or a phone's screen, in the light or dark theme: a reply's screenshots as one card of small
   pictures (a row of them, with Show all, when there are more), each opening a review (beside the conversation, or
   over the app on a phone) with a slider or side by side, and arrows to the reply's other screens.
 - Every file a turn changed, with its diff, and the commits it made, each opening to its message and diff. Screenshots you attach show in the conversation and open full size.

@@ -47,6 +47,10 @@ export interface CaptureOpts {
   offline?: boolean;
   /** A second picture of the same page, as it is (another size or format): Captured.alt. */
   alt?: { format: 'webp' | 'jpeg' | 'png'; quality?: number; outWidth?: number; fullPage?: boolean };
+  /** The colour scheme the page is told the device prefers (prefers-color-scheme), when not the browser's own (light). */
+  colorScheme?: 'light' | 'dark';
+  /** A script to run in the page before any of its own (to add a stylesheet, say). */
+  firstScript?: string;
 }
 
 export interface Captured {
@@ -163,7 +167,7 @@ export interface Tab {
   evaluate<T>(expression: string, timeoutMs?: number): Promise<T>;
 }
 
-type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline'>;
+type TabOpts = Pick<CaptureOpts, 'url' | 'html' | 'width' | 'height' | 'scale' | 'mobile' | 'settleMs' | 'blockPrivate' | 'offline' | 'colorScheme' | 'firstScript'>;
 
 /** Opens a page in a fresh context, waits for it to load and settle, and hands it to `job`; the context goes after. */
 async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
@@ -177,6 +181,8 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
     await s.send('Emulation.setDeviceMetricsOverride', { width: o.width, height: o.height, deviceScaleFactor: o.scale ?? 1, mobile: !!o.mobile });
     if (o.mobile) await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await s.send('Emulation.setScrollbarsHidden', { hidden: true }).catch(() => {});
+    if (o.colorScheme) await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: o.colorScheme }] });
+    if (o.firstScript) await s.send('Page.addScriptToEvaluateOnNewDocument', { source: o.firstScript });
     if (o.html !== undefined || o.blockPrivate || o.offline) {
       const html = o.html;
       s.on('Fetch.requestPaused', (p) => {

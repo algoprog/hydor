@@ -321,7 +321,8 @@ function fontFaces(): string {
 /**
  * The app's current theme as the page kit's colours and font (server/pages/kit.ts puts it after the kit), so a
  * page made with the kit looks like part of the app: its light or dark, and the user's own colours. In the dark
- * they go to body.n-page only, as the kit's own dark ones do: a page of its own colours keeps its light kit parts.
+ * they go to body.n-page and its <html> only, as the kit's own dark ones do (a page of its own colours keeps its
+ * light kit parts); on <html> they weigh as :root does, so the page's own :root colours still come after them.
  */
 export function themeCss(): string {
   const cs = getComputedStyle(document.documentElement);
@@ -331,7 +332,7 @@ export function themeCss(): string {
   if (/^[#\w(),.%\s/-]{1,80}$/.test(accent)) colours.push(['--n-accent-soft', `color-mix(in srgb, ${accent} 14%, transparent)`]);
   const font = (k: string) => v(k).replace(/[;{}<>]/g, '');
   const fonts = [font('font-sans') && `--n-font:${font('font-sans')}`, font('font-mono') && `--n-mono:${font('font-mono')}`].filter(Boolean).join(';');
-  return `${fontFaces()}:root{${fonts}}${themeNow() === 'dark' ? 'html[data-n-theme] .n-page' : ':root'}{${colours.map(([n, x]) => `${n}:${x}`).join(';')}}${partWords()}`;
+  return `${fontFaces()}:root{${fonts}}${themeNow() === 'dark' ? ':root:where([data-n-theme]:has(>body.n-page)),html[data-n-theme] .n-page' : ':root'}{${colours.map(([n, x]) => `${n}:${x}`).join(';')}}${partWords()}`;
 }
 
 /** What a template's parts say where they stand unrun (in the editor), in the app's language: the words before and after the part's name. */

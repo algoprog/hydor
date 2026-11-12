@@ -701,7 +701,7 @@ When an agent changes how a web app looks or works (a site or an app with a dev 
 - On a wide screen, a screen's after opens beside the conversation by itself when it comes.
 - An after picture without a before one shows alone, with "No before picture to compare with"; the agent is told to take the before one first next time.
 
-You can also ask for a screenshot any time: "show me the settings page on a phone". The pictures are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)) and kept with their session: they go when the session is deleted, and the oldest go first past 500 MB in all.
+You can also ask for a screenshot any time: "show me the settings page on a phone", or "in the dark theme" (a site that follows your computer's light or dark shows in the one you name, and in the light otherwise). A page an agent made for the conversation or the Library (a mock-up, a report) is pictured as the app shows it, in the dark theme unless the light one is asked for, so the agent sees what would not read well before you do. The pictures are taken on this computer by a Chromium ([Settings → Capabilities → Browser](/settings?s=browser)) and kept with their session: they go when the session is deleted, and the oldest go first past 500 MB in all.
 
 ## Watch this computer in Monitor
 
@@ -750,5 +750,5 @@ It takes a reading every 2 seconds while the page is open and keeps the last 10 
 - "What changed in ~/code/shop-api this week? Sum up the commits in plain words."
 - "Search went slow after v2.3 in ~/code/shop-api: find the commit that made it slow."
 - "Which dev servers are running on this computer right now?"
-- "Make the checkout page's button bigger, and show me before and after on a phone."
+- "Make the checkout page's button bigger, and show me before and after on a phone, in the dark theme."
 - "What's using the most memory on this computer?"
