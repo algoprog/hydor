@@ -128,6 +128,12 @@ problem; everything else once.
   starting on Quick and moving up a tier only when a check fails, and work whose result cannot be checked by a program
   (designs, research, writing), where a judge has to read it.
 
+**After 0.57.0** (Max only by the lead's own step up), the team ran again, once each, on the 13 tasks where Automatic
+had started it on Max. It passed every case in 12 of the 13 (2 of 78 security cases missed), for $13.07 in all: 48%
+less than the same tasks had cost the team on Max ($24.90, 13 of 13) and 25% less than Best alone ($17.51, 11 of 13).
+No lead stepped itself up: none found a problem too hard for Best, including the contest problem Best alone had
+failed, which it solved. `results/2026-11-12/team-after-0.57.json`.
+
 **The first measurement** (10 November, the nine tasks with a written specification): the team cost 9% less than
 Best alone over seven ordinary tasks, from 27% less where Quick helpers did real work to 41% more on a request that
 reads as a hard problem, which Automatic started on Max. Against Max alone it cost 67% less over six. Max alone failed
@@ -167,8 +173,8 @@ graded again when the grader itself had failed (its Python lacked a package).
 
 - Starting on Quick and stepping up only on a failed check, which these results suggest could keep most of the
   quality at a fraction of the cost: not built, not measured.
-- Max only by the lead's own step up (0.57.0): the team has not been measured again since; the expectation from the
-  runs above is the team at 8-16% below Best alone, with one problem in 37 left to the lead to notice.
+- Max only by the lead's own step up (0.57.0) is measured on the 13 tasks where Automatic had chosen Max (below), once
+  each; a wider set and more runs would say more.
 - Work whose result a program cannot check (a design, a report, writing) is not measured: it needs a judge, checked
   against people's ratings first.
 - The benchmark ran Claude Code alone. Codex and Custom get the same tiers and the same instructions, with child

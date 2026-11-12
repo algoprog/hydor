@@ -33,8 +33,8 @@ Nothing in the app depends on it.
 | Way | What runs |
 |---|---|
 | `solo` | One agent on the Best tier's model, the team off: how a session worked before tiers led by default. |
-| `team` | Automatic, the team on: the main agent leads on Best, may step itself up to Max, and hands parts to helpers. |
-| `lead` | The team on with Max for hard problems off: the main agent leads on Best, never on Max, and hands parts to helpers. |
+| `team` | Automatic, the team on: the main agent leads on Best, may step up to Max, and hands parts to helpers. |
+| `lead` | The team on, Max for hard problems off: the main agent leads on Best only and hands parts to helpers. |
 | `max` | One agent on the Max tier's model, the team off: the strongest model for everything. |
 | `standard`, `quick` | One agent on that tier's model alone, the team off: what the tier can do with no lead. |
 
@@ -83,6 +83,8 @@ shows one as a table. Keep a new measurement beside them, in a folder named by i
 `lcb.json` (the thirty LiveCodeBench problems; `node scripts/tier-bench/run.mjs --tasks-dir
 ~/.cache/hydor-bench/lcb/tasks` after `lcb/make-tasks.py`). Runs made in the trial of 11 November and carried over
 say so in `copiedFrom`; four LiveCodeBench solutions graded again after the grader failed say so in `regraded`.
+`team-after-0.57.json` is the team again on 0.57.0, where Max comes only from the lead's own step up, on the 13 tasks
+where Automatic had started it on Max.
 
 ## Reading the table
 
