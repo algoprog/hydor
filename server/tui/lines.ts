@@ -27,6 +27,23 @@ export interface Look {
 /** Text the agent wrote and steps are indented this much under your messages. */
 export const INDENT = '  ';
 
+/** The logo's colours, left to right (also the spinner's, frame by frame). */
+export const LOGO = ['#4fd1c5', '#8aa8ff', '#a78bfa'];
+
+/** HYDΩR in bold, shading across the logo's colours where there are 256 colours or more, else in the accent colour. */
+export const logo = (p: Paint) => p.bold(p.level >= 2 ? p.gradient('HYDΩR', LOGO) : p.accent('HYDΩR'));
+
+/**
+ * A word with a brighter band of two or three letters sweeping across it about every 1.2 seconds, the rest dim; the
+ * word as it is when there are no colours. `yellow`: for what needs you.
+ */
+export function shimmer(word: string, p: Paint, now = Date.now(), yellow = false): string {
+  if (!p.on) return word;
+  const gs = [...word];
+  const pos = ((now % 1200) / 1200) * (gs.length + 3) - 1.5;
+  return gs.map((g, i) => (Math.abs(i - pos) < 1.5 ? p.bold(yellow ? p.yellow(g) : g) : p.dim(yellow ? p.yellow(g) : g))).join('');
+}
+
 // ---- models -----------------------------------------------------------------------------------------
 
 /** A model's name as people know it: its label in the program's list, else "Opus 5.5" from "claude-opus-5-5". */

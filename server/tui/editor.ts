@@ -2,7 +2,8 @@
 // and End in their several spellings, Alt and Ctrl with arrows, a paste between bracketed-paste marks arriving whole
 // with its line breaks), and the text with its cursor changed by them (by characters as people see them, by words,
 // across lines; history with ↑ and ↓; Enter sends, Alt+Enter, Ctrl+J or a `\` before Enter add a line). It is laid
-// out in rows a width wide, the cursor's row and column with it, so the screen can put the cursor there.
+// out in rows a width wide, the cursor's row and column with it, so the screen can put the cursor there, and after
+// the cursor the grey rest of an earlier message that starts with the text.
 import { graphemes, graphemeWidth, strWidth, type Paint } from './term.ts';
 
 /** Keys that are only their name. */
@@ -29,6 +30,7 @@ export type Named =
   | 'ctrl-c'
   | 'ctrl-d'
   | 'ctrl-l'
+  | 'ctrl-r'
   | 'ctrl-z'
   | 'page-up'
   | 'page-down';
@@ -51,6 +53,7 @@ const CTRL: Record<string, Named> = {
   '\x03': 'ctrl-c',
   '\x04': 'ctrl-d',
   '\x0c': 'ctrl-l',
+  '\x12': 'ctrl-r',
   '\x10': 'up',
   '\x0e': 'down',
   '\x1a': 'ctrl-z',
@@ -385,6 +388,20 @@ export class LineEditor {
   }
 }
 
+// ---- the grey suggestion from history ------------------------------------------------------------------------------
+
+/** The rest of the newest earlier message that starts with the text (one line of 2 or more characters, the cursor at its end), or ''. */
+export function ghostOf(text: string, cursor: number, history: string[]): string {
+  if (cursor !== text.length || text.length < 2 || text.includes('\n')) return '';
+  for (let i = history.length - 1; i >= 0; i--) if (history[i].length > text.length && history[i].startsWith(text)) return history[i].slice(text.length);
+  return '';
+}
+
+/** The next word of a suggestion (the spaces before it with it); all of it when there is only space left. */
+export function ghostWord(ghost: string): string {
+  return /^\s*\S+/.exec(ghost)?.[0] ?? ghost;
+}
+
 // ---- laying it out ----------------------------------------------------------------------------------
 
 export interface Layout {
@@ -396,9 +413,10 @@ export interface Layout {
 /**
  * The text as rows `width` columns wide (each row at most width - 1, so the terminal never wraps one), the first after
  * `prompt` and the rest after as many spaces; the cursor's row and column. At most `maxRows` rows show, around the
- * cursor, with a dim line saying how many more there are.
+ * cursor, with a dim line saying how many more there are. `ghost`: the rest of an earlier message, shown dim after the
+ * cursor at the end of one line of text (cut to the row; the cursor stays where it is).
  */
-export function layout(text: string, cursor: number, width: number, o: { prompt: string; placeholder?: string; maxRows?: number; p: Paint }): Layout {
+export function layout(text: string, cursor: number, width: number, o: { prompt: string; placeholder?: string; maxRows?: number; ghost?: string; p: Paint }): Layout {
   const promptW = strWidth(o.prompt);
   const indent = ' '.repeat(promptW);
   const room = Math.max(4, width - 1 - promptW);
@@ -446,6 +464,11 @@ export function layout(text: string, cursor: number, width: number, o: { prompt:
     rows.push(lead() + row);
     pos += line.length + 1;
   });
+  if (o.ghost && cursor === text.length && lines.length === 1) {
+    // After the cursor, on its row only.
+    const cut = truncateTo(o.ghost.replace(/\n/g, '↵'), width - 1 - cursorCol);
+    if (cut) rows[cursorRow] += o.p.dim(cut);
+  }
   const max = o.maxRows ?? 12;
   if (rows.length <= max) return { rows, cursorRow, cursorCol };
   // A window around the cursor, with how much is above and below it.
