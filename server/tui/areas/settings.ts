@@ -132,7 +132,7 @@ export const settings: Area = {
     {
       name: 'list',
       aliases: ['ls'],
-      args: [{ name: 'section', kind: 'section', optional: true }],
+      args: [{ name: 'section', kind: 'settings-section', optional: true }],
       summary: 'Every option with its value',
       help: 'With a section, only its options. --json gives { id: value } for the options that have a value (a key or token only as set or not).',
       examples: ['hydor settings list', 'hydor settings list memory', 'hydor settings list --json'],
@@ -233,7 +233,7 @@ export const settings: Area = {
     },
     {
       name: 'open',
-      args: [{ name: 'section', kind: 'section', optional: true }],
+      args: [{ name: 'section', kind: 'settings-section', optional: true }],
       summary: 'The address of a section or an option',
       help: 'Prints it; --browser opens it in your browser too.',
       examples: ['hydor settings open', 'hydor settings open memory', 'hydor settings open --browser general.new-theme'],

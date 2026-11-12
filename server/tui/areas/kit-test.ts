@@ -71,7 +71,7 @@ test('registry: every area is well formed', () => {
       const h = helpText(makePaint(true), a.name, v.name.split(' '))!;
       assert.ok(widest(h) <= 80, `${a.name} ${v.name}: help in ${widest(h)} columns`);
       assert.ok(stripAnsi(h).startsWith(`Usage: ${usageLine(a, v)}`), `${a.name} ${v.name}: its usage line`);
-      for (const e of v.examples ?? []) assert.ok(e.startsWith('hydor '), `${a.name} ${v.name}: an example is a command`);
+      for (const e of v.examples ?? []) assert.ok(/(^|\| )hydor /.test(e), `${a.name} ${v.name}: an example is a command`);
       assert.ok((v.examples ?? []).length >= 1, `${a.name} ${v.name}: has an example`);
     }
     const h = helpText(makePaint(true), a.name)!;
@@ -85,7 +85,8 @@ test('registry: help and the parser agree on every verb’s options and words', 
     for (const v of a.verbs) {
       const words = [a.name, ...v.name.split(' ')];
       const route = routeOf(words)!;
-      assert.equal(route.verb, v, `${a.name} ${v.name} is found by its words`);
+      // A bare area's words are its one verb's own: no verb is named.
+      assert.equal(a.bare ? defaultVerb(a) : route.verb, v, `${a.name} ${v.name} is found by its words`);
       for (const [name, o] of Object.entries(v.options ?? {})) {
         const o2 = parseArgv([...words, `--${name}`, ...(o.type === 'boolean' ? [] : ['x'])]);
         assert.ok(o2.route!.values[name] !== undefined, `${a.name} ${v.name} takes --${name}`);
@@ -104,9 +105,9 @@ test('registry: Tab completion lists every area, its verbs and its options', asy
   for (const a of AREAS) {
     assert.ok(first.includes(a.name) && help.includes(a.name), `${a.name} is completed as a command`);
     const verbs = (await completeWords([a.name, ''], api)).map((l) => l.split('\t')[0]);
-    for (const v of a.verbs) assert.ok(verbs.includes(v.name.split(' ')[0]), `${a.name}: ${v.name} is completed`);
+    if (!a.bare) for (const v of a.verbs) assert.ok(verbs.includes(v.name.split(' ')[0]), `${a.name}: ${v.name} is completed`);
     for (const v of a.verbs) {
-      const route = v.name.split(' ');
+      const route = a.bare ? [] : v.name.split(' ');
       const opts = (await completeWords([a.name, ...route, '--'], api)).map((l) => l.split('\t')[0]);
       for (const name of Object.keys(v.options ?? {})) assert.ok(opts.includes(`--${name}`), `${a.name} ${v.name}: --${name} is completed`);
       assert.ok(opts.includes('--json'), 'the common options too');
@@ -170,13 +171,36 @@ test('parseArgv: a verb’s options, strictly, with did you mean', () => {
   assert.throws(() => parseArgv(['projects', 'show', 'x', '--model', 'opus']), /Unknown option '--model'/, 'a session option');
   assert.throws(
     () => parseArgv(['projects', 'shw']),
-    (e: Error) => e instanceof UsageError && /^Unknown projects command: shw\. Did you mean hydor projects show\?\nTo send it to an agent as a message: hydor chat projects shw$/.test(e.message),
+    (e: Error) => e instanceof UsageError && /^Unknown projects command: shw\. Did you mean hydor projects show\?$/.test(e.message),
   );
   assert.equal(parseArgv(['projects', 'show', 'x', '-y']).yes, true, 'the common short options');
   assert.equal(parseArgv(['projects', '--json']).route!.verb, undefined);
   // The commands that exist are parsed as before.
   assert.equal(parseArgv(['sessions', '-n', '5']).cmd, 'sessions');
   assert.equal(parseArgv(['fix', 'the', 'tests']).cmd, 'chat');
+});
+
+test('messages that start with a command’s name: quoted is a message; unknown verbs say how to send it', () => {
+  // Quoted as one word with spaces, it is never a command or an area.
+  for (const line of ['find the bug in login', 'projects show x', 'sessions pin 3f9a', 'open the file', 'guide me through it', 'api is slow']) {
+    const o = parseArgv([line]);
+    assert.equal(o.cmd, 'chat', line);
+    assert.deepEqual(o.args, [line]);
+    assert.equal(o.route, undefined);
+    assert.equal(routeOf([line]), null);
+  }
+  assert.equal(parseArgv(['--model', 'opus', 'find the bug']).cmd, 'chat');
+  assert.equal(parseArgv(['chat', 'find', 'the', 'bug']).cmd, 'chat', 'after hydor chat');
+  assert.deepEqual(parseArgv(['chat', 'find', 'the', 'bug']).args, ['find', 'the', 'bug']);
+  // Unquoted, an area name starts that area.
+  assert.equal(parseArgv(['find', 'the', 'bug']).route!.area.name, 'find');
+  assert.deepEqual(parseArgv(['find', 'the', 'bug']).args, ['the', 'bug']);
+  // A word after an area that is no verb of it: a near verb is suggested, otherwise how to send it as a message.
+  assert.throws(() => parseArgv(['projects', 'shw', 'x']), /^Error: Unknown projects command: shw\. Did you mean hydor projects show\?$/);
+  assert.throws(() => parseArgv(['projects', 'leak', 'in', 'parser']), /^Error: Unknown projects command: leak\.\nTo send this to an agent: hydor chat projects leak in parser$/);
+  // Bare areas take any words as their own.
+  assert.doesNotThrow(() => parseArgv(['find', 'leak', 'in', 'parser']));
+  assert.ok(helpText(plain)!.replace(/\s+/g, ' ').includes('A message that starts with a command’s name goes in quotes (hydor "find the bug in login") or after hydor chat.'));
 });
 
 // ---- help --------------------------------------------------------------------------------------------------------
