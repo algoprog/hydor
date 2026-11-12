@@ -151,7 +151,7 @@ async function followJob(ctx: Ctx, first: Job, what: string): Promise<Job> {
 export const plugins: Area = {
   name: 'plugins',
   aliases: ['plugin'],
-  summary: 'Plugins: skills, tool servers and instructions bundled for the agents',
+  summary: 'Plugins for every agent',
   help: 'Hydor’s plugins work for every agent: each brings skills, tool servers and instructions. Claude Code and Codex have plugins of their own besides: add --agent claude or --agent codex. Name one by its name or the start of it; on a terminal, leave it out to pick from a list. Making a plugin of your own is on its page (hydor open plugins).',
   group: 'tools',
   verbs: [

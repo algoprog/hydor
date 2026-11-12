@@ -23,7 +23,7 @@ async function findKey(ctx: Ctx, given: string | undefined): Promise<SecretView>
 export const keys: Area = {
   name: 'keys',
   aliases: ['vault'],
-  summary: 'The vault: keys agents use by name, never shown',
+  summary: 'The vault: keys agents use by name',
   help: 'A key is a secret (an API key, a token, a password) kept encrypted in Hydor’s vault. Agents use one by its NAME (http_request, the browser, run_with_secrets) and never see its value; they ask you for one with a card. These commands are yours alone: a value is never typed as an option (it would stay in your shell’s history) and never printed.',
   group: 'tools',
   verbs: [
