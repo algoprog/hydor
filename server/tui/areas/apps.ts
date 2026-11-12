@@ -287,7 +287,7 @@ export const apps: Area = {
             ['Installed', detail.installed === false ? 'no (a ready-made app, not installed)' : undefined],
             ['Keys', secrets.length ? secrets.map((s) => `${s.name} ${s.have ? 'saved' : p.yellow('missing')}`).join(', ') : undefined],
             ['Used', detail.usage?.runs ? `${detail.usage.runs} runs today${detail.usage.spent ? `, ${money(detail.usage.spent)}` : ''}` : undefined],
-            ['Page', `${ctx.conn.base}/apps/${enc(e.slug)}`],
+            ['Page', `${ctx.conn.base}/apps/${e.slug}`],
           ]),
         ]);
         ctx.out([
@@ -352,7 +352,7 @@ export const apps: Area = {
         } catch (x) {
           const keys = (x as { secrets?: { name: string }[] }).secrets;
           if (x instanceof ApiError && x.status === 409 && /key|secret/i.test(x.message))
-            throw new ApiError(409, `${x.message}\nAdd the keys it needs on its page: ${ctx.conn.base}/apps/${enc(e.slug)}${keys ? ` (${keys.map((k) => k.name).join(', ')})` : ''}`);
+            throw new ApiError(409, `${x.message}\nAdd the keys it needs on its page: ${ctx.conn.base}/apps/${e.slug}${keys ? ` (${keys.map((k) => k.name).join(', ')})` : ''}`);
           throw x;
         }
         if (flag(v, 'no-wait')) return ctx.o.json ? ctx.json(r) : ctx.out(`Started “${e.name}”: run ${r.run.id} (hydor apps run-show ${r.run.id})`);

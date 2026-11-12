@@ -129,7 +129,7 @@ const bodyOf = (t: ScheduledTask) => {
 };
 
 const AGENT_OPTIONS = {
-  agent: { type: 'string', value: '<program>', desc: 'claude, codex, custom or an ACP agent’s id', kind: 'agent' },
+  agent: { type: 'string', value: '<program>', desc: 'claude, codex, custom or an ACP agent’s id', values: ['claude', 'codex', 'custom'] as string[] },
   model: { type: 'string', value: '<name>', desc: 'The model (hydor models lists them)' },
   effort: { type: 'string', value: '<level>', desc: 'How hard it thinks: low, medium, high, xhigh, max' },
   mode: { type: 'string', value: '<mode>', desc: 'What it may do alone: ask, edits, auto, plan, full…' },
@@ -365,7 +365,8 @@ export const tasks: Area = {
         const body = bodyOf(t);
         const schedule = scheduleOf(ctx, v);
         if (schedule) {
-          // A webhook keeps its address; the server leaves it when the kind stays.
+          // A new time of day keeps the days it had; a webhook keeps its address (the server leaves it when the kind stays).
+          if (schedule.kind === 'daily' && t.schedule.kind === 'daily' && str(v, 'days') === undefined && t.schedule.days) schedule.days = t.schedule.days;
           body.schedule = schedule;
         }
         if (str(v, 'name')) body.name = str(v, 'name');

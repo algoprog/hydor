@@ -133,6 +133,7 @@ test('sign-out and remove ask first; the program’s own sign-in is not removed'
   const { conn, calls } = fakeConn({
     ...routes,
     'POST /api/accounts/claude/logout?account=acc1': { ok: true },
+    'DELETE /api/agent-accounts/acc1': { ok: true },
     'DELETE /api/agent-accounts/acc1?wipe=1': { ok: true },
     'DELETE /api/agent-accounts/acc2': { ok: true },
   });
@@ -146,6 +147,16 @@ test('sign-out and remove ask first; the program’s own sign-in is not removed'
   const r = await run(conn, ['accounts', 'remove', 'claude:personal', '--wipe'], { interactive: true, confirm: true });
   assert.match(r.asked[0], /Its sign-in and its sessions’ history are deleted for good/);
   assert.equal((await run(conn, ['accounts', 'rm', 'codex:personal', '-y'])).out, 'Removed “Personal”.\n');
+  assert.deepEqual(calls.at(-1), { method: 'DELETE', path: '/api/agent-accounts/acc2' }, 'acc2 was not the one new sessions used');
+  await run(conn, ['accounts', 'rm', 'claude:personal', '-y']);
+  assert.deepEqual(
+    calls.slice(-2).map((c) => [c.method, c.path]),
+    [
+      ['DELETE', '/api/agent-accounts/acc1'],
+      ['PUT', '/api/start'],
+    ],
+    'it was the one new sessions used: back to its own',
+  );
   await assert.rejects(run(conn, ['accounts', 'remove', 'personal', '-y']), (e) => e instanceof UsageError && /fits 2 accounts/.test((e as Error).message));
 });
 

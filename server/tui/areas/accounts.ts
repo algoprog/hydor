@@ -260,6 +260,8 @@ export const accounts: Area = {
         if (!(await ctx.confirm(`Remove “${e.name}” (${PROGRAM[e.agent]})?${wipe ? ' Its sign-in and its sessions’ history are deleted for good.' : ' Its sessions leave the list.'}`)))
           return ctx.out('Not removed.');
         const r = await ctx.conn.api('DELETE', `/api/agent-accounts/${enc(e.ref)}${wipe ? '?wipe=1' : ''}`);
+        // New sessions were to start with it: back to the program's own sign-in.
+        if (e.used) await ctx.conn.api('PUT', '/api/start', { runs: { [e.agent]: { account: '' } } }).catch(() => {});
         if (ctx.o.json) return ctx.json(r);
         ctx.out(`Removed “${e.name}”.`);
       },
