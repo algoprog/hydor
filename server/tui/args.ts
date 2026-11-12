@@ -12,7 +12,7 @@ export { GROUPS, UsageError };
 export type { Group };
 
 /** The commands `hydor` knows in the terminal (the maintenance ones in server/cli.ts come before these). */
-export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'agents', 'tasks', 'usage', 'status', 'serve', 'help'] as const;
+export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'tasks', 'usage', 'status', 'serve', 'help'] as const;
 /** A command of COMMANDS, or 'area': a verb of an area (server/tui/areas), with the words in Opts.route. */
 export type Command = (typeof COMMANDS)[number] | 'area';
 
@@ -136,15 +136,6 @@ export const CMD_TABLE: CommandDef[] = [
       ['hard', 'Max for hard problems: on or off'],
     ],
     options: ['effort', 'json'],
-  },
-  {
-    name: 'agents',
-    group: 'models',
-    args: '',
-    desc: 'Your agents',
-    help: 'Lists your agents (the built-in ones first) with their ids: --as takes an id or a name.',
-    examples: ['hydor agents', 'hydor --as researcher "find papers on reranking"'],
-    options: ['json'],
   },
   {
     name: 'tasks',
