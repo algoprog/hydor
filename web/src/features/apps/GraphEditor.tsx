@@ -20,7 +20,7 @@
 // theirs its answer. Other templates can call it too, and a change to it is a change for all of them.
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AppWindow, Bot, Boxes, CircleDot, ClipboardCheck, Clock, CodeXml, Columns2, Database, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, MessageCircleQuestion, Minimize2, Minus, Plus, Repeat, Sigma, Snowflake, Sparkles, Split, TextCursorInput, Wrench, X } from 'lucide-react';
+import { Boxes, CircleDot, ClipboardCheck, Clock, Ellipsis, FlaskConical, Group, LayoutGrid, Maximize, Maximize2, Minimize2, Minus, Plus, Repeat, Snowflake, TextCursorInput, X } from 'lucide-react';
 import type { Flow, NamedFlow, Step, StepKind } from '@shared/app-manifest';
 import { allSteps, asText, BUILTIN_ROOTS, BUILTIN_VALUES, collapseSteps, givesOf, refsIn, STEP_KINDS, titleOf } from '@shared/app-manifest';
 import type { AppDef, AppGraph, AppRecipe, AppRun, RunProgress, RunStepView } from '@shared/apps';
@@ -34,6 +34,9 @@ import { AppForm, formErrors, initialValues, type FormFiles, type FormValues } f
 import { BlockChips } from './Blocks';
 import { childList, listsOf, type ListPath } from './paths';
 import type { Ctx } from './StepsEditor';
+import { ICON, KIND_COLOR } from './stepKinds';
+
+export { ICON, KIND_COLOR };
 
 const W = 200;
 const H = 52;
@@ -47,21 +50,6 @@ const SLOT_H = 28;
 const IO_GAP = 46;
 const IO_GAP_X = 24;
 
-/** Each kind's colour: the node's stripe and the wires of the values it gives. */
-export const KIND_COLOR: Record<StepKind, string> = {
-  agent: '#8b5cf6',
-  model: '#3b82f6',
-  tool: '#f59e0b',
-  decide: '#94a3b8',
-  repeat: '#14b8a6',
-  parallel: '#6366f1',
-  app: '#06b6d4',
-  data: '#22c55e',
-  ask: '#f97316',
-  code: '#ec4899',
-  value: '#84cc16',
-};
-export const ICON: Record<StepKind, typeof Bot> = { agent: Bot, model: Sparkles, tool: Wrench, decide: Split, repeat: Repeat, parallel: Columns2, app: AppWindow, data: Database, ask: MessageCircleQuestion, code: CodeXml, value: Sigma };
 const KIND = Object.fromEntries(STEP_KINDS.map((k) => [k.value, k.label])) as Record<StepKind, string>;
 
 // ---- laying it out ------------------------------------------------------------------------------------------

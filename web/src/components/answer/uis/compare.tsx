@@ -5,7 +5,7 @@ import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, CircleX, C
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
-import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -315,7 +315,8 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
   const [sent, setSent] = useKept<boolean>('sent', false);
   const ask = useAsk();
   const chosen = (Array.isArray(picked) ? picked : []).filter((i) => typeof i === 'number' && i < options.length);
-  const anyPic = options.some((o) => str(o.image));
+  const picOks = usePicsOk(options.map((o) => o.image));
+  const anyPic = picOks.some(Boolean);
   const pick = (i: number) => {
     if (!done) return;
     setSent(false);
@@ -337,20 +338,21 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
           const on = chosen.includes(i);
           const title = textOf(o, 'title', 'name', 'label');
           const tags = words(o.tags);
+          const hasPic = picOks[i];
           return (
             <label
               key={i}
               className={cx(
                 'relative flex min-w-0 overflow-hidden rounded-xl border transition-colors',
                 // A picture sits beside the words when the choices are one under the other, above them in a grid.
-                anyPic ? (options.length > 1 ? 'flex-row @md:flex-col' : 'flex-row') : 'flex-col',
+                hasPic ? (options.length > 1 ? 'flex-row @md:flex-col' : 'flex-row') : 'flex-col',
                 done ? 'cursor-pointer' : 'cursor-default',
                 on ? 'border-accent bg-accent-soft ring-1 ring-accent' : 'border-line hover:border-line-2 hover:bg-bg-1',
               )}
             >
               <input type={multiple ? 'checkbox' : 'radio'} name={group} checked={on} disabled={!done} onChange={() => pick(i)} className="sr-only" />
-              {anyPic && <Pic src={o.image} alt={title} zoom={false} className={cx('min-h-24 w-[34%] max-w-40 shrink-0 self-stretch rounded-none', options.length > 1 && '@md:aspect-[16/9] @md:min-h-0 @md:w-full @md:max-w-none @md:self-auto')} />}
-              {yes(o.recommended) && anyPic && (
+              {str(o.image) && <Pic src={o.image} alt={title} zoom={false} className={cx('min-h-24 w-[34%] max-w-40 shrink-0 self-stretch rounded-none', options.length > 1 && '@md:aspect-[16/9] @md:min-h-0 @md:w-full @md:max-w-none @md:self-auto')} />}
+              {yes(o.recommended) && hasPic && (
                 <span className="absolute top-2 left-2 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-fg shadow-sm">{tr('Recommended')}</span>
               )}
               <div className="flex min-w-0 flex-1 gap-2.5 p-3">
@@ -358,7 +360,7 @@ function Choices({ data, done }: { data: Data; done: boolean }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-semibold text-fg">{title}</span>
-                    {yes(o.recommended) && !anyPic && <Chip tone="accent">{tr('Recommended')}</Chip>}
+                    {yes(o.recommended) && !hasPic && <Chip tone="accent">{tr('Recommended')}</Chip>}
                   </div>
                   {str(o.description) && <Md text={o.description} className="mt-0.5 text-[13px] text-fg-2" />}
                   {(tags.length > 0 || str(o.price)) && (

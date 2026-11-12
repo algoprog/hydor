@@ -31,7 +31,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { mu } from '../../../lib/machine';
 import { cx } from '../../ui';
-import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, isObj, Md, num, obj, parseDate, Pic, Seg, Stars, str, textOf, useAui, useKept, Video, words, youTubeId, type AnswerUiView, type Data } from '../kit';
+import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, isObj, Md, num, obj, parseDate, Pic, Seg, Stars, str, textOf, useAui, useKept, usePicOk, usePicsOk, Video, WithPic, words, youTubeId, type AnswerUiView, type Data } from '../kit';
 
 // ---- small parts these views share ------------------------------------------------------------------------------------
 
@@ -175,12 +175,19 @@ function Gallery({ data, done }: { data: Data; done: boolean }) {
   const [layout, setLayout] = useKept<'grid' | 'carousel' | ''>('layout', '');
   const mode = layout || (str(data.layout).toLowerCase() === 'carousel' ? 'carousel' : 'grid');
   const [at, setAt] = useKept<number>('at', 0);
-  const cur = clamp(at, shots.length);
-  const group = shots.map((s) => s.src);
-  const go = (i: number) => done && setAt((i + shots.length) % shots.length);
+  // A picture that cannot load is left out, with its caption (it stays in the tree, hidden: it is asked for again, and
+  // comes back if that works). The carousel moves over the ones that are there.
+  const oks = usePicsOk(shots.map((s) => s.src));
+  const liveIdx = shots.map((_, i) => i).filter((i) => oks[i]);
+  const live = liveIdx.length;
+  const at0 = clamp(at, shots.length);
+  const cur = liveIdx.includes(at0) ? at0 : (liveIdx.find((i) => i > at0) ?? liveIdx[0] ?? at0);
+  const pos = Math.max(0, liveIdx.indexOf(cur));
+  const group = liveIdx.map((i) => shots[i].src);
+  const go = (step: number) => done && live > 0 && setAt(liveIdx[(pos + step + live) % live]);
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'ArrowRight') go(cur + 1);
-    else if (e.key === 'ArrowLeft') go(cur - 1);
+    if (e.key === 'ArrowRight') go(1);
+    else if (e.key === 'ArrowLeft') go(-1);
   };
   const shot = shots[cur];
   return (
@@ -188,7 +195,7 @@ function Gallery({ data, done }: { data: Data; done: boolean }) {
       <Head
         title={data.title}
         aside={
-          done && shots.length > 1 ? (
+          done && live > 1 ? (
             <Seg
               size="sm"
               options={[
@@ -218,18 +225,20 @@ function Gallery({ data, done }: { data: Data; done: boolean }) {
         }
       />
       {mode === 'carousel' && shot ? (
-        <div>
-          <div className="relative outline-none" tabIndex={shots.length > 1 ? 0 : -1} onKeyDown={onKey} aria-roledescription="carousel">
-            <Pic src={shot.src} alt={plain(shot.caption)} group={group} fit="contain" className="aspect-[16/10] w-full rounded-xl bg-bg-1" />
-            {shots.length > 1 && (
+        <div className={cx(live === 0 && 'hidden')}>
+          <div className="relative outline-none" tabIndex={live > 1 ? 0 : -1} onKeyDown={onKey} aria-roledescription="carousel">
+            {shots.map((s, i) => (
+              <Pic key={i} src={s.src} alt={plain(s.caption)} group={group} fit="contain" className={cx('aspect-[16/10] w-full rounded-xl bg-bg-1', i !== cur && 'hidden')} />
+            ))}
+            {live > 1 && (
               <>
-                <button type="button" disabled={!done} onClick={() => go(cur - 1)} aria-label={tr('Previous')} className="absolute top-1/2 left-2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/70 disabled:opacity-40">
+                <button type="button" disabled={!done} onClick={() => go(-1)} aria-label={tr('Previous')} className="absolute top-1/2 left-2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/70 disabled:opacity-40">
                   <ChevronLeft size={18} />
                 </button>
-                <button type="button" disabled={!done} onClick={() => go(cur + 1)} aria-label={tr('Next')} className="absolute top-1/2 right-2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/70 disabled:opacity-40">
+                <button type="button" disabled={!done} onClick={() => go(1)} aria-label={tr('Next')} className="absolute top-1/2 right-2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/70 disabled:opacity-40">
                   <ChevronRight size={18} />
                 </button>
-                <span className="pointer-events-none absolute right-2.5 bottom-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[11.5px] font-medium text-white tabular-nums">{`${cur + 1} / ${shots.length}`}</span>
+                <span className="pointer-events-none absolute right-2.5 bottom-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[11.5px] font-medium text-white tabular-nums">{`${pos + 1} / ${live}`}</span>
               </>
             )}
           </div>
@@ -240,27 +249,27 @@ function Gallery({ data, done }: { data: Data; done: boolean }) {
             </div>
           )}
           {shots.length > 1 && (
-            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+            <div className={cx('mt-3 flex gap-1.5 overflow-x-auto pb-1', live < 2 && 'hidden')}>
               {shots.map((s, i) => (
-                <button key={i} type="button" disabled={!done} onClick={() => setAt(i)} aria-label={`${i + 1}`} className={cx('shrink-0 rounded-lg p-0.5 transition-colors', i === cur ? 'bg-accent' : 'hover:bg-bg-3')}>
+                <WithPic key={i} src={s.src} as="button" type="button" disabled={!done} onClick={() => setAt(i)} aria-label={`${i + 1}`} className={cx('shrink-0 rounded-lg p-0.5 transition-colors', i === cur ? 'bg-accent' : 'hover:bg-bg-3')}>
                   <Pic src={s.src} alt="" zoom={false} className="h-12 w-[72px] rounded-md" />
-                </button>
+                </WithPic>
               ))}
             </div>
           )}
         </div>
       ) : (
-        <div className={cx('grid gap-x-2.5 gap-y-3', shots.length > 1 && 'grid-cols-2 @xl:grid-cols-3')}>
+        <div className={cx('grid gap-x-2.5 gap-y-3', live > 1 && 'grid-cols-2 @xl:grid-cols-3')}>
           {shots.map((s, i) => (
-            <figure key={i} className="m-0 min-w-0">
-              <Pic src={s.src} alt={plain(s.caption)} group={group} className={cx('w-full rounded-lg', shots.length > 1 ? 'aspect-[4/3]' : 'aspect-[16/10]')} />
+            <WithPic key={i} as="figure" src={s.src} className="m-0 min-w-0">
+              <Pic src={s.src} alt={plain(s.caption)} group={group} className={cx('w-full rounded-lg', live > 1 ? 'aspect-[4/3]' : 'aspect-[16/10]')} />
               {(s.caption || s.credit || s.page) && (
                 <figcaption className="mt-1.5 px-0.5 text-[12.5px] leading-snug text-fg-2">
                   <Md text={s.caption} inline />
                   <Credit shot={s} />
                 </figcaption>
               )}
-            </figure>
+            </WithPic>
           ))}
         </div>
       )}
@@ -277,6 +286,11 @@ function Videos({ data, done }: { data: Data; done: boolean }) {
   const [at, setAt] = useKept<number>('at', 0);
   const [jump, setJump] = useState<{ s: number; n: number } | null>(null);
   const cur = clamp(at, videos.length);
+  const thumbOf = (x: Data) => {
+    const yt = youTubeId(str(x.url ?? x.link));
+    return yt ? `https://i.ytimg.com/vi/${yt}/mqdefault.jpg` : (x.thumbnail ?? x.image);
+  };
+  const thumbOk = usePicsOk(videos.map(thumbOf));
   const v = videos[cur];
   const url = v ? str(v.url ?? v.link) : '';
   const chapters = arr(v?.chapters)
@@ -333,13 +347,12 @@ function Videos({ data, done }: { data: Data; done: boolean }) {
           <ul className="m-0 -mx-1.5 list-none space-y-0.5 p-0">
             {videos.map((x, i) => {
               const u = str(x.url ?? x.link);
-              const yt = youTubeId(u);
               const len = lengthText(x.duration);
               return (
                 <li key={i}>
                   <button type="button" disabled={!done && i !== cur} onClick={() => pick(i)} aria-current={i === cur} className={cx('flex w-full items-center gap-3 rounded-lg p-1.5 text-left transition-colors', i === cur ? 'bg-bg-1' : 'hover:bg-bg-1')}>
-                    <span className="relative shrink-0">
-                      <Pic src={yt ? `https://i.ytimg.com/vi/${yt}/mqdefault.jpg` : x.thumbnail ?? x.image} alt="" zoom={false} className="h-[54px] w-24 rounded-md" />
+                    <span className={cx('relative shrink-0', !thumbOk[i] && 'hidden')}>
+                      <Pic src={thumbOf(x)} alt="" zoom={false} className="h-[54px] w-24 rounded-md" />
                       {i === cur ? (
                         <span className="absolute inset-0 grid place-items-center rounded-md bg-black/45 text-white">
                           <Play size={16} fill="currentColor" />
@@ -351,6 +364,7 @@ function Videos({ data, done }: { data: Data; done: boolean }) {
                     <span className="min-w-0 flex-1">
                       <span className={cx('line-clamp-2 text-[13px] leading-snug font-medium', i === cur && 'text-accent')}>{str(x.title) || hostOf(u)}</span>
                       {str(x.channel ?? x.author) && <span className="block truncate text-[12px] text-fg-3">{str(x.channel ?? x.author)}</span>}
+                      {!thumbOk[i] && len && <span className="block text-[11.5px] text-fg-3 tabular-nums">{len}</span>}
                     </span>
                   </button>
                 </li>
@@ -371,6 +385,7 @@ function AudioPlayer({ data, done }: { data: Data; done: boolean }) {
     .map((t) => ({ src: str(t.src ?? t.url ?? t.file ?? t.path).trim(), title: str(t.title ?? t.name), artist: str(t.artist ?? t.by), duration: lengthText(t.duration), image: str(t.image ?? t.cover) }))
     .filter((t) => t.src || t.title);
   const { cwd } = useAui();
+  const coverOk = usePicsOk(tracks.map((t) => t.image));
   const audio = useRef<HTMLAudioElement>(null);
   const [cur, setCur] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -425,9 +440,8 @@ function AudioPlayer({ data, done }: { data: Data; done: boolean }) {
           const name = t.title || t.src.split(/[\\/]/).pop() || t.src;
           return (
             <li key={i} className={cx('flex items-center gap-3 rounded-xl px-2 py-2 transition-colors', on ? 'bg-bg-1' : 'hover:bg-bg-1/70')}>
-              {t.image ? (
-                <Pic src={t.image} alt="" zoom={false} className="h-12 w-12 shrink-0 rounded-lg" />
-              ) : (
+              {t.image && <Pic src={t.image} alt="" zoom={false} className="h-12 w-12 shrink-0 rounded-lg" />}
+              {!coverOk[i] && (
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-bg-2 text-fg-3">
                   <Music size={18} />
                 </span>
@@ -1124,9 +1138,9 @@ function News({ data }: { data: Data; done: boolean }) {
   const picture = (s: Story, className: string) => {
     const pic = <Pic src={s.image} alt="" zoom={!isWeb(s.url)} className={className} />;
     return isWeb(s.url) ? (
-      <a href={s.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden className="block shrink-0">
+      <WithPic src={s.image} as="a" href={s.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden className="block shrink-0">
         {pic}
-      </a>
+      </WithPic>
     ) : (
       pic
     );
@@ -1215,6 +1229,7 @@ function AnnotatedImage({ data, done }: { data: Data; done: boolean }) {
   const spots = spotsOf(data.notes ?? data.markers ?? data.labels ?? data.points);
   const box = useRef<HTMLDivElement>(null);
   const ready = usePictureIn(box, src);
+  const hasPic = usePicOk(src);
   // The marker under the pointer, the note under it in the list, and the one tapped (or clicked) open.
   const [over, setOver] = useState<number | null>(null);
   const [listed, setListed] = useState<number | null>(null);
@@ -1230,7 +1245,7 @@ function AnnotatedImage({ data, done }: { data: Data; done: boolean }) {
       {src && (
         <div
           ref={box}
-          className={cx('relative', !ready && 'aspect-[16/10] overflow-hidden rounded-xl bg-bg-2')}
+          className={cx('relative', !ready && 'aspect-[16/10] overflow-hidden rounded-xl bg-bg-2', !hasPic && 'hidden')}
           onKeyDown={(e) => {
             if (e.key !== 'Escape' || pinned === null) return;
             setPinned(null);
@@ -1243,7 +1258,7 @@ function AnnotatedImage({ data, done }: { data: Data; done: boolean }) {
             e.stopPropagation();
           }}
         >
-          <Pic src={src} alt={str(data.alt) || str(data.title)} className="block h-auto w-full rounded-xl [&.aui-pic-none]:aspect-[16/10]" />
+          <Pic src={src} alt={str(data.alt) || str(data.title)} className="block h-auto w-full rounded-xl" />
           {ready &&
             spots.map((s, i) =>
               placed(s) ? (
@@ -1292,10 +1307,10 @@ function AnnotatedImage({ data, done }: { data: Data; done: boolean }) {
               key={i}
               onPointerEnter={(e) => e.pointerType === 'mouse' && setListed(i)}
               onPointerLeave={() => setListed(null)}
-              onClick={() => placed(s) && pin(i)}
-              className={cx('flex min-w-0 gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors', lit === i && 'bg-accent-soft', done && placed(s) && 'cursor-pointer')}
+              onClick={() => hasPic && placed(s) && pin(i)}
+              className={cx('flex min-w-0 gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors', lit === i && 'bg-accent-soft', done && hasPic && placed(s) && 'cursor-pointer')}
             >
-              <span className={cx('mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold tabular-nums', placed(s) ? 'bg-accent text-accent-fg' : 'bg-bg-2 text-fg-3')}>{i + 1}</span>
+              <span className={cx('mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold tabular-nums', placed(s) && hasPic ? 'bg-accent text-accent-fg' : 'bg-bg-2 text-fg-3')}>{i + 1}</span>
               <div className="min-w-0">
                 {s.label && <div className="font-semibold text-fg">{s.label}</div>}
                 {s.text && <Md text={s.text} className="text-fg-2" />}
@@ -1326,6 +1341,8 @@ function BeforeAfter({ data, done }: { data: Data; done: boolean }) {
   const pos = at ?? pctIn(num(data.start) ?? 50);
   const box = useRef<HTMLDivElement>(null);
   const ready = usePictureIn(box, base);
+  const hasBase = usePicOk(base);
+  const overOk = usePicOk(over);
   const dragging = useRef<number | null>(null);
   const moveTo = (x: number) => {
     const r = box.current?.getBoundingClientRect();
@@ -1347,9 +1364,9 @@ function BeforeAfter({ data, done }: { data: Data; done: boolean }) {
       {base && (
         <div
           ref={box}
-          className={cx('relative touch-pan-y overflow-hidden rounded-xl bg-bg-2 select-none', !ready && 'aspect-[16/10]', done && over && 'cursor-ew-resize')}
+          className={cx('relative touch-pan-y overflow-hidden rounded-xl bg-bg-2 select-none', !ready && 'aspect-[16/10]', done && over && overOk && 'cursor-ew-resize', !hasBase && 'hidden')}
           onPointerDown={(e) => {
-            if (!done || !over || e.button !== 0) return;
+            if (!done || !over || !overOk || e.button !== 0) return;
             dragging.current = e.pointerId;
             e.currentTarget.setPointerCapture(e.pointerId);
             moveTo(e.clientX);
@@ -1362,15 +1379,15 @@ function BeforeAfter({ data, done }: { data: Data; done: boolean }) {
             dragging.current = null;
           }}
         >
-          <Pic src={base} alt={over ? afterLabel : beforeLabel} zoom={!over} className="block h-auto w-full [&.aui-pic-none]:aspect-[16/10]" />
+          <Pic src={base} alt={over && overOk ? afterLabel : beforeLabel} zoom={!over || !overOk} className="block h-auto w-full" />
           {over && (
             <>
-              <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
+              <div className={cx('absolute inset-0', !overOk && 'hidden')} style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
                 <Pic src={over} alt={beforeLabel} zoom={false} className="h-full w-full" />
               </div>
-              {pos > 16 && <span className={cx(label, 'left-2.5')}>{beforeLabel}</span>}
-              {pos < 84 && <span className={cx(label, 'right-2.5')}>{afterLabel}</span>}
-              <div className="pointer-events-none absolute inset-y-0 w-0" style={{ left: `${pos}%` }}>
+              {overOk && pos > 16 && <span className={cx(label, 'left-2.5')}>{beforeLabel}</span>}
+              {overOk && pos < 84 && <span className={cx(label, 'right-2.5')}>{afterLabel}</span>}
+              <div className={cx('pointer-events-none absolute inset-y-0 w-0', !overOk && 'hidden')} style={{ left: `${pos}%` }}>
                 <span className="absolute inset-y-0 -left-px w-0.5 bg-white shadow-[0_0_4px_rgba(0,0,0,0.55)]" aria-hidden />
                 <div
                   role="slider"

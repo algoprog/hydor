@@ -1,8 +1,11 @@
 import { lazy, Suspense, useState } from 'react';
 import { ClipboardList, ExternalLink, MessageCircleQuestion, ShieldAlert } from 'lucide-react';
+import type { StepKind } from '@shared/app-manifest';
 import { formDefaults } from '@shared/forms';
 import type { Agent, ApprovalRequest } from '@shared/types';
 import { api, enc } from '../../lib/api';
+import { duration, money } from '../../lib/format';
+import { goApp } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { CodeBlock, Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
@@ -10,6 +13,7 @@ import { Button } from '../../components/ui';
 import { AppIcon } from '../apps/AppIcon';
 import { AppForm, formErrors, type FormFiles } from '../apps/Form';
 import { AppKeys, emptyKeys, keysMissing, type KeyInput } from '../apps/AppKeys';
+import { ICON, KIND_COLOR } from '../apps/stepKinds';
 import { Elapsed } from './items';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 import { tr } from '../../i18n/runtime';
@@ -52,6 +56,34 @@ export function ApprovalCard(props: { a: ApprovalRequest; sessionKey: string; ag
   return <Card {...props} />;
 }
 
+/** At most this many of an app's steps show on the card that asks to run it. */
+const STEPS_SHOWN = 6;
+
+/** What an app does, as the card that asks to run it shows: its steps in order, each with its kind's icon, a few of them. */
+function AppSteps({ steps, own }: { steps: { title: string; kind: string }[]; own: boolean }) {
+  const shown = steps.slice(0, STEPS_SHOWN);
+  const more = steps.length - shown.length;
+  return (
+    <div>
+      <div className="mb-1 text-[11.5px] font-medium text-fg-3">What it does</div>
+      <ol className="space-y-1">
+        {shown.map((s, i) => {
+          const Icon = ICON[s.kind as StepKind];
+          return (
+            <li key={i} className="flex items-center gap-2 text-[12.5px]">
+              {Icon ? <Icon size={13} className="shrink-0" style={{ color: KIND_COLOR[s.kind as StepKind] }} /> : <span className="w-[13px] shrink-0" />}
+              <span className="min-w-0 truncate" translate={own ? 'no' : undefined}>
+                {s.title}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {more > 0 && <div className="mt-1 pl-[21px] text-[12px] text-fg-3">{tr(`and ${more} more`)}</div>}
+    </div>
+  );
+}
+
 function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [denyOpen, setDenyOpen] = useState(false);
@@ -71,7 +103,8 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
   const [keyErrors, setKeyErrors] = useState<Record<string, string>>({});
 
   const respond = async (decision: string) => {
-    if (decision === 'accept' && (fields.length || keyStates.length)) {
+    const run = decision === 'accept' || decision === 'always';
+    if (run && (fields.length || keyStates.length)) {
       const wrong = formErrors(fields, values, files);
       setErrors(wrong);
       const lacking = keysMissing(keyStates, keys);
@@ -79,15 +112,15 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
       if (Object.keys(wrong).length || lacking.length) return;
     }
     // The page the server asks the user to open, opened by their own tap (a pop-up blocker allows it).
-    if (decision === 'accept' && link) window.open(link, '_blank', 'noopener,noreferrer');
+    if (run && link) window.open(link, '_blank', 'noopener,noreferrer');
     setBusy(true);
     try {
       const answers: Record<string, string> = {};
       if (a.kind === 'question') {
         for (const q of a.questions ?? []) answers[q.id] = answerOf(q, picks[q.id], agent === 'claude' ? ', ' : '\n');
       }
-      if (app && decision === 'accept' && keyStates.length) await api(`/api/apps/${enc(app.id)}/secrets`, { method: 'POST', base, body: { values: keys.values } });
-      let form = fields.length && decision === 'accept' ? values : undefined;
+      if (app && run && keyStates.length) await api(`/api/apps/${enc(app.id)}/secrets`, { method: 'POST', base, body: { values: keys.values } });
+      let form = fields.length && run ? values : undefined;
       // Files picked on the card are saved ahead of the answer, which gives where each went.
       const picked = Object.keys(files).filter((id) => fields.some((f) => f.id === id && f.type === 'file'));
       if (form && picked.length) {
@@ -114,7 +147,7 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
   const question = a.kind === 'question';
   const answeredAll = !question || allAnswered(a.questions ?? [], picks);
   // Declining a question or a form needs no word to the agent first.
-  const plainDecline = question || !!a.form;
+  const plainDecline = question || !!a.form || !!app?.approve;
 
   return (
     <div id={id} className="anim-pop my-2 overflow-hidden rounded-xl border border-warn/45 bg-panel shadow-[0_0_0_3px_color-mix(in_srgb,var(--warn)_10%,transparent)]">
@@ -136,7 +169,14 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
         </span>
       </div>
       <div className="space-y-3 px-3 py-3">
-        {app && (
+        {app?.approve && <p className="text-[13px] leading-snug font-medium">An agent wants to run this app for you.</p>}
+        {app?.approve && app.about && (
+          <p className="text-[13px] leading-snug text-fg-2" translate={app.id.startsWith('tpl:') ? undefined : 'no'}>
+            {app.about}
+          </p>
+        )}
+        {app?.approve && app.steps && app.steps.length > 0 && <AppSteps steps={app.steps} own={!app.id.startsWith('tpl:')} />}
+        {app && (fields.length > 0 || keyStates.length > 0 || !app.approve) && (
           <p className="text-[13px] leading-snug text-fg-2">
             {fields.some((f) => f.required && !f.default)
               ? 'It needs a few details before it runs. Leave the optional ones empty if you don’t mind.'
@@ -160,6 +200,16 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
               </span>
             ))}
           </div>
+        )}
+        {app?.approve && app.lastRun && (
+          <div className="text-[12px] text-fg-3">
+            {tr(`Last run: ${[duration(app.lastRun.ms), app.lastRun.usd != null ? money(app.lastRun.usd) : ''].filter(Boolean).join(' · ')}`)}
+          </div>
+        )}
+        {app?.approve && app.link && (
+          <button type="button" onClick={() => goApp(app.link!)} className="flex items-center gap-1 text-[12.5px] text-accent hover:underline">
+            About this app
+          </button>
         )}
         {a.detail && a.kind === 'command' && <CodeBlock code={a.detail} lang="bash" maxHeight={260} className="!my-0" />}
         {a.detail && a.kind === 'file' && <FileDetail detail={a.detail} />}
@@ -232,7 +282,7 @@ function Card({ a, sessionKey, agent, id, base, onDone }: { a: ApprovalRequest; 
                 disabled={busy || (o.id === 'answer' && !answeredAll)}
                 onClick={() => respond(o.id)}
               >
-                {app && o.id === 'accept' ? 'Run it' : app && o.id === 'decline' ? 'Not now' : o.label}
+                {app && o.id === 'accept' ? 'Run it' : app && o.id === 'always' ? 'Always run it' : app && o.id === 'decline' ? (app.approve ? 'Don’t run' : 'Not now') : o.label}
               </Button>
             );
           })}

@@ -97,6 +97,12 @@ export abstract class LiveAdapter extends EventEmitter {
 
   protected onExited() {}
 
+  /**
+   * One of the app's own tools (served at /mcp/run) was just called, with the id of the agent's step for it ('' when the
+   * agent does not say which): a step Claude Code held back until the one before it ended shows as waiting until then.
+   */
+  callStarted(_toolUseId: string): void {}
+
   protected changed() {
     // The app's own cards end when the agent's code clears the approvals (the turn ended, it stopped).
     for (const [id, x] of this.asides) if (!this.approvals.has(id)) x.done(null);

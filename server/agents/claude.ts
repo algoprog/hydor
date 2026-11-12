@@ -16,6 +16,8 @@ import { JsonFields } from '../pages/drafts.ts';
 
 type Json = Record<string, any>;
 
+/** How long one of the app's own tools may go unstarted after the model asked for it before it shows as waiting its turn. */
+const QUEUE_AFTER_MS = 1500;
 /** The app's tools that save a page, a deck, a document, a spreadsheet or a LaTeX document, given its id to save it again
  * (named naget-agent or agent-console in sessions started before the renames). */
 const SAVES_PAGE = new RegExp(`^mcp__(?:${PAGE_SERVER}|naget-agent|agent-console)__save_(?:page|slides|doc|sheet|latex)$`);
@@ -188,6 +190,16 @@ export class ClaudeLive extends LiveAdapter {
   private toolNames = new Map<string, string>();
   /** A call saving a page again, while the model writes it: the page's id, read as soon as it comes (SAVES_PAGE). */
   private savedIds = new Map<string, JsonFields>();
+  /** When the model finished asking for each of the app's own tools (by step id), until its result is in. */
+  private askedAt = new Map<string, number>();
+  /** The same steps' timers: when one runs out with the step not started, it shows as waiting its turn. */
+  private queueTimers = new Map<string, NodeJS.Timeout>();
+  /** When each of them really started, for those that began later than they were asked for. */
+  private startedAt = new Map<string, number>();
+  /** This process sent a call of the app's own tool with its step id (Claude Code 2.x does); one without it, and none is marked waiting. */
+  private callIds: 'unknown' | 'sent' | 'missing' = 'unknown';
+  /** How long a step may stay unstarted before it shows as waiting (ms): steps that start at once never flash it. */
+  queueAfterMs = QUEUE_AFTER_MS;
   /** Tasks the CLI's list of background tasks has named: only these end by leaving it (a foreground subagent is never on it). */
   private listed = new Set<string>();
 
@@ -491,11 +503,92 @@ export class ClaudeLive extends LiveAdapter {
           (item as ToolItem).tool = { ...describeClaudeTool(this.toolNames.get(id) ?? item.tool.name, input), status: 'running' };
           this.toolJson.delete(id);
           this.savedIds.delete(id);
+          this.watchStart(id, this.toolNames.get(id) ?? item.tool.name);
           this.emit('toolstream', { id, name: this.toolNames.get(id) ?? item.tool.name, at: 'end', input });
         }
         break;
       }
     }
+  }
+
+  // ---- steps that wait their turn ----------------------------------------------------------------
+  // Claude Code runs a step that changes things (a command, an edit, a tool without a read-only hint) on its own: the steps
+  // asked for after it in the same message wait until it ends. The app's own tools are served here, so their real start is
+  // known (callStarted); the page counts a step's clock from then, and shows it as waiting until then.
+
+  /** A step for one of the app's own tools was written whole: if it has not started by the delay, it waits its turn. */
+  private watchStart(id: string, name: string) {
+    if (!name.startsWith(`mcp__${PAGE_SERVER}__`)) return;
+    this.askedAt.set(id, Date.now());
+    if (this.callIds !== 'sent') return;
+    this.queueTimers.set(
+      id,
+      setTimeout(() => {
+        this.queueTimers.delete(id);
+        if (this.exited || this.startedAt.has(id) || !this.askedAt.has(id) || this.callIds !== 'sent') return;
+        this.patches.set(id, { ...(this.patches.get(id) ?? {}), queued: true });
+        this.changed();
+      }, this.queueAfterMs),
+    );
+  }
+
+  /** The app was asked to run one of its tools: `id` is the step's ('' when Claude Code does not send it). */
+  callStarted(id: string): void {
+    if (this.exited) return;
+    if (!id) {
+      // An older Claude Code: no step can be told apart, so none is shown as waiting.
+      this.callIds = 'missing';
+      for (const t of this.queueTimers.values()) clearTimeout(t);
+      this.queueTimers.clear();
+      this.dropWaiting(true);
+      return;
+    }
+    if (this.callIds === 'unknown') this.callIds = 'sent';
+    const now = Date.now();
+    const timer = this.queueTimers.get(id);
+    if (timer) clearTimeout(timer);
+    this.queueTimers.delete(id);
+    const asked = this.askedAt.get(id);
+    const { queued, ...rest } = this.patches.get(id) ?? {};
+    if (queued || (asked !== undefined && now - asked > this.queueAfterMs)) {
+      this.startedAt.set(id, now);
+      this.patches.set(id, { ...rest, startedAt: now });
+      this.changed();
+    }
+  }
+
+  /** A step's result came in: it took from when it really started, not from when it was asked for. */
+  private stepEnded(id: string) {
+    const timer = this.queueTimers.get(id);
+    if (timer) clearTimeout(timer);
+    this.queueTimers.delete(id);
+    this.askedAt.delete(id);
+    const began = this.startedAt.get(id);
+    this.startedAt.delete(id);
+    const p = this.patches.get(id);
+    if (!p || (!p.queued && began === undefined)) return;
+    const { queued, ...rest } = p;
+    this.patches.set(id, began === undefined ? rest : { ...rest, durationMs: Date.now() - began });
+    if (!Object.keys(this.patches.get(id)!).length) this.patches.delete(id);
+  }
+
+  /** Forgets what is known of unstarted steps (the turn ended, the process exited); `onlyMarks`: just the "waiting" marks. */
+  private dropWaiting(onlyMarks = false) {
+    if (!onlyMarks) {
+      for (const t of this.queueTimers.values()) clearTimeout(t);
+      this.queueTimers.clear();
+      this.askedAt.clear();
+      this.startedAt.clear();
+    }
+    let changed = false;
+    for (const [id, p] of this.patches) {
+      if (!p.queued) continue;
+      const { queued, ...rest } = p;
+      if (Object.keys(rest).length) this.patches.set(id, rest);
+      else this.patches.delete(id);
+      changed = true;
+    }
+    if (changed && onlyMarks) this.changed();
   }
 
   /** What a model call used (a subagent's too): each block of its message repeats it, under the message's id. */
@@ -531,6 +624,7 @@ export class ClaudeLive extends LiveAdapter {
         for (const [id, a] of this.approvals) if (a.itemId === b.tool_use_id) this.approvals.delete(id);
         // A foreground subagent ends with its call; one sent to the background has its result at launch instead.
         for (const t of this.tasks.values()) if (t.status === 'running' && t.toolUseId === b.tool_use_id && (t.kind ?? '').includes('agent') && !this.listed.has(t.id) && !/async_launched|Async agent launched/i.test(JSON.stringify(m.tool_use_result ?? b.content ?? ''))) t.status = 'completed';
+        if (typeof b.tool_use_id === 'string') this.stepEnded(b.tool_use_id);
         if (typeof b.tool_use_id === 'string' && this.toolNames.has(b.tool_use_id)) this.emit('toolstream', { id: b.tool_use_id, name: this.toolNames.get(b.tool_use_id), at: 'result' });
       }
     }
@@ -549,6 +643,7 @@ export class ClaudeLive extends LiveAdapter {
     this.limitStopped = kept || (!!m.is_error && (this.limitStopped === true || /hit your .*limit/i.test(String(m.result ?? ''))));
     if (!replay && this.limitStopped && !kept) this.emit('limithit');
     this.approvals.clear();
+    this.dropWaiting();
     this.state.status = 'idle';
     this.state.turnStartedAt = undefined;
     this.overlayItems.delete('retry');
@@ -679,6 +774,7 @@ export class ClaudeLive extends LiveAdapter {
       p.reject(new Error('session ended'));
     }
     this.pending.clear();
+    this.dropWaiting();
   }
 }
 

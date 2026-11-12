@@ -6,6 +6,7 @@ import type { ToolInfo, ToolItem } from '@shared/types';
 import { parseKnowledge } from '@shared/knowledge';
 import { openFile } from '../../lib/nav';
 import { cx } from '../../components/ui';
+import { StepClock } from '../../components/StepClock';
 
 const arg = (t: ToolInfo, k: string) => {
   const v = (t.input as Record<string, unknown> | undefined)?.[k];
@@ -22,9 +23,10 @@ export function KnowledgeRow({ item }: { item: ToolItem; sessionKey: string }) {
       <button onClick={() => setOpen((o) => !o)} className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}>
         <Library size={14} className="shrink-0 text-fg-3" />
         <span className="flex min-w-0 flex-1 items-baseline gap-2 text-[13px]">
-          <span className={cx('shrink-0', running(t) ? 'text-fg' : 'text-fg-3')}>{running(t) ? 'Searching your documents' : 'Searched your documents'}</span>
-          <span className={cx('min-w-0 truncate', running(t) ? 'shine' : 'text-fg-2')}>{arg(t, 'query')}</span>
+          <span className={cx('shrink-0', running(t) && !t.queued ? 'text-fg' : 'text-fg-3')}>{running(t) ? 'Searching your documents' : 'Searched your documents'}</span>
+          <span className={cx('min-w-0 truncate', running(t) && !t.queued ? 'shine' : 'text-fg-2')}>{arg(t, 'query')}</span>
         </span>
+        {running(t) && t.queued && <StepClock t={t} />}
         {!running(t) && <span className="shrink-0 text-[11.5px] text-fg-3">{hits.length ? `${hits.length} passage${hits.length === 1 ? '' : 's'}` : 'nothing found'}</span>}
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
       </button>

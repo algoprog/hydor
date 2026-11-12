@@ -6,6 +6,7 @@ import { ChevronRight, Globe, Hand, XCircle } from 'lucide-react';
 import type { ToolItem } from '@shared/types';
 import { StepMarks, useStepMarks } from '../../components/StepMarks';
 import { cx } from '../../components/ui';
+import { StepClock } from '../../components/StepClock';
 import { enc } from '../../lib/api';
 import { mu } from '../../lib/machine';
 import { ToolDetail } from '../session/items';
@@ -88,6 +89,8 @@ export const BrowserStep = memo(function BrowserStep({ item, sessionKey }: { ite
   const [noPic, setNoPic] = useState(false);
   const tool = nagetTool(t.name) ?? t.name;
   const running = t.status === 'running' || t.status === 'pending';
+  // Asked for but waiting its turn: quiet, with no busy look.
+  const busy = running && !t.queued;
   const n = /Browser step (\d+)/.exec((t.output ?? '').slice(0, 400))?.[1];
   const pic = n && !noPic ? mu(`/api/browser/sessions/${enc(sessionKey)}/steps/${n}`) : null;
   const big = useRef<HTMLImageElement>(null);
@@ -97,9 +100,10 @@ export const BrowserStep = memo(function BrowserStep({ item, sessionKey }: { ite
   return (
     <div className="tl-item">
       <button onClick={() => setOpen((o) => !o)} className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}>
-        <Icon size={14} className={cx('shrink-0', failed ? 'text-err' : running ? 'text-busy' : 'text-fg-3')} />
-        <span className={cx('min-w-0 flex-1 truncate text-[13px]', running ? 'shine' : 'text-fg-2')}>{summary(tool, (t.input ?? {}) as Args, running, t.output)}</span>
+        <Icon size={14} className={cx('shrink-0', failed ? 'text-err' : busy ? 'text-busy' : 'text-fg-3')} />
+        <span className={cx('min-w-0 flex-1 truncate text-[13px]', busy ? 'shine' : 'text-fg-2')}>{summary(tool, (t.input ?? {}) as Args, running, t.output)}</span>
         {pic && <img src={pic} alt="" loading="lazy" onError={() => setNoPic(true)} className="h-7 w-11 shrink-0 rounded border border-line object-cover object-top" />}
+        {running && t.queued && <StepClock t={t} />}
         {failed && <XCircle size={14} className="shrink-0 text-err" />}
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
       </button>

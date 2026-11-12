@@ -30,7 +30,11 @@ export function mergeOverlay(items: TimelineItem[], ov?: LiveOverlay): TimelineI
     }
     return i;
   });
-  const extra = ov.items.filter((i) => !ids.has(i.id) && !savedCopy(items, i)).sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+  // A step still streaming (no transcript copy yet) takes its patches too: waiting its turn, when it really started.
+  const extra = ov.items
+    .filter((i) => !ids.has(i.id) && !savedCopy(items, i))
+    .map((i): TimelineItem => (i.kind === 'tool' && ov.patches[i.id] ? { ...i, tool: { ...i.tool, ...ov.patches[i.id] } } : i))
+    .sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   return extra.length ? [...merged, ...extra] : merged;
 }
 

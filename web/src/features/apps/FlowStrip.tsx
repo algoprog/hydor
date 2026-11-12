@@ -4,7 +4,7 @@ import { Network } from 'lucide-react';
 import type { Flow, Step } from '@shared/app-manifest';
 import { titleOf } from '@shared/app-manifest';
 import { tr } from '../../i18n/runtime';
-import { ICON, KIND_COLOR } from './GraphEditor';
+import { ICON, KIND_COLOR } from './stepKinds';
 
 /** How a step runs, in a few words, when that is more than once. */
 function how(s: Step): string | null {

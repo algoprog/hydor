@@ -43,6 +43,7 @@ import { spokenReply } from '@shared/citations';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
 import { DiffStat, DiffView } from '../../components/DiffView';
 import { Button, cx, useConfirm } from '../../components/ui';
+import { StepClock } from '../../components/StepClock';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 import { openLightbox } from '../../components/Lightbox';
 import { commandLabel, commandLine } from '../../lib/commands';
@@ -291,7 +292,11 @@ function toolTitle(t: ToolInfo, home?: string, cwd?: string): string {
 }
 
 function StatusIcon({ t }: { t: ToolInfo }) {
-  if (t.status === 'running' || t.status === 'pending') return <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-busy" aria-label="Running" />;
+  if (t.status === 'running' || t.status === 'pending') {
+    // Asked for but waiting its turn behind a step the agent runs alone: an outlined dot, not a busy one.
+    if (t.queued) return <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full border border-fg-3" />;
+    return <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-busy" aria-label="Running" />;
+  }
   if (t.status === 'error') return <XCircle size={14} className="text-err" />;
   if (t.status === 'declined') return <CircleSlash size={14} className="text-warn" />;
   if (t.status === 'interrupted') return <Octagon size={13} className="text-warn" />;
@@ -396,6 +401,7 @@ export function ToolLine({ item }: { item: ToolItem }) {
   const { cwd } = useContext(SessionCtx);
   const Icon = CAT_ICON[t.category] ?? Wrench;
   const running = t.status === 'running' || t.status === 'pending';
+  const busy = running && !t.queued;
   const v = t.verb ?? verb(t);
   const added = t.files?.reduce((a, f) => a + f.added, 0) ?? 0;
   const removed = t.files?.reduce((a, f) => a + f.removed, 0) ?? 0;
@@ -405,17 +411,17 @@ export function ToolLine({ item }: { item: ToolItem }) {
   const label = useMemo(() => (cmd ? t.label || (v ? commandLabel(t.title) : undefined) : undefined), [cmd, t.label, t.title, v]);
   return (
     <>
-        <Icon size={14} className={cx('shrink-0', t.status === 'error' ? 'text-err' : running ? 'text-busy' : 'text-fg-3')} />
+        <Icon size={14} className={cx('shrink-0', t.status === 'error' ? 'text-err' : busy ? 'text-busy' : 'text-fg-3')} />
         <span className="flex min-w-0 flex-1 items-baseline gap-2 text-[13px]">
           {label ? (
             <>
-              <span className={cx('max-w-full shrink-0 truncate', running ? 'shine' : 'text-fg-2')}>{label}</span>
+              <span className={cx('max-w-full shrink-0 truncate', busy ? 'shine' : 'text-fg-2')}>{label}</span>
               <span className="hidden min-w-0 flex-1 truncate font-mono text-[11.5px] text-fg-3 sm:block">{line}</span>
             </>
           ) : (
             <>
-              {v && <span className={cx('shrink-0', running ? 'text-fg' : 'text-fg-3')}>{v}</span>}
-              <span className={cx('min-w-0 truncate', (cmd || t.category === 'search') && 'font-mono text-[12px]', running ? 'shine' : 'text-fg-2')}>
+              {v && <span className={cx('shrink-0', busy ? 'text-fg' : 'text-fg-3')}>{v}</span>}
+              <span className={cx('min-w-0 truncate', (cmd || t.category === 'search') && 'font-mono text-[12px]', busy ? 'shine' : 'text-fg-2')}>
                 {(cmd ? line : toolTitle(t, home, cwd)) || t.name}
               </span>
               {t.subtitle && !cmd && <span className="hidden min-w-0 shrink truncate text-[12px] text-fg-3 sm:inline">{t.subtitle}</span>}
@@ -431,9 +437,7 @@ export function ToolLine({ item }: { item: ToolItem }) {
         <DiffStat added={added} removed={removed} />
         {t.exitCode != null && t.exitCode !== 0 && <span className="shrink-0 font-mono text-[11px] text-err">exit {t.exitCode}</span>}
         {running ? (
-          <span className="shrink-0 text-[11px] text-fg-3">
-            <Elapsed since={item.ts} />
-          </span>
+          <StepClock t={t} since={item.ts} />
         ) : (
           t.durationMs != null && t.durationMs >= 1500 && <span className="tnum shrink-0 text-[11px] text-fg-3">{duration(t.durationMs)}</span>
         )}

@@ -6,12 +6,12 @@
 //
 // Every UI draws the agent's words as they are (the block is translate="no") and the app's own words through tr(), so
 // they are in the app's language. A UI reads `done` (useAui) to hold back what only makes sense once its data is whole.
-import { createContext, lazy, memo, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { createContext, lazy, memo, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import { ChevronDown, ExternalLink, ImageOff, MessageSquarePlus, Play, Star, Volume2 } from 'lucide-react';
+import { ChevronDown, ExternalLink, MessageSquarePlus, Play, Star, Volume2 } from 'lucide-react';
 import { videoEmbed } from '@shared/app-media';
 import { LOCALE } from '../../i18n/locale';
 import { tr } from '../../i18n/runtime';
@@ -259,15 +259,70 @@ export function usePicUrl(src: unknown): string | null {
 }
 
 /**
- * A picture: fitted to its box (`className` sizes it), opened large on a click (with the others of `group`, by their
- * addresses as given), a quiet empty tile when there is none or it cannot load.
- */
-/**
  * How long a picture that did not load waits before it is asked for again: a site that limits its rate (Wikimedia, when a
  * reply holds many of its pictures) answers again a little later, and this server forgets such a failure in 15 seconds.
  */
 const PIC_RETRIES = [3_000, 16_000];
 
+// Which pictures are failing now (waiting for a retry, or given up on): a Pic tells here, and what is laid out around a
+// picture (a frame, a column, a gallery's cell) asks, so nothing stays behind as an empty box. Keyed by the address.
+const failing = new Map<string, number>();
+const watchers = new Set<() => void>();
+let failRev = 0;
+function markFailing(url: string, by: 1 | -1) {
+  const n = (failing.get(url) ?? 0) + by;
+  if (n > 0) failing.set(url, n);
+  else failing.delete(url);
+  failRev++;
+  watchers.forEach((f) => f());
+}
+const watchFailing = (f: () => void) => {
+  watchers.add(f);
+  return () => void watchers.delete(f);
+};
+
+/**
+ * For each of `srcs`: is there a picture to show (an address it may load from, and it has not failed)? A Pic draws
+ * nothing for one that is not, so give what frames a picture a way to leave it out. A picture that failed is asked for
+ * again after a while: keep its Pic in the tree (hide what is around it with `hidden`, do not remove it), and it comes
+ * back by itself if the retry works. It is true while a picture is still loading.
+ */
+export function usePicsOk(srcs: unknown[]): boolean[] {
+  const { cwd, offline } = useAui();
+  useSyncExternalStore(watchFailing, () => failRev);
+  return srcs.map((s) => {
+    const from = str(s).trim();
+    if (!from || (offline && /^https?:\/\//i.test(from))) return false;
+    const url = replyPicture(from, cwd);
+    return !!url && !failing.has(url);
+  });
+}
+
+/** Is there a picture to show for `src` (see usePicsOk)? */
+export function usePicOk(src: unknown): boolean {
+  return usePicsOk([src])[0];
+}
+
+/**
+ * What only makes sense with its picture (a frame, a column, a gallery's cell, an entry that is nothing but a picture):
+ * `src` is that picture. It stays in the tree, so the picture's Pic inside keeps retrying, but it is hidden while there
+ * is no picture to show (unless `keep`: it has other things in it, and only the picture is left out).
+ */
+export function WithPic({ src, as: Tag = 'div', keep, className, children, ...rest }: { src: unknown; as?: 'div' | 'li' | 'span' | 'figure' | 'button' | 'a'; keep?: boolean; className?: string; children: ReactNode } & Record<string, unknown>) {
+  const ok = usePicOk(src);
+  const T = Tag as 'div';
+  return (
+    <T {...rest} className={cx(className, !ok && !keep && 'hidden')}>
+      {children}
+    </T>
+  );
+}
+
+/**
+ * A picture: fitted to its box (`className` sizes it), opened large on a click (with the others of `group`, by their
+ * addresses as given). Nothing at all when there is none or it cannot load (the picture appears if a retry works), so
+ * what is laid out around it must not depend on it being there (usePicOk, WithPic).
+ */
 export function Pic({ src, alt, className, group, fit = 'cover', zoom = true }: { src: unknown; alt?: string; className?: string; group?: unknown[]; fit?: 'cover' | 'contain'; zoom?: boolean }) {
   const { cwd, offline } = useAui();
   const base = usePicUrl(src);
@@ -279,6 +334,11 @@ export function Pic({ src, alt, className, group, fit = 'cover', zoom = true }: 
     setFailed(false);
   }, [base]);
   useEffect(() => {
+    if (!failed || !base) return;
+    markFailing(base, 1);
+    return () => markFailing(base, -1);
+  }, [failed, base]);
+  useEffect(() => {
     if (!failed || tries >= PIC_RETRIES.length || !base || base.startsWith('data:')) return;
     const t = setTimeout(() => {
       setTries((n) => n + 1);
@@ -287,12 +347,7 @@ export function Pic({ src, alt, className, group, fit = 'cover', zoom = true }: 
     return () => clearTimeout(t);
   }, [failed, tries, base]);
   const url = base && tries ? `${base}${base.includes('?') ? '&' : '?'}try=${tries}` : base;
-  if (!url || failed)
-    return (
-      <div className={cx('aui-pic aui-pic-none', className)} aria-hidden>
-        <ImageOff size={18} />
-      </div>
-    );
+  if (!url || failed) return null;
   const open = () => {
     const list = (group?.length ? group : [src]).map((s) => ({ from: str(s), url: offline && /^https?:/i.test(str(s)) ? null : replyPicture(str(s), cwd) })).filter((x): x is { from: string; url: string } => !!x.url);
     const at = Math.max(0, list.findIndex((x) => x.url === base));
@@ -305,7 +360,7 @@ export function Pic({ src, alt, className, group, fit = 'cover', zoom = true }: 
     <img
       src={url}
       alt={alt ?? ''}
-      loading="lazy"
+      loading={tries ? 'eager' : 'lazy'}
       decoding="async"
       draggable={false}
       onError={() => setFailed(true)}
@@ -327,13 +382,18 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-/** A person's picture, or their initials on a quiet disc (`className` sizes it). */
+/** A person's picture, or their initials on a quiet disc (`className` sizes it), also when the picture cannot load. */
 export function Avatar({ name, image, className }: { name: string; image?: unknown; className?: string }) {
-  if (str(image).trim()) return <Pic src={image} alt={name} className={cx('shrink-0 rounded-full', className)} />;
+  const ok = usePicOk(image);
   return (
-    <span aria-hidden className={cx('grid shrink-0 place-items-center rounded-full bg-bg-2 font-semibold text-fg-2 select-none', className)}>
-      {initials(name)}
-    </span>
+    <>
+      {str(image).trim() && <Pic src={image} alt={name} className={cx('shrink-0 rounded-full', className)} />}
+      {!ok && (
+        <span aria-hidden className={cx('grid shrink-0 place-items-center rounded-full bg-bg-2 font-semibold text-fg-2 select-none', className)}>
+          {initials(name)}
+        </span>
+      )}
+    </>
   );
 }
 

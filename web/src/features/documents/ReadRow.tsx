@@ -8,6 +8,7 @@ import { basename, duration } from '../../lib/format';
 import { openFile } from '../../lib/nav';
 import { useApp, useSessions } from '../../lib/store';
 import { cx } from '../../components/ui';
+import { StepClock } from '../../components/StepClock';
 import { FileIcon, resolveIn } from './fileTypes';
 
 export const docPath = (t: ToolInfo): string | undefined => {
@@ -25,6 +26,8 @@ export function ReadRow({ item, sessionKey }: { item: ToolItem; sessionKey: stri
   const path = given ? resolveIn(given, cwd, home) : undefined;
   const running = t.status === 'running' || t.status === 'pending';
   const failed = t.status === 'error';
+  // Asked for but waiting its turn: quiet, with no busy look.
+  const busy = running && !t.queued;
   useEffect(() => {
     if (!open || !t.truncated || full !== undefined || running) return;
     let alive = true;
@@ -43,12 +46,14 @@ export function ReadRow({ item, sessionKey }: { item: ToolItem; sessionKey: stri
       <button onClick={() => setOpen((o) => !o)} className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}>
         {path ? <FileIcon path={path} size={18} className="!rounded-[5px]" /> : <span className="h-[18px] w-[18px] shrink-0" />}
         <span className="flex min-w-0 flex-1 items-baseline gap-2 text-[13px]">
-          <span className={cx('shrink-0', running ? 'text-fg' : 'text-fg-3')}>{running ? 'Reading' : failed ? 'Could not read' : 'Read'}</span>
-          <span className={cx('min-w-0 truncate', running ? 'shine' : 'text-fg-2')}>{path ? basename(path) : 'a document'}</span>
+          <span className={cx('shrink-0', busy ? 'text-fg' : 'text-fg-3')}>{running ? 'Reading' : failed ? 'Could not read' : 'Read'}</span>
+          <span className={cx('min-w-0 truncate', busy ? 'shine' : 'text-fg-2')}>{path ? basename(path) : 'a document'}</span>
         </span>
         {!running && !failed && head.includes(' · ') && <span className="min-w-0 max-w-[40%] shrink truncate text-[11.5px] text-fg-3 max-sm:hidden">{head.split(' · ').slice(1).join(' · ')}</span>}
         {t.durationMs != null && t.durationMs >= 1500 && <span className="tnum shrink-0 text-[11px] text-fg-3 max-sm:hidden">{duration(t.durationMs)}</span>}
-        {running && <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-busy" aria-label="Running" />}
+        {running && t.queued && <StepClock t={t} />}
+        {busy && <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-busy" aria-label="Running" />}
+        {running && t.queued && <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full border border-fg-3" />}
         {failed && <XCircle size={14} className="shrink-0 text-err" />}
         <ChevronRight size={14} className={cx('shrink-0 text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
       </button>

@@ -7,6 +7,7 @@ import type { ToolItem } from '@shared/types';
 import { markLightbox, openLightbox } from '../../components/Lightbox';
 import { StepMarks, useStepMarks } from '../../components/StepMarks';
 import { cx } from '../../components/ui';
+import { StepClock } from '../../components/StepClock';
 import { enc } from '../../lib/api';
 import { mu } from '../../lib/machine';
 import { ToolDetail } from '../session/items';
@@ -71,6 +72,8 @@ export const ComputerStep = memo(function ComputerStep({ item, sessionKey }: { i
   const [noPic, setNoPic] = useState(false);
   const tool = nagetTool(t.name) ?? t.name;
   const running = t.status === 'running' || t.status === 'pending';
+  // Asked for but waiting its turn: quiet, with no busy look.
+  const busy = running && !t.queued;
   const n = /Computer step (\d+)/.exec((t.output ?? '').slice(0, 200))?.[1];
   const pic = n && !noPic ? mu(`/api/computer/sessions/${enc(sessionKey)}/steps/${n}`) : null;
   const failed = t.status === 'error' || (!n && !running && !!t.output);
@@ -90,14 +93,15 @@ export const ComputerStep = memo(function ComputerStep({ item, sessionKey }: { i
     <div className="tl-item">
       <div className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 transition-colors hover:bg-bg-2', open && 'bg-bg-2')}>
         <button onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-          <Icon size={14} className={cx('shrink-0', failed ? 'text-err' : running ? 'text-busy' : 'text-fg-3')} />
-          <span className={cx('min-w-0 flex-1 truncate text-[13px]', running ? 'shine' : 'text-fg-2')}>{summary(tool, (t.input ?? {}) as Args, running, t.output)}</span>
+          <Icon size={14} className={cx('shrink-0', failed ? 'text-err' : busy ? 'text-busy' : 'text-fg-3')} />
+          <span className={cx('min-w-0 flex-1 truncate text-[13px]', busy ? 'shine' : 'text-fg-2')}>{summary(tool, (t.input ?? {}) as Args, running, t.output)}</span>
         </button>
         {pic && (
           <button onClick={enlarge} className="shrink-0 cursor-zoom-in" aria-label="Show the screen larger">
             <img src={pic} alt="" loading="lazy" onError={() => setNoPic(true)} className="h-7 w-11 rounded border border-line object-cover object-top" />
           </button>
         )}
+        {running && t.queued && <StepClock t={t} />}
         {failed && <XCircle size={14} className="shrink-0 text-err" />}
         <ChevronRight size={14} onClick={() => setOpen((o) => !o)} className={cx('shrink-0 cursor-pointer text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
       </div>

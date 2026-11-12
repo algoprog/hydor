@@ -663,6 +663,21 @@ row('assistants', 'Task folders', 'text', {
   write: put('/api/assistants/settings', (v) => ({ taskRoot: v })),
   note: 'A full path or one starting with ~/; an empty value goes back to the default.',
 });
+row('apps', 'Run without asking', 'list', {
+  items: 'the apps agents run without asking first, by their ids (tpl:<id> for a ready-made app, as this shows them)',
+  check: (v) => ((v as string[]).find((i) => !/^\S+$/.test(i)) ? 'An app is named by its id, with no spaces (tpl:<id> for a ready-made one)' : null),
+  read: { endpoint: '/api/apps/allowed', pick: (d) => (d.apps ?? []).map((a: any) => a.id) },
+  write: {
+    cur: true,
+    apply: async (api, v, cur) => {
+      const want = v as string[];
+      const have = ((cur?.apps ?? []) as { id: string }[]).map((a) => a.id);
+      for (const id of have) if (!want.includes(id)) await api('PUT', `/api/apps/allowed/${encodeURIComponent(id)}`, { allowed: false });
+      for (const id of want) if (!have.includes(id)) await api('PUT', `/api/apps/allowed/${encodeURIComponent(id)}`, { allowed: true });
+    },
+  },
+  note: 'Replaces the list: an app left out is asked about again before an agent runs it; one agents cannot run is refused.',
+});
 row('custom', 'Auto mode', 'page', { note: 'Nothing to set here: Auto mode is one of Custom’s modes, picked in a session (hydor chat --agent custom --mode auto).' });
 row('custom', 'Sandbox for commands', 'switch', {
   read: rd('/api/custom/settings', 'sandbox'),

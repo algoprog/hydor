@@ -4,7 +4,7 @@ import { ArrowLeftRight, Clock, Download, ExternalLink, Globe, Mail, MapPin, Pho
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { Legend, useWidth } from '../charts';
-import { arr, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, initials, isObj, KeyValues, LinkOut, Md, num, parseDate, Pic, Section, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, withUnit, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtNum, fmtTime, Head, hostOf, initials, isObj, KeyValues, LinkOut, Md, num, parseDate, Pic, Section, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, usePicOk, withUnit, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -325,12 +325,17 @@ function inkOn(hex: string): string {
 
 /** A team's crest, or its initials on its colour. */
 function Crest({ side, className }: { side: Side; className: string }) {
-  if (side.logo) return <Pic src={side.logo} alt={side.name} fit="contain" zoom={false} className={cx('shrink-0 bg-transparent', className)} />;
+  const hasLogo = usePicOk(side.logo);
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(side.color) ? side.color : '';
   return (
-    <span aria-hidden className={cx('grid shrink-0 place-items-center rounded-full text-[14px] font-bold', className, !hex && 'bg-bg-2 text-fg-2')} style={hex ? { background: hex, color: inkOn(hex) } : undefined}>
-      {initials(side.name)}
-    </span>
+    <>
+      {side.logo && <Pic src={side.logo} alt={side.name} fit="contain" zoom={false} className={cx('shrink-0 bg-transparent', className)} />}
+      {!hasLogo && (
+        <span aria-hidden className={cx('grid shrink-0 place-items-center rounded-full text-[14px] font-bold', className, !hex && 'bg-bg-2 text-fg-2')} style={hex ? { background: hex, color: inkOn(hex) } : undefined}>
+          {initials(side.name)}
+        </span>
+      )}
+    </>
   );
 }
 

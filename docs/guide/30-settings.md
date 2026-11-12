@@ -275,6 +275,12 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Clean up after a task**](/settings?s=assistants&find=Clean%20up%20after%20a%20task): Agents remove what they made along the way and no longer need.
 - [**Task folders**](/settings?s=assistants&find=Task%20folders): Where new task folders go, for sessions started without a folder.
 
+### Apps
+
+[Settings → Apps](/settings?s=apps): which apps agents run for you without asking first. More in [Apps](/guide/apps).
+
+- [**Run without asking**](/settings?s=apps&find=Run%20without%20asking): The apps agents run for you without asking first; remove one to be asked again.
+
 ### Custom
 
 [Settings → Custom](/settings?s=custom): auto mode, a sandbox for commands, and how long goals run. More in [Custom, the app's own agent](/guide/custom).

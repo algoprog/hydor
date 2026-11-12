@@ -63,7 +63,7 @@ import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { normalizeMath } from '../../markdown-math';
 import { cx } from '../../ui';
-import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, num, Pic, Ring, Section, Seg, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, words, yes, type AnswerUiView, type Data } from '../kit';
+import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, num, Pic, Ring, Section, Seg, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, usePicOk, words, yes, type AnswerUiView, type Data } from '../kit';
 
 const LETTERS = 'ABCDEFGH';
 
@@ -625,6 +625,7 @@ function Explainer({ data, done }: { data: Data; done: boolean }) {
     .map((t) => ({ term: str(t.term ?? t.name), meaning: str(t.meaning ?? t.definition) }))
     .filter((t) => t.term);
   const image = str(data.image);
+  const hasImage = usePicOk(image);
   const topic = str(data.topic ?? data.title);
   return (
     <Card>
@@ -635,7 +636,7 @@ function Explainer({ data, done }: { data: Data; done: boolean }) {
         </div>
       )}
       {(levels.length > 0 || image) && (
-        <div className={cx('grid gap-4', image && '@lg:grid-cols-[minmax(0,1fr)_minmax(0,200px)]')}>
+        <div className={cx('grid gap-4', hasImage && '@lg:grid-cols-[minmax(0,1fr)_minmax(0,200px)]')}>
           {levels[at] && <Md text={levels[at].text} className="text-[14.5px] leading-relaxed" />}
           {image && <Pic src={image} alt={topic} fit="contain" className="aspect-[4/3] w-full self-start rounded-lg bg-bg-1" />}
         </div>

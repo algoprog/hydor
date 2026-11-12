@@ -91,7 +91,7 @@ function Busy() {
   );
 }
 
-function Working({ since, kind, prompt }: { since?: number; kind: Kind; prompt?: string }) {
+function Working({ since, queued, kind, prompt }: { since?: number; queued?: boolean; kind: Kind; prompt?: string }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((x) => x + 1), 1000);
@@ -105,7 +105,16 @@ function Working({ since, kind, prompt }: { since?: number; kind: Kind; prompt?:
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-medium text-fg">
             {k.making}
-            {since ? ` · ${duration(Date.now() - since)}` : '…'}
+            {queued ? (
+              <>
+                {' · '}
+                <span title="Waiting for the step before it to finish">Waiting</span>
+              </>
+            ) : since ? (
+              ` · ${duration(Date.now() - since)}`
+            ) : (
+              '…'
+            )}
           </div>
           <div className="text-[12px] text-fg-3">{k.takes}</div>
         </div>
@@ -170,7 +179,7 @@ export function GeneratedAudio({ item, sessionKey }: { item: ToolItem; sessionKe
     return (
       <>
         <OpenRouterKeyCard sessionKey={sessionKey} />
-        <Working since={item.ts} kind={kind} prompt={prompt} />
+        <Working since={t.startedAt ?? item.ts} queued={t.queued} kind={kind} prompt={prompt} />
       </>
     );
   if (!sounds.length) {

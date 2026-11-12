@@ -39,6 +39,7 @@ import {
   TONE_FILL,
   toneOf,
   useKept,
+  usePicOk,
   withUnit,
   yes,
   type AnswerUiView,
@@ -158,13 +159,24 @@ function cellText(c: Col, v: unknown): string {
   return str(v);
 }
 
+/** A picture in a cell; a dash when it cannot be shown. */
+function CellPic({ v }: { v: unknown }) {
+  const ok = usePicOk(v);
+  return (
+    <>
+      <Pic src={v} className="h-10 w-10 rounded-md" />
+      {!ok && <span className="text-fg-3">—</span>}
+    </>
+  );
+}
+
 function TableCell({ c, v, max }: { c: Col; v: unknown; max: number }) {
   if (v === null || v === undefined || v === '') return <span className="text-fg-3">—</span>;
   switch (c.type) {
     case 'link':
       return <LinkOut url={v}>{/^https?:/i.test(str(v)) ? undefined : str(v)}</LinkOut>;
     case 'image':
-      return <Pic src={v} className="h-10 w-10 rounded-md" />;
+      return <CellPic v={v} />;
     case 'tag':
       return <Chip tone={toneOf(v)}>{str(v)}</Chip>;
     case 'rating':

@@ -275,6 +275,12 @@
 - [**任务完成后清理**](/settings?s=assistants&find=Clean%20up%20after%20a%20task)：智能体会删除过程中创建且不再需要的内容。
 - [**任务文件夹**](/settings?s=assistants&find=Task%20folders)：新任务文件夹的位置，用于未选文件夹而开始的会话。
 
+### 应用
+
+[设置 → 应用](/settings?s=apps)：哪些应用智能体无需先询问就为你运行。详见[应用](/guide/apps)。
+
+- [**无需询问直接运行**](/settings?s=apps&find=Run%20without%20asking)：智能体无需先询问就为你运行的应用；移除某个应用后会再次询问。
+
 ### Custom
 
 [设置 → Custom](/settings?s=custom)：自动模式、命令沙盒，以及目标的运行时长。详见[Custom，应用自己的智能体](/guide/custom)。

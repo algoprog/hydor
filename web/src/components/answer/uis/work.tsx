@@ -37,7 +37,7 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
-import { arr, Ask, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtMoney, fmtNum, Head, hostOf, initials, isObj, Md, Meter, num, obj, Pic, Section, Seg, str, textOf, TONE, useKept, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Ask, Avatar, Btn, Card, Chip, Copy, download, fmtDate, fmtMoney, fmtNum, Head, hostOf, initials, isObj, Md, Meter, num, obj, Pic, Section, Seg, str, textOf, TONE, useKept, usePicOk, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared by the views below ----------------------------------------------------------------------------------------
 
@@ -1093,16 +1093,21 @@ function FilterChips<T extends string>({ options, value, onChange, label, count 
 
 /** A company's logo on a white tile (logos are made for a light ground), or its initials. */
 function Logo({ src, name }: { src: string; name: string }) {
-  if (!src)
-    return (
-      <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-bg-2 text-[15px] font-semibold text-fg-2 select-none">
-        {initials(name) || '?'}
-      </span>
-    );
+  const ok = usePicOk(src);
+  // A logo that cannot load leaves the initials in its place; its tile stays in the tree (hidden) so a retry can bring it back.
   return (
-    <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-line">
-      <Pic src={src} alt={name} fit="contain" zoom={false} className="h-full w-full bg-transparent" />
-    </span>
+    <>
+      {src && (
+        <span className={cx('grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-line', !ok && 'hidden')}>
+          <Pic src={src} alt={name} fit="contain" zoom={false} className="h-full w-full bg-transparent" />
+        </span>
+      )}
+      {!ok && (
+        <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-bg-2 text-[15px] font-semibold text-fg-2 select-none">
+          {initials(name) || '?'}
+        </span>
+      )}
+    </>
   );
 }
 

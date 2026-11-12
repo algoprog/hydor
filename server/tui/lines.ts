@@ -109,6 +109,8 @@ export function stepWords(t: ToolInfo, look: Look): { main: string; more: string
 
 /** The mark a step's line starts with: by how it ended, or the spinner's frame while it runs. */
 function stepMark(t: ToolInfo, p: Paint, frame?: string): string {
+  // Asked for but waiting its turn behind a step the agent runs alone: a still circle, not the spinner.
+  if (running(t) && t.queued) return p.dim('○');
   if (running(t)) return p.accent(frame ?? '○');
   if (t.status === 'error') return p.red('✗');
   if (t.status === 'declined') return p.yellow('×');
@@ -140,7 +142,8 @@ export function stepLines(item: ToolItem, look: Look, o: { frame?: string; now?:
   if (t.exitCode != null && t.exitCode !== 0) bits.push(p.red(`exit ${t.exitCode}`));
   if (t.status === 'declined') bits.push(p.yellow('declined'));
   if (t.status === 'interrupted') bits.push(p.yellow('stopped'));
-  if (running(t) && item.ts) bits.push(p.dim(elapsed(item.ts, o.now)));
+  if (running(t) && t.queued) bits.push(p.dim('waiting for the step before it'));
+  else if (running(t) && (t.startedAt ?? item.ts)) bits.push(p.dim(elapsed(t.startedAt ?? item.ts, o.now)));
   else if (t.durationMs != null && t.durationMs >= 1500) bits.push(p.dim(duration(t.durationMs)));
   const tail = bits.length ? `  ${bits.join(p.dim(' · '))}` : '';
   const head = `${INDENT}${stepMark(t, p, o.frame)} `;

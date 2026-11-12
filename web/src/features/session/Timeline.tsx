@@ -65,7 +65,11 @@ export function mergeOverlay(items: TimelineItem[], ov?: LiveOverlay): TimelineI
     return i;
   });
   // A message the transcript has under an id of its own shows once: the server drops its copy a moment later.
-  const extra = ov.items.filter((i) => !ids.has(i.id) && !savedCopy(items, i)).sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+  // A step still streaming (no transcript copy yet) takes its patches too: waiting its turn, when it really started.
+  const extra = ov.items
+    .filter((i) => !ids.has(i.id) && !savedCopy(items, i))
+    .map((i): TimelineItem => (i.kind === 'tool' && ov.patches[i.id] ? { ...i, tool: { ...i.tool, ...ov.patches[i.id] } } : i))
+    .sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   return extra.length ? [...merged, ...extra] : merged;
 }
 
@@ -421,7 +425,9 @@ function NowPart({ part, state, open, onToggle, sessionKey, agent, live }: { par
   const shown = part.items.filter((i) => !hiddenThought(i));
   const active = shown.filter(isActive);
   const waitingOn = state === 'waiting' ? [...tools].reverse().find((t) => t.tool.status === 'waiting' || t.tool.status === 'pending') : undefined;
-  const now = open ? undefined : (active[active.length - 1] ?? waitingOn);
+  // The step really under way, before those waiting their turn behind it (Claude Code runs a command alone first).
+  const going = active.filter((i) => !(i.kind === 'tool' && i.tool.queued));
+  const now = open ? undefined : (going[going.length - 1] ?? active[active.length - 1] ?? waitingOn);
   const done = tools.filter((i) => !isActive(i)).length;
   const writing = part.notes.some((n) => n.streaming);
   const busy = state === 'now';
