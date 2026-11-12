@@ -93,7 +93,7 @@ export const connections: Area = {
               p.dim(c.tools ? `${c.tools.filter((t) => t.on).length}/${c.tools.length} tools` : ''),
               p.dim(c.hint ?? ''),
             ]),
-            { grow: 6 },
+            { grow: 1, fixed: [2], free: [1, 6] },
           ),
         );
       },
@@ -133,8 +133,8 @@ export const connections: Area = {
                 ...table(
                   ctx,
                   c.tools.map((t) => [t.on ? p.green('on') : p.dim('off'), t.name, p.dim(t.description ?? '')]),
-                  { grow: 2 },
-                ).map((l) => `  ${l}`),
+                  { grow: 1, free: [1, 2], indent: 2 },
+                ),
               ]
             : []),
           ...(c.catalogChanged ? ['', p.yellow('The catalog has another server or sign-in for it: connect it again to use that.')] : []),
@@ -159,7 +159,7 @@ export const connections: Area = {
           table(
             ctx,
             list.map((a) => [have.some((c) => c.id === a.id) ? mark(p, 'on') : mark(p, 'off'), p.bold(a.name), p.dim(a.id), p.dim(authWord(a)), p.dim(a.description)]),
-            { grow: 4 },
+            { grow: 1, fixed: [2], free: [1, 4] },
           ),
         );
       },

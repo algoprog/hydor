@@ -234,15 +234,16 @@ const RUN_MARK = { queued: 'busy', starting: 'busy', running: 'busy', waiting: '
 
 export const apps: Area = {
   name: 'apps',
-  summary: 'Your apps: small tools from a form',
-  help: 'Your apps and the ready-made ones (tpl:<id>). Name one by its address, its name or the start of either; on a terminal, leave it out to pick from a list. Running an app starts agent work and costs what its agent costs. The files of an app (writing one in your editor, trying it, carrying it to another computer) are the commands of hydor app (singular): app new, folder, dev, try, export, import.',
+  summary: 'Your apps, and the ready-made ones',
+  help: 'Small tools that run from a form; the ready-made ones are tpl:<id>. Name one by its address, its name or the start of either; on a terminal, leave it out to pick from a list. Running an app starts agent work and costs what its agent costs. The files of an app (writing one in your editor, trying it, carrying it to another computer) are the commands of hydor app (singular): app new, folder, dev, try, export, import.',
   group: 'work',
   verbs: [
     {
       name: 'list',
       args: [],
       summary: 'Your apps and the ready-made ones',
-      examples: ['hydor apps', 'hydor apps --json'],
+      help: '30 are shown (-n for more, or --all).',
+      examples: ['hydor apps', 'hydor apps -n 5', 'hydor apps --json'],
       async run(ctx) {
         const { list, raw } = await entries(ctx);
         if (ctx.o.json) return ctx.json(raw);
@@ -257,8 +258,10 @@ export const apps: Area = {
           p.dim(timeAgo(e.lastRunAt)),
           p.dim(e.description ?? ''),
         ];
-        ctx.out(table(ctx, list.map(row), { head: ['', 'APP', 'ADDRESS', '', 'RUNS', 'LAST', ''], grow: 6 }));
-        if (list.some((e) => e.needsKey)) ctx.out(p.dim('A yellow mark: it needs a key the vault lacks (add it on the app’s page).'));
+        const shown = list.slice(0, ctx.o.all ? list.length : (ctx.o.limit ?? 30));
+        ctx.out(table(ctx, shown.map(row), { head: ['', 'APP', 'ADDRESS', 'KIND', 'RUNS', 'LAST', ''], grow: 1, fixed: [2], free: [1, 6] }));
+        if (list.length > shown.length) ctx.out(p.dim(`… ${list.length - shown.length} more (-n <number>, or --all)`));
+        if (shown.some((e) => e.needsKey)) ctx.out(p.dim('A yellow mark: it needs a key the vault lacks (add it on the app’s page).'));
       },
     },
     {
@@ -303,8 +306,8 @@ export const apps: Area = {
                   f.required ? p.yellow('required') : p.dim(f.default ? `default ${f.default}` : 'optional'),
                   p.dim(f.help ?? ''),
                 ]),
-                { grow: 4 },
-              ).map((l) => `  ${l}`)
+                { grow: 1, fixed: [0], free: [1, 4], indent: 2 },
+              )
             : ['  It takes no answers: hydor apps run ' + e.slug]),
         ]);
         const answer: AnswerField[] = recipe.answer ?? [];
@@ -315,8 +318,8 @@ export const apps: Area = {
             ...table(
               ctx,
               answer.map((a) => [a.id, a.label, p.dim(a.type)]),
-              { grow: 2 },
-            ).map((l) => `  ${l}`),
+              { grow: 1, fixed: [0], indent: 2 },
+            ),
           ]);
         ctx.out([
           '',
@@ -405,7 +408,7 @@ export const apps: Area = {
               x.costUsd ? p.dim(money(x.costUsd)) : '',
               p.dim(truncate(Object.values(x.inputs ?? {}).join(', '), 40)),
             ]),
-            { grow: 6 },
+            { grow: 2, fixed: [1], free: [2, 6] },
           ),
         );
         if (runs.length > shown.length) ctx.out(p.dim(`… ${runs.length - shown.length} more (-n <number>, or --all)`));
