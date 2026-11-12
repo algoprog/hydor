@@ -244,6 +244,9 @@ test('keys: escape sequences in their spellings, a paste whole across reads', ()
   assert.deepEqual(names('\x01\x05\x0b\x15\x17\x03\x04\r\n\x1b\r\t'), ['home', 'end', 'kill-end', 'kill-start', 'delete-word-back', 'ctrl-c', 'ctrl-d', 'enter', 'newline', 'newline', 'tab']);
   assert.deepEqual(names('\x1b[13;2u'), ['newline']);
   assert.deepEqual(names('\x1b'), ['escape']);
+  // Esc and a key in one read (typed fast, or sent by tmux): both, neither swallowed.
+  assert.deepEqual(names('\x1b\x15'), ['escape', 'kill-start']);
+  assert.deepEqual(r.feed('\x1b/he'), [{ name: 'escape' }, { name: 'text', text: '/he' }]);
   assert.deepEqual(r.feed('héllo 你好'), [{ name: 'text', text: 'héllo 你好' }]);
   assert.deepEqual(r.feed('\x1b[200~line one\r\nline'), []);
   assert.deepEqual(r.feed(' two\x1b[201~x'), [{ name: 'paste', text: 'line one\nline two' }, { name: 'text', text: 'x' }]);
