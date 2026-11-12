@@ -3,6 +3,26 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.58.0 · 12 November 2026
+
+The `hydor` command now comes with the Linux and Windows apps too, draws only what every terminal font shows (plain
+characters where symbols can't show), and greets you with a new panel.
+
+- **The Linux and Windows apps put `hydor` on your PATH** by themselves whenever they start, as the Mac app does: no
+  password, no question. Open a new terminal afterwards. With any of the desktop apps, `hydor` opens the app when it
+  is closed.
+- **A new welcome panel**: HYDΩR and the version in its border, the folder on its git branch, the program, model and
+  mode, and the keys to remember, at one steady width. The status line under the message says the same in a line.
+- **Symbols every terminal font has**: the few some fonts lacked (the branch sign, the hourglass of a queued message
+  and a few more) are gone, so lines and boxes line up in Menlo, SF Mono, Consolas and DejaVu alike. In the Linux
+  console, in a locale that isn't UTF-8 and in Windows' old console, the command uses plain characters instead;
+  `HYDOR_ASCII=1` turns that on anywhere.
+- **`hydor accounts show`** and **`hydor mcp show`** say everything about one account or tool server, never a key's
+  value.
+- **Lists fit narrow terminals**: descriptions are left out before names are cut, plugins and apps have a column for
+  each thing they say, and `hydor library show` gives a document's full id.
+- `hydor … | head` stops quietly instead of with an error.
+
 ## 0.57.0 · 12 November 2026
 
 Sessions on Automatic start on Best and move to Max only when their own agent finds a problem too hard for it, which
