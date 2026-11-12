@@ -22715,5 +22715,10 @@
 "Working{0} · {1} subagent{2}":"工作中{0} · {1} 个子智能体{2}",
 "Working{0} · {1} subagent{2} and {3} background task{4} running":"工作中{0} · {1} 个子智能体{2}和 {3} 个后台任务{4}正在运行",
 "Working{0} · {1} subagent{2} running":"工作中{0} · {1} 个子智能体{2}正在运行",
-"Working{0} · {1} subagent{2}, {3} in background":"工作中{0} · {1} 个子智能体{2}，{3} 个在后台"
+"Working{0} · {1} subagent{2}, {3} in background":"工作中{0} · {1} 个子智能体{2}，{3} 个在后台",
+"A main agent on Automatic may move itself to Max when a problem proves harder than Best can manage":"使用“自动”时，当问题超出最佳档位的能力，主智能体可以自己升到最高档位",
+"A main agent on Automatic may move itself to Max":"使用“自动”时，主智能体可以自己升到最高档位",
+"On Automatic, a session starts on Best, and its main agent may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find). The conversation says when it does. A request is never sent to Max on its wording alone.":"使用“自动”时，会话从最佳档位开始；当问题超出最佳档位的能力（修复已失败两次、找不到原因）时，主智能体可以自己升到最高档位。发生时对话中会说明。请求不会仅凭措辞就被送到最高档位。",
+"The model each tier means for each program. A session on Automatic thinks with Best, and its main agent may move itself to Max when a problem proves too hard; it hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model.":"每个档位在每个程序中对应的模型。使用“自动”的会话用最佳档位思考，问题太难时主智能体可以自己升到最高档位；它把明确的部分交给标准和快速档位的子智能体。你没有改动的档位会跟随其程序的最新模型。",
+"{0}, or {1} if the problem proves too hard":"{0}，问题太难时用 {1}"
 }

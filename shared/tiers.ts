@@ -3,8 +3,8 @@
 // problems. Settings → Models → Tiers names each tier's model (and effort) for each agent program; until one is
 // changed it is the newest model of its family the program offers (Haiku, Sonnet, Opus and Fable for Claude Code;
 // Luna, Terra, Sol and Astra for Codex).
-// A session started on Automatic thinks with Best, or with Max when its request reads as a hard problem, and hands
-// clear parts to subagents on Standard and Quick: the team. An agent of the user's thinks with one tier, or with
+// A session started on Automatic thinks with Best (its main agent may step itself up to Max when a problem proves too
+// hard), and hands clear parts to subagents on Standard and Quick: the team. An agent of the user's thinks with one tier, or with
 // Automatic, and a lead gives each subagent it starts one, never above its own.
 import type { Agent, ModelOption } from './types.ts';
 
@@ -21,12 +21,12 @@ export const isTier = (v: unknown): v is Tier => v === 'quick' || v === 'standar
 
 export const tierLabel = (t: Tier | undefined): string => TIERS.find((x) => x.id === t)?.label ?? 'Automatic';
 
-/** The model a session names to start on Automatic: the server picks Best's, or Max's for a hard problem. */
+/** The model a session names to start on Automatic: the server picks Best's (its agent may step up to Max's later). */
 export const AUTO_MODEL = 'auto';
 
 /** A note of kind "tier" in a conversation: the session moved to a tier's model by itself. */
 export interface TierNote {
-  /** auto: Automatic started it there (its request reads as a hard problem); stepUp: its agent stepped itself up. */
+  /** stepUp: its agent stepped itself up; auto: Automatic started it there because its request read as a hard problem (before 0.57.0). */
   event: 'auto' | 'stepUp';
   tier: Tier;
   /** The model it thinks with now, as people read it ("Fable 5.2"). */

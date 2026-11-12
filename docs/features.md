@@ -305,13 +305,13 @@ agents that speak ACP and take MCP servers.
   and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
   agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers
   (Haiku, Sonnet, Opus and Fable for Claude Code; Luna, Terra, Sol and Astra for Codex). The start page's Model
-  opens on Automatic: the session starts on Best, or on Max when the helper model reads the request as a hard problem
-  (sized up while the agent starts; a line in the conversation says why). The main agent is told to lead: it plans,
-  hands clear parts to subagents on Standard and Quick (a subagent asked for with no tier gets Standard, and none thinks
-  with a tier above its lead's), checks what comes back, and may move itself to Max with step_up_session when a problem
-  proves harder than it looked. Claude Code's own Agent tool is told the same models. Two switches, **Lead with subagents** and
-  **Max for hard problems**, turn the team and Max for hard problems off. `scripts/tier-bench` measures what the team costs and how its results compare on your own
-  setup.
+  opens on Automatic: the session starts on Best. The main agent is told to lead: it plans, hands clear parts to
+  subagents on Standard and Quick (a subagent asked for with no tier gets Standard, and none thinks with a tier above
+  its lead's), checks what comes back, and may move itself to Max with step_up_session when a problem proves harder
+  than Best can manage (a line in the conversation says why); a request is not sent to Max on its wording alone.
+  Claude Code's own Agent tool is told the same models. Two switches, **Lead with subagents** and **Max for hard
+  problems**, turn the team and stepping up to Max off. `scripts/tier-bench` measures what each tier and the team cost
+  and how their results compare on your own setup, on tasks of its own, recent contest problems and LiveCodeBench.
 - **Deep research**: one switch under Options. The agent plans the searches a question needs, sends researchers
   (Hydor subagents) after each part, digs into what they leave open, has the key claims checked against two
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many

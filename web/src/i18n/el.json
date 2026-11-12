@@ -22700,5 +22700,10 @@
 "Working{0} · {1} subagent{2}":"Εργάζεται{0} · υποπράκτορες: {1}{2}",
 "Working{0} · {1} subagent{2} and {3} background task{4} running":"Εργάζεται{0} · υποπράκτορες σε εξέλιξη: {1}{2}, εργασίες στο παρασκήνιο: {3}{4}",
 "Working{0} · {1} subagent{2} running":"Εργάζεται{0} · υποπράκτορες σε εξέλιξη: {1}{2}",
-"Working{0} · {1} subagent{2}, {3} in background":"Εργάζεται{0} · υποπράκτορες: {1}{2}, {3} στο παρασκήνιο"
+"Working{0} · {1} subagent{2}, {3} in background":"Εργάζεται{0} · υποπράκτορες: {1}{2}, {3} στο παρασκήνιο",
+"A main agent on Automatic may move itself to Max when a problem proves harder than Best can manage":"Στο Αυτόματα, ο κύριος πράκτορας μπορεί να ανεβεί μόνος του στο Μέγιστο όταν ένα πρόβλημα αποδειχθεί δυσκολότερο απ’ όσο μπορεί το Καλύτερο",
+"A main agent on Automatic may move itself to Max":"Στο Αυτόματα, ο κύριος πράκτορας μπορεί να ανεβεί μόνος του στο Μέγιστο",
+"On Automatic, a session starts on Best, and its main agent may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find). The conversation says when it does. A request is never sent to Max on its wording alone.":"Στο Αυτόματα, μια συνεδρία ξεκινά στο Καλύτερο, και ο κύριος πράκτοράς της μπορεί να ανεβεί μόνος του στο Μέγιστο όταν ένα πρόβλημα αποδειχθεί δυσκολότερο απ’ όσο μπορεί το Καλύτερο (μια διόρθωση που απέτυχε δύο φορές, μια αιτία που δεν βρίσκει). Η συνομιλία το αναφέρει όταν συμβεί. Ένα αίτημα δεν στέλνεται ποτέ στο Μέγιστο μόνο από τη διατύπωσή του.",
+"The model each tier means for each program. A session on Automatic thinks with Best, and its main agent may move itself to Max when a problem proves too hard; it hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model.":"Το μοντέλο που σημαίνει κάθε βαθμίδα για κάθε πρόγραμμα. Μια συνεδρία στο Αυτόματα σκέφτεται με το Καλύτερο, και ο κύριος πράκτοράς της μπορεί να ανεβεί μόνος του στο Μέγιστο όταν ένα πρόβλημα αποδειχθεί πολύ δύσκολο· δίνει σαφή κομμάτια σε υποπράκτορες στο Τυπικό και το Γρήγορο. Μια βαθμίδα που δεν αλλάζετε ακολουθεί το νεότερο μοντέλο του προγράμματός της.",
+"{0}, or {1} if the problem proves too hard":"{0}, ή {1} αν το πρόβλημα αποδειχθεί πολύ δύσκολο"
 }

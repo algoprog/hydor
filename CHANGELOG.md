@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.57.0 · 12 November 2026
+
+Sessions on Automatic start on Best and move to Max only when their own agent finds a problem too hard for it, which
+costs less for the same work.
+
+- **Max when it is needed, not when a request sounds hard.** A session on Automatic used to start on Max whenever its
+  request read as a hard problem. Measured on 37 runs of coding tasks, that sent 16 of them to Max, cost 43% more on
+  those, and solved one more task. Now every session on Automatic starts on Best, and its main agent moves itself to
+  Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find); the
+  conversation says when it does. **Max for hard problems** in Settings → Models → Tiers now turns that step up on or
+  off.
+- **The tiers measured again**, on harder tasks: ones whose requirements are only implied, recent contest problems from
+  after the models were trained, and 30 hard LiveCodeBench problems. The cheapest tier alone passed most of them, at
+  about an eighth of the cost of Best; leading cheaper subagents saves 8-16% next to Best alone when the main agent
+  stays on Best. The results are written up in the repository, in docs/plans/tiers-and-the-team.md.
+
 ## 0.56.0 · 12 November 2026
 
 The `hydor` command does everything the app does, with a menu that completes as you type, Tab completion in your

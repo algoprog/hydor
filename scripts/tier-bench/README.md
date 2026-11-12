@@ -27,16 +27,14 @@ Nothing in the app depends on it.
 - `run.mjs`: each task done several ways, with what came of it: the share of checks passed, the cost at API
   prices (the lead's and its helpers'), the time, the helpers and their tiers.
 - `report.mjs`: the results as a table.
-- `size.ts` and `requests.json`: how well Automatic tells a hard problem from the rest: thirty requests as people
-  write them, ten of them hard, sized up by the helper model as a session's start does.
 
 ## The ways
 
 | Way | What runs |
 |---|---|
 | `solo` | One agent on the Best tier's model, the team off: how a session worked before tiers led by default. |
-| `team` | Automatic, the team on: the main agent leads on Best (Max for a hard problem) and hands parts to helpers. |
-| `lead` | The team on with Max for hard problems off: the main agent always leads on Best and hands parts to helpers. |
+| `team` | Automatic, the team on: the main agent leads on Best, may step itself up to Max, and hands parts to helpers. |
+| `lead` | The team on with Max for hard problems off: the main agent leads on Best, never on Max, and hands parts to helpers. |
 | `max` | One agent on the Max tier's model, the team off: the strongest model for everything. |
 | `standard`, `quick` | One agent on that tier's model alone, the team off: what the tier can do with no lead. |
 
@@ -49,9 +47,6 @@ node scripts/tier-bench/serve.mjs --from ~/.claude &           # the scratch app
 node scripts/tier-bench/run.mjs --out /tmp/hydor-bench/results.json            # solo and team, every task
 node scripts/tier-bench/run.mjs --ways max,standard,quick --out /tmp/hydor-bench/results.json   # each tier alone
 node scripts/tier-bench/report.mjs /tmp/hydor-bench/results.json
-
-OUTDIR=dist/dev node scripts/build-server.mjs scripts/tier-bench/size.ts
-DATA_DIR=/tmp/hydor-bench/data node dist/dev/size.js           # how Automatic sizes requests up
 ```
 
 The benchmark's agents work offline: the tasks hold everything they need, and a task made from a published problem
