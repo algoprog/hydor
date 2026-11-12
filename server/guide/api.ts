@@ -2,8 +2,10 @@
 // assistant, a scheduled task…) by calling the app's own API, in the server's own process (internal.ts).
 // What it may do follows the rules below: reading is free; a change shows the user a card first (with a form
 // to fill in or check, when the agent gives one), which they can allow for the rest of the session; risky or
-// hard-to-undo changes ask every time; some things are never an agent's (passwords, keys' values, files and
-// commands, answering approval cards). Plan mode only reads; Full access asks nothing.
+// hard-to-undo changes ask every time; a session's permissions and spending caps ask every time in every mode, Full
+// access too; some things are never an agent's (passwords, keys' values, files and commands, answering approval
+// cards). Plan mode only reads, but for the session's own settings (on a card); Full access asks nothing else.
+// An agent names its own session `this` (/api/sessions/this/config).
 // Settings kept on each device (theme, language…) go to the pages showing the session.
 import crypto from 'node:crypto';
 import { formContent, formFields } from '../../shared/forms.ts';
@@ -14,13 +16,17 @@ import { confidentialIn, NOT_FROM_HERE, withoutConfidential } from '../confident
 import type { RunCtx, ToolOutput } from '../features/types.ts';
 import { internalHeaders } from '../internal.ts';
 
-type Level = 'free' | 'confirm' | 'always' | 'refuse';
+/** free: no card; confirm: a card unless allowed for the session (none in Full access); always: a card each time (none in
+ * Full access); ask: a card each time, Full access too, never allowed for the session; refuse: never. */
+type Level = 'free' | 'confirm' | 'always' | 'ask' | 'refuse';
 type Json = Record<string, any>;
 
 /** Methods a rule is for: one, several ("PUT|PATCH"), any change ("W"), or any ("*"). */
 type Rule = [methods: string, path: RegExp, level: Level, why?: string];
 
 const YOUR_TOOLS = 'Use your own tools for that (files, commands, git): they ask the user as the session’s permissions say.';
+const CAP = 'This changes a spending cap: how much may be spent before the work stops.';
+const PERMISSIONS = 'This changes what the agent may do without asking you.';
 
 /** The first rule that matches decides. */
 const RULES: Rule[] = [
@@ -42,7 +48,7 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/apps\/[^/]+\/secrets$/, 'refuse', 'A key’s value never passes through an agent: the user gives the keys an app needs on its page, its install card, or its card in a session (use_app shows it).'],
   ['*', /^\/api\/accounts\/[^/]+\/(login|logout)/, 'refuse', 'Signing in and out of an agent’s account is the user’s to do, in Settings → Agents → Accounts.'],
   ['*', /^\/api\/accounts\/claude\/api-keys\//, 'refuse', 'An API key is the user’s to add, in Settings → Agents → Accounts (an account’s ⋯ menu → Add API key…).'],
-  ['W', /^\/api\/budget\//, 'refuse', 'Spending caps are the user’s to set: the session’s menu → Spending cap, or Options on the start page.'],
+  ['W', /^\/api\/budget\//, 'ask', CAP],
   ['W', /^\/api\/sessions\/[^/]+\/(takeover|seen|queue)/, 'refuse', 'That is for the session’s own page.'],
   ['W', /^\/api\/sites$/, 'refuse', 'Publish with your publish_site tool: the user confirms on its card.'],
   ['PUT', /^\/api\/memory\/bring-in\/file$/, 'refuse', 'An export comes from the user’s own browser: they add it with Bring in… in Settings → Memory.'],
@@ -72,7 +78,7 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/pages\/(tex\/(reference|compile)|docs\/print)$/, 'free'],
   // Ask every time: risky, costly or hard to undo.
   ['DELETE', /./, 'always'],
-  ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|interrupt|cancel)(\/|$)/, 'always'],
+  ['W', /\/(remove|delete|discard|clear|reset|rotate|branch-delete|stop|stop-all|interrupt|cancel)(\/|$)/, 'always'],
   ['W', /^\/api\/setup\//, 'always', 'This changes what Claude Code or Codex load in every session; an MCP server runs a program on this computer.'],
   ['W', /^\/api\/(custom|browser)\/settings$/, 'always', 'This changes what agents may do without asking.'],
   ['W', /^\/api\/computer\/settings$/, 'always', 'This lets agents see this Mac’s screen and use its mouse and keyboard (each session still asks before its agent starts).'],
@@ -109,7 +115,15 @@ export function ruleFor(method: string, path: string): { level: Level; why?: str
   return { level: method === 'GET' ? 'free' : 'confirm' };
 }
 
-/** A few calls are refused for what they carry: an agent changing a session's permissions or its spending cap. */
+/** What a call carries that the user decides on a card each time, in every mode: a session's permissions or its spending cap. */
+function askedFor(path: string, body: Json): { level: Level; why: string } | null {
+  const s = /^\/api\/sessions\/[^/]+(\/[^/]+)$/.exec(path);
+  if (s?.[1] === '/config' && body.mode !== undefined) return { level: 'ask', why: PERMISSIONS };
+  if (s?.[1] === '/extra' && body.capUsd !== undefined) return { level: 'ask', why: CAP };
+  return null;
+}
+
+/** A few calls are refused for what they carry. */
 function refusedBody(method: string, path: string, body: Json, own: string): string | null {
   const s = /^\/api\/sessions\/([^/]+)(\/.*)?$/.exec(path);
   // An app's keys go with a run or an install only from the user's own pages.
@@ -121,8 +135,6 @@ function refusedBody(method: string, path: string, body: Json, own: string): str
     return 'A key’s value never passes through an agent. The tools that need an OpenRouter key (generate_image and the rest) ask the user for it on a card when they need it; other keys the user enters in Settings → Models.';
   if (!s) return null;
   const key = decodeURIComponent(s[1]);
-  if (s[2] === '/config' && body.mode !== undefined) return 'A session’s permissions are the user’s to change (the picker by the message box, or Shift+Tab).';
-  if (s[2] === '/extra' && body.capUsd !== undefined) return 'Spending caps are the user’s to set: the session’s menu → Spending cap.';
   if (s[2] === '/message' && key === own) return 'That is this session: just answer here.';
   if (method === 'DELETE' && !s[2] && key === own) return 'An agent cannot delete its own session.';
   return null;
@@ -279,25 +291,34 @@ export async function appApi(a: ApiArgs, ctx: RunCtx): Promise<ToolOutput> {
   if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return { text: 'method: GET, POST, PUT, PATCH or DELETE', isError: true };
   let url = String(a.path ?? '').trim();
   if (/^https?:\/\//i.test(url)) url = url.replace(/^https?:\/\/[^/]+/i, '');
+  // `this`: the agent's own session.
+  url = url.replace(/^\/api\/sessions\/(this|self)(?=[/?]|$)/, `/api/sessions/${encodeURIComponent(ctx.key)}`);
   const path = url.split('?')[0].replace(/\/+$/, '') || '/';
   const body: Json = a.body && typeof a.body === 'object' && !Array.isArray(a.body) ? { ...(a.body as Json) } : {};
   const mode = modeOf(ctx);
   if (path === '/device' || path === '/api/device') return device(ctx, method, body, mode);
   if (!path.startsWith('/api/') || path.includes('..')) return { text: 'path: one of the app’s /api/… addresses (app_guide topic "api" lists them), or /device.', isError: true };
 
-  const rule = ruleFor(method, path);
+  let rule = ruleFor(method, path);
   if (rule.level === 'refuse') return { text: `Not through app_api: ${rule.why ?? 'that is the user’s to do.'}`, isError: true };
+  rule = askedFor(path, body) ?? rule;
   const refused = refusedBody(method, path, body, ctx.key);
   if (refused) return { text: `Not through app_api: ${refused}`, isError: true };
   // A confidential session stays out of other sessions' reach (server/confidential).
   if (confidentialIn(ctx.deps.db, url).some((k) => k !== ctx.key)) return { text: `Not through app_api: ${NOT_FROM_HERE}`, isError: true };
   if (method === 'GET' || rule.level === 'free') return out(await call(ctx, method, url), ctx);
-  if (mode === 'read-only') return { text: 'This session only reads (Plan mode, or read-only): tell the user what you would change, or ask them to switch the mode.', isError: true };
+  // Plan mode changes nothing, but for the session's own settings (its model, effort, permissions, memory), which the
+  // user allows on a card: "leave plan mode and start" works.
+  const own = /^\/api\/sessions\/([^/]+)\/(config|extra)$/.exec(path);
+  if (mode === 'read-only') {
+    if (!own || decodeURIComponent(own[1]) !== ctx.key) return { text: 'This session only reads (Plan mode, or read-only): tell the user what you would change, or change this session’s own mode with POST /api/sessions/this/config { mode } (the user allows it on a card).', isError: true };
+    if (rule.level !== 'ask') rule = { level: 'ask', why: rule.why };
+  }
 
   const form = a.form && typeof a.form === 'object' ? (a.form as Json) : null;
   // A form always shows (it asks for input); otherwise Full access asks nothing,
   // and the other modes ask for changes not yet allowed for the session.
-  const needsCard = !!form || (rule.level === 'always' ? mode !== 'full' : mode === 'normal' && !allowed.has(ctx.key));
+  const needsCard = !!form || rule.level === 'ask' || (rule.level === 'always' ? mode !== 'full' : mode === 'normal' && !allowed.has(ctx.key));
   if (needsCard) {
     const answer = await askCard(ctx, { method, url, path, body, summary: a.summary, form, rule });
     if (answer.declined) return { text: answer.declined, isError: true };
@@ -332,6 +353,12 @@ async function askCard(ctx: RunCtx, c: CardIn): Promise<{ body: Json; declined?:
   // For a change in place, what is there now (the same address read), so the card shows before → after.
   let now: unknown;
   if (c.method === 'PUT' || c.method === 'PATCH') now = (await call(ctx, 'GET', c.url).catch(() => null))?.json;
+  // A session's model, effort and permissions as they are now (its config has no GET of its own).
+  const config = /^\/api\/sessions\/([^/]+)\/config$/.exec(c.path);
+  if (config) {
+    const s = ctx.deps.sessions.summary(decodeURIComponent(config[1]));
+    if (s) now = { model: s.live?.model ?? s.prefs?.model ?? s.model, effort: s.live?.effort ?? s.prefs?.effort, mode: s.live?.mode ?? s.prefs?.mode };
+  }
   const asked = new Set(fields.map((f) => f.id));
   const lines = changeLines(Object.fromEntries(Object.entries(c.body).filter(([k]) => !asked.has(k))), now);
   const session = /^\/api\/sessions\/([^/]+)/.exec(c.path)?.[1];

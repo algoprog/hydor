@@ -1,4 +1,4 @@
-// Swarm: a session that leads a team of agents. Its members are child sessions; they post what they try and
+// Swarm: a session that leads a team of agents. Its members are Hydor subagents; they post what they try and
 // find to the swarm's board, read each other's posts and message each other, and the lead hears of the board
 // as it goes. Two kinds: a swarm attacks a hard problem, each member from its own angle, and the lead gives the
 // user the checked answer; a campaign makes one big change in many parts (a migration, a rename across a
@@ -54,7 +54,7 @@ export interface CampaignPart {
 export interface SwarmBoard {
   swarm: string;
   mode: SwarmMode;
-  /** How many members may work at once (Settings → Child sessions). */
+  /** How many members may work at once (Settings → Capabilities → Subagents). */
   size: number;
   /** Its members' session keys, oldest first. */
   members: string[];

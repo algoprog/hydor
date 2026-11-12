@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type CSSProperties,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -582,6 +583,38 @@ export function Dialog({
         )}
         {!bare && <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">{children}</div>}
         {!bare && footer && <div className="flex items-center justify-end gap-2 px-5 pt-2 pb-[max(16px,var(--safe-bottom))]">{footer}</div>}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * A panel over the right side of the page, full screen on a phone (a background task opens in one): the page dims behind
+ * it, a tap there or Escape closes it, and a dialog opened from it (a confirmation) goes over it. Its children lay out
+ * the whole of it: their own header, scrolling and buttons.
+ */
+export function Sheet({ open, onClose, children, label, width = 560 }: { open: boolean; onClose: () => void; children: ReactNode; label: string; width?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useStacked(ref, open);
+  // As Dialog: a tap on the dimmed page closes on its click, and a press that began inside (selecting text) does not.
+  const pressed = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && onTop(ref.current) && onClose();
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  }, [open, onClose]);
+  if (!open) return null;
+  return createPortal(
+    <div
+      ref={ref}
+      className="scrim fixed inset-0 z-50 flex justify-end [--scrim:0.26]"
+      onPointerDown={(e) => (pressed.current = e.target === e.currentTarget)}
+      onClick={(e) => pressed.current && e.target === e.currentTarget && onClose()}
+    >
+      <div role="dialog" aria-modal aria-label={label} style={{ '--sheet-w': `${width}px` } as CSSProperties} className="flex h-full w-full flex-col overflow-hidden border-l border-line bg-bg shadow-lg sm:max-w-[var(--sheet-w)] max-sm:border-l-0">
+        {children}
       </div>
     </div>,
     document.body,

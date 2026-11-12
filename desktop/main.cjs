@@ -29,6 +29,10 @@
 // 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
 // and Esc let go while the agent itself presses it; on Linux the app takes the agent's screenshots.
 //
+// The hydor command (a Mac): bin/hydor inside the app runs the app's own Node.js on the app's own cli.js. At each start
+// the app puts it on the PATH of Terminal by itself (cli-link.cjs), and under the app the command opens the app when it
+// is not running, rather than starting a server of its own.
+//
 // Notices (a session finished, failed or needs you): the server sends each one here ({ type: 'notice' }), and the app
 // shows it as the system's own notification, even with the window closed; clicking it opens that session. The page in
 // the window shows none itself, only those the system did not show (not allowed in its settings), handed to it here.
@@ -292,6 +296,7 @@ function ownEnv() {
  * the folders your shell adds (where `claude`, `git` and the rest are). The server gets your login shell's environment
  * instead, as a terminal would. Windows apps get your whole environment as it is.
  */
+let loginEnvRead = false; // whether loginEnv() got the shell's environment (else its PATH is a guess)
 function loginEnv() {
   const own = ownEnv();
   if (WIN) return own;
@@ -310,7 +315,10 @@ function loginEnv() {
       if (i > 0) env[kv.slice(0, i)] = kv.slice(i + 1);
     }
     for (const k of ['SHLVL', 'PWD', 'OLDPWD', '_', 'HYDOR_READING_ENV']) delete env[k];
-    if (env.PATH) return env;
+    if (env.PATH) {
+      loginEnvRead = true;
+      return env;
+    }
   } catch {}
   return MAC ? { ...own, PATH: ['/opt/homebrew/bin', '/usr/local/bin', own.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'].join(':') } : own;
 }
@@ -574,10 +582,25 @@ const sessionNotices = createNotices({
   showApp: () => go(),
 });
 
+/**
+ * Where the system lets you allow the app's notifications: on a Mac, Hydor's own page in System Settings →
+ * Notifications (its bundle id, electron-builder.cjs appId); on Windows, Settings → System → Notifications.
+ */
+const NOTICE_SETTINGS = MAC ? 'x-apple.systempreferences:com.apple.preference.notifications?id=com.hydor.app' : WIN ? 'ms-settings:notifications' : null;
+
 // What the page in the window asks (preload.cjs): only the app's own pages.
 const fromOwnPage = (e) => sameOrigin((e.senderFrame && e.senderFrame.url) || '');
 ipcMain.handle('hydor:notices', (e) => (fromOwnPage(e) ? sessionNotices.state() : null));
 ipcMain.handle('hydor:notice-test', (e, t) => (fromOwnPage(e) ? sessionNotices.test(t) : null));
+ipcMain.handle('hydor:notice-settings', async (e) => {
+  if (!fromOwnPage(e) || !NOTICE_SETTINGS) return false;
+  try {
+    await shell.openExternal(NOTICE_SETTINGS);
+    return true;
+  } catch {
+    return false;
+  }
+});
 
 const SYSTEM_USING = MAC ? 'An agent is using your Mac' : WIN ? 'An agent is using your PC' : 'An agent is using your computer';
 
@@ -1053,6 +1076,28 @@ function action(what) {
 
 const go = (at) => (serverUrl ? openWindow(at) : openWindow());
 
+// ---- the `hydor` command in Terminal (a Mac) -----------------------------------------------------------------------
+
+/**
+ * Puts the command on the PATH of Terminal (cli-link.cjs), with nothing asked and nothing shown: a link to bin/hydor
+ * inside the app, in ~/.local/bin, ~/bin, /usr/local/bin or /opt/homebrew/bin when that is on your PATH and yours to write
+ * in, else in ~/.local/bin with a line in your shell's startup file.
+ */
+function linkCommand() {
+  if (!MAC || !PACKAGED) return;
+  // From a disk image or a translocated copy the app's files go away, and the link would point at nothing.
+  if (BUNDLE.includes('/AppTranslocation/') || BUNDLE.startsWith('/Volumes/')) return trace('hydor command', 'skipped: the app runs from a disk image or a translocated copy', BUNDLE);
+  try {
+    // Only a PATH the login shell really gave counts (loginEnv's guess does not say what Terminal has).
+    const loginPath = loginEnvRead && baseEnv ? baseEnv.PATH : null;
+    const did = require('./cli-link.cjs').linkCommand({ launcher: path.join(RES, 'bin/hydor'), loginPath, shell: os.userInfo().shell, env: baseEnv || process.env });
+    trace('hydor command', did);
+    console.log(`[hydor] the hydor command: ${did}`);
+  } catch (e) {
+    trace('hydor command failed', String(e));
+  }
+}
+
 // ---- menus ------------------------------------------------------------------------------------------------------
 
 let tray = null;
@@ -1237,6 +1282,8 @@ app.whenReady().then(async () => {
   if (!HIDDEN) openWindow();
   else app.dock?.hide();
   await start();
+  // The hydor command, a moment later and in the background.
+  setTimeout(linkCommand, 2000).unref?.();
 });
 
 app.on('window-all-closed', () => {

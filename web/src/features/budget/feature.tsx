@@ -36,14 +36,14 @@ function CapDock({ s }: { s: SessionSummary }) {
       {cap != null && (
         <div data-tip="budget" className="mx-3 mb-2 flex items-center gap-2.5 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
           <Wallet size={14} className={cx('shrink-0', reached ? 'text-err' : near ? 'text-warn' : 'text-fg-3')} />
-          <span className="tnum shrink-0" title={st?.childrenUsd ? `This session ${usd(st.ownUsd)}, its child sessions ${usd(st.childrenUsd)}` : 'Spent at API prices'}>
+          <span className="tnum shrink-0" title={st?.childrenUsd ? `This session ${usd(st.ownUsd)}, its Hydor subagents ${usd(st.childrenUsd)}` : 'Spent at API prices'}>
             <span className="font-medium text-fg">{st ? usd(spent) : '…'}</span>
             <span className="text-fg-3"> of {usd(cap)}</span>
           </span>
           <span className="h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-bg-3" aria-hidden>
             <span className={cx('block h-full rounded-full transition-[width] duration-500', reached ? 'bg-err' : near ? 'bg-warn' : 'bg-accent')} style={{ width: `${Math.max(share * 100, spent > 0 ? 2 : 0)}%` }} />
           </span>
-          {reached ? <span className="shrink-0 text-err">Cap reached</span> : st?.childrenUsd ? <span className="shrink-0 text-fg-3 max-sm:hidden">with children</span> : null}
+          {reached ? <span className="shrink-0 text-err">Cap reached</span> : st?.childrenUsd ? <span className="shrink-0 text-fg-3 max-sm:hidden">with subagents</span> : null}
           <button type="button" onClick={() => openDialog(s.key)} className="shrink-0 font-medium text-accent hover:underline">
             {reached ? 'Raise' : 'Change'}
           </button>

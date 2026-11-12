@@ -27,16 +27,14 @@ Nothing in the app depends on it.
 - `run.mjs`: each task done several ways, with what came of it: the share of checks passed, the cost at API
   prices (the lead's and its helpers'), the time, the helpers and their tiers.
 - `report.mjs`: the results as a table.
-- `size.ts` and `requests.json`: how well Automatic tells a hard problem from the rest: thirty requests as people
-  write them, ten of them hard, sized up by the helper model as a session's start does.
 
 ## The ways
 
 | Way | What runs |
 |---|---|
 | `solo` | One agent on the Best tier's model, the team off: how a session worked before tiers led by default. |
-| `team` | Automatic, the team on: the main agent leads on Best (Max for a hard problem) and hands parts to helpers. |
-| `lead` | The team on with Max for hard problems off: the main agent always leads on Best and hands parts to helpers. |
+| `team` | Automatic, the team on: the main agent leads on Best, may step up to Max, and hands parts to helpers. |
+| `lead` | The team on, Max for hard problems off: the main agent leads on Best only and hands parts to helpers. |
 | `max` | One agent on the Max tier's model, the team off: the strongest model for everything. |
 | `standard`, `quick` | One agent on that tier's model alone, the team off: what the tier can do with no lead. |
 
@@ -49,9 +47,6 @@ node scripts/tier-bench/serve.mjs --from ~/.claude &           # the scratch app
 node scripts/tier-bench/run.mjs --out /tmp/hydor-bench/results.json            # solo and team, every task
 node scripts/tier-bench/run.mjs --ways max,standard,quick --out /tmp/hydor-bench/results.json   # each tier alone
 node scripts/tier-bench/report.mjs /tmp/hydor-bench/results.json
-
-OUTDIR=dist/dev node scripts/build-server.mjs scripts/tier-bench/size.ts
-DATA_DIR=/tmp/hydor-bench/data node dist/dev/size.js           # how Automatic sizes requests up
 ```
 
 The benchmark's agents work offline: the tasks hold everything they need, and a task made from a published problem
@@ -67,9 +62,11 @@ nothing on the computer (no service that starts it at boot) and leaves the agent
 `--from` names a signed-in Claude Code folder (`~/.claude`, or an added account's folder under the app's data).
 Only its access token is copied, never the token that renews it, so the copy cannot replace the real sign-in; it
 works until it runs out (an hour or two: run `serve.mjs --from …` again to renew it while the server is up). The runs
-use that account's plan: the nine tasks two ways come to about ten dollars at API prices (Max alone to as much again). A run already in the results file is
-not run again; `--repeat 3` runs each three times (the table shows means), `--tasks a,b` some of them,
-`--parallel 3` how many at once, `--recost` reads the costs again.
+use that account's plan: the first nine tasks two ways come to about ten dollars at API prices (Max alone to as much
+again), the whole second measurement to about $110. A run already in the results file is not run again; `--repeat 3`
+runs each three times (the table shows means), `--tasks a,b` some of them, `--parallel 3` how many at once,
+`--recost` reads the costs again. A run waits for the copied token to have 20 minutes left: for a long measurement,
+copy it again every few minutes while the account is in use elsewhere (it renews there).
 
 When you are done, stop `serve.mjs` and remove `/tmp/hydor-bench`: it holds the copied token.
 
@@ -80,6 +77,14 @@ Haiku 5.5, Sonnet 5.5, Opus 5.5 and Fable 5.2): `ordinary.json` (the seven ordin
 (the two hard ones) and `earlier-wordings.json` (the team's runs under earlier wordings of the lead's instructions,
 which the means leave out). `node scripts/tier-bench/report.mjs scripts/tier-bench/results/2026-11-10/ordinary.json`
 shows one as a table. Keep a new measurement beside them, in a folder named by its date.
+
+`results/2026-11-12/` holds the second measurement (11-12 November, the same models, agents offline): `own.json`
+(the nine newer tasks of our own), `contest.json` (the ten AtCoder problems, Quick alone three times each) and
+`lcb.json` (the thirty LiveCodeBench problems; `node scripts/tier-bench/run.mjs --tasks-dir
+~/.cache/hydor-bench/lcb/tasks` after `lcb/make-tasks.py`). Runs made in the trial of 11 November and carried over
+say so in `copiedFrom`; four LiveCodeBench solutions graded again after the grader failed say so in `regraded`.
+`team-after-0.57.json` is the team again on 0.57.0, where Max comes only from the lead's own step up, on the 13 tasks
+where Automatic had started it on Max.
 
 ## Reading the table
 

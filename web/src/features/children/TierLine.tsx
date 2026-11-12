@@ -1,5 +1,6 @@
-// A line in a conversation when its session moved to a tier's model by itself: Automatic started it on Max because
-// its request reads as a hard problem, or its agent stepped itself up when the problem proved harder than it looked.
+// A line in a conversation when its session moved to a tier's model by itself: its agent stepped itself up when the
+// problem proved harder than it looked, or (in sessions from before 0.57.0) Automatic started it on Max because its
+// request read as a hard problem.
 import { ChevronsUp } from 'lucide-react';
 import type { SessionNote } from '@shared/features';
 import { tierLabel, type TierNote } from '@shared/tiers';

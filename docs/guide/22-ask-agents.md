@@ -22,6 +22,7 @@ Agents can do in the app what you could do in its pages. Some examples of what y
 - "Delete the memory notes about my old job."
 - "Which apps do I have? Run the trip planner for a long weekend in Lisbon."
 - "Switch this device to the light theme."
+- "Use Opus for this session and think harder." "Leave plan mode and go ahead."
 
 The agent first reads how things are now, then asks you to confirm the change on a card in the conversation. Reading never asks: an agent can always look at your settings, projects, tasks and the rest to answer you.
 
@@ -80,7 +81,6 @@ Some things stay yours. An agent that tries gets told where you do it:
 - the values of keys and sign-ins: an agent asks for them with a card where you type them into the vault, and never sees them ([Connected apps, keys and tools](/guide/connections)); the OpenRouter key has a card of its own, which puts it straight into Settings → Models ([When an agent needs the OpenRouter key](/guide/documents-voice#when-an-agent-needs-the-openrouter-key));
 - making access tokens for other machines or agents, and an app's API keys;
 - answering approval cards, its own or another session's, and deciding on cards that ask you (a proposed skill, a scheduled task, publishing);
-- a session's permissions and its spending cap;
 - files, commands, terminals and git through the app: agents use their own tools for those, which ask you as the session's permissions say;
 - the editors' own AI tools and the picture and video editors: agents make, find, change and edit pictures, drawings, plots and videos with tools of their own, which save what they make in the session's folder ([Documents, images, videos and voice](/guide/documents-voice)), and narrate slides with a voice-over of each slide's notes.
 
@@ -88,10 +88,12 @@ Some things stay yours. An agent that tries gets told where you do it:
 
 What a session's permissions allow decides how much the cards ask:
 
-- **Plan** (and Codex's **Read only**): the agent can read the app's settings and answer questions, but changes nothing. It tells you what it would change.
+- **Plan** (and Codex's **Read only**): the agent can read the app's settings and answer questions, but changes nothing. It tells you what it would change. One exception: its own session's settings. Ask it to leave Plan mode, use another model or think harder, and it asks you on a card.
 - **Ask**, **Accept edits**, **Auto** and the like: changes ask on a card, as above.
 - **Bypass** (Claude Code) and **Full access** (Codex): no cards; the agent makes the changes you ask for. A form still shows when the agent needs details.
 - Custom's **Full access**: no approval cards, including for changes that normally ask every time. A form still shows when details are needed.
+
+Whatever the permissions, a change to a session's permissions or its spending cap asks you on a card every time, with no **Allow for this session**: "Switch this session to Bypass", "Raise the cap to $20". You can ask for these in the app and in the terminal alike; the terminal shows the same card, and **y** or **n** answers it.
 
 ## Settings kept on each device
 
@@ -104,3 +106,4 @@ A few settings belong to each device rather than the app: the theme, the languag
 - "Turn the browser's screenshots off."
 - "Show me which scheduled tasks I have, and turn off the price watch."
 - "Switch this device to the light theme."
+- "Switch this session to Sonnet with low effort."

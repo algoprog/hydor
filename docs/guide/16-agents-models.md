@@ -26,7 +26,7 @@ What each can do in the app:
 On the start page (`/`), the row under the message box says who does the work.
 
 1. Click **Runs on**. The list shows **Claude Code** ("Anthropic · Claude plan or API key"), **Codex** ("OpenAI · ChatGPT plan or API key"), **Custom** ("Any model: OpenRouter, Ollama, vLLM") and every agent you added in Settings → More agents ("ACP agent · " and its command). At the bottom, **Models for Custom** opens Settings → Models, and **Add or manage agents** opens Settings → More agents.
-2. Click **Model** and pick one. **Automatic**, at the top and picked to start with, lets the tiers choose: Best, or Max for a hard problem (see [Tiers: a model for each kind of job](#tiers-a-model-for-each-kind-of-job)). Under it the list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
+2. Click **Model** and pick one. **Automatic**, at the top and picked to start with, lets the tiers choose: Best, and Max if the problem proves too hard (see [Tiers: a model for each kind of job](#tiers-a-model-for-each-kind-of-job)). Under it the list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
 3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
 
 The start page remembers what you picked, per agent, on every device: next time it opens with the same agent, model, effort and permissions.
@@ -52,16 +52,16 @@ The model menu only lists the session's own agent's models; a confidential sessi
 
 ## Tiers: a model for each kind of job
 
-Agents pick models by tier instead of by name: **Quick** for small, very clear jobs whose result can be checked, **Standard** for clear tasks of medium size, **Best** for a session's main agent, which plans, leads helpers and checks their work, and **Max** for the hardest problems. Most of a job is clear parts that a cheaper model does well, so a session costs less this way without the result getting worse: the strongest model in the room still plans the work and checks it.
+Agents pick models by tier instead of by name: **Quick** for small, very clear jobs whose result can be checked, **Standard** for clear tasks of medium size, **Best** for a session's main agent, which plans, leads subagents and checks their work, and **Max** for the hardest problems. Most of a job is clear parts that a cheaper model does well, so a session costs less this way without the result getting worse: the strongest model in the room still plans the work and checks it.
 
-On the start page, **Model** opens on **Automatic**: the session starts on Best, or on Max when your request reads as a hard problem (a proof, a bug nobody can find the cause of, a design whose constraints pull against each other). The helper model sizes the request up while the agent starts, so nothing waits for it, and a line in the conversation says so when Max was picked, with why. The main agent then hands clear parts to helpers on Standard and Quick, and may move itself to Max when a problem proves harder than it looked (the conversation says that too). Pick a model by name instead and the session thinks with that one; its helpers still get tiers. An agent of yours can think with one tier instead (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
+On the start page, **Model** opens on **Automatic**: the session starts on Best. Its main agent hands clear parts to subagents on Standard and Quick, and may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find, a proof); a line in the conversation says so, with why. A request is not sent to Max on its wording alone: Best solves most of what reads as hard, for less. Pick a model by name instead and the session thinks with that one; its subagents still get tiers. An agent of yours can think with one tier instead (see [What an agent thinks with: tiers](/guide/agents#what-an-agent-thinks-with-tiers)).
 
 [Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means for each program: a row for each tier, with a switch beside the group's title to pick the program (**Claude Code**, **Codex** or **Custom**), and in each row a model and, for Claude Code and Codex, an effort. A tier's (i) says more about it. To start, Quick is Haiku, Standard is Sonnet, Best is Opus and Max is the newest Fable for Claude Code; for Codex, Quick is Luna, Standard is Terra, Best is Sol and Max is Astra (on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); Custom has none, so its sessions keep the model they picked until you choose one of your Custom models (a model on this computer makes Quick free). A tier you leave alone follows its program's newest model of that kind. **Back to the defaults**, in the **⋯** menu beside the title, puts them back.
 
 Two switches in the **Tiers in sessions** group under the tiers say how sessions use them:
 
-- **Lead with helpers** (on to start): a session's main agent is told to plan, hand clear parts to helpers on cheaper tiers and check their work, and a helper asked for with no tier gets Standard. Off, agents work alone unless they choose otherwise, and the start page has no Automatic.
-- **Max for hard problems** (on to start): Automatic starts a hard problem on Max, and a main agent may move itself there. Off, Automatic always starts on Best.
+- **Lead with subagents** (on to start): a session's main agent is told to plan, hand clear parts to subagents on cheaper tiers and check their work, and a subagent asked for with no tier gets Standard. Off, agents work alone unless they choose otherwise, and the start page has no Automatic.
+- **Max for hard problems** (on to start): a main agent on Automatic may move itself to Max when a problem proves too hard for Best. Off, sessions on Automatic stay on Best.
 
 ## Agent programs install and update themselves
 
@@ -252,7 +252,7 @@ The helper model does small jobs beside your sessions, outside any conversation:
 - tidying up memory about once a day, learning from the conversations since, and titling notes for the index agents start with;
 - answering one question about a web page the browser has open;
 - describing pictures for a Custom model that can't see them;
-- summing up a long reply from a child session;
+- summing up a long reply from a Hydor subagent;
 - drafting an app or a scheduled task from a session;
 - hands-free voice mode.
 
