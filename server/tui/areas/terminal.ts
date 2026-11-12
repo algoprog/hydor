@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { Writable } from 'node:stream';
 import type { Opts } from '../args.ts';
 import type { Conn } from '../client.ts';
 import type { Look } from '../lines.ts';
@@ -75,6 +76,27 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
     async pick(title, items) {
       const { pickInTerminal } = await import('../picker.ts');
       return pickInTerminal(title, items, look.p);
+    },
+    async ask(question, { hidden = false } = {}) {
+      if (!interactive) throw new UsageError(`${question.replace(/[:?]\s*$/, '')}: there is no terminal to type it on`);
+      // Hidden: what is typed is not echoed (a muted output for readline), only the question and a line break after it.
+      const quiet = new Writable({ write: (_c, _e, done) => done() });
+      const rl = readline.createInterface({ input: process.stdin, output: hidden ? quiet : process.stderr, terminal: true });
+      if (hidden) process.stderr.write(question);
+      return new Promise((resolve) => {
+        let done = false;
+        const end = (v: string | null) => {
+          if (done) return;
+          done = true;
+          if (hidden) process.stderr.write('\n');
+          rl.close();
+          resolve(v);
+        };
+        rl.on('SIGINT', () => end(null));
+        rl.on('close', () => end(null));
+        if (hidden) rl.once('line', (l) => end(l));
+        else rl.question(question, (l) => end(l));
+      });
     },
   };
 }
