@@ -101,7 +101,7 @@ if (cmd === 'set-password') {
   const { createAccessToken } = await import('./machines.ts');
   console.log(createAccessToken(db, process.argv.slice(3).join(' ') || 'Another machine').token);
 } else if (cmd === 'service' && sub === 'install') {
-  if (process.env.HYDOR_APP_BUNDLE) {
+  if (process.env.HYDOR_APP_BUNDLE || process.env.HYDOR_APP_OPEN) {
     console.error('The Hydor app already runs the server (and keeps it running): there is nothing to install.');
     process.exit(1);
   }
@@ -147,8 +147,8 @@ if (cmd === 'set-password') {
     process.exitCode = 1;
   }
 } else if (cmd === 'update') {
-  if (process.env.HYDOR_APP_BUNDLE) {
-    console.error('The Hydor app updates itself: choose Hydor → Check for Updates…');
+  if (process.env.HYDOR_APP_BUNDLE || process.env.HYDOR_APP_OPEN) {
+    console.error(process.env.HYDOR_APP_OPEN ? 'The Hydor app updates itself: choose Check for Updates… in its tray menu.' : 'The Hydor app updates itself: choose Hydor → Check for Updates…');
     process.exit(1);
   }
   if (!fs.existsSync(path.join(ROOT, '.git'))) {
