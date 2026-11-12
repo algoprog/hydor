@@ -318,12 +318,6 @@ export function agentLines(list: Assistant[], look: Look): string[] {
   return columns(rows).map((l) => truncate(l, look.width));
 }
 
-async function agents(conn: Conn, o: Opts, look: Look) {
-  const r = await conn.api<{ assistants: Assistant[] }>('GET', '/api/assistants');
-  if (o.json) return json(r);
-  say(agentLines(r.assistants, look));
-}
-
 async function tasks(conn: Conn, o: Opts, look: Look) {
   const { p } = look;
   if (o.args[0] === 'run') {
@@ -507,9 +501,6 @@ export async function listCommand(conn: Conn | null, o: Opts, look: Look): Promi
       return 0;
     case 'tiers':
       await tiers(conn, o, look);
-      return 0;
-    case 'agents':
-      await agents(conn, o, look);
       return 0;
     case 'tasks':
       await tasks(conn, o, look);
