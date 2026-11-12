@@ -16,7 +16,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   subagent or a background task opens in a side panel like a session: its steps or
   output, refreshed as it runs.
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
-  separate folder, so several agents can change one repository at once). Pick the model, how hard it
+  separate folder, so several agents can change one repository at once). The folder menu lists your projects and the
+  folders you used last under their own headings, each with where it is (a project's own folder only as the project),
+  with Browse for any other folder and a new task folder; it opens on the side of its chip with more room and fits
+  without scrolling. Pick the model, how hard it
   thinks, and what it may do without asking you. The start page opens with what you picked there last,
   on any device: the agent and its model, the folder, the assistant, memory and a spending cap. What you
   write in a message box, with the files you attach, waits there while you look at other pages. Pressing
@@ -173,7 +176,7 @@ agents that speak ACP and take MCP servers.
   background).
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
-  folder: its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
+  folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
   with, are told what its folder holds, remember what its earlier sessions learned, search its documents, get its
   guidelines and its own skills and start as its assistant. The Projects page shows each as a card in its colour with
   what it holds (sessions, things in the Library, documents, skills) and New session. A project's own page opens at

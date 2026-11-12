@@ -104,8 +104,8 @@ Everything on the start page is explained in [Start a session](/guide/sessions#s
 2. Press **New session** at the top of the sidebar. The app opens on the start page too.
 3. Press **Runs on** under the message box and pick the program. **Model** beside it picks its model; the one marked "default" is fine to start with.
 4. Press **Folder** and pick where the agent works:
-   - one of the folders you used last, or another one: type its name or its path in **Find a folder, or type its path**;
-   - a project, by its name, to work in that project's folder with its documents and guidelines;
+   - a project, under **Projects**, to work in that project's folder with its documents and guidelines;
+   - one of the folders you used last, under **Folders**, or another one: **Browse** your folders, or type a folder's name or path in **Find a project or folder, or type a path**;
    - **New task folder**, for a fresh folder named after your task (in `~/Hydor` unless you change it in [Settings → Capabilities → Your agents](/settings?s=assistants&find=Task%20folders)).
 
    Most agents start in a new task folder unless you pick a folder; Coder works in the folder you pick.

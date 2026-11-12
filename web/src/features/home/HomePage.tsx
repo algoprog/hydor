@@ -66,6 +66,9 @@ function fromLink(search: string): { prompt?: string; agent?: Agent; model?: str
 const PICKS = new Set(['assistant', 'connections', 'memory', 'capUsd', 'space', 'confidential']);
 const ownOptions = (x: SessionExtra): SessionExtra => Object.fromEntries(Object.entries(x).filter(([k]) => !PICKS.has(k)));
 
+/** The same folder, however its end is written. */
+const sameDir = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
+
 /** The folder picked last, as one value: its path, a new task folder, the space. */
 const folderOf = (s: StartSettings) => JSON.stringify([s.cwd ?? null, s.task ?? null, s.space ?? null]);
 
@@ -117,6 +120,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   // An ACP agent (Settings → More agents) when agent is 'acp'.
   const [acpId, setAcpId] = useState<string | null>(first.acp);
   const acpList = useApp((s) => s.boot?.acpAgents);
+  const home = useApp((s) => s.boot?.home) ?? '';
   const cat = useCatalog(agent, acpId ?? undefined);
   const [cwd, setCwd] = useState(() => linkCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
   // Settings for the new session from the capabilities' start options (an assistant, memory off…).
@@ -141,6 +145,13 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const [taskPick, setTaskPick] = useState<boolean | null>(() => (linkCwd ? false : (saved.task ?? null)));
   const folderPicked = useRef(!!linkCwd);
   const task = useTaskFolder(typeof extra.assistant === 'string' ? extra.assistant : undefined, taskPick);
+  // A project's own folder is the project: picked as a folder (before the folder menu showed it only as the project, or
+  // by a link's ?cwd=), the session starts in the project. Its agent stays as picked.
+  useEffect(() => {
+    if (!spaces || extra.space || task || !cwd) return;
+    const own = spaces.find((s) => sameDir(s.folder, cwd));
+    if (own) setExtra((x) => ({ ...x, space: own.id }));
+  }, [spaces, extra.space, task, cwd]);
   const [text, setText] = useState(() => (draft ? draft.text : (link?.prompt ?? '')));
   const [model, setModel] = useState<string | null>(null);
   const [effort, setEffort] = useState<string | null>(null);
@@ -531,18 +542,21 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
                   saveStart({ task: true, space: null });
                 }}
                 space={space}
-                spaces={spaces ?? []}
+                spaces={spaces}
                 onSpace={pickSpace}
                 onNewSpace={() => setNewSpace(true)}
               >
                 {!task && repo && (
                   <label
                     title={`A branch and folder of its own, from ${repo.branch}`}
-                    className="flex h-8.5 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 hover:bg-bg-2 max-sm:h-11"
+                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 hover:bg-bg-2 max-sm:py-2.5"
                   >
                     <GitBranch size={15} className="shrink-0 text-fg-3" />
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] text-fg">
-                      New worktree <span className="text-[12px] text-fg-3">from {repo.branch}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px] text-fg">
+                        New worktree <span className="text-[12px] text-fg-3">from {repo.branch}</span>
+                      </span>
+                      <span className="block truncate text-[11.5px] text-fg-3">{`A new branch, in a copy of ${folderName(repo.repo, home)}`}</span>
                     </span>
                     <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
                   </label>

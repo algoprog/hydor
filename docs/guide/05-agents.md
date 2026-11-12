@@ -397,8 +397,8 @@ How the name is made:
 
 Open the folder chip on the start page:
 
-- **New task folder** ("in ~/Hydor") makes a fresh folder for each session.
-- Pick a project, a folder you used lately, or any folder you find by typing its name or path, and the session works there instead (see [Projects](/guide/projects) and [Sessions](/guide/sessions)).
+- **New task folder** ("a fresh one in ~/Hydor") makes a fresh folder for each session.
+- Pick a project, a folder you used lately, or any folder you find with **Browse** or by typing its name or path, and the session works there instead (see [Projects](/guide/projects) and [Sessions](/guide/sessions)).
 
 Until you choose, the agent decides: the built-ins other than Coder, and your own set to "A new task folder", use a task folder; Coder and agents set to "The folder on the start page" use the folder shown, and an agent that works in one project uses that project. The start page remembers what you chose. Picking another agent hands the choice back to it, unless you picked a folder since the page opened.
 

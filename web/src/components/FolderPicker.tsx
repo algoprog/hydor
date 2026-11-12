@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
-import { Check, ChevronDown, ChevronRight, Folder, FolderOpen, History, House, Search } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
+import { Check, ChevronDown, ChevronRight, CornerLeftUp, Folder, FolderOpen, History, House, Plus, Search, X } from 'lucide-react';
 import type { DirEntry } from '@shared/types';
 import { api } from '../lib/api';
 import { basename, dirname, isWinPath, joinPath, tildify } from '../lib/format';
@@ -32,6 +32,9 @@ export function useRecentFolders(when: boolean): string[] | null {
   return dirs;
 }
 
+/** A folder's path without a separator at its end (the root's kept), to tell two ways of writing it apart. */
+const bare = (p: string) => (p.length > 1 && !/^[A-Za-z]:[\\/]$/.test(p) ? p.replace(/[\\/]+$/, '') : p);
+
 // The folders in each folder listed so far (null: no such folder), by listKey: shown at once while asked again.
 const listed = new Map<string, string[] | null>();
 const listKey = (path: string, hidden: boolean) => `${hidden ? 1 : 0}${path}`;
@@ -60,7 +63,7 @@ function useSubfolders(path: string | null, hidden: boolean): string[] | null | 
   return listed.has(key) ? listed.get(key) : undefined;
 }
 
-/** A row of a folder menu: a folder, or another choice (a new task folder). */
+/** A row of a folder menu: a folder, or another choice (a project, a new task folder). */
 export interface FolderChoice {
   key: string;
   icon: ReactNode;
@@ -73,15 +76,43 @@ export interface FolderChoice {
   pick: () => void;
   /** A folder: Tab, or the arrow at its end, lists the folders inside it. */
   path?: string;
+  /** The folder it stands for (a project's own): that folder isn't listed again, and found by its name or path it shows as this row. */
+  owns?: string;
 }
 
+/** The headings over a folder menu's two lists while nothing is typed: `lead`'s, then the folders' (with Browse). */
+export interface FolderGroups {
+  /** The heading over `lead` ("Projects"). */
+  lead: string;
+  /** A button at its end that makes a new one ("New"), and its tooltip. */
+  onNew?: () => void;
+  newTitle?: string;
+  /** Said under it while `lead` is empty (null: nothing yet, as while it loads). */
+  empty?: string | null;
+}
+
+/** A heading in a folder menu, with its button at the end. */
+function GroupHead({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="flex min-h-7 items-center justify-between gap-2 pt-1 pr-0.5 pl-2.5 text-[11.5px] font-medium text-fg-3">
+      <span>{title}</span>
+      {children}
+    </div>
+  );
+}
+const headBtn =
+  'inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11.5px] font-medium text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg max-sm:h-8 max-sm:px-2 max-sm:text-[13px]';
+const fieldBtn = 'flex size-6.5 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg max-sm:size-9';
+
 /**
- * The inside of a folder menu: a field over `lead` (the spaces), the folder in use, the ones used last and
- * `more` (a new task folder). A name finds those of `lead` it names, and folders among those used lately,
- * in the folder in use and in the home folder; a
- * path (~/code/, or code/ from home) lists the folders there. Either way they take the list's place, so
- * nothing opens over the menu. ↑ ↓ and Enter pick; Tab, or the arrow at a row's end, lists the folders
- * inside one. `footer` ends the menu while nothing is typed.
+ * The inside of a folder menu: a field over `lead` (projects, pinned folders), the folder in use, the ones used last
+ * and `more` (a new task folder). A name finds those of `lead` it names, and folders among those used lately, in the
+ * folder in use and in the home folder; a path (~/code/, or code/ from home) lists the folders there. Either way they
+ * take the list's place, so nothing opens over the menu. ↑ ↓ and Enter pick; Tab, or the arrow at a row's end, lists
+ * the folders inside one; the field's arrow goes up a folder, its cross (or Escape) back to the lists. `footer` ends the
+ * menu while nothing is typed. With `groups`, `lead` and the folders used last show under headings, the folders' with
+ * Browse (the home folder's folders, as a path lists them). With `fit`, the menu shows fewer of the folders used last,
+ * then of `lead`, until it is no taller than that, and "N more" brings the rest of `lead` back.
  */
 export function FolderFinder({
   value,
@@ -91,18 +122,28 @@ export function FolderFinder({
   more = [],
   footer,
   recent: count = 3,
+  leadCount = count,
+  groups,
+  fit,
+  placeholder = 'Find a folder, or type its path',
   anchor,
 }: {
   /** The folder in use, checked; null when it is none of them (a new task folder). */
   value: string | null;
   onPick: (path: string) => void;
   autoFocus?: boolean;
-  /** Choices before the folders (the spaces), found by their names too. */
+  /** Choices before the folders (projects, pinned folders), found by their names too. */
   lead?: FolderChoice[];
   more?: FolderChoice[];
   footer?: ReactNode;
   /** How many of the folders used last show while nothing is typed. */
   recent?: number;
+  /** How many of `lead` show while nothing is typed (the one in use besides). */
+  leadCount?: number;
+  groups?: FolderGroups;
+  /** The most the menu may be tall (CSS pixels), its field and footer in: it shows fewer to fit, rather than scroll. */
+  fit?: number;
+  placeholder?: string;
   /** What the menu opened from: over it, the menu keeps its height while something is typed. */
   anchor?: RefObject<HTMLElement | null>;
 }) {
@@ -117,6 +158,8 @@ export function FolderFinder({
   // A menu over its chip, or a sheet from the bottom, grows and shrinks at the top, where the field is: so
   // while something is typed it keeps the height it had, and the matches scroll in it.
   const [fixed, setFixed] = useState(0);
+  // How many of `lead` and of the folders used last show while nothing is typed: fewer to fit, all of `lead` once asked.
+  const [shown, setShown] = useState({ lead: leadCount, folders: count, all: false });
   // A name is looked for in these two: listed now, its first letter finds them at once.
   useEffect(() => {
     void listFolders(home, false);
@@ -165,41 +208,80 @@ export function FolderFinder({
     add(inBase, byName);
   }
   found.sort((a, b) => a.r - b.r || a.i - b.i);
+  // The folder a path names, listed first: it has no arrow, as the folders in it are the ones listed.
+  const named = (p: string) => asPath && !part && p === base;
   const folder = (p: string): FolderChoice => {
     const up = dirname(p);
     return {
       key: p,
       icon: p === home ? <House size={15} /> : <Folder size={15} />,
       name: folderName(p, home),
-      // Where it is, unless that goes without saying: in home, or in the folder whose path is typed.
-      where: p === home || p === '/' || up === home || (asPath && up === base) ? '' : tildify(up, home),
+      // Where it is, unless that goes without saying: the home folder itself, or the folder whose path is typed.
+      where: p === home || p === '/' || (asPath && up === base) ? '' : tildify(up, home),
       title: tildify(p, home),
       on: p === value,
       pick: () => onPick(p),
-      path: p,
+      path: named(p) ? undefined : p,
     };
   };
-  const last = recent.slice(0, count);
+  // The folders `lead` stands for (a project's own): never listed as folders, and found as their row of `lead`.
+  const owner = new Map<string, FolderChoice>();
+  for (const c of lead) if (c.owns) owner.set(bare(c.owns), c);
+  const free = (p: string) => !owner.has(bare(p));
+  const last = recent.filter(free).slice(0, shown.folders);
   // The folder in use leads while nothing is typed, when it is not among the last used.
-  const folders = text ? found.slice(0, asPath ? 200 : 8).map((f) => f.p) : [...(value && !last.includes(value) ? [value] : []), ...last];
-  // As many of `lead` as of the folders used last (the one in use among them), the rest found by name.
-  const leadRows = text ? lead.filter((c) => c.name.toLowerCase().includes(text.toLowerCase())) : lead.filter((c, i) => i < count || c.on);
-  // A folder shown among `lead` (a space's, a pinned one) isn't listed again.
+  const folders = text ? found.slice(0, asPath ? 200 : 8).map((f) => f.p) : [...(value && free(value) && !last.includes(value) ? [value] : []), ...last];
+  // As many of `lead` as asked (the one in use among them), the rest found by name.
+  const leadRows = text ? lead.filter((c) => c.name.toLowerCase().includes(text.toLowerCase())) : lead.filter((c, i) => shown.all || i < shown.lead || c.on);
+  const hiddenLead = text ? 0 : lead.length - leadRows.length;
+  // A folder shown among `lead` (a pinned one) isn't listed again; one `lead` stands for shows as that row, once.
   const inLead = new Set(leadRows.map((c) => c.path).filter(Boolean));
-  const folderRows = folders.filter((p) => !inLead.has(p)).map(folder);
+  const leadKeys = new Set(leadRows.map((c) => c.key));
+  const folderRows: FolderChoice[] = [];
+  for (const p of folders) {
+    if (inLead.has(p)) continue;
+    const o = owner.get(bare(p));
+    if (!o) folderRows.push(folder(p));
+    else if (!leadKeys.has(o.key)) {
+      leadKeys.add(o.key);
+      folderRows.push({ ...o, path: named(p) ? undefined : p });
+    }
+  }
   const rows = text ? [...leadRows, ...folderRows] : [...leadRows, ...folderRows, ...more];
-  // A line between the spaces and the folders, and between the folders and a new task folder.
-  const seps = new Set(text ? [] : [leadRows.length, leadRows.length + folderRows.length].filter((i) => i > 0 && i < rows.length));
   const hi = Math.min(sel ?? (text ? 0 : rows.findIndex((r) => r.on)), rows.length - 1);
 
   useEffect(() => {
     list.current?.querySelector('[data-hi]')?.scrollIntoView({ block: 'nearest' });
   }, [hi, text]);
 
-  const inside = (p: string) => {
-    setQ(tildify(p, home).replace(/\/?$/, '/'));
+  // Too tall for its room: one folder used last fewer (down to one), then one of `lead` (down to two), until it fits.
+  useLayoutEffect(() => {
+    const h = root.current?.offsetHeight ?? 0;
+    if (!fit || text || shown.all || h <= fit) return;
+    if (shown.folders > 1 && last.length > 1) setShown((s) => ({ ...s, folders: Math.min(s.folders, last.length) - 1 }));
+    else if (shown.lead > 2 && leadRows.length > 2) setShown((s) => ({ ...s, lead: Math.min(s.lead, leadRows.length) - 1 }));
+  });
+
+  // Something about to be typed (or a path put in the field): the menu keeps its height, so the field stays where it is.
+  const hold = () => {
+    const el = root.current;
+    if (q || !el) return;
+    const a = anchor?.current?.getBoundingClientRect();
+    const growsUp = sheet || (!!a && el.getBoundingClientRect().top < a.top);
+    // Below its chip a fitted menu grows down to show more, as far as its room goes.
+    setFixed(growsUp ? el.offsetHeight : fit ? Math.max(el.offsetHeight, Math.min(fit, 360)) : 0);
+  };
+  const show = (path: string) => {
+    hold();
+    setQ(tildify(path, home).replace(/[\\/]?$/, isWinPath(path) ? '\\' : '/'));
     setSel(null);
-    input.current?.focus();
+    // On a phone the keyboard would cover the list.
+    if (!sheet) input.current?.focus();
+  };
+  const clear = () => {
+    setQ('');
+    setSel(null);
+    if (!sheet) input.current?.focus();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -212,9 +294,49 @@ export function FolderFinder({
       rows[hi]?.pick();
     } else if (e.key === 'Tab' && !e.shiftKey && (text || sel !== null) && rows[hi]?.path) {
       e.preventDefault();
-      inside(rows[hi].path!);
+      show(rows[hi].path!);
+    } else if (e.key === 'Escape' && q) {
+      // Back to the lists; the next Escape closes the menu.
+      e.preventDefault();
+      e.stopPropagation();
+      clear();
     }
   };
+
+  const row = (r: FolderChoice, i: number) => (
+    <div key={r.key} data-hi={i === hi || undefined} onMouseMove={() => i !== hi && setSel(i)} className={cx('group flex items-center rounded-lg', i === hi && 'bg-bg-2')}>
+      <button type="button" onClick={r.pick} title={r.title} className="flex h-8 min-w-0 flex-1 items-center gap-2.5 pr-1 pl-2.5 text-left max-sm:h-11">
+        <span className="flex shrink-0 text-fg-3">{r.icon}</span>
+        <span className="max-w-[70%] shrink-0 truncate text-[13.5px] text-fg max-sm:text-[14.5px]">{r.name}</span>
+        <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{r.where}</span>
+        {r.on && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+      </button>
+      {r.path && (
+        <button
+          type="button"
+          tabIndex={-1}
+          title="The folders in it"
+          aria-label={`The folders in ${r.name}`}
+          onClick={() => show(r.path!)}
+          className={cx(
+            'mr-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg max-sm:size-10',
+            // Listing a folder's folders, each shows its way in; elsewhere the one pointed at does.
+            i === hi ? 'opacity-100' : asPath ? 'opacity-50 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100',
+            // A touch screen shows the arrows among matches; on the folders used last they would read as the row's own tap.
+            text ? 'pointer-coarse:opacity-100' : 'pointer-coarse:hidden',
+          )}
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
+    </div>
+  );
+  // Rows in order, numbered as ↑ ↓ move through them.
+  let n = 0;
+  const block = (rs: FolderChoice[]) => rs.map((r) => row(r, n++));
+  const note = (t: string) => <div className="px-2.5 pt-0.5 pb-1.5 text-[12px] text-fg-3">{t}</div>;
+  const shownRows = leadRows.length + folderRows.length;
+  const up = asPath && dirname(base) !== base ? dirname(base) : null;
 
   const held = !!text && fixed > 0;
   return (
@@ -226,9 +348,7 @@ export function FolderFinder({
           autoFocus={autoFocus}
           value={q}
           onChange={(e) => {
-            const el = root.current;
-            const a = anchor?.current?.getBoundingClientRect();
-            if (!q && el) setFixed(sheet || (a && el.getBoundingClientRect().top < a.top) ? el.offsetHeight : 0);
+            hold();
             setQ(e.target.value);
             setSel(null);
           }}
@@ -238,46 +358,69 @@ export function FolderFinder({
           autoCorrect="off"
           autoComplete="off"
           enterKeyHint="go"
-          aria-label="Find a folder, or type its path"
-          placeholder="Find a folder, or type its path"
-          className="h-8.5 w-full rounded-lg bg-bg-2 pr-2.5 pl-8 text-[13px] outline-none placeholder:text-fg-3 max-sm:h-11 max-sm:text-[15px]"
+          aria-label={placeholder}
+          placeholder={placeholder}
+          className={cx(
+            'h-8.5 w-full rounded-lg bg-bg-2 pl-8 text-[13px] outline-none placeholder:text-fg-3 max-sm:h-11 max-sm:text-[15px]',
+            !text ? 'pr-2.5' : up ? 'pr-16 max-sm:pr-21' : 'pr-9 max-sm:pr-11',
+          )}
         />
-      </div>
-      <div ref={list} className={cx('overflow-y-auto overscroll-contain', held ? 'min-h-0 flex-1' : 'max-h-[min(50dvh,300px)]')}>
-        {rows.map((r, i) => (
-          <Fragment key={r.key}>
-            {seps.has(i) && <MenuSep />}
-            <div
-              data-hi={i === hi || undefined}
-              onMouseMove={() => i !== hi && setSel(i)}
-              className={cx('group flex items-center rounded-lg', i === hi && 'bg-bg-2')}
-            >
-              <button type="button" onClick={r.pick} title={r.title} className="flex h-8 min-w-0 flex-1 items-center gap-2.5 pr-1 pl-2.5 text-left max-sm:h-11">
-                <span className="flex shrink-0 text-fg-3">{r.icon}</span>
-                <span className="max-w-[70%] shrink-0 truncate text-[13.5px] text-fg max-sm:text-[14.5px]">{r.name}</span>
-                <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{r.where}</span>
-                {r.on && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
+        {text && (
+          <div className="absolute inset-y-0 right-1 flex items-center gap-0.5">
+            {up && (
+              <button type="button" title="Up a folder" aria-label="Up a folder" onClick={() => show(up)} className={fieldBtn}>
+                <CornerLeftUp size={14} />
               </button>
-              {r.path && (
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  title="The folders in it"
-                  aria-label={`The folders in ${r.name}`}
-                  onClick={() => inside(r.path!)}
-                  className={cx(
-                    'mr-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg max-sm:size-10',
-                    i === hi ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-                    // A touch screen shows the arrows among matches; on the folders used last they would read as the row's own tap.
-                    text ? 'pointer-coarse:opacity-100' : 'pointer-coarse:hidden',
-                  )}
-                >
-                  <ChevronRight size={14} />
+            )}
+            <button type="button" title="Clear" aria-label="Clear" onClick={clear} className={fieldBtn}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div ref={list} className={cx('overflow-y-auto overscroll-contain', held ? 'min-h-0 flex-1' : !fit && 'max-h-[min(50dvh,300px)]')}>
+        {text ? (
+          block(rows)
+        ) : (
+          <>
+            {groups && (
+              <GroupHead title={groups.lead}>
+                {groups.onNew && (
+                  <button type="button" onClick={groups.onNew} title={groups.newTitle} className={headBtn}>
+                    <Plus size={12} strokeWidth={2.4} />
+                    New
+                  </button>
+                )}
+              </GroupHead>
+            )}
+            {block(leadRows)}
+            {hiddenLead > 0 && (
+              <button
+                type="button"
+                onClick={() => setShown((s) => ({ ...s, all: true }))}
+                className="flex h-8 w-full items-center gap-2.5 rounded-lg pl-2.5 text-left text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg max-sm:h-11 max-sm:text-[13.5px]"
+              >
+                <ChevronDown size={15} className="shrink-0" />
+                {`${hiddenLead} more`}
+              </button>
+            )}
+            {groups && !lead.length && groups.empty && note(groups.empty)}
+            {groups ? (
+              <GroupHead title="Folders">
+                <button type="button" onClick={() => show(home)} title="The folders in your home folder" className={headBtn}>
+                  Browse
+                  <ChevronRight size={12} strokeWidth={2.4} />
                 </button>
-              )}
-            </div>
-          </Fragment>
-        ))}
+              </GroupHead>
+            ) : (
+              leadRows.length > 0 && folderRows.length > 0 && <MenuSep />
+            )}
+            {block(folderRows)}
+            {groups && !folderRows.length && note('None yet: browse, or type a path above')}
+            {more.length > 0 && (shownRows > 0 || groups) && <MenuSep />}
+            {block(more)}
+          </>
+        )}
         {text && !loading && !rows.length && <div className="px-2.5 py-2 text-[12.5px] text-fg-3">{asPath && inBase === null ? 'No folder there' : 'No folder by that name'}</div>}
       </div>
       {!text && footer && (

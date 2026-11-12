@@ -29,20 +29,23 @@ At the bottom, **Models for Custom** opens [Settings → Models](/settings?s=mod
 
 ### Pick a folder, a project or a new task folder
 
-The **Folder** chip says where the agent works. Its menu ("Project or folder to work in") has a field, **Find a folder, or type its path**, over a short list:
+The **Folder** chip says where the agent works. Its menu ("Project or folder to work in") has a field, **Find a project or folder, or type a path**, over two short lists, each row with where it is:
 
-- your projects, by name (the three used last, and the one picked). Picking a project sets the folder to the project's own, its agent, and its guidelines for the session; the chip then reads **Project** and shows the project's name. A group of projects works the same way, with all its projects. See [Projects and knowledge](/guide/projects) and [Agent Guidelines](/guide/guidelines).
-- the folder in use and the three folders you picked last;
-- **New task folder**: a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Hydor` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Your agents);
-- **New project**: makes a project (sessions, files and memory together) and picks it.
+- **Projects**: your projects by name, the five at work most recently (and the one picked), each with its folder. Picking one sets the folder to the project's own, its agent, and its guidelines for the session; the chip then reads **Project** and shows the project's name. A group of projects works the same way, with all its projects. **New**, at the end of the heading, makes a project (sessions, files and memory together) and picks it. See [Projects and knowledge](/guide/projects) and [Agent Guidelines](/guide/guidelines).
+- **Folders**: the folder in use and the three folders you picked last, each with the folder it is in. **Browse**, at the end of the heading, lists the folders in your home folder.
+- **New task folder** ("a fresh one in ~/Hydor"): a fresh folder for this task, named by the day and a few words of your message (such as `2026-11-01-plan-trip-lisbon`), in `~/Hydor` unless you set another place in [Task folders](/settings?s=assistants&find=Task%20folders) (Settings → Capabilities → Your agents).
+
+A project's own folder is the project: the menu lists it only as the project, and a session started in it works in the project, even when the start page had the folder picked rather than the project.
+
+The menu opens above or below the chip, wherever there is more room, and fits without scrolling: in a small window it shows fewer folders, then fewer projects, and a line such as "2 more" under the projects brings back the rest.
 
 Type in the field to find more:
 
-- A name finds matching projects, and folders among those you used lately, in the folder in use and in your home folder.
-- A path (`~/code/`, or `code/` from your home folder) lists the folders there.
+- A name finds matching projects, and folders among those you used lately, in the folder in use and in your home folder. A project's folder, found by its name, shows as the project.
+- A path (`~/code/`, or `code/` from your home folder) lists the folders there, as **Browse** does. The arrow at the end of the field goes up a folder; the cross, or Escape, goes back to the lists.
 - ↑ ↓ and Enter pick. Tab, or the arrow at the end of a row, lists the folders inside it.
 
-When the folder is in a git repository (and you have not chosen a new task folder), the menu ends with a switch: **New worktree from main** (or whichever branch is checked out). With it on, the session works in a copy of its own on a new branch; the chip reads "· new worktree". See [Work in a worktree](#work-in-a-worktree).
+When the folder is in a git repository (and you have not chosen a new task folder), the menu ends with a switch: **New worktree from main** (or whichever branch is checked out), "A new branch, in a copy of" the repository. With it on, the session works in a copy of its own on a new branch; the chip reads "· new worktree". See [Work in a worktree](#work-in-a-worktree).
 
 Whether a session gets a new task folder by default depends on the agent: most start in one unless you pick a folder; Coder works in the folder you pick, and an agent of one project in that project.
 
