@@ -116,10 +116,10 @@ const GB = (mb?: number | null) => (mb ? String(mb / 1024) : null);
 export const settingsAddress = (r: Pick<Row, 'section' | 'label'>) => `/settings?s=${r.section}&find=${encodeURIComponent(r.label)}`;
 
 // ---- App › General ----------------------------------------------------------------------------------------------------
-row('general', 'Appearance', 'device', { device: { key: 'theme' }, note: 'Dark, light or following the device, or a theme of your own: kept in each browser, so set it in the app on that device.' });
+row('general', 'Appearance', 'device', { device: { key: 'theme' }, note: 'Dark, light or following the device, or a theme of your own.' });
 row('general', 'New theme', 'page', { note: 'The theme editor is a page.' });
 row('general', 'Import', 'page', { note: 'Importing a theme file is done on the page.' });
-row('general', 'Language', 'device', { device: { key: 'language' }, note: 'The language the app is shown in is kept in each browser, so set it in the app on that device.' });
+row('general', 'Language', 'device', { device: { key: 'language' }, note: 'The language the app is shown in.' });
 row('general', 'Sending while an agent works', 'device', {
   device: { key: 'enter', terminal: true },
   choices: [
@@ -190,8 +190,8 @@ row('general', 'Check now', 'action', {
 });
 
 // ---- App › Notifications ----------------------------------------------------------------------------------------------
-row('notifications', 'Notify this device', 'device', { device: { key: 'push' }, note: 'Each device turns notices on for itself (a browser or a phone), so turn it on in the app on that device.' });
-row('notifications', 'Sound', 'device', { device: { key: 'sound' }, note: 'The chime is kept in each browser, so set it in the app on that device.' });
+row('notifications', 'Notify this device', 'device', { device: { key: 'push' }, note: 'Each device turns notices on for itself (a browser or a phone).' });
+row('notifications', 'Sound', 'device', { device: { key: 'sound' }, note: 'A chime with each notice while the app is open.' });
 row('notifications', 'Send a test', 'action', {
   act: {
     run: async (api) => {
@@ -271,7 +271,7 @@ row('chat', 'Notices from every session', 'switch', {
 
 // ---- App › Password, Signatures, Source control, Connect other agents, Machines -----------------------------------------
 row('security', 'Change password', 'command', { command: 'hydor set-password', note: 'Changing it signs out every other browser.' });
-row('security', 'Sign out of this browser', 'device', { device: { key: 'signout' }, note: 'It signs out one browser, so do it in the app on that device.' });
+row('security', 'Sign out of this browser', 'device', { device: { key: 'signout' }, note: 'It signs out one browser.' });
 row('signatures', 'New signature', 'page', { note: 'Drawing, typing or uploading a signature happens on the page.' });
 row('scm', 'Add an account', 'page', { note: 'A token goes into the page’s form (GitHub and Gitea accounts).' });
 row('connect', 'New token', 'action', {
@@ -643,8 +643,8 @@ row('images', 'Captions in the Library', 'choice', {
   write: put('/api/media/settings', (v) => ({ captions: { provider: v } })),
   note: 'Where the model that writes the captions runs; its model is picked on the page (the first one it offers is used until then).',
 });
-row('voice', 'Dictation', 'device', { device: { key: 'dictation' }, note: 'Dictation uses a browser’s microphone, so it is set in the app on that device.' });
-row('voice', 'Language you speak', 'device', { device: { key: 'speech-language' }, note: 'Kept in each browser, so set it in the app on that device.' });
+row('voice', 'Dictation', 'device', { device: { key: 'dictation' }, note: 'Dictation uses a browser’s microphone.' });
+row('voice', 'Language you speak', 'device', { device: { key: 'speech-language' }, note: 'The language dictation listens for.' });
 row('voice', 'Speech recognition on the server', 'choice', {
   choices: [
     { value: 'off', label: 'Off' },
@@ -655,7 +655,7 @@ row('voice', 'Speech recognition on the server', 'choice', {
   write: put('/api/voice', (v) => ({ engine: v })),
   note: 'On this machine downloads whisper.cpp and a model; a service needs its address first, which is set on the page.',
 });
-row('voice', 'Read aloud', 'device', { device: { key: 'read-aloud' }, note: 'Each browser keeps its own voice and speed, so set it in the app on that device.' });
+row('voice', 'Read aloud', 'device', { device: { key: 'read-aloud' }, note: 'Each browser keeps its own voice and speed.' });
 row('assistants', 'Your agents', 'command', { command: 'hydor agents' });
 row('assistants', 'Clean up after a task', 'switch', { read: rd('/api/assistants', 'cleanUp'), write: put('/api/assistants/settings', (v) => ({ cleanUp: v })) });
 row('assistants', 'Task folders', 'text', {
