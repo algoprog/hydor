@@ -381,6 +381,11 @@ export class SessionManager extends EventEmitter {
         runner.cleanup();
         continue;
       }
+      // Idle since the agent's last output, not since this server started (connect() replays the output, which
+      // touches it): restarted more often than IDLE_STOP_HOURS (17 times on 11 November 2026), the server never
+      // stopped an idle agent, and 42 of them were left running with 11 GB.
+      const last = runner.lastOutputAt();
+      if (last !== null) adapter.lastActivity = Math.min(adapter.lastActivity, last);
       this.attach({ key: k, agent: meta.agent, cwd: meta.cwd, adapter, runner, account: opts.account || undefined, apiCredit: !!opts.apiCredit || undefined });
       if (adapter instanceof AcpLive) adapter.restored();
       console.log(`[restore] reattached ${k} (${adapter.state.status})`);

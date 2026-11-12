@@ -136,6 +136,23 @@ export class Runner extends EventEmitter {
     return this.readJson<{ runnerPid: number }>('state.json')?.runnerPid ?? null;
   }
 
+  /**
+   * When the agent last printed anything: the last change of its logs, which outlive this server process.
+   * Null when it has printed nothing yet.
+   */
+  lastOutputAt(): number | null {
+    let last: number | null = null;
+    for (const name of ['out.log', 'err.log']) {
+      try {
+        const at = fs.statSync(path.join(this.dir, name)).mtimeMs;
+        if (last === null || at > last) last = at;
+      } catch {
+        // not written yet
+      }
+    }
+    return last;
+  }
+
   /** True while the runner process (and so the agent) is still running. */
   isAlive(): boolean {
     if (this.exit || fs.existsSync(path.join(this.dir, 'exit.json'))) return false;
