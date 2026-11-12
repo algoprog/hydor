@@ -36,7 +36,7 @@ export async function tuiCommand(argv: string[]): Promise<number> {
   } catch (e) {
     const message = (e as Error).message;
     fail(message, argv.includes('--no-color'));
-    if (!message.includes('Did you mean') && !message.includes('To send it') && !message.includes('shows what it takes')) process.stderr.write(`\n${USAGE}\n`);
+    if (!message.includes('Did you mean') && !message.includes('To send this') && !message.includes('shows what it takes')) process.stderr.write(`\n${USAGE}\n`);
     return 2;
   }
   if (o.help) {

@@ -72,6 +72,9 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
       }
       return edit(current, ext);
     },
+    open(url) {
+      void import('../commands.ts').then((m) => m.openBrowser(url));
+    },
     async pick(title, items) {
       const { pickInTerminal } = await import('../picker.ts');
       return pickInTerminal(title, items, look.p);

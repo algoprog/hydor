@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import WebSocket from 'ws';
 import type { ClientEvent, ServerEvent } from '../../shared/types.ts';
-import { UsageError } from './args.ts';
+import { UsageError } from './areas/kit.ts';
 
 export class ApiError extends Error {
   constructor(
