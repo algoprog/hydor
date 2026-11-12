@@ -757,7 +757,7 @@ export function saveResult(id: string, value: Record<string, unknown>) {
 
 // ---- progress -------------------------------------------------------------------------------------
 
-const VERB: Record<string, string> = { command: 'Ran', edit: 'Changed', read: 'Read', search: 'Searched', web: 'Looked up', todo: 'Planned', message: 'Messaged', agent: 'Asked a helper' };
+const VERB: Record<string, string> = { command: 'Ran', edit: 'Changed', read: 'Read', search: 'Searched', web: 'Looked up', todo: 'Planned', message: 'Messaged', agent: 'Asked a subagent' };
 
 /** A step as one line: the app's own tools by what they do, others by their kind and title. */
 export function stepTitle(t: { name: string; category?: string; title: string; label?: string }, publicView = false): string {

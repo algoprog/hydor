@@ -1,6 +1,6 @@
-// The work tray: everything this session started (its child sessions, and its background tasks: subagents, commands,
-// monitors) in one place at the bottom of the session, directly above the message box. Folded to one line by default
-// (what runs, who needs you, Stop all); opened, a row for each in the one look (WorkRow). A task opens in a panel, a child session as a session.
+// The work tray: everything this session started (its Hydor subagents, and its background tasks: its program's own
+// subagents, commands, monitors) in one place at the bottom of the session, directly above the message box. Folded to one line by default
+// (what runs, who needs you, Stop all); opened, a row for each in the one look (WorkRow). A task opens in a panel, a Hydor subagent as a session.
 import { useId, useMemo, useState } from 'react';
 import { ChevronRight, ListTree } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
@@ -9,7 +9,8 @@ import { cx } from '../../components/ui';
 import { openSession } from '../../lib/nav';
 import { useLive, useSessions } from '../../lib/store';
 import { childrenOf, needsLine, workItems, workSummary, type WorkItem } from '../../lib/work';
-import { ChildIcon, ChildStatus, childKindLine, stopEverything, TaskItem, WorkRow } from './WorkRow';
+import { ChildIcon, ChildStatus, childKindLine, HYDOR_SUBAGENT_HINT, stopEverything, TaskItem, WorkRow } from './WorkRow';
+import { agentName } from '../../components/AgentIcon';
 import { useTaskPanel } from './TaskLog';
 
 function ChildItem({ item }: { item: Extract<WorkItem, { type: 'child' }> }) {
@@ -21,12 +22,12 @@ function ChildItem({ item }: { item: Extract<WorkItem, { type: 'child' }> }) {
     <WorkRow
       icon={<ChildIcon s={s} agent={s.agent} />}
       title={s.title}
-      kind={<span>{childKindLine(s, s.model ? modelLabel(cat, s.model) : undefined)}</span>}
+      kind={<span title={HYDOR_SUBAGENT_HINT}>{childKindLine(s, s.model ? modelLabel(cat, s.model) : undefined)}</span>}
       status={<ChildStatus s={s} state={item.state} />}
       cost={s.stats?.costUsd}
       onOpen={() => openSession(s.key)}
       onStop={live ? () => void stopEverything(s.key) : undefined}
-      stopLabel="Stop this helper session"
+      stopLabel="Stop this subagent"
     />
   );
 }
@@ -46,10 +47,11 @@ export function WorkTray({ s }: { s: SessionSummary }) {
   const panel = useTaskPanel(s.key, here, tasks);
   const [open, setOpen] = useState(false);
   const listId = useId();
+  const program = agentName(s.agent, s.acpName);
   if (!items.length) return null;
   const sum = workSummary(items);
   const going = sum.children + sum.tasks > 0;
-  // Child sessions stop wherever the session is; its own tasks only while it runs here.
+  // Hydor subagents stop wherever the session is; its own tasks only while it runs here.
   const stoppable = sum.children > 0 || (here && sum.tasks > 0);
   return (
     <div className="mb-2 overflow-hidden rounded-2xl border border-line bg-panel">
@@ -82,7 +84,7 @@ export function WorkTray({ s }: { s: SessionSummary }) {
             i.type === 'child' ? (
               <ChildItem key={`c:${i.id}`} item={i} />
             ) : (
-              <TaskItem key={`t:${i.id}`} t={i.t} onOpen={() => panel.open(i.t)} onStop={here && i.state === 'running' ? () => panel.stop(i.t) : undefined} />
+              <TaskItem key={`t:${i.id}`} t={i.t} program={program} onOpen={() => panel.open(i.t)} onStop={here && i.state === 'running' ? () => panel.stop(i.t) : undefined} />
             ),
           )}
         </div>

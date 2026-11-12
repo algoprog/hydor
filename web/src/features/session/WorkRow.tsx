@@ -1,5 +1,5 @@
-// One row for everything a session started: a child session or a background task (a subagent, a command, a monitor, a
-// workflow). The work tray above the message box lists them, and a child's card in the conversation is the same row in
+// One row for everything a session started: a Hydor subagent (a child session) or a background task (its program's own
+// subagent, a command, a monitor, a workflow). The work tray above the message box lists them, and a Hydor subagent's card in the conversation is the same row in
 // a card, so the two look alike: an icon with its status dot, the title (two lines at most), under it what it is, how
 // it stands and what it cost, and on the right a way in and Stop while it runs.
 import type { ReactNode } from 'react';
@@ -53,7 +53,7 @@ export function TaskStatus({ t, className }: { t: BackgroundTask; className?: st
   return <span className={cx('truncate', state === 'done' ? 'text-fg-3' : tone, className)}>{state === 'done' ? (ended ? `Done · ${ended}` : 'Done') : state === 'stopped' ? 'Stopped' : 'Failed'}</span>;
 }
 
-/** How a child session stands: its activity while it works or waits, else "Done · 3 min ago", "Stopped" or "Failed". */
+/** How a Hydor subagent stands: its activity while it works or waits, else "Done · 3 min ago", "Stopped" or "Failed". */
 export function ChildStatus({ s, state }: { s: SessionSummary; state: WorkState }) {
   if (state === 'running' || state === 'needs') return <ActivityText s={s} className="min-w-0" />;
   if (state === 'failed') return <span className="truncate text-err">Failed</span>;
@@ -62,7 +62,7 @@ export function ChildStatus({ s, state }: { s: SessionSummary; state: WorkState 
   return <span className="truncate text-fg-3">{when ? `Done · ${when}` : 'Done'}</span>;
 }
 
-/** A child session's icon: its agent's mark (turning while it works) with its status dot. */
+/** A Hydor subagent's icon: its agent's mark (turning while it works) with its status dot. */
 export function ChildIcon({ s, agent, acpName }: { s?: SessionSummary; agent: SessionSummary['agent']; acpName?: string }) {
   const busy = isBusy(activityOf(s));
   return (
@@ -84,8 +84,20 @@ export function TaskWorkIcon({ t }: { t: BackgroundTask }) {
   );
 }
 
-/** "Helper session · Claude Code · Sonnet 5.5": what a child session is (`model`: its model's name, as the model menu shows it). */
-export const childKindLine = (s: SessionSummary, model?: string) => ['Helper session', agentName(s.agent, s.acpName), model].filter(Boolean).join(' · ');
+/** "Hydor subagent · Claude Code · Sonnet 5.5": what a Hydor subagent (a child session) is (`model`: its model's name, as the model menu shows it). */
+export const childKindLine = (s: SessionSummary, model?: string) => ['Hydor subagent', agentName(s.agent, s.acpName), model].filter(Boolean).join(' · ');
+
+/** What a Hydor subagent's kind says on hover: who runs it. */
+export const HYDOR_SUBAGENT_HINT = 'Hydor started it as a session of its own: open it to watch it or talk to it';
+
+/** What a program's subagent says on hover: who runs it. */
+export const programSubagentHint = (program: string) => `${program} runs it inside this session: open it to see its steps`;
+
+/** A task's kind as text ("Command", "Claude Code subagent"); a subagent's says on hover that its program runs it. */
+export function TaskKindText({ kind, program }: { kind?: string; program?: string }) {
+  const sub = taskKindOf(kind) === 'subagent';
+  return <span title={sub && program ? programSubagentHint(program) : undefined}>{taskKindLabel(kind, program)}</span>;
+}
 
 export function WorkRow({
   icon,
@@ -102,7 +114,7 @@ export function WorkRow({
 }: {
   icon: ReactNode;
   title: string;
-  /** What it is ("Command", "Helper session · Claude Code · model"), and any chip beside it (a tier). */
+  /** What it is ("Command", "Hydor subagent · Claude Code · model"), and any chip beside it (a tier). */
   kind: ReactNode;
   status: ReactNode;
   /** A child's cost, when known (US dollars). */
@@ -148,9 +160,9 @@ export function WorkRow({
 }
 
 /** A background task as a row: it opens in its panel, and stops (asking first) while it runs. */
-export function TaskItem({ t, onOpen, onStop }: { t: BackgroundTask; onOpen: () => void; onStop?: () => void }) {
-  return <WorkRow icon={<TaskWorkIcon t={t} />} title={t.description} kind={<span>{taskKindLabel(t.kind)}</span>} status={<TaskStatus t={t} />} onOpen={onOpen} onStop={onStop} stopLabel="Stop this task" />;
+export function TaskItem({ t, program, onOpen, onStop }: { t: BackgroundTask; /** The session's program ("Claude Code"): who runs a subagent task. */ program?: string; onOpen: () => void; onStop?: () => void }) {
+  return <WorkRow icon={<TaskWorkIcon t={t} />} title={t.description} kind={<TaskKindText kind={t.kind} program={program} />} status={<TaskStatus t={t} />} onOpen={onOpen} onStop={onStop} stopLabel={taskKindOf(t.kind) === 'subagent' ? 'Stop this subagent' : 'Stop this task'} />;
 }
 
-/** Stops a session and everything it started: its turn, its background tasks, and its child sessions, theirs in turn (the server's stop-all). */
+/** Stops a session and everything it started: its turn, its background tasks, and its Hydor subagents, theirs in turn (the server's stop-all). */
 export const stopEverything = (key: string) => post(`/api/sessions/${enc(key)}/stop-all`).catch(toastError);

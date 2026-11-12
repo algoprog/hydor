@@ -5,7 +5,7 @@ export interface BudgetState {
   key: string;
   /** The session's own cap, in US dollars; none when unset. */
   capUsd?: number;
-  /** What counts against the cap, at API prices: the session's own spending and its child sessions'. */
+  /** What counts against the cap, at API prices: the session's own spending and its Hydor subagents'. */
   spentUsd: number;
   ownUsd: number;
   childrenUsd: number;
@@ -13,7 +13,7 @@ export interface BudgetState {
   unpriced?: boolean;
   /** The cap is reached: new messages wait until it is raised or cleared. */
   reached: boolean;
-  /** A child session's parent, whose cap covers it too. */
+  /** A Hydor subagent's parent, whose cap covers it too. */
   parent?: { key: string; title: string; capUsd: number; spentUsd: number; reached: boolean };
 }
 
@@ -21,7 +21,7 @@ export interface BudgetState {
 export interface BudgetNote {
   capUsd: number;
   spentUsd: number;
-  /** It was the parent's cap (this is one of its child sessions). */
+  /** It was the parent's cap (this is one of its Hydor subagents). */
   parent?: { key: string; title: string };
 }
 

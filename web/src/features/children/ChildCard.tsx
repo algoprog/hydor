@@ -1,5 +1,5 @@
-// A child session's card in its parent's conversation, under the turn that started it: the work tray's row (features/session/WorkRow)
-// in a card, so the two places look alike. Its title, what it is (a helper session, or the agent of yours it works as), its program
+// A Hydor subagent's (child session's) card in its parent's conversation, under the turn that started it: the work tray's row (features/session/WorkRow)
+// in a card, so the two places look alike. Its title, what it is (a Hydor subagent, or the agent of yours it works as), its program
 // and model, its tier, how it stands, what it cost, a way in, and Stop while it works; a line under it when it was stepped up.
 import { researchOf } from '@shared/research';
 import type { ChildNote } from '@shared/children';
@@ -8,7 +8,7 @@ import { tierLabel } from '@shared/tiers';
 import { useSessions } from '../../lib/store';
 import { openSession } from '../../lib/nav';
 import { childState } from '../../lib/work';
-import { ChildIcon, ChildStatus, stopEverything, WorkRow } from '../session/WorkRow';
+import { ChildIcon, ChildStatus, HYDOR_SUBAGENT_HINT, stopEverything, WorkRow } from '../session/WorkRow';
 
 export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey: string }) {
   const d = note.data as ChildNote;
@@ -24,7 +24,7 @@ export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey:
       title={s?.title ?? d.title}
       kind={
         <>
-          {d.as ? <span translate="no">{d.as}</span> : <span>{researcher ? 'Researcher' : 'Helper session'}</span>}
+          {d.as ? <span translate="no">{d.as}</span> : <span title={HYDOR_SUBAGENT_HINT}>{researcher ? 'Researcher' : 'Hydor subagent'}</span>}
           <span>·</span>
           <span className="truncate">{d.label}</span>
           {d.tier && (
@@ -45,7 +45,7 @@ export function ChildCard({ note, sessionKey }: { note: SessionNote; sessionKey:
       }
       onOpen={() => openSession(d.child)}
       onStop={live ? () => void stopEverything(d.child) : undefined}
-      stopLabel="Stop this helper session"
+      stopLabel="Stop this subagent"
     />
   );
 }

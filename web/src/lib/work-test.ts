@@ -1,4 +1,4 @@
-// Script test for the work tray's list (work.ts): which child sessions and background tasks it holds, their states, the
+// Script test for the work tray's list (work.ts): which Hydor subagents (child sessions) and background tasks it holds, their states, the
 // order (what needs you, what runs, what ended newest first), the line that sums them up, and what Stop says it stops.
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/lib/work-test.ts && node dist/dev/work-test.js
@@ -56,7 +56,12 @@ test('a task’s state and kind', () => {
   assert.equal(taskState(task('a', 'stopped')), 'stopped');
   assert.equal(taskState(task('a', 'killed')), 'stopped');
   assert.deepEqual(['local_bash', 'local_agent', 'monitor_mcp', 'local_workflow', 'x', undefined].map(taskKindOf), ['command', 'subagent', 'monitor', 'workflow', 'task', 'task']);
-  assert.deepEqual(['local_bash', 'local_agent', 'monitor', 'workflow', 'x'].map(taskKindLabel), ['Command', 'Subagent', 'Monitor', 'Workflow', 'Background task']);
+  assert.deepEqual(['local_bash', 'local_agent', 'monitor', 'workflow', 'x'].map((k) => taskKindLabel(k)), ['Command', 'Subagent', 'Monitor', 'Workflow', 'Background task']);
+  // With the program's name, a subagent task says whose it is; the other kinds do not change.
+  assert.equal(taskKindLabel('local_agent', 'Claude Code'), 'Claude Code subagent');
+  assert.equal(taskKindLabel('local_agent', 'Codex'), 'Codex subagent');
+  assert.equal(taskKindLabel('local_bash', 'Claude Code'), 'Command');
+  assert.equal(taskKindLabel('monitor', 'Codex'), 'Monitor');
 });
 
 test('the order: what needs you, what runs (oldest first), then what ended, newest first, children and tasks together', () => {
@@ -82,28 +87,52 @@ test('a task listed twice is one row, and nothing at all is an empty list', () =
 test('the line that sums it up: what runs, who needs you, or that all is done', () => {
   const kid = (state: 'working' | 'waiting' | 'idle') => ses({ live: live(state) });
   let w = workSummary(workItems([kid('working'), kid('working'), kid('idle')], [task('a', 'running'), task('b', 'completed')]));
-  assert.deepEqual([w.text, w.needs, w.children, w.tasks], ['2 helper sessions and 1 background task running', 0, 2, 1]);
+  assert.deepEqual([w.text, w.needs, w.children, w.tasks], ['2 subagents and 1 background task running', 0, 2, 1]);
   w = workSummary(workItems([kid('waiting')], []));
-  assert.deepEqual([w.text, w.needs], ['1 helper session running', 1]);
+  assert.deepEqual([w.text, w.needs], ['1 subagent running', 1]);
   w = workSummary(workItems([], [task('a', 'running'), task('b', 'running')]));
   assert.equal(w.text, '2 background tasks running');
   w = workSummary(workItems([kid('idle'), kid('idle'), kid('idle')], [task('a', 'completed'), task('b', 'failed')]));
-  assert.equal(w.text, '3 helper sessions · 2 background tasks · all done');
-  assert.equal(workSummary(workItems([kid('idle')], [])).text, '1 helper session · all done');
+  assert.equal(w.text, '3 subagents · 2 background tasks · all done');
+  assert.equal(workSummary(workItems([kid('idle')], [])).text, '1 subagent · all done');
   assert.equal(workSummary(workItems([], [task('a', 'stopped')])).text, '1 background task · all done');
   assert.equal(needsLine(1), '1 needs you');
   assert.equal(needsLine(3), '3 need you');
 });
 
-test('what Stop says it stops: the turn, the tasks and the helper sessions, each case in its own words', () => {
+test('the program’s own subagents (tasks of kind subagent) count as subagents, not as background tasks', () => {
+  const kid = (state: 'working' | 'waiting' | 'idle') => ses({ live: live(state) });
+  const agent = (id: string, status: string) => task(id, status, { kind: 'local_agent' });
+  // One Hydor subagent and one program subagent running, and a command.
+  let w = workSummary(workItems([kid('working')], [agent('a', 'running'), task('c', 'running')]));
+  assert.equal(w.text, '2 subagents and 1 background task running');
+  // The fields Stop all uses keep their meaning: Hydor subagents, and every running task.
+  assert.deepEqual([w.children, w.tasks], [1, 2]);
+  assert.equal(workSummary(workItems([], [agent('a', 'running'), agent('b', 'running')])).text, '2 subagents running');
+  assert.equal(workSummary(workItems([], [agent('a', 'running')])).text, '1 subagent running');
+  assert.equal(workSummary(workItems([], [agent('a', 'running'), task('c', 'running'), task('d', 'running')])).text, '1 subagent and 2 background tasks running');
+  // A finished program subagent is no longer running: the command is.
+  assert.equal(workSummary(workItems([], [agent('a', 'completed'), task('c', 'running')])).text, '1 background task running');
+  // Nothing running: the same split over every item.
+  w = workSummary(workItems([kid('idle')], [agent('a', 'completed'), agent('b', 'failed'), task('c', 'completed')]));
+  assert.equal(w.text, '3 subagents · 1 background task · all done');
+  assert.equal(workSummary(workItems([], [agent('a', 'completed')])).text, '1 subagent · all done');
+  assert.equal(workSummary(workItems([], [agent('a', 'stopped'), agent('b', 'stopped')])).text, '2 subagents · all done');
+});
+
+test('what Stop says it stops: the turn, the subagents and the background tasks, each case in its own words', () => {
   assert.deepEqual(stopWords(true, 0, 0), { note: null, label: 'Stop the current turn' });
-  assert.equal(stopWords(true, 2, 1).note, 'Stops this turn, 2 background tasks and 1 helper session');
-  assert.equal(stopWords(true, 1, 0).note, 'Stops this turn and 1 background task');
-  assert.equal(stopWords(true, 0, 2).note, 'Stops this turn and 2 helper sessions');
-  assert.equal(stopWords(false, 1, 0).note, 'Stops 1 background task');
-  assert.equal(stopWords(false, 0, 2).note, 'Stops 2 helper sessions');
-  assert.equal(stopWords(false, 3, 1).note, 'Stops 3 background tasks and 1 helper session');
-  assert.equal(stopWords(false, 3, 1).label, 'Stop 3 background tasks and 1 helper session');
+  assert.equal(stopWords(true, 2, 1).note, 'Stops this turn, 2 subagents and 1 background task');
+  assert.equal(stopWords(true, 2, 1).label, 'Stop this turn, 2 subagents and 1 background task');
+  assert.equal(stopWords(true, 2, 0).note, 'Stops this turn and 2 subagents');
+  assert.equal(stopWords(true, 1, 0).label, 'Stop this turn and 1 subagent');
+  assert.equal(stopWords(true, 0, 1).note, 'Stops this turn and 1 background task');
+  assert.equal(stopWords(true, 0, 2).label, 'Stop this turn and 2 background tasks');
+  assert.equal(stopWords(false, 2, 1).note, 'Stops 2 subagents and 1 background task');
+  assert.equal(stopWords(false, 1, 3).label, 'Stop 1 subagent and 3 background tasks');
+  assert.equal(stopWords(false, 2, 0).note, 'Stops 2 subagents');
+  assert.equal(stopWords(false, 0, 1).note, 'Stops 1 background task');
+  assert.equal(stopWords(false, 0, 3).label, 'Stop 3 background tasks');
 });
 
 console.log(`${passed}/${total} passed`);

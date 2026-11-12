@@ -16,7 +16,7 @@ const STARTED_IN: Record<string, string> = {
   'sdk-py': 'Another app',
   mcp: 'Another app',
   exec: 'codex exec',
-  subagent: 'A sub-agent',
+  subagent: 'A subagent',
 };
 
 type Origin = Pick<SessionSummary, 'agent' | 'createdByApp' | 'source'>;
@@ -50,7 +50,7 @@ export const fromOrigins = (o: FolderOrigin[]): FolderSource[] | undefined =>
 /**
  * Where a folder's sessions came from, the most sessions first, when the first of them was started outside Hydor;
  * undefined when Hydor started it. From the sessions the page holds, for a folder the server did not know of yet.
- * A sub-agent's thread counts for its parent, which is listed as well.
+ * A subagent's thread counts for its parent, which is listed as well.
  */
 export function folderSources(list: readonly SessionSummary[]): FolderSource[] | undefined {
   const own = list.filter((s) => s.source !== 'subagent');

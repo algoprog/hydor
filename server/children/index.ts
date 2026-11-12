@@ -1,10 +1,10 @@
-// Child sessions: an agent hands a self-contained part of its job to a new session (Custom with any of
+// Hydor subagents (child sessions in the code): an agent hands a self-contained part of its job to a new session (Custom with any of
 // its models, Claude Code, Codex or another ACP agent) that works on it in parallel. When the child's turn
 // ends, its reply comes back to the parent as a message and the parent goes on. One level only, a few
 // at a time, never in a freer mode than the parent, and within a share of the parent's spending cap.
 // It is all tools on the app's own MCP server, so any agent can delegate to any other. Each child gets a tier for
 // its part, never above its parent's own (Standard when none is asked for, in a team): the parent leads, the
-// helpers do the well-defined parts for less (team.ts says what the parent is told).
+// subagents do the well-defined parts for less (team.ts says what the parent is told).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,15 +64,15 @@ const starting = new Map<string, number>();
 /** Turns already reported, so one is never sent twice. */
 const reported = new Set<string>();
 
-const ONE_LEVEL = 'This is a child session: it cannot start child sessions of its own (one level only). Do this part yourself, and say in your reply what else is needed.';
+const ONE_LEVEL = 'This is a Hydor subagent: it cannot start Hydor subagents of its own (one level only). Do this part yourself, and say in your reply what else is needed.';
 
 /** What a child is told, beside its brief. */
 export const CHILD_INSTRUCTIONS = [
-  'This is a child session: another session started it to do one part of a bigger job, and the first message is its brief.',
+  'This is a Hydor subagent: another session started it to do one part of a bigger job, and the first message is its brief.',
   'Nobody watches it as it works, so decide small questions yourself (and say what you decided); stop to ask only when you cannot go on.',
   'Your reply at the end of each turn goes back to the session that started you, as a message: make it a complete, short report of what you did',
   'and found, the files you changed or made (with their paths), and anything left open. Put long material in a file and give its path.',
-  'You cannot start child sessions yourself.',
+  'You cannot start Hydor subagents yourself.',
 ].join(' ');
 
 // ---- which agent and model -----------------------------------------------------------------------
@@ -173,7 +173,7 @@ const firstLine = (s: string, n: number) => {
 
 // ---- the tools -----------------------------------------------------------------------------------
 
-/** The highest tier a session's helpers may have: never above its own, nor above what the agent it works as allows. */
+/** The highest tier a session's subagents may have: never above its own, nor above what the agent it works as allows. */
 function ceilingOf(d: Deps, ctx: { key: string; agent: Agent; acpAgent?: string }, lead: Assistant | null): Tier {
   return lowerTier(leadTier(d, ctx), lead?.helperMax)!;
 }
@@ -191,7 +191,7 @@ const TIER_FOR: Record<Tier, string> = {
 /**
  * `local`: the parent is confidential, so its children run on Custom with a model on this computer (server/confidential).
  * `named`: the user's agents it may hand work to (by name, with their own instructions, tools and tier); `top`: the
- * highest tier its helpers may have (its own, or lower when the agent it works as says so); `team`: a child asked for
+ * highest tier its subagents may have (its own, or lower when the agent it works as says so); `team`: a child asked for
  * with no tier gets Standard.
  */
 function startTool(d: Deps, max: number, local = false, named: Assistant[] = [], top: Tier = 'best', team = false): RunTool {
@@ -201,33 +201,33 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
   return {
     name: 'start_child_session',
     description: [
-      'Hand a self-contained part of the job to a new session that works on it in parallel: a child session.',
+      'Hand a self-contained part of the job to a Hydor subagent: a new session of its own that works on it in parallel.',
       local
-        ? 'This session is confidential, so a child runs here too: on custom, with one of the models on this computer, and confidential like this one.'
+        ? 'This session is confidential, so a Hydor subagent runs here too: on custom, with one of the models on this computer, and confidential like this one.'
         : 'It can run another agent or model of this app: a cheaper or local model for bulk work, Claude Code or Codex for a hard part.',
       'It starts at once and returns its key; when its turn ends, its reply comes back to you as a message, and you go on from there.',
-      'The child sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
-      `Use it for parts that can be handed over whole, not for single steps you can take yourself. A child cannot start children; at most ${max} of yours run at once.`,
+      'A Hydor subagent sees nothing of this conversation: put everything it needs in the brief (the goal, the facts and files it needs, what to hand back).',
+      `Use it for parts that can be handed over whole, not for single steps you can take yourself. A Hydor subagent cannot start Hydor subagents; at most ${max} of yours run at once.`,
       local
         ? ''
-        : `Give each child the lowest tier that can do its part well: ${orList(offered.map((t) => TIER_FOR[t]))}.${team ? ` With no tier a child gets ${tierLabel(clampTier('standard', top)).toLowerCase()}.` : ''} A child never thinks with a tier above ${tierLabel(top).toLowerCase()}.`,
+        : `Give each Hydor subagent the lowest tier that can do its part well: ${orList(offered.map((t) => TIER_FOR[t]))}.${team ? ` With no tier a Hydor subagent gets ${tierLabel(clampTier('standard', top)).toLowerCase()}.` : ''} A Hydor subagent never thinks with a tier above ${tierLabel(top).toLowerCase()}.`,
       local
         ? ''
-        : 'A child on a tier whose reply to its brief does not pass a quick check runs again one tier up by itself (never above the highest allowed); its later replies, to your messages, are not checked. step_up_child does that when you judge a result not good enough.',
+        : 'A Hydor subagent on a tier whose reply to its brief does not pass a quick check runs again one tier up by itself (never above the highest allowed); its later replies, to your messages, are not checked. step_up_child does that when you judge a result not good enough.',
       agents.length
         ? `You can also hand a part to one of the user's agents, by its name in as; it works with its own instructions, tools and tier: ${agents
             .slice(0, 40)
             .map((a) => `${a.name} (${a.description || 'no description'}${a.tier ? `; ${tierLabel(a.tier)}` : ''})`)
             .join('; ')}${agents.length > 40 ? `; and ${agents.length - 40} more` : ''}.`
         : '',
-      'The user sees each child in the conversation and can open it.',
+      'The user sees each one as a Hydor subagent (a card in this conversation, a row in the tray above the message box, under this session in the sidebar), told apart from your program’s own subagents, and can open it.',
     ]
       .filter(Boolean)
       .join(' '),
     inputSchema: {
       type: 'object',
       properties: {
-        brief: { type: 'string', description: 'Everything the child needs: the goal, context, files, limits, and what its reply should contain.' },
+        brief: { type: 'string', description: 'Everything the Hydor subagent needs: the goal, context, files, limits, and what its reply should contain.' },
         agent: { type: 'string', description: 'custom (the app’s own agent: name the model), claude, codex, or another agent’s id. Default: the same agent as yours.' },
         model: {
           type: 'string',
@@ -259,7 +259,7 @@ function startTool(d: Deps, max: number, local = false, named: Assistant[] = [],
 /** What a child on a tier keeps, to run again one tier up when it fails a check (or its lead asks). */
 interface StepUp {
   tier: Tier;
-  /** The highest tier its lead may give a helper: its own, or lower when the agent it works as says so. */
+  /** The highest tier its lead may give a subagent: its own, or lower when the agent it works as says so. */
   max: Tier;
   brief: string;
   agent?: string;
@@ -285,7 +285,7 @@ async function startChild(
 ): Promise<string> {
   const { max, local, models } = o;
   const brief = String(a.brief ?? '').trim();
-  if (!brief) throw new Error('The brief is empty. Write a self-contained brief: the child sees nothing of this conversation.');
+  if (!brief) throw new Error('The brief is empty. Write a self-contained brief: the Hydor subagent sees nothing of this conversation.');
   if (parentOf(d.db, ctx.key)) throw new Error(ONE_LEVEL);
   const own = sessionExtra(d.db, ctx.key);
   const leadAgent = findAssistant(d.db, own.assistant);
@@ -293,7 +293,7 @@ async function startChild(
   let named: Assistant | null = null;
   const asArg = String(a.as ?? '').trim();
   if (asArg) {
-    if (local) throw new Error('This session is confidential: its children cannot work as other agents.');
+    if (local) throw new Error('This session is confidential: its Hydor subagents cannot work as other agents.');
     const w = asArg.toLowerCase();
     const all = allAssistants(d.db);
     named = all.find((x) => x.id.toLowerCase() === w) ?? all.find((x) => x.name.toLowerCase() === w) ?? null;
@@ -305,7 +305,7 @@ async function startChild(
         named.askable === false
           ? `${named.name} does not take work from other agents.`
           : named.id === leadAgent?.id
-            ? `You are ${named.name}: do this part yourself, or start a plain child for it.`
+            ? `You are ${named.name}: do this part yourself, or start a plain Hydor subagent for it.`
             : `${leadAgent!.name} may not hand work to ${named.name}: the user can allow it in ${leadAgent!.name}'s settings (Team).`,
       );
   }
@@ -322,7 +322,7 @@ async function startChild(
   // A swarm's members take on hard problems: they run with the lead's own model and effort unless it names others.
   const role = roleOf(d.db, ctx);
   // The tier: a named agent's own; else the one asked for, never above the lead's own tier nor what its agent allows. With none
-  // asked for: Standard in a team (the lead leads, helpers do the clear parts for less), else the highest its agent allows.
+  // asked for: Standard in a team (the lead leads, subagents do the clear parts for less), else the highest its agent allows.
   const ceiling = ceilingOf(d, ctx, leadAgent);
   const unasked = teamOf(d.db).on && role?.role !== 'lead' && !local ? clampTier('standard', ceiling) : leadAgent?.helperMax;
   const asked = isTier(a.tier) ? clampTier(a.tier, ceiling) : unasked;
@@ -351,7 +351,7 @@ async function startChild(
   if (named) target.label = `${named.name} · ${target.label}`;
   if (tier) target.label = `${target.label} · ${tierLabel(tier)}`;
   const running = childKeys(d.db, ctx.key).filter((k) => busy(d.sessions.summary(k))).length + (starting.get(ctx.key) ?? 0);
-  if (running >= max) throw new Error(`${running} of your child sessions are working already, the most at once. Wait for one to finish (its reply comes to you as a message), then start the next; or do this part yourself.`);
+  if (running >= max) throw new Error(`${running} of your Hydor subagents are working already, the most at once. Wait for one to finish (its reply comes to you as a message), then start the next; or do this part yourself.`);
   const capUsd = childShare(d.db, ctx.key, max);
   const cwd = folder(a.cwd, ctx.cwd);
   const parent = d.sessions.summary(ctx.key);
@@ -408,9 +408,9 @@ async function startChild(
   };
   addNote(d.db, { key: ctx.key, kind: 'child', anchor: await currentPrompt(d, ctx.key), data: note });
   return [
-    `Started child session ${key}: "${title}" (${target.label}${mode ? `, mode ${mode}` : ''}${s?.worktree ? `, on branch ${s.worktree.branch}` : ''}${capUsd != null ? `, spending cap $${capUsd.toFixed(2)}` : ''}).`,
+    `Started Hydor subagent ${key}: "${title}" (${target.label}${mode ? `, mode ${mode}` : ''}${s?.worktree ? `, on branch ${s.worktree.branch}` : ''}${capUsd != null ? `, spending cap $${capUsd.toFixed(2)}` : ''}).`,
     'It works on its own now. Its reply comes to you as a message when its turn ends: go on with other work, or end your turn to wait for it.',
-    'child_sessions shows how your children are doing; message_child sends one more to do.',
+    'child_sessions shows how your Hydor subagents are doing; message_child sends one more to do.',
   ].join('\n');
 }
 
@@ -432,19 +432,19 @@ const ago = (ts?: number) => {
 const LIST: RunTool = {
   name: 'child_sessions',
   description:
-    'Your child sessions: what each is doing, its agent and model, when it last did something, what it has spent, and the start of its latest reply. With key, the whole latest reply of that child.',
-  inputSchema: { type: 'object', properties: { key: { type: 'string', description: 'One child’s key: its whole latest reply.' } } },
+    'Your Hydor subagents: what each is doing, its agent and model, when it last did something, what it has spent, and the start of its latest reply. With key, the whole latest reply of that Hydor subagent.',
+  inputSchema: { type: 'object', properties: { key: { type: 'string', description: 'One Hydor subagent’s key: its whole latest reply.' } } },
   annotations: { readOnlyHint: true },
   async run(a, ctx) {
     const d = ctx.deps;
     const keys = childKeys(d.db, ctx.key);
     const want = String(a.key ?? '').trim();
     if (want) {
-      if (!keys.includes(want)) throw new Error('That is not one of your child sessions.');
+      if (!keys.includes(want)) throw new Error('That is not one of your Hydor subagents.');
       const t = lastTurn((await d.sessions.timeline(want)).parser.items);
       return t?.reply ? `Latest reply of ${want}:\n\n${t.reply}` : 'It has not replied yet.';
     }
-    if (!keys.length) return 'You have no child sessions yet. start_child_session starts one.';
+    if (!keys.length) return 'You have no Hydor subagents yet. start_child_session starts one.';
     const lines: string[] = [];
     for (const k of keys) {
       const s = d.sessions.summary(k);
@@ -463,17 +463,17 @@ const LIST: RunTool = {
 const MESSAGE: RunTool = {
   name: 'message_child',
   description:
-    'Send one of your child sessions a message: more to do, a correction, an answer to its question. If it is working, the message waits for its turn to end. Its reply comes back to you as a message, like its first one.',
-  inputSchema: { type: 'object', properties: { key: { type: 'string', description: 'The child’s key.' }, text: { type: 'string' } }, required: ['key', 'text'] },
+    'Send one of your Hydor subagents a message: more to do, a correction, an answer to its question. If it is working, the message waits for its turn to end. Its reply comes back to you as a message, like its first one.',
+  inputSchema: { type: 'object', properties: { key: { type: 'string', description: 'The Hydor subagent’s key.' }, text: { type: 'string' } }, required: ['key', 'text'] },
   async run(a, ctx) {
     const d = ctx.deps;
     const key = String(a.key ?? '').trim();
     const text = String(a.text ?? '').trim();
     if (!text) throw new Error('The text is empty.');
-    if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your child sessions: child_sessions lists them.');
+    if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your Hydor subagents: child_sessions lists them.');
     const queued = busy(d.sessions.summary(key));
     await d.sessions.deliverOrQueue(key, `Message from the session that started you:\n\n${text}`);
-    return queued ? 'Queued: it goes to the child when its current turn ends. Its reply comes to you as a message.' : 'Sent. Its reply comes to you as a message when its turn ends.';
+    return queued ? 'Queued: it goes to the Hydor subagent when its current turn ends. Its reply comes to you as a message.' : 'Sent. Its reply comes to you as a message when its turn ends.';
   },
 };
 
@@ -481,7 +481,7 @@ const MESSAGE: RunTool = {
 
 /** What the parent is told when a child's turn ends; `summary` stands in for a long reply. */
 export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string }): string {
-  const who = `child session "${o.title}" (${o.key}, ${o.label})`;
+  const who = `Hydor subagent "${o.title}" (${o.key}, ${o.label})`;
   const reply = o.turn.reply.trim();
   const head =
     o.turn.status === 'interrupted'
@@ -625,17 +625,17 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
 const LIMIT = /\b(hit|reached) (your|its|the)\b.{0,24}\blimit\b|\busage limit\b/i;
 
 const JUDGE = [
-  'You check the work an AI helper did for the agent that gave it the job. Answer with one JSON object and nothing else:',
+  'You check the work a subagent did for the agent that gave it the job. Answer with one JSON object and nothing else:',
   '{"pass": true or false, "why": "one short sentence"}. Fail it only when its reply plainly does not do the job: it says it could',
   'not or gave up, does another job, leaves out a part the brief asked for, or is plainly wrong. Pass anything that does the job, even briefly.',
 ].join(' ');
 
-/** Why a helper's reply fails its brief, by the helper model; empty when it does the job, or when the helper model cannot say. */
+/** Why a subagent's reply fails its brief, by the helper model; empty when it does the job, or when the helper model cannot say. */
 async function judge(d: Deps, brief: string, reply: string): Promise<string> {
   try {
     const r = await helperJson<{ pass?: unknown; why?: unknown }>(
       d.db,
-      { system: JUDGE, prompt: `The job (its brief):\n${brief.slice(0, 6000)}\n\nThe helper's reply:\n${reply.slice(0, 12_000)}`, maxTokens: 200, timeoutMs: 45_000 },
+      { system: JUDGE, prompt: `The job (its brief):\n${brief.slice(0, 6000)}\n\nThe subagent's reply:\n${reply.slice(0, 12_000)}`, maxTokens: 200, timeoutMs: 45_000 },
       'a check',
     );
     return r.pass === false ? firstLine(String(r.why ?? 'its reply does not do the job'), 200) : '';
@@ -656,7 +656,7 @@ async function stepUpCheck(d: Deps, key: string, turn: Turn, startedAt = 0): Pro
   // A turn its plan's usage limit stopped is no failure of the tier: another account takes it over, or it waits for the reset.
   if (d.sessions.stoppedAtLimit?.(key, startedAt) || LIMIT.test(turn.error ?? '')) return null;
   const next = nextTier(x.tier);
-  // By itself a helper goes no higher than Best: Max is for its lead to ask for.
+  // By itself a subagent goes no higher than Best: Max is for its lead to ask for.
   if (!next || tierRank(next) > tierRank(lowerTier(x.max, 'best')!)) return null;
   if (turn.status === 'interrupted' || capReached(d.db, key)) return null;
   const parent = parentOf(d.db, key);
@@ -684,27 +684,27 @@ async function stepUpChild(d: Deps, parent: string, key: string, tier: Tier, why
     { brief, agent: x.agent, as: x.as, cwd: x.cwd, worktree: x.worktree, title: x.title },
     { max: maxFor(d.db, { key: parent }), local: false, models: customModels(), tierOverride: tier, baseBrief: x.brief, stepFrom: { key, tier: x.tier, why } },
   );
-  return `[The child session "${x.title}" (${key}) on ${tierLabel(x.tier)} fell short: ${why}. It runs again on ${tierLabel(tier)}.]\n${started}`;
+  return `[The Hydor subagent "${x.title}" (${key}) on ${tierLabel(x.tier)} fell short: ${why}. It runs again on ${tierLabel(tier)}.]\n${started}`;
 }
 
 const STEP_UP: RunTool = {
   name: 'step_up_child',
   description:
-    'Run a child session’s brief again one tier up when its result was not good enough: a new child on the next tier (never above your own, nor the highest your agent allows) gets the same brief and why the first one fell short. Only for a child started on a tier that has finished its turn.',
+    'Run a Hydor subagent’s brief again one tier up when its result was not good enough: a new Hydor subagent on the next tier (never above your own, nor the highest your agent allows) gets the same brief and why the first one fell short. Only for a Hydor subagent started on a tier that has finished its turn.',
   inputSchema: {
     type: 'object',
-    properties: { key: { type: 'string', description: 'The child’s key.' }, why: { type: 'string', description: 'What was wrong with its result, for the new child.' } },
+    properties: { key: { type: 'string', description: 'The Hydor subagent’s key.' }, why: { type: 'string', description: 'What was wrong with its result, for the new Hydor subagent.' } },
     required: ['key', 'why'],
   },
   async run(a, ctx) {
     const d = ctx.deps;
     const key = String(a.key ?? '');
-    if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your child sessions.');
+    if (!childKeys(d.db, ctx.key).includes(key)) throw new Error('That is not one of your Hydor subagents.');
     const x = sessionExtra(d.db, key).stepUp as StepUp | undefined;
-    if (!x) throw new Error('It was started without a tier, or on the highest a helper of yours may have: do the part yourself, or start a child with another model.');
+    if (!x) throw new Error('It was started without a tier, or on the highest a subagent of yours may have: do the part yourself, or start a Hydor subagent with another model.');
     if (busy(d.sessions.summary(key))) throw new Error('It is still working: wait for its reply, or message_child it.');
     const next = nextTier(x.tier);
-    if (!next || tierRank(next) > tierRank(x.max)) throw new Error(`It is on ${tierLabel(x.tier)}, the highest a helper of yours may have.`);
+    if (!next || tierRank(next) > tierRank(x.max)) throw new Error(`It is on ${tierLabel(x.tier)}, the highest a subagent of yours may have.`);
     return stepUpChild(d, ctx.key, key, next, String(a.why ?? '').trim() || 'its result was not good enough');
   },
 };
@@ -713,11 +713,11 @@ const STEP_UP: RunTool = {
 const STEP_UP_SELF: RunTool = {
   name: 'step_up_session',
   description:
-    'Carry on with the strongest model (the Max tier) when the problem proves harder than it looked: a fix that has failed twice, a cause you cannot find, constraints that pull against each other, a proof. You keep the whole conversation and go on from where you are. Say why in a line: the user sees it. Not for work that is merely long: hand that to helpers.',
+    'Carry on with the strongest model (the Max tier) when the problem proves harder than it looked: a fix that has failed twice, a cause you cannot find, constraints that pull against each other, a proof. You keep the whole conversation and go on from where you are. Say why in a line: the user sees it. Not for work that is merely long: hand that to subagents.',
   inputSchema: { type: 'object', properties: { why: { type: 'string', description: 'What makes the problem hard, in a line.' } }, required: ['why'] },
   async run(a, ctx) {
     const d = ctx.deps;
-    if (parentOf(d.db, ctx.key)) throw new Error('A child session cannot step itself up: say in your reply that this part needs a stronger model.');
+    if (parentOf(d.db, ctx.key)) throw new Error('A Hydor subagent cannot step itself up: say in your reply that this part needs a stronger model.');
     const own = sessionExtra(d.db, ctx.key);
     const can = stepUpSelf(d, { agent: ctx.agent, acpAgent: ctx.acpAgent, key: ctx.key, assistant: own.assistant, auto: own.auto });
     if ('no' in can) throw new Error(can.no);
@@ -755,7 +755,7 @@ export const children: Feature = {
 
   spawn(s, d) {
     if (s.extra?.parent) return { instructions: [CHILD_INSTRUCTIONS] };
-    // The main agent of a session leads helpers on cheaper tiers (Settings → Models → Tiers).
+    // The main agent of a session leads subagents on cheaper tiers (Settings → Models → Tiers).
     const team = teamNote(d, s);
     return team ? { instructions: [team] } : undefined;
   },

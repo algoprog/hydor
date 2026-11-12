@@ -1,4 +1,4 @@
-// Child sessions in the sidebar: under their parent, folded by default, with a line on how many there
+// Subagents (child sessions) in the sidebar: under their parent, folded by default, with a line on how many there
 // are and what they are doing. Open while one of them is on screen.
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
@@ -51,7 +51,7 @@ export function ChildNest({ parent, kids, activeKey, row }: { parent: string; ki
       >
         <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', open && 'rotate-90')} />
         <span className="shrink-0">
-          {kids.length} {team === 'campaign' ? 'campaign member' : team ? 'swarm member' : 'child session'}
+          {kids.length} {team === 'campaign' ? 'campaign member' : team ? 'swarm member' : 'subagent'}
           {kids.length === 1 ? '' : 's'}
         </span>
         {waiting > 0 && <span className="truncate text-warn">· {waiting} need{waiting === 1 ? 's' : ''} you</span>}
