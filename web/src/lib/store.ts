@@ -462,7 +462,7 @@ useUI.subscribe((s) => {
 const pageBuild = document.querySelector<HTMLScriptElement>('script[type="module"][src*="assets/index-"]')?.getAttribute('src')?.split('/').pop();
 let offered = '';
 /** The server hands out a newer build than this page runs (after an update): reload into it, or offer to. */
-function newerBuild(build: string) {
+export function newerBuild(build: string) {
   if (!pageBuild || build === pageBuild || offered === build) return;
   offered = build;
   // "Update now" in this tab: it wanted the new version.
@@ -475,6 +475,21 @@ function newerBuild(build: string) {
   const offer = () => useToasts.getState().push('info', 'Hydor was updated', { label: 'Reload', run: () => location.reload() }, 'Reload to use the new version');
   if (document.visibilityState === 'visible') offer();
   else document.addEventListener('visibilitychange', offer, { once: true });
+}
+
+/** On another machine's pages: the build that machine's socket named first. */
+let machineBuild = '';
+/** That machine names another build: it was updated. Update now in this tab (its Settings → General) shows its pages again. */
+function machineBuilt(build: string) {
+  if (!machineBuild || build === machineBuild) return void (machineBuild = build);
+  machineBuild = build;
+  try {
+    if (!sessionStorage.getItem('wa.updating')) return;
+    sessionStorage.removeItem('wa.updating');
+  } catch {
+    return;
+  }
+  location.reload();
 }
 
 export function handleEvent(e: ServerEvent) {
@@ -516,7 +531,9 @@ export function handleEvent(e: ServerEvent) {
       break;
     }
     case 'hello':
-      if (e.build) newerBuild(e.build);
+      // On another machine's pages this socket is that machine's, whose build is not this page's: this server's own
+      // comes on its own socket (App.tsx), and that machine's tells when it was updated.
+      if (e.build) (machineId ? machineBuilt(e.build) : newerBuild(e.build));
       break;
     case 'index': {
       const was = useApp.getState().indexing?.running;

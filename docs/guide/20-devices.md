@@ -113,6 +113,18 @@ Once you have added a machine, a row with the current machine's name appears at 
 
 On another machine's pages the row is highlighted, so you know where you are, and a dot on it means sessions on the other machines wait for you. If the machine doesn't answer, a page says "… is not reachable" with **Try again**, a button back to your own machine, and **Settings → Machines**.
 
+### When a machine has an older Hydor
+
+The app you open shows another machine's pages in its own version, whatever Hydor that machine runs. A machine with an older Hydor can lack what its pages need, and some of them can stop working. So when you pick a machine whose Hydor is older than this app's, a page comes first: "… has an older Hydor". It says both versions, that its pages open here in this app's version, and that some can stop working with an older one. It has three buttons:
+
+- **Update …** (with the machine's name) updates that machine from here, as the **Update now** button of its version row in [Settings → App → General](/settings?s=general&find=Check%20now) does (see [Keep the app up to date](/guide/app#keep-the-app-up-to-date)): a copy installed from git, or the Docker image, gets the new version, builds it and restarts; a desktop app downloads the new version and restarts into it. It takes a few minutes, and agents working there carry on. The page shows each step ("Getting the new version", "Installing packages", "Building", "Restarting, this page reconnects by itself") and opens that machine's pages by itself once it is back.
+- **Open anyway** opens its pages as they are. This browser tab doesn't ask again for that version.
+- **Open** followed by your own machine's name goes back to your own machine.
+
+When it can't update from here, the page says why instead: a desktop app that can't replace itself where it is ("Move Hydor to your Applications folder to update it."), a copy with nowhere to update from ("… has nowhere to update from by itself (it was not installed from git with an upstream): update Hydor there, or open it anyway."), an update that failed ("The update did not work: …"), one that must restart first ("It has the new version: restart Hydor on … to use it."), or one that is already as new as where it updates from.
+
+If a page of another machine fails to draw, you see "This page stopped working" with what went wrong, **Reload**, and **Open** your own machine, instead of an empty window. The sidebar stays, and moving to another page tries again. On a machine with an older Hydor the page offers **Update …** as above; on a machine with a newer Hydor than this app, it says to update this app, then open the machine again.
+
 ### What works across machines
 
 - **Everything on a machine's pages is that machine's**: its sessions, folders and files, Git, terminals, agents' sign-ins, models and settings.

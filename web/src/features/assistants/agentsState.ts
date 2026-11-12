@@ -1,12 +1,12 @@
 // What the Agents pages know beside the agents themselves: each one's activity (its schedules, sessions at work
 // or waiting, what it spent this month), loaded on first use and kept current; the tiers (Settings → Models →
 // Tiers); and the words that describe an agent in sentences.
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import type { AgentActivity, Assistant, ToolKind } from '@shared/assistants';
 import type { TaskSchedule } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
-import { tierLabel, type TeamSettings, type Tier, type TierMap } from '@shared/tiers';
+import { tierLabel, TIER_PROGRAMS, TIERS, type TeamSettings, type Tier, type TierMap } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { useApp } from '../../lib/store';
@@ -50,11 +50,22 @@ function askTiers() {
   load().catch(() => (tiersAsked = false));
   onFeatureEvent('assistants', () => void load().catch(() => {}));
 }
+/**
+ * Every program with all four tiers, whatever the server sent: one from before 0.52 has three (no Max), and its pages
+ * shown from a newer machine (Settings → Machines) would trip over the missing one.
+ */
+function wholeTiers(m: TierMap | null): TierMap | null {
+  if (!m) return null;
+  const out = {} as TierMap;
+  for (const p of TIER_PROGRAMS) out[p.id] = Object.fromEntries(TIERS.map((t) => [t.id, m[p.id]?.[t.id] ?? {}])) as TierMap[typeof p.id];
+  return out;
+}
 /** The tiers as set (each program's model and effort for Quick, Standard, Best and Max), loaded once. */
 export function useTierMap(): TierMap | null {
   useEffect(askTiers, []);
   const boot = useApp((s) => s.boot?.tiers);
-  return useTiers((s) => s.tiers) ?? boot ?? null;
+  const tiers = useTiers((s) => s.tiers) ?? boot ?? null;
+  return useMemo(() => wholeTiers(tiers), [tiers]);
 }
 /** How sessions use the tiers (Settings → Models → Tiers): the team on or off, Max for hard problems; null on a server from before them. */
 export function useTeam(): TeamSettings | null {

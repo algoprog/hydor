@@ -18,3 +18,7 @@ one you opened.
 
 An access token can do all you can do on its machine, so make one for each machine that connects, and revoke
 it when that machine no longer needs it. Dev-server previews work on the machine you opened only.
+
+Keep the machines on the same Hydor version. The app you open shows another machine's pages in its own version, so a
+machine with an older Hydor can lack what some of its pages need. Opening one offers to update it from there (as its own
+Settings → General Update now does, with agents there carrying on), or to open it anyway.
