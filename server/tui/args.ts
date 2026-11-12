@@ -12,7 +12,7 @@ export { GROUPS, UsageError };
 export type { Group };
 
 /** The commands `hydor` knows in the terminal (the maintenance ones in server/cli.ts come before these). */
-export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'tasks', 'usage', 'status', 'serve', 'open', 'help'] as const;
+export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'tasks', 'usage', 'status', 'serve', 'help'] as const;
 /** A command of COMMANDS, or 'area': a verb of an area (server/tui/areas), with the words in Opts.route. */
 export type Command = (typeof COMMANDS)[number] | 'area';
 
@@ -172,15 +172,6 @@ export const CMD_TABLE: CommandDef[] = [
     desc: 'Run the server here, in the foreground',
     help: 'Runs this computer’s Hydor in this terminal until you press Ctrl+C. Other commands start it for you when nothing answers; hydor service install keeps it running in the background instead.',
     examples: ['hydor serve'],
-  },
-  {
-    name: 'open',
-    group: 'this',
-    args: '[key]',
-    desc: 'The web app’s address (--browser opens it)',
-    help: 'Prints the address of the web app, or of one session in it. --browser opens it in your browser.',
-    examples: ['hydor open', 'hydor open 3f9a --browser'],
-    options: ['browser', 'json'],
   },
   {
     name: 'help',
@@ -511,7 +502,8 @@ export function parseArgv(argv: string[]): Opts {
   const route = routeOf(argv);
   if (route?.unknown) {
     const mean = didYouMean(route.unknown, route.area.verbs.map((v) => v.name.split(' ')[0]), (w) => `hydor ${route.area.name} ${w}`);
-    throw new UsageError(`Unknown ${route.area.name} command: ${route.unknown}.${mean}\nTo send it to an agent as a message: hydor chat ${argv.filter((a) => !a.startsWith('-')).join(' ')}`);
+    const said = argv.filter((a) => !a.startsWith('-')).join(' ');
+    throw new UsageError(`Unknown ${route.area.name} command: ${route.unknown}.${mean || `\nTo send this to an agent: hydor chat ${said}`}`);
   }
   let parsed: ReturnType<typeof parseArgs>;
   try {
@@ -638,6 +630,7 @@ function generalHelp(p: Paint): string[] {
   out.push(...twoColumns(OPTION_TABLE.filter((o) => o.name !== 'print' && o.name !== 'version').map((o) => [optionStyled(o, p), o.desc] as [string, string]), p, '  ', 26));
   out.push('', p.bold('Examples'));
   out.push(...['hydor fix the failing tests', 'hydor run "summarize README.md" --json', 'hydor sessions', 'hydor send 3f9a "and add a test"', 'hydor tiers set claude best opus'].map((e) => `  ${e}`));
+  out.push('', ...wrap('A message that starts with a command’s name goes in quotes (hydor "find the bug in login") or after hydor chat.', WIDTH - 2));
   out.push('', p.bold('More'), ...twoColumns(more, p, '  ', left, true));
   return out;
 }
@@ -675,7 +668,7 @@ function areaHelp(a: Area, p: Paint): string[] {
 
 /** One verb's help: usage, what it does, its options (the common ones named), examples. */
 function verbHelp(a: Area, v: Verb, p: Paint): string[] {
-  const usage = ['hydor', p.accent(a.name), p.accent(v.name), ...v.args.map((x) => p.dim(argLabel(x))), v.options ? p.dim('[options]') : ''].filter(Boolean).join(' ');
+  const usage = ['hydor', p.accent(a.name), a.bare ? '' : p.accent(v.name), ...v.args.map((x) => p.dim(argLabel(x))), v.options ? p.dim('[options]') : ''].filter(Boolean).join(' ');
   const out = [`Usage: ${usage}`, '', ...wrap(v.help ? `${v.summary}. ${v.help}` : `${v.summary}.`, WIDTH - 2)];
   const own = Object.entries(v.options ?? {});
   if (own.length) {
@@ -697,6 +690,8 @@ export function helpText(p: Paint, topic?: string, sub: string[] = []): string |
   const c = commandDef(topic);
   const a = areaByName(topic);
   if (!c && !a) return null;
+  // An area whose words are its one verb's own (`hydor find <words>`) has just that verb's help.
+  if (a && a.bare && !c) return verbHelp(a, defaultVerb(a), p).join('\n');
   if (a && sub.length) {
     const hit = findVerb(a, sub);
     if (hit) return verbHelp(a, hit.verb, p).join('\n');
