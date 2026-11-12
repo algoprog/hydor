@@ -25,6 +25,7 @@ import { QueueList } from './QueueList';
 import { GoalBar } from './GoalBar';
 import { LimitBanner } from '../usage/LimitReset';
 import { FeatureComposerButtons, FeatureSessionOptions } from '../registry';
+import { SessionAccount } from './SessionAccount';
 import { SessionAssistantPicker, useSessionAssistant } from '../assistants/AssistantPicker';
 import { putText } from '../../lib/featureEvents';
 
@@ -556,6 +557,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                     <ModelPicker label="Model" agent={s.agent} acp={s.acpAgent} value={model} onChange={(v) => configure({ model: v })} localOnly={confidential} />
                     <EffortPicker label="Effort" agent={s.agent} acp={s.acpAgent} model={model} value={effort} onChange={(v) => configure({ effort: v })} />
                     <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
+                    <SessionAccount s={s} />
                     <FeatureSessionOptions s={s} />
                     {ctx != null && (
                       <button

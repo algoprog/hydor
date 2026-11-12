@@ -23308,5 +23308,14 @@
 "A main agent on Automatic may move itself to Max":"Στο Αυτόματα, ο κύριος πράκτορας μπορεί να ανεβεί μόνος του στο Μέγιστο",
 "On Automatic, a session starts on Best, and its main agent may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find). The conversation says when it does. A request is never sent to Max on its wording alone.":"Στο Αυτόματα, μια συνεδρία ξεκινά στο Καλύτερο, και ο κύριος πράκτοράς της μπορεί να ανεβεί μόνος του στο Μέγιστο όταν ένα πρόβλημα αποδειχθεί δυσκολότερο απ’ όσο μπορεί το Καλύτερο (μια διόρθωση που απέτυχε δύο φορές, μια αιτία που δεν βρίσκει). Η συνομιλία το αναφέρει όταν συμβεί. Ένα αίτημα δεν στέλνεται ποτέ στο Μέγιστο μόνο από τη διατύπωσή του.",
 "The model each tier means for each program. A session on Automatic thinks with Best, and its main agent may move itself to Max when a problem proves too hard; it hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model.":"Το μοντέλο που σημαίνει κάθε βαθμίδα για κάθε πρόγραμμα. Μια συνεδρία στο Αυτόματα σκέφτεται με το Καλύτερο, και ο κύριος πράκτοράς της μπορεί να ανεβεί μόνος του στο Μέγιστο όταν ένα πρόβλημα αποδειχθεί πολύ δύσκολο· δίνει σαφή κομμάτια σε υποπράκτορες στο Τυπικό και το Γρήγορο. Μια βαθμίδα που δεν αλλάζετε ακολουθεί το νεότερο μοντέλο του προγράμματός της.",
-"{0}, or {1} if the problem proves too hard":"{0}, ή {1} αν το πρόβλημα αποδειχθεί πολύ δύσκολο"
+"{0}, or {1} if the problem proves too hard":"{0}, ή {1} αν το πρόβλημα αποδειχθεί πολύ δύσκολο",
+"A session is confidential from its start: start a new one with Options → Confidential.":"Μια συνεδρία είναι εμπιστευτική από την αρχή της: ξεκινήστε μια νέα με Επιλογές → Εμπιστευτική λειτουργία.",
+"No such {0} account":"Δεν υπάρχει τέτοιος λογαριασμός {0}",
+"Only a Claude Code or Codex session runs as an account":"Μόνο μια συνεδρία Claude Code ή Codex τρέχει με λογαριασμό",
+"Picked when a session starts: its first message goes to other models too":"Επιλέγεται όταν ξεκινά μια συνεδρία: το πρώτο της μήνυμα πηγαίνει και σε άλλα μοντέλα",
+"Set when a session starts, and kept":"Ορίζεται όταν ξεκινά μια συνεδρία και διατηρείται",
+"The arena is picked when a session starts: its first message goes to other models too. Start a new session with Options → Arena.":"Η αρένα επιλέγεται όταν ξεκινά μια συνεδρία: το πρώτο της μήνυμα πηγαίνει και σε άλλα μοντέλα. Ξεκινήστε μια νέα συνεδρία με Επιλογές → Αρένα.",
+"The most this session may spend, at API prices":"Το μέγιστο που μπορεί να ξοδέψει αυτή η συνεδρία, σε τιμές API",
+"This session runs as {0} from your next message":"Από το επόμενο μήνυμά σας, αυτή η συνεδρία τρέχει ως {0}",
+"This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.":"Αυτή η συνεδρία μένει εμπιστευτική, ώστε ό,τι ειπώθηκε να μένει σε αυτόν τον υπολογιστή. Για δουλειά που μπορεί να φύγει από αυτόν, ξεκινήστε νέα συνεδρία."
 }

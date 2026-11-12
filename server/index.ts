@@ -734,6 +734,17 @@ app.post('/api/sessions/:key/config', async (req) => {
   await sessions.configure(K(req), { model: b.model, effort: b.effort, mode: b.mode });
   return { ok: true };
 });
+// The account a Claude Code or Codex session runs as ('' or none: the CLI's own sign-in): its history moves there,
+// and its agent starts there with the next message.
+app.post('/api/sessions/:key/account', async (req) => {
+  const id = String((req.body as { account?: unknown } | undefined)?.account ?? '');
+  const key = K(req);
+  const agent = key.startsWith('codex:') ? 'codex' : key.startsWith('claude:') ? 'claude' : null;
+  if (!agent) throw new HttpError(400, 'Only a Claude Code or Codex session runs as an account');
+  if (id && accountById(db, id)?.agent !== agent) throw new HttpError(404, `No such ${agent === 'claude' ? 'Claude Code' : 'Codex'} account`);
+  await sessions.moveToAccount(key, id || undefined);
+  return { ok: true };
+});
 app.post('/api/sessions/:key/rename', async (req) => {
   await sessions.rename(K(req), String((req.body as any)?.title ?? ''));
   return { ok: true };

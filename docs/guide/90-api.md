@@ -108,6 +108,7 @@ These live in the user's browser, one set per device, so they are not in the API
 
 ## Organizing sessions
 
+- `POST /api/sessions/:key/account` — moves a Claude Code or Codex session to another of its agent's accounts (Settings → Accounts): its history moves there, and its agent starts there with the next message. Body: `{ account: string — an added account's id, or '' for the CLI's own sign-in }`. Returns: `{ ok }`. 404 for an account of another agent or none; 409 while a turn is running, or when the session is open in another program.
 - `POST /api/sessions/:key/rename` — sets the title. Body: `{ title: string }` (trimmed, up to 200 characters; empty gives back the agent's own title). Returns: `{ ok }`.
 - `POST /api/sessions/:key/flags` — pin, archive or snooze (send only what changes). Body: `{ pinned?: boolean, archived?: boolean, snoozedUntil?: number|null (ms in the future; null unsnoozes) }`. Returns: `{ ok }`. A snoozed session comes back at that time, or as soon as it needs the user.
 - `POST /api/sessions/order` — the order of a sidebar group (Active or Pinned) after a drag. Body: `{ keys: string[] }` (top to bottom, up to 1,000 session keys). Returns: `{ ok }`.
