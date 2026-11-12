@@ -9,13 +9,13 @@
 - **用安装程序安装**（`./install.sh`）：当 `~/.local/bin` 在你的 PATH 中时，安装程序会把 `hydor` 链接到那里，并告诉你。否则它会告诉你命令在哪里：Hydor 文件夹里的 `bin/hydor.mjs`，你可以直接运行它，也可以把它链接到你存放命令的地方。
 - **用 Docker**：镜像里已经有它。运行 `docker exec -it hydor hydor`，就可以在容器内与智能体对话。
 - **Mac 应用**每次启动时都会自己把它放进你的 PATH。它把 `hydor` 链接到 `~/.local/bin`、`~/bin`、`/usr/local/bin` 或 `/opt/homebrew/bin` 中第一个既在你的 PATH 里、又是你有权写入的文件夹。如果没有这样的文件夹，它就用 `~/.local/bin`，并在你的 shell 启动文件（zsh 是 `~/.zprofile`）里加上一行标明由 Hydor 添加的内容，让这个文件夹进入你的 PATH。之后请打开一个新的“终端”窗口。这个命令运行的是应用自带的 Node.js，应用关闭时，`hydor` 会把它打开。从磁盘映像里打开时，或在你把应用移到**应用程序**文件夹之前，它不会做这件事。在应用里，`hydor update`、`hydor service install` 和 `hydor serve` 只会告诉你这些由应用自己完成。
-- **Windows 和 Linux 桌面应用**暂时还不会把这个命令放进你的 PATH。在 Linux 上，安装程序仍像上面那样链接它。如果你在另一台电脑上有一份 Hydor，仍然可以使用那一份的：参见[使用另一台电脑上的 Hydor](#use-another-computers-hydor)。
+- **Linux 和 Windows 桌面应用**每次启动时也会这样做，不需要密码，也不会问你任何问题。在 **Linux** 上（AppImage 或 .deb），这个命令是 `~/.local/bin`、`~/bin` 或 `/usr/local/bin` 里的一个小小的 `hydor` 文件，取其中第一个既在你的 PATH 里、又是你有权写入的文件夹。如果没有这样的文件夹，它就用 `~/.local/bin`，并在你的 shell 启动文件里加上一行标明由 Hydor 添加的内容。.deb 自带的 `/usr/bin/hydor` 打开的是应用窗口，所以这个命令在你的 PATH 里排在它前面。在 **Windows** 上，它把 `hydor.cmd` 放进你的 WindowsApps 文件夹（Windows 本来就会在那里查找）；否则放进 `%LOCALAPPDATA%\Hydor\bin`，并把这个文件夹加入你的 PATH。之后请打开一个新的终端（Windows 终端、PowerShell 或命令提示符）。和 Mac 上一样，这个命令运行的是应用自带的 Node.js，应用关闭时 `hydor` 会把它打开，而 `hydor update`、`hydor service install` 和 `hydor serve` 只会告诉你这些由应用自己完成。如果你的 PATH 里已经有另一个 `hydor`（安装程序为 git 副本建立的链接），应用就什么都不动。如果你在另一台电脑上有一份 Hydor，仍然可以使用那一份的：参见[使用另一台电脑上的 Hydor](#use-another-computers-hydor)。
 
 `hydor help` 会按组列出它能做的一切，每个命令一行；`hydor help <命令>` 给出一个命令的用法、选项和示例，`hydor help options` 列出所有选项，`hydor help <命令> <动词>` 给出某个动词的。维护命令用的是同一个名称：`hydor service status`、`hydor setup-token`、`hydor update` 等等（`node dist/server/cli.js …` 也仍然可用）。输错了命令、选项或动词，它会问“Did you mean …?”（你是想输入……吗？）。错误以红色显示。
 
 以某个命令的名字开头的消息要放在引号里（`hydor "find the bug in login"`），或者放在 `hydor chat` 后面，这样它就不会被当成命令。
 
-你不必先启动 Hydor。当这台电脑上没有任何响应时，命令会在后台启动它，显示 **Starting Hydor…**（正在启动 Hydor…），并在命令结束后让它继续运行，所以你的会话不会中断。`hydor status` 会告诉你它用的是哪个 Hydor、它的版本、它是否作为服务运行，以及现在有什么在工作。
+你不必先启动 Hydor。当这台电脑上没有任何响应时，命令会在后台启动它，显示 **Starting Hydor…**（正在启动 Hydor…），并在命令结束后让它继续运行，所以你的会话不会中断。`hydor status` 会告诉你它用的是哪个 Hydor、它的版本、它是否作为服务运行，以及现在有什么在工作。 在装有桌面应用的电脑上，如果应用已关闭，命令会把它打开，而不是自己再启动一个服务器。
 
 ## 在 shell 里用 Tab 补全
 
@@ -33,7 +33,7 @@ hydor completion install
 
 在一个文件夹里运行 `hydor`，或者在 `hydor` 后面跟上你的消息（`hydor fix the failing test`）。第一条消息会在该文件夹里开始一个会话。
 
-聊天以一个欢迎框开头：**HYDΩR** 和它的版本、文件夹及其 git 分支，以及由谁来回答你：程序（**Claude Code**、**Codex** 或 **Custom**）、模型（在有档位的 Hydor 上，如果模型按任务来定，则显示为**自动**）以及权限模式。智能体不经询问就行动时，模式显示为红色；计划模式则用强调色。后面跟着一行提示：`/ commands · @ files · ! shell · ↑ history · Ctrl+R search · /help`。
+聊天以一个欢迎面板开头，这是一个框，它的上边框里是 **HYDΩR** 和它的版本。框内依次是：文件夹“在”它的 git 分支上（git 没有分支可显示时，就不显示分支）；然后是由谁来回答你：程序（**Claude Code**、**Codex** 或 **Custom**）、模型（在有档位的 Hydor 上，如果模型按任务来定，则显示为**自动**）以及权限模式，中间用 · 隔开；智能体不经询问就行动时，模式显示为红色，计划模式则用强调色；最后是一行提示：`/ commands · @ files · ! shell · ↑ history · Ctrl+R search · /help`。无论文件夹叫什么名字，这个框的宽度都不变。
 
 你看到的内容都留在终端自己的历史记录里，所以你可以向上滚动并从中复制，通过 SSH 和在 tmux 里也一样：
 
@@ -48,7 +48,7 @@ hydor completion install
 
 ### 输入行
 
-你的输入位于两条细线之间，下面有一行状态栏：文件夹及其分支、模型和模式，以及到目前为止的费用，右侧是 `/help`。
+你的输入位于两条细线之间，下面有一行状态栏：文件夹及其所在的分支、模型和模式，以及到目前为止的费用，右侧是 `/help`。
 
 - 你输入的内容后面会显示取自你之前消息的**灰色建议**。按 **→** 接受它，按 **Alt+→** 接受其中一个词。**设置 → 应用 → 通用 → 终端建议**可以把它关掉或打开（[设置](/settings?s=general&find=Terminal%20suggestions)）。
 - **Ctrl+R** 搜索你之前的消息：输入其中的几个词，用 **↑** 和 **↓** 移到某个匹配项，按 **Enter** 会把它放进输入行但不发送，这样你可以先修改。按 **Esc** 放弃。
@@ -301,7 +301,7 @@ hydor --server https://hydor.example.com --token acm_… sessions
 
 ## 颜色和管道
 
-终端里颜色是开启的（有真彩色时就用真彩色）；当输出到文件或另一个程序、设置了 `NO_COLOR` 或使用 `--no-color` 时，颜色是关闭的；`FORCE_COLOR` 会把它们打开。当你输入的内容通过管道传入时（`echo "…" | hydor`），它的工作方式和 `hydor run` 一样。当只有输出被管道接走时，对话会不带颜色和不断变化的行来打印，你输入的每一行都会被发送。像 `hydor sessions` 这样的列表此时会打印同样的列，不带颜色，也不会把较长的内容截断，方便脚本读取。 在较窄的终端上，列表会整列省略（先是说明，再是地址或时间等其他列），而不是把名称和标题截短。
+终端里颜色是开启的（有真彩色时就用真彩色）；当输出到文件或另一个程序、设置了 `NO_COLOR` 或使用 `--no-color` 时，颜色是关闭的；`FORCE_COLOR` 会把它们打开。当你输入的内容通过管道传入时（`echo "…" | hydor`），它的工作方式和 `hydor run` 一样。当只有输出被管道接走时，对话会不带颜色和不断变化的行来打印，你输入的每一行都会被发送。像 `hydor sessions` 这样的列表此时会打印同样的列，不带颜色，也不会把较长的内容截断，方便脚本读取。 在较窄的终端上，列表会整列省略（先是说明，再是地址或时间等其他列），而不是把名称和标题截短。 在显示不了符号的地方（Linux 控制台、不是 UTF-8 的区域设置，以及旧的 Windows 控制台），命令改用普通字符绘制：方框用 `+-|`，提示符用 `>`，标记用 `*`、`+` 和 `x`，标志用 HYDOR。`HYDOR_ASCII=1` 在任何地方都会打开这个模式，`HYDOR_ASCII=0` 会把它关掉。输出到文件或另一个程序的内容会保留符号，除非设置了 `HYDOR_ASCII=1`。
 
 ## 问问智能体
 
