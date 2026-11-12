@@ -2,10 +2,18 @@
 // list, so an area is only its file plus its line here (see kit.ts for what an area is). An area named like a command
 // that exists already (sessions, agents, tasks, open…) takes over only the verbs it names; the command's own code
 // still answers the rest until it is moved into the area.
+import { api } from './api.ts';
+import { experiments } from './experiments.ts';
+import { find } from './find.ts';
+import { guide } from './guide.ts';
+import { guidelines } from './guidelines.ts';
+import { inbox } from './inbox.ts';
+import { open } from './open.ts';
 import { projects } from './projects.ts';
+import { sessions } from './sessions.ts';
 import type { Area, Verb } from './kit.ts';
 
-export const AREAS: Area[] = [projects];
+export const AREAS: Area[] = [api, experiments, find, guide, guidelines, inbox, open, projects, sessions];
 
 /** An area by its name or an alias of it. */
 export const areaByName = (name: string): Area | undefined => AREAS.find((a) => a.name === name || a.aliases?.includes(name));
