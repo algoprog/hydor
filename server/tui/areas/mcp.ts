@@ -3,7 +3,7 @@
 // server: removing one is how it stops. Values of env and headers are never returned by the server, so edit asks for them again.
 import path from 'node:path';
 import { ApiError } from '../client.ts';
-import { Cancelled, choose, mark, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
+import { Cancelled, choose, fields, flag, mark, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
 
 interface Server {
   agent: 'claude' | 'codex';
@@ -145,6 +145,42 @@ export const mcp: Area = {
             { head: ['', 'SERVER', 'AGENT', 'SCOPE', 'TYPE', 'COMMAND OR ADDRESS', 'KEYS'], grow: 1, fixed: [1], free: [5] },
           ),
         );
+      },
+    },
+    {
+      name: 'show',
+      aliases: ['info'],
+      args: [server],
+      options: { ...PICK, tools: { type: 'boolean', desc: 'Start it and count its tools (slow: up to 2 minutes)' } },
+      summary: 'One server: program, command, keys, state',
+      help: 'Which program has it (Claude Code or Codex), its scope, its command and arguments or its address, the names of its environment variables and headers (never their values: the agents do not give them out), and whether it is on. The API has no tools list without starting servers, so --tools starts the program’s servers, as hydor mcp status does, and says how many tools this one has.',
+      examples: ['hydor mcp show github', 'hydor mcp show github --agent codex', 'hydor mcp show docs --tools', 'hydor mcp show claude:user:github --json'],
+      async run(ctx, [given], v) {
+        const s = await findServer(ctx, v, given);
+        const cwd = folderOf(ctx, v);
+        const live = flag(v, 'tools')
+          ? (await ctx.conn.api<{ servers: { name: string; state: string; error?: string; tools?: number }[] }>('POST', '/api/setup/mcp/status', { agent: s.agent, ...(cwd ? { cwd } : {}) }, { timeoutMs: 200_000 })).servers.find((x) => x.name === s.name)
+          : undefined;
+        if (ctx.o.json) return ctx.json(live ? { ...s, status: live } : s);
+        const { p } = ctx.look;
+        ctx.out([
+          p.bold(s.name),
+          ...fields(ctx, [
+            ['Id', idOf(s)],
+            ['Program', programName(s.agent)],
+            ['Scope', s.scope],
+            ['Type', s.transport],
+            ['Command', s.transport === 'stdio' ? [s.command, ...(s.args ?? [])].filter(Boolean).join(' ') : undefined],
+            ['Address', s.transport === 'stdio' ? undefined : s.url],
+            ['Environment', s.envKeys?.length ? `${s.envKeys.join(', ')} ${p.dim('(values hidden)')}` : undefined],
+            ['Headers', s.headerKeys?.length ? `${s.headerKeys.join(', ')} ${p.dim('(values hidden)')}` : undefined],
+            ['Bearer token', s.bearerEnv ? `from the variable ${s.bearerEnv}` : undefined],
+            ['State', s.enabled === false ? `${mark(p, 'off')} off` : `${mark(p, 'on')} on`],
+            ['Working', live ? `${live.state}${live.error ? `: ${live.error}` : ''}` : undefined],
+            ['Tools', live ? (live.tools !== undefined ? String(live.tools) : undefined) : undefined],
+          ]),
+          ...(live ? [] : [p.dim(`hydor mcp show ${idOf(s)} --tools starts it and says what it offers.`)]),
+        ]);
       },
     },
     {

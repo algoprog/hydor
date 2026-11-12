@@ -45,6 +45,49 @@ test('list: a table with the keys’ names (never values); --agent, --scope, --f
   await refused(run(conn, ['mcp', '--agent', 'x']), /--agent takes claude or codex/);
 });
 
+test('show: the program, scope, command or address, the names of env and headers (never values), on or off, tools when asked', async () => {
+  const { conn, calls } = fakeConn(routes());
+  const r = await run(conn, ['mcp', 'show', 'docs']);
+  assert.deepEqual(calls, [{ method: 'GET', path: '/api/setup/mcp' }]);
+  assert.match(r.out, /^docs$/m);
+  assert.match(r.out, /^Id +claude:user:docs$/m);
+  assert.match(r.out, /^Program +Claude Code$/m);
+  assert.match(r.out, /^Scope +user$/m);
+  assert.match(r.out, /^Type +http$/m);
+  assert.match(r.out, /^Address +https:\/\/x\.dev\/mcp$/m);
+  assert.doesNotMatch(r.out, /^Command/m);
+  assert.match(r.out, /^State +● on$/m);
+  assert.match(r.out, /hydor mcp show claude:user:docs --tools/);
+  // A command server, with the names of what it needs; the same name in two programs is asked for by --agent or agent:scope:name.
+  await refused(run(conn, ['mcp', 'show', 'github']), /fits 2 MCP servers: github \(claude:user:github\), github \(codex:user:github\)/);
+  const g = await run(conn, ['mcp', 'show', 'github', '--agent', 'claude']);
+  assert.match(g.out, /^Command +npx -y gh-mcp$/m);
+  assert.match(g.out, /^Environment +GITHUB_TOKEN \(values hidden\)$/m);
+  assert.doesNotMatch(g.out, /^Address/m);
+  const off = await run(conn, ['mcp', 'show', 'codex:user:github']);
+  assert.match(off.out, /^Program +Codex$/m);
+  assert.match(off.out, /^State +· off$/m);
+  // Headers and a bearer variable.
+  const rem = { agent: 'claude', name: 'api', scope: 'project', transport: 'sse', url: 'https://x.dev/sse', headerKeys: ['Authorization'], bearerEnv: 'API_TOKEN' };
+  const h = await run(fakeConn({ 'GET /api/setup/mcp': { servers: [rem] } }).conn, ['mcp', 'show', 'api']);
+  assert.match(h.out, /^Headers +Authorization \(values hidden\)$/m);
+  assert.match(h.out, /^Bearer token +from the variable API_TOKEN$/m);
+  assert.match(h.out, /^Scope +project$/m);
+  // --tools starts the program's servers and says what this one offers.
+  const t = fakeConn(routes({ 'POST /api/setup/mcp/status': { servers: [{ name: 'github', state: 'connected', tools: 12 }, { name: 'docs', state: 'failed', error: 'spawn ENOENT' }] } }));
+  const withTools = await run(t.conn, ['mcp', 'show', 'github', '--agent', 'claude', '--tools']);
+  assert.deepEqual(t.calls.at(-1), { method: 'POST', path: '/api/setup/mcp/status', body: { agent: 'claude' } });
+  assert.match(withTools.out, /^Working +connected$/m);
+  assert.match(withTools.out, /^Tools +12$/m);
+  assert.doesNotMatch(withTools.out, /--tools/);
+  assert.match((await run(t.conn, ['mcp', 'show', 'docs', '--tools'])).out, /^Working +failed: spawn ENOENT$/m);
+  // --json: the server as listed (and its status with --tools).
+  assert.deepEqual((await run(conn, ['mcp', 'show', 'docs', '--json'])).json, [docs]);
+  assert.deepEqual((await run(t.conn, ['mcp', 'show', 'github', '--agent', 'claude', '--tools', '--json'])).json, [{ ...gh, status: { name: 'github', state: 'connected', tools: 12 } }]);
+  await refused(run(conn, ['mcp', 'show']), /Say which server: hydor mcp show <server> \[options\]/);
+  await refused(run(conn, ['mcp', 'show', 'zzz']), /No MCP server “zzz”: hydor mcp lists them/);
+});
+
 test('status: each agent’s servers started, one after the other; --agent; --json', async () => {
   const st = (agent: string) => ({
     servers: [

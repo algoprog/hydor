@@ -4,7 +4,7 @@ import type { Assistant } from '../../../shared/assistants.ts';
 import { ASSISTANT_ICONS } from '../../../shared/assistants.ts';
 import { enc } from '../client.ts';
 import { tierName } from '../lines.ts';
-import { choose, fields, markdown, num, pickOne, str, strs, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
+import { choose, fields, markdown, num, pickOne, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
 
 const AGENT_HINT = 'hydor agents lists them';
 const agent = { name: 'agent', kind: 'agent', pick: true } as const;
@@ -162,8 +162,9 @@ export const agents: Area = {
       examples: ['hydor agents', 'hydor agents --json'],
       async run(ctx) {
         if (ctx.o.json) return ctx.json(await ctx.conn.api('GET', '/api/assistants'));
-        const { agentLines } = await import('../commands.ts');
-        ctx.out(agentLines(await listAgents(ctx), ctx.look));
+        const { p } = ctx.look;
+        // The name is the main column; the description goes whole on a narrow terminal before the name is cut.
+        ctx.out(table(ctx, (await listAgents(ctx)).map((a) => [p.bold(a.name), p.dim(a.id), p.dim(a.description ?? ''), a.tier ? p.dim(tierName(a.tier)) : '']), { grow: 0, fixed: [1], free: [2], drop: [2] }));
       },
     },
     {

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { Conn, Events } from '../client.ts';
-import { fakeConn, run } from './test-kit.ts';
+import { atWidths, fakeConn, run } from './test-kit.ts';
 import { UsageError } from './kit.ts';
 import { wait } from './accounts.ts';
 
@@ -50,6 +50,65 @@ test('list shows the sign-ins and which one new sessions start with', async () =
   assert.match(t.out, /●\s+Personal\s+acc1\s+Claude Code\s+me@home\.example/);
   assert.match(t.out, /·\s+Personal\s+acc2\s+Codex\s+not signed in/);
   assert.deepEqual((await run(conn, ['accounts', 'list', '--json'])).json, [accountsAnswer]);
+});
+
+const usage = {
+  claude: { agent: 'claude', ok: true, fetchedAt: 1, account: { email: 'me@work.example', plan: 'Max' }, windows: [{ id: 'five', label: '5-hour', usedPercent: 40, resetsAt: Date.now() + 3_600_000 }, { id: 'week', label: 'Week', usedPercent: 92 }] },
+  codex: { agent: 'codex', ok: false, fetchedAt: 1, error: 'Not signed in', windows: [] },
+  accounts: { acc1: { agent: 'claude', ok: true, fetchedAt: 1, windows: [{ id: 'five', label: '5-hour', usedPercent: 10 }], limited: { label: 'Week', resetsAt: Date.now() + 86_400_000 * 2 } } },
+};
+
+test('show: the program, who is signed in, whether new sessions use it, usage, the API key (never its value), the switches at a limit', async () => {
+  const { conn, calls } = fakeConn({ ...routes, 'GET /api/usage': usage, 'GET /api/app-settings': { autoResume: true, autoSwitch: true, apiCredit: false } });
+  const t = await run(conn, ['accounts', 'show', 'claude']);
+  assert.deepEqual(calls.map((c) => c.path).sort(), ['/api/accounts', '/api/app-settings', '/api/bootstrap', '/api/usage']);
+  assert.match(t.out, /^Claude Code$/m);
+  assert.match(t.out, /^Program +Claude Code$/m);
+  assert.match(t.out, /^Sign-in +the program’s own$/m);
+  assert.match(t.out, /^State +signed in$/m);
+  assert.match(t.out, /^Who +me@work\.example$/m);
+  assert.match(t.out, /^Plan +Max$/m);
+  assert.match(t.out, /^Signed in with +claudeai$/m);
+  assert.match(t.out, /^New sessions +do not start with it \(hydor accounts use claude\)$/m);
+  assert.match(t.out, /^API key +saved \(API credit/m);
+  assert.match(t.out, /^At a limit +carries on with another account/m);
+  assert.match(t.out, /^API credit +off$/m);
+  assert.match(t.out, /^Usage$/m);
+  assert.match(t.out, /^ +5-hour +████████░░░░░░░░░░░░ 40% +resets in /m);
+  assert.match(t.out, /^ +Week +.* 92%/m);
+  assert.doesNotMatch(t.out, /sk-ant/);
+  // An added account: its own usage (at a limit), the one new sessions start with, no API key.
+  const a = await run(conn, ['accounts', 'show', 'claude:personal']);
+  assert.match(a.out, /^Personal · Claude Code$/m);
+  assert.match(a.out, /^Sign-in +an account you added$/m);
+  assert.match(a.out, /^New sessions +● start with it$/m);
+  assert.match(a.out, /^API key +none$/m);
+  assert.match(a.out, /At its limit \(Week\), lifts in 2 days/);
+  // Codex has no API key; the usage that cannot be read says so.
+  const c = await run(conn, ['accounts', 'info', 'codex']);
+  assert.match(c.out, /^State +Not signed in$/m);
+  assert.match(c.out, /^API key +not used by Codex$/m);
+  assert.doesNotMatch(c.out, /^API credit/m);
+  assert.match(c.out, /Not signed in/);
+  // By id, by email, picked on a terminal; --json has it all.
+  assert.match((await run(conn, ['accounts', 'show', 'acc1'])).out, /^Personal · Claude Code$/m);
+  assert.match((await run(conn, ['accounts', 'show', 'me@work.example'])).out, /^Claude Code$/m);
+  const picked = await run(conn, ['accounts', 'show'], { interactive: true, pick: 'acc2' });
+  assert.deepEqual(picked.picked, ['Which account?']);
+  await assert.rejects(run(conn, ['accounts', 'show']), (e) => e instanceof UsageError && /Say which account: hydor accounts show <account>/.test((e as Error).message));
+  const j = (await run(conn, ['accounts', 'show', 'claude', '--json'])).json[0] as any;
+  assert.equal(j.apiKey, true);
+  assert.equal(j.usage.windows.length, 2);
+  assert.equal(j.autoSwitch, true);
+  assert.equal(j.newSessions, false);
+});
+
+test('show: with the usage and the settings out of reach it still says what it knows', async () => {
+  const { conn } = fakeConn({ ...routes });
+  const t = await run(conn, ['accounts', 'show', 'claude']);
+  assert.match(t.out, /^Who +me@work\.example$/m);
+  assert.match(t.out, /^No usage to show\.$/m);
+  assert.doesNotMatch(t.out, /^At a limit/m);
 });
 
 test('add makes the account, and with --no-sign-in stops there', async () => {
@@ -171,6 +230,16 @@ test('use sets the account new sessions start with', async () => {
   await assert.rejects(run(conn, ['accounts', 'use']), (e) => e instanceof UsageError && /Say which account/.test((e as Error).message));
   const picked = await run(conn, ['accounts', 'use'], { interactive: true, pick: 'acc1' });
   assert.deepEqual(picked.picked, ['Which account?']);
+});
+
+test('list on a narrow terminal: the API key note goes whole, then the id', async () => {
+  const w = await atWidths(fakeConn(routes).conn, ['accounts']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.slice(0, -1).every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][1], /API key saved$/);
+  assert.match(w[100][0], /^ +ACCOUNT +ID +PROGRAM +STATE$/);
+  assert.match(w[60][0], /^ +ACCOUNT +PROGRAM +STATE$/, 'the API key note and the id went whole, not the sign-in cut to a stub');
+  assert.match(w[60][1], /me@work\.example · Max · claud…$/);
+  assert.match(w[40][0], /^ +ACCOUNT +PROGRAM +STATE$/);
 });
 
 for (const [name, fn] of tests) {

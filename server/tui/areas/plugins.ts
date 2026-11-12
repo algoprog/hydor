@@ -171,12 +171,13 @@ export const plugins: Area = {
           if (!r.installed.length && !r.available.length) return ctx.out('No plugins yet: hydor plugins add <source> adds one.');
           const row = (x: HydorPlugin) => [
             x.installed ? (x.enabled && x.setup.state !== 'failed' ? mark(p, 'on') : x.setup.state === 'failed' ? mark(p, 'error') : mark(p, 'off')) : p.dim('+'),
-            titled(x, p),
+            p.bold(x.title),
+            p.dim(x.name),
             p.dim(x.version ?? ''),
             p.dim(stateWord(x)),
             p.dim(x.description ?? ''),
           ];
-          ctx.out(table(ctx, [...r.installed, ...r.available].map(row), { head: ['', 'PLUGIN', 'VERSION', 'STATE', ''], grow: 1, free: [1, 4] }));
+          ctx.out(table(ctx, [...r.installed, ...r.available].map(row), { head: ['', 'PLUGIN', 'ID', 'VERSION', 'STATE', ''], grow: 1, fixed: [2], free: [1, 5], drop: [5, 2] }));
           return;
         }
         const q = str(v, 'search');
@@ -186,7 +187,7 @@ export const plugins: Area = {
         const more = q ? r.available.map((x) => [p.dim('+'), x.name, p.dim(x.marketplace ?? ''), p.dim(x.version ?? ''), p.dim(x.description ?? '')]) : [];
         if (!rows.length && !more.length)
           return ctx.out(`${programName(where)} has no plugins${q ? ` that fit “${q}”` : ''}: hydor plugins add <name@marketplace> --agent ${where} adds one (--search finds them).`);
-        ctx.out(table(ctx, [...rows, ...more], { head: ['', 'PLUGIN', 'MARKETPLACE', 'VERSION', ''], grow: 1, free: [1, 4] }));
+        ctx.out(table(ctx, [...rows, ...more], { head: ['', 'PLUGIN', 'MARKETPLACE', 'VERSION', ''], grow: 1, free: [1, 4], drop: [4] }));
         if (q && r.total && r.total > more.length) ctx.out(p.dim(`… ${r.total - more.length} more that fit (-n <number>)`));
       },
     },

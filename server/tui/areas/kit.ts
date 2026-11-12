@@ -224,18 +224,26 @@ export async function choose<T>(
 /** Free-text columns (titles, snippets, first messages) are cut to this many characters when piped, so one long one does not pad every other row. */
 export const FREE_TEXT_CAP = 80;
 
+/** The room the main column (the name or title) is held at while the others give and optional columns go: a long title is not worth more than this. */
+const MAIN_ROOM = 40;
+
 /** A column this narrow (a state, an age, a size) is cut only after the wider ones, as a fixed one is. */
 const NARROW = 14;
 
 /**
  * Rows as aligned columns, with an optional dim head. On a terminal (`ctx.fit`) no line is wider than the width minus
- * one: the column `grow` (the one that says what the thing is: its title or name; default the last) keeps its room,
- * and the other columns shrink first, the widest first, down to their labels (8 characters at least); `fixed` columns
- * (ids, addresses: no use cut) and narrow ones (up to 14: states, ages, sizes) shrink only after the rest. Piped, nothing is cut to the width,
- * but the `free` columns (default: `grow` only) are cut to FREE_TEXT_CAP characters. `indent` puts that many spaces
- * before each line, counted in the width.
+ * one. The column `grow` (the one that says what the thing is: its title or name; default the last) keeps its room;
+ * the other columns shrink first, the widest first, but not below 20 characters while an optional column can still go,
+ * nor below 12 (or what their widest cell needs, when that is less) while another can still give. `fixed` columns (ids,
+ * addresses: no use cut) and narrow ones (up to 14: states, ages, sizes) give only after the rest.
+ *
+ * Still too wide: the columns in `drop` (indexes of the descriptions and other free text that can go, the first to go
+ * first) are left out whole, one at a time, before the main column is cut below its natural width (or 40 characters,
+ * when a title is longer than that). Then the main column gives, then the held ones, and last the rest, down to their
+ * labels (8 at least). Piped, nothing is cut to the width, but the `free` columns (default: `grow` only) are cut to
+ * FREE_TEXT_CAP characters. `indent` puts that many spaces before each line, counted in the width.
  */
-export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { head?: string[]; grow?: number; free?: number[]; fixed?: number[]; indent?: number } = {}): string[] {
+export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { head?: string[]; grow?: number; free?: number[]; fixed?: number[]; drop?: number[]; indent?: number } = {}): string[] {
   const { p, width } = ctx.look;
   const pre = ' '.repeat(o.indent ?? 0);
   // A header over nothing is no table: the caller says what is not there.
@@ -252,29 +260,55 @@ export function table(ctx: Pick<Ctx, 'look' | 'fit'>, rows: string[][], o: { hea
   const grow = o.grow === undefined ? n - 1 : empty.has(o.grow) ? n - 1 : moved(o.grow, n - 1);
   const free = o.free ? o.free.filter((i) => !empty.has(i)).map((i) => moved(i, i)) : [grow];
   const headW = (i: number) => (o.head ? strWidth(keep(o.head)[i] ?? '') : 0);
-  const w: number[] = Array.from({ length: n }, () => 0);
+  const natural: number[] = Array.from({ length: n }, () => 0);
   const cap = (i: number) => (!ctx.fit && free.includes(i) ? FREE_TEXT_CAP : Infinity);
-  for (const r of all) r.forEach((c, i) => (w[i] = Math.max(w[i], Math.min(strWidth(c), cap(i)))));
+  for (const r of all) r.forEach((c, i) => (natural[i] = Math.max(natural[i], Math.min(strWidth(c), cap(i)))));
   const fixed = (o.fixed ?? []).filter((i) => !empty.has(i)).map((i) => moved(i, i));
-  const natural = [...w];
+  const droppable = (o.drop ?? []).filter((i) => !empty.has(i)).map((i) => moved(i, i)).filter((i) => i !== grow);
+  // The columns left out whole, and the widths of the others.
+  const gone = new Set<number>();
+  let w = [...natural];
   if (ctx.fit) {
     const limit = width - 1 - pre.length;
-    // A column never goes below its label, nor (the main one) 12; a fixed one (an id, an address: useless cut) shrinks only when nothing else can.
-    const floor = (i: number) => Math.min(w[i], Math.max(headW(i), i === grow ? 12 : 8));
-    const hold = (i: number) => (fixed.includes(i) || natural[i] <= NARROW ? w[i] : floor(i));
-    let total = w.reduce((a, x) => a + x, 0) + gap * (n - 1);
-    while (total > limit) {
-      // The widest column that is not the main one gives a character; the main one only when none can.
+    // The least a column is cut to while another can still give: first a comfortable 20 (before an optional column goes whole), then 12; or its widest cell when that is less.
+    const soft = (i: number, to = 12) => Math.min(natural[i], to);
+    const comfy = (i: number) => soft(i, 20);
+    // The very least: its label (8 characters at least); the main column never goes below its soft one.
+    const hard = (i: number) => (i === grow ? soft(i, 12) : Math.min(natural[i], Math.max(headW(i), 8)));
+    const held = (i: number) => fixed.includes(i) || natural[i] <= NARROW;
+    const live = (i: number) => !gone.has(i);
+    const gives = (i: number, least: (i: number) => number, skip?: (i: number) => boolean) => live(i) && !skip?.(i) && w[i] > least(i);
+    const total = () => w.reduce((a, x, i) => a + (live(i) ? x : 0), 0) + gap * (n - gone.size - 1);
+    // Of the live columns that can give, the widest gives a character; false when none can.
+    const shave = (ok: (i: number) => boolean) => {
       let pick = -1;
-      for (let i = 0; i < n; i++) if (i !== grow && w[i] > hold(i) && (pick < 0 || w[i] > w[pick])) pick = i;
-      if (pick < 0 && w[grow] > floor(grow)) pick = grow;
-      for (let i = 0; pick < 0 && i < n; i++) if (i !== grow && w[i] > floor(i) && (pick < 0 || w[i] > w[pick])) pick = i;
-      if (pick < 0) break;
+      for (let i = 0; i < n; i++) if (ok(i) && (pick < 0 || w[i] > w[pick])) pick = i;
+      if (pick < 0) return false;
       w[pick]--;
-      total--;
+      return true;
+    };
+    // A long title is not worth more room than this when deciding whether an optional column stays.
+    const room = Math.min(natural[grow], MAIN_ROOM);
+    for (;;) {
+      w = [...natural];
+      // 1. the others (not the main one, not the held ones) down to a comfortable width, the widest first.
+      while (total() > limit && shave((i) => i !== grow && gives(i, comfy, held))) {}
+      // 2. the main column would have less than its room: the next droppable column goes whole, and it is tried again without it.
+      const next = droppable.find((i) => live(i));
+      if (total() - (w[grow] - room) > limit && next !== undefined) {
+        gone.add(next);
+        continue;
+      }
+      // 3. the others to 12, the main column to 12, then the held ones, then everything to the very least.
+      while (total() > limit && shave((i) => i !== grow && gives(i, soft, held))) {}
+      while (total() > limit && shave((i) => i === grow && gives(i, soft))) {}
+      while (total() > limit && shave((i) => i !== grow && gives(i, soft))) {}
+      while (total() > limit && shave((i) => gives(i, hard))) {}
+      break;
     }
   }
-  const cut = all.map((r) => r.map((c, i) => (strWidth(c) > w[i] ? truncate(c, w[i]) : c)));
+  const alive = Array.from({ length: n }, (_, i) => i).filter((i) => !gone.has(i));
+  const cut = all.map((r) => alive.map((i) => (strWidth(r[i] ?? '') > w[i] ? truncate(r[i] ?? '', w[i]) : (r[i] ?? ''))));
   const lines = columns(cut).map((l) => pre + l);
   return ctx.fit ? lines.map((l) => truncate(l, width - 1)) : lines;
 }
