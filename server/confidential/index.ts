@@ -2,11 +2,11 @@
 // Options → Confidential runs on Custom with a model on this computer or your private network, and nothing of it
 // leaves this computer:
 // - Starting one (sessions.create calls confidentialStart): Custom only, a local model (the best one installed when
-//   none is named), memory off, no swarm, deep research or arena. A child of one is confidential too.
+//   none is named), memory off, no swarm, deep research or arena. A subagent of one is confidential too.
 // - Each message (beforeSend) is refused while its model is not local, or not there; so is a switch to a model
 //   elsewhere, a hand-off to another agent, and turning it off or memory on (it stays as it started).
 // - Tools (allowTool): only those that work here (files, documents, the Library, knowledge bases, reading memory,
-//   child sessions, the guide). Every other one is off, tools added later too, until they are named here.
+//   Hydor subagents (child sessions), the guide). Every other one is off, tools added later too, until they are named here.
 // - Custom is told so (context), and its process (HYDOR_CONFIDENTIAL) leaves out its web_fetch and every MCP server
 //   but the app's own, uses local models alone, and runs commands in the sandbox without network
 //   (server/agent/sandbox.ts), or asks before each one where that cannot run.
@@ -63,7 +63,7 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'recall',
   'search_sessions',
   'read_session',
-  // Child sessions, confidential too.
+  // Hydor subagents (child sessions), confidential too.
   'start_child_session',
   'child_sessions',
   'message_child',
@@ -122,14 +122,14 @@ export function confidentialStart(db: DB, o: CreateOpts, deps?: Pick<Deps, 'mode
   const parent = typeof o.extra?.parent === 'string' ? o.extra.parent : undefined;
   const inherited = confidentialKey(db, parent);
   if (!isConfidential(o.extra) && !inherited) return o;
-  // A child's replies go to its parent: a confidential one only to a confidential parent.
-  if (parent && !inherited) throw new HttpError(400, 'A confidential session can’t be the child of one that isn’t: its replies would go there.');
+  // A subagent's replies go to its parent: a confidential one only to a confidential parent.
+  if (parent && !inherited) throw new HttpError(400, 'A confidential session can’t be a subagent of one that isn’t: its replies would go there.');
   const d = deps ?? featureDeps();
   if (o.agent !== 'acp' || o.acpAgent !== CONSOLE_ID)
     throw new HttpError(
       400,
       inherited
-        ? 'A child of a confidential session runs on this computer too: start it on Custom (agent "custom") with a model on this computer.'
+        ? 'A subagent of a confidential session runs on this computer too: start it on Custom (agent "custom") with a model on this computer.'
         : 'A confidential session runs on Custom, the app’s own agent, with a model on this computer: pick Custom as the agent.',
     );
   for (const k of ['swarm', 'research', 'arena'] as const) if (o.extra?.[k]) throw new HttpError(400, OFF_AT_START[k]);
@@ -259,7 +259,7 @@ export function confidentialInstructions(cut: boolean): string {
   return [
     '# A confidential session',
     'The user started this session as confidential: nothing of it may leave this computer. You run on a model here, and the app keeps it so:',
-    '- Off here: web search and reading web pages, the browser and the screen, connected apps and their keys, apps and changes to the app (app_api), making pictures, videos or sound, publishing, scheduled tasks, other models (second opinions, hand-offs), and saving to memory or to skills. Child sessions you start run here too, on a local model.',
+    '- Off here: web search and reading web pages, the browser and the screen, connected apps and their keys, apps and changes to the app (app_api), making pictures, videos or sound, publishing, scheduled tasks, other models (second opinions, hand-offs), and saving to memory or to skills. Hydor subagents you start run here too, on a local model.',
     cut
       ? '- Your commands run without network: they can’t download, install from the internet, push, send or reach any service. Use what is on this computer.'
       : '- Commands can’t be cut off from the network on this computer, so the user approves each one: don’t run commands that use the network (downloads, installs from the internet, pushes, calls to services).',

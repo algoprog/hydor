@@ -213,7 +213,7 @@ test('start_child_session: Custom with a named model, the parent’s folder, a m
   assert.equal(o.remember, false);
   assert.equal(o.prompt, 'Count the words in every chapter and report a table.');
   assert.deepEqual(o.extra, { parent: 'claude:p' });
-  const key = /Started child session (\S+):/.exec(out)?.[1];
+  const key = /Started Hydor subagent (\S+):/.exec(out)?.[1];
   assert.equal(key, 'acp:child1');
   assert.equal(parentOf(db, key!), 'claude:p');
   assert.deepEqual(childKeys(db, 'claude:p'), [key]);
@@ -243,14 +243,14 @@ test('one level only: a child gets no child tools, and cannot start one', async 
   const kid = 'acp:child1';
   assert.deepEqual(children.tools!(ctxOf(kid)), []);
   const start = children.tools!(ctxOf('claude:p')).find((t) => t.name === 'start_child_session')!;
-  await assert.rejects(start.run({ brief: 'x', agent: 'custom', model: 'llama3' }, ctxOf(kid)), /cannot start child sessions of its own/);
+  await assert.rejects(start.run({ brief: 'x', agent: 'custom', model: 'llama3' }, ctxOf(kid)), /cannot start Hydor subagents of its own/);
   assert.deepEqual(children.spawn!({ agent: 'acp', acpAgent: 'console', cwd: tmp, runId: 'r', resume: false, extra: { parent: 'claude:p' } }, deps), { instructions: [CHILD_INSTRUCTIONS] });
 });
 
 test('at most N working at once (busy children and ones still starting count)', async () => {
   kvSet(db, 'children.maxRunning', '2');
   // Two children of claude:p are working already.
-  await assert.rejects(call('claude:p', 'start_child_session', { brief: 'third', agent: 'custom', model: 'llama3' }), /2 of your child sessions are working already, the most at once/);
+  await assert.rejects(call('claude:p', 'start_child_session', { brief: 'third', agent: 'custom', model: 'llama3' }), /2 of your Hydor subagents are working already, the most at once/);
   sessions.all.get('acp:child1')!.live = 'idle';
   // A burst: the first is still being created when the second comes.
   let open!: () => void;
@@ -287,7 +287,7 @@ test('a child’s turn ends: its reply goes to the parent, once', async () => {
   await reportTurn(deps, { key: kid, startedAt: Date.now() - 1000, external: false });
   const m = sessions.delivered.at(-1)!;
   assert.equal(m.key, 'claude:p');
-  assert.equal(m.text, `[Reply from the child session "Count words" (${kid}, Custom · Qwen3 Coder)]\n\n| Chapter | Words |\n| 1 | 1200 |`);
+  assert.equal(m.text, `[Reply from the Hydor subagent "Count words" (${kid}, Custom · Qwen3 Coder)]\n\n| Chapter | Words |\n| 1 | 1200 |`);
   const n = sessions.delivered.length;
   await reportTurn(deps, { key: kid, startedAt: Date.now() - 1000, external: false });
   assert.equal(sessions.delivered.length, n);
@@ -322,8 +322,8 @@ test('a long reply comes back as a summary, with the way to read it whole', asyn
 test('stopped, failed, or no reply: the parent hears how it ended', () => {
   const base = { key: 'acp:x', title: 'T', label: 'Custom · M', link: 'L' };
   const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
-  assert.equal(resultMessage({ ...base, turn: t({ status: 'interrupted', reply: 'half' }), stopped: 'its spending cap was reached' }), '[The child session "T" (acp:x, Custom · M) was stopped before it finished: its spending cap was reached. What it wrote is below.]\n\nhalf');
-  assert.equal(resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'model not found' }), '[The child session "T" (acp:x, Custom · M) stopped with an error: model not found]\n(It wrote no reply. child_sessions shows how it stands; the user can open it at L.)');
+  assert.equal(resultMessage({ ...base, turn: t({ status: 'interrupted', reply: 'half' }), stopped: 'its spending cap was reached' }), '[The Hydor subagent "T" (acp:x, Custom · M) was stopped before it finished: its spending cap was reached. What it wrote is below.]\n\nhalf');
+  assert.equal(resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'model not found' }), '[The Hydor subagent "T" (acp:x, Custom · M) stopped with an error: model not found]\n(It wrote no reply. child_sessions shows how it stands; the user can open it at L.)');
 });
 
 test('the parent’s conversation reads each kind of reply back as it was sent', () => {
@@ -335,6 +335,12 @@ test('the parent’s conversation reads each kind of reply back as it was sent',
   assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ status: 'interrupted', reply: 'half' }), stopped: 'its spending cap was reached' })), { ...who, ended: 'stopped', why: 'its spending cap was reached', text: 'half' });
   assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ status: 'interrupted' }) })), { ...who, ended: 'stopped', text: '' });
   assert.deepEqual(childReplyOf(resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'model not found [404]' })), { ...who, ended: 'failed', why: 'model not found [404]', text: '' });
+  // Transcripts from before the rename ("child session") read back the same, and so do the new words.
+  const old = (o: string) => childReplyOf(o)!;
+  assert.deepEqual(old('[Reply from the child session "Find \"the\" papers (2018)" (claude:x-1, Claude Code · claude-opus-5-5)]\n\nTwelve papers.'), { title: 'Find "the" papers (2018)', key: 'claude:x-1', label: 'Claude Code · claude-opus-5-5', ended: 'replied', text: 'Twelve papers.' });
+  assert.deepEqual(old('[The child session "T" (acp:x, Custom · M) was stopped before it finished: its spending cap was reached. What it wrote is below.]\n\nhalf'), { title: 'T', key: 'acp:x', label: 'Custom · M', ended: 'stopped', why: 'its spending cap was reached', text: 'half' });
+  assert.deepEqual(old('[The child session "T" (acp:x, Custom · M) stopped with an error: model not found]'), { title: 'T', key: 'acp:x', label: 'Custom · M', ended: 'failed', why: 'model not found', text: '' });
+  assert.deepEqual(childReplyOf('[Reply from the Hydor subagent "T" (acp:x, Custom · M)]\n\nDone.'), { title: 'T', key: 'acp:x', label: 'Custom · M', ended: 'replied', text: 'Done.' });
   // Anything else is a message like any other.
   assert.equal(childReplyOf('[Reply from me] hello'), null);
   assert.equal(childReplyOf('papers on latent sparse retrieval'), null);
@@ -355,7 +361,7 @@ test('a parent over its cap gets the reply in its queue instead', async () => {
 // ---- steering ---------------------------------------------------------------------------------------
 
 test('message_child: only one’s own children; queued while it works', async () => {
-  await assert.rejects(call('claude:p', 'message_child', { key: 'codex:q', text: 'hi' }), /not one of your child sessions/);
+  await assert.rejects(call('claude:p', 'message_child', { key: 'codex:q', text: 'hi' }), /not one of your Hydor subagents/);
   sessions.all.get(kid)!.live = 'idle';
   assert.match(await call('claude:p', 'message_child', { key: kid, text: 'Add a total row.' }), /^Sent\./);
   assert.equal(sessions.delivered.at(-1)!.text, 'Message from the session that started you:\n\nAdd a total row.');
@@ -369,7 +375,7 @@ test('child_sessions: each child’s state, and one’s whole latest reply', asy
   assert.match(list, /latest reply: Done: 3 tables\./);
   assert.match(list, /- claude:child2 · "Proofread chapter 2\." · claude · sonnet · working/);
   assert.equal(await call('claude:p', 'child_sessions', { key: kid }), `Latest reply of ${kid}:\n\nDone: 3 tables.`);
-  await assert.rejects(call('claude:p', 'child_sessions', { key: 'codex:q' }), /not one of your child sessions/);
+  await assert.rejects(call('claude:p', 'child_sessions', { key: 'codex:q' }), /not one of your Hydor subagents/);
 });
 
 test('the setting: how many at once', async () => {
@@ -423,7 +429,9 @@ test('an agent’s highest tier for helpers: asked for above it, or none asked, 
   assert.equal(sessions.created.at(-1)!.model, 'haiku');
   // The tool says so, and offers no tier above it.
   const t = tool(k, 'start_child_session');
-  assert.match(t.description, /A child never thinks with a tier above standard\./);
+  assert.match(t.description, /A Hydor subagent never thinks with a tier above standard\./);
+  assert.match(t.description, /^Hand a self-contained part of the job to a Hydor subagent: a new session of its own that works on it in parallel\./);
+  assert.match(t.description, /The user sees each one as a Hydor subagent \(a card in this conversation, a row in the tray above the message box, under this session in the sidebar\), told apart from your program’s own subagents/);
   assert.deepEqual((t.inputSchema as any).properties.tier.enum, ['quick', 'standard']);
 });
 
@@ -443,7 +451,7 @@ test('in a team a child asked for with no tier gets Standard; with the team off,
   await call(k, 'start_child_session', { brief: 'Add the --json flag to the export command as specified.' });
   assert.equal(sessions.created.at(-1)!.model, 'sonnet');
   assert.equal((notesOf(db, k, 'child').at(-1)!.data as ChildNote).tier, 'standard');
-  assert.match(tool(k, 'start_child_session').description, /With no tier a child gets standard\./);
+  assert.match(tool(k, 'start_child_session').description, /With no tier a Hydor subagent gets standard\./);
   // A model named for it is used as named, with no tier.
   await call(k, 'start_child_session', { brief: 'Same, on Opus.', model: 'opus' });
   assert.equal(sessions.created.at(-1)!.model, 'opus');
@@ -496,25 +504,25 @@ test('a helper never thinks with a tier above its lead’s own: Sonnet leads Sta
   assert.equal(sessions.created.at(-1)!.model, 'fable');
 });
 
-test('what a session’s main agent is told: to lead helpers on cheaper tiers, in the same words each time', () => {
+test('what a session’s main agent is told: to lead subagents on cheaper tiers, in the same words each time', () => {
   const told = spawnOf({ extra: { auto: true } })!.instructions;
   assert.equal(told.length, 1);
-  assert.match(told[0], /^# Working with helpers\nYou are this session’s main agent/);
+  assert.match(told[0], /^# Working with subagents\nYou are this session’s main agent/);
   assert.match(told[0], /^- Sort the work before you start on it/m);
   assert.match(told[0], /^- Hand over the doing, keep the deciding\./m);
   assert.match(told[0], /^- quick, for a job specified so exactly/m);
   assert.match(told[0], /^- standard, for a clear part/m);
-  assert.match(told[0], /You answer for what helpers hand back/);
-  // With no prices known, what helpers cost is said in words alone.
+  assert.match(told[0], /You answer for what subagents hand back/);
+  // With no prices known, what subagents cost is said in words alone.
   assert.match(told[0], /one on quick costs a small fraction of what you do, one on standard clearly less than you\./);
   // Claude Code's own Agent tool gets the tiers' models by its names for them; it may step itself up.
-  assert.match(told[0], /Your own Agent tool, for a part of a few minutes: .* each with model "haiku" for a quick part and model "sonnet" for a standard one \(with no model it runs on yours and saves nothing\)/);
-  assert.match(told[0], /start_child_session, for a long part/);
+  assert.match(told[0], /Two kinds of subagent\. Your program’s own \(its Agent tool\), for a part of a few minutes: .* each with model "haiku" for a quick part and model "sonnet" for a standard one \(with no model it runs on yours and saves nothing\)/);
+  assert.match(told[0], /Hydor subagents \(start_child_session\), for a long part/);
   assert.match(told[0], /call step_up_session/);
   assert.equal(told[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' }, stepUp: true }));
   // The same for a lead on Opus, on Max, and on a model the tiers do not know.
   for (const model of ['opus', 'fable', 'mystery-9']) assert.deepEqual(spawnOf({ model, extra: { auto: true } })!.instructions, told, model);
-  // A session whose model was picked by name leads helpers too, but stays on its model: no word of stepping up.
+  // A session whose model was picked by name leads subagents too, but stays on its model: no word of stepping up.
   assert.equal(spawnOf({ model: 'opus' })!.instructions[0], teamInstructions({ native: { standard: 'sonnet', quick: 'haiku' } }));
   // Codex has no Agent tool of its own; before it lists its models its tiers differ by effort alone.
   const codex = spawnOf({ agent: 'codex' })!.instructions[0];
@@ -547,7 +555,7 @@ test('what a session’s main agent is told: to lead helpers on cheaper tiers, i
   assert.equal(spawnOf({ agent: 'acp', acpAgent: 'gemini' }), undefined);
   assert.equal(spawnOf({ agent: 'acp', acpAgent: 'console' }), undefined);
   setTiers(db, { console: { standard: { model: 'ollama/llama3' } } });
-  assert.match(spawnOf({ agent: 'acp', acpAgent: 'console' })!.instructions[0], /^# Working with helpers/);
+  assert.match(spawnOf({ agent: 'acp', acpAgent: 'console' })!.instructions[0], /^# Working with subagents/);
   setTiers(db, null);
   setTeam(db, { on: false });
   assert.equal(spawnOf({}), undefined);
@@ -669,7 +677,7 @@ test('a helper on a tier that fails the check runs again one tier up, up to Best
   assert.notEqual(second, first);
   assert.equal(sessions.created.at(-1)!.model, 'sonnet');
   assert.match(sessions.created.at(-1)!.prompt!, /^Find the bug in parser\.ts and fix it\.\n\n\(A try on Quick fell short: it gave up without fixing anything\./);
-  assert.match(sessions.delivered.at(-1)!.text, /on Quick fell short: it gave up without fixing anything\. It runs again on Standard\.\]\nStarted child session/);
+  assert.match(sessions.delivered.at(-1)!.text, /on Quick fell short: it gave up without fixing anything\. It runs again on Standard\.\]\nStarted Hydor subagent/);
   const note = notesOf(db, k, 'child').at(-1)!.data as ChildNote;
   assert.deepEqual(note.steppedFrom, { key: first, tier: 'quick', why: 'it gave up without fixing anything' });
   assert.equal(note.tier, 'standard');
@@ -767,7 +775,7 @@ test('step_up_child: the lead runs a finished helper’s brief again one tier up
   const out = await call(k, 'step_up_child', { key: a, why: 'too thin: name each change' });
   assert.match(out, /fell short: too thin: name each change\. It runs again on Standard/);
   assert.equal(sessions.created.at(-1)!.model, 'sonnet');
-  await assert.rejects(call(k, 'step_up_child', { key: 'claude:nobody', why: 'x' }), /not one of your child sessions/);
+  await assert.rejects(call(k, 'step_up_child', { key: 'claude:nobody', why: 'x' }), /not one of your Hydor subagents/);
 });
 
 test('as: an agent that keeps a conversation of its own takes the brief in its inbox; its answer comes back as a message', async () => {

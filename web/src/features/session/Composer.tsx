@@ -17,7 +17,7 @@ import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
 import { BlockedApproval } from './BlockedApproval';
 import { SessionMeters } from './SessionMeters';
-import { stopWords } from '../../lib/work';
+import { stopWords, taskKindOf } from '../../lib/work';
 import { stopEverything } from './WorkRow';
 import { WorkTray } from './WorkTray';
 import { useComposerMenu } from '../../components/ComposerMenu';
@@ -163,7 +163,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ext = running ? null : (s.external ?? null);
   const takeover = !!ext && s.agent === 'claude';
   const locked = !!ext && !takeover;
-  // Its turn is over but background tasks or child sessions it started still run (the header says "Working · 2 in
+  // Its turn is over but background tasks or subagents it started still run (the header says "Working · 2 in
   // background"): the ring keeps turning, around Send, since the agent takes messages as usual meanwhile.
   const activity = activityOf({ ...s, live });
   const background = !working && !ext && inBackground(activity);
@@ -354,10 +354,12 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   };
 
   // Only the Stop button stops a turn: Esc closes what is open (the find bar, a menu, a list) and nothing more. It stops
-  // what the session started too (its background tasks and child sessions), which the tray above the box lists.
+  // what the session started too (its Hydor subagents and background tasks), which the tray above the box lists. Its program's
+  // own subagents (running tasks too) count as subagents; the other running tasks are background tasks.
   const stopAll = () => void stopEverything(key);
-  const stopsTasks = (live?.backgroundTasks ?? []).filter((t) => t.status === 'running').length;
-  const stops = stopWords(working, stopsTasks, activity?.helpers ?? 0);
+  const runningTasks = (live?.backgroundTasks ?? []).filter((t) => t.status === 'running');
+  const agentTasks = runningTasks.filter((t) => taskKindOf(t.kind) === 'subagent').length;
+  const stops = stopWords(working, (activity?.helpers ?? 0) + agentTasks, runningTasks.length - agentTasks);
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
   const touch = isTouch();
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;

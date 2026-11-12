@@ -21,7 +21,7 @@ export class ApiError extends Error {
   }
 }
 
-/** What a session has spent at API prices, its child sessions' with it (GET /api/budget/:key); null when the server cannot say. */
+/** What a session has spent at API prices, its Hydor subagents' with it (GET /api/budget/:key); null when the server cannot say. */
 export interface Spent {
   spentUsd: number;
   ownUsd: number;
@@ -205,7 +205,7 @@ export async function connect(o: { server?: string; token?: string; start?: bool
   return conn;
 }
 
-/** What a session has spent, its child sessions' with it, as the server adds it up; null when it cannot say (an older server). */
+/** What a session has spent, its Hydor subagents' with it, as the server adds it up; null when it cannot say (an older server). */
 export async function spentOf(conn: Conn, key: string): Promise<Spent | null> {
   try {
     const b = await conn.api<Partial<Spent>>('GET', `/api/budget/${enc(key)}`, undefined, { timeoutMs: 15_000 });

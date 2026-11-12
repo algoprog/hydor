@@ -1,34 +1,27 @@
 // What a session started and still has going, as one list (the work tray above its message box, features/session/WorkTray):
-// its child sessions and its background tasks (agents of its own, commands, monitors), each in a state, in the order the
+// its Hydor subagents (child sessions) and its background tasks (subagents of its program's own, commands, monitors), each in a state, in the order the
 // tray shows them, with the words that sum them up. Plain functions, so tests need no page (work-test.ts).
 import { leadsSwarm } from '@shared/swarm';
 import type { BackgroundTask, SessionSummary } from '@shared/types';
-import { activityOf, isWorking } from './activity';
+import { activityOf, isWorking, taskKindOf, type TaskKind } from './activity';
+
+export { taskKindOf, type TaskKind };
 
 /** needs: a child waits for you; running: at work; the rest ended. */
 export type WorkState = 'needs' | 'running' | 'done' | 'stopped' | 'failed';
-
-export type TaskKind = 'subagent' | 'command' | 'monitor' | 'workflow' | 'task';
 
 export type WorkItem =
   | { type: 'child'; id: string; state: WorkState; /** When it began, or when it last did something once it ended: what the order goes by. */ at: number; s: SessionSummary }
   | { type: 'task'; id: string; state: WorkState; at: number; t: BackgroundTask };
 
-/** The kind of a background task, from the CLI's task types (local_bash, local_agent, …). */
-export function taskKindOf(kind?: string): TaskKind {
-  const k = (kind ?? '').toLowerCase();
-  if (k.includes('bash') || k.includes('shell') || k === 'command') return 'command';
-  if (k.includes('agent')) return 'subagent';
-  if (k.includes('monitor')) return 'monitor';
-  if (k.includes('workflow')) return 'workflow';
-  return 'task';
-}
-
-/** "Subagent", "Command", "Monitor", "Workflow", or "Background task" for one that is none of those. */
-export function taskKindLabel(kind?: string): string {
+/**
+ * "<program> subagent" (just "Subagent" without the program's name), "Command", "Monitor", "Workflow", or "Background task"
+ * for one that is none of those.
+ */
+export function taskKindLabel(kind?: string, program?: string): string {
   switch (taskKindOf(kind)) {
     case 'subagent':
-      return 'Subagent';
+      return program ? `${program} subagent` : 'Subagent';
     case 'command':
       return 'Command';
     case 'monitor':
@@ -61,7 +54,7 @@ export function childState(s: SessionSummary): WorkState {
   return 'done';
 }
 
-/** The child sessions of one session, oldest first; none for a swarm's or a campaign's lead, whose board shows them. */
+/** The Hydor subagents (child sessions) of one session, oldest first; none for a swarm's or a campaign's lead, whose board shows them. */
 export function childrenOf(byKey: Record<string, SessionSummary>, key: string): SessionSummary[] {
   if (leadsSwarm(byKey[key]?.extra)) return [];
   return Object.values(byKey)
@@ -96,28 +89,36 @@ export function workItems(children: SessionSummary[], tasks: BackgroundTask[]): 
 }
 
 export interface WorkSummary {
-  /** The tray's line: "2 helper sessions and 1 background task running", or, with none running, "3 helper sessions · 2 background tasks · all done". */
+  /** The tray's line: "2 subagents and 1 background task running", or, with none running, "3 subagents · 2 background tasks · all done". */
   text: string;
-  /** Child sessions waiting for you. */
+  /** Hydor subagents waiting for you. */
   needs: number;
-  /** What runs: child sessions (those waiting for you too) and tasks. */
+  /** What runs of Hydor subagents (those waiting for you too). */
   children: number;
+  /** What runs of background tasks (the program's own subagents too). */
   tasks: number;
 }
 
 export function workSummary(items: WorkItem[]): WorkSummary {
   const kids = items.filter((i) => i.type === 'child');
   const tasks = items.filter((i) => i.type === 'task');
+  const running = tasks.filter((i) => i.state === 'running');
+  const isAgent = (i: WorkItem) => i.type === 'task' && taskKindOf(i.t.kind) === 'subagent';
   const k = kids.filter((i) => i.state === 'running' || i.state === 'needs').length;
-  const t = tasks.filter((i) => i.state === 'running').length;
+  const t = running.length;
   const needs = kids.filter((i) => i.state === 'needs').length;
+  // Subagents: Hydor's and the program's own; background tasks: the other tasks.
+  const subs = k + running.filter(isAgent).length;
+  const bg = t - running.filter(isAgent).length;
+  const allSubs = kids.length + tasks.filter(isAgent).length;
+  const allBg = tasks.length - tasks.filter(isAgent).length;
   let text: string;
-  if (k && t) text = `${k} helper session${k === 1 ? '' : 's'} and ${t} background task${t === 1 ? '' : 's'} running`;
-  else if (k) text = `${k} helper session${k === 1 ? '' : 's'} running`;
-  else if (t) text = `${t} background task${t === 1 ? '' : 's'} running`;
-  else if (kids.length && tasks.length) text = `${kids.length} helper session${kids.length === 1 ? '' : 's'} · ${tasks.length} background task${tasks.length === 1 ? '' : 's'} · all done`;
-  else if (kids.length) text = `${kids.length} helper session${kids.length === 1 ? '' : 's'} · all done`;
-  else text = `${tasks.length} background task${tasks.length === 1 ? '' : 's'} · all done`;
+  if (subs && bg) text = `${subs} subagent${subs === 1 ? '' : 's'} and ${bg} background task${bg === 1 ? '' : 's'} running`;
+  else if (subs) text = `${subs} subagent${subs === 1 ? '' : 's'} running`;
+  else if (bg) text = `${bg} background task${bg === 1 ? '' : 's'} running`;
+  else if (allSubs && allBg) text = `${allSubs} subagent${allSubs === 1 ? '' : 's'} · ${allBg} background task${allBg === 1 ? '' : 's'} · all done`;
+  else if (allSubs) text = `${allSubs} subagent${allSubs === 1 ? '' : 's'} · all done`;
+  else text = `${allBg} background task${allBg === 1 ? '' : 's'} · all done`;
   return { text, needs, children: k, tasks: t };
 }
 
@@ -126,24 +127,25 @@ export const needsLine = (n: number) => `${n} need${n === 1 ? 's' : ''} you`;
 
 /**
  * What the message box's Stop button stops, in words: the line under "Stop" in its title (none when it stops only the turn)
- * and its label for screen readers. Each case is a sentence of its own, so each translates as it reads in the language.
+ * and its label for screen readers. Subagents are Hydor's and the program's own together; tasks are the other background
+ * tasks. Each case is a sentence of its own, so each translates as it reads in the language.
  */
-export function stopWords(turn: boolean, tasks: number, helpers: number): { note: string | null; label: string } {
+export function stopWords(turn: boolean, subagents: number, tasks: number): { note: string | null; label: string } {
+  const s = subagents;
   const t = tasks;
-  const h = helpers;
-  if (turn && t && h)
+  if (turn && s && t)
     return {
-      note: `Stops this turn, ${t} background task${t === 1 ? '' : 's'} and ${h} helper session${h === 1 ? '' : 's'}`,
-      label: `Stop this turn, ${t} background task${t === 1 ? '' : 's'} and ${h} helper session${h === 1 ? '' : 's'}`,
+      note: `Stops this turn, ${s} subagent${s === 1 ? '' : 's'} and ${t} background task${t === 1 ? '' : 's'}`,
+      label: `Stop this turn, ${s} subagent${s === 1 ? '' : 's'} and ${t} background task${t === 1 ? '' : 's'}`,
     };
+  if (turn && s) return { note: `Stops this turn and ${s} subagent${s === 1 ? '' : 's'}`, label: `Stop this turn and ${s} subagent${s === 1 ? '' : 's'}` };
   if (turn && t) return { note: `Stops this turn and ${t} background task${t === 1 ? '' : 's'}`, label: `Stop this turn and ${t} background task${t === 1 ? '' : 's'}` };
-  if (turn && h) return { note: `Stops this turn and ${h} helper session${h === 1 ? '' : 's'}`, label: `Stop this turn and ${h} helper session${h === 1 ? '' : 's'}` };
   if (turn) return { note: null, label: 'Stop the current turn' };
-  if (t && h)
+  if (s && t)
     return {
-      note: `Stops ${t} background task${t === 1 ? '' : 's'} and ${h} helper session${h === 1 ? '' : 's'}`,
-      label: `Stop ${t} background task${t === 1 ? '' : 's'} and ${h} helper session${h === 1 ? '' : 's'}`,
+      note: `Stops ${s} subagent${s === 1 ? '' : 's'} and ${t} background task${t === 1 ? '' : 's'}`,
+      label: `Stop ${s} subagent${s === 1 ? '' : 's'} and ${t} background task${t === 1 ? '' : 's'}`,
     };
-  if (t) return { note: `Stops ${t} background task${t === 1 ? '' : 's'}`, label: `Stop ${t} background task${t === 1 ? '' : 's'}` };
-  return { note: `Stops ${h} helper session${h === 1 ? '' : 's'}`, label: `Stop ${h} helper session${h === 1 ? '' : 's'}` };
+  if (s) return { note: `Stops ${s} subagent${s === 1 ? '' : 's'}`, label: `Stop ${s} subagent${s === 1 ? '' : 's'}` };
+  return { note: `Stops ${t} background task${t === 1 ? '' : 's'}`, label: `Stop ${t} background task${t === 1 ? '' : 's'}` };
 }

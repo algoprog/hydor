@@ -3,11 +3,12 @@ import { Square, X } from 'lucide-react';
 import type { BackgroundTask, TaskLog } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { duration } from '../../lib/format';
-import { toastError } from '../../lib/store';
+import { toastError, useSessions } from '../../lib/store';
+import { agentName } from '../../components/AgentIcon';
 import { Button, cx, IconButton, Sheet, Throbber, useConfirm } from '../../components/ui';
-import { taskKindLabel, taskState } from '../../lib/work';
+import { taskKindLabel, taskKindOf, taskState } from '../../lib/work';
 import { Elapsed } from './items';
-import { STATE_TONE, StateDot, TaskIcon } from './WorkRow';
+import { STATE_TONE, StateDot, TaskIcon, TaskKindText } from './WorkRow';
 import { LOCALE } from '../../i18n/locale';
 
 const clock = (ts: number) => new Date(ts).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -17,13 +18,13 @@ export function useStopTask(sessionKey: string) {
   const [confirm, node] = useConfirm();
   const stop = async (t: BackgroundTask): Promise<boolean> => {
     const ok = await confirm({
-      title: 'Stop this background task?',
+      title: taskKindOf(t.kind) === 'subagent' ? 'Stop this subagent?' : 'Stop this background task?',
       body: (
         <>
           <b className="font-medium text-fg">{t.description}</b> stops now{t.startedAt ? `, after ${duration(Date.now() - t.startedAt)}` : ''}, and does not finish. What it has done so far stays.
         </>
       ),
-      confirm: 'Stop task',
+      confirm: taskKindOf(t.kind) === 'subagent' ? 'Stop subagent' : 'Stop task',
       danger: true,
     });
     if (!ok) return false;
@@ -75,6 +76,11 @@ export function TaskPanel({ sessionKey, task, canStop, onStop, onClose }: { sess
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const running = task.status === 'running';
+  // Who runs a subagent task: the program of the session it belongs to ("Claude Code subagent").
+  const program = useSessions((x) => {
+    const s = x.byKey[sessionKey];
+    return s ? agentName(s.agent, s.acpName) : undefined;
+  });
 
   useEffect(() => {
     let alive = true;
@@ -107,7 +113,7 @@ export function TaskPanel({ sessionKey, task, canStop, onStop, onClose }: { sess
 
   const empty = log && (log.kind === 'agent' ? !log.entries?.length : !log.text?.trim());
   return (
-    <Sheet open onClose={onClose} label={taskKindLabel(task.kind)}>
+    <Sheet open onClose={onClose} label={taskKindLabel(task.kind, program)}>
       <div className="flex shrink-0 items-start gap-3 border-b border-line px-4 pt-[max(12px,var(--safe-top))] pb-3">
         <span className="mt-0.5 shrink-0 text-fg-2">
           <TaskIcon kind={task.kind} size={18} />
@@ -117,7 +123,7 @@ export function TaskPanel({ sessionKey, task, canStop, onStop, onClose }: { sess
             {task.description}
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-fg-3">
-            <span>{taskKindLabel(task.kind)}</span>
+            <TaskKindText kind={task.kind} program={program} />
             <StatePill task={task} />
             {running && task.startedAt ? (
               <span>

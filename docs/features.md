@@ -5,13 +5,15 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 ## Sessions
 - The prompt bar’s Stop button shows a rotating ring while a session starts or works, paused while
   waiting for you and respecting reduced-motion preferences. Once the turn is over, it stays, ring and all,
-  while background tasks or helper sessions it started still run, and it stops all of them at once: the turn, the
-  background tasks, and the child sessions with the ones they started (a stopped child does not report back and
-  wake its parent). Pointing at it says what it stops.
-- The work tray, one line above the prompt bar, gathers what a session started: its child sessions and its
-  background tasks (subagents, commands, monitors). Folded, it sums them up (“2 helper sessions and 1 background
+  while subagents or background tasks it started still run, and it stops all of them at once: the turn, the
+  subagents, and the background tasks, with the ones they started (a stopped Hydor subagent does not report back and
+  wake its parent). Pointing at it says what it stops (“Stops this turn, 2 subagents and 1 background task”).
+- The work tray, one line above the prompt bar, gathers what a session started: its subagents and its
+  background tasks (commands, monitors, workflows). Folded, it sums them up (“2 subagents and 1 background
   task running”, “1 needs you”) with a **Stop all**; opened, every one is a row in the same look, with its state,
-  what it cost, **Open** and a stop button. A background task opens in a side panel like a session: its steps or
+  what it cost, **Open** and a stop button, and its kind (“Hydor subagent · Claude Code · Sonnet 5.5” for a session of its
+  own that Hydor started, “Claude Code subagent” for one Claude Code runs inside the session), with who runs it on hover. A Claude Code
+  subagent or a background task opens in a side panel like a session: its steps or
   output, refreshed as it runs.
 - Start a Claude Code or Codex session in any folder, optionally in a worktree of its own (a new branch in a
   separate folder, so several agents can change one repository at once). Pick the model, how hard it
@@ -40,7 +42,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
-  agents, commands or monitors, or child sessions, are still running, until those end (a session whose helpers still run shows as working, with no Done marker, and takes messages). Pinned comes next, then Projects: a group for each project and each folder you picked
+  agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages). Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
   start a new session there, and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
@@ -84,9 +86,9 @@ agents that speak ACP and take MCP servers.
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
   listed on its page); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
-  agents: plain helpers on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
+  agents: plain subagents on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
   with their own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's;
-  steps up: a helper on a tier whose reply to its brief fails a quick check by the helper model (or that stops with an
+  steps up: a Hydor subagent on a tier whose reply to its brief fails a quick check by the helper model (or that stops with an
   error) runs again a tier up (its later replies, to messages, are not checked), as far as Best, the lead told why, and a scheduled run that fails goes again a tier up, unless the
   agent turns it off; hands
   back results: the fields of each (an app's answer fields: text, numbers, dates, links, lists, tables), checked by its
@@ -294,22 +296,24 @@ agents that speak ACP and take MCP servers.
   in commands on this computer that you allow (what they print comes back masked). When an app needs something from
   you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
   whichever agent is working; Codex's own servers ask the same way.
-- **Child sessions**: an agent hands parts of a job to new sessions, with any agent and model, and gets their
-  results back, each a line in its conversation that opens to the reply; they show under it in the sidebar and in the
-  work tray above the prompt bar.
+- **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
+  session of its own that Hydor starts, with any agent and model, each a card in its conversation that opens to
+  the reply; it shows under its parent in the sidebar and in the work tray above the prompt bar, and you can talk to
+  it. A Claude Code subagent is one Claude Code runs inside the session: a row in the tray that opens with its steps
+  and can be stopped, its spending the session's own.
 - **Tiers and the team** (Settings → Models → Tiers): four tiers name a model and an effort for Claude Code, Codex
   and Custom: Quick for small, very clear jobs, Standard for clear tasks of medium size, Best for a session's main
   agent, Max for the hardest problems. Until you change one it is the newest model of its kind the program offers
   (Haiku, Sonnet, Opus and Fable for Claude Code; Luna, Terra, Sol and Astra for Codex). The start page's Model
   opens on Automatic: the session starts on Best, or on Max when the helper model reads the request as a hard problem
   (sized up while the agent starts; a line in the conversation says why). The main agent is told to lead: it plans,
-  hands clear parts to helpers on Standard and Quick (a helper asked for with no tier gets Standard, and none thinks
+  hands clear parts to subagents on Standard and Quick (a subagent asked for with no tier gets Standard, and none thinks
   with a tier above its lead's), checks what comes back, and may move itself to Max with step_up_session when a problem
-  proves harder than it looked. Claude Code's own Agent tool is told the same models. Two switches turn the team and
-  Max for hard problems off. `scripts/tier-bench` measures what the team costs and how its results compare on your own
+  proves harder than it looked. Claude Code's own Agent tool is told the same models. Two switches, **Lead with subagents** and
+  **Max for hard problems**, turn the team and Max for hard problems off. `scripts/tier-bench` measures what the team costs and how its results compare on your own
   setup.
 - **Deep research**: one switch under Options. The agent plans the searches a question needs, sends researchers
-  (child sessions) after each part, digs into what they leave open, has the key claims checked against two
+  (Hydor subagents) after each part, digs into what they leave open, has the key claims checked against two
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many
   rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
   searches used, and opens the report once it is ready.
@@ -1094,19 +1098,19 @@ programs shows each program's version and what is out, with Check now, Update no
   terminal (headings, lists, quotes, tables aligned when they fit, links with their address, code never re-wrapped),
   each step on one line with what matters of its result (lines added and removed, the time a command took, its exit
   code and the first line of its error), thoughts as one line (`--thinking` for all of them, `-v` for each step's
-  output), helpers starting and finishing (Claude Code's own helpers in the background too, while they work and as they end),
-  tier notes, and each turn's end (time, cost, model, helpers). Only a few
-  lines at the bottom change while the agent works: the text being written, the step under way, the helpers at work,
+  output), subagents starting and finishing (Claude Code's own subagents in the background too, while they work and as they end),
+  tier notes, and each turn's end (time, cost, model, subagents). Only a few
+  lines at the bottom change while the agent works: the text being written, the step under way, the subagents at work,
   a spinner with the time, and the input line; nothing printed above them ever changes. Widths follow the terminal,
   wide characters and emoji included, and are redrawn on a resize.
 - Approvals answered with a key (`y`, `n`, a choice's number) or denied with your own words; questions with numbered
   choices, several picks or your own answer; forms field by field, files by their path. Messages sent while the agent
   works are queued, as in the app. An input line of its own: history (the last 500), several lines (Alt+Enter, Ctrl+J
   or a `\` before Enter), pastes whole, word moves and deletes, and Tab for commands, `@` files and model names.
-  Commands for a new session, another session, the model, effort and mode, your agents, helpers, tiers, usage and
+  Commands for a new session, another session, the model, effort and mode, your agents, subagents, tiers, usage and
   cost; any other `/command` goes to the agent. `hydor -c` carries on the folder's latest session, `hydor resume` any.
-- `hydor run` for scripts: one request, followed until the work is done (helpers' replies, Claude Code's own helpers in
-  the background, and the turns they wake included; a dev server left running does not hold it up), the reply on stdout, progress on stderr, `--json` (the reply, cost, tokens, turns, helpers) or
+- `hydor run` for scripts: one request, followed until the work is done (subagents' replies, Claude Code's own subagents in
+  the background, and the turns they wake included; a dev server left running does not hold it up), the reply on stdout, progress on stderr, `--json` (the reply, cost, tokens, turns, subagents) or
   `--stream-json` (each change as it happens), `--timeout`, and exit codes for done, failed (a usage limit named),
   bad usage, an answer needed, a time-out and Ctrl+C. A message can be piped in.
 - Commands for the rest: sessions (what each is doing), a session's conversation, a message to one, stopping one,

@@ -24,10 +24,10 @@ What you see stays in the terminal's own history, so you can scroll back and cop
 - **The agent's text** as it comes, with its headings, lists, quotes, tables, links (the address after the words) and code (never re-wrapped, so what you copy runs).
 - **Each step** on one line: what it read, searched, edited (with the lines added and removed), ran (with the time it took, and its exit code when it failed, with the first line of the error under it).
 - **Thoughts** as one dim line, such as "Thought for 8 s". Start with `--thinking` to see them in full, and with `-v` to see the first lines of each step's output.
-- **Helpers**: "Helper started" when the agent hands part of its work to a [child session](/guide/research#let-an-agent-hand-work-to-child-sessions), and "Helper finished" (or stopped, or failed) when its reply comes back. Claude Code can also run helpers of its own in the background and end its turn while they work: the bottom lines say which are at work in the background, "Finished in the background" shows as each one ends, and the agent carries on by itself. A command it leaves running in the background, such as a dev server, holds nothing up. `/helpers` lists them all with what each is doing (and what a helper cost).
-- **The end of each turn**: how long it took, what it cost, the model, and how many helpers worked.
+- **Subagents**: "Subagent started" when the agent hands part of its work to a [Hydor subagent](/guide/research#let-an-agent-hand-work-to-subagents), and "Subagent finished" (or "Subagent failed") when its reply comes back. Claude Code can also run subagents of its own in the background and end its turn while they work: the bottom lines say which are at work in the background, "Finished in the background" shows as each one ends, and the agent carries on by itself. A command it leaves running in the background, such as a dev server, holds nothing up. `/subagents` lists them all with what each is doing (and what a subagent cost).
+- **The end of each turn**: how long it took, what it cost, the model, and how many subagents worked ("1 subagent", "3 subagents").
 
-At the bottom, a few lines change while the agent works: the text still being written, the step under way, the helpers at work, a spinner with the time so far, and your input line. Press Esc or Ctrl+C to stop the turn.
+At the bottom, a few lines change while the agent works: the text still being written, the step under way, the subagents at work, a spinner with the time so far, and your input line. Press Esc or Ctrl+C to stop the turn.
 
 ### Answer what the agent asks
 
@@ -63,9 +63,9 @@ Type them in the input line:
 - `/sessions`: pick another session to carry on.
 - `/model`, `/effort`, `/mode`: change the model, how hard it thinks, and what it may do without asking. Without a name, each shows a numbered list to pick from.
 - `/agent`: work as one of [your agents](/guide/agents), from the next message on.
-- `/helpers`: the helpers, those in the background too, what each is doing (and what a helper cost); `/helpers 2` shows the second helper's conversation.
-- `/tiers`, `/usage`, `/cost`: which model each tier means, your plans' usage and limits, and what this session and its helpers cost.
-- `/stop`, `/rename`, `/open`, `/quit`: stop the turn and the helpers in the background, rename the session, show its address in the app, leave.
+- `/subagents`: the subagents, those in the background too, what each is doing (and what a subagent cost); `/subagents 2` shows the second subagent's conversation.
+- `/tiers`, `/usage`, `/cost`: which model each tier means, your plans' usage and limits, and what this session and its subagents cost.
+- `/stop`, `/rename`, `/open`, `/quit`: stop the turn and the subagents in the background, rename the session, show its address in the app, leave.
 
 Any other `/command` goes to the agent as it is, for the program's own commands and skills.
 
@@ -89,11 +89,11 @@ What you leave out comes from what the app's start page picked last, then from t
 
 ## One request from a script
 
-`hydor run "…"` (or `hydor -p "…"`) starts a session with your message, follows it until the work is done, prints the agent's last reply, and ends. Done means the turn ended, no helper is still working or still owes its reply (Claude Code's own helpers in the background included, the agent's or a helper's), and nothing waits in the queue: an agent that ends its turn to wait for its helpers is woken by their replies or their ends, and the run waits for that turn too. A command left running in the background, such as a dev server, does not hold it up. On `--timeout` or Ctrl+C, the helpers in the background are stopped with the turn. With nothing after it, it reads the message from what is piped in: `git diff | hydor run "review this change"`.
+`hydor run "…"` (or `hydor -p "…"`) starts a session with your message, follows it until the work is done, prints the agent's last reply, and ends. Done means the turn ended, no subagent is still working or still owes its reply (Claude Code's own subagents in the background included, the agent's or a subagent's), and nothing waits in the queue: an agent that ends its turn to wait for its subagents is woken by their replies or their ends, and the run waits for that turn too. A command left running in the background, such as a dev server, does not hold it up. On `--timeout` or Ctrl+C, the subagents in the background are stopped with the turn. With nothing after it, it reads the message from what is piped in: `git diff | hydor run "review this change"`.
 
-- On a terminal, short lines on the side say what happens (each step, helpers starting and finishing); `-q` turns them off.
+- On a terminal, short lines on the side say what happens (each step, subagents starting and finishing); `-q` turns them off.
 - Nobody is there to answer, so an approval or a question stops the run, says what it was asked, and the session waits for you in the app or with `hydor resume`. With `--mode full` (or `-y`) the agent asks nothing.
-- `--json` prints one object at the end: `key`, `url`, `status`, `reply`, `model`, `costUsd` (with its helpers'), `tokens`, `durationMs`, `turns`, `children` (each helper's `title`, `label`, `tier`, `costUsd`, `status`) and `error` when it failed. `--stream-json` prints a line for each change as it happens (`item`, `live`, `note`), then that object as its last line.
+- `--json` prints one object at the end: `key`, `url`, `status`, `reply`, `model`, `costUsd` (with its subagents'), `tokens`, `durationMs`, `turns`, `children` (each Hydor subagent's `title`, `label`, `tier`, `costUsd`, `status`) and `error` when it failed. `--stream-json` prints a line for each change as it happens (`item`, `live`, `note`), then that object as its last line.
 - `--timeout 300` stops the turn after 300 seconds.
 
 It ends with an exit code a script can check:
@@ -109,11 +109,11 @@ It ends with an exit code a script can check:
 
 ## Look after things
 
-- `hydor sessions`: your latest sessions, what each is doing (**Working**, **Needs you**, **Finished**), their program and model, folder and when. The first column is what the other commands take to name one; `--all` lists helpers too.
+- `hydor sessions`: your latest sessions, what each is doing (**Working**, **Needs you**, **Finished**), their program and model, folder and when. The first column is what the other commands take to name one; `--all` lists subagents too.
 - `hydor show 6f1e2a3b`: a session's conversation.
 - `hydor send 6f1e2a3b "…"`: a message to a session, queued when it is working. `hydor stop 6f1e2a3b` stops its turn.
 - `hydor models` (or `hydor models claude`): the models each program offers, their efforts, and its modes.
-- `hydor tiers`: which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means for each program, and how sessions use them. `hydor tiers set claude best opus --effort high` changes one, `hydor tiers reset` puts them back; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with helpers** and **Max for hard problems** (`on` turns them back on).
+- `hydor tiers`: which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means for each program, and how sessions use them. `hydor tiers set claude best opus --effort high` changes one, `hydor tiers reset` puts them back; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with subagents** and **Max for hard problems** (`on` turns them back on).
 - `hydor agents`: your agents, the built-in ones first.
 - `hydor tasks`: your [scheduled tasks](/guide/tasks); `hydor tasks run <id>` runs one now.
 - `hydor usage`: each plan's usage and limits, and when they reset.

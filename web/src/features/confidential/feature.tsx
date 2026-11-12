@@ -76,7 +76,7 @@ export function ConfidentialLock({ s }: { s: SessionSummary }) {
           </div>
           <p>This session stays on this computer: its model runs here, and nothing from it is sent anywhere.</p>
           <p>
-            <span className="font-medium text-fg">On:</span> the files in its folder, documents, the Library, knowledge bases, memory notes to read, and child sessions, which are confidential too.
+            <span className="font-medium text-fg">On:</span> the files in its folder, documents, the Library, knowledge bases, memory notes to read, and subagents, which are confidential too.
           </p>
           <p>
             <span className="font-medium text-fg">Off:</span> web search and web pages, the browser, connected apps and keys, apps, publishing, scheduled tasks, models elsewhere, and saving to memory.
