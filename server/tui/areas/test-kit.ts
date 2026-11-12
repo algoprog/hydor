@@ -18,7 +18,7 @@ export interface Call {
 /** A route's answer: a value, or a function of the request (its body); an ApiError to refuse. */
 export type Answer = unknown | ((body: unknown, path: string) => unknown);
 
-/** A connection whose `api` answers `"METHOD /path"` from the table (the path as called, query and all), or 404s. */
+/** A connection whose `api` answers `"METHOD /path"` (or just `"/path"`, any method) from the table, the path as called, query and all; or 404s. */
 export function fakeConn(routes: Record<string, Answer>, o: { here?: boolean } = {}): { conn: Conn; calls: Call[] } {
   const calls: Call[] = [];
   const conn: Conn = {
@@ -28,8 +28,9 @@ export function fakeConn(routes: Record<string, Answer>, o: { here?: boolean } =
     version: '0',
     async api(method: string, p: string, body?: unknown) {
       calls.push({ method, path: p, ...(body !== undefined ? { body } : {}) });
-      const key = `${method} ${p}`;
-      if (!(key in routes)) throw new ApiError(404, `No fake route ${key}`);
+      // "METHOD /path" answers that method; a bare "/path" answers any.
+      const key = `${method} ${p}` in routes ? `${method} ${p}` : p;
+      if (!(key in routes)) throw new ApiError(404, `No fake route ${method} ${p}`);
       const a = routes[key];
       const r = typeof a === 'function' ? (a as (b: unknown, p: string) => unknown)(body, p) : a;
       if (r instanceof Error) throw r;
@@ -60,6 +61,8 @@ export interface Ran {
   edited: string[];
   /** The questions ask() asked, with whether hidden. */
   typed: { question: string; hidden: boolean }[];
+  /** The addresses open() was asked to open. */
+  opened: string[];
 }
 
 export interface Answers {
@@ -81,7 +84,7 @@ export interface Answers {
 
 /** A Ctx that collects. */
 export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArgv>, a: Answers = {}): { ctx: Ctx; ran: Ran } {
-  const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [], typed: [] };
+  const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [], typed: [], opened: [] };
   const typed = [...(a.typed ?? [])];
   const look: Look = { p: makePaint(false), width: 80, home: '/home/u' };
   const ctx: Ctx = {
@@ -116,6 +119,9 @@ export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArg
       }
       if (!ctx.interactive) throw new UsageError('There is no terminal for the editor: give the text with --file <path>');
       return ctx.edit(current ?? '');
+    },
+    open(url) {
+      ran.opened.push(url);
     },
     async pick(title, items: PickItem[]) {
       ran.picked.push(title);
