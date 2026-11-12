@@ -20,10 +20,9 @@ measurements say. Measured again on 11-12 November, when the first tasks proved 
 | **Max** | the main agent of a hard problem | the newest Fable | Astra |
 
 - **Automatic** is the start page's model until another is picked (`model: "auto"` in `POST /api/sessions`). The
-  session starts on Best. While its agent starts, the helper model reads the request and says whether it is a hard
-  problem (`server/assistants/auto.ts`); if so the session is on Max before its first message goes, and a line in the
-  conversation says why. A start never waits more than ten seconds for that answer, and reads silence as "not hard":
-  the session is on Best then, and only the server's log says that the helper model was not there to ask (`[auto]`).
+  session starts on Best (`server/assistants/auto.ts`) and reaches Max only by its own agent's step up (below). Until
+  0.57.0 the helper model also read each request as it started and sent what read as a hard problem to Max: the second
+  measurement found that costly for coding work (16 of 37 requests, 43% more than Best on them, for one more solved).
 - **The main agent leads** (`server/children/team.ts`): it is told what each tier is for and what each costs beside
   it, to sort the work before it starts, to hand the doing to helpers and keep the deciding, and that it answers for
   what comes back. A helper asked for with no tier gets Standard; none thinks with a tier above its lead's.
@@ -50,9 +49,9 @@ measurements say. Measured again on 11-12 November, when the first tasks proved 
 - **No silent change of a remembered pick.** Someone who picked Sonnet to spend less must not find sessions on Opus.
   Automatic is what the start page shows where no model was ever picked, and the first row of the menu for everyone
   else.
-- **Sizing up is one small call, in parallel.** A request is read once by the cheapest model there is while the
-  agent's program starts. The alternative, the lead deciding for itself, costs a turn of the lead and comes after
-  it has begun.
+- **Max when Best has struggled, not when a request sounds hard.** Reading a request's words to pick Max was quick and
+  cheap in itself (one small call while the agent starts), but most of what reads as hard Best solves; the lead knows
+  when it is stuck (a fix that failed twice, a cause it cannot find) and steps up then.
 
 ## What was measured
 
@@ -64,8 +63,9 @@ it passes every one of the task's hidden cases. Costs are what the tokens would 
 flat-rate: they compare runs). In the second measurement the agents worked offline, and every transcript was checked
 for reads of the tasks' hidden files (none). The runs: `scripts/tier-bench/results/2026-11-10/` and `2026-11-12/`.
 
-**Sizing up.** The helper model (Haiku through Claude Code) called all 10 hard requests of `requests.json` hard and
-kept all 20 plain ones on Best, in 1.8 s at the median and 3.7 s at most. A start waits at most 10 s for it.
+**Sizing up** (the first measurement, before 0.57.0 removed it): the helper model called all 10 hard requests of a set
+of 30 hard and kept all 20 plain ones on Best, in 1.8 s at the median. It was accurate on requests as people word
+them; on coding requests it was eager, and the second measurement shows what that cost.
 
 ### Five sets of tasks
 
@@ -123,10 +123,10 @@ problem; everything else once.
   against the team, p = 0.12 (Fisher). The cost differences are not: 7.5 times from Quick alone to Best alone.
 - **What it means for the design.** On work whose result can be checked, the doing can go to the cheapest tier, and
   the lead's price buys reliability on the rare hard miss rather than ability. The big levers are the lead's own tier
-  and Max: the sizer sends many coding requests to Max (16 of the 37 team runs on our own tasks and the contest
-  problems), which cost more here than it bought. Not measured yet: starting on Quick and moving up a tier only when
-  a check fails, and work whose result cannot be checked by a program (designs, research, writing), where a judge has
-  to read it.
+  and Max: the sizer sent many coding requests to Max (16 of the 37 team runs on our own tasks and the contest
+  problems), which cost more here than it bought, so 0.57.0 leaves Max to the lead's own step up. Not measured yet:
+  starting on Quick and moving up a tier only when a check fails, and work whose result cannot be checked by a program
+  (designs, research, writing), where a judge has to read it.
 
 **The first measurement** (10 November, the nine tasks with a written specification): the team cost 9% less than
 Best alone over seven ordinary tasks, from 27% less where Quick helpers did real work to 41% more on a request that
@@ -167,8 +167,8 @@ graded again when the grader itself had failed (its Python lacked a package).
 
 - Starting on Quick and stepping up only on a failed check, which these results suggest could keep most of the
   quality at a fraction of the cost: not built, not measured.
-- Automatic's sizer reads coding requests as hard problems often (16 of 37 team runs went to Max); whether a stricter
-  sizer loses anything is not measured.
+- Max only by the lead's own step up (0.57.0): the team has not been measured again since; the expectation from the
+  runs above is the team at 8-16% below Best alone, with one problem in 37 left to the lead to notice.
 - Work whose result a program cannot check (a design, a report, writing) is not measured: it needs a judge, checked
   against people's ratings first.
 - The benchmark ran Claude Code alone. Codex and Custom get the same tiers and the same instructions, with child

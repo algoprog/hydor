@@ -206,7 +206,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     ta.current?.focus();
   };
 
-  // Automatic: the tiers pick the model (Best's, or Max's for a hard problem). Offered where the team is on and the
+  // Automatic: the tiers pick the model (Best's, and Max's if its agent steps up). Offered where the team is on and the
   // program has tiers (Custom once its Best names a model); a confidential session picks among this computer's models.
   const tiers = useTierMap();
   const team = useTeam();
@@ -368,7 +368,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const autoHint = !autoOn
     ? undefined
     : team?.hard && maxModel && maxModel !== bestModel
-      ? `${modelLabel(cat, bestModel)}, or ${modelLabel(cat, maxModel)} for a hard problem`
+      ? `${modelLabel(cat, bestModel)}, or ${modelLabel(cat, maxModel)} if the problem proves too hard`
       : modelLabel(cat, bestModel);
   // What the Options chip names: the settings under it that are not as usual.
   const levels = findModel(cat, effortModel)?.efforts ?? [];

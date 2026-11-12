@@ -1,5 +1,5 @@
 // The team: what a session's main agent is told about its subagents when it starts. It leads on its own tier (Best, or
-// Max for a hard problem) and hands well-defined parts to subagents on cheaper tiers, so most of the work costs less
+// Max once it has stepped up) and hands well-defined parts to subagents on cheaper tiers, so most of the work costs less
 // while the judgement stays with the strongest model in the room. Settings → Models → Tiers turns it off.
 import { swarmMode } from '../../shared/swarm.ts';
 import { modelFamily, resolvedName, tierProgram, tierRank, type Tier, type TierPick } from '../../shared/tiers.ts';

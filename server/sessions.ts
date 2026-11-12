@@ -1123,8 +1123,8 @@ export class SessionManager extends EventEmitter {
     o = confidentialStart(this.db, o);
     // Started as one of your agents: its tier's model when none was picked, and what is left of its monthly budget as its cap.
     o = agentStart(this.db, o);
-    // Automatic: Best's model for its program. Whether the request is a hard problem, which Max takes, is asked now and known before its message goes.
-    const auto = wantAuto && !o.model ? autoPlan(this.db, { agent: o.agent, acpAgent: o.acpAgent, prompt: splitHandoff(o.prompt ?? '')?.request ?? o.prompt, extra: o.extra }) : null;
+    // Automatic: Best's model for its program; its own agent may step up to Max when a problem proves too hard for it.
+    const auto = wantAuto && !o.model ? autoPlan(this.db, { agent: o.agent, acpAgent: o.acpAgent }) : null;
     if (auto) o = { ...o, model: auto.model, effort: o.effort ?? auto.effort, extra: { ...o.extra, auto: true } };
     if (o.agent === 'claude') await ensureClaude();
     // A session started with a request and no title gets one from the helper model, asked now, beside the agent's start;
@@ -1167,9 +1167,6 @@ export class SessionManager extends EventEmitter {
     const here = onThisComputer(o.paths);
     const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
     const images = [...(o.images ?? []), ...here.images];
-    // A hard problem, on Automatic: Max takes it from its first step.
-    const hard = auto?.hard ? await auto.hard : null;
-    if (hard) await this.moveToTier(l.key, 'max', hard, { event: 'auto', why: hard.why }).catch(() => {});
     if (prompt || images.length) {
       await beforeSend(l.key);
       await this.snapshot(l.key);

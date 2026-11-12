@@ -251,7 +251,7 @@ Tiers pick a model by the job instead of by its name:
 - **Best**: a session's main agent. It works out what is asked, plans, leads subagents and checks their work.
 - **Max**: the strongest, for the hardest problems: stubborn bugs, proofs, designs with many constraints.
 
-An agent set to a tier starts on that tier's model for the program it runs on, unless a model was picked for the session; set to **Automatic** (the default), it uses the model picked where it starts: the start page, the scheduled task, or the agent that hands it work. On the start page that pick can itself be **Automatic**: Best, or Max when the request reads as a hard problem (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)).
+An agent set to a tier starts on that tier's model for the program it runs on, unless a model was picked for the session; set to **Automatic** (the default), it uses the model picked where it starts: the start page, the scheduled task, or the agent that hands it work. On the start page that pick can itself be **Automatic**: Best, moving up to Max if the problem proves too hard (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)).
 
 [Settings → Agents → Models → Tiers](/settings?s=models&find=Tiers) says what each tier means, in a table with a column for each program: for **Claude Code** a model (Haiku, Sonnet, Opus and the newest Fable to start) and an effort; for **Codex** a model and an effort (Luna, Terra, Sol and Astra to start; on a plan without one of them, the nearest it offers, with more effort for the higher tier where two share a model); for **Custom** one of your Custom models, or nothing, which keeps the model the session picked. A tier you leave alone follows its program's newest model of that kind. **Back to the defaults** puts them back.
 
@@ -439,7 +439,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Let my Release manager agent hand work to Translator and Test runner."
 - "Make my Translator agent work only in the Hydor project."
 - "Make Quick mean Haiku for Claude Code and my local Qwen model for Custom."
-- "Turn off Max for hard problems, so Automatic always starts on Best."
+- "Turn off Max for hard problems, so sessions on Automatic stay on Best."
 - "Import my Claude Code agent file ~/.claude/agents/code-reviewer.md as an agent."
 - "Which agents do I have, what does each think with, and what did they spend this month?"
 - "Make my Paper scout hand back a list of papers, each with a title, a link and why it matters, as a page in the Library and a notification."

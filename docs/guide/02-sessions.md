@@ -25,7 +25,7 @@ The row under the message box holds **Runs on**, **Model**, **Folder** (or **Pro
 
 At the bottom, **Models for Custom** opens [Settings → Models](/settings?s=models) and **Add or manage agents** opens [Settings → More agents](/settings?s=agents). See [Agents, accounts and models](/guide/agents-models).
 
-**Model** opens on **Automatic**: the session starts on the Best tier's model, or on Max's when your request reads as a hard problem, and its main agent hands clear parts to subagents on cheaper tiers (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). Under it the menu lists only the chosen agent's own models. The agent's default is marked "default". Older versions of a model wait behind "2 older models"; a long list has a **Search models** field (Enter picks the first match). Custom lists the models you added in Settings → Models; another ACP agent lists the models it offered when it last ran, and the chip appears once it has run.
+**Model** opens on **Automatic**: the session starts on the Best tier's model, its main agent hands clear parts to subagents on cheaper tiers, and it may move itself to Max's when a problem proves too hard (see [Tiers: a model for each kind of job](/guide/agents-models#tiers-a-model-for-each-kind-of-job)). Under it the menu lists only the chosen agent's own models. The agent's default is marked "default". Older versions of a model wait behind "2 older models"; a long list has a **Search models** field (Enter picks the first match). Custom lists the models you added in Settings → Models; another ACP agent lists the models it offered when it last ran, and the chip appears once it has run.
 
 ### Pick a folder, a project or a new task folder
 

@@ -1,6 +1,7 @@
 // Settings → Models → Tiers: the model (and effort) Quick, Standard, Best and Max mean for each program, and how
-// sessions use them. A session on Automatic thinks with Best, or with Max for a hard problem, and its main agent
-// hands clear parts to subagents on Standard and Quick; an agent of yours thinks with one tier.
+// sessions use them. A session on Automatic thinks with Best (its main agent may move itself to Max when a problem
+// proves too hard), and its main agent hands clear parts to subagents on Standard and Quick; an agent of yours thinks
+// with one tier.
 import { useEffect, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { TIER_PROGRAMS, TIERS, type TeamSettings, type Tier, type TierMap, type TierPick, type TierProgram } from '@shared/tiers';
@@ -47,7 +48,7 @@ export function TiersSection() {
     <>
       <Group
         title="Tiers"
-        info="The model each tier means for each program. A session on Automatic thinks with Best, or with Max for a hard problem; its main agent hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model."
+        info="The model each tier means for each program. A session on Automatic thinks with Best, and its main agent may move itself to Max when a problem proves too hard; it hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model."
         actions={
           <>
             <Segmented size="sm" value={program} onChange={setProgram} options={TIER_PROGRAMS.map((p) => ({ value: p.id, label: p.label }))} />
@@ -108,8 +109,8 @@ export function TiersSection() {
           />
           <Row
             label="Max for hard problems"
-            hint="Automatic starts a hard problem on Max instead of Best"
-            info="On Automatic, a request that reads as a hard problem starts on Max instead of Best, and a main agent may move itself to Max when a problem proves harder than it looked. The conversation says when either happens."
+            hint="A main agent on Automatic may move itself to Max"
+            info="On Automatic, a session starts on Best, and its main agent may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find). The conversation says when it does. A request is never sent to Max on its wording alone."
             control={<Switch on={st.team.hard} onChange={(hard) => save({ team: { hard } })} label="Max for hard problems" />}
           />
         </Group>

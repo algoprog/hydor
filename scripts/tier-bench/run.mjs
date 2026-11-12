@@ -1,7 +1,7 @@
 // Runs the benchmark: the same tasks done several ways on one server, and how each came out.
 //   solo:     one agent on the Best tier's model, with the team off (how sessions worked before tiers led by default)
-//   team:     Automatic, the team on: the main agent leads on Best (or Max for a hard problem) and hands parts to helpers
-//   lead:     Automatic with Max for hard problems off: the main agent always leads on Best and hands parts to helpers
+//   team:     Automatic, the team on: the main agent leads on Best, may step itself up to Max, and hands parts to helpers
+//   lead:     Automatic with Max for hard problems off: the main agent leads on Best, never on Max, and hands parts to helpers
 //   max:      one agent on the Max tier's model alone, the team off (the strongest model for everything)
 //   standard: one agent on the Standard tier's model alone, the team off (what that tier can do with no lead)
 //   quick:    one agent on the Quick tier's model alone, the team off
