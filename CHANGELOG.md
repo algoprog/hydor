@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.60.0 · 12 November 2026
+
+Swarm and deep research can be turned on, off or changed inside a session, and the modes that cost several times
+as much explain themselves the first time you pick them.
+
+- **Swarm and deep research in a session**: the session menu's **Session settings** now has **Swarm** (off, a swarm
+  or a campaign) and **Deep research** (off or on, with its researchers, rounds, searches and report). Before, they
+  could only be picked on the start page. A change takes effect from your next message: the agent starts afresh with
+  what the mode needs, and the conversation carries on.
+- **Know what a costly mode is for before you use it**: the first time you pick Swarm, Campaign, Deep research or
+  Arena, a short card says what it does, what it is worth it for, what it is not (a quick question or a small fix is
+  better done by one agent, for a fraction of the cost) and what it costs. Use it or cancel; it shows once for each
+  mode, on every device, whether tips are on or not.
+- **The work tray keeps a working subagent as working**: a subagent still at work no longer shows as done when one
+  of its background commands ends.
+
 ## 0.59.1 · 12 November 2026
 
 Agents you have finished with stop on their own again, so they no longer use up the computer's memory.
