@@ -227,7 +227,7 @@ test('reading gives each option’s value from the endpoint the page reads', asy
   assert.deepEqual(await v('general.limit-each-session'), ['memory=8', 'cpus=2']);
   assert.equal(await v('memory.notes-each-agent-starts-with'), 20);
   assert.equal(await v('memory.your-profile'), 'Hello');
-  assert.equal(await v('models.lead-with-helpers'), true);
+  assert.equal(await v('models.lead-with-subagents'), true);
   assert.equal(await v('browser.show-a-window'), false, 'Show a window is the opposite of headless');
   assert.deepEqual(await v('browser.sites'), ['allow:a.com', 'block:b.com']);
   assert.deepEqual(await v('browser.profiles'), ['Work']);

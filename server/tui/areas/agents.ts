@@ -34,7 +34,7 @@ const FIELD_OPTIONS: Record<string, OptionSpec> = {
   agent: { type: 'string', value: '<program>', desc: 'The program: claude, codex, custom, or a More agents one' },
   model: { type: 'string', value: '<model>', desc: 'The model it suggests, in that program’s names' },
   tier: { type: 'string', value: '<tier>', desc: 'The tier it thinks with (auto: Automatic)', values: [...TIERS, 'auto'] },
-  'helper-max': { type: 'string', value: '<tier>', desc: 'The highest tier of the helpers it starts (auto: any)', values: [...TIERS, 'auto'] },
+  'helper-max': { type: 'string', value: '<tier>', desc: 'The highest tier of the subagents it starts (auto: any)', values: [...TIERS, 'auto'] },
   tools: { type: 'strings', value: '<tools>', desc: 'What it may use: read, edit, run, web, mcp, all, none', values: [...TOOLS, 'all', 'none'] },
   mode: { type: 'string', value: '<mode>', desc: 'Its permission mode ("" keeps the start page’s)', values: MODES },
   folder: { type: 'string', value: 'task|project', desc: 'Where its sessions start: a new task folder, or here', values: ['task', 'project'] },
@@ -138,7 +138,7 @@ function merged(base: Partial<Assistant>, changes: Record<string, unknown>): Rec
 /** What a field is called when it is said it changed. */
 const FIELD_WORDS: Record<string, string> = {
   budgetUsd: 'budget',
-  helperMax: 'helpers’ tier',
+  helperMax: 'subagents’ tier',
   canAsk: 'who it hands work to',
   askable: 'handed work by others',
   stepUp: 'step up',
