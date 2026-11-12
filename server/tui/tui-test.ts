@@ -1130,7 +1130,7 @@ test('the chat: a grey suggestion from history, Ctrl+R searches it, ! runs a she
   await c.until(/❯ review the plan\n {2}line one↵line two\n {2}fix the tests\n {2}deploy the site to staging/);
   c.p.write('\x12');
   await c.until(/ {2}review the plan\n❯ line one↵line two/);
-  c.p.write('fx');
+  c.p.write('fix');
   await c.until(/❯ fix the tests/);
   c.p.write('\r');
   // In the input, not sent.
