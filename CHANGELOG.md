@@ -3,6 +3,37 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.56.0 · 12 November 2026
+
+The `hydor` command does everything the app does, with a menu that completes as you type, Tab completion in your
+shell and a new look; on a Mac it is there by itself, and agents change a session's settings when you ask.
+
+- **Everything from the terminal.** Each part of the app is a command of its own: `hydor projects`, `tasks`, `apps`,
+  `library`, `memory`, `guidelines`, `skills`, `plugins`, `mcp`, `connections`, `keys`, `agents`, `accounts`,
+  `machines`, `inbox` and `experiments`, and `hydor sessions` can now search, rename, pin, archive, move, fork and share
+  them. `hydor settings` reads and changes every option of the Settings page, or lets you browse them. `hydor find`
+  searches everything as the search box does, `hydor guide` reads this guide, `hydor open` opens any page (the editors
+  in your browser), and `hydor api` calls any part of the app's API.
+- **A menu as you type in the chat.** Type `/` for the commands with what each does, `@` for files (found loosely;
+  end with `/` to look inside a folder), or a value after `/model`, `/mode` or `/effort`: ↑ and ↓ choose, Tab
+  completes, Enter runs. Matching is loose: `mdl` finds `/model`.
+- **Your earlier messages** show in grey as you type (→ takes them), and Ctrl+R searches them.
+- **A new look**: a welcome box with the folder and its branch, the message line between two rules with the model,
+  the mode and what was spent under it, the mode in red when the agent acts without asking, and lists you move through
+  with the arrows and filter by typing.
+- **New in the chat**: `!command` runs a command in the session's folder, `/copy` copies the agent's last reply (over
+  SSH too), `/clear`, `/keys`, `/queue` and `/now`, and `/hydor <command>` runs any of the commands above without
+  leaving the conversation. While the agent works, Enter joins its turn or waits for it to end, as **Settings →
+  General → Sending while an agent works** says.
+- **At your shell**: Tab completion for bash, zsh and fish (`hydor completion install`) completes commands, options,
+  sessions, models, agents and folders. `hydor help` fits on one screen, `hydor help <command>` explains one, and a
+  mistyped command or option gets "Did you mean…".
+- **On a Mac, `hydor` just works.** The Mac app puts the command on your PATH by itself whenever it starts, with no
+  password: open a new Terminal window after the update. When the app is closed, `hydor` opens it.
+- **Agents change a session's settings when you ask**: "use Opus for this session", "think harder", "leave plan mode
+  and go ahead". A change to a session's permissions or spending cap asks you on a card every time, even in Bypass or
+  Full access, and in Plan mode an agent can still change its own session's settings on a card.
+
 ## 0.55.5 · 12 November 2026
 
 The helpers an agent starts all go by one name, subagents, and each one says who started it.
