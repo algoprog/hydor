@@ -3,6 +3,60 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.59.0 · 12 November 2026
+
+Every editor gets a right-click menu, and the ones that place things help you line them up as you move and size them,
+as PowerPoint, Canva and Figma do.
+
+- **A right-click menu in every editor**: documents, slides, spreadsheets, designs, diagrams, pages, LaTeX, notebooks,
+  the code editor, and the picture, video and sound editors. It offers what fits where you click (words, a link, a
+  table cell, a picture, a clip…) with the same names and keys as the editor's menus; the menu key or Shift+F10 opens
+  it from the keyboard, and a long press on a phone.
+- **Lining things up** in slides, designs, diagrams, pages, pictures and the video's viewer: what you move or size snaps
+  to the edges and middles of the other parts and of the page, with pink lines between them, the distances to its
+  neighbours, and its position or size as you go. **Ctrl+drag** copies it and **Alt** turns snapping off (**⌥** and
+  **⌘** on a Mac), as in PowerPoint and Keynote; Shift keeps it straight.
+- **Documents**: a web address you type becomes a link, and quotes, dashes and signs turn typographic (undo straight
+  after takes one back; both can be turned off in **Tools**); drag picked words to move them; a menu on each
+  paragraph's handle; table rows and columns go in and out as many as are picked; numbered lists in 1. a. i. A. I. that
+  restart, continue or start at a number; Legal, A3 and A5 paper and a margin for each side; the document's language
+  (**Tools → Language**); keys for the font size, the indent and copying the format.
+- **Slides**: copy and paste work with other apps both ways (before, anything copied in the editor stopped pastes from
+  elsewhere); rows and columns go in anywhere in a table; several parts are aligned to the slide, locked, sized and
+  turned together; text boxes, shapes and lines are drawn at the size you drag; several slides are picked in the list to
+  move, copy or delete together.
+- **Pages**: placed parts are dragged anywhere with guides (**Place freely** in the right-click menu), nudged with the
+  arrow keys and sized from every side; pasted words keep their bold, italic, links, lists and headings; any file can be
+  dropped in (a PDF, a video, a sound); zoom, a width of your own, find and replace, and Ctrl+A.
+- **Designs**: a **Layers** panel to pick, reorder, hide, lock and rename parts; a list of the keys (Ctrl+/); Shift+2
+  zooms to what is picked and Space+drag pans; words pasted from elsewhere become a text box.
+- **Diagrams**: copy and paste a shape's look (Ctrl+Alt+C, Ctrl+Alt+V); **Tab** adds a connected shape; pictures dropped
+  from your computer; several shapes sized and turned together; Ctrl+Shift+H fits the page again.
+- **Pictures**: **New → Picture** in the Library (and **File → New** in the editor) for a blank picture of the size you
+  choose; Align to the canvas; move or transform a selection; words in some sixty fonts with bold, italic, alignment,
+  outline and shadow; Shift+click draws straight lines, Alt picks a colour, a pen's pressure counts; a zoom list in the
+  status bar; Paste in place; merging no longer swallows hidden layers.
+- **Video**: Cut, Copy, Paste, Duplicate and Paste attributes for clips and words; several picked at once (Shift-click or
+  a box) to move, cut or delete together; files dropped from your computer; captions read from .srt and .vtt files and
+  saved as .vtt; a list of the keys; ↑ and ↓ jump between cuts, Q and W trim to the playhead; locked tracks are safe from
+  every command, and S splits what is picked.
+- **Sound**: a list of the keys; files dropped from your computer; J, K and L shuttle (Loop moves to Q); splits and picks
+  snap to zero crossings, and to a time grid if you want one; a volume line on each clip, kept when you save; smooth
+  fades; moving an effect's slider no longer stutters; a ripple delete keeps every track and the markers in step.
+- **Spreadsheets**: cut and paste re-point the formulas that used the cells (before, they turned to 0); drag cells, rows
+  and columns to move them; Ctrl+Shift+1 to 6 for number formats, Alt+= and a Σ button for AutoSum, $ and % buttons and
+  a format painter; pasting from Excel, Google Sheets or a web page keeps its look; 45 more functions (SUBTOTAL, XIRR,
+  NORM.DIST, ROMAN…) and a list of all of them; coloured and hidden sheet tabs; Resize, Fit to the data and Freeze up to
+  here on the row and column headers.
+- **LaTeX, notebooks and code**: in LaTeX, Ctrl+click (or F12) on a \ref, a \cite or an \input goes to what it names,
+  citations offer "Author Year — Title" as you type, **Search** finds and replaces in every file of the project, and
+  **View → Editor settings** sets the text size, wrapping and line numbers. In notebooks, each cell's menu (⋯ or a
+  right-click) runs the cells above or below it, copies, cuts, pastes, splits and merges cells, and folds or clears an
+  output; an outline of the headings; a run asked while the kernel starts waits for it. In the code editor, **unsaved
+  changes are no longer lost** when you switch to another file's tab (a dot marks them, and closing asks first); a
+  status bar shows the line and column, the indentation and the line ends (files with Windows line ends keep them), and
+  Ctrl+G goes to a line.
+
 ## 0.58.0 · 12 November 2026
 
 The `hydor` command now comes with the Linux and Windows apps too, draws only what every terminal font shows (plain
