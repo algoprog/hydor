@@ -98,8 +98,8 @@ export interface Ranked {
   hits: number[];
 }
 
-/** The items that match, best first (the order they came in for ties); with no query all of them as they are. */
-export function rank(items: Item[], query: string): Ranked[] {
+/** The items that match, best first (the order they came in for ties); with no query all of them as they are. `byHint`: a hint's words can match too, below the names (not for commands: a word that is no command's name goes to the agent as it is). */
+export function rank(items: Item[], query: string, byHint = true): Ranked[] {
   if (!query.trim()) return items.map((item) => ({ item, hits: [] }));
   const out: { r: Ranked; score: number; i: number }[] = [];
   items.forEach((item, i) => {
@@ -107,7 +107,7 @@ export function rank(items: Item[], query: string): Ranked[] {
     const m = fuzzy(query, item.label.slice(skip));
     if (m) return out.push({ r: { item, hits: m.hits.map((h) => h + skip) }, score: m.score, i });
     // Its hint can match too (a model's label, an agent's description), below those that match by name.
-    const h = item.hint ? fuzzy(query, item.hint) : null;
+    const h = byHint && item.hint ? fuzzy(query, item.hint) : null;
     if (h) out.push({ r: { item, hits: [] }, score: h.score - 100, i });
   });
   return out.sort((a, b) => b.score - a.score || a.i - b.i).map((x) => x.r);
@@ -160,7 +160,9 @@ export function historyItems(history: string[], query: string): Ranked[] {
 
 // ---- what is being completed ---------------------------------------------------------------------------------
 
-export type Context = { kind: 'commands'; from: number; query: string } | { kind: 'values'; cmd: string; from: number; query: string } | { kind: 'files'; from: number; query: string };
+export type Context = { kind: 'commands'; from: number; query: string } | { kind: 'values'; cmd: string; from: number; query: string } | { kind: 'files'; from: number; query: string }
+  /** After `/hydor `: the words before the one being typed (an area, a verb, arguments, options) and that word. */
+  | { kind: 'hydor'; from: number; before: string[]; query: string };
 
 /** The commands that take a value from a list. */
 export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'helpers', 'open'];
@@ -170,6 +172,11 @@ export function contextOf(before: string): Context | null {
   let m: RegExpExecArray | null;
   if ((m = /^\/(\S*)$/.exec(before))) return { kind: 'commands', from: 0, query: m[1] };
   if ((m = new RegExp(`^/(${VALUE_COMMANDS.join('|')})[ \\t]+(\\S*)$`).exec(before))) return { kind: 'values', cmd: m[1], from: before.length - m[2].length, query: m[2] };
+  if ((m = /^\/hydor[ \t]+([^\n]*)$/.exec(before))) {
+    const words = m[1].split(/\s+/);
+    const query = words.pop() ?? '';
+    return { kind: 'hydor', from: before.length - query.length, before: words, query };
+  }
   if ((m = /(?:^|\s)@(\S*)$/.exec(before))) return { kind: 'files', from: before.length - m[1].length - 1, query: m[1] };
   return null;
 }

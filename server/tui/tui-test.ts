@@ -592,6 +592,10 @@ const server = http.createServer((req, res) => {
     const f = m ? fakes.get(decodeURIComponent(m[1])) : undefined;
     const rest = m?.[2] ?? '';
     if (p === '/api/bootstrap') return send(200, { version: '9.9.9', home: '/home/u', defaultCwd: '/home/u', start: { agent: 'claude', runs: { claude: { mode: 'default' } } }, acpAgents: [{ id: 'console', name: 'Custom', command: '', args: [], builtin: true }] });
+    if (p === '/api/projects' && req.method === 'GET') return send(200, { spaces: [{ id: 'sp1', name: 'Thesis', folder: '/home/u/thesis', sessions: 2, docs: 1, lastAt: Date.now() - 3600_000, description: 'my writing' }, { id: 'sp2', name: 'Website', folder: '/home/u/site', sessions: 0, docs: 0, description: '' }] });
+    if (p === '/api/projects/sp1' && req.method === 'DELETE') return send(200, { ok: true });
+    if (p === '/api/connections' && req.method === 'GET') return send(200, { secrets: [] });
+    if (p === '/api/connections/secrets' && req.method === 'POST') return send(200, { secret: { name: body.name, domains: [], note: '', commands: false } });
     if (p === '/api/git/repo-info') return send(200, { info: { repo: '/home/u', branch: 'main', sub: '' } });
     if (p === '/api/fs/find') {
       const q = url.searchParams.get('q') ?? '';
@@ -1289,6 +1293,86 @@ test('the chat: Enter while the agent works joins the turn (as set) or queues it
   while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
   assert.equal(c.exit(), 0);
   fs.rmSync(terminalFile, { force: true });
+});
+
+test('the chat: /hydor runs an area command (its table above the region), the menu lists areas, verbs and arguments, a confirm answered No, a hidden answer never shown or kept, and the old commands get a note', async () => {
+  const history = path.join(DATA, 'terminal-history');
+  fs.rmSync(history, { force: true });
+  const c = await chatIn(110);
+  await c.until(/What should the agent do\?/);
+  // The menu after `/hydor `: the areas with what they are, a few at a time.
+  c.p.write('/hydor ');
+  await c.until(/❯ \S+ +\S[^\n]*\n {2}\S+ +\S/);
+  c.p.write('proj');
+  await c.until(/❯ projects +[A-Z][^\n]*\n─*$|❯ projects +\S/m);
+  assert.doesNotMatch((await c.screen()).split('\n').slice(-4).join('\n'), /memory/, 'only the areas that match');
+  c.p.write('\t');
+  // After an area: its verbs, with what each does.
+  await c.until(/› \/hydor projects /);
+  await c.until(/❯ list +Your projects[^\n]*\n {2}show +One project/);
+  // After a verb: its arguments, from the same loaders as Tab completion in a shell.
+  c.p.write('sho');
+  await c.until(/❯ show +One project/);
+  c.p.write('\t');
+  await c.until(/❯ Thesis +sp1\n {2}Website +sp2/);
+  assert.ok(calls.some((x) => x.path === '/api/projects'));
+  // Options when the word starts with a dash.
+  c.p.write('-');
+  await c.until(/❯ --\S+ +\S/);
+  c.p.write('\x7f\x15');
+  // Run: `/hydor projects` prints its table above the region.
+  c.p.write('/hydor projects\r');
+  await c.until(/PROJECT +FOLDER +SESSIONS +DOCS +LAST\n[^\n]*Thesis +~\/thesis +2 +1 /);
+  assert.match(await c.screen(), /Website +~\/site/);
+  await c.until(/› What should the agent do\?/);
+  // A confirm: the picker with No first; answered No, nothing is removed.
+  c.p.write('/hydor projects remove Thesis\r');
+  await c.until(/Remove “Thesis”\?\n❯ 1 No\n {2}2 Yes/);
+  c.p.write('\r');
+  await c.until(/Not removed\./);
+  assert.ok(!calls.some((x) => x.method === 'DELETE' && x.path === '/api/projects/sp1'));
+  // The same answered Yes removes it (a digit alone picks).
+  c.p.write('/hydor projects rm Thesis\r');
+  await c.until(/Remove “Thesis”\?/);
+  c.p.write('2');
+  await c.until(/Removed “Thesis”\./);
+  assert.ok(calls.some((x) => x.method === 'DELETE' && x.path === '/api/projects/sp1'));
+  // A hidden question: • for each character, the answer sent, never shown, never in the history.
+  c.p.write('/hydor keys set TEST_KEY\r');
+  await c.until(/Value for TEST_KEY:/);
+  await c.until(/Hidden as you type/);
+  c.p.write('s3cr3tVALUE');
+  await c.until(/› •{11}$/m);
+  assert.doesNotMatch(await c.screen(), /s3cr3t/);
+  // Up and Tab do nothing there (history is not reached into the answer).
+  c.p.write('\x1b[A\t');
+  await sleep(200);
+  c.p.write('\r');
+  await c.until(/TEST_KEY is in the vault\./);
+  const post = calls.find((x) => x.method === 'POST' && x.path === '/api/connections/secrets');
+  assert.equal(post?.body.value, 's3cr3tVALUE');
+  assert.doesNotMatch(await c.screen(), /s3cr3t/);
+  assert.doesNotMatch(c.raw(), /s3cr3t/, 'it was never written to the terminal');
+  assert.doesNotMatch(fs.existsSync(history) ? fs.readFileSync(history, 'utf8') : '', /s3cr3t/);
+  // Esc backs out of a question and says nothing; the chat goes on.
+  c.p.write('/hydor keys set OTHER_KEY\r');
+  await c.until(/Value for OTHER_KEY:/);
+  c.p.write('\x1b');
+  await c.until(/› What should the agent do\?/);
+  assert.equal(calls.filter((x) => x.method === 'POST' && x.path === '/api/connections/secrets').length, 1);
+  // A wrong use is told in red-and-words, an old command gets a note; neither ends the chat.
+  c.p.write('/hydor projects frobnicate\r');
+  await c.until(/✗ Unknown projects command: frobnicate\./);
+  c.p.write('/hydor usage\r');
+  await c.until(/In the chat, use \/usage, or run it in a shell: hydor usage/);
+  c.p.write('/hydor nothing-like-it\r');
+  await c.until(/Unknown command: nothing-like-it\./);
+  c.p.write('/hydor projects show Nothing\r');
+  await c.until(/✗ No project “Nothing”/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
 });
 
 test('the chat with stdout not a terminal: no colour and no region, each line typed sent', async () => {
