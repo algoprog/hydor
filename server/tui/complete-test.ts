@@ -99,7 +99,10 @@ test('commands: the chat’s own first, the program’s after, nobody twice; arg
     items.map((i) => !!i.needsArg),
     [false, true, false, true, false, false],
   );
-  assert.equal(items[1].hint, '<title>  rename it');
+  assert.equal(items[1].args, '<title>');
+  assert.equal(items[1].hint, 'rename it');
+  assert.equal(items[3].args, '<pr>');
+  assert.equal(items[3].hint, 'review code');
 });
 
 test('history: newest first, each once, line breaks as ↵, filtered loosely', () => {
@@ -125,10 +128,20 @@ const named = (labels: string[], hint?: string): Ranked[] => labels.map((label) 
 
 test('menu rows: ❯ on the selected row, labels padded to the widest, hints after, none wider than the terminal', () => {
   const r = rows([
-    { item: { label: '/model', hint: '[name|auto]  the model', value: '/model', kind: 'command' }, hits: [] },
-    { item: { label: '/new', hint: 'a new session', value: '/new', kind: 'command' }, hits: [] },
+    { item: { label: '/model', args: '[name|auto]', hint: 'the model', value: '/model', kind: 'command' }, hits: [] },
+    { item: { label: '/new', args: '[message]', hint: 'a new session', value: '/new', kind: 'command' }, hits: [] },
+    { item: { label: '/help', hint: 'these commands', value: '/help', kind: 'command' }, hits: [] },
   ]);
-  assert.deepEqual(r, ['❯ /model   [name|auto]  the model', '  /new     a new session']);
+  // A command's arguments sit by its name, so the descriptions line up.
+  assert.deepEqual(r, ['❯ /model [name|auto]   the model', '  /new [message]       a new session', '  /help                these commands']);
+  const longArgs = rows([{ item: { label: '/auto-mode-setup', args: '[--request-id <uuid>] (--wizard posture=… scope=…)', hint: 'set it up', value: '/x', kind: 'command' }, hits: [] }], {
+    width: 100,
+  })[0];
+  assert.equal(longArgs.indexOf('set it up'), 2 + 28 + 3, 'the label column is at most 28 wide');
+  assert.match(longArgs, /^❯ \/auto-mode-setup \[--r\S*…/);
+  // Dim args after the name, in colour.
+  const [coloured] = menuRows({ items: [{ item: { label: '/new', args: '[message]', value: '/new', kind: 'command' }, hits: [] }], sel: 0, top: 0, rows: 8, width: 60, p: makePaint(true, 2) });
+  assert.match(coloured, /\/new\x1b\[22m \x1b\[2m\[message\]\x1b\[22m/);
   assert.deepEqual(rows(named(['a', 'b']), { sel: 1 }), ['  a', '❯ b']);
   for (const width of [20, 40, 80]) {
     const long = named(['x'.repeat(50), 'short'], 'a hint that goes on and on and on and on and on and on and on');

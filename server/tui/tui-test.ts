@@ -640,6 +640,11 @@ const server = http.createServer((req, res) => {
     if (rest === '' && req.method === 'GET') return send(200, { summary: summaryOf(f), live: f.live, overlay: f.overlay });
     if (rest === '/timeline') return send(200, { items: f.items, total: f.items.length, start: 0 });
     if (rest === '/notes') return send(200, { notes: f.notes });
+    if (rest === '/__device') {
+      // What the server sends a session's subscribers when an agent changes the device's settings (PUT /device).
+      toSubs(f.key, { t: 'feature', id: 'guide', key: f.key, data: { device: body } });
+      return send(200, { ok: true });
+    }
     if (rest === '/message') {
       send(200, { ok: true });
       void play(f, String(body.text));
@@ -898,6 +903,7 @@ async function chatIn(cols: number, o: { args?: string[]; env?: Record<string, s
 
 for (const cols of [80, 120]) {
   test(`the chat at ${cols} columns: a message, a streamed reply, an approval by key, a queued message, a paste, Ctrl+C twice`, async () => {
+    fs.writeFileSync(path.join(DATA, 'terminal.json'), '{"enter":"queue"}');
     const c = await chatIn(cols);
     await c.until(/HYDΩR 9\.9\.9/);
     await c.until(/What should the agent do\?/);
@@ -928,6 +934,7 @@ for (const cols of [80, 120]) {
     const t0 = Date.now();
     while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
     assert.equal(c.exit(), 0);
+    fs.rmSync(path.join(DATA, 'terminal.json'), { force: true });
     const s = await c.screen();
     assert.match(s, /Carry on with: hydor resume/);
     fs.writeFileSync(path.join(DATA, `chat-screen-${cols}.txt`), s + '\n');
@@ -1130,7 +1137,8 @@ test('the chat: a grey suggestion from history, Ctrl+R searches it, ! runs a she
   c.p.write('\x15');
   // A shell command: its output, then the chat again; a failure says its exit code.
   c.p.write('!echo hi there');
-  await c.until(/^! !echo hi there$/m);
+  await c.until(/^› !echo hi there$/m);
+  assert.ok(c.raw().includes('\x1b[33m›\x1b[39m !echo hi there'), 'the › is yellow in shell mode');
   c.p.write('\r');
   await c.until(/\$ echo hi there\nhi there\n/);
   c.p.write('!false\r');
@@ -1208,6 +1216,80 @@ test('hydor resume with no session named: the chat opens with the sessions to pi
   fakes.delete(f.key);
 });
 
+
+test('the chat: Enter while the agent works joins the turn (as set) or queues it, /queue and /now, an agent changing the device settings, the grey suggestion switched off', async () => {
+  const terminalFile = path.join(DATA, 'terminal.json');
+  fs.rmSync(terminalFile, { force: true });
+  fs.writeFileSync(path.join(DATA, 'terminal-history'), `${JSON.stringify('deploy the site to staging')}\n`);
+  const c = await chatIn(120);
+  await c.until(/What should the agent do\?/);
+  const sent = (suffix: string, text: string) => calls.filter((x) => x.method === 'POST' && x.path.endsWith(suffix) && x.body?.text === text).length;
+  const waitFor = async (f: () => boolean) => {
+    const t0 = Date.now();
+    while (!f() && Date.now() - t0 < 6000) await sleep(50);
+    assert.ok(f());
+  };
+  // The default: Enter sends into the running turn.
+  c.p.write('be slow\r');
+  await c.until(/Working · \d+ s/);
+  await sleep(600);
+  await c.until(/Enter sends into the running turn · \/queue waits for its end/);
+  c.p.write('and also this\r');
+  await waitFor(() => sent('/message', 'and also this') === 1);
+  assert.equal(sent('/queue', 'and also this'), 0);
+  await c.until(/› and also this/);
+  await c.until(/✓ 900 ms/);
+  // /queue always waits, /now always joins (a message to an idle agent just goes).
+  c.p.write('be slow again\r');
+  await c.until(/Working · \d+ s/);
+  await sleep(600);
+  c.p.write('/queue for later\r');
+  await waitFor(() => sent('/queue', 'for later') === 1);
+  assert.equal(sent('/message', 'for later'), 0);
+  await c.until(/⧗ queued: for later/);
+  c.p.write('/now right away\r');
+  await waitFor(() => sent('/message', 'right away') === 1);
+  assert.equal(sent('/queue', 'right away'), 0);
+  // A command that needs its message waits for it: Enter in the menu puts the name in.
+  c.p.write('/queue\r');
+  await c.until(/› \/queue /m); // (the grey rest of an earlier /queue shows after it)
+  c.p.write('\x15');
+  // An agent changes the device settings: the terminal's two are kept and said, the rest is the browser's.
+  const f = [...fakes.values()].at(-1)!;
+  const device = (body: unknown) => fetch(`${BASE}/api/sessions/${encodeURIComponent(f.key)}/__device`, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  await device({ theme: 'dark', language: 'el' });
+  await sleep(300);
+  assert.equal(fs.existsSync(terminalFile), false, 'theme and language are not the terminal’s');
+  await device({ enter: 'queue', terminalSuggestions: false, theme: 'dark' });
+  await c.until(/Enter now waits for the turn to end · Grey suggestions are off/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(terminalFile, 'utf8')), { enter: 'queue', suggestions: false });
+  // With Enter queuing, the placeholder says so, Enter queues, and /now still joins.
+  c.p.write('be slow a third time\r');
+  await c.until(/Working · \d+ s/);
+  await sleep(600);
+  await c.until(/Enter queues it for when the turn ends · \/now joins the turn/);
+  c.p.write('wait for the end\r');
+  await waitFor(() => sent('/queue', 'wait for the end') === 1);
+  assert.equal(sent('/message', 'wait for the end'), 0);
+  await device({ enter: 'join' });
+  await c.until(/Enter now joins the running turn/);
+  c.p.write('\x1b');
+  await c.until(/■ Stopped/);
+  // Suggestions off: nothing grey after what is typed.
+  c.p.write('deplo');
+  await c.until(/› deplo$/m);
+  await sleep(300);
+  assert.doesNotMatch(await c.screen(), /deploy the site/);
+  await device({ terminalSuggestions: true });
+  await c.until(/Grey suggestions are on/);
+  c.p.write('y');
+  await c.until(/› deploy the site to staging/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+  fs.rmSync(terminalFile, { force: true });
+});
 
 test('the chat with stdout not a terminal: no colour and no region, each line typed sent', async () => {
   const out = path.join(DATA, 'plain-out.txt');
