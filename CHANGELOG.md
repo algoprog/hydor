@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.61.2 · 12 November 2026
+
+The start page's folder menu is rebuilt: your projects and your folders in two short lists, each row saying where it
+is, and the whole menu fits on the screen.
+
+- **Projects and folders in their own lists**: the folder menu now shows **Projects**, the five at work most recently
+  with each one's folder, and **Folders**, the one in use and the three you picked last with where each is, under
+  their own headings, then **New task folder** ("a fresh one in ~/Hydor"). **New** beside the Projects heading makes
+  a project. **Browse** beside Folders lists the folders in your home folder; an arrow in the field goes up a folder,
+  and the cross (or Escape) goes back to the lists.
+- **A project's folder is the project**: a project's own folder is no longer listed a second time as a plain folder.
+  A session started in it works in the project, with its guidelines, skills and knowledge, even when the start page
+  had the folder picked rather than the project. The leftover word "space" under each project is gone.
+- **It fits on screen**: the menu opens above or below its chip, wherever there is more room, and in a small window
+  it shows fewer folders, then fewer projects, rather than scroll, so the **New worktree** switch is never cut off;
+  a line such as "2 more" under the projects brings back the rest. On a phone everything shows in its sheet.
+- The **New worktree** switch says what it does: a new branch, in a copy of the repository.
+
 ## 0.61.1 · 12 November 2026
 
 Pages agents make look right in the dark theme again, and agents can now check a page in the dark before they show
