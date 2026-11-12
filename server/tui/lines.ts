@@ -109,11 +109,11 @@ export function stepWords(t: ToolInfo, look: Look): { main: string; more: string
 
 /** The mark a step's line starts with: by how it ended, or the spinner's frame while it runs. */
 function stepMark(t: ToolInfo, p: Paint, frame?: string): string {
-  if (running(t)) return p.accent(frame ?? '◌');
+  if (running(t)) return p.accent(frame ?? '○');
   if (t.status === 'error') return p.red('✗');
-  if (t.status === 'declined') return p.yellow('⊘');
+  if (t.status === 'declined') return p.yellow('×');
   if (t.status === 'interrupted') return p.yellow('■');
-  if (t.status === 'waiting') return p.yellow('◌');
+  if (t.status === 'waiting') return p.yellow('○');
   return p.dim('●');
 }
 
@@ -213,8 +213,8 @@ export function textLines(md: string, look: Look): string[] {
 export function thoughtLines(item: Extract<TimelineItem, { kind: 'thinking' }>, look: Look): string[] {
   const { p } = look;
   const head = item.durationMs && item.durationMs >= 1000 ? `Thought for ${duration(item.durationMs)}` : 'Thought';
-  if (!look.thinking || !item.text.trim()) return [`${INDENT}${p.dim(`∴ ${head}`)}`];
-  return [`${INDENT}${p.dim(`∴ ${head}`)}`, ...wrap(p.dim(p.italic(item.text.trim())), look.width, { first: `${INDENT}  `, indent: `${INDENT}  ` })];
+  if (!look.thinking || !item.text.trim()) return [`${INDENT}${p.dim(`◇ ${head}`)}`];
+  return [`${INDENT}${p.dim(`◇ ${head}`)}`, ...wrap(p.dim(p.italic(item.text.trim())), look.width, { first: `${INDENT}  `, indent: `${INDENT}  ` })];
 }
 
 /** Your message: `›` and its words, wrapped under it. */
@@ -243,7 +243,7 @@ export function userLines(item: Extract<TimelineItem, { kind: 'user' }>, look: L
   const { p } = look;
   const child = childReplyLines(item.text, look);
   if (child) return child;
-  if (item.peer) return wrap(p.dim(`✉ From ${item.peer.name ?? 'another session'}: ${item.text.trim()}`), look.width, { first: INDENT, indent: `${INDENT}  ` }).slice(0, 4);
+  if (item.peer) return wrap(p.dim(`» From ${item.peer.name ?? 'another session'}: ${item.text.trim()}`), look.width, { first: INDENT, indent: `${INDENT}  ` }).slice(0, 4);
   if (item.meta === 'note' || item.meta === 'command-output') return wrap(p.dim(item.text.trim()), look.width, { first: INDENT, indent: INDENT }).slice(0, 4);
   return promptLines(item.text, look);
 }
@@ -376,7 +376,7 @@ export function approvalNeedsApp(a: ApprovalRequest): string {
 /** An approval's card as lines: its title, its detail (a command, a file's change, a plan), then its choices. */
 export function approvalLines(a: ApprovalRequest, look: Look, o: { detailRows?: number } = {}): string[] {
   const { p, width } = look;
-  const icon = a.kind === 'question' ? '?' : a.form ? '☐' : '!';
+  const icon = a.kind === 'question' ? '?' : a.form ? '□' : '!';
   const out = wrap(p.bold(a.title), width, { first: `${INDENT}${p.yellow(icon)} `, indent: `${INDENT}  ` });
   if (a.from) out.push(`${INDENT}  ${p.dim(`Asked by ${a.from}`)}`);
   if (a.app?.given.length) out.push(...wrap(p.dim(`From your message: ${a.app.given.map((g) => `${g.label}: ${g.value}`).join(' · ')}`), width, { first: `${INDENT}  `, indent: `${INDENT}  ` }));

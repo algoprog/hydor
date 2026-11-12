@@ -107,6 +107,46 @@ export function colorLevel(stream: { isTTY?: boolean }, noColor = false, env: No
   return colorWanted(stream, noColor, env) ? levelOf(env) : 0;
 }
 
+// ---- plain ASCII ----------------------------------------------------------------------------------
+
+/**
+ * Whether to draw only ASCII where Unicode cannot show: HYDOR_ASCII=1 says yes and =0 no; else, on a terminal, by itself for the
+ * Linux console (TERM=linux), for a locale that is not UTF-8 (the first of LC_ALL, LC_CTYPE and LANG that is set) on Linux and
+ * macOS, and on Windows without a modern terminal (none of WT_SESSION, TERM_PROGRAM, ConEmuANSI, TERM). Piped output stays Unicode.
+ */
+export function asciiWanted(env: NodeJS.ProcessEnv = process.env, platform: string = process.platform, stream: { isTTY?: boolean } = process.stdout): boolean {
+  if (env.HYDOR_ASCII === '1') return true;
+  if (env.HYDOR_ASCII === '0' || !stream.isTTY) return false;
+  if (env.TERM === 'linux') return true;
+  if (platform === 'win32') return !(env.WT_SESSION || env.TERM_PROGRAM || env.ConEmuANSI || env.TERM);
+  if (platform === 'linux' || platform === 'darwin') {
+    const locale = env.LC_ALL || env.LC_CTYPE || env.LANG;
+    return !!locale && !/utf-?8/i.test(locale);
+  }
+  return false;
+}
+
+/** What each of our symbols becomes in plain ASCII (the braille spinner's frames take `| / - \` in turn). */
+const ASCII: Record<string, string> = {
+  '“': '"', '”': '"', '‘': "'", '’': "'", '—': '-', '–': '-', '−': '-',
+  '…': '...', '·': '-', '•': '*', '●': '*', '◆': '*', '○': 'o', '◦': '-', '◇': '-', '□': '[ ]',
+  '✓': '+', '✗': 'x', '×': 'x', '›': '>', '❯': '>', '»': '>>', '→': '->', '←': '<-', '↑': '^', '↓': 'v', '↵': '/',
+  '─': '-', '│': '|', '╭': '+', '╮': '+', '╰': '+', '╯': '+', '├': '+', '┤': '+', '┼': '+',
+  '░': '.', '█': '#', '▪': '*', '■': '#', 'Ω': 'O',
+};
+const SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+const ASCII_RE = new RegExp(`[${Object.keys(ASCII).join('')}${SPINNER}]`, 'g');
+
+/** The text with our symbols (quotes, dashes, dots, marks, arrows, box lines, the spinner, the logo's omega) as plain ASCII; everything else (the agent's words, names, other languages) stays as it is. */
+export function asciify(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7f]*$/.test(text)) return text;
+  return text.replace(ASCII_RE, (c) => ASCII[c] ?? '|/-\\'[SPINNER.indexOf(c) % 4]);
+}
+
+/** Lines ready for this stream: as ASCII when `ascii` says so. */
+export const forTerminal = (lines: string[], ascii: boolean) => (ascii ? lines.map(asciify) : lines);
+
 // ---- widths ---------------------------------------------------------------------------------------
 
 const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
@@ -167,7 +207,7 @@ export function graphemes(s: string): string[] {
 export function graphemeWidth(g: string): number {
   const cp = g.codePointAt(0) ?? 0;
   const w = codeWidth(cp);
-  if (g.length > 1 && w === 1 && (g.includes('️') || g.includes('‍'))) return 2;
+  if (g.length > 1 && w === 1 && (g.includes('\uFE0F') || g.includes('\u200D'))) return 2;
   // Two regional indicators are a flag.
   if (cp >= 0x1f1e6 && cp <= 0x1f1ff) return 2;
   return w;

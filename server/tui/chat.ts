@@ -27,7 +27,7 @@ import { Screen, suspend, takeTerminal } from './screen.ts';
 import { setTerminalPref, terminalPrefs, type TerminalPrefs } from './settings-table.ts';
 import { hydorItems, runHydor, stepAfter, type Host } from './hydor-cmd.ts';
 import { catalogOf, findAssistant, modeFor, modeLabel, modeRisk, newStartId, planStart, programName, startBody, tiersOf, type Boot, type Plan, type TiersState } from './start.ts';
-import { colorLevel, colorWanted, elapsed, gradientAt, graphemes, makePaint, money, pad, strWidth, tildify, truncate, wrap, type Paint } from './term.ts';
+import { asciify, asciiWanted, colorLevel, colorWanted, elapsed, forTerminal, gradientAt, graphemes, makePaint, money, pad, strWidth, tildify, truncate, wrap, type Paint } from './term.ts';
 
 const SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 const rgbHex = ([r, g, b]: [number, number, number]) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
@@ -111,6 +111,8 @@ function keepHistory(file: string, line: string, all: string[]) {
 
 export class Chat {
   private look: Look;
+  /** Plain ASCII instead of our symbols (a terminal or locale that cannot show them, or HYDOR_ASCII=1). */
+  private ascii: boolean;
   private screen: Screen | null;
   private editor: LineEditor;
   private keys = new KeyReader();
@@ -165,7 +167,8 @@ export class Chat {
     const out = process.stdout;
     const level = colorLevel(out, o.noColor);
     this.look = { p: makePaint(!plain && level > 0, level || undefined), width: out.columns || 100, home: boot.home, verbose: o.verbose, thinking: o.thinking };
-    this.screen = plain ? null : new Screen(out);
+    this.ascii = asciiWanted(process.env, process.platform, out);
+    this.screen = plain ? null : new Screen(out, this.ascii);
     this.editor = new LineEditor();
     this.printer = new Printer(this.look);
   }
@@ -277,7 +280,11 @@ export class Chat {
     } catch {}
   }
 
-  /** The head of a chat: a box with the app, its version, the folder and branch, the program, model and mode (the session's title for one carried on), and a line of hints. */
+  /**
+   * The head of a chat: a box with the app and its version in its top edge, then the folder on its branch, the session's title
+   * (for one carried on), the program, model and mode, the server's address when it is not this computer's, and the keys.
+   * Its width is the same whatever the folder: at least 64 columns, wider only for a longer line, never past the screen.
+   */
   private async welcome(title?: string): Promise<string[]> {
     const { p } = this.look;
     this.welcomed = true;
@@ -285,21 +292,23 @@ export class Chat {
     await this.loadGit();
     const width = this.screen!.columns;
     const c = this.current();
-    const lines = [`${logo(p)} ${p.dim(this.conn.version)}`];
+    const lines = [onBranch(tildify(this.cwd(), this.boot.home), this.git.branch, p, false)];
     if (title) lines.push(p.bold(title));
-    lines.push(`${tildify(this.cwd(), this.boot.home)}${this.git.branch ? `  ${p.accent(`⎇ ${this.git.branch}`)}` : ''}`);
     const who = [this.plan.assistant && this.plan.assistant.id !== 'general' && !this.view ? this.plan.assistant.name : '', programName(this.prog.agent, this.prog.acpAgent, this.boot.acpAgents), c.model].filter(Boolean);
     lines.push([...who, c.mode ? paintMode(c.mode, c.risk, p) : ''].filter(Boolean).join(p.dim(' · ')));
     if (!this.conn.local) lines.push(p.dim(`on ${this.conn.base}`));
-    const boxW = Math.min(width - 1, Math.max(40, Math.max(...lines.map((l) => strWidth(l))) + 4));
+    // The keys: each one's key in the accent colour, its words dim; the ones that do not fit are dropped whole, from the end.
+    const hints: [string, string][] = [['/', ' commands'], ['@', ' files'], ['!', ' shell'], ['↑', ' history'], ['Ctrl+R', ' search'], ['/help', '']];
+    const hintLine = (n: number) => hints.slice(0, n).map(([k, w]) => `${p.accent(k)}${p.dim(w)}`).join('  ');
+    const boxW = Math.min(width - 1, Math.max(64, Math.max(...lines.map((l) => strWidth(l)), strWidth(hintLine(hints.length))) + 4));
+    let n = hints.length;
+    while (n > 1 && strWidth(hintLine(n)) > boxW - 4) n--;
+    lines.push(hintLine(n));
     const edge = (s: string) => p.dim(p.accent(s));
-    const out = [edge(`╭${'─'.repeat(boxW - 2)}╮`)];
+    const head = `${logo(p)} ${p.dim(this.conn.version)}`;
+    const out = [`${edge('╭─ ')}${truncate(head, Math.max(1, boxW - 6))}${edge(` ${'─'.repeat(Math.max(0, boxW - 5 - strWidth(head)))}╮`)}`];
     for (const l of lines) out.push(`${edge('│')} ${pad(truncate(l, boxW - 4), boxW - 4)} ${edge('│')}`);
     out.push(edge(`╰${'─'.repeat(boxW - 2)}╯`));
-    // The hints that fit, whole ones only.
-    const hints = ['/ commands', '@ files', '! shell', '↑ history', 'Ctrl+R search', '/help'];
-    while (hints.length > 1 && INDENT.length + hints.join(' · ').length > width - 1) hints.pop();
-    out.push(`${INDENT}${p.dim(hints.join(' · '))}`);
     return out;
   }
 
@@ -345,7 +354,7 @@ export class Chat {
   private write(lines: string[]) {
     if (!lines.length) return;
     if (this.screen) this.screen.print(lines);
-    else process.stdout.write(`${lines.join('\n')}\n`);
+    else process.stdout.write(`${(this.ascii ? lines.map(asciify) : lines).join('\n')}\n`);
   }
 
   /** A line of the chat's own (a command's answer), with a blank line before it. */
@@ -357,7 +366,7 @@ export class Chat {
   /** A short note in the region for a few seconds ("Ctrl+C again to leave", an error). */
   private flash(text: string, ms = 4000) {
     this.notice = { text, until: Date.now() + ms };
-    if (this.plain) process.stderr.write(`${text}\n`);
+    if (this.plain) process.stderr.write(`${this.ascii ? asciify(text) : text}\n`);
     this.render();
     setTimeout(() => this.render(), ms + 50).unref?.();
   }
@@ -449,7 +458,7 @@ export class Chat {
         } else if (it.kind === 'tool') live.push(it.tool.status === 'running' || it.tool.status === 'pending' ? runningLine(it, look, frame) : stepLines(it, look)[0]);
         else if (it.kind === 'thinking') {
           const head = it.text.trim().match(/^\*\*(.+?)\*\*/)?.[1];
-          live.push(truncate(`${INDENT}${p.dim(`∴ Thinking${head ? ` · ${head}` : ''}${it.ts ? ` · ${elapsed(it.ts)}` : ''}`)}`, width));
+          live.push(truncate(`${INDENT}${p.dim(`◇ Thinking${head ? ` · ${head}` : ''}${it.ts ? ` · ${elapsed(it.ts)}` : ''}`)}`, width));
         } else live.push(...itemLines(it, look));
       }
       const max = Math.max(3, Math.floor(height / 2) - 4);
@@ -462,8 +471,8 @@ export class Chat {
       if (bg.length) rows.push(truncate(`${INDENT}${p.accent('◆')} ${p.dim(backgroundWords(bg))}`, width));
     }
     rows.push(...this.cardRows(look));
-    for (const q of (view?.summary?.queue ?? []).slice(0, 3)) rows.push(truncate(`${INDENT}${p.dim(`⧗ queued: ${q.text.replace(/\s+/g, ' ')}`)}`, width));
-    if ((view?.summary?.queue?.length ?? 0) > 3) rows.push(`${INDENT}${p.dim(`⧗ and ${view!.summary!.queue!.length - 3} more`)}`);
+    for (const q of (view?.summary?.queue ?? []).slice(0, 3)) rows.push(truncate(`${INDENT}${p.dim(`◦ queued: ${q.text.replace(/\s+/g, ' ')}`)}`, width));
+    if ((view?.summary?.queue?.length ?? 0) > 3) rows.push(`${INDENT}${p.dim(`◦ and ${view!.summary!.queue!.length - 3} more`)}`);
     if (this.working()) {
       const l = view?.live;
       const waiting = l?.status === 'waiting' || !!view?.overlay.approvals.length;
@@ -472,7 +481,7 @@ export class Chat {
       // The spinner shades across the logo's colours, frame by frame, and a brighter band sweeps the word.
       const t = 1 - Math.abs((2 * this.frame) / SPIN.length - 1);
       const spin = p.level >= 2 ? p.hex(frame, rgbHex(gradientAt(LOGO, t))) : p.accent(frame);
-      const left = waiting ? `${p.yellow('◌')} ${shimmer(word, p, Date.now(), true)}` : `${spin} ${shimmer(word, p)}`;
+      const left = waiting ? `${p.yellow('○')} ${shimmer(word, p, Date.now(), true)}` : `${spin} ${shimmer(word, p)}`;
       rows.push(truncate(`${left}${p.dim(`${since ? ` · ${elapsed(since)}` : ''} · esc to stop`)}`, width));
     } else if (view?.helpersWorking().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('Subagents at work: their replies wake the agent')}`, width));
     else if (view?.background().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('At work in the background: each one that ends wakes the agent · /stop stops them')}`, width));
@@ -485,8 +494,10 @@ export class Chat {
     const ghost = this.ui.kind === 'input' && !this.menu && !this.hist && this.prefs().suggestions ? ghostOf(ed.text, ed.cursor, ed.history) : '';
     // A hidden answer (a key) shows a • for each character.
     const hidden = this.ui.kind === 'ask' && this.ui.hidden;
-    const text = hidden ? '•'.repeat(graphemes(ed.text).length) : ed.text;
-    const cursor = hidden ? graphemes(ed.text.slice(0, ed.cursor)).length : ed.cursor;
+    let text = hidden ? '•'.repeat(graphemes(ed.text).length) : ed.text;
+    let cursor = hidden ? graphemes(ed.text.slice(0, ed.cursor)).length : ed.cursor;
+    // In ASCII mode what is typed is mapped here, before it is laid out, so the cursor's column is that of the mapped text.
+    if (this.ascii) [text, cursor] = [asciify(text), asciify(text.slice(0, cursor)).length];
     const lay = layout(text, cursor, width, { prompt: `${shell ? p.yellow('›') : p.accent('›')} `, placeholder: this.placeholder(), maxRows: Math.max(3, Math.floor(height / 3)), ghost, p });
     const top = rows.length;
     rows.push(...lay.rows, rule);
@@ -513,7 +524,7 @@ export class Chat {
     const c = this.current();
     const cost = money(this.view?.summary?.stats.costUsd);
     const where = tildify(this.cwd(), this.boot.home);
-    const left = `${INDENT}${p.dim(`${where}${this.git.branch ? ` ⎇ ${this.git.branch}` : ''}${c.model ? ` · ${c.model}` : ''}${c.mode ? ' · ' : ''}`)}${c.mode ? paintMode(c.mode, c.risk, p) : ''}`;
+    const left = `${INDENT}${onBranch(where, this.git.branch, p, true)}${c.model ? `${p.dim(' · ')}${c.model}` : ''}${c.mode ? `${p.dim(' · ')}${paintMode(c.mode, c.risk, p)}` : ''}`;
     const right = p.dim(`${cost ? `${cost} · ` : ''}/help`);
     // The right part goes when there is no room for it.
     if (strWidth(left) + strWidth(right) + 3 > width - 1) return [truncate(left, width - 1)];
@@ -553,7 +564,7 @@ export class Chat {
     if (ui.kind === 'form') {
       const f = ui.a.form!.fields[ui.fi];
       const n = ui.a.form!.fields.length;
-      const out = wrap(`${n > 1 ? p.dim(`${ui.fi + 1}/${n} `) : ''}${p.bold(f.label)}${f.required ? p.dim(' (needed)') : ''}${f.help ? p.dim(` · ${f.help}`) : ''}`, width, { first: `${INDENT}${p.yellow('☐')} `, indent: `${INDENT}  ` });
+      const out = wrap(`${n > 1 ? p.dim(`${ui.fi + 1}/${n} `) : ''}${p.bold(f.label)}${f.required ? p.dim(' (needed)') : ''}${f.help ? p.dim(` · ${f.help}`) : ''}`, width, { first: `${INDENT}${p.yellow('□')} `, indent: `${INDENT}  ` });
       for (const [i, c] of choicesOf(f).entries()) out.push(truncate(`${INDENT}  ${p.accent(String(i + 1))} ${c}`, width));
       if (f.type === 'file') out.push(`${INDENT}  ${p.dim('The path of a file on this computer')}`);
       if (f.default) out.push(`${INDENT}  ${p.dim(`Enter keeps: ${f.default.replace(/\n/g, ', ')}`)}`);
@@ -764,7 +775,7 @@ export class Chat {
         ui.values[f.id] = cs.length && n >= 1 && n <= cs.length ? cs[n - 1] : t;
       }
       if (f.required && !ui.values[f.id]?.trim()) return this.flash(this.look.p.yellow('It is needed'));
-      if (f.type === 'number' && ui.values[f.id] && !/^[-+]?(\d[\d,_ ]*\.?\d*|\.\d+)$/.test(ui.values[f.id].replace(/^[$€£¥]\s*/, ''))) return this.flash(this.look.p.yellow('A number, please'));
+      if (f.type === 'number' && ui.values[f.id] && !/^[-+]?(\d[\d,_ ]*\.?\d*|\.\d+)$/.test(ui.values[f.id].replace(/^[$\u20AC\u00A3\u00A5]\s*/, ''))) return this.flash(this.look.p.yellow('A number, please'));
       return this.nextField();
     }
     if (!this.plain && text.startsWith('!')) {
@@ -1610,6 +1621,12 @@ function paintMode(label: string, risk: 'full' | 'plan' | 'other', p: Paint): st
   return risk === 'full' ? p.red(label) : risk === 'plan' ? p.accent(label) : p.dim(label);
 }
 
+/** A folder on its branch, in words every font draws: "~/web-agent on main", the "on" dim and the branch in the accent colour (the folder dim as well when `dimmed`). */
+function onBranch(where: string, branch: string, p: Paint, dimmed: boolean): string {
+  const w = dimmed ? p.dim(where) : where;
+  return branch ? `${w} ${p.dim('on')} ${p.accent(branch)}` : w;
+}
+
 /** What works in the background, in a line: "At work in the background: Check the docs", "2 subagents at work in the background: …". */
 function backgroundWords(list: { task: { description: string; startedAt?: number } }[]): string {
   const what = list.map((x) => x.task.description.replace(/\s+/g, ' ')).join(' · ');
@@ -1716,7 +1733,7 @@ export async function chatCommand(conn: Conn, o: Opts, boot: Boot, message?: str
     else {
       const look: Look = { p: makePaint(colorWanted(process.stderr, o.noColor)), width: process.stderr.columns || 100, home: boot.home };
       const lines = sessionLines(list, look);
-      process.stderr.write(`${lines.map((l, i) => `${String(i + 1).padStart(3)}  ${l}`).join('\n')}\n`);
+      process.stderr.write(`${forTerminal(lines.map((l, i) => `${String(i + 1).padStart(3)}  ${l}`), asciiWanted(process.env, process.platform, process.stderr)).join('\n')}\n`);
       const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
       const a = await new Promise<string>((r) => rl.question('Which one? (its number) ', (x) => (rl.close(), r(x.trim()))));
       const n = Number(a);
