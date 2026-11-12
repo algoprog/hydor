@@ -108,8 +108,8 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Models](/settings?s=models): models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM. More in [Agents, accounts and models](/guide/agents-models).
 
 - [**Helper model**](/settings?s=models&find=Helper%20model): The model for small jobs beside sessions.
-- [**Tiers**](/settings?s=models&find=Tiers): The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its helpers get Standard and Quick.
-- [**Lead with helpers**](/settings?s=models&find=Lead%20with%20helpers): A session’s main agent plans, hands clear parts to helpers on cheaper tiers and checks their work.
+- [**Tiers**](/settings?s=models&find=Tiers): The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its subagents get Standard and Quick.
+- [**Lead with subagents**](/settings?s=models&find=Lead%20with%20subagents): A session’s main agent plans, hands clear parts to subagents on cheaper tiers and checks their work.
 - [**Max for hard problems**](/settings?s=models&find=Max%20for%20hard%20problems): Automatic starts a hard problem on Max, and an agent may move itself there when a problem proves harder than it looked.
 - [**On this machine**](/settings?s=models&find=On%20this%20machine): Models installed here, and their downloads.
 - [**Add a model from Hugging Face**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face): The ones suggested for this computer, or search, see how each would run here, and install it.
@@ -235,11 +235,11 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Export**](/settings?s=memory&find=Export): Every note as Markdown to read, or as JSON with histories.
 - [**Clear all…**](/settings?s=memory&find=Clear%20all%E2%80%A6): Deletes every note and its history.
 
-### Child sessions
+### Subagents
 
-[Settings → Child sessions](/settings?s=children): agents handing parts of a job to other agents, and swarms for hard problems. More in [Deep research, second opinions and several agents](/guide/research).
+[Settings → Subagents](/settings?s=children): agents handing parts of a job to subagents, and swarms for hard problems. More in [Deep research, second opinions and several agents](/guide/research).
 
-- [**Working at once, per session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): How many child sessions one session runs at once.
+- [**Working at once, per session**](/settings?s=children&find=Working%20at%20once%2C%20per%20session): How many Hydor subagents one session runs at once.
 - [**Swarm size**](/settings?s=children&find=Swarm%20size): How many agents of a swarm or campaign work at once.
 
 ### Images, video and audio

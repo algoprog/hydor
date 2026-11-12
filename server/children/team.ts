@@ -1,5 +1,5 @@
-// The team: what a session's main agent is told about its helpers when it starts. It leads on its own tier (Best, or
-// Max for a hard problem) and hands well-defined parts to helpers on cheaper tiers, so most of the work costs less
+// The team: what a session's main agent is told about its subagents when it starts. It leads on its own tier (Best, or
+// Max for a hard problem) and hands well-defined parts to subagents on cheaper tiers, so most of the work costs less
 // while the judgement stays with the strongest model in the room. Settings → Models → Tiers turns it off.
 import { swarmMode } from '../../shared/swarm.ts';
 import { modelFamily, resolvedName, tierProgram, tierRank, type Tier, type TierPick } from '../../shared/tiers.ts';
@@ -22,7 +22,7 @@ function nativeName(d: Deps, pick: TierPick): string | undefined {
   return NATIVE.find((n) => words.includes(n));
 }
 
-/** What a helper on a tier costs beside its lead, in words ("about 1/40 of what you do"); `r`: its price over the lead's. */
+/** What a subagent on a tier costs beside its lead, in words ("about 1/40 of what you do"); `r`: its price over the lead's. */
 export function costWords(r: number): string {
   if (r <= 0) return 'nothing';
   if (r >= 0.85) return 'about what you do';
@@ -35,33 +35,33 @@ export function costWords(r: number): string {
 }
 
 /**
- * What the main agent of a session is told about leading helpers. `native`: Claude Code's names for the Standard and
+ * What the main agent of a session is told about leading subagents. `native`: Claude Code's names for the Standard and
  * Quick models, for its own Agent tool; `stepUp`: it may step itself up to Max (step_up_session); `costs`: what a
- * helper on each tier costs beside the lead, when both prices are known (costWords). The same words for every session
+ * subagent on each tier costs beside the lead, when both prices are known (costWords). The same words for every session
  * on one model, so the provider's cache of the instructions holds.
  */
 export function teamInstructions(o: { native?: { standard?: string; quick?: string }; stepUp?: boolean; costs?: { quick?: string; standard?: string } } = {}): string {
   const { standard, quick } = o.native ?? {};
   const costs = o.costs?.quick && o.costs.standard ? `one on quick costs ${o.costs.quick}, one on standard ${o.costs.standard}` : 'one on quick costs a small fraction of what you do, one on standard clearly less than you';
   const lines = [
-    '# Working with helpers',
-    `You are this session’s main agent: you work out what is asked, decide how it is done, and answer for the result. You are also the most expensive model in it, so the doing goes to helpers wherever a cheaper model does it as well: ${costs}.`,
-    '- Sort the work before you start on it, in a line or two the user can read: the parts that go to helpers, each with its tier, and what you keep and why. Only a job of a few steps needs no sorting: do it.',
-    '- Hand over the doing, keep the deciding. Count a part by what would have to be written and read for it, not by how hard it is: more than about fifty lines of code or text to write, the same change in many places, tests, a draft, a handful of files or pages to read through, is a helper’s part once what is wanted is clear, however easy it would be for you. Easy is the reason to hand it over: you would be paid the most for the least. Yours are an edit of a few lines, a command or two, what is itself a decision (a design, a diagnosis), and the hard core of the problem.',
+    '# Working with subagents',
+    `You are this session’s main agent: you work out what is asked, decide how it is done, and answer for the result. You are also the most expensive model in it, so the doing goes to subagents wherever a cheaper model does it as well: ${costs}.`,
+    '- Sort the work before you start on it, in a line or two the user can read: the parts that go to subagents, each with its tier, and what you keep and why. Only a job of a few steps needs no sorting: do it.',
+    '- Hand over the doing, keep the deciding. Count a part by what would have to be written and read for it, not by how hard it is: more than about fifty lines of code or text to write, the same change in many places, tests, a draft, a handful of files or pages to read through, is a subagent’s part once what is wanted is clear, however easy it would be for you. Easy is the reason to hand it over: you would be paid the most for the least. Yours are an edit of a few lines, a command or two, what is itself a decision (a design, a diagnosis), and the hard core of the problem.',
     '- quick, for a job specified so exactly that little can go wrong and its result can be checked: a function or a small module to a written specification, a targeted edit in files you name, the same mechanical change across many files, tests for cases you list, facts pulled out of documents, converting or formatting. Prefer it whenever the job is that clear.',
-    '- standard, for a clear part that still takes judgement along the way: a change you have described but not spelled out, a feature in code that must first be read, a module whose rules bear on each other (a parser, a state machine), research on a set question, a draft to your outline. It saves less than quick does and reads its way in first, so it has to be a part of some size: a small one is yours, or a quick helper’s.',
+    '- standard, for a clear part that still takes judgement along the way: a change you have described but not spelled out, a feature in code that must first be read, a module whose rules bear on each other (a parser, a state machine), research on a set question, a draft to your outline. It saves less than quick does and reads its way in first, so it has to be a part of some size: a small one is yours, or a quick subagent’s.',
     '- best, for a hard part that stands on its own. The hardest thinking stays with you.',
     '- Where a part could go to either of two tiers, give it to the lower one and check what comes back: a try that falls short costs little, and the part then goes one tier up with what was wrong. Starting too high costs every time.',
-    '- A brief stands alone, since the helper sees nothing of this conversation: the goal, the files and facts it needs, exact names, what not to touch, how to check the result, what to report. Where the specification is already written down (a file, the request itself), the brief is a few lines that point at it: do not weigh the time a brief takes against the time the work would take you, weigh a few lines against the whole of the work at your price. Decide the design first: a helper left to guess costs more than it saves.',
+    '- A brief stands alone, since the subagent sees nothing of this conversation: the goal, the files and facts it needs, exact names, what not to touch, how to check the result, what to report. Where the specification is already written down (a file, the request itself), the brief is a few lines that point at it: do not weigh the time a brief takes against the time the work would take you, weigh a few lines against the whole of the work at your price. Decide the design first: a subagent left to guess costs more than it saves.',
   ];
   if (standard || quick) {
     const models = [quick ? `model "${quick}" for a quick part` : '', standard ? `model "${standard}" for a standard one` : ''].filter(Boolean).join(' and ');
     lines.push(
-      `- Two ways to hand a part over. Your own Agent tool, for a part of a few minutes: start those that do not depend on each other in one message, each with ${models} (with no model it runs on yours and saves nothing), and their results come back in this turn. start_child_session, for a long part, one the user should be able to follow and steer, or another program’s model: start them together, then end your turn, and each reply comes back to you as a message. What depends on a part waits for it.`,
+      `- Two kinds of subagent. Your program’s own (its Agent tool), for a part of a few minutes: start those that do not depend on each other in one message, each with ${models} (with no model it runs on yours and saves nothing), and their results come back in this turn. Hydor subagents (start_child_session), for a long part, one the user should be able to follow and steer, or another program’s model: start them together, then end your turn, and each reply comes back to you as a message. What depends on a part waits for it.`,
     );
   } else lines.push('- Start parts that do not depend on each other together with start_child_session, then end your turn: each reply comes back to you as a message. What depends on a part waits for it.');
   lines.push(
-    '- You answer for what helpers hand back: run the checks and read what changed before you build on it or report it. Fix a slip yourself, send the helper back for more, or give the part to a higher tier when the tier was too weak for it (step_up_child does that for a child session).',
+    '- You answer for what subagents hand back: run the checks and read what changed before you build on it or report it. Fix a slip yourself, send the subagent back for more, or give the part to a higher tier when the tier was too weak for it (step_up_child does that for a Hydor subagent).',
   );
   if (o.stepUp)
     lines.push(
@@ -106,9 +106,9 @@ export function stepUpSelf(d: Deps, s: { agent: Agent; acpAgent?: string; key?: 
 }
 
 /**
- * What a starting session is told about leading helpers; null when it is not told: the team is off, it is a swarm
+ * What a starting session is told about leading subagents; null when it is not told: the team is off, it is a swarm
  * (its lead has its own instructions), an app's run or a question on Help (small jobs of their own), confidential (its
- * children run on this computer's models), its program has no tiers, it thinks with less than Best itself, or no tier
+ * subagents run on this computer's models), its program has no tiers, it thinks with less than Best itself, or no tier
  * below its own would run anything cheaper (Custom before its tiers are set).
  */
 export function teamNote(d: Deps, s: SpawnInfo): string | null {

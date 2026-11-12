@@ -63,7 +63,7 @@ The status dot says how a session is doing:
 
 The browser tab shows how many sessions wait on you, as in "(2) Hydor".
 
-Sessions that an agent started for parts of its job (child sessions) sit folded under it, with a line such as "3 child sessions · 1 needs you · 2 working"; click it to see them. See [Child sessions](/guide/sessions#child-sessions).
+Sessions that an agent started for parts of its job (Hydor subagents) sit folded under it, with a line such as "3 subagents · 1 needs you · 2 working"; click it to see them. See [Subagents](/guide/sessions#subagents).
 
 Each session has a menu in the list: point at its row and click **⋯** at the end, or right-click the row (on a phone, tap its **⋯**). It holds **Rename**, **Rename folder** (for a session not in a project), **Pin** (or **Unpin**), **Snooze**, **Settle**, **Archive** and **Delete**, which asks first. Double-click a title, or press F2 on a selected row, to rename it. All of these are explained in [Rename, pin, snooze, settle, archive or delete](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 

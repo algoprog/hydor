@@ -1,11 +1,11 @@
 // Tiers: models picked by the job rather than by name. Quick for small, very clear jobs, Standard for clear tasks of
-// medium size, Best for a session's main agent (it plans, leads helpers and checks their work) and Max for the hardest
+// medium size, Best for a session's main agent (it plans, leads subagents and checks their work) and Max for the hardest
 // problems. Settings → Models → Tiers names each tier's model (and effort) for each agent program; until one is
 // changed it is the newest model of its family the program offers (Haiku, Sonnet, Opus and Fable for Claude Code;
 // Luna, Terra, Sol and Astra for Codex).
 // A session started on Automatic thinks with Best, or with Max when its request reads as a hard problem, and hands
-// clear parts to helpers on Standard and Quick: the team. An agent of the user's thinks with one tier, or with
-// Automatic, and a lead gives each helper it starts one, never above its own.
+// clear parts to subagents on Standard and Quick: the team. An agent of the user's thinks with one tier, or with
+// Automatic, and a lead gives each subagent it starts one, never above its own.
 import type { Agent, ModelOption } from './types.ts';
 
 export type Tier = 'quick' | 'standard' | 'best' | 'max';
@@ -13,7 +13,7 @@ export type Tier = 'quick' | 'standard' | 'best' | 'max';
 export const TIERS: { id: Tier; label: string; hint: string }[] = [
   { id: 'quick', label: 'Quick', hint: 'The cheapest: small, very clear jobs whose result can be checked (a targeted edit, pulling out facts, sorting, formatting, short summaries)' },
   { id: 'standard', label: 'Standard', hint: 'Clear tasks of medium size: a change that is spelled out, tests, research on a set question, a draft to an outline' },
-  { id: 'best', label: 'Best', hint: 'The main agent: it works out what is asked, plans, leads helpers and checks their work' },
+  { id: 'best', label: 'Best', hint: 'The main agent: it works out what is asked, plans, leads subagents and checks their work' },
   { id: 'max', label: 'Max', hint: 'The strongest: the hardest problems (stubborn bugs, proofs, designs with many constraints)' },
 ];
 
@@ -54,7 +54,7 @@ export type TierOverrides = Partial<Record<TierProgram, Partial<Record<Tier, Tie
 
 /** How sessions use the tiers (Settings → Models → Tiers). */
 export interface TeamSettings {
-  /** A session's main agent leads helpers: it is told to hand clear parts to helpers on cheaper tiers, and a helper asked for with no tier gets Standard. */
+  /** A session's main agent leads subagents: it is told to hand clear parts to subagents on cheaper tiers, and a subagent asked for with no tier gets Standard. */
   on: boolean;
   /** Hard problems get Max: Automatic starts one there, and a main agent may step itself up when a problem proves harder than it looked. */
   hard: boolean;

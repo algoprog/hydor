@@ -63,7 +63,7 @@ export function CapDialog({ s }: { s: SessionSummary }) {
     >
       <p className="text-[13px] leading-relaxed text-fg-3">
         The most this session may spend, at API prices (what its tokens would cost through the API, whatever plan you pay with). When it gets there the agent stops, and new
-        messages wait until you raise or remove the cap. Child sessions it starts count too.
+        messages wait until you raise or remove the cap. Subagents it starts count too.
       </p>
       {st && (
         <div className="mt-3 rounded-xl bg-bg-2 px-3 py-2 text-[13px]">
@@ -73,7 +73,7 @@ export function CapDialog({ s }: { s: SessionSummary }) {
           </div>
           {st.childrenUsd > 0 && (
             <div className="mt-0.5 text-[12px] text-fg-3">
-              This session {usd(st.ownUsd)}, its child sessions {usd(st.childrenUsd)}
+              This session {usd(st.ownUsd)}, its Hydor subagents {usd(st.childrenUsd)}
             </div>
           )}
           {st.unpriced && <div className="mt-0.5 text-[12px] text-fg-3">Some of its tokens have no known price, so it may have spent more.</div>}

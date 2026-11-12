@@ -1,5 +1,5 @@
-// Child sessions: an agent hands a part of its job to a new session, which works in parallel and whose
-// reply comes back to it as a message.
+// Hydor subagents (child sessions in the code): an agent hands a part of its job to a new session, which works in parallel and
+// whose reply comes back to it as a message.
 import type { Tier } from './tiers.ts';
 import type { Agent } from './types.ts';
 
@@ -29,7 +29,7 @@ export interface ChildNote {
   startedAt: number;
 }
 
-/** Settings → Child sessions. */
+/** Settings → Capabilities → Subagents. */
 export interface ChildSettings {
   /** How many children of one session may work at the same time. */
   maxRunning: number;
@@ -57,9 +57,9 @@ export interface ChildReply {
   text: string;
 }
 
-const REPLIED = /^\[Reply from the child session "(.*)" \(([^\s,()]+), (.*)\)\]$/;
-const STOPPED = /^\[The child session "(.*)" \(([^\s,()]+), (.*?)\) was stopped before it finished(?:: (.*?))?\.(?: What it wrote is below\.)?\]$/;
-const FAILED = /^\[The child session "(.*)" \(([^\s,()]+), (.*?)\) stopped with an error: (.*)\]$/;
+const REPLIED = /^\[Reply from the (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*)\)\]$/;
+const STOPPED = /^\[The (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*?)\) was stopped before it finished(?:: (.*?))?\.(?: What it wrote is below\.)?\]$/;
+const FAILED = /^\[The (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*?)\) stopped with an error: (.*)\]$/;
 const SUMMARY = /^Its reply is long \(([\d,]+) characters\), so here is a summary\./;
 
 /** A message that is a child's reply, read back; null for any other message. */
