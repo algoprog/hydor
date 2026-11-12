@@ -245,6 +245,8 @@ export interface BackgroundTask {
   kind?: string;
   status: 'running' | 'completed' | 'failed' | 'stopped' | string;
   startedAt?: number;
+  /** When it was seen to end (not set while it runs). */
+  endedAt?: number;
   toolUseId?: string;
 }
 
@@ -283,6 +285,8 @@ export interface LiveState {
   contextTokens?: number;
   contextWindow?: number;
   backgroundTasks?: BackgroundTask[];
+  /** Background tasks that ended in this run of the session (done, failed or stopped), newest first, a few: the work tray lists them under the running ones. */
+  endedTasks?: BackgroundTask[];
   /** Output decode speed of the last reply, tokens/sec (Claude: measured from the stream; Codex: per turn). */
   tokPerSec?: number;
   /** Prompt cache (Claude): when the last request refreshed the cache, and its TTL, so the UI can count down to expiry. */

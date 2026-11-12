@@ -103,6 +103,15 @@ export abstract class LiveAdapter extends EventEmitter {
     if (this.asides.size && this.state.status === 'working') this.state.status = 'waiting';
     this.state.pendingApprovals = this.approvals.size;
     this.state.backgroundTasks = [...this.tasks.values()].filter((t) => t.status === 'running');
+    // The ones that ended meanwhile stay listed a while (the work tray), newest first; those the replay of a transcript
+    // brought have no start and no end worth showing.
+    const now = Date.now();
+    for (const t of this.tasks.values()) {
+      if (t.status === 'running') delete t.endedAt;
+      else t.endedAt ??= now;
+    }
+    const ended = [...this.tasks.values()].filter((t) => t.status !== 'running' && t.startedAt).sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, 20);
+    this.state.endedTasks = ended.length ? ended : undefined;
     this.emit('change');
   }
 

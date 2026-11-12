@@ -52,7 +52,7 @@ const lists = {
   '/api/guide': { topics: [{ id: 'projects', title: 'Projects and knowledge', sections: [{ id: 'what-a-project-is', title: 'What a project is' }] }] },
 };
 
-test('find: groups, names and addresses', async () => {
+test('find: groups, one line a result (number, title, where), no addresses', async () => {
   const t = fakeConn({ [`GET /api/find?q=${encodeURIComponent('rate limit')}`]: found, ...lists });
   const r = await run(t.conn, ['find', 'rate', 'limit']);
   const groups = [...r.out.matchAll(/^([A-Z][A-Za-z, ]+)$/gm)].map((m) => m[1]);
@@ -74,24 +74,82 @@ test('find: groups, names and addresses', async () => {
     'Themes',
     'Other',
   ]);
-  assert.match(r.out, /^ {2}1 +Fix login +~\/proj · 1h ago +http:\/\/fake\/s\/claude%3As1$/m);
-  assert.match(r.out, /the rate limit is hit +Fix login +http:\/\/fake\/s\/claude%3As1/);
-  assert.match(r.out, /Rate limits are 60 a minute +project +http:\/\/fake\/settings\?s=memory/);
-  assert.match(r.out, /Library .*http:\/\/fake\/library$/m, 'a page of the app, from the catalog');
-  assert.match(r.out, /Memory +Settings › Capabilities +http:\/\/fake\/settings\?s=memory$/m);
-  assert.match(r.out, /Appearance +Settings › App › General +http:\/\/fake\/settings\?s=general&find=Appearance$/m);
-  assert.match(r.out, /Thesis +http:\/\/fake\/projects\/sp1$/m);
-  assert.match(r.out, /Reading list +http:\/\/fake\/apps\/a1$/m);
-  assert.match(r.out, /Quiz +http:\/\/fake\/apps\/t\/quiz$/m);
-  assert.match(r.out, /Coder +http:\/\/fake\/agents\/coder$/m);
-  assert.match(r.out, /Daily brief +http:\/\/fake\/settings\?s=tasks&find=Daily%20brief$/m);
-  assert.match(r.out, /Tracker +http:\/\/fake\/pages\/p1$/m);
-  assert.match(r.out, /Notion +http:\/\/fake\/apps\/connected\?tab=connected$/m);
-  assert.match(r.out, /What a project is +Help › Projects and knowledge +http:\/\/fake\/guide\/projects#what-a-project-is$/m);
-  assert.match(r.out, /Projects and knowledge +http:\/\/fake\/guide\/projects$/m);
+  assert.ok(!r.out.includes('http://'), 'no addresses unless asked');
+  assert.match(r.out, /^ {2}1 +Fix login +~\/proj · 1h ago$/m);
+  assert.match(r.out, /^ {2}2 +the rate limit is hit +Fix login$/m, 'the words said, then the session');
+  assert.match(r.out, /^ {2}3 +Rate limits are 60 a minute +project$/m);
+  assert.match(r.out, /^ {2}\d+ +Library$/m, 'a page of the app, from the catalog');
+  assert.match(r.out, /^ {2}\d+ +Memory +Settings › Capabilities$/m);
+  assert.match(r.out, /^ {2}\d+ +Appearance +Settings › App › General$/m);
+  for (const name of ['Thesis', 'Reading list', 'Quiz', 'Coder', 'Daily brief', 'Tracker', 'Notion']) assert.match(r.out, new RegExp(`^ {2}\\d+ +${name}$`, 'm'), name);
+  assert.match(r.out, /^ {2}\d+ +What a project is +Help › Projects and knowledge$/m);
   assert.match(r.out, /asst:gone/, 'what a list does not have: its id');
   assert.match(r.out, /weird:1/);
   assert.ok(t.calls.every((c) => c.method === 'GET'));
+});
+
+test('find --urls: each address on a dim line of its own under its result', async () => {
+  const t = fakeConn({ [`GET /api/find?q=x`]: found, ...lists });
+  const r = await run(t.conn, ['find', 'x', '--urls']);
+  const lines = r.out.split('\n');
+  const addr = (title: RegExp) => {
+    const i = lines.findIndex((l) => title.test(l));
+    assert.ok(i >= 0, String(title));
+    return lines[i + 1].trim();
+  };
+  assert.equal(addr(/^ {2}1 +Fix login/), 'http://fake/s/claude%3As1');
+  assert.equal(addr(/ the rate limit is hit/), 'http://fake/s/claude%3As1');
+  assert.equal(addr(/Rate limits are 60/), 'http://fake/settings?s=memory');
+  assert.equal(addr(/ Library$/), 'http://fake/library');
+  assert.equal(addr(/Appearance +Settings/), 'http://fake/settings?s=general&find=Appearance');
+  assert.equal(addr(/ Thesis$/), 'http://fake/projects/sp1');
+  assert.equal(addr(/ Reading list$/), 'http://fake/apps/a1');
+  assert.equal(addr(/ Quiz$/), 'http://fake/apps/t/quiz');
+  assert.equal(addr(/ Coder$/), 'http://fake/agents/coder');
+  assert.equal(addr(/ Daily brief$/), 'http://fake/settings?s=tasks&find=Daily%20brief');
+  assert.equal(addr(/ Tracker$/), 'http://fake/pages/p1');
+  assert.equal(addr(/ Notion$/), 'http://fake/apps/connected?tab=connected');
+  assert.equal(addr(/What a project is +Help/), 'http://fake/guide/projects#what-a-project-is');
+  assert.equal(addr(/^ {2}\d+ +Projects and knowledge$/), 'http://fake/guide/projects');
+  // A result with no page of its own has no address line.
+  const act = lines.findIndex((l) => /Switch between light and dark/.test(l));
+  assert.ok(!/http/.test(lines[act + 1]));
+});
+
+test('find: at 120 columns no line passes the width, and the titles keep their room', async () => {
+  const long = 'Limit each session’s spending with a cap so a long task cannot run away with your money';
+  const t = fakeConn({
+    [`GET /api/find?q=${encodeURIComponent('spending cap')}`]: {
+      meaning: true,
+      sessions: [{ key: 'claude:aaaa1111-0000-4000-8000-000000000001', title: long, cwd: '/home/u/a/very/deep/project/folder/name', updatedAt: Date.now() - 86_400_000 * 5 }],
+      messages: [
+        {
+          key: 'claude:aaaa1111-0000-4000-8000-000000000001',
+          title: 'A session with a rather long title indeed',
+          cwd: '/x',
+          updatedAt: 1,
+          snippet: `set a \u0001spending\u0002 \u0001cap\u0002 of ${'ten dollars '.repeat(20)}`,
+        },
+      ],
+      alike: [{ id: 'opt:general:Appearance', score: 1 }],
+    },
+  });
+  for (const w of [120, 80, 60]) {
+    for (const flags of [[], ['--urls']]) {
+      const { testCtx } = await import('./test-kit.ts');
+      const { parseArgv } = await import('../args.ts');
+      const { find } = await import('./find.ts');
+      const { ctx, ran } = testCtx(t.conn, 'hydor find <words…>', parseArgv(['find', 'spending', 'cap', ...flags]), { fit: true });
+      ctx.look.width = w;
+      await find.verbs[0].run(ctx, ['spending', 'cap'], flags.length ? { urls: true } : {});
+      const lines = ran.out.split('\n');
+      assert.ok(
+        lines.every((l) => [...l].length <= w - 1),
+        `${w} columns ${flags}: ${Math.max(...lines.map((l) => [...l].length))}`,
+      );
+      if (w === 120 && !flags.length) assert.match(ran.out, /Limit each session’s spending with a cap so a long task cannot run away with your money +~\/a/);
+    }
+  }
 });
 
 test('find: only the lists it needs are read; --in, --json, nothing found', async () => {
@@ -102,7 +160,7 @@ test('find: only the lists it needs are read; --in, --json, nothing found', asyn
     ['/api/find?q=dark&in=settings'],
     'a shipped item needs no list',
   );
-  assert.match(r.out, /General .*http:\/\/fake\/settings\?s=general$/m);
+  assert.match(r.out, /^ {2}1 +General +Settings › App$/m);
   const j = await run(t.conn, ['find', 'dark', '--in', 'settings', '--json']);
   assert.deepEqual(j.json, [{ meaning: true, alike: [{ id: 'sec:general', score: 1 }] }]);
   assert.match((await run(t.conn, ['find', 'zzz'])).out, /^Nothing found for “zzz”\.$/m);

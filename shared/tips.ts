@@ -66,7 +66,7 @@ export const TIP_GUIDE: Record<TipId, string> = {
   browser: '/guide/web#watch-the-browser-live',
   skill: '/guide/skills#approve-edit-or-dismiss-a-proposed-skill',
   goal: '/guide/sessions#give-the-session-a-goal',
-  children: '/guide/research#let-an-agent-hand-work-to-child-sessions',
+  children: '/guide/research#let-an-agent-hand-work-to-subagents',
   research: '/guide/research#run-a-deep-research',
   budget: '/guide/research#put-a-spending-cap-on-a-session',
   context: '/guide/sessions#read-the-meters-context-cache-and-speed',

@@ -45,7 +45,7 @@ const when = (ms?: number) => (ms ? new Date(ms).toLocaleDateString('en-GB', { d
 export const projects: Area = {
   name: 'projects',
   aliases: ['project'],
-  summary: 'Your projects: their folders, guidelines, documents and sessions',
+  summary: 'Your projects',
   help: 'A project keeps a folder, guidelines every session in it is told, documents only its sessions search, skills and the agent they start as. Name one by its name or the start of its id; on a terminal, leave it out to pick from a list.',
   group: 'work',
   verbs: [
@@ -70,7 +70,7 @@ export const projects: Area = {
               p.dim(timeAgo(s.lastAt)),
               p.dim(s.description ?? ''),
             ]),
-            { head: ['PROJECT', 'FOLDER', 'SESSIONS', 'DOCS', 'LAST', ''], grow: 5 },
+            { head: ['PROJECT', 'FOLDER', 'SESSIONS', 'DOCS', 'LAST', ''], grow: 0, free: [0, 5] },
           ),
         );
       },
@@ -244,7 +244,7 @@ export const projects: Area = {
               p.dim(`${d.passages} passages`),
               p.dim(tildify(d.path, ctx.look.home)),
             ]);
-          out.push(...table(ctx, rows, { grow: 3 }).map((l) => `  ${l}`));
+          out.push(...table(ctx, rows, { grow: 1, free: [1], indent: 2 }));
           if (docs[i].length > rows.length) out.push(p.dim(`  … ${docs[i].length - rows.length} more (-n <number>, or --all)`));
           for (const e of b.errors.slice(0, 3)) out.push(`  ${p.red(`✗ ${tildify(e.path, ctx.look.home)}: ${e.error}`)}`);
         });

@@ -69,7 +69,7 @@ const SLASH_FOR: Record<string, string> = {
   tiers: '/tiers',
   usage: '/usage',
   stop: '/stop',
-  show: '/sessions or /helpers',
+  show: '/sessions or /subagents',
   send: 'the input line (type the message)',
   run: 'the input line (type the message)',
   chat: 'the input line (type the message)',

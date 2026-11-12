@@ -33,7 +33,7 @@ export const settingsSections = () => SECTIONS.map(([id, label, group]) => ({ id
 
 export const open: Area = {
   name: 'open',
-  summary: 'The address of a page or a session (--browser opens it)',
+  summary: 'A page’s or session’s address',
   help: 'Without words, the address of the web app. Name a page (library, projects, inbox, experiments… Tab completes them), settings [section], guide [topic [section]], project <name>, or a session as hydor sessions shows it.',
   group: 'this',
   bare: true,
@@ -42,8 +42,8 @@ export const open: Area = {
     {
       name: 'open',
       args: [
-        { name: 'where', kind: 'page', optional: true },
-        { name: 'more', kind: 'place', optional: true, rest: true },
+        { name: 'page', kind: 'page', optional: true },
+        { name: 'name', kind: 'place', optional: true, rest: true },
       ],
       options: { browser: { type: 'boolean', desc: 'Open it in your browser too' }, find: { type: 'string', value: '<words>', desc: 'For settings: point at an option by its words' } },
       summary: 'Where a page or session is, in the web app',

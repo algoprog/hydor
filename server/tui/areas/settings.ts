@@ -82,7 +82,7 @@ const option_ = { name: 'option', kind: 'setting', pick: true } as const;
 
 export const settings: Area = {
   name: 'settings',
-  summary: 'Every option of the Settings page: read it, change it',
+  summary: 'Read and change every setting',
   help: 'The options are the page’s, in its three tabs (App, Agents, Capabilities) and their sections, each with an id such as general.resume-after-usage-limits. Name one by its id, by its section and the start of its words (general.resume), or by its words alone when only one fits. What the app keeps in each browser (theme, language, sound) cannot be changed from here: those say so and give the page’s address.',
   group: 'this',
   default: 'browse',
@@ -275,7 +275,7 @@ async function listAll(ctx: Ctx, args: string[]): Promise<void> {
       if (out.length) out.push('');
       out.push(p.bold(`${g} › ${s.label}`));
       const rows = t.rowsOf(s.id).map((r) => [r.label, shown(ctx, t, r, reads.get(r.id)), p.dim(r.id)]);
-      out.push(...table(ctx, rows, { grow: 1 }).map((l) => `  ${l}`));
+      out.push(...table(ctx, rows, { grow: 1, indent: 2 }));
     }
   }
   ctx.out(out);

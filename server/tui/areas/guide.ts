@@ -14,7 +14,7 @@ const text = (md: string) => md.replace(/^!\[[^\]]*\]\([^)]*\)[ \t]*\n?/gm, '').
 
 export const guide: Area = {
   name: 'guide',
-  summary: 'Read the guide: how everything in Hydor works',
+  summary: 'Read the guide',
   help: 'Without a topic, the topics are listed. With one, the topic is shown, through less when it is longer than the screen. Name a topic by its id or its title; add a section to read only that.',
   group: 'this',
   bare: true,
@@ -38,7 +38,7 @@ export const guide: Area = {
             table(
               ctx,
               topics.filter((t) => !AGENT_TOPICS.includes(t.id)).map((t) => [p.accent(t.id), t.title, p.dim(truncate(t.summary.replace(/\s+/g, ' ').split(/(?<=\.)\s/)[0], 110))]),
-              { grow: 2 },
+              { grow: 1, free: [1, 2] },
             ),
           );
         }
