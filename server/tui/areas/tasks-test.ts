@@ -170,7 +170,7 @@ test('edit sends the whole task with only what was named changed; pause and resu
     enabled: true,
     name: 'Daily brief',
     prompt: 'Summarise **my** email.',
-    schedule: { kind: 'daily', time: '08:30' },
+    schedule: { kind: 'daily', time: '08:30', days: [1, 2, 3, 4, 5] },
     agent: 'claude',
     cwd: '/home/u',
     model: 'opus',
