@@ -165,7 +165,7 @@ test('beforeSend refuses a session over its cap, and a child over its parent’s
   await budget.beforeSend!('acp:k2', deps);
   indexed('claude:p1', { model: 'test-model', cost: 4 });
   await assert.rejects(async () => budget.beforeSend!('acp:k2', deps), (e: unknown) => e instanceof HttpError && /The session that started this one \("Title of claude:p1"\) has spent \$5\.20 of its \$5\.00/.test(e.message));
-  assert.throws(() => childShare(db, 'claude:p1', 4), /nothing left for a child session/);
+  assert.throws(() => childShare(db, 'claude:p1', 4), /nothing left for a Hydor subagent/);
 });
 
 test('a running turn past the cap stops, once, with a note under it; the cap stops the family', async () => {

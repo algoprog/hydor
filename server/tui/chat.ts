@@ -1,6 +1,6 @@
 // The chat: a conversation with an agent in the terminal's own scrollback (no full-screen mode: what was said stays
 // above, selectable, over SSH and in tmux too). What is final is printed once; one region at the bottom is redrawn
-// while the agent works: what still streams, the step under way, helpers at work, a card waiting for you (an
+// while the agent works: what still streams, the step under way, subagents at work, a card waiting for you (an
 // approval, a question, a form), queued messages, a status line with a spinner, and the input line between two rules
 // with a status line under it (the folder and branch, the model, the mode; the cost). Enter sends (a new session with
 // the first message, then into it; queued while the agent works), slash commands change things or show them. A menu
@@ -15,7 +15,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { agentMode, type Assistant } from '../../shared/assistants.ts';
 import type { AppField } from '../../shared/apps.ts';
-import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, SessionSummary, TimelineItem } from '../../shared/types.ts';
+import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, ServerEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import type { Opts } from './args.ts';
 import { enc, spentOf, type Conn } from './client.ts';
 import { conversationLines, openBrowser, resolveKey, sessionLines, shortKey, statusWord, tierLines, usageLines, whyNoReply } from './commands.ts';
@@ -24,6 +24,7 @@ import { ghostOf, ghostWord, KeyReader, layout, LineEditor, type Key } from './e
 import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, choiceLine, INDENT, isDeny, itemLines, LOGO, logo, modelLabel, runningLine, shimmer, stepLines, textLines, tierName, type Look } from './lines.ts';
 import { backgroundEnd, busy, historyLines, lastReply, Printer, SessionView } from './session.ts';
 import { Screen, suspend, takeTerminal } from './screen.ts';
+import { setTerminalPref, terminalPrefs, type TerminalPrefs } from './settings-table.ts';
 import { catalogOf, findAssistant, modeFor, modeLabel, modeRisk, newStartId, planStart, programName, startBody, tiersOf, type Boot, type Plan, type TiersState } from './start.ts';
 import { colorLevel, colorWanted, elapsed, gradientAt, makePaint, money, pad, strWidth, tildify, truncate, wrap, type Paint } from './term.ts';
 
@@ -41,13 +42,15 @@ const SLASH: { name: string; args?: string; what: string }[] = [
   { name: 'effort', args: '[level]', what: 'how hard it thinks' },
   { name: 'mode', args: '[ask|edits|plan|full]', what: 'what it may do without asking' },
   { name: 'agent', args: '[name]', what: 'work as one of your agents' },
-  { name: 'helpers', args: '[n]', what: 'the helpers (child sessions), or one’s conversation' },
+  { name: 'subagents', args: '[n]', what: 'the subagents (Hydor’s, and those in the background), or one’s conversation' },
   { name: 'tiers', what: 'which model each tier means' },
   { name: 'usage', what: 'plan usage and limits' },
-  { name: 'cost', what: 'what this session and its helpers cost' },
+  { name: 'cost', what: 'what this session and its subagents cost' },
   { name: 'copy', what: 'copy the agent’s last reply' },
   { name: 'clear', what: 'clear the screen' },
-  { name: 'stop', what: 'stop the turn, and the helpers in the background' },
+  { name: 'queue', args: '<message>', what: 'send it when the turn ends' },
+  { name: 'now', args: '<message>', what: 'send it into the running turn' },
+  { name: 'stop', what: 'stop the turn, and the subagents in the background' },
   { name: 'rename', args: '<title>', what: 'rename the session' },
   { name: 'open', args: '[browser]', what: 'its address in the web app' },
   { name: 'quit', what: 'leave (the session goes on in the app)' },
@@ -135,6 +138,8 @@ export class Chat {
   private shelling = false;
   /** The head of the chat was printed (a new chat's, or a session's carried on). */
   private welcomed = false;
+  private prefsCache: TerminalPrefs | null = null;
+  private prefsAt = 0;
   private frame = 0;
   /** The menu's first visible row. */
   private menuTop = 0;
@@ -173,6 +178,10 @@ export class Chat {
     this.look.cwd = this.plan.cwd;
     this.look.models = this.cat.models;
     const ended = new Promise<number>((r) => (this.done = r));
+    // News of this device's settings, sent to the session's subscribers when an agent changes them.
+    this.conn.events().on('event', (e: ServerEvent) => {
+      if (e.t === 'feature' && e.id === 'guide' && e.key && e.key === this.view?.key) this.deviceChanged((e.data as { device?: { enter?: unknown; terminalSuggestions?: unknown } } | undefined)?.device);
+    });
     if (key) await this.openView(key, true);
     else if (!o.pickSession) this.write(await this.welcome());
     if (this.plain) this.plainInput();
@@ -211,6 +220,33 @@ export class Chat {
     const lines = [truncate(head, width - 1), p.dim('─'.repeat(Math.max(10, width - 1)))];
     if (!this.conn.local) lines.splice(1, 0, p.dim(` on ${this.conn.base}`));
     return lines;
+  }
+
+  /** The terminal's own settings (Enter while it works, the grey suggestion), read from their file at most once a second: another terminal may change them. */
+  private prefs(): TerminalPrefs {
+    const now = Date.now();
+    if (!this.prefsAt || now - this.prefsAt > 1000) {
+      this.prefsCache = terminalPrefs();
+      this.prefsAt = now;
+    }
+    return this.prefsCache!;
+  }
+
+  /** An agent changed settings of this device (PUT /device): the two that are the terminal's are kept and said; theme, language and the rest belong to the browser. */
+  private deviceChanged(d: { enter?: unknown; terminalSuggestions?: unknown } | undefined) {
+    const { p } = this.look;
+    const say: string[] = [];
+    if (d?.enter === 'join' || d?.enter === 'queue') {
+      setTerminalPref('enter', d.enter);
+      say.push(d.enter === 'join' ? 'Enter now joins the running turn' : 'Enter now waits for the turn to end');
+    }
+    if (typeof d?.terminalSuggestions === 'boolean') {
+      setTerminalPref('suggestions', d.terminalSuggestions);
+      say.push(d.terminalSuggestions ? 'Grey suggestions are on' : 'Grey suggestions are off');
+    }
+    if (!say.length) return;
+    this.prefsAt = 0;
+    this.flash(p.dim(say.join(' · ')));
   }
 
   /** The folder the session is in (the one a new session starts in before there is one). */
@@ -388,7 +424,7 @@ export class Chat {
     }
   }
 
-  /** The region's rows: the work under way, helpers, a card's choices, the queue, the status line, the input. */
+  /** The region's rows: the work under way, subagents, a card's choices, the queue, the status line, the input. */
   private render() {
     if (!this.screen) return;
     const look = { ...this.look, width: this.screen.columns };
@@ -417,7 +453,7 @@ export class Chat {
     }
     if (view) {
       const helpers = view.helpersWorking();
-      if (helpers.length) rows.push(truncate(`${INDENT}${p.accent('◆')} ${p.dim(`${helpers.length === 1 ? '1 helper works' : `${helpers.length} helpers work`}: ${helpers.map((h) => h.note.title).join(' · ')}`)}`, width));
+      if (helpers.length) rows.push(truncate(`${INDENT}${p.accent('◆')} ${p.dim(`${helpers.length === 1 ? '1 subagent works' : `${helpers.length} subagents work`}: ${helpers.map((h) => h.note.title).join(' · ')}`)}`, width));
       const bg = view.background();
       if (bg.length) rows.push(truncate(`${INDENT}${p.accent('◆')} ${p.dim(backgroundWords(bg))}`, width));
     }
@@ -434,7 +470,7 @@ export class Chat {
       const spin = p.level >= 2 ? p.hex(frame, rgbHex(gradientAt(LOGO, t))) : p.accent(frame);
       const left = waiting ? `${p.yellow('◌')} ${shimmer(word, p, Date.now(), true)}` : `${spin} ${shimmer(word, p)}`;
       rows.push(truncate(`${left}${p.dim(`${since ? ` · ${elapsed(since)}` : ''} · esc to stop`)}`, width));
-    } else if (view?.helpersWorking().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('Helpers at work: their replies wake the agent')}`, width));
+    } else if (view?.helpersWorking().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('Subagents at work: their replies wake the agent')}`, width));
     else if (view?.background().length) rows.push(truncate(`${p.accent(frame)} ${p.dim('At work in the background: each one that ends wakes the agent · /stop stops them')}`, width));
     if (this.notice && this.notice.until > Date.now()) rows.push(truncate(`${INDENT}${this.notice.text}`, width));
     // The input between two rules, then the status line (the menu or a list to pick from takes its place).
@@ -442,8 +478,8 @@ export class Chat {
     rows.push(rule);
     const ed = this.editor;
     const shell = this.ui.kind === 'input' && ed.text.startsWith('!');
-    const ghost = this.ui.kind === 'input' && !this.menu && !this.hist ? ghostOf(ed.text, ed.cursor, ed.history) : '';
-    const lay = layout(ed.text, ed.cursor, width, { prompt: `${shell ? p.yellow('!') : p.accent('›')} `, placeholder: this.placeholder(), maxRows: Math.max(3, Math.floor(height / 3)), ghost, p });
+    const ghost = this.ui.kind === 'input' && !this.menu && !this.hist && this.prefs().suggestions ? ghostOf(ed.text, ed.cursor, ed.history) : '';
+    const lay = layout(ed.text, ed.cursor, width, { prompt: `${shell ? p.yellow('›') : p.accent('›')} `, placeholder: this.placeholder(), maxRows: Math.max(3, Math.floor(height / 3)), ghost, p });
     const top = rows.length;
     rows.push(...lay.rows, rule);
     rows.push(...this.footer(look));
@@ -482,7 +518,7 @@ export class Chat {
     if (this.ui.kind === 'question') return 'A number picks · your own words, then Enter · Esc skips';
     if (this.ui.kind === 'form') return 'Your answer, then Enter · Esc declines';
     if (a) return 'A key above answers · or say what to do instead, then Enter';
-    if (this.working()) return 'Queue a message: it goes when the turn ends';
+    if (this.working()) return this.prefs().enter === 'join' ? 'Enter sends into the running turn · /queue waits for its end' : 'Enter queues it for when the turn ends · /now joins the turn';
     return this.view ? 'Message the agent · /help' : 'What should the agent do? · /help';
   }
 
@@ -546,7 +582,7 @@ export class Chat {
     if (this.ui.kind === 'pick' && this.moveKey(k)) return;
     if (this.menuOpen() && this.menuKey(k)) return;
     // The grey suggestion from history: → or End takes it, Alt+→ its next word.
-    if ((k.name === 'right' || k.name === 'end' || k.name === 'word-right') && this.ui.kind === 'input' && !this.menu && !this.hist) {
+    if ((k.name === 'right' || k.name === 'end' || k.name === 'word-right') && this.ui.kind === 'input' && !this.menu && !this.hist && this.prefs().suggestions) {
       const ghost = ghostOf(this.editor.text, this.editor.cursor, this.editor.history);
       if (ghost) {
         this.editor.insert(k.name === 'word-right' ? ghostWord(ghost) : ghost);
@@ -767,7 +803,7 @@ export class Chat {
     if (this.view && busy(this.view.live)) void this.stopTurn();
   }
 
-  /** Stops the turn; with `background`, what works in the background too (the session's and its helpers'). */
+  /** Stops the turn; with `background`, what works in the background too (the session's and its subagents'). */
   private async stopTurn(background = false) {
     const view = this.view;
     if (!view) return;
@@ -775,7 +811,7 @@ export class Chat {
     try {
       if (busy(view.live)) await this.conn.api('POST', `/api/sessions/${enc(view.key)}/interrupt`, {});
       await Promise.all(tasks.map(({ key, task }) => this.conn.api('POST', `/api/sessions/${enc(key)}/tasks/${encodeURIComponent(task.id)}/stop`, {})));
-      if (busy(view.live) || tasks.length) this.flash(this.look.p.dim(tasks.length ? 'Stopping it, and its helpers in the background…' : 'Stopping its turn…'), 2000);
+      if (busy(view.live) || tasks.length) this.flash(this.look.p.dim(tasks.length ? 'Stopping it, and its subagents in the background…' : 'Stopping its turn…'), 2000);
       else this.flash(this.look.p.dim('Nothing is working'), 2000);
     } catch (e) {
       this.flash(this.look.p.red((e as Error).message));
@@ -853,8 +889,11 @@ export class Chat {
 
   // ---- sending -------------------------------------------------------------------------------------------------
 
-  /** A message: the first starts the session; one while the agent works is queued. */
-  async submit(text: string) {
+  /**
+   * A message: the first starts the session; one while the agent works joins the running turn or waits for its end
+   * (`how`, else as Enter is set to: the terminal's `enter`; in plain mode it waits).
+   */
+  async submit(text: string, how?: 'join' | 'queue') {
     const { p } = this.look;
     if (!this.view) {
       this.write(this.printer.echo(text));
@@ -876,10 +915,14 @@ export class Chat {
     }
     const key = this.view.key;
     try {
-      if (busy(this.view.live)) {
+      if (busy(this.view.live) && (how ?? (this.plain ? 'queue' : this.prefs().enter)) === 'queue') {
         // It shows under the work as queued until it goes.
         await this.conn.api('POST', `/api/sessions/${enc(key)}/queue`, { text });
         void this.view.refresh().catch(() => {});
+      } else if (busy(this.view.live)) {
+        // Into the running turn (Claude Code and Codex take it in; other agents queue it themselves).
+        this.write(this.printer.echo(text));
+        await this.conn.api('POST', `/api/sessions/${enc(key)}/message`, { text });
       } else {
         this.write(this.printer.echo(text));
         this.starting = Date.now();
@@ -991,7 +1034,8 @@ export class Chat {
           return this.setMode(arg);
         case 'agent':
           return this.setAgent(arg);
-        case 'helpers':
+        case 'subagents':
+        case 'helpers': // its old name, still taken
           return this.helpers(arg);
         case 'tiers':
           return this.say(...(await tierLines(this.conn, this.look, this.tiers ? await this.conn.api<TiersState>('GET', '/api/models/tiers') : undefined)));
@@ -1008,9 +1052,13 @@ export class Chat {
           const own = spent ? spent.ownUsd : (view.summary?.stats.costUsd ?? 0);
           const theirs = spent ? spent.childrenUsd : hs.reduce((a, h) => a + (h.summary?.stats.costUsd ?? 0), 0);
           const lines = [`This session: ${money(own) || '$0.00'}`];
-          if (hs.length) lines.push(`Its ${hs.length === 1 ? 'helper' : `${hs.length} helpers`}: ${money(theirs) || '$0.00'}`, `Together: ${money(own + theirs) || '$0.00'}`);
+          if (hs.length) lines.push(`Its ${hs.length === 1 ? 'subagent' : `${hs.length} subagents`}: ${money(theirs) || '$0.00'}`, `Together: ${money(own + theirs) || '$0.00'}`);
           return this.say(...lines.map((l) => `${INDENT}${l}`));
         }
+        case 'queue':
+        case 'now':
+          if (!arg) return this.flash(p.yellow(`Give the message: /${name} <message>`));
+          return this.submit(arg, name === 'now' ? 'join' : 'queue');
         case 'copy':
           return this.copyReply();
         case 'clear':
@@ -1099,18 +1147,18 @@ export class Chat {
     const { p } = this.look;
     const view = this.view;
     const hs = view ? [...view.helpers.values()] : [];
-    // Claude Code's own helpers in the background: those running, then the background tasks that ended.
+    // The program's own subagents in the background: those running, then the background tasks that ended.
     const running = view?.background() ?? [];
     const ended = (view?.items ?? []).flatMap((i) => (i.kind === 'system' ? [backgroundEnd(i.text)].filter((x) => !!x) : [])) as { status: string; what: string }[];
     const bgLines = [
-      ...running.map(({ key, task }) => truncate(`${INDENT}${p.accent('·')}  ${p.accent('Running')}  ${task.description}${p.dim(` · in the background${key !== view!.key ? ` of ${view!.helpers.get(key)?.note.title ?? 'a helper'}` : ''}${task.startedAt ? ` · ${elapsed(task.startedAt)}` : ''}`)}`, this.look.width)),
+      ...running.map(({ key, task }) => truncate(`${INDENT}${p.accent('·')}  ${p.accent('Running')}  ${task.description}${p.dim(` · in the background${key !== view!.key ? ` of ${view!.helpers.get(key)?.note.title ?? 'a subagent'}` : ''}${task.startedAt ? ` · ${elapsed(task.startedAt)}` : ''}`)}`, this.look.width)),
       ...ended.map((e) => truncate(`${INDENT}${p.dim('·')}  ${e.status === 'completed' ? p.green('Finished') : e.status === 'failed' ? p.red('Failed') : p.yellow(e.status === 'killed' ? 'Stopped' : e.status[0].toUpperCase() + e.status.slice(1))}  ${e.what.split('\n')[0]}${p.dim(' · in the background')}`, this.look.width)),
     ];
-    if (!hs.length && !bgLines.length) return this.say(p.dim(`${INDENT}No helpers in this session.`));
+    if (!hs.length && !bgLines.length) return this.say(p.dim(`${INDENT}No subagents in this session.`));
     if (!hs.length) return this.say(...bgLines);
     if (arg) {
       const h = hs[Number(arg) - 1] ?? hs.find((x) => x.key === arg || x.note.title.toLowerCase().startsWith(arg.toLowerCase()));
-      if (!h) return this.flash(p.yellow(`No helper ${arg}: /helpers lists them`));
+      if (!h) return this.flash(p.yellow(`No subagent ${arg}: /subagents lists them`));
       return this.say(...(await conversationLines(this.conn, h.key, this.look, { turns: 3 })));
     }
     await view!.refresh();
@@ -1119,7 +1167,7 @@ export class Chat {
       const state = s ? statusWord(s, p) || p.dim(h.replaced ? 'Stepped up' : 'Done') : p.dim('…');
       return truncate(`${INDENT}${p.accent(String(i + 1))}  ${state}  ${h.note.title}${p.dim(` · ${[h.note.label, h.note.tier ? tierName(h.note.tier) : '', money(s?.stats.costUsd)].filter(Boolean).join(' · ')}`)}`, this.look.width);
     });
-    this.say(...lines, ...bgLines, p.dim(`${INDENT}/helpers <n> shows one’s conversation`));
+    this.say(...lines, ...bgLines, p.dim(`${INDENT}/subagents <n> shows a subagent’s conversation`));
   }
 
   // ---- the completion menu -------------------------------------------------------------------------------------
@@ -1285,6 +1333,7 @@ export class Chat {
           return null;
         }
         return this.assistants.map((a) => item(a.name, truncate(a.description ?? '', 60), a.id));
+      case 'subagents':
       case 'helpers':
         return [...(this.view?.helpers.values() ?? [])].map((h, i) => item(String(i + 1), h.note.title));
       case 'open':
@@ -1437,11 +1486,11 @@ function paintMode(label: string, risk: 'full' | 'plan' | 'other', p: Paint): st
   return risk === 'full' ? p.red(label) : risk === 'plan' ? p.accent(label) : p.dim(label);
 }
 
-/** What works in the background, in a line: "At work in the background: Check the docs", "2 helpers at work in the background: …". */
+/** What works in the background, in a line: "At work in the background: Check the docs", "2 subagents at work in the background: …". */
 function backgroundWords(list: { task: { description: string; startedAt?: number } }[]): string {
   const what = list.map((x) => x.task.description.replace(/\s+/g, ' ')).join(' · ');
   if (list.length === 1) return `At work in the background: ${what}${list[0].task.startedAt ? ` · ${elapsed(list[0].task.startedAt)}` : ''}`;
-  return `${list.length} helpers at work in the background: ${what}`;
+  return `${list.length} subagents at work in the background: ${what}`;
 }
 
 /** A form field's choices: a choice's options, or Yes and No. */
@@ -1481,7 +1530,7 @@ async function toClipboard(text: string): Promise<boolean> {
 
 /** The keys, for /help and /keys: [the key, what it does]. */
 const KEYS: [string, string][] = [
-  ['Enter', 'send (queued while the agent works)'],
+  ['Enter', 'send (while the agent works: into its turn, or queued, as set)'],
   ['Alt+Enter / Ctrl+J', 'a new line (so does a \\ before Enter)'],
   ['Tab', 'open the menu; accept the highlighted row'],
   ['↑ ↓', 'move in the menu, or go through earlier messages'],

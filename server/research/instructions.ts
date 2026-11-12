@@ -11,7 +11,7 @@ const DELIVER: Record<ResearchSettings['format'], string> = {
 export const leadInstructions = (r: ResearchSettings) => {
   const each = Math.max(5, Math.floor((r.queries * 0.8) / Math.max(1, r.breadth * r.depth)));
   return [
-    'Deep research mode: the user wants a thorough, cited answer to their question, researched across many sources. You lead the research; researchers (your child sessions) do the searching and reading.',
+    'Deep research mode: the user wants a thorough, cited answer to their question, researched across many sources. You lead the research; researchers (your Hydor subagents) do the searching and reading.',
     `Budget: at most ${r.queries} web searches in all (yours and your researchers’ together: web_search says how many are left), ${r.depth} round${r.depth === 1 ? '' : 's'} of research and then one of checking, and ${r.breadth} researcher${r.breadth === 1 ? '' : 's'} at a time. Search with the app’s web_search tool, and read pages with read_page.`,
     '1. Plan. Work out what the question really asks and what a complete answer covers. Split it into sub-questions and, for each, a few search queries: varied wording, other languages where useful, and the kinds of sources that settle it (official data, papers, primary documents, reputable reporting). If a crucial point is ambiguous, ask the user once, briefly; otherwise state your assumptions and go on.',
     `2. Round 1: start up to ${r.breadth} researchers with start_child_session, one per sub-question, each with a self-contained brief: the whole question, its own sub-question, the queries to start from, about ${each} searches as its share, and what to report. Then end your turn: their reports come to you as messages, and each wakes you.`,
@@ -22,7 +22,7 @@ export const leadInstructions = (r: ResearchSettings) => {
   ].join('\n');
 };
 
-/** A researcher: a child session of a deep research's lead. */
+/** A researcher: a Hydor subagent of a deep research's lead. */
 export const RESEARCHER_INSTRUCTIONS = [
   'Researcher: you research one part of a bigger question for the session that started you; your brief says which part and about how many searches are yours (web_search says how many are left in the whole research).',
   '- Search with the app’s web_search (vary the wording, try other languages, prefer primary and reputable sources), read the promising pages with read_page, and keep track of where each fact came from.',

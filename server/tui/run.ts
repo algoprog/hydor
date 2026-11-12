@@ -1,6 +1,6 @@
 // `hydor run`: one request, no questions asked. It starts a session with the message, follows it until the work is
-// done (its turn ended, no helper works or still owes its reply, none of Claude Code's own helpers works in the
-// background, its own or a helper's, and nothing waits in its queue: a lead that ended its turn to wait for them is woken
+// done (its turn ended, no subagent works or still owes its reply, none of Claude Code's own subagents works in the
+// background, its own or a subagent's, and nothing waits in its queue: a lead that ended its turn to wait for them is woken
 // by their replies or their ends, so the turn after them is waited for), prints the agent's last
 // reply, and ends. Progress goes to stderr as short lines when that is a terminal. An approval or a question with
 // nobody to answer stops it (exit 3); --json prints one object at the end, --stream-json a line per event.
@@ -49,7 +49,7 @@ function verdict(view: SessionView, since: { settled?: number }): Pick<RunResult
   const ask = view.overlay.approvals[0];
   if (ask) return { status: 'needs-answer', asks: ask.title };
   const helper = view.helperWaiting();
-  if (helper) return { status: 'needs-answer', asks: `The helper “${helper.note.title}” needs an answer` };
+  if (helper) return { status: 'needs-answer', asks: `The subagent “${helper.note.title}” needs an answer` };
   if (l?.status === 'error') return { status: 'failed', error: l.error ?? 'The agent stopped with an error' };
   if (!view.settled()) {
     since.settled = undefined;
@@ -58,7 +58,7 @@ function verdict(view: SessionView, since: { settled?: number }): Pick<RunResult
   const turn = view.lastTurn();
   const now = Date.now();
   since.settled ??= now;
-  // Settled a moment (a helper's reply may be on its way), with the turn's end in the conversation; or settled a while.
+  // Settled a moment (a subagent's reply may be on its way), with the turn's end in the conversation; or settled a while.
   const replied = !!lastReply(view.items) || view.items.some((i) => i.kind === 'turn');
   // Settled with nothing to show for it a few seconds on: it never got going (a usage limit, an error at the start).
   if (!replied && now - since.settled >= 3000) return { status: 'failed', error: '' };
@@ -197,7 +197,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
     const stopAll = async () => {
       await conn.api('POST', `/api/sessions/${enc(key)}/interrupt`, {}).catch(() => {});
       await Promise.all(view.helpersWorking().map((h) => conn.api('POST', `/api/sessions/${enc(h.key)}/interrupt`, {}).catch(() => {})));
-      // Its helpers in the background would wake the agent again later: stopped too (a dev server left running is not).
+      // Its subagents in the background would wake the agent again later: stopped too (a dev server left running is not).
       await Promise.all(view.background().map(({ key, task }) => conn.api('POST', `/api/sessions/${enc(key)}/tasks/${encodeURIComponent(task.id)}/stop`, {}).catch(() => {})));
     };
     const timer = o.timeout
@@ -221,7 +221,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
   stream();
   showProgress();
   const r = resultOf(conn, view, outcome, t0, 0);
-  // What it cost as the server adds it up (its tokens at their price until the agent's own figure lands), helpers and all.
+  // What it cost as the server adds it up (its tokens at their price until the agent's own figure lands), subagents and all.
   const spent = key ? await spentOf(conn, key) : null;
   if (spent) r.costUsd = Math.round(spent.spentUsd * 10_000) / 10_000;
   for (const c of r.children) {
@@ -242,7 +242,7 @@ export async function runCommand(conn: Conn, o: Opts, boot: Boot, message?: stri
     if (r.status === 'needs-answer') process.stderr.write(`${p.yellow('?')} It needs an answer: ${r.asks}.\n  Answer it in the app (${r.url}) or here: hydor resume ${key}\n`);
     else if (r.status !== 'done') process.stderr.write(`${p.red('✗')} ${r.error}\n`);
     else if (progress) {
-      const bits = [`${Math.round(r.durationMs / 100) / 10} s`, r.costUsd ? `$${r.costUsd.toFixed(2)}` : '', modelLabel(r.model, models), r.children.length ? `${r.children.length} ${r.children.length === 1 ? 'helper' : 'helpers'}` : ''].filter(Boolean);
+      const bits = [`${Math.round(r.durationMs / 100) / 10} s`, r.costUsd ? `$${r.costUsd.toFixed(2)}` : '', modelLabel(r.model, models), r.children.length ? `${r.children.length} ${r.children.length === 1 ? 'subagent' : 'subagents'}` : ''].filter(Boolean);
       process.stderr.write(`${p.green('✓')} ${p.dim(bits.join(' · '))}\n`);
     }
   }

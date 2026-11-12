@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MessagesSquare, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
-import type { BackgroundTask, FileChange, SessionSummary, ToolItem } from '@shared/types';
+import type { FileChange, SessionSummary, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { activityLabel, activityOf, backgroundLine, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
 import { ago, basename, bytes, compact, dirname, money, prettyPath, tildify } from '../../lib/format';
@@ -18,7 +18,8 @@ import { Badge, Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segme
 import { NavButton } from '../layout/PageHeader';
 import { Composer, handoffName } from './Composer';
 import { SessionCtx, ToolRow } from './items';
-import { TaskLogDialog, TaskRow, useStopTask } from './TaskLog';
+import { useTaskPanel } from './TaskLog';
+import { TaskItem } from './WorkRow';
 import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
@@ -420,9 +421,8 @@ function InfoPanel({ s }: { s: SessionSummary }) {
   const a = activityOf(s);
   // Tasks of a session open elsewhere are listed, not stoppable from here.
   const here = !!lv && lv.status !== 'exited';
-  const tasks = (here ? lv.backgroundTasks : s.external?.backgroundTasks) ?? [];
-  const [logTask, setLogTask] = useState<BackgroundTask | null>(null);
-  const stopper = useStopTask(s.key);
+  const tasks = (here ? [...(lv.backgroundTasks ?? []), ...(lv.endedTasks ?? [])] : s.external?.backgroundTasks) ?? [];
+  const panel = useTaskPanel(s.key, here, tasks);
   const ctx = lv?.contextTokens && lv?.contextWindow ? Math.round((lv.contextTokens / lv.contextWindow) * 100) : null;
   // What its programs use now, while its agent runs here.
   const use = useSessionResources(!!lv && lv.status !== 'exited')?.sessions.find((x) => x.key === s.key);
@@ -478,13 +478,12 @@ function InfoPanel({ s }: { s: SessionSummary }) {
       {tasks.length > 0 && (
         <div className="mt-4">
           <div className="mb-1.5 text-[12.5px] font-medium text-fg-3">Background tasks</div>
-          <div className="space-y-1">
+          <div className="divide-y divide-line overflow-hidden rounded-xl bg-bg-1">
             {tasks.map((t) => (
-              <TaskRow key={t.id} t={t} className="rounded-xl bg-bg-1 py-0.5" onOpen={() => setLogTask(t)} onStop={here ? () => void stopper.stop(t) : undefined} />
+              <TaskItem key={t.id} t={t} onOpen={() => panel.open(t)} onStop={here && t.status === 'running' ? () => panel.stop(t) : undefined} />
             ))}
           </div>
-          {stopper.node}
-          {logTask && <TaskLogDialog sessionKey={s.key} task={logTask} canStop={here} onClose={() => setLogTask(null)} />}
+          {panel.node}
         </div>
       )}
       <div className="mt-4">

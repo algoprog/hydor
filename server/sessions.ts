@@ -45,7 +45,7 @@ import { autoPlan, tierNote } from './assistants/auto.ts';
 import { noteModels } from './assistants/tiers.ts';
 import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/tiers.ts';
 import { opensTurn } from './opinion/turns.ts';
-import { ancestorsOf, runningChildren } from './children/family.ts';
+import { ancestorsOf, runningBelow, runningChildren } from './children/family.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
 export const agentOfKey = (key: string): Agent => (key.startsWith('codex:') ? 'codex' : key.startsWith('acp:') ? 'acp' : 'claude');
@@ -1817,6 +1817,37 @@ export class SessionManager extends EventEmitter {
     await this.live(key).adapter.interrupt();
   }
 
+  /**
+   * Stops all of what the session started: its turn (when one runs), its background tasks still running, and its running
+   * child sessions, theirs in turn. What stopped with it is marked first (`stoppedWithParent` on a child, `stoppedAll` on
+   * each session), so a child's cut-short turn is not reported back, and a report that races in after the stop waits in
+   * the held queue instead of waking the session (server/children reportTurn). Returns what it stopped here: the turn, the
+   * tasks, and the session's own running child sessions (not the ones below those).
+   */
+  async stopAll(key: string): Promise<{ turn: boolean; tasks: number; children: number }> {
+    const running = this.runningHelpers();
+    const below = runningBelow(running, key);
+    const now = Date.now();
+    // Marked before anything is stopped, so no report slips past between the stop and the mark.
+    for (const k of below) setSessionExtra(this.db, k, { stoppedWithParent: now });
+    for (const k of [key, ...below]) setSessionExtra(this.db, k, { stoppedAll: now });
+    const mine = await this.stopOwn(key);
+    for (const k of below) await this.stopOwn(k).catch(() => {});
+    return { turn: mine.turn, tasks: mine.tasks, children: running.get(key)?.size ?? 0 };
+  }
+
+  /** One session's own part of stopAll: its turn and its running background tasks, and its queue held. */
+  private async stopOwn(key: string): Promise<{ turn: boolean; tasks: number }> {
+    const a = this.lives.get(key)?.adapter;
+    const status = a?.state.status;
+    const turn = status === 'starting' || status === 'working' || status === 'waiting';
+    if (turn) await this.interrupt(key);
+    else this.holdQueue(key);
+    const tasks = (a?.state.backgroundTasks ?? []).filter((t) => t.status === 'running');
+    if (a) await Promise.allSettled(tasks.map((t) => a.stopTask(t.id)));
+    return { turn, tasks: tasks.length };
+  }
+
   // ---- queued messages --------------------------------------------------------------
 
   private queues = new Map<string, { id: string; text: string; images: { path: string; mediaType: string }[]; files: string[]; at: number }[]>();
@@ -1877,14 +1908,18 @@ export class SessionManager extends EventEmitter {
     this.queueSummary(key);
   }
 
-  /** Adds a message to send when the running turn ends (or now, if the session is idle and not held). */
-  enqueue(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []) {
+  /**
+   * Adds a message to send when the running turn ends (or now, if the session is idle and not held). `hold`: the queue
+   * waits for Resume, as after a stop, so the message does not wake the session.
+   */
+  enqueue(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = [], hold = false) {
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
     this.loadQueues();
     const saved = this.saveImages(images).map((i) => ({ path: i.path!, mediaType: i.mediaType }));
     const m = { id: crypto.randomUUID(), text, images: saved, files: this.saveFiles(files), at: Date.now() };
     this.db.prepare('insert into queued (id, key, text, images, files, created_at) values (?, ?, ?, ?, ?, ?)').run(m.id, key, m.text, JSON.stringify(m.images), JSON.stringify(m.files), m.at);
     this.queues.set(key, [...(this.queues.get(key) ?? []), m]);
+    if (hold) this.held.add(key);
     this.queueSummary(key);
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'idle' && !this.held.has(key)) this.dispatchQueued(key);

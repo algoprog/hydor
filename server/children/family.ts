@@ -51,3 +51,23 @@ export function runningChildren(db: DB, statuses: Iterable<[string, string | und
   }
   return out;
 }
+
+/**
+ * Everything running below a session that "Stop all" stops: its running child sessions, theirs in turn, and so on
+ * (`running`: runningChildren's answer). Each comes after the one that started it, once, whatever loops the settings
+ * hold; the session itself is not in the list.
+ */
+export function runningBelow(running: Map<string, Set<string>>, key: string): string[] {
+  const out: string[] = [];
+  const seen = new Set([key]);
+  const walk = (parent: string) => {
+    for (const child of running.get(parent) ?? []) {
+      if (seen.has(child)) continue;
+      seen.add(child);
+      out.push(child);
+      walk(child);
+    }
+  };
+  walk(key);
+  return out;
+}

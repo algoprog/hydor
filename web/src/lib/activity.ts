@@ -7,22 +7,38 @@ export interface Activity {
   status: 'starting' | 'working' | 'waiting' | 'idle' | 'stopping';
   client?: string;
   detail?: string;
-  /** Background commands, agents and monitors still running. */
+  /** Background tasks still running: commands, monitors, workflows and the program's own subagents. */
   background: number;
-  /** Child sessions it started that are still running (starting, working or waiting, or kept working by helpers of their own). */
+  /** Of those, how many are the program's own subagents (a Claude Code subagent): they count as subagents, not as background tasks. */
+  agents: number;
+  /** Hydor subagents it started that are still running (starting, working or waiting, or kept working by subagents of their own). */
   helpers: number;
 }
+
+export type TaskKind = 'subagent' | 'command' | 'monitor' | 'workflow' | 'task';
+
+/** The kind of a background task, from the CLI's task types (local_bash, local_agent, …). */
+export function taskKindOf(kind?: string): TaskKind {
+  const k = (kind ?? '').toLowerCase();
+  if (k.includes('bash') || k.includes('shell') || k === 'command') return 'command';
+  if (k.includes('agent')) return 'subagent';
+  if (k.includes('monitor')) return 'monitor';
+  if (k.includes('workflow')) return 'workflow';
+  return 'task';
+}
+
+const agentsIn = (tasks?: { kind?: string }[]) => (tasks ?? []).filter((t) => taskKindOf(t.kind) === 'subagent').length;
 
 /** Whether (and how) a session is running right now, here or elsewhere. */
 export function activityOf(s: SessionSummary | undefined | null): Activity | null {
   if (!s) return null;
   const l = s.live;
   const helpers = s.helpers ?? 0;
-  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0, helpers };
+  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0, agents: agentsIn(l.backgroundTasks), helpers };
   const e = s.external;
-  if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: e.backgroundTasks?.length ?? 0, helpers };
-  // Its own process has stopped between turns, but its child sessions still run: it is not done.
-  if (helpers > 0) return { kind: 'app', status: 'idle', background: 0, helpers };
+  if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: e.backgroundTasks?.length ?? 0, agents: agentsIn(e.backgroundTasks), helpers };
+  // Its own process has stopped between turns, but its Hydor subagents still run: it is not done.
+  if (helpers > 0) return { kind: 'app', status: 'idle', background: 0, agents: 0, helpers };
   return null;
 }
 
@@ -30,20 +46,24 @@ export function activityOf(s: SessionSummary | undefined | null): Activity | nul
 export const isBusy = (a: Activity | null) => !!a && (a.status === 'working' || a.status === 'starting');
 
 /**
- * Between turns, but background tasks or child sessions still run: the agent picks up again when they finish.
+ * Between turns, but background tasks or subagents still run: the agent picks up again when they finish.
  * It takes your messages all the same: its own turn is over.
  */
 export const inBackground = (a: Activity | null) => !!a && a.status === 'idle' && (a.background > 0 || a.helpers > 0);
 
-/** Not done yet: a turn is running, or background tasks or child sessions are. */
+/** Not done yet: a turn is running, or background tasks or subagents are. */
 export const isWorking = (a: Activity | null) => isBusy(a) || inBackground(a);
 
-/** Between turns, as one short line for a list: "Working · 2 in background", "Working · 1 helper session", or both. */
+/** Subagents (Hydor's and the program's own) and the other background tasks of an activity. */
+const counts = (a: Activity) => ({ subs: a.helpers + a.agents, tasks: a.background - a.agents });
+
+/** Between turns, as one short line for a list: "Working · 2 in background", "Working · 1 subagent", or both. */
 export function backgroundLine(a: Activity): string {
   const where = a.kind === 'external' ? ` in ${a.client}` : '';
-  if (a.background && a.helpers) return `Working${where} · ${a.background} in background, ${a.helpers} helper session${a.helpers === 1 ? '' : 's'}`;
-  if (a.helpers) return `Working${where} · ${a.helpers} helper session${a.helpers === 1 ? '' : 's'}`;
-  return `Working${where} · ${a.background} in background`;
+  const { subs, tasks } = counts(a);
+  if (tasks && subs) return `Working${where} · ${subs} subagent${subs === 1 ? '' : 's'}, ${tasks} in background`;
+  if (subs) return `Working${where} · ${subs} subagent${subs === 1 ? '' : 's'}`;
+  return `Working${where} · ${tasks} in background`;
 }
 
 export function activityLabel(a: Activity): string {
@@ -57,11 +77,13 @@ export function activityLabel(a: Activity): string {
       return a.kind === 'external' ? `Waiting for you${where}` : 'Waiting for you';
     case 'stopping':
       return 'Stopping';
-    default:
-      if (a.background && a.helpers) return `Working${where} · ${a.background} background task${a.background === 1 ? '' : 's'} and ${a.helpers} helper session${a.helpers === 1 ? '' : 's'} running`;
-      if (a.helpers) return `Working${where} · ${a.helpers} helper session${a.helpers === 1 ? '' : 's'} running`;
-      if (a.background) return `Working${where} · ${a.background} background task${a.background === 1 ? '' : 's'} running`;
+    default: {
+      const { subs, tasks } = counts(a);
+      if (subs && tasks) return `Working${where} · ${subs} subagent${subs === 1 ? '' : 's'} and ${tasks} background task${tasks === 1 ? '' : 's'} running`;
+      if (subs) return `Working${where} · ${subs} subagent${subs === 1 ? '' : 's'} running`;
+      if (tasks) return `Working${where} · ${tasks} background task${tasks === 1 ? '' : 's'} running`;
       return a.kind === 'external' ? `Open${where}` : 'Running, idle';
+    }
   }
 }
 

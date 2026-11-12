@@ -16,7 +16,7 @@ import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from 
 import { api, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { saveStart, startSettings } from '../../lib/start';
-import { enablePush, pushState, type PushState } from '../../lib/notify';
+import { desktopSystem, enablePush, pushState, systemNotices, systemNoticesState, testSystemNotice, turnOnSystemNotices, whenBack, type PushState } from '../../lib/notify';
 import { toastError, useApp, useUI } from '../../lib/store';
 import { live } from '../../lib/ws';
 import { AgentIcon, agentName } from '../../components/AgentIcon';
@@ -424,6 +424,48 @@ function NotifySetup() {
   );
 }
 
+/**
+ * In a desktop app, its notifications are the system's, which the system has to allow: a test one shows when it does;
+ * when it does not, the system's settings open where you allow them, and coming back tries again.
+ */
+function SystemNotifySetup() {
+  const [st, setSt] = useState<'ask' | 'busy' | 'on' | 'settings' | 'off'>('ask');
+  useEffect(() => {
+    void systemNoticesState().then((s) => s?.shows && setSt('on'));
+  }, []);
+  useEffect(() => {
+    if (st !== 'settings') return;
+    return whenBack(() => void testSystemNotice().then((r) => r?.ok && setSt('on')));
+  }, [st]);
+  const turnOn = async () => {
+    setSt('busy');
+    setSt(await turnOnSystemNotices());
+  };
+  if (st === 'on')
+    return (
+      <div className="flex items-center gap-1.5 text-[13px] text-fg-2">
+        <Check size={14} className="text-ok" /> Notifications are on for this device
+      </div>
+    );
+  if (st === 'off') return <div className="text-[12.5px] text-balance text-fg-3">Your desktop isn’t showing Hydor’s notifications, so they show inside the app.</div>;
+  if (st === 'settings')
+    return (
+      <div className="space-y-2">
+        <div className="text-[12.5px] text-balance text-fg-3">
+          {desktopSystem === 'windows' ? 'In Settings, turn on notifications for Hydor, then come back here.' : 'In System Settings, turn on Allow notifications for Hydor, then come back here.'}
+        </div>
+        <Button size="sm" variant="secondary" icon={<Bell size={14} />} onClick={turnOn}>
+          Check again
+        </Button>
+      </div>
+    );
+  return (
+    <Button size="sm" variant="secondary" icon={<Bell size={14} />} disabled={st === 'busy'} onClick={turnOn}>
+      Turn on notifications
+    </Button>
+  );
+}
+
 /** First things to try: each puts its words in the message box (and, at the end, ends the tour there). */
 /** The assistants found, and the button that opens Bring in over the tour (the dialog lists what would come first). */
 function BringInStep() {
@@ -653,7 +695,7 @@ function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
       icon: <Bell size={16} />,
       title: 'Hear when it’s done',
       body: 'Get a notification when an agent finishes or needs you, even with the app closed. Settings holds this, and everything else you can change.',
-      Extra: NotifySetup,
+      Extra: systemNotices ? SystemNotifySetup : NotifySetup,
     },
     {
       id: 'done',

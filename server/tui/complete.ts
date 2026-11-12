@@ -80,6 +80,8 @@ export interface Item {
   /** What the row shows and what is matched (after `skip` characters). */
   label: string;
   hint?: string;
+  /** A command's arguments, shown dim after its name in the label column. */
+  args?: string;
   /** What accepting it puts in (a file: its path after the @). */
   value: string;
   kind: 'command' | 'value' | 'file' | 'dir' | 'history';
@@ -127,13 +129,13 @@ export function commandItems(own: { name: string; args?: string; what: string }[
   const out: Item[] = [];
   for (const c of own) {
     seen.add(c.name);
-    out.push({ label: `/${c.name}`, hint: [c.args, c.what].filter(Boolean).join('  '), value: `/${c.name}`, kind: 'command', skip: 1, needsArg: argsRequired(c.args) });
+    out.push({ label: `/${c.name}`, args: c.args, hint: c.what, value: `/${c.name}`, kind: 'command', skip: 1, needsArg: argsRequired(c.args) });
   }
   for (const c of prog) {
     const name = c.name.replace(/^\//, '');
     if (!name || seen.has(name)) continue;
     seen.add(name);
-    out.push({ label: `/${name}`, hint: [c.argumentHint, c.description].filter(Boolean).join('  '), value: `/${name}`, kind: 'command', skip: 1, needsArg: argsRequired(c.argumentHint) });
+    out.push({ label: `/${name}`, args: c.argumentHint, hint: c.description, value: `/${name}`, kind: 'command', skip: 1, needsArg: argsRequired(c.argumentHint) });
   }
   return out;
 }
@@ -161,7 +163,7 @@ export function historyItems(history: string[], query: string): Ranked[] {
 export type Context = { kind: 'commands'; from: number; query: string } | { kind: 'values'; cmd: string; from: number; query: string } | { kind: 'files'; from: number; query: string };
 
 /** The commands that take a value from a list. */
-export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'helpers', 'open'];
+export const VALUE_COMMANDS = ['model', 'mode', 'effort', 'agent', 'subagents', 'helpers', 'open'];
 
 /** What the text before the cursor is completing, and where that starts; null when nothing. */
 export function contextOf(before: string): Context | null {
@@ -249,11 +251,17 @@ export function menuRows(o: MenuOpts): string[] {
   const shown = o.items.slice(top, top + o.rows);
   const numW = Math.max(0, ...shown.map((r) => r.item.num?.length ?? 0));
   const cap = Math.max(8, Math.min(o.maxLabel ?? 28, width - 6 - (numW ? numW + 1 : 0)));
-  const labelW = Math.min(cap, Math.max(...shown.map((r) => strWidth(r.item.label))));
+  // The label column: the name, and a command's arguments dim after it (cut first when they do not fit).
+  const cols = shown.map((r) => {
+    const lab = cutLabel(r.item.label, cap);
+    const room = cap - strWidth(lab) - 1;
+    return { lab, args: r.item.args && room >= 2 ? cutLabel(r.item.args, room) : '' };
+  });
+  const labelW = Math.min(cap, Math.max(...cols.map((c) => strWidth(c.lab) + (c.args ? 1 + strWidth(c.args) : 0))));
   const rows = shown.map((r, i) => {
     const sel = top + i === o.sel;
-    const cut = cutLabel(r.item.label, labelW);
-    const label = pad(styled(cut, new Set(cut === r.item.label ? r.hits : r.hits.filter((h) => h < cut.length - 1)), r.item.kind, sel, p), labelW);
+    const { lab, args } = cols[i];
+    const label = pad(styled(lab, new Set(lab === r.item.label ? r.hits : r.hits.filter((h) => h < lab.length - 1)), r.item.kind, sel, p) + (args ? ` ${p.dim(args)}` : ''), labelW);
     const num = numW ? `${p.dim((r.item.num ?? '').padStart(numW))} ` : '';
     const hint = r.item.hint ? `   ${p.dim(r.item.hint)}` : '';
     return truncate(`${sel ? p.accent('❯') : ' '} ${num}${label}${hint}`.replace(/\s+$/, ''), width - 1);

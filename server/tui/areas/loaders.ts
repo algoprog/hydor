@@ -43,6 +43,37 @@ async function sessions(c: LoadCtx): Promise<Loaded> {
   return list.map((s) => [shortKey(s, n), [cut((s.title || s.firstPrompt || '(untitled)').replace(/\s+/g, ' ')), statusWord(s, plain)].filter(Boolean).join(' · ')]);
 }
 
+/** Skills: the library's, or with --agent claude|codex that agent's own. */
+async function skills(c: LoadCtx): Promise<Loaded> {
+  const agent = c.opts.get('agent');
+  if (agent === 'claude' || agent === 'codex') {
+    const r = await c.get<{ skills?: { agent: string; name: string; description: string }[] }>('/api/setup/skills');
+    return (r?.skills ?? []).filter((s) => s.agent === agent).map((s) => [s.name, s.description]);
+  }
+  const r = await c.get<{ skills?: { name: string; description: string }[] }>('/api/skillpack');
+  return (r?.skills ?? []).map((s) => [s.name, s.description]);
+}
+
+/** Plugins: Hydor's, or with --agent claude|codex that agent's own (name@marketplace). */
+async function plugins(c: LoadCtx): Promise<Loaded> {
+  const agent = c.opts.get('agent');
+  if (agent === 'claude' || agent === 'codex') {
+    const r = await c.get<{ installed?: { id: string; description?: string }[] }>(agent === 'claude' ? '/api/setup/plugins' : '/api/setup/codex-plugins');
+    return (r?.installed ?? []).map((x) => [x.id, x.description]);
+  }
+  const r = await c.get<{ installed?: { name: string; title: string }[]; available?: { name: string; title: string }[] }>('/api/plugins');
+  return [...(r?.installed ?? []), ...(r?.available ?? [])].map((x) => [x.name, x.title]);
+}
+
+/** Memory notes, by number, with the start of their text. */
+async function notes(c: LoadCtx): Promise<Loaded> {
+  const r = await c.get<{ entries?: { id: number; text: string; scope: string; kind: string }[] }>('/api/memory/entries');
+  return (r?.entries ?? [])
+    .filter((e) => !(e.kind === 'profile' && e.scope === 'global'))
+    .slice(0, 40)
+    .map((e) => [String(e.id), e.text.replace(/\s+/g, ' ').slice(0, 60)]);
+}
+
 /** What follows `hydor settings set <option> `: on and off for a switch, a choice's values (a model's, asked from the server). */
 async function settingValues(c: LoadCtx): Promise<Loaded> {
   const t = await import('../settings-table.ts');
@@ -75,11 +106,11 @@ export const LOADERS: Record<ArgKind, Loader> = {
     const found = await sessions(c);
     return [...pageWords(), ...(typeof found === 'string' ? [] : found)];
   },
-  skill: none,
-  plugin: none,
-  mcp: none,
-  key: none,
-  note: none,
+  skill: skills,
+  plugin: plugins,
+  mcp: async (c) => ((await c.get<{ servers?: { agent: string; scope: string; name: string }[] }>('/api/setup/mcp'))?.servers ?? []).map((s) => [s.name, `${s.agent === 'claude' ? 'Claude Code' : 'Codex'}${s.scope === 'user' ? '' : `, ${s.scope}`}`]),
+  key: async (c) => ((await c.get<{ secrets?: { name: string; domains: string[]; note: string }[] }>('/api/connections'))?.secrets ?? []).map((s) => [s.name, s.domains.join(', ') || s.note]),
+  note: notes,
   experiment: async (c) =>
     ((await c.get<{ runs?: { id: string; name?: string; command: string; status: string }[] }>('/api/experiments/runs?limit=40'))?.runs ?? []).map((r) => [
       r.id,
