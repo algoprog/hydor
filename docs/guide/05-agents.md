@@ -51,7 +51,7 @@ Eight agents come with the app. None of them suggests a program, model, tier or 
 
 ### General
 
-"Help with anything: questions, writing, planning, files." The start page picks General until you pick another. It is written for people who may not be programmers.
+"Help with anything: questions, writing, planning, files." The start page picks General until you pick another agent in that place (a project's own agent comes first). It is written for people who may not be programmers.
 
 - It works out what you want and does it. It asks one short question only when the request is unclear in a way that changes the result; otherwise it makes a sensible choice and says what it chose.
 - It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or in your [Library](/guide/library) when it is a page you'll use again, such as a tracker or a calculator.
@@ -230,7 +230,7 @@ An agent works **Everywhere** unless you pick projects for it. One that works in
 - works in the project's folder when it works in one project, with the project's knowledge, memory, guidelines and skills;
 - shows on each of its projects' **Agents** tab (see [Projects](/guide/projects)).
 
-If you pick a project on the start page where the agent picked doesn't work, the start page picks General instead.
+If you pick a project on the start page where the agent picked doesn't work, the start page picks the project's own agent instead, else General.
 
 ## When an agent works: schedules
 
@@ -326,11 +326,11 @@ What picking an agent does on the start page:
 
 - **Program, model and permissions**: if the agent suggests a program, the start page switches to it, with the model of its tier when it thinks with one, else the agent's model when it names one. If it has a permission mode, the start page's **Permissions** (under **Options**) changes to the matching mode of that program. You can still change any of them before you start.
 - **Connections**: the connected accounts the agent turns on are on for the new session.
-- **Folder**: unless you picked a folder yourself, the agent decides. Most agents start in **New task folder**; Coder, and agents set to "The folder on the start page", use the folder shown.
+- **Folder**: unless you picked a folder yourself, the agent decides. Most agents start in **New task folder**; Coder, and agents set to "The folder on the start page", use the folder shown. In a project, picking an agent never takes you out of it. When the agent changes the folder, the box shows the picks kept for that place, with the agent you picked.
 
-The start page opens with the agent you picked last, on any device you use; the very first time, that is General. When the page opens this way, your other picks (program, model, permissions) stay as you left them; only picking an agent changes them. If the agent you picked last has been deleted, General is picked instead.
+The start page keeps the agent for each place (each project, each folder and **New task folder**), on any device you use, with the place's other picks. A place where you have not picked one yet opens with the project's own agent when the project has one, else General. An agent that no longer exists, or that does not work in the project picked, gives way to that default too.
 
-Picking a project in the folder menu also picks the agent that project starts its sessions as, when it has one (see [Projects](/guide/projects)).
+Picking a project in the folder menu opens the box with that project's picks; in a project where you have picked nothing yet, that includes the agent the project starts its sessions as, when it has one (see [Projects](/guide/projects)).
 
 ## Switch agents in a session
 
@@ -354,7 +354,7 @@ A session started without an agent (in VS Code or a terminal, or before agents c
 On an agent's page:
 
 - **Duplicate** (on every agent): opens the editor as a new agent with everything filled in and the name "*name* (copy)". Change what you like and **Save**. This is how you make your own version of a built-in.
-- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it.
+- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again.
 
 The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too; picking one opens its page.
 
@@ -400,7 +400,7 @@ Open the folder chip on the start page:
 - **New task folder** ("a fresh one in ~/Hydor") makes a fresh folder for each session.
 - Pick a project, a folder you used lately, or any folder you find with **Browse** or by typing its name or path, and the session works there instead (see [Projects](/guide/projects) and [Sessions](/guide/sessions)).
 
-Until you choose, the agent decides: the built-ins other than Coder, and your own set to "A new task folder", use a task folder; Coder and agents set to "The folder on the start page" use the folder shown, and an agent that works in one project uses that project. The start page remembers what you chose. Picking another agent hands the choice back to it, unless you picked a folder since the page opened.
+Until you choose, the agent decides: the built-ins other than Coder, and your own set to "A new task folder", use a task folder; Coder and agents set to "The folder on the start page" use the folder shown, and an agent that works in one project uses that project. The start page remembers what you chose. Picking another agent hands the choice back to it, unless you picked a folder since the page opened or you are in a project. When it changes the folder, the box shows the picks kept for that place, with the agent you picked.
 
 Task folders don't crowd the folder menu: the folders used lately that it lists leave them out. Sessions started by voice in hands-free mode get a task folder too, unless the start page was last set to a folder or a project (see [Documents, images, videos and voice](/guide/documents-voice)).
 
@@ -430,7 +430,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - **Projects**: a project can say which agent its sessions start as ("Its sessions start as"); picking the project on the start page picks it. Its **Agents** tab shows the agents that work in it. See [Projects](/guide/projects).
 - **Apps**: an app can name an **Agent**, and its runs start as it (runs from a public page don't); an app's agent steps can each name one. See [Apps](/guide/apps).
 - **Scheduled tasks**: a task runs as the agent its **Agent** option names; a task an agent sets up for you from a session runs as that session does. See [Scheduled tasks](/guide/tasks).
-- **Hands-free voice**: sessions you start by voice start as the agent picked last on the start page.
+- **Hands-free voice**: sessions you start by voice start in the place picked last on the start page, with its picks, as the agent picked there (else the project's own agent, else General).
 
 ## Ask an agent
 

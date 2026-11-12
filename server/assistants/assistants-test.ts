@@ -31,6 +31,7 @@ import { findAgentFiles, parseAgentFile, parseFrontmatter } from './importer.ts'
 import { instructionsFor, spawnFor, switchNote } from './instructions.ts';
 import { cleanAssistant, cleanUpOn, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
 import { cleanup } from '../cleanup/index.ts';
+import { createSpace, spaceById } from '../spaces/index.ts';
 import { dayIn, makeTaskFolder, slugOf, taskFolderName } from './taskFolder.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -565,6 +566,16 @@ test('settings: cleaning up after a task is on until turned off, and every agent
   assert.equal(cleanUpOn(db), false);
   setSettings(db, { cleanUp: true });
   assert.equal(cleanUpOn(db), true);
+});
+
+test('deleting an agent: the projects that started as it start as the default again', async () => {
+  await fakeApp.ready();
+  const a = saveAssistant(db, { name: 'Project helper' });
+  const sp = createSpace(db, { name: 'Its project', folder: fs.mkdtempSync(path.join(tmp, 'proj-')), assistant: a.id });
+  assert.equal(spaceById(db, sp.id)?.assistant, a.id);
+  const r = await fakeApp.inject({ method: 'DELETE', url: `/api/assistants/${a.id}` });
+  assert.equal(r.statusCode, 200);
+  assert.equal(spaceById(db, sp.id)?.assistant, undefined, 'the project no longer names an agent that is gone');
 });
 
 test('routes: the list, a task folder, an import, and Custom’s runtime question', async () => {

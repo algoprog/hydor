@@ -51,7 +51,7 @@ Whether a session gets a new task folder by default depends on the agent: most s
 
 ### Pick an agent
 
-**Agent** sets who the session works as: **General** (the first time), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours** (those that work everywhere, and those of the project picked). Point at one to read what it does and which program and model it uses. Picking one can also set the program, model and permissions it suggests (the model of its tier, when it thinks with one), and turn on its connected accounts. **Make or change agents** opens the [Agents page](/agents). See [Agents](/guide/agents).
+**Agent** sets who the session works as: **General** (until you pick another; in a project that has an agent of its own, that agent), **Researcher**, **Writer**, **Coder**, **Tutor**, **Planner**, **Analyst**, **App builder**, or one of yours under **Yours** (those that work everywhere, and those of the project picked). Point at one to read what it does and which program and model it uses. Picking one can also set the program, model and permissions it suggests (the model of its tier, when it thinks with one), and turn on its connected accounts. **Make or change agents** opens the [Agents page](/agents). See [Agents](/guide/agents).
 
 ### Options: effort, permissions and more
 
@@ -137,7 +137,11 @@ What it can't promise: Hydor checks where a model's server is, not what that ser
 
 ### What the start page remembers
 
-The start page opens with what you picked last, on every device: the program; for each program its model, effort, permissions and account; the folder, new task folder or project; the worktree switch; the agent; memory off; the spending cap; and Confidential. Picking a program brings back what you last used with it.
+The start page keeps its picks for each place you work in: each project, each folder and **New task folder**, on every device. A place keeps its **Runs on** (the program), each program's **Model** and, under **Options**, its **Effort** and **Permissions**, the **Agent**, **Memory**, the **Spending cap**, **Confidential** and the **New worktree** switch. The account (**Options → Account**) is not kept per place: it stays the one you picked, everywhere. Picking a program in a place brings back what you last used with it there.
+
+A place keeps its picks once you change one of them there or start a session there; just looking at a place keeps nothing. Pick a place in the **Folder** chip (a project, a folder or **New task folder**) and the box opens with that place's picks, while what you have written and attached stays in it. Starting from a project (**New session** on its card or page, or the project in the sidebar) opens the start page with that project's picks, and **New session in this folder** on a folder (in Files or the sidebar) opens it with that folder's picks. The page opens in the place you picked last.
+
+A place where you have not picked or started anything yet opens with the defaults: the agent is **General**, or the project's own agent when the project has one (and what that agent suggests applies, as when you pick it: its program, the model of its tier and its permissions); the **Model** is **Automatic** where it is offered, else the program's default; **Effort** and **Permissions** are the program's usual ones; memory is on; there is no spending cap; **Confidential** and **New worktree** are off. **Runs on** stays the program you used last. The place you had picked last before this was added keeps the picks you had.
 
 A link to the start page can fill it in, for example `/?prompt=Summarize%20my%20notes&agent=codex`; `model=`, `cwd=` (a folder's path) and `confidential=1` (Confidential on) can be added. It only fills the box and the choices; it never starts anything by itself. Invisible characters are removed from a linked message, with a notice.
 

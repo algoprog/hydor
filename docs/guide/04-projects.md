@@ -75,16 +75,16 @@ Your home folder, hidden folders, temporary ones and the folders the app makes f
 
 There are two ways:
 
-- **From the project**: click **New session** on its card on the Projects page, or at the top of its own page (on a phone, the pen). The start page opens with the project picked, and with its agent when it has one.
+- **From the project**: click **New session** on its card on the Projects page, or at the top of its own page (on a phone, the pen). The start page opens with the project picked and with what you picked in it before; if you have picked nothing there yet, with its agent when it has one.
 - **From the start page**: open the folder chip in the row under the message box. Its menu has two short lists: **Projects**, the five at work most recently (and the one picked, if it isn't among them), each with its mark, its name and its folder; then **Folders**, the folder in use and the ones you used last; then **New task folder**. **New**, beside the **Projects** heading, makes a project and picks it. Type part of a name in the field at the top to find any project, or any folder. A project's own folder is never listed as a folder: found by its name or path, or picked on the start page before as a folder, it is the project, and the session works in the project.
 
-When you pick a project, the chip shows its mark and name instead of a folder, and the session will work in the project's folder. If the project starts its sessions as an agent, the **Agent** chip changes to it, with any program, model and permissions that agent suggests. You can still change any of them before you start. Then type your message and click **Start**.
+When you pick a project, the chip shows its mark and name instead of a folder, and the session will work in the project's folder. In a project where you have not picked anything yet, the **Agent** chip shows the project's own agent when it has one, with any program, model and permissions that agent suggests, else **General**; in one where you have, it shows what you picked there. You can still change any of them before you start. Then type your message and click **Start**.
 
-The start page remembers the project for your next session, on any device you use. To work outside it again, pick a folder or **New task folder** in the same menu. If a project you had picked is deleted, the start page keeps its folder but no longer the project.
+Each project keeps its own picks on the start page: its program, model, effort, permissions, agent, memory, spending cap, **Confidential** and **New worktree** (see [What the start page remembers](/guide/sessions#what-the-start-page-remembers)). The start page remembers the project for your next session, on any device you use. To work outside it again, pick a folder or **New task folder** in the same menu. If a project you had picked is deleted, the start page keeps its folder but no longer the project.
 
 On a phone, the menu opens as a sheet from the bottom of the screen, titled "Project or folder to work in", and the keyboard waits until you tap the field.
 
-When the project's folder is a Git repository, the end of the menu offers **New worktree**, as for any folder in a repository: the session then works on a branch of its own, in a separate copy of the repository (see [Sessions](/guide/sessions)). Sessions you start by voice in hands-free mode start in the project picked last on the start page (see [Documents, images, videos and voice](/guide/documents-voice)).
+When the project's folder is a Git repository, the end of the menu offers **New worktree**, as for any folder in a repository: the session then works on a branch of its own, in a separate copy of the repository (see [Sessions](/guide/sessions)). Sessions you start by voice in hands-free mode start in the place picked last on the start page, with its picks (see [Documents, images, videos and voice](/guide/documents-voice)).
 
 ## A project's own page
 
@@ -140,7 +140,7 @@ A project can have an agent made for it, with **An agent for it** when you make 
 - When it says little, the agent is the template for its kind, from what its folder holds or the words it was described with: an engineer for software, a web developer for a website, an ML researcher for machine learning experiments, an analyst for data, a paper writer for a paper in LaTeX, a researcher for papers and reports to read, a writer for documents, a designer for pictures and videos, or a presenter for slides.
 - With nothing to go on, it is the default project agent.
 
-It is named after the project ("Shop engineer"), works only in the project and in its folder, and, unless the project names another agent, the project's sessions start as it. Change it like any agent of yours.
+It is named after the project ("Shop engineer"), works only in the project and in its folder, and, unless the project names another agent, the project's sessions start as it. Change it like any agent of yours. When you make a project from the start page, its **Agent** chip switches to this agent once it is ready, unless you picked another agent meanwhile.
 
 ### Settings
 
@@ -148,7 +148,7 @@ Everything about the project itself, in four parts, each with a line on what it 
 
 - **The project**: its **Name** (beside its mark, in the colour picked), **What it is about** and **Its colour**.
 - **What every agent in it follows**: its **Agent Guidelines**, as when you made it.
-- **How its sessions start**: under **Its sessions start as**, one choice to tap: **The agent picked on the start page** (the default: picking the project leaves the start page's agent as it is), or one of your agents, built in or your own. Picking the project on the start page then picks that agent too.
+- **How its sessions start**: under **Its sessions start as**, one choice to tap: **The agent picked on the start page** (the default: the start page keeps the agent you picked in the project, General until you pick another), or one of your agents, built in or your own. A project where you have not picked anything yet then opens on the start page with that agent.
 - **The projects it brings together**: pick projects here to turn this project into a group (see [Bring projects together in a group](#bring-projects-together-in-a-group)).
 
 Once you change something, a bar says **Unsaved changes**, with **Undo changes** and **Save**; it stays in view while you scroll. At the bottom, **Delete the project** says what stays, with its button.

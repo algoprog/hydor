@@ -162,11 +162,21 @@ const sameAgent = (a: Assistant, agent: Agent, acpId: string | null) => a.agent 
  * Picking an agent sets the program, model and mode it suggests (the model of the tier it thinks with, when it has one). Call it after the start page's own
  * choice of model and mode for an agent (from what it was last used with): each catalog of the agent
  * that arrives (`cat`) resets them to that, so the assistant's go on again after it. The pick the page
- * opens with changes nothing.
+ * opens with changes nothing, unless `applyFirst` (a place where nothing was picked yet: what its agent suggests is
+ * its default too).
  */
 export function useAssistantDefaults(
   id: string | undefined,
-  o: { agent: Agent; acpId: string | null; cat: unknown; setAgent: (a: Agent) => void; setAcpId: (id: string | null) => void; setModel: (m: string | null) => void; setMode: (m: string | null) => void },
+  o: {
+    agent: Agent;
+    acpId: string | null;
+    cat: unknown;
+    setAgent: (a: Agent) => void;
+    setAcpId: (id: string | null) => void;
+    setModel: (m: string | null) => void;
+    setMode: (m: string | null) => void;
+    applyFirst?: boolean;
+  },
 ) {
   const st = useAssistantsState();
   const tiers = useTierMap();
@@ -174,17 +184,18 @@ export function useAssistantDefaults(
   const seen = useRef<string | undefined>(undefined);
   const done = useRef<unknown>(null);
   useEffect(() => {
-    if (id === seen.current) return;
+    // Nothing is decided until the agents are known (a link's agent, as a page loads).
+    if (!st || id === seen.current) return;
     const first = seen.current === undefined;
     seen.current = id;
-    const a = first ? undefined : assistantIn(st, id);
+    const a = first && !o.applyFirst ? undefined : assistantIn(st, id);
     pending.current = a && (a.agent || a.mode || a.tier) ? a : null;
     done.current = null;
     if (a?.agent && !sameAgent(a, o.agent, o.acpId)) {
       if (a.agent === 'acp') o.setAcpId(a.acpAgent ?? null);
       o.setAgent(a.agent);
     }
-  }, [id]);
+  }, [id, st]);
   useEffect(() => {
     const a = pending.current;
     if (!a || !o.cat || done.current === o.cat || (a.agent && !sameAgent(a, o.agent, o.acpId))) return;

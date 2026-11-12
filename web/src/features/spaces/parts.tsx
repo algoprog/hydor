@@ -4,12 +4,13 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Check, ChevronRight, Folder, FolderOpen, Plus, X } from 'lucide-react';
 import { isGroup, MAX_FOLDERS, MAX_GROUP, SPACE_COLORS, spaceColor, type Space, type SpaceSuggestion } from '@shared/spaces';
+import { placeKey } from '@shared/start';
 import { FolderFinder } from '../../components/FolderPicker';
 import { Button, cx, Dialog, inputCls, Popover, Switch, Tabs } from '../../components/ui';
 import { api, post } from '../../lib/api';
 import { basename, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { saveStart } from '../../lib/start';
+import { placePicks, saveStart, startSettings } from '../../lib/start';
 import { toast, toastError, useApp } from '../../lib/store';
 import { loadSpaces, useSpaces } from './state';
 
@@ -48,9 +49,13 @@ export function SpaceMark({ s, size = 15, className }: { s: Pick<Space, 'name' |
   );
 }
 
-/** The start page, with this space picked: its folder, its assistant (and a message in its box, to send or change). */
+/**
+ * The start page, with this space picked: its folder, and what was picked in it last (else the defaults, with its own
+ * agent), and a message in its box, to send or change. A start page open already opens its box again there.
+ */
 export function startInSpace(s: Space, prompt?: string) {
-  saveStart({ space: s.id, cwd: s.folder, task: false, ...(s.assistant ? { assistant: s.assistant } : {}) }, true);
+  saveStart({ space: s.id, cwd: s.folder, task: false, ...placePicks(startSettings(), placeKey({ space: s.id }), placeKey({ cwd: s.folder })) }, true);
+  window.dispatchEvent(new Event('wa:place'));
   go(prompt ? `/?prompt=${encodeURIComponent(prompt)}` : '/');
 }
 

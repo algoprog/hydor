@@ -1,17 +1,19 @@
-// Which assistant a session works as. On the start page: the one the new session starts as, General the
-// first time, then the one the start page used last; picking one turns its connections on. In a session's
-// message box: another one from the next message on.
+// Which assistant a session works as. On the start page: the one the new session starts as, the one last used in the
+// place picked (a project, a folder), else General or the project's own agent; picking one turns its connections on.
+// In a session's message box: another one from the next message on.
 import { useEffect, useRef, useState } from 'react';
 import { Check, Settings2 } from 'lucide-react';
-import { assistantExtra, inScope, type Assistant, type AssistantSwitch } from '@shared/assistants';
+import { assistantExtra, DEFAULT_ASSISTANT, inScope, type Assistant, type AssistantSwitch } from '@shared/assistants';
 import type { SessionExtra } from '@shared/features';
 import type { SessionSummary } from '@shared/types';
 import { enc, put } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { toast, toastError, useApp } from '../../lib/store';
 import { cx, MenuItem, MenuLabel, MenuSep, Picker, Popover, SettingChip, useSheets } from '../../components/ui';
+import type { StartChange } from '../registry';
+import { useSpaces } from '../spaces/state';
 import { AssistantIcon } from './icons';
-import { assistantIn, lastAssistant, useAssistantsState } from './state';
+import { useAssistantsState } from './state';
 
 const AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
 
@@ -110,27 +112,40 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
   );
 }
 
-/** The start page's agent picker: which agent the new session starts as, from those that work in the project picked. */
-export function AssistantStartOption({ value, onChange }: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void }) {
+/**
+ * The start page's agent picker: which agent the new session starts as, from those that work in the project picked.
+ * The one in `value` (picked, or last used in this place) while it exists and works there; else the default: the
+ * project's own agent while it works there, else General. A default set by itself follows the project's own agent
+ * once that is made (it is drafted in the background), until another is picked. It never shows none.
+ */
+export function AssistantStartOption({ value, onChange }: { value: SessionExtra; onChange: StartChange }) {
   const st = useAssistantsState();
+  const spaces = useSpaces();
   const sheet = useSheets();
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const set = (a: Assistant) => onChange({ ...assistantExtra(a), connections: assistantExtra(a).connections });
-  // A new session starts as the assistant picked last, while it still exists.
-  useEffect(() => {
-    if (!st || value.assistant !== undefined) return;
-    const a = assistantIn(st, lastAssistant()) ?? assistantIn(st, undefined);
-    if (a) set(a);
-  }, [st]);
   const space = typeof value.space === 'string' ? value.space : null;
-  const cur = st ? assistantIn(st, typeof value.assistant === 'string' ? value.assistant : undefined) : undefined;
-  // Another project picked, where the agent does not work: the default one instead.
+  const id = typeof value.assistant === 'string' ? value.assistant : undefined;
+  // The agent it set by itself, and the one whose connections it last turned on.
+  const auto = useRef<string | null>(null);
+  const applied = useRef<string | null>(null);
+  const usable = (x: string | undefined) => {
+    const a = x ? st?.assistants.find((y) => y.id === x) : undefined;
+    return a && inScope(a, space) ? a : undefined;
+  };
+  const def = usable(spaces?.find((s) => s.id === space)?.assistant) ?? usable(DEFAULT_ASSISTANT) ?? st?.assistants.find((a) => inScope(a, space));
+  const picked = id !== undefined && id !== auto.current ? usable(id) : undefined;
+  const cur = picked ?? def;
+  // Its id and connections (none: the last one's off).
+  const set = (a: Assistant, how?: { auto?: boolean }) => onChange({ ...assistantExtra(a), connections: assistantExtra(a).connections }, how);
   useEffect(() => {
-    if (!st || !cur || inScope(cur, space)) return;
-    const a = assistantIn(st, undefined);
-    if (a) set(a);
-  }, [st, space, cur?.id]);
+    if (!cur) return;
+    if (!picked) auto.current = cur.id;
+    // Set already, with its connections on (or none to turn on, or the session's own choice of them kept).
+    if (id === cur.id && (applied.current === cur.id || !cur.connections?.length || value.connections !== undefined)) return;
+    applied.current = cur.id;
+    set(cur, { auto: true });
+  }, [cur?.id, id]);
   if (!st) return null;
   return (
     <>
@@ -153,6 +168,8 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
           cur={cur}
           heading="Start as"
           onPick={(a) => {
+            auto.current = null;
+            applied.current = a.id;
             set(a);
             setOpen(false);
           }}

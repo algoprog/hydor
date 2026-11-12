@@ -84,6 +84,9 @@ export interface FeatureSection {
   Body: ComponentType;
 }
 
+/** A start option changed; `how.auto` when it set itself rather than being picked. */
+export type StartChange = (patch: Partial<SessionExtra>, how?: { auto?: boolean }) => void;
+
 export interface WebFeature {
   id: string;
   /** Views for its tools on each session's own MCP server, by bare name ("web_search"). */
@@ -115,8 +118,11 @@ export interface WebFeature {
   ComposerButtons?: ComponentType<{ s?: SessionSummary; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }>;
   /** In a session's options (the message box's settings chip), after its agent, model, effort and permissions: rows of its own. */
   SessionOptions?: ComponentType<{ s: SessionSummary }>;
-  /** On the start page, options for the new session, kept in its settings. */
-  StartOptions?: ComponentType<{ value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string }>;
+  /**
+   * On the start page, options for the new session, kept in its settings. `how.auto`: an option set by itself (a
+   * default, or in place of one that is gone), not picked: the start page does not keep it as a pick.
+   */
+  StartOptions?: ComponentType<{ value: SessionExtra; onChange: StartChange; cwd: string }>;
 }
 
 let list: WebFeature[] | null = null;
@@ -237,7 +243,7 @@ const startRank = (f: WebFeature) => (f.id === 'assistants' ? 0 : 1);
  * The capabilities' options for a new session; with `part`, only the one that leads (on the start page's
  * row, always there) or the rest (in its Options menu, there only while it is open).
  */
-export function FeatureStartOptions({ part, ...p }: { value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string; part?: 'lead' | 'rest' }) {
+export function FeatureStartOptions({ part, ...p }: { value: SessionExtra; onChange: StartChange; cwd: string; part?: 'lead' | 'rest' }) {
   return (
     <>
       {[...features()]
