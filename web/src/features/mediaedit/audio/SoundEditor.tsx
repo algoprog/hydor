@@ -1250,8 +1250,8 @@ function Editing({ o, active, detached, setDirty, done, lead, facts }: EditorPro
         </>
       ) : (
         <>
+          {/* (the bar grows into the room up to the buttons, and folds into one button only when its names do not fit) */}
           <MenuBar menus={menus} compact="auto" />
-          <span className="min-w-2 flex-1" />
         </>
       )}
       <IconButton label="Undo (Ctrl+Z)" size="sm" disabled={!h.canUndo || busy} onClick={h.undo}>
