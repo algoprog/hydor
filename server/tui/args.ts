@@ -374,7 +374,9 @@ export function routeOf(tokens: string[]): Route | null {
   if (area.bare) return isCommand ? null : route({ area, words: 1 });
   const hit = findVerb(area, pos.slice(1));
   if (hit) return route({ area, verb: hit.verb, words: 1 + hit.used });
-  if (isCommand) return null;
+  // An area that is also an older command (`hydor sessions`): the command, unless a word follows that is none of its verbs
+  // (`hydor sessions shw`), which gets "did you mean" rather than the list.
+  if (isCommand && pos.length < 2) return null;
   return route({ area, words: 1, unknown: pos[1] });
 }
 
