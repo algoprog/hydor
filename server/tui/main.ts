@@ -9,17 +9,20 @@ import { ApiError, connect, type Conn } from './client.ts';
 import { listCommand } from './commands.ts';
 import type { Look } from './lines.ts';
 import type { Boot } from './start.ts';
-import { colorWanted, makePaint } from './term.ts';
+import { asciify, asciiWanted, colorWanted, makePaint } from './term.ts';
 
 /** A single word that reads like a command but is none: a typo, not a message (`hydor sesions`). */
 const looksLikeCommand = (o: Opts, argv: string[]) => o.cmd === 'chat' && argv.filter((a) => !a.startsWith('-')).length === 1 && o.args.length === 1 && /^[a-z][a-z-]{2,}$/.test(o.args[0]) && !argv.includes('chat');
 
+/** Text for this stream: as plain ASCII where Unicode cannot show (a terminal or locale that cannot, or HYDOR_ASCII=1), else as it is. */
+const shown = (text: string, stream: NodeJS.WriteStream) => (asciiWanted(process.env, process.platform, stream) ? asciify(text) : text);
+
 /** An error on stderr: on a terminal in red after a ✗ (its first line; any others as they are), else as it is. */
 function fail(message: string, noColor: boolean) {
   const [first, ...more] = message.split('\n');
-  if (!process.stderr.isTTY) return void process.stderr.write(`${message}\n`);
+  if (!process.stderr.isTTY) return void process.stderr.write(`${shown(message, process.stderr)}\n`);
   const p = makePaint(colorWanted(process.stderr, noColor));
-  process.stderr.write(`${p.red(`✗ ${first}`)}${more.length ? `\n${more.join('\n')}` : ''}\n`);
+  process.stderr.write(`${shown(`${p.red(`✗ ${first}`)}${more.length ? `\n${more.join('\n')}` : ''}`, process.stderr)}\n`);
 }
 
 /** The word of a command that is none, with what it may have meant: the message, and whether it suggested a command. */
@@ -36,7 +39,7 @@ export async function tuiCommand(argv: string[]): Promise<number> {
   } catch (e) {
     const message = (e as Error).message;
     fail(message, argv.includes('--no-color'));
-    if (!message.includes('Did you mean') && !message.includes('To send this') && !message.includes('shows what it takes')) process.stderr.write(`\n${USAGE}\n`);
+    if (!message.includes('Did you mean') && !message.includes('To send this') && !message.includes('shows what it takes')) process.stderr.write(`\n${shown(USAGE, process.stderr)}\n`);
     return 2;
   }
   if (o.help) {
@@ -55,7 +58,7 @@ export async function tuiCommand(argv: string[]): Promise<number> {
       fail(`${unknownCommand(topic!).text}\nhydor help lists the commands.`, o.noColor);
       return 2;
     }
-    process.stdout.write(`${text}\n`);
+    process.stdout.write(`${shown(text, process.stdout)}\n`);
     return 0;
   }
   if (looksLikeCommand(o, argv)) {
@@ -64,7 +67,7 @@ export async function tuiCommand(argv: string[]): Promise<number> {
     if (u.close) fail(`${u.text}\nTo send it to an agent as a message: hydor chat ${word}`, o.noColor);
     else {
       fail(`Unknown command: ${word} (to send it to an agent as a message: hydor chat ${word})`, o.noColor);
-      process.stderr.write(`\n${USAGE}\n`);
+      process.stderr.write(`\n${shown(USAGE, process.stderr)}\n`);
     }
     return 2;
   }

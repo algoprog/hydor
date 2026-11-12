@@ -20,7 +20,7 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { ENV_FILE, UNIT, UNIT_PATH, unitText } from './service.ts';
 import { helpText, MAINTENANCE, subCommandError } from './tui/args.ts';
-import { colorWanted, makePaint } from './tui/term.ts';
+import { asciify, asciiWanted, colorWanted, makePaint } from './tui/term.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -35,7 +35,8 @@ try {
 } catch {}
 
 if (cmd && MAINTENANCE.includes(cmd) && process.argv.slice(3).some((a) => a === '-h' || a === '--help')) {
-  process.stdout.write(`${helpText(makePaint(colorWanted(process.stdout, process.argv.includes('--no-color'))), cmd)}\n`);
+  const help = helpText(makePaint(colorWanted(process.stdout, process.argv.includes('--no-color'))), cmd);
+  process.stdout.write(`${help && asciiWanted(process.env, process.platform, process.stdout) ? asciify(help) : help}\n`);
   process.exit(0);
 }
 

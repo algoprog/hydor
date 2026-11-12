@@ -3,8 +3,9 @@
 // they are. Each redraw is one write, inside synchronized output and with the cursor hidden, rewriting the region's
 // rows in place; rows are kept a column short of the width so the terminal never wraps one. On a resize the region's
 // old rows are counted again at the new width (terminals that reflow move them) before it is drawn again. The
-// terminal is taken into raw mode with bracketed paste on, and given back as it was on every way out.
-import { strWidth, truncate } from './term.ts';
+// terminal is taken into raw mode with bracketed paste on, and given back as it was on every way out. Where Unicode cannot
+// show (`ascii`), every line is mapped to plain ASCII first and the widths are those of the mapped text.
+import { asciify, strWidth, truncate } from './term.ts';
 
 export interface Cursor {
   row: number;
@@ -20,7 +21,10 @@ export class Screen {
   private cursor: Cursor | null = null;
   private width: number;
 
-  constructor(private out: NodeJS.WriteStream) {
+  constructor(
+    private out: NodeJS.WriteStream,
+    private ascii = false,
+  ) {
     this.width = out.columns || 80;
   }
 
@@ -35,7 +39,7 @@ export class Screen {
   /** Lines printed for good above the region (which is drawn again under them). */
   print(lines: string[]) {
     if (!lines.length) return;
-    this.draw(lines, true);
+    this.draw(this.ascii ? lines.map(asciify) : lines, true);
   }
 
   /** The region drawn again with these rows, the cursor at `cursor` (hidden when null). */
@@ -77,7 +81,7 @@ export class Screen {
   private draw(perm: string[], clearFirst: boolean) {
     const width = this.columns;
     const height = this.rows;
-    let rows = this.region.map((l) => (strWidth(l) > width - 1 ? truncate(l, width - 1) : l));
+    let rows = (this.ascii ? this.region.map(asciify) : this.region).map((l) => (strWidth(l) > width - 1 ? truncate(l, width - 1, this.ascii ? '...' : '…') : l));
     let cursor = this.cursor;
     // Never taller than the screen: the bottom rows (where the input is) stay.
     if (rows.length > height - 1) {

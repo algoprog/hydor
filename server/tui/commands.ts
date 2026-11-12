@@ -14,10 +14,10 @@ import { ApiError, enc, health, localBase, type Conn } from './client.ts';
 import { modelLabel, tierName, type Look } from './lines.ts';
 import { busy, historyLines } from './session.ts';
 import { catalogOf, programName, type TiersState } from './start.ts';
-import { columns, money, strWidth, tildify, timeAgo, truncate, type Paint } from './term.ts';
+import { asciiWanted, columns, forTerminal, money, strWidth, tildify, timeAgo, truncate, type Paint } from './term.ts';
 
 /** Prints lines to stdout. */
-const say = (lines: string[] | string) => process.stdout.write(`${(Array.isArray(lines) ? lines : [lines]).join('\n')}\n`);
+const say = (lines: string[] | string) => process.stdout.write(`${forTerminal(Array.isArray(lines) ? lines : [lines], asciiWanted(process.env, process.platform, process.stdout)).join('\n')}\n`);
 const json = (v: unknown) => process.stdout.write(`${JSON.stringify(v, null, 2)}\n`);
 
 /**
