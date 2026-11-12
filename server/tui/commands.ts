@@ -6,7 +6,6 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Assistant } from '../../shared/assistants.ts';
-import { scheduleText, type ScheduledTask } from '../../shared/automations.ts';
 import type { SessionNote } from '../../shared/features.ts';
 import { TIER_PROGRAMS } from '../../shared/tiers.ts';
 import type { AgentCatalog, AgentUsage, LiveOverlay, LiveState, SessionSummary, TimelinePage } from '../../shared/types.ts';
@@ -324,33 +323,6 @@ async function agents(conn: Conn, o: Opts, look: Look) {
   say(agentLines(r.assistants, look));
 }
 
-async function tasks(conn: Conn, o: Opts, look: Look) {
-  const { p } = look;
-  if (o.args[0] === 'run') {
-    const id = o.args[1];
-    if (!id) throw new UsageError('Say which task: hydor tasks run <id> (hydor tasks lists them)');
-    const { tasks: list } = await conn.api<{ tasks: ScheduledTask[] }>('GET', '/api/tasks');
-    const t = list.find((x) => x.id === id) ?? list.find((x) => x.name.toLowerCase() === id.toLowerCase());
-    if (!t) throw new ApiError(404, `No task “${id}”: hydor tasks lists them`);
-    const r = await conn.api<{ key?: string }>('POST', `/api/tasks/${encodeURIComponent(t.id)}/run`, {});
-    if (o.json) return json(r);
-    return say(r.key ? `Started “${t.name}”: ${conn.url(r.key)}` : `Started “${t.name}”.`);
-  }
-  if (o.args.length) throw new UsageError('hydor tasks [run <id>]');
-  const r = await conn.api<{ tasks: ScheduledTask[] }>('GET', '/api/tasks');
-  if (o.json) return json(r);
-  if (!r.tasks.length) return say('No scheduled tasks yet: make one in the app (Scheduled), or ask an agent to.');
-  const when = (ms?: number) => (ms ? new Date(ms).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
-  const rows = r.tasks.map((t) => [
-    p.dim(t.id),
-    p.bold(t.name),
-    scheduleText(t.schedule),
-    t.enabled ? (t.nextAt ? p.dim(`next ${when(t.nextAt)}`) : '') : p.yellow(t.pausedReason ? `paused: ${t.pausedReason}` : 'paused'),
-    t.lastStatus ? (t.lastStatus === 'ok' ? p.green('last ok') : p.red(`last: ${t.lastStatus}`)) : '',
-  ]);
-  say(columns(rows).map((l) => truncate(l, look.width)));
-}
-
 /** A bar of `n` cells, `pct` full. */
 const bar = (pct: number, n: number, p: Paint) => {
   const full = Math.round((Math.max(0, Math.min(100, pct)) / 100) * n);
@@ -518,9 +490,6 @@ export async function listCommand(conn: Conn | null, o: Opts, look: Look): Promi
       return 0;
     case 'agents':
       await agents(conn, o, look);
-      return 0;
-    case 'tasks':
-      await tasks(conn, o, look);
       return 0;
     case 'usage':
       await usage(conn, o, look);

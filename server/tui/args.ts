@@ -12,7 +12,7 @@ export { GROUPS, UsageError };
 export type { Group };
 
 /** The commands `hydor` knows in the terminal (the maintenance ones in server/cli.ts come before these). */
-export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'agents', 'tasks', 'usage', 'status', 'serve', 'open', 'help'] as const;
+export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'agents', 'usage', 'status', 'serve', 'open', 'help'] as const;
 /** A command of COMMANDS, or 'area': a verb of an area (server/tui/areas), with the words in Opts.route. */
 export type Command = (typeof COMMANDS)[number] | 'area';
 
@@ -144,16 +144,6 @@ export const CMD_TABLE: CommandDef[] = [
     desc: 'Your agents',
     help: 'Lists your agents (the built-in ones first) with their ids: --as takes an id or a name.',
     examples: ['hydor agents', 'hydor --as researcher "find papers on reranking"'],
-    options: ['json'],
-  },
-  {
-    name: 'tasks',
-    group: 'models',
-    args: '[run <id>]',
-    desc: 'Scheduled tasks, and running one now',
-    help: 'Lists your scheduled tasks with when each runs next and how its last run went. run starts one now and prints the address of its session.',
-    examples: ['hydor tasks', 'hydor tasks run daily-brief'],
-    subs: [['run', 'Run a task now: run <id>']],
     options: ['json'],
   },
   {
