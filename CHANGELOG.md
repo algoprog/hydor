@@ -3,6 +3,24 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.61.0 · 12 November 2026
+
+Another machine with an older Hydor no longer opens as an empty window: the app offers to update it from where you
+are. The desktop apps also show on their icon how many sessions have news for you.
+
+- **Machines with an older Hydor open again**: picking a machine in the sidebar's switcher that runs a Hydor from
+  before 0.52 showed an empty window; its start page works again.
+- **Update another machine from here**: the app you open shows another machine's pages in its own version, so a
+  machine with an older Hydor now opens on a page that says so, with **Update** (it updates that machine where it
+  is, shows each step, and opens its pages once it is back; agents working there carry on), **Open anyway**, and a
+  way back to your own machine. When a machine cannot update itself, the page says why.
+- **No more empty windows**: a page that fails to draw now says "This page stopped working", with what went wrong and
+  **Reload**, and the sidebar stays.
+- **A count on the app's icon**: while the window of the Mac, Windows or Linux app is away, its icon shows how many
+  sessions have new notices (on the Dock, the taskbar button, or the launcher), even with Do Not Disturb or a Focus
+  on. Bringing the window to the front clears it.
+- Another machine's pages no longer say "Hydor was updated" when only that machine runs a different version.
+
 ## 0.60.1 · 12 November 2026
 
 A session's options now have everything the start page offers, so you can change them without leaving the session.
