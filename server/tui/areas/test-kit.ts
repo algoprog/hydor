@@ -58,6 +58,8 @@ export interface Ran {
   code: number;
   /** The text edit() was handed, in order. */
   edited: string[];
+  /** The prompts the hidden question (secret) was asked. */
+  secretAsked: string[];
 }
 
 export interface Answers {
@@ -69,6 +71,8 @@ export interface Answers {
   edit?: string | null;
   /** The files readText reads, by path. */
   files?: Record<string, string>;
+  /** What a hidden prompt (secret) returns: a string, or null for nobody there (default: null). */
+  secret?: string | null;
   /** Whether a person is there (default false: piped). */
   interactive?: boolean;
   /** Whether lists are cut to the width (default false). */
@@ -77,7 +81,7 @@ export interface Answers {
 
 /** A Ctx that collects. */
 export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArgv>, a: Answers = {}): { ctx: Ctx; ran: Ran } {
-  const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [] };
+  const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [], secretAsked: [] };
   const look: Look = { p: makePaint(false), width: 80, home: '/home/u' };
   const ctx: Ctx = {
     conn,
@@ -111,6 +115,10 @@ export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArg
       }
       if (!ctx.interactive) throw new UsageError('There is no terminal for the editor: give the text with --file <path>');
       return ctx.edit(current ?? '');
+    },
+    async secret(prompt) {
+      ran.secretAsked.push(prompt);
+      return a.secret === undefined ? null : a.secret;
     },
     async pick(title, items: PickItem[]) {
       ran.picked.push(title);
