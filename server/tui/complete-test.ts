@@ -105,21 +105,34 @@ test('commands: the chat’s own first, the program’s after, nobody twice; arg
   assert.equal(items[3].hint, 'review code');
 });
 
-test('history: newest first, each once, line breaks as ↵, filtered loosely', () => {
+test('history: newest first, each once, line breaks as ↵, found by words', () => {
   const h = ['first', 'fix the\ntests', 'second', 'first', 'other'];
   assert.deepEqual(
     historyItems(h, '').map((r) => r.item.label),
     ['other', 'first', 'second', 'fix the↵tests'],
   );
+  // Words, each a contiguous piece, in any order and case: not scattered letters.
   assert.deepEqual(
     historyItems(h, 'ft').map((r) => r.item.label),
-    ['first', 'fix the↵tests'],
+    [],
+    'letters apart do not match',
   );
   assert.deepEqual(
-    historyItems(h, 'fx').map((r) => r.item.label),
+    historyItems(h, 'TESTS FIX').map((r) => r.item.label),
     ['fix the↵tests'],
   );
-  assert.equal(historyItems(h, 'fx')[0].item.value, 'fix the\ntests', 'the message as it was');
+  assert.deepEqual(
+    historyItems(h, 'fi').map((r) => r.item.label),
+    ['first', 'fix the↵tests'],
+    'newest first',
+  );
+  assert.equal(historyItems(['/hydor projects show Thesis'], 'the').length, 1, 'the word “the” is in Thesis…');
+  assert.deepEqual(historyItems(['/hydor projects show'], 'the'), [], '…but t, h, e apart in “/hydor projects show” do not make it');
+  assert.equal(historyItems(['/hydor projects show'], 'proj show').length, 1);
+  assert.equal(historyItems(['fix the failing tests'], 'fix tests').length, 1);
+  assert.deepEqual(historyItems(['fix the failing tests'], 'fix tests')[0].hits, [0, 1, 2, 16, 17, 18, 19, 20]);
+  assert.equal(historyItems(['fix the failing tests'], 'tests fixes').length, 0);
+  assert.equal(historyItems(h, 'fix')[0].item.value, 'fix the\ntests', 'the message as it was');
 });
 
 /** The rows of a menu, without colour. */
