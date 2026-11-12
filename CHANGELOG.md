@@ -3,6 +3,37 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.61.3 · 12 November 2026
+
+The start page now keeps its own picks for each project, each folder and the new task folder, and the **Agent** chip no
+longer shows "…" after you pick a project or folder.
+
+- **Each place keeps its own picks**: the start page remembers what you picked separately for each project, each
+  folder and **New task folder**: **Runs on**, each program's **Model**, and under **Options** its **Effort** and
+  **Permissions**, the **Agent**, **Memory**, the **Spending cap**, **Confidential** and the **New worktree** switch.
+  Pick a place in the **Folder** chip and the box opens with that place's picks; what you have written and attached
+  stays in it. A place keeps its picks once you change one there or start a session there; just looking at it keeps
+  nothing. A folder you make into a project brings its picks along. The account (**Options → Account**) is the same
+  everywhere.
+- **Places you have not used yet open with the defaults**: the agent is **General**, or the project's own agent when it
+  has one (with the program, model and permissions that agent suggests); the model is **Automatic** where it is offered;
+  memory is on, there is no spending cap, and **Confidential** and **New worktree** are off. **Runs on** stays the
+  program you used last, and after the update the place you had picked last keeps the picks you had.
+- **Start from a place and find it as you left it**: **New session** on a project's card or page, or the project in the
+  sidebar, opens the start page with that project's picks; **New session in this folder** on a folder opens it with
+  that folder's picks. Sessions you start by voice in hands-free mode start in the place picked last on the start page,
+  with its picks, as the agent picked there (else the project's own agent, else General).
+- **No more "…" on the Agent chip**: after you picked a project or folder, the chip could show "…" because the project
+  still named an agent that had been deleted. An agent that no longer exists, or does not work in the project picked,
+  now gives way to the default: the project's own agent, else General.
+- **Deleting an agent clears it from projects**: the projects that started their sessions as it forget it, and their
+  sessions start as General (or the agent you pick) again.
+- **A new project's agent shows up**: when you make a project from the start page and it gets an agent of its own (made
+  in the background), the **Agent** chip switches to it once it is ready, unless you picked another agent meanwhile.
+- **Picking an agent keeps you in your project**: in a project, picking an agent no longer moves the box to a new task
+  folder. Elsewhere, an agent that works in the folder shown (Coder) or in a new task folder still takes the box there
+  until you pick a folder yourself, and the box then shows that place's picks with the agent you picked.
+
 ## 0.61.2 · 12 November 2026
 
 The start page's folder menu is rebuilt: your projects and your folders in two short lists, each row saying where it
