@@ -281,7 +281,7 @@ hydor settings run notifications.send-a-test
 
 ### 在聊天里
 
-`/hydor <命令>` 无需离开对话就能运行上面的任何命令：`/hydor sessions`、`/hydor memory add I prefer short answers`、`/hydor settings get general.resume-after-usage-limits`。它的菜单在 `/hydor ` 之后列出各个命令，再列出它们的动词和所接受的对象。它打印的内容显示在输入行上方，它提出的问题（例如删除）会以选择器的形式出现，它需要的编辑器会拿到终端，和 `!` 一样。<!-- TODO-VERIFY: the exact behaviour of /hydor -->
+`/hydor <命令>` 无需离开对话就能运行上面的任何命令：`/hydor sessions`、`/hydor memory search docker`、`/hydor settings get general.resume-after-usage-limits`。它出现在 `/` 菜单里，也在 `/help` 的 **Also** 部分。在 `/hydor ` 之后，它的菜单先列出各个领域，再列出它们的动词，再列出每个动词所接受的对象（你的项目、会话、设置、文件夹……，和在 shell 里按 Tab 补全的一样），输入 `-` 时列出它的选项。命令打印的内容显示在输入行上方，用法不对或 Hydor 拒绝时以红色显示；聊天继续进行。命令的询问方式和在 shell 里一样，只是改在聊天里：一个问题（比如删除）会打开一个选择器，第一行是 **No**；密钥或令牌在输入行里输入，显示为圆点，也绝不会记入你的历史；它需要的编辑器会拿到终端，和 `!` 一样。聊天里没有管道输入，所以较长的文字请用 `--file <路径>` 给出（或者省略，改在编辑器里写）。有自己的斜杠命令的命令（`models` 有 `/model`，`tiers` 有 `/tiers`，`usage` 有 `/usage`），或者只适合在 shell 里用的命令（`run`、`serve`），会这样说明，并告诉你该用哪个。
 
 ## 管理这个 Hydor
 
