@@ -23317,5 +23317,18 @@
 "The arena is picked when a session starts: its first message goes to other models too. Start a new session with Options → Arena.":"Η αρένα επιλέγεται όταν ξεκινά μια συνεδρία: το πρώτο της μήνυμα πηγαίνει και σε άλλα μοντέλα. Ξεκινήστε μια νέα συνεδρία με Επιλογές → Αρένα.",
 "The most this session may spend, at API prices":"Το μέγιστο που μπορεί να ξοδέψει αυτή η συνεδρία, σε τιμές API",
 "This session runs as {0} from your next message":"Από το επόμενο μήνυμά σας, αυτή η συνεδρία τρέχει ως {0}",
-"This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.":"Αυτή η συνεδρία μένει εμπιστευτική, ώστε ό,τι ειπώθηκε να μένει σε αυτόν τον υπολογιστή. Για δουλειά που μπορεί να φύγει από αυτόν, ξεκινήστε νέα συνεδρία."
+"This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.":"Αυτή η συνεδρία μένει εμπιστευτική, ώστε ό,τι ειπώθηκε να μένει σε αυτόν τον υπολογιστή. Για δουλειά που μπορεί να φύγει από αυτόν, ξεκινήστε νέα συνεδρία.",
+"{0} has an older Hydor":"Το {0} έχει παλαιότερο Hydor",
+"{0} has Hydor {1}, newer than this app ({2}): update this app, then open it again.":"Το {0} έχει Hydor {1}, νεότερο από αυτή την εφαρμογή ({2}): ενημερώστε αυτή την εφαρμογή και ανοίξτε το ξανά.",
+"{0} has nowhere to update from by itself (it was not installed from git with an upstream): update Hydor there, or open it anyway.":"Το {0} δεν έχει από πού να ενημερωθεί μόνο του (δεν εγκαταστάθηκε από git με upstream): ενημερώστε το Hydor εκεί ή ανοίξτε το όπως είναι.",
+"{0} has version {1}, and this app {2}. Its pages open here in this app's version, and some can stop working with an older one. Update it from here: it takes a few minutes, and agents working there carry on.":"Το {0} έχει την έκδοση {1} και αυτή η εφαρμογή την {2}. Οι σελίδες του ανοίγουν εδώ στην έκδοση αυτής της εφαρμογής και κάποιες μπορεί να σταματήσουν να λειτουργούν με παλαιότερη. Ενημερώστε το από εδώ: χρειάζονται λίγα λεπτά και οι πράκτορες που δουλεύουν εκεί συνεχίζουν.",
+"{0}. Update Hydor on {1} itself, or open it anyway.":"{0}. Ενημερώστε το Hydor στο {1} απευθείας ή ανοίξτε το όπως είναι.",
+"it gave no reason":"δεν έδωσε κάποιον λόγο",
+"It has the new version: restart Hydor on {0} to use it.":"Έχει τη νέα έκδοση: κάντε επανεκκίνηση του Hydor στο {0} για να τη χρησιμοποιήσετε.",
+"It is already as new as where it updates from ({0}): update Hydor there itself, or open it anyway.":"Είναι ήδη τόσο νέο όσο η πηγή από την οποία ενημερώνεται ({0}): ενημερώστε το Hydor εκεί απευθείας ή ανοίξτε το όπως είναι.",
+"Open anyway":"Άνοιγμα όπως είναι",
+"Starting the update":"Έναρξη της ενημέρωσης",
+"The update did not work: {0}":"Η ενημέρωση δεν πέτυχε: {0}",
+"This page stopped working":"Αυτή η σελίδα σταμάτησε να λειτουργεί",
+"Update {0}":"Ενημέρωση {0}"
 }

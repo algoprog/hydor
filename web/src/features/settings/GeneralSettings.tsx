@@ -11,6 +11,7 @@ import { Button, cx, Throbber, Segmented, Switch } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
 import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
+import { cannotUpdate, UPDATE_PHASE as PHASE } from '../../lib/updates';
 import { followUpPref, type FollowUp } from '../session/Composer';
 import { startTour } from '../tour/Tour';
 import { setTipsOn, useTips } from '../tips/state';
@@ -93,28 +94,6 @@ function LanguageSelect() {
       onChange={(v) => isLang(v) && setLang(v)}
     />
   );
-}
-
-const PHASE: Record<NonNullable<UpdateState['running']>['phase'], string> = {
-  pull: 'Getting the new version',
-  download: 'Downloading the new version',
-  install: 'Installing packages',
-  build: 'Building',
-  restart: 'Restarting, this page reconnects by itself',
-};
-
-/** Why a desktop app cannot update itself where it is (as the server says when you try). */
-function cannotUpdate(update: UpdateState): string {
-  switch (update.format) {
-    case 'app':
-      return 'Move Hydor to your Applications folder to update it.';
-    case 'appimage':
-      return 'Put the AppImage in a folder you can write to (your home folder, say) to update it.';
-    case 'deb':
-      return 'Updating the .deb needs pkexec: install the new version from the Releases page.';
-    default:
-      return 'This copy does not update itself: install the new version from the Releases page.';
-  }
 }
 
 /**

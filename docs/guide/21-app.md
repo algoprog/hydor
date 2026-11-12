@@ -147,7 +147,7 @@ When a newer version is out, a dot shows on **Settings** in the sidebar. A copy 
 
 [**Update automatically**](/settings?s=general&find=Update%20automatically) (on at first, the row above the version) installs a newer version by itself: a copy installed from git after 5 hours without a message from you, at most once a day; the desktop apps as soon as one is out, after a minute's notice (the Linux .deb asks for your password first). Running agents carry on. It needs an app that can restart itself (the installer's service, Docker, or a desktop app that can replace itself, such as the Mac app in the Applications folder); otherwise the switch is off and says why.
 
-Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Hydor was updated").
+Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Hydor was updated"). A page that fails to draw shows "This page stopped working", what went wrong and **Reload**, instead of an empty window; the sidebar stays, and moving to another page tries again.
 
 ### Updates in the desktop apps
 

@@ -1,16 +1,19 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Router } from 'wouter';
+import { compareVersions } from '@shared/releases';
 import type { AppTheme } from '@shared/themes';
 import { api, onUnauthorized } from './lib/api';
 import { endBoot } from './lib/boot';
 import { machineBase, machineId } from './lib/machine';
 import { currentLang } from './i18n';
 import { useMachines } from './lib/machines';
-import { useApp, useSessions, useUI, useUsage, type Bootstrap } from './lib/store';
+import { newerBuild, useApp, useSessions, useUI, useUsage, type Bootstrap } from './lib/store';
 import { applyTheme, setCustomThemes, useThemes } from './lib/theme';
 import { handleNotify, initNotifications } from './lib/notify';
 import { live, ownLive } from './lib/ws';
 import { MachineDown } from './features/machines/MachineSwitcher';
+import { MachineOld, openedAnyway } from './features/machines/MachineOld';
+import { CrashGuard } from './components/CrashGuard';
 import { Throbber } from './components/ui';
 import { Toasts } from './components/Toasts';
 import { Login, Setup } from './features/auth/AuthScreens';
@@ -34,6 +37,14 @@ export function App() {
   const custom = useThemes((s) => s.custom);
   // Another machine's page whose machine does not answer.
   const [down, setDown] = useState<string | null>(null);
+  // Another machine's pages run in this app's version: they wait (the logo stays) until that machine's version and this
+  // app's are known, and an older machine is offered an update first (MachineOld), unless opened anyway.
+  const boot = useApp((s) => s.boot);
+  const self = useMachines((s) => s.self);
+  const [ownKnown, setOwnKnown] = useState(!machineId);
+  const [anyway, setAnyway] = useState(false);
+  const holding = !!machineId && (!boot || !ownKnown);
+  const older = !!machineId && !!boot?.version && !!self?.version && compareVersions(boot.version, self.version) < 0 && !anyway && !openedAnyway(boot.version);
 
   useEffect(() => {
     applyTheme();
@@ -78,7 +89,11 @@ export function App() {
         live.stop();
         setDown((e as Error).message);
       });
-    useMachines.getState().load().catch(() => {});
+    useMachines
+      .getState()
+      .load()
+      .catch(() => {})
+      .finally(() => setOwnKnown(true));
     // On another machine's pages the themes are this server's, and so is the socket that brings every machine's notices.
     let offOwn = () => {};
     if (ownLive) {
@@ -87,6 +102,8 @@ export function App() {
         .catch(() => {});
       offOwn = ownLive.on((e) => {
         if (e.t === 'notify') handleNotify(e.n, true);
+        // This page is this server's: an update of it is told here (that machine's socket names that machine's build).
+        else if (e.t === 'hello' && e.build) newerBuild(e.build);
         else if (e.t === 'machines') useMachines.getState().load().catch(() => {});
         else if (e.t === 'themes') window.dispatchEvent(new CustomEvent('wa:themes', { detail: e.themes }));
       });
@@ -123,13 +140,17 @@ export function App() {
         <Login />
       ) : down ? (
         <MachineDown error={down} />
+      ) : holding ? null : older ? (
+        <MachineOld version={boot!.version} own={self!.version} onOpen={() => setAnyway(true)} />
       ) : (
         <Router base={machineBase}>
-          <Suspense fallback={null}>
-            <Arrived>
-              <Shell />
-            </Arrived>
-          </Suspense>
+          <CrashGuard>
+            <Suspense fallback={null}>
+              <Arrived>
+                <Shell />
+              </Arrived>
+            </Suspense>
+          </CrashGuard>
         </Router>
       )}
       <Toasts />

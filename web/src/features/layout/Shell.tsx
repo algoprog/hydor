@@ -28,6 +28,7 @@ import { CountVisits } from '../palette/usage';
 import { ReleaseNotes, WhatsNew } from '../settings/Releases';
 import { Lightbox, VideoBox } from '../../components/Lightbox';
 import { EditorHost } from '../mediaedit/host';
+import { CrashGuard } from '../../components/CrashGuard';
 import { ShareDialogHost } from '../spaces/ShareHost';
 import { HelpButton, Tour } from '../tour/Tour';
 import { Tips } from '../tips/Tips';
@@ -259,7 +260,9 @@ export function Shell() {
     return (
       <div data-shell className="flex h-dvh flex-col overflow-hidden bg-bg">
         <EditorHost>
-          <Routes />
+          <CrashGuard again={loc}>
+            <Routes />
+          </CrashGuard>
         </EditorHost>
         <MobileDrawer />
         <UploadTrays />
@@ -290,7 +293,9 @@ export function Shell() {
       )}
       <main className="flex min-w-0 flex-1 flex-col">
         <EditorHost>
-          <Routes />
+          <CrashGuard again={loc}>
+            <Routes />
+          </CrashGuard>
         </EditorHost>
         {panelOpen && loc !== '/terminal' && (
           <>

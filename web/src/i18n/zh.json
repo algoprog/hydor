@@ -23332,5 +23332,18 @@
 "The arena is picked when a session starts: its first message goes to other models too. Start a new session with Options → Arena.":"竞技场在会话开始时选定：它的第一条消息也会发给其他模型。请用“选项 → 竞技场”新建一个会话。",
 "The most this session may spend, at API prices":"这个会话最多可以花费的金额，按 API 价格计算",
 "This session runs as {0} from your next message":"从你的下一条消息起，这个会话以 {0} 运行",
-"This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.":"这个会话会一直保密，所以说过的内容都留在这台电脑上。可能需要离开这台电脑的工作，请新建一个会话。"
+"This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.":"这个会话会一直保密，所以说过的内容都留在这台电脑上。可能需要离开这台电脑的工作，请新建一个会话。",
+"{0} has an older Hydor":"{0} 的 Hydor 版本较旧",
+"{0} has Hydor {1}, newer than this app ({2}): update this app, then open it again.":"{0} 的 Hydor 是 {1}，比这个应用（{2}）更新：请先更新这个应用，然后再打开它。",
+"{0} has nowhere to update from by itself (it was not installed from git with an upstream): update Hydor there, or open it anyway.":"{0} 无法自行获取更新（它不是通过带上游仓库的 git 安装的）：请在那里更新 Hydor，或者仍然打开它。",
+"{0} has version {1}, and this app {2}. Its pages open here in this app's version, and some can stop working with an older one. Update it from here: it takes a few minutes, and agents working there carry on.":"{0} 的版本是 {1}，而这个应用是 {2}。它的页面在这里以这个应用的版本打开，其中一些在较旧的版本上可能无法正常工作。你可以从这里更新它：需要几分钟，在那里工作的智能体会继续运行。",
+"{0}. Update Hydor on {1} itself, or open it anyway.":"{0}。请直接在 {1} 上更新 Hydor，或者仍然打开它。",
+"it gave no reason":"它没有给出原因",
+"It has the new version: restart Hydor on {0} to use it.":"它已有新版本：请在 {0} 上重启 Hydor 来使用它。",
+"It is already as new as where it updates from ({0}): update Hydor there itself, or open it anyway.":"它已经和它获取更新的来源一样新（{0}）：请直接在那里更新 Hydor，或者仍然打开它。",
+"Open anyway":"仍然打开",
+"Starting the update":"正在开始更新",
+"The update did not work: {0}":"更新没有成功：{0}",
+"This page stopped working":"此页面已停止工作",
+"Update {0}":"更新 {0}"
 }
