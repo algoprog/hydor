@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ApiError } from '../client.ts';
 import { UsageError } from './kit.ts';
-import { fakeConn, run, type Answer } from './test-kit.ts';
+import { atWidths, fakeConn, run, type Answer } from './test-kit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -181,6 +181,16 @@ test('remove: yours is removed after a yes, built in ones are not, an agent’s 
   await refused(run(conn, ['skills', 'remove', 'research', '-y']), /“research” is built in and cannot be removed: hydor skills off research turns it off/);
   await refused(run(conn, ['skills', 'remove', 'paper-notes', '-y']), /a plugin’s and cannot be removed/);
   await refused(run(conn, ['skills', 'remove', 'imagegen', '-y']), /cannot be deleted/);
+});
+
+test('list on a narrow terminal: the description goes whole, then the use count, before the name is cut', async () => {
+  const w = await atWidths(fakeConn(routes()).conn, ['skills']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][1], /^● +research +built in +4 uses +Use when research$/);
+  assert.match(w[60][0], /^ +SKILL +FROM +USED$/);
+  assert.match(w[60][6], /^● +imagegen \(codex\) +Codex’s own, built in$/);
+  assert.match(w[40][0], /^ +SKILL +FROM$/);
+  assert.match(w[40][4], /^● +deploy \(claude\) +Claude Code’s own$/, 'names whole');
 });
 
 for (const [name, fn] of tests) {

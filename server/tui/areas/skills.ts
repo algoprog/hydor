@@ -143,7 +143,7 @@ export const skills: Area = {
             p.dim(s.lib?.uses ? `${s.lib.uses} uses` : ''),
             p.dim(s.description),
           ]);
-        ctx.out(table(ctx, rows, { head: ['', 'SKILL', 'FROM', 'USED', ''], grow: 1, free: [1, 4] }));
+        ctx.out(table(ctx, rows, { head: ['', 'SKILL', 'FROM', 'USED', ''], grow: 1, free: [1, 4], drop: [4, 3] }));
         if (list.length > rows.length) ctx.out(p.dim(`… ${list.length - rows.length} more (-n <number>, or --all)`));
       },
     },

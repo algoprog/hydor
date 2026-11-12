@@ -253,13 +253,14 @@ export const apps: Area = {
           e.ready && !e.installed ? mark(p, 'off') : mark(p, e.needsKey ? 'attention' : 'on'),
           p.bold(e.name),
           p.dim(e.slug),
-          e.ready ? p.dim(e.installed ? 'ready-made' : 'ready-made, not installed') : '',
+          p.dim(e.ready ? 'ready-made' : 'yours'),
+          e.ready && !e.installed ? p.dim('not installed') : '',
           e.runs ? p.dim(`${e.runs} runs`) : '',
           p.dim(timeAgo(e.lastRunAt)),
           p.dim(e.description ?? ''),
         ];
         const shown = list.slice(0, ctx.o.all ? list.length : (ctx.o.limit ?? 30));
-        ctx.out(table(ctx, shown.map(row), { head: ['', 'APP', 'ADDRESS', 'KIND', 'RUNS', 'LAST', ''], grow: 1, fixed: [2], free: [1, 6] }));
+        ctx.out(table(ctx, shown.map(row), { head: ['', 'APP', 'ADDRESS', 'KIND', 'STATE', 'RUNS', 'LAST', ''], grow: 1, fixed: [2], free: [1, 7], drop: [7, 2, 6, 5, 4] }));
         if (list.length > shown.length) ctx.out(p.dim(`… ${list.length - shown.length} more (-n <number>, or --all)`));
         if (shown.some((e) => e.needsKey)) ctx.out(p.dim('A yellow mark: it needs a key the vault lacks (add it on the app’s page).'));
       },

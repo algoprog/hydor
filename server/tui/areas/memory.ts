@@ -99,7 +99,7 @@ function noteLines(ctx: Ctx, list: Note[], n: number): string[] {
     cut(e.title ? `${e.title}: ${e.text}` : e.text, 400),
     p.dim(timeAgo(e.updatedAt)),
   ]);
-  const out = table(ctx, rows, { head: ['', 'NOTE', 'ABOUT', 'TEXT', 'CHANGED'], grow: 3, fixed: [1] });
+  const out = table(ctx, rows, { head: ['', 'NOTE', 'ABOUT', 'TEXT', 'CHANGED'], grow: 3, fixed: [1], drop: [2, 4] });
   if (list.length > shown.length) out.push(p.dim(`… ${list.length - shown.length} more (-n <number>, or --all)`));
   return out;
 }

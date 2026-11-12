@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ApiError, type Conn } from '../client.ts';
-import { fakeConn, run } from './test-kit.ts';
+import { atWidths, fakeConn, run } from './test-kit.ts';
 import { UsageError } from './kit.ts';
 import { kindOf } from './library.ts';
 
@@ -220,6 +220,27 @@ test('open prints the address; remove asks, then deletes a page or a media item'
     calls.filter((c) => c.method === 'DELETE').map((c) => c.path),
     ['/api/pages/b0a3333333', '/api/media/img6666666'],
   );
+});
+
+test('list on a narrow terminal: where it is, size and change go whole, the id is never cut', async () => {
+  const w = await atWidths(fakeConn(routes).conn, ['library']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][0], /^KIND +TITLE +ID +WHERE +CHANGED +SIZE$/);
+  assert.match(w[60][0], /^KIND +TITLE +ID +CHANGED +SIZE$/, 'where it is goes first');
+  assert.match(w[60][2], /^doc +Q3 report +d0c1111111 +1h ago +12 kB$/);
+  assert.match(w[40][0], /^KIND +TITLE +ID$/);
+  assert.match(w[40][2], /^doc +Q3 report +d0c1111111$/, 'the id is whole');
+});
+
+test('show prints the whole id even where the list had to cut it', async () => {
+  const { conn } = fakeConn({ ...routes, 'GET /api/pages/d0c1111111/export?format=md': '# Q3\n\nRevenue grew.\n' });
+  const cut = await atWidths(conn, ['library'], [24]);
+  assert.ok(cut[24].join('\n').includes('…') && !cut[24].join('\n').includes('d0c1111111'), cut[24].join('\n'));
+  for (const given of ['Q3 report', 'Sunset', 'Launch deck']) {
+    const t = await run(conn, ['library', 'show', given], { interactive: true, width: 24 });
+    const id = given === 'Q3 report' ? 'd0c1111111' : given === 'Sunset' ? 'img6666666' : 'd3c2222222';
+    assert.match(t.out, new RegExp(`^Id +${id}$`, 'm'), given);
+  }
 });
 
 for (const [name, fn] of tests) {

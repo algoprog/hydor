@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ApiError } from '../client.ts';
-import { fakeConn, run } from './test-kit.ts';
+import { atWidths, fakeConn, run } from './test-kit.ts';
 import { UsageError } from './kit.ts';
 import { poll } from './apps.ts';
 
@@ -71,10 +71,12 @@ const routes: Record<string, any> = {
 test('list shows your apps and the ready-made ones, --json what the API returned', async () => {
   const { conn } = fakeConn(routes);
   const t = await run(conn, ['apps']);
-  assert.match(t.out, /Trip planner\s+trip-planner\s+5 runs/);
-  assert.match(t.out, /Quiz\s+quiz/);
-  assert.match(t.out, /Deep research report\s+tpl:deep-research\s+ready-made/);
-  assert.match(t.out, /Weather outlook\s+tpl:weather\s+ready-made, not installed/);
+  assert.match(t.out, /^ +APP +ADDRESS +KIND +STATE +RUNS +LAST/m);
+  assert.match(t.out, /Trip planner\s+trip-planner\s+yours\s+5 runs/);
+  assert.match(t.out, /Quiz\s+quiz\s+yours/);
+  assert.match(t.out, /Deep research report\s+tpl:deep-research\s+ready-made /);
+  assert.match(t.out, /Weather outlook\s+tpl:weather\s+ready-made\s+not installed/, 'KIND says one thing, the state is a column of its own');
+  assert.doesNotMatch(t.out, /ready-made, not installed/);
   assert.match(t.out, /needs a key/);
   assert.deepEqual((await run(conn, ['apps', 'list', '--json'])).json, [routes['GET /api/apps']]);
   assert.match((await run(fakeConn({ 'GET /api/apps': { apps: [], templates: [] } }).conn, ['apps'])).out, /No apps yet: hydor app new/);
@@ -223,6 +225,18 @@ test('remove deletes after a yes, and uninstalls a ready-made app', async () => 
     calls.filter((c) => c.method !== 'GET').map((c) => `${c.method} ${c.path}`),
     ['DELETE /api/apps/app1', 'POST /api/apps/tpl%3Adeep-research/uninstall'],
   );
+});
+
+test('list on a narrow terminal: the kind and the state are columns of their own, and the description goes whole before the name is cut', async () => {
+  // The kind says one thing, the state another; the description and the address go whole before the name is cut.
+  const w = await atWidths(fakeConn(routes).conn, ['apps']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.slice(0, -1).every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][0], /^ +APP +ADDRESS +KIND +STATE +RUNS +LAST$/);
+  assert.match(w[100][4], /^· +Weather outlook +tpl:weather +ready-made +not installed$/);
+  assert.match(w[60][0], /^ +APP +KIND +STATE +RUNS$/);
+  assert.match(w[60][3], /^● +Deep research report +ready-made$/, 'the name whole');
+  assert.match(w[40][0], /^ +APP +KIND$/);
+  assert.match(w[40][4], /^· +Weather outlook +ready-made$/);
 });
 
 for (const [name, fn] of tests) {
