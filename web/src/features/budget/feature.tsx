@@ -64,6 +64,13 @@ function CapMenuItem({ s, close }: { s: SessionSummary; close: () => void }) {
   );
 }
 
+/** In a session's options (the message box's chip): its cap, opening the cap dialog. */
+function CapOption({ s }: { s: SessionSummary }) {
+  const open = useCapDialog((x) => x.open);
+  const cap = capOf(s.extra);
+  return <SettingChip label="Spending cap" icon={<Wallet size={14} />} value={cap != null ? usd(cap) : 'None'} on={cap != null} onClick={() => open(s.key)} title="The most this session may spend, at API prices" />;
+}
+
 /** Under a turn the cap stopped. */
 function CapNote({ note, sessionKey }: { note: SessionNote; sessionKey: string }) {
   const d = note.data as BudgetNote;
@@ -159,6 +166,7 @@ export const budgetFeature: WebFeature = {
   id: 'budget',
   noteViews: { budget: CapNote },
   SessionMenu: CapMenuItem,
+  SessionOptions: CapOption,
   sessionMenuPart: 'settings',
   SessionDock: CapDock,
   StartOptions: StartCap,

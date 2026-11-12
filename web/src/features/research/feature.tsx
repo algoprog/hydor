@@ -236,7 +236,7 @@ function ResearchMenuItem({ s, close }: { s: SessionSummary; close: () => void }
 function ResearchOption({ s }: { s: SessionSummary }) {
   if (!canLead(s)) return null;
   const r = researchOf(s.extra);
-  return <SettingChip label="Deep research" icon={<Telescope size={14} />} value={r ? `${r.queries} searches` : 'Off'} on={!!r} onClick={() => useResearchDialog.setState({ key: s.key })} />;
+  return <SettingChip label="Research" icon={<Telescope size={14} />} value={r ? `Deep · ${r.queries} searches` : 'Off'} on={!!r} onClick={() => useResearchDialog.setState({ key: s.key })} />;
 }
 
 function ResearchDialog({ s }: { s: SessionSummary }) {

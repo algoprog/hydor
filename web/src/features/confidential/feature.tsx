@@ -7,7 +7,8 @@ import type { SessionExtra } from '@shared/features';
 import { isConfidential } from '@shared/confidential';
 import type { SessionSummary } from '@shared/types';
 import { go } from '../../lib/nav';
-import { cx, Popover, Switch } from '../../components/ui';
+import { cx, Popover, SettingChip, Switch } from '../../components/ui';
+import { toast } from '../../lib/store';
 import type { WebFeature } from '../registry';
 import { useConfidentialInfo } from './state';
 
@@ -125,8 +126,33 @@ function Dock({ s }: { s: SessionSummary }) {
   );
 }
 
+/**
+ * In a session's options (the message box's chip): whether it is confidential. That is set when a session starts and
+ * stays, so a click says how to get the other.
+ */
+function SessionOption({ s }: { s: SessionSummary }) {
+  const on = isConfidential(s.extra);
+  return (
+    <SettingChip
+      label="Confidential"
+      icon={<Lock size={14} className={on ? 'text-ok' : undefined} />}
+      value={on ? 'On' : 'Off'}
+      on={on}
+      title="Set when a session starts, and kept"
+      onClick={() =>
+        toast(
+          on
+            ? 'This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.'
+            : 'A session is confidential from its start: start a new one with Options → Confidential.',
+        )
+      }
+    />
+  );
+}
+
 export const confidentialFeature: WebFeature = {
   id: 'confidential',
+  SessionOptions: SessionOption,
   StartOptions: StartOption,
   SessionDock: Dock,
 };

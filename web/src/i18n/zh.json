@@ -23323,5 +23323,14 @@
 "A main agent on Automatic may move itself to Max":"使用“自动”时，主智能体可以自己升到最高档位",
 "On Automatic, a session starts on Best, and its main agent may move itself to Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find). The conversation says when it does. A request is never sent to Max on its wording alone.":"使用“自动”时，会话从最佳档位开始；当问题超出最佳档位的能力（修复已失败两次、找不到原因）时，主智能体可以自己升到最高档位。发生时对话中会说明。请求不会仅凭措辞就被送到最高档位。",
 "The model each tier means for each program. A session on Automatic thinks with Best, and its main agent may move itself to Max when a problem proves too hard; it hands clear parts to subagents on Standard and Quick. A tier you leave alone follows its program’s newest model.":"每个档位在每个程序中对应的模型。使用“自动”的会话用最佳档位思考，问题太难时主智能体可以自己升到最高档位；它把明确的部分交给标准和快速档位的子智能体。你没有改动的档位会跟随其程序的最新模型。",
-"{0}, or {1} if the problem proves too hard":"{0}，问题太难时用 {1}"
+"{0}, or {1} if the problem proves too hard":"{0}，问题太难时用 {1}",
+"A session is confidential from its start: start a new one with Options → Confidential.":"会话从开始时就是保密的：请用“选项 → 保密”新建一个会话。",
+"No such {0} account":"没有这个 {0} 账户",
+"Only a Claude Code or Codex session runs as an account":"只有 Claude Code 或 Codex 会话会以某个账户运行",
+"Picked when a session starts: its first message goes to other models too":"在会话开始时选定：它的第一条消息也会发给其他模型",
+"Set when a session starts, and kept":"在会话开始时设定，并一直保持",
+"The arena is picked when a session starts: its first message goes to other models too. Start a new session with Options → Arena.":"竞技场在会话开始时选定：它的第一条消息也会发给其他模型。请用“选项 → 竞技场”新建一个会话。",
+"The most this session may spend, at API prices":"这个会话最多可以花费的金额，按 API 价格计算",
+"This session runs as {0} from your next message":"从你的下一条消息起，这个会话以 {0} 运行",
+"This session stays confidential, so what was said stays on this computer. Start a new session for work that may leave it.":"这个会话会一直保密，所以说过的内容都留在这台电脑上。可能需要离开这台电脑的工作，请新建一个会话。"
 }

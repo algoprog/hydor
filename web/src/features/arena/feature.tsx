@@ -10,7 +10,7 @@ import { AgentIcon } from '../../components/AgentIcon';
 import { useCatalog } from '../../components/AgentPickers';
 import { cx, inputCls, OptionRow, Popover, SettingChip } from '../../components/ui';
 import { go } from '../../lib/nav';
-import { useApp } from '../../lib/store';
+import { toast, useApp } from '../../lib/store';
 import type { WebFeature } from '../registry';
 import { useCostlyMode } from '../tips/ModeExplainer';
 import { ComparePage } from './ComparePage';
@@ -129,8 +129,28 @@ function ArenaDock({ s }: { s: SessionSummary }) {
   );
 }
 
+/**
+ * In a session's options (the message box's chip): whether it is one of an arena's sessions. An arena sends the
+ * first message to other models as well, so it is picked when a session starts; a click says so.
+ */
+function ArenaOption({ s }: { s: SessionSummary }) {
+  if (s.extra?.confidential) return null;
+  const id = typeof s.extra?.arena === 'string' ? s.extra.arena : null;
+  return (
+    <SettingChip
+      label="Arena"
+      icon={<Swords size={14} />}
+      value={id ? 'On' : 'Off'}
+      on={!!id}
+      title="Picked when a session starts: its first message goes to other models too"
+      onClick={() => (id ? go(`/arena/${id}`) : toast('The arena is picked when a session starts: its first message goes to other models too. Start a new session with Options → Arena.'))}
+    />
+  );
+}
+
 export const arenaFeature: WebFeature = {
   id: 'arena',
+  SessionOptions: ArenaOption,
   StartOptions: ArenaStartOption,
   SessionDock: ArenaDock,
   routes: [{ match: (p) => p.startsWith('/arena/'), Page: ComparePage }],
