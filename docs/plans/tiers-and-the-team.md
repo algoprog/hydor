@@ -1,14 +1,7 @@
 # Tiers and the team: a strong lead, cheaper helpers
 
-*10 November 2026. The owner: "change the way agents work so that by default, they use 3 tiers of agents (4 in the case
-of claude): one for planning / orchestration of subagents (these are main agents, eg opus, gpt sol), another for
-subagents that implement well defined coding tasks or other tasks of medium complexity (eg sonnet and gpt terra),
-another for very well defined simpler tasks (targeted code edits, specific jobs etc), and another when trying to solve
-more complex problems (fable 5.2, gpt astra as main agents / orchestrators) … this will help the agent reduce cost
-without sacrificing quality", then "smallest tier would use haiku, luna etc", and "do some testing to validate the
-approach works well without quality loss". What was built in 0.52.0, why it is shaped as it is, and what the
-measurements say. Measured again on 11-12 November, when the first tasks proved too easy to tell the tiers apart:
-"all models score 100% which should not be the case for weaker models".*
+*How sessions pick their models by tier and hand work to cheaper helpers: what was built (0.52.0, with Max left to
+the lead's own step up since 0.57.0), why it is shaped as it is, and what the measurements say.*
 
 ## What a session does now
 

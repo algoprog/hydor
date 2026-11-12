@@ -1,8 +1,8 @@
 # Research and engineering: a plan
 
-*5 November 2026. The owner picked 34 ideas from a brainstorm for researchers and engineers; this is how they fit
-Hydor. Several builders work on it at once, each in its own worktree and branch (`rs/<workstream>`); the lead
-merges them, translates, makes the vectors, writes the release notes and ships one release.*
+*5 November 2026. 34 ideas from a brainstorm for researchers and engineers, and how they fit Hydor. Several builders
+work on it at once, each in its own worktree and branch (`rs/<workstream>`); the lead merges them, translates, makes
+the vectors, writes the release notes and ships one release.*
 
 ## In short
 
