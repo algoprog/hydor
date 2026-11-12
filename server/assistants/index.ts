@@ -23,6 +23,7 @@ import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { userTimezone } from '../userPrefs.ts';
 import { helperJson } from '../helper.ts';
 import { validSchedule } from '../scheduler.ts';
+import { allSpaces, updateSpace } from '../spaces/index.ts';
 import { makeProjectAgent } from './projectAgent.ts';
 import { handBackTool, resultsOf } from './output.ts';
 import { ensureStanding, inboxCounts, inboxOf, inboxTurnEnded, sendToInbox, standingKey, sweepInboxes } from './inbox.ts';
@@ -236,8 +237,13 @@ function routes(d: Deps) {
     return { assistant: a, ...state() };
   });
   app.delete('/api/assistants/:id', async (req) => {
-    removeAssistant(db, idOf(req));
+    const id = idOf(req);
+    removeAssistant(db, id);
     changed();
+    // Projects that started their sessions as it no longer name it: they start as the default again.
+    const freed = allSpaces(db).filter((s) => s.assistant === id);
+    for (const s of freed) updateSpace(db, s.id, { assistant: '' });
+    if (freed.length) d.broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
     return state();
   });
 

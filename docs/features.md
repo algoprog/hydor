@@ -20,8 +20,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   folders you used last under their own headings, each with where it is (a project's own folder only as the project),
   with Browse for any other folder and a new task folder; it opens on the side of its chip with more room and fits
   without scrolling. Pick the model, how hard it
-  thinks, and what it may do without asking you. The start page opens with what you picked there last,
-  on any device: the agent and its model, the folder, the assistant, memory and a spending cap. What you
+  thinks, and what it may do without asking you. The start page keeps what you pick for each
+  project, each folder and the new task folder separately, on any device: the program with its model, effort and
+  permissions, the agent, memory, a spending cap, Confidential and the worktree switch; a place you have not used
+  opens with the defaults (the project's own agent, else General). What you
   write in a message box, with the files you attach, waits there while you look at other pages. Pressing
   Start opens the session's page at once with your message and the agent at work on it (Working), as the
   session shows it, and it becomes the session as soon as the agent is up, with no loading in between; if it

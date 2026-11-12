@@ -531,6 +531,28 @@ export interface StartSettings {
   capUsd?: number;
   /** Confidential: local models only, nothing leaves this computer. */
   confidential?: boolean;
+  /**
+   * What was picked in each place, by its name (placeKey in shared/start.ts: a project, a new task folder or a
+   * folder), so the start page opens that way there again; a place without one opens with the defaults.
+   */
+  places?: Record<string, StartPlace>;
+}
+
+/** The start page's picks in one place: as last used there. Missing fields are the defaults. */
+export interface StartPlace {
+  /** 'claude', 'codex' or 'acp:<id>'. */
+  agent?: string;
+  /** Each program's model, effort and mode there (the account is the same everywhere: StartSettings.runs). */
+  runs?: Record<string, Omit<StartRun, 'account'>>;
+  /** The agent (General, Researcher…) the session starts as. */
+  assistant?: string;
+  worktree?: boolean;
+  /** false: without memory. */
+  memory?: boolean;
+  capUsd?: number;
+  confidential?: boolean;
+  /** When something was last picked or started there: the latest places are kept. */
+  at: number;
 }
 
 /** Live additions layered over the persisted timeline. */

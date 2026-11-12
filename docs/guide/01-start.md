@@ -96,7 +96,7 @@ On a computer, a line under the box reminds you: "Enter to start · Shift+Enter 
 
 At the top right, **Explore** opens a magazine made for you: articles and recent news on what you work on and care about, picked from your profile and your latest sessions (see [Explore](/guide/apps#explore)). A dot on it means a new edition is ready that you haven't opened yet.
 
-Everything on the start page is explained in [Start a session](/guide/sessions#start-a-session).
+The start page keeps its picks for each project, each folder and **New task folder** separately, so a project can open with its own program, model and agent (see [What the start page remembers](/guide/sessions#what-the-start-page-remembers)). Everything on the start page is explained in [Start a session](/guide/sessions#start-a-session).
 
 ## Start your first session
 

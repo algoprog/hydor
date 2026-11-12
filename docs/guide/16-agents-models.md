@@ -29,7 +29,7 @@ On the start page (`/`), the row under the message box says who does the work.
 2. Click **Model** and pick one. **Automatic**, at the top and picked to start with, lets the tiers choose: Best, and Max if the problem proves too hard (see [Tiers: a model for each kind of job](#tiers-a-model-for-each-kind-of-job)). Under it the list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
 3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
 
-The start page remembers what you picked, per agent, on every device: next time it opens with the same agent, model, effort and permissions.
+The start page remembers what you picked for each place you work in (each project, each folder and **New task folder**), on every device: each program's model, effort and permissions come back there as you left them (see [What the start page remembers](/guide/sessions#what-the-start-page-remembers)).
 
 An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran.
 
@@ -149,7 +149,7 @@ When the agent you picked has added accounts, the start page's **Options** shows
 - Each added account is listed by name.
 - **Manage accounts** opens Settings → Agents → Accounts.
 
-The start page remembers your choice for that agent. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below).
+The start page remembers your choice for that agent, the same in every place. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below).
 
 ## Use all your accounts: switch at a limit
 

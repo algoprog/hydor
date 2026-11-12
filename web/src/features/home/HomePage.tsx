@@ -2,11 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { useSearch } from 'wouter';
 import { ArrowUp, ChevronRight, CircleHelp, GitBranch, MonitorUp, Paperclip, SlidersHorizontal } from 'lucide-react';
 import { startTour } from '../tour/Tour';
-import type { Agent, StartRun, StartSettings } from '@shared/types';
+import type { Agent, StartPlace, StartRun, StartSettings } from '@shared/types';
 import type { SessionExtra } from '@shared/features';
 import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
 import { isConfidential } from '@shared/confidential';
+import { placeKey } from '@shared/start';
 import { AUTO_MODEL, tierProgram } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
@@ -15,7 +16,7 @@ import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
 import { openSession } from '../../lib/nav';
 import { startSession, warmMemory } from '../../lib/starting';
-import { agentKey, lastAgent, parseAgentKey, saveStart, startSettings } from '../../lib/start';
+import { agentKey, lastAgent, parseAgentKey, picksAt, placePicks, placeRecord, saveStart, startSettings } from '../../lib/start';
 import { toast, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, findModel, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
@@ -33,8 +34,9 @@ import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
 import { useTeam, useTierMap } from '../assistants/agentsState';
+import { assistantIn, useAssistants } from '../assistants/state';
 import { NewSpaceDialog } from '../spaces/parts';
-import { useSpaces } from '../spaces/state';
+import { useSpaces, useSpacesStore } from '../spaces/state';
 import type { Space } from '@shared/spaces';
 import { doneStartFiles, waitingStartFiles } from '../../lib/startFiles';
 import { useConfidentialInfo } from '../confidential/state';
@@ -65,6 +67,13 @@ function fromLink(search: string): { prompt?: string; agent?: Agent; model?: str
 /** The start options kept as picks for next time (lib/start.ts); the others are this task's alone, kept with what is written. */
 const PICKS = new Set(['assistant', 'connections', 'memory', 'capUsd', 'space', 'confidential']);
 const ownOptions = (x: SessionExtra): SessionExtra => Object.fromEntries(Object.entries(x).filter(([k]) => !PICKS.has(k)));
+
+/**
+ * The box opening again in another place: what a link set for this task and is still set (its words, its agent,
+ * Confidential); `placed`: false when the place was chosen by an agent picked, not picked itself; `suggest`: that
+ * agent's suggestions (program, model, permissions) apply there.
+ */
+type Reopen = { link: ReturnType<typeof fromLink>; placed: boolean; suggest: boolean };
 
 /** The same folder, however its end is written. */
 const sameDir = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
@@ -97,13 +106,31 @@ function MoreOptions({ changed, title, children }: { changed: string[]; title: s
 }
 
 /**
- * The start page's message box. It opens with what was picked here last time (kept on the server, so on
- * any device): the agent with its model, effort and permissions, the folder, the assistant, memory and a
- * spending cap. One row under the box shows who does the work, where and as which assistant; the rest
- * wait under Options, whose chip names any of them set away from the usual. What is written, attached
- * and set for this task alone waits in the box while you are on other pages (lib/drafts.ts).
+ * The start page's message box. It opens in the place picked last (a project, a folder or a new task folder), with
+ * what was picked there last time (kept on the server, so on any device): the program with its model, effort and
+ * permissions, the agent, memory, a spending cap, Confidential and the worktree switch; a place where nothing was
+ * picked yet opens with the defaults (lib/start.ts placePicks). Picking another place opens the box again there
+ * (`onPlace`: it starts over, with what was written). One row under the box shows who does the work, where and as
+ * which agent; the rest wait under Options, whose chip names any of them set away from the usual. What is written,
+ * attached and set for this task alone waits in the box while you are on other pages (lib/drafts.ts).
  */
-function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?: ReturnType<typeof fromLink>; from: string }) {
+function StartComposer({
+  initialCwd,
+  link,
+  from,
+  placed,
+  suggest,
+  onPlace,
+}: {
+  initialCwd?: string;
+  link?: ReturnType<typeof fromLink>;
+  from: string;
+  /** Opened again for a place picked in it (or elsewhere): a folder was picked. */
+  placed?: boolean;
+  /** Opened again for an agent picked in it that chose this place: what the agent suggests applies. */
+  suggest?: boolean;
+  onPlace?: (o: Reopen) => void;
+}) {
   const mobile = useIsMobile();
   const [saved] = useState(() => startSettings());
   // The box as it was left. A link's prompt takes its place, unless it was written from that link.
@@ -115,7 +142,17 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   // The folder a link opened the box in (?cwd=), or the draft's from one, while the folder picked last is the one it stood over.
   const [linkCwd, setLinkCwd] = useState(() => initialCwd ?? (draft?.folder?.over === folderOf(saved) ? draft.folder.cwd : undefined));
   const [linkOver] = useState(() => (initialCwd ? folderOf(saved) : (draft?.folder?.over ?? '')));
-  const [first] = useState(() => (link?.agent ? { agent: link.agent, acp: null } : lastAgent()));
+  // The picks of the place the box opens in (a link's folder, else the place picked last; a project's own folder is the
+  // project, when the projects are known): as last used there (a project: else in its folder before), else the
+  // defaults. `recorded`: something was picked or started there before.
+  const [{ src, recorded, ownSpace }] = useState(() => {
+    const dir = linkCwd ?? (saved.task || saved.space ? undefined : saved.cwd);
+    const own = dir ? useSpacesStore.getState().list?.find((s) => sameDir(s.folder, dir)) : undefined;
+    const k = linkCwd ? placeKey({ space: own?.id, cwd: linkCwd }) : placeKey({ ...saved, space: saved.space ?? own?.id });
+    const also = own ? placeKey({ cwd: own.folder }) : null;
+    return { src: picksAt(saved, k, also), recorded: !!placeRecord(saved, k, also), ownSpace: own?.id };
+  });
+  const [first] = useState(() => (link?.agent ? { agent: link.agent, acp: null } : lastAgent(src)));
   const [agent, setAgent] = useState<Agent>(first.agent);
   // An ACP agent (Settings → More agents) when agent is 'acp'.
   const [acpId, setAcpId] = useState<string | null>(first.acp);
@@ -123,15 +160,16 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const home = useApp((s) => s.boot?.home) ?? '';
   const cat = useCatalog(agent, acpId ?? undefined);
   const [cwd, setCwd] = useState(() => linkCwd ?? saved.cwd ?? useUI.getState().explorerRoot ?? useApp.getState().boot?.defaultCwd ?? '');
-  // Settings for the new session from the capabilities' start options (an assistant, memory off…).
+  // Settings for the new session from the capabilities' start options (an agent, memory off…). The agent is the
+  // place's (or the link's); with none, the picker settles on the default (the project's own, else General).
   const [extra, setExtra] = useState<SessionExtra>(() => ({
     ...draft?.extra,
-    ...(saved.memory === false ? { memory: false } : {}),
-    ...(saved.capUsd ? { capUsd: saved.capUsd } : {}),
-    ...(saved.confidential || link?.confidential ? { confidential: true as const } : {}),
-    // The space picked last, while the folder is still its own.
-    ...(saved.space && !linkCwd ? { space: saved.space } : {}),
-    ...(link?.assistant ? { assistant: link.assistant } : {}),
+    ...(src.memory === false ? { memory: false } : {}),
+    ...(src.capUsd ? { capUsd: src.capUsd } : {}),
+    ...(src.confidential || link?.confidential ? { confidential: true as const } : {}),
+    // The space picked last, while the folder is still its own; or the project the folder is the folder of.
+    ...(saved.space && !linkCwd ? { space: saved.space } : ownSpace ? { space: ownSpace } : {}),
+    ...(link?.assistant ? { assistant: link.assistant } : src.assistant ? { assistant: src.assistant } : {}),
   }));
   // Spaces: picked by name in the folder chip, each with its folder, assistant and guidelines.
   const spaces = useSpaces();
@@ -143,14 +181,21 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   }, [spaces, extra.space, space]);
   // A new task folder (Settings → Assistants) or the folder shown: as picked here, else as the assistant prefers (Coder works in projects).
   const [taskPick, setTaskPick] = useState<boolean | null>(() => (linkCwd ? false : (saved.task ?? null)));
-  const folderPicked = useRef(!!linkCwd);
+  const folderPicked = useRef(!!linkCwd || !!placed);
   const task = useTaskFolder(typeof extra.assistant === 'string' ? extra.assistant : undefined, taskPick);
+  // Where the session will work, by the name its picks are kept under (shared/start.ts).
+  const place = placeKey({ task, space: typeof extra.space === 'string' ? extra.space : null, cwd });
+  const placeNow = useRef(place);
+  placeNow.current = place;
   // A project's own folder is the project: picked as a folder (before the folder menu showed it only as the project, or
   // by a link's ?cwd=), the session starts in the project. Its agent stays as picked.
   useEffect(() => {
     if (!spaces || extra.space || task || !cwd) return;
     const own = spaces.find((s) => sameDir(s.folder, cwd));
-    if (own) setExtra((x) => ({ ...x, space: own.id }));
+    if (!own) return;
+    // With nothing picked here yet, the box opens again as the project, with its picks (a link's folder stays as is).
+    if (!touched.current && !linkCwd && onPlace) enterPlace({ cwd: own.folder, task: false, space: own.id });
+    else setExtra((x) => ({ ...x, space: own.id }));
   }, [spaces, extra.space, task, cwd]);
   const [text, setText] = useState(() => (draft ? draft.text : (link?.prompt ?? '')));
   const [model, setModel] = useState<string | null>(null);
@@ -171,7 +216,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   }, [text, atts, own, linkCwd]);
   // In a git repository the session can get a worktree of its own: a branch and folder for this task.
   const [repo, setRepo] = useState<{ repo: string; branch: string } | null>(null);
-  const [worktree, setWorktree] = useState(!!saved.worktree);
+  const [worktree, setWorktree] = useState(!!src.worktree);
   // Accounts added for this agent (Settings → Accounts); '' is the CLI's own sign-in.
   const allAccounts = useApp((s) => s.boot?.accounts);
   const accounts = useMemo(() => (allAccounts ?? []).filter((a) => a.agent === agent), [allAccounts, agent]);
@@ -181,17 +226,26 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const keyNow = useRef(key);
   keyNow.current = key;
   const keepRun = (r: StartRun) => saveStart({ runs: { [keyNow.current]: r } });
+  // Something was picked here: from now on what the box shows is kept as this place's picks (below). The defaults
+  // it opened with, and what settles by itself, are not kept until then.
+  const touched = useRef(false);
+  const touch = () => void (touched.current = true);
+  // The agent was picked in this place (else the place keeps the one it had, if any), or the box set it by itself
+  // (the place's default, or the project's own once that is made).
+  const agentPicked = useRef(false);
+  const agentAuto = useRef(false);
 
-  const chooseAgent = (a: Agent, id: string | null) => {
+  // `keep`: false for the program Confidential needs, which is not the one to use elsewhere.
+  const chooseAgent = (a: Agent, id: string | null, keep = true) => {
     setAcpId(id);
     setAgent(a);
-    saveStart({ agent: agentKey(a, id) });
+    if (keep) saveStart({ agent: agentKey(a, id) });
   };
   // The tour sets the agent to one of those picked there.
   useEffect(() => {
     const pick = (e: Event) => {
       const v = parseAgentKey(String((e as CustomEvent<string>).detail ?? ''));
-      if (v) chooseAgent(v.agent, v.acp);
+      if (v) (touch(), chooseAgent(v.agent, v.acp));
     };
     window.addEventListener('wa:agent', pick);
     return () => window.removeEventListener('wa:agent', pick);
@@ -223,28 +277,32 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const team = useTeam();
   const prog = tierProgram(agent, acpId ?? undefined);
   const autoOn = !!team?.on && !!prog && !isConfidential(extra) && (prog !== 'console' || !!tiers?.console.best.model);
-  // Each agent starts from what it last ran with here (else from its last session's), or from a link's model.
+  // Each program starts from what it last ran with in this place (else its own default model, effort and permissions),
+  // or from a link's model. The account is the one picked for every place (else its last session's). Before the box
+  // first shows, so a place's model shows from the start.
   const linked = useRef<{ agent: Agent; model: string } | null>(link?.model ? { agent: first.agent, model: link.model } : null);
-  useEffect(() => {
-    const r = startSettings().runs?.[key] ?? {};
+  useLayoutEffect(() => {
+    const now = startSettings();
+    const r = (placeNow.current ? now.places?.[placeNow.current]?.runs?.[key] : undefined) ?? src.runs?.[key] ?? {};
     const p = cat?.prefs ?? {};
     const pick = linked.current?.agent === agent ? linked.current : null;
     if (pick && cat) linked.current = null;
-    const last = pick ? pick.model : r.model !== undefined ? r.model : p.model;
+    const last = pick ? pick.model : r.model;
     // No model picked (or the program's own default): Automatic where it is offered. Automatic kept from when it was: the default.
     const m = autoOn ? (last ?? AUTO_MODEL) : last === AUTO_MODEL ? null : last;
     // Codex's default must be named: unnamed, Codex takes config.toml's model, which a ChatGPT sign-in may not allow.
     setModel(m ?? (agent === 'codex' ? (cat?.models.find((x) => x.isDefault)?.value ?? null) : null));
-    setEffort((r.effort !== undefined ? r.effort : p.effort) ?? null);
-    const md = (r.mode !== undefined ? r.mode : p.mode) ?? null;
+    setEffort(r.effort ?? null);
+    const md = r.mode ?? null;
     setMode(md && (!cat || cat.modes.some((x) => x.value === md)) ? md : cat?.defaultMode || null);
-    setAccount((r.account !== undefined ? r.account : p.account) ?? '');
+    const acc = now.runs?.[key]?.account;
+    setAccount((acc !== undefined ? acc : p.account) ?? '');
   }, [agent, acpId, cat, autoOn]);
   // Confidential: Custom, with the best model on this computer (or the one picked, when it is one of them).
   const confidential = isConfidential(extra);
   const local = useConfidentialInfo();
   useEffect(() => {
-    if (confidential && !(agent === 'acp' && acpId === CUSTOM)) chooseAgent('acp', CUSTOM);
+    if (confidential && !(agent === 'acp' && acpId === CUSTOM)) chooseAgent('acp', CUSTOM, false);
   }, [confidential, agent, acpId]);
   useEffect(() => {
     if (!confidential || agent !== 'acp' || acpId !== CUSTOM || !cat || !local) return;
@@ -253,17 +311,41 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     const best = local.models.find((id) => here.has(id));
     if (best) (setModel(best), keepRun({ model: best }));
   }, [confidential, agent, acpId, cat, local, model]);
-  // Picking an assistant sets the agent, model and mode it suggests (after the above, which it overrides).
+  // Picking an assistant sets the agent, model and mode it suggests (after the above, which it overrides); in a place
+  // where nothing was picked yet, so does the agent it opens with (the project's own), and so does an agent picked
+  // elsewhere that chose this place (`suggest`). What an agent the box set by itself suggests never undoes a pick.
   const pendingAcp = useRef<string | null>(null);
+  const quiet = () => agentAuto.current && touched.current;
   useAssistantDefaults(typeof extra.assistant === 'string' ? extra.assistant : undefined, {
     agent,
     acpId,
     cat,
-    setAgent: (a) => chooseAgent(a, a === 'acp' ? pendingAcp.current : null),
+    setAgent: (a) => void (quiet() || chooseAgent(a, a === 'acp' ? pendingAcp.current : null)),
     setAcpId: (id) => void (pendingAcp.current = id),
-    setModel: (m) => (setModel(m), keepRun({ model: m })),
-    setMode: (m) => (setMode(m), keepRun({ mode: m })),
+    setModel: (m) => void (quiet() || (setModel(m), keepRun({ model: m }))),
+    setMode: (m) => void (quiet() || (setMode(m), keepRun({ mode: m }))),
+    applyFirst: !!suggest || (!recorded && !link?.agent && !link?.model),
   });
+
+  /** What the box shows, as this place's picks (with what each other program last ran with here; its agent if picked). */
+  const shownRecord = (k: string): StartPlace => {
+    const prev = startSettings().places?.[k];
+    const who = agentPicked.current ? extra.assistant : prev?.assistant;
+    return {
+      agent: key,
+      runs: { ...prev?.runs, [key]: agent === 'acp' ? { model, mode } : { model, effort, mode } },
+      ...(typeof who === 'string' ? { assistant: who } : {}),
+      ...(worktree ? { worktree: true } : {}),
+      ...(extra.memory === false ? { memory: false } : {}),
+      ...(typeof extra.capUsd === 'number' ? { capUsd: extra.capUsd } : {}),
+      ...(confidential ? { confidential: true } : {}),
+      at: Date.now(),
+    };
+  };
+  const shown = JSON.stringify([key, model, effort, mode, extra.assistant, worktree, extra.memory, extra.capUsd, confidential]);
+  useEffect(() => {
+    if (touched.current && place) saveStart({ places: { [place]: shownRecord(place) } });
+  }, [shown, place]);
 
   useLayoutEffect(() => {
     const el = ta.current;
@@ -296,7 +378,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
   const start = () => {
     if (starting.current || !cwd || (confidential && local && !local.models.length)) return;
     starting.current = true;
-    // Kept as it was used, the whole of it, for the next start.
+    // Kept as it was used, the whole of it, for the next start, and as the picks of the place it starts in.
     saveStart(
       {
         agent: key,
@@ -309,6 +391,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         memory: extra.memory === false ? false : null,
         capUsd: typeof extra.capUsd === 'number' ? extra.capUsd : null,
         confidential: confidential ? true : null,
+        ...(place ? { places: { [place]: shownRecord(place) } } : {}),
       },
       true,
     );
@@ -346,29 +429,91 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
     );
   };
 
-  /** A space picked: its folder, its assistant, and its guidelines for the session (the server adds them). */
-  const pickSpace = (sp: Space) => {
-    folderPicked.current = true;
+  /**
+   * A place picked in the folder menu: a project (its folder, and its guidelines for the session, which the server
+   * adds), a folder (a project's own folder is the project) or a new task folder. Another place than the one shown
+   * opens the box again there, as it was last used there or with the defaults; what is written and attached stays.
+   */
+  const enterPlace = (to: { cwd?: string; task: boolean; space: string | null }, agentHere?: string) => {
+    if (!agentHere) folderPicked.current = true;
+    // A project's own folder is the project (its picks before it was one: its folder's).
+    const dir = to.task || to.space ? undefined : (to.cwd ?? cwd);
+    const own = dir ? spaces?.find((s) => sameDir(s.folder, dir)) : undefined;
+    if (own) to = { cwd: own.folder, task: false, space: own.id };
+    const where = { ...(to.cwd ? { cwd: to.cwd } : {}), task: to.task, space: to.space };
+    const k = placeKey({ ...where, cwd: to.cwd ?? cwd });
+    const also = to.space ? placeKey({ cwd: to.cwd ?? spaces?.find((s) => s.id === to.space)?.folder }) : null;
+    if (onPlace && k && k !== place) {
+      const s = startSettings();
+      saveStart({
+        ...where,
+        ...placePicks(s, k, also),
+        // An agent picked, which chose this place: it is this place's pick.
+        ...(agentHere ? { assistant: agentHere, places: { [k]: { ...placeRecord(s, k, also), assistant: agentHere, at: Date.now() } } } : {}),
+      });
+      reopen({ placed: !agentHere, suggest: !!agentHere }, agentHere);
+      return;
+    }
     setLinkCwd(undefined);
-    setCwd(sp.folder);
-    setTaskPick(false);
-    setExtra((x) => ({ ...x, space: sp.id, ...(sp.assistant ? { assistant: sp.assistant } : {}) }));
-    saveStart({ cwd: sp.folder, task: false, space: sp.id, ...(sp.assistant ? { assistant: sp.assistant } : {}) });
+    if (to.cwd) setCwd(to.cwd);
+    setTaskPick(to.task);
+    setExtra((x) => ({ ...x, space: to.space ?? undefined }));
+    saveStart(where);
   };
+  const pickSpace = (sp: Space) => enterPlace({ cwd: sp.folder, task: false, space: sp.id });
+  /**
+   * The box opens again (in the place saved as picked): what is written and attached stays (unless it holds a draft
+   * from elsewhere, untouched here), and so do the link's agent (unless another is picked: `agentNow`) and
+   * Confidential while they are still set.
+   */
+  const reopen = (o: Omit<Reopen, 'link'>, agentNow = extra.assistant) => {
+    if (!sent.current && !opened.current) keepStartDraft({ text, files: atts, extra: JSON.parse(own), from });
+    const keep = {
+      prompt: link?.prompt,
+      ...(link?.assistant && agentNow === link.assistant ? { assistant: link.assistant } : {}),
+      ...(link?.confidential && confidential ? { confidential: true } : {}),
+      stripped: false,
+    };
+    onPlace?.({ ...o, link: keep });
+  };
+  // A project picked elsewhere while the box shows (the sidebar): it opens there (startInSpace saved it as picked).
+  const reopenHere = useRef(reopen);
+  reopenHere.current = reopen;
+  useEffect(() => {
+    const f = () => reopenHere.current({ placed: true, suggest: false });
+    window.addEventListener('wa:place', f);
+    return () => window.removeEventListener('wa:place', f);
+  }, []);
 
-  // A capability's start option changed (the assistant, memory, a spending cap, Confidential): kept for next time.
-  const onExtra = (o: Partial<SessionExtra>) => {
+  // A capability's start option changed (the agent, memory, a spending cap, Confidential): kept for next time, and as
+  // this place's. One that set itself (`how.auto`: the agent the place opens with) is no pick.
+  const onExtra = (o: Partial<SessionExtra>, how?: { auto?: boolean }) => {
     const before = extra.assistant;
     // Swarm, deep research and the arena reach the web or other models: turning one on turns Confidential off.
     const p = (o.swarm || o.research || arenaOf(o as SessionExtra)) && confidential ? { ...o, confidential: undefined } : o;
     setExtra((x) => ({ ...x, ...p }));
+    const changed = typeof p.assistant === 'string' && p.assistant !== before;
+    if (how?.auto) {
+      if (changed) {
+        agentAuto.current = true;
+        agentPicked.current = false;
+      }
+      return;
+    }
+    // A place keeps these; Swarm, deep research and the like are this task's alone.
+    if (['memory', 'capUsd', 'confidential', 'assistant'].some((k) => k in p)) touch();
     if ('memory' in p) saveStart({ memory: p.memory === false ? false : null });
     if ('capUsd' in p) saveStart({ capUsd: typeof p.capUsd === 'number' ? p.capUsd : null });
     if ('confidential' in p) saveStart({ confidential: p.confidential ? true : null });
-    // The assistant picked (not the one the page opened with): its kind of folder too, unless one was picked here.
-    if (typeof p.assistant === 'string' && before !== undefined && p.assistant !== before) {
+    if (typeof p.assistant === 'string' && changed) {
+      agentPicked.current = true;
+      agentAuto.current = false;
       saveStart({ assistant: p.assistant });
-      if (!folderPicked.current) (setTaskPick(null), saveStart({ task: null }));
+      // Its kind of folder too (a new task folder, or the folder shown), unless a place was picked here or the box is
+      // in a project: the box opens there, with this agent.
+      const a = assistantIn(useAssistants.getState().state, p.assistant);
+      const t = a ? a.folder !== 'project' : null;
+      if (!folderPicked.current && typeof extra.space !== 'string' && t !== null && t !== task) enterPlace({ task: t, space: null }, p.assistant);
     }
   };
 
@@ -457,7 +602,7 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
             } else if (e.key === 'Tab' && e.shiftKey) {
               e.preventDefault();
               const m = nextMode(cat, mode);
-              if (m) (setMode(m), keepRun({ mode: m }));
+              if (m) (touch(), setMode(m), keepRun({ mode: m }));
             }
           }}
           onPaste={(e) => {
@@ -520,27 +665,14 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
         <SettingLayout.Provider value="bare">
           <SheetsOnPhone.Provider value>
             <div data-tour="start-bar" className="flex flex-wrap items-center gap-0.5 rounded-b-[21px] border-t border-line bg-bg-1/70 px-2 py-1.5">
-              <AgentPicker label="Runs on" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={chooseAgent} localOnly={confidential} />
-              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (setModel(v), keepRun({ model: v }))} localOnly={confidential} auto={autoHint} />
+              <AgentPicker label="Runs on" agent={agent} acpId={acpId} acpList={acpList ?? []} onPick={(a, id) => (touch(), chooseAgent(a, id))} localOnly={confidential} />
+              <ModelPicker label="Model" agent={agent} acp={acpId ?? undefined} value={model} onChange={(v) => (touch(), setModel(v), keepRun({ model: v }))} localOnly={confidential} auto={autoHint} />
               <WorkFolderChip
                 value={cwd}
                 task={task}
                 note={!task && repo && worktree ? 'new worktree' : undefined}
-                onFolder={(p) => {
-                  folderPicked.current = true;
-                  setLinkCwd(undefined);
-                  setCwd(p);
-                  setTaskPick(false);
-                  setExtra((x) => ({ ...x, space: undefined }));
-                  saveStart({ cwd: p, task: false, space: null });
-                }}
-                onTask={() => {
-                  folderPicked.current = true;
-                  setLinkCwd(undefined);
-                  setTaskPick(true);
-                  setExtra((x) => ({ ...x, space: undefined }));
-                  saveStart({ task: true, space: null });
-                }}
+                onFolder={(p) => enterPlace({ cwd: p, task: false, space: null })}
+                onTask={() => enterPlace({ task: true, space: null })}
                 space={space}
                 spaces={spaces}
                 onSpace={pickSpace}
@@ -558,15 +690,15 @@ function StartComposer({ initialCwd, link, from }: { initialCwd?: string; link?:
                       </span>
                       <span className="block truncate text-[11.5px] text-fg-3">{`A new branch, in a copy of ${folderName(repo.repo, home)}`}</span>
                     </span>
-                    <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (setWorktree(v), saveStart({ worktree: v }))} />
+                    <Switch on={worktree} label="Work in a new worktree" onChange={(v) => (touch(), setWorktree(v), saveStart({ worktree: v }))} />
                   </label>
                 )}
               </WorkFolderChip>
               <FeatureStartOptions part="lead" value={extra} cwd={cwd} onChange={onExtra} />
               <span data-tour="pickers" className="ml-auto flex min-w-0">
                 <MoreOptions changed={changed} title={optionsTitle}>
-                  <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={effortModel} value={effort} onChange={(v) => (setEffort(v), keepRun({ effort: v }))} />
-                  <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (setMode(v), keepRun({ mode: v }))} />
+                  <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={effortModel} value={effort} onChange={(v) => (touch(), setEffort(v), keepRun({ effort: v }))} />
+                  <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (touch(), setMode(v), keepRun({ mode: v }))} />
                   {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
                   <FeatureStartOptions part="rest" value={extra} cwd={cwd} onChange={onExtra} />
                 </MoreOptions>
@@ -629,6 +761,11 @@ export function HomePage() {
   useEffect(() => {
     if (link.stripped) toast('Invisible characters were removed from the linked prompt', 'error');
   }, [link]);
+  // A place picked in the box, or a project picked elsewhere while this page shows (the sidebar), opens the box again
+  // there: round n of this page's box. Only the first takes a link's folder, program and model; the box carries on
+  // what else the link set while it is still set.
+  const [round, setRound] = useState<{ search: string; n: number } & Partial<Reopen>>({ search, n: 0 });
+  const cur = round.search === search ? round : { search, n: 0 };
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div data-tour="home-top" className="flex h-14 shrink-0 items-center gap-1.5 px-3 pt-[var(--safe-top)] sm:px-6">
@@ -654,7 +791,19 @@ export function HomePage() {
           </div>
           <div className="mt-6 sm:mt-8">
             {/* It opens with the last picks, which come with the bootstrap. */}
-            {booted ? <StartComposer key={search} initialCwd={initialCwd} link={link} from={search} /> : <div className="h-[200px]" />}
+            {booted ? (
+              <StartComposer
+                key={`${search}#${cur.n}`}
+                initialCwd={cur.n ? undefined : initialCwd}
+                link={cur.n ? cur.link : link}
+                from={search}
+                placed={cur.n > 0 && cur.placed !== false}
+                suggest={cur.n > 0 && !!cur.suggest}
+                onPlace={(o) => setRound({ search, n: cur.n + 1, ...o })}
+              />
+            ) : (
+              <div className="h-[200px]" />
+            )}
           </div>
           <div className="mt-5 flex justify-center sm:mt-8">
             <div data-tour="today">

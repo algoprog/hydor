@@ -4,16 +4,18 @@
 // says the answer aloud. Without a helper model, plain words are understood ("status", "approve", "stop").
 // The answer is in the language the user reads the app in. Confidential sessions (server/confidential) stay out of
 // it: never in what the helper reads, never read aloud; what is said while one is the focus goes to it by plain words.
+import { DEFAULT_ASSISTANT } from '../../shared/assistants.ts';
 import { isConfidential } from '../../shared/confidential.ts';
 import { LANGS } from '../../shared/i18n.ts';
 import { quickAnswer } from '../../shared/inbox.ts';
 import type { Agent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import { makeTaskFolder, dayIn } from '../assistants/taskFolder.ts';
-import { taskRoot } from '../assistants/store.ts';
+import { findAssistant, taskRoot } from '../assistants/store.ts';
 import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
 import { helper, type HelperAsk } from '../helper.ts';
 import { userLang } from '../language/index.ts';
+import { spaceById } from '../spaces/index.ts';
 import { startSettings } from '../startSettings.ts';
 import { userTimezone } from '../userPrefs.ts';
 
@@ -133,6 +135,8 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
       const agent: Agent = agentKey.startsWith('acp:') ? 'acp' : (agentKey as Agent);
       const run = st.runs?.[agentKey] ?? {};
       const cwd = st.task !== false || !st.cwd ? makeTaskFolder(taskRoot(d.db), task, dayIn(userTimezone(d.db))) : st.cwd || config.defaultCwd;
+      // The agent the start page shows there: the one picked in that place, else the project's own, else General.
+      const assistant = [st.assistant, st.space ? spaceById(d.db, st.space)?.assistant : undefined, DEFAULT_ASSISTANT].find((id) => !!id && !!findAssistant(d.db, id));
       const k = await d.sessions.create({
         agent,
         acpAgent: agent === 'acp' ? agentKey.slice(4) : undefined,
@@ -142,7 +146,7 @@ export async function handsFree(d: Pick<Deps, 'db' | 'sessions'>, text: string, 
         effort: agent === 'acp' ? undefined : (run.effort ?? undefined),
         mode: run.mode ?? undefined,
         remember: false,
-        extra: { ...(st.assistant ? { assistant: st.assistant } : {}), ...(st.space ? { space: st.space } : {}) },
+        extra: { ...(assistant ? { assistant } : {}), ...(st.space ? { space: st.space } : {}) },
       });
       return { say: plan.say || 'Started. I will tell you when it is done.', focus: k, did: 'started' };
     }
