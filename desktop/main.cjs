@@ -29,9 +29,11 @@
 // 'computer-stop' } to the server). The glow is hidden while the agent looks at the screen,
 // and Esc let go while the agent itself presses it; on Linux the app takes the agent's screenshots.
 //
-// The hydor command (a Mac): bin/hydor inside the app runs the app's own Node.js on the app's own cli.js. At each start
-// the app puts it on the PATH of Terminal by itself (cli-link.cjs), and under the app the command opens the app when it
-// is not running, rather than starting a server of its own.
+// The hydor command: bin/hydor (bin/hydor.cmd on Windows) in the copy the server runs from runs the app's own Node.js on
+// the app's own cli.js. At each start the app puts it on the PATH by itself, with no password and nothing shown
+// (cli-link.cjs): a link into the .app on a Mac, and on Linux and Windows a small shim file that names this version's
+// launcher and the program that opens the app. Under the app the command opens the app when it is not running, rather than
+// starting a server of its own.
 //
 // Notices (a session finished, failed or needs you): the server sends each one here ({ type: 'notice' }), and the app
 // shows it as the system's own notification, even with the window closed; clicking it opens that session. The page in
@@ -1076,21 +1078,32 @@ function action(what) {
 
 const go = (at) => (serverUrl ? openWindow(at) : openWindow());
 
-// ---- the `hydor` command in Terminal (a Mac) -----------------------------------------------------------------------
+// ---- the `hydor` command in a terminal ------------------------------------------------------------------------------
 
 /**
- * Puts the command on the PATH of Terminal (cli-link.cjs), with nothing asked and nothing shown: a link to bin/hydor
+ * Puts the command on the PATH (cli-link.cjs), with nothing asked and nothing shown. A Mac gets a link to bin/hydor
  * inside the app, in ~/.local/bin, ~/bin, /usr/local/bin or /opt/homebrew/bin when that is on your PATH and yours to write
- * in, else in ~/.local/bin with a line in your shell's startup file.
+ * in, else in ~/.local/bin with a line in your shell's startup file. Linux gets a shim there that runs the launcher of the
+ * copy the server runs from now, and Windows a hydor.cmd in WindowsApps or in its own folder, added to your user Path.
+ * The shim names the program that opens the app (HYDOR_APP_OPEN): the AppImage, or the app's own program.
  */
 function linkCommand() {
-  if (!MAC || !PACKAGED) return;
+  if (!PACKAGED || process.env.HYDOR_DESKTOP_NO_COMMAND) return;
   // From a disk image or a translocated copy the app's files go away, and the link would point at nothing.
-  if (BUNDLE.includes('/AppTranslocation/') || BUNDLE.startsWith('/Volumes/')) return trace('hydor command', 'skipped: the app runs from a disk image or a translocated copy', BUNDLE);
+  if (MAC && (BUNDLE.includes('/AppTranslocation/') || BUNDLE.startsWith('/Volumes/'))) return trace('hydor command', 'skipped: the app runs from a disk image or a translocated copy', BUNDLE);
   try {
-    // Only a PATH the login shell really gave counts (loginEnv's guess does not say what Terminal has).
-    const loginPath = loginEnvRead && baseEnv ? baseEnv.PATH : null;
-    const did = require('./cli-link.cjs').linkCommand({ launcher: path.join(RES, 'bin/hydor'), loginPath, shell: os.userInfo().shell, env: baseEnv || process.env });
+    // The launcher of the copy the server runs from (an AppImage's mount goes away with it, and the version's copy stays).
+    if (!ROOT || (COPIES && ROOT === RES)) return trace('hydor command', 'skipped: the server runs from no copy of this version');
+    const launcher = path.join(ROOT, WIN ? 'bin/hydor.cmd' : 'bin/hydor');
+    // Only a PATH the login shell really gave counts (loginEnv's guess does not say what a terminal has). Windows has the whole environment.
+    const loginPath = WIN ? process.env.PATH : loginEnvRead && baseEnv ? baseEnv.PATH : null;
+    const o = { launcher, loginPath, env: WIN ? process.env : baseEnv || process.env };
+    if (!MAC) {
+      if (!BUNDLE) return trace('hydor command', 'skipped: no program that opens the app');
+      Object.assign(o, { open: BUNDLE, appProgram: process.execPath });
+    }
+    if (!WIN) o.shell = os.userInfo().shell;
+    const did = require('./cli-link.cjs').linkCommand(o);
     trace('hydor command', did);
     console.log(`[hydor] the hydor command: ${did}`);
   } catch (e) {

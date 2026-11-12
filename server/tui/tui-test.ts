@@ -872,7 +872,7 @@ test('tiers: shown, set, the team switched', async () => {
 async function chatIn(cols: number, o: { args?: string[]; env?: Record<string, string | undefined> } = {}) {
   const { default: xterm } = (await import('@xterm/xterm')) as any;
   const term = new (xterm?.Terminal ?? (await import('@xterm/xterm')).Terminal)({ cols, rows: 30, allowProposedApi: true, scrollback: 500 });
-  const env = { ...ENV, NO_COLOR: '', TERM: 'xterm-256color', ...o.env } as Record<string, string>;
+  const env = { ...ENV, NO_COLOR: '', TERM: 'xterm-256color', LANG: 'C.UTF-8', LC_ALL: undefined, LC_CTYPE: undefined, HYDOR_ASCII: undefined, ...o.env } as unknown as Record<string, string>;
   delete env.NO_COLOR;
   for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
   const p = pty.spawn(process.execPath, [CLI, ...(o.args ?? [])], { cols, rows: 30, env, cwd: DATA });
@@ -1018,8 +1018,12 @@ test('the chat: the welcome box, the rules and the status line, and none of it w
     await c.until(/What should the agent do\?/);
     const s = await c.screen();
     // (A long scratch folder name cuts the lines on a narrow terminal: its text is looked at from 100 columns.)
-    if (cols >= 100) assert.match(s, /╭─+╮\n│ HYDΩR 9\.9\.9 +│\n│ \S+ +⎇ main +│\n│ Claude Code · Opus 5\.5 · Ask +│\n│ on http:\/\/127\.0\.0\.1:\d+ +│\n╰─+╯\n {2}\/ commands · @ files/, `${cols}`);
-    else assert.match(s, /╭─+╮\n│ HYDΩR 9\.9\.9 +│\n/);
+    if (cols >= 100) assert.match(s, /╭─ HYDΩR 9\.9\.9 ─+╮\n│ \S+ on main +│\n│ Claude Code · Opus 5\.5 · Ask +│\n│ on http:\/\/127\.0\.0\.1:\d+ +│\n│ \/ commands {2}@ files {2}! shell {2}↑ history {2}Ctrl\+R search {2}\/help +│\n╰─+╯\n/, `${cols}`);
+    else assert.match(s, /╭─ HYDΩR 9\.9\.9 ─+╮\n│ /);
+    // The box is as wide as the terminal allows up to 64 columns (65 with all the keys), the same whatever the folder: its edges line up.
+    const box = s.split('\n').filter((l) => /^[╭│╰]/.test(l));
+    assert.ok(box.length >= 5 && box.every((l) => strWidth(l) === strWidth(box[0])), `${cols}: the box's edges line up`);
+    assert.equal(strWidth(box[0]), Math.min(cols - 1, 65), `${cols}: the box's width`);
     const lines = s.split('\n');
     const rules = lines.map((l, i) => (/^─+$/.test(l) ? i : -1)).filter((i) => i >= 0);
     assert.equal(rules.length, 2, 'a rule above and one below the input');
@@ -1027,8 +1031,8 @@ test('the chat: the welcome box, the rules and the status line, and none of it w
     assert.equal(lines[rules[0] + 1].startsWith('› '), true);
     assert.equal(lines[rules[0]].length, cols - 1);
     assert.match(lines[rules[1] + 1], /^ {2}\S+/);
-    if (cols >= 100) assert.match(lines[rules[1] + 1], /^ {2}\S+ ⎇ main · Opus 5\.5 · Ask/);
-    assert.equal(/\/help$/.test(lines[rules[1] + 1]), 2 + DATA.length + ' ⎇ main · Opus 5.5 · Ask'.length + 5 + 3 <= cols - 1, 'the right part goes when there is no room for it');
+    if (cols >= 100) assert.match(lines[rules[1] + 1], /^ {2}\S+ on main · Opus 5\.5 · Ask/);
+    assert.equal(/\/help$/.test(lines[rules[1] + 1]), 2 + DATA.length + ' on main · Opus 5.5 · Ask'.length + 5 + 3 <= cols - 1, 'the right part goes when there is no room for it');
     c.p.write('/');
     await c.until(/❯ \/help/);
     for (const l of (await c.screen()).split('\n').slice(-12)) assert.ok(strWidth(l) <= cols - 1, `${cols}: ${l}`);
@@ -1037,6 +1041,34 @@ test('the chat: the welcome box, the rules and the status line, and none of it w
     while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
     assert.equal(c.exit(), 0);
   }
+});
+
+test('the chat in ASCII mode (HYDOR_ASCII=1, TERM=linux, LANG=C): none of our symbols on the screen, the box and the menu as wide as ever, at 100 and 60 columns', async () => {
+  const cases: [string, Record<string, string | undefined>][] = [['HYDOR_ASCII=1', { HYDOR_ASCII: '1' }], ['TERM=linux', { TERM: 'linux' }], ['LANG=C', { LANG: 'C' }]];
+  for (const cols of [100, 60]) {
+    for (const [name, env] of cases) {
+      const c = await chatIn(cols, { env });
+      await c.until(/What should the agent do\?/);
+      c.p.write('/');
+      await c.until(/> \/help/);
+      const s = await c.screen();
+      assert.doesNotMatch(s, /[^\x00-\x7f]/, `${name} at ${cols}: ${s.match(/[^\x00-\x7f]/)?.[0]}`);
+      assert.match(s, /\+- HYDOR 9\.9\.9 -+\+\n\| \S+ on main +\|\n/, `${name} at ${cols}`);
+      const box = s.split('\n').filter((l) => /^[+|]/.test(l));
+      assert.ok(box.length >= 5 && box.every((l) => l.length === box[0].length), `${name} at ${cols}: the box's edges line up`);
+      for (const l of s.split('\n')) assert.ok(strWidth(l) <= cols - 1, `${name} at ${cols}: ${l}`);
+      c.p.write('\x15\x04');
+      const t0 = Date.now();
+      while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+      assert.equal(c.exit(), 0);
+    }
+  }
+  // With HYDOR_ASCII=0 a locale that is not UTF-8 still shows the symbols.
+  const c = await chatIn(100, { env: { LANG: 'C', HYDOR_ASCII: '0' } });
+  await c.until(/╭─ HYDΩR 9\.9\.9/);
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
 });
 
 test('the chat: the menu opens as you type, Esc closes it, Tab completes, Enter runs a command or puts a file in', async () => {
@@ -1056,7 +1088,7 @@ test('the chat: the menu opens as you type, Esc closes it, Tab completes, Enter 
   c.p.write('\x7f');
   await c.until(/❯ \/(model|mode)/);
   c.p.write('\x15');
-  await c.until(/ {2}\S+ ⎇ main/);
+  await c.until(/ {2}\S+ on main/);
   // Tab on an empty line opens the commands.
   c.p.write('\t');
   await c.until(/› \/\n─+\n❯ \/help/);
@@ -1073,7 +1105,7 @@ test('the chat: the menu opens as you type, Esc closes it, Tab completes, Enter 
   // A value: /model then a name runs it.
   c.p.write('/model ha');
   await c.until(/❯ haiku +Haiku 4\.5/);
-  assert.match(await c.screen(), /\n {2}.*\n?/);
+  assert.match(await c.screen(), /\n│ \/ commands {2}@ files/, 'the keys stay in the welcome box');
   c.p.write('\r');
   await c.until(/Model: Haiku 4\.5/);
   // A command that needs no argument runs at once; /clear clears the screen.
@@ -1205,7 +1237,7 @@ test('hydor resume with no session named: the chat opens with the sessions to pi
   assert.match(await c.screen(), /❯ {2}1 an earlier session/);
   assert.doesNotMatch(await c.screen(), /╭/, 'no head yet');
   c.p.write('\x1b');
-  await c.until(/╭─+╮[\s\S]*What should the agent do\?/);
+  await c.until(/╭─ HYDΩR 9\.9\.9 ─+╮[\s\S]*What should the agent do\?/);
   assert.doesNotMatch(await c.screen(), /Carry on with which/);
   c.p.write('\x04');
   const t0 = Date.now();
@@ -1253,7 +1285,7 @@ test('the chat: Enter while the agent works joins the turn (as set) or queues it
   c.p.write('/queue for later\r');
   await waitFor(() => sent('/queue', 'for later') === 1);
   assert.equal(sent('/message', 'for later'), 0);
-  await c.until(/⧗ queued: for later/);
+  await c.until(/◦ queued: for later/);
   c.p.write('/now right away\r');
   await waitFor(() => sent('/message', 'right away') === 1);
   assert.equal(sent('/queue', 'right away'), 0);

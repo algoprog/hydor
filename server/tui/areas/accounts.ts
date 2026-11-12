@@ -3,9 +3,9 @@
 // sessions use. A sign-in is the page's: a link to open in your browser (printed, and opened with --browser), then a code or a
 // redirect address pasted back here, or a one-time code to enter there; this command follows the flow until it ends. Never run it
 // against a real account you do not mean to sign in or out of.
-import type { AccountStatus, LoginFlow, ServerEvent } from '../../../shared/types.ts';
+import type { AccountStatus, AgentUsage, LoginFlow, ServerEvent } from '../../../shared/types.ts';
 import { enc } from '../client.ts';
-import { Cancelled, mark, pickOne, str, table, UsageError, type Area, type Ctx } from './kit.ts';
+import { Cancelled, fields, mark, pickOne, str, table, UsageError, type Area, type Ctx } from './kit.ts';
 
 const ACCOUNT_HINT = 'hydor accounts lists them';
 const account = { name: 'account', kind: 'account', pick: true } as const;
@@ -178,10 +178,48 @@ export const accounts: Area = {
               e.status.loggedIn ? p.green(state(e.status)) : p.yellow(state(e.status)),
               p.dim(e.apiKey ? 'API key saved' : ''),
             ]),
-            { head: ['', 'ACCOUNT', 'ID', 'PROGRAM', 'STATE', ''], grow: 1, fixed: [2] },
+            { head: ['', 'ACCOUNT', 'ID', 'PROGRAM', 'STATE', ''], grow: 1, fixed: [2], drop: [5, 2] },
           ),
         );
         ctx.out(p.dim('● new sessions start with it (hydor accounts use <account> changes that).'));
+      },
+    },
+    {
+      name: 'show',
+      aliases: ['info'],
+      args: [account],
+      summary: 'One account: sign-in, usage, API key',
+      help: 'What Settings → Accounts shows for one: its program and who is signed in (and the plan), whether new sessions start with it, how much of its plan’s usage is left, whether an API key for API credit is on file (never the key), and whether a session switches to another account, or to API credit, at a usage limit. Those two switches are for all accounts: hydor settings changes them.',
+      examples: ['hydor accounts show claude', 'hydor accounts show work', 'hydor accounts show codex --json'],
+      async run(ctx, [given]) {
+        const e = await findAccount(ctx, given);
+        const [usage, app] = await Promise.all([
+          ctx.conn.api<{ claude?: AgentUsage; codex?: AgentUsage; accounts?: Record<string, AgentUsage> }>('GET', '/api/usage', undefined, { timeoutMs: 30_000 }).catch(() => undefined),
+          ctx.conn.api<{ autoSwitch?: boolean; apiCredit?: boolean }>('GET', '/api/app-settings').catch(() => undefined),
+        ]);
+        const plan = e.main ? usage?.[e.agent] : usage?.accounts?.[e.ref];
+        if (ctx.o.json) return ctx.json({ id: e.ref, agent: e.agent, name: e.name, main: e.main, status: e.status, newSessions: e.used, apiKey: e.apiKey, usage: plan, autoSwitch: app?.autoSwitch, apiCredit: app?.apiCredit });
+        const { p } = ctx.look;
+        const on = (b: boolean | undefined, yes: string, no: string) => (b === undefined ? undefined : b ? yes : no);
+        ctx.out([
+          p.bold(e.main ? e.name : `${e.name} · ${PROGRAM[e.agent]}`),
+          ...fields(ctx, [
+            ['Id', e.ref],
+            ['Program', PROGRAM[e.agent]],
+            ['Sign-in', e.main ? 'the program’s own' : 'an account you added'],
+            ['State', e.status.loggedIn ? p.green('signed in') : p.yellow(e.status.error ?? 'not signed in')],
+            ['Who', e.status.email],
+            ['Plan', e.status.plan],
+            ['Signed in with', e.status.method],
+            ['About', e.status.detail],
+            ['New sessions', e.used ? `${mark(p, 'on')} start with it` : `do not start with it (hydor accounts use ${e.main ? e.ref : e.name.includes(' ') ? e.ref : e.name})`],
+            ['API key', e.agent === 'claude' ? (e.apiKey ? 'saved (API credit for when every account is at its limit)' : 'none') : 'not used by Codex'],
+            ['At a limit', on(app?.autoSwitch, 'carries on with another account that has usage left', 'stays with this account')],
+            ['API credit', e.agent === 'claude' ? on(app?.apiCredit, e.apiKey ? 'on: carries on billed to its API key when every account is at its limit' : 'on, but this account has no API key', 'off') : undefined],
+          ]),
+        ]);
+        if (plan) ctx.out(['', p.bold('Usage'), ...(await import('../commands.ts')).planLines(plan, ctx.look)]);
+        else if (e.status.loggedIn) ctx.out(['', p.dim('No usage to show.')]);
       },
     },
     {

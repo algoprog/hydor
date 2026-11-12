@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { ApiError } from '../client.ts';
 import { UsageError } from './kit.ts';
-import { fakeConn, run, type Answer } from './test-kit.ts';
+import { atWidths, fakeConn, run, type Answer } from './test-kit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -195,6 +195,15 @@ test('profile: shown as Markdown, written from a file or the editor, cleared on 
   assert.match((await run(empty.conn, ['memory', 'profile'])).out, /Your profile is empty/);
   const long = fakeConn({ 'GET /api/memory/profile': { profile: prof, maxWords: 1000 }, 'PUT /api/memory/profile': { profile: prof, maxWords: 1000, fitting: true } });
   assert.match((await run(long.conn, ['memory', 'profile', 'edit', '--file', 'p.md'], { files: { 'p.md': 'x' } })).out, /shortens it in the background/);
+});
+
+test('list on a narrow terminal: the place and the age go whole before the note is cut', async () => {
+  const w = await atWidths(fakeConn(routes()).conn, ['memory']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][0], /^ +NOTE +ABOUT +TEXT +CHANGED$/);
+  assert.match(w[60][2], /^● +22 +thesis +Uses pnpm, not npm +1h ago$/);
+  assert.match(w[40][0], /^ +NOTE +TEXT$/);
+  assert.match(w[40][2], /^● +22 +Uses pnpm, not npm$/);
 });
 
 for (const [name, fn] of tests) {

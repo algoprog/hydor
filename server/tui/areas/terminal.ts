@@ -9,7 +9,7 @@ import { Writable } from 'node:stream';
 import type { Opts } from '../args.ts';
 import type { Conn } from '../client.ts';
 import type { Look } from '../lines.ts';
-import { strWidth, wrap } from '../term.ts';
+import { asciify, asciiWanted, strWidth, wrap } from '../term.ts';
 import { Cancelled, UsageError, type Ctx } from './kit.ts';
 
 /** The editor to run: $VISUAL, $EDITOR, else nano, else vi (the command with its own arguments). */
@@ -29,6 +29,11 @@ async function stdinText(): Promise<string> {
 
 export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx {
   const interactive = !!process.stdin.isTTY && !!process.stderr.isTTY;
+  // Plain ASCII where Unicode cannot show (a terminal or locale that cannot, or HYDOR_ASCII=1): what goes to stdout and to the questions on stderr.
+  const asciiOut = asciiWanted(process.env, process.platform, process.stdout);
+  const asciiErr = asciiWanted(process.env, process.platform, process.stderr);
+  const forOut = (lines: string[]) => (asciiOut ? lines.map(asciify) : lines);
+  const forErr = (text: string) => (asciiErr ? asciify(text) : text);
   const edit = async (text: string, ext = 'md'): Promise<string | null> => {
     if (!interactive) throw new UsageError(`There is no terminal for the editor: give the text with --file <path> (or - for stdin)`);
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-edit-'));
@@ -54,7 +59,7 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
     o,
     // On a terminal a line wider than the screen breaks at a word (hanging under its own indent), not in the middle of one.
     out: (lines) => {
-      const all = Array.isArray(lines) ? lines : [lines];
+      const all = forOut(Array.isArray(lines) ? lines : [lines]);
       const wide = process.stdout.isTTY ? Math.max(20, look.width - 1) : Infinity;
       const fitted = all.flatMap((l) => (strWidth(l) <= wide ? [l] : wrap(l, wide, { indent: /^ */.exec(l)![0] })));
       process.stdout.write(`${fitted.join('\n')}\n`);
@@ -64,7 +69,7 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
       if (o.yes) return true;
       if (!interactive) throw new UsageError(`${question.replace(/\?$/, '')}: nobody to ask here, so add -y to say yes`);
       const rl = readline.createInterface({ input: process.stdin, output: process.stderr, terminal: true });
-      const answer = await new Promise<string>((resolve) => rl.question(`${question} [y/N] `, resolve));
+      const answer = await new Promise<string>((resolve) => rl.question(`${forErr(question)} [y/N] `, resolve));
       rl.close();
       return /^y(es)?$/i.test(answer.trim());
     },
@@ -86,7 +91,7 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
     // Longer than the screen, on a terminal: through $PAGER, else less (its colours kept; LESS=FRX as git sets it, so it
     // ends by itself on a short text and leaves what was read on the screen). Printed when there is no pager.
     async page(lines) {
-      const text = `${lines.join('\n')}\n`;
+      const text = `${forOut(lines).join('\n')}\n`;
       if (!process.stdout.isTTY || lines.length < (process.stdout.rows || 24) - 1) return void process.stdout.write(text);
       const [cmd, ...args] = (process.env.PAGER || 'less').trim().split(/\s+/);
       const r = spawnSync(cmd, cmd === 'less' && !args.length ? ['-R'] : args, { input: text, stdio: ['pipe', 'inherit', 'inherit'], env: { LESS: 'FRX', ...process.env } });
@@ -101,7 +106,7 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
       // Hidden: what is typed is not echoed (a muted output for readline), only the question and a line break after it.
       const quiet = new Writable({ write: (_c, _e, done) => done() });
       const rl = readline.createInterface({ input: process.stdin, output: hidden ? quiet : process.stderr, terminal: true });
-      if (hidden) process.stderr.write(question);
+      if (hidden) process.stderr.write(forErr(question));
       return new Promise((resolve) => {
         let done = false;
         const end = (v: string | null) => {
@@ -114,7 +119,7 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
         rl.on('SIGINT', () => end(null));
         rl.on('close', () => end(null));
         if (hidden) rl.once('line', (l) => end(l));
-        else rl.question(question, (l) => end(l));
+        else rl.question(forErr(question), (l) => end(l));
       });
     },
   };

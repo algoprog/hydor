@@ -256,13 +256,20 @@ For Tab completion in bash, zsh or fish, run `hydor completion install` once and
 script where your shell looks for it and, for zsh and for bash without bash-completion, adds one line to your
 `.zshrc` or `.bashrc`. `hydor completion bash` (or `zsh`, `fish`) prints the script instead.
 
-**The Mac app** puts the command on your PATH by itself, at every start: a link to `hydor` in `~/.local/bin`, `~/bin`,
-`/usr/local/bin` or `/opt/homebrew/bin`, the first that is on your PATH and yours to write to. When none is, it links
-it in `~/.local/bin` and adds one line, marked as Hydor's, to your shell's startup file (`~/.zprofile` for zsh) so
-that folder is on your PATH. Open a new Terminal window afterwards. The command runs the app's own Node.js, and opens
-the app when it is closed; inside the app, `hydor update`, `hydor service install` and `hydor serve` say the app does
-that itself. It does nothing from the disk image or before the app is in Applications. The Windows and Linux desktop
-apps do not put it on your PATH yet (on Linux the installer links it, as above).
+**The desktop apps** put the command on your PATH by themselves, at every start, with no password and nothing shown.
+The command runs the app's own Node.js, and opens the app when it is closed; inside the app, `hydor update`,
+`hydor service install` and `hydor serve` say the app does that itself.
+
+- **Mac:** a link to `hydor` in `~/.local/bin`, `~/bin`, `/usr/local/bin` or `/opt/homebrew/bin`, the first that is on
+  your PATH and yours to write to. When none is, it links it in `~/.local/bin` and adds one line, marked as Hydor's,
+  to your shell's startup file (`~/.zprofile` for zsh) so that folder is on your PATH. Open a new Terminal window
+  afterwards. It does nothing from the disk image or before the app is in Applications.
+- **Linux (AppImage and `.deb`):** a small file `hydor` in the same folders (and the same startup-file line), which the
+  app writes again at each start so that it follows the version that runs. If a `hydor` that is not Hydor's is on your
+  PATH already (the installer's link to a checkout), it leaves everything as it is.
+- **Windows:** `hydor.cmd` in `%LOCALAPPDATA%\Microsoft\WindowsApps`, which is on your PATH by default on Windows 10 and
+  11; otherwise in `%LOCALAPPDATA%\Hydor\bin`, which it adds to your user Path (once, keeping what is there). Open a
+  new terminal window afterwards.
 
 The maintenance commands on this page work under the same name: `hydor service status`, `hydor setup-token`,
 `hydor update`, `hydor app …` are `node dist/server/cli.js …` written short; both keep working. When nothing answers

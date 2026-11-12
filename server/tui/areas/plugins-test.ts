@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ApiError } from '../client.ts';
 import { UsageError } from './kit.ts';
-import { fakeConn, run, type Answer } from './test-kit.ts';
+import { atWidths, fakeConn, run, type Answer } from './test-kit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -72,11 +72,11 @@ test('list: Hydor’s with their state and the built-in ones to add; Claude Code
   const { conn, calls } = fakeConn(routes());
   const r = await run(conn, ['plugins']);
   assert.deepEqual(calls, [{ method: 'GET', path: '/api/plugins' }]);
-  assert.match(r.out, /^ *PLUGIN +VERSION +STATE/m);
-  assert.match(r.out, /^● +Papers +1\.0\.0 +on +The papers plugin$/m);
-  assert.match(r.out, /^· +Reviewer +1\.0\.0 +off/m);
-  assert.match(r.out, /^✗ +Broken +1\.0\.0 +setup failed/m);
-  assert.match(r.out, /^\+ +Web tools web-tools +1\.0\.0 +not added/m);
+  assert.match(r.out, /^ *PLUGIN +ID +VERSION +STATE/m, 'the name and the id are columns of their own');
+  assert.match(r.out, /^● +Papers +papers +1\.0\.0 +on +The papers plugin$/m);
+  assert.match(r.out, /^· +Reviewer +reviewer +1\.0\.0 +off/m);
+  assert.match(r.out, /^✗ +Broken +broken +1\.0\.0 +setup failed/m);
+  assert.match(r.out, /^\+ +Web tools +web-tools +1\.0\.0 +not added/m);
   assert.deepEqual((await run(fakeConn(routes()).conn, ['plugins', '--json'])).json, [routes()['GET /api/plugins']]);
   const c = fakeConn(routes());
   const cl = await run(c.conn, ['plugins', '--agent', 'claude']);
@@ -232,6 +232,14 @@ test('remove: says what goes with it, asks, --keep-data', async () => {
   await run(conn, ['plugins', 'remove', 'papers', '-y', '--keep-data']);
   assert.deepEqual(calls.at(-1)?.body, { keepData: true });
   assert.deepEqual((await run(conn, ['plugins', 'remove', 'papers', '-y', '--json'])).json, [{ removed: ['reviewer', 'papers'] }]);
+});
+
+test('list on a narrow terminal: the description goes whole, then the id, before the name is cut', async () => {
+  const w = await atWidths(fakeConn(routes()).conn, ['plugins']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][1], /^● +Papers +papers +1\.0\.0 +on +The papers plugin$/);
+  assert.match(w[60][0], /^ +PLUGIN +ID +VERSION +STATE$/, 'the description went whole');
+  assert.match(w[40][4], /^\+ +Web tools +1\.0\.0 +not added$/, 'the id went too, not the name');
 });
 
 for (const [name, fn] of tests) {

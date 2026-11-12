@@ -14,10 +14,11 @@ import { ApiError, enc, health, localBase, type Conn } from './client.ts';
 import { modelLabel, tierName, type Look } from './lines.ts';
 import { busy, historyLines } from './session.ts';
 import { catalogOf, programName, type TiersState } from './start.ts';
-import { columns, money, strWidth, tildify, timeAgo, truncate, type Paint } from './term.ts';
+import { table } from './areas/kit.ts';
+import { asciiWanted, columns, forTerminal, money, strWidth, tildify, timeAgo, truncate, type Paint } from './term.ts';
 
 /** Prints lines to stdout. */
-const say = (lines: string[] | string) => process.stdout.write(`${(Array.isArray(lines) ? lines : [lines]).join('\n')}\n`);
+const say = (lines: string[] | string) => process.stdout.write(`${forTerminal(Array.isArray(lines) ? lines : [lines], asciiWanted(process.env, process.platform, process.stdout)).join('\n')}\n`);
 const json = (v: unknown) => process.stdout.write(`${JSON.stringify(v, null, 2)}\n`);
 
 /**
@@ -117,12 +118,8 @@ export function sessionLines(list: SessionSummary[], look: Look, fit = true, mar
     p.dim(folderIn(tildify(s.cwd, look.home), fit ? 28 : 200)),
     p.dim(timeAgo(s.updatedAt)),
   ]);
-  if (!fit) return columns(rows);
-  // The title takes what the width leaves.
-  const fixed = [0, 1, 3, 4, 5].reduce((a, i) => a + Math.max(...rows.map((r) => strWidth(r[i]))) + 2, 0);
-  const room = Math.max(20, look.width - fixed - 1);
-  for (const r of rows) r[2] = truncate(r[2], room);
-  return columns(rows).map((l) => truncate(l, look.width - 1));
+  // The title takes what the width leaves; on a narrow terminal the agent and model go whole, then the folder, before it is cut.
+  return table({ look, fit }, rows, { grow: 2, fixed: [0], free: [], drop: [3, 4] });
 }
 
 /** `hydor sessions`: the latest sessions (subagents only with --all). */
@@ -310,13 +307,6 @@ async function tiers(conn: Conn, o: Opts, look: Look) {
 
 // ---- agents, tasks, usage ----------------------------------------------------------------------------------
 
-/** Your agents as lines: the built-in ones first. */
-export function agentLines(list: Assistant[], look: Look): string[] {
-  const { p } = look;
-  const rows = list.map((a) => [p.bold(a.name), p.dim(a.id), truncate(a.description ?? '', Math.max(20, look.width - 40)), a.tier ? p.dim(tierName(a.tier)) : '']);
-  return columns(rows).map((l) => truncate(l, look.width));
-}
-
 /** A bar of `n` cells, `pct` full. */
 const bar = (pct: number, n: number, p: Paint) => {
   const full = Math.round((Math.max(0, Math.min(100, pct)) / 100) * n);
@@ -350,6 +340,18 @@ export async function whyNoReply(conn: Conn, view: { live: LiveState | null; ite
 
 type TimelineItemLike = { kind: string };
 
+/** One plan's usage as indented lines: its limit when used up, each window with a bar, extra usage. */
+export function planLines(a: AgentUsage, look: Look): string[] {
+  const { p } = look;
+  if (!a.ok) return [p.dim(`  ${a.error ?? 'Not signed in, or nothing to show'}`)];
+  const out: string[] = [];
+  if (a.limited) out.push(`  ${p.red(`At its limit (${a.limited.label})`)}${a.limited.resetsAt ? p.dim(`, lifts ${inTime(a.limited.resetsAt)}`) : ''}`);
+  const rows = a.windows.map((w) => [`  ${w.label}`, w.usedPercent == null ? p.dim('–') : `${bar(w.usedPercent, 20, p)} ${Math.round(w.usedPercent)}%`, p.dim(w.resetsAt ? `resets ${inTime(w.resetsAt)}` : '')]);
+  out.push(...columns(rows));
+  if (a.extra?.enabled && a.extra.used != null) out.push(p.dim(`  Extra usage: ${a.extra.used}${a.extra.monthlyLimit ? ` of ${a.extra.monthlyLimit}` : ''} ${a.extra.currency ?? ''}`.trimEnd()));
+  return out;
+}
+
 /** Plan usage as lines: each program's windows with a bar, its limit when used up. */
 export function usageLines(u: { claude?: AgentUsage; codex?: AgentUsage }, look: Look): string[] {
   const { p } = look;
@@ -359,14 +361,7 @@ export function usageLines(u: { claude?: AgentUsage; codex?: AgentUsage }, look:
     if (out.length) out.push('');
     const who = [a.account?.plan, a.account?.email].filter(Boolean).join(' · ');
     out.push(`${p.bold(name)}${who ? p.dim(`  ${who}`) : ''}`);
-    if (!a.ok) {
-      out.push(p.dim(`  ${a.error ?? 'Not signed in, or nothing to show'}`));
-      continue;
-    }
-    if (a.limited) out.push(`  ${p.red(`At its limit (${a.limited.label})`)}${a.limited.resetsAt ? p.dim(`, lifts ${inTime(a.limited.resetsAt)}`) : ''}`);
-    const rows = a.windows.map((w) => [`  ${w.label}`, w.usedPercent == null ? p.dim('–') : `${bar(w.usedPercent, 20, p)} ${Math.round(w.usedPercent)}%`, p.dim(w.resetsAt ? `resets ${inTime(w.resetsAt)}` : '')]);
-    out.push(...columns(rows));
-    if (a.extra?.enabled && a.extra.used != null) out.push(p.dim(`  Extra usage: ${a.extra.used}${a.extra.monthlyLimit ? ` of ${a.extra.monthlyLimit}` : ''} ${a.extra.currency ?? ''}`.trimEnd()));
+    out.push(...planLines(a, look));
   }
   return out.length ? out : ['No usage to show.'];
 }
@@ -424,8 +419,8 @@ async function serve() {
     say(`Hydor ${v} runs at ${base} already.`);
     return 1;
   }
-  // The Mac app's own command (its launcher sets HYDOR_APP_BUNDLE): the app runs the server, a second one would hold its port.
-  if (process.env.HYDOR_APP_BUNDLE) throw new ApiError(0, 'The Hydor app runs the server: open the app (hydor opens it by itself when it is closed).');
+  // The app's own command (its launcher sets HYDOR_APP_BUNDLE on a Mac, the shim on Linux and Windows HYDOR_APP_OPEN): the app runs the server, a second one would hold its port.
+  if (process.env.HYDOR_APP_BUNDLE || process.env.HYDOR_APP_OPEN) throw new ApiError(0, 'The Hydor app runs the server: open the app (hydor opens it by itself when it is closed).');
   const entry = path.join(APP_ROOT, 'dist/server/index.js');
   if (!fs.existsSync(entry)) throw new ApiError(0, `It is not built yet: npm ci && npm run build (in ${APP_ROOT})`);
   const child = spawn(process.execPath, [entry], { cwd: APP_ROOT, stdio: 'inherit', env: { NODE_ENV: 'production', ...process.env } });
