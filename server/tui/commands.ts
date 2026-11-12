@@ -467,14 +467,6 @@ export function openBrowser(url: string) {
   spawn(cmd, args as string[], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
 }
 
-async function open(conn: Conn, o: Opts) {
-  const key = o.args[0] ? await resolveKey(conn, o.args[0]) : undefined;
-  const url = conn.url(key);
-  if (o.json) return json({ url });
-  say(url);
-  if (o.browser) openBrowser(url);
-}
-
 /** Reads all of stdin (a message piped in). */
 export function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -515,9 +507,6 @@ export async function listCommand(conn: Conn | null, o: Opts, look: Look): Promi
       return 0;
     case 'usage':
       await usage(conn, o, look);
-      return 0;
-    case 'open':
-      await open(conn, o);
       return 0;
     default:
       throw new UsageError(`Unknown command: ${o.cmd}`);

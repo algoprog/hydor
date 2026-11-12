@@ -47,7 +47,9 @@ export type ArgKind =
   | 'connection'
   | 'account'
   | 'setting'
+  | 'value'
   | 'section'
+  | 'settings-section'
   | 'topic'
   | 'route'
   | 'place'
@@ -148,8 +150,18 @@ export interface Ctx {
   readText(spec: { file?: string; current?: string; ext?: string }): Promise<string | null>;
   /** A list to pick from (↑↓, type to filter, Enter); null when they back out. Without a terminal, a UsageError. */
   pick(title: string, items: PickItem[]): Promise<string | null>;
-  /** Asks for a secret on a terminal with what is typed hidden (nothing is echoed); null when nobody is there to ask (read stdin instead). Backing out (Ctrl-C) is Cancelled. */
-  secret?(prompt: string): Promise<string | null>;
+  /** One line typed by the person; `hidden` for a key or a token (never shown, never printed). null when they back out. Without a terminal, a UsageError. */
+  ask(question: string, o?: { hidden?: boolean }): Promise<string | null>;
+  /** Long text to read: on a terminal through the pager when it is longer than the screen (optional: a Ctx without one prints it with `out`). */
+  page?(lines: string[]): Promise<void>;
+  /** Opens an address in the person's browser (optional: a Ctx that cannot does nothing). */
+  open?(url: string): void;
+}
+
+/** Prints long lines through the Ctx's pager when it has one. */
+export async function showLong(ctx: Ctx, lines: string[]): Promise<void> {
+  if (ctx.page) await ctx.page(lines);
+  else ctx.out(lines);
 }
 
 export interface PickItem {
@@ -250,7 +262,7 @@ export function mark(p: Paint, kind: 'on' | 'off' | 'attention' | 'done' | 'erro
 export const argLabel = (a: Arg) => `${a.optional ? '[' : '<'}${a.name}${a.rest ? '…' : ''}${a.optional ? ']' : '>'}`;
 
 /** A verb's usage line: `hydor projects show <project> [options]`. */
-export const usageLine = (area: Area, verb: Verb) => ['hydor', area.name, verb.name, ...verb.args.map(argLabel), verb.options ? '[options]' : ''].filter(Boolean).join(' ');
+export const usageLine = (area: Area, verb: Verb) => ['hydor', area.name, area.bare ? '' : verb.name, ...verb.args.map(argLabel), verb.options ? '[options]' : ''].filter(Boolean).join(' ');
 
 /** Checks the words against the verb's arguments, then runs it. */
 export async function runVerb(ctx: Ctx, area: Area, verb: Verb, args: string[], values: Values): Promise<number> {

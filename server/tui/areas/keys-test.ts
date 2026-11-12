@@ -39,9 +39,9 @@ test('set: a new key, its value asked for hidden on a terminal and never printed
   const { conn, calls } = fakeConn(routes({ 'POST /api/connections/secrets': (b: unknown) => ({ secret: { ...gh, name: (b as { name: string }).name } }) }));
   const r = await run(conn, ['keys', 'set', 'new token', '--domain', 'api.x.com', '--domain', 'x.com', '--commands', 'on', '--note', 'for x', '--header', 'Authorization', '--prefix', 'Bearer '], {
     interactive: true,
-    secret: SECRET,
+    typed: [SECRET],
   });
-  assert.deepEqual(r.secretAsked, ['Value for NEW_TOKEN: ']);
+  assert.deepEqual(r.typed, [{ question: 'Value for NEW_TOKEN: ', hidden: true }]);
   assert.deepEqual(calls.at(-1), {
     method: 'POST',
     path: '/api/connections/secrets',
@@ -49,11 +49,11 @@ test('set: a new key, its value asked for hidden on a terminal and never printed
   });
   assert.match(r.out, /^NEW_TOKEN is in the vault\.$/m);
   assert.ok(!r.out.includes(SECRET) && !JSON.stringify(r.json).includes(SECRET), 'the value is never printed');
-  const j = await run(conn, ['keys', 'set', 'NEW_TOKEN2', '--json'], { interactive: true, secret: SECRET });
+  const j = await run(conn, ['keys', 'set', 'NEW_TOKEN2', '--json'], { interactive: true, typed: [SECRET] });
   assert.ok(!JSON.stringify(j.json).includes(SECRET));
-  await refused(run(conn, ['keys', 'set', 'NEW_TOKEN3'], { interactive: true, secret: '' }), /NEW_TOKEN3 has no value: type it when asked, or pipe it in/);
+  await refused(run(conn, ['keys', 'set', 'NEW_TOKEN3'], { interactive: true, typed: [''] }), /NEW_TOKEN3 has no value: type it when asked, or pipe it in/);
   await refused(run(conn, ['keys', 'set', '1']), /is no name for a key/);
-  await refused(run(conn, ['keys', 'set', 'X_KEY', '--commands', 'maybe'], { interactive: true, secret: 'v' }), /--commands takes on or off/);
+  await refused(run(conn, ['keys', 'set', 'X_KEY', '--commands', 'maybe'], { interactive: true, typed: ['v'] }), /--commands takes on or off/);
 });
 
 test('set: from stdin when piped (the first line); the value is never an option', async () => {
@@ -68,15 +68,15 @@ test('set: from stdin when piped (the first line); the value is never an option'
 
 test('set: a key that is there gets a new value, or only new details when the answer is empty', async () => {
   const { conn, calls } = fakeConn(routes({ 'PATCH /api/connections/secrets/GITHUB_TOKEN': { secret: gh } }));
-  let r = await run(conn, ['keys', 'set', 'github token'], { interactive: true, secret: SECRET });
-  assert.deepEqual(r.secretAsked, ['New value for GITHUB_TOKEN (empty keeps the current one): ']);
+  let r = await run(conn, ['keys', 'set', 'github token'], { interactive: true, typed: [SECRET] });
+  assert.deepEqual(r.typed, [{ question: 'New value for GITHUB_TOKEN (empty keeps the current one): ', hidden: true }]);
   assert.deepEqual(calls.at(-1), { method: 'PATCH', path: '/api/connections/secrets/GITHUB_TOKEN', body: { value: SECRET } });
   assert.match(r.out, /^GITHUB_TOKEN has its new value\.$/m);
-  r = await run(conn, ['keys', 'set', 'GITHUB_TOKEN', '--note', 'new note', '--domain', ''], { interactive: true, secret: '' });
+  r = await run(conn, ['keys', 'set', 'GITHUB_TOKEN', '--note', 'new note', '--domain', ''], { interactive: true, typed: [''] });
   assert.deepEqual(calls.at(-1)?.body, { domains: '', note: 'new note' });
   assert.match(r.out, /^Changed GITHUB_TOKEN\.$/m);
   const n = calls.length;
-  r = await run(conn, ['keys', 'set', 'GITHUB_TOKEN'], { interactive: true, secret: '' });
+  r = await run(conn, ['keys', 'set', 'GITHUB_TOKEN'], { interactive: true, typed: [''] });
   assert.equal(calls.length, n + 1, 'only the list was read');
   assert.match(r.out, /^Nothing changed\.$/m);
 });

@@ -96,9 +96,9 @@ test('add: a command server to both agents; a remote one; env hidden; what each 
   await run(good.conn, ['mcp', 'add', 'b', '--url', 'https://x.dev/m', '--bearer-env', 'TOKEN_VAR']);
   assert.equal((good.calls.at(-1)?.body as { bearerEnv: string }).bearerEnv, 'TOKEN_VAR');
   // A KEY alone is asked for hidden; with nobody to ask it is an error that says how.
-  const hidden = await run(good.conn, ['mcp', 'add', 'h', '--env', 'API_KEY', '--', 'srv'], { interactive: true, secret: 'typed-secret' });
+  const hidden = await run(good.conn, ['mcp', 'add', 'h', '--env', 'API_KEY', '--', 'srv'], { interactive: true, typed: ['typed-secret'] });
   assert.deepEqual((good.calls.at(-1)?.body as { env: object }).env, { API_KEY: 'typed-secret' });
-  assert.deepEqual(hidden.secretAsked, ['Environment variable API_KEY: ']);
+  assert.deepEqual(hidden.typed, [{ question: 'Environment variable API_KEY: ', hidden: true }]);
   assert.doesNotMatch(hidden.out, /typed-secret/);
   await refused(run(good.conn, ['mcp', 'add', 'h', '--env', 'API_KEY', '--', 'srv']), /Environment variable API_KEY has no value: write API_KEY=<value>/);
   await refused(run(good.conn, ['mcp', 'add', 'x']), /Say what starts it: hydor mcp add x <command…> \(or --url for a remote one\)/);

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
+import { Writable } from 'node:stream';
 import type { Opts } from '../args.ts';
 import type { Conn } from '../client.ts';
 import type { Look } from '../lines.ts';
@@ -23,34 +24,6 @@ async function stdinText(): Promise<string> {
   process.stdin.setEncoding('utf8');
   for await (const c of process.stdin) s += c;
   return s;
-}
-
-/** Asks on the terminal (stderr) for one line with nothing echoed: Enter ends it, Backspace erases, Ctrl-C or Ctrl-D backs out. */
-function hiddenLine(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const input = process.stdin;
-    process.stderr.write(prompt);
-    input.setRawMode(true);
-    input.resume();
-    input.setEncoding('utf8');
-    let text = '';
-    const done = (end: () => void) => {
-      input.off('data', onData);
-      input.setRawMode(false);
-      input.pause();
-      process.stderr.write('\n');
-      end();
-    };
-    const onData = (chunk: string) => {
-      for (const ch of chunk) {
-        if (ch === '\r' || ch === '\n') return done(() => resolve(text));
-        if (ch === '\u0003' || ch === '\u0004') return done(() => reject(new Cancelled()));
-        if (ch === '\u007f' || ch === '\b') text = [...text].slice(0, -1).join('');
-        else if (ch >= ' ') text += ch;
-      }
-    };
-    input.on('data', onData);
-  });
 }
 
 export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx {
@@ -100,13 +73,33 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
       }
       return edit(current, ext);
     },
+    open(url) {
+      void import('../commands.ts').then((m) => m.openBrowser(url));
+    },
     async pick(title, items) {
       const { pickInTerminal } = await import('../picker.ts');
       return pickInTerminal(title, items, look.p);
     },
-    async secret(prompt) {
-      if (!interactive) return null;
-      return hiddenLine(prompt);
+    async ask(question, { hidden = false } = {}) {
+      if (!interactive) throw new UsageError(`${question.replace(/[:?]\s*$/, '')}: there is no terminal to type it on`);
+      // Hidden: what is typed is not echoed (a muted output for readline), only the question and a line break after it.
+      const quiet = new Writable({ write: (_c, _e, done) => done() });
+      const rl = readline.createInterface({ input: process.stdin, output: hidden ? quiet : process.stderr, terminal: true });
+      if (hidden) process.stderr.write(question);
+      return new Promise((resolve) => {
+        let done = false;
+        const end = (v: string | null) => {
+          if (done) return;
+          done = true;
+          if (hidden) process.stderr.write('\n');
+          rl.close();
+          resolve(v);
+        };
+        rl.on('SIGINT', () => end(null));
+        rl.on('close', () => end(null));
+        if (hidden) rl.once('line', (l) => end(l));
+        else rl.question(question, (l) => end(l));
+      });
     },
   };
 }

@@ -5,7 +5,7 @@
 import { secretName, type SecretView } from '../../../shared/connections.ts';
 import { enc } from '../client.ts';
 import { timeAgo } from '../term.ts';
-import { choose, str, strs, table, UsageError, type Area, type Ctx, type Values } from './kit.ts';
+import { Cancelled, choose, str, strs, table, UsageError, type Area, type Ctx, type Values } from './kit.ts';
 
 const KEY_HINT = 'hydor keys lists them';
 const key = { name: 'NAME', kind: 'key', pick: true } as const;
@@ -86,8 +86,11 @@ export const keys: Area = {
         for (const k of ['note', 'header', 'prefix', 'query'] as const) if (str(v, k) !== undefined) details[k] = str(v, k) || null;
         if (details.note === null) details.note = '';
         // The value: asked hidden on a terminal, else the first line of stdin.
-        let value: string | null | undefined = await ctx.secret?.(`${existing ? 'New value' : 'Value'} for ${name}${existing ? ' (empty keeps the current one)' : ''}: `);
-        if (value == null) value = (await ctx.readText({ file: '-' }))?.split(/\r?\n/)[0];
+        let value: string | null | undefined;
+        if (ctx.interactive) {
+          value = await ctx.ask(`${existing ? 'New value' : 'Value'} for ${name}${existing ? ' (empty keeps the current one)' : ''}: `, { hidden: true });
+          if (value === null) throw new Cancelled();
+        } else value = (await ctx.readText({ file: '-' }))?.split(/\r?\n/)[0];
         value = value?.trim();
         if (!value) {
           if (!existing) throw new UsageError(`${name} has no value: type it when asked, or pipe it in (hydor keys set ${name} < file)`);

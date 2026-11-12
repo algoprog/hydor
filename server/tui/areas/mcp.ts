@@ -3,7 +3,7 @@
 // server: removing one is how it stops. Values of env and headers are never returned by the server, so edit asks for them again.
 import path from 'node:path';
 import { ApiError } from '../client.ts';
-import { choose, mark, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
+import { Cancelled, choose, mark, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
 
 interface Server {
   agent: 'claude' | 'codex';
@@ -84,8 +84,9 @@ async function pairs(ctx: Ctx, list: string[], sep: '=' | ':', what: string): Pr
     if (!key) throw new UsageError(`${what} “${item}” has no name`);
     let value = i < 0 ? undefined : item.slice(i + 1).trim();
     if (value === undefined) {
-      const typed = await ctx.secret?.(`${what} ${key}: `);
-      if (typed == null) throw new UsageError(`${what} ${key} has no value: write ${key}${sep}<value> (on a terminal, ${key} alone asks for it hidden)`);
+      if (!ctx.interactive) throw new UsageError(`${what} ${key} has no value: write ${key}${sep}<value> (on a terminal, ${key} alone asks for it hidden)`);
+      const typed = await ctx.ask(`${what} ${key}: `, { hidden: true });
+      if (typed === null) throw new Cancelled();
       value = typed;
     }
     out[key] = value;

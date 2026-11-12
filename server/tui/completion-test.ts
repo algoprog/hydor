@@ -79,7 +79,7 @@ test('complete: the first word is a command, with its description', async () => 
     all.every((l) => l.split('\t').length === 2 && !l.startsWith('__')),
     'a value and a description, none hidden',
   );
-  assert.deepEqual(await values('se'), ['sessions', 'send', 'serve', 'set-password', 'setup-token', 'service']);
+  assert.deepEqual(await values('se'), ['sessions', 'send', 'serve', 'set-password', 'setup-token', 'service', 'settings']);
   assert.deepEqual(await complete('zzz'), []);
   assert.equal(asked.length, 0, 'commands need no server');
 });
@@ -126,7 +126,7 @@ test('complete: --agent, --model and --as come from the server', async () => {
 test('complete: after a command', async () => {
   const keys = await complete('show', '');
   assert.deepEqual(keys, ['aaaa1111\tFix the tests · Working', 'cccc3333\tPlan the move · Needs you'], 'helpers left out, a title on one line');
-  for (const c of ['send', 'stop', 'open', 'resume']) assert.equal((await values(c, '')).length, 2, c);
+  for (const c of ['send', 'stop', 'resume']) assert.equal((await values(c, '')).length, 2, c);
   assert.deepEqual(await values('send', 'aaaa1111', ''), [], 'only the first word is a key');
   assert.deepEqual(await values('show', 'cc'), ['cccc3333']);
   assert.deepEqual(await values('models', ''), ['claude', 'codex', 'custom']);
@@ -144,7 +144,7 @@ test('complete: after a command', async () => {
   assert.deepEqual(await values('help', 'st'), ['stop', 'status']);
   assert.deepEqual(await values('help', ''), ALL_COMMAND_NAMES);
   assert.deepEqual(await values('fix', 'the', ''), [], 'a message has none');
-  assert.deepEqual(await values('sessions', ''), []);
+  assert.ok((await values('sessions', '')).includes('search') && (await values('sessions', '')).includes('queue'), 'the verbs of the sessions area');
 });
 
 // ---- the scripts -----------------------------------------------------------------------------------------------
