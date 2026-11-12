@@ -80,13 +80,15 @@ export interface Answers {
   interactive?: boolean;
   /** Whether lists are cut to the width (default false). */
   fit?: boolean;
+  /** The terminal's width in columns (default 80). */
+  width?: number;
 }
 
 /** A Ctx that collects. */
 export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArgv>, a: Answers = {}): { ctx: Ctx; ran: Ran } {
   const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [], typed: [], opened: [] };
   const typed = [...(a.typed ?? [])];
-  const look: Look = { p: makePaint(false), width: 80, home: '/home/u' };
+  const look: Look = { p: makePaint(false), width: a.width ?? 80, home: '/home/u' };
   const ctx: Ctx = {
     conn,
     look,
@@ -147,4 +149,11 @@ export async function run(conn: Conn, words: string[], a: Answers = {}): Promise
   const { ctx, ran } = testCtx(conn, usageLine(o.route.area, verb), o, a);
   ran.code = await runVerb(ctx, o.route.area, verb, o.args, o.route.values);
   return ran;
+}
+
+/** The lines `hydor <words>` prints on a terminal of each width (default 40, 60 and 100 columns), in a map by width. */
+export async function atWidths(conn: Conn, words: string[], widths = [40, 60, 100], a: Answers = {}): Promise<Record<number, string[]>> {
+  const out: Record<number, string[]> = {};
+  for (const width of widths) out[width] = (await run(conn, words, { ...a, interactive: true, fit: true, width })).out.replace(/\n$/, '').split('\n');
+  return out;
 }

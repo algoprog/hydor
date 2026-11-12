@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { ApiError } from '../client.ts';
 import { UsageError } from './kit.ts';
-import { fakeConn, run, type Answer } from './test-kit.ts';
+import { atWidths, fakeConn, run, type Answer } from './test-kit.ts';
 
 const DATA = process.env.DATA_DIR ?? '';
 if (!DATA.startsWith('/tmp/')) {
@@ -211,6 +211,14 @@ test('remove: asks, says no to a built-in one, --json', async () => {
   await refused(run(conn, ['agents', 'remove', 'coder', '-y']), /“Coder” is built in and cannot be removed/);
   const server = fakeConn(routes({ 'DELETE /api/assistants/scribe-1': new ApiError(400, 'No') }));
   await refused(run(server.conn, ['agents', 'remove', 'scribe', '-y']), /^No$/, ApiError);
+});
+
+test('list on a narrow terminal: the description goes whole before the name is cut', async () => {
+  const w = await atWidths(fakeConn(routes()).conn, ['agents']);
+  for (const [n, lines] of Object.entries(w)) assert.ok(lines.every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
+  assert.match(w[100][0], /^Researcher +researcher +Finds and weighs sources +Best$/);
+  assert.match(w[40][0], /^Researcher +researcher +Best$/, 'the description went whole');
+  assert.match(w[40][2], /^Bookkeeper +bookkeeper-3f9a +Standard$/);
 });
 
 for (const [name, fn] of tests) {

@@ -217,7 +217,7 @@ hydor library export "Q3 report" --to pdf -o q3.pdf
 | `hydor models` and `hydor tiers` | The models each program offers, and which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means (`hydor tiers set claude best opus --effort high`, `hydor tiers reset`; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with subagents** and **Max for hard problems**, and `on` turns them back on). |
 | `hydor usage` | Each plan's usage and limits, and when they reset. |
 | `hydor agents` | [Your agents](/guide/agents): `list`, `show`, `new`, `edit` and `remove` (the built-in ones can be copied, not changed). An agent's output fields and where its results go are set on its page (`hydor open agents`). |
-| `hydor accounts` | The sign-ins of Claude Code and Codex: `list`, `add <program> <name>` (another account, signed in at once), `sign-in`, `sign-out`, `remove` and `use` (the one new sessions start with). The API key for API credit and the switches at a usage limit are settings (`accounts.*`). |
+| `hydor accounts` | The sign-ins of Claude Code and Codex: `list`, `show` (one account: who is signed in and the plan, whether new sessions start with it, its usage and limits, whether an API key is on file (never the key), and whether a session switches at a limit), `add <program> <name>` (another account, signed in at once), `sign-in`, `sign-out`, `remove` and `use` (the one new sessions start with). The API key for API credit and the switches at a usage limit are settings (`accounts.*`). |
 
 ```bash
 hydor agents new Bookkeeper --tools read,edit --tier standard
@@ -234,7 +234,7 @@ hydor accounts use work
 | `hydor guidelines` | `show` and `edit` what every agent follows: for every session, for a project (`--project`) or for one session (`--session`). |
 | `hydor skills` | The skills agents use: `list`, `show`, `on`, `off`, `add` (from a `SKILL.md` or a folder) and `remove`. `--agent claude` or `--agent codex` is for the skills those programs have of their own. |
 | `hydor plugins` | Add-ons with skills and tools: `list`, `show`, `on`, `off`, `add` (built in, a Git address, a .zip or a folder) and `remove`. Making a plugin of your own is on its page (`hydor open plugins`). |
-| `hydor mcp` | Tool servers (MCP) for Claude Code and Codex: `list`, `status` (starts each and says which work), `add`, `edit` and `remove`. |
+| `hydor mcp` | Tool servers (MCP) for Claude Code and Codex: `list`, `show` (one server: its program, scope, command or address, the names of its environment variables and headers with their values hidden, on or off, and with `--tools` how many tools it has), `status` (starts each and says which work), `add`, `edit` and `remove`. |
 | `hydor connections` | The [connected apps](/guide/connections) (Notion, GitHub, Gmail…): `list`, `show`, `services` (what can be connected), `connect <service>` (a key typed hidden, or a sign-in in your browser that the command waits for) and `disconnect`. Which tools of a connection are on is on its page. |
 | `hydor keys` | The [vault](/guide/connections): `list` your keys' names and where each may go, `set <NAME>` and `remove <NAME>`. A value is asked for with what you type hidden, or read from what you pipe in; it is never typed as an option (your shell would keep it) and never printed. |
 
@@ -301,7 +301,7 @@ or set `HYDOR_URL` and `HYDOR_TOKEN` once. Folders are that computer's: a sessio
 
 ## Colours and pipes
 
-Colours are on in a terminal (true colour where it has it) and off when the output goes to a file or another program, and with `NO_COLOR` set or `--no-color`; `FORCE_COLOR` turns them on. When what you type is piped in (`echo "…" | hydor`), it works as `hydor run`. When only the output is piped, the conversation prints without colours or the changing lines, and each line you type is sent. Lists such as `hydor sessions` then print the same columns, without colours and without cutting what is long, so scripts can read them.
+Colours are on in a terminal (true colour where it has it) and off when the output goes to a file or another program, and with `NO_COLOR` set or `--no-color`; `FORCE_COLOR` turns them on. When what you type is piped in (`echo "…" | hydor`), it works as `hydor run`. When only the output is piped, the conversation prints without colours or the changing lines, and each line you type is sent. Lists such as `hydor sessions` then print the same columns, without colours and without cutting what is long, so scripts can read them. On a narrow terminal a list leaves out whole columns (first a description, then others such as an address or an age) rather than cutting the names and titles short.
 
 ## Ask an agent
 

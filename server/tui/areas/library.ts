@@ -154,7 +154,7 @@ function rows(ctx: Ctx, lib: Library, list: Thing[]): string[] {
       p.dim(timeAgo(t.updatedAt)),
       p.dim(size(t.bytes)),
     ]),
-    { head: ['KIND', 'TITLE', 'ID', 'WHERE', 'CHANGED', 'SIZE'], grow: 1, fixed: [2] },
+    { head: ['KIND', 'TITLE', 'ID', 'WHERE', 'CHANGED', 'SIZE'], grow: 1, fixed: [2], drop: [3, 5, 4] },
   );
 }
 

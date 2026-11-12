@@ -217,7 +217,7 @@ hydor library export "Q3 report" --to pdf -o q3.pdf
 | `hydor models` 和 `hydor tiers` | 每个程序提供的模型，以及每个[档位](/guide/agents-models#tiers-a-model-for-each-kind-of-job)对应哪个模型（`hydor tiers set claude best opus --effort high`、`hydor tiers reset`；`hydor tiers team off` 和 `hydor tiers hard off` 分别关闭**主智能体带领子智能体**和**难题用最高档位**，`on` 再把它们打开）。 |
 | `hydor usage` | 每个套餐的用量和限额，以及它们何时重置。 |
 | `hydor agents` | [你的智能体](/guide/agents)：`list`、`show`、`new`、`edit` 和 `remove`（内置的可以复制，不能更改）。智能体的输出字段和结果去向在它自己的页面上设置（`hydor open agents`）。 |
-| `hydor accounts` | Claude Code 和 Codex 的登录：`list`、`add <程序> <名称>`（再添加一个账户，并立即登录）、`sign-in`、`sign-out`、`remove` 和 `use`（新会话用哪一个开始）。用于 API 额度的 API 密钥和用量限额时的开关是设置（`accounts.*`）。 |
+| `hydor accounts` | Claude Code 和 Codex 的登录：`list`、`show`（一个账户：谁已登录及套餐、新会话是否用它开始、它的用量和限额、是否保存了 API 密钥（绝不显示密钥）、会话在限额时是否切换）、`add <程序> <名称>`（再添加一个账户，并立即登录）、`sign-in`、`sign-out`、`remove` 和 `use`（新会话用哪一个开始）。用于 API 额度的 API 密钥和用量限额时的开关是设置（`accounts.*`）。 |
 
 ```bash
 hydor agents new Bookkeeper --tools read,edit --tier standard
@@ -234,7 +234,7 @@ hydor accounts use work
 | `hydor guidelines` | `show` 和 `edit` 每个智能体都遵循的准则：对每个会话（默认）、对某个项目（`--project`）或对某一个会话（`--session`）。 |
 | `hydor skills` | 智能体用的技能：`list`、`show`、`on`、`off`、`add`（来自一个 `SKILL.md` 或一个文件夹）和 `remove`。`--agent claude` 或 `--agent codex` 用于这些程序自己的技能。 |
 | `hydor plugins` | 带有技能和工具的附加组件：`list`、`show`、`on`、`off`、`add`（内置的、Git 地址、.zip 或文件夹）和 `remove`。制作你自己的插件在它的页面上（`hydor open plugins`）。 |
-| `hydor mcp` | Claude Code 和 Codex 的工具服务器（MCP）：`list`、`status`（启动每一个并说明哪些在工作）、`add`、`edit` 和 `remove`。 |
+| `hydor mcp` | Claude Code 和 Codex 的工具服务器（MCP）：`list`、`show`（一个服务器：它属于哪个程序、范围、命令或地址、环境变量和请求头的名称（值已隐藏）、开或关，用 `--tools` 还显示它有多少工具）、`status`（启动每一个并说明哪些在工作）、`add`、`edit` 和 `remove`。 |
 | `hydor connections` | [已连接的应用](/guide/connections)（Notion、GitHub、Gmail……）：`list`、`show`、`services`（可以连接什么）、`connect <服务>`（隐藏地输入密钥，或者在浏览器里登录，命令会等你完成）和 `disconnect`。连接的哪些工具开着，要在它的页面上设置。 |
 | `hydor keys` | [保险库](/guide/connections)：`list` 你的密钥的名称和每个密钥可以发往哪里，`set <NAME>` 和 `remove <NAME>`。值是在你输入时隐藏地询问的，或者从管道输入读取；它绝不会作为选项输入（你的 shell 会把它记下来），也绝不会被打印出来。 |
 
@@ -301,7 +301,7 @@ hydor --server https://hydor.example.com --token acm_… sessions
 
 ## 颜色和管道
 
-终端里颜色是开启的（有真彩色时就用真彩色）；当输出到文件或另一个程序、设置了 `NO_COLOR` 或使用 `--no-color` 时，颜色是关闭的；`FORCE_COLOR` 会把它们打开。当你输入的内容通过管道传入时（`echo "…" | hydor`），它的工作方式和 `hydor run` 一样。当只有输出被管道接走时，对话会不带颜色和不断变化的行来打印，你输入的每一行都会被发送。像 `hydor sessions` 这样的列表此时会打印同样的列，不带颜色，也不会把较长的内容截断，方便脚本读取。
+终端里颜色是开启的（有真彩色时就用真彩色）；当输出到文件或另一个程序、设置了 `NO_COLOR` 或使用 `--no-color` 时，颜色是关闭的；`FORCE_COLOR` 会把它们打开。当你输入的内容通过管道传入时（`echo "…" | hydor`），它的工作方式和 `hydor run` 一样。当只有输出被管道接走时，对话会不带颜色和不断变化的行来打印，你输入的每一行都会被发送。像 `hydor sessions` 这样的列表此时会打印同样的列，不带颜色，也不会把较长的内容截断，方便脚本读取。 在较窄的终端上，列表会整列省略（先是说明，再是地址或时间等其他列），而不是把名称和标题截短。
 
 ## 问问智能体
 
