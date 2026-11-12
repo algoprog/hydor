@@ -6,7 +6,6 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Assistant } from '../../shared/assistants.ts';
-import { scheduleText, type ScheduledTask } from '../../shared/automations.ts';
 import type { SessionNote } from '../../shared/features.ts';
 import { TIER_PROGRAMS } from '../../shared/tiers.ts';
 import type { AgentCatalog, AgentUsage, LiveOverlay, LiveState, SessionSummary, TimelinePage } from '../../shared/types.ts';
@@ -36,17 +35,57 @@ export async function resolveKey(conn: Conn, given: string | undefined): Promise
   throw new UsageError(`“${given}” starts ${hits.length} sessions: give more of it`);
 }
 
+/** What a session is doing, as one of a few kinds ('' when nothing is). */
+function statusKind(s: SessionSummary): 'needs' | 'starting' | 'working' | 'stopping' | 'error' | 'outside' | 'finished' | '' {
+  const l = s.live;
+  if (l?.status === 'waiting' || (l?.pendingApprovals ?? 0) > 0) return 'needs';
+  if (l?.status === 'starting') return 'starting';
+  if (l?.status === 'working') return 'working';
+  if (l?.status === 'stopping') return 'stopping';
+  if (l?.status === 'error') return 'error';
+  if (s.external && s.external.status !== 'idle') return 'outside';
+  if (s.doneAt && (!s.seenAt || s.seenAt < s.doneAt)) return 'finished';
+  return '';
+}
+
 /** A session's state in the app's words: Working, Needs you, Starting, Finished (not read yet), or nothing. */
 export function statusWord(s: SessionSummary, p: Paint): string {
-  const l = s.live;
-  if (l?.status === 'waiting' || (l?.pendingApprovals ?? 0) > 0) return p.yellow('Needs you');
-  if (l?.status === 'starting') return p.accent('Starting');
-  if (l?.status === 'working') return p.accent('Working');
-  if (l?.status === 'stopping') return p.dim('Stopping');
-  if (l?.status === 'error') return p.red('Error');
-  if (s.external && s.external.status !== 'idle') return p.accent(s.external.status === 'waiting' ? `Needs you in ${s.external.client}` : `Working in ${s.external.client}`);
-  if (s.doneAt && (!s.seenAt || s.seenAt < s.doneAt)) return p.green('Finished');
-  return '';
+  switch (statusKind(s)) {
+    case 'needs':
+      return p.yellow('Needs you');
+    case 'starting':
+      return p.accent('Starting');
+    case 'working':
+      return p.accent('Working');
+    case 'stopping':
+      return p.dim('Stopping');
+    case 'error':
+      return p.red('Error');
+    case 'outside':
+      return p.accent(s.external!.status === 'waiting' ? `Needs you in ${s.external!.client}` : `Working in ${s.external!.client}`);
+    case 'finished':
+      return p.green('Finished');
+    default:
+      return '';
+  }
+}
+
+/** The mark before a session's state: ● accent when it works, ● yellow when it needs you, ✓ green when it finished, ✗ red on an error, · dim otherwise. */
+export function statusMark(s: SessionSummary, p: Paint): string {
+  switch (statusKind(s)) {
+    case 'needs':
+      return p.yellow('●');
+    case 'starting':
+    case 'working':
+    case 'outside':
+      return p.accent('●');
+    case 'error':
+      return p.red('✗');
+    case 'finished':
+      return p.green('✓');
+    default:
+      return p.dim('·');
+  }
 }
 
 /**
@@ -65,14 +104,14 @@ export const shortKey = (s: Pick<SessionSummary, 'id'>, n = 8) => s.id.slice(0, 
 /** A folder, cut from its start to fit (its end says most). */
 const folderIn = (p: string, max: number) => (strWidth(p) <= max ? p : `…${p.slice(p.length - max + 1)}`);
 
-/** The sessions as aligned lines, latest first (cut to the width on a terminal only). */
-export function sessionLines(list: SessionSummary[], look: Look, fit = true): string[] {
+/** The sessions as aligned lines, latest first (cut to the width on a terminal only, with a mark before each state). */
+export function sessionLines(list: SessionSummary[], look: Look, fit = true, marks = false): string[] {
   const { p } = look;
   if (!list.length) return ['No sessions yet: `hydor` starts one here.'];
   const n = keyLength(list);
   const rows = list.map((s) => [
     p.dim(shortKey(s, n)),
-    statusWord(s, p) || p.dim('·'),
+    marks ? `${statusMark(s, p)}${statusWord(s, p) ? ` ${statusWord(s, p)}` : ''}` : statusWord(s, p) || p.dim('·'),
     (s.title || s.firstPrompt || '(untitled)').replace(/\s+/g, ' '),
     p.dim([s.acpName ?? (s.agent === 'claude' ? 'Claude Code' : s.agent === 'codex' ? 'Codex' : 'Agent'), modelLabel(s.live?.model ?? s.model)].filter(Boolean).join(' · ')),
     p.dim(folderIn(tildify(s.cwd, look.home), fit ? 28 : 200)),
@@ -86,13 +125,13 @@ export function sessionLines(list: SessionSummary[], look: Look, fit = true): st
   return columns(rows).map((l) => truncate(l, look.width - 1));
 }
 
-/** `hydor sessions`: the latest sessions (helpers only with --all). */
+/** `hydor sessions`: the latest sessions (subagents only with --all). */
 async function sessions(conn: Conn, o: Opts, look: Look) {
   const limit = o.all ? 300 : (o.limit ?? 25);
   const { sessions: all, total } = await conn.api<{ sessions: SessionSummary[]; total: number }>('GET', `/api/sessions?limit=${o.all ? 300 : Math.min(300, limit * 3)}`);
   const list = (o.all ? all : all.filter((s) => !s.extra?.parent)).slice(0, limit);
   if (o.json) return json({ sessions: list, total });
-  say(sessionLines(list, look, !!process.stdout.isTTY));
+  say(sessionLines(list, look, !!process.stdout.isTTY, !!process.stdout.isTTY));
 }
 
 /** A session's whole conversation (every page of it). */
@@ -223,7 +262,7 @@ export async function tierLines(conn: Conn, look: Look, t?: TiersState | null): 
   };
   const rows = [['', ...TIER_PROGRAMS.map((x) => p.bold(x.label))], ...tierIds(st).map((id) => [p.bold(tierName(id)), ...PROGRAMS.map((x, i) => cell(x.tier, id, i))])];
   const out = columns(rows, '   ');
-  if (st.team) out.push('', `Lead with helpers: ${st.team.on ? p.green('on') : 'off'}    Max for hard problems: ${st.team.hard ? p.green('on') : 'off'}`);
+  if (st.team) out.push('', `Lead with subagents: ${st.team.on ? p.green('on') : 'off'}    Max for hard problems: ${st.team.hard ? p.green('on') : 'off'}`);
   return out;
 }
 
@@ -276,39 +315,6 @@ export function agentLines(list: Assistant[], look: Look): string[] {
   const { p } = look;
   const rows = list.map((a) => [p.bold(a.name), p.dim(a.id), truncate(a.description ?? '', Math.max(20, look.width - 40)), a.tier ? p.dim(tierName(a.tier)) : '']);
   return columns(rows).map((l) => truncate(l, look.width));
-}
-
-async function agents(conn: Conn, o: Opts, look: Look) {
-  const r = await conn.api<{ assistants: Assistant[] }>('GET', '/api/assistants');
-  if (o.json) return json(r);
-  say(agentLines(r.assistants, look));
-}
-
-async function tasks(conn: Conn, o: Opts, look: Look) {
-  const { p } = look;
-  if (o.args[0] === 'run') {
-    const id = o.args[1];
-    if (!id) throw new UsageError('Say which task: hydor tasks run <id> (hydor tasks lists them)');
-    const { tasks: list } = await conn.api<{ tasks: ScheduledTask[] }>('GET', '/api/tasks');
-    const t = list.find((x) => x.id === id) ?? list.find((x) => x.name.toLowerCase() === id.toLowerCase());
-    if (!t) throw new ApiError(404, `No task “${id}”: hydor tasks lists them`);
-    const r = await conn.api<{ key?: string }>('POST', `/api/tasks/${encodeURIComponent(t.id)}/run`, {});
-    if (o.json) return json(r);
-    return say(r.key ? `Started “${t.name}”: ${conn.url(r.key)}` : `Started “${t.name}”.`);
-  }
-  if (o.args.length) throw new UsageError('hydor tasks [run <id>]');
-  const r = await conn.api<{ tasks: ScheduledTask[] }>('GET', '/api/tasks');
-  if (o.json) return json(r);
-  if (!r.tasks.length) return say('No scheduled tasks yet: make one in the app (Scheduled), or ask an agent to.');
-  const when = (ms?: number) => (ms ? new Date(ms).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
-  const rows = r.tasks.map((t) => [
-    p.dim(t.id),
-    p.bold(t.name),
-    scheduleText(t.schedule),
-    t.enabled ? (t.nextAt ? p.dim(`next ${when(t.nextAt)}`) : '') : p.yellow(t.pausedReason ? `paused: ${t.pausedReason}` : 'paused'),
-    t.lastStatus ? (t.lastStatus === 'ok' ? p.green('last ok') : p.red(`last: ${t.lastStatus}`)) : '',
-  ]);
-  say(columns(rows).map((l) => truncate(l, look.width)));
 }
 
 /** A bar of `n` cells, `pct` full. */
@@ -393,15 +399,18 @@ async function status(o: Opts, look: Look) {
   const working = list.filter((s) => busy(s.live) && s.live?.status !== 'waiting');
   const waiting = list.filter((s) => s.live?.status === 'waiting' || (s.live?.pendingApprovals ?? 0) > 0);
   if (o.json) return json({ server: base, local: !remote, version: v, running: !!v, dataDir: remote ? undefined : config.dataDir, service: service === undefined ? undefined : service === null ? { installed: false } : { installed: true, unit: UNIT, state: service }, working: working.map((s) => s.key), waiting: waiting.map((s) => s.key) });
-  const out = [v ? `${p.bold(`Hydor ${v}`)} at ${base}${remote ? '' : p.dim(' (this computer)')}` : `${p.red('Nothing answers')} at ${base}${remote ? '' : p.dim(': hydor starts it when you run it, or hydor serve')}`];
+  const out = [v ? `${p.green('●')} ${p.bold(`Hydor ${v}`)}  running at ${base}${remote ? '' : p.dim(' (this computer)')}` : `${p.red('✗')} ${p.red('Nothing answers')} at ${base}${remote ? '' : p.dim(': hydor starts it when you run it, or hydor serve')}`];
+  const rows: string[][] = [];
   if (!remote) {
-    out.push(`Data folder: ${tildify(config.dataDir, look.home)}`);
-    if (process.platform === 'linux') out.push(service === null ? 'Service: not installed (hydor service install keeps it running, also after a restart)' : `Service: ${UNIT}, ${service}`);
+    rows.push([p.dim('Data'), tildify(config.dataDir, look.home)]);
+    if (process.platform === 'linux') rows.push([p.dim('Service'), service === null ? 'not installed (hydor service install keeps it running, also after a restart)' : `${UNIT}, ${service}`]);
   }
+  if (v) rows.push([p.dim('Sessions'), `${working.length} working, ${waiting.length} ${waiting.length === 1 ? 'needs' : 'need'} you`]);
+  out.push(...columns(rows).map((l) => `  ${l}`));
   if (v) {
-    out.push(`Sessions: ${working.length} working, ${waiting.length} ${waiting.length === 1 ? 'needs' : 'need'} you`);
     const shown = [...waiting, ...working].slice(0, 10);
-    for (const s of shown) out.push(`  ${statusWord(s, p)}  ${truncate(s.title || '(untitled)', look.width - 20)} ${p.dim(shortKey(s, keyLength(list)))}`);
+    const n = keyLength(list);
+    for (const s of shown) out.push(`    ${statusMark(s, p)} ${statusWord(s, p)}  ${truncate(s.title || '(untitled)', look.width - 24)} ${p.dim(shortKey(s, n))}`);
   }
   say(out);
 }
@@ -415,6 +424,8 @@ async function serve() {
     say(`Hydor ${v} runs at ${base} already.`);
     return 1;
   }
+  // The Mac app's own command (its launcher sets HYDOR_APP_BUNDLE): the app runs the server, a second one would hold its port.
+  if (process.env.HYDOR_APP_BUNDLE) throw new ApiError(0, 'The Hydor app runs the server: open the app (hydor opens it by itself when it is closed).');
   const entry = path.join(APP_ROOT, 'dist/server/index.js');
   if (!fs.existsSync(entry)) throw new ApiError(0, `It is not built yet: npm ci && npm run build (in ${APP_ROOT})`);
   const child = spawn(process.execPath, [entry], { cwd: APP_ROOT, stdio: 'inherit', env: { NODE_ENV: 'production', ...process.env } });
@@ -426,14 +437,6 @@ async function serve() {
 export function openBrowser(url: string) {
   const [cmd, args] = process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
   spawn(cmd, args as string[], { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
-}
-
-async function open(conn: Conn, o: Opts) {
-  const key = o.args[0] ? await resolveKey(conn, o.args[0]) : undefined;
-  const url = conn.url(key);
-  if (o.json) return json({ url });
-  say(url);
-  if (o.browser) openBrowser(url);
 }
 
 /** Reads all of stdin (a message piped in). */
@@ -471,17 +474,8 @@ export async function listCommand(conn: Conn | null, o: Opts, look: Look): Promi
     case 'tiers':
       await tiers(conn, o, look);
       return 0;
-    case 'agents':
-      await agents(conn, o, look);
-      return 0;
-    case 'tasks':
-      await tasks(conn, o, look);
-      return 0;
     case 'usage':
       await usage(conn, o, look);
-      return 0;
-    case 'open':
-      await open(conn, o);
       return 0;
     default:
       throw new UsageError(`Unknown command: ${o.cmd}`);

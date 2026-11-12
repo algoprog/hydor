@@ -254,6 +254,7 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
   assert.equal(lv('POST', '/api/sessions'), 'always');
   assert.equal(lv('POST', '/api/tasks'), 'always');
   assert.equal(lv('POST', '/api/search/test'), 'free');
+  assert.equal(lv('PUT', '/api/budget/claude:x'), 'ask', 'a spending cap: a card every time');
   for (const [m, p] of [
     ['POST', '/api/auth/password'],
     ['GET', '/api/fs/read'],
@@ -264,7 +265,6 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['POST', '/api/mcp/tokens'],
     ['POST', '/api/access-tokens'],
     ['POST', '/api/connections/secrets'],
-    ['PUT', '/api/budget/claude:x'],
     ['POST', '/api/accounts/claude/login'],
     ['POST', '/api/sites'],
     // The editors' AI tools: agents have their own.
@@ -320,6 +320,8 @@ async function testApp() {
   app.put('/api/search/settings', async (req) => (settings = { ...settings, ...(req.body as object) }));
   app.post('/api/projects', async (req) => ({ id: 'sp1', ...(req.body as object) }));
   app.delete('/api/projects/:id', async () => ({ ok: true }));
+  app.post('/api/sessions/:key/config', async (req) => ({ ok: true, key: (req.params as { key: string }).key, ...(req.body as object) }));
+  app.patch('/api/sessions/:key/extra', async (req) => ({ extra: req.body }));
   await app.ready();
   return app;
 }
@@ -448,7 +450,7 @@ test('app_api: a form on the card, filled in from the body; the user’s answers
   await app.close();
 });
 
-test('app_api: never the user’s own things, nor raising a cap, nor changing permissions', async () => {
+test('app_api: never the user’s own things', async () => {
   const app = await testApp();
   const s = session('bypassPermissions', () => ({ decision: 'accept' }));
   const ctx = ctxOf(app, s);
@@ -456,8 +458,6 @@ test('app_api: never the user’s own things, nor raising a cap, nor changing pe
     ['POST', '/api/auth/password', {}, /Password/],
     ['GET', '/api/fs/read?path=/etc/passwd', {}, /your own tools/],
     ['POST', '/api/sessions/claude:own/approvals/a1', { decision: 'allow' }, /Only the user answers/],
-    ['POST', '/api/sessions/claude:own/config', { mode: 'bypassPermissions' }, /permissions are the user’s/],
-    ['PATCH', '/api/sessions/claude:other/extra', { capUsd: 500 }, /Spending caps/],
     ['POST', '/api/sessions/claude:own/message', { text: 'hi' }, /That is this session/],
     ['PUT', '/api/models', { openrouterKey: 'sk-or-v1-x' }, /never passes through an agent/],
     ['POST', '/api/images/make', { prompt: 'a cat' }, /generate_image/],
@@ -467,6 +467,46 @@ test('app_api: never the user’s own things, nor raising a cap, nor changing pe
     assert.equal(r.isError, true, `${method} ${p}`);
     assert.match(r.text, why, `${method} ${p}: ${r.text}`);
   }
+  await app.close();
+});
+
+test('app_api: a session’s permissions and spending cap: a card each time, in every mode; Plan mode changes its own settings on a card', async () => {
+  const app = await testApp();
+  // Full access asks nothing else, but asks these, and never for the rest of the session.
+  const full = session('bypassPermissions', () => ({ decision: 'accept' }));
+  let r = await appApi({ method: 'POST', path: '/api/sessions/this/config', body: { mode: 'plan' }, summary: 'Switch to Plan mode' }, ctxOf(app, full));
+  assert.equal(r.isError, undefined, r.text);
+  assert.match(r.text, /"key": "claude:own"/, '`this` is the session itself');
+  assert.equal(full.cards.length, 1);
+  assert.match(full.cards[0].card.detail!, /what the agent may do without asking/);
+  assert.deepEqual(full.cards[0].card.options.map((o) => o.id), ['accept', 'deny'], 'no Allow for this session');
+  r = await appApi({ method: 'PATCH', path: '/api/sessions/claude:other/extra', body: { capUsd: 500 } }, ctxOf(app, full));
+  assert.equal(r.isError, undefined, r.text);
+  assert.equal(full.cards.length, 2, 'a spending cap asks too');
+  r = await appApi({ method: 'POST', path: '/api/sessions/this/config', body: { model: 'opus' } }, ctxOf(app, full));
+  assert.equal(full.cards.length, 2, 'the model alone asks nothing in Full access');
+  // Said no: nothing changes.
+  const no = session('default', () => ({ decision: 'decline' }));
+  r = await appApi({ method: 'POST', path: '/api/sessions/this/config', body: { mode: 'bypassPermissions' } }, ctxOf(app, no));
+  assert.equal(r.isError, true);
+  assert.match(r.text, /said no/);
+  // Plan mode: its own settings on a card (each time), nothing else.
+  const plan = session('plan', () => ({ decision: 'accept' }));
+  r = await appApi({ method: 'POST', path: '/api/sessions/this/config', body: { mode: 'acceptEdits' }, summary: 'Leave Plan mode' }, ctxOf(app, plan));
+  assert.equal(r.isError, undefined, r.text);
+  assert.equal(plan.cards.length, 1);
+  r = await appApi({ method: 'PATCH', path: '/api/sessions/claude%3Aown/extra', body: { memory: false } }, ctxOf(app, plan));
+  assert.equal(r.isError, undefined, r.text);
+  assert.equal(plan.cards.length, 2, 'its memory too, on a card');
+  for (const [method, p, body] of [
+    ['POST', '/api/sessions/claude:other/config', { mode: 'acceptEdits' }],
+    ['PUT', '/api/search/settings', { results: 5 }],
+  ] as const) {
+    r = await appApi({ method, path: p, body }, ctxOf(app, plan));
+    assert.equal(r.isError, true, `${method} ${p}`);
+    assert.match(r.text, /only reads/);
+  }
+  assert.equal(plan.cards.length, 2);
   await app.close();
 });
 

@@ -1,6 +1,6 @@
 // One session as the terminal follows it: its timeline (loaded, then kept current by `items` events by their place,
 // reloaded after a gap or a reset), its live state and overlay (`live` events: what still streams, steps changed in
-// place, approvals), its notes (helpers starting, tiers) and its helpers' summaries (`sessions` events, and a look now
+// place, approvals), its notes (subagents starting, tiers) and its subagents' summaries (`sessions` events, and a look now
 // and then). The Printer turns it into lines printed once and never changed: an item is printed when it is final (a
 // streaming text's finished chunks as they finish); what is still under way is left for the redrawn region.
 import { EventEmitter } from 'node:events';
@@ -45,7 +45,7 @@ function savedCopy(items: TimelineItem[], o: TimelineItem): TimelineItem | undef
   }
 }
 
-/** A helper as its lead knows it: its card, its summary, and how many of its turns have reported back. */
+/** A subagent as its lead knows it: its card, its summary, and how many of its turns have reported back. */
 export interface Helper {
   key: string;
   note: ChildNote;
@@ -55,11 +55,11 @@ export interface Helper {
   replies: number;
   /** When it stopped working with a reply still to come. */
   idleSince?: number;
-  /** Stepped up: another helper took over its job, and its reply never comes. */
+  /** Stepped up: another subagent took over its job, and its reply never comes. */
   replaced?: boolean;
 }
 
-/** How long a helper's reply may take to reach its lead after it stopped working (the reply may be summarized, or checked). */
+/** How long a subagent's reply may take to reach its lead after it stopped working (the reply may be summarized, or checked). */
 const REPLY_GRACE_MS = 120_000;
 
 export class SessionView extends EventEmitter {
@@ -87,7 +87,7 @@ export class SessionView extends EventEmitter {
     super();
   }
 
-  /** Subscribes and loads: the timeline, the live state, the notes and the helpers. */
+  /** Subscribes and loads: the timeline, the live state, the notes and the subagents. */
   async open() {
     const ev = this.conn.events();
     ev.on('event', this.onEvent);
@@ -135,7 +135,7 @@ export class SessionView extends EventEmitter {
     return this.loading;
   }
 
-  /** A look at the session and its helpers now (as the socket would have told, in case it did not). */
+  /** A look at the session and its subagents now (as the socket would have told, in case it did not). */
   async refresh() {
     const one = await this.conn.api<{ summary: SessionSummary | null; live: LiveState | null; overlay: LiveOverlay }>('GET', `/api/sessions/${enc(this.key)}`);
     if (one.summary) this.summary = one.summary;
@@ -169,7 +169,7 @@ export class SessionView extends EventEmitter {
     h.summary = s;
   }
 
-  /** A note: a helper's card makes it one of the helpers. */
+  /** A note: a subagent's card makes it one of the subagents. */
   private noteHelper(n: SessionNote) {
     if (n.kind !== 'child') return;
     const c = n.data as ChildNote;
@@ -191,7 +191,7 @@ export class SessionView extends EventEmitter {
       .catch(() => {});
   }
 
-  /** A reply from a helper in the lead's conversation. */
+  /** A reply from a subagent in the lead's conversation. */
   private countReply(it: TimelineItem) {
     if (it.kind !== 'user') return;
     const r = childReplyOf(it.text);
@@ -268,7 +268,7 @@ export class SessionView extends EventEmitter {
     return !this.items.some((i) => i.id === id);
   }
 
-  /** Helpers at work, and those whose reply is still on its way to the lead. */
+  /** Subagents at work, and those whose reply is still on its way to the lead. */
   helpersWorking(): Helper[] {
     return [...this.helpers.values()].filter((h) => !h.replaced && busy(h.summary?.live));
   }
@@ -277,7 +277,7 @@ export class SessionView extends EventEmitter {
     return [...this.helpers.values()].filter((h) => !h.replaced && !busy(h.summary?.live) && h.turns > h.replies && (!h.idleSince || now - h.idleSince < REPLY_GRACE_MS));
   }
 
-  /** A helper waiting for you (an approval or a question in its own session). */
+  /** A subagent waiting for you (an approval or a question in its own session). */
   helperWaiting(): Helper | undefined {
     return [...this.helpers.values()].find((h) => h.summary?.live?.status === 'waiting' || (h.summary?.live?.pendingApprovals ?? 0) > 0);
   }
@@ -288,8 +288,8 @@ export class SessionView extends EventEmitter {
   }
 
   /**
-   * The helpers at work in the background now (Claude Code's own, kind "local_agent"): the session's, then each
-   * helper's. The agent ended its turn with them running and is woken as each one ends, so the work is not done. A
+   * The subagents at work in the background now (Claude Code's own, kind "local_agent"): the session's, then each
+   * subagent's. The agent ended its turn with them running and is woken as each one ends, so the work is not done. A
    * command left running in the background ("local_bash", such as a dev server) may never end: it does not count.
    */
   background(): { key: string; task: BackgroundTask }[] {
@@ -303,15 +303,15 @@ export class SessionView extends EventEmitter {
   }
 
   /**
-   * Whether the work is done: its turn ended, no helper works or owes a reply, nothing works in the background (its
-   * own or a helper's), and nothing waits in its queue.
+   * Whether the work is done: its turn ended, no subagent works or owes a reply, nothing works in the background (its
+   * own or a subagent's), and nothing waits in its queue.
    */
   settled(): boolean {
     return !busy(this.live) && !this.helpersWorking().length && !this.helpersOwed().length && !this.background().length && !this.queued();
   }
 
   /**
-   * The end of the latest turn, when it has ended: no message (yours or a helper's) came after it, nor the end of a
+   * The end of the latest turn, when it has ended: no message (yours or a subagent's) came after it, nor the end of a
    * task in the background (which wakes the agent for another turn).
    */
   lastTurn(): TurnItem | undefined {
@@ -323,7 +323,7 @@ export class SessionView extends EventEmitter {
   }
 }
 
-/** A helper of Claude Code's own at work in the background (not a command left running there). */
+/** A subagent of Claude Code's own at work in the background (not a command left running there). */
 export const backgroundHelper = (t: BackgroundTask) => (t.kind ?? '').includes('agent') && t.status === 'running';
 
 /** A notice that a task in the background ended ("Background task completed: Check the docs"): how, and what it was. */
@@ -352,7 +352,7 @@ export function lastReply(items: TimelineItem[]): string {
 
 // ---- printing --------------------------------------------------------------------------------------------
 
-/** The app's own step that starts a helper: its card (the note) says it already. */
+/** The app's own step that starts a subagent: its card (the note) says it already. */
 const HIDDEN_STEP = /(^|__)start_child_session$/;
 
 /** Whether an item will not change any more, so it can be printed. A step in the background is printed as it starts. */
@@ -367,7 +367,7 @@ type Group = 'prompt' | 'text' | 'step' | 'turn';
 /**
  * What is printed for good, once: each item when it is final, in order (an item still under way holds back those
  * after it, for the region), a streaming text's finished chunks as they finish, notes as they come. `brief` prints
- * steps, helpers and notes only (a run's progress).
+ * steps, subagents and notes only (a run's progress).
  */
 export class Printer {
   private printed = new Set<string>();
@@ -375,7 +375,7 @@ export class Printer {
   private notesSeen = new Set<string>();
   private echoes: string[] = [];
   private last: Group | null = null;
-  /** Helpers started in the turn under way, for its end line. */
+  /** Subagents started in the turn under way, for its end line. */
   private turnHelpers: string[] = [];
 
   constructor(
@@ -515,7 +515,7 @@ export class Printer {
 
 /** A conversation as lines: each turn's messages, its work folded into a line (each step with -v), its reply, its end. */
 export function historyLines(items: TimelineItem[], notes: SessionNote[], look: Look, o: { turns?: number } = {}): string[] {
-  // Turns: from a message of yours (or a helper's reply, or a notice that started it) to its end.
+  // Turns: from a message of yours (or a subagent's reply, or a notice that started it) to its end.
   const turns: TimelineItem[][] = [];
   let cur: TimelineItem[] = [];
   for (const it of items) {
@@ -540,7 +540,7 @@ export function historyLines(items: TimelineItem[], notes: SessionNote[], look: 
     // The reply: the texts after the last step.
     let a = t.length;
     while (a > 0 && (t[a - 1].kind === 'turn' || t[a - 1].kind === 'system')) a--;
-    // What opened it: your message, a helper's reply, or a task in the background that ended and woke the agent.
+    // What opened it: your message, a subagent's reply, or a task in the background that ended and woke the agent.
     let u = 0;
     while (u < t.length && (t[u].kind === 'user' || (t[u].kind === 'system' && !!backgroundEnd((t[u] as { text: string }).text)))) u++;
     let r = a;

@@ -1,6 +1,6 @@
-// Child sessions: an agent hands parts of a job to new sessions (any agent or model here), and their
-// replies come back to it. A card for each in the parent's conversation, children folded under their
-// parent in the sidebar, a line in a child pointing back to its parent, and Settings → Child sessions.
+// Hydor subagents (child sessions): an agent hands parts of a job to new sessions (any agent or model here), and their
+// replies come back to it. A card for each in the parent's conversation, them folded under their
+// parent in the sidebar, a line in a subagent pointing back to its parent, and Settings → Subagents.
 import { CornerDownRight, Network } from 'lucide-react';
 import { MAX_RUNNING_LIMIT, SWARM_SIZE_LIMIT } from '@shared/children';
 import { leadsSwarm } from '@shared/swarm';
@@ -14,7 +14,7 @@ import { saveChildSettings, useChildSettingsState } from '../swarm/state';
 import { ChildCard } from './ChildCard';
 import { TierLine } from './TierLine';
 
-/** In a child session, above the message box: where its replies go. */
+/** In a Hydor subagent, above the message box: where its replies go. */
 function ParentDock({ s }: { s: SessionSummary }) {
   const parent = typeof s.extra?.parent === 'string' ? s.extra.parent : undefined;
   const p = useSessions((x) => (parent ? x.byKey[parent] : undefined));
@@ -24,7 +24,7 @@ function ParentDock({ s }: { s: SessionSummary }) {
     <div data-tip="children" className="mx-3 mb-2 flex items-center gap-2 rounded-xl border border-line bg-bg-1 px-3 py-1.5 text-[12.5px] sm:mx-auto sm:w-[calc(100%-48px)] sm:max-w-[800px]">
       <CornerDownRight size={14} className="shrink-0 text-fg-3" />
       <span className="min-w-0 flex-1 truncate text-fg-2">
-        Child of <span className="text-fg">{p?.title ?? 'another session'}</span>
+        Subagent of <span className="text-fg">{p?.title ?? 'another session'}</span>
         <span className="max-sm:hidden">: its replies go back there</span>
       </span>
       {p && (
@@ -41,15 +41,18 @@ function ChildSettingsBody() {
   const wait = <Throbber className="text-fg-3" />;
   return (
     <Stack>
-      <Group title="Child sessions" info="An agent can hand parts of a job to new sessions, with any agent or model here. They work at the same time, and each one’s reply comes back to it.">
+      <Group
+        title="Subagents"
+        info="An agent can hand parts of a job to subagents. A Hydor subagent is a session of its own, with any agent or model here: it works at the same time, and its reply comes back to the agent. These settings are for Hydor subagents; Claude Code’s and Codex’s own subagents run inside their session."
+      >
         <Row
           label="Working at once, per session"
           hint="The agent waits for one to finish before it starts more"
           info={
             <ul className="list-disc space-y-1 pl-4">
-              <li>One level: a child session cannot start children of its own.</li>
-              <li>A child never gets a freer mode than the session that started it.</li>
-              <li>A session with a spending cap gives each child a share of what is left, and its cap covers them all.</li>
+              <li>One level: a Hydor subagent cannot start Hydor subagents of its own.</li>
+              <li>A subagent never gets a freer mode than the session that started it.</li>
+              <li>A session with a spending cap gives each Hydor subagent a share of what is left, and its cap covers them all.</li>
             </ul>
           }
           control={st ? <Stepper label="Working at once, per session" value={st.maxRunning} min={1} max={MAX_RUNNING_LIMIT} onChange={(n) => saveChildSettings({ maxRunning: n })} /> : wait}
@@ -74,5 +77,5 @@ export const childrenFeature: WebFeature = {
   id: 'children',
   noteViews: { child: ChildCard, tier: TierLine },
   SessionDock: ParentDock,
-  settings: [{ id: 'children', label: 'Child sessions', icon: Network, sub: 'Agents handing parts of a job to other agents, and swarms for hard problems', Body: ChildSettingsBody }],
+  settings: [{ id: 'children', label: 'Subagents', icon: Network, sub: 'Agents handing parts of a job to subagents, and swarms for hard problems', Body: ChildSettingsBody }],
 };

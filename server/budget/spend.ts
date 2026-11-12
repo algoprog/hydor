@@ -1,6 +1,6 @@
 // What a session has spent, at API prices: the agent's own figure when its transcript has one (Claude
 // Code's cost, Custom's per call), else its tokens at the model's price (server/prices.ts). A model on
-// this machine costs nothing. A session's cap covers the child sessions it started too. While a turn
+// this machine costs nothing. A session's cap covers the Hydor subagents it started too. While a turn
 // runs, the model calls its agent reports come in ahead of the indexer: see setLiveSpend.
 import type { BudgetState } from '../../shared/budget.ts';
 import type { Agent } from '../../shared/types.ts';
@@ -45,7 +45,7 @@ export function callCost(db: DB, agent: Agent, model: string | undefined, c: { u
 let liveSpend: (key: string, indexed: number) => number = (_key, indexed) => indexed;
 export const setLiveSpend = (fn: typeof liveSpend) => (liveSpend = fn);
 
-/** A session's own spending: its transcript, and its agent's own helpers' (Claude's subagents, Codex's sub-agent threads). */
+/** A session's own spending: its transcript, and its agent's own subagents' (Claude's, Codex's sub-agent threads). */
 export function ownSpend(db: DB, key: string): { usd: number; unpriced: boolean } {
   const rows = db.prepare('select agent, model, tokens_in, tokens_out, tokens_cached, cost_usd, parent_key from sessions where key = ? or parent_key = ?').all(key, key) as Row[];
   // Claude Code's own figure covers its subagents.
@@ -67,7 +67,7 @@ export function capOf(db: DB, key: string): number | undefined {
   return typeof c === 'number' && Number.isFinite(c) && c > 0 ? c : undefined;
 }
 
-/** What counts against a session's cap: its own spending and its children's. */
+/** What counts against a session's cap: its own spending and its Hydor subagents'. */
 export function spending(db: DB, key: string): { spentUsd: number; ownUsd: number; childrenUsd: number; unpriced: boolean } {
   const own = ownSpend(db, key);
   const ownUsd = liveSpend(key, own.usd);
@@ -81,7 +81,7 @@ export function spending(db: DB, key: string): { spentUsd: number; ownUsd: numbe
   return { spentUsd: ownUsd + kids, ownUsd, childrenUsd: kids, unpriced };
 }
 
-/** A cap that is reached: the session's own, or (for a child session) its parent's, which covers it too. */
+/** A cap that is reached: the session's own, or (for a Hydor subagent) its parent's, which covers it too. */
 export function capReached(db: DB, key: string): { key: string; capUsd: number; spentUsd: number } | null {
   for (const k of [key, parentOf(db, key)]) {
     if (!k) continue;
@@ -108,7 +108,7 @@ export function budgetState(db: DB, key: string, titleOf: (key: string) => strin
 }
 
 /**
- * The cap a new child session of `parent` gets: an equal share of what is left of the parent's cap,
+ * The cap a new Hydor subagent of `parent` gets: an equal share of what is left of the parent's cap,
  * kept for the parent and as many children as may run at once. None when the parent has no cap; an
  * error when nothing is left.
  */
@@ -117,6 +117,6 @@ export function childShare(db: DB, parent: string, slots: number): number | unde
   if (cap == null) return undefined;
   const spent = spending(db, parent).spentUsd;
   const left = cap - spent;
-  if (left < 0.01) throw new Error(`This session's spending cap is reached ($${spent.toFixed(2)} of $${cap.toFixed(2)}): there is nothing left for a child session. Finish with what you have, or ask the user to raise the cap.`);
+  if (left < 0.01) throw new Error(`This session's spending cap is reached ($${spent.toFixed(2)} of $${cap.toFixed(2)}): there is nothing left for a Hydor subagent. Finish with what you have, or ask the user to raise the cap.`);
   return Math.max(0.01, Math.floor((left / (slots + 1)) * 100) / 100);
 }

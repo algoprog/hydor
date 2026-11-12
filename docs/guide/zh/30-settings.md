@@ -108,9 +108,9 @@
 [设置 → 模型](/settings?s=models)：Custom（本应用自带的智能体）的模型：OpenRouter、Ollama，以及在这里用 vLLM 运行的 Hugging Face 模型。详见[智能体、账户和模型](/guide/agents-models)。
 
 - [**辅助模型**](/settings?s=models&find=Helper%20model)：在会话之外处理小任务的模型。
-- [**档位**](/settings?s=models&find=Tiers)：快速、标准、最佳和最高在每个程序中对应的模型：会话由最佳或最高档位主导，它的助手使用标准和快速档位。
-- [**主智能体带领助手**](/settings?s=models&find=Lead%20with%20helpers)：会话的主智能体负责规划，把明确的部分交给更便宜档位的助手，并检查它们的工作。
-- [**难题用最高档位**](/settings?s=models&find=Max%20for%20hard%20problems)：“自动”会让难题从最高档位开始；当问题比看起来更难时，智能体也可以自己升到最高档位。
+- [**档位**](/settings?s=models&find=Tiers)：快速、标准、最佳和最高在每个程序中对应的模型：会话由最佳或最高档位主导，它的子智能体使用标准和快速档位。
+- [**主智能体带领子智能体**](/settings?s=models&find=Lead%20with%20subagents)：会话的主智能体负责规划，把明确的部分交给更便宜档位的子智能体，并检查它们的工作。
+- [**难题用最高档位**](/settings?s=models&find=Max%20for%20hard%20problems)：使用“自动”时，当问题超出最佳档位的能力，主智能体可以自己升到最高档位。
 - [**在本机**](/settings?s=models&find=On%20this%20machine)：安装在这里的模型及其下载。
 - [**从 Hugging Face 添加模型**](/settings?s=models&find=Add%20a%20model%20from%20Hugging%20Face)：为这台电脑推荐的模型，或者搜索，看看每一个在这里运行得如何，然后安装它。
 - [**OpenRouter**](/settings?s=models&find=OpenRouter)：通过 OpenRouter 使用的模型，用你的密钥。
@@ -235,11 +235,11 @@
 - [**导出**](/settings?s=memory&find=Export)：把所有笔记导出为便于阅读的 Markdown，或含更改历史的 JSON。
 - [**全部清除…**](/settings?s=memory&find=Clear%20all%E2%80%A6)：删除所有笔记及其历史记录。
 
-### 子会话
+### 子智能体
 
-[设置 → 子会话](/settings?s=children)：智能体把部分工作交给其他智能体，以及用集群攻克难题。详见[深度研究、第二意见和多个智能体](/guide/research)。
+[设置 → 子智能体](/settings?s=children)：智能体把部分工作交给子智能体，以及用集群攻克难题。详见[深度研究、第二意见和多个智能体](/guide/research)。
 
-- [**每个会话同时工作的数量**](/settings?s=children&find=Working%20at%20once%2C%20per%20session)：一个会话同时运行的子会话数量。
+- [**每个会话同时工作的数量**](/settings?s=children&find=Working%20at%20once%2C%20per%20session)：一个会话同时运行的 Hydor 子智能体数量。
 - [**集群规模**](/settings?s=children&find=Swarm%20size)：一个集群或战役中同时工作的智能体数量。
 
 ### 图片、视频和音频

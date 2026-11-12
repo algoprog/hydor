@@ -1,7 +1,7 @@
 // Runs the benchmark: the same tasks done several ways on one server, and how each came out.
 //   solo:     one agent on the Best tier's model, with the team off (how sessions worked before tiers led by default)
-//   team:     Automatic, the team on: the main agent leads on Best (or Max for a hard problem) and hands parts to helpers
-//   lead:     Automatic with Max for hard problems off: the main agent always leads on Best and hands parts to helpers
+//   team:     Automatic, the team on: the main agent leads on Best, may step itself up to Max, and hands parts to helpers
+//   lead:     Automatic with Max for hard problems off: the main agent leads on Best, never on Max, and hands parts to helpers
 //   max:      one agent on the Max tier's model alone, the team off (the strongest model for everything)
 //   standard: one agent on the Standard tier's model alone, the team off (what that tier can do with no lead)
 //   quick:    one agent on the Quick tier's model alone, the team off
@@ -64,10 +64,28 @@ function availableGb() {
   return os.freemem() / 1073741824;
 }
 
-/** Waits until the machine has MIN_FREE_GB available, so that the benchmark never pushes it out of memory. */
+/** Minutes the benchmark account's copy of the access token still works (serve.mjs --from renews it); Infinity when unknown. */
+function tokenMinutes() {
+  try {
+    const file = path.join(path.dirname(benchFile), 'accounts', `claude-${bench.account}`, '.credentials.json');
+    return (JSON.parse(fs.readFileSync(file, 'utf8')).claudeAiOauth.expiresAt - Date.now()) / 60_000;
+  } catch {
+    return Infinity;
+  }
+}
+
+/**
+ * Waits until the machine has MIN_FREE_GB available, so that the benchmark never pushes it out of memory, and until
+ * the account's token works for 20 minutes more, so that no run starts on a sign-in about to lapse (it would end at
+ * once, having done nothing, and count as a failure).
+ */
 async function roomToRun() {
   for (let said = false; availableGb() < MIN_FREE_GB; said = true) {
     if (!said) console.log(`waiting for memory: ${availableGb().toFixed(1)} GB available, a run starts at ${MIN_FREE_GB} GB`);
+    await sleep(30_000);
+  }
+  for (let said = false; tokenMinutes() < 20; said = true) {
+    if (!said) console.log(`waiting for the sign-in: its token works for ${Math.max(0, Math.round(tokenMinutes()))} more minutes; renew it with serve.mjs --from`);
     await sleep(30_000);
   }
 }

@@ -57,6 +57,8 @@ when this computer starts**).
 
 - Sessions run as you, with your `~/.claude` and `~/.codex`, and with the `PATH` your login shell sets up, so
   the programs you installed with Homebrew or npm are found.
+- The `hydor` command is on your PATH once the app has started from Applications (see [The hydor
+  command](#the-hydor-command)); open a new Terminal window for it.
 - Its data is in `~/.hydor`, as on Linux. Settings such as `PORT` or `DATA_DIR` go in
   `~/.config/hydor.env`, one `NAME=value` per line; quit and open the app to apply them.
 - The server's log is in `~/Library/Logs/Hydor/server.log` (**Help → Show the Server Log**).
@@ -246,8 +248,21 @@ If you missed the setup link, `node dist/server/cli.js setup-token` prints the t
 The installer links `hydor` into `~/.local/bin` when that folder is on your PATH (it says so; otherwise run
 `bin/hydor.mjs` in Hydor's folder, or link it yourself), and the Docker image has it in `/usr/local/bin`
 (`docker exec -it hydor hydor`). It is Hydor in a terminal: `hydor` talks to an agent in the folder you are in,
-`hydor run "…"` runs one request for a script, and `hydor help` lists the rest. The [guide](guide/27-terminal.md)
-says how it works.
+`hydor run "…"` runs one request for a script, and `hydor help` lists the rest: it does everything the app does,
+with a command for each part (`hydor sessions`, `hydor projects`, `hydor memory`, `hydor settings`…). The
+[guide](guide/27-terminal.md) says how it works.
+
+For Tab completion in bash, zsh or fish, run `hydor completion install` once and open a new terminal: it writes the
+script where your shell looks for it and, for zsh and for bash without bash-completion, adds one line to your
+`.zshrc` or `.bashrc`. `hydor completion bash` (or `zsh`, `fish`) prints the script instead.
+
+**The Mac app** puts the command on your PATH by itself, at every start: a link to `hydor` in `~/.local/bin`, `~/bin`,
+`/usr/local/bin` or `/opt/homebrew/bin`, the first that is on your PATH and yours to write to. When none is, it links
+it in `~/.local/bin` and adds one line, marked as Hydor's, to your shell's startup file (`~/.zprofile` for zsh) so
+that folder is on your PATH. Open a new Terminal window afterwards. The command runs the app's own Node.js, and opens
+the app when it is closed; inside the app, `hydor update`, `hydor service install` and `hydor serve` say the app does
+that itself. It does nothing from the disk image or before the app is in Applications. The Windows and Linux desktop
+apps do not put it on your PATH yet (on Linux the installer links it, as above).
 
 The maintenance commands on this page work under the same name: `hydor service status`, `hydor setup-token`,
 `hydor update`, `hydor app …` are `node dist/server/cli.js …` written short; both keep working. When nothing answers

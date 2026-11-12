@@ -42,7 +42,7 @@ you close the tab, and the ones you start in VS Code or a terminal show up too.
 
 **For coding.** Run the official Claude Code and Codex on the plans you already pay for, and follow, steer and approve
 their work from your phone: every step in plain words, every change as a diff. A strong model leads and hands the clear
-parts to cheaper helpers: in our benchmark of 10 November 2026 the team passed every check at 9% less than the best
+parts to cheaper subagents: in our benchmark of 10 November 2026 the team passed every check at 9% less than the best
 tier alone, and 67% less than running everything on the strongest model
 ([the numbers](docs/plans/tiers-and-the-team.md)). See [Sessions](docs/guide/02-sessions.md).
 
@@ -76,7 +76,7 @@ delete all of it ([memory](docs/guide/06-memory.md), [skills](docs/guide/13-skil
 
 Hydor runs the official Claude Code and Codex on your own plans, gives every agent one memory, puts every session on a
 phone app with notifications and approvals, and keeps what agents write in a Library you can edit. Its own agent works
-with any model, and a strong model can lead cheaper helpers. Each comparison has its sources:
+with any model, and a strong model can lead cheaper subagents. Each comparison has its sources:
 [how Hydor compares with other agents](docs/compare/README.md).
 
 ## What else it does
@@ -89,8 +89,9 @@ with any model, and a strong model can lead cheaper helpers. Each comparison has
 - **For researchers and engineers**: a paper radar and a check before you submit, experiments that wait for a free GPU,
   failed CI runs looked into, issues triaged, large changes made by a team of agents.
 - **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.
-- **In your terminal**: the `hydor` command talks to an agent, runs one request from a script, and looks after
-  sessions, models, agents, tasks and usage.
+- **In your terminal**: the `hydor` command talks to an agent with a menu that completes as you type, runs one
+  request from a script, and does everything the app does (sessions, projects, agents, memory, skills, keys, every
+  setting…), with Tab completion for bash, zsh and fish.
 - **Your choice of permissions**: approvals for risky steps, Auto mode that checks them, a command sandbox, or Full
   access when you want none of it.
 - **English, Chinese and Greek.**
@@ -136,7 +137,10 @@ The installer also links the `hydor` command, to use Hydor from a terminal:
 hydor "add a --json flag to the export command"   # talk to an agent in this folder
 git diff | hydor run "review this change"          # one request from a script: the reply on stdout
 hydor sessions                                     # what each session is doing
+hydor completion install                           # Tab completion in your shell
 ```
+
+On a Mac, the app puts the command on your PATH by itself.
 
 ## Documentation
 

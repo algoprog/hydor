@@ -205,7 +205,7 @@ Agents save notes in the moment, before they know what comes next, so a note can
 
 A project note that names a file no longer in the project is pointed out to it, so it can correct the note.
 
-It never reads sessions with memory off (confidential sessions have it off), child sessions (an agent wrote their requests) or scheduled runs, and the first time it reads back three days. Each change shows in the tidy-up's list with the conversation it came from, and can be undone there (see [Tidy up now and undo its changes](/guide/memory#tidy-up-now-and-undo-its-changes)). Turn the switch off and the tidy-up reads notes only.
+It never reads sessions with memory off (confidential sessions have it off), Hydor subagents (an agent wrote their requests) or scheduled runs, and the first time it reads back three days. Each change shows in the tidy-up's list with the conversation it came from, and can be undone there (see [Tidy up now and undo its changes](/guide/memory#tidy-up-now-and-undo-its-changes)). Turn the switch off and the tidy-up reads notes only.
 
 ### Tidy up now and undo its changes
 

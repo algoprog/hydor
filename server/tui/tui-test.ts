@@ -1,7 +1,7 @@
 // Checks for `hydor` in a terminal: arguments to options, widths and wrapping, Markdown at several widths, each kind
-// of step's line, the turn's line, helpers' lines, an approval's keys and the body each sends, the input line's keys
+// of step's line, the turn's line, subagents' lines, an approval's keys and the body each sends, the input line's keys
 // and paste, the printer (final items once, streaming text by its finished chunks); then against a small fake server
-// (node:http and ws on 127.0.0.1, checking the bearer token): `run` end to end (streamed items, a helper whose reply
+// (node:http and ws on 127.0.0.1, checking the bearer token): `run` end to end (streamed items, a subagent whose reply
 // wakes the lead, --json and --stream-json, a failed turn, an approval with nobody to answer, a timeout, a socket that
 // drops and comes back), `sessions --json`, `tiers` shown and set; and the chat itself in a pseudo-terminal at 80 and
 // 120 columns (a message, a streamed reply, an approval answered with a key, a message queued while it works, a
@@ -185,22 +185,25 @@ test('steps: one line each, by category, with what matters of the result', () =>
   assert.equal(fold[0], '  ● Ran 1 command, read 2 files');
 });
 
-test('the turn’s line, helpers, tiers and a spending cap', () => {
+test('the turn’s line, subagents, tiers and a spending cap', () => {
   const L = look(80);
-  assert.equal(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'completed', durationMs: 64_000, costUsd: 0.31, model: 'claude-opus-5-5' }, L, { helpers: 1 })[0], '  ✓ 1m 04s · $0.31 · Opus 5.5 · 1 helper');
+  assert.equal(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'completed', durationMs: 64_000, costUsd: 0.31, model: 'claude-opus-5-5' }, L, { helpers: 1 })[0], '  ✓ 1m 04s · $0.31 · Opus 5.5 · 1 subagent');
   assert.equal(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'interrupted', durationMs: 12_000 }, L)[0], '  ■ Stopped · 12 s');
   assert.match(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'failed' }, L)[0], /✗ Failed/);
   assert.equal(modelLabel('claude-sonnet-5-5'), 'Sonnet 5.5');
   assert.equal(modelLabel('opus', [{ value: 'opus', label: 'Opus 5.5', efforts: [] }]), 'Opus 5.5');
   assert.equal(modelLabel('auto'), 'Automatic');
   const child: ChildNote = { child: 'claude:c1', agent: 'claude', label: 'Claude Code · sonnet', title: 'Add --json to export', brief: '', cwd: '/', tier: 'standard', startedAt: 0 };
-  assert.equal(noteLines({ id: 'n', key: 'k', kind: 'child', at: 0, data: child }, L)![0], '  ◆ Helper started: Add --json to export · Claude Code · sonnet · Standard');
+  assert.equal(noteLines({ id: 'n', key: 'k', kind: 'child', at: 0, data: child }, L)![0], '  ◆ Subagent started: Add --json to export · Claude Code · sonnet · Standard');
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'tier', at: 0, data: { event: 'auto', tier: 'max', label: 'Fable 5.2', why: 'a hard proof' } }, L)![0], '  ◆ Automatic picked Max (Fable 5.2): a hard proof');
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'tier', at: 0, data: { event: 'stepUp', tier: 'best', label: 'Opus 5.5' } }, L)![0], '  ◆ Stepped up to Best (Opus 5.5)');
   assert.match(noteLines({ id: 'n', key: 'k', kind: 'budget', at: 0, data: { capUsd: 5, spentUsd: 5.02 } }, L)![0], /Stopped at its spending cap: \$5\.02 of \$5\.00/);
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'memory', at: 0, data: {} }, L), null);
-  assert.equal(childReplyLines('[Reply from the child session "Add --json" (claude:c1, Claude Code · sonnet)]\n\nDone.', L)![0], '  ◆ Helper finished: Add --json');
-  assert.match(childReplyLines('[The child session "T" (claude:c2, Claude Code · haiku) stopped with an error: model not found]\n(It wrote no reply.)', L)![0], /Helper failed: T · model not found/);
+  assert.equal(childReplyLines('[Reply from the Hydor subagent "Add --json" (claude:c1, Claude Code · sonnet)]\n\nDone.', L)![0], '  ◆ Subagent finished: Add --json');
+  // Transcripts written before the rename say "child session": they read the same.
+  assert.equal(childReplyLines('[Reply from the child session "Old" (claude:c0, Claude Code · sonnet)]\n\nDone.', L)![0], '  ◆ Subagent finished: Old');
+  assert.match(childReplyLines('[The child session "Old" (claude:c0, Claude Code · haiku) stopped with an error: x]', L)![0], /Subagent failed: Old · x/);
+  assert.match(childReplyLines('[The Hydor subagent "T" (claude:c2, Claude Code · haiku) stopped with an error: model not found]\n(It wrote no reply.)', L)![0], /Subagent failed: T · model not found/);
 });
 
 const APPROVAL: ApprovalRequest = {
@@ -244,6 +247,9 @@ test('keys: escape sequences in their spellings, a paste whole across reads', ()
   assert.deepEqual(names('\x01\x05\x0b\x15\x17\x03\x04\r\n\x1b\r\t'), ['home', 'end', 'kill-end', 'kill-start', 'delete-word-back', 'ctrl-c', 'ctrl-d', 'enter', 'newline', 'newline', 'tab']);
   assert.deepEqual(names('\x1b[13;2u'), ['newline']);
   assert.deepEqual(names('\x1b'), ['escape']);
+  // Esc and a key in one read (typed fast, or sent by tmux): both, neither swallowed.
+  assert.deepEqual(names('\x1b\x15'), ['escape', 'kill-start']);
+  assert.deepEqual(r.feed('\x1b/he'), [{ name: 'escape' }, { name: 'text', text: '/he' }]);
   assert.deepEqual(r.feed('héllo 你好'), [{ name: 'text', text: 'héllo 你好' }]);
   assert.deepEqual(r.feed('\x1b[200~line one\r\nline'), []);
   assert.deepEqual(r.feed(' two\x1b[201~x'), [{ name: 'paste', text: 'line one\nline two' }, { name: 'text', text: 'x' }]);
@@ -361,7 +367,7 @@ test('the printer: each final item once, in order; what is under way held for th
   assert.match(p2.take(viewOf([bg])).lines.join('\n'), /in the background/);
 });
 
-test('settled: not while the session or a helper has a task running in the background', () => {
+test('settled: not while the session or a subagent has a task running in the background', () => {
   const v = viewOf([{ kind: 'user', id: 'u', seq: 0, text: 'go' }, { kind: 'turn', id: 't', seq: 0, status: 'completed' }]);
   v.live = { status: 'idle', startedAt: 0, pendingApprovals: 0, backgroundTasks: [{ id: 'b', description: 'Check the docs', kind: 'local_agent', status: 'running' }] };
   assert.equal(v.settled(), false);
@@ -372,7 +378,7 @@ test('settled: not while the session or a helper has a task running in the backg
   const child: ChildNote = { child: 'claude:c', agent: 'claude', label: 'L', title: 'T', brief: '', cwd: '/', startedAt: 0 };
   const idle = { status: 'idle' as const, startedAt: 0, pendingApprovals: 0 };
   v.helpers.set('claude:c', { key: 'claude:c', note: child, turns: 1, replies: 1, summary: { key: 'claude:c', agent: 'claude', id: 'c', title: 'T', stats: {} as SessionSummary['stats'], live: { ...idle, backgroundTasks: [{ id: 'x', description: 'Run the tests', kind: 'local_agent', status: 'running' }] } } });
-  assert.equal(v.settled(), false, 'a helper’s task in the background');
+  assert.equal(v.settled(), false, 'a subagent’s task in the background');
   assert.deepEqual(v.background().map((b) => [b.key, b.task.description]), [['claude:c', 'Run the tests']]);
   // Its end woke the agent: the turn before it is not the last one.
   v.items.push({ kind: 'system', id: 's', seq: 2, level: 'info', text: 'Background task completed: Check the docs' });
@@ -504,7 +510,7 @@ async function play(f: Fake, text: string) {
   }
   if (/work in the background/.test(text)) {
     // Claude Code's own Agent tool in the background: the turn ends with it running, and its end wakes the lead.
-    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A helper is running; I’ll review it as it comes back.' });
+    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A subagent is running; I’ll review it as it comes back.' });
     push(f, turnEnd());
     const devServer = { id: 'dev', description: 'npm run dev', kind: 'local_bash', status: 'running', startedAt: Date.now() };
     setLive(f, { status: 'idle', backgroundTasks: [devServer, { id: 'bg1', description: 'Check the docs', kind: 'local_agent', status: 'running', startedAt: Date.now() }] });
@@ -537,13 +543,13 @@ async function play(f: Fake, text: string) {
     push(f, { kind: 'tool', id: 'td', seq: 0, tool: { name: 'Read', category: 'read', title: '/home/u/proj/missed.ts', status: 'ok' } });
     await sleep(400);
   }
-  if (/helper/.test(text)) {
+  if (/subagent/.test(text)) {
     const c = newFake('Count the files', { parent: f.key });
     setLive(c, { status: 'working', turnStartedAt: Date.now() });
     const note: SessionNote = { id: `n${Math.random()}`, key: f.key, kind: 'child', at: Date.now(), data: { child: c.key, agent: 'claude', label: 'Claude Code · haiku', title: 'Count the files', brief: 'count', cwd: '/', tier: 'quick', startedAt: Date.now() } satisfies ChildNote };
     f.notes.push(note);
     toSubs(f.key, { t: 'note', key: f.key, note });
-    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A helper counts them; I wait for it.' });
+    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A subagent counts them; I wait for it.' });
     push(f, turnEnd());
     setLive(f, { status: 'idle' });
     await sleep(1600);
@@ -551,7 +557,7 @@ async function play(f: Fake, text: string) {
     setLive(c, { status: 'idle' });
     // Its reply reaches the lead a moment later, and wakes it.
     await sleep(900);
-    push(f, { kind: 'user', id: `u${Math.random()}`, seq: 0, ts: Date.now(), text: `[Reply from the child session "Count the files" (${c.key}, Claude Code · haiku)]\n\n42 files.` });
+    push(f, { kind: 'user', id: `u${Math.random()}`, seq: 0, ts: Date.now(), text: `[Reply from the Hydor subagent "Count the files" (${c.key}, Claude Code · haiku)]\n\n42 files.` });
     setLive(f, { status: 'working', turnStartedAt: Date.now() });
     await sleep(200);
     push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'There are **42** files.' });
@@ -589,6 +595,33 @@ const server = http.createServer((req, res) => {
     const f = m ? fakes.get(decodeURIComponent(m[1])) : undefined;
     const rest = m?.[2] ?? '';
     if (p === '/api/bootstrap') return send(200, { version: '9.9.9', home: '/home/u', defaultCwd: '/home/u', start: { agent: 'claude', runs: { claude: { mode: 'default' } } }, acpAgents: [{ id: 'console', name: 'Custom', command: '', args: [], builtin: true }] });
+    if (p === '/api/projects' && req.method === 'GET') return send(200, { spaces: [{ id: 'sp1', name: 'Thesis', folder: '/home/u/thesis', sessions: 2, docs: 1, lastAt: Date.now() - 3600_000, description: 'my writing' }, { id: 'sp2', name: 'Website', folder: '/home/u/site', sessions: 0, docs: 0, description: '' }] });
+    if (p === '/api/projects/sp1' && req.method === 'DELETE') return send(200, { ok: true });
+    if (p === '/api/connections' && req.method === 'GET') return send(200, { secrets: [] });
+    if (p === '/api/connections/secrets' && req.method === 'POST') return send(200, { secret: { name: body.name, domains: [], note: '', commands: false } });
+    if (p === '/api/git/repo-info') return send(200, { info: { repo: '/home/u', branch: 'main', sub: '' } });
+    if (p === '/api/fs/find') {
+      const q = url.searchParams.get('q') ?? '';
+      // A slow answer for 'slo', to arrive after the one for 'slow'.
+      if (q === 'slo') await sleep(700);
+      const all = ['src/chat.ts', 'src/client.ts', 'src/sub/deep.ts', 'README.md', 'docs/guide.md'];
+      const subseq = (f: string) => {
+        let at = 0;
+        for (const ch of q.toLowerCase()) {
+          at = f.toLowerCase().indexOf(ch, at) + 1;
+          if (!at) return false;
+        }
+        return true;
+      };
+      const root = url.searchParams.get('root') ?? '/home/u';
+      const hit = q === 'slo' ? [`${root}/STALE.txt`] : q === 'slow' ? [`${root}/fresh.txt`] : all.filter(subseq).map((f) => `${root}/${f}`);
+      return send(200, { files: hit });
+    }
+    if (p === '/api/fs/list') {
+      const dir = url.searchParams.get('path') ?? '';
+      const entries = /\/src\/?$/.test(dir) ? [{ name: 'chat.ts', type: 'file' }, { name: 'sub', type: 'dir' }] : [{ name: 'docs', type: 'dir' }, { name: 'src', type: 'dir' }, { name: 'README.md', type: 'file' }];
+      return send(200, { entries });
+    }
     if (p === '/api/models/tiers' && req.method === 'GET') return send(200, tiersState);
     if (p === '/api/models/tiers' && req.method === 'PUT') {
       if (body.tiers) tiersState = { ...tiersState, tiers: Object.keys(body.tiers).length ? body.tiers : tiersState.defaults };
@@ -614,6 +647,11 @@ const server = http.createServer((req, res) => {
     if (rest === '' && req.method === 'GET') return send(200, { summary: summaryOf(f), live: f.live, overlay: f.overlay });
     if (rest === '/timeline') return send(200, { items: f.items, total: f.items.length, start: 0 });
     if (rest === '/notes') return send(200, { notes: f.notes });
+    if (rest === '/__device') {
+      // What the server sends a session's subscribers when an agent changes the device's settings (PUT /device).
+      toSubs(f.key, { t: 'feature', id: 'guide', key: f.key, data: { device: body } });
+      return send(200, { ok: true });
+    }
     if (rest === '/message') {
       send(200, { ok: true });
       void play(f, String(body.text));
@@ -712,8 +750,8 @@ test('run --json: one object; the message from stdin', async () => {
   assert.deepEqual(start.body.extra, { capUsd: 3 });
 });
 
-test('run: a helper’s reply wakes the lead, and the run waits for the turn after it', async () => {
-  const r = await hydor(['run', '--json', 'count with a helper']);
+test('run: a subagent’s reply wakes the lead, and the run waits for the turn after it', async () => {
+  const r = await hydor(['run', '--json', 'count with a subagent']);
   assert.equal(r.code, 0, r.err);
   const j = JSON.parse(r.out);
   assert.equal(j.reply, 'There are **42** files.');
@@ -724,7 +762,7 @@ test('run: a helper’s reply wakes the lead, and the run waits for the turn aft
 });
 
 test('run --stream-json: a line per event, the result last', async () => {
-  const r = await hydor(['run', '--stream-json', 'stream a helper']);
+  const r = await hydor(['run', '--stream-json', 'stream a subagent']);
   assert.equal(r.code, 0, r.err);
   const lines = r.out.trim().split('\n').map((l) => JSON.parse(l));
   assert.ok(lines.some((l) => l.type === 'item' && l.item.kind === 'user'));
@@ -791,7 +829,7 @@ test('sessions --json, show, send, stop', async () => {
   assert.equal(r.code, 0, r.err);
   const j = JSON.parse(r.out);
   assert.ok(j.sessions.length >= 3);
-  assert.ok(j.sessions.every((s: SessionSummary) => !s.extra?.parent), 'helpers only with --all');
+  assert.ok(j.sessions.every((s: SessionSummary) => !s.extra?.parent), 'subagents only with --all');
   const all = JSON.parse((await hydor(['sessions', '--json', '--all'])).out);
   assert.ok(all.sessions.some((s: SessionSummary) => s.extra?.parent));
   const text = await hydor(['sessions']);
@@ -813,7 +851,7 @@ test('tiers: shown, set, the team switched', async () => {
   assert.equal(shown.code, 0, shown.err);
   assert.match(shown.out, /Quick +Haiku 4\.5/);
   assert.match(shown.out, /Max/);
-  assert.match(shown.out, /Lead with helpers: on    Max for hard problems: off/);
+  assert.match(shown.out, /Lead with subagents: on    Max for hard problems: off/);
   const set = await hydor(['tiers', 'set', 'claude', 'best', 'haiku', '--effort', 'high']);
   assert.equal(set.code, 0, set.err);
   const put = calls.filter((c) => c.method === 'PUT' && c.path === '/api/models/tiers').at(-1)!;
@@ -831,12 +869,13 @@ test('tiers: shown, set, the team switched', async () => {
 // ---- the chat, in a pseudo-terminal ------------------------------------------------------------------------------------
 
 /** The chat in a pseudo-terminal, its screen kept in a headless xterm. */
-async function chatIn(cols: number) {
+async function chatIn(cols: number, o: { args?: string[]; env?: Record<string, string | undefined> } = {}) {
   const { default: xterm } = (await import('@xterm/xterm')) as any;
   const term = new (xterm?.Terminal ?? (await import('@xterm/xterm')).Terminal)({ cols, rows: 30, allowProposedApi: true, scrollback: 500 });
-  const env = { ...ENV, NO_COLOR: '', TERM: 'xterm-256color' } as Record<string, string>;
+  const env = { ...ENV, NO_COLOR: '', TERM: 'xterm-256color', ...o.env } as Record<string, string>;
   delete env.NO_COLOR;
-  const p = pty.spawn(process.execPath, [CLI], { cols, rows: 30, env, cwd: DATA });
+  for (const k of Object.keys(env)) if (env[k] === undefined) delete env[k];
+  const p = pty.spawn(process.execPath, [CLI, ...(o.args ?? [])], { cols, rows: 30, env, cwd: DATA });
   let raw = '';
   let exit: number | null = null;
   p.onData((d) => {
@@ -871,6 +910,7 @@ async function chatIn(cols: number) {
 
 for (const cols of [80, 120]) {
   test(`the chat at ${cols} columns: a message, a streamed reply, an approval by key, a queued message, a paste, Ctrl+C twice`, async () => {
+    fs.writeFileSync(path.join(DATA, 'terminal.json'), '{"enter":"queue"}');
     const c = await chatIn(cols);
     await c.until(/HYDΩR 9\.9\.9/);
     await c.until(/What should the agent do\?/);
@@ -879,6 +919,9 @@ for (const cols of [80, 120]) {
     c.p.write('y');
     await c.until(/✓ Allow/);
     await c.until(/Hello there\./);
+    // The working line: the spinner shaded across the logo's colours (256 here), a bright band across the word, the rest dim.
+    assert.match(c.raw(), /\x1b\[38;[25];[\d;]+m[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]\x1b\[39m/);
+    assert.match(c.raw(), /\x1b\[2mW\x1b\[22m\x1b\[2mo|\x1b\[1mW\x1b\[22m/);
     // While it works, a message is queued.
     c.p.write('and then this\r');
     await c.until(/queued: and then this/);
@@ -898,6 +941,7 @@ for (const cols of [80, 120]) {
     const t0 = Date.now();
     while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
     assert.equal(c.exit(), 0);
+    fs.rmSync(path.join(DATA, 'terminal.json'), { force: true });
     const s = await c.screen();
     assert.match(s, /Carry on with: hydor resume/);
     fs.writeFileSync(path.join(DATA, `chat-screen-${cols}.txt`), s + '\n');
@@ -915,7 +959,7 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   const c = await chatIn(100);
   await c.until(/What should the agent do\?/);
   c.p.write('/he\t');
-  await c.until(/\/help {2}\/helpers\n› \/help$/m);
+  await c.until(/› \/help $/m);
   c.p.write('\x15/ti\t');
   await c.until(/› \/tiers $/m);
   c.p.write('\x15');
@@ -943,13 +987,13 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   assert.deepEqual(f.answers[0].body, { decision: 'answer', answers: { color: 'Blue', size: 'S, L', name: 'Rex' } });
   assert.deepEqual(f.answers[1].body, { decision: 'accept', answers: {}, form: { city: 'Lisbon', when: 'Tomorrow', pets: 'No' } });
   await c.until(/✓ 900 ms/);
-  // A task in the background: shown while it runs, its end a line, then the turn it wakes; /helpers lists it.
+  // A task in the background: shown while it runs, its end a line, then the turn it wakes; /subagents lists it.
   c.p.write('work in the background\r');
   await c.until(/◆ At work in the background: Check the docs/);
   await c.until(/each one that ends wakes the agent/);
   await c.until(/◆ Finished in the background: Check the docs/);
   await c.until(/The docs check out\./);
-  c.p.write('/helpers\r');
+  c.p.write('/subagents\r');
   await c.until(/Finished {2}Check the docs · in the background/);
   // A turn that runs until stopped: Esc stops it, a resize meanwhile draws the region again at the new width.
   c.p.write('be slow\r');
@@ -965,6 +1009,373 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   assert.equal(c.exit(), 0);
   const tail = (await c.screen()).split('\n').slice(-6);
   for (const l of tail) assert.ok(strWidth(l) <= 70, l);
+});
+
+
+test('the chat: the welcome box, the rules and the status line, and none of it wider than the terminal at 60, 100 and 140 columns', async () => {
+  for (const cols of [60, 100, 140]) {
+    const c = await chatIn(cols);
+    await c.until(/What should the agent do\?/);
+    const s = await c.screen();
+    // (A long scratch folder name cuts the lines on a narrow terminal: its text is looked at from 100 columns.)
+    if (cols >= 100) assert.match(s, /╭─+╮\n│ HYDΩR 9\.9\.9 +│\n│ \S+ +⎇ main +│\n│ Claude Code · Opus 5\.5 · Ask +│\n│ on http:\/\/127\.0\.0\.1:\d+ +│\n╰─+╯\n {2}\/ commands · @ files/, `${cols}`);
+    else assert.match(s, /╭─+╮\n│ HYDΩR 9\.9\.9 +│\n/);
+    const lines = s.split('\n');
+    const rules = lines.map((l, i) => (/^─+$/.test(l) ? i : -1)).filter((i) => i >= 0);
+    assert.equal(rules.length, 2, 'a rule above and one below the input');
+    assert.equal(rules[1] - rules[0], 2);
+    assert.equal(lines[rules[0] + 1].startsWith('› '), true);
+    assert.equal(lines[rules[0]].length, cols - 1);
+    assert.match(lines[rules[1] + 1], /^ {2}\S+/);
+    if (cols >= 100) assert.match(lines[rules[1] + 1], /^ {2}\S+ ⎇ main · Opus 5\.5 · Ask/);
+    assert.equal(/\/help$/.test(lines[rules[1] + 1]), 2 + DATA.length + ' ⎇ main · Opus 5.5 · Ask'.length + 5 + 3 <= cols - 1, 'the right part goes when there is no room for it');
+    c.p.write('/');
+    await c.until(/❯ \/help/);
+    for (const l of (await c.screen()).split('\n').slice(-12)) assert.ok(strWidth(l) <= cols - 1, `${cols}: ${l}`);
+    c.p.write('\x15\x04');
+    const t0 = Date.now();
+    while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+    assert.equal(c.exit(), 0);
+  }
+});
+
+test('the chat: the menu opens as you type, Esc closes it, Tab completes, Enter runs a command or puts a file in', async () => {
+  const c = await chatIn(100, { env: { PATH: '/nonexistent', DISPLAY: undefined, WAYLAND_DISPLAY: undefined } });
+  await c.until(/What should the agent do\?/);
+  c.p.write('/');
+  await c.until(/❯ \/help +these commands and the keys/);
+  c.p.write('comp');
+  await c.until(/❯ \/compact/);
+  c.p.write('\x7f\x7f\x7f\x7f');
+  c.p.write('mdl');
+  await c.until(/❯ \/model +\[name\|auto\] +the model/);
+  assert.doesNotMatch((await c.screen()).split('\n').slice(-6).join('\n'), /\/mode /, 'mdl does not match mode');
+  // Esc closes it and keeps the text; it stays closed until the text changes.
+  c.p.write('\x1b');
+  await c.until(/› \/mdl\n─+\n {2}\S+/);
+  c.p.write('\x7f');
+  await c.until(/❯ \/(model|mode)/);
+  c.p.write('\x15');
+  await c.until(/ {2}\S+ ⎇ main/);
+  // Tab on an empty line opens the commands.
+  c.p.write('\t');
+  await c.until(/› \/\n─+\n❯ \/help/);
+  c.p.write('\x15');
+  // ↑ wraps to the last row, ↓ back to the first; Tab puts it in.
+  c.p.write('/');
+  await c.until(/❯ \/help/);
+  c.p.write('\x1b[A');
+  await c.until(/❯ \/compact/);
+  assert.doesNotMatch(await c.screen(), /❯ \/help/);
+  c.p.write('\x1b[B');
+  await c.until(/❯ \/help/);
+  c.p.write('\x15');
+  // A value: /model then a name runs it.
+  c.p.write('/model ha');
+  await c.until(/❯ haiku +Haiku 4\.5/);
+  assert.match(await c.screen(), /\n {2}.*\n?/);
+  c.p.write('\r');
+  await c.until(/Model: Haiku 4\.5/);
+  // A command that needs no argument runs at once; /clear clears the screen.
+  c.p.write('/cop');
+  await c.until(/❯ \/copy/);
+  c.p.write('\r');
+  await c.until(/No reply to copy yet/);
+  c.p.write('/ke\r');
+  await c.until(/Alt\+Enter \/ Ctrl\+J/);
+  assert.doesNotMatch(await c.screen(), /Commands\n/, '/keys shows just the keys');
+  // Files: the folder part dim, the name normal; a folder opens, a file goes in with a space.
+  c.p.write('look at @');
+  await c.until(/❯ docs\/\n {2}src\/\n {2}README\.md/);
+  c.p.write('\x1b[B\r');
+  await c.until(/› look at @src\/\n─+\n❯ src\/sub\/\n {2}src\/chat\.ts/m);
+  c.p.write('\x7f\x7f\x7f\x7fch');
+  await c.until(/❯ src\/chat\.ts/);
+  c.p.write('\r');
+  await c.until(/› look at @src\/chat\.ts $/m);
+  assert.doesNotMatch(await c.screen(), /❯/, 'the menu is closed once the file is in');
+  assert.ok(calls.some((x) => x.path.startsWith('/api/fs/find?root=') && x.path.endsWith('&q=ch')));
+  c.p.write('\x15');
+  // What arrives out of order is dropped: the answer for "slo" comes after the one for "slow".
+  c.p.write('@slo');
+  await sleep(150);
+  c.p.write('w');
+  await c.until(/❯ fresh\.txt/);
+  await sleep(1000);
+  assert.doesNotMatch(await c.screen(), /STALE/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+});
+
+test('the chat: a grey suggestion from history, Ctrl+R searches it, ! runs a shell command, /copy copies the last reply', async () => {
+  fs.writeFileSync(path.join(DATA, 'terminal-history'), ['deploy the site to staging', 'fix the tests', 'line one\nline two', 'review the plan'].map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const c = await chatIn(100, { env: { PATH: '/nonexistent', DISPLAY: undefined, WAYLAND_DISPLAY: undefined } });
+  await c.until(/What should the agent do\?/);
+  // The suggestion shows after the cursor; → takes it (Home and a letter show where the cursor was).
+  c.p.write('deplo');
+  await c.until(/› deploy the site to staging/);
+  assert.match(c.raw(), /deplo\x1b\[0m\r\n|deplo\x1b\[2m y the site to staging\x1b\[22m|\x1b\[2my the site to staging\x1b\[22m/);
+  c.p.write('\x1b[C\x01X');
+  await c.until(/› Xdeploy the site to staging/);
+  // Alt+→ takes one word of it.
+  c.p.write('\x05\x15de');
+  await c.until(/› deploy the site to staging/);
+  c.p.write('\x1b[1;3C\x01X');
+  await c.until(/› Xdeploy$/m);
+  // Ctrl+R: newest first, line breaks as ↵, filtered by what is typed.
+  c.p.write('\x05\x15\x12');
+  await c.until(/Search earlier messages/);
+  await c.until(/❯ review the plan\n {2}line one↵line two\n {2}fix the tests\n {2}deploy the site to staging/);
+  c.p.write('\x12');
+  await c.until(/ {2}review the plan\n❯ line one↵line two/);
+  c.p.write('fix');
+  await c.until(/❯ fix the tests/);
+  c.p.write('\r');
+  // In the input, not sent.
+  await c.until(/› fix the tests\n─+\n {2}\/tmp/);
+  assert.ok(!calls.some((x) => x.method === 'POST' && x.body?.prompt === 'fix the tests'));
+  // Esc closes the search and keeps the text.
+  c.p.write('\x15\x12');
+  await c.until(/❯ review the plan/);
+  c.p.write('r\x1b');
+  await c.until(/› r\n─+\n {2}\/tmp/);
+  c.p.write('\x15');
+  // A shell command: its output, then the chat again; a failure says its exit code.
+  c.p.write('!echo hi there');
+  await c.until(/^› !echo hi there$/m);
+  assert.ok(c.raw().includes('\x1b[33m›\x1b[39m !echo hi there'), 'the › is yellow in shell mode');
+  c.p.write('\r');
+  await c.until(/\$ echo hi there\nhi there\n/);
+  c.p.write('!false\r');
+  await c.until(/\$ false\nexit 1/);
+  c.p.write('!pwd\r');
+  await c.until(/\$ pwd\n\/\S+/);
+  // /copy: nothing before a reply, the reply after (OSC 52).
+  c.p.write('say hello for the copy\r');
+  await c.until(/I looked at the README\./);
+  await c.until(/✓ 900 ms/);
+  c.p.write('/copy\r');
+  await c.until(/Copied the last reply \(3 lines\)/);
+  assert.ok(c.raw().includes(`\x1b]52;c;${Buffer.from('Hello there.\n\nI looked at the README.').toString('base64')}\x07`), 'OSC 52');
+  // The status line has the session now; its cost comes once there is one.
+  assert.match(await c.screen(), /Opus 5\.5 · Ask/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+});
+
+test('the chat: a list to pick from filters as you type, Enter picks the highlighted row, a number still picks, Esc cancels', async () => {
+  const c = await chatIn(100);
+  await c.until(/What should the agent do\?/);
+  c.p.write('/effort\r');
+  await c.until(/How hard should it think\?\n❯ 1 low\n {2}2 high/);
+  c.p.write('\x1b');
+  await c.until(/› What should the agent do\?/);
+  assert.doesNotMatch((await c.screen()).split('\n').slice(-5).join('\n'), /How hard/);
+  c.p.write('/model\r');
+  await c.until(/Which model\?\n❯ 1 Automatic +picked by the job[^\n]*\n {2}2 Opus 5\.5 +opus · default\n {2}3 Haiku 4\.5 +haiku/);
+  c.p.write('\x1b[B');
+  await c.until(/ {2}1 Automatic[^\n]*\n❯ 2 Opus 5\.5/);
+  c.p.write('\x1b[A\x1b[A');
+  await c.until(/ {2}1 Automatic[^\n]*\n {2}2 Opus[^\n]*\n❯ 3 Haiku/);
+  c.p.write('\x1b[B');
+  await c.until(/❯ 1 Automatic/);
+  c.p.write('hai');
+  await c.until(/Which model\?\n❯ 3 Haiku 4\.5 +haiku/);
+  c.p.write('\r');
+  await c.until(/Model: Haiku 4\.5/);
+  // A digit alone on an empty line picks that row at once (with 9 or fewer).
+  c.p.write('/mode\r');
+  await c.until(/What may it do without asking\?/);
+  c.p.write('3');
+  await c.until(/Mode: Full access/);
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+});
+
+test('hydor resume with no session named: the chat opens with the sessions to pick from, Esc leaves a new chat', async () => {
+  const f = newFake('an earlier session');
+  const c = await chatIn(100, { args: ['resume'] });
+  await c.until(/Carry on with which session\?/);
+  assert.match(await c.screen(), /❯ {2}1 an earlier session/);
+  assert.doesNotMatch(await c.screen(), /╭/, 'no head yet');
+  c.p.write('\x1b');
+  await c.until(/╭─+╮[\s\S]*What should the agent do\?/);
+  assert.doesNotMatch(await c.screen(), /Carry on with which/);
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+  // Picked instead: its head with its title, and its history.
+  const d = await chatIn(100, { args: ['resume'] });
+  await d.until(/Carry on with which session\?/);
+  d.p.write('\r');
+  await d.until(/│ an earlier session +│/);
+  d.p.write('\x04');
+  const t1 = Date.now();
+  while (d.exit() === null && Date.now() - t1 < 5000) await sleep(50);
+  assert.equal(d.exit(), 0);
+  fakes.delete(f.key);
+});
+
+
+test('the chat: Enter while the agent works joins the turn (as set) or queues it, /queue and /now, an agent changing the device settings, the grey suggestion switched off', async () => {
+  const terminalFile = path.join(DATA, 'terminal.json');
+  fs.rmSync(terminalFile, { force: true });
+  fs.writeFileSync(path.join(DATA, 'terminal-history'), `${JSON.stringify('deploy the site to staging')}\n`);
+  const c = await chatIn(120);
+  await c.until(/What should the agent do\?/);
+  const sent = (suffix: string, text: string) => calls.filter((x) => x.method === 'POST' && x.path.endsWith(suffix) && x.body?.text === text).length;
+  const waitFor = async (f: () => boolean) => {
+    const t0 = Date.now();
+    while (!f() && Date.now() - t0 < 6000) await sleep(50);
+    assert.ok(f());
+  };
+  // The default: Enter sends into the running turn.
+  c.p.write('be slow\r');
+  await c.until(/Working · \d+ s/);
+  await sleep(600);
+  await c.until(/Enter sends into the running turn · \/queue waits for its end/);
+  c.p.write('and also this\r');
+  await waitFor(() => sent('/message', 'and also this') === 1);
+  assert.equal(sent('/queue', 'and also this'), 0);
+  await c.until(/› and also this/);
+  await c.until(/✓ 900 ms/);
+  // /queue always waits, /now always joins (a message to an idle agent just goes).
+  c.p.write('be slow again\r');
+  await c.until(/Working · \d+ s/);
+  await sleep(600);
+  c.p.write('/queue for later\r');
+  await waitFor(() => sent('/queue', 'for later') === 1);
+  assert.equal(sent('/message', 'for later'), 0);
+  await c.until(/⧗ queued: for later/);
+  c.p.write('/now right away\r');
+  await waitFor(() => sent('/message', 'right away') === 1);
+  assert.equal(sent('/queue', 'right away'), 0);
+  // A command that needs its message waits for it: Enter in the menu puts the name in.
+  c.p.write('/queue\r');
+  await c.until(/› \/queue /m); // (the grey rest of an earlier /queue shows after it)
+  c.p.write('\x15');
+  // An agent changes the device settings: the terminal's two are kept and said, the rest is the browser's.
+  const f = [...fakes.values()].at(-1)!;
+  const device = (body: unknown) => fetch(`${BASE}/api/sessions/${encodeURIComponent(f.key)}/__device`, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  await device({ theme: 'dark', language: 'el' });
+  await sleep(300);
+  assert.equal(fs.existsSync(terminalFile), false, 'theme and language are not the terminal’s');
+  await device({ enter: 'queue', terminalSuggestions: false, theme: 'dark' });
+  await c.until(/Enter now waits for the turn to end · Grey suggestions are off/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(terminalFile, 'utf8')), { enter: 'queue', suggestions: false });
+  // With Enter queuing, the placeholder says so, Enter queues, and /now still joins.
+  c.p.write('be slow a third time\r');
+  await c.until(/Working · \d+ s/);
+  await sleep(600);
+  await c.until(/Enter queues it for when the turn ends · \/now joins the turn/);
+  c.p.write('wait for the end\r');
+  await waitFor(() => sent('/queue', 'wait for the end') === 1);
+  assert.equal(sent('/message', 'wait for the end'), 0);
+  await device({ enter: 'join' });
+  await c.until(/Enter now joins the running turn/);
+  c.p.write('\x1b');
+  await c.until(/■ Stopped/);
+  // Suggestions off: nothing grey after what is typed.
+  c.p.write('deplo');
+  await c.until(/› deplo$/m);
+  await sleep(300);
+  assert.doesNotMatch(await c.screen(), /deploy the site/);
+  await device({ terminalSuggestions: true });
+  await c.until(/Grey suggestions are on/);
+  c.p.write('y');
+  await c.until(/› deploy the site to staging/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
+  fs.rmSync(terminalFile, { force: true });
+});
+
+test('the chat: /hydor runs an area command (its table above the region), the menu lists areas, verbs and arguments, a confirm answered No, a hidden answer never shown or kept, and the old commands get a note', async () => {
+  const history = path.join(DATA, 'terminal-history');
+  fs.rmSync(history, { force: true });
+  const c = await chatIn(110);
+  await c.until(/What should the agent do\?/);
+  // The menu after `/hydor `: the areas with what they are, a few at a time.
+  c.p.write('/hydor ');
+  await c.until(/❯ \S+ +\S[^\n]*\n {2}\S+ +\S/);
+  c.p.write('proj');
+  await c.until(/❯ projects +[A-Z][^\n]*\n─*$|❯ projects +\S/m);
+  assert.doesNotMatch((await c.screen()).split('\n').slice(-4).join('\n'), /memory/, 'only the areas that match');
+  c.p.write('\t');
+  // After an area: its verbs, with what each does.
+  await c.until(/› \/hydor projects /);
+  await c.until(/❯ list +Your projects[^\n]*\n {2}show +One project/);
+  // After a verb: its arguments, from the same loaders as Tab completion in a shell.
+  c.p.write('sho');
+  await c.until(/❯ show +One project/);
+  c.p.write('\t');
+  await c.until(/❯ Thesis +sp1\n {2}Website +sp2/);
+  assert.ok(calls.some((x) => x.path === '/api/projects'));
+  // Options when the word starts with a dash.
+  c.p.write('-');
+  await c.until(/❯ --\S+ +\S/);
+  c.p.write('\x7f\x15');
+  // Run: `/hydor projects` prints its table above the region.
+  c.p.write('/hydor projects\r');
+  await c.until(/PROJECT +FOLDER +SESSIONS +DOCS +LAST\n[^\n]*Thesis +~\/thesis +2 +1 /);
+  assert.match(await c.screen(), /Website +~\/site/);
+  await c.until(/› What should the agent do\?/);
+  // A confirm: the picker with No first; answered No, nothing is removed.
+  c.p.write('/hydor projects remove Thesis\r');
+  await c.until(/Remove “Thesis”\?\n❯ 1 No\n {2}2 Yes/);
+  c.p.write('\r');
+  await c.until(/Not removed\./);
+  assert.ok(!calls.some((x) => x.method === 'DELETE' && x.path === '/api/projects/sp1'));
+  // The same answered Yes removes it (a digit alone picks).
+  c.p.write('/hydor projects rm Thesis\r');
+  await c.until(/Remove “Thesis”\?/);
+  c.p.write('2');
+  await c.until(/Removed “Thesis”\./);
+  assert.ok(calls.some((x) => x.method === 'DELETE' && x.path === '/api/projects/sp1'));
+  // A hidden question: • for each character, the answer sent, never shown, never in the history.
+  c.p.write('/hydor keys set TEST_KEY\r');
+  await c.until(/Value for TEST_KEY:/);
+  await c.until(/Hidden as you type/);
+  c.p.write('s3cr3tVALUE');
+  await c.until(/› •{11}$/m);
+  assert.doesNotMatch(await c.screen(), /s3cr3t/);
+  // Up and Tab do nothing there (history is not reached into the answer).
+  c.p.write('\x1b[A\t');
+  await sleep(200);
+  c.p.write('\r');
+  await c.until(/TEST_KEY is in the vault\./);
+  const post = calls.find((x) => x.method === 'POST' && x.path === '/api/connections/secrets');
+  assert.equal(post?.body.value, 's3cr3tVALUE');
+  assert.doesNotMatch(await c.screen(), /s3cr3t/);
+  assert.doesNotMatch(c.raw(), /s3cr3t/, 'it was never written to the terminal');
+  assert.doesNotMatch(fs.existsSync(history) ? fs.readFileSync(history, 'utf8') : '', /s3cr3t/);
+  // Esc backs out of a question and says nothing; the chat goes on.
+  c.p.write('/hydor keys set OTHER_KEY\r');
+  await c.until(/Value for OTHER_KEY:/);
+  c.p.write('\x1b');
+  await c.until(/› What should the agent do\?/);
+  assert.equal(calls.filter((x) => x.method === 'POST' && x.path === '/api/connections/secrets').length, 1);
+  // A wrong use is told in red-and-words, an old command gets a note; neither ends the chat.
+  c.p.write('/hydor projects frobnicate\r');
+  await c.until(/✗ Unknown projects command: frobnicate\./);
+  c.p.write('/hydor usage\r');
+  await c.until(/In the chat, use \/usage, or run it in a shell: hydor usage/);
+  c.p.write('/hydor nothing-like-it\r');
+  await c.until(/Unknown command: nothing-like-it\./);
+  c.p.write('/hydor projects show Nothing\r');
+  await c.until(/✗ No project “Nothing”/);
+  c.p.write('\x15\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+  assert.equal(c.exit(), 0);
 });
 
 test('the chat with stdout not a terminal: no colour and no region, each line typed sent', async () => {

@@ -1,6 +1,6 @@
 // Settings → Models → Tiers: which model (and effort) Quick, Standard, Best and Max mean for each agent program, and
 // how sessions use them (the team), kept in the kv table. An agent that thinks with a tier starts on its model; a
-// session on Automatic starts on Best's, or Max's for a hard problem; a lead gives each helper a tier. Only the picks
+// session on Automatic starts on Best's (its agent may step up to Max's); a lead gives each helper a tier. Only the picks
 // that were changed are kept: the others follow the models each program offers, remembered here each time a program
 // lists them, so a tier left alone moves to its family's newest model by itself.
 import {

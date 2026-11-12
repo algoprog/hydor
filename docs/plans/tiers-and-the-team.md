@@ -7,7 +7,8 @@ another for very well defined simpler tasks (targeted code edits, specific jobs 
 more complex problems (fable 5.2, gpt astra as main agents / orchestrators) … this will help the agent reduce cost
 without sacrificing quality", then "smallest tier would use haiku, luna etc", and "do some testing to validate the
 approach works well without quality loss". What was built in 0.52.0, why it is shaped as it is, and what the
-measurements say.*
+measurements say. Measured again on 11-12 November, when the first tasks proved too easy to tell the tiers apart:
+"all models score 100% which should not be the case for weaker models".*
 
 ## What a session does now
 
@@ -19,10 +20,9 @@ measurements say.*
 | **Max** | the main agent of a hard problem | the newest Fable | Astra |
 
 - **Automatic** is the start page's model until another is picked (`model: "auto"` in `POST /api/sessions`). The
-  session starts on Best. While its agent starts, the helper model reads the request and says whether it is a hard
-  problem (`server/assistants/auto.ts`); if so the session is on Max before its first message goes, and a line in the
-  conversation says why. A start never waits more than ten seconds for that answer, and reads silence as "not hard":
-  the session is on Best then, and only the server's log says that the helper model was not there to ask (`[auto]`).
+  session starts on Best (`server/assistants/auto.ts`) and reaches Max only by its own agent's step up (below). Until
+  0.57.0 the helper model also read each request as it started and sent what read as a hard problem to Max: the second
+  measurement found that costly for coding work (16 of 37 requests, 43% more than Best on them, for one more solved).
 - **The main agent leads** (`server/children/team.ts`): it is told what each tier is for and what each costs beside
   it, to sort the work before it starts, to hand the doing to helpers and keep the deciding, and that it answers for
   what comes back. A helper asked for with no tier gets Standard; none thinks with a tier above its lead's.
@@ -49,81 +49,112 @@ measurements say.*
 - **No silent change of a remembered pick.** Someone who picked Sonnet to spend less must not find sessions on Opus.
   Automatic is what the start page shows where no model was ever picked, and the first row of the menu for everyone
   else.
-- **Sizing up is one small call, in parallel.** A request is read once by the cheapest model there is while the
-  agent's program starts. The alternative, the lead deciding for itself, costs a turn of the lead and comes after
-  it has begun.
+- **Max when Best has struggled, not when a request sounds hard.** Reading a request's words to pick Max was quick and
+  cheap in itself (one small call while the agent starts), but most of what reads as hard Best solves; the lead knows
+  when it is stuck (a fix that failed twice, a cause it cannot find) and steps up then.
 
 ## What was measured
 
-`scripts/tier-bench` (its README says how to run it): nine coding tasks with hidden checkers, each done on a scratch
-copy of the app by one agent alone on each tier's model and by a session on Automatic with the team on; and thirty
-requests, ten of them hard, sized up by the helper model. Claude Code throughout: Haiku 5.5, Sonnet 5.5, Opus 5.5
-and Fable 5.2 as Quick, Standard, Best and Max. Costs are what the tokens would cost at API prices on 10 November
-2026 (a plan is flat-rate: the figures compare runs). Checks are the share of a task's hidden cases that pass. Every
-run behind the tables is recorded in `scripts/tier-bench/results/2026-11-10/`, and `report.mjs` shows them again.
+`scripts/tier-bench` (its README says how to run it) gives each task to a session of a scratch copy of the app, the
+way a person would: an agent with its tools, in a folder of its own, unattended. Five ways: **Quick alone**
+(Haiku 5.5), **Standard alone** (Sonnet 5.5), **Best alone** (Opus 5.5), **Max alone** (Fable 5.2), and the
+**team**: Automatic, with its main agent leading helpers as shipped. Claude Code throughout. A run passes a task when
+it passes every one of the task's hidden cases. Costs are what the tokens would cost at API prices (a plan is
+flat-rate: they compare runs). In the second measurement the agents worked offline, and every transcript was checked
+for reads of the tasks' hidden files (none). The runs: `scripts/tier-bench/results/2026-11-10/` and `2026-11-12/`.
 
-**Sizing up.** The helper model (Haiku through Claude Code) called all 10 hard requests hard and kept all 20 plain
-ones on Best, in 1.8 s at the median and 3.7 s at most. A start waits at most 10 s for it.
+**Sizing up** (the first measurement, before 0.57.0 removed it): the helper model called all 10 hard requests of a set
+of 30 hard and kept all 20 plain ones on Best, in 1.8 s at the median. It was accurate on requests as people word
+them; on coding requests it was eager, and the second measurement shows what that cost.
 
-**Seven ordinary tasks** (six small ones of different kinds and one of twelve modules). Best alone and the team are
-means of two or three runs, the others one run each:
+### Five sets of tasks
 
-Each cell: checks passed · cost · time.
+1. **A written specification** (9 tasks, 10 November): modules to a specification, a mechanical change across files,
+   a feature, an expression evaluator, a one-line fix, a timing bug, twelve modules, a linear-time matcher and an
+   invoice rulebook.
+2. **Requirements left implied** (5): a Python module ported to JavaScript with identical behaviour (505 cases from
+   the Python itself), seven issues as users report them in a time tracker (time zones over daylight saving, money
+   rounded at the right level, a reporter's wrong guess), a cache with four causes behind four symptoms (one a race),
+   a report made fast with every byte kept, and an exhaustive search that has to become the right algorithm.
+3. **A hard core** (4): a security review of a small service with thirteen unlisted holes, an exact rectilinear
+   spanning tree for 200,000 points where the fast heuristics fail, spanning-tree probabilities that need a theorem,
+   and an undocumented binary format worked out from samples.
+4. **Contest problems from after the models' training** (10): AtCoder Regular Contest problems of July-October 2026,
+   rated 2277 to 3596 on AtCoder's scale (3000 is the level of its strongest hundred or so contestants), with their
+   statements as published, references from their editorials proved against brute force on thousands to millions of
+   inputs, and our own hidden tests.
+5. **LiveCodeBench** (30): hard problems of its release v6 (22 AtCoder, 8 LeetCode, drawn at random), graded by its
+   own code at a pinned commit (`lcb/`). Anyone can check these. They are from January-April 2025, before the models
+   were trained, so a model may have seen them.
 
-| Task | Quick alone | Standard alone | Best alone | Max alone | Team |
+### What came of it
+
+Each cell: runs that passed every case · the cost of one pass over the set (each task's mean, summed). On the first
+set Best alone and the team ran two or three times on each task, and Quick alone three times on each contest
+problem; everything else once.
+
+| Set | Quick alone | Standard alone | Best alone | Max alone | Team |
 |---|---|---|---|---|---|
-| page-count | 100% · $0.01 · 0.5 min | 100% · $0.08 · 0.5 min | 100% · $0.16 · 0.5 min | 100% · $0.19 · 0.7 min | 100% · $0.17 · 0.5 min |
-| logger-move | 100% · $0.01 · 0.8 min | 100% · $0.12 · 0.6 min | 100% · $0.29 · 0.7 min | 100% · $0.33 · 0.7 min | 100% · $0.29 · 0.7 min |
-| todo-due | 100% · $0.02 · 1.3 min | 100% · $0.15 · 1.0 min | 100% · $0.37 · 1.4 min | 100% · $0.86 · 12.5 min | 100% · $0.43 · 1.8 min |
-| utils4 | 100% · $0.03 · 2.0 min | 100% · $0.26 · 1.7 min | 100% · $0.55 · 2.0 min | 97.3% · $3.09 · 15.7 min | 100% · $0.41 · 1.6 min |
-| expr | 100% · $0.05 · 3.8 min | 100% · $0.25 · 1.7 min | 100% · $0.98 · 3.6 min | 100% · $2.25 · 12.3 min | 100% · $0.71 · 4.0 min |
-| flaky-queue | 100% · $0.01 · 1.1 min | 100% · $0.10 · 1.0 min | 100% · $0.29 · 1.6 min | 100% · $0.73 · 5.7 min | 100% · $0.41 · 2.6 min |
-| kit12 | 100% · $0.03 · 3.9 min | 100% · $0.68 · 4.2 min | 100% · $1.46 · 5.4 min | – | 100% · $1.33 · 2.7 min |
-| **The six** | **100% · $0.11 · 9.4 min** | **100% · $0.95 · 6.5 min** | **100% · $2.65 · 9.8 min** | **99.5% · $7.45 · 47.5 min** | **100% · $2.42 · 11.3 min** |
-| **All seven** | **100% · $0.15 · 13.3 min** | **100% · $1.63 · 10.7 min** | **100% · $4.11 · 15.2 min** | – | **100% · $3.76 · 14.0 min** |
+| Written specification (9) | 9 of 9 · $0.34 | 9 of 9 · $2.38 | 21 of 21 · $6.53 | 6 of 8 · $12.84 | 18 of 18 · $7.29 |
+| Requirements implied (5) | 5 of 5 · $0.68 | – | 5 of 5 · $6.71 | – | 5 of 5 · $9.63 |
+| A hard core (4) | 4 of 4 · $0.87 | – | 3 of 4 · $4.41 | – | 4 of 4 · $6.14 |
+| Contest problems after training (10) | 26 of 30 · $2.19 | – | 9 of 10 · $8.45 | – | 10 of 10 · $9.38 |
+| LiveCodeBench, hard (30) | 28 of 30 · $0.73 | 27 of 30 · $4.37 | 29 of 30 · $9.97 | – | 29 of 30 · $9.13 |
+| **All 58 tasks** | **72 of 78 (92%) · $4.81** | | **67 of 70 (96%) · $36.07** | | **66 of 67 (98.5%) · $41.57** |
 
-- **No check was lost by leading with helpers**: the team passed every hidden case in every run (14 runs), as Best
-  alone did (19 runs). The team's 14 are the runs made with the lead's instructions as shipped; the 19 made with
-  earlier wordings of them are left out of the means, and passed every case as well (for 2% less than Best alone).
-- **The team cost 9% less than Best alone** over the seven, and took about as long: from 27% less where Quick helpers
-  did real work (the evaluator's tests, four modules) and half the time on the twelve modules, to 41% more on the one
-  task whose request reads as a hard problem, which Automatic started on Max although Best alone solves it.
-- **Against the strongest model for everything it cost 67% less** (the six tasks Max alone was run on: $2.42 against
-  $7.45, and 11 minutes against 47, ten of those spent waiting on a question nobody was there to answer), which is
-  the comparison for anyone who ran every session on Max.
-- **These tasks do not tell the tiers apart**: Quick alone passed every case for 4% of what Best alone cost. A lead
-  that hands a clear part to a Quick helper is safe on work like this, which is why the lead is told to try the
-  lower tier first and check; it also says that the big lever is the main agent's own tier, not its helpers'.
-- One run is one draw: the same task twice differed by up to a third in cost (what the lead chose to hand over, and
-  to which tier). The means above are of few runs.
+- **The cheapest model alone did nearly all of it**, for an eighth of what Best alone cost: every task with a
+  written specification or with implied requirements, the security review with all thirteen holes, the theorem, the
+  binary format, and every one of the ten contest problems in at least one of its three runs (98.5% of their cases),
+  including the two rated above 3500. It checks its work against whatever can tell it the answer (it ran the Python
+  it was porting on its own edge cases), and it knew every algorithm and theorem these tasks were built around.
+- **Its six misses** (of 78 runs): a LiveCodeBench solution too slow for the largest tests, a game problem every way
+  missed, and four contest runs that lost some hidden cases (34 of 47 on one problem, 53 and 60 of 61 on another, 51
+  of 53 on a third) where its other runs of the same problems passed them all. They are misses of reliability, not
+  of reach.
+- **A strong model alone is no guarantee.** Best alone missed three: the game problem; a contest problem Haiku solved
+  three times, where Opus explored for 21 minutes (117,000 tokens written) and never wrote the solution; and eight
+  of the 78 cases of the security review.
+- **The team was the most reliable**, 66 of 67 runs, its one miss the problem nobody solved, and the dearest: 15%
+  more than Best alone, because Automatic started 10 of its 49 new runs on Max (seven of the nine on our own tasks;
+  its extra contest solve was one of them) and its leads handed over almost nothing: 3 helpers in 49 runs, none on
+  the contest or LiveCodeBench problems, which are one piece of reasoning each. Where it stayed on Best
+  (LiveCodeBench), it did what Best alone did, at about the same cost.
+- **These quality differences are within noise**: 92% (95% interval 84-96%), 96% (88-99%) and 98.5% (92-100%); Quick
+  against the team, p = 0.12 (Fisher). The cost differences are not: 7.5 times from Quick alone to Best alone.
+- **What it means for the design.** On work whose result can be checked, the doing can go to the cheapest tier, and
+  the lead's price buys reliability on the rare hard miss rather than ability. The big levers are the lead's own tier
+  and Max: the sizer sent many coding requests to Max (16 of the 37 team runs on our own tasks and the contest
+  problems), which cost more here than it bought, so 0.57.0 leaves Max to the lead's own step up. Not measured yet:
+  starting on Quick and moving up a tier only when a check fails, and work whose result cannot be checked by a program
+  (designs, research, writing), where a judge has to read it.
 
-**Two hard tasks**, written so that a quick solution fails where a careful one passes (a matcher that must run in
-linear time, where a backtracking one passes 51 of 74 cases; an invoice rulebook where floating-point numbers and the
-wrong rounding pass 37 of 61):
+**After 0.57.0** (Max only by the lead's own step up), the team ran again, once each, on the 13 tasks where Automatic
+had started it on Max. It passed every case in 12 of the 13 (2 of 78 security cases missed), for $13.07 in all: 48%
+less than the same tasks had cost the team on Max ($24.90, 13 of 13) and 25% less than Best alone ($17.51, 11 of 13).
+No lead stepped itself up: none found a problem too hard for Best, including the contest problem Best alone had
+failed, which it solved. `results/2026-11-12/team-after-0.57.json`.
 
-| Task | Quick alone | Standard alone | Best alone | Max alone | Team |
-|---|---|---|---|---|---|
-| regex-linear | 100% · $0.14 · 5.8 min | 100% · $0.42 · 3.2 min | 100% · $1.62 · 8.6 min | 0% · $2.78 · 24.5 min | 100% · $2.22 · 11.5 min |
-| invoice-rules | 100% · $0.05 · 3.5 min | 100% · $0.33 · 1.8 min | 100% · $0.80 · 2.7 min | 100% · $2.62 · 11.8 min | 100% · $1.32 · 5.9 min |
-| **Both** | **100% · $0.19 · 9.3 min** | **100% · $0.75 · 5.0 min** | **100% · $2.42 · 11.4 min** | **50% · $5.39 · 36.3 min** | **100% · $3.54 · 17.4 min** |
-
-- **Every tier passed these too**, Quick alone included, so they do not tell the tiers apart either: with a written
-  specification to work from, the smallest model of this generation writes a matcher that never backtracks and gets
-  banker's rounding right. What would tell them apart is work without a specification, which a checker cannot mark.
-- **Automatic started both on Max**, as their requests read as hard problems. The team passed every case in all four
-  runs, for 46% more than Best alone ($3.54 against $2.42) and 34% less than Max alone. Max for hard problems is
-  insurance: on tasks Best can do, it is the price of not knowing that beforehand.
-- **Max alone failed one of them outright**: on the matcher its replies ran over the 32,000-token limit of one reply
-  three times, and the turn ended after 24 minutes and $2.78 with no file written. The same model as a lead, told to
-  sort the work and hand parts over, finished it in both runs. One run proves little, but it is the only task a way
-  failed in the whole benchmark, and it was the most expensive way.
+**The first measurement** (10 November, the nine tasks with a written specification): the team cost 9% less than
+Best alone over seven ordinary tasks, from 27% less where Quick helpers did real work to 41% more on a request that
+reads as a hard problem, which Automatic started on Max. Against Max alone it cost 67% less over six. Max alone failed
+the linear-time matcher outright: its replies ran over the 32,000-token limit of one reply three times, and the turn
+ended after 24 minutes and $2.78 with no file written. The same model as a lead, told to sort the work and hand parts
+over, finished it in both runs.
 
 **What the lead does**, read from its conversations: it reads the task, says in a line what goes to whom (as it is
 told to), and hands out what can be specified: tests, modules to a written specification, twelve modules as four
-helpers of three. It keeps what is one piece of reasoning (the evaluator, the feature's design), writes its own
-checks from the specification while the helpers work, and runs them on what comes back. A mechanical change across
-twelve files it did itself with one command, which no helper would have beaten. All of this was Claude Code's own
+helpers of three. It keeps what is one piece of reasoning (the evaluator, the feature's design, a contest problem),
+writes its own checks while the helpers work, and runs them on what comes back. All of this was Claude Code's own
 Agent tool with a model named for each helper; none of these tasks was long enough for child sessions.
+
+**How far to trust it.** One run is one draw, and a set of 4 to 30 tasks is small: read the totals, not single cells.
+The contest problems are recent enough that neither model can have seen them (asked, both said they knew nothing of
+these contests), but our tests are our own; LiveCodeBench's tests are its own, but the models may have seen those
+problems. Four LiveCodeBench problems whose exact comparison cannot judge them fairly (a test that contradicts its
+statement, three that accept any of several answers) were replaced by the next in the random order before any run.
+Run records were kept as they came, with three corrections, each noted in the results: 23 runs that never began (a
+copied sign-in had lapsed) and 4 cut short by a restart of the app were run again, and 4 LiveCodeBench solutions were
+graded again when the grader itself had failed (its Python lacked a package).
 
 **What changed because of the measurements**:
 - The lead's instructions went through four wordings. Told only what each tier is for, Opus did everything itself
@@ -134,9 +165,18 @@ Agent tool with a model named for each helper; none of these tasks was long enou
   before it says a session has finished, and so do `hydor run` and the benchmark.
 - A helper stopped by the plan's usage limit was being run again a tier up, beside the original once another account
   took it over. It is no longer.
+- The benchmark itself: tasks that need judgement, recent contest problems and LiveCodeBench; agents offline; a check
+  that no run read its task's hidden files; everything it starts in a memory-capped scope of its own (two
+  out-of-memory restarts of the machine on 11 November happened while it ran without one).
 
 ## Not done
 
+- Starting on Quick and stepping up only on a failed check, which these results suggest could keep most of the
+  quality at a fraction of the cost: not built, not measured.
+- Max only by the lead's own step up (0.57.0) is measured on the 13 tasks where Automatic had chosen Max (below), once
+  each; a wider set and more runs would say more.
+- Work whose result a program cannot check (a design, a report, writing) is not measured: it needs a judge, checked
+  against people's ratings first.
 - The benchmark ran Claude Code alone. Codex and Custom get the same tiers and the same instructions, with child
   sessions in place of Claude Code's own helpers; the tests check that, nothing has measured it.
 - Custom has no tiers until its models are named in the table, so its sessions lead no team by default.

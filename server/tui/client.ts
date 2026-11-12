@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import WebSocket from 'ws';
 import type { ClientEvent, ServerEvent } from '../../shared/types.ts';
-import { UsageError } from './args.ts';
+import { UsageError } from './areas/kit.ts';
 
 export class ApiError extends Error {
   constructor(
@@ -21,11 +21,19 @@ export class ApiError extends Error {
   }
 }
 
-/** What a session has spent at API prices, its child sessions' with it (GET /api/budget/:key); null when the server cannot say. */
+/** What a session has spent at API prices, its Hydor subagents' with it (GET /api/budget/:key); null when the server cannot say. */
 export interface Spent {
   spentUsd: number;
   ownUsd: number;
   childrenUsd: number;
+}
+
+/** A file the server sent (an export, a picture): its bytes, its kind, the name it gave and any note it sent with it. */
+export interface RawFile {
+  data: Buffer;
+  type: string;
+  filename?: string;
+  note?: string;
 }
 
 export interface Conn {
@@ -39,6 +47,8 @@ export interface Conn {
   version: string;
   /** Calls the API; the server's `{ error }` as an ApiError. */
   api<T = any>(method: string, p: string, body?: unknown, o?: { timeoutMs?: number }): Promise<T>;
+  /** Fetches a file as it is, bytes and all (a GET); the server's `{ error }` as an ApiError. */
+  raw?(p: string, o?: { timeoutMs?: number }): Promise<RawFile>;
   /** The event socket (opened on first use, one per connection). */
   events(): Events;
   /** A page of the web app: a session's when given its key. */
@@ -97,6 +107,24 @@ export async function localBase(): Promise<string> {
 
 /** Starts this computer's server in the background (its output to logs/terminal-server.log) and waits for it. */
 export async function startServer(base: string, say: (s: string) => void): Promise<string> {
+  // Inside the Mac app (its `hydor` sets HYDOR_APP_BUNDLE) the app owns the server, its restarts and its updates:
+  // a server of this command's own would hold the port. Opening the app (in the background) starts it.
+  const bundle = process.env.HYDOR_APP_BUNDLE;
+  if (bundle && process.platform === 'darwin') {
+    spawn('open', ['-g', '-a', bundle], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    const t0 = Date.now();
+    let told = false;
+    while (Date.now() - t0 < 90_000) {
+      const v = await health(base, 1500);
+      if (v) return v;
+      if (!told && Date.now() - t0 > 1000) {
+        say('Opening Hydor…');
+        told = true;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    throw new ApiError(0, 'Hydor did not start in time: open the Hydor app, then try again.');
+  }
   const { APP_ROOT, config, ensureDirs, paths } = await import('../config.ts');
   const entry = path.join(APP_ROOT, 'dist/server/index.js');
   if (!fs.existsSync(entry)) throw new ApiError(0, `Hydor is not running here, and it is not built yet: npm ci && npm run build (in ${APP_ROOT})`);
@@ -188,6 +216,26 @@ export async function connect(o: { server?: string; token?: string; start?: bool
       }
       return data as T;
     },
+    async raw(p: string, opts: { timeoutMs?: number } = {}): Promise<RawFile> {
+      let r = await call('GET', p, undefined, opts.timeoutMs ?? 300_000);
+      if (r.status === 401 && local && !remade) {
+        remade = true;
+        token = await localToken(true);
+        socket?.setToken(token);
+        r = await call('GET', p, undefined, opts.timeoutMs ?? 300_000);
+      }
+      if (!r.ok) {
+        const text = await r.text();
+        let msg = `${r.status} ${text.slice(0, 200)}`;
+        try {
+          const j = JSON.parse(text);
+          if (j && typeof j.error === 'string') msg = j.error;
+        } catch {}
+        throw new ApiError(r.status, msg);
+      }
+      const name = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(r.headers.get('content-disposition') ?? '')?.[1];
+      return { data: Buffer.from(await r.arrayBuffer()), type: r.headers.get('content-type') ?? '', filename: name ? decodeURIComponent(name) : undefined, note: r.headers.get('x-export-note') ?? undefined };
+    },
     events() {
       if (!socket) {
         socket = new Events(base.replace(/^http/, 'ws') + '/ws', token);
@@ -205,7 +253,7 @@ export async function connect(o: { server?: string; token?: string; start?: bool
   return conn;
 }
 
-/** What a session has spent, its child sessions' with it, as the server adds it up; null when it cannot say (an older server). */
+/** What a session has spent, its Hydor subagents' with it, as the server adds it up; null when it cannot say (an older server). */
 export async function spentOf(conn: Conn, key: string): Promise<Spent | null> {
   try {
     const b = await conn.api<Partial<Spent>>('GET', `/api/budget/${enc(key)}`, undefined, { timeoutMs: 15_000 });

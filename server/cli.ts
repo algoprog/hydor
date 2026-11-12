@@ -8,6 +8,9 @@
 //   node dist/server/cli.js service uninstall | status | logs
 //   node dist/server/cli.js update              pulls the latest code, builds it and restarts the service
 //   node dist/server/cli.js app …               templates: new, folder, dev, try, export, import (server/apps/cli.ts)
+//   node dist/server/cli.js completion [shell]  prints Tab completion for bash, zsh or fish; `completion install` sets it up
+//   node dist/server/cli.js __complete -- …     (hidden) what the completion scripts ask for: candidates, quick and quiet
+// `<maintenance command> --help` shows that command's help and runs nothing.
 import './env-compat.ts';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -16,6 +19,8 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { ENV_FILE, UNIT, UNIT_PATH, unitText } from './service.ts';
+import { helpText, MAINTENANCE, subCommandError } from './tui/args.ts';
+import { colorWanted, makePaint } from './tui/term.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -28,6 +33,11 @@ try {
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
   }
 } catch {}
+
+if (cmd && MAINTENANCE.includes(cmd) && process.argv.slice(3).some((a) => a === '-h' || a === '--help')) {
+  process.stdout.write(`${helpText(makePaint(colorWanted(process.stdout, process.argv.includes('--no-color'))), cmd)}\n`);
+  process.exit(0);
+}
 
 function ask(q: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
@@ -91,6 +101,10 @@ if (cmd === 'set-password') {
   const { createAccessToken } = await import('./machines.ts');
   console.log(createAccessToken(db, process.argv.slice(3).join(' ') || 'Another machine').token);
 } else if (cmd === 'service' && sub === 'install') {
+  if (process.env.HYDOR_APP_BUNDLE) {
+    console.error('The Hydor app already runs the server (and keeps it running): there is nothing to install.');
+    process.exit(1);
+  }
   if (!fs.existsSync(path.join(ROOT, 'dist/server/index.js'))) {
     console.error('Build it first: npm ci && npm run build');
     process.exit(1);
@@ -118,6 +132,12 @@ if (cmd === 'set-password') {
   process.exit(systemctl('status', '--no-pager', UNIT));
 } else if (cmd === 'service' && sub === 'logs') {
   spawnSync('journalctl', ['--user', '-u', UNIT, '-n', '200', '--no-pager'], { stdio: 'inherit' });
+} else if (cmd === '__complete') {
+  const { completeCommand } = await import('./tui/completion.ts');
+  await completeCommand(process.argv.slice(3));
+} else if (cmd === 'completion') {
+  const { completionCommand } = await import('./tui/completion.ts');
+  process.exitCode = completionCommand(process.argv.slice(3));
 } else if (cmd === 'app') {
   const { appCommand } = await import('./apps/cli.ts');
   try {
@@ -127,6 +147,10 @@ if (cmd === 'set-password') {
     process.exitCode = 1;
   }
 } else if (cmd === 'update') {
+  if (process.env.HYDOR_APP_BUNDLE) {
+    console.error('The Hydor app updates itself: choose Hydor → Check for Updates…');
+    process.exit(1);
+  }
   if (!fs.existsSync(path.join(ROOT, '.git'))) {
     console.error('This copy was not installed from git; download the new version instead.');
     process.exit(1);
@@ -147,7 +171,7 @@ if (cmd === 'set-password') {
     console.log('Updated and restarted.');
   } else console.log('Updated. Restart the server to use the new version (running agents are not interrupted).');
 } else if (cmd === 'service') {
-  console.error('usage: hydor service install | uninstall | status | logs');
+  console.error(subCommandError('service', sub));
   process.exitCode = 2;
 } else {
   // Everything else is Hydor in a terminal (with no command at all, the chat).

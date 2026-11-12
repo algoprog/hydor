@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowRightLeft, ArrowUp, ChevronDown, ListTodo, MonitorUp, Paperclip, Plus, SlidersHorizontal, Square, X } from 'lucide-react';
-import type { Agent, BackgroundTask, SessionSummary } from '@shared/types';
+import { ArrowRightLeft, ArrowUp, ChevronDown, MonitorUp, Paperclip, Plus, SlidersHorizontal, Square, X } from 'lucide-react';
+import type { Agent, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
 import { enc, lostOnTheWay, post } from '../../lib/api';
@@ -10,14 +10,16 @@ import { toast, toastError, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { cx, MenuItem, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
-import { activityLabel, activityOf, confirmResume, inBackground, takeoverDialog } from '../../lib/activity';
+import { activityOf, confirmResume, inBackground, takeoverDialog } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, releaseSentPictures, sendingPictures, type Attachment } from '../../lib/attachments';
 import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from '../../lib/drafts';
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
 import { BlockedApproval } from './BlockedApproval';
 import { SessionMeters } from './SessionMeters';
-import { TaskLogDialog, TaskRow, useStopTask } from './TaskLog';
+import { stopWords, taskKindOf } from '../../lib/work';
+import { stopEverything } from './WorkRow';
+import { WorkTray } from './WorkTray';
 import { useComposerMenu } from '../../components/ComposerMenu';
 import { QueueList } from './QueueList';
 import { GoalBar } from './GoalBar';
@@ -137,11 +139,11 @@ function ContextRing({ pct, title, disabled, onClick }: { pct: number; title: st
   );
 }
 
-/** The ring that turns on the box's round button while the agent is at work; still if the device asks for reduced motion. */
-function WorkRing({ className, opacity = 0.55 }: { className?: string; opacity?: number }) {
+/** The ring that turns on the box's Stop button while the agent is at work, or what it started is; still if the device asks for reduced motion. */
+function WorkRing() {
   return (
-    <svg viewBox="0 0 36 36" className={cx('pointer-events-none absolute inset-0 h-full w-full animate-spin motion-reduce:animate-none', className)} aria-hidden>
-      <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="24 71" opacity={opacity} />
+    <svg viewBox="0 0 36 36" className="pointer-events-none absolute inset-0 h-full w-full animate-spin motion-reduce:animate-none" aria-hidden>
+      <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="24 71" opacity="0.55" />
     </svg>
   );
 }
@@ -161,7 +163,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const ext = running ? null : (s.external ?? null);
   const takeover = !!ext && s.agent === 'claude';
   const locked = !!ext && !takeover;
-  // Its turn is over but background tasks or child sessions it started still run (the header says "Working · 2 in
+  // Its turn is over but background tasks or subagents it started still run (the header says "Working · 2 in
   // background"): the ring keeps turning, around Send, since the agent takes messages as usual meanwhile.
   const activity = activityOf({ ...s, live });
   const background = !working && !ext && inBackground(activity);
@@ -179,10 +181,6 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const moveCat = useCatalog(move?.agent ?? s.agent, move ? move.acp : s.acpAgent);
   const ta = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const tasksRef = useRef<HTMLButtonElement>(null);
-  const [tasksOpen, setTasksOpen] = useState(false);
-  const [logTask, setLogTask] = useState<BackgroundTask | null>(null);
-  const stopper = useStopTask(s.key);
   const menu = useComposerMenu({ ta, setText, root: s.cwd, commands: (move ? moveCat : cat)?.commands });
   // Text from elsewhere (dictation, a choice clicked in a page) joins what is being written.
   const insertText = (t: string) => {
@@ -355,10 +353,13 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     }
   };
 
-  // Only the Stop button stops a turn: Esc closes what is open (the find bar, a menu, a list) and nothing more.
-  const interrupt = () => post(`/api/sessions/${enc(key)}/interrupt`).catch(toastError);
-
-  const tasks = (running ? live!.backgroundTasks : ext?.backgroundTasks) ?? [];
+  // Only the Stop button stops a turn: Esc closes what is open (the find bar, a menu, a list) and nothing more. It stops
+  // what the session started too (its Hydor subagents and background tasks), which the tray above the box lists. Its program's
+  // own subagents (running tasks too) count as subagents; the other running tasks are background tasks.
+  const stopAll = () => void stopEverything(key);
+  const runningTasks = (live?.backgroundTasks ?? []).filter((t) => t.status === 'running');
+  const agentTasks = runningTasks.filter((t) => taskKindOf(t.kind) === 'subagent').length;
+  const stops = stopWords(working, (activity?.helpers ?? 0) + agentTasks, runningTasks.length - agentTasks);
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
   const touch = isTouch();
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;
@@ -390,6 +391,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         <BlockedApproval sessionKey={key} agent={s.agent} running={running} mode={mode} />
         <LimitBanner agent={s.agent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />
         <GoalBar s={s} className="mb-2" />
+        <WorkTray key={key} s={s} />
         <QueueList s={s} />
         {move && (
           <div className="anim-pop mb-2 flex items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 py-2 text-[12.5px]">
@@ -571,34 +573,6 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                   </>
                 )}
               </OptionsChip>
-              {tasks.length > 0 && (
-                <>
-                  <button
-                    ref={tasksRef}
-                    onClick={() => setTasksOpen((o) => !o)}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] text-accent hover:bg-bg-2"
-                    title="Background tasks"
-                  >
-                    <ListTodo size={13} />
-                    {tasks.length}
-                  </button>
-                  <Popover anchor={tasksRef} open={tasksOpen} onClose={() => setTasksOpen(false)} width={340} prefer="above" sheet>
-                    <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-fg-3 uppercase">Background tasks · {tasks.length}</div>
-                    {tasks.map((t) => (
-                      <TaskRow
-                        key={t.id}
-                        t={t}
-                        onOpen={() => {
-                          setTasksOpen(false);
-                          setLogTask(t);
-                        }}
-                        onStop={running ? () => void stopper.stop(t) : undefined}
-                      />
-                    ))}
-                  </Popover>
-                  {stopper.node}
-                </>
-              )}
             </div>
             {ctx != null && (
               <ContextRing
@@ -619,11 +593,11 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 e.target.value = '';
               }}
             />
-            {working && (
+            {(working || background) && (
               <button
-                onClick={interrupt}
-                title="Stop"
-                aria-label="Stop the current turn"
+                onClick={stopAll}
+                title={['Stop', stops.note].filter(Boolean).join('\n')}
+                aria-label={stops.label}
                 className="anim-pop-in relative ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-fg transition duration-150 hover:opacity-90 active:scale-90"
               >
                 {live?.status !== 'waiting' && <WorkRing />}
@@ -634,13 +608,10 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
               <button
                 onClick={() => send()}
                 disabled={!canSend}
-                // While the ring turns, what is still running ("Working · 2 background tasks running") on a line of its own.
-                title={[running ? 'Send (Enter)' : takeover ? `End it in ${ext!.client} and send here` : 'Resume and send', background && activity && activityLabel(activity)].filter(Boolean).join('\n')}
+                title={running ? 'Send (Enter)' : takeover ? `End it in ${ext!.client} and send here` : 'Resume and send'}
                 aria-label="Send"
-                className={cx('group relative ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-90', canSend ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3')}
+                className={cx('group ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-90', canSend ? 'bg-accent text-accent-fg hover:opacity-90' : 'bg-bg-3 text-fg-3')}
               >
-                {/* On the grey button the ring takes the accent, as on Stop; on the coloured one, the arrow's colour. */}
-                {background && <WorkRing className={canSend ? undefined : 'text-accent'} opacity={canSend ? 0.55 : 0.9} />}
                 <span className={cx('ico', canSend && 'ico-rise')}>
                   <ArrowUp size={16} strokeWidth={2.4} />
                 </span>
@@ -650,7 +621,6 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
         </div>
       </div>
       {confirmNode}
-      {logTask && <TaskLogDialog sessionKey={key} task={logTask} canStop={running} onClose={() => setLogTask(null)} />}
     </div>
   );
 }

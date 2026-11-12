@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { post } from '../../lib/api';
 import { toast, toastError } from '../../lib/store';
 import { Button, Switch, Throbber } from '../../components/ui';
-import { chime, desktopSystem, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, systemNotices, systemNoticesState, testSystemNotice, type PushState, type SystemNotices } from '../../lib/notify';
+import { chime, desktopSystem, disablePush, enablePush, notifyPrefs, pushState, setNotifyPrefs, systemNoticeSettings, systemNotices, systemNoticesState, testSystemNotice, turnOnSystemNotices, whenBack, type PushState, type SystemNotices } from '../../lib/notify';
 import { Group, Row, Stack } from './kit';
 
 /** Notices when a session finishes, fails or needs you: pushed to this device, with or without a chime. */
@@ -13,16 +13,34 @@ export function NotificationSettings() {
   const [busy, setBusy] = useState(false);
   // In a desktop app: whether the system shows its notifications (false: not allowed in the system's settings).
   const [system, setSystem] = useState<SystemNotices | null>(null);
+  // The system's settings are open to allow them: back from there, a test one says whether they show now.
+  const [allowing, setAllowing] = useState(false);
   useEffect(() => {
     pushState()
       .then(setState)
       .catch(() => setState('unsupported'));
     if (systemNotices) void systemNoticesState().then(setSystem);
   }, []);
+  useEffect(() => {
+    if (!allowing) return;
+    return whenBack(async () => {
+      const r = await testSystemNotice();
+      setSystem(await systemNoticesState());
+      if (r?.ok) setAllowing(false);
+    });
+  }, [allowing]);
+  /** The system does not show the desktop app's notifications (it refused one). */
+  const systemOff = state === 'app' && system?.shows === false;
   const appleNotInstalled = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator as Navigator & { standalone?: boolean }).standalone;
   const toggle = async (on: boolean) => {
     setBusy(true);
     try {
+      // In a desktop app, turning it on is the system's to allow: a test one, else its settings where you allow them.
+      if (state === 'app') {
+        if ((await turnOnSystemNotices()) === 'settings') setAllowing(true);
+        setSystem(await systemNoticesState());
+        return;
+      }
       setState(on ? await enablePush() : await disablePush());
     } catch (e) {
       toastError(e);
@@ -33,7 +51,11 @@ export function NotificationSettings() {
   const hint =
     state === 'app'
       ? system?.shows === false
-        ? desktopSystem === 'windows'
+        ? allowing
+          ? desktopSystem === 'windows'
+            ? 'In Settings, turn on notifications for Hydor, then come back here.'
+            : 'In System Settings, turn on Allow notifications for Hydor, then come back here.'
+          : desktopSystem === 'windows'
           ? 'Windows isn’t showing them, so they show inside the app'
           : desktopSystem === 'linux'
             ? 'Your desktop isn’t showing them, so they show inside the app'
@@ -66,7 +88,7 @@ export function NotificationSettings() {
           label="Notify this device"
           hint={hint}
           info={appInfo}
-          control={state === null || busy ? <Throbber className="text-fg-3" /> : <Switch on={state === 'on' || state === 'app'} disabled={state === 'unsupported' || state === 'denied' || state === 'app'} onChange={toggle} label="Notify this device" />}
+          control={state === null || busy ? <Throbber className="text-fg-3" /> : <Switch on={state === 'on' || (state === 'app' && !systemOff)} disabled={state === 'unsupported' || state === 'denied' || (state === 'app' && !(systemOff && systemNoticeSettings))} onChange={toggle} label="Notify this device" />}
         />
         <Row
           label="Sound"

@@ -1,10 +1,10 @@
 // Checks for Confidential sessions: which addresses count as this computer or your network (tricky hosts too), which
 // models are local (Ollama's cloud ones are not) and which is the best, starting one (Custom and a local model only,
-// memory off, no swarm, research or arena; a child of one confidential too), each message refused while its model is
+// memory off, no swarm, research or arena; a Hydor subagent of one confidential too), each message refused while its model is
 // elsewhere, model switches, hand-offs and settings changes refused, the tools it keeps and the ones it loses (also
 // before its settings are stored), what Custom is told, no MCP servers but the app's own, titles without the helper
 // model (or with one on this computer), notices without its words, no share links, memory read but never written,
-// child sessions told to stay local, second opinions only from local models, other agents (app_api, hands-free
+// Hydor subagents told to stay local, second opinions only from local models, other agents (app_api, hands-free
 // voice, the Library) kept away from it, and the sandbox's arguments carrying --unshare-net, with, where bwrap runs
 // here, a real command that tries the network and fails. Sessions and models are stubs; nothing reaches the network.
 // Build and run with a scratch data folder:
@@ -266,12 +266,12 @@ test('a child of a confidential session is confidential too, on Custom with a lo
   assert.equal(isConfidential(o.extra), true);
   assert.equal(o.extra?.memory, false);
   assert.equal(o.extra?.parent, SECRET);
-  assert.throws(() => confidentialStart(db, { agent: 'claude', cwd: tmp, extra: { parent: SECRET } }, deps), refused(400, /child of a confidential session/));
+  assert.throws(() => confidentialStart(db, { agent: 'claude', cwd: tmp, extra: { parent: SECRET } }, deps), refused(400, /subagent of a confidential session/));
   assert.throws(() => start({ model: 'openrouter/anthropic/claude-sonnet', extra: { parent: SECRET } }), refused(409, /OpenRouter/));
   const child = confidentialStart(db, { agent: 'claude', cwd: tmp, extra: { parent: PLAIN } }, deps);
   assert.equal(isConfidential(child.extra), false, 'a child of another session is not');
   // Nor can a session that isn't confidential have a confidential child, whose replies would go to it.
-  assert.throws(() => start({ extra: { confidential: true, parent: PLAIN } }), refused(400, /can’t be the child of one that isn’t/));
+  assert.throws(() => start({ extra: { confidential: true, parent: PLAIN } }), refused(400, /can’t be a subagent of one that isn’t/));
 });
 
 test('each message: refused while its model is elsewhere or gone, or its agent is not Custom', async () => {
@@ -457,9 +457,9 @@ test('memory: read, never written', () => {
   assert.match(profileBlock('Prefers British spelling.'), /update_user_profile/);
 });
 
-test('child sessions of a confidential session are told to stay here, with the local models', () => {
+test('Hydor subagents of a confidential session are told to stay here, with the local models', () => {
   const desc = children.tools!(ctxOf(SECRET)).find((t) => t.name === 'start_child_session')!.description;
-  assert.match(desc, /This session is confidential, so a child runs here too/);
+  assert.match(desc, /This session is confidential, so a Hydor subagent runs here too/);
   const schema = JSON.stringify(children.tools!(ctxOf(SECRET)).find((t) => t.name === 'start_child_session')!.inputSchema);
   assert.match(schema, /ollama\/qwen3:8b/);
   assert.doesNotMatch(schema, /openrouter/);

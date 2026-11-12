@@ -40,6 +40,7 @@ interface DesktopBridge {
   onNotices?: (show: (n: NotifyEvent) => void, open: (path: string) => void) => void;
   notices?: () => Promise<SystemNotices | null>;
   testNotice?: (title: string, body: string) => Promise<{ ok: boolean; error: string } | null>;
+  noticeSettings?: () => Promise<boolean>;
 }
 /** Whether the system shows the desktop app's notifications: null before the first; `error`, what it said when not. */
 export interface SystemNotices {
@@ -57,6 +58,37 @@ export const systemNoticesState = (): Promise<SystemNotices | null> => bridge?.n
 /** A notification from the desktop app to try them: whether the system showed it (null outside one). */
 export const testSystemNotice = (): Promise<{ ok: boolean; error: string } | null> =>
   bridge?.testNotice?.(tr('Hydor'), tr('Notifications work on this device.')).catch(() => null) ?? Promise.resolve(null);
+
+/**
+ * Turns the desktop app's notifications on: a test one, which shows when the system allows them; when it does not
+ * show, the system's settings open where you allow them (Hydor's page of a Mac's Notifications, Windows' Notifications).
+ * 'on': it showed; 'settings': the settings are open (whenBack tries again); 'off': nothing more to do here.
+ */
+export async function turnOnSystemNotices(): Promise<'on' | 'settings' | 'off'> {
+  const r = await testSystemNotice();
+  if (r?.ok) return 'on';
+  const opened = await (bridge?.noticeSettings?.() ?? Promise.resolve(false)).catch(() => false);
+  return opened ? 'settings' : 'off';
+}
+
+/** Calls `fn` when the window is in front again after it was not (back from the system's settings). Returns how to stop. */
+export function whenBack(fn: () => void): () => void {
+  let away = !document.hasFocus();
+  const blur = () => {
+    away = true;
+  };
+  const focus = () => {
+    if (!away) return;
+    away = false;
+    fn();
+  };
+  window.addEventListener('blur', blur);
+  window.addEventListener('focus', focus);
+  return () => {
+    window.removeEventListener('blur', blur);
+    window.removeEventListener('focus', focus);
+  };
+}
 
 let bridged = false;
 
@@ -89,6 +121,9 @@ export type PushState = 'unsupported' | 'denied' | 'off' | 'on' | 'app';
 export const inDesktopApp = /\b(?:HydorMac|HydorWindows|HydorLinux|NagetAgentMac)\//.test(navigator.userAgent);
 /** Which desktop app the window is: 'mac', 'windows' or 'linux' (null in a browser). */
 export const desktopSystem: 'mac' | 'windows' | 'linux' | null = /\bHydorWindows\//.test(navigator.userAgent) ? 'windows' : /\bHydorLinux\//.test(navigator.userAgent) ? 'linux' : inDesktopApp ? 'mac' : null;
+
+/** Whether the desktop app can open the system's settings where you allow its notifications (a Mac's, Windows'). */
+export const systemNoticeSettings = typeof bridge?.noticeSettings === 'function' && desktopSystem !== 'linux';
 
 export async function pushState(): Promise<PushState> {
   if (inDesktopApp) return 'app';

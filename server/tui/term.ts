@@ -1,10 +1,16 @@
-// The terminal's basics for `hydor`: colours (off when piped, with NO_COLOR or --no-color; on with FORCE_COLOR), how
+// The terminal's basics for `hydor`: colours (off when piped, with NO_COLOR or --no-color; on with FORCE_COLOR; how many
+// of them by FORCE_COLOR=1/2/3, COLORTERM, TERM_PROGRAM and TERM, with exact hex colours and gradients for decoration), how
 // many columns a string takes (East Asian wide characters and emoji count two, escape codes none), and wrapping text
 // by words to a width with its colours carried from line to line.
+
+/** How many colours the terminal shows: 0 none, 1 the 16 of its theme, 2 the 256 of xterm, 3 all (truecolor). */
+export type ColorLevel = 0 | 1 | 2 | 3;
 
 /** Colours and styles, or nothing at all when they are off: every style is a function of a string. */
 export interface Paint {
   on: boolean;
+  /** How many colours there are (0 when they are off). */
+  level: ColorLevel;
   bold: (s: string) => string;
   dim: (s: string) => string;
   italic: (s: string) => string;
@@ -16,16 +22,54 @@ export interface Paint {
   green: (s: string) => string;
   /** For what needs you (an approval, a question): the app's warning colour. */
   yellow: (s: string) => string;
+  /** Text in an exact colour ("#4fd1c5") at level 3, the nearest of the 256 at level 2, as it is below that: for decoration only. */
+  hex: (s: string, color: string) => string;
+  /** Text with its characters shading from one hex colour to the next across `stops` (as `hex` does at each level). */
+  gradient: (s: string, stops: string[]) => string;
 }
 
 const sgr = (open: number | string, close: number) => (s: string) => (s ? `\x1b[${open}m${s}\x1b[${close}m` : s);
 const plain = (s: string) => s;
 
-/** Styles that write escape codes (on) or leave the text as it is (off). */
-export function makePaint(on: boolean): Paint {
-  if (!on) return { on, bold: plain, dim: plain, italic: plain, underline: plain, inverse: plain, accent: plain, red: plain, green: plain, yellow: plain };
+/** "#4fd1c5" as its red, green and blue. */
+export function rgbOf(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/./g, '$&$&') : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** The colour `t` (0 to 1) of the way along the stops, as [r, g, b]. */
+export function gradientAt(stops: string[], t: number): [number, number, number] {
+  if (stops.length === 1) return rgbOf(stops[0]);
+  const x = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(x));
+  const a = rgbOf(stops[i]);
+  const b = rgbOf(stops[i + 1]);
+  const f = x - i;
+  return [0, 1, 2].map((k) => Math.round(a[k] + (b[k] - a[k]) * f)) as [number, number, number];
+}
+
+/** The nearest entry of the 256-colour palette's 6×6×6 cube (16 to 231) to a colour. */
+export function cube256([r, g, b]: [number, number, number]): number {
+  const q = (v: number) => Math.round((v / 255) * 5);
+  return 16 + 36 * q(r) + 6 * q(g) + q(b);
+}
+
+const rgbCode = (level: ColorLevel, c: [number, number, number]) => (level === 3 ? `38;2;${c[0]};${c[1]};${c[2]}` : `38;5;${cube256(c)}`);
+
+/** Styles that write escape codes (on) or leave the text as it is (off); `level` is how many colours (by the environment when not given). */
+export function makePaint(on: boolean, level?: ColorLevel): Paint {
+  if (!on) return { on, level: 0, bold: plain, dim: plain, italic: plain, underline: plain, inverse: plain, accent: plain, red: plain, green: plain, yellow: plain, hex: plain, gradient: plain };
+  const lv: ColorLevel = level ?? levelOf(process.env);
+  const hex = (s: string, color: string) => (lv < 2 || !s ? s : `\x1b[${rgbCode(lv, rgbOf(color))}m${s}\x1b[39m`);
+  const gradient = (s: string, stops: string[]) => {
+    if (lv < 2 || !s) return s;
+    const gs = graphemes(s);
+    return gs.map((g, i) => (g === ' ' ? g : `\x1b[${rgbCode(lv, gradientAt(stops, gs.length > 1 ? i / (gs.length - 1) : 0))}m${g}`)).join('') + '\x1b[39m';
+  };
   return {
     on,
+    level: lv,
     bold: sgr(1, 22),
     dim: sgr(2, 22),
     italic: sgr(3, 23),
@@ -35,6 +79,8 @@ export function makePaint(on: boolean): Paint {
     red: sgr(31, 39),
     green: sgr(32, 39),
     yellow: sgr(33, 39),
+    hex,
+    gradient,
   };
 }
 
@@ -44,6 +90,21 @@ export function colorWanted(stream: { isTTY?: boolean }, noColor = false, env: N
   if (env.FORCE_COLOR !== undefined && env.FORCE_COLOR !== '0' && env.FORCE_COLOR !== 'false') return true;
   if (env.NO_COLOR !== undefined && env.NO_COLOR !== '') return false;
   return !!stream.isTTY && env.TERM !== 'dumb';
+}
+
+/** How many colours the terminal in this environment shows, when colours are on (1, 2 or 3): FORCE_COLOR=1/2/3 says; else COLORTERM, TERM_PROGRAM, WT_SESSION and TERM tell. */
+export function levelOf(env: NodeJS.ProcessEnv = process.env): 1 | 2 | 3 {
+  const f = env.FORCE_COLOR;
+  if (f === '1' || f === '2' || f === '3') return Number(f) as 1 | 2 | 3;
+  const prog = env.TERM_PROGRAM ?? '';
+  if (/^(truecolor|24bit)$/i.test(env.COLORTERM ?? '') || ['iTerm.app', 'WezTerm', 'vscode', 'ghostty'].includes(prog) || env.WT_SESSION) return 3;
+  if ((env.TERM ?? '').includes('256color') || prog === 'Apple_Terminal') return 2;
+  return 1;
+}
+
+/** The colour level for what goes to this stream: 0 when colours are off, else `levelOf`. */
+export function colorLevel(stream: { isTTY?: boolean }, noColor = false, env: NodeJS.ProcessEnv = process.env): ColorLevel {
+  return colorWanted(stream, noColor, env) ? levelOf(env) : 0;
 }
 
 // ---- widths ---------------------------------------------------------------------------------------

@@ -19,7 +19,7 @@ import { BUILTINS } from './builtins.ts';
 import { activity, agentSessions, agentStart, monthSpend, monthStart } from './rules.ts';
 import { cleanAssistant, findAssistant, removeAssistant, saveAssistant } from './store.ts';
 import { modelName, noteModels, seenModels, setTeam, setTiers, teamOf, tierDefaults, tierOf, tierPick, tiersOf } from './tiers.ts';
-import { autoPlan, sizeRequest, sizeUp, tierNote } from './auto.ts';
+import { autoPlan, tierNote } from './auto.ts';
 import { enoughToGoOn, fromTemplate, kindOf, makeProjectAgent, scanFolder, templateOf } from './projectAgent.ts';
 import { createSpace, spaceById } from '../spaces/index.ts';
 import { EventEmitter } from 'node:events';
@@ -243,45 +243,14 @@ test('the team: on with Max for hard problems until changed; a change keeps the 
   assert.deepEqual(setTeam(db, { on: true, hard: true }), { on: true, hard: true });
 });
 
-test('Automatic: Best’s model, and Max’s once the helper model reads the request as a hard problem', async () => {
+test('Automatic: Best’s model for its program, never Max on a request’s wording', () => {
   assert.equal(AUTO_MODEL, 'auto');
-  const asked: string[] = [];
-  const hard = (async (_db: unknown, q: { prompt: string; system: string }) => (asked.push(q.prompt), { hard: true, why: 'a proof  of a new bound' })) as any;
-  const easy = (async () => ({ hard: false, why: 'a lookup' })) as any;
-  const broken = (async () => Promise.reject(new Error('the helper is away'))) as any;
-  // Sizing up: only what the helper calls hard, in its words; never for two words, never an error.
-  assert.equal(await sizeUp(db, 'Prove that this bound is tight for all n', hard), 'a proof of a new bound');
-  assert.match(asked[0], /^<request>\nProve that this bound is tight for all n\n<\/request>$/);
-  assert.equal(await sizeUp(db, 'What is the capital of France?', easy), null);
-  assert.equal(await sizeUp(db, 'hello there', hard), null);
-  assert.equal(await sizeUp(db, 'Prove that this bound is tight', broken), null);
-  // Why it could not say is kept apart from "not hard" (the benchmark reads it); a start never waits past the limit, and the helper's call is stopped.
-  assert.deepEqual(await sizeRequest(db, 'Prove that this bound is tight', broken), { hard: false, error: 'the helper is away' });
-  let stopped = false;
-  const silent = ((_db: unknown, q: { signal?: AbortSignal }) => new Promise(() => q.signal?.addEventListener('abort', () => (stopped = true)))) as any;
-  const t0 = Date.now();
-  assert.deepEqual(await sizeRequest(db, 'Prove that this bound is tight', silent, 120), { hard: false, error: 'the helper model did not answer within 0 s' });
-  assert.ok(Date.now() - t0 < 1000 && stopped, 'stopped at the limit');
-  // The plan: Best now; Max when it is hard.
-  const plan = autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n' }, hard)!;
-  assert.deepEqual({ tier: plan.tier, model: plan.model, effort: plan.effort }, { tier: 'best', model: 'opus', effort: undefined });
-  assert.deepEqual(await plan.hard, { model: 'claude-fable-5-2', why: 'a proof of a new bound' });
-  assert.equal(await autoPlan(db, { agent: 'claude', prompt: 'Rename the helper function in utils' }, easy)!.hard, null);
-  const codex = autoPlan(db, { agent: 'codex', prompt: 'Find the cause of this deadlock nobody understands' }, hard)!;
-  assert.deepEqual({ model: codex.model, effort: codex.effort }, { model: 'gpt-6.1-sol', effort: 'high' });
-  assert.deepEqual(await codex.hard, { model: 'gpt-6.2-astra', effort: 'high', why: 'a proof of a new bound' });
-  // Never sized up: no request, a child, a confidential session, an app's run, a question on Help, Max turned off, a Max that is Best.
-  const n = asked.length;
-  for (const extra of [{ parent: 'claude:p' }, { confidential: true as const }, { app: { run: 'r1' } }, { help: true }])
-    assert.equal(autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n', extra }, hard)!.hard, null);
-  assert.equal(autoPlan(db, { agent: 'claude', prompt: '  ' }, hard)!.hard, null);
-  setTeam(db, { hard: false });
-  assert.equal(autoPlan(db, { agent: 'claude', prompt: 'Prove that this bound is tight for all n' }, hard)!.hard, null);
-  setTeam(db, { hard: true });
-  assert.equal(autoPlan(db, { agent: 'acp', acpAgent: 'console', prompt: 'Prove that this bound is tight for all n' }, hard)!.hard, null, 'Custom before its tiers are set');
-  assert.equal(asked.length, n, 'and the helper model is not asked');
-  assert.equal(autoPlan(db, { agent: 'acp', acpAgent: 'gemini', prompt: 'x y z' }, hard), null, 'a program without tiers');
-  // What the conversation says of it.
+  // Best's model and effort for every program with tiers: a session reaches Max only when its own agent steps up.
+  assert.deepEqual(autoPlan(db, { agent: 'claude' }), { tier: 'best', model: 'opus', effort: undefined });
+  assert.deepEqual(autoPlan(db, { agent: 'codex' }), { tier: 'best', model: 'gpt-6.1-sol', effort: 'high' });
+  assert.equal(autoPlan(db, { agent: 'acp', acpAgent: 'console' })?.tier, 'best', 'Custom before its tiers are set');
+  assert.equal(autoPlan(db, { agent: 'acp', acpAgent: 'gemini' }), null, 'a program without tiers');
+  // What the conversation says of a move to Max: a step up, and the notes of sessions Automatic once started there.
   assert.deepEqual(tierNote(db, { agent: 'claude', event: 'auto', tier: 'max', model: 'claude-fable-5-2', why: 'a proof' }), { event: 'auto', tier: 'max', label: 'Fable 5.2', why: 'a proof' });
   assert.deepEqual(tierNote(db, { agent: 'acp', acpAgent: 'console', event: 'stepUp', tier: 'max' }), { event: 'stepUp', tier: 'max', label: 'Max' });
 });
