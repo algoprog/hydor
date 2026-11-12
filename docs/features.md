@@ -1234,7 +1234,10 @@ programs shows each program's version and what is out, with Check now, Update no
   opening at login. They show a session's notices as the system's own notifications (Notification Center on a Mac,
   which asks once to allow them; when they are not allowed, the welcome tour's Turn on notifications and the Notify this
   device switch open System Settings at Hydor's notifications), even with the window closed, and click one to open its
-  session; they find your programs through your login shell's PATH (on Windows, your own environment), and update
+  session, and while the window is away (closed, hidden, minimised or behind another app) their icon counts the
+  sessions with new notices (the Dock on a Mac, the taskbar on Windows, the launcher on Linux desktops that show counts),
+  even with Do Not Disturb on, until you bring the window to the front; they find your programs through your login
+  shell's PATH (on Windows, your own environment), and update
   themselves release by release: they look every 4 hours, download and
   check a new build as soon as it is out (a download that breaks off, as when the computer sleeps, carries on from where
   it stopped, and one that gets nowhere tries again an hour later), say so (a notification, and a note in every open

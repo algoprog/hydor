@@ -17,7 +17,7 @@ module.exports = {
   productName: 'Hydor',
   copyright: 'Copyright © Hydor Devs',
   directories: { output: 'dist', buildResources: 'resources' },
-  files: ['main.cjs', 'glow.cjs', 'notices.cjs', 'cli-link.cjs', 'preload.cjs', 'package.json'],
+  files: ['main.cjs', 'glow.cjs', 'notices.cjs', 'badge.cjs', 'cli-link.cjs', 'preload.cjs', 'package.json'],
   extraResources: [
     // build/ as a whole, not build/server: electron-builder always leaves out a node_modules at the top of
     // a folder it copies, and the server's packages are in server/node_modules.

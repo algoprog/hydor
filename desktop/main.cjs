@@ -42,6 +42,7 @@
 const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
 const glow = require('./glow.cjs');
 const { createNotices } = require('./notices.cjs');
+const { badgeBitmap } = require('./badge.cjs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -573,9 +574,24 @@ function openAt(at) {
   } else go(at);
 }
 
+/**
+ * The count on the app's icon: the Dock's on a Mac and a Linux launcher's (Electron's badge count; on a Mac it shows
+ * while Hydor may badge its icon, System Settings → Notifications → Hydor, Do Not Disturb or not), the taskbar button's
+ * on Windows (a small picture over it, drawn by badge.cjs; none while the window is closed to the notification area).
+ */
+function setBadge(count) {
+  try {
+    if (!WIN) return void app.setBadgeCount(count);
+    if (!win || win.isDestroyed()) return;
+    const b = count > 0 ? badgeBitmap(count, 32) : null;
+    win.setOverlayIcon(b ? nativeImage.createFromBitmap(b.data, { width: b.width, height: b.height, scaleFactor: 2 }) : null, b ? `${count} new` : '');
+  } catch {}
+}
+
 const sessionNotices = createNotices({
   Notification,
   mac: MAC,
+  badge: setBadge,
   front: () => (win && win.isVisible() && !win.isMinimized() && win.isFocused() ? shownPath() : null),
   inApp: (n) => {
     if (win && !win.webContents.isDestroyed()) win.webContents.send('hydor:notice', n);
@@ -986,6 +1002,8 @@ function openWindow(at) {
       }
     });
     win.on('closed', () => (win = null));
+    // Back in front: the count of sessions with notices goes from the app's icon (notices.cjs).
+    win.on('focus', () => sessionNotices.inView());
     win.webContents.setWindowOpenHandler(({ url }) => {
       // With the window's preload, a page there leaves notices to the app as the window's does.
       if (sameOrigin(url)) return { action: 'allow', overrideBrowserWindowOptions: { width: 1100, height: 800, autoHideMenuBar: !MAC, webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') } } };
