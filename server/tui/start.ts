@@ -166,3 +166,11 @@ export function modeLabel(mode: string | undefined, cat: AgentCatalog): string {
   const m = mode ?? cat.defaultMode;
   return cat.modes.find((x) => x.value === m)?.label ?? m ?? '';
 }
+
+/** What a mode lets the agent do: 'full' when it acts without asking (Claude's bypassPermissions, Codex's full access, the app's full), 'plan' when it only plans, else 'other'. */
+export function modeRisk(mode: string | undefined): 'full' | 'plan' | 'other' {
+  const m = (mode ?? '').toLowerCase();
+  if (m === 'full' || m === 'bypasspermissions' || m.includes('bypass') || m.includes('yolo') || m === 'danger-full-access') return 'full';
+  if (m === 'plan') return 'plan';
+  return 'other';
+}
