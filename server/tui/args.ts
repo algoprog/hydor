@@ -12,7 +12,7 @@ export { GROUPS, UsageError };
 export type { Group };
 
 /** The commands `hydor` knows in the terminal (the maintenance ones in server/cli.ts come before these). */
-export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'tasks', 'usage', 'status', 'serve', 'help'] as const;
+export const COMMANDS = ['chat', 'run', 'resume', 'sessions', 'show', 'send', 'stop', 'models', 'tiers', 'usage', 'status', 'serve', 'help'] as const;
 /** A command of COMMANDS, or 'area': a verb of an area (server/tui/areas), with the words in Opts.route. */
 export type Command = (typeof COMMANDS)[number] | 'area';
 
@@ -136,16 +136,6 @@ export const CMD_TABLE: CommandDef[] = [
       ['hard', 'Max for hard problems: on or off'],
     ],
     options: ['effort', 'json'],
-  },
-  {
-    name: 'tasks',
-    group: 'models',
-    args: '[run <id>]',
-    desc: 'Scheduled tasks, and running one now',
-    help: 'Lists your scheduled tasks with when each runs next and how its last run went. run starts one now and prints the address of its session.',
-    examples: ['hydor tasks', 'hydor tasks run daily-brief'],
-    subs: [['run', 'Run a task now: run <id>']],
-    options: ['json'],
   },
   {
     name: 'usage',
@@ -623,18 +613,29 @@ function generalHelp(p: Paint): string[] {
   }).filter((g) => g.rows.length);
   const more: [string, string][] = [
     [`hydor ${p.accent('help')} ${p.dim('<command>')}`, 'A command’s usage, options and examples'],
+    [`hydor ${p.accent('help options')}`, 'Every option: --model, --json, --server…'],
     [`hydor ${p.accent('completion install')}`, 'Tab completion for bash, zsh and fish'],
   ];
   // One width for the left part of every row, so the groups line up.
   const left = Math.max(...[...groups.flatMap((g) => g.rows), ...more].map(([l]) => strWidth(l)));
   for (const g of groups) out.push('', p.bold(g.title), ...twoColumns(g.rows, p, '  ', left, true));
-  out.push('', p.bold('Options'));
-  out.push(...twoColumns(OPTION_TABLE.filter((o) => o.name !== 'print' && o.name !== 'version').map((o) => [optionStyled(o, p), o.desc] as [string, string]), p, '  ', 26));
   out.push('', p.bold('Examples'));
   out.push(...['hydor fix the failing tests', 'hydor run "summarize README.md" --json', 'hydor sessions', 'hydor send 3f9a "and add a test"', 'hydor tiers set claude best opus'].map((e) => `  ${e}`));
   out.push('', ...wrap('A message that starts with a command’s name goes in quotes (hydor "find the bug in login") or after hydor chat.', WIDTH - 2));
   out.push('', p.bold('More'), ...twoColumns(more, p, '  ', left, true));
   return out;
+}
+
+/** `hydor help options`: every option the commands take, and what it does. */
+function optionsHelp(p: Paint): string[] {
+  return [
+    'Usage: hydor [command] [options]',
+    '',
+    p.bold('Options'),
+    ...twoColumns(OPTION_TABLE.filter((o) => o.name !== 'print' && o.name !== 'version').map((o) => [optionStyled(o, p), o.desc] as [string, string]), p, '  ', 26),
+    '',
+    ...wrap('Each command takes the ones that fit it: hydor help <command> lists them. A verb of an area has options of its own too (hydor help projects new).', WIDTH - 2),
+  ];
 }
 
 /** One command's help: usage, what it does, its options, its second words, examples. */
@@ -649,7 +650,7 @@ function commandHelp(c: CommandDef, p: Paint): string[] {
   if (opts.length) {
     out.push('', p.bold('Options'));
     out.push(...twoColumns(opts.map((o) => [optionStyled(o, p), o.desc] as [string, string]), p, '  ', 26));
-    out.push('', p.dim('  hydor help lists them all (--server, --token, --no-color…).'));
+    out.push('', p.dim('  hydor help options lists them all (--server, --token, --no-color…).'));
   }
   out.push('', p.bold('Examples'), ...c.examples.map((e) => `  ${e}`));
   return out;
@@ -689,6 +690,7 @@ function verbHelp(a: Area, v: Verb, p: Paint): string[] {
  */
 export function helpText(p: Paint, topic?: string, sub: string[] = []): string | null {
   if (!topic) return generalHelp(p).join('\n');
+  if (topic === 'options') return optionsHelp(p).join('\n');
   const c = commandDef(topic);
   const a = areaByName(topic);
   if (!c && !a) return null;

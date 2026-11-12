@@ -42,7 +42,7 @@ export const open: Area = {
     {
       name: 'open',
       args: [
-        { name: 'page', kind: 'page', optional: true },
+        { name: 'page', kind: 'goto', optional: true },
         { name: 'name', kind: 'place', optional: true, rest: true },
       ],
       options: { browser: { type: 'boolean', desc: 'Open it in your browser too' }, find: { type: 'string', value: '<words>', desc: 'For settings: point at an option by its words' } },
