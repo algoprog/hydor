@@ -143,8 +143,12 @@ export function commandItems(own: { name: string; args?: string; what: string }[
 /** A message of history as one row: its line breaks as ↵. */
 export const oneRow = (s: string) => s.replace(/\s*\n\s*/g, '↵');
 
-/** Earlier messages, newest first, each once, those the typed letters are found in. */
+/**
+ * Earlier messages, newest first, each once, that hold every word typed (split on spaces) as a contiguous piece, in any
+ * case and in any order (as fzf's words do, not scattered letters). The pieces are what is marked.
+ */
 export function historyItems(history: string[], query: string): Ranked[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   const seen = new Set<string>();
   const out: Ranked[] = [];
   for (let i = history.length - 1; i >= 0; i--) {
@@ -152,8 +156,18 @@ export function historyItems(history: string[], query: string): Ranked[] {
     if (seen.has(h)) continue;
     seen.add(h);
     const label = oneRow(h);
-    const m = fuzzy(query, label);
-    if (m) out.push({ item: { label, value: h, kind: 'history' }, hits: m.hits });
+    const lower = label.toLowerCase();
+    const hits = new Set<number>();
+    let all = true;
+    for (const w of words) {
+      const at = lower.indexOf(w);
+      if (at < 0) {
+        all = false;
+        break;
+      }
+      for (let k = at; k < at + w.length; k++) hits.add(k);
+    }
+    if (all) out.push({ item: { label, value: h, kind: 'history' }, hits: [...hits].sort((x, y) => x - y) });
   }
   return out;
 }
