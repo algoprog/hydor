@@ -6,8 +6,9 @@
 # Each release also carries the update feeds the apps read (hydor-mac.json, hydor-windows.json, hydor-linux.json) and
 # copies of the downloads under names without the version, for the README's links (releases/latest/download/…).
 # Run it by hand (Actions → Desktop apps → Run workflow) to build without publishing: the builds are kept as the run's
-# artifacts. Every build is checked before it is kept: its server starts from inside it, and the app itself opens and
-# starts its server (on Windows, also once installed with its installer).
+# artifacts. Every build is checked before it is kept: its server starts from inside it, its hydor command runs and the
+# app puts it on a PATH (on scratch folders), and the app itself opens and starts its server (on Windows, also once
+# installed with its installer).
 #
 # The Mac app is signed with Hydor's own self-signed certificate (desktop/scripts/sign.cjs), the same for every version,
 # so that macOS keeps the permissions people give it (Accessibility, Screen Recording) when it updates. Repository
@@ -102,6 +103,8 @@ jobs:
           scripts/dist.sh
       - name: The app's server starts from inside it
         run: node desktop/scripts/smoke.mjs "${{ matrix.unpacked }}"
+      - name: The hydor command runs, and the app puts it on a PATH
+        run: node desktop/scripts/cli-smoke.mjs "${{ matrix.unpacked }}"
       - name: The app opens and starts its server
         run: node desktop/scripts/launch-test.mjs "${{ matrix.program }}"
       # Computer use on the system itself: the mouse, the keyboard, typing in any script and opening apps (on Windows

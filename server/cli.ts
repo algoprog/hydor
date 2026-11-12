@@ -20,9 +20,16 @@ import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { ENV_FILE, UNIT, UNIT_PATH, unitText } from './service.ts';
 import { helpText, MAINTENANCE, subCommandError } from './tui/args.ts';
-import { colorWanted, makePaint } from './tui/term.ts';
+import { asciify, asciiWanted, colorWanted, makePaint } from './tui/term.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+// A reader that stops early (`hydor library show x | head`): what is left to print has nowhere to go, which is no error.
+for (const out of [process.stdout, process.stderr])
+  out.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code === 'EPIPE') process.exit(0);
+    throw e;
+  });
 
 const [cmd, sub] = process.argv.slice(2);
 
@@ -35,7 +42,8 @@ try {
 } catch {}
 
 if (cmd && MAINTENANCE.includes(cmd) && process.argv.slice(3).some((a) => a === '-h' || a === '--help')) {
-  process.stdout.write(`${helpText(makePaint(colorWanted(process.stdout, process.argv.includes('--no-color'))), cmd)}\n`);
+  const help = helpText(makePaint(colorWanted(process.stdout, process.argv.includes('--no-color'))), cmd);
+  process.stdout.write(`${help && asciiWanted(process.env, process.platform, process.stdout) ? asciify(help) : help}\n`);
   process.exit(0);
 }
 
@@ -101,7 +109,7 @@ if (cmd === 'set-password') {
   const { createAccessToken } = await import('./machines.ts');
   console.log(createAccessToken(db, process.argv.slice(3).join(' ') || 'Another machine').token);
 } else if (cmd === 'service' && sub === 'install') {
-  if (process.env.HYDOR_APP_BUNDLE) {
+  if (process.env.HYDOR_APP_BUNDLE || process.env.HYDOR_APP_OPEN) {
     console.error('The Hydor app already runs the server (and keeps it running): there is nothing to install.');
     process.exit(1);
   }
@@ -147,8 +155,8 @@ if (cmd === 'set-password') {
     process.exitCode = 1;
   }
 } else if (cmd === 'update') {
-  if (process.env.HYDOR_APP_BUNDLE) {
-    console.error('The Hydor app updates itself: choose Hydor → Check for Updates…');
+  if (process.env.HYDOR_APP_BUNDLE || process.env.HYDOR_APP_OPEN) {
+    console.error(process.env.HYDOR_APP_OPEN ? 'The Hydor app updates itself: choose Check for Updates… in its tray menu.' : 'The Hydor app updates itself: choose Hydor → Check for Updates…');
     process.exit(1);
   }
   if (!fs.existsSync(path.join(ROOT, '.git'))) {

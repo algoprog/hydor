@@ -371,13 +371,66 @@ test('table: on a terminal no line passes the width; the main column keeps its r
   const t120 = table(mk(120), rows, { grow: 1 });
   assert.match(t120[0], /A title that says what the thing is and is quite long indeed/);
   assert.match(t120[0], /…$/);
-  // The others shrink the widest first, down to a few characters, before the title is cut.
+  // The others shrink the widest first, down to 12 characters, and then the title gives: none goes below 12 while another can still give.
   const t50 = table(mk(50), rows, { grow: 1 });
-  assert.match(t50[0], /A title that says what th…/);
+  assert.match(t50[0], /A title that says…  ~\/projects\/…  http:\/\/127\.…/);
   assert.ok(t50.every((l) => width(l) <= 49));
   // Short rows are not touched.
   assert.deepEqual(table(mk(120), [['1', 'a', 'b']], { grow: 1 }), ['1  a  b']);
   assert.deepEqual(table(mk(120), [['1', 'a', 'b']], { grow: 1, indent: 2 }), ['  1  a  b']);
+});
+
+test('table: on a narrow terminal whole optional columns go (in the order given) before the name is cut below its natural width', () => {
+  const mk = (w: number, fit = true) => ({ look: { p: plain, width: w, home: '/h' }, fit });
+  const desc = 'Looks things up on the web and writes a short report with sources for every claim';
+  const rows = [
+    ['●', 'Deep research', 'ready-made', 'not installed', desc],
+    ['·', 'Cover letter', 'yours', '', 'Writes a cover letter from a job post and your CV'],
+  ];
+  const head = ['', 'APP', 'KIND', 'STATE', 'ABOUT'];
+  const o = { head, grow: 1, drop: [4, 3] };
+  const cols = (l: string) => l.trim().split(/ {2,}/);
+  const at = (w: number, opts = o) => table(mk(w), rows, opts);
+  // Wide: every column, the description cut to what is left.
+  const t100 = at(100);
+  assert.equal(cols(t100[1]).length, 5);
+  assert.match(t100[1], /not installed  Looks things up on the web and writes a short report …$/);
+  // Narrower: the description goes whole, not cut to a stub; the name and the state stay whole.
+  const t60 = at(60);
+  assert.ok(t60.every((l) => width(l) <= 59));
+  assert.ok(!t60.join('\n').includes('Looks'), t60.join('\n'));
+  assert.ok(!t60.join('\n').includes('ABOUT'), 'its label goes with it');
+  assert.match(t60[1], /Deep research {2}ready-made {2}not installed/);
+  // Narrower still: the next one in the order (the state) goes too, the name is whole while it can be.
+  const t40 = at(40);
+  assert.ok(t40.every((l) => width(l) <= 39));
+  assert.match(t40[1], /Deep research {2}ready-made$/);
+  assert.ok(!t40.join('\n').includes('STATE'));
+  // Without `drop` the old way holds: every column stays, cut.
+  assert.equal(cols(at(60, { head, grow: 1 } as typeof o)[1]).length, 5);
+  // A column is not cut below 12 (or its widest cell) while another can still give; the one named first goes first.
+  const t30 = at(30);
+  assert.ok(t30.every((l) => width(l) <= 29));
+  assert.match(t30[1], /Deep research/);
+  // Piped: nothing is dropped or cut to the width.
+  const piped = table(mk(40, false), rows, o);
+  assert.equal(cols(piped[1]).length, 5);
+});
+
+test('table: a very long main column does not make the optional ones go while it could still have 40 characters', () => {
+  const mk = (w: number) => ({ look: { p: plain, width: w, home: '/h' }, fit: true });
+  const rows = [['●', '177', 'About you', `${'A long note that goes on and on. '.repeat(12)}`, '45m ago']];
+  const o = { head: ['', 'NOTE', 'ABOUT', 'TEXT', 'CHANGED'], grow: 3, fixed: [1], drop: [2, 4] };
+  const t100 = table(mk(100), rows, o);
+  assert.match(t100[0], /NOTE +ABOUT +TEXT +CHANGED$/);
+  assert.ok(t100.every((l) => width(l) <= 99));
+  assert.match(t100[1], /About you +A long note .*… +45m ago$/);
+  const t60 = table(mk(60), rows, o);
+  assert.match(t60[0], /NOTE +TEXT +CHANGED$/, 'at 60 the one named first goes, the text keeps its 40');
+  assert.ok(t60.every((l) => width(l) <= 59));
+  const t40 = table(mk(40), rows, o);
+  assert.match(t40[0], /NOTE +TEXT$/, 'at 40 both go');
+  assert.ok(t40.every((l) => width(l) <= 39));
 });
 
 test('table: piped, nothing is cut to a width, but free-text columns are capped near 80 characters', () => {

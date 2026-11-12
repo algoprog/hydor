@@ -48,8 +48,10 @@ Around it:
   `hydor settings` reads and changes it; `settings-test.ts` fails when an option has no row.
 - `server/tui/complete.ts` is the chat's completion menu and `completion.ts` the shell's Tab completion (scripts for
   bash, zsh and fish, and the lists they ask the command for), each with a test.
-- The Mac app puts the command on the PATH from `desktop/cli-link.cjs` (`server/desktop-cli-link-test.ts` tries it on
-  scratch folders).
+- The desktop apps put the command on the PATH from `desktop/cli-link.cjs`: a link on a Mac, a shim file on Linux and
+  a `hydor.cmd` (with the user's Path in the registry) on Windows; the shim names the program that opens the app
+  (`HYDOR_APP_OPEN`, read in `server/tui/client.ts`). `server/desktop-cli-link-test.ts` tries all of it on scratch
+  folders and a fake registry, and CI runs `desktop/scripts/cli-smoke.mjs` on each packed app.
 
 Tiers and the team (`shared/tiers.ts`, `server/assistants/tiers.ts` and `auto.ts`, `server/children/team.ts`) have
 their checks in `server/assistants/agents-test.ts` and `server/children/children-test.ts`. Whether a led session

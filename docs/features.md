@@ -1157,7 +1157,7 @@ programs shows each program's version and what is out, with Check now, Update no
 ## In a terminal
 - The `hydor` command does everything the app does, from a terminal. In a folder it opens a conversation with an
   agent in the terminal's own history (no full-screen mode, so it scrolls, copies, and works over SSH and in tmux):
-  a welcome box (the version, the folder and its git branch, program, model and mode, the mode in red when the agent
+  a welcome panel (the version in its top border, the folder on its git branch, program · model · mode, the mode in red when the agent
   acts without asking), your messages, the agent's text as it streams with its Markdown drawn for a terminal
   (headings, lists, quotes, tables aligned when they fit, links with their address, code never re-wrapped), each
   step on one line with what matters of its result (lines added and removed, the time a command took, its exit code
@@ -1208,6 +1208,15 @@ programs shows each program's version and what is out, with Check now, Update no
   `~/.local/bin`, the Docker image has it, and the Mac app puts it on your PATH by itself at every start (a link in
   `~/.local/bin`, `~/bin`, `/usr/local/bin` or `/opt/homebrew/bin`, or `~/.local/bin` with one line in your shell's
   startup file), running the app's own Node.js and opening the app when it is closed.
+- The Linux and Windows desktop apps do the same at every start, with no password and no question: on Linux a small
+  `hydor` file in `~/.local/bin`, `~/bin` or `/usr/local/bin` (or `~/.local/bin` with one line in your shell's startup
+  file, placed before the .deb's own `/usr/bin/hydor`, which opens the window), on Windows `hydor.cmd` in your
+  WindowsApps folder (or `%LOCALAPPDATA%\Hydor\bin`, added to your PATH). Another `hydor` already on your PATH is
+  left alone.
+- Where symbols cannot show (the Linux console, a locale that is not UTF-8, the old Windows console) the command draws
+  with plain characters: `+-|` for the box, `>` for the prompt, `*`, `+` and `x` for marks, HYDOR for the logo.
+  `HYDOR_ASCII=1` turns it on anywhere and `HYDOR_ASCII=0` off; output to a file or another program keeps its symbols
+  unless it is set to 1.
 
 ## Everywhere
 - Desktop apps for Mac (macOS 12+, Apple silicon or Intel), Windows (10 and 11, x64) and Linux (x64 and ARM: a .deb
