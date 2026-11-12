@@ -12,6 +12,7 @@ import { cx, inputCls, OptionRow, Popover, SettingChip } from '../../components/
 import { go } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import type { WebFeature } from '../registry';
+import { useCostlyMode } from '../tips/ModeExplainer';
 import { ComparePage } from './ComparePage';
 import { useContenderName } from './names';
 
@@ -63,6 +64,8 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
     } catch {}
     set(last.length ? last : choices.slice(0, 1));
   };
+  // Picked for the first time, it is explained before it is on (what it is for, what it costs).
+  const { ask, dialog } = useCostlyMode();
   // A long list gets a find field, so the menu still fits on the screen.
   const shown = choices.filter((c) => !q.trim() || name(c).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8);
   return (
@@ -79,7 +82,7 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
       />
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={320} title="Arena">
         <OptionRow label="Off" hint="One model answers" selected={!picked.length} onClick={() => (set([]), setOpen(false))} />
-        <OptionRow label="Compare models" hint="The same prompt to more models, side by side" selected={!!picked.length} onClick={() => !picked.length && turnOn()} />
+        <OptionRow label="Compare models" hint="The same prompt to more models, side by side" selected={!!picked.length} onClick={() => !picked.length && ask('arena', turnOn)} />
         {!!picked.length && (
           <div className="mx-1 mt-1 border-t border-line pt-1.5">
             <div className="px-2 pb-1 text-[11.5px] text-fg-3">Beside the model you picked, also ask (up to {ARENA_MAX - 1}):</div>
@@ -102,6 +105,7 @@ function ArenaStartOption({ value, onChange }: { value: SessionExtra; onChange: 
           Each model works in a session of its own, in the same folder (turn on New worktree in a git repository, so each gets its own copy). Keep the best answer; the
           others are archived, and every pick counts toward which models win on your tasks (Usage → Arena).
         </div>
+        {dialog}
       </Popover>
     </>
   );

@@ -4,11 +4,17 @@
 import type { SessionExtra } from '../../shared/features.ts';
 import { swarmMode, type SwarmMode } from '../../shared/swarm.ts';
 import type { DB } from '../db.ts';
+import { GivenAtStart } from '../features/freshStart.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 
 export type SwarmRole = { role: 'lead'; mode: SwarmMode } | { role: 'member'; swarm: string; mode: SwarmMode };
 
 const byRun = new Map<string, SwarmRole>();
+/** Each run's role as it started, in words, also when it had none: Swarm mode turned on or off later starts it afresh. */
+export const givenRole = new GivenAtStart(1000);
+
+/** A role in words, to tell whether a session's settings still give its agent the one it started with. */
+export const roleWords = (r: SwarmRole | null): string => (r ? (r.role === 'lead' ? `lead ${r.mode}` : `member ${r.mode} of ${r.swarm}`) : 'none');
 
 /** The role of a session starting with these settings: a lead, a member (its parent leads a swarm), or none. */
 export function roleFromExtra(db: DB, extra: SessionExtra | undefined): SwarmRole | null {
@@ -21,6 +27,7 @@ export function roleFromExtra(db: DB, extra: SessionExtra | undefined): SwarmRol
 
 /** Noted as an agent starts (Feature.spawn), for its run. */
 export function noteRun(runId: string, role: SwarmRole | null) {
+  givenRole.note(runId, roleWords(role));
   if (!role) return void byRun.delete(runId);
   byRun.set(runId, role);
   if (byRun.size > 1000) byRun.delete(byRun.keys().next().value!);

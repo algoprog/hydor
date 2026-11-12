@@ -113,6 +113,8 @@ export interface WebFeature {
    * start page's box, for a confidential session (a session's own box has it in `s`).
    */
   ComposerButtons?: ComponentType<{ s?: SessionSummary; insert: (text: string) => void; disabled?: boolean; confidential?: boolean }>;
+  /** In a session's options (the message box's settings chip), after its agent, model, effort and permissions: rows of its own. */
+  SessionOptions?: ComponentType<{ s: SessionSummary }>;
   /** On the start page, options for the new session, kept in its settings. */
   StartOptions?: ComponentType<{ value: SessionExtra; onChange: (patch: Partial<SessionExtra>) => void; cwd: string }>;
 }
@@ -215,6 +217,15 @@ export function FeatureComposerButtons(p: { s?: SessionSummary; insert: (text: s
   return (
     <>
       {features().map((f) => (f.ComposerButtons ? <f.ComposerButtons key={f.id} {...p} /> : null))}
+    </>
+  );
+}
+
+/** The capabilities' rows in a session's options (the message box's settings chip). */
+export function FeatureSessionOptions({ s }: { s: SessionSummary }) {
+  return (
+    <>
+      {features().map((f) => (f.SessionOptions ? <f.SessionOptions key={f.id} s={s} /> : null))}
     </>
   );
 }

@@ -16,7 +16,7 @@ import type { DB } from '../db.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { CAMPAIGN_MEMBER_INSTRUCTIONS, campaignLeadInstructions, leadInstructions, MEMBER_INSTRUCTIONS } from './instructions.ts';
-import { noteRun, roleFromExtra, roleOf } from './roles.ts';
+import { givenRole, noteRun, roleFromExtra, roleOf, roleWords } from './roles.ts';
 
 /** A finding, a question or a message for the lead: the lead hears of it within this. */
 const SOON_MS = 45_000;
@@ -481,6 +481,11 @@ export const swarm: Feature = {
     const size = swarmSize(d.db);
     if (r.mode === 'campaign') return { instructions: [r.role === 'lead' ? campaignLeadInstructions(size) : CAMPAIGN_MEMBER_INSTRUCTIONS] };
     return { instructions: [r.role === 'lead' ? leadInstructions(size) : MEMBER_INSTRUCTIONS] };
+  },
+
+  async beforeSend(key, d) {
+    // Swarm mode turned on, off or to a campaign in the session: its agent starts afresh with the instructions and tools for it.
+    await givenRole.refresh(key, d, () => roleWords(roleFromExtra(d.db, sessionExtra(d.db, key))));
   },
 
   turnEnd(t, d) {

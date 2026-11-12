@@ -2,12 +2,12 @@
 // Changes made here show at once and go to the server one after another; what another device or an agent changes
 // arrives as the server's news. Another machine's pages use this server's, as they do the tour.
 import { create } from 'zustand';
-import { isTipId, type TipId, type TipsState } from '@shared/tips';
+import { isCostlyMode, isTipId, type CostlyMode, type TipId, type TipsState } from '@shared/tips';
 import { api, put } from '../../lib/api';
 import { onFeatureEvent } from '../../lib/featureEvents';
 import { ownLive } from '../../lib/ws';
 
-export const useTips = create<TipsState & { loaded: boolean }>(() => ({ on: true, seen: [], tour: 0, loaded: false }));
+export const useTips = create<TipsState & { loaded: boolean }>(() => ({ on: true, seen: [], tour: 0, explained: [], loaded: false }));
 
 /** Changes on their way to the server: what it says meanwhile is older. */
 let sending = 0;
@@ -17,10 +17,11 @@ function heard(v: unknown, mine = false) {
   if (sending && !mine) return;
   const s = v as Partial<TipsState> | undefined;
   if (!s || typeof s.on !== 'boolean' || !Array.isArray(s.seen)) return;
-  useTips.setState({ on: s.on, seen: s.seen.filter(isTipId), tour: Math.max(Number(s.tour) || 0, useTips.getState().tour), loaded: true });
+  const explained = Array.isArray(s.explained) ? s.explained.filter(isCostlyMode) : [];
+  useTips.setState({ on: s.on, seen: s.seen.filter(isTipId), tour: Math.max(Number(s.tour) || 0, useTips.getState().tour), explained, loaded: true });
 }
 
-function send(body: { on?: boolean; seen?: TipId[] }) {
+function send(body: { on?: boolean; seen?: TipId[]; explained?: CostlyMode[] }) {
   sending++;
   queue = queue
     .then(() => put<TipsState>('/api/tips', body))
@@ -51,6 +52,13 @@ export function tipSeen(id: TipId) {
   const s = useTips.getState();
   if (!s.seen.includes(id)) useTips.setState({ seen: [...s.seen, id] });
   send({ seen: [id] });
+}
+
+/** A costly mode was explained: its explanation does not come again, here or on another device. */
+export function modeExplained(mode: CostlyMode) {
+  const s = useTips.getState();
+  if (!s.explained.includes(mode)) useTips.setState({ explained: [...s.explained, mode] });
+  send({ explained: [mode] });
 }
 
 /** Turns the tips on or off, on every device. */
