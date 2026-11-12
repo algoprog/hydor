@@ -115,7 +115,7 @@ async function addServer(ctx: Ctx, body: Record<string, unknown>, quiet = false)
 
 export const mcp: Area = {
   name: 'mcp',
-  summary: 'The tool servers (MCP) Claude Code and Codex use',
+  summary: 'Tool servers (MCP) for the agents',
   help: 'An MCP server gives an agent tools (GitHub, a database, a browser…). These are the ones Claude Code and Codex have, which Hydor’s sessions with them use. Name one by its name; with the same name in several places, by agent:scope:name (or --agent, --scope). Keys it needs go in the vault (hydor keys). There is no on and off for a server: remove it to stop it, add it to have it back.',
   group: 'tools',
   verbs: [

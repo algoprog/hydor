@@ -150,7 +150,7 @@ const programName = (a: Assistant) => (a.agent === 'acp' ? (a.acpAgent === 'cons
 
 export const agents: Area = {
   name: 'agents',
-  summary: 'Your agents: who they are, what they may use, and how they work',
+  summary: 'Your agents',
   help: 'An agent is a preset a session starts as (Researcher, Writer…): its instructions, the program and model it suggests, what it may use and how much it may spend. The built-in ones can be copied, not changed. Name one by its name or the start of its id; on a terminal, leave it out to pick from a list. Its output fields and where results go are set on the page (hydor open agents).',
   group: 'models',
   verbs: [

@@ -112,7 +112,7 @@ function parseSkillFile(text: string): { name?: string; description?: string; bo
 export const skills: Area = {
   name: 'skills',
   aliases: ['skill'],
-  summary: 'The skills agents get: the library, and Claude Code’s and Codex’s own',
+  summary: 'Skills: the library and the agents’ own',
   help: 'A skill is a SKILL.md that tells an agent how to do one kind of task. The library is every agent’s; Claude Code and Codex have their own besides (--agent claude, --agent codex). A skill an agent proposed is approved on the Skills page. Name one by its name or the start of it; on a terminal, leave it out to pick from a list.',
   group: 'work',
   verbs: [
