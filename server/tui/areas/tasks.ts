@@ -281,7 +281,7 @@ export const tasks: Area = {
           t.enabled ? (t.nextAt ? p.dim(`next ${whenText(t.nextAt)}`) : '') : p.yellow(t.pausedReason ? `paused: ${t.pausedReason}` : 'paused'),
           t.lastStatus ? (t.lastStatus === 'ok' ? p.green('last ok') : p.red(`last: ${t.lastStatus}`)) : '',
         ]);
-        ctx.out(table(ctx, rows, { head: ['ID', 'TASK', 'WHEN', 'NEXT', 'LAST'], grow: 1, fixed: [0, 2] }));
+        ctx.out(table(ctx, rows, { head: ['ID', 'TASK', 'WHEN', 'NEXT', 'LAST'], grow: 1, fixed: [0, 2], drop: [4, 3] }));
       },
     },
     {
