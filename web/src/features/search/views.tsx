@@ -10,6 +10,7 @@ import { api, enc } from '../../lib/api';
 import { duration } from '../../lib/format';
 import { Markdown } from '../../components/Markdown';
 import { Badge, cx } from '../../components/ui';
+import { StepClock } from '../../components/StepClock';
 import { LOCALE } from '../../i18n/locale';
 
 /** The tool's whole answer: a conversation keeps only the start and end of a long one at first. */
@@ -30,35 +31,27 @@ function useFullOutput(item: ToolItem, sessionKey: string, open: boolean): strin
   return full ?? t.output;
 }
 
-function Since({ ts }: { ts?: number }) {
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return ts ? <span className="tnum">{duration(Date.now() - ts)}</span> : null;
-}
-
 /** A step's line, as the other steps look: icon, what it did, details; a click opens it. */
 function StepButton({ icon, verb, what, aside, item, open, onClick }: { icon: ReactNode; verb: string; what: ReactNode; aside?: ReactNode; item: ToolItem; open: boolean; onClick: () => void }) {
   const t = item.tool;
   const running = t.status === 'running' || t.status === 'pending';
+  // Asked for but waiting its turn: it says what it will do, quietly, and does not look busy.
+  const busy = running && !t.queued;
   return (
     <button onClick={onClick} className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}>
       {icon}
       <span className="flex min-w-0 flex-1 items-baseline gap-2 text-[13px]">
-        <span className={cx('shrink-0', running ? 'text-fg' : 'text-fg-3')}>{verb}</span>
-        <span className={cx('min-w-0 truncate', running ? 'shine' : 'text-fg-2')}>{what}</span>
+        <span className={cx('shrink-0', busy ? 'text-fg' : 'text-fg-3')}>{verb}</span>
+        <span className={cx('min-w-0 truncate', busy ? 'shine' : 'text-fg-2')}>{what}</span>
       </span>
       {aside}
       {running ? (
-        <span className="shrink-0 text-[11px] text-fg-3">
-          <Since ts={item.ts} />
-        </span>
+        <StepClock t={t} since={item.ts} />
       ) : (
         t.durationMs != null && t.durationMs >= 1500 && <span className="tnum shrink-0 text-[11px] text-fg-3 max-sm:hidden">{duration(t.durationMs)}</span>
       )}
-      {running && <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-busy" aria-label="Running" />}
+      {busy && <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-busy" aria-label="Running" />}
+      {running && t.queued && <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full border border-fg-3" />}
       {t.status === 'error' && <XCircle size={14} className="shrink-0 text-err" />}
       <ChevronRight size={14} className={cx('shrink-0 text-fg-3 opacity-0 transition group-hover:opacity-100', open && 'rotate-90 opacity-100')} />
     </button>
@@ -148,7 +141,7 @@ export function SearchRow({ item, sessionKey }: { item: ToolItem; sessionKey: st
         item={item}
         open={open}
         onClick={() => setOpen((o) => !o)}
-        icon={<Globe size={14} className={cx('shrink-0', failed ? 'text-err' : running ? 'text-busy' : 'text-fg-3')} />}
+        icon={<Globe size={14} className={cx('shrink-0', failed ? 'text-err' : running && !t.queued ? 'text-busy' : 'text-fg-3')} />}
         verb={running ? 'Searching the web' : failed ? 'Web search failed' : 'Searched the web'}
         what={query ? `“${query}”` : ''}
         aside={
@@ -207,7 +200,7 @@ export function ReadRow({ item, sessionKey }: { item: ToolItem; sessionKey: stri
         item={item}
         open={open}
         onClick={() => setOpen((o) => !o)}
-        icon={<BookOpen size={14} className={cx('shrink-0', failed ? 'text-err' : running ? 'text-busy' : 'text-fg-3')} />}
+        icon={<BookOpen size={14} className={cx('shrink-0', failed ? 'text-err' : running && !t.queued ? 'text-busy' : 'text-fg-3')} />}
         verb={running ? 'Reading' : failed ? 'Could not read' : 'Read'}
         what={title}
         aside={detail && <span className="min-w-0 max-w-[45%] shrink truncate text-[11.5px] text-fg-3 max-sm:hidden">{detail}</span>}

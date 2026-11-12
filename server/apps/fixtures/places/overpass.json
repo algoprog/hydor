@@ -1,0 +1,560 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.7 375dc00a",
+  "osm3s": {
+    "timestamp_osm_base": "2026-11-07T19:56:52Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 2422867542,
+  "lat": 35.8279014,
+  "lon": -78.8052908,
+  "tags": {
+    "leisure": "dog_park",
+    "source": "visited"
+  }
+},
+{
+  "type": "node",
+  "id": 8567602905,
+  "lat": 35.9352681,
+  "lon": -78.7885795,
+  "tags": {
+    "leisure": "dog_park",
+    "name": "Carolina Arbors Small Dog Park",
+    "operator": "Carolina Arbors",
+    "operator:type": "private"
+  }
+},
+{
+  "type": "way",
+  "id": 106521850,
+  "center": {
+    "lat": 35.9146642,
+    "lon": -78.9222552
+  },
+  "tags": {
+    "barrier": "fence",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 211517956,
+  "center": {
+    "lat": 35.8112347,
+    "lon": -78.8403898
+  },
+  "tags": {
+    "access": "private",
+    "barrier": "fence",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 366515020,
+  "center": {
+    "lat": 35.9102086,
+    "lon": -78.7891209
+  },
+  "tags": {
+    "barrier": "fence",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 479548909,
+  "center": {
+    "lat": 35.8794976,
+    "lon": -78.8293838
+  },
+  "tags": {
+    "description": "Fenced in Dog Park with utilities (trash/waste bags)",
+    "leisure": "dog_park",
+    "noname": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 547545487,
+  "center": {
+    "lat": 35.9152343,
+    "lon": -78.9290382
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 584953930,
+  "center": {
+    "lat": 35.9469404,
+    "lon": -78.8205311
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 689673970,
+  "center": {
+    "lat": 35.9352661,
+    "lon": -78.7881806
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 775060277,
+  "center": {
+    "lat": 35.9251710,
+    "lon": -78.7747031
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 775083867,
+  "center": {
+    "lat": 35.9290134,
+    "lon": -78.7772356
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 850234183,
+  "center": {
+    "lat": 35.8310107,
+    "lon": -78.8128344
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 850234184,
+  "center": {
+    "lat": 35.8259144,
+    "lon": -78.8049467
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 850234185,
+  "center": {
+    "lat": 35.8198948,
+    "lon": -78.8211292
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 965964098,
+  "center": {
+    "lat": 35.8785471,
+    "lon": -78.8656346
+  },
+  "tags": {
+    "leisure": "dog_park",
+    "name": "Bark Park",
+    "opening_hours": "Mo-Su 10:00-21:00",
+    "wheelchair": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1170993632,
+  "center": {
+    "lat": 35.8435879,
+    "lon": -78.8937335
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1170993635,
+  "center": {
+    "lat": 35.8407286,
+    "lon": -78.8896400
+  },
+  "tags": {
+    "access": "unknown",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1171004471,
+  "center": {
+    "lat": 35.8422010,
+    "lon": -78.8453753
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park",
+    "operator": "Broadstone Trailside"
+  }
+},
+{
+  "type": "way",
+  "id": 1200622239,
+  "center": {
+    "lat": 35.8551584,
+    "lon": -78.8963756
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1225097916,
+  "center": {
+    "lat": 35.8237125,
+    "lon": -78.8577566
+  },
+  "tags": {
+    "addr:city": "Cary",
+    "addr:housenumber": "820",
+    "addr:postcode": "27519",
+    "addr:state": "NC",
+    "addr:street": "Bistre Drive",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1225514044,
+  "center": {
+    "lat": 35.8185687,
+    "lon": -78.8497513
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1226730281,
+  "center": {
+    "lat": 35.8340601,
+    "lon": -78.8326035
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1228448093,
+  "center": {
+    "lat": 35.8661338,
+    "lon": -78.8609895
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1228448095,
+  "center": {
+    "lat": 35.8661066,
+    "lon": -78.8613888
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1251683365,
+  "center": {
+    "lat": 35.8320535,
+    "lon": -78.9054187
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1258839464,
+  "center": {
+    "lat": 35.8211666,
+    "lon": -78.8835318
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1295814248,
+  "center": {
+    "lat": 35.8426396,
+    "lon": -78.8936209
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1361001804,
+  "center": {
+    "lat": 35.9097152,
+    "lon": -78.9076613
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1388554532,
+  "center": {
+    "lat": 35.8342298,
+    "lon": -78.8893217
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1415195492,
+  "center": {
+    "lat": 35.8265103,
+    "lon": -78.8898482
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1431023959,
+  "center": {
+    "lat": 35.9205516,
+    "lon": -78.7884922
+  },
+  "tags": {
+    "barrier": "fence",
+    "leisure": "dog_park",
+    "wheelchair": "no"
+  }
+},
+{
+  "type": "way",
+  "id": 1459957144,
+  "center": {
+    "lat": 35.8791945,
+    "lon": -78.8872504
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1473382763,
+  "center": {
+    "lat": 35.8645027,
+    "lon": -78.8250342
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1473382764,
+  "center": {
+    "lat": 35.8644270,
+    "lon": -78.8251519
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1482658253,
+  "center": {
+    "lat": 35.9453635,
+    "lon": -78.8257294
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1488732504,
+  "center": {
+    "lat": 35.9648211,
+    "lon": -78.8282425
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1494465577,
+  "center": {
+    "lat": 35.9279493,
+    "lon": -78.7559086
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1503780245,
+  "center": {
+    "lat": 35.9433537,
+    "lon": -78.8291274
+  },
+  "tags": {
+    "access": "private",
+    "barrier": "fence",
+    "leisure": "dog_park",
+    "name": "Copper Run Dog Park"
+  }
+},
+{
+  "type": "way",
+  "id": 1504276697,
+  "center": {
+    "lat": 35.9427120,
+    "lon": -78.8576664
+  },
+  "tags": {
+    "barrier": "fence",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1524978498,
+  "center": {
+    "lat": 35.8355630,
+    "lon": -78.8854445
+  },
+  "tags": {
+    "access": "private",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1526298924,
+  "center": {
+    "lat": 35.9451925,
+    "lon": -78.8597790
+  },
+  "tags": {
+    "barrier": "fence",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1530743554,
+  "center": {
+    "lat": 35.8970129,
+    "lon": -78.7964215
+  },
+  "tags": {
+    "access": "private",
+    "addr:city": "Raleigh",
+    "addr:housenumber": "9951",
+    "addr:postcode": "27617",
+    "addr:state": "NC",
+    "addr:street": "Ponder Lane",
+    "description": "Fenced private dog park with 2 metal benches and a dog waste can (plastic bags available). The ground is covered with bark mulch",
+    "leisure": "dog_park",
+    "name": "The Providence Dog Park",
+    "operator": "The Providence at Brier Creek"
+  }
+},
+{
+  "type": "way",
+  "id": 1534280171,
+  "center": {
+    "lat": 35.9331227,
+    "lon": -78.8371649
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1552454465,
+  "center": {
+    "lat": 35.8922811,
+    "lon": -78.8644094
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1569861084,
+  "center": {
+    "lat": 35.9518552,
+    "lon": -78.7745017
+  },
+  "tags": {
+    "barrier": "fence",
+    "leisure": "dog_park"
+  }
+},
+{
+  "type": "way",
+  "id": 1571519573,
+  "center": {
+    "lat": 35.9186745,
+    "lon": -78.7821284
+  },
+  "tags": {
+    "leisure": "dog_park"
+  }
+}
+
+  ]
+}

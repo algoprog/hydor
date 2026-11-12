@@ -3105,10 +3105,10 @@ return { events: events.map((e) => ({ ...e, era: era(e.year) })), eras, span: sh
     icon: 'map-pin',
     color: 'teal',
     category: 'Research',
-    description: 'What is around any place, on a map: sights, museums, parks and landmarks with pictures and a line on each, the best for you picked out and put in walking order.',
+    description: 'What is around any place, on a map: the kinds of place you name (dog parks, cafés, playgrounds…) from OpenStreetMap, and sights, museums, parks and landmarks from Wikipedia and Wikidata, with pictures and a line on each, the best for you picked out and put in walking order.',
     fields: [
       { id: 'place', label: 'Where', type: 'text', required: true, placeholder: 'e.g. Alfama, Lisbon, or the Colosseum' },
-      { id: 'interests', label: 'What you like', type: 'text', placeholder: 'e.g. History, architecture, views, quiet parks' },
+      { id: 'interests', label: 'What you like', type: 'text', placeholder: 'e.g. History, views, or kinds of place on OpenStreetMap: dog parks, cafés, playgrounds' },
       { id: 'radius', label: 'How far around', type: 'choice', options: ['A short walk (1 km)', 'Nearby (3 km)', 'The wider area (10 km)'], default: 'Nearby (3 km)' },
     ],
     prompt: '',
@@ -3147,12 +3147,13 @@ const km = Math.min(10, m ? Number(m[1]) : 3);
 const q = 'SELECT ?item ?itemLabel ?itemDescription ?loc ?links ?image ?article ?held WHERE { { SELECT ?item ?loc ?links WHERE { SERVICE wikibase:around { ?item wdt:P625 ?loc . bd:serviceParam wikibase:center "Point(' + p.lng + ' ' + p.lat + ')"^^geo:wktLiteral . bd:serviceParam wikibase:radius "' + km + '" . } ?item wikibase:sitelinks ?links . FILTER(?links >= 2) } ORDER BY DESC(?links) LIMIT 100 } OPTIONAL { ?item wdt:P18 ?image } OPTIONAL { ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> } BIND(EXISTS { ?item wdt:P195 [] } AS ?held) SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul" . } } ORDER BY DESC(?links)';
 const wikidata = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q);
 const url = 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&generator=geosearch&ggslimit=200&ggsradius=' + km * 1000 + '&ggscoord=' + p.lat + '|' + p.lng + '&prop=coordinates|pageimages|description|info&colimit=max&coprop=type&pilimit=max&piprop=thumbnail&pithumbsize=500&inprop=url';
-return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, at: p.lat + ',' + p.lng, wikidata, url };`,
+return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, km, at: p.lat + ',' + p.lng, wikidata, url };`,
           outputs: [
             { id: 'label', label: 'Place', type: 'text' },
             { id: 'name', label: 'Its name', type: 'text' },
             { id: 'lat', label: 'Latitude', type: 'number' },
             { id: 'lng', label: 'Longitude', type: 'number' },
+            { id: 'km', label: 'Km around it', type: 'number' },
             { id: 'at', label: 'Where on a map', type: 'text' },
             { id: 'wikidata', label: 'What is best known around it', type: 'url' },
             { id: 'url', label: 'What is around it', type: 'url' },
@@ -3162,15 +3163,112 @@ return { label: p.label, name: p.name, lat: p.lat, lng: p.lng, at: p.lat + ',' +
         { id: 'famous', title: 'Find what is best known there', do: 'tool', tool: 'http_request', with: { url: '{{spot.wikidata}}', headers: { ...HEADERS, Accept: 'application/sparql-results+json' }, max_chars: 200000 }, failed: 'skip' },
         { id: 'nearby', title: 'Find what is around', do: 'tool', tool: 'http_request', with: { url: '{{spot.url}}', headers: HEADERS, max_chars: 200000 }, failed: 'skip' },
         {
+          id: 'kinds',
+          title: 'Which kinds of place they like',
+          do: 'model',
+          if: '{{interests}} is not empty',
+          instructions: `Which kinds of place on OpenStreetMap match what someone likes: {{interests}}
+
+Give up to six OpenStreetMap tags (a key and a value) for kinds of place a person would go to: dog parks are leisure=dog_park, playgrounds leisure=playground, cafés amenity=cafe, viewpoints tourism=viewpoint, breweries craft=brewery, bookshops shop=books. Give each a short label naming the kind in the words of what they wrote, in their language ("Dog park"). Give none for what is no kind of place (history, architecture, quiet), and none for a tag you are not sure exists.
+
+- tags: each the key, the value and the label.`,
+          outputs: [{ id: 'tags', label: 'Kinds of place', type: 'table', columns: [{ id: 'key', label: 'Key', type: 'text' }, { id: 'value', label: 'Value', type: 'text' }, { id: 'label', label: 'Label', type: 'text' }] }],
+          failed: 'skip',
+        },
+        {
+          id: 'osm',
+          title: 'Find them on OpenStreetMap',
+          do: 'code',
+          language: 'javascript',
+          if: '{{kinds.tags}} is not empty',
+          with: { tags: '{{kinds.tags}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}', km: '{{spot.km}}' },
+          code:
+            LIST +
+            BODY +
+            String.raw`// What OpenStreetMap has of the kinds of place they like, around the place: one question to a public Overpass server (the
+// main one, then another when it is busy or down). Kept: the named ones that anyone may go to, the nearest first; up to
+// five with no name only when fewer than three have one.
+const tags = rows(input.tags)
+  .map((t) => ({ key: String(t.key || '').trim(), value: String(t.value || '').trim(), label: String(t.label || '').trim() }))
+  .filter((t) => /^[a-z][a-z0-9_:]*$/.test(t.key) && /^[A-Za-z0-9_:+-]+$/.test(t.value))
+  .slice(0, 6)
+  .map((t) => ({ ...t, label: t.label || t.value.charAt(0).toUpperCase() + t.value.slice(1).replace(/_/g, ' ') }));
+if (!tags.length) return { found: [] };
+const lat0 = Number(input.lat);
+const lng0 = Number(input.lng);
+const metres = Math.round(Math.min(10, Number(input.km) || 3) * 1000);
+const query = '[out:json][timeout:20];(' + tags.map((t) => 'nwr["' + t.key + '"="' + t.value + '"](around:' + metres + ',' + lat0 + ',' + lng0 + ');').join('') + ');out center tags 200;';
+let els = null;
+for (const server of ['https://overpass-api.de/api/interpreter', 'https://overpass.openstreetmap.fr/api/interpreter']) {
+  try {
+    const r = await ctx.tool('http_request', { method: 'POST', url: server, headers: { 'User-Agent': '${UA}', 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(query), max_chars: 200000 }, { title: 'Ask OpenStreetMap what is there' });
+    const b = bodyOf(r);
+    // A server that ran out of time says so in "remark" and gives what it had: that is no answer.
+    if (b && Array.isArray(b.elements) && (b.elements.length || !b.remark)) {
+      els = b.elements;
+      break;
+    }
+  } catch (e) {}
+}
+// Neither answered (they are often busy or down): nothing from OpenStreetMap, and the answer comes from Wikipedia and Wikidata.
+if (!els) return { found: [] };
+const between = (a, b) => Math.hypot((a.lat - b.lat) * 111.2, (a.lng - b.lng) * 111.2 * Math.cos((a.lat * Math.PI) / 180));
+const away = (lat, lng) => Math.round(between({ lat, lng }, { lat: lat0, lng: lng0 }) * 100) / 100;
+const all = [];
+for (const e of els) {
+  const t = e.tags || {};
+  const at = e.type === 'node' ? e : e.center;
+  const hit = tags.find((x) => t[x.key] === x.value);
+  if (!hit || !at || !isFinite(at.lat) || !isFinite(at.lon) || /^(?:private|no|customers|delivery)$/i.test(String(t.access || ''))) continue;
+  const name = String(t.name || t['name:en'] || '').trim();
+  const row = { name: name || hit.label, label: hit.label, type: e.type, id: String(e.id), lat: at.lat, lng: at.lon, km: away(at.lat, at.lon), unnamed: !name, hours: String(t.opening_hours || ''), website: String(t.website || t['contact:website'] || ''), operator: String(t.operator || ''), fee: String(t.fee || ''), access: String(t.access || ''), image: String(t.image || ''), commons: String(t.wikimedia_commons || ''), wikidata: String(t.wikidata || ''), wikipedia: String(t.wikipedia || '') };
+  // The same place mapped twice (a point inside its outline): once.
+  if (!all.some((o) => o.label === row.label && o.name === row.name && between(o, row) < 0.15)) all.push(row);
+}
+all.sort((a, b) => a.km - b.km);
+const named = all.filter((r) => !r.unnamed);
+const found = (named.length >= 3 ? named : named.concat(all.filter((r) => r.unnamed).slice(0, 5))).sort((a, b) => a.km - b.km).slice(0, 60);
+return { found };`,
+          outputs: [
+            {
+              id: 'found',
+              label: 'On OpenStreetMap',
+              type: 'table',
+              columns: [
+                { id: 'name', label: 'Place', type: 'text' },
+                { id: 'label', label: 'Kind', type: 'text' },
+                { id: 'type', label: 'Type on the map', type: 'text' },
+                { id: 'id', label: 'Number on the map', type: 'text' },
+                { id: 'lat', label: 'Latitude', type: 'number' },
+                { id: 'lng', label: 'Longitude', type: 'number' },
+                { id: 'km', label: 'Km from the centre', type: 'number' },
+                { id: 'unnamed', label: 'No name on the map', type: 'yesno' },
+                { id: 'hours', label: 'Opening hours', type: 'text' },
+                { id: 'website', label: 'Website', type: 'text' },
+                { id: 'operator', label: 'Run by', type: 'text' },
+                { id: 'fee', label: 'Fee', type: 'text' },
+                { id: 'access', label: 'Who may go', type: 'text' },
+                { id: 'image', label: 'Picture', type: 'text' },
+                { id: 'commons', label: 'Wikimedia Commons file', type: 'text' },
+                { id: 'wikidata', label: 'Wikidata', type: 'text' },
+                { id: 'wikipedia', label: 'Wikipedia', type: 'text' },
+              ],
+            },
+          ],
+          failed: 'agent',
+        },
+        {
           id: 'sort',
           title: 'Sort what is there',
           do: 'code',
           language: 'javascript',
-          with: { famous: '{{famous}}', found: '{{nearby}}', name: '{{spot.name}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
+          with: { famous: '{{famous}}', found: '{{nearby}}', osm: '{{osm.found}}', name: '{{spot.name}}', lat: '{{spot.lat}}', lng: '{{spot.lng}}' },
           code:
             BODY +
-            String.raw`// The places around it, the best known first: Wikidata's, by how many Wikipedias write about each, and Wikipedia's
-// articles there, by how much each says (either alone when the other did not answer). What is no place to go (the place
+            LIST +
+            String.raw`// The places around it: first the kinds of place they asked for that OpenStreetMap has (nearest first, about twenty), then
+// the best known: Wikidata's, by how many Wikipedias write about each, and Wikipedia's articles there, by how much each
+// says (either alone when the other did not answer). What is no place to go (the place
 // itself and other towns and areas, events, states, institutions, languages) is left out; schools, firms, stations,
 // roads and a World Heritage listing of many sites go lower.
 const lat0 = Number(input.lat);
@@ -3215,25 +3313,67 @@ for (const b of ((bodyOf(input.famous) || {}).results || {}).bindings || []) {
   const name = v('itemLabel');
   if (!at || !name || /^Q\d+$/.test(name) || v('held') === 'true') continue;
   const links = Number(v('links')) || 0;
-  add(titleOf(v('article')) || v('item'), { name: plain(name), about: v('itemDescription'), lat: Number(at[2]), lng: Number(at[1]), fame: links, langs: links, picture: v('image') ? v('image').replace(/^http:/, 'https:') + '?width=330' : null, link: v('article') || v('item').replace(/^http:/, 'https:') });
+  add(titleOf(v('article')) || v('item'), { qid: v('item').split('/').pop(), name: plain(name), about: v('itemDescription'), lat: Number(at[2]), lng: Number(at[1]), fame: links, langs: links, picture: v('image') ? v('image').replace(/^http:/, 'https:') + '?width=330' : null, link: v('article') || v('item').replace(/^http:/, 'https:') });
 }
 for (const p of ((bodyOf(input.found) || {}).query || {}).pages || []) {
   const c = p.coordinates && p.coordinates[0];
   if (!c || /^(?:event|country|adm)/.test(String(c.type || ''))) continue;
   add(p.title, { name: plain(p.title), about: String(p.description || ''), lat: c.lat, lng: c.lon, fame: Math.min(40, (Number(p.length) || 0) / 2500), langs: null, picture: p.thumbnail ? p.thumbnail.source : null, link: p.fullurl || null });
 }
-const places = [...all.values()]
+const wiki = [...all.values()]
   .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && !AREA.test(r.about) && !EVENT.test(r.about) && !DATED.test(r.about) && !ART.test(r.about) && !TOPIC.test(r.name))
   .map((r) => {
     const text = r.name + ' ' + r.about;
     const kind = (KINDS.find(([, re]) => re.test(text)) || ['Other'])[0];
-    return { name: r.name, kind, about: r.about, km: away(r.lat, r.lng), lat: r.lat, lng: r.lng, picture: r.picture, link: r.link, langs: r.langs, fame: r.fame * (LESS.test(text) || GROUP(r) ? 0.3 : 1) };
+    return { qid: r.qid || '', name: r.name, kind, about: r.about, km: away(r.lat, r.lng), lat: r.lat, lng: r.lng, picture: r.picture, link: r.link, langs: r.langs, fame: r.fame * (LESS.test(text) || GROUP(r) ? 0.3 : 1) };
   })
   // The district asked about is where the walk is, not a stop of it.
   .filter((r) => !(r.kind === 'Area' && own && r.name.toLowerCase() === own.toLowerCase()))
-  .sort((a, b) => b.fame - a.fame)
-  .slice(0, 40);
-if (!places.length) throw new Error('Nothing around it is on Wikipedia or Wikidata: try a larger area, or a nearby town');
+  .sort((a, b) => b.fame - a.fame);
+// What they asked for, from OpenStreetMap: each with its kind (what the chips show), what its tags say in plain words, a
+// picture and a link. One that Wikipedia or Wikidata has as well (the same name, or nearly, within 300 m) is one place.
+const squash = (s) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+const between = (a, b) => Math.hypot((a.lat - b.lat) * 111.2, (a.lng - b.lng) * 111.2 * Math.cos((a.lat * Math.PI) / 180));
+const alike = (a, b) => a === b || (Math.min(a.length, b.length) >= 5 && (a.includes(b) || b.includes(a)));
+const clock = (s) => {
+  const t = String(s || '').trim();
+  if (!t) return '';
+  if (t === '24/7') return 'Open 24 hours';
+  if (t.length > 70 || /["\[\]+]|sunrise|sunset|week|easter|\bSH\b/i.test(t)) return '';
+  return 'Open ' + t.replace(/(\d)-(?=\d)/g, '$1–').replace(/\b([A-Z][a-z])-(?=[A-Z][a-z])/g, '$1–').replace(/;\s*/g, ', ').replace(/\bPH\b/g, 'public holidays').replace(/\boff\b/g, 'closed');
+};
+const site = (s) => {
+  const t = String(s || '').trim().split(/[;\s]/)[0];
+  return /^https?:\/\/[^\s/]+\.[^\s/]+/i.test(t) ? t : /^(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/\S*)?$/i.test(t) ? 'https://' + t : '';
+};
+const commons = (f) => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(String(f).replace(/^File:/i, '').trim()) + '?width=330';
+const pictureOf = (o) => {
+  const img = o.image.trim();
+  const file = /^https?:\/\/commons\.wikimedia\.org\/wiki\/File:([^?#]+)/i.exec(img);
+  if (file) return commons(decodeURIComponent(file[1]).replace(/_/g, ' '));
+  if (/^https?:\/\/[^\s]+$/i.test(img)) return img;
+  return /^File:\S/i.test(o.commons.trim()) ? commons(o.commons) : null;
+};
+const linkOf = (o) => {
+  const wp = /^([a-z-]{2,8}):(.+)$/.exec(o.wikipedia.trim());
+  return site(o.website) || (wp ? 'https://' + wp[1] + '.wikipedia.org/wiki/' + encodeURIComponent(wp[2].trim().replace(/ /g, '_')) : '');
+};
+const asked = [];
+for (const row of rows(input.osm)) {
+  const o = { ...row };
+  for (const k of ['name', 'label', 'type', 'id', 'hours', 'website', 'operator', 'fee', 'access', 'image', 'commons', 'wikidata', 'wikipedia']) o[k] = String(row[k] || '');
+  const lat = Number(o.lat);
+  const lng = Number(o.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !o.name) continue;
+  const same = o.unnamed ? -1 : wiki.findIndex((r) => between(r, { lat, lng }) <= 0.3 && ((o.wikidata && r.qid === o.wikidata) || alike(squash(r.name), squash(o.name))));
+  const had = same >= 0 ? wiki.splice(same, 1)[0] : null;
+  const fee = /^no$/i.test(o.fee) ? 'Free' : /^yes$/i.test(o.fee) ? 'Entry fee' : '';
+  const facts = [clock(o.hours), o.operator ? 'run by ' + o.operator : '', fee, /^permit$/i.test(o.access) ? 'Permit needed' : '', o.unnamed ? 'No name on the map' : ''].filter(Boolean).join(' · ');
+  asked.push({ name: o.name, kind: o.label || 'Place', about: facts || (had && had.about) || 'Marked on OpenStreetMap', km: away(lat, lng), lat, lng, picture: pictureOf(o) || (had && had.picture) || null, link: linkOf(o) || (had && had.link) || 'https://www.openstreetmap.org/' + o.type + '/' + o.id, langs: had ? had.langs : null, asked: true });
+}
+asked.sort((a, b) => a.km - b.km);
+const places = asked.slice(0, 20).concat(wiki.map((r) => ({ ...r, asked: false }))).slice(0, 40);
+if (!places.length) throw new Error('Nothing around it is on Wikipedia, Wikidata or OpenStreetMap: try a larger area, or a nearby town');
 // Pictures for those without one, from their Wikipedia articles (all at once).
 const need = places.filter((r) => !r.picture && /en\.wikipedia\.org\/wiki\//.test(String(r.link || '')));
 if (need.length)
@@ -3244,8 +3384,8 @@ if (need.length)
     for (const x of need) x.picture = got[titleOf(x.link)] || null;
   } catch (e) {}
 return {
-  places: places.map(({ fame, langs, ...p }) => p),
-  list: places.map((p, i) => i + 1 + '. ' + p.name + ' (' + p.kind + (p.about ? ', ' + p.about : '') + '; ' + p.km + ' km from the centre' + (p.langs ? '; in ' + p.langs + ' Wikipedias' : '') + ')').join('\n'),
+  places: places.map(({ fame, langs, asked, qid, ...p }) => p),
+  list: places.map((p, i) => i + 1 + '. ' + p.name + ' (' + p.kind + (p.about ? ', ' + p.about : '') + '; ' + p.km + ' km from the centre' + (p.asked ? '; what they asked for' : '') + (p.langs ? '; in ' + p.langs + ' Wikipedias' : '') + ')').join('\n'),
 };`,
           outputs: [
             { id: 'places', label: 'Places', type: 'table', columns: [{ id: 'name', label: 'Place', type: 'text' }, { id: 'kind', label: 'Kind', type: 'text' }, { id: 'about', label: 'What it is', type: 'text' }, { id: 'km', label: 'Km from the centre', type: 'number' }, { id: 'lat', label: 'Latitude', type: 'number' }, { id: 'lng', label: 'Longitude', type: 'number' }, { id: 'picture', label: 'Picture', type: 'url' }, { id: 'link', label: 'More about it', type: 'url' }] },
@@ -3259,11 +3399,11 @@ return {
           do: 'model',
           instructions: `Pick the places most worth a visit around {{spot.label}}{{#interests}} for someone who likes: {{interests}}{{/interests}}: six to ten from the numbered list below (none that are not on it), each by its number, with why go in a sentence.
 
-The list puts the best known first and says how far each is from the centre of {{spot.label}}. {{#interests}}Let what they like decide, but keep the sights a first visit should not miss unless what they like rules them out.{{/interests}}{{^interests}}Keep the sights a first visit should not miss, then add variety where the list allows (a museum, a church or monument, a square or market, a park or a view).{{/interests}} Leave out what is no place to visit (a school, an office, a station, an event).
+The list puts the best known first and says how far each is from the centre of {{spot.label}}; the places marked "what they asked for" come first. {{#interests}}If the list has places marked that way, pick from them first (all of them when there are only a few, so fewer than six is fine), and keep a famous sight only if it also fits what they like. Otherwise let what they like decide, but keep the sights a first visit should not miss unless what they like rules them out.{{/interests}}{{^interests}}Keep the sights a first visit should not miss, then add variety where the list allows (a museum, a church or monument, a square or market, a park or a view).{{/interests}} Leave out what is no place to visit (a school, an office, a station, an event).
 
 {{sort.list}}
 
-- picks: each its number in the list, and why go, in one sentence a guide would write (no distances).
+- picks: each its number in the list, and why go, in one sentence a guide would write from what the list says of it (no distances, nothing the list does not say).
 - summary: what the place is like and what to see there, in two or three sentences as a guide would write them; say nothing about the list, its distances or what you cannot check.`,
           outputs: [
             { id: 'picks', label: 'Picks', type: 'table', required: true, columns: [{ id: 'n', label: 'Number', type: 'number' }, { id: 'why', label: 'Why go', type: 'text' }] },
@@ -3314,6 +3454,7 @@ return { places: out, walk: Math.round(km * 10) / 10, stops: order.length };`,
     examples: [
       { id: 'thessaloniki', name: 'A whole city', inputs: { place: 'Thessaloniki' }, checks: ['{{answer.stops}} >= 6', '{{answer.places}} contains White Tower', '{{answer.places}} contains Rotunda'] },
       { id: 'alfama', name: 'Alfama, Lisbon', inputs: { place: 'Alfama, Lisbon', interests: 'History and views' }, checks: ['{{answer.stops}} >= 5', '{{answer.walk}} < 15'] },
+      { id: 'dog-parks', name: 'One kind of place', inputs: { place: 'Research Triangle Park, NC', interests: 'Dog parks', radius: 'The wider area (10 km)' }, checks: ['{{answer.places[0].kind}} = Dog park', '{{answer.stops}} >= 1'] },
       { id: 'a-landmark', name: 'Around a landmark', inputs: { place: 'Colosseum', radius: 'A short walk (1 km)' }, checks: ['{{answer.places}} is not empty'] },
     ],
   },

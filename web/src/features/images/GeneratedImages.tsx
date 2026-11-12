@@ -47,7 +47,7 @@ function doing(tool: string): string {
   return 'Making an image';
 }
 
-function Working({ since, aspect, prompt, what = 'Making an image' }: { since?: number; aspect?: string; prompt?: string; what?: string }) {
+function Working({ since, queued, aspect, prompt, what = 'Making an image' }: { since?: number; queued?: boolean; aspect?: string; prompt?: string; what?: string }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((x) => x + 1), 1000);
@@ -61,7 +61,16 @@ function Working({ since, aspect, prompt, what = 'Making an image' }: { since?: 
           <Sparkles size={20} className="spin-gentle text-accent" />
           <span>
             {what}
-            {since ? ` · ${duration(Date.now() - since)}` : '…'}
+            {queued ? (
+              <>
+                {' · '}
+                <span title="Waiting for the step before it to finish">Waiting</span>
+              </>
+            ) : since ? (
+              ` · ${duration(Date.now() - since)}`
+            ) : (
+              '…'
+            )}
           </span>
         </div>
       </div>
@@ -83,7 +92,7 @@ export function GeneratedImages({ item, sessionKey }: { item: ToolItem; sessionK
     return (
       <>
         <OpenRouterKeyCard sessionKey={sessionKey} />
-        <Working since={item.ts} aspect={aspect} prompt={prompt} what={doing(t.name)} />
+        <Working since={t.startedAt ?? item.ts} queued={t.queued} aspect={aspect} prompt={prompt} what={doing(t.name)} />
       </>
     );
   if (!pics.length) {

@@ -4,7 +4,7 @@ import { Bath, BedDouble, Check, ChevronLeft, ChevronRight, ExternalLink, MapPin
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, useWidth } from '../charts';
-import { arr, Card, Chip, fmtDate, fmtMoney, fmtNum, Head, hostOf, isObj, KeyValues, LinkOut, MapBox, mapPoints, Md, num, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, useAui, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Card, Chip, fmtDate, fmtMoney, fmtNum, Head, hostOf, isObj, KeyValues, LinkOut, MapBox, mapPoints, Md, num, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, useAui, useKept, usePicOk, WithPic, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -52,6 +52,7 @@ function Product({ data, done }: { data: Data; done: boolean }) {
   const pics = [...new Set([str(data.image), ...more].map((p) => p.trim()).filter(Boolean))];
   const [at, setAt] = useState(0);
   const shown = pics[Math.min(at, pics.length - 1)];
+  const hasPic = usePicOk(shown);
   const name = str(data.name ?? data.title);
   const off = savings(data.price, data.was);
   const specs = specRows(data.specs);
@@ -64,16 +65,16 @@ function Product({ data, done }: { data: Data; done: boolean }) {
   const lowest = prices.length > 1 ? Math.min(...prices) : null;
   return (
     <Card>
-      <div className={cx('grid gap-5', pics.length > 0 && '@xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]')}>
+      <div className={cx('grid gap-5', pics.length > 0 && hasPic && '@xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]')}>
         {pics.length > 0 && (
-          <div className="min-w-0">
+          <div className={cx('min-w-0', !hasPic && 'hidden')}>
             <Pic src={shown} alt={name} group={pics} fit="contain" className="aspect-[4/3] max-h-72 w-full rounded-xl bg-bg-1 @xl:aspect-square @xl:max-h-none" />
             {pics.length > 1 && (
               <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
                 {pics.map((p, i) => (
-                  <button key={p} type="button" onClick={() => done && setAt(i)} aria-label={tr('Picture {0}').replace('{0}', String(i + 1))} className={cx('shrink-0 rounded-lg border-2 p-px transition-colors', i === Math.min(at, pics.length - 1) ? 'border-accent' : 'border-transparent hover:border-line-2')}>
+                  <WithPic key={p} src={p} as="button" type="button" onClick={() => done && setAt(i)} aria-label={tr('Picture {0}').replace('{0}', String(i + 1))} className={cx('shrink-0 rounded-lg border-2 p-px transition-colors', i === Math.min(at, pics.length - 1) ? 'border-accent' : 'border-transparent hover:border-line-2')}>
                     <Pic src={p} alt="" zoom={false} fit="contain" className="h-12 w-12 rounded-md bg-bg-1" />
-                  </button>
+                  </WithPic>
                 ))}
               </div>
             )}
@@ -165,14 +166,21 @@ function ProductTile({ it }: { it: Data }) {
   const currency = str(it.currency);
   const off = savings(it.price, it.was);
   const url = str(it.url ?? it.link);
+  const hasPic = usePicOk(it.image);
   return (
     <div className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel">
-      <div className="relative">
+      <div className={cx('relative', !hasPic && 'hidden')}>
         <Pic src={it.image} alt={name} fit="contain" className="aspect-square w-full rounded-none bg-bg-1" />
         {str(it.tag) && <span className="absolute top-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-fg shadow-sm">{str(it.tag)}</span>}
         {off !== null && <span className="absolute top-2 right-2 rounded-full bg-ok px-1.5 py-0.5 text-[11px] font-semibold text-white shadow-sm">−{off}%</span>}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-3">
+        {!hasPic && (str(it.tag) || off !== null) && (
+          <div className="flex flex-wrap gap-1">
+            {str(it.tag) && <Chip tone="accent">{str(it.tag)}</Chip>}
+            {off !== null && <Chip tone="good">−{off}%</Chip>}
+          </div>
+        )}
         {/^https?:\/\//i.test(url) ? (
           <a href={url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-[13.5px] leading-snug font-semibold text-fg hover:text-accent hover:underline">
             {name}
@@ -524,6 +532,7 @@ function ListingCard({ it, pin, done }: { it: Data; pin: number | null; done: bo
   const pics = [...new Set([it.image, ...(typeof it.images === 'string' ? [it.images] : arr(it.images))].map((p) => textOf(p, 'url', 'src', 'image').trim()).filter(Boolean))];
   const [at, setAt] = useState(0);
   const pic = pics.length && !offline ? pics[Math.min(at, pics.length - 1)] : '';
+  const hasPic = usePicOk(pic);
   const cur = listingCurrency(it);
   const unit = areaUnit(it.area_unit ?? it.unit);
   const price = amountOf(it.price);
@@ -544,7 +553,7 @@ function ListingCard({ it, pin, done }: { it: Data; pin: number | null; done: bo
   return (
     <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel @md:flex-row @xl:flex-col">
       {pic && (
-        <div className="relative shrink-0 @md:w-[40%] @md:max-w-[230px] @xl:w-auto @xl:max-w-none">
+        <div className={cx('relative shrink-0 @md:w-[40%] @md:max-w-[230px] @xl:w-auto @xl:max-w-none', !hasPic && 'hidden')}>
           <Pic src={pic} alt={title} group={pics} className="aspect-[16/10] w-full @md:aspect-auto @md:h-full @md:min-h-[176px] @xl:aspect-[16/10] @xl:h-auto @xl:min-h-0" />
           {pin !== null && <span className="absolute top-2 left-2 grid h-6 w-6 place-items-center rounded-full border-2 border-panel bg-accent text-[11px] font-semibold text-accent-fg">{pin}</span>}
           {str(it.type) && <span className="absolute top-2 right-2 max-w-[60%] truncate rounded-full bg-panel/90 px-2 py-0.5 text-[11px] font-semibold text-fg shadow-sm">{str(it.type)}</span>}
@@ -564,7 +573,7 @@ function ListingCard({ it, pin, done }: { it: Data; pin: number | null; done: bo
       <div className="flex min-w-0 flex-1 flex-col p-3">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">
           <div className="flex min-w-0 items-baseline gap-1.5">
-            {pin !== null && !pic && <span className="grid h-5 w-5 shrink-0 place-items-center self-center rounded-full bg-accent text-[10.5px] font-semibold text-accent-fg">{pin}</span>}
+            {pin !== null && !hasPic && <span className="grid h-5 w-5 shrink-0 place-items-center self-center rounded-full bg-accent text-[10.5px] font-semibold text-accent-fg">{pin}</span>}
             {str(it.price) && <span className="text-[18px] leading-tight font-semibold tracking-tight tabular-nums">{priceText(it.price, cur)}</span>}
             {per && <span className="text-[12.5px] text-fg-3">/ {per}</span>}
           </div>
@@ -597,7 +606,7 @@ function ListingCard({ it, pin, done }: { it: Data; pin: number | null; done: bo
             <span className="min-w-0">{str(it.address)}</span>
           </div>
         )}
-        {(!pic || offline) && str(it.type) && <div className="mt-1 text-[12px] text-fg-3">{str(it.type)}</div>}
+        {!hasPic && str(it.type) && <div className="mt-1 text-[12px] text-fg-3">{str(it.type)}</div>}
         {tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {tags.slice(0, 5).map((t, i) => (

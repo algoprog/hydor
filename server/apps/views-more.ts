@@ -522,7 +522,7 @@ const FRIDGE: AppUi = {
       css:
         PIC +
         String.raw`
-.dt { display: grid; grid-template-columns: minmax(0, 240px) 1fr; gap: 18px; align-items: start; }
+.dt { display: grid; grid-template-columns: minmax(0, 240px) 1fr; gap: 18px; align-items: start; } .dt > :only-child { grid-column: 1 / -1; }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 h2 { margin: 4px 0 10px !important; font-size: 24px !important; } p { margin: 0 0 8px; font-size: 14.5px; line-height: 1.5; }
 @media (max-width: 560px) { .dt { grid-template-columns: 1fr; } }
@@ -746,7 +746,7 @@ const WATCH: AppUi = {
       css:
         PIC +
         String.raw`
-.dt { display: grid; grid-template-columns: minmax(0, 200px) 1fr; gap: 18px; align-items: start; }
+.dt { display: grid; grid-template-columns: minmax(0, 200px) 1fr; gap: 18px; align-items: start; } .dt > :only-child { grid-column: 1 / -1; }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 h2 { margin: 4px 0 10px !important; font-size: 24px !important; } p { margin: 0 0 10px; font-size: 15px; line-height: 1.5; }
 @media (max-width: 560px) { .dt { grid-template-columns: 1fr; } }
@@ -934,7 +934,7 @@ const BOOKS: AppUi = {
       css:
         PIC +
         String.raw`
-.dt { display: grid; grid-template-columns: minmax(0, 180px) 1fr; gap: 18px; align-items: start; }
+.dt { display: grid; grid-template-columns: minmax(0, 180px) 1fr; gap: 18px; align-items: start; } .dt > :only-child { grid-column: 1 / -1; }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 h2 { margin: 4px 0 2px !important; font-size: 24px !important; } .by { margin: 0 0 12px; color: var(--n-muted); }
 p { margin: 0 0 10px; font-size: 15px; line-height: 1.5; } .muted { color: var(--n-muted); font-size: 13.5px; }
@@ -1194,7 +1194,7 @@ const PLACES: AppUi = {
       description: 'A stop of the walk: its picture, why go, how far; ticked off when seen',
       html: String.raw`<div class="s{{#state.seen.@key}} seen{{/state.seen.@key}}"><span class="n">{{n}}</span>{{#picture}}<img src="{{picture}}" alt="" loading="lazy">{{/picture}}<div class="body"><h3>{{name}}</h3><p class="muted">{{kind}}{{#about}} · {{about}}{{/about}} · {{km}} km</p><p>{{why}}</p><div class="foot">{{#link}}<a class="b" href="{{link}}" target="_blank" rel="noopener noreferrer">About it ↗</a>{{/link}}<button type="button" class="b" data-event="seen">{{#state.seen.@key}}✓ Seen{{/state.seen.@key}}{{^state.seen.@key}}Mark seen{{/state.seen.@key}}</button></div></div></div>`,
       css: String.raw`
-.s { display: grid; grid-template-columns: auto 96px 1fr; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+.s { display: grid; grid-template-columns: auto 96px 1fr; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); } .s > .body:nth-child(2) { grid-column: 2 / -1; }
 .seen { opacity: .65; } .n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--n-accent); color: var(--n-accent-fg); font-weight: 700; font-size: 13px; }
 img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; background: var(--n-soft); }
 h3 { margin: 0 0 2px; font-size: 15.5px; } p { margin: 0 0 6px; font-size: 14px; line-height: 1.45; } .muted { color: var(--n-muted); font-size: 12.5px; }

@@ -333,7 +333,7 @@ test('Tab completion lists option ids with their labels, sections, and a choiceâ
     secs.find(([v]) => v === 'chat'),
     ['chat', 'Chat apps'],
   );
-  assert.equal(secs.length, 25);
+  assert.equal(secs.length, 26);
   assert.deepEqual(await LOADERS.value(load('', ['general.resume'])), [['on'], ['off']]);
   assert.deepEqual((await LOADERS.value(load('', ['voice.speech-recognition-on-the-server']))) as Candidate[], [
     ['off', 'Off'],

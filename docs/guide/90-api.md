@@ -423,6 +423,8 @@ Agents in your sessions run your apps with their `use_app` tool: the apps instal
 - `POST /api/apps/:id/uninstall` — uninstalls a ready-made app (`tpl:<id>`): it leaves your apps and agents' tools, runs no more (409) and waits under Ready-made apps to install on the Apps page; its runs and records stay, its Update automatically task goes, and it leaves the pinned apps. Returns: `{ template, installed: false, agents }`.
 - `POST /api/apps/:id/install` — installs a ready-made app (`tpl:<id>`) again. Body (the user's own pages only): `{ secrets?: { NAME: value }, allow?: [NAME] }` — keys it needs, saved to the vault. Returns: `{ template, installed: true, agents }`.
 - `PUT /api/apps/:id/agents` — whether agents in your sessions may run an app (yours by id or slug, or `tpl:<id>`): its page's Agents can use it. Body: `{ on: boolean }`. Returns: `{ agents: boolean, made: boolean — it is made for that (when false, agents never get it) }`.
+- `GET /api/apps/allowed` — the apps agents run for you without asking first (Settings → Apps → Run without asking), and the other apps agents may run, which could be added. Returns: `{ apps: [AppRef] — those that run without asking, others: [AppRef] — the rest }`, each `AppRef` `{ id — yours by id, ready-made ones as tpl:<id>, name, icon, color, own: boolean — one of yours }`.
+- `PUT /api/apps/allowed/:id` — adds an app to those agents run without asking first, or takes it off so agents ask again on its card (yours by id, or ready-made as `tpl:<id>`). Adding needs an app agents can run (404 otherwise). Body: `{ allowed: boolean }`. Returns: the same as `GET /api/apps/allowed`.
 
 ## App runs
 

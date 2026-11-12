@@ -33,6 +33,8 @@ import { byWords, dropAppIndex, findApps, stem } from './search.ts';
 import { addModels, modelStates, needModels, setModelsHere } from './models.ts';
 import { missingSecrets, needSecrets, saveAppSecrets, secretsOf } from './secrets.ts';
 import { providerModels } from '../../shared/app-models.ts';
+import { allowApp, allowedApps } from './allowed.ts';
+import { migrateRuns, setRun as setTaskRun, startRun as startTaskRun, finishRun as finishTaskRun } from '../automations/runs.ts';
 import { notesOf } from '../notes.ts';
 import { appSummary } from '../../shared/app-summary.ts';
 import { madeForSessions } from '../../shared/apps.ts';
@@ -1019,14 +1021,15 @@ test('use_app: what the request lacks is asked on the app’s own card (optional
   // Closing the card runs nothing.
   sessions.answerWith = () => ({ decision: 'decline' });
   const closed = String(await useTool(key).run({ app: 'city-break', inputs: {} }, sessionCtx(key)));
-  assert.match(closed, /closed City break's card without running it/);
+  assert.match(closed, /chose not to run City break\. Don't run it again for this request/);
   assert.equal(store.listRuns(db, { app: a.id, limit: 9 }).filter((r) => r.source === 'session').length, 1);
   sessions.answerWith = null;
   store.deleteApp(db, a.id);
 });
 
-test('use_app: everything given runs at once; a run that outlasts the call comes to the session as a message when it ends', async () => {
+test('use_app: everything given runs at once (an app the user allowed); a run that outlasts the call comes to the session as a message when it ends', async () => {
   const a = store.saveApp(db, { recipe: recipe({ name: 'Day trip' }) });
+  allowApp(db, a.id, true);
   const key = 'claude:asker-2';
   sessions.cards = [];
   const said = String(await useTool(key).run({ app: 'day-trip', inputs: { city: 'Sintra', days: 1 }, wait: 1 }, sessionCtx(key)));
@@ -1046,7 +1049,122 @@ test('use_app: everything given runs at once; a run that outlasts the call comes
   // Waiting for it again by its run gives the answer; another session's run is not this one's.
   assert.match(String(await useTool(key).run({ run: run.id }, sessionCtx(key))), /Day trip is done/);
   assert.match(JSON.stringify(await useTool('claude:other').run({ run: run.id }, sessionCtx('claude:other'))), /No run with that id/);
+  // Its answer is told to miss nothing twice: the agent may take the card back, or say what it lacks.
+  assert.match(msg!.text, /do not add a second answer beside it/);
+  assert.match(msg!.text, /remove: true/);
   store.deleteApp(db, a.id);
+});
+
+test('use_app: unless the user always runs the app, its card asks first with what it does; Always run it keeps it on the list and runs; Don’t run runs nothing', async () => {
+  const a = store.saveApp(db, {
+    recipe: recipe({
+      name: 'Ask first',
+      description: 'Plans a short stay',
+      flow: { steps: [{ id: 'plan', do: 'agent', title: 'Plan the days', prompt: 'x' }, { id: 'pick', do: 'model', prompt: 'y' }] } as any,
+    }),
+  });
+  const key = 'claude:asker-3';
+  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'Plan a stay' }]);
+  const inputs = { city: 'Faro', days: 2 };
+  // An earlier run of it that finished: the card says how long it took and what it cost.
+  const old = store.insertRun(db, { app: a.id, appName: a.name, recipe: a, source: 'web', inputs: { city: 'X', days: '1' } });
+  db.prepare("update app_runs set status = 'done', started_at = 1000, ended_at = 27000, cost_usd = 0.04 where id = ?").run(old.id);
+  // Not allowed: the card shows although nothing is missing.
+  sessions.cards = [];
+  sessions.answerWith = () => ({ decision: 'decline' });
+  const no = String(await useTool(key).run({ app: 'ask-first', inputs }, sessionCtx(key)));
+  assert.equal(sessions.cards.length, 1, 'asked although nothing is missing');
+  const card = sessions.cards[0];
+  assert.deepEqual(card.options.map((o: any) => [o.id, o.label, o.style]), [['accept', 'Run it', 'primary'], ['always', 'Always run it', undefined], ['decline', 'Don’t run', undefined]]);
+  assert.equal(card.app.approve, true);
+  assert.equal(card.app.about, 'Plans a short stay');
+  assert.deepEqual(card.app.steps, [{ title: 'Plan the days', kind: 'agent' }, { title: 'Pick', kind: 'model' }]);
+  assert.deepEqual(card.app.lastRun, { ms: 26000, usd: 0.04 });
+  assert.equal(card.app.link, `/apps/${a.slug}`);
+  assert.match(no, /^The user chose not to run Ask first\. Don't run it again for this request: do what they asked another way, or ask them in words\.$/);
+  assert.equal(store.listRuns(db, { app: a.id, limit: 9 }).filter((r) => r.source === 'session').length, 0, 'nothing ran');
+  assert.deepEqual(allowedApps(db).filter((x) => x === a.id), []);
+  // Run it: runs, and is not on the list.
+  sessions.answerWith = () => ({ decision: 'accept', form: {} });
+  let going = useTool(key).run({ app: 'ask-first', inputs, wait: 1 }, sessionCtx(key));
+  assert.match(String(await going), /still running/);
+  assert.equal(store.listRuns(db, { app: a.id, limit: 9 }).filter((r) => r.source === 'session').length, 1);
+  assert.ok(!allowedApps(db).includes(a.id));
+  // Always run it: on the list afterwards, and runs.
+  sessions.answerWith = () => ({ decision: 'always', form: {} });
+  assert.match(String(await useTool(key).run({ app: 'ask-first', inputs, wait: 1 }, sessionCtx(key))), /still running/);
+  assert.ok(allowedApps(db).includes(a.id));
+  assert.equal(store.listRuns(db, { app: a.id, limit: 9 }).filter((r) => r.source === 'session').length, 2);
+  // On the list: no card when nothing is missing, but one when details are.
+  sessions.cards = [];
+  assert.match(String(await useTool(key).run({ app: 'ask-first', inputs, wait: 1 }, sessionCtx(key))), /still running/);
+  assert.equal(sessions.cards.length, 0, 'allowed: no card');
+  sessions.answerWith = () => ({ decision: 'accept', form: { city: 'Faro' } });
+  await useTool(key).run({ app: 'ask-first', inputs: { days: 2 }, wait: 1 }, sessionCtx(key));
+  assert.equal(sessions.cards.length, 1, 'allowed, but a detail is missing');
+  assert.ok(!sessions.cards[0].app.approve);
+  assert.deepEqual(sessions.cards[0].options.map((o: any) => o.id), ['accept', 'decline']);
+  // Taken off the list, it asks again; a scheduled task running in the session is not asked.
+  allowApp(db, a.id, false);
+  migrateRuns(db);
+  const tkey = 'claude:asker-task';
+  sessions.cards = [];
+  sessions.answerWith = () => ({ decision: 'decline' });
+  await useTool(tkey).run({ app: 'ask-first', inputs, wait: 1 }, sessionCtx(tkey));
+  assert.equal(sessions.cards.length, 1, 'asks again once removed from the list');
+  const tr = startTaskRun(db, { taskId: 't1', trigger: 'schedule' as any, input: 'go' });
+  setTaskRun(db, tr, { key: tkey });
+  sessions.cards = [];
+  assert.match(String(await useTool(tkey).run({ app: 'ask-first', inputs, wait: 1 }, sessionCtx(tkey))), /still running/);
+  assert.equal(sessions.cards.length, 0, 'a scheduled task runs it without asking');
+  finishTaskRun(db, tr, { status: 'done' } as any);
+  sessions.answerWith = null;
+  allowApp(db, a.id, false);
+  store.deleteApp(db, a.id);
+});
+
+test('use_app: remove: true with a run takes its card out of the conversation, once it is this session’s run', async () => {
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Take back' }) });
+  allowApp(db, a.id, true);
+  const key = 'claude:asker-4';
+  sessions.items.set(key, [{ kind: 'user', id: 'u1', seq: 0, text: 'Plan' }]);
+  await useTool(key).run({ app: 'take-back', inputs: { city: 'Faro', days: 1 }, wait: 1 }, sessionCtx(key));
+  const run = store.listRuns(db, { app: a.id, limit: 5 }).find((r) => r.source === 'session')!;
+  assert.equal(notesOf(db, key, 'app-run').filter((n) => (n.data as any).run === run.id).length, 1);
+  assert.match(JSON.stringify(await useTool('claude:other').run({ run: run.id, remove: true }, sessionCtx('claude:other'))), /No run with that id/);
+  assert.equal(notesOf(db, key, 'app-run').length, 1, 'another session cannot remove it');
+  assert.equal(String(await useTool(key).run({ run: run.id, remove: true }, sessionCtx(key))), "Removed Take back's card; the run stays in the app's history.");
+  assert.equal(notesOf(db, key, 'app-run').length, 0);
+  assert.ok(store.getRun(db, run.id), 'the run stays');
+  allowApp(db, a.id, false);
+  store.deleteApp(db, a.id);
+});
+
+test('GET and PUT /api/apps/allowed: the apps that run without asking, and the others to add; removing works for any id, adding needs an app agents can run', async () => {
+  const a = store.saveApp(db, { recipe: recipe({ name: 'Listed app' }) });
+  const get = async () => (await http.inject({ method: 'GET', url: '/api/apps/allowed' })).json() as { apps: any[]; others: any[] };
+  let r = await get();
+  assert.ok(r.others.some((x) => x.id === a.id), 'not allowed yet: among the others');
+  assert.deepEqual(Object.keys(r.others.find((x) => x.id === a.id)).sort(), ['color', 'icon', 'id', 'name', 'own']);
+  assert.equal(r.others.find((x) => x.id === a.id).own, true);
+  const put = (id: string, allowed: unknown) => http.inject({ method: 'PUT', url: `/api/apps/allowed/${encodeURIComponent(id)}`, payload: { allowed } });
+  let res = await put(a.id, true);
+  assert.equal(res.statusCode, 200);
+  r = res.json();
+  assert.ok(r.apps.some((x) => x.id === a.id) && !r.others.some((x) => x.id === a.id));
+  assert.equal((await put('tpl:trip-planner', true)).statusCode, 200, 'a ready-made app by its tpl: id');
+  assert.ok((await get()).apps.some((x) => x.id === 'tpl:trip-planner'));
+  assert.equal((await put('nope-no-app', true)).statusCode, 404);
+  assert.equal((await put(a.id, 'yes')).statusCode, 400);
+  assert.equal((await put('nope-no-app', false)).statusCode, 200, 'removing works for any id');
+  // One deleted since is left out, though still kept.
+  store.deleteApp(db, a.id);
+  assert.ok(allowedApps(db).includes(a.id));
+  assert.ok(!(await get()).apps.some((x) => x.id === a.id));
+  allowApp(db, a.id, false);
+  assert.ok(!allowedApps(db).includes(a.id));
+  await put('tpl:trip-planner', false);
+  assert.ok(!(await get()).apps.some((x) => x.id === 'tpl:trip-planner'));
 });
 
 // A run whose session failed to start ends as failed, with the reason.

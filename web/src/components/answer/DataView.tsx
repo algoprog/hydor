@@ -2,16 +2,27 @@
 // picture's address as the picture, a list of objects as a table (or cards, when they are wide), a list of words as a
 // list, an object as label and value rows. Also the data as plain text, for copying a UI.
 import type { ReactNode } from 'react';
-import { Card, isObj, KeyValues, Md, Pic, str } from './kit';
+import { Card, isObj, KeyValues, Md, Pic, str, usePicOk } from './kit';
 
 const PIC = /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
 const humanize = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/[_-]+/g, ' ');
+
+/** A picture given as a value; its address as text when it cannot be shown. */
+function ValuePic({ v }: { v: string }) {
+  const ok = usePicOk(v);
+  return (
+    <>
+      <Pic src={v} className="h-24 w-36 rounded-lg" />
+      {!ok && <Md text={v} inline />}
+    </>
+  );
+}
 
 function Value({ v, depth = 0 }: { v: unknown; depth?: number }): ReactNode {
   if (v === null || v === undefined || v === '') return <span className="text-fg-3">—</span>;
   if (typeof v === 'boolean') return v ? '✓' : '✗';
   if (typeof v === 'number') return v.toLocaleString();
-  if (typeof v === 'string') return /^https?:\/\//i.test(v) && PIC.test(v) ? <Pic src={v} className="h-24 w-36 rounded-lg" /> : <Md text={v} inline={v.length < 120} />;
+  if (typeof v === 'string') return /^https?:\/\//i.test(v) && PIC.test(v) ? <ValuePic v={v} /> : <Md text={v} inline={v.length < 120} />;
   if (Array.isArray(v)) {
     if (!v.length) return <span className="text-fg-3">—</span>;
     if (v.every((x) => !isObj(x) && !Array.isArray(x)))

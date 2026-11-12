@@ -42,7 +42,7 @@ const ratio = (aspect?: string) => {
   return m ? `${m[1]} / ${m[2]}` : '16 / 9';
 };
 
-function Working({ since, aspect, prompt }: { since?: number; aspect?: string; prompt?: string }) {
+function Working({ since, queued, aspect, prompt }: { since?: number; queued?: boolean; aspect?: string; prompt?: string }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((x) => x + 1), 1000);
@@ -54,7 +54,19 @@ function Working({ since, aspect, prompt }: { since?: number; aspect?: string; p
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-bg-2 via-bg-3 to-bg-2" />
         <div className="relative flex flex-col items-center gap-1.5 px-4 text-center text-[13px] text-fg-2">
           <Clapperboard size={20} className="text-accent" />
-          <span>Making a video{since ? ` · ${duration(Date.now() - since)}` : '…'}</span>
+          <span>
+            Making a video
+            {queued ? (
+              <>
+                {' · '}
+                <span title="Waiting for the step before it to finish">Waiting</span>
+              </>
+            ) : since ? (
+              ` · ${duration(Date.now() - since)}`
+            ) : (
+              '…'
+            )}
+          </span>
           <span className="text-[12px] text-fg-3">It takes a minute or several</span>
         </div>
       </div>
@@ -91,7 +103,7 @@ export function GeneratedVideos({ item, sessionKey }: { item: ToolItem; sessionK
     return (
       <>
         <OpenRouterKeyCard sessionKey={sessionKey} />
-        <Working since={item.ts} aspect={aspect} prompt={prompt} />
+        <Working since={t.startedAt ?? item.ts} queued={t.queued} aspect={aspect} prompt={prompt} />
       </>
     );
   if (!clips.length) {

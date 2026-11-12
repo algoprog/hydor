@@ -56,6 +56,7 @@ export const SECTION_TOPIC: Record<string, string> = {
   images: 'documents-voice',
   voice: 'documents-voice',
   assistants: 'agents',
+  apps: 'apps',
   skillpack: 'skills',
   custom: 'custom',
 };
@@ -86,6 +87,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Your agents', 'Capabilities', 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page'],
+  ['apps', 'Apps', 'Capabilities', 'Which apps agents run for you without asking first'],
   ['custom', 'Custom', 'Capabilities', 'Auto mode, a sandbox for commands, and how long goals run'],
 ];
 
@@ -258,6 +260,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['assistants', 'Your agents', 'agents assistants presets researcher writer tutor make change your own', 'Your agents are on the Agents page'],
   ['assistants', 'Clean up after a task', 'cleanup tidy up remove temp files scratch branches worktrees leftovers', 'Agents remove what they made along the way and no longer need'],
   ['assistants', 'Task folders', 'task folder default folder sessions', 'Where new task folders go, for sessions started without a folder'],
+  // Capabilities › Apps
+  ['apps', 'Run without asking', 'auto approve allow always permission ask before agent runs app trust', 'The apps agents run for you without asking first; remove one to be asked again'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
   ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],

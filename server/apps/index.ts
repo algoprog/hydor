@@ -80,7 +80,8 @@ import {
 } from './store.ts';
 import { templateById } from './templates.ts';
 import { agentsMay, builtinsOf, isInstalled, setAgents, setInstalled } from './builtins.ts';
-import { appHint, findAppsTool, tellAsker, useAppTool, useNote } from './use.ts';
+import { allowApp, allowedApps } from './allowed.ts';
+import { appHint, findAppsTool, tellAsker, usableApps, useAppTool, useNote } from './use.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
@@ -319,6 +320,25 @@ function routes(d: Deps) {
   });
   /** An app gone, or uninstalled, leaves the pins: the pages hear of it. */
   const unpinned = (id: string) => unpin(db, id) && d.broadcast({ t: 'feature', id: 'apps', data: { pins: pinsOf(db) } });
+
+  /** The apps agents run for you without asking first (Settings → Apps), and the other apps they may run, to add one. */
+  const allowedView = () => {
+    const ok = new Set(allowedApps(db));
+    const ref = (u: ReturnType<typeof usableApps>[number]) => ({ id: u.app, name: u.recipe.name, icon: u.recipe.icon, color: u.recipe.color, own: u.own });
+    const usable = usableApps(db);
+    return { apps: usable.filter((u) => ok.has(u.app)).map(ref), others: usable.filter((u) => !ok.has(u.app)).map(ref) };
+  };
+  app.get('/api/apps/allowed', async () => allowedView());
+
+  /** Allows an app to run without asking (allowed: true; it must be one agents can run) or asks again before it runs (false). */
+  app.put('/api/apps/allowed/:id', async (req) => {
+    const id = (req.params as { id: string }).id;
+    const on = (req.body as { allowed?: unknown } | undefined)?.allowed;
+    if (typeof on !== 'boolean') throw new HttpError(400, 'allowed: true or false');
+    if (on && !usableApps(db).some((u) => u.app === id)) throw new HttpError(404, 'No such app agents can run');
+    allowApp(db, id, on);
+    return allowedView();
+  });
 
   /** The tools of the app's own MCP server an app may allow (from every capability), for the builder. */
   app.get('/api/apps/tools', async () => {

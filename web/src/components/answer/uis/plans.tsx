@@ -8,7 +8,7 @@ import { toast } from '../../../lib/store';
 import { CodeBlock } from '../../Markdown';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
-import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, hostOf, isObj, LinkOut, Md, Meter, num, parseDate, Pic, Ring, Seg, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, useAui, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Btn, Card, Chip, Copy, download, fmtDate, fmtMinutes, fmtNum, fmtTime, Head, hostOf, isObj, LinkOut, Md, Meter, num, parseDate, Pic, Ring, Seg, seriesColor, str, textOf, TONE, TONE_FILL, toneOf, useAui, useKept, useNow, WithPic, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared by the views below ----------------------------------------------------------------------------------------
 
@@ -124,10 +124,10 @@ function Timeline({ data }: { data: Data }) {
                   {str(e.tag) && <Chip tone={tone ?? 'neutral'}>{str(e.tag)}</Chip>}
                 </div>
                 {(str(e.text) || pic) && (
-                  <div className="mt-1 flex items-start gap-3">
+                  <WithPic src={pic ? e.image : ''} keep={!!str(e.text)} className="mt-1 flex items-start gap-3">
                     {str(e.text) && <Md text={e.text} className="min-w-0 flex-1 text-[13px] text-fg-2" />}
                     {pic && <Pic src={e.image} alt={title} className="h-16 w-24 shrink-0 rounded-md @md:h-[72px] @md:w-28" />}
-                  </div>
+                  </WithPic>
                 )}
               </div>
             </li>

@@ -415,8 +415,13 @@ agents that speak ACP and take MCP servers.
   their forms, those pinned on the Apps page first and those used lately next, each marked so. An app that needs a model through OpenRouter asks for OpenRouter's key with its other keys (kept
   in Settings → Models) and adds the model by itself when it first runs; one for Ollama, vLLM or an endpoint is
   refused until it is set up. Agents in any session run your apps for you (use_app):
-  ask to plan a trip and the Trip planner runs there, the questions your message left out asked on the app's own
-  card (the optional ones may stay empty), its run and its view shown in the conversation; each app's Agents can
+  ask to plan a trip and the Trip planner runs there. The app's own card asks first (what it does, its steps, what it
+  took from your message, how long and what its last run cost, a way to the app's page): Run it, Always run it or Don’t run,
+  with the questions your message left out on it too (the optional ones may stay empty); an app you chose to always
+  run, or added under Settings → Capabilities → Apps → Run without asking (remove it there to be asked again), shows its
+  card only when it needs details your message left out, and a scheduled task's own session runs apps without asking.
+  Its run and its view show in the conversation, and when its answer does not fit and the agent answers itself, the
+  card is taken out so there is one answer. Each app's Agents can
   use it switch keeps agents from running it, and blocks and apps made for their own page stay out. An app's page has its form beside what you get, its latest
   runs and how it works, with a way to its graph; a ready-made one's agent and model wait behind one Change. The
   ready-made ones work in steps (Deep research plans its questions, searches them a few at a time, ranks the
@@ -436,7 +441,7 @@ agents that speak ACP and take MCP servers.
   for games out now or coming soon (Nintendo Switch 2 too), each with its picture and trailer, and PC prices with
   their lowest ever (CheapShark), a quiz on any topic to play on its page, a book finder (Open
   Library), what's on in a city by day and on a map, a savings plan, your own spreadsheet or numbers as charts, a
-  topic as a timeline (Wikipedia) and a place explored on a map in walking order, its best-known sights first (Wikidata, Wikipedia and OpenStreetMap). Many
+  topic as a timeline (Wikipedia) and a place explored on a map in walking order, the kinds of place you name (dog parks, cafés, playgrounds) first from OpenStreetMap, then its best-known sights (Wikidata, Wikipedia). Many
   show pictures and videos of what they find, through find_media: each game's cover and trailer, each film's or show's
   trailer, each product, gift idea, news story and event, a picture for each day of a trip, a photo of the place to
   go. Each hands back its answer in a view of its own: pages of elements made for it (the Trip planner's timeline of days to tick
@@ -998,7 +1003,8 @@ programs shows each program's version and what is out, with Check now, Update no
   between steps starts a part, one line in a few words with a check, how many steps it took and the lines it changed,
   its steps folded under it with plain-words names ("Run the tests", "Read index.ts"), each a click away from its full
   output. The part under way shows the agent's note in full and the step being taken now, so a long turn takes a few
-  lines rather than the screen; its latest parts show, the rest a click away. A reply long enough to fill the screen
+  lines rather than the screen; its latest parts show, the rest a click away. A step of Hydor's own that waits for a command
+  Claude Code runs on its own shows Waiting in place of its clock, and counts from when it really starts. A reply long enough to fill the screen
   stops at its first line as it grows, so you read it from its beginning; a short one sits under what came before,
   with no empty space below it. A page still being written shows the app's mark and "Writing the page…" until it has
   something to show.
@@ -1045,7 +1051,7 @@ programs shows each program's version and what is out, with Check now, Update no
   answer shows, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
   with the data each takes and an example, or the best three for each part of an answer at once (`queries`), since one
   answer may hold a UI for each of its parts and a session as many as its answers need. What you tick or answer in one
-  is kept on that device; **Show the data** and
+  is kept on that device; an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data** and
   **Copy as text** sit on each. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen.

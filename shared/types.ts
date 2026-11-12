@@ -87,6 +87,16 @@ export interface ApprovalRequest {
     given: { label: string; value: string }[];
     /** Keys it needs that the vault does not have yet: the card saves them there (POST /api/apps/:id/secrets) before it answers. */
     secrets?: { name: string; label: string; help?: string; url?: string }[];
+    /** The card asks whether to run the app at all (the user has not chosen to always run it), not only for what the request left out. */
+    approve?: boolean;
+    /** What the app does: its description. */
+    about?: string;
+    /** Its steps in order: each step's title and its kind (the step's `do`). */
+    steps?: { title: string; kind: string }[];
+    /** Its latest finished run on this computer: how long it took (ms) and what it cost. */
+    lastRun?: { ms: number; usd?: number };
+    /** Its page in the app: `/apps/<slug>` for the user's own, `/apps/t/<template id>` for a ready-made one. */
+    link?: string;
   };
   /**
    * A signature: a pad to draw one an agent asked for (kept by the card itself, POST /api/signatures, before it answers
@@ -142,6 +152,10 @@ export interface ToolInfo {
   auto?: string;
   /** Live-only: output streamed while running. */
   liveOutput?: string;
+  /** Live-only: the agent asked for this step but it waits its turn, behind a step the agent runs on its own. */
+  queued?: boolean;
+  /** Live-only: when the step really started (ms since 1970), when that was later than the agent asked for it. */
+  startedAt?: number;
 }
 
 interface BaseItem {

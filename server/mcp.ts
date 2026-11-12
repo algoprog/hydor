@@ -29,10 +29,13 @@ interface Tool {
   run: (args: Record<string, any>) => Promise<string | ToolOutput>;
 }
 
+/** `callStarted`: told of each tool call as it starts, with the agent's id for that step ('' when the agent sends none). */
+type ServeInfo = { instructions?: string; callStarted?: (toolUseId: string) => void };
+
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: any };
 
 /** Answers one JSON-RPC message; null for notifications and responses (nothing to send back). */
-async function answer(m: Rpc, tools: Tool[], info: { instructions?: string }): Promise<object | null> {
+async function answer(m: Rpc, tools: Tool[], info: ServeInfo): Promise<object | null> {
   if (m.id === undefined || m.id === null || !m.method) return null;
   const ok = (result: unknown) => ({ jsonrpc: '2.0', id: m.id, result });
   const fail = (code: number, message: string) => ({ jsonrpc: '2.0', id: m.id, error: { code, message } });
@@ -53,6 +56,9 @@ async function answer(m: Rpc, tools: Tool[], info: { instructions?: string }): P
     case 'tools/call': {
       const tool = tools.find((t) => t.name === m.params?.name);
       if (!tool) return fail(-32602, `Unknown tool: ${m.params?.name}`);
+      // Claude Code puts the step's id in the request: the app knows when the step really began, not only when it was asked for.
+      const stepId = m.params?._meta?.['claudecode/toolUseId'];
+      info.callStarted?.(typeof stepId === 'string' ? stepId : '');
       try {
         const r = await tool.run(m.params?.arguments ?? {});
         if (typeof r === 'string') return ok({ content: [{ type: 'text', text: r }] });
@@ -66,7 +72,7 @@ async function answer(m: Rpc, tools: Tool[], info: { instructions?: string }): P
   }
 }
 
-async function serve(req: FastifyRequest, reply: FastifyReply, tools: Tool[], info: { instructions?: string }) {
+async function serve(req: FastifyRequest, reply: FastifyReply, tools: Tool[], info: ServeInfo) {
   const body = req.body as Rpc | Rpc[];
   const list = Array.isArray(body) ? body : [body];
   if (!list.length || list.some((m) => !m || typeof m !== 'object')) return reply.code(400).send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
@@ -277,7 +283,7 @@ export function mcpRoutes(app: FastifyInstance, db: DB, sessions: SessionManager
     reply.raw.on('close', () => reply.raw.writableFinished || gone.abort());
     const ctx: RunCtx = { runId, key: live.key, agent: live.agent, acpAgent: live.acpAgent, cwd: live.cwd, deps: featureDeps(), signal: gone.signal };
     const tools: Tool[] = runTools(ctx).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema, annotations: t.annotations, run: (a) => t.run(a, ctx) }));
-    return serve(req, reply, tools, {});
+    return serve(req, reply, tools, { callStarted: (id) => sessions.adapterByRun(runId)?.callStarted(id) });
   });
   // No event stream: clients fall back to plain request and reply.
   for (const p of ['/mcp', '/mcp/run/:token']) {

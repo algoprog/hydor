@@ -1324,14 +1324,6 @@ html {
   .aui-pic-contain {
     object-fit: contain;
   }
-  .aui-pic-none {
-    display: grid;
-    place-items: center;
-    color: var(--fg-3);
-  }
-  .aui-pic-none > svg {
-    opacity: 0.45;
-  }
   .aui-video {
     position: relative;
     aspect-ratio: 16 / 9;

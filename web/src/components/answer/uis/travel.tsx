@@ -50,10 +50,16 @@ import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, useWidth } from '../charts';
-import { arr, Card, Chip, compact, fmtDate, fmtMinutes, fmtMoney, fmtNum, fmtTime, Head, isObj, LinkOut, MapBox, mapPoints, Md, num, obj, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, TONE, toneOf, useAui, useKept, useNow, yes, type AnswerUiView, type Data, type MapPoint, type Tone } from '../kit';
+import { arr, Card, Chip, compact, fmtDate, fmtMinutes, fmtMoney, fmtNum, fmtTime, Head, isObj, LinkOut, MapBox, mapPoints, Md, num, obj, parseDate, Pic, Section, Seg, seriesColor, Stars, str, textOf, TONE, toneOf, useAui, useKept, useNow, usePicOk, usePicsOk, WithPic, yes, type AnswerUiView, type Data, type MapPoint, type Tone } from '../kit';
 import { HoverTip } from './data';
 
 // ---- places on a map --------------------------------------------------------------------------------------------------
+
+/** A list entry's number, in the line of its name, when it has no picture for the number to sit on. */
+function NoPicNumber({ src, n }: { src: unknown; n: number }) {
+  if (usePicOk(src)) return null;
+  return <span className="grid h-5 w-5 shrink-0 place-items-center self-center rounded-full bg-accent text-[10.5px] font-semibold text-accent-fg">{n}</span>;
+}
 
 function Places({ data }: { data: Data }) {
   const places = arr(data.places ?? data.items).filter(isObj);
@@ -71,12 +77,13 @@ function Places({ data }: { data: Data }) {
           const num_ = located ? ++n : null;
           return (
             <li key={i} className="flex min-w-0 gap-3 border-b border-line/70 px-4 py-3 @lg:px-5 @xl:odd:border-r">
-              <div className="relative shrink-0">
+              <WithPic src={p.image} className="relative shrink-0">
                 <Pic src={p.image} alt={str(p.name)} className="h-16 w-16 rounded-lg" />
                 {num_ !== null && <span className="absolute -top-1.5 -left-1.5 grid h-5 w-5 place-items-center rounded-full border-2 border-panel bg-accent text-[10.5px] font-semibold text-accent-fg">{num_}</span>}
-              </div>
+              </WithPic>
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-baseline gap-2">
+                  {num_ !== null && <NoPicNumber src={p.image} n={num_} />}
                   {str(p.url) ? (
                     <LinkOut url={p.url} icon={false} className="line-clamp-2 font-semibold text-fg">
                       {str(p.name)}
@@ -344,14 +351,21 @@ function coversToday(label: string, today: number): boolean {
 
 /** A place's pictures: the first large and up to four more beside it (two when narrow), all opened large on a click. */
 function Mosaic({ pics, alt }: { pics: string[]; alt: string }) {
-  const rest = pics.slice(1, 5);
-  if (!rest.length) return <Pic src={pics[0]} alt={alt} group={pics} className="aspect-[16/7] max-h-[300px] w-full" />;
+  // Every candidate stays in the tree (a picture that failed is asked for again); the ones that work are laid out.
+  const cand = pics.slice(0, 8);
+  const oks = usePicsOk(cand);
+  const live = cand.filter((_, i) => oks[i]);
+  const rest = live.length - 1;
+  let rank = -1;
   return (
-    <div className={cx('grid h-[210px] grid-rows-2 gap-0.5 @lg:h-[270px]', rest.length > 2 ? 'grid-cols-[2fr_1fr] @lg:grid-cols-[2fr_1fr_1fr]' : 'grid-cols-[2fr_1fr]')}>
-      <Pic src={pics[0]} alt={alt} group={pics} className="row-span-2 h-full min-h-0 w-full" />
-      {rest.map((p, i) => (
-        <Pic key={i} src={p} alt={alt} group={pics} className={cx('h-full min-h-0 w-full', rest.length === 1 && 'row-span-2', i >= 2 && 'hidden @lg:block', rest.length === 3 && i === 2 && '@lg:col-span-2')} />
-      ))}
+    <div className={cx(live.length === 0 && 'hidden', live.length > 1 && 'grid h-[210px] grid-rows-2 gap-0.5 @lg:h-[270px]', live.length > 1 && (rest > 2 ? 'grid-cols-[2fr_1fr] @lg:grid-cols-[2fr_1fr_1fr]' : 'grid-cols-[2fr_1fr]'))}>
+      {cand.map((p, i) => {
+        if (oks[i]) rank++;
+        const r = oks[i] ? rank : -1;
+        const cls =
+          r === 0 ? (live.length === 1 ? 'aspect-[16/7] max-h-[300px] w-full' : 'row-span-2 h-full min-h-0 w-full') : r < 0 || r > 4 ? 'hidden' : cx('h-full min-h-0 w-full', Math.min(rest, 4) === 1 && 'row-span-2', r >= 3 && 'hidden @lg:block', Math.min(rest, 4) === 3 && r === 3 && '@lg:col-span-2');
+        return <Pic key={i} src={p} alt={alt} group={live} className={cls} />;
+      })}
     </div>
   );
 }
@@ -583,7 +597,7 @@ function Itinerary({ data, done }: { data: Data; done: boolean }) {
                     <div className="leading-snug font-semibold">{textOf(it, 'title', 'name')}</div>
                     {str(it.place) && <div className="text-[12.5px] text-fg-3">{str(it.place)}</div>}
                   </div>
-                  {str(it.image) && !offline && <Pic src={it.image} alt={textOf(it, 'title', 'name')} className="h-12 w-16 shrink-0 rounded-md" />}
+                  {!offline && <Pic src={it.image} alt={textOf(it, 'title', 'name')} className="h-12 w-16 shrink-0 rounded-md" />}
                 </div>
                 {str(it.note) && <Md text={it.note} className="mt-0.5 text-[13px] text-fg-2" />}
                 {meta.length > 0 && (
@@ -920,6 +934,7 @@ function Score({ value, count }: { value: unknown; count?: unknown }) {
 
 function StayCard({ s, pin, cur }: { s: Data; pin: number | null; cur: string }) {
   const { offline } = useAui();
+  const hasPic = usePicOk(s.image);
   const name = textOf(s, 'name', 'title');
   const stars = Math.min(5, Math.max(0, Math.round(num(s.stars) ?? 0)));
   const money = (v: unknown) => {
@@ -930,7 +945,7 @@ function StayCard({ s, pin, cur }: { s: Data; pin: number | null; cur: string })
   return (
     <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel @sm:flex-row @xl:flex-col">
       {!offline && str(s.image) && (
-        <div className="relative shrink-0 @sm:w-[38%] @sm:max-w-[200px] @xl:w-auto @xl:max-w-none">
+        <div className={cx('relative shrink-0 @sm:w-[38%] @sm:max-w-[200px] @xl:w-auto @xl:max-w-none', !hasPic && 'hidden')}>
           <Pic src={s.image} alt={name} className="aspect-[2/1] w-full @sm:aspect-auto @sm:h-full @sm:min-h-[150px] @xl:aspect-[16/10] @xl:h-auto @xl:min-h-0" />
           {pin !== null && <span className="absolute top-2 left-2 grid h-6 w-6 place-items-center rounded-full border-2 border-panel bg-accent text-[11px] font-semibold text-accent-fg">{pin}</span>}
         </div>
@@ -939,7 +954,7 @@ function StayCard({ s, pin, cur }: { s: Data; pin: number | null; cur: string })
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-1.5 leading-snug font-semibold">
-              {pin !== null && (offline || !str(s.image)) && <span className="grid h-5 w-5 place-items-center rounded-full bg-accent text-[10.5px] text-accent-fg">{pin}</span>}
+              {pin !== null && !hasPic && <span className="grid h-5 w-5 place-items-center rounded-full bg-accent text-[10.5px] text-accent-fg">{pin}</span>}
               {/^https?:\/\//i.test(str(s.url).trim()) ? (
                 <a href={str(s.url).trim()} target="_blank" rel="noopener noreferrer" className="text-fg hover:text-accent hover:underline">
                   {name}
