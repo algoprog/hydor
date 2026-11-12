@@ -142,7 +142,7 @@ export const mcp: Area = {
               s.url ?? [s.command, ...(s.args ?? [])].filter(Boolean).join(' '),
               p.dim([...(s.envKeys ?? []), ...(s.headerKeys ?? []), ...(s.bearerEnv ? [s.bearerEnv] : [])].join(', ')),
             ]),
-            { head: ['', 'SERVER', 'AGENT', 'SCOPE', 'TYPE', 'COMMAND OR ADDRESS', 'KEYS'], grow: 5 },
+            { head: ['', 'SERVER', 'AGENT', 'SCOPE', 'TYPE', 'COMMAND OR ADDRESS', 'KEYS'], grow: 1, fixed: [1], free: [5] },
           ),
         );
       },
@@ -179,7 +179,7 @@ export const mcp: Area = {
                 s.state + (s.tools !== undefined ? p.dim(` · ${s.tools} tools`) : ''),
                 p.dim(s.error ?? ''),
               ]),
-              { grow: 4 },
+              { grow: 1, fixed: [1] },
             ),
           );
         }

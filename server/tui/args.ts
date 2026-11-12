@@ -76,7 +76,7 @@ export const CMD_TABLE: CommandDef[] = [
     group: 'sessions',
     args: '',
     desc: 'The latest sessions and what each is doing',
-    help: 'Lists your sessions, latest first: its key (what the other commands take), what it is doing (● working, ● needs you, ✓ finished, ✗ error), its title, program and model, folder and when it last changed. Helper sessions an agent started are left out unless you ask for --all.',
+    help: 'Lists your sessions, latest first: its key (what the other commands take), what it is doing (● working, ● needs you, ✓ finished, ✗ error), its title, program and model, folder and when it last changed. Subagent sessions an agent started are left out unless you ask for --all.',
     examples: ['hydor sessions', 'hydor sessions -n 5', 'hydor sessions --all --json'],
     options: ['limit', 'all', 'json'],
   },
@@ -296,7 +296,7 @@ export const OPTION_TABLE: OptionDef[] = [
   { name: 'verbose', short: 'v', desc: 'Show each step’s output' },
   { name: 'thinking', desc: 'Show the agent’s thinking' },
   { name: 'limit', short: 'n', value: '<n>', desc: 'How many to list (show: how many turns)' },
-  { name: 'all', short: 'a', desc: 'List helper sessions too' },
+  { name: 'all', short: 'a', desc: 'List subagent sessions too' },
   { name: 'browser', desc: 'open: open the address in your browser too' },
   { name: 'server', value: '<url>', desc: 'Another computer’s Hydor (HYDOR_URL)' },
   { name: 'token', value: '<token>', desc: 'Its access token, from hydor access-token there (HYDOR_TOKEN)' },
@@ -661,7 +661,7 @@ const verbRow = (v: Verb, p: Paint): [string, string] => [[p.accent(v.name), ...
 
 /** The verbs of an area, the options they share noted, and an example or two of each. */
 function areaHelp(a: Area, p: Paint): string[] {
-  const out = [`Usage: hydor ${p.accent(a.name)} ${p.dim('[verb] [options]')}`, '', ...wrap(a.help ? `${a.summary}. ${a.help}` : `${a.summary}.`, WIDTH - 2)];
+  const out = [`Usage: hydor ${p.accent(a.name)} ${p.dim('[verb] [options]')}`, '', ...wrap(a.help ? `${a.summary}${/[.…!?]$/.test(a.summary) ? '' : '.'} ${a.help}` : `${a.summary}${/[.…!?]$/.test(a.summary) ? '' : '.'}`, WIDTH - 2)];
   out.push('', p.bold('Verbs'), ...twoColumns(a.verbs.map((v) => verbRow(v, p)), p, '  ', 34));
   const examples = a.verbs.flatMap((v) => (v.examples ?? []).slice(0, 1)).slice(0, 6);
   if (examples.length) out.push('', p.bold('Examples'), ...examples.map((e) => `  ${e}`));
@@ -672,7 +672,7 @@ function areaHelp(a: Area, p: Paint): string[] {
 /** One verb's help: usage, what it does, its options (the common ones named), examples. */
 function verbHelp(a: Area, v: Verb, p: Paint): string[] {
   const usage = ['hydor', p.accent(a.name), a.bare ? '' : p.accent(v.name), ...v.args.map((x) => p.dim(argLabel(x))), v.options ? p.dim('[options]') : ''].filter(Boolean).join(' ');
-  const out = [`Usage: ${usage}`, '', ...wrap(v.help ? `${v.summary}. ${v.help}` : `${v.summary}.`, WIDTH - 2)];
+  const out = [`Usage: ${usage}`, '', ...wrap(v.help ? `${v.summary}${/[.…!?]$/.test(v.summary) ? '' : '.'} ${v.help}` : `${v.summary}${/[.…!?]$/.test(v.summary) ? '' : '.'}`, WIDTH - 2)];
   const own = Object.entries(v.options ?? {});
   if (own.length) {
     const rows = own.map(([name, o]) => [`${o.short ? `${p.accent(`-${o.short}`)}, ` : '    '}${p.accent(`--${name}`)}${o.value ? ` ${p.dim(o.value)}` : ''}`, o.desc] as [string, string]);

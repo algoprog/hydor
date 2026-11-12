@@ -400,6 +400,53 @@ test('table: piped, nothing is cut to a width, but free-text columns are capped 
   assert.equal(width(two), 1 + 2 + FREE_TEXT_CAP + 2 + FREE_TEXT_CAP);
 });
 
+test('table: a header with empty cells lines up with its columns, piped and at 100 columns; empty labelled columns are left out', () => {
+  const rowsA = [
+    ['●', 'Reading list', 'reading-list', '', '12 runs', '3d ago', 'Keeps my reading list'],
+    ['·', 'Deep research report', 'tpl:deep-research', 'ready-made, not installed', '', '', `A sourced report ${'on any question '.repeat(12)}`],
+    ['●', 'Trip planner', 'tpl:trip-planner', 'ready-made', '9 runs', '9d ago', 'x'.repeat(300)],
+  ];
+  const head = ['', 'APP', 'ADDRESS', 'KIND', 'RUNS', 'LAST', ''];
+  const starts = (line: string) => [...line.matchAll(/\S+(?: \S+)*/g)].filter((m) => !/^\s/.test(m[0])).map((m) => m.index!);
+  for (const [fit, w] of [
+    [false, 100],
+    [true, 100],
+    [true, 60],
+  ] as const) {
+    const t = table({ look: { p: plain, width: w, home: '/h' }, fit }, rowsA, { head, grow: 1, free: [1, 6] });
+    assert.ok(!fit || t.every((l) => width(l) <= w - 1), `${w} columns`);
+    // Each label starts where the first cell of its column starts.
+    const col = (label: string, cell: string) =>
+      assert.equal(t[0].indexOf(label), t[1 + (cell === 'ready-made' ? 2 : 0)].indexOf(cell.slice(0, Math.min(cell.length, 4))), `${fit ? w : 'piped'}: ${label} over its column`);
+    col('APP', 'Reading list');
+    col('ADDRESS', 'reading-list');
+    col('RUNS', '12 r');
+    col('LAST', '3d ago');
+    assert.ok(t[0].indexOf('KIND') > t[0].indexOf('ADDRESS') && t[0].indexOf('KIND') < t[0].indexOf('RUNS'), 'KIND between them');
+    if (!fit) assert.ok(width(t[3]) <= 3 + 14 + 2 + 17 + 2 + 25 + 2 + 7 + 2 + 6 + 2 + 2 + 80 + 20, 'the free column is capped');
+  }
+  // A labelled column with nothing in it is left out, with the numbers of the others (grow, free) moved up.
+  const t = table(
+    { look: { p: plain, width: 100, home: '/h' }, fit: false },
+    rowsA.map((r) => [r[0], r[1], r[2], r[3], '', r[5], r[6]]),
+    { head, grow: 1, free: [1, 6] },
+  );
+  assert.ok(!t[0].includes('RUNS'));
+  assert.match(t[0], /^ {3}APP +ADDRESS +KIND +LAST$/);
+  assert.match(t[1], /^● +Reading list +reading-list +3d ago/);
+  // Not when the label is empty (the mark column), or when some row has a value.
+  assert.ok(
+    table(
+      { look: { p: plain, width: 100, home: '/h' }, fit: false },
+      [
+        ['', 'a'],
+        ['', 'b'],
+      ],
+      { head: ['', 'NAME'] },
+    )[1].startsWith('  a'),
+  );
+});
+
 test('table and fields: aligned, cut to the width on a terminal only', () => {
   const ctx = { look: { p: plain, width: 40, home: '/h' }, fit: false } as Pick<Ctx, 'look' | 'fit'>;
   const rows = [

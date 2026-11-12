@@ -80,6 +80,20 @@ test('list shows your apps and the ready-made ones, --json what the API returned
   assert.match((await run(fakeConn({ 'GET /api/apps': { apps: [], templates: [] } }).conn, ['apps'])).out, /No apps yet: hydor app new/);
 });
 
+test('list: -n limits it and says how many more; --all shows every one; a header has no label over nothing', async () => {
+  const { conn } = fakeConn(routes);
+  let t = await run(conn, ['apps', '-n', '1']);
+  assert.equal(t.out.split('\n').filter((l) => /^[●·]/.test(l)).length, 1);
+  assert.match(t.out, /^… 3 more \(-n <number>, or --all\)$/m);
+  t = await run(conn, ['apps', '--all']);
+  assert.equal(t.out.split('\n').filter((l) => /^[●·]/.test(l)).length, 4);
+  assert.ok(!t.out.includes('more ('));
+  // The header lines up with its columns.
+  const [head, first] = (await run(conn, ['apps'])).out.split('\n');
+  assert.equal(head.indexOf('ADDRESS'), first.indexOf('trip-planner'));
+  assert.equal(head.indexOf('KIND') > head.indexOf('ADDRESS'), true);
+});
+
 test('show prints the form and the answer, and how to run it', async () => {
   const { conn } = fakeConn(routes);
   const t = await run(conn, ['apps', 'show', 'trip']);
