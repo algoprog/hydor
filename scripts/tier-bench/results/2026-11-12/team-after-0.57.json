@@ -1,0 +1,450 @@
+[
+ {
+  "id": "flaky-queue/team/1",
+  "task": "flaky-queue",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794448881194,
+  "key": "claude:dd2e9c59-e002-4b57-af58-90c4af63c657",
+  "end": "done",
+  "ms": 80807,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.351797,
+  "leadUsd": 0.351797,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 28442,
+   "out": 4187,
+   "cached": 202845
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 21,
+   "total": 21,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "stale-cache/team/1",
+  "task": "stale-cache",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794448977123,
+  "key": "claude:0ea412e1-fed8-4fd7-b993-1bb12c4b5c1d",
+  "end": "done",
+  "ms": 92737,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.4953248,
+  "leadUsd": 0.4953248,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 34329,
+   "out": 7663,
+   "cached": 337524
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 45,
+   "total": 45,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "invoice-rules/team/1",
+  "task": "invoice-rules",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794448881201,
+  "key": "claude:7b5238a1-6b1c-48ae-89ad-eb7065e77113",
+  "end": "done",
+  "ms": 237082,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.940152815,
+  "leadUsd": 0.940152815,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 51229,
+   "out": 10241,
+   "cached": 456988
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "sonnet",
+    "type": null,
+    "title": "Implement invoice module"
+   },
+   {
+    "model": "haiku",
+    "type": null,
+    "title": "Write invoice tests"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 61,
+   "total": 61,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "regex-linear/team/1",
+  "task": "regex-linear",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794448881208,
+  "key": "claude:3f79a538-40e3-41e0-96ae-06c0ae5580ab",
+  "end": "done",
+  "ms": 281613,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.9625701349999999,
+  "leadUsd": 0.9625701349999999,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 45290,
+   "out": 22900,
+   "cached": 592124
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "haiku",
+    "type": null,
+    "title": "Write regex engine tests"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 74,
+   "total": 74,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "slow-report/team/1",
+  "task": "slow-report",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449085784,
+  "key": "claude:a630f286-3237-4b3d-81c6-5e1ebf8b63f8",
+  "end": "done",
+  "ms": 108630,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.45527860000000003,
+  "leadUsd": 0.45527860000000003,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 26703,
+   "out": 8978,
+   "cached": 310793
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 71,
+   "total": 71,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "manhattan-mst/team/1",
+  "task": "manhattan-mst",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449210487,
+  "key": "claude:4b64a058-abd0-48f2-9cd9-22b979ac9ea4",
+  "end": "done",
+  "ms": 82996,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.3442782,
+  "leadUsd": 0.3442782,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 21207,
+   "out": 6634,
+   "cached": 209951
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "timesheet/team/1",
+  "task": "timesheet",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449133652,
+  "key": "claude:9b33ae25-b28b-4947-a761-03b36723af17",
+  "end": "done",
+  "ms": 168752,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.8779330000000001,
+  "leadUsd": 0.8779330000000001,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 52368,
+   "out": 17061,
+   "cached": 589285
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 111,
+   "total": 111,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "format-detective/team/1",
+  "task": "format-detective",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449327315,
+  "key": "claude:6bba6d4f-e2de-4c8c-890c-260b6206bc4a",
+  "end": "done",
+  "ms": 284770,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.3926962000000005,
+  "leadUsd": 1.3926962000000005,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 68282,
+   "out": 25852,
+   "cached": 1648041
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 110,
+   "total": 110,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "contest-minmax/team/1",
+  "task": "contest-minmax",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449628130,
+  "key": "claude:53b98984-0584-429e-9d9e-0e30c2aca5bf",
+  "end": "done",
+  "ms": 112491,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.34939220000000004,
+  "leadUsd": 0.34939220000000004,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 20770,
+   "out": 6654,
+   "cached": 251041
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 58,
+   "total": 58,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "security-review/team/1",
+  "task": "security-review",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449312162,
+  "key": "claude:ffac3631-f0fa-445c-bec2-c739fe83de02",
+  "end": "done",
+  "ms": 449055,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.3345577300000002,
+  "leadUsd": 1.3345577300000002,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 67130,
+   "out": 24892,
+   "cached": 1424838
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "haiku",
+    "type": null,
+    "title": "Write security regression tests"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 76,
+   "total": 78,
+   "failed": [
+    "JSON bodies up to 1 MB are accepted, larger ones refused",
+    "7 the codes of two accounts are not the same, nor made one from the other"
+   ]
+  },
+  "peeked": false
+ },
+ {
+  "id": "py-port/team/1",
+  "task": "py-port",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449178551,
+  "key": "claude:857f2f19-7188-4c7d-9f47-73142034478e",
+  "end": "done",
+  "ms": 770419,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 3.2406244000000006,
+  "leadUsd": 3.2406244000000006,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 111519,
+   "out": 79101,
+   "cached": 2440173
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "sonnet",
+    "type": null,
+    "title": "Write node:test suite for port"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 505,
+   "total": 505,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "contest-two-ones/team/1",
+  "task": "contest-two-ones",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449780700,
+  "key": "claude:be8a0212-5bfe-4dad-851f-426de434dc51",
+  "end": "done",
+  "ms": 236589,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.7995868,
+  "leadUsd": 0.7995868,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 36640,
+   "out": 22443,
+   "cached": 288314
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 61,
+   "total": 61,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "contest-gap-swaps/team/1",
+  "task": "contest-gap-swaps",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794449775540,
+  "key": "claude:104acadd-03fd-41c1-ae3e-371171f74967",
+  "end": "done",
+  "ms": 615171,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.5253982000000001,
+  "leadUsd": 1.5253982000000001,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 62817,
+   "out": 47435,
+   "cached": 371131
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 53,
+   "total": 53,
+   "failed": []
+  },
+  "peeked": false
+ }
+]

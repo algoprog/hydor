@@ -13,7 +13,8 @@ costs less for the same work.
   those, and solved one more task. Now every session on Automatic starts on Best, and its main agent moves itself to
   Max when a problem proves harder than Best can manage (a fix that has failed twice, a cause it cannot find); the
   conversation says when it does. **Max for hard problems** in Settings → Models → Tiers now turns that step up on or
-  off.
+  off. Measured again on those tasks, the team cost 48% less than before and 25% less than Best alone, and passed every
+  check in 12 of 13 (Best alone, 11).
 - **The tiers measured again**, on harder tasks: ones whose requirements are only implied, recent contest problems from
   after the models were trained, and 30 hard LiveCodeBench problems. The cheapest tier alone passed most of them, at
   about an eighth of the cost of Best; leading cheaper subagents saves 8-16% next to Best alone when the main agent
