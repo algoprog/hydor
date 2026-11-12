@@ -11,7 +11,7 @@ The `hydor` command does in a terminal what you do in the app's pages: talk to a
 - **The Mac app** puts it on your PATH by itself, every time it starts. It links `hydor` into `~/.local/bin`, `~/bin`, `/usr/local/bin` or `/opt/homebrew/bin`, the first of them that is on your PATH and yours to write to. When none is, it uses `~/.local/bin` and adds one line, marked as Hydor's, to your shell's startup file (`~/.zprofile` for zsh) so that folder is on your PATH. Open a new Terminal window afterwards. The command runs the app's own Node.js, and when the app is closed, `hydor` opens it. It does nothing from the disk image, or before you move the app to **Applications**. Inside the app, `hydor update`, `hydor service install` and `hydor serve` only say that the app does that itself.
 - **The Windows and Linux desktop apps** do not put the command on your PATH yet. On Linux, the installer links it as above. From a copy of Hydor on another computer, you can still use theirs: see [Use another computer's Hydor](#use-another-computers-hydor).
 
-`hydor help` lists everything it does, in groups with a line for each; `hydor help <command>` gives a command's usage, its options and examples, and `hydor help <command> <verb>` a verb's. The maintenance commands work under the same name: `hydor service status`, `hydor setup-token`, `hydor update` and the rest (`node dist/server/cli.js …` keeps working too). Mistype a command, an option or a verb and it says "Did you mean …?". Errors show in red.
+`hydor help` lists everything it does, in groups with a line for each; `hydor help <command>` gives a command's usage, its options and examples, `hydor help options` lists every option, and `hydor help <command> <verb>` a verb's. The maintenance commands work under the same name: `hydor service status`, `hydor setup-token`, `hydor update` and the rest (`node dist/server/cli.js …` keeps working too). Mistype a command, an option or a verb and it says "Did you mean …?". Errors show in red.
 
 A message that starts with a command's name goes in quotes (`hydor "find the bug in login"`), or after `hydor chat`, so it is not taken for the command.
 
@@ -176,47 +176,67 @@ How they all work:
 - **Another computer's Hydor**: every command works with `--server` and `--token`.
 - **Only a page can do it**: the command says so and gives the page's address. `hydor open … --browser` opens it.
 
-### Your work
+### Sessions
 
 | Command | What it does |
 | --- | --- |
 | `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `send`, `stop` and `delete`. |
-| `hydor projects` | `list`, `show`, `new`, `rename`, `edit` (description, guidelines, the agent it starts as, folders), `sessions`, `files` (the documents it reads: `files add` and `files remove`) and `remove`. |
-| `hydor guidelines` | `show` and `edit` what every agent follows: for every session, for a project (`--project`) or for one session (`--session`). |
 | `hydor inbox` | What waits on you (approvals, questions, a key an agent asked for, a skill to review): `list`, and `show` for one item, with where to answer it. |
-| `hydor experiments` | Training and evaluation runs: `list`, `show` and `stop`. Starting a run is for the agents and the page. |
-| `hydor tasks` | Your [scheduled tasks](/guide/tasks): `list`, and `run <id>` to run one now. <!-- TODO-VERIFY: show, new, edit, pause, resume, runs and remove, from `hydor help tasks` once they are in --> |
-| `hydor apps` | Your [apps](/guide/apps): `list`, `show`, `run` (its form's fields as options; it prints the answer), `runs`, and `remove`. `hydor app …` (without the s) is for making apps as files: `new`, `dev`, `try`, `export`, `import`. <!-- TODO-VERIFY --> |
-| `hydor library` | The [Library](/guide/library): `list`, `search`, `show`, `export` to a format, `open` and `remove`. <!-- TODO-VERIFY --> |
 
 `hydor show 6f1e2a3b` is the same as `hydor sessions show 6f1e2a3b`, and so are `send` and `stop`: the short ones stay.
-
-A few examples:
 
 ```bash
 hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
+hydor inbox
+```
+
+### Your work
+
+| Command | What it does |
+| --- | --- |
+| `hydor projects` | `list`, `show`, `new`, `rename`, `edit` (description, guidelines, the agent it starts as, folders), `sessions`, `files` (the documents it reads: `files add` and `files remove`) and `remove`. |
+| `hydor tasks` | Your [scheduled tasks](/guide/tasks) and the other work that starts by itself: `list`, `show`, `new` (when it runs: `--every 2h`, `--at 09:00 --days weekdays`, `--cron`, `--once`; or `--webhook`, `--watch-feed`, `--watch-page`, `--watch-folder`), `edit`, `pause`, `resume`, `run` (now, even while paused), `runs` (the latest runs, `--reply` for the last reply) and `remove`. Watching a command or a JSON address is on the page. |
+| `hydor apps` | Your [apps](/guide/apps) and the ready-made ones: `list`, `show`, `run` (the form's answers as `field=value`, or `--input` JSON; it prints the answer and what it cost), `runs`, `run-show` (one run) and `remove`. `hydor app …` (without the s) makes apps as files: `new`, `folder`, `dev`, `try`, `export`, `import`. |
+| `hydor library` | The [Library](/guide/library): `list` (`--kind`, `--project`), `search`, `show` (a document's text, or what the item is), `export` (`--to pdf`, `docx`, `pptx`…, `-o file`), `open` (the address of its editor) and `remove`. |
+| `hydor experiments` | Training and evaluation runs: `list`, `show` and `stop`. Starting a run is for the agents and the page. |
+
+```bash
 hydor projects new Thesis
 hydor projects edit thesis --file guidelines.md
-hydor guidelines edit --project thesis
-hydor inbox
+hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"
+hydor apps run trip-planner destination=Lisbon days=5
+hydor library export "Q3 report" --to pdf -o q3.pdf
+```
+
+### Agents and models
+
+| Command | What it does |
+| --- | --- |
+| `hydor models` and `hydor tiers` | The models each program offers, and which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means (`hydor tiers set claude best opus --effort high`, `hydor tiers reset`; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with subagents** and **Max for hard problems**, and `on` turns them back on). |
+| `hydor usage` | Each plan's usage and limits, and when they reset. |
+| `hydor agents` | [Your agents](/guide/agents): `list`, `show`, `new`, `edit` and `remove` (the built-in ones can be copied, not changed). An agent's output fields and where its results go are set on its page (`hydor open agents`). |
+| `hydor accounts` | The sign-ins of Claude Code and Codex: `list`, `add <program> <name>` (another account, signed in at once), `sign-in`, `sign-out`, `remove` and `use` (the one new sessions start with). The API key for API credit and the switches at a usage limit are settings (`accounts.*`). |
+
+```bash
+hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor tiers set claude best opus --effort high
+hydor accounts add claude Work
+hydor accounts use work
 ```
 
 ### What agents know and use
 
 | Command | What it does |
 | --- | --- |
-| `hydor agents` | [Your agents](/guide/agents): `list`, `show`, `new`, `edit` and `remove` (the built-in ones can be copied, not changed). An agent's output fields and where its results go are set on its page (`hydor open agents`). |
 | `hydor memory` | What agents remember about you: `list`, `search`, `show`, `add`, `edit`, `forget` (restorable for 30 days) and `restore`, and `profile` and `profile edit` for what every agent reads first. `--scope`, `--project` and `--session` say whose notes. |
+| `hydor guidelines` | `show` and `edit` what every agent follows: for every session, for a project (`--project`) or for one session (`--session`). |
 | `hydor skills` | The skills agents use: `list`, `show`, `on`, `off`, `add` (from a `SKILL.md` or a folder) and `remove`. `--agent claude` or `--agent codex` is for the skills those programs have of their own. |
 | `hydor plugins` | Add-ons with skills and tools: `list`, `show`, `on`, `off`, `add` (built in, a Git address, a .zip or a folder) and `remove`. Making a plugin of your own is on its page (`hydor open plugins`). |
 | `hydor mcp` | Tool servers (MCP) for Claude Code and Codex: `list`, `status` (starts each and says which work), `add`, `edit` and `remove`. |
+| `hydor connections` | The [connected apps](/guide/connections) (Notion, GitHub, Gmail…): `list`, `show`, `services` (what can be connected), `connect <service>` (a key typed hidden, or a sign-in in your browser that the command waits for) and `disconnect`. Which tools of a connection are on is on its page. |
 | `hydor keys` | The [vault](/guide/connections): `list` your keys' names and where each may go, `set <NAME>` and `remove <NAME>`. A value is asked for with what you type hidden, or read from what you pipe in; it is never typed as an option (your shell would keep it) and never printed. |
-| `hydor connections` | The services you connected: `list`, `connect <service>` (opens its sign-in page) and `disconnect`. <!-- TODO-VERIFY --> |
-| `hydor accounts` | The accounts of Claude Code and Codex: `list`, `add`, `remove`, and which one sessions use. <!-- TODO-VERIFY --> |
-| `hydor models` and `hydor tiers` | The models each program offers, and which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means (`hydor tiers set claude best opus --effort high`, `hydor tiers reset`; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with subagents** and **Max for hard problems**, and `on` turns them back on). |
-| `hydor usage` | Each plan's usage and limits, and when they reset. |
 
 ```bash
 hydor memory add I prefer short answers
@@ -224,7 +244,8 @@ hydor memory forget 42
 hydor skills off research
 hydor mcp add github --env GITHUB_TOKEN -- npx -y gh-mcp
 hydor keys set GITHUB_TOKEN --domain github.com
-hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor guidelines edit --project thesis
+hydor connections connect notion --browser
 ```
 
 ### Settings
@@ -276,7 +297,7 @@ Make an access token on that computer (in its [Settings → App → Machines](/s
 hydor --server https://hydor.example.com --token acm_… sessions
 ```
 
-or set `HYDOR_URL` and `HYDOR_TOKEN` once. Folders are that computer's: a session starts in its default folder unless you give `--cwd` with a folder there (an address on this computer itself, such as `http://localhost:8790`, keeps the folder you are in).  `!` commands only work with this computer's Hydor. On this computer, the command makes a token of its own the first time, which [Settings → App → Machines](/settings?s=machines&find=Access%20from%20other%20machines) lists as "This computer's command line". `hydor machines` lists, adds and removes those tokens' machines from the terminal as the page does. <!-- TODO-VERIFY: machines, from `hydor help machines` -->
+or set `HYDOR_URL` and `HYDOR_TOKEN` once. Folders are that computer's: a session starts in its default folder unless you give `--cwd` with a folder there (an address on this computer itself, such as `http://localhost:8790`, keeps the folder you are in).  `!` commands only work with this computer's Hydor. On this computer, the command makes a token of its own the first time, which [Settings → App → Machines](/settings?s=machines&find=Access%20from%20other%20machines) lists as "This computer's command line". To have this Hydor show another computer's sessions and pages, add it as a machine: `hydor machines` lists the machines this Hydor uses and whether they answer, `hydor machines add Lab --url https://lab.example.com` adds one (give `--ssh <host>` instead of `--url` to reach it through SSH; its access token is typed hidden, or comes from `--file -`), and `hydor machines remove lab` stops using it.
 
 ## Colours and pipes
 

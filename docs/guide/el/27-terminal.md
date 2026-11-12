@@ -11,7 +11,7 @@
 - **Η εφαρμογή για Mac** βάζει μόνη της την εντολή στο PATH σας, σε κάθε εκκίνηση. Συνδέει το `hydor` στο `~/.local/bin`, στο `~/bin`, στο `/usr/local/bin` ή στο `/opt/homebrew/bin`, στον πρώτο από αυτούς που βρίσκεται στο PATH σας και μπορείτε να γράψετε σε αυτόν. Όταν κανένας δεν ταιριάζει, χρησιμοποιεί το `~/.local/bin` και προσθέτει μία γραμμή, σημειωμένη ως του Hydor, στο αρχείο εκκίνησης του κελύφους σας (το `~/.zprofile` για το zsh), ώστε ο φάκελος αυτός να μπει στο PATH σας. Ανοίξτε ένα νέο παράθυρο του Terminal μετά. Η εντολή τρέχει το δικό της Node.js της εφαρμογής, και όταν η εφαρμογή είναι κλειστή, το `hydor` την ανοίγει. Δεν το κάνει από την εικόνα δίσκου, ούτε πριν μετακινήσετε την εφαρμογή στις **Εφαρμογές**. Μέσα στην εφαρμογή, τα `hydor update`, `hydor service install` και `hydor serve` λένε μόνο ότι αυτά τα κάνει η ίδια η εφαρμογή.
 - **Οι εφαρμογές για Windows και Linux** δεν βάζουν ακόμη την εντολή στο PATH σας. Στο Linux, το πρόγραμμα εγκατάστασης τη συνδέει όπως παραπάνω. Από ένα αντίγραφο του Hydor σε άλλον υπολογιστή μπορείτε παρ' όλα αυτά να χρησιμοποιήσετε το δικό τους: δείτε [Χρησιμοποιήστε το Hydor ενός άλλου υπολογιστή](#use-another-computers-hydor).
 
-Το `hydor help` απαριθμεί όσα κάνει, σε ομάδες και με μία γραμμή για καθεμία· το `hydor help <εντολή>` δίνει τη χρήση μιας εντολής, τις επιλογές και τα παραδείγματά της, και το `hydor help <εντολή> <ρήμα>` ενός ρήματος. Οι εντολές συντήρησης λειτουργούν με το ίδιο όνομα: `hydor service status`, `hydor setup-token`, `hydor update` και οι υπόλοιπες (το `node dist/server/cli.js …` συνεχίζει επίσης να λειτουργεί). Αν γράψετε λάθος μια εντολή, μια επιλογή ή ένα ρήμα, ρωτά «Did you mean …?» (Εννοείτε …;). Τα σφάλματα εμφανίζονται με κόκκινο.
+Το `hydor help` απαριθμεί όσα κάνει, σε ομάδες και με μία γραμμή για καθεμία· το `hydor help <εντολή>` δίνει τη χρήση μιας εντολής, τις επιλογές και τα παραδείγματά της, το `hydor help options` απαριθμεί όλες τις επιλογές, και το `hydor help <εντολή> <ρήμα>` ενός ρήματος. Οι εντολές συντήρησης λειτουργούν με το ίδιο όνομα: `hydor service status`, `hydor setup-token`, `hydor update` και οι υπόλοιπες (το `node dist/server/cli.js …` συνεχίζει επίσης να λειτουργεί). Αν γράψετε λάθος μια εντολή, μια επιλογή ή ένα ρήμα, ρωτά «Did you mean …?» (Εννοείτε …;). Τα σφάλματα εμφανίζονται με κόκκινο.
 
 Ένα μήνυμα που αρχίζει με το όνομα μιας εντολής μπαίνει σε εισαγωγικά (`hydor "find the bug in login"`), ή μετά το `hydor chat`, ώστε να μην εκληφθεί ως η εντολή.
 
@@ -176,47 +176,67 @@ hydor completion install
 - **Το Hydor ενός άλλου υπολογιστή**: κάθε εντολή λειτουργεί με `--server` και `--token`.
 - **Μόνο μια σελίδα μπορεί να το κάνει**: η εντολή το λέει και δίνει τη διεύθυνση της σελίδας. Το `hydor open … --browser` την ανοίγει.
 
-### Η δουλειά σας
+### Συνεδρίες
 
 | Εντολή | Τι κάνει |
 | --- | --- |
 | `hydor sessions` | Οι τελευταίες συνεδρίες σας, η καθεμία με ένα σημάδι: ● εργάζεται, ● σας χρειάζεται, ✓ ολοκληρώθηκε, ✗ σφάλμα. Τα ρήματά της κάνουν ό,τι κάνει το μενού μιας συνεδρίας: `search`, `rename`, `archive` και `unarchive`, `pin` και `unpin`, `read`, `snooze`, `move` (σε ένα έργο), `fork`, `goal`, `share` (ένας σύνδεσμος μόνο για ανάγνωση), `changes` (τα αρχεία που άλλαξε), `commands` (οι εντολές που εκτέλεσε), `queue` (τα μηνύματα που περιμένουν, και τα `queue clear` και `queue remove`), `show`, `send`, `stop` και `delete`. |
-| `hydor projects` | `list`, `show`, `new`, `rename`, `edit` (περιγραφή, οδηγίες, ο πράκτορας με τον οποίο ξεκινά, φάκελοι), `sessions`, `files` (τα έγγραφα που διαβάζει: `files add` και `files remove`) και `remove`. |
-| `hydor guidelines` | `show` και `edit` ό,τι ακολουθούν όλοι οι πράκτορες: για κάθε συνεδρία (προεπιλογή), για ένα έργο (`--project`) ή για μία συνεδρία (`--session`). |
 | `hydor inbox` | Ό,τι περιμένει εσάς (εγκρίσεις, ερωτήσεις, ένα κλειδί που ζήτησε ένας πράκτορας, μια δεξιότητα για έλεγχο): `list`, και `show` για ένα στοιχείο, με το πού να το απαντήσετε. |
-| `hydor experiments` | Εκτελέσεις εκπαίδευσης και αξιολόγησης: `list`, `show` και `stop`. Η έναρξη μιας εκτέλεσης αφορά τους πράκτορες και τη σελίδα. |
-| `hydor tasks` | Οι [προγραμματισμένες εργασίες](/guide/tasks) σας: `list`, και `run <id>` για να εκτελέσετε μία αμέσως.<!-- TODO-VERIFY: show, new, edit, pause, resume, runs and remove --> |
-| `hydor apps` | Οι [εφαρμογές](/guide/apps) σας: `list`, `show`, `run` (τα πεδία της φόρμας της ως επιλογές· εκτυπώνει την απάντηση), `runs` και `remove`. Το `hydor app …` (χωρίς s) είναι για να φτιάχνετε εφαρμογές ως αρχεία: `new`, `dev`, `try`, `export`, `import`.<!-- TODO-VERIFY --> |
-| `hydor library` | Η [Βιβλιοθήκη](/guide/library): `list`, `search`, `show`, `export` (σε μια μορφή), `open` και `remove`.<!-- TODO-VERIFY --> |
 
 Το `hydor show 6f1e2a3b` είναι το ίδιο με το `hydor sessions show 6f1e2a3b`, και το ίδιο ισχύει για τα `send` και `stop`: οι σύντομες μορφές μένουν.
-
-Μερικά παραδείγματα:
 
 ```bash
 hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
+hydor inbox
+```
+
+### Η δουλειά σας
+
+| Εντολή | Τι κάνει |
+| --- | --- |
+| `hydor projects` | `list`, `show`, `new`, `rename`, `edit` (περιγραφή, οδηγίες, ο πράκτορας με τον οποίο ξεκινά, φάκελοι), `sessions`, `files` (τα έγγραφα που διαβάζει: `files add` και `files remove`) και `remove`. |
+| `hydor tasks` | Οι [προγραμματισμένες εργασίες](/guide/tasks) σας και η άλλη δουλειά που ξεκινά μόνη της: `list`, `show`, `new` (πότε τρέχει: `--every 2h`, `--at 09:00 --days weekdays`, `--cron`, `--once`· ή `--webhook`, `--watch-feed`, `--watch-page`, `--watch-folder`), `edit`, `pause`, `resume`, `run` (αμέσως, ακόμη και σε παύση), `runs` (οι τελευταίες εκτελέσεις, με `--reply` η τελευταία απάντηση) και `remove`. Η παρακολούθηση μιας εντολής ή μιας διεύθυνσης JSON γίνεται στη σελίδα. |
+| `hydor apps` | Οι [εφαρμογές](/guide/apps) σας και οι έτοιμες: `list`, `show`, `run` (οι απαντήσεις της φόρμας ως `πεδίο=τιμή`, ή JSON με `--input`· εκτυπώνει την απάντηση και το κόστος της), `runs`, `run-show` (μία εκτέλεση) και `remove`. Το `hydor app …` (χωρίς s) φτιάχνει εφαρμογές ως αρχεία: `new`, `folder`, `dev`, `try`, `export`, `import`. |
+| `hydor library` | Η [Βιβλιοθήκη](/guide/library): `list` (`--kind`, `--project`), `search`, `show` (το κείμενο ενός εγγράφου, ή τι είναι το στοιχείο), `export` (`--to pdf`, `docx`, `pptx`…, `-o αρχείο`), `open` (η διεύθυνση του επεξεργαστή του) και `remove`. |
+| `hydor experiments` | Εκτελέσεις εκπαίδευσης και αξιολόγησης: `list`, `show` και `stop`. Η έναρξη μιας εκτέλεσης αφορά τους πράκτορες και τη σελίδα. |
+
+```bash
 hydor projects new Thesis
 hydor projects edit thesis --file guidelines.md
-hydor guidelines edit --project thesis
-hydor inbox
+hydor tasks new --at 09:00 --days weekdays "Summarise my unread email"
+hydor apps run trip-planner destination=Lisbon days=5
+hydor library export "Q3 report" --to pdf -o q3.pdf
+```
+
+### Πράκτορες και μοντέλα
+
+| Εντολή | Τι κάνει |
+| --- | --- |
+| `hydor models` και `hydor tiers` | Τα μοντέλα που προσφέρει κάθε πρόγραμμα, και ποιο μοντέλο σημαίνει κάθε [βαθμίδα](/guide/agents-models#tiers-a-model-for-each-kind-of-job) (`hydor tiers set claude best opus --effort high`, `hydor tiers reset`· τα `hydor tiers team off` και `hydor tiers hard off` απενεργοποιούν την **Καθοδήγηση με υποπράκτορες** και το **Μέγιστο για δύσκολα προβλήματα**, και το `on` τα ενεργοποιεί ξανά). |
+| `hydor usage` | Η χρήση και τα όρια κάθε προγράμματος, και πότε επαναφέρονται. |
+| `hydor agents` | [Οι πράκτορές σας](/guide/agents): `list`, `show`, `new`, `edit` και `remove` (οι ενσωματωμένοι αντιγράφονται, δεν αλλάζουν). Τα πεδία εξόδου ενός πράκτορα και το πού πηγαίνουν τα αποτελέσματά του ορίζονται στη σελίδα του (`hydor open agents`). |
+| `hydor accounts` | Οι συνδέσεις του Claude Code και του Codex: `list`, `add <πρόγραμμα> <όνομα>` (ένας ακόμη λογαριασμός, με άμεση σύνδεση), `sign-in`, `sign-out`, `remove` και `use` (με ποιον ξεκινούν οι νέες συνεδρίες). Το κλειδί API για πίστωση API και οι διακόπτες στο όριο χρήσης είναι ρυθμίσεις (`accounts.*`). |
+
+```bash
+hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor tiers set claude best opus --effort high
+hydor accounts add claude Work
+hydor accounts use work
 ```
 
 ### Όσα γνωρίζουν και χρησιμοποιούν οι πράκτορες
 
 | Εντολή | Τι κάνει |
 | --- | --- |
-| `hydor agents` | [Οι πράκτορές σας](/guide/agents): `list`, `show`, `new`, `edit` και `remove` (οι ενσωματωμένοι αντιγράφονται, δεν αλλάζουν). Τα πεδία εξόδου ενός πράκτορα και το πού πηγαίνουν τα αποτελέσματά του ορίζονται στη σελίδα του (`hydor open agents`). |
 | `hydor memory` | Ό,τι θυμούνται οι πράκτορες για εσάς: `list`, `search`, `show`, `add`, `edit`, `forget` (αναστρέψιμο για 30 ημέρες) και `restore`, και τα `profile` και `profile edit` για ό,τι διαβάζει πρώτο κάθε πράκτορας. Τα `--scope`, `--project` και `--session` λένε ποιανού είναι οι σημειώσεις. |
+| `hydor guidelines` | `show` και `edit` ό,τι ακολουθούν όλοι οι πράκτορες: για κάθε συνεδρία (προεπιλογή), για ένα έργο (`--project`) ή για μία συνεδρία (`--session`). |
 | `hydor skills` | Οι δεξιότητες που χρησιμοποιούν οι πράκτορες: `list`, `show`, `on`, `off`, `add` (από ένα `SKILL.md` ή έναν φάκελο) και `remove`. Το `--agent claude` ή `--agent codex` αφορά τις δεξιότητες που έχουν αυτά τα προγράμματα από μόνα τους. |
 | `hydor plugins` | Πρόσθετα με δεξιότητες και εργαλεία: `list`, `show`, `on`, `off`, `add` (ενσωματωμένο, διεύθυνση Git, .zip ή φάκελος) και `remove`. Η δημιουργία ενός δικού σας πρόσθετου γίνεται στη σελίδα του (`hydor open plugins`). |
 | `hydor mcp` | Διακομιστές εργαλείων (MCP) για το Claude Code και το Codex: `list`, `status` (ξεκινά τον καθένα και λέει ποιοι δουλεύουν), `add`, `edit` και `remove`. |
+| `hydor connections` | Οι [συνδεδεμένες εφαρμογές](/guide/connections) (Notion, GitHub, Gmail…): `list`, `show`, `services` (τι μπορεί να συνδεθεί), `connect <υπηρεσία>` (ένα κλειδί που πληκτρολογείται κρυφά, ή σύνδεση στο πρόγραμμα περιήγησης που η εντολή περιμένει) και `disconnect`. Ποια εργαλεία μιας σύνδεσης είναι ενεργά ορίζεται στη σελίδα της. |
 | `hydor keys` | Το [θησαυροφυλάκιο](/guide/connections): `list` τα ονόματα των κλειδιών σας και πού μπορεί να πάει το καθένα, `set <NAME>` και `remove <NAME>`. Η τιμή ζητείται με όσα πληκτρολογείτε κρυμμένα, ή διαβάζεται από όσα στέλνετε με pipe· δεν πληκτρολογείται ποτέ ως επιλογή (το κέλυφός σας θα την κρατούσε) και δεν εκτυπώνεται ποτέ. |
-| `hydor connections` | Οι υπηρεσίες που συνδέσατε: `list`, `connect <υπηρεσία>` (ανοίγει τη σελίδα σύνδεσής της) και `disconnect`.<!-- TODO-VERIFY --> |
-| `hydor accounts` | Οι λογαριασμοί του Claude Code και του Codex: `list`, `add`, `remove`, και ποιον χρησιμοποιούν οι συνεδρίες.<!-- TODO-VERIFY --> |
-| `hydor models` και `hydor tiers` | Τα μοντέλα που προσφέρει κάθε πρόγραμμα, και ποιο μοντέλο σημαίνει κάθε [βαθμίδα](/guide/agents-models#tiers-a-model-for-each-kind-of-job) (`hydor tiers set claude best opus --effort high`, `hydor tiers reset`· τα `hydor tiers team off` και `hydor tiers hard off` απενεργοποιούν την **Καθοδήγηση με υποπράκτορες** και το **Μέγιστο για δύσκολα προβλήματα**, και το `on` τα ενεργοποιεί ξανά). |
-| `hydor usage` | Η χρήση και τα όρια κάθε προγράμματος, και πότε επαναφέρονται. |
 
 ```bash
 hydor memory add I prefer short answers
@@ -224,7 +244,8 @@ hydor memory forget 42
 hydor skills off research
 hydor mcp add github --env GITHUB_TOKEN -- npx -y gh-mcp
 hydor keys set GITHUB_TOKEN --domain github.com
-hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor guidelines edit --project thesis
+hydor connections connect notion --browser
 ```
 
 ### Ρυθμίσεις
@@ -276,7 +297,7 @@ hydor settings run notifications.send-a-test
 hydor --server https://hydor.example.com --token acm_… sessions
 ```
 
-ή ορίστε μία φορά τα `HYDOR_URL` και `HYDOR_TOKEN`. Οι φάκελοι είναι του άλλου υπολογιστή: μια συνεδρία ξεκινά στον προεπιλεγμένο φάκελό του, εκτός αν δώσετε `--cwd` με έναν φάκελο που υπάρχει εκεί (μια διεύθυνση του ίδιου του υπολογιστή σας, όπως η `http://localhost:8790`, κρατά τον φάκελο όπου βρίσκεστε). Οι εντολές `!` λειτουργούν μόνο με το Hydor αυτού του υπολογιστή. Σε αυτόν τον υπολογιστή, η εντολή δημιουργεί ένα δικό της διακριτικό την πρώτη φορά, που το απαριθμούν οι [Ρυθμίσεις → Εφαρμογή → Μηχανήματα](/settings?s=machines&find=Access%20from%20other%20machines) ως «This computer's command line». Το `hydor machines` απαριθμεί, προσθέτει και αφαιρεί από το τερματικό τα μηχανήματα αυτών των διακριτικών, όπως η σελίδα.<!-- TODO-VERIFY: machines -->
+ή ορίστε μία φορά τα `HYDOR_URL` και `HYDOR_TOKEN`. Οι φάκελοι είναι του άλλου υπολογιστή: μια συνεδρία ξεκινά στον προεπιλεγμένο φάκελό του, εκτός αν δώσετε `--cwd` με έναν φάκελο που υπάρχει εκεί (μια διεύθυνση του ίδιου του υπολογιστή σας, όπως η `http://localhost:8790`, κρατά τον φάκελο όπου βρίσκεστε). Οι εντολές `!` λειτουργούν μόνο με το Hydor αυτού του υπολογιστή. Σε αυτόν τον υπολογιστή, η εντολή δημιουργεί ένα δικό της διακριτικό την πρώτη φορά, που το απαριθμούν οι [Ρυθμίσεις → Εφαρμογή → Μηχανήματα](/settings?s=machines&find=Access%20from%20other%20machines) ως «This computer's command line». Για να δείχνει αυτό το Hydor τις συνεδρίες και τις σελίδες ενός άλλου υπολογιστή, προσθέστε τον ως μηχάνημα: το `hydor machines` απαριθμεί τα μηχανήματα που χρησιμοποιεί αυτό το Hydor και αν απαντούν, το `hydor machines add Lab --url https://lab.example.com` προσθέτει ένα (με `--ssh <υπολογιστής>` αντί για `--url` φτάνετε σε αυτό μέσω SSH· το διακριτικό πρόσβασής του πληκτρολογείται κρυφά, ή έρχεται από το `--file -`) και το `hydor machines remove lab` σταματά να το χρησιμοποιεί.
 
 ## Χρώματα και pipes
 
