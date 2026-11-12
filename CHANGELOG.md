@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.61.1 · 12 November 2026
+
+Pages agents make look right in the dark theme again, and agents can now check a page in the dark before they show
+it to you.
+
+- **Pages in the dark theme**: a page an agent made (a mock-up, a report, a dashboard) could come out with white
+  panels and pale text you could hardly read when the app was dark: the page took its colours from the app's light
+  theme while its text followed the dark one. Its colours now follow the app's theme everywhere on the page, light or
+  dark, and colours the page sets for itself still come first.
+- **Screenshots in the light or dark theme**: you can ask an agent for a screenshot "in the dark theme", and a site
+  that follows your computer's light or dark shows in the one you asked for. When an agent looks at a page it made
+  before showing it to you, the screenshot shows the page as the app does, in the dark theme unless the light one
+  is asked for, so it can fix what would not read well first.
+
 ## 0.61.0 · 12 November 2026
 
 Agents ask before they run one of your apps, steps waiting their turn say so, and Explore a place finds the kinds of
