@@ -1,7 +1,7 @@
 // Checks for `hydor` in a terminal: arguments to options, widths and wrapping, Markdown at several widths, each kind
-// of step's line, the turn's line, helpers' lines, an approval's keys and the body each sends, the input line's keys
+// of step's line, the turn's line, subagents' lines, an approval's keys and the body each sends, the input line's keys
 // and paste, the printer (final items once, streaming text by its finished chunks); then against a small fake server
-// (node:http and ws on 127.0.0.1, checking the bearer token): `run` end to end (streamed items, a helper whose reply
+// (node:http and ws on 127.0.0.1, checking the bearer token): `run` end to end (streamed items, a subagent whose reply
 // wakes the lead, --json and --stream-json, a failed turn, an approval with nobody to answer, a timeout, a socket that
 // drops and comes back), `sessions --json`, `tiers` shown and set; and the chat itself in a pseudo-terminal at 80 and
 // 120 columns (a message, a streamed reply, an approval answered with a key, a message queued while it works, a
@@ -185,22 +185,25 @@ test('steps: one line each, by category, with what matters of the result', () =>
   assert.equal(fold[0], '  ● Ran 1 command, read 2 files');
 });
 
-test('the turn’s line, helpers, tiers and a spending cap', () => {
+test('the turn’s line, subagents, tiers and a spending cap', () => {
   const L = look(80);
-  assert.equal(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'completed', durationMs: 64_000, costUsd: 0.31, model: 'claude-opus-5-5' }, L, { helpers: 1 })[0], '  ✓ 1m 04s · $0.31 · Opus 5.5 · 1 helper');
+  assert.equal(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'completed', durationMs: 64_000, costUsd: 0.31, model: 'claude-opus-5-5' }, L, { helpers: 1 })[0], '  ✓ 1m 04s · $0.31 · Opus 5.5 · 1 subagent');
   assert.equal(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'interrupted', durationMs: 12_000 }, L)[0], '  ■ Stopped · 12 s');
   assert.match(turnLines({ kind: 'turn', id: 't', seq: 0, status: 'failed' }, L)[0], /✗ Failed/);
   assert.equal(modelLabel('claude-sonnet-5-5'), 'Sonnet 5.5');
   assert.equal(modelLabel('opus', [{ value: 'opus', label: 'Opus 5.5', efforts: [] }]), 'Opus 5.5');
   assert.equal(modelLabel('auto'), 'Automatic');
   const child: ChildNote = { child: 'claude:c1', agent: 'claude', label: 'Claude Code · sonnet', title: 'Add --json to export', brief: '', cwd: '/', tier: 'standard', startedAt: 0 };
-  assert.equal(noteLines({ id: 'n', key: 'k', kind: 'child', at: 0, data: child }, L)![0], '  ◆ Helper started: Add --json to export · Claude Code · sonnet · Standard');
+  assert.equal(noteLines({ id: 'n', key: 'k', kind: 'child', at: 0, data: child }, L)![0], '  ◆ Subagent started: Add --json to export · Claude Code · sonnet · Standard');
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'tier', at: 0, data: { event: 'auto', tier: 'max', label: 'Fable 5.2', why: 'a hard proof' } }, L)![0], '  ◆ Automatic picked Max (Fable 5.2): a hard proof');
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'tier', at: 0, data: { event: 'stepUp', tier: 'best', label: 'Opus 5.5' } }, L)![0], '  ◆ Stepped up to Best (Opus 5.5)');
   assert.match(noteLines({ id: 'n', key: 'k', kind: 'budget', at: 0, data: { capUsd: 5, spentUsd: 5.02 } }, L)![0], /Stopped at its spending cap: \$5\.02 of \$5\.00/);
   assert.equal(noteLines({ id: 'n', key: 'k', kind: 'memory', at: 0, data: {} }, L), null);
-  assert.equal(childReplyLines('[Reply from the child session "Add --json" (claude:c1, Claude Code · sonnet)]\n\nDone.', L)![0], '  ◆ Helper finished: Add --json');
-  assert.match(childReplyLines('[The child session "T" (claude:c2, Claude Code · haiku) stopped with an error: model not found]\n(It wrote no reply.)', L)![0], /Helper failed: T · model not found/);
+  assert.equal(childReplyLines('[Reply from the Hydor subagent "Add --json" (claude:c1, Claude Code · sonnet)]\n\nDone.', L)![0], '  ◆ Subagent finished: Add --json');
+  // Transcripts written before the rename say "child session": they read the same.
+  assert.equal(childReplyLines('[Reply from the child session "Old" (claude:c0, Claude Code · sonnet)]\n\nDone.', L)![0], '  ◆ Subagent finished: Old');
+  assert.match(childReplyLines('[The child session "Old" (claude:c0, Claude Code · haiku) stopped with an error: x]', L)![0], /Subagent failed: Old · x/);
+  assert.match(childReplyLines('[The Hydor subagent "T" (claude:c2, Claude Code · haiku) stopped with an error: model not found]\n(It wrote no reply.)', L)![0], /Subagent failed: T · model not found/);
 });
 
 const APPROVAL: ApprovalRequest = {
@@ -364,7 +367,7 @@ test('the printer: each final item once, in order; what is under way held for th
   assert.match(p2.take(viewOf([bg])).lines.join('\n'), /in the background/);
 });
 
-test('settled: not while the session or a helper has a task running in the background', () => {
+test('settled: not while the session or a subagent has a task running in the background', () => {
   const v = viewOf([{ kind: 'user', id: 'u', seq: 0, text: 'go' }, { kind: 'turn', id: 't', seq: 0, status: 'completed' }]);
   v.live = { status: 'idle', startedAt: 0, pendingApprovals: 0, backgroundTasks: [{ id: 'b', description: 'Check the docs', kind: 'local_agent', status: 'running' }] };
   assert.equal(v.settled(), false);
@@ -375,7 +378,7 @@ test('settled: not while the session or a helper has a task running in the backg
   const child: ChildNote = { child: 'claude:c', agent: 'claude', label: 'L', title: 'T', brief: '', cwd: '/', startedAt: 0 };
   const idle = { status: 'idle' as const, startedAt: 0, pendingApprovals: 0 };
   v.helpers.set('claude:c', { key: 'claude:c', note: child, turns: 1, replies: 1, summary: { key: 'claude:c', agent: 'claude', id: 'c', title: 'T', stats: {} as SessionSummary['stats'], live: { ...idle, backgroundTasks: [{ id: 'x', description: 'Run the tests', kind: 'local_agent', status: 'running' }] } } });
-  assert.equal(v.settled(), false, 'a helper’s task in the background');
+  assert.equal(v.settled(), false, 'a subagent’s task in the background');
   assert.deepEqual(v.background().map((b) => [b.key, b.task.description]), [['claude:c', 'Run the tests']]);
   // Its end woke the agent: the turn before it is not the last one.
   v.items.push({ kind: 'system', id: 's', seq: 2, level: 'info', text: 'Background task completed: Check the docs' });
@@ -507,7 +510,7 @@ async function play(f: Fake, text: string) {
   }
   if (/work in the background/.test(text)) {
     // Claude Code's own Agent tool in the background: the turn ends with it running, and its end wakes the lead.
-    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A helper is running; I’ll review it as it comes back.' });
+    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A subagent is running; I’ll review it as it comes back.' });
     push(f, turnEnd());
     const devServer = { id: 'dev', description: 'npm run dev', kind: 'local_bash', status: 'running', startedAt: Date.now() };
     setLive(f, { status: 'idle', backgroundTasks: [devServer, { id: 'bg1', description: 'Check the docs', kind: 'local_agent', status: 'running', startedAt: Date.now() }] });
@@ -540,13 +543,13 @@ async function play(f: Fake, text: string) {
     push(f, { kind: 'tool', id: 'td', seq: 0, tool: { name: 'Read', category: 'read', title: '/home/u/proj/missed.ts', status: 'ok' } });
     await sleep(400);
   }
-  if (/helper/.test(text)) {
+  if (/subagent/.test(text)) {
     const c = newFake('Count the files', { parent: f.key });
     setLive(c, { status: 'working', turnStartedAt: Date.now() });
     const note: SessionNote = { id: `n${Math.random()}`, key: f.key, kind: 'child', at: Date.now(), data: { child: c.key, agent: 'claude', label: 'Claude Code · haiku', title: 'Count the files', brief: 'count', cwd: '/', tier: 'quick', startedAt: Date.now() } satisfies ChildNote };
     f.notes.push(note);
     toSubs(f.key, { t: 'note', key: f.key, note });
-    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A helper counts them; I wait for it.' });
+    push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'A subagent counts them; I wait for it.' });
     push(f, turnEnd());
     setLive(f, { status: 'idle' });
     await sleep(1600);
@@ -554,7 +557,7 @@ async function play(f: Fake, text: string) {
     setLive(c, { status: 'idle' });
     // Its reply reaches the lead a moment later, and wakes it.
     await sleep(900);
-    push(f, { kind: 'user', id: `u${Math.random()}`, seq: 0, ts: Date.now(), text: `[Reply from the child session "Count the files" (${c.key}, Claude Code · haiku)]\n\n42 files.` });
+    push(f, { kind: 'user', id: `u${Math.random()}`, seq: 0, ts: Date.now(), text: `[Reply from the Hydor subagent "Count the files" (${c.key}, Claude Code · haiku)]\n\n42 files.` });
     setLive(f, { status: 'working', turnStartedAt: Date.now() });
     await sleep(200);
     push(f, { kind: 'assistant', id: `a${Math.random()}`, seq: 0, text: 'There are **42** files.' });
@@ -743,8 +746,8 @@ test('run --json: one object; the message from stdin', async () => {
   assert.deepEqual(start.body.extra, { capUsd: 3 });
 });
 
-test('run: a helper’s reply wakes the lead, and the run waits for the turn after it', async () => {
-  const r = await hydor(['run', '--json', 'count with a helper']);
+test('run: a subagent’s reply wakes the lead, and the run waits for the turn after it', async () => {
+  const r = await hydor(['run', '--json', 'count with a subagent']);
   assert.equal(r.code, 0, r.err);
   const j = JSON.parse(r.out);
   assert.equal(j.reply, 'There are **42** files.');
@@ -755,7 +758,7 @@ test('run: a helper’s reply wakes the lead, and the run waits for the turn aft
 });
 
 test('run --stream-json: a line per event, the result last', async () => {
-  const r = await hydor(['run', '--stream-json', 'stream a helper']);
+  const r = await hydor(['run', '--stream-json', 'stream a subagent']);
   assert.equal(r.code, 0, r.err);
   const lines = r.out.trim().split('\n').map((l) => JSON.parse(l));
   assert.ok(lines.some((l) => l.type === 'item' && l.item.kind === 'user'));
@@ -822,7 +825,7 @@ test('sessions --json, show, send, stop', async () => {
   assert.equal(r.code, 0, r.err);
   const j = JSON.parse(r.out);
   assert.ok(j.sessions.length >= 3);
-  assert.ok(j.sessions.every((s: SessionSummary) => !s.extra?.parent), 'helpers only with --all');
+  assert.ok(j.sessions.every((s: SessionSummary) => !s.extra?.parent), 'subagents only with --all');
   const all = JSON.parse((await hydor(['sessions', '--json', '--all'])).out);
   assert.ok(all.sessions.some((s: SessionSummary) => s.extra?.parent));
   const text = await hydor(['sessions']);
@@ -844,7 +847,7 @@ test('tiers: shown, set, the team switched', async () => {
   assert.equal(shown.code, 0, shown.err);
   assert.match(shown.out, /Quick +Haiku 4\.5/);
   assert.match(shown.out, /Max/);
-  assert.match(shown.out, /Lead with helpers: on    Max for hard problems: off/);
+  assert.match(shown.out, /Lead with subagents: on    Max for hard problems: off/);
   const set = await hydor(['tiers', 'set', 'claude', 'best', 'haiku', '--effort', 'high']);
   assert.equal(set.code, 0, set.err);
   const put = calls.filter((c) => c.method === 'PUT' && c.path === '/api/models/tiers').at(-1)!;
@@ -980,13 +983,13 @@ test('the chat: Tab completes, a question and a form answered field by field, Es
   assert.deepEqual(f.answers[0].body, { decision: 'answer', answers: { color: 'Blue', size: 'S, L', name: 'Rex' } });
   assert.deepEqual(f.answers[1].body, { decision: 'accept', answers: {}, form: { city: 'Lisbon', when: 'Tomorrow', pets: 'No' } });
   await c.until(/✓ 900 ms/);
-  // A task in the background: shown while it runs, its end a line, then the turn it wakes; /helpers lists it.
+  // A task in the background: shown while it runs, its end a line, then the turn it wakes; /subagents lists it.
   c.p.write('work in the background\r');
   await c.until(/◆ At work in the background: Check the docs/);
   await c.until(/each one that ends wakes the agent/);
   await c.until(/◆ Finished in the background: Check the docs/);
   await c.until(/The docs check out\./);
-  c.p.write('/helpers\r');
+  c.p.write('/subagents\r');
   await c.until(/Finished {2}Check the docs · in the background/);
   // A turn that runs until stopped: Esc stops it, a resize meanwhile draws the region again at the new width.
   c.p.write('be slow\r');

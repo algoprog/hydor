@@ -3,6 +3,51 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.55.5 · 12 November 2026
+
+The helpers an agent starts all go by one name, subagents, and each one says who started it.
+
+- What used to be called child sessions or helper sessions are now **subagents** everywhere: their cards in the
+  conversation, the sidebar ("3 subagents · 1 needs you"), the tray above the message box, the status line, the
+  Stop button and the guide.
+- Each one says who started it. A **Hydor subagent** is a session of its own that Hydor runs, on any agent and
+  model ("Hydor subagent · Codex · GPT-5.5"), which you can open and talk to. A **Claude Code subagent** is one the
+  agent's own program runs inside the session, which you can watch and stop. Point at it to see which is which.
+- Both kinds count as subagents in the tray, the status line and the Stop button: "2 subagents and 1 background
+  task running". Background tasks are now just commands, monitors and workflows.
+- **Settings → Capabilities → Child sessions** is now **Subagents**, and **Lead with helpers** in Settings → Models →
+  Tiers is now **Lead with subagents**. The spending cap bar says "with subagents" when they've spent part of it.
+- In the terminal app, `/subagents` lists them (`/helpers` still works), and its lines say "Subagent finished" and
+  "Subagent failed".
+- Agents are told the same names, so what they write about their subagents matches what you see.
+
+## 0.55.4 · 11 November 2026
+
+The welcome tour turns on the desktop apps' notifications, and opens System Settings when your Mac isn't allowing them.
+
+- **Hear when it's done**, the welcome tour's step on notifications, has **Turn on notifications** in the Mac and
+  Windows apps too. It shows a test notification; if your system isn't showing Hydor's notifications yet, it opens
+  System Settings right at Hydor's notifications (on Windows, Settings → System → Notifications), and when you come
+  back it checks again and says when they're on.
+- **Settings → Notifications** does the same: when your system isn't showing them, the **Notify this device** switch
+  is off, and turning it on opens those settings.
+- On a Mac, notifications are still yours to allow: macOS asks once when the app starts, and clicking **Allow** is
+  all it takes. System Settings is only needed if that question was missed or declined, since macOS never asks twice.
+
+## 0.55.3 · 11 November 2026
+
+What a session started sits in one tray above its message box, and Stop stops all of it.
+
+- A session's helper sessions and background tasks (subagents, commands and monitors) are listed together in a tray
+  just above the message box. It's folded to one line, like "1 helper session and 2 background tasks running", with
+  **Stop all**. Opened, each one is a row in the same look, with how it stands, **Open** and Stop.
+- A background task opens in a panel on the right, laid out like a session: how it stands, its steps or its output
+  as they come, and **Stop**. It used to open in a plain dialog.
+- While a session's turn, or anything it started, is still running, the button in the message box is **Stop**, and
+  it stops all of it: the turn, the background tasks and the helper sessions, with any they started. Helper sessions
+  stopped this way don't report back and wake the session up again.
+- A helper session's card in the conversation has the same look as the tray's rows.
+
 ## 0.55.2 · 11 November 2026
 
 The prompt bar keeps its spinning ring while a session's background work still runs.

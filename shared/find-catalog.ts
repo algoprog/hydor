@@ -82,7 +82,7 @@ export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', strin
   ['browser', 'Browser', 'Capabilities', 'A web browser agents use, which you can watch and take over'],
   ['computer', 'Computer use', 'Capabilities', 'Agents see your screen and use the mouse and keyboard, in the desktop app'],
   ['memory', 'Memory', 'Capabilities', 'What agents remember about you, your projects and each session, and when it was written'],
-  ['children', 'Child sessions', 'Capabilities', 'Agents handing parts of a job to other agents, and swarms for hard problems'],
+  ['children', 'Subagents', 'Capabilities', 'Agents handing parts of a job to subagents, and swarms for hard problems'],
   ['images', 'Images, video and audio', 'Capabilities', 'Pictures, videos, music and voices agents make for you through OpenRouter, and who writes their captions in the Library'],
   ['voice', 'Voice', 'Capabilities', 'Dictate messages, and have replies read aloud'],
   ['assistants', 'Your agents', 'Capabilities', 'Where task folders go, and cleaning up after a task; your agents themselves are on the Agents page'],
@@ -145,8 +145,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['agents', 'Agents that speak ACP', 'gemini cli opencode qwen code goose hermes agent pi openclaw acp', 'Gemini CLI, OpenCode, Qwen Code and Goose, ready to add'],
   // Agents › Models
   ['models', 'Helper model', 'small model haiku memory tidy auto mode second opinion', 'The model for small jobs beside sessions'],
-  ['models', 'Tiers', 'tiers quick standard best max cheaper cheap strong strongest model per job helpers subagents haiku sonnet opus fable terra sol astra effort automatic', 'The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its helpers get Standard and Quick'],
-  ['models', 'Lead with helpers', 'team orchestrate delegate subagents helpers cheaper cost save main agent plan lead automatic sonnet haiku', 'A session’s main agent plans, hands clear parts to helpers on cheaper tiers and checks their work'],
+  ['models', 'Tiers', 'tiers quick standard best max cheaper cheap strong strongest model per job helpers helper sessions child sessions subagents haiku sonnet opus fable terra sol astra effort automatic', 'The model Quick, Standard, Best and Max mean for each program: a session leads on Best or Max, and its subagents get Standard and Quick'],
+  ['models', 'Lead with subagents', 'team orchestrate delegate subagents helpers helper sessions child sessions lead with helpers cheaper cost save main agent plan lead automatic sonnet haiku', 'A session’s main agent plans, hands clear parts to subagents on cheaper tiers and checks their work'],
   ['models', 'Max for hard problems', 'automatic hard complex difficult problem strongest model fable astra step up escalate', 'Automatic starts a hard problem on Max, and an agent may move itself there when a problem proves harder than it looked'],
   ['models', 'On this machine', 'local models ollama vllm gpu download', 'Models installed here, and their downloads', 'Models on this machine'],
   ['models', 'Add a model from Hugging Face', 'hugging face hf download install gguf vllm ollama suggested recommended for this computer lfm3 gemma flint glm', 'The ones suggested for this computer, or search, see how each would run here, and install it'],
@@ -233,8 +233,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Bring in…', 'import migrate switch transfer claude code codex chatgpt claude.ai hermes openclaw pi atomic agent export memories history chats skills', 'Notes from what other assistants know about you, and the skills you made in them: Claude Code, Codex, other agents, or a ChatGPT or Claude export', 'Bring in memory and skills from other assistants'],
   ['memory', 'Export', 'download backup save copy json markdown', 'Every note as Markdown to read, or as JSON with histories', 'Export memory notes'],
   ['memory', 'Clear all…', 'delete erase wipe forget everything', 'Deletes every note and its history', 'Clear all memory'],
-  // Capabilities › Child sessions
-  ['children', 'Working at once, per session', 'child sessions parallel subagents concurrency limit', 'How many child sessions one session runs at once'],
+  // Capabilities › Subagents
+  ['children', 'Working at once, per session', 'child sessions helper sessions parallel subagents concurrency limit', 'How many Hydor subagents one session runs at once'],
   ['children', 'Swarm size', 'swarm mode team of agents subagents parallel angles hard problems math proof campaign migration', 'How many agents of a swarm or campaign work at once'],
   // Capabilities › Images, video and audio
   ['images', 'Making images', 'image generation pictures openrouter', 'Let agents make images'],
@@ -318,7 +318,7 @@ const PAGES: [string, string, string, string, string][] = [
   ['import-folder', 'Import a folder', '/library?new=import', 'import bring add folder computer disk directory latex project tex bib overleaf documents spreadsheets notebooks upload library', 'A folder of this computer into the Library: a LaTeX project as one document, any other with its documents'],
   ['published', 'Published', '/library?tab=published', 'published public share link site pages folder', 'Pages and sites anyone with the link can open'],
   ['preview', 'Preview', '/preview', 'dev server localhost web app browser phone tablet screen picture screenshot', 'The web apps running on this computer, to look at from any device'],
-  ['agents', 'Agents', '/agents', 'agents assistants presets team helpers subagents schedules scheduled automations tiers budget researcher writer coder tutor planner analyst', 'Your agents: what each does, where and when it works, what it thinks with, and whom it asks'],
+  ['agents', 'Agents', '/agents', 'agents assistants presets team helpers subagents child sessions schedules scheduled automations tiers budget researcher writer coder tutor planner analyst', 'Your agents: what each does, where and when it works, what it thinks with, and whom it asks'],
   ['new-agent', 'New agent', '/agents?new=1', 'make create new agent assistant describe draft schedule team helper', 'An agent of your own, drafted from what you say it should do'],
   ['usage', 'Usage and limits', '/usage', 'usage limits plan quota reset tokens system', 'What you have used of each plan, and when it resets (System → Usage)'],
   ['arena', 'Model arena', '/arena', 'arena compare models side by side best answer leaderboard rating which model wins vote', 'Which models win on your own tasks, from the answers you kept'],

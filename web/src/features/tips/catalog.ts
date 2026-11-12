@@ -58,8 +58,8 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
     body: 'The agent keeps working, turn after turn, until the goal holds. Pause or clear it here.',
   },
   children: {
-    title: 'A child session',
-    body: 'Another session handed this part of its work over. It runs alongside, and its replies go back to the session that started it.',
+    title: 'A subagent',
+    body: 'Hydor started this session to do part of another session’s work. It runs alongside, and its replies go back to the session that started it.',
   },
   research: {
     title: 'Deep research',
@@ -67,7 +67,7 @@ export const TIP_TEXT: Record<TipId, { title: string; body: string }> = {
   },
   budget: {
     title: 'A spending cap',
-    body: 'What this session and its child sessions spent, at API prices. At the cap the agent stops until you raise it.',
+    body: 'What this session and its subagents spent, at API prices. At the cap the agent stops until you raise it.',
   },
   context: {
     title: 'How full the context is',

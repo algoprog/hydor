@@ -104,7 +104,7 @@ function TierChoice({ a, set, close }: { a: Patch; set: (p: Patch) => void; clos
         <OptionRow key={t.id} label={t.label} hint={t.hint} selected={a.tier === t.id} onClick={() => (set({ tier: t.id }), close())} />
       ))}
       <div className="mt-1 border-t border-line px-2 pt-2 pb-1.5">
-        <div className="mb-1.5 text-[12.5px] text-fg-2">Helpers it starts, never above</div>
+        <div className="mb-1.5 text-[12.5px] text-fg-2">Subagents it starts, never above</div>
         <Segmented<Tier | 'any'>
           size="sm"
           value={a.helperMax ?? 'any'}
@@ -217,7 +217,7 @@ export function AgentSentences({ a, editable, onChange, all, spaces, when }: Sen
       <Phrase text={tierText(a.tier)} editable={editable} title="What it thinks with" width={330}>
         {(close) => <TierChoice a={a} set={onChange} close={close} />}
       </Phrase>
-      {a.helperMax ? <span> (its helpers {tierText(a.helperMax)} at most)</span> : null}. It may{' '}
+      {a.helperMax ? <span> (its subagents {tierText(a.helperMax)} at most)</span> : null}. It may{' '}
       <Phrase text={toolsText(a)} editable={editable} title="What it may use" width={320}>
         {() => (
           <div>

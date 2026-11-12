@@ -147,7 +147,7 @@ let B = '';
 let C = '';
 test('members start with the lead’s model and effort unless it names others; at most the swarm’s size at once', async () => {
   const out = await call(LEAD, 'start_child_session', { brief: 'Prove it by induction on n. Post what you find.', title: 'Induction' });
-  A = /Started child session (\S+):/.exec(out)![1];
+  A = /Started Hydor subagent (\S+):/.exec(out)![1];
   assert.equal(sessions.created.at(-1)!.model, 'opus');
   assert.equal(sessions.created.at(-1)!.effort, 'max');
   assert.match(out, /Claude Code · opus/);
@@ -161,7 +161,7 @@ test('members start with the lead’s model and effort unless it names others; a
   assert.deepEqual(toolsOf(A), ['swarm_post', 'swarm_read'], 'a member starts no children');
   await call(LEAD, 'start_child_session', { brief: 'Four', title: 'Four' });
   await call(LEAD, 'start_child_session', { brief: 'Five', title: 'Five' });
-  await assert.rejects(call(LEAD, 'start_child_session', { brief: 'Six', title: 'Six' }), /5 of your child sessions are working already/);
+  await assert.rejects(call(LEAD, 'start_child_session', { brief: 'Six', title: 'Six' }), /5 of your Hydor subagents are working already/);
   // Those two finish, so the board's tests have three members working.
   for (const k of [`claude:m4`, `claude:m5`]) sessions.all.get(k)!.live = 'idle';
 });
@@ -277,7 +277,7 @@ test('routes: the board of a lead only, and the user stopping members tells the 
   await assert.rejects(routes.get('POST /api/swarm/:key/stop')!({ params: { key: LEAD }, body: { member: 'claude:solo' } }), (e: unknown) => e instanceof HttpError && e.status === 404);
 });
 
-test('the setting: how many members of a swarm at once (Settings → Child sessions)', async () => {
+test('the setting: how many members of a swarm at once (Settings → Capabilities → Subagents)', async () => {
   const routes = new Map<string, (req: any) => Promise<any>>();
   children.routes!({ ...deps, app: { get: (p: string, h: any) => routes.set(`GET ${p}`, h), put: (p: string, h: any) => routes.set(`PUT ${p}`, h) } } as unknown as Deps);
   assert.deepEqual(await routes.get('GET /api/children/settings')!({}), { maxRunning: 4, swarmSize: 5 });
@@ -324,7 +324,7 @@ test('a campaign’s post tool takes a plan and parts; its members always get a 
     ['packages/cli', 'Part packages/cli: the same.'],
   ]) {
     const out = await call(CAMP, 'start_child_session', { brief, title });
-    campMembers.push(/Started child session (\S+):/.exec(out)![1]);
+    campMembers.push(/Started Hydor subagent (\S+):/.exec(out)![1]);
     assert.equal(sessions.created.at(-1)!.worktree, true, 'a member works on a branch of its own');
   }
   assert.deepEqual(toolsOf(campMembers[0]), ['swarm_post', 'swarm_read'], 'a member starts no children');

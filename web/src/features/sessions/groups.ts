@@ -39,8 +39,8 @@ export const STALE_MS = 7 * 86400_000;
 /** Active means recent activity, background tasks (agents, commands, monitors) still running, or a session scheduled to resume after a usage limit. */
 export const ACTIVE_MS = 5 * 60_000;
 /**
- * Background tasks or child sessions still run: the agent picks up again when they finish, though its transcript may be
- * quiet meanwhile. A child session's end changes its parent's summary too, which groups the list again.
+ * Background tasks or subagents still run: the agent picks up again when they finish, though its transcript may be
+ * quiet meanwhile. A Hydor subagent's end changes its parent's summary too, which groups the list again.
  */
 export const hasBackgroundWork = (s: SessionSummary) =>
   !!(s.live && s.live.status !== 'exited' && s.live.status !== 'error' && s.live.backgroundTasks?.length) || !!s.external?.backgroundTasks?.length || !!s.helpers;
