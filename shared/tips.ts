@@ -94,6 +94,16 @@ export const TIP_GUIDE: Record<TipId, string> = {
   skills: '/guide/skills#open-the-skills-page',
 };
 
+/**
+ * The modes that cost several times what one agent does. The first time someone picks one, a short explanation
+ * says what it is for, when it is not worth it and what it costs, before it is on; whether tips are on or not.
+ */
+export const COSTLY_MODES = ['swarm', 'campaign', 'research', 'arena'] as const;
+
+export type CostlyMode = (typeof COSTLY_MODES)[number];
+
+export const isCostlyMode = (v: unknown): v is CostlyMode => (COSTLY_MODES as readonly unknown[]).includes(v);
+
 /** GET and PUT /api/tips. */
 export interface TipsState {
   /** Tips show as their parts come on screen; off once skipped. */
@@ -102,4 +112,6 @@ export interface TipsState {
   seen: TipId[];
   /** The welcome tour version finished or skipped here (as POST /api/tour keeps it): tips wait for the tour. */
   tour: number;
+  /** The costly modes explained already, so the explanation comes once (on every device). */
+  explained: CostlyMode[];
 }

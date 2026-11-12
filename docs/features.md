@@ -312,11 +312,20 @@ agents that speak ACP and take MCP servers.
   Claude Code's own Agent tool is told the same models. Two switches, **Lead with subagents** and **Max for hard
   problems**, turn the team and stepping up to Max off. `scripts/tier-bench` measures what each tier and the team cost
   and how their results compare on your own setup, on tasks of its own, recent contest problems and LiveCodeBench.
-- **Deep research**: one switch under Options. The agent plans the searches a question needs, sends researchers
+- **Deep research**: one switch under Options, or in a running session from its menu → Session settings → Deep
+  research (it takes effect from the next message; the agent restarts with the new instructions and the conversation
+  carries on). The agent plans the searches a question needs, sends researchers
   (Hydor subagents) after each part, digs into what they leave open, has the key claims checked against two
   sources, and delivers a cited report as a page or a Word document. How many researchers at a time, how many
   rounds and how many searches in all are yours to set; a bar in the session says what it is doing and the
   searches used, and opens the report once it is ready.
+- **Swarm** (Options → Swarm, or a running session's menu → Session settings → Swarm; **Campaign** is the same for one
+  big change in parts, below): a lead agent splits a hard problem into different angles, starts a member for each,
+  and has the answer checked; members share a board. Like Deep research it takes effect from the next message, turning
+  one on turns the other off, and neither is offered for a confidential session or one another session started.
+  The first time someone picks Swarm, Campaign, Deep research or Arena (on the start page, in a scheduled task's
+  options or in a session's dialog), a dialog says what it does, what it is worth it for and not, and what it costs;
+  it shows once per mode, on every device, whether tips are on or not.
 - **Pages and apps**: pages the agents show can answer back (pick an option, fill in a form), stay in the
   Library with pictures, storage of their own and an address for a phone's home screen, and pages and folders publish at a
   link (a published page with a description and a social picture where its link is shared). The Library is sorted by project: what an agent saves goes in its session's project, Keep and Save to Library
@@ -848,7 +857,7 @@ agents that speak ACP and take MCP servers.
   dates and times written that way and notifications in it too, and agents write to you in it. Translations
   live in `web/src/i18n`: `npm run i18n:extract` lists every string, the server's messages and what ships with
   the app (skills, connections, search providers) included.
-- **Model arena**: under Options, send the same prompt to one or two more models; their answers show side by
+- **Model arena**: under Options (start page only: it sends the first message to the other models), send the same prompt to one or two more models; their answers show side by
   side, you keep the best one and the others are archived. Usage → Arena shows which models win on your own
   tasks, as a rating over the matches you decided.
 - **A second opinion, and caps**: one click has another company's model check a turn's work against what you
@@ -922,7 +931,7 @@ agents that speak ACP and take MCP servers.
   in one timeline, a notice at once, a rollback only after your yes).
 - **Find what broke it** (Git → History, a commit's ⋯): give the commit where it worked and what is broken; an agent
   writes a check, runs git bisect in a worktree of its own, names the first bad commit and says why.
-- **Campaign** (Options → Swarm → Campaign): one big change in many parts, each made by a member in its own worktree
+- **Campaign** (Options → Swarm → Campaign, or a running session's menu → Session settings → Swarm): one big change in many parts, each made by a member in its own worktree
   with its tests, on a board of parts and their status; a failed part is tried once more, and the lead merges the parts
   in order or opens pull requests.
 - New skills for every agent: ci-doctor, issue-triage, dependency-upgrades, incident-response and git-bisect.

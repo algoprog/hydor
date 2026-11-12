@@ -12,6 +12,7 @@ import type { SessionExtra } from '../../shared/features.ts';
 import { setSettings, toneOf } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
+import { GivenAtStart } from '../features/freshStart.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { spaceById, updateSpace } from '../spaces/index.ts';
@@ -47,13 +48,7 @@ export function guidelinesBlock(db: DB, extra: SessionExtra): string {
 const hash = (s: string) => crypto.createHash('sha1').update(s).digest('base64url').slice(0, 16);
 
 /** What each agent process was started with, by its run id: a later change starts it afresh. */
-const given = new Map<string, string>();
-function remember(runId: string, block: string) {
-  given.delete(runId);
-  given.set(runId, hash(block));
-  // A few hundred runs at most: the oldest go.
-  if (given.size > 500) given.delete(given.keys().next().value!);
-}
+const given = new GivenAtStart();
 
 export function guidelinesView(db: DB, o: { key?: string; space?: string }): GuidelinesView {
   const out: GuidelinesView = { global: globalGuidelines(db) };
@@ -96,20 +91,12 @@ export const guidelines: Feature = {
   },
   spawn(s, d) {
     const block = guidelinesBlock(d.db, s.extra);
-    remember(s.runId, block);
+    given.note(s.runId, hash(block));
     return block ? { instructions: [block] } : undefined;
   },
   async beforeSend(key, d) {
     // Claude Code and Codex read their instructions once, when they start: changed guidelines start them afresh.
-    if (!key.startsWith('claude:') && !key.startsWith('codex:')) return;
-    const run = d.sessions.runOf(key);
-    const was = run ? given.get(run) : undefined;
-    if (!run || was === undefined) return;
-    const st = d.sessions.adapterByRun(run)?.state;
-    // Not mid-turn, nor with a goal or work in the background, which a new process would lose.
-    if (!st || st.status !== 'idle' || st.goal || st.backgroundTasks?.length) return;
-    if (hash(guidelinesBlock(d.db, sessionExtra(d.db, key))) === was) return;
-    await d.sessions.recycle(key);
+    await given.refresh(key, d, () => hash(guidelinesBlock(d.db, sessionExtra(d.db, key))));
   },
   start(d) {
     // "How the agents talk to you" became part of the guidelines for every session.

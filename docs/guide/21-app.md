@@ -187,6 +187,7 @@ After the tour, tips show you the rest of the app as you come to it. The first t
 
 - **Got it**, or using the part it points at, puts a tip away for good, on every device.
 - **Skip tips** stops them all, on every device. **Skip the tour** on the tour's first page does too; closing the tour with ✕ leaves them on.
+- Separately, the first time you pick a mode that costs several times what one agent does (**Swarm**, **Campaign**, **Deep research** or **Arena**), a dialog explains what it is for and what it costs before it is on. It shows once for each mode, on every device, whether tips are on or not; ask an agent to show the tips again and it comes back too.
 - To turn them on or off again: [Settings → App → General → Help → **Tips**](/settings?s=general&find=Tips).
 
 ## Change your password

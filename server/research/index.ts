@@ -7,6 +7,7 @@
 import { researchOf, type ResearchSettings, type ResearchState } from '../../shared/research.ts';
 import { childKeys } from '../children/family.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
+import { GivenAtStart } from '../features/freshStart.ts';
 import type { Deps, Feature, RunCtx } from '../features/types.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { leadInstructions, RESEARCHER_INSTRUCTIONS } from './instructions.ts';
@@ -66,6 +67,10 @@ function start(ctx: RunCtx, r: NonNullable<ReturnType<typeof researchFor>>) {
   return null;
 }
 
+/** The research each run was started for, in words ("none" for none): a research turned on, off or changed later starts it afresh. */
+const given = new GivenAtStart();
+const researchWords = (r: ReturnType<typeof researchFor>): string => (r ? JSON.stringify([r.role, r.lead, r.settings]) : 'none');
+
 export const research: Feature = {
   id: 'research',
 
@@ -76,10 +81,15 @@ export const research: Feature = {
   spawn(s, d) {
     // A new Codex thread has no key yet: its own settings say whether it leads, its parent's whether it researches.
     const r = researchFor(d.db, s.key ?? '', s.extra);
+    given.note(s.runId, researchWords(r));
     if (!r) return undefined;
     // Every search goes through web_search, where the budget is kept: the agents' own web search is off.
     const off = s.agent === 'claude' ? { disallowedTools: ['WebSearch'] } : s.agent === 'codex' ? { codexConfig: { web_search: 'disabled' } } : {};
     return { instructions: [r.role === 'lead' ? leadInstructions(r.settings) : RESEARCHER_INSTRUCTIONS], ...off };
+  },
+
+  async beforeSend(key, d) {
+    await given.refresh(key, d, () => researchWords(researchFor(d.db, key)));
   },
 
   aroundTool(name, ctx) {

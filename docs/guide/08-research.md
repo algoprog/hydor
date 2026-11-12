@@ -21,6 +21,12 @@ On a phone, Options opens as a sheet from the bottom of the screen, and Research
 
 A deep research and a swarm (or a campaign) all work through a team of Hydor subagents, so you get one or the other: turning one on turns the other off.
 
+The first time you pick **Deep research**, a dialog called "Before you use Deep research" explains what it does, what it is worth it for, what it is not worth it for and what it costs. Press **Use Deep research** to go on, or **Cancel** to leave things as they were. It shows once for you, on every device, wherever you pick it (the start page, a scheduled task's options or a session's dialog) and whether tips are on or not; asking an agent to show the tips again brings it back too.
+
+You do not have to decide on the start page. In a session that is already going, open its menu (⋯) → **Session settings** → **Deep research**; its hint reads "Off", or the number of searches ("60 searches"). The dialog has **Off** and **Deep research** with the same settings as above (**Researchers at a time**, **Rounds**, **Searches in all**, **The report**); press **Save** when you are done, or **Cancel**. The change takes effect from your next message: the session's agent (Claude Code or Codex) restarts with the new instructions and tools before that message, and the conversation carries on where it was. Turning a deep research on turns a swarm off, and the other way round. The message box's chip beside the **+** (its **Options**) has the same **Deep research** row, below **Permissions**.
+
+The entry is not there for a confidential session, nor for a session another session started (a swarm member, a researcher, a subagent).
+
 A scheduled task can run a deep research each time it runs: its editor has the same **Research** setting ([Scheduled tasks](/guide/tasks)).
 
 ### Its settings
@@ -120,6 +126,10 @@ It is meant for hard problems with many possible routes: a proof, a stubborn bug
 
 The Swarm row reads "On · 5 at once", and the Options chip names it. **Swarm size** at the bottom of that menu takes you to its setting. As with a deep research, the mode is not kept for your next session, and only one of the two can be on. A spending cap set in the same Options menu covers the lead and every member. A scheduled task's editor has the same **Swarm** setting, for a swarm on each run.
 
+The first time you pick **Swarm** (or **Campaign**), a dialog called "Before you use Swarm" explains what it does, what it is worth it for, what it is not worth it for and what it costs. Press **Use Swarm** to go on, or **Cancel** to leave it off. It shows once for each mode, for you, on every device, whether tips are on or not; asking an agent to show the tips again brings it back too.
+
+You can also turn a swarm on or off, or change it to a campaign, inside a session: open its menu (⋯) → **Session settings** → **Swarm** (its hint reads **Off**, **On** or **Campaign**) and pick **Off**, **Swarm** or **Campaign**. The change takes effect from your next message: the session's agent (Claude Code or Codex) restarts with the new instructions and tools before that message, and the conversation carries on. Turning a swarm on turns a deep research off, and the other way round. The entry is not there for a confidential session, nor for a session another session started (a member, a researcher, a subagent). The message box's chip beside the **+** (its **Options**) has the same **Swarm** row, below **Permissions**.
+
 ### How a swarm works
 
 1. The lead works out what the task asks and what a checked answer looks like, and chooses up to your swarm size of different angles (for a proof: a direct argument, contradiction, induction, small cases and a computer search, known results).
@@ -150,7 +160,7 @@ In [Settings → Capabilities → Subagents](/settings?s=children), **Swarm size
 
 ## Make one big change with a campaign
 
-A campaign is the other kind of swarm, for one big change across a codebase rather than one hard problem: a migration, a framework upgrade, a rename everywhere. Pick it in the same place, **Options** → **Swarm** → **Campaign** ("One big change in parts, each in a worktree"), in a folder that is a git repository. The Swarm row then reads "Campaign · 5 at once".
+A campaign is the other kind of swarm, for one big change across a codebase rather than one hard problem: a migration, a framework upgrade, a rename everywhere. Pick it in the same place, **Options** → **Swarm** → **Campaign** ("One big change in parts, each in a worktree"), in a folder that is a git repository. The Swarm row then reads "Campaign · 5 at once". In a session that is already going, its menu (⋯) → **Session settings** → **Swarm** → **Campaign** does the same from your next message.
 
 The lead splits the change into parts (packages, modules, folders) and posts them as its plan. A member makes each part on a branch of its own in a new worktree, at most your swarm size at once, runs its checks and posts the part as done or failed; a failed part gets one more try. The lead merges the finished parts one at a time with the checks run after each (or opens a pull request for each, if you asked for that), and reports what changed and what failed. Its bar reads "Campaign · 12 of 40 parts done · 2 failed", and its board shows the parts and how each stands beside the posts. See [Campaigns: a big change in many parts](/guide/engineering#campaigns-a-big-change-in-many-parts).
 
@@ -213,6 +223,8 @@ The model arena sends the same prompt to two or three models at once, so you can
 4. Type the prompt and press **Start**.
 
 The Arena row reads "+1 model" or "+2 models", and the Options chip names it. This browser remembers your last picks, but the arena is not kept on for your next session.
+
+The first time you choose **Compare models**, a dialog called "Before you use Arena" explains what it does, what it is worth it for, what it is not worth it for and what it costs; press **Use Arena** to go on, or **Cancel**. It shows once for you, on every device, whether tips are on or not. Unlike a deep research or a swarm, the arena is a choice for the start page only: it sends your first message to the other models, so it cannot be added to a session that is already going.
 
 Each model works in a session of its own, with the same prompt, attachments, folder and session settings (agent, memory, spending cap), and its agent's usual effort and permissions. In a git repository, turn on **New worktree** in the folder menu so that each model gets its own copy of the code instead of all of them changing one folder. If a model cannot start, the app says so and the match goes on without it.
 
@@ -284,6 +296,8 @@ Each new Hydor subagent gets a cap of its own: an equal share of what is left of
 
 - "Start a deep research on heat pumps for a 1930s house, with 6 researchers at a time, a Word report and a $10 cap."
 - "How far along is the deep research in my 'EV chargers compared' session?"
+- "In my 'EV chargers compared' session, turn on deep research with 6 researchers and a Word report, from my next message."
+- "Switch my 'Flaky tests' session to a swarm, and back to one agent when I say so."
 - "Put a $5 spending cap on this session, and tell me what it has spent so far."
 - "Let up to 6 subagents work at once per session, and make swarms 8 agents."
 - "Which of these subagents did Hydor start, and which did Claude Code?"

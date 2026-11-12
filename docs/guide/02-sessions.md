@@ -271,7 +271,7 @@ Queued messages wait above the message box, numbered in the order they go out. O
 
 ## Change the agent, model, effort or permissions
 
-The message box of a session has the start page's **Agent** and its three choices **Model**, **Effort** and **Permissions**, in one chip beside the **+** (it opens **Options**, a sheet from the bottom on a phone). The chip names the agent and the model, and the effort and permissions when they are not the usual; it turns amber while the agent may do anything without asking (**Bypass**, or Codex's **Full access**). Another agent applies from your next message (see [Switch agents in a session](/guide/agents#switch-agents-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
+The message box of a session has the start page's **Agent** and its three choices **Model**, **Effort** and **Permissions**, in one chip beside the **+** (it opens **Options**, a sheet from the bottom on a phone). Below them, **Swarm** and **Deep research** open the same dialogs as the session menu's [Session settings](/guide/research#turn-it-on), from your next message. The chip names the agent and the model, and the effort and permissions when they are not the usual; it turns amber while the agent may do anything without asking (**Bypass**, or Codex's **Full access**). Another agent applies from your next message (see [Switch agents in a session](/guide/agents#switch-agents-in-a-session)). A change of model, effort or permissions applies to the running agent at once and stays with the session. Shift+Tab moves to the next permissions mode. The model menu lists only this agent's models; to move the conversation to another agent, use [Continue in another agent](#continue-in-another-agent).
 
 ## Quote part of a reply
 
@@ -450,6 +450,8 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
   - **Memory**, with **On** or **Off** beside it: turns memory on or off for this session ("Off for all" when memory is off in Settings). See [Memory](/guide/memory).
   - **Spending cap**, with the cap beside it: set, change or raise it. See [Usage, limits and costs](/guide/usage).
   - **Connected accounts**: turn each connected account on or off for this session only. See [Connected apps, keys and tools](/guide/connections).
+  - **Swarm**, with **Off**, **On** or **Campaign** beside it: opens a dialog to turn a swarm or a campaign on or off from your next message. See [Deep research, second opinions and several agents](/guide/research#set-a-swarm-on-a-hard-problem).
+  - **Deep research**, with **Off** or the number of searches beside it: opens a dialog to turn a deep research on, off or change it from your next message. See [Deep research, second opinions and several agents](/guide/research#turn-it-on). (Swarm and Deep research are not shown for a confidential session, nor for a session another session started.)
   - **Agent**, with its name beside it: opens the agent's page (sessions with an agent). The message box switches it.
 - **More** (a submenu):
   - **Open a browser** / **Show the browser**: the agents' browser for this session, which you can watch and take over. See [Search and the browser](/guide/web).

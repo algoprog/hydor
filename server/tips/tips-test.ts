@@ -32,7 +32,7 @@ test('the list: ids once each, each with a place in the guide', () => {
 });
 
 test('at first: on, nothing shown, the tour as POST /api/tour kept it', () => {
-  assert.deepEqual(tipsState(db), { on: true, seen: [], tour: 0 });
+  assert.deepEqual(tipsState(db), { on: true, seen: [], tour: 0, explained: [] });
   kvSet(db, 'tour.seen', '2');
   assert.equal(tipsState(db).tour, 2);
 });
@@ -40,9 +40,9 @@ test('at first: on, nothing shown, the tour as POST /api/tour kept it', () => {
 test('shown tips are kept once each, in order; off and on keep them', () => {
   assert.deepEqual(setTips(db, { seen: ['search'] }).seen, ['search']);
   assert.deepEqual(setTips(db, { seen: ['details', 'search', 'details'] }).seen, ['search', 'details']);
-  assert.deepEqual(setTips(db, { on: false }), { on: false, seen: ['search', 'details'], tour: 2 });
-  assert.deepEqual(tipsState(db), { on: false, seen: ['search', 'details'], tour: 2 }, 'every device reads the same');
-  assert.deepEqual(setTips(db, { on: true, seen: ['git'] }), { on: true, seen: ['search', 'details', 'git'], tour: 2 });
+  assert.deepEqual(setTips(db, { on: false }), { on: false, seen: ['search', 'details'], tour: 2, explained: [] });
+  assert.deepEqual(tipsState(db), { on: false, seen: ['search', 'details'], tour: 2, explained: [] }, 'every device reads the same');
+  assert.deepEqual(setTips(db, { on: true, seen: ['git'] }), { on: true, seen: ['search', 'details', 'git'], tour: 2, explained: [] });
   assert.deepEqual(setTips(db, { reset: true }).seen, [], 'reset shows every tip again');
   assert.deepEqual(setTips(db, { reset: true, seen: ['apps'] }).seen, ['apps'], 'reset comes before seen');
   assert.equal(kvGet(db, 'tips'), JSON.stringify({ seen: ['apps'] }), 'on is kept as nothing');
@@ -61,11 +61,22 @@ test('refused, changing nothing: a tip it does not know, and wrong kinds', () =>
 
 test('kept by another version or by hand: what this one does not know is left out', () => {
   db.prepare("insert or replace into kv (k, v) values ('tips', ?)").run(JSON.stringify({ off: true, seen: ['gone', 'git', 'git', 4] }));
-  assert.deepEqual(tipsState(db), { on: false, seen: ['git'], tour: 2 });
+  assert.deepEqual(tipsState(db), { on: false, seen: ['git'], tour: 2, explained: [] });
   db.prepare("insert or replace into kv (k, v) values ('tips', 'not json')").run();
-  assert.deepEqual(tipsState(db), { on: true, seen: [], tour: 2 });
+  assert.deepEqual(tipsState(db), { on: true, seen: [], tour: 2, explained: [] });
   db.prepare("insert or replace into kv (k, v) values ('tips', '[1]')").run();
-  assert.deepEqual(tipsState(db), { on: true, seen: [], tour: 2 });
+  assert.deepEqual(tipsState(db), { on: true, seen: [], tour: 2, explained: [] });
+});
+
+test('costly modes explained: kept once each whether tips are on or off, refused when unknown, shown again by reset', () => {
+  setTips(db, { on: false });
+  assert.deepEqual(setTips(db, { explained: ['swarm'] }).explained, ['swarm']);
+  assert.deepEqual(setTips(db, { explained: ['research', 'swarm'] }).explained, ['swarm', 'research']);
+  assert.equal(tipsState(db).on, false, 'explaining a mode leaves tips off');
+  assert.throws(() => setTips(db, { explained: ['swarn'] }), (e: Error) => status(e) === 400 && /swarn/.test(e.message) && /campaign/.test(e.message));
+  assert.throws(() => setTips(db, { explained: 'swarm' }), (e: Error) => status(e) === 400 && /explained/.test(e.message));
+  assert.deepEqual(tipsState(db).explained, ['swarm', 'research']);
+  assert.deepEqual(setTips(db, { reset: true }).explained, [], 'reset explains them again');
 });
 
 test('the routes: GET reads it, PUT keeps it and tells every open page', async () => {
@@ -76,7 +87,7 @@ test('the routes: GET reads it, PUT keeps it and tells every open page', async (
   };
   const sent: ServerEvent[] = [];
   tips.routes!({ app, db, broadcast: (e: ServerEvent) => sent.push(e) } as unknown as Deps);
-  const state = { on: false, seen: ['inbox'], tour: 2 };
+  const state = { on: false, seen: ['inbox'], tour: 2, explained: [] };
   assert.deepEqual(await handlers.get('PUT /api/tips')!({ body: { on: false, seen: ['inbox'] } }), state);
   assert.deepEqual(sent, [{ t: 'feature', id: 'tips', data: state }]);
   assert.deepEqual(await handlers.get('GET /api/tips')!({}), state);

@@ -1,18 +1,23 @@
 // Swarm mode: a session that leads a team of agents, as a swarm attacking a hard problem from different angles,
 // or as a campaign making one big change in many parts, each in a worktree of its own. On the start page, an
-// option under Options; in the lead's session, a bar over the message box with how it is doing and its board; in
+// option under Options; in a session, its menu's Session settings → Swarm, to turn it on, off or to a campaign
+// from the next message; in the lead's session, a bar over the message box with how it is doing and its board; in
 // a member's, where its posts and report go. Its size is in Settings → Subagents; members are child
 // sessions, so they also nest under the lead in the sidebar.
 import { useEffect, useRef, useState } from 'react';
 import { Settings2, Users } from 'lucide-react';
+import { create } from 'zustand';
+import { isConfidential } from '@shared/confidential';
 import type { SessionExtra } from '@shared/features';
 import { partsTally, swarmMode, type SwarmMode } from '@shared/swarm';
 import type { SessionSummary } from '@shared/types';
-import { MenuItem, MenuSep, OptionRow, Popover, SettingChip } from '../../components/ui';
+import { Dialog, MenuItem, MenuSep, OptionRow, Popover, SettingChip } from '../../components/ui';
 import { activityOf, isBusy } from '../../lib/activity';
+import { enc, patch } from '../../lib/api';
 import { go, openSession } from '../../lib/nav';
-import { useSessions } from '../../lib/store';
+import { toast, toastError, useSessions } from '../../lib/store';
 import type { WebFeature } from '../registry';
+import { useCostlyMode } from '../tips/ModeExplainer';
 import { BoardDialog, useMembers } from './Board';
 import { loadBoard, useBoards, useChildSettingsState } from './state';
 
@@ -93,7 +98,7 @@ function MemberDock({ lead, mode }: { lead: SessionSummary; mode: SwarmMode }) {
   );
 }
 
-function SwarmDock({ s }: { s: SessionSummary }) {
+function SwarmBar({ s }: { s: SessionSummary }) {
   const parent = typeof s.extra?.parent === 'string' ? s.extra.parent : undefined;
   const lead = useSessions((x) => (parent ? x.byKey[parent] : undefined));
   const own = swarmMode(s.extra);
@@ -101,6 +106,80 @@ function SwarmDock({ s }: { s: SessionSummary }) {
   const theirs = swarmMode(lead?.extra);
   if (lead && theirs) return <MemberDock lead={lead} mode={theirs} />;
   return null;
+}
+
+function SwarmDock({ s }: { s: SessionSummary }) {
+  return (
+    <>
+      <SwarmBar s={s} />
+      <SwarmDialog s={s} />
+    </>
+  );
+}
+
+/**
+ * Off, a swarm or a campaign: the start page's popover and a session's dialog both list these. Picked for the first
+ * time, a swarm or a campaign is explained before it is on (what it is for, what it costs).
+ */
+function SwarmChoices({ mode, size, set }: { mode: SwarmMode | null; size?: number; set: (swarm: true | 'campaign' | undefined) => void }) {
+  const { ask, dialog } = useCostlyMode();
+  return (
+    <>
+      <OptionRow label="Off" hint="One agent works on the task" selected={!mode} onClick={() => set(undefined)} />
+      <OptionRow label="Swarm" hint={`Up to ${size ?? 'several'} agents at once, each from its own angle`} selected={mode === 'swarm'} onClick={() => ask('swarm', () => set(true))} />
+      <OptionRow label="Campaign" hint="One big change in parts, each in a worktree" selected={mode === 'campaign'} onClick={() => ask('campaign', () => set('campaign'))} />
+      {dialog}
+    </>
+  );
+}
+
+/** The session whose Swarm dialog is open, if any (its menu opens it; its dock shows it, outliving the menu). */
+const useSwarmDialog = create<{ key: string | null }>(() => ({ key: null }));
+
+/** A session that may lead a swarm: not a confidential one, nor one another session started (a member, a researcher, a subagent). */
+const canLead = (s: SessionSummary) => !isConfidential(s.extra) && typeof s.extra?.parent !== 'string';
+
+/** The session menu's Session settings → Swarm: turns it on, off or to a campaign, from the next message. */
+function SwarmMenuItem({ s, close }: { s: SessionSummary; close: () => void }) {
+  if (!canLead(s)) return null;
+  const mode = swarmMode(s.extra);
+  return (
+    <MenuItem icon={<Users size={15} />} hint={mode === 'campaign' ? 'Campaign' : mode ? 'On' : 'Off'} onClick={() => (close(), useSwarmDialog.setState({ key: s.key }))}>
+      Swarm
+    </MenuItem>
+  );
+}
+
+/** In the message box's settings: Swarm, and what it is now; opens the same dialog. */
+function SwarmOption({ s }: { s: SessionSummary }) {
+  if (!canLead(s)) return null;
+  const mode = swarmMode(s.extra);
+  return <SettingChip label="Swarm" icon={<Users size={14} />} value={mode === 'campaign' ? 'Campaign' : mode ? 'On' : 'Off'} on={!!mode} onClick={() => useSwarmDialog.setState({ key: s.key })} />;
+}
+
+function SwarmDialog({ s }: { s: SessionSummary }) {
+  const open = useSwarmDialog((x) => x.key === s.key);
+  const size = useChildSettingsState()?.swarmSize;
+  const mode = swarmMode(s.extra);
+  const close = () => useSwarmDialog.setState({ key: null });
+  const set = (swarm: true | 'campaign' | undefined) => {
+    close();
+    if ((swarm === 'campaign' ? 'campaign' : swarm ? 'swarm' : null) === mode) return;
+    // A swarm and a deep research both lead child sessions: one or the other.
+    patch(`/api/sessions/${enc(s.key)}/extra`, swarm ? { swarm, research: null } : { swarm: null })
+      .then(() => toast(swarm === 'campaign' ? 'Campaign from your next message' : swarm ? 'Swarm from your next message' : 'One agent from your next message'))
+      .catch(toastError);
+  };
+  return (
+    <Dialog open={open} onClose={close} title="Swarm" width={400}>
+      <div className="-mx-2">
+        <SwarmChoices mode={mode} size={size} set={set} />
+      </div>
+      <p className="mt-2 text-[12.5px] leading-snug text-fg-3">
+        A lead agent shares the work out and checks it; it costs several times what one agent does. A change takes effect from your next message, and the conversation carries on.
+      </p>
+    </Dialog>
+  );
 }
 
 /**
@@ -137,9 +216,7 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
         }
       />
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} width={300} title="Swarm">
-        <OptionRow label="Off" hint="One agent works on the task" selected={!mode} onClick={() => set(undefined)} />
-        <OptionRow label="Swarm" hint={`Up to ${size ?? 'several'} agents at once, each from its own angle`} selected={mode === 'swarm'} onClick={() => set(true)} />
-        <OptionRow label="Campaign" hint="One big change in parts, each in a worktree" selected={mode === 'campaign'} onClick={() => set('campaign')} />
+        <SwarmChoices mode={mode} size={size} set={set} />
         <div className="mx-1 mt-1 border-t border-line px-2 pt-2 pb-1 text-[12px] leading-snug text-fg-3">
           A lead agent shares the work out and checks it; it costs several times what one agent does.
         </div>
@@ -161,5 +238,8 @@ function SwarmStartOption({ value, onChange }: { value: SessionExtra; onChange: 
 export const swarmFeature: WebFeature = {
   id: 'swarm',
   SessionDock: SwarmDock,
+  SessionMenu: SwarmMenuItem,
+  SessionOptions: SwarmOption,
+  sessionMenuPart: 'settings',
   StartOptions: SwarmStartOption,
 };
