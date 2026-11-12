@@ -112,7 +112,7 @@ function parseSkillFile(text: string): { name?: string; description?: string; bo
 export const skills: Area = {
   name: 'skills',
   aliases: ['skill'],
-  summary: 'Skills: the library and the agents’ own',
+  summary: 'The skills agents use',
   help: 'A skill is a SKILL.md that tells an agent how to do one kind of task. The library is every agent’s; Claude Code and Codex have their own besides (--agent claude, --agent codex). A skill an agent proposed is approved on the Skills page. Name one by its name or the start of it; on a terminal, leave it out to pick from a list.',
   group: 'work',
   verbs: [
@@ -143,7 +143,7 @@ export const skills: Area = {
             p.dim(s.lib?.uses ? `${s.lib.uses} uses` : ''),
             p.dim(s.description),
           ]);
-        ctx.out(table(ctx, rows, { head: ['', 'SKILL', 'FROM', 'USED', ''], grow: 4 }));
+        ctx.out(table(ctx, rows, { head: ['', 'SKILL', 'FROM', 'USED', ''], grow: 1, free: [1, 4] }));
         if (list.length > rows.length) ctx.out(p.dim(`… ${list.length - rows.length} more (-n <number>, or --all)`));
       },
     },
