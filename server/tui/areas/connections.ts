@@ -123,7 +123,7 @@ export const connections: Area = {
             ],
             ['Keys set', c.secretFields.join(', ')],
             ['Tested', c.testedAt ? timeAgo(c.testedAt) : undefined],
-            ['Sign-in ends', c.expiresAt ? `${new Date(c.expiresAt).toLocaleString('en-GB')} (it renews by itself while it can)` : undefined],
+            ['Sign-in ends', c.expiresAt ? `${new Date(c.expiresAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} (it renews by itself while it can)` : undefined],
             ['Website', c.app.homepage],
           ]),
           ...(c.tools?.length
