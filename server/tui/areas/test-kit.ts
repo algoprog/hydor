@@ -58,6 +58,8 @@ export interface Ran {
   code: number;
   /** The text edit() was handed, in order. */
   edited: string[];
+  /** The questions ask() asked, with whether hidden. */
+  typed: { question: string; hidden: boolean }[];
 }
 
 export interface Answers {
@@ -67,6 +69,8 @@ export interface Answers {
   pick?: string | null;
   /** What the editor returns (null: unchanged). */
   edit?: string | null;
+  /** What ask returns, in order (null when they run out); the questions go to ran.typed. */
+  typed?: (string | null)[];
   /** The files readText reads, by path. */
   files?: Record<string, string>;
   /** Whether a person is there (default false: piped). */
@@ -77,7 +81,8 @@ export interface Answers {
 
 /** A Ctx that collects. */
 export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArgv>, a: Answers = {}): { ctx: Ctx; ran: Ran } {
-  const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [] };
+  const ran: Ran = { out: '', json: [], asked: [], picked: [], code: 0, edited: [], typed: [] };
+  const typed = [...(a.typed ?? [])];
   const look: Look = { p: makePaint(false), width: 80, home: '/home/u' };
   const ctx: Ctx = {
     conn,
@@ -115,6 +120,11 @@ export function testCtx(conn: Conn, usage: string, o: ReturnType<typeof parseArg
     async pick(title, items: PickItem[]) {
       ran.picked.push(title);
       return a.pick === undefined ? (items[0]?.value ?? null) : a.pick;
+    },
+    async ask(question, { hidden = false } = {}) {
+      if (!ctx.interactive && !a.typed) throw new UsageError(`${question.replace(/[:?]\s*$/, '')}: there is no terminal to type it on`);
+      ran.typed.push({ question, hidden });
+      return typed.length ? typed.shift()! : null;
     },
   };
   return { ctx, ran };

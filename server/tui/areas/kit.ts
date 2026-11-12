@@ -149,6 +149,8 @@ export interface Ctx {
   readText(spec: { file?: string; current?: string; ext?: string }): Promise<string | null>;
   /** A list to pick from (↑↓, type to filter, Enter); null when they back out. Without a terminal, a UsageError. */
   pick(title: string, items: PickItem[]): Promise<string | null>;
+  /** One line typed by the person; `hidden` for a key or a token (never shown, never printed). null when they back out. Without a terminal, a UsageError. */
+  ask(question: string, o?: { hidden?: boolean }): Promise<string | null>;
 }
 
 export interface PickItem {

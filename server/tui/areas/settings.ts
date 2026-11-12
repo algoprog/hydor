@@ -3,8 +3,6 @@
 // (Send a test, Check now), open prints the page's address, and with no verb on a terminal the options are browsed: a
 // section, then an option, and Enter changes it. The options and how each is read and changed are in one table
 // (server/tui/settings-table.ts), loaded only when a verb runs.
-import readline from 'node:readline';
-import { Writable } from 'node:stream';
 import { makePaint } from '../term.ts';
 import { Cancelled, choose, fields, flag, str, table, UsageError, type Area, type Ctx } from './kit.ts';
 import type { Read, Row, Value } from '../settings-table.ts';
@@ -65,35 +63,13 @@ function takes(t: Table, r: Row): string | undefined {
   }
 }
 
-/** Types one line, hidden for a secret; null when they give up. Needs a terminal. */
-async function ask(ctx: Ctx, question: string, hidden = false): Promise<string | null> {
-  if (!ctx.interactive) throw new UsageError(`${question.replace(/[:?]\s*$/, '')}: there is no terminal to type it on`);
-  const quiet = new Writable({ write: (_c, _e, done) => done() });
-  const rl = readline.createInterface({ input: process.stdin, output: hidden ? quiet : process.stderr, terminal: true });
-  if (hidden) process.stderr.write(question);
-  return new Promise((resolve) => {
-    let done = false;
-    const end = (v: string | null) => {
-      if (done) return;
-      done = true;
-      if (hidden) process.stderr.write('\n');
-      rl.close();
-      resolve(v);
-    };
-    rl.on('SIGINT', () => end(null));
-    rl.on('close', () => end(null));
-    if (hidden) rl.once('line', (l) => end(l));
-    else rl.question(question, (l) => end(l));
-  });
-}
-
 /** Presses a button: asks its question first, says what it did. */
 async function pressed(ctx: Ctx, t: Table, r: Row, arg?: string): Promise<void> {
   const q = r.act?.question;
   if (q && !(await ctx.confirm(q))) return ctx.out('Not done.');
   if (r.act?.arg && !arg) {
     if (!ctx.interactive) throw new UsageError(`${r.label} needs ${r.act.arg}: ${ctx.usage} <${r.act.arg}>`);
-    arg = (await ask(ctx, `${r.act.arg[0].toUpperCase()}${r.act.arg.slice(1)}: `)) ?? undefined;
+    arg = (await ctx.ask(`${r.act.arg[0].toUpperCase()}${r.act.arg.slice(1)}: `)) ?? undefined;
     if (!arg) throw new Cancelled();
   }
   if (r.act?.slow) ctx.out(ctx.look.p.dim('This can take a minute…'));
@@ -222,7 +198,7 @@ export const settings: Area = {
         else if (text === undefined) {
           if (r.kind === 'secret') {
             if (!ctx.interactive) throw new UsageError(`Give the ${r.label} on stdin with --file -, or run it at a prompt to type it hidden`);
-            text = (await ask(ctx, `${r.label} (typed hidden): `, true)) ?? undefined;
+            text = (await ctx.ask(`${r.label} (typed hidden): `, { hidden: true })) ?? undefined;
             if (!text) throw new Cancelled();
           } else if (r.multiline && ctx.interactive) {
             const cur = await t.readAll(ctx.conn, [r]).then((m) => m.get(r.id)?.value);
@@ -349,7 +325,7 @@ async function change(ctx: Ctx, t: Table, r: Row, rd: Read | undefined): Promise
         if (!what) throw new Cancelled();
         if (what === 'remove') return set('');
       }
-      const key = await ask(ctx, `${r.label} (typed hidden): `, true);
+      const key = await ctx.ask(`${r.label} (typed hidden): `, { hidden: true });
       if (!key) throw new Cancelled();
       return set(key);
     }
@@ -359,17 +335,17 @@ async function change(ctx: Ctx, t: Table, r: Row, rd: Read | undefined): Promise
         if (next === null) return say(['Left as it was.']);
         return set(next);
       }
-      const next = await ask(ctx, `${r.label}${typeof cur === 'string' && cur ? ` [${cur}]` : ''} (empty keeps it, - empties it): `);
+      const next = await ctx.ask(`${r.label}${typeof cur === 'string' && cur ? ` [${cur}]` : ''} (empty keeps it, - empties it): `);
       if (next === null || next === '') throw new Cancelled();
       return set(next === '-' ? '' : next);
     }
     case 'number': {
-      const next = await ask(ctx, `${r.label} (${r.range!.min} to ${r.range!.max}${cur !== undefined ? `, now ${cur}` : ''}): `);
+      const next = await ctx.ask(`${r.label} (${r.range!.min} to ${r.range!.max}${cur !== undefined ? `, now ${cur}` : ''}): `);
       if (!next) throw new Cancelled();
       return set(next);
     }
     case 'list': {
-      const next = await ask(ctx, `${r.label} (${r.items}; none empties it${Array.isArray(cur) && cur.length ? `; now ${cur.join(',')}` : ''}): `);
+      const next = await ctx.ask(`${r.label} (${r.items}; none empties it${Array.isArray(cur) && cur.length ? `; now ${cur.join(',')}` : ''}): `);
       if (!next) throw new Cancelled();
       return set(next);
     }
