@@ -29,12 +29,27 @@ OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA
 The terminal client (`hydor`, `server/tui/`) is a client of the same API and event socket as the web app, started
 from `server/cli.ts` (`bin/hydor.mjs` runs it). `server/tui/tui-test.ts` checks its parts (arguments, widths and
 wrapping, Markdown, each step's line, approvals, the input line's keys), `hydor run` against a small fake server
-(streamed events, helpers, `--json`, the exit codes, a socket that drops), and the chat itself in a pseudo-terminal
+(streamed events, subagents, `--json`, the exit codes, a socket that drops), and the chat itself in a pseudo-terminal
 (node-pty, its screen read back through a headless xterm):
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/tui/tui-test.ts && DATA_DIR=/tmp/hydor-test-tui node dist/dev/tui-test.js
 ```
+
+Around it:
+
+- `server/tui/areas/` has one file for each area of the app the command reaches (`sessions.ts`, `projects.ts`,
+  `memory.ts`, `settings.ts`…), each listing its verbs, their arguments and options and what they call, with a
+  `-test.ts` beside it that runs them against a fake connection. `index.ts` lists the areas; `kit.ts` has what they
+  share (the verb types, tables, naming a thing by id or by name, markdown). `hydor help`, option parsing
+  (`args.ts`) and Tab completion all come out of that list, so a new verb needs nothing else. See
+  [the plan](plans/terminal-parity.md).
+- `server/tui/settings-table.ts` says, for every option of the Settings page (`shared/find-catalog.ts`), how
+  `hydor settings` reads and changes it; `settings-test.ts` fails when an option has no row.
+- `server/tui/complete.ts` is the chat's completion menu and `completion.ts` the shell's Tab completion (scripts for
+  bash, zsh and fish, and the lists they ask the command for), each with a test.
+- The Mac app puts the command on the PATH from `desktop/cli-link.cjs` (`server/desktop-cli-link-test.ts` tries it on
+  scratch folders).
 
 Tiers and the team (`shared/tiers.ts`, `server/assistants/tiers.ts` and `auto.ts`, `server/children/team.ts`) have
 their checks in `server/assistants/agents-test.ts` and `server/children/children-test.ts`. Whether a led session
