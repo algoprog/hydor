@@ -151,7 +151,7 @@ async function followJob(ctx: Ctx, first: Job, what: string): Promise<Job> {
 export const plugins: Area = {
   name: 'plugins',
   aliases: ['plugin'],
-  summary: 'Plugins: skills, tool servers and instructions bundled for the agents',
+  summary: 'Add-ons with skills and tools',
   help: 'Hydor’s plugins work for every agent: each brings skills, tool servers and instructions. Claude Code and Codex have plugins of their own besides: add --agent claude or --agent codex. Name one by its name or the start of it; on a terminal, leave it out to pick from a list. Making a plugin of your own is on its page (hydor open plugins).',
   group: 'tools',
   verbs: [
@@ -176,7 +176,7 @@ export const plugins: Area = {
             p.dim(stateWord(x)),
             p.dim(x.description ?? ''),
           ];
-          ctx.out(table(ctx, [...r.installed, ...r.available].map(row), { head: ['', 'PLUGIN', 'VERSION', 'STATE', ''], grow: 4 }));
+          ctx.out(table(ctx, [...r.installed, ...r.available].map(row), { head: ['', 'PLUGIN', 'VERSION', 'STATE', ''], grow: 1, free: [1, 4] }));
           return;
         }
         const q = str(v, 'search');
@@ -186,7 +186,7 @@ export const plugins: Area = {
         const more = q ? r.available.map((x) => [p.dim('+'), x.name, p.dim(x.marketplace ?? ''), p.dim(x.version ?? ''), p.dim(x.description ?? '')]) : [];
         if (!rows.length && !more.length)
           return ctx.out(`${programName(where)} has no plugins${q ? ` that fit “${q}”` : ''}: hydor plugins add <name@marketplace> --agent ${where} adds one (--search finds them).`);
-        ctx.out(table(ctx, [...rows, ...more], { head: ['', 'PLUGIN', 'MARKETPLACE', 'VERSION', ''], grow: 4 }));
+        ctx.out(table(ctx, [...rows, ...more], { head: ['', 'PLUGIN', 'MARKETPLACE', 'VERSION', ''], grow: 1, free: [1, 4] }));
         if (q && r.total && r.total > more.length) ctx.out(p.dim(`… ${r.total - more.length} more that fit (-n <number>)`));
       },
     },
