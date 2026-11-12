@@ -79,7 +79,7 @@ test('complete: the first word is a command, with its description', async () => 
     all.every((l) => l.split('\t').length === 2 && !l.startsWith('__')),
     'a value and a description, none hidden',
   );
-  assert.deepEqual(await values('se'), ['sessions', 'send', 'serve', 'set-password', 'setup-token', 'service']);
+  assert.deepEqual(await values('se'), ['sessions', 'send', 'serve', 'set-password', 'setup-token', 'service', 'settings']);
   assert.deepEqual(await complete('zzz'), []);
   assert.equal(asked.length, 0, 'commands need no server');
 });

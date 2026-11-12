@@ -43,6 +43,25 @@ async function sessions(c: LoadCtx): Promise<Loaded> {
   return list.map((s) => [shortKey(s, n), [cut((s.title || s.firstPrompt || '(untitled)').replace(/\s+/g, ' ')), statusWord(s, plain)].filter(Boolean).join(' · ')]);
 }
 
+/** What follows `hydor settings set <option> `: on and off for a switch, a choice's values (a model's, asked from the server). */
+async function settingValues(c: LoadCtx): Promise<Loaded> {
+  const t = await import('../settings-table.ts');
+  let row;
+  try {
+    row = t.findRow(c.args[0] ?? '');
+  } catch {
+    return [];
+  }
+  if (row.kind === 'switch' || row.device?.key === 'suggestions') return [['on'], ['off']];
+  if (row.kind !== 'choice' && row.kind !== 'list' && !row.device) return [];
+  const api = (async (_method: string, p: string) => {
+    const r = await c.get(p);
+    if (r === null) throw new Error('not answered');
+    return r;
+  }) as never;
+  return (await t.choicesOf({ api }, row)).map((x): Candidate => [x.value, x.label === x.value ? undefined : x.label]);
+}
+
 export const LOADERS: Record<ArgKind, Loader> = {
   session: sessions,
   project: async (c) => ((await c.get<{ spaces?: { id: string; name: string }[] }>('/api/projects'))?.spaces ?? []).map((s) => named(s.id, s.name)),
@@ -60,8 +79,9 @@ export const LOADERS: Record<ArgKind, Loader> = {
   machine: none,
   connection: none,
   account: none,
-  setting: none,
-  section: none,
+  setting: async () => (await import('../settings-table.ts')).ROWS.map((r): Candidate => [r.id, r.label]),
+  value: settingValues,
+  section: async () => (await import('../settings-table.ts')).SECTION_LIST.map((s): Candidate => [s.id, s.label]),
   topic: none,
   route: none,
   place: none,

@@ -3,9 +3,10 @@
 // that exists already (sessions, agents, tasks, open…) takes over only the verbs it names; the command's own code
 // still answers the rest until it is moved into the area.
 import { projects } from './projects.ts';
+import { settings } from './settings.ts';
 import type { Area, Verb } from './kit.ts';
 
-export const AREAS: Area[] = [projects];
+export const AREAS: Area[] = [projects, settings];
 
 /** An area by its name or an alias of it. */
 export const areaByName = (name: string): Area | undefined => AREAS.find((a) => a.name === name || a.aliases?.includes(name));
