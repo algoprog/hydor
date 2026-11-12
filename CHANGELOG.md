@@ -3,6 +3,14 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.59.1 · 12 November 2026
+
+Agents you have finished with stop on their own again, so they no longer use up the computer's memory.
+
+- **Idle agents stop again after the app restarts**: an agent session left idle stops after three hours, as before,
+  even when the app restarted in the meantime. Each restart used to start the count again, so on a computer where the
+  app restarted often, idle agents were never stopped and kept their memory (40 were left running at once).
+
 ## 0.59.0 · 12 November 2026
 
 Every editor gets a right-click menu, and the ones that place things help you line them up as you move and size them,
