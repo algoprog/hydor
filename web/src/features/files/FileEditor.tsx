@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { ArrowLeft, Copy, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, MessageSquarePlus, RotateCcw, Save, Search, Signature, SlidersHorizontal, SquareTerminal, WrapText } from 'lucide-react';
+import { ArrowLeft, ClipboardPaste, Copy, CornerDownRight, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, Keyboard, MessageSquarePlus, Replace, RotateCcw, Save, Scissors, Search, Signature, SlidersHorizontal, Sparkles, SquareTerminal, TextSelect, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
-import type { EditorHandle } from '../../lib/codemirror';
+import type { EditorHandle, EditorSnapshot, EditorStatus } from '../../lib/codemirror';
 import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
@@ -14,7 +14,13 @@ import { showInFiles } from '../../lib/nav';
 import { isPreviewable } from '@shared/documents';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
 import { useSpaceMenu } from './SpaceMenu';
-import { useWatchMs } from './FileAsk';
+import { askAbout, useWatchMs } from './FileAsk';
+import { FileStatus } from './FileStatus';
+import { ContextMenu, type ContextMenuAt, type MenuEntry } from '../pages/common/menus';
+import { ShortcutsDialog, type ShortcutGroup } from '../pages/common/Shortcuts';
+import { isApple, keyLabel } from '../pages/common/keys';
+import { detectEol, forDisk, forEditor, type Eol } from './lineends';
+import { getDraft, isDirty, keepDraft, leaveFile, registerSaver, setDirty as noteDirty } from './unsaved';
 import { EDITABLE, editFile } from '../mediaedit/open';
 import { EDITABLE_VIDEO, editVideoFile } from '../mediaedit/video/open';
 import { EDITABLE_SOUND, editSoundFile } from '../mediaedit/audio/open';
@@ -63,6 +69,52 @@ const MEDIA: Record<string, 'image' | 'pdf' | 'video' | 'audio'> = {
   weba: 'audio',
 };
 
+/** The text editor's keys, for the shortcuts list (More → Keyboard shortcuts). */
+const SHORTCUTS: ShortcutGroup[] = [
+  {
+    title: 'File',
+    items: [
+      ['Ctrl+S', 'Save'],
+      ['Shift+F10 / Menu', 'Open the right-click menu at the cursor'],
+    ],
+  },
+  {
+    title: 'Find',
+    items: [
+      ['Ctrl+F', 'Find'],
+      [isApple ? 'Ctrl+Alt+F' : 'Ctrl+H', 'Find and replace'],
+      [isApple ? 'Ctrl+Alt+G' : 'Ctrl+G / Ctrl+Alt+G', 'Go to a line'],
+      ['F3 / Shift+F3', 'Next / previous match'],
+      ['Ctrl+D', 'Pick the next place the picked words appear'],
+      ['Ctrl+Shift+L', 'Pick every place the picked words appear'],
+    ],
+  },
+  {
+    title: 'Edit',
+    items: [
+      ['Ctrl+Z', 'Undo'],
+      ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'],
+      ['Ctrl+/', 'Comment or uncomment the lines'],
+      ['Tab / Shift+Tab', 'Indent / unindent'],
+      ['Alt+↑ / Alt+↓', 'Move the line up / down'],
+      ['Shift+Alt+↑ / Shift+Alt+↓', 'Copy the line up / down'],
+      ['Ctrl+Shift+K', 'Delete the line'],
+      ['Ctrl+Enter', 'Add a line below'],
+      ['Ctrl+Space', 'Suggest a completion'],
+    ],
+  },
+  {
+    title: 'Picking',
+    items: [
+      ['Ctrl+A', 'Pick everything'],
+      ['Alt+L', 'Pick the line'],
+      ['Ctrl+I', 'Pick the block around it'],
+      ['Ctrl+Alt+↑ / Ctrl+Alt+↓', 'Add a cursor above / below'],
+      ['Ctrl+Shift+[ / Ctrl+Shift+]', 'Fold / unfold the block'],
+    ],
+  },
+];
+
 function isDark() {
   return document.documentElement.classList.contains('dark');
 }
@@ -101,7 +153,8 @@ export function FileEditor({
   const mobile = useIsMobile();
   const [file, setFile] = useState<FileData | null>(null);
   const [error, setError] = useState('');
-  const [dirty, setDirty] = useState(false);
+  // Coming back to a file with changes not saved, it starts as changed (its tab's dot stays on).
+  const [dirty, setDirty] = useState(() => !embedded && isDirty(path));
   useEffect(() => onDirty?.(dirty), [dirty, onDirty]);
   const [saving, setSaving] = useState(false);
   const [changedOnDisk, setChangedOnDisk] = useState(false);
@@ -117,6 +170,11 @@ export function FileEditor({
   const [wrapKey] = useState(() => (mobile ? 'wa.wrap.phone' : 'wa.wrap'));
   const [wrap, setWrap] = useState(() => (localStorage.getItem(wrapKey) ?? (mobile ? '1' : '0')) === '1');
   const [menu, setMenu] = useState(false);
+  // The status bar's reading of the editor, the right-click menu's place, and the shortcuts list.
+  const [status, setStatus] = useState<EditorStatus | null>(null);
+  const [ctx, setCtx] = useState<ContextMenuAt | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [eolShown, setEolShown] = useState<Eol>('lf');
   // A PDF being filled in and signed (Fill & sign) instead of shown.
   const [fill, setFill] = useState(false);
   useEffect(() => setFill(false), [path]);
@@ -135,6 +193,12 @@ export function FileEditor({
   // The text as last read or saved: the editor's differs while there are unsaved changes.
   const base = useRef('');
   const mtime = useRef(0);
+  // How the file's lines end (the editor's text always ends them with \n), and how they ended when it was read or saved.
+  const eol = useRef<Eol>('lf');
+  const baseEol = useRef<Eol>('lf');
+  // The editor's undo history and place from when this file was last open, put back as it is made.
+  const restore = useRef<EditorSnapshot | undefined>(undefined);
+  const changed = () => doc.current !== base.current || eol.current !== baseEol.current;
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const media = MEDIA[ext];
   const isMd = ext === 'md' || ext === 'markdown' || ext === 'mdx';
@@ -154,35 +218,59 @@ export function FileEditor({
     };
   }, [isHtml, mode, path]);
 
-  const load = useCallback(async () => {
+  // `keep`: the file as it was left open (changes not saved, undo history) comes back instead of what is on disk, which
+  // is told if it has changed since.
+  const load = useCallback(async (keep = false) => {
     setError('');
     try {
       const f = await api<FileData>(`/api/fs/read?path=${encodeURIComponent(path)}`);
+      const text = forEditor(f.content ?? '');
+      const disk = detectEol(f.content ?? '');
+      const kept = keep && !embedded ? getDraft(path) : undefined;
+      restore.current = undefined;
+      if (kept && f.content != null && (kept.text !== kept.base || kept.eol !== kept.baseEol || (kept.base === text && kept.mtime === f.mtime))) {
+        doc.current = kept.text;
+        base.current = kept.base;
+        eol.current = kept.eol;
+        baseEol.current = kept.baseEol;
+        // A file touched but not changed since is no conflict.
+        mtime.current = kept.base === text ? f.mtime : kept.mtime;
+        restore.current = { state: kept.state, scroll: kept.scroll };
+        setDirty(changed());
+        setChangedOnDisk(kept.base !== text);
+      } else {
+        doc.current = text;
+        base.current = text;
+        eol.current = disk;
+        baseEol.current = disk;
+        mtime.current = f.mtime;
+        setDirty(false);
+        setChangedOnDisk(false);
+      }
+      setEolShown(eol.current);
       setFile(f);
-      doc.current = f.content ?? '';
-      base.current = f.content ?? '';
-      mtime.current = f.mtime;
-      setDirty(false);
-      setChangedOnDisk(false);
       return f;
     } catch (e) {
       setError((e as Error).message);
       return null;
     }
-  }, [path]);
+  }, [path, embedded]);
 
   useEffect(() => {
     // A dialog editor (CLAUDE.md, a skill) opens straight into editing and leaves the Files tabs alone.
     if (!embedded) useUI.getState().openTab({ id: `f:${path}`, kind: 'file', ref: path });
     setFile(null);
     setMode((isMd || isHtml) && (!embedded || preview) ? 'preview' : 'edit');
-    load();
+    load(true);
   }, [path, load, isMd, isHtml, embedded, preview]);
 
-  // Mount CodeMirror once the text is loaded; reading it again later (a change from elsewhere, a save) keeps it.
+  // Mount CodeMirror once the text is loaded, and keep it while the file is open here: Preview and Changes show over it,
+  // so coming back to the text finds the undo history, the cursor and the scroll as they were. Reading the file again
+  // later (a change from elsewhere, a save) keeps it too.
   const editable = !!file && !file.binary && !file.tooLarge && file.content != null;
+  const textual = !error && editable && !(office && ext === 'rtf') && !(media && ext === 'svg');
   useEffect(() => {
-    if (!editable || mode !== 'edit' || !host.current) return;
+    if (!textual || !host.current) return;
     let alive = true;
     let handle: EditorHandle | null = null;
     import('../../lib/codemirror').then(async ({ createEditor }) => {
@@ -193,11 +281,14 @@ export function FileEditor({
         dark: isDark(),
         wrap,
         phone: mobile,
+        restore: restore.current,
         onChange: (d) => {
           doc.current = d;
-          setDirty(d !== base.current);
+          setDirty(changed());
         },
         onSave: () => saveRef.current(),
+        onStatus: setStatus,
+        onContextMenu: mobile ? undefined : setCtx,
       });
       if (!alive) return handle.destroy();
       editor.current = handle;
@@ -208,11 +299,23 @@ export function FileEditor({
     return () => {
       alive = false;
       mo.disconnect();
+      // Taken down (another file's tab, Back): what it holds is kept, to be put back as it was.
+      // (Not what was left out with Don't save: it is not kept.)
+      const tabOpen = useUI.getState().tabs.some((t) => t.id === `f:${path}`);
+      if (handle && !embedded && tabOpen && (isDirty(path) || !changed())) {
+        const snap = handle.snapshot();
+        keepDraft(path, { text: doc.current, base: base.current, mtime: mtime.current, eol: eol.current, baseEol: baseEol.current, state: snap.state, scroll: snap.scroll });
+      }
       handle?.destroy();
       editor.current = null;
+      setStatus(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editable, mode, path]);
+  }, [textual, path]);
+  // Back to the text from Preview or Changes: the cursor is in it again.
+  useEffect(() => {
+    if (mode === 'edit') editor.current?.focus();
+  }, [mode]);
 
   useEffect(() => {
     editor.current?.setWrap(wrap);
@@ -224,11 +327,13 @@ export function FileEditor({
     setSaving(true);
     try {
       const content = doc.current;
-      const r = await put<{ mtime: number; size: number }>('/api/fs/write', { path, content, expectedMtime: force ? undefined : mtime.current });
+      const at = eol.current;
+      const r = await put<{ mtime: number; size: number }>('/api/fs/write', { path, content: forDisk(content, at), expectedMtime: force ? undefined : mtime.current });
       mtime.current = r.mtime;
       base.current = content;
+      baseEol.current = at;
       setFile((f) => (f ? { ...f, content, mtime: r.mtime, size: r.size } : f));
-      setDirty(doc.current !== content);
+      setDirty(changed());
       setChangedOnDisk(false);
       toast(`Saved ${basename(path)}`, 'ok');
       onSaved?.();
@@ -246,7 +351,19 @@ export function FileEditor({
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   if (saveFirst) saveFirst.current = async () => (dirtyRef.current ? saveRef.current() : true);
-
+  // Files page: whether there are changes not saved shows on the file's tab, which asks before it closes, and the file's
+  // own saving is there for it to use.
+  useEffect(() => {
+    if (embedded) return;
+    noteDirty(path, dirty);
+  }, [path, dirty, embedded]);
+  useEffect(() => {
+    if (embedded) return;
+    const off = registerSaver(path, async () => (dirtyRef.current ? saveRef.current() : true));
+    return () => {
+      off();
+    };
+  }, [path, embedded]);
   // Pick up edits made by agents or terminals, every second while an agent is at work.
   const watchMs = useWatchMs();
   const loaded = !!file;
@@ -262,7 +379,7 @@ export function FileEditor({
         if (dirtyRef.current) setChangedOnDisk(true);
         else {
           const f = await load();
-          if (f?.content != null) editor.current?.setDoc(f.content, { flash: true });
+          if (f?.content != null) editor.current?.setDoc(forEditor(f.content), { flash: true });
         }
       } catch {
       } finally {
@@ -314,6 +431,34 @@ export function FileEditor({
     setMenu(false);
     f();
   };
+  // A new ending for the file's lines (the status bar's LF / CRLF): a change to save, though the text reads the same.
+  const toggleEol = () => {
+    eol.current = eol.current === 'crlf' ? 'lf' : 'crlf';
+    setEolShown(eol.current);
+    setDirty(changed());
+  };
+  // What the editor's right-click menu, and the menu on a desktop, do with the text: with the keys that do them too.
+  const withClip = (what: 'Cut' | 'Copy' | 'Paste', ok: boolean) => ok || toast(`${what} is not allowed here: press ${keyLabel(`Ctrl+${what === 'Cut' ? 'X' : what === 'Copy' ? 'C' : 'V'}`)} instead`, 'info');
+  const askSelection = () => {
+    const sel = editor.current?.selection();
+    if (sel && !sel.empty) void askAbout(path, { page: 0, lines: [sel.fromLine, sel.toLine], text: sel.text });
+  };
+  const textMenu = (): MenuEntry[] => {
+    const h = editor.current;
+    const none = !h || h.selection().empty;
+    return [
+      { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', disabled: none, run: () => void h?.cut().then((ok) => withClip('Cut', ok)) },
+      { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', disabled: none, run: () => void h?.copy().then((ok) => withClip('Copy', ok)) },
+      { label: 'Paste', icon: <ClipboardPaste size={14} />, keys: 'Ctrl+V', run: () => void h?.paste().then((ok) => withClip('Paste', ok)) },
+      { label: 'Select all', icon: <TextSelect size={14} />, keys: 'Ctrl+A', run: () => h?.selectAll() },
+      '-',
+      { label: 'Find', icon: <Search size={14} />, keys: 'Ctrl+F', run: () => h?.find() },
+      { label: 'Replace', icon: <Replace size={14} />, keys: isApple ? 'Ctrl+Alt+F' : 'Ctrl+H', run: () => h?.replace() },
+      { label: 'Go to line', icon: <CornerDownRight size={14} />, keys: isApple ? 'Ctrl+Alt+G' : 'Ctrl+G', run: () => h?.goto() },
+      !!saveFirst && '-',
+      !!saveFirst && { label: 'Ask about the selection', icon: <Sparkles size={14} />, disabled: none, run: askSelection },
+    ];
+  };
   const unsaved = dirty && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />;
   // What else can be done with the file (the Files page): start a session with it, add it to a space…
   const shut = (f: () => void) => () => {
@@ -343,7 +488,7 @@ export function FileEditor({
         <div className={cx('shrink-0 border-b border-line', !embedded && 'pt-[var(--safe-top)]')}>
           <div className={cx('flex items-center gap-1 px-2', embedded ? 'h-12' : 'h-14')}>
             {!embedded && (
-              <IconButton label="Back" onClick={() => history.back()}>
+              <IconButton label="Back" onClick={() => void leaveFile(path).then((ok) => ok && history.back())}>
                 <ArrowLeft size={18} />
               </IconButton>
             )}
@@ -398,9 +543,19 @@ export function FileEditor({
               {space.sub || (
                 <>
                   {text && mode === 'edit' && (
-                    <MenuItem icon={<Search size={14} />} onClick={fromMenu(() => editor.current?.find())}>
-                      Find
-                    </MenuItem>
+                    <>
+                      <MenuItem icon={<Search size={14} />} onClick={fromMenu(() => editor.current?.find())}>
+                        Find
+                      </MenuItem>
+                      <MenuItem icon={<CornerDownRight size={14} />} onClick={fromMenu(() => editor.current?.goto())}>
+                        Go to line
+                      </MenuItem>
+                      {!!saveFirst && (
+                        <MenuItem icon={<Sparkles size={14} />} disabled={!editor.current || editor.current.selection().empty} onClick={fromMenu(askSelection)}>
+                          Ask about the selection
+                        </MenuItem>
+                      )}
+                    </>
                   )}
                   {text && (
                     <>
@@ -482,13 +637,45 @@ export function FileEditor({
           <IconButton label="Download" size="sm" onClick={download}>
             <Download size={14} />
           </IconButton>
-          {fileMenu && (
+          {(fileMenu || text) && (
             <>
               <IconButton ref={deskRef} label="More" size="sm" active={desk} onClick={() => (space.reset(), setDesk((o) => !o))}>
                 <Ellipsis size={15} />
               </IconButton>
               <Popover anchor={deskRef} open={desk} onClose={() => setDesk(false)} align="end" width={250}>
-                {space.sub || more}
+                {space.sub || (
+                  <>
+                    {text && mode === 'edit' && (
+                      <>
+                        <MenuItem icon={<Search size={14} />} hint={keyLabel('Ctrl+F')} onClick={shut(() => editor.current?.find())}>
+                          Find
+                        </MenuItem>
+                        <MenuItem icon={<Replace size={14} />} hint={keyLabel(isApple ? 'Ctrl+Alt+F' : 'Ctrl+H')} onClick={shut(() => editor.current?.replace())}>
+                          Replace
+                        </MenuItem>
+                        <MenuItem icon={<CornerDownRight size={14} />} hint={keyLabel(isApple ? 'Ctrl+Alt+G' : 'Ctrl+G')} onClick={shut(() => editor.current?.goto())}>
+                          Go to line
+                        </MenuItem>
+                        {!!saveFirst && (
+                          <MenuItem icon={<Sparkles size={14} />} disabled={!editor.current || editor.current.selection().empty} onClick={shut(askSelection)}>
+                            Ask about the selection
+                          </MenuItem>
+                        )}
+                      </>
+                    )}
+                    {text && (
+                      <MenuItem icon={<Keyboard size={14} />} onClick={shut(() => setKeysOpen(true))}>
+                        Keyboard shortcuts
+                      </MenuItem>
+                    )}
+                    {fileMenu && (
+                      <>
+                        {text && <MenuSep />}
+                        {more}
+                      </>
+                    )}
+                  </>
+                )}
               </Popover>
             </>
           )}
@@ -505,7 +692,7 @@ export function FileEditor({
           <span className="flex-1">The file changed on disk since you opened it.</span>
           <Button size="sm" variant="ghost" icon={<RotateCcw size={13} />} onClick={async () => {
             const f = await load();
-            if (f?.content != null) editor.current?.setDoc(f.content);
+            if (f?.content != null) editor.current?.setDoc(forEditor(f.content));
           }}>
             Reload (discard mine)
           </Button>
@@ -515,6 +702,8 @@ export function FileEditor({
         </div>
       )}
       <div className="relative min-h-0 flex-1">
+        {/* The text's editor stays made while Preview or Changes show over it (hidden, so it keeps its undo history, cursor and scroll). */}
+        {textual && <div ref={host} className={cx('cm-host absolute inset-0', mode !== 'edit' && 'invisible')} />}
         {error ? (
           <Empty title="Could not open the file">{error}</Empty>
         ) : !file ? (
@@ -563,25 +752,26 @@ export function FileEditor({
               src={pageUrl}
               title={basename(path)}
               sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
-              className="h-full w-full border-0 bg-white"
+              className="relative z-10 h-full w-full border-0 bg-white"
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-fg-3">
+            <div className="relative z-10 flex h-full items-center justify-center bg-bg text-fg-3">
               <Throbber size={34} />
             </div>
           )
         ) : mode === 'preview' ? (
-          <div className="h-full overflow-auto">
+          <div className="relative z-10 h-full overflow-auto bg-bg">
             <div className="mx-auto max-w-[860px] px-5 py-6">
               {mdHtml ? <Markdown text={doc.current} rehypeExtra={mdHtml.MD_HTML} resolveImage={docImages} baseDir={dirname(path)} /> : <Throbber className="text-fg-3" />}
             </div>
           </div>
         ) : mode === 'diff' ? (
-          <div className="h-full overflow-auto">{diff ? <DiffView diff={diff} /> : <Empty title="No changes">This file matches the last commit (or is not in a git repository).</Empty>}</div>
-        ) : (
-          <div ref={host} className="cm-host absolute inset-0" />
-        )}
+          <div className="relative z-10 h-full overflow-auto bg-bg">{diff ? <DiffView diff={diff} /> : <Empty title="No changes">This file matches the last commit (or is not in a git repository).</Empty>}</div>
+        ) : null}
       </div>
+      {textual && mode === 'edit' && <FileStatus status={status} eol={eolShown} wrap={wrap} onEol={toggleEol} onWrap={() => setWrap((w) => !w)} onGoto={() => editor.current?.goto()} onIndent={(i) => editor.current?.setIndent(i)} />}
+      <ContextMenu at={ctx} items={textMenu()} onClose={() => setCtx(null)} />
+      <ShortcutsDialog open={keysOpen} onClose={() => setKeysOpen(false)} groups={SHORTCUTS} />
     </div>
   );
 }

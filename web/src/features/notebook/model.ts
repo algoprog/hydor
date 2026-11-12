@@ -125,7 +125,17 @@ export type Action =
   | { type: 'edit'; id: string; source: string }
   | { type: 'retype'; id: string; to: CellType }
   | { type: 'insert'; at: number; cell: Cell }
+  /** Several cells at once (a paste, a duplicate, Z after cutting some): one change. */
+  | { type: 'insertMany'; at: number; cells: Cell[] }
   | { type: 'remove'; id: string }
+  /** Several cells taken out at once (a cut, a delete of the cells picked): one change. */
+  | { type: 'removeMany'; ids: string[] }
+  /** One cell made two, at a place in its text (`newId` is the second's id). */
+  | { type: 'split'; id: string; at: number; newId: string }
+  /** The cells (next to each other, in the order they are in) made one, in the first. */
+  | { type: 'merge'; ids: string[] }
+  /** A code cell's output folded away (kept in its metadata), or shown. */
+  | { type: 'fold'; id: string; folded: boolean }
   | { type: 'move'; id: string; by: -1 | 1 }
   | { type: 'clear'; ids?: string[] }
   | { type: 'sent'; ids: string[] }
@@ -210,8 +220,36 @@ export function reduce(st: DocState, a: Action): DocState {
       cells.splice(Math.max(0, Math.min(a.at, cells.length)), 0, a.cell);
       return bump(cells);
     }
+    case 'insertMany': {
+      if (!a.cells.length) return st;
+      const cells = nb.cells.slice();
+      cells.splice(Math.max(0, Math.min(a.at, cells.length)), 0, ...a.cells);
+      return bump(cells);
+    }
     case 'remove':
       return bump(nb.cells.filter((c) => c.id !== a.id));
+    case 'removeMany': {
+      const ids = new Set(a.ids);
+      return ids.size ? bump(nb.cells.filter((c) => !ids.has(c.id))) : st;
+    }
+    case 'split': {
+      const i = nb.cells.findIndex((c) => c.id === a.id);
+      const parts = i < 0 ? null : splitCell(nb.cells[i], a.at, a.newId);
+      if (!parts) return st;
+      const cells = nb.cells.slice();
+      cells.splice(i, 1, ...parts);
+      return bump(cells);
+    }
+    case 'merge': {
+      const picked = nb.cells.filter((c) => a.ids.includes(c.id));
+      const first = nb.cells.findIndex((c) => c.id === picked[0]?.id);
+      if (picked.length < 2 || first < 0) return st;
+      const cells = nb.cells.filter((c) => !a.ids.includes(c.id) || c.id === picked[0].id);
+      cells[cells.findIndex((c) => c.id === picked[0].id)] = mergeCells(picked);
+      return bump(cells);
+    }
+    case 'fold':
+      return mapCell(st, a.id, (c) => (c.type !== 'code' || outputsFolded(c) === a.folded ? null : { ...c, raw: withFolded(c.raw, a.folded) }));
     case 'move': {
       const i = nb.cells.findIndex((c) => c.id === a.id);
       const j = i + a.by;
@@ -238,4 +276,95 @@ export function reduce(st: DocState, a: Action): DocState {
     case 'kernel':
       return applyOp(st, a.op, a.since);
   }
+}
+
+// ---- cells as a group: what Copy, Cut, Paste, Duplicate, Split, Merge and Run above / below do ------------------
+
+/** A cell as the clipboard keeps it: its type, text, outputs and the rest as read (no id: a paste makes its own). */
+export interface ClipCell {
+  type: CellType;
+  source: string;
+  outputs: NbOutput[];
+  count: number | null;
+  raw: Json;
+}
+
+/** The cells as copied: copies, so changing the originals changes nothing in them. */
+export const copyCells = (cells: Cell[]): ClipCell[] => cells.map((c) => structuredClone({ type: c.type, source: c.source, outputs: c.outputs, count: c.count, raw: c.raw }));
+
+/** The copied cells as new cells, each with an id of its own (what they ran is not carried over). */
+export const pasteCells = (clip: ClipCell[]): Cell[] =>
+  clip.map((c) => {
+    const copy = structuredClone(c);
+    return { id: newCellId(), type: copy.type, source: copy.source, outputs: copy.outputs, count: copy.count, raw: { ...copy.raw, metadata: copy.raw.metadata ?? {} } };
+  });
+
+/**
+ * Where a run starts and ends among the cells: 'above' the one given (every cell before it), 'below' (every cell after
+ * it), or 'from' it (it and every cell after it). The ids of the code cells in that range, in order; none when the cell is not there.
+ */
+export function cellsToRun(cells: Cell[], id: string, how: 'above' | 'below' | 'from'): string[] {
+  const i = cells.findIndex((c) => c.id === id);
+  if (i < 0) return [];
+  const range = how === 'above' ? cells.slice(0, i) : how === 'below' ? cells.slice(i + 1) : cells.slice(i);
+  return range.filter((c) => c.type === 'code').map((c) => c.id);
+}
+
+/**
+ * A cell made two at `at` characters into its text: the first keeps its id, type and what it was, with the words before
+ * the cut; the second is a new cell of the same type with the rest (a line break at the cut goes). Both lose their outputs,
+ * which belonged to the whole. Null when the cut is at the very start or end, or leaves one side with only blanks.
+ */
+export function splitCell(c: Cell, at: number, newId: string): [Cell, Cell] | null {
+  const head = c.source.slice(0, at).replace(/\s+$/, '');
+  const tail = c.source.slice(at).replace(/^\s*\n/, '');
+  if (at <= 0 || at >= c.source.length || !head.trim() || !tail.trim()) return null;
+  const first: Cell = { ...c, source: head, outputs: [], count: null, run: undefined };
+  const second: Cell = { id: newId, type: c.type, source: tail, outputs: [], count: null, raw: { metadata: structuredClone(c.raw.metadata ?? {}) } };
+  return [first, second];
+}
+
+/** Cells made one: the first's id, type and metadata, the texts one after another with a blank line between; no outputs. */
+export function mergeCells(cells: Cell[]): Cell {
+  const [first] = cells;
+  return { ...first, source: cells.map((c) => c.source).join('\n\n'), outputs: [], count: null, run: undefined };
+}
+
+/** Whether a code cell's output is folded away (Jupyter keeps it as `jupyter.outputs_hidden`). */
+export const outputsFolded = (c: Cell): boolean => c.raw.metadata?.jupyter?.outputs_hidden === true;
+
+/** A cell's raw fields with its output folded or shown, the rest of its metadata as it was. */
+export function withFolded(raw: Json, folded: boolean): Json {
+  const metadata: Json = { ...(raw.metadata ?? {}) };
+  const jupyter: Json = { ...(metadata.jupyter ?? {}) };
+  if (folded) jupyter.outputs_hidden = true;
+  else delete jupyter.outputs_hidden;
+  if (Object.keys(jupyter).length) metadata.jupyter = jupyter;
+  else delete metadata.jupyter;
+  return { ...raw, metadata };
+}
+
+/** A heading in a text cell: its cell, its level (1 to 6), its words, and its line in the cell. */
+export interface Heading {
+  id: string;
+  level: number;
+  text: string;
+  line: number;
+}
+
+/** The Markdown headings of the text cells (# and ##, not those in code fences), in the order they come. */
+export function outlineOf(cells: Cell[]): Heading[] {
+  const out: Heading[] = [];
+  for (const c of cells) {
+    if (c.type !== 'markdown') continue;
+    let fence = '';
+    c.source.split('\n').forEach((line, i) => {
+      const f = /^\s*(```+|~~~+)/.exec(line);
+      if (f) fence = fence ? (line.trim().startsWith(fence[0]) ? '' : fence) : f[1][0].repeat(3);
+      if (fence) return;
+      const m = /^ {0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$/.exec(line);
+      if (m) out.push({ id: c.id, level: m[1].length, text: m[2].replace(/[*_`]/g, '').trim(), line: i + 1 });
+    });
+  }
+  return out;
 }

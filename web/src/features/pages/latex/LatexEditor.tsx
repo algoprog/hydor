@@ -7,7 +7,11 @@
 // its line, with TeX's log a click away. The menus (Edit, Insert, Format, View, Tools, and Search the menus) hold what
 // it can do: headings, lists, figures, tables made in a grid, equations, symbols, references found on the web by DOI,
 // arXiv id or title, folding, spelling, a word count, versions compared, the pages presented. An outline goes to a
-// section, a double click on a page goes to its source and Show in the PDF the other way. On a phone, Source and
+// section, a double click on a page goes to its source and Show in the PDF the other way. A right click in the source or
+// on a page has its own menu (the same actions as the menus), Ctrl+click or F12 on a \ref, \cite, \input or
+// \includegraphics name goes to where it is defined (shared/latex-nav.ts), Find in all files (ProjectSearch.tsx, a third
+// tab beside Files and Outline) finds and replaces in every file, and Editor settings keep the text size, line wrap and
+// line numbers on this device. On a phone, Source and
 // Preview are two tabs and the menus are behind one button. Changes stay unsaved until Save (Ctrl+S), as a page's do.
 // A document of more than one file has its files as a tree on the left (FileTree.tsx; View → Files, remembered on this
 // device; a sheet on a phone), beside the Outline in the same panel: the tab row then lists the files you have open,
@@ -39,6 +43,10 @@ import {
   ImagePlus,
   Italic,
   Keyboard,
+  ClipboardPaste,
+  CornerDownRight,
+  Scissors,
+  SlidersHorizontal,
   Link2,
   MessageSquare,
   MessageSquarePlus,
@@ -99,7 +107,9 @@ import { tr } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
 import { findIn, replacementOf, type Match } from '../common/find';
 import { FindBar, useFind } from '../common/FindBar';
-import { MenuBar, type MenuDef, type MenuEntry } from '../common/menus';
+import { ContextMenu, MenuBar, type ContextMenuAt, type MenuDef, type MenuEntry } from '../common/menus';
+import { replaceFiles, type SearchFile } from '@shared/latex-search';
+import { citeNotes, findDefinition, labelNotes, type CiteNote, type LabelNote, type Target } from '@shared/latex-nav';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
 import type { AskScope, ModelEditorProps } from '../kinds';
 import { useOwnScroll } from '../live';
@@ -118,6 +128,7 @@ import { docDefs, type DocDefs } from './complete';
 import { NameDialog, OutlineList, Problems, where } from './parts';
 import { paperItems, PaperTools, type PaperAsk } from './PaperTools';
 import { Preview, type Flash } from './Preview';
+import { ProjectSearch } from './ProjectSearch';
 import { ReferencesDialog } from './References';
 import { texMacros } from './scan';
 import { docWords, makeSnippet, SAMPLE_BIB, withBibliography, withPackages, type SnipId } from './snippets';
@@ -144,6 +155,11 @@ const PANEL_KEY = 'wa.tex.panel';
 const OUTLINE_KEY = 'wa.tex.outline';
 const MODE_KEY = 'wa.tex.mode';
 const SPELL_KEY = 'wa.tex.spell';
+/** Editor settings, remembered on this device: the text size (0: the app's own), line wrap and line numbers. */
+const FONT_KEY = 'wa.tex.font';
+const WRAP_KEY = 'wa.tex.wrap';
+const LINES_KEY = 'wa.tex.lines';
+const FONT_SIZES = [11, 12, 13, 14, 15, 16, 18, 20];
 const DARK_PAGES_KEY = 'wa.tex.darkpages';
 const COMMENTS_KEY = 'wa.tex.comments';
 /** The Pictures tab, among the files' (a document of one file). */
@@ -192,12 +208,15 @@ const SHORTCUTS: ShortcutGroup[] = [
       ['Ctrl+Shift+Z / Ctrl+Y', 'Redo'],
       ['Ctrl+F', 'Find'],
       ['Ctrl+H', 'Find and replace'],
+      ['Ctrl+Shift+F', 'Find and replace in every file of the document'],
       ['Enter / Shift+Enter', 'In the find bar: the next match, or the one before'],
       ['Ctrl+D', 'Pick the next of the same words too'],
       ['Alt+↑ / Alt+↓', 'Move the lines up or down'],
       ['Ctrl+Shift+K', 'Delete the line'],
       ['Ctrl+] / Ctrl+[', 'Indent more or less'],
       ['Ctrl+Alt+G', 'Go to a line'],
+      ['F12 / Ctrl+click', 'Go to where a \\ref, \\cite, \\input or \\includegraphics name is defined'],
+      ['Shift+F10 / Menu', 'Open the right-click menu at the cursor'],
     ],
   },
   {
@@ -332,7 +351,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const [setup, setSetup] = useState<TexSetup | null>(null);
   const [pane, setPane] = useState<'source' | 'preview'>('source');
   // The left panel, Files or Outline: as last chosen on this device; never chosen, the files of a document of more than one.
-  const [panelPick, setPanelPick] = useState<'files' | 'outline' | 'none' | null>(() => {
+  const [panelPick, setPanelPick] = useState<'files' | 'outline' | 'search' | 'none' | null>(() => {
     const p = localStorage.getItem(PANEL_KEY);
     return p === 'files' || p === 'outline' || p === 'none' ? p : null;
   });
@@ -351,6 +370,24 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const [spell, setSpell] = useState(() => localStorage.getItem(SPELL_KEY) === '1');
   const spellRef = useRef(spell);
   spellRef.current = spell;
+  // Editor settings: the text size (null: the app's own), line wrap (on unless turned off) and line numbers (on unless turned off).
+  const [edFont, setEdFont] = useState<number | null>(() => Number(localStorage.getItem(FONT_KEY)) || null);
+  const [edWrap, setEdWrap] = useState(() => localStorage.getItem(WRAP_KEY) !== '0');
+  const [edLines, setEdLines] = useState(() => localStorage.getItem(LINES_KEY) !== '0');
+  const edRef = useRef({ font: edFont, wrap: edWrap, lines: edLines });
+  edRef.current = { font: edFont, wrap: edWrap, lines: edLines };
+  useEffect(() => {
+    localStorage.setItem(FONT_KEY, String(edFont ?? 0));
+    for (const c of codes.current.values()) c.handle.setFontSize(edFont);
+  }, [edFont]);
+  useEffect(() => {
+    localStorage.setItem(WRAP_KEY, edWrap ? '1' : '0');
+    for (const c of codes.current.values()) c.handle.setWrap(edWrap);
+  }, [edWrap]);
+  useEffect(() => {
+    localStorage.setItem(LINES_KEY, edLines ? '1' : '0');
+    for (const c of codes.current.values()) c.handle.setLineNumbers(edLines);
+  }, [edLines]);
   const [darkPages, setDarkPages] = useState(() => localStorage.getItem(DARK_PAGES_KEY) === '1');
   // View → Keys: Normal, Vim or Emacs, kept on this device.
   const [keys, setKeys] = useState<KeysMode>(savedKeys);
@@ -380,6 +417,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const [tableAsk, setTableAsk] = useState<{ table: TexTable; at: { file: string; from: number; to: number } | null } | null>(null);
   const [naming, setNaming] = useState<{ kind: 'new' | 'new-folder' | 'rename-file' | 'rename-picture' | 'rename-folder'; from?: string; folder?: string } | null>(null);
   const [cursor, setCursor] = useState<Cursor>(START);
+  // The source's right-click menu: where, and the name a command there takes (a label, a key, a file), for Go to definition.
+  const [srcMenu, setSrcMenu] = useState<(ContextMenuAt & { target: Target | null }) | null>(null);
   // Where the cursor is in each file (the scopes follow the file in view).
   const cursors = useRef(new Map<string, Cursor>());
   const fileRef = useRef(file);
@@ -433,12 +472,16 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   }, [auto]);
   // A document of more than one file (pictures, and the files TeX takes from the folder, count): its files show as a tree.
   const multi = !!model && model.files.length + model.pictures.length + diskUses.length + madeFolders.length > 0;
-  const panel: 'files' | 'outline' | null = panelPick === 'none' ? null : (panelPick ?? (multi ? 'files' : localStorage.getItem(OUTLINE_KEY) === '1' ? 'outline' : null));
-  const showPanel = (p: 'files' | 'outline' | null) => {
+  const panel: 'files' | 'outline' | 'search' | null = panelPick === 'none' ? null : (panelPick ?? (multi ? 'files' : localStorage.getItem(OUTLINE_KEY) === '1' ? 'outline' : null));
+  // (Search is not remembered: a new window starts on the files or the outline.)
+  const showPanel = (p: 'files' | 'outline' | 'search' | null) => {
     setPanelPick(p ?? 'none');
-    localStorage.setItem(PANEL_KEY, p ?? 'none');
+    if (p !== 'search') localStorage.setItem(PANEL_KEY, p ?? 'none');
   };
-  const togglePanel = (p: 'files' | 'outline') => showPanel(panel === p ? null : p);
+  const togglePanel = (p: 'files' | 'outline' | 'search') => showPanel(panel === p ? null : p);
+  // Find in all files: the words to start from (those picked in the source), and the sheet where there is no room for the panel.
+  const [searchSeed, setSearchSeed] = useState({ text: '', n: 0 });
+  const [searchSheet, setSearchSheet] = useState(false);
   /** The tree is in view beside the source: the tab row then lists only the files open. */
   const treeShown = wide && panel === 'files';
   useEffect(() => {
@@ -494,17 +537,27 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   };
 
   // ---- what the editors ask of the document (worked out once a change) -------------------------------------------
-  const defsCache = useRef<{ d: TexDoc | null; defs: DocDefs; macros: Record<string, string>; refs: { labels: Set<string>; keys: Set<string> | null } | null }>({ d: null, defs: NO_DEFS, macros: {}, refs: null });
+  const defsCache = useRef<{ d: TexDoc | null; defs: DocDefs; macros: Record<string, string>; refs: { labels: Set<string>; keys: Set<string> | null } | null; notes: { labels: Map<string, LabelNote>; keys: Map<string, CiteNote> } | null }>({ d: null, defs: NO_DEFS, macros: {}, refs: null, notes: null });
   const known = () => {
     const d = live.current;
     if (d && defsCache.current.d !== d) {
       const texts = [{ name: TEX_MAIN, text: d.main }, ...d.files];
       const tex = texts.filter((f) => /\.(tex|ltx)$/i.test(f.name)).map((f) => f.text);
-      defsCache.current = { d, defs: docDefs(texts), macros: texMacros(texts.filter((f) => /\.(tex|ltx|sty|cls)$/i.test(f.name)).map((f) => f.text)), refs: refsOf(d, tex) };
+      defsCache.current = { d, defs: docDefs(texts), macros: texMacros(texts.filter((f) => /\.(tex|ltx|sty|cls)$/i.test(f.name)).map((f) => f.text)), refs: refsOf(d, tex), notes: null };
     }
     return defsCache.current;
   };
   const defsOf = () => known().defs;
+  /** What each label and key says (its heading or caption, "Author Year — Title"): worked out when first asked for, once a change. */
+  const notesOf = () => {
+    const k = known();
+    if (!k.notes) {
+      const d = live.current;
+      const texts = d ? [{ name: TEX_MAIN, text: d.main }, ...d.files] : [];
+      k.notes = { labels: labelNotes(texts), keys: citeNotes(texts) };
+    }
+    return k.notes;
+  };
   const macrosOf = () => known().macros;
   /**
    * What the quick check of references knows: every label of the document's files, and its bibliographies' keys when
@@ -607,10 +660,17 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
           onWrite: () => aiRef.current?.openWrite(),
           onPictures: (files) => !!aiRef.current?.pictures(files),
           refs: () => known().refs,
+          notes: notesOf,
+          onSearchAll: () => openSearchRef.current(),
+          onContextMenu: (c) => setSrcMenu(c),
+          onDefinition: (t) => goDefinition(t, name),
         },
         visual: modeRef.current === 'visual',
         spell: spellRef.current,
         keys: keysRef.current,
+        font: edRef.current.font,
+        wrap: edRef.current.wrap,
+        lineNumbers: edRef.current.lines,
       }).then((c) => {
         mounting.current.delete(name);
         if (at !== epochRef.current || !hosts.current.get(name)?.isConnected) return c.destroy();
@@ -727,6 +787,54 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       if (at) c.select(at[0], at[1]);
       else c.goto(line);
     });
+  };
+  /** To where a label, key, file or picture a command names is defined: its file opened with the name picked there. */
+  const goDefinition = (t: Target, from: string) => {
+    const d = live.current;
+    if (!d) return;
+    const files = [{ name: TEX_MAIN, text: d.main }, ...d.files];
+    // The files' text as the editors hold it now (an edit not yet in the document).
+    for (const f of files) {
+      const c = codes.current.get(f.name);
+      if (c) f.text = c.text();
+    }
+    const at = findDefinition(files, t, from, d.pictures.map((p) => p.name));
+    if (!at) return toast(`Nothing defines ${t.name}`);
+    if (at.kind === 'picture') return open(PIC + at.name);
+    withCode(at.file, (c) => (at.to > at.from ? c.select(at.from, at.to) : c.goto(1)));
+  };
+  /** The files' text as their editors hold it now (the document's own where a file has none open). */
+  const searchable = (): SearchFile[] => {
+    const d = live.current;
+    if (!d) return [];
+    return [{ name: TEX_MAIN, text: d.main }, ...d.files.filter((f) => !/\.(png|jpe?g|pdf|gif|webp|eps)$/i.test(f.name))].map((f) => ({ name: f.name, text: codes.current.get(f.name)?.text() ?? f.text }));
+  };
+  /** Find in all files opened: on the words picked, in the panel beside the source, or a sheet where it has no room. */
+  const openSearch = () => {
+    const p = codes.current.get(fileRef.current)?.picked();
+    setSearchSeed((s) => ({ text: p && !p.empty && p.text.length < 200 ? p.text : '', n: s.n + 1 }));
+    if (wide) showPanel('search');
+    else setSearchSheet(true);
+  };
+  const openSearchRef = useRef(openSearch);
+  openSearchRef.current = openSearch;
+  /** Replace all, in every file at once (each file's editor takes its changes as one step to undo). */
+  const replaceInFiles = (q: string, by: string, o: Parameters<typeof replaceFiles>[3], only: Set<string>): number => {
+    if (readOnly || !live.current) return 0;
+    const r = replaceFiles(searchable(), q, by, o, only);
+    if (r.error || !r.count) return 0;
+    for (const f of r.files) {
+      const c = codes.current.get(f.name);
+      if (c) c.edit(f.changes);
+      else change((d) => withText(d, f.name, f.text));
+    }
+    toast(`Replaced ${r.count} ${r.count === 1 ? 'place' : 'places'} in ${r.files.length} ${r.files.length === 1 ? 'file' : 'files'}`, 'ok');
+    return r.count;
+  };
+  const goHit = (h: { file: string; from: number; to: number }) => {
+    setSearchSheet(false);
+    withCode(h.file, (c) => c.select(Math.min(h.from, c.view.state.doc.length), Math.min(h.to, c.view.state.doc.length)));
+    if (!wide) setPane('source');
   };
   /** A file changed by the editor (in its editor when it has one, so Undo takes it back). */
   const editFile = (name: string, f: (text: string) => string) => {
@@ -852,6 +960,10 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
         void saveRef.current();
+      } else if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        // Find in all files, from anywhere in the editor.
+        e.preventDefault();
+        openSearchRef.current();
       } else if (mod && e.key.toLowerCase() === 'f' && a?.closest('[data-tex-preview]')) {
         // Over the typeset pages: Find in the pages.
         e.preventDefault();
@@ -1702,6 +1814,38 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   // Documents in the Library keep their comments; a file of this computer has its comments kept by the app.
   const canComment = true;
 
+  // The source's right-click menu: the editor's own actions (from the menus above, with the same words and keys).
+  const srcItems = (): MenuEntry[] => {
+    const h = code?.handle;
+    const none = !h || h.selection().empty;
+    const clip = (what: string) => (ok: boolean) => ok || toast(`${what} is not allowed here: use the keys instead`);
+    return [
+      { label: 'Cut', icon: <Scissors size={14} />, keys: 'Ctrl+X', disabled: readOnly || none, run: () => void h?.cut().then(clip('Cut')) },
+      { label: 'Copy', icon: <Copy size={14} />, keys: 'Ctrl+C', disabled: none, run: () => void h?.copy().then(clip('Copy')) },
+      { label: 'Paste', icon: <ClipboardPaste size={14} />, keys: 'Ctrl+V', disabled: readOnly, run: () => void h?.paste().then(clip('Paste')) },
+      '-',
+      { label: 'Comment or uncomment', keys: 'Ctrl+/', disabled: readOnly, run: () => code?.comment() },
+      { label: 'Bold', icon: <Bold size={14} />, keys: 'Ctrl+B', disabled: readOnly, run: fmt('textbf') },
+      { label: 'Italic', icon: <Italic size={14} />, keys: 'Ctrl+I', disabled: readOnly, run: fmt('textit') },
+      { label: 'Emphasis', disabled: readOnly, also: 'emph', run: fmt('emph') },
+      ...ai.editItems,
+      '-',
+      { label: 'Go to definition', icon: <CornerDownRight size={14} />, keys: 'F12', disabled: !srcMenu?.target, run: () => srcMenu?.target && goDefinition(srcMenu.target, file) },
+      setup?.sync !== false && { label: 'Show this line in the PDF', icon: <LocateFixed size={14} />, disabled: !result?.pdf || isView(file), run: () => void showInPdf() },
+      !readOnly && '-',
+      !readOnly && {
+        label: 'Insert',
+        items: [
+          { label: 'Figure with a picture', icon: <ImageIcon size={14} />, run: () => void insert('figure') },
+          { label: 'Table', icon: <Table2 size={14} />, run: () => openTable(false) },
+          { label: 'Equation', icon: <Sigma size={14} />, run: () => void insert('equation') },
+          { label: 'Citation', icon: <BookOpen size={14} />, run: () => void insert('cite') },
+          { label: 'Cross-reference', icon: <LocateFixed size={14} />, run: () => void insert('ref') },
+        ],
+      },
+    ];
+  };
+
   const menus: MenuDef[] = [
     {
       label: 'Edit',
@@ -1710,7 +1854,9 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         { label: 'Redo', icon: <Redo2 size={14} />, keys: 'Ctrl+Shift+Z', disabled: !code || readOnly, run: () => code?.redo() },
         '-',
         { label: 'Find and replace', icon: <Search size={14} />, keys: 'Ctrl+H', also: 'search find', disabled: !code, run: () => find.show(!readOnly) },
+        { label: 'Find in all files', icon: <Search size={14} />, keys: 'Ctrl+Shift+F', also: 'search replace project every file chapters', run: openSearch },
         { label: 'Go to line', keys: 'Ctrl+Alt+G', disabled: !code, run: () => code?.gotoLine() },
+        { label: 'Go to definition', icon: <CornerDownRight size={14} />, keys: 'F12', also: 'ref label cite key input include file jump', disabled: !code || !code.targetAtCursor(), run: () => { const t = code?.targetAtCursor(); if (t) goDefinition(t, file); } },
         { label: 'Select all', keys: 'Ctrl+A', disabled: !code, run: () => code?.selectAll() },
         '-',
         { label: 'Comment or uncomment', keys: 'Ctrl+/', also: 'percent', disabled: !code || readOnly, run: () => code?.comment() },
@@ -1829,6 +1975,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         '-',
         { label: 'Files', icon: <FolderTree size={14} />, checked: wide ? panel === 'files' : undefined, also: 'tree project folders chapters pictures', run: () => (wide ? togglePanel('files') : setFilesSheet(true)) },
         { label: 'Outline', icon: <ListTree size={14} />, checked: wide ? panel === 'outline' : undefined, also: 'sections headings', run: () => (wide ? togglePanel('outline') : setMenu('outline')) },
+        { label: 'Search in all files', icon: <Search size={14} />, checked: wide ? panel === 'search' : undefined, also: 'find replace project', run: () => (wide && panel === 'search' ? showPanel(null) : openSearch()) },
         canComment && { label: 'Comments', icon: <MessageSquare size={14} />, checked: commentsOpen, also: 'review notes', run: () => setCommentsOpen((x) => !x) },
         { label: 'Check spelling', icon: <SpellCheck size={14} />, checked: spell, also: 'spell', run: () => setSpell((x) => !x) },
         {
@@ -1842,6 +1989,16 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
               ['emacs', 'Emacs'],
             ] as const
           ).map(([id, label]) => ({ label, checked: keys === id, run: () => setKeys(id) })),
+        },
+        {
+          label: 'Editor settings',
+          icon: <SlidersHorizontal size={14} />,
+          also: 'font size text zoom line wrap line numbers',
+          items: [
+            { label: 'Text size', items: [{ label: 'The app’s own', checked: edFont === null, run: () => setEdFont(null) }, ...FONT_SIZES.map((n) => ({ label: `${n} px`, checked: edFont === n, run: () => setEdFont(n) }))] },
+            { label: 'Wrap long lines', checked: edWrap, also: 'line wrap word wrap', run: () => setEdWrap((x) => !x) },
+            { label: 'Line numbers', checked: edLines, run: () => setEdLines((x) => !x) },
+          ],
         },
         { label: 'Fold all', icon: <FoldVertical size={14} />, keys: 'Ctrl+Alt+[', disabled: !code, also: 'collapse', run: () => code?.foldAll() },
         { label: 'Unfold all', icon: <UnfoldVertical size={14} />, keys: 'Ctrl+Alt+]', disabled: !code, also: 'expand', run: () => code?.unfoldAll() },
@@ -2334,11 +2491,21 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
               >
                 Outline
               </button>
+              <button
+                type="button"
+                aria-pressed={panel === 'search'}
+                onClick={() => showPanel('search')}
+                className={cx('h-7 rounded-md px-2 text-[12.5px] transition-colors', panel === 'search' ? 'bg-bg-2 font-medium text-fg' : 'text-fg-3 hover:text-fg-2')}
+              >
+                Search
+              </button>
               <span className="flex-1" />
               {panel === 'files' && !readOnly && <NewButton onNew={onNew} />}
             </div>
             {panel === 'files' ? (
               tree('min-h-0 flex-1')
+            ) : panel === 'search' ? (
+              <ProjectSearch files={searchable} version={model} readOnly={readOnly} seed={searchSeed} label={label} onGo={goHit} onReplace={replaceInFiles} />
             ) : (
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <OutlineList outline={outline} current={heading} onGo={(h) => goTo(h.file, h.line)} />
@@ -2553,6 +2720,12 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         />
       )}
       <ShortcutsDialog open={dialog === 'keys'} onClose={() => setDialog(null)} groups={SHORTCUTS} />
+      <Dialog open={searchSheet} onClose={() => setSearchSheet(false)} title="Find in all files" width={560}>
+        <div className="-mx-5 -my-3 flex h-[60dvh] flex-col">
+          <ProjectSearch files={searchable} version={model} readOnly={readOnly} seed={searchSeed} label={label} onGo={goHit} onReplace={replaceInFiles} />
+        </div>
+      </Dialog>
+      <ContextMenu at={srcMenu} items={srcMenu ? srcItems() : []} onClose={() => setSrcMenu(null)} width={280} />
       {ai.dialogs}
       {dialog === 'bib' && (
         <BibTidyDialog
