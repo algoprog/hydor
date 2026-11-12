@@ -1,0 +1,942 @@
+[
+ {
+  "id": "job-picker/quick/1",
+  "task": "job-picker",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794376894643,
+  "key": "claude:0fa34178-6192-4cff-af46-a8555d62d706",
+  "end": "done",
+  "ms": 55956,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.01094265,
+  "leadUsd": 0.01094265,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 29362,
+   "out": 6039,
+   "cached": 205195
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 57,
+   "total": 57,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "stale-cache/quick/1",
+  "task": "stale-cache",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794376967227,
+  "key": "claude:45c71449-8be9-4188-b016-798e0dda3de5",
+  "end": "done",
+  "ms": 109628,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.025422749999999997,
+  "leadUsd": 0.025422749999999997,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 40182,
+   "out": 18525,
+   "cached": 812725
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 45,
+   "total": 45,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "slow-report/quick/1",
+  "task": "slow-report",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794377094520,
+  "key": "claude:48a03e94-6bda-4103-8a3f-bcaf9ba1aea3",
+  "end": "done",
+  "ms": 319109,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.0203687,
+  "leadUsd": 0.0203687,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 36942,
+   "out": 16769,
+   "cached": 459780
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 71,
+   "total": 71,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "py-port/quick/1",
+  "task": "py-port",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794376894620,
+  "key": "claude:ef0f68d2-878f-48c9-bfc7-612e905239b4",
+  "end": "done",
+  "ms": 700084,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.5633581600000003,
+  "leadUsd": 0.5633581600000003,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 171882,
+   "out": 137373,
+   "cached": 4952322
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 505,
+   "total": 505,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "timesheet/quick/1",
+  "task": "timesheet",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794377438982,
+  "key": "claude:8c1cd0ad-ed59-4269-af4e-1d17ca2fe169",
+  "end": "done",
+  "ms": 281983,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.06348688000000001,
+  "leadUsd": 0.06348688000000001,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 81178,
+   "out": 45348,
+   "cached": 1027136
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 111,
+   "total": 111,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "job-picker/solo/1",
+  "task": "job-picker",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794377764430,
+  "key": "claude:e9cc4284-5c3a-47d2-ae9b-1861e1776560",
+  "end": "done",
+  "ms": 58336,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.261608,
+  "leadUsd": 0.261608,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 18348,
+   "out": 3768,
+   "cached": 197560
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 57,
+   "total": 57,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "stale-cache/solo/1",
+  "task": "stale-cache",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794377841851,
+  "key": "claude:15c209d8-f997-49d1-8c44-0d814f31c41f",
+  "end": "done",
+  "ms": 107436,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.4415828,
+  "leadUsd": 0.4415828,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 26112,
+   "out": 7734,
+   "cached": 390434
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 45,
+   "total": 45,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "slow-report/solo/1",
+  "task": "slow-report",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794377973264,
+  "key": "claude:cb72c8fa-7f0b-4878-a1c2-d06359d15781",
+  "end": "done",
+  "ms": 323672,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.42311940000000003,
+  "leadUsd": 0.42311940000000003,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 26175,
+   "out": 7156,
+   "cached": 353357
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 71,
+   "total": 71,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "timesheet/solo/1",
+  "task": "timesheet",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794378327504,
+  "key": "claude:a2fead07-4c2f-4ec2-ab78-fb26bc9646da",
+  "end": "done",
+  "ms": 421958,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.2304642,
+  "leadUsd": 1.2304642,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 61624,
+   "out": 24705,
+   "cached": 1217621
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 111,
+   "total": 111,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "py-port/solo/1",
+  "task": "py-port",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794377764418,
+  "key": "claude:67367741-f089-4cfe-ad2f-dccb52ce5b00",
+  "end": "timeout",
+  "ms": 1801016,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 4.355107199999999,
+  "leadUsd": 4.355107199999999,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 172391,
+   "out": 111040,
+   "cached": 3777136
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 505,
+   "total": 505,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "manhattan-mst/quick/1",
+  "task": "manhattan-mst",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794379593083,
+  "key": "claude:a540943f-7f46-4cc9-9662-88ec8b21885e",
+  "end": "done",
+  "ms": 227734,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.03379797,
+  "leadUsd": 0.03379797,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 46443,
+   "out": 27426,
+   "cached": 1080057
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "security-review/quick/1",
+  "task": "security-review",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794379593064,
+  "key": "claude:b74a773f-165d-4c2c-9e3c-02769c682dd9",
+  "end": "done",
+  "ms": 308345,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.07706107000000001,
+  "leadUsd": 0.07706107000000001,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 84478,
+   "out": 49069,
+   "cached": 1608173
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 78,
+   "total": 78,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "ust-exact/quick/1",
+  "task": "ust-exact",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794379956450,
+  "key": "claude:1b42115b-f825-4014-89fa-f98b97a77d68",
+  "end": "done",
+  "ms": 63735,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.01167741,
+  "leadUsd": 0.01167741,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 24282,
+   "out": 8485,
+   "cached": 257991
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "format-detective/quick/1",
+  "task": "format-detective",
+  "way": "quick",
+  "rep": 1,
+  "startedAt": 1794419022798,
+  "key": "claude:19d226f6-41cf-4682-bbae-c243b271c0b0",
+  "end": "done",
+  "ms": 728039,
+  "model": "claude-haiku-5-5",
+  "asked": 0,
+  "usd": 0.7455317900000001,
+  "leadUsd": 0.7455317900000001,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 198202,
+   "out": 147447,
+   "cached": 7490305
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 110,
+   "total": 110,
+   "failed": []
+  },
+  "copiedFrom": "the trial of 11 November"
+ },
+ {
+  "id": "manhattan-mst/solo/1",
+  "task": "manhattan-mst",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794445459417,
+  "key": "claude:6fb9ae16-c230-4b89-b717-5780ee24f70f",
+  "end": "done",
+  "ms": 73093,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.3170978,
+  "leadUsd": 0.3170978,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 20287,
+   "out": 5748,
+   "cached": 199449
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "ust-exact/solo/1",
+  "task": "ust-exact",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794445459428,
+  "key": "claude:87634800-1875-4c60-8214-73d7ed3da4a8",
+  "end": "done",
+  "ms": 327619,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.0509596,
+  "leadUsd": 1.0509596,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 44133,
+   "out": 25862,
+   "cached": 903998
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "format-detective/solo/1",
+  "task": "format-detective",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794445565503,
+  "key": "claude:e84ddf5d-1c25-4e55-8c95-002368266c21",
+  "end": "done",
+  "ms": 290099,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.3469605999999998,
+  "leadUsd": 1.3469605999999998,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 65479,
+   "out": 25236,
+   "cached": 1593043
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 110,
+   "total": 110,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "security-review/solo/1",
+  "task": "security-review",
+  "way": "solo",
+  "rep": 1,
+  "startedAt": 1794445459406,
+  "key": "claude:e5c44b88-355b-4782-bbde-7a26b699628a",
+  "end": "done",
+  "ms": 549759,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 1.6965933999999998,
+  "leadUsd": 1.6965933999999998,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 81856,
+   "out": 33729,
+   "cached": 1836867
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 70,
+   "total": 78,
+   "failed": [
+    "PATCH /me changes the display name and the address and refuses bad ones",
+    "log-out ends only its own session; sessions work side by side",
+    "changing the password: a new session, the new password logs in, a wrong current is 401",
+    "settings are merged key by key, other values replace, each account has its own",
+    "password reset: the e-mailed code sets a new password, once; a wrong code is 400",
+    "password reset: an unknown name answers 202 and sends nothing; the last code sent is the one that works",
+    "JSON bodies up to 1 MB are accepted, larger ones refused",
+    "7 the codes of two accounts are not the same, nor made one from the other"
+   ]
+  },
+  "peeked": false
+ },
+ {
+  "id": "stale-cache/team/1",
+  "task": "stale-cache",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446038792,
+  "key": "claude:3174f436-23d0-4a8d-9da1-b8d219a7e0bf",
+  "end": "done",
+  "ms": 121106,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 0.6577438,
+  "leadUsd": 0.6577438,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 23081,
+   "out": 6511,
+   "cached": 140359
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "Multiple interacting cache bugs (stale TTL under concurrency, stampede protection, error caching, a self-referencing render bug) that must be fixed without rais"
+   }
+  ],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 45,
+   "total": 45,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "slow-report/team/1",
+  "task": "slow-report",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446181373,
+  "key": "claude:ffdfc0d4-42c3-4ec2-8bc0-187feed26c56",
+  "end": "done",
+  "ms": 165954,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 0.8917254,
+  "leadUsd": 0.8917254,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 28192,
+   "out": 9069,
+   "cached": 390187
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "performance fix on a report that now never finishes at 300k rows, needing a root-cause analysis of likely quadratic behavior, with output required to stay byte-"
+   }
+  ],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 71,
+   "total": 71,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "timesheet/team/1",
+  "task": "timesheet",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446038747,
+  "key": "claude:bef0c4ff-4d94-44cf-b56e-c56c950e6474",
+  "end": "done",
+  "ms": 341423,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 2.0674139,
+  "leadUsd": 2.0674139,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 60130,
+   "out": 17322,
+   "cached": 722159
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "fixing multiple open issues in an unseen codebase, keeping README behavior and tests intact; the fixes may include subtle bugs whose causes are unknown until re"
+   }
+  ],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "sonnet",
+    "type": null,
+    "title": "Write regression tests for tt"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 111,
+   "total": 111,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "job-picker/team/1",
+  "task": "job-picker",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446367914,
+  "key": "claude:646a6798-d9fc-4c7c-b83e-4bf3451d85c9",
+  "end": "done",
+  "ms": 66475,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.25172140000000004,
+  "leadUsd": 0.25172140000000004,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 17867,
+   "out": 3406,
+   "cached": 203567
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 57,
+   "total": 57,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "manhattan-mst/team/1",
+  "task": "manhattan-mst",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446451599,
+  "key": "claude:05f94e06-487f-4c04-b3bb-d148f99d7eb1",
+  "end": "done",
+  "ms": 191366,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 0.9340328,
+  "leadUsd": 0.9340328,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 26233,
+   "out": 11482,
+   "cached": 275684
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "Minimum spanning tree under Manhattan distance for 200,000 points needs a subquadratic algorithm (e.g. k-d tree or sweep-based candidate edges with Kruskal, or "
+   }
+  ],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "security-review/team/1",
+  "task": "security-review",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446448193,
+  "key": "claude:765f7b8d-653a-40b1-ae73-bbc34fe05bad",
+  "end": "done",
+  "ms": 407141,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 2.5491733549999998,
+  "leadUsd": 2.5491733549999998,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 70200,
+   "out": 32865,
+   "cached": 482854
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "security review and fixes across an internet-facing service with no packages; needs careful reasoning about attack surface and avoiding regressions"
+   }
+  ],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "its own",
+    "type": null,
+    "title": "Write security regression tests"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 78,
+   "total": 78,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "ust-exact/team/1",
+  "task": "ust-exact",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446676647,
+  "key": "claude:9d122cee-e3bd-4633-93fa-204b1fb42606",
+  "end": "done",
+  "ms": 218873,
+  "model": "claude-opus-5-5",
+  "asked": 0,
+  "usd": 0.7540052199999999,
+  "leadUsd": 0.7540052199999999,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 37778,
+   "out": 16358,
+   "cached": 554109
+  },
+  "moved": [],
+  "helpers": [],
+  "inTurn": [
+   {
+    "model": "haiku",
+    "type": null,
+    "title": "Write exact BigInt reference"
+   }
+  ],
+  "error": null,
+  "check": {
+   "passed": 72,
+   "total": 72,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "format-detective/team/1",
+  "task": "format-detective",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446890088,
+  "key": "claude:ab230efd-ab75-4161-9486-7fdf04bd3955",
+  "end": "done",
+  "ms": 268516,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 1.9022753999999997,
+  "leadUsd": 1.9022753999999997,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 56557,
+   "out": 20897,
+   "cached": 808537
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "reverse-engineering an undocumented binary format from samples alone, required to generalize to thousands of unseen files and to match the refusal behavior exac"
+   }
+  ],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 110,
+   "total": 110,
+   "failed": []
+  },
+  "peeked": false
+ },
+ {
+  "id": "py-port/team/1",
+  "task": "py-port",
+  "way": "team",
+  "rep": 1,
+  "startedAt": 1794446038707,
+  "key": "claude:515de8f3-ef52-4a5c-a734-d27a03244eb1",
+  "end": "done",
+  "ms": 1597681,
+  "model": "claude-fable-5-2",
+  "asked": 0,
+  "usd": 5.765563600000001,
+  "leadUsd": 5.765563600000001,
+  "helpersUsd": 0,
+  "unpriced": false,
+  "turns": 1,
+  "tokens": {
+   "in": 117816,
+   "out": 87573,
+   "cached": 1889458
+  },
+  "moved": [
+   {
+    "event": "auto",
+    "tier": "max",
+    "label": "Fable 5.2",
+    "why": "exact parity with Python across all JSON inputs means matching float formatting, rounding, int/float behavior and exception semantics, which is subtle numerics"
+   }
+  ],
+  "helpers": [],
+  "inTurn": [],
+  "error": null,
+  "check": {
+   "passed": 505,
+   "total": 505,
+   "failed": []
+  },
+  "peeked": false
+ }
+]

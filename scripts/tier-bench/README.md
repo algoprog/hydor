@@ -67,9 +67,11 @@ nothing on the computer (no service that starts it at boot) and leaves the agent
 `--from` names a signed-in Claude Code folder (`~/.claude`, or an added account's folder under the app's data).
 Only its access token is copied, never the token that renews it, so the copy cannot replace the real sign-in; it
 works until it runs out (an hour or two: run `serve.mjs --from …` again to renew it while the server is up). The runs
-use that account's plan: the nine tasks two ways come to about ten dollars at API prices (Max alone to as much again). A run already in the results file is
-not run again; `--repeat 3` runs each three times (the table shows means), `--tasks a,b` some of them,
-`--parallel 3` how many at once, `--recost` reads the costs again.
+use that account's plan: the first nine tasks two ways come to about ten dollars at API prices (Max alone to as much
+again), the whole second measurement to about $110. A run already in the results file is not run again; `--repeat 3`
+runs each three times (the table shows means), `--tasks a,b` some of them, `--parallel 3` how many at once,
+`--recost` reads the costs again. A run waits for the copied token to have 20 minutes left: for a long measurement,
+copy it again every few minutes while the account is in use elsewhere (it renews there).
 
 When you are done, stop `serve.mjs` and remove `/tmp/hydor-bench`: it holds the copied token.
 
@@ -80,6 +82,12 @@ Haiku 5.5, Sonnet 5.5, Opus 5.5 and Fable 5.2): `ordinary.json` (the seven ordin
 (the two hard ones) and `earlier-wordings.json` (the team's runs under earlier wordings of the lead's instructions,
 which the means leave out). `node scripts/tier-bench/report.mjs scripts/tier-bench/results/2026-11-10/ordinary.json`
 shows one as a table. Keep a new measurement beside them, in a folder named by its date.
+
+`results/2026-11-12/` holds the second measurement (11-12 November, the same models, agents offline): `own.json`
+(the nine newer tasks of our own), `contest.json` (the ten AtCoder problems, Quick alone three times each) and
+`lcb.json` (the thirty LiveCodeBench problems; `node scripts/tier-bench/run.mjs --tasks-dir
+~/.cache/hydor-bench/lcb/tasks` after `lcb/make-tasks.py`). Runs made in the trial of 11 November and carried over
+say so in `copiedFrom`; four LiveCodeBench solutions graded again after the grader failed say so in `regraded`.
 
 ## Reading the table
 
