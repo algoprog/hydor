@@ -148,6 +148,8 @@ export interface Ctx {
   readText(spec: { file?: string; current?: string; ext?: string }): Promise<string | null>;
   /** A list to pick from (↑↓, type to filter, Enter); null when they back out. Without a terminal, a UsageError. */
   pick(title: string, items: PickItem[]): Promise<string | null>;
+  /** Asks for a secret on a terminal with what is typed hidden (nothing is echoed); null when nobody is there to ask (read stdin instead). Backing out (Ctrl-C) is Cancelled. */
+  secret?(prompt: string): Promise<string | null>;
 }
 
 export interface PickItem {

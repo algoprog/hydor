@@ -25,6 +25,34 @@ async function stdinText(): Promise<string> {
   return s;
 }
 
+/** Asks on the terminal (stderr) for one line with nothing echoed: Enter ends it, Backspace erases, Ctrl-C or Ctrl-D backs out. */
+function hiddenLine(prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const input = process.stdin;
+    process.stderr.write(prompt);
+    input.setRawMode(true);
+    input.resume();
+    input.setEncoding('utf8');
+    let text = '';
+    const done = (end: () => void) => {
+      input.off('data', onData);
+      input.setRawMode(false);
+      input.pause();
+      process.stderr.write('\n');
+      end();
+    };
+    const onData = (chunk: string) => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') return done(() => resolve(text));
+        if (ch === '\u0003' || ch === '\u0004') return done(() => reject(new Cancelled()));
+        if (ch === '\u007f' || ch === '\b') text = [...text].slice(0, -1).join('');
+        else if (ch >= ' ') text += ch;
+      }
+    };
+    input.on('data', onData);
+  });
+}
+
 export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx {
   const interactive = !!process.stdin.isTTY && !!process.stderr.isTTY;
   const edit = async (text: string, ext = 'md'): Promise<string | null> => {
@@ -75,6 +103,10 @@ export function terminalCtx(conn: Conn, look: Look, o: Opts, usage: string): Ctx
     async pick(title, items) {
       const { pickInTerminal } = await import('../picker.ts');
       return pickInTerminal(title, items, look.p);
+    },
+    async secret(prompt) {
+      if (!interactive) return null;
+      return hiddenLine(prompt);
     },
   };
 }
