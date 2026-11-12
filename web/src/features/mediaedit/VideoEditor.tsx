@@ -1266,7 +1266,8 @@ function Studio({ o, active, detached, setDirty, done, close, lead, facts }: Edi
           {lead}
           <Clapperboard size={15} className="shrink-0 text-accent" />
           <MenuBar menus={menus} compact="auto" />
-          <span translate="no" className="min-w-0 flex-1 truncate text-center text-[12.5px] text-fg-3">
+          {/* (its name is on its tab above too: here only where there is room beside the menus' names) */}
+          <span translate="no" className="hidden max-w-[40%] min-w-0 shrink truncate text-[12.5px] text-fg-3 2xl:block">
             {o.title}
           </span>
           <WorkspaceTabs value={workspace} tabs={WORKSPACES} onChange={setWorkspace} />
