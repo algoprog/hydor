@@ -47,6 +47,7 @@ export type ArgKind =
   | 'connection'
   | 'account'
   | 'setting'
+  | 'value'
   | 'section'
   | 'topic'
   | 'route'
