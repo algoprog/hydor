@@ -19,6 +19,7 @@ import { config } from '../config.ts';
 import { resolvePath } from '../files.ts';
 import type { Feature, RunCtx, RunTool } from '../features/types.ts';
 import { canRead, extractText, readDocument } from './extract.ts';
+import { madeRoutes } from './made.ts';
 import { pdfRoutes } from './pdf/routes.ts';
 import { PDF_INSTRUCTIONS, PDF_TOOLS } from './pdf/tools.ts';
 import { convert, soffice } from './tools.ts';
@@ -84,9 +85,10 @@ const PRESENT: RunTool = {
   annotations: { readOnlyHint: true },
   description: [
     'Hand finished files to the user: they show with your reply as cards (an icon by type, name and size) that open in the app’s file viewer',
-    '(Word, Excel, CSV and LaTeX files in an editor where they can change and save them, Jupyter notebooks as notebooks they can run, slides and PDFs as a preview) or download. Call it once, at the end, with the files you made or changed for',
-    'the user: a report, a spreadsheet, slides, a PDF, a notebook, images, an archive. Not for scratch files, or for code changes in a project. Give',
-    'each a short caption. Then do not repeat their paths or contents in your reply: a sentence on what you made is enough.',
+    '(Word, Excel, CSV and LaTeX files in an editor where they can change and save them, Jupyter notebooks as notebooks they can run, slides and PDFs as a preview) or download.',
+    'Call it once, at the end of every turn in which you made or changed files for the user, updates included: a report, a paper, a spreadsheet, slides, a PDF, a notebook,',
+    'images, an archive. Not for scratch files, or for code changes in a project. Give each a short caption. In your reply, name each as a Markdown link to its',
+    'path ([report.pdf](/full/path/report.pdf)), which opens it in the viewer; do not paste their contents.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -124,7 +126,7 @@ const PRESENT: RunTool = {
       else shown.push(`${abs} (${size(st.size)})`);
     }
     if (wrong.length) return { isError: true, text: `Nothing was shown. Fix these and call present_files again: ${wrong.join('; ')}.` };
-    return `The user now sees ${shown.length === 1 ? 'this file' : `these ${shown.length} files`} with your reply, each with Open and Download:\n${shown.join('\n')}\nDon’t repeat the paths or contents in your reply.`;
+    return `The user now sees ${shown.length === 1 ? 'this file' : `these ${shown.length} files`} with your reply, each with Open and Download:\n${shown.join('\n')}\nIn your reply, name each as a link to its path ([name](path)) rather than pasting its contents.`;
   },
 };
 
@@ -218,6 +220,7 @@ export const documents: Feature = {
     });
     // Files' Fill & sign (pdf/routes.ts).
     pdfRoutes(app, db);
+    madeRoutes(app);
     app.get('/api/documents/pages.pdf', async (req, reply) => {
       const file = resolvePath((req.query as Record<string, string>).path);
       const { pdf } = await pagesPdf(file);
@@ -232,7 +235,7 @@ export const documents: Feature = {
   tools: (_ctx: RunCtx) => [READ, PRESENT, ...PDF_TOOLS],
   spawn: () => ({
     instructions: [
-      'Documents: read PDF, Word, Excel, PowerPoint and other documents with read_document. When you have made files for the user (a document, spreadsheet, slides, a PDF, a notebook, images), finish by calling present_files with them: they show as cards the user can open and download (a notebook opens in the notebook page, to run).',
+      'Documents: read PDF, Word, Excel, PowerPoint and other documents with read_document. Whenever a turn makes or changes files for the user (a document, a paper, a spreadsheet, slides, a PDF, a notebook, images), updates included, finish it by calling present_files with them: they show as cards the user can open and download (a notebook opens in the notebook page, to run). In your reply, name each file as a Markdown link to its path ([report.pdf](/full/path/report.pdf)): a click opens it in the app’s file viewer.',
       PDF_INSTRUCTIONS,
     ],
     // Where the office skills' helper scripts keep their Python environment.

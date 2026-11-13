@@ -233,6 +233,10 @@ agents that speak ACP and take MCP servers.
   turns that off.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
+  Under every reply the documents the agent made or changed in the turn (PDF, Word, Excel, PowerPoint, OpenDocument,
+  CSV and TSV, LaTeX, notebooks, EPUB, Markdown) show as cards marked New or Updated, handed over or not (the finished
+  ones before their sources, four first), and file names and paths in the reply are links that open the file in the
+  window over the conversation; agents are told to hand over what they made or changed and to name each file as a link.
   Agents make Jupyter notebooks too (the notebooks skill: sections with text, a run from the top before handing one
   over, an environment beside it to run it in): kept in the Library with save_notebook, or handed over as a file
   whose card opens it in the notebook page. A card's Save to Library keeps a copy of a notebook, a document, a
@@ -651,6 +655,7 @@ agents that speak ACP and take MCP servers.
   or LuaLaTeX, with BibTeX) as you type, beside the pages: a Visual mode that shows the source as a document while
   you type, formulas drawn as you write them, completion of commands, environments, packages, citations, labels and
   pictures, a symbols panel, tables made in a grid, references found by DOI, arXiv id or title, folding, spelling,
+  the engine under Recompile's arrow (Typeset with) and Recompile beside the pages' zoom, giving way as that side narrows,
   quick checks before TeX runs, errors and warnings at their lines, the log, an outline, snippets, a word count,
   comments agents answer (on .tex files opened from Files too), Track changes as in Overleaf (an agent's
   edits too, each accepted or rejected), versions compared, dark pages, the pages presented full screen, and a jump between a place
@@ -1110,7 +1115,9 @@ programs shows each program's version and what is out, with Check now, Update no
   Markdown and HTML preview and diffs, quick open, and uploads: changes not saved are kept per file while the app is open
   (undo history, cursor and scroll too, also across Preview and Changes), a dot on the file's tab and a Save / Don't save /
   Cancel question before closing it, CRLF files saved as CRLF, a right-click menu, Go to line, a status bar (line and column,
-  language, indentation, line ends, wrap) and a shortcuts list. Ask, beside an open file, has an agent change it
+  language, indentation, line ends, wrap) and a shortcuts list. Above every open file (Word, Excel, CSV and LaTeX too)
+  its path is a row of links: Home, then each folder going to it in Files with the next step picked, "…" for the folders
+  between, the file's name showing it in its folder; the same in the window over a conversation, which closes first. Ask, beside an open file, has an agent change it
   or answer about it: unsaved changes are saved first, the conversation stays beside the file, and the editor
   takes in each change as it is written (every second while an agent works), the changed lines tinted for a
   moment and your place kept. Word, Excel, CSV and LaTeX files open in the

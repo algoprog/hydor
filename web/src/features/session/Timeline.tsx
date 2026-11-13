@@ -19,6 +19,9 @@ import { TurnCost } from './TurnCost';
 import type { SessionNote } from '@shared/features';
 import { runEndedNotice } from '@shared/apps';
 import { LOCALE } from '../../i18n/locale';
+import { ReplyFilesCtx } from '../../components/Markdown';
+import type { Card } from '../documents/FileCards';
+import { SLACK, startOf, TurnDocs, turnFiles, useMadeFiles } from './TurnDocs';
 
 /**
  * Custom works with Hydor's loading mark; other agents keep their own animation. `name`: an agent of Settings → More
@@ -714,6 +717,7 @@ const SegmentView = memo(function SegmentView({
   fresh,
   notes,
   sent,
+  docs,
 }: {
   seg: Segment;
   sessionKey: string;
@@ -725,6 +729,8 @@ const SegmentView = memo(function SegmentView({
   notes: SessionNote[];
   /** The prompt's pictures as sent from this page, while it cannot show its own. */
   sent?: SentPictures;
+  /** The documents the turn made or changed, once it has finished: cards under its reply. */
+  docs?: Card[];
 }) {
   const [open, setOpen] = useState<boolean | null>(null);
   const expanded = open ?? !!live;
@@ -812,6 +818,7 @@ const SegmentView = memo(function SegmentView({
           {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
         </div>
       ))}
+      {!live && docs && docs.length > 0 && <TurnDocs docs={docs} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
       {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} after />}
@@ -1083,6 +1090,43 @@ export function Timeline({
       ? { status: ext.status, since: ext.since, worked, where: ext.client, note: ext.detail === 'input needed' ? undefined : ext.detail }
       : { status: live!.status, since: live!.turnStartedAt, worked };
 
+  // The documents the finished turns made: one look at the session's folder for all of them, made again when another turn
+  // finishes (never while one runs). Each turn picks its own from it (TurnDocs.tsx).
+  const ctxCwd = useContext(SessionCtx).cwd;
+  const sessionCwd = useSessions((s) => s.byKey[sessionKey]?.cwd) ?? ctxCwd;
+  const home = useApp((s) => s.boot?.home);
+  const isFinished = (seg: Segment, i: number) => !!seg.end && !(i === segs.length - 1 && liveInfo);
+  const idle = !liveInfo;
+  const [madeSince, madeUntil] = useMemo(() => {
+    let since: number | undefined;
+    let until: number | undefined;
+    segs.forEach((seg, i) => {
+      if (!isFinished(seg, i)) return;
+      const a = startOf(seg);
+      const b = seg.end?.ts;
+      if (a == null || b == null) return;
+      since = since == null ? a : Math.min(since, a);
+      until = until == null ? b : Math.max(until, b);
+    });
+    return [since, until != null ? until + SLACK : undefined];
+  }, [segs, idle]);
+  const made = useMadeFiles(sessionCwd, madeSince, madeUntil);
+  const filesOf = (seg: Segment, i: number) => turnFiles(seg, isFinished(seg, i), sessionCwd, home, made);
+  // The paths of everything the turns changed, handed over or show as documents, oldest first, each at its latest place:
+  // the replies' file links find their files among them. The same list (the same array) until a path changes.
+  const pathsKey = useMemo(() => {
+    const order = new Set<string>();
+    segs.forEach((seg, i) => {
+      const f = filesOf(seg, i);
+      for (const p of [...f.changed, ...f.handed, ...f.docs.map((d) => d.path)]) {
+        order.delete(p);
+        order.add(p);
+      }
+    });
+    return [...order].join('\n');
+  }, [segs, idle, sessionCwd, home, made]);
+  const replyFiles = useMemo(() => (pathsKey ? pathsKey.split('\n') : []), [pathsKey]);
+
   // Only what arrives after the first load animates in; opening a session does not replay it all.
   const known = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -1317,6 +1361,7 @@ export function Timeline({
             )}
             {tl.error && <div className="text-[13px] text-err">{tl.error}</div>}
             {!merged.length && !working && <div className="py-20 text-center text-[14px] text-fg-3">No messages yet. Say what you want done below.</div>}
+            <ReplyFilesCtx.Provider value={replyFiles}>
             {segs.map((seg, i) => {
               const ts = seg.prompt?.ts ?? seg.notice?.ts ?? seg.work[0]?.ts ?? seg.answer[0]?.ts;
               const day = ts ? dayLabel(ts) : '';
@@ -1339,11 +1384,13 @@ export function Timeline({
                       fresh={fresh}
                       notes={notes}
                       sent={seg.prompt && sent.get(seg.prompt.id)}
+                      docs={isLast && liveInfo ? undefined : filesOf(seg, i).docs}
                     />
                   </div>
                 </Fragment>
               );
             })}
+            </ReplyFilesCtx.Provider>
             {notes.length > 0 && <LooseNotes notes={notes} known={noteIds} sessionKey={sessionKey} complete={tl.start === 0} />}
             {working && !segs.length && (
               <div className="flex items-center gap-2.5 px-2 text-[13.5px] text-busy">

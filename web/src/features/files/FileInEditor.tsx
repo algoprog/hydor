@@ -15,14 +15,15 @@ import { TEX_MAIN } from '@shared/latex';
 import type { Workbook } from '@shared/sheets';
 import { api, ApiError, put } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
-import { basename, dirname, isWinPath, tildify } from '../../lib/format';
+import { basename, dirname } from '../../lib/format';
 import { mu } from '../../lib/machine';
 import { filePath, go, useFilePeek } from '../../lib/nav';
-import { toast, useApp, useUI } from '../../lib/store';
+import { toast, useUI } from '../../lib/store';
 import { Button, cx, IconButton, MenuItem, MenuSep, Popover, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { EDITORS } from '../pages/editors';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
+import { PathCrumbs } from './PathCrumbs';
 import { useSpaceMenu } from './SpaceMenu';
 import { askFileNow, useFileAsk, useWatchMs } from './FileAsk';
 import { useAskRun } from '../guide/ask';
@@ -111,7 +112,6 @@ export function FileInEditor({
   /** Given a way to save unsaved changes first (true when there were none, or they are saved). */
   saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
-  const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
   const kind = editorKindOf(path)!;
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
@@ -335,7 +335,6 @@ export function FileInEditor({
   const textLabel = kind === 'tex' || delimited ? 'Edit as text' : 'Show as a preview';
   const textIcon = kind === 'tex' || delimited ? <FileCode2 size={14} /> : <Eye size={14} />;
   const unsaved = dirty && <span className="h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />;
-  const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
 
   const lead = mobile ? (
     <>
@@ -354,25 +353,11 @@ export function FileInEditor({
             {unsaved}
           </div>
         )}
-        <div className="flex items-center gap-1.5">
-          {/* Cut at its start: the folders nearest the file say the most. */}
-          <span dir="rtl" translate="no" className="min-w-0 truncate text-left font-mono text-[11.5px] text-fg-3">
-            <span dir="ltr">{tildify(dirname(path), home)}</span>
-          </span>
-          {embedded && unsaved}
-        </div>
+        <PathCrumbs compact path={path} after={embedded ? unsaved : undefined} />
       </div>
     </>
   ) : (
-    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden pl-1 font-mono text-[12px] text-fg-3" title={path} translate="no">
-      {crumbs.map((c, i) => (
-        <span key={i} className={cx('truncate', i === crumbs.length - 1 ? 'shrink-0 text-fg' : 'min-w-0 shrink')}>
-          {i > 0 && <span className="px-0.5 opacity-50">/</span>}
-          {c}
-        </span>
-      ))}
-      {dirty && <span className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
-    </div>
+    <PathCrumbs path={path} after={unsaved} className="flex-1 pl-1" />
   );
 
   const tail = (

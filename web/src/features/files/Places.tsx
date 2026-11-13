@@ -35,8 +35,26 @@ function useDropOn(dir: string | null, after?: () => void) {
 }
 
 /** One step of the path, a button to go there that takes drops. */
-/** `bare`: its icon alone (home's house), its name as its title. */
-function Step({ dir, label, icon, onDir, after, last, bare }: { dir: string; label: string; icon?: ReactNode; onDir: (d: string) => void; after?: () => void; last?: boolean; bare?: boolean }) {
+/** `bare`: its icon alone (home's house), its name as its title. `fit`: it gives way (to a file's name beside it) instead of keeping its width. */
+export function Step({
+  dir,
+  label,
+  icon,
+  onDir,
+  after,
+  last,
+  bare,
+  fit,
+}: {
+  dir: string;
+  label: string;
+  icon?: ReactNode;
+  onDir: (d: string) => void;
+  after?: () => void;
+  last?: boolean;
+  bare?: boolean;
+  fit?: boolean;
+}) {
   const drop = useDropOn(last ? null : dir, after);
   return (
     <button
@@ -46,7 +64,8 @@ function Step({ dir, label, icon, onDir, after, last, bare }: { dir: string; lab
       aria-label={bare ? label : undefined}
       {...drop.props}
       className={cx(
-        'flex h-7 max-w-[14rem] min-w-0 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-[13px] transition-colors hover:bg-bg-2 max-sm:h-8',
+        'flex h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 text-[13px] transition-colors hover:bg-bg-2 max-sm:h-8',
+        fit ? 'max-w-[12rem] shrink' : 'max-w-[14rem] shrink-0',
         last ? 'font-medium text-fg' : 'text-fg-3 hover:text-fg',
         drop.on && 'bg-accent/15 text-fg ring-1 ring-accent/50',
       )}

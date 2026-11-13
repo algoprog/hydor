@@ -154,6 +154,14 @@ const KIND_WORDS: Record<DocKind, string> = {
   file: 'File',
 };
 
+/**
+ * The documents an agent makes or changes for people to read (a report, a paper, a PDF, a spreadsheet, slides, a
+ * notebook, a Markdown write-up): each one a turn wrote shows as a card under its reply (TurnDocs), handed over or not.
+ * Pictures, code and data files are left out: there are too many of them, made along the way.
+ */
+export const MADE_DOC_EXTS = ['pdf', 'docx', 'doc', 'odt', 'rtf', 'xlsx', 'xls', 'ods', 'csv', 'tsv', 'pptx', 'ppt', 'odp', 'tex', 'ipynb', 'epub', 'md', 'markdown'];
+export const isMadeDoc = (path: string) => /\.[^./\\]+$/.test(path) && MADE_DOC_EXTS.includes(path.split('.').pop()!.toLowerCase());
+
 /** "Word document", "Excel workbook", "PDF"…: what a file is, in words. */
 export function kindLabel(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
@@ -161,7 +169,7 @@ export function kindLabel(path: string): string {
     doc: 'Word document', docx: 'Word document', odt: 'OpenDocument text', rtf: 'Rich text',
     xls: 'Excel workbook', xlsx: 'Excel workbook', xlsm: 'Excel workbook', ods: 'OpenDocument sheet', csv: 'CSV table', tsv: 'TSV table',
     ppt: 'PowerPoint', pptx: 'PowerPoint', odp: 'OpenDocument slides',
-    md: 'Markdown', zip: 'ZIP archive', epub: 'EPUB book', svg: 'SVG image', ipynb: 'Jupyter notebook',
+    md: 'Markdown', zip: 'ZIP archive', epub: 'EPUB book', svg: 'SVG image', ipynb: 'Jupyter notebook', tex: 'LaTeX', ltx: 'LaTeX',
   };
   return named[ext] ?? (KIND_WORDS[docKind(path)] === 'Image' && ext ? `${ext.toUpperCase()} image` : KIND_WORDS[docKind(path)]);
 }

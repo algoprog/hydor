@@ -12,7 +12,7 @@ import { useDiscardGuard } from '../settings/Instructions';
 import { FileView } from './FilesPage';
 import { FileMore } from './SpaceMenu';
 
-const shut = () => useFilePeek.setState({ file: null });
+const shut = () => useFilePeek.setState({ file: null, leave: undefined });
 
 export function FilePeek() {
   const file = useFilePeek((s) => s.file);
@@ -29,6 +29,13 @@ export function FilePeek() {
     shut();
     return true;
   }, [leave]);
+
+  // What goes elsewhere from the dialog (the file's path above it) closes it through the same guard.
+  useEffect(() => {
+    if (!open) return;
+    useFilePeek.setState({ leave: close });
+    return () => useFilePeek.setState({ leave: undefined });
+  }, [open, close]);
 
   useEffect(() => {
     if (!open) return;

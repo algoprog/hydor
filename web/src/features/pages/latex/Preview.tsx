@@ -7,7 +7,7 @@
 // says which page is in view and goes to the one typed; Dark pages shows them light on dark in the dark theme; the
 // pages can be presented one at a time over the whole screen (Present.tsx). Without TeX here, a note says what to
 // install; without poppler, the PDF shows in the browser's own viewer.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Code, Copy, ExternalLink, Minus, MoveHorizontal, Plus, Presentation, Search, TriangleAlert } from 'lucide-react';
 import type { TexCompiled, TexSetup } from '@shared/latex';
 import { Button, cx, IconButton, Throbber } from '../../../components/ui';
@@ -44,6 +44,7 @@ export function Preview({
   findAsk,
   onFound,
   onPicked,
+  lead,
   className,
 }: {
   /** Changes when Find in the pages is asked for (Ctrl+F over them). */
@@ -65,6 +66,8 @@ export function Preview({
   darkPages?: boolean;
   /** Changes when the pages are to be presented over the whole screen (View → Present the pages). */
   presentAsk?: number;
+  /** At the start of the bar over the pages (Recompile, where the source and the pages are side by side): it says it is typesetting. */
+  lead?: ReactNode;
   className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -273,15 +276,19 @@ export function Preview({
   const missing = result?.missing ?? setup?.missing;
   const zi = ZOOMS.findIndex((z) => Math.abs(z - zoom) < 0.01);
   const bar = (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
-      <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[12px] text-fg-3">
-        {busy ? (
+    // Beside the source (with Recompile ahead), what the bar holds gives way as the pages' side narrows: the count of pages,
+    // then Present, Open the PDF and Find (all in the menus too, or a key away), and Recompile's word last.
+    <div className="@container flex h-9 shrink-0 items-center gap-1 border-b border-line bg-panel px-2">
+      {lead}
+      <span className={cx('flex min-w-0 flex-1 items-center gap-1.5 truncate text-[12px] text-fg-3', lead && '@max-[30rem]:invisible')}>
+        {/* With Recompile ahead of it (its ▷ turns while it typesets), only the count of pages, where no page box says it. */}
+        {busy && !lead ? (
           <>
             <Throbber className="h-3.5 w-3.5" />
             Typesetting…
           </>
-        ) : shown ? (
-          <span className="truncate">{`${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset`}</span>
+        ) : shown && (!lead || shown.pages < 2 || setup?.pictures === false) && !busy ? (
+          <span className="truncate">{lead ? `${shown.pages} page${shown.pages === 1 ? '' : 's'}` : `${shown.pages} page${shown.pages === 1 ? '' : 's'} typeset`}</span>
         ) : null}
       </span>
       {shown && setup?.pictures !== false && shown.pages > 1 && (
@@ -328,17 +335,24 @@ export function Preview({
         </>
       )}
       {shown && setup?.pictures !== false && setup?.words && (
-        <IconButton label="Find in the pages (Ctrl+F)" size="sm" active={find.open} onClick={() => find.setOpen(!find.open)}>
+        <IconButton label="Find in the pages (Ctrl+F)" size="sm" active={find.open} onClick={() => find.setOpen(!find.open)} className={lead && !find.open ? '@max-[24rem]:hidden' : undefined}>
           <Search size={14} />
         </IconButton>
       )}
       {shown && setup?.pictures !== false && (
-        <IconButton label="Present the pages" size="sm" onClick={() => setPresenting(page)}>
+        <IconButton label="Present the pages" size="sm" onClick={() => setPresenting(page)} className={lead ? '@max-[27rem]:hidden' : undefined}>
           <Presentation size={14} />
         </IconButton>
       )}
       {shown && (
-        <a href={pdfUrl(shown.key)} target="_blank" rel="noreferrer" title="Open the PDF" aria-label="Open the PDF" className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg">
+        <a
+          href={pdfUrl(shown.key)}
+          target="_blank"
+          rel="noreferrer"
+          title="Open the PDF"
+          aria-label="Open the PDF"
+          className={cx('inline-flex h-7 w-7 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg', lead && '@max-[25rem]:hidden')}
+        >
           <ExternalLink size={14} />
         </a>
       )}
