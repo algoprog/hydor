@@ -52,9 +52,11 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   start a new session there, and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
   for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
-  ones it makes for ChatGPT projects, show by the project's name). A folder whose work began outside Hydor (its first
-  session came from Claude Code or Codex in VS Code, a terminal or their desktop apps) carries the marks of the agents
-  its sessions came from after its name, and its tooltip and ⋯ say which apps, and which added account; then the rest
+  ones it makes for ChatGPT projects, show by the project's name). Any session working in a project's folder is in the
+  project's group, wherever it was started. A folder whose work began outside Hydor (its first
+  session came from Claude Code or Codex in VS Code, a terminal or their desktop apps) and that is not a project
+  carries the marks of the agents its sessions came from after its name (a project found in them carries the marks
+  after the project's name), and its tooltip and ⋯ say which apps, and which added account; then the rest
   by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
 - While a session works, its line says how long this turn has run and, after earlier turns, how long it has worked in
@@ -199,7 +201,21 @@ agents that speak ACP and take MCP servers.
   used lately one tap away; what it is about, its guidelines and other folders are under More options. Under your
   projects, the Projects page suggests folders your sessions worked in, or changed files in, over the last 90 days that
   no project has yet (a folder in a Git repository counting as the repository), each with Make a project, or ✕ to stop
-  suggesting it.
+  suggesting it, and from making it a project by itself.
+- **Projects found in Claude Code and Codex**: Hydor lists the sessions you had in Claude Code and Codex outside it, and
+  the folders you work in with them become projects by themselves: a folder once at least two sessions you started in
+  Claude Code or Codex yourself (a terminal, VS Code, Claude's desktop app, the Codex app) worked in it, a Codex
+  project (the ones you keep in the Codex app, with the folders it keeps for ChatGPT projects) once a session worked in
+  one of its folders, under Codex's name. Sessions a script or another program ran, subagents and Hydor's own sessions
+  don't count, a session in a subfolder of a Git repository counts for the whole repository, and the home folder,
+  hidden and temporary folders, the app's own, folders you marked Not a project and folders a project already has are
+  left out. It happens once Hydor has read your sessions after it starts, then within about a minute of new ones. The
+  project is named after the folder (or what you renamed it to in the sidebar), and on the Projects page its card says
+  From Claude Code, From Codex or From Claude Code and Codex, with the programs' marks. It is a project like any other,
+  with its own folder where the sessions ran (nothing moves), and deleting it keeps its folder from being made a
+  project again. Every session working in a project's folder, or one inside it, is in the project, wherever it was
+  started: making a project for a folder you work in brings its earlier sessions in at once, and sessions the app
+  starts there start in the project.
 - **Share a project with people** (a project's ⋯ → Share with people): your advisor or students get a personal link each
   (View and comment, or Edit documents; for a week, a month, or until you stop it), shown once, as a copy or a QR code.
   They open a portal of that project alone: its documents in the Library's own viewers and editors, its sessions

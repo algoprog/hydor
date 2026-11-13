@@ -38,7 +38,7 @@ export function hiddenSuggestions(db: DB): string[] {
 /** "Not a project": the folder is no longer suggested. */
 export function hideSuggestion(db: DB, folder: string) {
   const p = path.resolve(folder);
-  kvSet(db, HIDDEN_KEY, JSON.stringify([...new Set([p, ...hiddenSuggestions(db)])].slice(0, 200)));
+  kvSet(db, HIDDEN_KEY, JSON.stringify([...new Set([p, ...hiddenSuggestions(db)])].slice(0, 500)));
 }
 
 export function spaceSuggestions(db: DB, o: { limit?: number; now?: number; home?: string } = {}): SpaceSuggestion[] {

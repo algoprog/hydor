@@ -63,6 +63,9 @@ your machine. See [keep a session confidential](docs/guide/02-sessions.md#keep-a
 - **Bring in what it knows.** **Settings → Memory → Bring in** takes the memory and the skills you made in other
   agents, and what ChatGPT, Claude, Claude Code and Codex know about you. You see it all first and pick what comes
   over, and the setup tour offers it when it finds another agent on this computer ([memory](docs/guide/06-memory.md)).
+- **Your projects come along.** The folders you work in with Claude Code and Codex, and Codex's own projects, become
+  Hydor projects by themselves, with their sessions, and get documents, skills and guidelines of their own
+  ([projects](docs/guide/04-projects.md#projects-found-in-claude-code-and-codex)).
 - **Talk to your agents from a chat app.** Telegram, Discord or Slack, under **Settings → Chat apps**
   ([devices](docs/guide/20-devices.md)).
 

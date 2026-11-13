@@ -25,6 +25,8 @@ import { buildHandoff, splitHandoff } from './handoff.ts';
 import { ClaudeParser } from './history/claude.ts';
 import { Timeline } from './timeline.ts';
 import { removeSessionScratch } from './tasklog.ts';
+import { projectOfFolder } from './spaces/found.ts';
+import { allSpaces } from './spaces/index.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
 import { beforeSend, featureDeps, messageNotes, spawnAdditions, turnEnded } from './features/registry.ts';
@@ -1142,6 +1144,11 @@ export class SessionManager extends EventEmitter {
       const made = await createWorktree(cwd, o.prompt || o.title || 'task');
       wt = made.info;
       cwd = made.cwd;
+    }
+    // Working in a project's folder (a worktree: its main checkout) is working in the project: it gets its guidelines, skills and knowledge from the first turn.
+    if (!o.extra?.space) {
+      const sp = projectOfFolder(allSpaces(this.db), wt?.repo ?? cwd, config.home);
+      if (sp) o = { ...o, extra: { ...o.extra, space: sp.id } };
     }
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
     let account = o.account || undefined;

@@ -15,6 +15,8 @@ A project is one piece of work with everything that belongs to it, like Projects
 - **remembers what earlier sessions in the project learned**: agents keep notes about a project by its folder, so the sessions of a project share them (see [Memory](/guide/memory));
 - **searches the project's own documents**, and the shared knowledge too unless the project turns that off (see [Which sessions search which knowledge](#which-sessions-search-which-knowledge)).
 
+Sessions belong to a project by where they work. Every session that works in the project's folder, or in a folder inside it, is in the project, wherever it was started: in Hydor, in Claude Code or in Codex. When one project's folder is inside another's, the inner project gets it. A session in a worktree counts for the folder the worktree was made from, and a project whose folder is your home folder gets only the sessions in the home folder itself. So making a project for a folder you already work in brings its earlier sessions into it at once (the sidebar shows them under the project, not as a folder group), and a session that Hydor starts in a project's folder (from the start page, a scheduled task, an app or the API) starts in the project, with its guidelines, skills and knowledge from its first turn.
+
 A project can also bring other projects together. That is a **group**: see [Bring projects together in a group](#bring-projects-together-in-a-group).
 
 ## Open the Projects page
@@ -28,16 +30,16 @@ The page has two tabs:
 
 Each project shows as a card:
 
-- a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band), and in its corner **More** (⋯), the same menu as at the top of the project's page;
+- a band of its colour with its mark: a rounded square in its colour with the first letter of its name (a group's mark has a second square behind it, and **Group** on its band). A project Hydor made by itself says where it found it on its band: **From Claude Code**, **From Codex** or **From Claude Code and Codex**, with the programs' marks (see [Projects found in Claude Code and Codex](#projects-found-in-claude-code-and-codex)). In its corner **More** (⋯), the same menu as at the top of the project's page;
 - its name, and under it what it is about, or its folder when it has no description. A group says "Brings together" and the names of its projects;
-- what it holds: how many sessions, how many things in the Library, documents and skills;
+- what it holds: how many sessions (every session in it, whether you started it here or it works in the project's folder), how many things in the Library, documents and skills;
 - how long ago one of its sessions was last at work, and **New session**, which starts a session in it at once.
 
 Click a card to open the project's own page, or type the project's name in the search box (Ctrl+K) to go straight there. With no projects yet, the page says what a project is for in three short parts, with **Make a project**.
 
 Drop files from your computer on a project's card to add them to the project ("Drop to add to “Thesis”" shows while they are over it): documents, spreadsheets, slides, LaTeX and notebooks become pages of the Library, pictures, videos and sounds are kept there, and any other file goes in the project's folder (see [Add files of yours](/guide/library#add-files-of-yours)).
 
-Under the projects, **Folders you work in** lists folders your sessions used lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
+Under the projects, **Folders you work in** lists folders you worked in lately that could become projects (see [Folders you work in, not in a project yet](#folders-you-work-in-not-in-a-project-yet)).
 
 ## Make a project
 
@@ -60,16 +62,32 @@ Two more things are set on the project's **Settings** tab afterwards: the agent 
 
 ### A project for a folder you already have
 
-In the **New project** window, pick **In a folder I already have** under **Where its files go**, then the folder: the project works in it, and no new folder is made. An agent can do it too: "Make a project called Shop for ~/code/shop". A project's own folder can't be changed once the project is made, but the folders it works with can: see [Files](#files).
+In the **New project** window, pick **In a folder I already have** under **Where its files go**, then the folder: the project works in it, and no new folder is made. An agent can do it too: "Make a project called Shop for ~/code/shop". A project's own folder can't be changed once the project is made, but the folders it works with can: see [Files](#files). Sessions that already worked in that folder join the project at once. A folder is one project's own: if Hydor already made a project of it (see [Projects found in Claude Code and Codex](#projects-found-in-claude-code-and-codex)), making a project for it yourself makes that project yours as you make it now, with your name, colour, description and guidelines. It is the same project with its sessions, and it no longer says where it was found. For a folder a project you made already works in, the app says "The Shop project works in ~/code/shop already: open it, or pick another folder".
+
+### Projects found in Claude Code and Codex
+
+Hydor lists the sessions you had in Claude Code and Codex outside Hydor: in a terminal, VS Code, Claude's desktop app or the Codex app (see [The session list](/guide/start#the-session-list)). The folders you work in with them now become Hydor projects by themselves, so your work there is waiting for you as a project, with its sessions.
+
+- **When a folder becomes a project**: once at least two sessions you started yourself in Claude Code or Codex worked in it, in a terminal, VS Code, Claude's desktop app or the Codex app. Sessions that a script or another program ran (such as `codex exec` or the Agent SDK), sessions an agent started for part of its job (subagents) and Hydor's own sessions don't count. A session in a subfolder of a Git repository counts for the whole repository.
+- **Codex's own projects**: the projects you keep in the Codex app, including the folders it keeps for your ChatGPT projects, become projects once a session worked in one of their folders. The project takes Codex's name for it, its first folder as the project's own folder, and its other folders as the folders the project works with.
+- **What is left out**: your home folder; hidden folders (apart from the folders of Codex's own projects); temporary folders; the folders the app makes for itself (task folders, apps' runs, worktrees and its data); folders you marked **Not a project**; and folders a project already has: its own folder, one it works with, or a folder inside them.
+- **When**: once Hydor has read your sessions after it starts, then within about a minute of new sessions there.
+- **Its name**: the name you gave the folder in the sidebar (**Rename**), else the Codex project's name, else the folder's own name. If a project already has that name, the name of the folder above goes in front ("client/app"), then a number.
+- **On the Projects page**: its card says where it was found, on its band: **From Claude Code**, **From Codex** or **From Claude Code and Codex**, with the programs' marks. Point at it to read "Hydor made this project for a folder you work in with Claude Code" (or Codex, or both). Projects found this way come after the projects you already have, the one at work most recently first.
+- **In the sidebar**: its group is the project's group, with its mark and name and, after the name, the marks of the programs. Point at the name, or open the heading's **⋯**, to see where its sessions came from (**Started outside Hydor**), as for a folder's group.
+- **A project like any other**: its own folder is the folder where those sessions ran, and nothing is moved or copied. It has documents, skills, guidelines, an agent, a Library and sharing like any project, and you can rename it, describe it or delete it. Claude Code's own skills in the folder's `.claude/skills` show on its **Skills** tab as before, and the folder's own CLAUDE.md or AGENTS.md is still read by agents as before.
+- **If you delete it**, Hydor doesn't make it again, and you can still make a project for that folder yourself (see [Delete a project](#delete-a-project)).
+
+To see which projects came this way, look for the band on the [Projects page](/projects).
 
 ### Folders you work in, not in a project yet
 
 Under your projects on the [Projects page](/projects), the app lists up to six folders you could make projects for: folders your sessions worked in over the last 90 days, or changed files in while working somewhere else, that no project has yet. The ones used most, and most recently, come first. A folder inside a project kept in Git counts as the whole project. Each card shows the folder's name, where it is, how many sessions used it and when one last did.
 
 - **Make a project** opens the **New project** window with that folder picked and its name filled in.
-- ✕ (**Not a project**) stops suggesting that folder. The folder itself is untouched.
+- ✕ (**Not a project**) stops suggesting that folder, and stops Hydor from making it a project by itself (see [Projects found in Claude Code and Codex](#projects-found-in-claude-code-and-codex)). The folder itself is untouched, and **New project** can still make a project for it.
 
-Your home folder, hidden folders, temporary ones and the folders the app makes for itself (task folders, apps' runs, worktrees) are never suggested. Once a project has a folder, as its own or as one of the folders it works with, it leaves the list. The same folders show under **Used lately, in no project yet** in the **New project** window.
+Folders you work in with Claude Code and Codex become projects by themselves, so this list holds mostly folders you worked in from Hydor. Your home folder, hidden folders, temporary ones and the folders the app makes for itself (task folders, apps' runs, worktrees) are never suggested. Once a project has a folder, as its own or as one of the folders it works with, it leaves the list. The same folders show under **Used lately, in no project yet** in the **New project** window.
 
 ## Start a session in a project
 
@@ -91,7 +109,7 @@ When the project's folder is a Git repository, the end of the menu offers **New 
 Click a project on the Projects page to open it. The top of its page is in the project's colour: the arrow on the left goes back to all your projects (as on the app's other pages), then come the project's mark and name and what it is about (a group's projects, for a group; its folder, with no description). On the right, **New session** starts a session in the project (on a phone, the pen), and **More** (⋯) has:
 
 - **Open its folder in Files**: the project's folder on the Files page.
-- **Only its sessions in the sidebar**: the session list shows only the sessions started in the project, as the sidebar's own filter does (see [Show one project's sessions in the sidebar](#show-one-projects-sessions-in-the-sidebar)). Pick it again to see every session.
+- **Only its sessions in the sidebar**: the session list shows only the sessions in the project, as the sidebar's own filter does (see [Show one project's sessions in the sidebar](#show-one-projects-sessions-in-the-sidebar)). Pick it again to see every session.
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
@@ -101,7 +119,7 @@ Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **
 
 The project at a glance, in cards:
 
-- **Sessions**: the sessions started in the project, the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
+- **Sessions**: the sessions in the project (started in it, or working in its folder, in Hydor, Claude Code or Codex), the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
 - **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there. Files dropped on it are added to the project.
 - **Shared with** (beside them, under them on a phone), once you share the project with someone: each person, with their initials and what they did last ("Commented on “Chapter 3” · 2 h ago", "Not opened yet"). Click one, or **Share**, to see and change who it is shared with (see [Share a project with people](#share-a-project-with-people)).
 - **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its agent) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the project are listed under its folder).
@@ -211,11 +229,12 @@ Open the project, go to its **Settings** tab, change what you like and click **S
 
 1. Open the project, and click **More** (⋯) at its top, or go to its **Settings** tab.
 2. Click **Delete the project**.
-3. The app asks "Delete the *name* project?" Click **Delete**.
+3. The app asks "Delete the *name* project?" Click **Delete**. For a project Hydor found, it adds "Hydor found it in Claude Code’s sessions and won’t make it again." (or Codex’s, or Claude Code’s and Codex’s).
 
 Deleting a project keeps everything that was in it:
 
 - **Its folder** and the files in it stay where they are, and so do the folders it worked with.
+- **Its folder goes on the Not a project list**: Hydor won't suggest it again, and won't make it a project again by itself. You can still make a project for it yourself (**New project** → **In a folder I already have**).
 - **Its sessions** stay, and no longer belong to a project.
 - **What it holds in the Library** stays there, in no project.
 - **Its documents** move to the shared knowledge, so every session can search them from then on. To keep them apart, move their knowledge base into another project (see [Rename, move, read again or delete a knowledge base](#rename-move-read-again-or-delete-a-knowledge-base)).
@@ -262,7 +281,7 @@ To list only one project's sessions:
 1. In the sidebar, click the filter button at the end of the **Search sessions** field (**Filter and group sessions**).
 2. The menu lists **All agents**, **Claude Code** and **Codex**, then **Every project**, up to eight of your projects, and **Projects**, which opens the Projects page. Pick a project.
 
-The session list then shows only the sessions started in that project, by day, and the filter button is coloured while a filter is on. Pick **Every project** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a project. If the project is deleted, the list shows every session again.
+The session list then shows only the sessions in that project, by day, and the filter button is coloured while a filter is on. Pick **Every project** to see every session again. The agent filter works at the same time, to show only one agent's sessions in a project. If the project is deleted, the list shows every session again.
 
 On the project's own page, **More** (⋯) → **Only its sessions in the sidebar** does the same, with a check while it is on; pick it again to see every session.
 
@@ -446,6 +465,8 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Make a project called Shop for my code in ~/code/shop."
 - "What does my Thesis project hold in the Library? Move the reading tracker into it."
 - "Which folders have I been working in that aren't in a project yet? Make projects for the two I use most."
+- "Which of my projects came from Claude Code or Codex?"
+- "Don't make a project for ~/code/scratch by itself."
 - "Copy ~/Downloads/contract.pdf into my Taxes 2026 project, and have it work with ~/Documents/Receipts too."
 - "Group my Thesis and Reading notes projects into one called Everything for the thesis."
 - "Give my Thesis project a skill: cite in APA 7, and check that every DOI resolves before I hand a chapter in."

@@ -79,6 +79,8 @@ import { makeOf } from '../shared/content-asks.ts';
 import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from './confidential/index.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
+import { claimSessions, syncFoundProjects } from './spaces/found.ts';
+import { sidebarPlaces, sidebarTools } from './sidebar/index.ts';
 import { folderOrigins } from './sidebar/origins.ts';
 import { useMachines } from './experiments/remote.ts';
 
@@ -1625,6 +1627,59 @@ const onFlow = (f: LoginFlow) => {
 claude.on('flow', onFlow);
 codex.on('flow', onFlow);
 sessions.on('flow', onFlow);
+// Projects found in Claude Code and Codex (server/spaces/found.ts): a session that works in a project's folder joins it as the
+// indexer reads it, and the folders those programs work in become projects once the first pass is over, then as they change.
+const foundSync = () => {
+  try {
+    const places = JSON.stringify(sidebarPlaces(db));
+    const { made, claimed } = syncFoundProjects(db);
+    if (made.length) {
+      console.log(`[projects] found ${made.length} in Claude Code and Codex: ${made.map((s) => s.name).join(', ')}`);
+      broadcast({ t: 'feature', id: 'spaces', data: { changed: true } });
+    }
+    for (const k of claimed) sessions.queueSummary(k);
+    if (JSON.stringify(sidebarPlaces(db)) !== places) broadcast({ t: 'feature', id: 'sidebar', data: { tools: sidebarTools(db), places: sidebarPlaces(db) } });
+  } catch (e) {
+    console.warn('[projects] could not look for projects:', e instanceof Error ? e.message : e);
+  }
+};
+let foundTimer: NodeJS.Timeout | undefined;
+let foundSince = 0;
+let foundAt = 0;
+let foundFirst = false;
+indexer.on('updated', ({ keys }: { keys: string[] }) => {
+  try {
+    // (the session manager queued these summaries 250 ms ahead: they go out with the project)
+    if (keys.length) claimSessions(db, { keys });
+  } catch (e) {
+    console.warn('[projects] could not place sessions:', e instanceof Error ? e.message : e);
+  }
+  if (!foundFirst) return;
+  // Ten seconds after the last update (a session at work updates all the time: at most a minute after the first), and at most once a minute.
+  const now = Date.now();
+  if (foundTimer) clearTimeout(foundTimer);
+  else foundSince = now;
+  foundTimer = setTimeout(
+    () => {
+      foundTimer = undefined;
+      foundAt = Date.now();
+      foundSync();
+    },
+    Math.max(Math.min(10_000, foundSince + 60_000 - now), foundAt + 60_000 - now, 0),
+  );
+  foundTimer.unref();
+});
+indexer.on('progress', (p) => {
+  if (p.running || foundFirst) return;
+  foundFirst = true;
+  try {
+    claimSessions(db);
+  } catch (e) {
+    console.warn('[projects] could not place sessions:', e instanceof Error ? e.message : e);
+  }
+  foundAt = Date.now();
+  foundSync();
+});
 let lastProgress = 0;
 let wasRunning = true;
 indexer.on('progress', (p) => {

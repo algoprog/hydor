@@ -8,7 +8,8 @@ import { useState, type DragEvent, type ReactNode } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, UserPlus, X } from 'lucide-react';
 import type { SpaceView } from '@shared/spaces';
-import { isGroup, spaceColor } from '@shared/spaces';
+import { isGroup, spaceColor, type FoundIn } from '@shared/spaces';
+import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Throbber } from '../../components/ui';
 import { basename, tildify, timeAgo } from '../../lib/format';
 import { go } from '../../lib/nav';
@@ -77,6 +78,14 @@ function holds(s: SpaceView): string {
   return parts.join(' · ');
 }
 
+/** The chip on a project Hydor found for a folder you work in: the programs it found it for (Claude Code first), its text and title. */
+function foundChip(found: FoundIn[]) {
+  const agents = (['claude', 'codex'] as const).filter((a) => found.includes(a));
+  if (agents.length === 2) return { agents, text: 'From Claude Code and Codex', title: 'Hydor made this project for a folder you work in with Claude Code and Codex' };
+  if (agents[0] === 'claude') return { agents, text: 'From Claude Code', title: 'Hydor made this project for a folder you work in with Claude Code' };
+  return { agents, text: 'From Codex', title: 'Hydor made this project for a folder you work in with Codex' };
+}
+
 /**
  * A space's card: a band of its colour with its mark, its name and what it is about, what it holds, and New session.
  * Files dropped on it go into its Library, and it says so while they are over it.
@@ -85,6 +94,7 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
   const home = useApp((x) => x.boot?.home);
   const c = spaceColor(s);
   const group = isGroup(s);
+  const found = s.found?.length ? foundChip(s.found) : undefined;
   const [over, setOver] = useState(false);
   const onDragOver = (e: DragEvent) => {
     if (!dragsFiles(e.dataTransfer)) return;
@@ -124,6 +134,14 @@ function SpaceCard({ s, spaces }: { s: SpaceView; spaces: SpaceView[] }) {
           {group && (
             <span className="inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2">
               <Layers size={11} /> Group
+            </span>
+          )}
+          {found && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-panel/70 px-2 py-0.5 text-[11.5px] font-medium text-fg-2" title={found.title}>
+              {found.agents.map((a) => (
+                <AgentIcon key={a} agent={a} size={11} />
+              ))}
+              {found.text}
             </span>
           )}
           {/* Its menu, as on its page (share it with people…): a click in it is not a click on the card. */}

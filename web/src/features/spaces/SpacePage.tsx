@@ -9,7 +9,7 @@ import { useSearch } from 'wouter';
 import { ArrowLeft, ArrowRight, BookOpen, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Sparkles, SquarePen, Trash2, UserPlus, UserRound } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
-import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type Space, type SpaceView } from '@shared/spaces';
+import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type FoundIn, type Space, type SpaceView } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { api, del, enc, patch, post } from '../../lib/api';
@@ -91,11 +91,21 @@ function Fact({ icon, label, children, onClick }: { icon: ReactNode; label: stri
   );
 }
 
+/** The confirm's body for deleting a project: a project Hydor found says so, since it would find it again in the programs' sessions. */
+function deleteBody(found: FoundIn[] | undefined) {
+  const claude = !!found?.includes('claude');
+  const codex = !!found?.includes('codex');
+  if (claude && codex) return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s and Codex’s sessions and won’t make it again.';
+  if (claude) return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s sessions and won’t make it again.';
+  if (codex) return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Codex’s sessions and won’t make it again.';
+  return 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library.';
+}
+
 /** Asks, then deletes the space and goes back to the list (its sessions, folder, documents and skills stay). */
 async function deleteSpace(s: Space, confirm: ReturnType<typeof useConfirm>[0]) {
   const ok = await confirm({
     title: tr(`Delete the ${s.name} project?`),
-    body: 'Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library.',
+    body: deleteBody(s.found),
     confirm: 'Delete',
     danger: true,
   });
