@@ -1477,6 +1477,18 @@ html {
   padding: 0.12em 0.4em;
   overflow-wrap: anywhere;
 }
+/* A file named in an agent's reply opens in the file viewer: named in code, it keeps the code look, in the accent colour. */
+.md a.md-file > code {
+  color: var(--accent);
+}
+.md a.md-file:has(> code):hover {
+  text-decoration: none;
+}
+.md a.md-file:hover > code {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: var(--bg-3, var(--bg-2));
+}
 .md .md-table {
   max-width: 100%;
   overflow-x: auto;
