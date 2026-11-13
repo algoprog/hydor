@@ -130,15 +130,41 @@ export function noteTitle(md: string): string {
 }
 
 /**
- * Whether what the agent is writing after its last step, while it works, reads as a note on what it does next (it
- * shows in the outline) rather than its reply: short and in one piece, with no paragraphs, lists, headings, tables,
- * code or pictures of its own. A reply starts out like a note too; it moves to its place as soon as it reads as one.
+ * Whether a text of the agent's reads as a note on what it does next (it shows in the outline) rather than as a reply:
+ * short and in one piece, with no paragraphs, lists, headings, tables, code or pictures of its own (a tag inside
+ * `code` is words, not HTML). A reply starts out like a note too; it moves to its place as soon as it reads as one.
  */
 export function noteLike(md: string): boolean {
   const t = md.trim();
   if (!t || t.length > 320) return false;
   if (/\n\s*\n/.test(t)) return false;
   if (/^\s{0,3}(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\|)/m.test(t)) return false;
-  if (/```|\$\$|<\/?[a-z][^>]*>|!\[/i.test(t)) return false;
+  if (/```|\$\$|!\[/.test(t) || /<\/?[a-z][^>]*>/i.test(t.replace(/`[^`\n]*`/g, ''))) return false;
   return true;
+}
+
+/** A stretch of a turn: work, shown as an outline, or a text the agent wrote between its steps that reads as a reply. */
+export type Run = { kind: 'work'; id: string; items: TimelineItem[] } | { kind: 'said'; id: string; item: AssistantItem };
+
+/**
+ * A turn's work, cut where the agent wrote what reads as a reply (noteLike says no): its answer to a message you sent
+ * while it worked, or what it found before it went on. Such a text shows in its place as a reply, between the work
+ * before and after it; the short notes between steps stay in the outline. A stretch of work keeps its first item's id
+ * as it grows.
+ */
+export function runsOf(work: TimelineItem[]): Run[] {
+  const out: Run[] = [];
+  let cur: TimelineItem[] = [];
+  const flush = () => {
+    if (cur.length) out.push({ kind: 'work', id: cur[0].id, items: cur });
+    cur = [];
+  };
+  for (const it of work) {
+    if (it.kind === 'assistant' && !noteLike(it.text)) {
+      flush();
+      out.push({ kind: 'said', id: it.id, item: it });
+    } else cur.push(it);
+  }
+  flush();
+  return out;
 }

@@ -1029,7 +1029,9 @@ programs shows each program's version and what is out, with Check now, Update no
   between steps starts a part, one line in a few words with a check, how many steps it took and the lines it changed,
   its steps folded under it with plain-words names ("Run the tests", "Read index.ts"), each a click away from its full
   output. The part under way shows the agent's note in full and the step being taken now, so a long turn takes a few
-  lines rather than the screen; its latest parts show, the rest a click away. A step of Hydor's own that waits for a command
+  lines rather than the screen; its latest parts show, the rest a click away. What the agent writes between steps that
+  reads as a reply (its answer to a message sent while it worked, a report with a list or a table) shows as a reply in
+  its place, with the work before and after it each folded under a line of its own. A step of Hydor's own that waits for a command
   Claude Code runs on its own shows Waiting in place of its clock, and counts from when it really starts. A reply long enough to fill the screen
   stops at its first line as it grows, so you read it from its beginning; a short one sits under what came before,
   with no empty space below it. A page still being written shows the app's mark and "Writing the page…" until it has
