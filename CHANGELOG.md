@@ -3,6 +3,27 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.63.0 · 13 November 2026
+
+The projects you work on in Claude Code and Codex are Hydor projects now: they show on the Projects page by themselves,
+with their sessions, ready for documents, skills and guidelines of their own.
+
+- **Projects found in Claude Code and Codex**: a folder where at least two sessions you started in Claude Code or Codex
+  worked (in a terminal, VS Code, Claude's desktop app or the Codex app) becomes a project by itself, named after the
+  folder, or after the name you gave it in the sidebar. Codex's own projects come over under Codex's name, with all
+  their folders. Sessions that scripts ran don't count, and your home folder, hidden and temporary folders are left out.
+- **A project like any other**: each one has its documents, skills, guidelines, agent, Library and sharing. Its card
+  says **From Claude Code**, **From Codex** or **From Claude Code and Codex**, and its group in the sidebar shows where
+  its sessions came from. Delete one you don't want, and Hydor won't make it again.
+- **Every session in a project's folder is in the project**: wherever it was started (in Hydor, Claude Code or Codex),
+  a session working in a project's folder now shows under the project, in the sidebar and on the project's page, and a
+  session Hydor starts there gets the project's guidelines, skills and knowledge from its first turn. Making a project
+  for a folder you already work in brings its earlier sessions along at once.
+- **A found project becomes yours**: making a project for a folder Hydor already found makes that project yours, with
+  the name and details you give it, rather than a second project for the same folder.
+- **Last at work** on a project's card now follows its sessions' own activity, including sessions that run in a
+  terminal or VS Code.
+
 ## 0.62.0 · 13 November 2026
 
 Documents an agent makes or changes now always show under its reply, file names in replies open the file, every folder
