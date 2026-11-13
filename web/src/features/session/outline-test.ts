@@ -1,7 +1,7 @@
 // OUTDIR=dist/dev node scripts/build-server.mjs web/src/features/session/outline-test.ts && node dist/dev/outline-test.js
 import assert from 'node:assert/strict';
 import type { TimelineItem } from '@shared/types';
-import { noteLike, noteTitle, partsOf } from './outline';
+import { noteLike, noteTitle, partsOf, runsOf, type Run } from './outline';
 
 // A note in a few words: what it says it does next, else its sentence that introduces the step.
 const titles: [string, string][] = [
@@ -33,6 +33,9 @@ assert.equal(noteLike('Here is what changed:\n- the total\n- the tests'), false)
 assert.equal(noteLike('| a | b |\n|---|---|'), false);
 assert.equal(noteLike('x'.repeat(400)), false);
 assert.equal(noteLike('```ui recipe\n{}\n```'), false);
+// A tag in code is words: the note stays one.
+assert.equal(noteLike('Now stopping them through `/stop/<search_id>`:'), true);
+assert.equal(noteLike('It renders <details> blocks.'), false);
 
 // Parts: a note opens one; notes in a row are one; a thought goes with the note after it; steps before any note are a part.
 let n = 0;
@@ -66,5 +69,36 @@ const thought = (): TimelineItem => ({ kind: 'thinking', id: `h${++n}`, seq: n, 
   );
 }
 assert.deepEqual(partsOf([]), []);
+
+// Runs: what reads as a reply shows in its place, between the work before and after it; short notes stay in the work.
+const shape = (rs: Run[]) => rs.map((r) => (r.kind === 'said' ? `said:${r.item.id}` : `work:${r.items.map((i) => i.id).join(',')}`));
+{
+  // Your question, its answer (a table), a step to record it, and a closing line after it (that is the reply, not here).
+  const answer = note('Settled:\n\n| Model | Size |\n|---|---|\n| crawl | small |\n\nRecording it in the plan:');
+  const w = [thought(), answer, tool()];
+  const r = runsOf(w);
+  assert.deepEqual(shape(r), [`work:${w[0].id}`, `said:${answer.id}`, `work:${w[2].id}`]);
+  // A stretch is named by its first item, so it keeps its name as it grows.
+  assert.equal(r[2].id, w[2].id);
+}
+{
+  // Short notes between steps stay in the outline, as before.
+  const w = [note('Let me check the logs.'), tool(), note('Found it. Fixing the parser:'), tool()];
+  assert.deepEqual(shape(runsOf(w)), [`work:${w.map((i) => i.id).join(',')}`]);
+}
+{
+  // A long report mid-turn, then more work, then another report: each in its place.
+  const a = note('x'.repeat(400));
+  const b = note('Done.\n\nThe tests pass now.');
+  const w = [tool(), a, tool(), tool(), b, tool()];
+  assert.deepEqual(shape(runsOf(w)), [`work:${w[0].id}`, `said:${a.id}`, `work:${w[2].id},${w[3].id}`, `said:${b.id}`, `work:${w[5].id}`]);
+}
+{
+  // The answer first, before any step (a message you sent while the agent worked, answered before it went on).
+  const a = note('Yes. The context filter is its own model:\n- one\n- two');
+  const w = [a, tool()];
+  assert.deepEqual(shape(runsOf(w)), [`said:${a.id}`, `work:${w[1].id}`]);
+}
+assert.deepEqual(runsOf([]), []);
 
 console.log('outline: ok');

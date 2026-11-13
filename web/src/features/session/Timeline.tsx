@@ -12,7 +12,7 @@ import { ApprovalCard } from './Approval';
 import { AgentIcon } from '../../components/AgentIcon';
 import { QuoteSelection } from './QuoteSelection';
 import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summarize, SystemRow, ThinkingRow, ToolRow, UNFOLD, UserBubble, WorkTime } from './items';
-import { noteLike, noteTitle, partsOf, plainText, type Part } from './outline';
+import { noteLike, noteTitle, partsOf, plainText, runsOf, type Part, type Run } from './outline';
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
 import { TurnCost } from './TurnCost';
@@ -94,7 +94,8 @@ const FollowCtx = createContext<() => boolean>(() => true);
 
 /**
  * One exchange: what you said, the agent's work (steps and in-between notes), and the
- * reply it ended on. A message sent while it works opens the next one.
+ * reply it ended on. A message sent while it works opens the next one. What the agent wrote between its steps that
+ * reads as a reply shows in its place among the work (SegmentView, runsOf in outline.ts).
  */
 interface Segment {
   id: string;
@@ -708,6 +709,78 @@ function topIn(el: HTMLElement, sc: HTMLElement): number {
 /** How far below the top of the view a text it holds sits: clear of the fade under the header. */
 const HOLD_AT = 24;
 
+/**
+ * A stretch of a turn's work: the line that sums it up ("Worked for 2m 10s · 3 commands", or the agent at work while it
+ * runs), with its outline under it when open. `status`: how the turn ended, for its last stretch.
+ */
+const WorkRun = memo(function WorkRun({
+  id,
+  items,
+  live,
+  status,
+  took,
+  expanded,
+  onToggle,
+  sessionKey,
+  agent,
+  replying,
+  fresh,
+  className,
+  cost,
+}: {
+  id: string;
+  items: TimelineItem[];
+  live: LiveInfo | null;
+  status?: string;
+  took: number;
+  expanded: boolean;
+  onToggle: (id: string, open: boolean) => void;
+  sessionKey: string;
+  agent: Agent;
+  replying: boolean;
+  fresh: (id: string) => boolean;
+  className?: string;
+  cost?: React.ReactNode;
+}) {
+  const stats = useMemo(() => workStats(items), [items]);
+  const parts: string[] = [];
+  // Files changed are summed up in the card under the reply.
+  if (stats.commands) parts.push(plural(stats.commands, 'command'));
+  if (!parts.length && stats.steps) parts.push(plural(stats.steps, 'step'));
+  const onlyThought = !stats.steps && items.every((i) => i.kind === 'thinking');
+  const verbLine = status === 'interrupted' ? 'Stopped' : status === 'failed' ? 'Failed' : onlyThought ? 'Thought' : 'Worked';
+  const head = live
+    ? null
+    : `${verbLine}${took >= 1000 ? `${status === 'interrupted' || status === 'failed' ? ' after' : ' for'} ${duration(took)}` : ''}`;
+  return (
+    <div className={className}>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onToggle(id, !expanded)}
+          className="group flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-xl px-2 text-left text-[13.5px] transition-colors hover:bg-bg-2"
+        >
+          {!live && <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200 group-hover:text-fg-2', expanded && 'rotate-90')} />}
+          {live ? (
+            <LiveHead agent={agent} live={live} />
+          ) : (
+            <>
+              <span className={cx('shrink-0 font-medium', status === 'interrupted' ? 'text-warn' : status === 'failed' ? 'text-err' : 'text-fg-2')}>{head}</span>
+              {parts.length > 0 && <span className="min-w-0 truncate text-fg-3">· {parts.join(', ')}</span>}
+            </>
+          )}
+          {live && (
+            <span className="ml-auto flex shrink-0 items-center text-fg-3">
+              <ChevronRight size={15} className={cx('transition-transform duration-200', expanded && 'rotate-90')} />
+            </span>
+          )}
+        </button>
+        {cost}
+      </div>
+      {expanded && <Outline items={items} sessionKey={sessionKey} agent={agent} live={live} status={status} replying={replying} fresh={fresh} />}
+    </div>
+  );
+});
+
 const SegmentView = memo(function SegmentView({
   seg,
   sessionKey,
@@ -732,16 +805,17 @@ const SegmentView = memo(function SegmentView({
   /** The documents the turn made or changed, once it has finished: cards under its reply. */
   docs?: Card[];
 }) {
-  const [open, setOpen] = useState<boolean | null>(null);
-  const expanded = open ?? !!live;
+  // Each stretch of the work folds on its own line (by its first item's id), open while the turn runs.
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  // The turn ended while the reader was in the middle of it: its work stays open.
+  const [stay, setStay] = useState(false);
   const following = useContext(FollowCtx);
   // A finished turn folds its work away, unless the reader is in the middle of it.
   const wasLive = useRef(!!live);
   useLayoutEffect(() => {
-    if (wasLive.current && !live && open === null && !following()) setOpen(true);
+    if (wasLive.current && !live && !following()) setStay(true);
     wasLive.current = !!live;
   }, [!!live]);
-  const visibleWork = seg.work.filter((i) => !hiddenThought(i));
   const stats = useMemo(() => workStats(seg.work), [seg.work]);
   // While the agent works, what it writes after its last step is mostly a note on what it does next: it shows in the
   // outline as the part under way, and takes the reply's place when the turn ends there, or as soon as it reads as a
@@ -752,21 +826,38 @@ const SegmentView = memo(function SegmentView({
     if (!running || !said.length || !noteLike(said.map((a) => a.text).join('\n'))) return { work: seg.work, replyItems: seg.answer };
     return { work: [...seg.work, ...said], replyItems: seg.answer.filter((a) => a.kind !== 'assistant') };
   }, [seg.work, seg.answer, running]);
+  // What the agent wrote between its steps that reads as a reply (an answer to a message you sent while it worked, what
+  // it found before it went on) shows in its place, the work before and after it each under a line of its own. The
+  // stretches that did not change stay the same objects, so only the one being written is drawn again as it grows.
+  const lastRuns = useRef<Run[]>([]);
+  const runs = useMemo(() => {
+    const all = runsOf(work).filter((r) => r.kind === 'said' || r.items.some((i) => !hiddenThought(i)));
+    const next: Run[] = live && all[all.length - 1]?.kind !== 'work' ? [...all, { kind: 'work', id: `${seg.id}:work`, items: [] }] : all;
+    const old = new Map(lastRuns.current.map((r) => [r.id, r]));
+    return (lastRuns.current = next.map((r) => {
+      const o = old.get(r.id);
+      if (!o || o.kind !== r.kind) return r;
+      return (o.kind === 'said' && r.kind === 'said' && o.item === r.item) || (o.kind === 'work' && r.kind === 'work' && sameItems(o.items, r.items)) ? o : r;
+    }));
+  }, [work, !!live, seg.id]);
+  const toggle = useCallback((id: string, open: boolean) => setOpened((o) => ({ ...o, [id]: open })), []);
   const answer = useMemo(() => together(replyItems, seg.same), [replyItems, seg.same]);
   const first = seg.prompt?.ts ?? seg.notice?.ts ?? seg.work[0]?.ts;
   const lastItem = [...seg.work, ...seg.answer].reverse().find((i) => i.ts);
   const took = seg.end?.durationMs ?? (first && lastItem?.ts && lastItem.ts > first ? lastItem.ts - first : 0);
   const status = seg.end?.status;
   const tk = seg.end?.tokens;
-  const parts: string[] = [];
-  // Files changed are summed up in the card under the reply.
-  if (stats.commands) parts.push(plural(stats.commands, 'command'));
-  if (!parts.length && stats.steps) parts.push(plural(stats.steps, 'step'));
-  const onlyThought = !stats.steps && visibleWork.every((i) => i.kind === 'thinking');
-  const verbLine = status === 'interrupted' ? 'Stopped' : status === 'failed' ? 'Failed' : onlyThought ? 'Thought' : 'Worked';
-  const head = live
-    ? null
-    : `${verbLine}${took >= 1000 ? `${status === 'interrupted' || status === 'failed' ? ' after' : ' for'} ${duration(took)}` : ''}`;
+  // A stretch's time: from what came before it (your message, or the text it follows) to the next text, the last one to
+  // the turn's end. With a single stretch it is the turn's own time.
+  const spanOf = (k: number) => {
+    if (runs.length === 1) return took;
+    const said = (r?: Run) => (r?.kind === 'said' ? r.item.ts : undefined);
+    const from = k === 0 ? first : said(runs[k - 1]);
+    const to = k === runs.length - 1 ? (seg.end?.ts ?? lastItem?.ts) : said(runs[k + 1]);
+    return from != null && to != null && to > from ? to - from : 0;
+  };
+  const lastRun = runs.length - 1;
+  const replying = replyItems.some((a) => a.kind === 'assistant' && a.streaming);
 
   return (
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
@@ -777,47 +868,52 @@ const SegmentView = memo(function SegmentView({
           <span className="min-w-0 truncate">{seg.notice.text}</span>
         </div>
       )}
-      {(visibleWork.length > 0 || live) && (
-        <div className={cx(isNew && seg.prompt && 'anim-in [animation-delay:140ms]')}>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setOpen(!expanded)}
-              className="group flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-xl px-2 text-left text-[13.5px] transition-colors hover:bg-bg-2"
-            >
-              {!live && <ChevronRight size={15} className={cx('shrink-0 text-fg-3 transition-transform duration-200 group-hover:text-fg-2', expanded && 'rotate-90')} />}
-              {live ? (
-                <LiveHead agent={agent} live={live} />
-              ) : (
-                <>
-                  <span className={cx('shrink-0 font-medium', status === 'interrupted' ? 'text-warn' : status === 'failed' ? 'text-err' : 'text-fg-2')}>{head}</span>
-                  {parts.length > 0 && <span className="min-w-0 truncate text-fg-3">· {parts.join(', ')}</span>}
-                </>
-              )}
-              {live && (
-                <span className="ml-auto flex shrink-0 items-center text-fg-3">
-                  <ChevronRight size={15} className={cx('transition-transform duration-200', expanded && 'rotate-90')} />
-                </span>
-              )}
-            </button>
-            {/* Its time and cost: where the time went, the tokens by kind, what they cost. */}
-            {tk && !live && seg.end && <TurnCost sessionKey={sessionKey} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" />}
+      {/* One list, so a reply that becomes a text between steps (the agent went on working) keeps its place unredrawn: a
+          text has the same key in both. Keys by kind, as a page's card is keyed by its first save, which stays a step. */}
+      {[
+        ...runs.map((r, k) => {
+          if (r.kind === 'said') {
+            return (
+              <div key={`text:${r.id}`} className={cx(fresh(r.id) && 'anim-in')}>
+                <AssistantBlock item={r.item} />
+              </div>
+            );
+          }
+          const isLast = k === lastRun;
+          return (
+            <WorkRun
+              key={`work:${r.id}`}
+              id={r.id}
+              items={r.items}
+              live={isLast ? live : null}
+              status={isLast ? status : undefined}
+              took={spanOf(k)}
+              expanded={opened[r.id] ?? (!!live || stay)}
+              onToggle={toggle}
+              sessionKey={sessionKey}
+              agent={agent}
+              replying={isLast && replying}
+              fresh={fresh}
+              className={cx(k === 0 && isNew && seg.prompt && 'anim-in [animation-delay:140ms]', k > 0 && fresh(r.id) && 'anim-in')}
+              cost={
+                // Its time and cost: where the time went, the tokens by kind, what they cost.
+                isLast && tk && !live && seg.end ? <TurnCost sessionKey={sessionKey} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" /> : null
+              }
+            />
+          );
+        }),
+        ...seg.attention.map((q) => (
+          <div key={`ask:${q.id}`} className="anim-in">
+            {q.kind === 'tool' && <ToolRow item={q} sessionKey={sessionKey} />}
           </div>
-          {expanded && (
-            <Outline items={work} sessionKey={sessionKey} agent={agent} live={live} status={status} replying={replyItems.some((a) => a.kind === 'assistant' && a.streaming)} fresh={fresh} />
-          )}
-        </div>
-      )}
-      {seg.attention.map((q) => (
-        <div key={q.id} className="anim-in">
-          {q.kind === 'tool' && <ToolRow item={q} sessionKey={sessionKey} />}
-        </div>
-      ))}
-      {answer.map(({ key, item: a, more }) => (
-        <div key={key} className={cx(fresh(key) && 'anim-in')}>
-          {a.kind === 'assistant' && <AssistantBlock item={a} />}
-          {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
-        </div>
-      ))}
+        )),
+        ...answer.map(({ key, item: a, more }) => (
+          <div key={a.kind === 'assistant' ? `text:${a.id}` : `reply:${key}`} className={cx(fresh(key) && 'anim-in')}>
+            {a.kind === 'assistant' && <AssistantBlock item={a} />}
+            {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
+          </div>
+        )),
+      ]}
       {!live && docs && docs.length > 0 && <TurnDocs docs={docs} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
       {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
