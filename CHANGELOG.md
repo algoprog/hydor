@@ -3,6 +3,32 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.62.0 · 13 November 2026
+
+Documents an agent makes or changes now always show under its reply, file names in replies open the file, every folder
+in an open file's path is a click away, and the LaTeX editor's top bar is tidier.
+
+- **Every document a turn makes shows under the reply**: when an agent writes or changes a PDF, a Word, Excel or
+  PowerPoint file, a LaTeX file, a notebook, a table or a Markdown write-up, it shows as a card under its reply, each
+  saying **New** or **Updated**, with **Open**, **Download** and **⋯**, whether or not the agent handed it over. That
+  includes what its commands made in the session's folder, such as the PDF a LaTeX report typesets into; files other
+  sessions write in the same folder at the same time are left out. Finished documents come first, then their sources;
+  the first four show, the rest under **Show more documents**.
+- **File names in replies open the file**: a file's name or path in an agent's reply (`report.tex`,
+  `docs/report.pdf`, `src/app.ts:42`, or a full path in the text) is a link. A click opens the file in a window over
+  the conversation, at the line when one is given, with **Open in Files** to see it among its folder's files.
+  Agents are also told to hand over what they made or changed at the end of every such turn and to name each file as
+  a link.
+- **Click any folder in a file's path**: above a file opened in **Files** or in the window over a conversation, the
+  path reads Home › … › folder › file, and each folder takes you to it in **Files**, with the next step picked there.
+  **…** lists the folders between, and the file's own name shows it in its folder. On a phone, the folder line under
+  the name lists every folder on the way.
+- **A tidier LaTeX editor**: with the source and the pages side by side, **Recompile** now sits at the top of the
+  pages, and the engine (**pdfLaTeX**, **XeLaTeX**, **LuaLaTeX**) is under its arrow as **Typeset with** (and still in
+  **Tools**). The top bar keeps the file's path and the menus, **Edit**, **Insert**, **Format**, **View** and **Tools**,
+  now as words rather than one ≡ button, and the bar over the pages no longer cuts off "N pages typeset": when it is
+  narrow, its less used buttons give way first, all of them still in the menus.
+
 ## 0.61.3 · 12 November 2026
 
 The start page now keeps its own picks for each project, each folder and the new task folder, and the **Agent** chip no

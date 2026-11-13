@@ -2,8 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { ArrowLeft, ClipboardPaste, Copy, CornerDownRight, Download, Ellipsis, Eye, FileDiff, FolderOpen, Highlighter, Keyboard, MessageSquarePlus, Replace, RotateCcw, Save, Scissors, Search, Signature, SlidersHorizontal, Sparkles, SquareTerminal, TextSelect, WrapText } from 'lucide-react';
 import { api, ApiError, post, put } from '../../lib/api';
 import type { EditorHandle, EditorSnapshot, EditorStatus } from '../../lib/codemirror';
-import { basename, bytes, dirname, isWinPath, tildify } from '../../lib/format';
-import { toast, toastError, useApp, useUI } from '../../lib/store';
+import { basename, bytes, dirname } from '../../lib/format';
+import { toast, toastError, useUI } from '../../lib/store';
 import { Markdown } from '../../components/Markdown';
 import { DiffView } from '../../components/DiffView';
 import { Button, cx, Throbber, Empty, IconButton, MenuItem, MenuSep, Popover, useIsMobile } from '../../components/ui';
@@ -13,6 +13,7 @@ import { mu } from '../../lib/machine';
 import { showInFiles } from '../../lib/nav';
 import { isPreviewable } from '@shared/documents';
 import { copyPaths, goFolder, itemOf, startSession } from './actions';
+import { PathCrumbs } from './PathCrumbs';
 import { useSpaceMenu } from './SpaceMenu';
 import { askAbout, useWatchMs } from './FileAsk';
 import { FileStatus } from './FileStatus';
@@ -149,7 +150,6 @@ export function FileEditor({
   fileMenu?: boolean;
   saveFirst?: MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
-  const home = useApp((s) => s.boot?.home);
   const mobile = useIsMobile();
   const [file, setFile] = useState<FileData | null>(null);
   const [error, setError] = useState('');
@@ -422,7 +422,6 @@ export function FileEditor({
   // over, it shows anew here.
   const canEdit = !!file && !embedded && ((media === 'image' && EDITABLE.test(path)) || (media === 'video' && EDITABLE_VIDEO.test(path)) || (media === 'audio' && EDITABLE_SOUND.test(path)));
   const editPicture = () => (media === 'video' ? editVideoFile : media === 'audio' ? editSoundFile : editFile)(path, { label: basename(path), after: (r) => (r.replaced ? void load() : r.path && showInFiles(r.path)) });
-  const crumbs = tildify(path, home).split(isWinPath(path) ? /[\\/]/ : '/');
   const text = !!file && !file.binary && !file.tooLarge;
   const togglePreview = () => setMode((m) => (m === 'preview' ? 'edit' : 'preview'));
   const toggleDiff = () => setMode((m) => (m === 'diff' ? 'edit' : 'diff'));
@@ -502,13 +501,7 @@ export function FileEditor({
                   {unsaved}
                 </div>
               )}
-              <div className="flex items-center gap-1.5">
-                {/* Cut at its start: the folders nearest the file say the most. */}
-                <span dir="rtl" className="min-w-0 truncate text-left font-mono text-[11.5px] text-fg-3" translate="no">
-                  <span dir="ltr">{tildify(dirname(path), home)}</span>
-                </span>
-                {embedded && unsaved}
-              </div>
+              <PathCrumbs compact path={path} after={embedded ? unsaved : undefined} />
             </div>
             {text && (isMd || isHtml) && (
               <IconButton label={isHtml ? 'Show as a page' : 'Preview'} active={mode === 'preview'} onClick={togglePreview}>
@@ -589,15 +582,7 @@ export function FileEditor({
         </div>
       ) : (
         <div className="flex h-10 shrink-0 items-center gap-1 border-b border-line px-3">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden font-mono text-[12px] text-fg-3" title={path} translate="no">
-            {crumbs.map((c, i) => (
-              <span key={i} className={cx('truncate', i === crumbs.length - 1 ? 'shrink-0 text-fg' : 'min-w-0 shrink')}>
-                {i > 0 && <span className="px-0.5 opacity-50">/</span>}
-                {c}
-              </span>
-            ))}
-            {dirty && <span className="ml-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" title="Unsaved changes" />}
-          </div>
+          <PathCrumbs path={path} after={unsaved} className="flex-1" />
           {text && (
             <>
               {(isMd || isHtml) && (

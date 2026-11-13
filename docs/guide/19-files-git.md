@@ -44,7 +44,7 @@ On a phone the folder fills the screen. Its name at the top right opens the plac
 Other ways in:
 
 - Click the folder under a session's title, or use the session's menu (⋯) → **Folder and code** → **Browse the folder**: Files opens at that folder.
-- A file an agent changed or handed you, or a link to a file in its reply, opens in a window over the conversation, so you keep your place. **Open in Files** moves it to the Files page; ✕ or Esc closes it (if you changed it without saving, it asks "Discard your changes?" first).
+- A file an agent changed or handed you, or a link to a file in its reply, opens in a window over the conversation, so you keep your place. **Open in Files** moves it to the Files page; ✕ or Esc closes it (if you changed it without saving, it asks "Discard your changes?" first). The file's path shows above it as on the Files page; going to a folder from it closes the window first, asking about changes not saved. See [Documents it made or changed](/guide/documents-voice#documents-it-made-or-changed-and-file-names-in-its-reply).
 - A project's **Files** tab shows the project's own folders (see [Projects and knowledge](/guide/projects)).
 
 ## Places
@@ -214,6 +214,8 @@ Before anything is sent, the app checks for files with the same names in that fo
 ## Open and edit a file
 
 Click a file in the folder. It opens in the editor, in a tab of its own. The first tab goes back to the folder (or the search, the recent files or the trash) you opened it from. The last 12 files you opened stay as tabs: click one to go back to it, and close it with its ✕ or a middle click. **Recent files**, among the places, lists the ones you opened lately.
+
+Above the file its path shows: a house for your home folder (or **Computer**, for a file outside it), then the folders, then the file's name. Each folder goes to that folder in the Files page, with the next step of the path picked there; "…" lists the folders between when the path is long (**The folders between**); the file's name shows it in its folder, picked (**Show in its folder**). On a phone the folder line under the file's name opens **Go to a folder**: every folder on the path, then **Show in its folder**. The same path shows above the files of the editors for [Word, Excel, CSV and LaTeX files](#edit-word-excel-csv-and-latex-files).
 
 The editor numbers the lines, colours the text by the file's language, matches brackets and, on a computer, folds blocks and suggests completions as you type. Tab indents.
 

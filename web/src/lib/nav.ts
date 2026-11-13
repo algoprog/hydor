@@ -36,8 +36,11 @@ export function filePath(path: string, line?: number) {
   return `/file?path=${encodeURIComponent(path)}${line ? `&line=${line}` : ''}`;
 }
 
-/** The file shown in a dialog over the page (features/files/FilePeek), if any. */
-export const useFilePeek = create<{ file: { path: string; line?: number } | null }>(() => ({ file: null }));
+/**
+ * The file shown in a dialog over the page (features/files/FilePeek), if any. `leave` closes it the way its own close does
+ * (asking first about changes not saved) and says whether it did: what goes elsewhere from the dialog awaits it.
+ */
+export const useFilePeek = create<{ file: { path: string; line?: number } | null; leave?: () => Promise<boolean> }>(() => ({ file: null }));
 
 /** Opens a file. From a session it shows in a dialog over the conversation, which stays where it was; elsewhere on the Files page. */
 export function openFile(path: string, line?: number) {
