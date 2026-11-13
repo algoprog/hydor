@@ -14,6 +14,8 @@ import { openLightbox } from './Lightbox';
 import { cx } from './ui';
 import { goApp, openFile } from '../lib/nav';
 import { joinPath } from '../lib/format';
+import { useApp } from '../lib/store';
+import { filePathsIn, fileRef, resolveFile } from './file-refs';
 import { machineBase, mu } from '../lib/machine';
 import { tr } from '../i18n/runtime';
 
@@ -281,6 +283,12 @@ export interface MdInfo {
 }
 export const MdCtx = createContext<MdInfo>({ src: '', streaming: false, rich: false });
 
+/**
+ * The files of the conversation a reply is in (changed, made or handed over by its agent), absolute, the latest last:
+ * a reply's file named alone (`report.tex`) or by the end of its path (`docs/report.tex`) links to the one of them it is.
+ */
+export const ReplyFilesCtx = createContext<string[]>([]);
+
 // Loaded the first time a reply has one: Mermaid is big, the page frame is the Pages' own, and the answer UIs are many.
 const MermaidBlock = lazy(() => import('./MermaidBlock'));
 const HtmlBlock = lazy(() => import('./HtmlBlock'));
@@ -400,6 +408,78 @@ function urlTransform(url: string, key: string): string {
 
 /** Links as the Markdown of a reply has them (local paths in the file viewer, the web in a new tab). */
 const plainLink = makeLink()!;
+
+/** A link to a file of this computer, opening in the file viewer (the pop-up over the conversation). */
+function FileAnchor({ path, line, title, children }: { path: string; line?: number; title?: string; children: ReactNode }) {
+  return (
+    <a
+      href={`${machineBase}/file?path=${encodeURIComponent(path)}`}
+      title={title ?? path}
+      className="md-file"
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        openFile(path, line);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
+/** Set inside a link: a file named in code there is part of that link, not a link of its own. */
+const InLinkCtx = createContext(false);
+
+/** Inline code in an agent's reply: `report.pdf`, `docs/a.md:12` or `~/b.txt` that is a file opens in the file viewer. */
+function ReplyCode({ node, className, children }: { node?: any; className?: string; children?: ReactNode }) {
+  const { cwd } = useContext(MdCtx);
+  const known = useContext(ReplyFilesCtx);
+  const inLink = useContext(InLinkCtx);
+  const home = useApp((s) => s.boot?.home);
+  const text = hastText(node);
+  const ref = useMemo(() => (className || inLink ? null : fileRef(text, { cwd, home, known })), [text, className, inLink, cwd, home, known]);
+  const code = <code className={className}>{children}</code>;
+  return ref ? (
+    <FileAnchor path={ref.path} line={ref.line}>
+      {code}
+    </FileAnchor>
+  ) : (
+    code
+  );
+}
+
+/**
+ * A link in an agent's reply: as plainLink, and one to a path that is not absolute (docs/report.pdf, ./a.md, ~/a.md,
+ * report.tex) is a file too: from the session's folder, or the conversation's file of that name.
+ */
+function ReplyLink(props: { href?: string; title?: string; children?: ReactNode; [k: string]: any }) {
+  const { cwd } = useContext(MdCtx);
+  const known = useContext(ReplyFilesCtx);
+  const home = useApp((s) => s.boot?.home);
+  const h = props.href ?? '';
+  const local = !!h && !/^[a-z][a-z0-9+.-]*:/i.test(h) && !h.startsWith('#') && !h.startsWith('/') && !h.startsWith('?');
+  let file: { path: string; line?: number } | null = null;
+  if (local) {
+    let raw = h.replace(/[?#].*$/, '');
+    try {
+      raw = decodeURIComponent(raw);
+    } catch {}
+    const path = resolveFile(raw, { cwd, home, known });
+    if (path) file = { path, line: Number(/#L(\d+)/.exec(h)?.[1]) || undefined };
+  }
+  const Link = plainLink!;
+  return (
+    <InLinkCtx.Provider value>
+      {file ? (
+        <FileAnchor path={file.path} line={file.line} title={props.title ?? undefined}>
+          {props.children}
+        </FileAnchor>
+      ) : (
+        <Link {...props} />
+      )}
+    </InLinkCtx.Provider>
+  );
+}
 
 const components: Components = {
   pre: Pre as Components['pre'],
@@ -540,6 +620,40 @@ function remarkCites(o: { known: Set<number> }) {
   return (tree: any) => visit(tree);
 }
 
+/**
+ * The absolute paths of files in a reply's plain text (/home/me/report.pdf, ~/notes.md:12) as links, which the link
+ * component opens as files; not inside code, links or maths.
+ */
+function remarkFilePaths() {
+  const SKIP = new Set(['link', 'linkReference', 'inlineCode', 'code', 'definition', 'math', 'inlineMath', 'html']);
+  const visit = (node: any) => {
+    if (!node.children || SKIP.has(node.type)) return;
+    const out: any[] = [];
+    for (const child of node.children) {
+      if (child.type !== 'text' || !/[\\/]/.test(child.value)) {
+        visit(child);
+        out.push(child);
+        continue;
+      }
+      const v: string = child.value;
+      const spans = filePathsIn(v);
+      if (!spans.length) {
+        out.push(child);
+        continue;
+      }
+      let at = 0;
+      for (const s of spans) {
+        if (s.start > at) out.push({ type: 'text', value: v.slice(at, s.start) });
+        out.push({ type: 'link', url: `${encodeURI(s.path)}${s.line ? `#L${s.line}` : ''}`, title: null, children: [{ type: 'text', value: v.slice(s.start, s.end) }] });
+        at = s.end;
+      }
+      if (at < v.length) out.push({ type: 'text', value: v.slice(at) });
+    }
+    node.children = out;
+  };
+  return (tree: any) => visit(tree);
+}
+
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: true }]] as any;
 const remarkBreaks = [...remarkPlugins, remarkLineBreaks] as any;
 const rehypePlugins = [[rehypeKatex, katexOpts]] as any;
@@ -645,8 +759,9 @@ export const Markdown = memo(function Markdown({
   const comps = useMemo<Components>(() => {
     const base: Components = {
       ...components,
-      a: makeLink(baseDir, app),
-      ...(cites ? citeComponents(cites, makeLink(baseDir, app)) : {}),
+      a: rich ? (ReplyLink as Components['a']) : makeLink(baseDir, app),
+      ...(rich ? { code: ReplyCode as Components['code'] } : {}),
+      ...(cites ? citeComponents(cites, rich ? (ReplyLink as Components['a']) : makeLink(baseDir, app)) : {}),
     };
     if (resolveImage)
       return {
@@ -666,9 +781,9 @@ export const Markdown = memo(function Markdown({
     return rich ? { ...base, img: ReplyPicture as Components['img'] } : base;
   }, [resolveImage, baseDir, app, cites, rich]);
   const remark = useMemo(() => {
-    const list = breaks ? remarkBreaks : remarkPlugins;
+    const list = [...(breaks ? remarkBreaks : remarkPlugins), ...(rich ? [remarkFilePaths] : [])];
     return cites?.size ? [...list, [remarkCites, { known: new Set(cites.keys()) }]] : list;
-  }, [breaks, cites]);
+  }, [breaks, cites, rich]);
   const rehype = useMemo(
     () => [...(rehypeExtra ?? []), ...(streaming ? rehypeStreaming : rehypePlugins), ...(baseDir || app ? [[rehypeHeadingIds, { ids: headingIds }]] : [])],
     [rehypeExtra, streaming, baseDir, app, headingIds],

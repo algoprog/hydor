@@ -15,9 +15,11 @@ import { Button, cx, IconButton } from '../../components/ui';
 import { FileIcon, resolveIn } from './fileTypes';
 import { FileMore } from '../files/SpaceMenu';
 
-interface Card {
+export interface Card {
   path: string;
   caption?: string;
+  /** What happened to it in the turn that shows it ("New", "Updated"): ahead of its kind on the second line. */
+  note?: string;
 }
 
 /** Files to show, from the call's arguments. */
@@ -43,9 +45,36 @@ export const download = (path: string) => {
   a.remove();
 };
 
-type Stat = { exists: boolean; size?: number } | undefined;
+/** The files a present_files call hands over, as absolute paths. */
+export const presentedPaths = (item: ToolItem, cwd?: string, home?: string): string[] => cardsOf(item, cwd, home).map((c) => c.path);
 
-function FileCard({ card, stat, sessionKey }: { card: Card; stat: Stat; sessionKey: string }) {
+export type Stat = { exists: boolean; size?: number } | undefined;
+
+/** What each of the files is, from the server: whether it is there and how big. Nothing until `ready`. */
+export function useFileStats(paths: string[], ready = true): Record<string, Stat> {
+  const [stats, setStats] = useState<Record<string, Stat>>({});
+  const key = paths.join('\n');
+  useEffect(() => {
+    if (!ready || !key) return;
+    let alive = true;
+    Promise.all(
+      key.split('\n').map((p) =>
+        api<{ exists: boolean; size?: number }>(`/api/fs/stat?path=${encodeURIComponent(p)}`)
+          .then((s) => [p, s] as const)
+          .catch(() => [p, undefined] as const),
+      ),
+    ).then((list) => alive && setStats((was) => ({ ...was, ...Object.fromEntries(list) })));
+    return () => {
+      alive = false;
+    };
+  }, [key, ready]);
+  return stats;
+}
+
+/** The cards' grid: two across when there are several. */
+export const cardsGrid = (n: number) => cx('tl-item my-1.5 grid gap-2', n > 1 ? 'sm:grid-cols-2' : 'sm:max-w-[30rem]');
+
+export function FileCard({ card, stat, sessionKey }: { card: Card; stat: Stat; sessionKey: string }) {
   const name = basename(card.path);
   const gone = stat && !stat.exists;
   const image = docKind(card.path) === 'image' && !gone;
@@ -67,7 +96,7 @@ function FileCard({ card, stat, sessionKey }: { card: Card; stat: Stat; sessionK
             {name}
           </span>
           <span className="block truncate text-[12px] leading-4 text-fg-3">
-            {gone ? 'No longer there' : `${kindLabel(card.path)}${stat?.size != null ? ` · ${bytes(stat.size)}` : ''}`}
+            {gone ? 'No longer there' : `${card.note ? `${card.note} · ` : ''}${kindLabel(card.path)}${stat?.size != null ? ` · ${bytes(stat.size)}` : ''}`}
           </span>
           {card.caption && (
             <span translate="no" className="mt-1 line-clamp-2 block text-[12.5px] leading-snug text-fg-2">
@@ -95,29 +124,14 @@ export function FileCards({ item, sessionKey }: { item: ToolItem; sessionKey: st
   const cwd = useSessions((s) => s.byKey[sessionKey]?.cwd);
   const home = useApp((s) => s.boot?.home);
   const cards = cardsOf(item, cwd, home);
-  const [stats, setStats] = useState<Record<string, Stat>>({});
-  const key = cards.map((c) => c.path).join('\n');
   const done = item.tool.status === 'ok';
-  useEffect(() => {
-    if (!done || !key) return;
-    let alive = true;
-    Promise.all(
-      key.split('\n').map((p) =>
-        api<{ exists: boolean; size?: number }>(`/api/fs/stat?path=${encodeURIComponent(p)}`)
-          .then((s) => [p, s] as const)
-          .catch(() => [p, undefined] as const),
-      ),
-    ).then((list) => alive && setStats(Object.fromEntries(list)));
-    return () => {
-      alive = false;
-    };
-  }, [key, done]);
+  const stats = useFileStats(cards.map((c) => c.path), done);
   if (item.tool.status === 'error') {
     return <div className="tl-item my-1 px-1 text-[12.5px] text-fg-3">Could not show the files: {(item.tool.output ?? item.tool.error ?? '').replace(/^Nothing was shown\.\s*/, '').slice(0, 300)}</div>;
   }
   if (!cards.length) return null;
   return (
-    <div data-tip="files-made" className={cx('tl-item my-1.5 grid gap-2', cards.length > 1 ? 'sm:grid-cols-2' : 'sm:max-w-[30rem]')}>
+    <div data-tip="files-made" className={cardsGrid(cards.length)}>
       {cards.map((c) => (
         <FileCard key={c.path} card={c} stat={done ? stats[c.path] : undefined} sessionKey={sessionKey} />
       ))}

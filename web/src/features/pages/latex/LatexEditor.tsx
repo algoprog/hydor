@@ -81,7 +81,6 @@ import {
 import {
   cleanTexComments,
   cleanTexName,
-  engineLabel,
   headingAt,
   mergeTexComments,
   TEX_ENGINES,
@@ -102,7 +101,7 @@ import { texDocUses, texFileKind, texIsUsed, texMoveFiles, type TexUses } from '
 import { addBibEntry } from '@shared/latex-bib';
 import { blankTable, tableAt, tableTex, type TexTable } from '@shared/latex-table';
 import type { TexReference } from '@shared/latex-bib';
-import { Button, cx, Dialog, IconButton, MenuItem, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../../components/ui';
+import { Button, cx, Dialog, IconButton, MenuItem, MenuLabel, MenuSep, Popover, Segmented, Throbber, useConfirm } from '../../../components/ui';
 import { tr } from '../../../i18n/runtime';
 import { toast, toastError } from '../../../lib/store';
 import { findIn, replacementOf, type Match } from '../common/find';
@@ -362,7 +361,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const [madeFolders, setMadeFolders] = useState<string[]>([]);
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
-  const [menu, setMenu] = useState<'engine' | 'compile' | 'file' | 'outline' | 'symbols' | null>(null);
+  const [menu, setMenu] = useState<'compile' | 'file' | 'outline' | 'symbols' | null>(null);
   // Code or Visual, Check spelling, Dark pages: remembered on this device.
   const [mode, setMode] = useState<'code' | 'visual'>(() => (localStorage.getItem(MODE_KEY) === 'visual' ? 'visual' : 'code'));
   const modeRef = useRef(mode);
@@ -439,7 +438,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
   const afterMount = useRef(new Map<string, (c: Code) => void>());
   const lastTex = useRef(TEX_MAIN);
   const anchors = {
-    engine: useRef<HTMLButtonElement>(null),
     compile: useRef<HTMLButtonElement>(null),
     file: useRef<HTMLButtonElement>(null),
     outline: useRef<HTMLButtonElement>(null),
@@ -1703,12 +1701,8 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
     );
 
   const engine = model.engine;
-  const engineChip = (
-    <Button ref={anchors.engine} size="sm" variant="ghost" onClick={() => setMenu(menu === 'engine' ? null : 'engine')} disabled={readOnly} className={cx('shrink-0 gap-1 px-2', menu === 'engine' && 'bg-bg-2 text-fg')}>
-      {engineLabel(engine)}
-      <ChevronDown size={12} className="opacity-60" />
-    </Button>
-  );
+  // Recompile, and under its arrow how (the engine among it). Side by side it heads the pages' own bar, where its word
+  // goes when the bar is narrow; otherwise it is in the toolbar.
   const compileButtons = (
     <div className="flex shrink-0 items-center">
       <Button
@@ -1720,7 +1714,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         aria-label="Recompile"
         className="rounded-r-none"
       >
-        {roomy ? 'Recompile' : ''}
+        {roomy ? <span className="@max-[19rem]:hidden">Recompile</span> : ''}
       </Button>
       <Button ref={anchors.compile} size="sm" variant="primary" aria-label="Typesetting options" onClick={() => setMenu(menu === 'compile' ? null : 'compile')} className="rounded-l-none border-l border-accent-fg/25 px-1.5">
         <ChevronDown size={14} />
@@ -2063,7 +2057,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       ),
     },
     !wide && { id: 'compile', rank: 1, group: 'compile', node: compileButtons },
-    !wide && { id: 'engine', rank: 12, group: 'compile', node: engineChip },
     !overPages && {
       id: 'mode',
       rank: 8,
@@ -2428,6 +2421,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       busy={busy}
       setup={setup}
       flash={flash}
+      lead={wide ? compileButtons : undefined}
       className="min-h-0 flex-1"
       onSource={(f, line) => {
         goTo(f, line);
@@ -2464,8 +2458,6 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
               title gives way to (the switch between the source and the pages is in the toolbar then). */}
           <MenuBar menus={menus} compact={roomy ? 'auto' : true} className={roomy ? undefined : 'shrink-0'} />
         </div>
-        {wide && engineChip}
-        {wide && compileButtons}
         {tail}
       </div>
       {band}
@@ -2549,18 +2541,7 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
       <Popover anchor={anchors.symbols} open={menu === 'symbols'} onClose={() => setMenu(null)} width={340} title="Symbols">
         <SymbolsPanel onPick={insertSymbol} />
       </Popover>
-      <Popover anchor={anchors.engine} open={menu === 'engine'} onClose={() => setMenu(null)} width={300} title="Typeset with">
-        {TEX_ENGINES.map((x) => {
-          const why = setup?.notes[x.id];
-          return (
-            <MenuItem key={x.id} checked={engine === x.id} onClick={() => pickEngine(x.id)}>
-              <span className={cx(why && 'text-fg-3')}>{x.label}</span>
-              <span className="ml-2 text-[12px] text-fg-3">{why ? 'not on this computer' : x.hint}</span>
-            </MenuItem>
-          );
-        })}
-      </Popover>
-      <Popover anchor={anchors.compile} open={menu === 'compile'} onClose={() => setMenu(null)} align="end" width={270} title="Typesetting">
+      <Popover anchor={anchors.compile} open={menu === 'compile'} onClose={() => setMenu(null)} align={wide ? 'start' : 'end'} width={300} title="Typesetting">
         <MenuItem icon={<Play size={14} />} hint="Ctrl+Enter" onClick={() => (setMenu(null), void run(true))}>
           Recompile now
         </MenuItem>
@@ -2576,6 +2557,18 @@ export function LatexEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSav
         <MenuItem icon={<Eraser size={14} />} onClick={() => void clearCache()}>
           Clear the cached files
         </MenuItem>
+        <MenuSep />
+        {/* The engine TeX typesets with: the usual one, any language and this computer's fonts, or Lua. */}
+        <MenuLabel>Typeset with</MenuLabel>
+        {TEX_ENGINES.map((x) => {
+          const why = setup?.notes[x.id];
+          return (
+            <MenuItem key={x.id} icon={<span className="h-3.5 w-3.5" />} checked={engine === x.id} disabled={readOnly} onClick={() => pickEngine(x.id)}>
+              <span className={cx(why && 'text-fg-3')}>{x.label}</span>
+              <span className="ml-2 text-[12px] text-fg-3">{why ? 'not on this computer' : x.hint}</span>
+            </MenuItem>
+          );
+        })}
         <MenuSep />
         <MenuItem icon={<ScrollText size={14} />} disabled={!result?.log} onClick={() => (setMenu(null), setLogOpen(true))}>
           Show the log
