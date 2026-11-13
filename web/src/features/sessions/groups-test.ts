@@ -90,6 +90,23 @@ test('a space’s sessions are in its group from the first, whatever their folde
   );
 });
 
+test('a found project’s group says where its sessions came from; a project you made gets none', () => {
+  n = 0;
+  const found = { ...space('sp2', 'Found'), found: ['claude' as const] } as SpaceView;
+  const made = space('sp3', 'Made');
+  const gs = group(
+    [
+      ses(`${HOME}/code/found`, 1 * H, { source: 'vscode', extra: { space: 'sp2' } }),
+      ses(`${HOME}/code/found`, 2 * H, { source: 'cli', extra: { space: 'sp2' } }),
+      ses(`${HOME}/code/made`, 3 * H, { source: 'vscode', extra: { space: 'sp3' } }),
+    ],
+    { spaces: [found, made] },
+  );
+  assert.deepEqual(gs.map((g) => g.label), ['Found', 'Made']);
+  assert.deepEqual(gs[0].from?.map((x) => x.agent), ['claude']);
+  assert.equal(gs[1].from, undefined);
+});
+
 test('a session in a worktree counts for the checkout it was made from', () => {
   n = 0;
   const wt = { path: `${HOME}/.naget-agent/worktrees/shop-x`, branch: 'fix-x', base: 'main', repo: `${HOME}/code/shop` };

@@ -13,12 +13,13 @@ import os from 'node:os';
 import { isAbsPath } from '../platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { isGroup, MAX_FOLDERS, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type Space, type SpaceView } from '../../shared/spaces.ts';
+import { isGroup, MAX_FOLDERS, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type FoundIn, type Space, type SpaceView } from '../../shared/spaces.ts';
 import { taskRoot } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
+import { claimSessions } from './found.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 import { clearSpaceSwitches, copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, setSpaceSwitch, skillsOf, spaceSkillDoc, spaceSkillsView, spaceSwitches } from '../skillpack/spaceSkills.ts';
 
@@ -43,11 +44,16 @@ export function spaceById(db: DB, id: string): Space | null {
 /** Spaces with how many sessions each has, when one last was at work, how many documents their knowledge holds, and how many skills they have. */
 export function spaceViews(db: DB): SpaceView[] {
   const docs = docsBySpace(db);
+  // When one last was at work follows the session's own activity, as the session list's does: the later of its transcript's and the app's.
   const counts = new Map(
-    (db.prepare("select json_extract(extra, '$.space') as space, count(*) as n, max(updated_at) as last from app_sessions where json_extract(extra, '$.space') is not null group by 1").all() as { space: string; n: number; last: number | null }[]).map((r) => [
-      r.space,
-      r,
-    ]),
+    (
+      db
+        .prepare(
+          `select json_extract(a.extra, '$.space') as space, count(*) as n, max(max(coalesce(s.updated_at, 0), coalesce(a.updated_at, 0))) as last
+           from app_sessions a left join sessions s on s.key = a.key where json_extract(a.extra, '$.space') is not null group by 1`,
+        )
+        .all() as { space: string; n: number; last: number | null }[]
+    ).map((r) => [r.space, r]),
   );
   const kept = libraryCounts(db);
   return allSpaces(db).map((s) => ({
@@ -70,9 +76,16 @@ function libraryCounts(db: DB): Map<string, number> {
   return out;
 }
 
-/** A space's sessions, the last at work first. */
+/** A space's sessions, the last at work first (by the session's own activity, as the session list orders them). */
 export function sessionsIn(db: DB, id: string, limit = 100): string[] {
-  return (db.prepare("select key from app_sessions where json_extract(extra, '$.space') = ? order by updated_at desc limit ?").all(id, limit) as { key: string }[]).map((r) => r.key);
+  return (
+    db
+      .prepare(
+        `select a.key as key from app_sessions a left join sessions s on s.key = a.key where json_extract(a.extra, '$.space') = ?
+         order by max(coalesce(s.updated_at, 0), coalesce(a.updated_at, 0)) desc limit ?`,
+      )
+      .all(id, limit) as { key: string }[]
+  ).map((r) => r.key);
 }
 
 const clean = (s: unknown, max: number) => String(s ?? '').trim().slice(0, max);
@@ -144,16 +157,27 @@ function membersOf(db: DB, b: Record<string, unknown>, prev: Space | undefined):
   return ids.length ? ids : undefined;
 }
 
-export function createSpace(db: DB, b: Record<string, unknown>): Space {
+/** `own`: what only the app itself says of the project (the HTTP body never does): the programs whose work it was found in. */
+export function createSpace(db: DB, b: Record<string, unknown>, own?: { found?: FoundIn[] }): Space {
   tables(db);
+  const given = typeof b.folder === 'string' && b.folder.trim() ? path.resolve(home(b.folder.trim())) : null;
+  // A folder is one project's own. A project the app found there becomes yours, as you make it now (it no longer says
+  // where it was found); a project you made there already is not made twice.
+  const same = given ? allSpaces(db).find((x) => path.resolve(x.folder) === given) : undefined;
+  if (same) {
+    if (own) return same;
+    if (!same.found) throw new HttpError(400, `The ${same.name} project works in ${given} already: open it, or pick another folder`);
+    const { found: _was, ...mine } = updateSpace(db, same.id, b);
+    db.prepare('update spaces set data = ? where id = ?').run(JSON.stringify(mine), same.id);
+    return mine;
+  }
   const colors = Object.keys(SPACE_COLORS);
   const f = { ...fields(b, undefined, colors[allSpaces(db).length % colors.length]), members: membersOf(db, b, undefined) };
-  const given = typeof b.folder === 'string' && b.folder.trim() ? path.resolve(home(b.folder.trim())) : null;
   if (given && !isFolder(given)) throw new HttpError(400, `No folder at ${given}`);
   // The others are checked before a new folder is made for it.
   const folders = foldersOf(b, undefined, given ?? undefined);
   const folder = given ?? newFolder(db, f.name);
-  const s: Space = { id: `sp${crypto.randomBytes(5).toString('hex')}`, ...f, folder, ...(folders ? { folders } : {}), createdAt: Date.now() };
+  const s: Space = { id: `sp${crypto.randomBytes(5).toString('hex')}`, ...f, folder, ...(folders ? { folders } : {}), ...(own?.found?.length ? { found: own.found } : {}), createdAt: Date.now() };
   if (!s.members) delete s.members;
   db.prepare('insert into spaces (id, data, created_at) values (?, ?, ?)').run(s.id, JSON.stringify(s), s.createdAt);
   return s;
@@ -175,6 +199,8 @@ export function deleteSpace(db: DB, id: string): string[] {
   tables(db);
   const s = spaceById(db, id);
   db.prepare('delete from spaces where id = ?').run(id);
+  // Its folder is not suggested again, nor made a project again when it was one found in Claude Code or Codex.
+  if (s?.folder) hideSuggestion(db, s.folder);
   releaseSpace(db, id);
   // What the Library kept in it stays there, in no space.
   for (const table of ['pages', 'media', 'library_folders'])
@@ -287,6 +313,8 @@ export const spaces: Feature = {
     d.app.get('/api/projects', async () => ({ spaces: spaceViews(d.db) }));
     d.app.post('/api/projects', async (req) => {
       const s = createSpace(d.db, body(req));
+      // A project made for a folder you already work in has its earlier sessions at once.
+      for (const k of claimSessions(d.db)) d.sessions.queueSummary(k);
       changed();
       return s;
     });

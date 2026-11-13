@@ -6,7 +6,7 @@
 // what is under the app's own places (task folders, apps' runs, worktrees, the temporary folder: the server's
 // autoFolders). With grouping off, or while the list shows one space, the rest all go by day. A folder whose work began
 // outside Hydor (its first session came from VS Code, a terminal, Claude's or Codex's own app) says where its sessions
-// came from.
+// came from, as a found project's group does.
 import { isChatgptProjectFolder, type FolderOrigin } from '@shared/sidebar';
 import type { SpaceView } from '@shared/spaces';
 import type { SessionSummary } from '@shared/types';
@@ -165,6 +165,13 @@ export function groupSessions(
     g.label = labels.get(g.path!) ?? g.label;
     const known = o.origins?.[g.path!];
     g.from = known ? fromOrigins(known) : folderSources(inFolder.get(g.path!) ?? g.items);
+  }
+  // A found project's group: where its sessions came from, else the programs the app found it for.
+  for (const g of groups) {
+    if (g.kind === 'space' && g.space?.found?.length) {
+      const known = o.origins?.[g.space.folder];
+      g.from = (known ? fromOrigins(known) : undefined) ?? folderSources(g.items) ?? g.space.found.map((agent) => ({ agent, apps: [], sessions: 0 }));
+    }
   }
   const placed = new Map((o.places ?? []).map((id, i) => [id, i]));
   const at = (g: SessionGroup) => (isPlaceKind(g.kind) ? (placed.get(g.id) ?? -1) : 0);

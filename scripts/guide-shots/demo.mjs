@@ -145,7 +145,9 @@ class Transcript {
     return `claude:${this.id}`;
   }
   entry(type, extra) {
-    const e = { parentUuid: this.last, isSidechain: false, userType: 'external', cwd: this.cwd, sessionId: this.id, version: '2.1.30', ...(this.branch ? { gitBranch: this.branch } : {}), type, uuid: uuid(), timestamp: new Date(this.t).toISOString(), ...extra };
+    // Started as Hydor starts Claude Code ("sdk-cli"), so the app never takes Alex's folders for ones Claude Code worked
+    // in by itself, even before run.mjs marks the sessions as Hydor's (makeImported's terminal session says "cli").
+    const e = { parentUuid: this.last, isSidechain: false, userType: 'external', cwd: this.cwd, sessionId: this.id, version: '2.1.30', entrypoint: 'sdk-cli', ...(this.branch ? { gitBranch: this.branch } : {}), type, uuid: uuid(), timestamp: new Date(this.t).toISOString(), ...extra };
     this.lines.push(e);
     this.last = e.uuid;
     return e;

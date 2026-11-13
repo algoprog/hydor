@@ -23385,5 +23385,14 @@
 "Which kinds of place they like":"他们喜欢哪些种类的地点",
 "Who may go":"谁可以前往",
 "Wikidata":"Wikidata",
-"Wikimedia Commons file":"维基共享资源文件"
+"Wikimedia Commons file":"维基共享资源文件",
+"From Claude Code":"来自 Claude Code",
+"From Claude Code and Codex":"来自 Claude Code 和 Codex",
+"From Codex":"来自 Codex",
+"Hydor made this project for a folder you work in with Claude Code and Codex":"Hydor 为你在 Claude Code 和 Codex 中工作的一个文件夹做了这个项目",
+"Hydor made this project for a folder you work in with Claude Code":"Hydor 为你在 Claude Code 中工作的一个文件夹做了这个项目",
+"Hydor made this project for a folder you work in with Codex":"Hydor 为你在 Codex 中工作的一个文件夹做了这个项目",
+"Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s and Codex’s sessions and won’t make it again.":"它的会话、文件夹、文档、技能以及它在资料库中的内容都会保留。会话、文件夹和资料库中的内容只是不再属于某个项目，它的知识库移到共享知识中，它的技能移到你的技能库中。Hydor 在 Claude Code 和 Codex 的会话中找到了它，不会再做一次。",
+"Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Claude Code’s sessions and won’t make it again.":"它的会话、文件夹、文档、技能以及它在资料库中的内容都会保留。会话、文件夹和资料库中的内容只是不再属于某个项目，它的知识库移到共享知识中，它的技能移到你的技能库中。Hydor 在 Claude Code 的会话中找到了它，不会再做一次。",
+"Its sessions, folder, documents, skills and what it holds in the Library stay. The sessions, folder and Library’s things just no longer belong to a project, its knowledge moves to the shared knowledge, and its skills to your skill library. Hydor found it in Codex’s sessions and won’t make it again.":"它的会话、文件夹、文档、技能以及它在资料库中的内容都会保留。会话、文件夹和资料库中的内容只是不再属于某个项目，它的知识库移到共享知识中，它的技能移到你的技能库中。Hydor 在 Codex 的会话中找到了它，不会再做一次。"
 }

@@ -26,8 +26,16 @@ export interface Space {
    * skills and folders. A group brings in plain spaces, not other groups.
    */
   members?: string[];
+  /**
+   * A project the app made by itself for a folder Claude Code or Codex worked in (server/spaces/found.ts): the
+   * programs whose sessions it found there, or Codex's own project it came from. Absent for one you made.
+   */
+  found?: FoundIn[];
   createdAt: number;
 }
+
+/** A program whose work made the app find a project. */
+export type FoundIn = 'claude' | 'codex';
 
 /** A space with how many sessions it has, when one was last at work, how many documents its knowledge holds, its skills, and what it holds in the Library. */
 export interface SpaceView extends Space {
