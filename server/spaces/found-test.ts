@@ -393,7 +393,7 @@ test('a PATCH keeps what the app found; the HTTP body cannot say it', () => {
   assert.deepEqual(createSpace(db, { name: 'Theirs', folder: dir('theirs') }, { found: ['codex'] }).found, ['codex']);
 });
 
-test('a project made by hand for a found project’s folder takes it over; one for a folder a project of yours has is refused', () => {
+test('a project made by hand for a found project’s folder takes it over; a folder of a project of yours can have another', () => {
   reset();
   const d = dir('shop-api');
   const a = session(d);
@@ -408,9 +408,12 @@ test('a project made by hand for a found project’s folder takes it over; one f
   assert.equal(spaceById(db, mine.id)!.found, undefined);
   assert.deepEqual(names(), ['Shop website']);
   assert.equal(spaceOf(a), mine.id, 'its sessions stay in it');
-  assert.throws(() => createSpace(db, { name: 'Again', folder: d }), /The Shop website project works in .* already/);
-  assert.deepEqual(names(), ['Shop website']);
   assert.deepEqual(syncFoundProjects(db, { home }).made, [], 'the folder is taken: nothing is found there');
+  // As before, a second project of yours in the same folder is made (the first keeps the folder's sessions).
+  const again = createSpace(db, { name: 'Again', folder: d });
+  assert.notEqual(again.id, mine.id);
+  assert.deepEqual(names(), ['Shop website', 'Again']);
+  assert.equal(projectOfFolder(allSpaces(db), d, home)!.id, mine.id);
 });
 
 test('a project’s last activity follows its sessions’ own', () => {
