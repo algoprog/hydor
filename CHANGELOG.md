@@ -3,6 +3,19 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.63.1 · 13 November 2026
+
+When an agent answers you and then goes on working, its answer shows as a reply in the conversation, not folded into
+its steps.
+
+- **Answers between steps**: a message you send while the agent works, or a question it answers before recording what
+  you agreed, used to get its answer folded into the turn's steps, shown as one short line of the outline, with only
+  the agent's last words under the work. Now that answer shows as a reply, in its place, tables and lists included. So
+  do the reports it writes between steps during a long task, and its summary of a subagent's reply.
+- **The work around it**: the steps before and after such a reply each fold under a line of their own ("Worked for
+  20s · 2 commands"), so the turn reads in the order things happened. Short notes between steps stay in the outline,
+  as before.
+
 ## 0.63.0 · 13 November 2026
 
 The projects you work on in Claude Code and Codex are Hydor projects now: they show on the Projects page by themselves,
