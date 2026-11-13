@@ -161,12 +161,11 @@ function membersOf(db: DB, b: Record<string, unknown>, prev: Space | undefined):
 export function createSpace(db: DB, b: Record<string, unknown>, own?: { found?: FoundIn[] }): Space {
   tables(db);
   const given = typeof b.folder === 'string' && b.folder.trim() ? path.resolve(home(b.folder.trim())) : null;
-  // A folder is one project's own. A project the app found there becomes yours, as you make it now (it no longer says
-  // where it was found); a project you made there already is not made twice.
-  const same = given ? allSpaces(db).find((x) => path.resolve(x.folder) === given) : undefined;
+  // A project the app found in that folder becomes yours, as you make it now (it no longer says where it was found),
+  // rather than a second project for the same folder.
+  const same = given ? allSpaces(db).find((x) => x.found && path.resolve(x.folder) === given) : undefined;
   if (same) {
     if (own) return same;
-    if (!same.found) throw new HttpError(400, `The ${same.name} project works in ${given} already: open it, or pick another folder`);
     const { found: _was, ...mine } = updateSpace(db, same.id, b);
     db.prepare('update spaces set data = ? where id = ?').run(JSON.stringify(mine), same.id);
     return mine;
