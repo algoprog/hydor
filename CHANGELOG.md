@@ -3,6 +3,36 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.64.0 · 14 November 2026
+
+Agents answer with more than words: the parts of an answer that are better seen, compared, tried or practised come as
+cards, charts, maps and small tools, and six new ones let you practise, run code, check claims and ask the next question
+with a tap.
+
+- **Richer answers, more often**: every agent now knows which answer UIs suit which kind of answer (options to weigh,
+  things with pictures, numbers, plans, things to do, learning, writing, checking facts) and shows each part of an answer
+  that one of them shows better than prose in it, with pictures filled in, and a video where watching helps more.
+  Conversation, short answers and code changes stay text, and your guidelines can still ask for plain text.
+- **Practice problems**: answer in your own words or numbers and each one is checked in place (numbers within a
+  tolerance, words without minding capitals, with a note when only the accents are off), with hints one at a time, the
+  worked solution once you've tried, and your results to send to the tutor.
+- **Code playground**: JavaScript, Python or a web page that runs in the reply, sealed off from the app. Change it and
+  run it again, see its output (and Python's plots), or send your code to be checked.
+- **Annotated text**: your writing with passages marked, each with a note (a correction, a comment, a meaning). Tap one
+  to read it, filter the notes by kind, and copy the text with every change made.
+- **Fact check**: claims with their verdicts, why, how sure, and the evidence for and against with its sources; tap a
+  verdict to see only those claims.
+- **Network graph**: how things connect (a concept map, a novel's characters, ideas, dependencies). Tap a node to light
+  up its links and read its note, drag nodes to make room, or read it as a list.
+- **Follow-ups**: buttons for the next questions at the end of an answer. One tap sends it when your message box is
+  empty, or adds it to what you're writing.
+- **The built-in agents**: General asks with choices to click and offers next steps to tap. The Tutor makes each step
+  something to see or try, checks with practice problems and quizzes, corrects a language learner's sentences in place
+  and closes a topic with flashcards. The Researcher leads with the key points and weighs claims in a fact check; the
+  Writer shows its edits marked, with why, and hands over emails and posts ready to use; the Planner shows itineraries,
+  agendas, checklists and budgets; the Analyst key figures, charts and tables; the Coder errors, test runs and commands
+  to run.
+
 ## 0.63.2 · 14 November 2026
 
 A project's tabs fit a phone: the ones that don't fit are one tap away under More, instead of running off the edge of
