@@ -530,6 +530,23 @@ const YES = /^(yes|y|true|1|on|oui|ja|sí|si)$/i;
 const NO = /^(no|n|false|0|off|non|nein)$/i;
 
 /**
+ * What a choice that allows several is given: the options picked (a list, or text with one per line), each as the
+ * option spells it, without repeats, in the options' order, one per line; or what is wrong with it, in words.
+ */
+function checkPicks(f: AppField, v: unknown): { value: string } | { error: string } {
+  const lines = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/\r?\n/) : null;
+  if (!lines || lines.some((x) => typeof x !== 'string' && typeof x !== 'number')) return { error: `${f.label}: give it as text` };
+  const options = f.options ?? [];
+  const hit = new Set<string>();
+  for (const x of lines.map((l) => String(l).replace(/\s+/g, ' ').trim()).filter(Boolean)) {
+    const o = options.find((y) => y.toLowerCase() === x.toLowerCase());
+    if (!o) return { error: `${f.label}: ${x} is not one of its options` };
+    hit.add(o);
+  }
+  return { value: options.filter((o) => hit.has(o)).join('\n') };
+}
+
+/**
  * The form's answers, tidied and checked against its fields: every field gets a value (its default or
  * empty), yes/no as Yes or No, numbers and dates in a plain form. `errors` say what to fix, in words.
  */
@@ -541,6 +558,13 @@ export function checkInputs(fields: AppField[], raw: Record<string, unknown>, o:
   for (const f of fields) {
     let v: unknown = raw?.[f.id];
     if (v === undefined || v === null) v = f.default ?? '';
+    if (f.type === 'choice' && f.multi) {
+      const picked = checkPicks(f, v);
+      if ('error' in picked) errors.push(picked.error);
+      else if (!picked.value && f.required) errors.push(`${f.label}: needed`);
+      values[f.id] = 'value' in picked ? picked.value : '';
+      continue;
+    }
     let s = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'number' ? String(v) : typeof v === 'string' ? v : null;
     if (s === null) {
       errors.push(`${f.label}: give it as text`);
@@ -848,7 +872,7 @@ export function cleanFields(raw: unknown): AppField[] {
     const id = fieldId(str(x.id, 40) || label, taken);
     taken.push(id);
     const options = type === 'choice' ? [...new Set<string>((Array.isArray(x.options) ? x.options : []).map((o: unknown) => str(o, 80)).filter(Boolean))].slice(0, 30) : undefined;
-    return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, default: opt(x.default, 4000) }];
+    return [{ id, label, type, required: !!x.required || undefined, help: opt(x.help, 240), placeholder: opt(x.placeholder, 160), options: options?.length ? options : type === 'choice' ? ['Yes', 'No'] : undefined, ...(type === 'choice' && x.multi ? { multi: true } : {}), default: opt(x.default, 4000) }];
   });
 }
 

@@ -20,7 +20,8 @@ export function appSchema(): Record<string, unknown> {
       required: { type: 'boolean' },
       help: str('A line under the question'),
       placeholder: str('An example answer, shown in the empty box'),
-      options: { type: 'array', items: { type: 'string' }, description: 'A choice’s options' },
+      options: { type: 'array', items: { type: 'string' }, description: 'A choice’s options. In an Ask a person step, an option that is one {{step.value}} gives that list’s items (what an earlier step found), picked at the moment it asks' },
+      multi: { type: 'boolean', description: 'A choice: more than one may be picked; its value has one per line' },
       default: str('The answer it starts with'),
     },
     required: ['label'],
@@ -271,7 +272,7 @@ export interface Ctx {
   /** One of the app's own tools (web_search, read_page, http_request, read_document, generate_image, knowledge_search, knowledge_read, recall, notify_user): { text, data? }. */
   tool(tool: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<{ text: string; data?: unknown }>;
   /** Waits for the person: { yes }, or its fields' answers. */
-  ask(question: string, o?: Said & { fields?: { id: string; label: string; type?: string; required?: boolean; options?: string[] }[]; waitHours?: number }): Promise<Record<string, any>>;
+  ask(question: string, o?: Said & { fields?: { id: string; label: string; type?: string; required?: boolean; options?: string[]; multi?: boolean }[]; waitHours?: number }): Promise<Record<string, any>>;
   /** Another of the user's apps, by its address: its answer fields, and { reply }. */
   app(app: string, inputs?: Record<string, unknown>, o?: { title?: string }): Promise<Record<string, any>>;
   /** The records the app keeps (the lists its data names). */

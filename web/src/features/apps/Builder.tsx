@@ -356,7 +356,7 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
     <Row n={n} {...nav}>
       <div className="flex flex-wrap items-center gap-2">
         <input className={cx(smallFit, 'min-w-[200px] flex-[3] font-medium')} placeholder="The question, e.g. Where to?" value={f.label} onChange={(e) => onChange({ ...f, label: e.target.value })} />
-        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined })}>
+        <select className={cx(smallFit, 'min-w-[130px] flex-1')} aria-label="Its kind" value={f.type} onChange={(e) => onChange({ ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined, multi: e.target.value === 'choice' ? f.multi : undefined })}>
           {FIELD_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
@@ -366,13 +366,19 @@ function FieldRow({ f, n, auto, onChange, ...nav }: { f: AppField; n: number; au
         <Needed on={!!f.required} onChange={(on) => onChange({ ...f, required: on || undefined })} />
       </div>
       {f.type === 'choice' && (
-        <textarea
-          className={cx(inputCls, 'h-auto py-1.5 text-[13px] leading-relaxed')}
-          rows={Math.min(6, Math.max(2, (f.options?.length ?? 0) + 1))}
-          placeholder="The choices, one per line"
-          value={(f.options ?? []).join('\n')}
-          onChange={(e) => onChange({ ...f, options: e.target.value.split('\n') })}
-        />
+        <>
+          <textarea
+            className={cx(inputCls, 'h-auto py-1.5 text-[13px] leading-relaxed')}
+            rows={Math.min(6, Math.max(2, (f.options?.length ?? 0) + 1))}
+            placeholder="The choices, one per line"
+            value={(f.options ?? []).join('\n')}
+            onChange={(e) => onChange({ ...f, options: e.target.value.split('\n') })}
+          />
+          <label className="flex h-8.5 w-fit cursor-pointer items-center gap-2 text-[13px] text-fg-2">
+            <Switch on={!!f.multi} onChange={(on) => onChange({ ...f, multi: on || undefined })} label="Several can be picked" />
+            Several can be picked
+          </label>
+        </>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-fg-3">
         <code className="rounded-md bg-bg-3 px-1.5 py-px font-mono text-[11.5px] text-fg-2" translate="no" title={auto ? 'Follows the question until the task uses it' : 'How the task names its answer'}>{`{{${f.id}}}`}</code>

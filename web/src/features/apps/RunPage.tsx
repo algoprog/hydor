@@ -62,9 +62,10 @@ export function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDeta
     <section className="rounded-2xl border border-warn/40 bg-warn/5 px-4 py-3">
       <div className="text-[12px] font-medium text-warn">Needs your answer</div>
       {/* Its values come in as Markdown (a table of rows, a list of lines), so it is read as such; a header's
-          first letter in capitals, as a table of a step's rows is headed by its fields' ids ("product"). */}
+          first letter in capitals, as a table of a step's rows is headed by its fields' ids ("product"); a table
+          as wide as the card, its text wrapped in it, so the form under it stays near. */}
       <div translate="no">
-        <Markdown text={q.question} breaks className="mt-1 text-[14px] leading-relaxed [&_th_.md-cell]:first-letter:uppercase" />
+        <Markdown text={q.question} breaks className="mt-1 text-[14px] leading-relaxed md-fit [&_th_.md-cell]:first-letter:uppercase" />
       </div>
       {q.fields ? (
         <div className="mt-3 space-y-3">

@@ -1515,6 +1515,13 @@ html {
   /* On a phone the next column stays in sight, which shows the table scrolls. */
   max-width: min(24em, 62vw);
 }
+/* A table that fits its box (an Ask a person card's question): as wide as the box, its text wrapped in it. */
+.md.md-fit table {
+  width: 100%;
+}
+.md.md-fit .md-cell {
+  max-width: none;
+}
 .md th {
   background: var(--bg-1);
   font-weight: 600;

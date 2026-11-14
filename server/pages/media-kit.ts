@@ -404,14 +404,34 @@ function mediaKit(latest: MediaKitApi) {
           if (kind === 'histogram') data.push({ type: 'histogram', x: col(rs, y, true), name });
           else if (kind === 'box') data.push({ type: 'box', y: col(rs, y, true), name: g || y });
           else if (kind === 'scatter3d' || kind === 'line3d') data.push({ type: 'scatter3d', mode: kind === 'line3d' ? 'lines+markers' : 'markers', x: col(rs, xK, true), y: col(rs, y, true), z: col(rs, zK ?? y, true), name, marker: { size: 4 } });
-          else if (kind === 'bar' || kind === 'hbar') data.push(kind === 'hbar' ? { type: 'bar', orientation: 'h', y: col(rs, xK), x: col(rs, y, true), name } : { type: 'bar', x: col(rs, xK), y: col(rs, y, true), name });
-          else data.push({ type: 'scatter', mode: kind === 'scatter' ? 'markers' : 'lines+markers', fill: kind === 'area' ? 'tozeroy' : undefined, x: col(rs, xK), y: col(rs, y, true), name, customdata: rs.map((_r, i) => i) });
+          else if (kind === 'bar' || kind === 'hbar') {
+            const at = rs.map((r) => rows.indexOf(r));
+            data.push(kind === 'hbar' ? { type: 'bar', orientation: 'h', y: col(rs, xK), x: col(rs, y, true), name, customdata: at } : { type: 'bar', x: col(rs, xK), y: col(rs, y, true), name, customdata: at });
+          }
+          else data.push({ type: 'scatter', mode: kind === 'scatter' ? 'markers' : 'lines+markers', fill: kind === 'area' ? 'tozeroy' : undefined, x: col(rs, xK), y: col(rs, y, true), name, customdata: rs.map((r) => rows.indexOf(r)) });
         }
     const layout: any = {};
     if (typeof w.xLabel === 'string') layout.xaxis = { title: { text: w.xLabel } };
     if (typeof w.yLabel === 'string') layout.yaxis = { title: { text: w.yLabel } };
     if (kind === 'scatter3d' || kind === 'line3d' || kind === 'surface') layout.scene = { xaxis: { title: { text: w.xLabel ?? xK } }, yaxis: { title: { text: w.yLabel ?? yKs[0] } }, zaxis: { title: { text: w.zLabel ?? zK ?? '' } } };
     if (kind === 'bar' && w.stacked) layout.barmode = 'stack';
+    // Horizontal bars read top down, as a list does (Plotly starts at the bottom), and a long name goes on two or
+    // three lines, with the room it needs beside the bars.
+    if (kind === 'hbar') {
+      const names = [...new Set(rows.map((r) => r[xK]))];
+      const wrap = (v: unknown) => {
+        const t = String(v ?? '');
+        if (t.length <= 22) return t;
+        const lines: string[] = [];
+        for (const word of t.split(/\s+/)) {
+          const last = lines[lines.length - 1];
+          if (last !== undefined && `${last} ${word}`.length <= 20) lines[lines.length - 1] = `${last} ${word}`;
+          else lines.push(word);
+        }
+        return (lines.length > 3 ? [...lines.slice(0, 2), `${lines.slice(2).join(' ').slice(0, 19)}…`] : lines).join('<br>');
+      };
+      layout.yaxis = { ...(layout.yaxis ?? {}), autorange: 'reversed', automargin: true, tickmode: 'array', tickvals: names, ticktext: names.map(wrap) };
+    }
     // A box for each group: its x axis names the groups (values like 0.001 would otherwise lie on a number line).
     if (kind === 'box') layout.xaxis = { ...(layout.xaxis ?? {}), type: 'category' };
     return { data, layout };
@@ -430,7 +450,9 @@ function mediaKit(latest: MediaKitApi) {
         }
         const box = document.createElement('div');
         box.className = 'n-plot-box';
-        box.style.height = height(w, 360);
+        // Horizontal bars take room by how many there are (unless the block sets a height).
+        const bars = new Set(fig.data.filter((d) => d.orientation === 'h').flatMap((d) => (Array.isArray(d.y) ? d.y : []))).size;
+        box.style.height = height(w, bars ? Math.min(720, Math.max(160, 64 + 44 * bars)) : 360);
         this.replaceChildren(box);
         await script(K.libs.plotlyJs);
         if (!this.live) return;

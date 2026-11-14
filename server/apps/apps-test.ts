@@ -196,6 +196,23 @@ test('form: defaults, numbers, dates, choices, yes/no and what to fix', () => {
   assert.match(checkInputs(fields, { n: 1, t: 'x'.repeat(3000) }).errors.join(), /Name: too long/);
 });
 
+test('form: a choice that allows several takes a list or lines, keeps the options’ spelling and order, and refuses what is not an option', () => {
+  const fields = cleanRecipe({ fields: [
+    { id: 'm', label: 'Which', type: 'choice', multi: true, options: ['Alpha', 'Beta', 'Gamma'], default: 'gamma' },
+    { id: 's', label: 'One', type: 'choice', multi: 1, options: ['A', 'B'] },
+    { id: 't', label: 'Text', type: 'text', multi: true },
+  ], prompt: 'x' }).fields;
+  assert.deepEqual(fields.map((f) => f.multi), [true, true, undefined], 'multi is kept on choices only');
+  assert.deepEqual(checkInputs(fields, { m: ['gamma', 'ALPHA', 'Gamma'], s: 'a' }), { values: { m: 'Alpha\nGamma', s: 'A', t: '' }, errors: [] });
+  assert.equal(checkInputs(fields, { m: 'beta\r\n\n  alpha ', s: 'A' }).values.m, 'Alpha\nBeta');
+  assert.equal(checkInputs(fields, { s: 'A' }).values.m, 'Gamma', 'its default');
+  assert.equal(checkInputs(fields, { m: [], s: 'A' }).values.m, '', 'none is fine unless needed');
+  assert.match(checkInputs(fields, { m: ['Alpha', 'Delta'], s: 'A' }).errors.join(), /Which: Delta is not one of its options/);
+  assert.match(checkInputs(fields, { m: [{}], s: 'A' }).errors.join(), /Which: give it as text/);
+  const needed = [{ ...fields[0], required: true, default: undefined }];
+  assert.match(checkInputs(needed, { m: [] }).errors.join(), /Which: needed/);
+});
+
 /** The ten ready-made tasks of before the apps for everyday things (templates-more.ts), each made of several kinds of step. */
 const FIRST_TEN = ['deep-research', 'trip-planner', 'compare-products', 'document-qa', 'meeting-actions', 'cover-letter', 'lesson-plan', 'news-digest', 'explain-contract', 'small-web-app'];
 
