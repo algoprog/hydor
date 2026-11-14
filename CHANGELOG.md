@@ -3,6 +3,28 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.65.0 · 14 November 2026
+
+Compare products asks which of the options it found to compare as choices you tick, reads what you add in your own
+words, and gives a clearer answer: a runner-up, how each one scores on what matters, and prices from where you buy.
+
+- **Compare products, picking what to compare**: when you describe a need, the options it finds come as choices to
+  tick, all ticked at first, with a line to add others or to say what else to look for ("include Chinese brands"). What
+  you write there is read and acted on: before, an answer like "all, including chinese phones" was taken for the name
+  of a product, and the run compared that one "product".
+- **Compare products, a clearer answer**: the pick shows its price, the shop it was seen at and its score; a runner-up
+  says who should choose it instead; Side by side has a table of each product's score on each thing that matters, and
+  each product's page shows how it scores. Prices come from shops in the country you buy in (or your time zone's), in
+  one currency; a budget you give is kept to; products the research found too little on are named instead of guessed
+  at; and when only one product was compared, it says so.
+- **Apps, choices from what a run found**: an Ask a person step's choice can offer the items an earlier step found,
+  and a choice can let people pick several (**Several can be picked**, in an app's form too); a ticked choice shows a
+  check mark.
+- **Apps, questions with tables**: an Ask a person question shows its tables and lists formatted on its card, and
+  reads as one plain line in its notice and the Inbox.
+- **Bar charts in app views**: horizontal bars read from the top down, long names go on two or three lines instead of
+  being cut off, and the chart grows with the number of bars.
+
 ## 0.64.1 · 14 November 2026
 
 Agents reach for answer UIs in more of their answers: a comparison comes as a comparison table to read across, not
