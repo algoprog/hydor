@@ -185,7 +185,8 @@ agents that speak ACP and take MCP servers.
   guidelines and its own skills and start as its assistant. The Projects page shows each as a card in its colour with
   what it holds (sessions, things in the Library, documents, skills) and New session. A project's own page opens at
   once under a band of its colour, with the way back on the left, New session and one menu (its folder in Files,
-  only its sessions in the sidebar, delete it); its Overview has its sessions (with what each is doing), what it
+  only its sessions in the sidebar, delete it), and its tabs under them (on a phone, those that do not fit under More
+  at the row's end); its Overview has its sessions (with what each is doing), what it
   holds in the Library and what every session in it gets (its folder, guidelines, documents, skills, assistant and
   memory), a group's projects too, and its Library tab everything it holds there; its Settings tab sets its name,
   colour, guidelines, the assistant its sessions start as (one tap among them) and its group, saved from a bar

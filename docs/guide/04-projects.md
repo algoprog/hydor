@@ -113,7 +113,7 @@ Click a project on the Projects page to open it. The top of its page is in the p
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
-Below them are six tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out to fit. Each tab shows at once.
+Below them are seven tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills**, **Agents** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
 
 ### Overview
 
