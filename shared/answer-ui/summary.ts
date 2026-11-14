@@ -1,4 +1,4 @@
-// Answer UIs that sum things up or lay out notes: key points, callouts, fact sheets, definitions, FAQs, tabs…
+// Answer UIs that sum things up or lay out notes: key points, callouts, fact sheets, definitions, FAQs, tabs, fact checks, follow-ups…
 import type { AnswerUiSpec } from './types.ts';
 
 export const SUMMARY: AnswerUiSpec[] = [
@@ -280,6 +280,92 @@ Fact = { label: string, value: md, note?: string }   // note: a short line under
         { title: 'Spider plant', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Hierbabuena_0611_Revised.jpg/500px-Hierbabuena_0611_Revised.jpg', tag: 'Safe for pets', meta: 'Water weekly', text: 'Arching striped leaves, and baby plants on runners you can pot up and give away.' },
         { title: 'Peace lily', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Spathiphyllum_cochlearispathum_RTBG.jpg/500px-Spathiphyllum_cochlearispathum_RTBG.jpg', tag: 'Flowers', meta: 'Water when it droops', text: 'White flowers even in shade, and it wilts dramatically to tell you it needs water.' },
         { title: 'Cast-iron plant', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Aspidistra_elatior1.jpg/500px-Aspidistra_elatior1.jpg', tag: 'Safe for pets', meta: 'Water every 1–2 weeks', text: 'Named for being nearly indestructible: cold rooms, deep shade and dust do not bother it.' },
+      ],
+    },
+  },
+  {
+    id: 'fact-check',
+    title: 'Fact check',
+    group: 'summary',
+    use: 'Claims checked one by one: each with its verdict (true, false, misleading, unproven…), why, and the evidence for and against with its sources; a tally of the verdicts on top.',
+    keywords: 'fact check claims verdict true false misleading unproven myth debunk evidence sources verify contested established truth rating',
+    shape: `{
+  title?: string
+  claims: {
+    claim: md
+    who?: string                 // who made it, where or when
+    verdict: string              // "True", "Mostly true", "Mixed", "Misleading", "Mostly false", "False", "Unproven", "Established", "Contested"…
+    tone?: tone                  // its colour, when the verdict's words do not say
+    confidence?: "high" | "medium" | "low"
+    why: md                      // the reasoning, in a few lines
+    evidence?: {
+      text: md                   // what the source says or shows
+      source?: string            // its title or publisher
+      url?: url
+      date?: date
+      stance?: "supports" | "refutes" | "context"
+    }[]
+  }[]
+  summary?: md
+  checked?: date                 // when it was checked
+}`,
+    example: {
+      title: 'Claims about vitamin C and colds',
+      checked: '2026-11-10',
+      claims: [
+        {
+          claim: 'Taking vitamin C **prevents** the common cold.',
+          who: 'A widely shared wellness post, 2025',
+          verdict: 'Mostly false',
+          confidence: 'high',
+          why: 'In the general population, regular vitamin C does not lower how many colds people catch. Only in people under heavy short-term physical stress (marathon runners, soldiers in the cold) did it halve the risk.',
+          evidence: [
+            { text: 'Across 29 trials with 11,306 people, regular vitamin C did not reduce how often colds began (risk ratio 0.97).', source: 'Cochrane Review: Vitamin C for preventing and treating the common cold', url: 'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD000980.pub4/full', date: '2013-01-31', stance: 'refutes' },
+            { text: 'In five trials of people under extreme physical stress, vitamin C halved the number of colds.', source: 'Cochrane Review', url: 'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD000980.pub4/full', date: '2013-01-31', stance: 'supports' },
+          ],
+        },
+        {
+          claim: 'Vitamin C **shortens** a cold by about a day when taken every day.',
+          who: 'Health-food shop leaflet',
+          verdict: 'Mixed',
+          confidence: 'medium',
+          why: 'Daily use shortened colds by 8% in adults and 14% in children, which is under a day for most adults. Starting vitamin C only after symptoms begin showed no consistent benefit.',
+          evidence: [
+            { text: 'Colds lasted 8% shorter in adults and 14% shorter in children who took vitamin C daily.', source: 'Cochrane Review', url: 'https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD000980.pub4/full', date: '2013-01-31', stance: 'supports' },
+            { text: 'Taking it after the first symptoms did not shorten colds in 7 therapeutic trials.', source: 'Cochrane Review', stance: 'refutes' },
+          ],
+        },
+        {
+          claim: 'Doses above 1,000 mg a day are dangerous.',
+          verdict: 'Misleading',
+          confidence: 'medium',
+          why: 'The upper limit for adults is 2,000 mg a day, set for stomach upset and diarrhoea; the body excretes the excess. Very high doses can raise kidney stone risk in some people.',
+          evidence: [{ text: 'Sets the tolerable upper intake level of vitamin C at 2,000 mg a day for adults.', source: 'US National Institutes of Health, Office of Dietary Supplements', url: 'https://ods.od.nih.gov/factsheets/VitaminC-HealthProfessional/', stance: 'context' }],
+        },
+      ],
+      summary: 'Vitamin C is not a cold preventive for most people, and it helps only a little once you have one. It is not harmful at ordinary doses.',
+    },
+  },
+  {
+    id: 'follow-ups',
+    title: 'Follow-ups',
+    group: 'summary',
+    use: 'Two to five next questions or steps as buttons under an answer: one tap sends it as your next message, or adds it to what you are writing.',
+    keywords: 'follow up next questions suggestions next steps related questions buttons continue ask more explore further',
+    shape: `{
+  title?: string                 // a short heading ("Go further"); none by default
+  items: (string | {
+    label: string                // the button's words, short
+    ask?: string                 // the message it sends, when it says more than the label
+  })[]                           // 2 to 5
+}`,
+    example: {
+      title: 'Go further',
+      items: [
+        { label: 'What does it cost per year?', ask: 'What would a cold-climate heat pump cost me per year to run, compared with oil heat, for a 150 m² house?' },
+        { label: 'Which brands are reliable?', ask: 'Which cold-climate heat pump brands have the best reliability record, and what do installers say about them?' },
+        'How do I find a good installer?',
+        { label: 'What rebates can I get?', ask: 'What rebates and tax credits are available for installing a heat pump, and how do I apply?' },
       ],
     },
   },

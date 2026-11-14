@@ -1,5 +1,5 @@
 // The answer UIs for learning: their views, by name (shared/answer-ui/learn.ts has what each takes).
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -64,6 +64,7 @@ import { CodeBlock } from '../../Markdown';
 import { normalizeMath } from '../../markdown-math';
 import { cx } from '../../ui';
 import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, hostOf, isObj, Md, num, Pic, Ring, Section, Seg, seriesColor, SpeakBtn, str, textOf, useAsk, useKept, usePicOk, words, yes, type AnswerUiView, type Data } from '../kit';
+import { useWidth } from '../charts';
 
 const LETTERS = 'ABCDEFGH';
 
@@ -2942,6 +2943,812 @@ function Chess({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- practice problems -------------------------------------------------------------------------------------------------
+
+interface Problem {
+  q: string;
+  image: string;
+  /** What is accepted: a number (within the tolerance) or words. Empty: an open problem, which the tutor checks. */
+  accepted: ({ n: number } | { s: string })[];
+  open: boolean;
+  tolerance: number | null;
+  unit: string;
+  hints: string[];
+  solution: string;
+}
+
+/** A number as a learner writes it: "1,250", "3,5", "1.2e3", "3/4", "−5", "60 km/h", "x = 6". Null when it is not one. */
+function parseNumber(raw: string): number | null {
+  const s = raw
+    .normalize('NFKC')
+    .replace(/[−–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[A-Za-z][A-Za-z0-9_]{0,11}\s*=\s*/, '');
+  const m = /^([-+]?)\s*(\d[\d.,' ]*|[.,]\d+)(?:\s*\/\s*(\d[\d.,' ]*))?(?:\s*[eE]\s*([-+]?\d+))?\s*(.*)$/.exec(s);
+  if (!m) return null;
+  // What follows the number may only be a unit (m/s, °C, %): it is not looked at.
+  const rest = m[5].trim();
+  if (rest && !/^[^\d\s+*/=.,^_()-]/.test(rest)) return null;
+  const plain = (c: string): number | null => {
+    let t = c.trim().replace(/[.,]+$/, '');
+    if (!t || (/\s/.test(t) && !/^\d{1,3}(\s\d{3})+([.,]\d+)?$/.test(t))) return null; // spaces only as thousands separators
+    t = t.replace(/[\s']/g, '');
+    const dot = t.includes('.');
+    const comma = t.includes(',');
+    if (dot && comma) {
+      const dec = t.lastIndexOf('.') > t.lastIndexOf(',') ? '.' : ',';
+      t = t
+        .split(dec === '.' ? ',' : '.')
+        .join('')
+        .replace(dec, '.');
+    } else if (comma) t = /^\d{1,3}(,\d{3})+$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3}){2,}$/.test(t)) t = t.replace(/\./g, '');
+    return /^(\d+(\.\d+)?|\.\d+)$/.test(t) ? Number(t) : null;
+  };
+  let v = plain(m[2]);
+  if (v === null) return null;
+  if (m[3] !== undefined) {
+    const d = plain(m[3]);
+    if (d === null || d === 0) return null;
+    v /= d;
+  }
+  if (m[4] !== undefined) v *= 10 ** Number(m[4]);
+  if (m[1] === '-') v = -v;
+  return Number.isFinite(v) ? v : null;
+}
+
+/** An answer in words as it is compared: spaces, case and trailing punctuation do not count. */
+const answerKey = (s: string) => strict(s).replace(/[\s.,;:!?¡¿]+$/, '');
+const answerLoose = (s: string) => loose(s).replace(/[\s.,;:!?¡¿]+$/, '');
+
+function problemsOf(data: Data): Problem[] {
+  return arr(data.problems ?? data.questions ?? data.exercises)
+    .filter((x) => isObj(x) || typeof x === 'string')
+    .map((x) => {
+      const o: Data = isObj(x) ? x : { q: x };
+      const raw = o.answer ?? o.answers ?? o.accept;
+      const list: unknown[] = Array.isArray(raw) ? raw : raw === undefined || raw === null ? [] : [raw];
+      const accepted: Problem['accepted'] = [];
+      for (const a of list) {
+        if (typeof a === 'number') {
+          if (Number.isFinite(a)) accepted.push({ n: a });
+        } else if (typeof a === 'string' && a.trim()) {
+          // "60" or "1,250" are numbers; "3/4" and words are compared as they are written.
+          const n = /^[-+−]?[\d\s.,']+([eE][-+]?\d+)?$/.test(a.trim()) ? parseNumber(a) : null;
+          accepted.push(n !== null ? { n } : { s: a.trim() });
+        }
+      }
+      const tol = num(o.tolerance);
+      return {
+        q: str(o.q ?? o.question ?? o.problem),
+        image: str(o.image),
+        accepted,
+        open: accepted.length === 0,
+        tolerance: tol !== null ? Math.abs(tol) : null,
+        unit: str(o.unit).trim(),
+        hints: arr(o.hints ?? (o.hint ? [o.hint] : []))
+          .map((h) => textOf(h))
+          .filter(Boolean),
+        solution: str(o.solution ?? o.explain ?? o.explanation),
+      };
+    });
+}
+
+/** Is what was typed right, right but for its accents, or wrong? */
+function judge(p: Problem, typed: string): 'right' | 'accents' | 'wrong' {
+  const t = typed.trim();
+  if (!t) return 'wrong';
+  const v = parseNumber(t);
+  let accents = false;
+  for (const a of p.accepted) {
+    if ('n' in a) {
+      const tol = (p.tolerance ?? 1e-9 * Math.max(1, Math.abs(a.n))) + 1e-9 * Math.max(1, Math.abs(a.n));
+      if (v !== null && Math.abs(v - a.n) <= tol) return 'right';
+    } else if (answerKey(t) === answerKey(a.s)) return 'right';
+    else if (answerLoose(t) === answerLoose(a.s)) accents = true;
+  }
+  return accents ? 'accents' : 'wrong';
+}
+
+/** The accepted words a typed answer matches but for its accents. */
+const spelled = (p: Problem, typed: string) => p.accepted.map((a) => ('s' in a ? a.s : '')).find((s) => s && answerLoose(s) === answerLoose(typed)) ?? '';
+
+const tryText = (n: number) => (n === 1 ? tr('1 try') : fill(tr('{0} tries'), n));
+const hintText = (n: number) => (n === 1 ? tr('1 hint') : fill(tr('{0} hints'), n));
+
+const rec = <T,>(v: unknown): Record<number, T> => (isObj(v) ? (v as Record<number, T>) : {});
+
+function Practice({ data, done }: { data: Data; done: boolean }) {
+  const ps = problemsOf(data);
+  const [valsRaw, setVals] = useKept<Record<number, string>>('vals', {});
+  const [triesRaw, setTries] = useKept<Record<number, number>>('tries', {});
+  const [resRaw, setRes] = useKept<Record<number, string>>('res', {});
+  const [lastRaw, setLast] = useKept<Record<number, string>>('last', {});
+  const [hintsRaw, setHints] = useKept<Record<number, number>>('hints', {});
+  const [solRaw, setSol] = useKept<Record<number, boolean>>('sol', {});
+  const [atRaw, setAt] = useKept<number>('at', 0);
+  const ask = useAsk();
+  const vals = rec<string>(valsRaw);
+  const triesOf = rec<number>(triesRaw);
+  const res = rec<string>(resRaw);
+  const last = rec<string>(lastRaw);
+  const hintsOf = rec<number>(hintsRaw);
+  const sol = rec<boolean>(solRaw);
+  const total = ps.length;
+  const all = str(data.mode) === 'all';
+  const cur = Math.min(Math.max(0, num(atRaw) ?? 0), Math.max(0, total - 1));
+  const tries = (i: number) => Math.max(0, Math.floor(num(triesOf[i]) ?? 0));
+  const shownHints = (i: number) => Math.min(ps[i]?.hints.length ?? 0, Math.max(0, Math.floor(num(hintsOf[i]) ?? 0)));
+  const isRight = (i: number) => res[i] === 'right' || res[i] === 'accents';
+  const bump = (i: number) => setTries((t) => ({ ...rec<number>(t), [i]: Math.max(0, Math.floor(num(rec<number>(t)[i]) ?? 0)) + 1 }));
+
+  const check = (i: number) => {
+    const p = ps[i];
+    const typed = (vals[i] ?? '').trim();
+    if (!done || !p || p.open || !typed || isRight(i)) return;
+    if (tries(i) > 0 && last[i] === typed) return; // the same wrong answer again is not a new try
+    bump(i);
+    setLast((l) => ({ ...rec<string>(l), [i]: typed }));
+    const j = judge(p, typed);
+    if (j !== 'wrong') setRes((r) => ({ ...rec<string>(r), [i]: j }));
+  };
+  const send = (i: number) => {
+    const p = ps[i];
+    const typed = (vals[i] ?? '').trim();
+    if (!done || !p || !typed) return;
+    ask(`${fill(tr('Problem {0}: {1}'), i + 1, plainOf(p.q))}\n${fill(tr('My answer: {0}'), typed)}`);
+    bump(i);
+    setLast((l) => ({ ...rec<string>(l), [i]: typed }));
+    setRes((r) => ({ ...rec<string>(r), [i]: 'sent' }));
+  };
+  const reset = () => {
+    setVals({});
+    setTries({});
+    setRes({});
+    setLast({});
+    setHints({});
+    setSol({});
+    setAt(0);
+  };
+
+  const auto = ps.map((p, i) => ({ p, i })).filter(({ p }) => !p.open);
+  const right = auto.filter(({ i }) => isRight(i)).length;
+  const triesUsed = auto.reduce((n, { i }) => n + tries(i), 0);
+  const hintsUsed = ps.reduce((n, _, i) => n + shownHints(i), 0);
+  const touched = ps.some((p, i) => tries(i) > 0 || shownHints(i) > 0 || sol[i] || (p.open && (vals[i] ?? '').trim()));
+  const finished = done && total > 0 && ps.every((p, i) => (p.open ? res[i] === 'sent' : isRight(i) || !!sol[i]));
+  const sendResults = () => {
+    const lines: string[] = [];
+    ps.forEach((p, i) => {
+      const parts: string[] = [];
+      if (p.open) {
+        if (res[i] === 'sent' || (vals[i] ?? '').trim()) parts.push(tr('open answer') + ((vals[i] ?? '').trim() ? ` (${fill(tr('my answer: {0}'), plainOf(vals[i], 100))})` : ''));
+      } else if (isRight(i)) parts.push(tries(i) <= 1 ? tr('right first try') : fill(tr('right after {0} tries'), tries(i)));
+      else if (tries(i) > 0) parts.push(`${tries(i) === 1 ? tr('wrong after 1 try') : fill(tr('wrong after {0} tries'), tries(i))} (${fill(tr('my last answer: {0}'), plainOf(last[i] ?? '', 100))})`);
+      if (shownHints(i)) parts.push(hintText(shownHints(i)));
+      if (sol[i]) parts.push(tr('solution shown'));
+      if (parts.length) lines.push(`${i + 1}: ${parts.join(', ')}.`);
+    });
+    ask(`${headOf(data)}${auto.length ? fill(tr('Practice results: {0} of {1} right.'), right, auto.length) : tr('Practice results:')} ${lines.join(' ')}`.trim());
+  };
+
+  const card = (i: number) => {
+    const p = ps[i];
+    const val = vals[i] ?? '';
+    const ok = isRight(i);
+    const wrong = !ok && !p.open && tries(i) > 0 && last[i] === val.trim() && !!val.trim();
+    const sent = res[i] === 'sent';
+    const hn = shownHints(i);
+    const canSolution = tries(i) > 0 || (p.hints.length > 0 && hn >= p.hints.length);
+    const setVal = (v: string) => setVals((m) => ({ ...rec<string>(m), [i]: v }));
+    const showHint = !ok && hn < p.hints.length;
+    const showSolution = !!p.solution && !sol[i];
+    const unknown = !done && !p.accepted.length; // its answer may still be on its way
+    const boxCls = cx('min-w-0 rounded-lg border bg-bg-1 px-3 text-[14px] text-fg transition-colors outline-none focus:border-accent focus:bg-panel disabled:opacity-70', ok ? 'border-ok/50 bg-ok/10' : wrong ? 'border-err/50' : 'border-line-2');
+    return (
+      <div key={i}>
+        <div className="mb-1 text-[11.5px] font-medium text-fg-3">{fill(tr('Problem {0} of {1}'), i + 1, total)}</div>
+        {p.q ? <Md text={p.q} className="text-[15px] font-medium text-fg" /> : <Pending className="w-2/3" />}
+        {p.image && <Pic src={p.image} className="mt-2 aspect-video w-full max-w-md rounded-lg" />}
+        {p.open && !unknown ? (
+          <div className="mt-3">
+            <textarea
+              value={val}
+              rows={3}
+              disabled={!done}
+              onChange={(e) => setVal(e.target.value)}
+              aria-label={tr('Your answer')}
+              placeholder={tr('Write your answer here')}
+              spellCheck
+              className={cx(boxCls, 'block w-full resize-y py-2 leading-snug')}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Btn primary icon={<Send size={13} />} disabled={!done || !val.trim()} onClick={() => send(i)}>
+                {tr('Send for checking')}
+              </Btn>
+              {sent && last[i] === val.trim() && <span className="text-[12.5px] text-fg-3">{tr('In your message box: send it to have it checked.')}</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              value={val}
+              disabled={!done || ok || unknown}
+              onChange={(e) => setVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                check(i);
+              }}
+              aria-label={tr('Your answer')}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              className={cx(boxCls, 'h-9 flex-1 @md:max-w-xs')}
+            />
+            {p.unit && <span className="max-w-[9rem] shrink-0 truncate text-[14px] text-fg-2">{p.unit}</span>}
+            <Btn primary disabled={!done || ok || unknown || !val.trim()} onClick={() => check(i)}>
+              {tr('Check')}
+            </Btn>
+          </div>
+        )}
+        {ok && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-ok/10 px-3 py-2 text-[13.5px]">
+            <Mark ok className="mt-0.5" />
+            <div className="min-w-0 font-semibold text-ok">{res[i] === 'accents' ? fill(tr('Right — mind the accents: {0}'), spelled(p, val)) : tr('Right!')}</div>
+          </div>
+        )}
+        {wrong && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-err/10 px-3 py-2 text-[13.5px]">
+            <Mark ok={false} className="mt-0.5" />
+            <div className="min-w-0 font-semibold text-err">{tr('Not quite.')}</div>
+          </div>
+        )}
+        {hn > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {p.hints.slice(0, hn).map((h, k) => (
+              <div key={k} className="flex gap-2 text-[13px] text-fg-2">
+                <Lightbulb size={14} className="mt-[3px] shrink-0 text-warn" />
+                <div className="min-w-0">
+                  <span className="font-medium text-fg">{fill(tr('Hint {0} of {1}'), k + 1, p.hints.length)}: </span>
+                  <Md text={h} inline />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {(showHint || showSolution) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {showHint && (
+              <Btn icon={<Lightbulb size={13} />} disabled={!done} onClick={() => setHints((h) => ({ ...rec<number>(h), [i]: shownHints(i) + 1 }))}>
+                {tr('Show a hint')}
+              </Btn>
+            )}
+            {showSolution && (
+              <Btn icon={<BookOpen size={13} />} disabled={!done || !canSolution} onClick={() => setSol((s) => ({ ...rec<boolean>(s), [i]: true }))}>
+                {tr('Show solution')}
+              </Btn>
+            )}
+          </div>
+        )}
+        {p.solution && sol[i] && (
+          <div className="mt-3 rounded-lg bg-bg-1 px-3.5 py-3">
+            <div className="aui-h4 mb-1">{tr('Solution')}</div>
+            <Md text={p.solution} className="text-[14px] leading-relaxed" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const score = total > 0 && (finished || touched) && (
+    <div className="mt-5">
+      {finished && auto.length > 0 ? (
+        <Outcome score={right} total={auto.length} text={right === auto.length ? tr('All right. Well done!') : fill(tr('{0} of {1} right'), right, auto.length)}>
+          <Btn icon={<RotateCcw size={13} />} onClick={reset}>
+            {tr('Try again')}
+          </Btn>
+          <Btn primary icon={<Send size={13} />} disabled={!done} onClick={sendResults}>
+            {tr('Send my results')}
+          </Btn>
+        </Outcome>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-bg-1 px-3.5 py-3">
+          <div className="min-w-[140px] flex-1">
+            {auto.length > 0 && <div className="text-[14px] font-semibold">{fill(tr('{0} of {1} right'), right, auto.length)}</div>}
+            {(triesUsed > 0 || hintsUsed > 0) && <div className="text-[12px] text-fg-3">{[triesUsed > 0 ? tryText(triesUsed) : '', hintsUsed > 0 ? hintText(hintsUsed) : ''].filter(Boolean).join(' · ')}</div>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Btn icon={<RotateCcw size={13} />} onClick={reset}>
+              {tr('Try again')}
+            </Btn>
+            <Btn primary icon={<Send size={13} />} disabled={!done} onClick={sendResults}>
+              {tr('Send my results')}
+            </Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <Card>
+      <Head title={data.title} aside={total > 1 ? <span className="text-[12px] text-fg-3 tabular-nums">{all ? `${right}/${auto.length}` : `${cur + 1}/${total}`}</span> : undefined} />
+      {str(data.intro) && <Md text={data.intro} className="-mt-1 mb-3 text-[13.5px] text-fg-2" />}
+      {total === 0 ? (
+        <Pending className="w-1/2" />
+      ) : all ? (
+        <div className="space-y-6">{ps.map((_, i) => card(i))}</div>
+      ) : (
+        <>
+          {card(cur)}
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <Btn icon={<ChevronLeft size={14} />} disabled={cur === 0} onClick={() => setAt(cur - 1)} title={tr('Previous')} />
+            <div className="flex min-w-0 flex-wrap justify-center gap-1">
+              {ps.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setAt(i)}
+                  aria-label={fill(tr('Problem {0}'), i + 1)}
+                  className={cx('h-1.5 rounded-full transition-all', i === cur ? 'w-5 bg-accent' : isRight(i) ? 'w-1.5 bg-ok' : tries(i) > 0 ? 'w-1.5 bg-fg-3' : 'w-1.5 bg-bg-3')}
+                />
+              ))}
+            </div>
+            <Btn primary={isRight(cur) || res[cur] === 'sent'} disabled={cur >= total - 1} onClick={() => setAt(cur + 1)}>
+              {tr('Next')}
+              <ChevronRight size={14} className="-mr-1" />
+            </Btn>
+          </div>
+        </>
+      )}
+      {score}
+    </Card>
+  );
+}
+
+// ---- a network graph ----------------------------------------------------------------------------------------------------
+
+interface NetNode {
+  id: string;
+  label: string;
+  group: string;
+  note: string;
+  /** The size the agent gave, 1 to 5; null when it left it out. */
+  size: number | null;
+}
+interface NetLink {
+  from: number;
+  to: number;
+  label: string;
+  directed: boolean;
+  weight: number;
+  /** Which of the links between the same two nodes it is (they are drawn apart), and how many there are. */
+  nth: number;
+  of: number;
+}
+
+const NET_MAX = 60;
+
+/** The nodes and links as far as they have come: a link to an id that is no node is left out, a repeated id counts once. */
+function networkOf(data: Data): { nodes: NetNode[]; links: NetLink[] } {
+  const nodes: NetNode[] = [];
+  const index = new Map<string, number>();
+  for (const x of arr(data.nodes)) {
+    const o: Data = isObj(x) ? x : { id: x };
+    const id = str(o.id ?? o.name ?? o.label).trim();
+    if (!id || index.has(id) || nodes.length >= NET_MAX) continue;
+    const size = num(o.size);
+    index.set(id, nodes.length);
+    nodes.push({ id, label: str(o.label ?? o.name).trim() || id, group: str(o.group ?? o.category).trim(), note: str(o.note ?? o.description), size: size === null ? null : Math.min(5, Math.max(1, size)) });
+  }
+  const links: NetLink[] = [];
+  const seen = new Map<string, number>();
+  const everyDirected = yes(data.directed);
+  for (const x of arr(data.links ?? data.edges)) {
+    if (!isObj(x)) continue;
+    const from = index.get(str(x.from ?? x.source).trim());
+    const to = index.get(str(x.to ?? x.target).trim());
+    if (from === undefined || to === undefined || from === to) continue;
+    const key = from < to ? `${from}:${to}` : `${to}:${from}`;
+    const nth = seen.get(key) ?? 0;
+    seen.set(key, nth + 1);
+    links.push({ from, to, label: str(x.label).trim(), directed: x.directed === undefined ? everyDirected : yes(x.directed), weight: Math.min(5, Math.max(1, num(x.weight) ?? 1)), nth, of: 0 });
+  }
+  for (const l of links) l.of = seen.get(l.from < l.to ? `${l.from}:${l.to}` : `${l.to}:${l.from}`) ?? 1;
+  return { nodes, links };
+}
+
+/** Where the nodes go: springs along the links, repulsion between all, a pull to the middle. The same data gives the same places. */
+function layoutNetwork(ids: string[], pairs: [number, number, number][], radii: number[], w: number, h: number): { x: number; y: number }[] {
+  const n = ids.length;
+  if (!n) return [];
+  const pad = 26;
+  // A start from each id alone: the nodes that came before do not move when more arrive.
+  const x = ids.map((id) => pad + ((hashOf(`${id}#x`) % 10007) / 10007) * (w - 2 * pad));
+  const y = ids.map((id) => pad + ((hashOf(`${id}#y`) % 10009) / 10009) * (h - 2 * pad));
+  if (n === 1) return [{ x: w / 2, y: h / 2 }];
+  const k = Math.max(34, Math.sqrt((w * h) / n) * 0.75);
+  const steps = 300;
+  const dx = new Array<number>(n);
+  const dy = new Array<number>(n);
+  for (let it = 0; it < steps; it++) {
+    const temp = (Math.min(w, h) / 6) * (1 - it / steps) + 0.5;
+    dx.fill(0);
+    dy.fill(0);
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        let ex = x[i] - x[j];
+        let ey = y[i] - y[j];
+        let d = Math.hypot(ex, ey);
+        if (d < 0.01) {
+          ex = ((i * 7 + j) % 5) - 2 + 0.5;
+          ey = ((i + j * 3) % 5) - 2 + 0.5;
+          d = Math.hypot(ex, ey);
+        }
+        const f = (k * k) / d / d; // the push, as a share of the distance
+        dx[i] += ex * f;
+        dy[i] += ey * f;
+        dx[j] -= ex * f;
+        dy[j] -= ey * f;
+      }
+    for (const [a, b, wt] of pairs) {
+      const ex = x[a] - x[b];
+      const ey = y[a] - y[b];
+      const d = Math.hypot(ex, ey) || 0.01;
+      const f = (d / k) * (1 + (wt - 1) * 0.15); // the pull, as a share of the distance
+      dx[a] -= ex * f;
+      dy[a] -= ey * f;
+      dx[b] += ex * f;
+      dy[b] += ey * f;
+    }
+    for (let i = 0; i < n; i++) {
+      dx[i] -= (x[i] - w / 2) * 0.07;
+      dy[i] -= (y[i] - h / 2) * 0.12;
+      const d = Math.hypot(dx[i], dy[i]) || 0.01;
+      const m = Math.min(d, temp);
+      x[i] = Math.min(w - pad, Math.max(pad, x[i] + (dx[i] / d) * m));
+      y[i] = Math.min(h - pad, Math.max(pad, y[i] + (dy[i] / d) * m));
+    }
+  }
+  // Nodes that still overlap are pushed apart.
+  for (let it = 0; it < 30; it++)
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        const ex = x[i] - x[j];
+        const ey = y[i] - y[j];
+        const d = Math.hypot(ex, ey) || 0.01;
+        const gap = radii[i] + radii[j] + 8 - d;
+        if (gap <= 0) continue;
+        x[i] += (ex / d) * (gap / 2);
+        y[i] += (ey / d) * (gap / 2);
+        x[j] -= (ex / d) * (gap / 2);
+        y[j] -= (ey / d) * (gap / 2);
+      }
+  // Fitted to the box: as large as it can be (up to a point), in the middle.
+  const lo = { x: Math.min(...x), y: Math.min(...y) };
+  const hi = { x: Math.max(...x), y: Math.max(...y) };
+  const sx = hi.x - lo.x > 1 ? (w - 2 * pad) / (hi.x - lo.x) : 1;
+  const sy = hi.y - lo.y > 1 ? (h - 2 * pad) / (hi.y - lo.y) : 1;
+  const s = Math.min(sx, sy, 1.8);
+  return x.map((_, i) => ({ x: w / 2 + (x[i] - (lo.x + hi.x) / 2) * s, y: h / 2 + (y[i] - (lo.y + hi.y) / 2) * s }));
+}
+
+const netHue = (g: number) => (g < 0 ? 'var(--fg-3)' : g < 8 ? seriesColor(g) : 'var(--fg-3)');
+const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/** A node's links in words ("→ influenced Hume"): the arrow says which way a link points, a dash that it has no direction. */
+function NetLinks({ at, nodes, links, pick }: { at: number; nodes: NetNode[]; links: NetLink[]; pick: (i: number) => void }) {
+  const mine = links.filter((l) => l.from === at || l.to === at);
+  if (!mine.length) return null;
+  return (
+    <ul className="m-0 list-none space-y-1 p-0 text-[13px]">
+      {mine.map((l, k) => {
+        const other = l.from === at ? l.to : l.from;
+        const arrow = !l.directed ? '—' : l.from === at ? '→' : '←';
+        return (
+          <li key={k} className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="w-4 shrink-0 text-center text-fg-3" aria-hidden>
+              {arrow}
+            </span>
+            {l.label && <span className="text-fg-2">{l.label}</span>}
+            <button type="button" onClick={() => pick(other)} className="min-w-0 rounded text-left font-medium text-fg hover:text-accent focus-visible:text-accent">
+              {nodes[other].label}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Network({ data, done }: { data: Data; done: boolean }) {
+  const { nodes, links } = useMemo(() => networkOf(data), [data]);
+  const uid = useId().replace(/:/g, '');
+  const [view, setView] = useState<'graph' | 'list'>('graph');
+  const [boxRef, width] = useWidth<HTMLDivElement>();
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [sel, setSel] = useState<string | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const [group, setGroup] = useState<string | null>(null);
+  const [moved, setMoved] = useState<{ key: string; at: Record<string, { x: number; y: number }> }>({ key: '', at: {} });
+  const drag = useRef<{ id: string; pointer: number; dx: number; dy: number; x0: number; y0: number; moved: boolean } | null>(null);
+
+  const groups = useMemo(() => {
+    const out: string[] = [];
+    for (const n of nodes) if (n.group && !out.includes(n.group)) out.push(n.group);
+    return out;
+  }, [nodes]);
+  const byId = useMemo(() => new Map(nodes.map((n, i) => [n.id, i])), [nodes]);
+  const degree = useMemo(() => {
+    const d = nodes.map(() => 0);
+    for (const l of links) {
+      d[l.from]++;
+      d[l.to]++;
+    }
+    return d;
+  }, [nodes, links]);
+  const radii = useMemo(() => {
+    const top = Math.max(1, ...degree);
+    const shrink = nodes.length > 40 ? 0.75 : 1;
+    return nodes.map((n, i) => (5 + (n.size ?? 1 + Math.min(3, (degree[i] / top) * 3)) * 2.4) * shrink);
+  }, [nodes, degree]);
+
+  const W = width > 0 ? Math.max(280, Math.round(width / 20) * 20) : 0;
+  const H = Math.round(Math.min(420, Math.max(320, W * 0.62)));
+  const key = JSON.stringify([nodes.map((n) => n.id), links.map((l) => [l.from, l.to, l.weight]), radii.map((r) => Math.round(r)), W]);
+  const base = useMemo(
+    () =>
+      W
+        ? layoutNetwork(
+            nodes.map((n) => n.id),
+            links.map((l): [number, number, number] => [l.from, l.to, l.weight]),
+            radii,
+            W,
+            H,
+          )
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key],
+  );
+  const mv = moved.key === key ? moved.at : {};
+  const pos = nodes.map((n, i) => mv[n.id] ?? base[i] ?? { x: W / 2, y: H / 2 });
+
+  const selAt = sel !== null ? (byId.get(sel) ?? -1) : -1;
+  const focus = hover !== null && byId.has(hover) ? byId.get(hover)! : selAt;
+  const gAt = group !== null ? groups.indexOf(group) : -1;
+  const lit = useMemo(() => {
+    const s = new Set<number>();
+    if (focus >= 0) {
+      s.add(focus);
+      for (const l of links) {
+        if (l.from === focus) s.add(l.to);
+        if (l.to === focus) s.add(l.from);
+      }
+    } else if (gAt >= 0) nodes.forEach((n, i) => n.group === group && s.add(i));
+    else nodes.forEach((_, i) => s.add(i));
+    return s;
+  }, [focus, gAt, group, nodes, links]);
+  const dimmed = focus >= 0 || gAt >= 0;
+  const hueOf = (i: number) => (groups.length ? netHue(nodes[i].group ? groups.indexOf(nodes[i].group) : -1) : seriesColor(0));
+  const allLabels = links.length <= 12;
+
+  const svgPoint = (e: ReactPointerEvent) => {
+    const r = svgRef.current?.getBoundingClientRect();
+    if (!r || !r.width) return null;
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+  };
+  const down = (e: ReactPointerEvent<SVGGElement>, i: number) => {
+    if (e.button > 0) return;
+    const p = svgPoint(e);
+    if (!p) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { id: nodes[i].id, pointer: e.pointerId, dx: pos[i].x - p.x, dy: pos[i].y - p.y, x0: e.clientX, y0: e.clientY, moved: false };
+  };
+  const move = (e: ReactPointerEvent<SVGGElement>) => {
+    const d = drag.current;
+    if (!d || d.pointer !== e.pointerId) return;
+    if (!d.moved && Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 4) return;
+    d.moved = true;
+    const p = svgPoint(e);
+    if (!p) return;
+    const x = Math.min(W - 8, Math.max(8, p.x + d.dx));
+    const y = Math.min(H - 8, Math.max(8, p.y + d.dy));
+    setMoved((m) => ({ key, at: { ...(m.key === key ? m.at : {}), [d.id]: { x, y } } }));
+  };
+  const up = (e: ReactPointerEvent<SVGGElement>) => {
+    const d = drag.current;
+    if (!d || d.pointer !== e.pointerId) return;
+    drag.current = null;
+    if (!d.moved) choose(d.id);
+  };
+  const choose = (id: string) => {
+    setGroup(null);
+    setSel((s) => (s === id ? null : id));
+  };
+
+  const shown = selAt >= 0 ? selAt : -1;
+  const named = (i: number) => nodes[i].group;
+  const arrowId = (on: boolean) => `${uid}-${on ? 'on' : 'off'}`;
+  const ready = W > 0 && nodes.length > 0;
+
+  const linkPath = (l: NetLink) => {
+    const a = pos[l.from];
+    const b = pos[l.to];
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    // The links between one pair are bent apart, to either side of the straight line.
+    const bend = l.of > 1 ? (l.nth - (l.of - 1) / 2) * 26 * (l.from < l.to ? 1 : -1) : 0;
+    const cx2 = mx + (-(b.y - a.y) / len) * bend;
+    const cy2 = my + ((b.x - a.x) / len) * bend;
+    const ra = radii[l.from] + 1.5;
+    const rb = radii[l.to] + (l.directed ? 4 : 1.5);
+    const ua = Math.hypot(cx2 - a.x, cy2 - a.y) || 1;
+    const ub = Math.hypot(cx2 - b.x, cy2 - b.y) || 1;
+    const s = { x: a.x + ((cx2 - a.x) / ua) * ra, y: a.y + ((cy2 - a.y) / ua) * ra };
+    const t = { x: b.x + ((cx2 - b.x) / ub) * rb, y: b.y + ((cy2 - b.y) / ub) * rb };
+    return { d: bend ? `M${s.x},${s.y} Q${cx2},${cy2} ${t.x},${t.y}` : `M${s.x},${s.y} L${t.x},${t.y}`, lx: 0.25 * s.x + 0.5 * cx2 + 0.25 * t.x, ly: 0.25 * s.y + 0.5 * cy2 + 0.25 * t.y };
+  };
+
+  const listGroups = useMemo(() => {
+    const out = groups.map((g) => ({ g, items: nodes.map((_, i) => i).filter((i) => nodes[i].group === g) }));
+    const rest = nodes.map((_, i) => i).filter((i) => !nodes[i].group);
+    if (rest.length) out.push({ g: groups.length ? tr('Other') : '', items: rest });
+    return out;
+  }, [groups, nodes]);
+
+  return (
+    <Card>
+      <Head
+        title={data.title}
+        aside={
+          nodes.length > 0 ? (
+            <Seg
+              size="sm"
+              options={[
+                { value: 'graph', label: tr('Graph') },
+                { value: 'list', label: tr('List') },
+              ]}
+              value={view}
+              onChange={setView}
+            />
+          ) : undefined
+        }
+      />
+      {view === 'graph' ? (
+        <>
+          <div ref={boxRef} className="w-full" style={{ minHeight: nodes.length ? 320 : undefined }}>
+            {ready && (
+              <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} width="100%" style={{ height: 'auto' }} className="block max-w-full rounded-xl bg-bg-1 select-none" role="group" aria-label={str(data.title) || tr('Network graph')}>
+                <defs>
+                  {[false, true].map((on) => (
+                    <marker key={String(on)} id={arrowId(on)} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+                      <path d="M0,1 L10,5 L0,9 z" fill={on ? 'var(--fg-2)' : 'var(--fg-3)'} />
+                    </marker>
+                  ))}
+                </defs>
+                <rect width={W} height={H} fill="transparent" onClick={() => (setSel(null), setGroup(null))} />
+                <g>
+                  {links.map((l, k) => {
+                    const on = !dimmed || (focus >= 0 ? l.from === focus || l.to === focus : lit.has(l.from) && lit.has(l.to));
+                    const near = focus >= 0 && (l.from === focus || l.to === focus);
+                    const p = linkPath(l);
+                    return (
+                      <g key={k} opacity={on ? 1 : 0.1} pointerEvents="none">
+                        <path d={p.d} fill="none" stroke={near ? 'var(--fg-2)' : 'var(--fg-3)'} strokeWidth={(near ? 0.6 : 0) + 1 + (l.weight - 1) * 0.6} strokeOpacity={near ? 1 : 0.55} markerEnd={l.directed ? `url(#${arrowId(near)})` : undefined} />
+                        {l.label && (near || (allLabels && !dimmed)) && (
+                          <text x={p.lx} y={p.ly} dy="0.35em" textAnchor="middle" className="fill-fg-2 text-[10.5px]" stroke="var(--bg-1)" strokeWidth={3} strokeLinejoin="round" paintOrder="stroke">
+                            {cut(l.label, 24)}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+                <g>
+                  {nodes.map((n, i) => {
+                    const { x, y } = pos[i];
+                    const left = x > W * 0.6;
+                    const on = lit.has(i);
+                    const chosen = i === focus;
+                    return (
+                      <g
+                        key={n.id}
+                        transform={`translate(${x},${y})`}
+                        opacity={on ? 1 : 0.2}
+                        tabIndex={0}
+                        role="button"
+                        aria-pressed={i === selAt}
+                        aria-label={n.group ? `${n.label} (${n.group})` : n.label}
+                        style={{ cursor: 'grab', touchAction: 'none', outline: 'none' }}
+                        className="[&:focus-visible>circle]:stroke-accent"
+                        onPointerDown={(e) => down(e, i)}
+                        onPointerMove={move}
+                        onPointerUp={up}
+                        onPointerCancel={() => (drag.current = null)}
+                        onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(n.id)}
+                        onPointerLeave={() => setHover((h) => (h === n.id ? null : h))}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' && e.key !== ' ') return;
+                          e.preventDefault();
+                          choose(n.id);
+                        }}
+                      >
+                        <title>{n.label}</title>
+                        <circle r={radii[i]} fill={hueOf(i)} stroke={chosen ? 'var(--fg)' : 'var(--panel)'} strokeWidth={chosen ? 2.5 : 2} />
+                        <text x={left ? -(radii[i] + 5) : radii[i] + 5} dy="0.35em" textAnchor={left ? 'end' : 'start'} className={cx('text-[11.5px]', chosen ? 'fill-fg font-semibold' : 'fill-fg-2')} stroke="var(--bg-1)" strokeWidth={3} strokeLinejoin="round" paintOrder="stroke" pointerEvents="none">
+                          {cut(n.label, 22)}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              </svg>
+            )}
+          </div>
+          {groups.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {groups.map((g, gi) => (
+                <button
+                  key={g}
+                  type="button"
+                  aria-pressed={group === g}
+                  onClick={() => (setSel(null), setGroup((c) => (c === g ? null : g)))}
+                  className={cx('inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors', group === g ? 'border-accent bg-accent-soft text-fg' : 'border-line text-fg-2 hover:bg-bg-2')}
+                >
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: netHue(gi) }} />
+                  <span className="truncate">{g}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {nodes.length > 0 && (
+            <div className="mt-3 rounded-xl bg-bg-1 px-3.5 py-3" aria-live="polite">
+              {shown >= 0 ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: hueOf(shown) }} />
+                    <span className="text-[14.5px] font-semibold">{nodes[shown].label}</span>
+                    {named(shown) && <Chip>{named(shown)}</Chip>}
+                  </div>
+                  {nodes[shown].note && <Md text={nodes[shown].note} className="mt-1.5 text-[13.5px] text-fg-2" />}
+                  <div className={cx((nodes[shown].note || links.some((l) => l.from === shown || l.to === shown)) && 'mt-2')}>
+                    <NetLinks at={shown} nodes={nodes} links={links} pick={(i) => choose(nodes[i].id)} />
+                  </div>
+                </>
+              ) : (
+                <div className="text-[13px] text-fg-3">{done ? tr('Tap a node to see its links and its note.') : tr('The graph is still being written.')}</div>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="space-y-4">
+          {listGroups.map(({ g, items }) => (
+            <Section key={g || '-'} title={g || undefined}>
+              <ul className="m-0 list-none space-y-3 p-0">
+                {items.map((i) => (
+                  <li key={nodes[i].id} className="min-w-0">
+                    <div className="text-[14px] font-semibold">{nodes[i].label}</div>
+                    {nodes[i].note && <Md text={nodes[i].note} className="text-[13px] text-fg-2" />}
+                    <div className="mt-1">
+                      <NetLinks at={i} nodes={nodes} links={links} pick={(k) => (setView('graph'), choose(nodes[k].id))} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ))}
+        </div>
+      )}
+      {nodes.length === 0 && <Pending className="w-1/2" />}
+    </Card>
+  );
+}
+
 export const LEARN_UIS: Record<string, AnswerUiView> = {
   quiz: Quiz,
   flashcards: Flashcards,
@@ -2959,4 +3766,6 @@ export const LEARN_UIS: Record<string, AnswerUiView> = {
   dialogue: Dialogue,
   rubric: Rubric,
   chess: Chess,
+  practice: Practice,
+  network: Network,
 };

@@ -41,8 +41,8 @@ export function findUiTool(): RunTool {
     description: [
       `Finds the app's answer UIs that fit what your answer shows, among ${ANSWER_UIS.length} (cards, comparison tables, charts, maps, recipes, forecasts, itineraries, timelines, quizzes, calculators, galleries, product grids, code and more), each with the data it takes and an example, so you can show your answer in one: a \`\`\`ui <name> block of JSON in your reply, drawn in place in the app's look.`,
       `Give query: what the answer shows, in a few words with a synonym or two ("compare three laptops by price and battery", "weather forecast for the week", "places to eat on a map"). It searches by words and by meaning; you get the best ${UI_K} (k for more or fewer).`,
-      `For an answer with several parts that each want a UI of their own, give queries instead, one for each part (["day-by-day trip itinerary", "weather forecast", "packing list"], up to ${MAX_QUERIES}): you get the best ${PART_K} for each. Or give names to get those UIs by name.`,
-      'Call it in any turn of the conversation, as often as answers need. Use UIs only where they make the answer clearly better than text; plain conversation, short answers, explanations and code changes stay text.',
+      `For an answer with several parts that each want a UI of their own, give queries instead, one for each part (["day-by-day trip itinerary", "weather forecast", "packing list"], up to ${MAX_QUERIES}): you get the best ${PART_K} for each. Give names to get the UIs you already know you want by name (["comparison", "follow-ups"]), with or without queries for the other parts.`,
+      'Call it in any turn of the conversation, as often as answers need: a part of an answer that is something to look at, compare, choose from, follow, try or practise reads better in a UI than in prose. Plain conversation, short answers and code changes stay text.',
     ].join(' '),
     inputSchema: {
       type: 'object',
@@ -50,38 +50,44 @@ export function findUiTool(): RunTool {
         query: { type: 'string', description: 'What the answer shows, in a few words.' },
         queries: { type: 'array', items: { type: 'string' }, description: `The parts of one answer that each want a UI, a few words each (up to ${MAX_QUERIES}).` },
         k: { type: 'number', description: `How many to get (1 to ${UI_MAX}; ${UI_K} for a query, ${PART_K} for each of queries, unless set).` },
-        names: { type: 'array', items: { type: 'string' }, description: 'UIs to get by name instead (from an earlier find_ui).' },
+        names: { type: 'array', items: { type: 'string' }, description: 'UIs to get by name (the ones you know you want), alone or beside query or queries.' },
       },
     },
     async run(args, ctx) {
       const names = Array.isArray(args.names) ? args.names.map(String).filter((n) => n.trim()) : [];
-      if (names.length) {
-        const specs = [...new Map(names.map((n) => answerUi(n)).filter((s): s is AnswerUiSpec => !!s).map((s) => [s.id, s])).values()].slice(0, UI_MAX);
-        const unknown = names.filter((n) => !answerUi(n));
-        if (!specs.length) return { text: `No answer UI is called ${unknown.map((n) => `“${n}”`).join(', ')}. The UIs:\n${allUiNames()}`, isError: true };
-        return [HOW_TO_WRITE, unknown.length ? `(No UI is called ${unknown.map((n) => `“${n}”`).join(', ')}.)` : '', ...specs.map((s) => describeUi(s))].filter(Boolean).join('\n\n');
+      const named = [...new Map(names.map((n) => answerUi(n)).filter((s): s is AnswerUiSpec => !!s).map((s) => [s.id, s])).values()].slice(0, UI_MAX);
+      const unknown = names.filter((n) => !answerUi(n));
+      const multi = Array.isArray(args.queries);
+      const parts = [...new Set([...(multi ? args.queries : []), ...(typeof args.query === 'string' ? [args.query] : [])].map((q) => String(q ?? '').trim()).filter(Boolean))].slice(0, MAX_QUERIES);
+      if (names.length && !parts.length) {
+        if (!named.length) return { text: `No answer UI is called ${unknown.map((n) => `“${n}”`).join(', ')}. The UIs:\n${allUiNames()}`, isError: true };
+        return [HOW_TO_WRITE, unknown.length ? `(No UI is called ${unknown.map((n) => `“${n}”`).join(', ')}.)` : '', ...named.map((s) => describeUi(s))].filter(Boolean).join('\n\n');
       }
+      // The UIs named come first, each with its example; what the queries find comes after them, each UI described once.
+      const taken = new Set(named.map((s) => s.id));
+      const room = UI_MAX - named.length;
+      const first = [unknown.length ? `(No UI is called ${unknown.map((n) => `“${n}”`).join(', ')}.)` : '', ...named.map((s) => describeUi(s))].filter(Boolean);
+      const namedHead = named.length ? `The UIs you named (${named.map((s) => s.id).join(', ')}), then the` : 'The';
       // Several parts of one answer: the best few for each, each UI described once.
-      const parts = [...new Set([...(Array.isArray(args.queries) ? args.queries : []), ...(Array.isArray(args.queries) && typeof args.query === 'string' ? [args.query] : [])].map((q) => String(q ?? '').trim()).filter(Boolean))].slice(0, MAX_QUERIES);
-      if (parts.length > 1 || (parts.length === 1 && Array.isArray(args.queries))) {
+      if (parts.length > 1 || (parts.length === 1 && multi)) {
         const kp = Math.max(1, Math.min(UI_MAX, Math.round(Number(args.k)) || PART_K));
         const each = await Promise.all(parts.map(async (q) => ({ q, found: (await findUis(ctx.deps.db, q, kp)).found })));
         // Each part's best first, then each part's second…: at most UI_MAX, each once; an example only for a part's best.
         const order: { spec: AnswerUiSpec; best: boolean }[] = [];
-        for (let r = 0; r < kp; r++) for (const e of each) if (e.found[r] && !order.some((o) => o.spec.id === e.found[r].spec.id)) order.push({ spec: e.found[r].spec, best: r === 0 });
-        const shown = order.slice(0, UI_MAX);
-        if (!shown.length) return `No answer UI matched any of ${parts.map((q) => `“${q}”`).join(', ')}: answer in text, or call find_ui with other words, or by name. The UIs, by group:\n${allUiNames()}`;
+        for (let r = 0; r < kp; r++) for (const e of each) if (e.found[r] && !taken.has(e.found[r].spec.id) && !order.some((o) => o.spec.id === e.found[r].spec.id)) order.push({ spec: e.found[r].spec, best: r === 0 });
+        const shown = order.slice(0, room);
+        if (!shown.length && !named.length) return `No answer UI matched any of ${parts.map((q) => `“${q}”`).join(', ')}: answer in text, or call find_ui with other words, or by name. The UIs, by group:\n${allUiNames()}`;
         const lines = each.map((e) => `- “${e.q}”: ${e.found.length ? e.found.map((f) => f.spec.id).join(', ') : 'none fits: text'}`);
-        const head = `The answer UIs for each part of your answer, best first (each described once below; an example for each part's best, names gives the others' examples). Use the one that fits each part best, or text where none does.\n${lines.join('\n')}`;
-        return [head, HOW_TO_WRITE, ...shown.map((o) => describeUi(o.spec, o.best))].join('\n\n');
+        const head = `${namedHead} answer UIs for each part of your answer, best first (each described once below; an example for each part's best, names gives the others' examples). Use the one that fits each part best, or text where none does.\n${lines.join('\n')}`;
+        return [head, HOW_TO_WRITE, ...first, ...shown.map((o) => describeUi(o.spec, o.best))].join('\n\n');
       }
-      const query = String(parts[0] ?? args.query ?? '').trim();
+      const query = parts[0] ?? '';
       if (!query) return { text: 'Give query (what your answer shows, in a few words), queries (one for each part) or names.', isError: true };
       const k = Math.max(1, Math.min(UI_MAX, Math.round(Number(args.k)) || UI_K));
-      const { found } = await findUis(ctx.deps.db, query, k);
-      if (!found.length) return `No answer UI matched “${query}”: answer in text, or call find_ui with other words, or by name. The UIs, by group:\n${allUiNames()}`;
-      const head = `The answer UIs that fit “${query}”, best first (${found.length} of ${ANSWER_UIS.length}). Use the one that fits best, or none if none does; find_ui again with other words finds others.`;
-      return [head, HOW_TO_WRITE, ...found.map((f) => describeUi(f.spec))].join('\n\n');
+      const found = (await findUis(ctx.deps.db, query, Math.min(UI_MAX, k + named.length))).found.filter((f) => !taken.has(f.spec.id)).slice(0, Math.min(k, room));
+      if (!found.length && !named.length) return `No answer UI matched “${query}”: answer in text, or call find_ui with other words, or by name. The UIs, by group:\n${allUiNames()}`;
+      const head = `${namedHead} answer UIs that fit “${query}”, best first (${found.length} of ${ANSWER_UIS.length}). Use the one that fits best, or none if none does; find_ui again with other words finds others.`;
+      return [head, HOW_TO_WRITE, ...first, ...found.map((f) => describeUi(f.spec))].join('\n\n');
     },
   };
 }

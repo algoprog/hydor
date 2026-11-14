@@ -1,12 +1,13 @@
 // The answer UIs for code (code in tabs, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories): their views, by name (shared/answer-ui/code.ts has what each takes).
-import { Fragment, useDeferredValue, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, lazy, Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, OctagonX, RotateCcw, Route, Scale, Search, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
+import { BookMarked, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleCheck, CircleMinus, CircleX, Copy as CopyIcon, GitFork, Lock, MessageSquarePlus, OctagonX, Play, RotateCcw, Route, Scale, Search, ShieldCheck, Star, TriangleAlert, WrapText, Wrench } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
 import { tr } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
+import { playgroundDoc, type PlayLang } from '../playground-doc';
 import { cx } from '../../ui';
-import { arr, Ask, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, num, Section, Seg, str, textOf, TONE, TONE_FILL, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Ask, Btn, Card, Chip, compact, Copy, fmtDate, fmtNum, Head, hostOf, isObj, LinkOut, Md, num, Section, Seg, str, textOf, TONE, TONE_FILL, useAsk, useAui, useKept, useNow, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -1927,6 +1928,187 @@ function CronUi({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- playground ---------------------------------------------------------------------------------------------------------
+
+const PLAY_LANGS: Record<string, PlayLang> = { javascript: 'javascript', js: 'javascript', mjs: 'javascript', node: 'javascript', nodejs: 'javascript', python: 'python', py: 'python', python3: 'python', html: 'html', htm: 'html', web: 'html' };
+const PLAY_NAMES: Record<PlayLang, string> = { javascript: 'JavaScript', python: 'Python', html: 'HTML' };
+/** The frame its code runs in: its code comes with the first run. */
+const PlayFrame = lazy(() => import('../play-frame'));
+
+/** Text put in at the cursor as typing would (so undo keeps working), or by hand where the browser will not. */
+function typeIn(el: HTMLTextAreaElement, text: string, onChange: (v: string) => void) {
+  el.focus();
+  if (document.execCommand('insertText', false, text)) return;
+  el.setRangeText(text, el.selectionStart, el.selectionEnd, 'end');
+  onChange(el.value);
+}
+
+/** A code editor of a plain textarea: line numbers, Tab indents (Esc, then Tab, moves on), Enter keeps the indent, Ctrl or Cmd+Enter runs. */
+function PlayEditor({ value, onChange, onRun, readOnly, label }: { value: string; onChange: (v: string) => void; onRun: () => void; readOnly: boolean; label: string }) {
+  const free = useRef(false);
+  const lines = useMemo(() => value.split('\n'), [value]);
+  const wide = useMemo(() => lines.reduce((m, l) => Math.max(m, l.length), 0), [lines]);
+  const numbers = useMemo(() => Array.from({ length: lines.length }, (_, i) => i + 1).join('\n'), [lines.length]);
+  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    const el = e.currentTarget;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      onRun();
+      return;
+    }
+    if (e.key === 'Escape') {
+      free.current = true;
+      return;
+    }
+    const plain = !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+    if (e.key === 'Tab' && plain && !free.current && !readOnly) {
+      e.preventDefault();
+      typeIn(el, '  ', onChange);
+      return;
+    }
+    if (e.key === 'Enter' && plain && !readOnly) {
+      const before = el.value.slice(0, el.selectionStart);
+      const row = before.slice(before.lastIndexOf('\n') + 1);
+      const indent = /^[ \t]*/.exec(row)![0] + (/[:{(\[]\s*$/.test(row) ? '  ' : '');
+      if (indent) {
+        e.preventDefault();
+        typeIn(el, `\n${indent}`, onChange);
+      }
+    }
+    if (e.key !== 'Tab' && e.key !== 'Shift') free.current = false;
+  };
+  return (
+    <div className="flex max-h-[420px] overflow-auto rounded-lg border border-line bg-code-bg font-mono text-[12.5px] leading-[20px] focus-within:border-line-2">
+      <div aria-hidden className="sticky left-0 z-[1] shrink-0 bg-code-bg py-2.5 pr-2 pl-3 text-right whitespace-pre text-fg-3 select-none">
+        {numbers}
+      </div>
+      <textarea
+        translate="no"
+        value={value}
+        readOnly={readOnly}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKey}
+        onBlur={() => (free.current = false)}
+        aria-label={label}
+        aria-keyshortcuts="Control+Enter Meta+Enter"
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        wrap="off"
+        rows={lines.length}
+        style={{ height: lines.length * 20 + 20, minWidth: `calc(${wide + 2}ch + 1.5rem)` }}
+        className="block min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-2.5 pr-3 pl-1 text-fg outline-none [tab-size:2] whitespace-pre"
+      />
+    </div>
+  );
+}
+
+function Playground({ data, done }: { data: Data; done: boolean }) {
+  const { offline } = useAui();
+  const ask = useAsk();
+  const code = Array.isArray(data.code) ? arr(data.code).map(str).join('\n') : str(data.code);
+  const given = str(data.language ?? data.lang).trim().toLowerCase();
+  const lang: PlayLang | null = PLAY_LANGS[given] ?? (given ? null : /^\s*</.test(code) ? 'html' : 'javascript');
+  const [kept, setKept] = useKept<string | null>('code', null);
+  const text = typeof kept === 'string' ? kept : code;
+  const changed = text !== code;
+  const python = lang === 'python';
+  const runnable = !!lang && !!text.trim() && !(python && offline);
+  const [ran, setRan] = useState<{ id: number; html: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const run = () => {
+    if (!done || !lang || !runnable) return;
+    const html = playgroundDoc(lang, text, {
+      packages: words(data.packages),
+      words: {
+        loading: tr('Loading Python…'),
+        packages: tr('Loading packages…'),
+        running: tr('Running…'),
+        none: tr('(no output)'),
+        failed: tr('Python could not be loaded. It comes from the web, and this device may be offline.'),
+        package: tr('The package {0} could not be loaded.'),
+        cut: tr('(the rest of the output is not shown)'),
+        stopped: tr('Stopped: it was still running after {0} seconds (a loop that never ends?)'),
+      },
+    });
+    setRan((r) => ({ id: (r?.id ?? 0) + 1, html }));
+  };
+  // Run as soon as it is whole when asked to (a page runs unless told not to); once.
+  const never = data.autorun === false || (typeof data.autorun === 'string' && /^(false|no|n)$/i.test(data.autorun.trim()));
+  const auto = done && runnable && (lang === 'html' ? !never : yes(data.autorun));
+  const started = useRef(false);
+  useEffect(() => {
+    if (auto && !started.current) {
+      started.current = true;
+      run();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when it is whole
+  }, [auto]);
+  const tasks = arr(data.tasks ?? data.try).map((t) => textOf(t)).filter(Boolean);
+  const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform);
+  const fence = text.includes('```') ? '````' : '```';
+  return (
+    <Card>
+      <Head title={data.title} aside={(lang || given) && <Chip>{lang ? PLAY_NAMES[lang] : given}</Chip>} />
+      <PlayEditor value={text} onChange={(v) => setKept(v === code ? null : v)} onRun={run} readOnly={!done} label={str(data.title) || tr('Code')} />
+      {done && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {runnable && (
+            <Btn primary icon={<Play size={13} />} onClick={run}>
+              {tr('Run')}
+            </Btn>
+          )}
+          {changed && (
+            <Btn icon={<RotateCcw size={13} />} onClick={() => setKept(null)}>
+              {tr('Reset')}
+            </Btn>
+          )}
+          <Btn
+            icon={copied ? <Check size={13} className="text-ok" /> : <CopyIcon size={13} />}
+            onClick={() => {
+              void copyText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            }}
+          >
+            {copied ? tr('Copied') : tr('Copy')}
+          </Btn>
+          <Btn icon={<MessageSquarePlus size={13} />} onClick={() => ask(`${tr('Here is my code:')}\n${fence}${lang ?? given}\n${text.replace(/\n+$/, '')}\n${fence}\n`)}>
+            {tr('Send my code')}
+          </Btn>
+          {runnable && <span className="ml-auto hidden text-[11.5px] text-fg-3 @lg:inline">{tr('{0}+Enter runs it').replace('{0}', mac ? '⌘' : 'Ctrl')}</span>}
+        </div>
+      )}
+      {lang && text.trim() && (
+        <Section title={tr('Output')} className="mt-3">
+          <div className="overflow-hidden rounded-lg border border-line">
+            {ran ? (
+              <Suspense fallback={<div style={{ height: 56 }} />}>
+                <PlayFrame key={ran.id} html={ran.html} title={tr('Output')} />
+              </Suspense>
+            ) : (
+              <div className="px-3.5 py-3 text-[13px] text-fg-3">{python && offline ? tr('Python has to load from the web, so it is not available in this session.') : tr('Press Run to see the result here.')}</div>
+            )}
+          </div>
+        </Section>
+      )}
+      {tasks.length > 0 && (
+        <Section title={tr('Try this')} className="mt-3">
+          <ol className="m-0 list-decimal space-y-1 pl-5 text-[13.5px] text-fg-2 marker:text-fg-3">
+            {tasks.map((t, i) => (
+              <li key={i}>
+                <Md text={t} inline />
+              </li>
+            ))}
+          </ol>
+        </Section>
+      )}
+    </Card>
+  );
+}
+
 export const CODE_UIS: Record<string, AnswerUiView> = {
   code: CodeTabs,
   commands: Commands,
@@ -1939,4 +2121,5 @@ export const CODE_UIS: Record<string, AnswerUiView> = {
   repo: Repos,
   logs: Logs,
   cron: CronUi,
+  playground: Playground,
 };

@@ -1,4 +1,4 @@
-// Answer UIs for writing: emails, alternatives to pick from, social posts, changes to a text.
+// Answer UIs for writing: emails, alternatives to pick from, social posts, changes to a text, a text marked up with notes.
 import type { AnswerUiSpec } from './types.ts';
 
 export const WRITING: AnswerUiSpec[] = [
@@ -190,6 +190,43 @@ Source = {
         doi: '10.18653/v1/N19-1423',
         url: 'https://aclanthology.org/N19-1423/',
       },
+    },
+  },
+  {
+    id: 'annotated-text',
+    title: 'Annotated text',
+    group: 'writing',
+    use: 'A text with passages marked: tap one to read its note (a correction, a comment, a meaning) and its suggested change, filter notes by kind, and copy the text with every change made.',
+    keywords: 'annotated text feedback corrections proofread grammar mistakes markup comments close reading highlights edit review essay sentences',
+    shape: `{
+  title?: string
+  text: string                   // the text as it is, word for word (plain text; line breaks kept)
+  notes: {
+    quote: string                // the exact words of text the note is about
+    at?: number                  // which time quote appears, from 1, when it appears more than once
+    kind?: string                // "grammar", "spelling", "word choice", "clarity", "style", "tone", "fact", "strength"…: colours it and filters
+    tone?: tone                  // its colour, when kind does not say
+    note: md                     // why
+    fix?: string                 // what to write instead ("" to cut it)
+  }[]
+  summary?: md                   // an overall comment
+  language?: string              // the text's language ("es", "fr-FR"), for reading it aloud
+}`,
+    example: {
+      title: 'Your cover letter, marked up',
+      text: 'I am writing to apply for the Marketing Coordinator position at Brightside Coffee. I have worked in marketing since 3 years, and in that time I have grew our newsletter from 800 to 5,000 subscribers.\n\nI am very passionate about coffee and I think that I would be a really good fit for your team. In my current role I done everything from planning campaigns to writing the copy, which has taught me to be organised, and to work with deadlines.\n\nI look forward to hearing from you at your earliest convenience.',
+      notes: [
+        { quote: 'since 3 years', kind: 'grammar', note: 'Use **for** with a length of time (*for 3 years*) and **since** with a starting point (*since 2023*).', fix: 'for 3 years' },
+        { quote: 'have grew', kind: 'grammar', note: 'After *have*, use the past participle: *have grown*.', fix: 'have grown' },
+        { quote: 'our newsletter from 800 to 5,000 subscribers', kind: 'strength', note: 'A real number, and the strongest line in the letter: keep it, and put it first if you can.' },
+        { quote: 'very', kind: 'word choice', note: '*Very passionate* is a phrase every cover letter has. Say it plainly, and let the examples show it.', fix: '' },
+        { quote: 'I think that I would be a really good fit', kind: 'clarity', note: 'Drop *I think that* and *really*: hedging makes the claim weaker, and the sentence shorter without them.', fix: 'I would be a good fit' },
+        { quote: 'I done', kind: 'grammar', note: 'The past of *do* is *did*; *done* needs *have* before it (*I have done*).', fix: 'I did' },
+        { quote: 'organised, and to work with deadlines', kind: 'style', note: 'No comma before *and* when it joins two short items, and people work **to** deadlines, not *with* them.', fix: 'organised and to work to deadlines' },
+        { quote: 'at your earliest convenience', kind: 'tone', note: 'Formal to the point of stiff. The sentence closes just as well without it.', fix: '' },
+      ],
+      summary: 'A clear letter with one standout fact. Most of the changes are small **grammar** slips in the first two sentences: fix those and it reads as confident as the numbers deserve.',
+      language: 'en',
     },
   },
 ];

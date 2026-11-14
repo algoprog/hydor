@@ -49,13 +49,17 @@ Click a card for the agent's own page:
 
 Eight agents come with the app. None of them suggests a program, model, tier or permission mode, so they keep what you picked on the start page, and none of them limits what it may use or spends. All but Coder start a session without a folder in a new task folder (see [Task folders](#task-folders-where-a-task-without-a-folder-works)). You can't change or delete them, but you can duplicate one and change the copy (see [Duplicate or delete an agent](#duplicate-or-delete-an-agent)).
 
+Each one leans on the [answer UIs](/guide/sessions#answer-uis-cards-charts-and-maps-in-replies) that suit its work (a fact check, practice problems you answer in place, an itinerary with a map, key figures and charts), so what is better seen than read comes as something to look at, compare, tick off or try.
+
 ### General
 
 "Help with anything: questions, writing, planning, files." The start page picks General until you pick another agent in that place (a project's own agent comes first). It is written for people who may not be programmers.
 
-- It works out what you want and does it. It asks one short question only when the request is unclear in a way that changes the result; otherwise it makes a sensible choice and says what it chose.
-- It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or in your [Library](/guide/library) when it is a page you'll use again, such as a tracker or a calculator.
+- It works out what you want and does it. It asks one short question only when the request is unclear in a way that changes the result, with the likely answers as buttons to click when there are a few; otherwise it makes a sensible choice and says what it chose.
 - It leads with the answer, then the detail that matters, in plain words, and explains any technical term it can't avoid.
+- It makes each answer easy to take in and to use: what is better seen than read (options side by side, places on a map, steps to tick off, numbers as a chart, things with their pictures) comes as an answer UI, with a picture or a video where seeing helps, and its own words carry the reasoning and the advice.
+- It searches the web for anything current or anything it isn't sure of, reads the files you point it to, and saves work you'll want to keep as files in the session's folder, or in your [Library](/guide/library) when it is a page you'll use again, such as a tracker or a calculator.
+- When an answer leaves natural next steps (go deeper, compare, plan, make something of it), it ends with two to four of them as buttons to tap; not after every answer.
 - When it made or changed files, it ends by saying which ones and where they are.
 
 ### Researcher
@@ -67,7 +71,9 @@ Eight agents come with the app. None of them suggests a program, model, tier or 
 3. It reads the sources that matter instead of answering from snippets, and prefers primary and authoritative ones: original papers and data, official sites, recognized experts and outlets. It notes each source's date, and says how current the answer is when the facts change over time.
 4. Where sources disagree, it says so and weighs them by quality and recency, and keeps apart what is established, what is contested and what is unknown.
 5. It cites as it writes: a numbered marker after each claim, like [1], and the sources at the end with title, author or publisher, date and link. It never invents a source, a quote, a number or a link, and says so when it couldn't verify something.
-6. It leads with the findings in a short summary, then the detail, then what remains uncertain. A long report is also saved as a Markdown file in the session's folder.
+6. It leads with the findings: the answer in a line and the few points that matter, then the detail, then what remains uncertain.
+7. It shows what has a shape of its own instead of burying it in paragraphs: claims weighed against the evidence as a fact check, options or studies side by side, how something unfolded on a timeline, the key numbers, papers worth reading, and how people, ideas or organisations connect as a network graph.
+8. A long report is also saved in your [Library](/guide/library) as a document you can read, comment on and export, or as a Markdown file in the session's folder when you want a file.
 
 For a big question that needs many searches, see deep research in [Deep research, second opinions and several agents](/guide/research).
 
@@ -75,12 +81,13 @@ For a big question that needs many searches, see deep research in [Deep research
 
 "Drafts, edits and polishes your writing": emails, letters, posts, essays, reports, stories and speeches.
 
-- Before a long piece, it makes sure of the audience, the purpose, the tone and the length. It asks briefly when one of them is unclear and matters; otherwise it states its assumptions in a line and writes.
+- Before a long piece, it makes sure of the audience, the purpose, the tone and the length. It asks briefly when one of them is unclear and matters (in a form when several are); otherwise it states its assumptions in a line and writes.
 - It writes plainly and specifically: concrete words, the main point early, varied sentences, no filler or clichés.
 - It matches the voice you ask for, or your own when you share earlier writing.
-- When it edits your text, it keeps your meaning and voice: it fixes what is wrong, tightens what is loose, leaves what works, and lists the main changes briefly.
-- Anything longer than a few paragraphs is saved as a file in the session's folder (Markdown unless you want another format), and it says where.
-- When a choice matters (a subject line, a title, an opening), it offers two or three options.
+- When it edits your text, it keeps your meaning and voice: it fixes what is wrong, tightens what is loose, leaves what works. It shows the edits so you can follow them: your text with each change marked and explained when you want feedback, or what changed between the versions for a rewrite, then the clean text.
+- It hands over short pieces ready to use: an email in versions to switch between, opened in your mail app with everything filled in; posts, each checked against its platform's length limit; a reference in the style you need.
+- When a choice matters (a subject line, a title, an opening, a name), it offers two to four options, each with a note, for you to pick.
+- Anything longer than a few paragraphs is written in your [Library](/guide/library) as a document, where you can edit, comment on and export it, and it says so; it makes a file in the session's folder (Markdown unless you want another format) when you ask for a file.
 
 ### Coder
 
@@ -89,29 +96,33 @@ For a big question that needs many searches, see deep research in [Deep research
 - It reads the code around a change before making it, and follows the project's conventions and tools.
 - It keeps changes to what you asked, and mentions other problems it notices instead of fixing them unasked.
 - After changing code, it runs the project's tests, build or linter when the project has them, and fixes what fails.
-- If you seem new to programming, it explains what it did and how to run it, in plain words.
+- If you seem new to programming, it explains what it did and how to run it, in plain words: commands for you to run, each with a copy button and what it does, and a snippet you can try in a playground.
+- When it explains code instead of changing it, it shows what has a shape of its own instead of a wall of text: an error with its likely causes and fixes, a test run, a project's files as a tree, an endpoint, approaches to weigh side by side, and a diagram for a flow or an architecture.
 - It finishes with a short summary: what changed, how it checked it, and anything left to do.
 
 ### Tutor
 
-"Teaches step by step and checks you follow." The goal is that you understand, not only that you get an answer.
+"Teaches step by step and checks you follow." The goal is that you understand and can do it yourself, not only that you get an answer.
 
-- If your level or goal is unclear, it asks one quick question first.
+- If your level or goal is unclear, it asks one quick question first, with the likely answers as buttons to click (new to it, know the basics, revising for an exam).
 - It teaches one step at a time, in plain words, with a concrete example for each new idea, from simple to harder.
-- After each step, it checks with a short question or a small exercise, and waits for your answer before going on.
-- When you answer, it says what was right, corrects what was not kindly and specifically, and adapts: another explanation or example when you're stuck, a faster pace when you're ahead.
+- It makes each step something to see or try, not only to read: a diagram, a picture, a formula card, a function graph with sliders, a map of how ideas connect, an explanation you can switch between depths, a worked example revealed one step at a time, code you can run and change, a small simulation; maths drawn as in a textbook.
+- After each step, it checks with something you answer in place, and waits before going on: a short quiz, practice problems you answer in your own words or numbers (checked as you go, with hints and the solution after a try), fill-in-the-blanks, matching or putting things in order. It reads the score and the answers you send back.
+- When you answer, it says what was right, corrects what was not kindly and specifically, and adapts: another explanation or example when you're stuck, a harder step when you're ahead.
 - With homework or exercises, it guides you with hints and questions, and gives the full solution only when you ask for it or are still stuck after trying.
-- When a picture explains better than words, it draws one right in its reply: a diagram, an equation, a figure or a small interactive one to try. It closes a topic with a short recap.
+- For a language, it gives you words to hear and practise, verb forms, conversations, and your own sentences corrected with each mistake marked and explained.
+- It closes a topic with a short recap and flashcards of what to remember, and offers what to learn next as buttons to tap. For a longer course, it keeps a roadmap of the topics and how far you have come.
 
 ### Planner
 
 "Plans trips, events and projects", and moves and routines too.
 
-- First it pins down what shapes the plan: the goal, dates and deadlines, budget, the people involved and hard limits. It asks for the few that are missing and matter, and assumes sensible defaults for the rest, saying what it assumed.
-- It checks the facts the plan depends on (opening hours, travel times, prices, availability, rules) on the web, and says when something couldn't be checked or may change.
-- It makes the plan concrete: a timeline or a day-by-day schedule with times, places, costs and who does what, room for things that slip, and what to book or decide first.
-- Where a choice matters, it gives two or three options with their trade-offs. When money is involved, it adds a budget with a total.
-- It saves the plan as a file in the session's folder (Markdown, or CSV for budgets and schedules that belong in a spreadsheet), and offers to adjust it.
+- First it pins down what shapes the plan: the goal, dates and deadlines, budget, the people involved and hard limits. It asks for the few that are missing and matter (in a form when there are several), and assumes sensible defaults for the rest, saying what it assumed.
+- It checks the facts the plan depends on (opening hours, travel times, prices, availability, rules, the weather) on the web, and says when something couldn't be checked or may change.
+- It makes the plan concrete: times, places, costs and who does what, room for things that slip, and what to book or decide first.
+- It shows the plan so you can follow it at a glance, in the answer UIs made for plans: a trip day by day with its places on a map, a day's schedule, dates on a calendar or a countdown, a project in phases or over weeks, what to book or pack as a checklist, the forecast, and the costs as a budget with a total.
+- Where a choice matters, it gives two or three options side by side with their trade-offs (flights and stays for a trip).
+- It keeps the plan in your [Library](/guide/library), where you can change it: a document, and a spreadsheet for budgets and schedules with totals. It offers to adjust it, with the likely changes as buttons to tap. It makes files in the session's folder instead when you ask for files.
 
 ### Analyst
 
@@ -120,8 +131,8 @@ For a big question that needs many searches, see deep research in [Deep research
 - It looks at the data before analysing it (its columns, size, types and gaps) and reports problems such as missing values, duplicates or odd formats before drawing conclusions.
 - It computes with code (a short Python or JavaScript script, or a formula), never by estimating by eye, and keeps the scripts in the session's folder so the work can be repeated.
 - It answers the question first, in plain words with the key numbers, then shows how it got them. It states assumptions and limits, and doesn't claim causes the data can't show.
-- It shows results as charts and tables when that helps, in its reply (or on a page in the session when there are several): the simplest chart that fits (bars to compare, lines over time), with labelled axes and units, readable on a phone.
-- It saves cleaned data and results as files (CSV, or XLSX when you ask) when you'll want them.
+- It shows results in the answer UIs made for numbers: the key figures, a chart (the simplest that fits: bars to compare, lines over time), a table you can sort and filter, how values spread, shares of a whole, how a total changed, flows, values across two dimensions as a heatmap, numbers at places on a map, and a calculator when you'll want to try other values. A figure none of them draws goes in a live figure in the reply, or in a page when there are several; axes and units are labelled, and it is readable on a phone.
+- It saves cleaned data and results as files (CSV, or XLSX when you ask) when you'll want them. A table you'll look at and change goes in your [Library](/guide/library) as a spreadsheet with its formulas, and a dashboard you'll come back to as a page.
 
 ### App builder
 

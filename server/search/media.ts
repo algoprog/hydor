@@ -310,7 +310,7 @@ export function findMediaTool(deps: () => MediaDeps): RunTool {
     name: 'find_media',
     annotations: { readOnlyHint: true, openWorldHint: true },
     description:
-      'Find a picture, and a video when you ask, for each of a list of things (games, films, books, places, dishes, products, teams, people), to show them in an app’s answer, a page or a document. A picture is the lead picture of the thing’s own Wikipedia article (a game’s cover, a place’s photo, a team’s crest), else the one the pages about it show when shared; a video is a YouTube video whose title names it (a trailer, a recipe, highlights), which views and pages show playing in place. Only what clearly names the thing counts, so some may come back without one. Returns JSON: items, in the order given, each { item, picture, picture_page, video, video_title } (picture and video null when none was found).',
+      'Find a picture, and a video when you ask, for each of a list of things (games, films, books, places, dishes, products, teams, people), to show them in an answer UI’s cards, an app’s answer, a page or a document. A picture is the lead picture of the thing’s own Wikipedia article (a game’s cover, a place’s photo, a team’s crest), else the one the pages about it show when shared; a video is a YouTube video whose title names it (a trailer, a recipe, highlights), which views and pages show playing in place. Only what clearly names the thing counts, so some may come back without one. Returns JSON: items, in the order given, each { item, picture, picture_page, video, video_title } (picture and video null when none was found).',
     inputSchema: {
       type: 'object',
       properties: {

@@ -1,4 +1,4 @@
-// Answer UIs for learning: quizzes, flashcards, worked solutions, explainers, vocabulary, translations, papers…
+// Answer UIs for learning: quizzes, practice problems, flashcards, worked solutions, explainers, vocabulary, translations, papers, network graphs…
 import type { AnswerUiSpec } from './types.ts';
 
 export const LEARN: AnswerUiSpec[] = [
@@ -680,6 +680,115 @@ Node = { name: string, note?: md, icon?: string, children?: Node[] }   // icon: 
           comment: 'Mate, with the last two pieces: the rook gives check and the bishop guards it.',
           arrows: [{ from: 'g5', to: 'd8', color: 'green' }],
         },
+      ],
+    },
+  },
+  {
+    id: 'practice',
+    title: 'Practice problems',
+    group: 'learn',
+    use: 'Problems to answer in your own words or numbers, checked in place: hints one at a time, the worked solution after a try, and a score; open answers go to the message box for the tutor to check.',
+    keywords: 'practice problems exercises homework worksheet tutor maths physics calculation answer check hints solution score try again drill',
+    shape: `{
+  title?: string
+  intro?: md
+  problems: {
+    q: md                        // the problem
+    image?: image
+    answer?: string | number | (string | number)[]   // the right answer, or several accepted ones; leave out for an open answer the tutor checks
+    tolerance?: number           // for a number: how far off still counts (absolute)
+    unit?: string                // shown after the box ("m/s")
+    hints?: md[]                 // revealed one at a time
+    solution?: md                // the worked solution: shown after a try, or when asked
+  }[]
+  mode?: "one" | "all"           // one problem at a time (the default) or all at once
+}`,
+    example: {
+      title: 'Speed, equations and a little physics',
+      intro: 'Type your answer and press **Enter** to check it. Ask for a hint when you are stuck.',
+      problems: [
+        {
+          q: 'A train covers $150\\ \\text{km}$ in $2\\ \\text{h}\\ 30\\ \\text{min}$. What is its average speed?',
+          answer: 60,
+          unit: 'km/h',
+          hints: ['Average speed is distance divided by time.', 'Write $2\\ \\text{h}\\ 30\\ \\text{min}$ as a number of hours first: $2.5\\ \\text{h}$.'],
+          solution: '$$v = \\frac{d}{t} = \\frac{150\\ \\text{km}}{2.5\\ \\text{h}} = 60\\ \\text{km/h}$$',
+        },
+        {
+          q: 'Solve for $x$: $\;3x - 7 = 11$',
+          answer: 6,
+          hints: ['Add 7 to both sides first.'],
+          solution: 'Add 7 to both sides: $3x = 18$. Then divide both sides by 3: $x = 6$.',
+        },
+        {
+          q: 'What is $\\sqrt{2}$, to two decimal places?',
+          answer: 1.41,
+          tolerance: 0.005,
+          hints: ['It is a little more than $1.4^2 = 1.96$.'],
+          solution: '$1.41^2 = 1.9881$ and $1.42^2 = 2.0164$, so $\\sqrt{2} \\approx 1.41$.',
+        },
+        {
+          q: 'Simplify the fraction $\\tfrac{18}{24}$ to its lowest terms.',
+          answer: ['3/4'],
+          hints: ['Find the largest number that divides both 18 and 24.'],
+          solution: 'The greatest common divisor of 18 and 24 is 6, so $\\tfrac{18 \\div 6}{24 \\div 6} = \\tfrac{3}{4}$.',
+        },
+        {
+          q: 'In two or three sentences, explain why a hammer and a feather fall together on the Moon.',
+          hints: ['Think about what is missing on the Moon that is there on Earth.'],
+          solution: 'The Moon has no air, so nothing pushes back harder on the feather. Gravity speeds up every object at the same rate, whatever its mass, so both land together.',
+        },
+      ],
+    },
+  },
+  {
+    id: 'network',
+    title: 'Network graph',
+    group: 'learn',
+    use: 'Things and how they connect, as a graph to explore: nodes in coloured groups joined by labelled links (a concept map, characters, ideas, dependencies); tap a node to light up its links and read its note.',
+    keywords: 'network graph concept map relationships connections nodes links characters ideas dependencies social network knowledge graph web of influences',
+    shape: `{
+  title?: string
+  nodes: {
+    id: string
+    label?: string               // shown on the node (its id when left out)
+    group?: string               // colours it; a legend names the groups
+    note?: md                    // shown when it is tapped
+    size?: number                // how much it counts, 1 to 5
+  }[]                            // up to 60
+  links: {
+    from: string                 // a node's id
+    to: string
+    label?: string               // what joins them ("influenced", "imports")
+    directed?: boolean           // an arrow from → to
+    weight?: number              // 1 to 5: a thicker line
+  }[]
+  directed?: boolean             // every link an arrow
+}`,
+    example: {
+      title: 'Who influenced whom in early modern philosophy',
+      directed: true,
+      nodes: [
+        { id: 'descartes', label: 'Descartes', group: 'Rationalists', size: 4, note: 'Began from doubt: “I think, therefore I am”, and built knowledge on reason alone.' },
+        { id: 'spinoza', label: 'Spinoza', group: 'Rationalists', size: 3, note: 'Argued that God and nature are one substance, in a book laid out like geometry.' },
+        { id: 'leibniz', label: 'Leibniz', group: 'Rationalists', size: 3, note: 'Held that the world is made of simple, mind-like units he called monads.' },
+        { id: 'locke', label: 'Locke', group: 'Empiricists', size: 4, note: 'The mind starts as a blank slate: every idea comes from experience.' },
+        { id: 'berkeley', label: 'Berkeley', group: 'Empiricists', size: 2, note: 'To be is to be perceived: matter exists only as ideas in minds.' },
+        { id: 'hume', label: 'Hume', group: 'Empiricists', size: 4, note: 'Showed that cause and effect is a habit of expecting, not something we observe.' },
+        { id: 'kant', label: 'Kant', group: 'Critical philosophy', size: 5, note: 'Joined the two camps: experience gives the content of knowledge, the mind gives its form.' },
+        { id: 'hegel', label: 'Hegel', group: 'Idealists', size: 3, note: 'Saw history as thought unfolding itself through conflict and resolution.' },
+      ],
+      links: [
+        { from: 'descartes', to: 'spinoza', label: 'influenced' },
+        { from: 'descartes', to: 'leibniz', label: 'influenced' },
+        { from: 'locke', to: 'descartes', label: 'criticised' },
+        { from: 'locke', to: 'berkeley', label: 'influenced' },
+        { from: 'locke', to: 'hume', label: 'influenced' },
+        { from: 'berkeley', to: 'hume', label: 'influenced' },
+        { from: 'hume', to: 'kant', label: 'awakened', weight: 4 },
+        { from: 'leibniz', to: 'kant', label: 'influenced' },
+        { from: 'kant', to: 'hegel', label: 'influenced', weight: 3 },
+        { from: 'spinoza', to: 'hegel', label: 'influenced' },
       ],
     },
   },
