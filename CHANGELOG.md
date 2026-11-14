@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.64.1 · 14 November 2026
+
+Agents reach for answer UIs in more of their answers: a comparison comes as a comparison table to read across, not
+plain text, and next steps as buttons to tap.
+
+- **Comparisons and lists**: when an answer compares things, lists things each with its details or shows rows of data,
+  agents now show it in one of the app's answer UIs instead of a plain table, and look up the ones they need in a
+  single step before they write.
+- **Next steps as buttons**: instead of ending on an offer such as "tell me your engine and I'll suggest a library",
+  agents give you the likely next steps as follow-up buttons.
+- **Practice problems**: tutors know how your answers are matched, so they accept each way you might write one.
+
 ## 0.64.0 · 14 November 2026
 
 Agents answer with more than words: the parts of an answer that are better seen, compared, tried or practised come as
