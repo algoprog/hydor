@@ -3,6 +3,18 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.63.2 · 14 November 2026
+
+A project's tabs fit a phone: the ones that don't fit are one tap away under More, instead of running off the edge of
+the screen.
+
+- **Project tabs on a phone**: a project's page shows the tabs that fit (Overview, Library, Files and Knowledge on most
+  phones), then **More**, whose menu has the rest (Skills, Agents and Settings), each with its icon. While you're in
+  one of those, its name shows in place of **More**, so you always see where you are. The same goes for the page of a
+  project someone shared with you, and for a narrow window on a computer.
+- **Tidier tab rows**: a project's tabs are taller on a phone, so they're easier to tap. No scroll bars show under any
+  row of tabs, and a row that still scrolls sideways elsewhere in the app keeps the open tab in view.
+
 ## 0.63.1 · 13 November 2026
 
 When an agent answers you and then goes on working, its answer shows as a reply in the conversation, not folded into
