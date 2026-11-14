@@ -145,6 +145,20 @@ const TRIP_DAYS: AnswerField['columns'] = [
 ];
 
 /** The Trip planner's days on its map. */
+/** The columns of Compare products' comparison: the step that works it out gives them, and its answer shows them. */
+const COMPARE_COLUMNS: AnswerField['columns'] = [
+  { id: 'product', label: 'Product', type: 'text' },
+  { id: 'score', label: 'Score', type: 'number', description: 'Out of 100, by what matters to you' },
+  { id: 'price', label: 'Price', type: 'text' },
+  { id: 'shop', label: 'Shop', type: 'text', description: 'Where the price is from, and when' },
+  { id: 'strengths', label: 'Strengths', type: 'text' },
+  { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
+  { id: 'best_for', label: 'Best for', type: 'text' },
+  { id: 'scores', label: 'How it scores', type: 'text', description: 'Its score on each thing that matters, one a line' },
+  { id: 'link', label: 'Link', type: 'url' },
+  { id: 'picture', label: 'Picture', type: 'image' },
+];
+
 const TRIP_STOPS: AnswerField['columns'] = [
   { id: 'day', label: 'Day', type: 'number' },
   { id: 'date', label: 'Date', type: 'date' },
@@ -985,7 +999,7 @@ return { days, budget, stops: at.filter((s) => !far(s)) };`,
       { id: 'products', label: 'What to compare', type: 'long', required: true, placeholder: 'Name the products, one per line, or describe what you need: e.g. a quiet dishwasher under $900' },
       { id: 'needs', label: 'What matters to you', type: 'long', required: true, placeholder: 'e.g. Quiet, reliable, fits a 60 cm space, enough for a family of four' },
       { id: 'budget', label: 'Budget', type: 'text' },
-      { id: 'region', label: 'Where you’ll buy', type: 'text', placeholder: 'e.g. Germany, or online in the US' },
+      { id: 'region', label: 'Where you’ll buy', type: 'text', placeholder: 'e.g. Germany, or online in the US', help: 'Prices come from shops there, in its currency; left empty, from the country of your time zone' },
       { id: 'choose', label: 'Let me pick which ones to compare', type: 'yesno', help: 'When you describe a need, the run waits for you to pick from the options it finds' },
     ],
     prompt: '',
@@ -1001,8 +1015,15 @@ What to compare: {{products}}
 What matters to them: {{needs}}
 {{#budget}}Budget: {{budget}}
 {{/budget}}{{#region}}Buying in: {{region}}
-{{/region}}
-Say whether they named the products to compare, or described a need instead. List the products they named, each as exactly as they can be told apart (brand and model), and say what kind of product they are in a word or two (headphones, a dishwasher), for their pictures. Turn what matters to them into three to six criteria, each weighted from 1 (nice to have) to 5 (a must), with what a good score looks like. If they described a need, write a web search query to find the strongest current options for it; today is {{today}}, so put the year in it.`,
+{{/region}}Their time zone: {{timezone}}
+
+- named: yes when they named the products to compare (brand and model), no when they described a need or a kind of product instead ("the best phones", "a quiet dishwasher under €900").
+- products: the products they named, each as exactly as it can be told apart (brand and model); none when they described a need.
+- kind: what kind of product they are, in a word or two (headphones, a dishwasher), for their pictures.
+- criteria: one criterion for each thing that matters to them, as they name it (one to six), each weighted from 1 (nice to have) to 5 (a must), with what a good score looks like. Add none they did not ask for, except value for money within their budget when they gave one.
+- market: the country they will buy in: the one they gave; else one their words show (a currency, a shop, a city); else the country of their time zone; empty when none of these tells.
+- currency: that country's currency, as its code (USD, EUR, GBP).
+- query: when they described a need, a web search query for the strongest current options, as reviewers who test them rate them; today is {{today}}, so put the year in it, and keep the brands or kinds they mention.`,
           outputs: [
             { id: 'named', label: 'Products named', type: 'yesno', required: true },
             { id: 'products', label: 'Products', type: 'list' },
@@ -1014,6 +1035,8 @@ Say whether they named the products to compare, or described a need instead. Lis
               required: true,
               columns: [{ id: 'criterion', label: 'Criterion', type: 'text' }, { id: 'weight', label: 'Weight', type: 'number' }, { id: 'good', label: 'What good looks like', type: 'text' }],
             },
+            { id: 'market', label: 'Where they’ll buy', type: 'text', description: 'A country, or empty' },
+            { id: 'currency', label: 'Currency', type: 'text', description: 'Its code: USD, EUR, GBP' },
             { id: 'query', label: 'Search for options', type: 'text' },
           ],
         },
@@ -1028,16 +1051,17 @@ Say whether they named the products to compare, or described a need instead. Lis
               id: 'options',
               title: 'Pick the strongest options',
               do: 'model',
-              instructions: `From the search results below, pick the three to five strongest options on sale now for this need, each as brand and model, preferring those independent reviews rate well. Leave out models that have been replaced.
+              instructions: `From the search results below, pick the three to six strongest options on sale now for this need, each as its brand and exact model, preferring those that independent reviewers who test them rate well. Cover the range the person asks for (the brands or kinds they mention), leave out models a newer one has replaced, and keep within their budget when they gave one. Today is {{today}}.
 
 The need: {{products}}
 What matters: {{needs}}
 {{#budget}}Budget: {{budget}}
-{{/budget}}
+{{/budget}}{{#understand.market}}Buying in: {{understand.market}}
+{{/understand.market}}
 {{options_search.text}}`,
               outputs: [
-                { id: 'products', label: 'Products', type: 'list', required: true },
-                { id: 'why', label: 'Why each', type: 'table', columns: [{ id: 'product', label: 'Product', type: 'text' }, { id: 'why', label: 'Why', type: 'text' }] },
+                { id: 'products', label: 'Products', type: 'list', required: true, description: 'Each as its brand and exact model' },
+                { id: 'why', label: 'Why each', type: 'table', description: 'Why each is among the strongest, in one short line', columns: [{ id: 'product', label: 'Product', type: 'text' }, { id: 'why', label: 'Why', type: 'text' }] },
               ],
             },
             {
@@ -1045,10 +1069,58 @@ What matters: {{needs}}
               title: 'Ask which to compare',
               do: 'ask',
               if: someoneThere('choose'),
-              question: 'These look like the strongest options for you:\n\n{{options.why}}\n\nWhich should be compared?',
-              fields: [{ id: 'products', label: 'The ones to compare, one per line', type: 'long', help: 'Leave it empty to compare them all' }],
+              question: 'These look like the strongest options for you:\n\n{{options.why}}\n\nUntick any to leave out, and add others if you like.',
+              fields: [
+                { id: 'products', label: 'Compare these', type: 'choice', multi: true, options: ['{{options.products}}'], default: '{{options.products}}', help: 'Untick the ones to leave out' },
+                { id: 'more', label: 'Anything to add or change', type: 'text', placeholder: 'e.g. add the OnePlus 15, or include Chinese brands' },
+              ],
               waitHours: 24,
               failed: 'skip',
+            },
+            {
+              id: 'wanted',
+              title: 'Read your answer',
+              do: 'model',
+              if: '{{pick.more}} is not empty',
+              instructions: `Someone is choosing which products to compare ({{understand.kind}}). The run found these options:
+{{options.why}}
+
+They kept these ticked:
+{{pick.products}}
+
+And they wrote: “{{pick.more}}”
+
+- products: the products to compare, following what they wrote: start from the ones they kept ticked (all of the options when they kept none), leave out those they say to leave out, and add those they name, each as its brand and exact model. Only products' names: never their words themselves ("all", "including Chinese phones").
+- find: when they ask for more of a kind the list does not have without naming models ("include Chinese brands", "something cheaper", "a foldable one"), a web search query for the strongest current ones of that kind, with the year (today is {{today}}); empty otherwise.`,
+              outputs: [
+                { id: 'products', label: 'Products', type: 'list', description: 'Each as its brand and exact model' },
+                { id: 'find', label: 'Search for more', type: 'text', description: 'A web search query, or empty' },
+              ],
+              failed: 'skip',
+            },
+            {
+              id: 'extra',
+              title: 'More of a kind you asked for?',
+              do: 'decide',
+              rule: '{{wanted.find}} is not empty',
+              then: [
+                { id: 'more_search', title: 'Search for more options', do: 'tool', tool: 'web_search', with: { query: '{{wanted.find}}', k: 8 }, failed: 'skip' },
+                {
+                  id: 'more',
+                  title: 'Pick the ones you asked for',
+                  do: 'model',
+                  instructions: `From the search results below, pick the two strongest options on sale now that fit this request (three when it is broad), each as its brand and exact model, preferring those independent reviewers rate well; today is {{today}}. Leave out any already in this list, and give none when the results name none:
+{{wanted.products}}
+
+The request: {{pick.more}}
+What matters: {{needs}}
+{{#budget}}Budget: {{budget}}
+{{/budget}}
+{{more_search.text}}`,
+                  outputs: [{ id: 'products', label: 'Products', type: 'list', description: 'Each as its brand and exact model' }],
+                  failed: 'skip',
+                },
+              ],
             },
           ],
         },
@@ -1057,20 +1129,27 @@ What matters: {{needs}}
           title: 'The products to compare',
           do: 'code',
           language: 'javascript',
-          with: { named: '{{understand.named}}', products: '{{understand.products}}', options: '{{options.products}}', picked: '{{pick.products}}', text: '{{products}}' },
+          with: { named: '{{understand.named}}', products: '{{understand.products}}', options: '{{options.products}}', picked: '{{pick.products}}', wanted: '{{wanted.products}}', more: '{{more.products}}', text: '{{products}}' },
           code:
             LIST +
-            String.raw`// The products to compare: those named, or those picked from the options found (all of them, when none were
-// picked); each once, five at most.
-const named = input.named === true || /^(yes|true)$/i.test(String(input.named));
-let items = named ? list(input.products) : list(input.picked).length ? list(input.picked) : list(input.options);
-if (!items.length) items = list(input.text);
+            String.raw`// The products to compare: those named; or, for a need, the options the person kept (all of them when they kept
+// none), as they changed them in words, with the ones they asked to add; each once, eight at most. Only what reads
+// as a product's name: never words like "all, including Chinese phones", which once made a run compare one
+// "product" of that name.
+const yes = (v) => v === true || /^(yes|true)$/i.test(String(v == null ? '' : v).trim());
+const NOT_A_NAME = /^(all|any|none|both|each|every|everything|the rest|rest|others?|include|including|plus|and|or|compare|only|just)\b/i;
+const clean = (v) =>
+  list(v)
+    .map((x) => String(x && typeof x === 'object' ? x.product || x.name || '' : x).trim())
+    .filter((x) => x && x.length <= 80 && x.split(/\s+/).length <= 10 && !NOT_A_NAME.test(x));
+let items;
+if (yes(input.named)) items = clean(input.products).length ? clean(input.products) : clean(input.text);
+else if (clean(input.wanted).length) items = clean(input.wanted).concat(clean(input.more));
+else items = (clean(input.picked).length ? clean(input.picked) : clean(input.options)).concat(clean(input.more));
 const seen = new Set();
-items = items
-  .map((x) => String(x).trim())
-  .filter((x) => x && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase()))
-  .slice(0, 5);
-if (!items.length) throw new Error('There is nothing to compare: name the products, or describe what you need');
+const key = (x) => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+items = items.filter((x) => !seen.has(key(x)) && seen.add(key(x))).slice(0, 8);
+if (!items.length) throw new Error(yes(input.named) ? 'There is nothing to compare: name the products, one per line' : 'No products were found for this need: describe it another way, or name the products');
 return { items, count: items.length };`,
           outputs: [
             { id: 'items', label: 'Products', type: 'list' },
@@ -1087,7 +1166,7 @@ return { items, count: items.length };`,
           as: 'product',
           collect: 'facts',
           steps: [
-            { id: 'prices', title: 'Search for prices', do: 'tool', tool: 'web_search', with: { query: '{{product}} price{{#region}} {{region}}{{/region}}', k: 8 }, failed: 'skip' },
+            { id: 'prices', title: 'Search for prices', do: 'tool', tool: 'web_search', with: { query: '{{product}} price{{#understand.market}} {{understand.market}}{{/understand.market}}', k: 8 }, failed: 'skip' },
             { id: 'reviews', title: 'Search for reviews', do: 'tool', tool: 'web_search', with: { query: '{{product}} review long-term reliability problems', k: 8 }, failed: 'skip' },
             {
               id: 'best',
@@ -1097,19 +1176,26 @@ return { items, count: items.length };`,
               with: { product: '{{product}}', reviews: '{{reviews}}', prices: '{{prices}}' },
               code:
                 HITS +
-                String.raw`// The most independent review among the results (testers' and owners' reports before shops, and before the
-// maker's own site), and the price results as lines.
-const brand = String(input.product || '').toLowerCase().split(/\s+/)[0] || '';
+                String.raw`// The most independent review of this very model among the results (testers' and owners' reports before shops, and
+// before the maker's own site; a page whose title or address names the model before one about something else), and
+// the price results as lines.
+const name = String(input.product || '').toLowerCase();
+const brand = name.split(/\s+/)[0] || '';
+const words = name.split(/[^\p{L}\p{N}+]+/u).filter((w, i) => w && !(i === 0 && w === brand));
 const SHOPS = /(^|\.)(amazon|ebay|walmart|bestbuy|target|argos|currys|johnlewis|mediamarkt|saturn|otto|fnac|darty|boulanger|elgiganten|bol|coolblue|newegg|bhphotovideo|costco|homedepot|lowes|aliexpress|temu|idealo|pricerunner)\.[a-z.]+$/;
-const TESTERS = /(^|\.)(rtings\.com|which\.co\.uk|consumerreports\.org|nytimes\.com|techradar\.com|tomsguide\.com|cnet\.com|theverge\.com|engadget\.com|pcmag\.com|notebookcheck\.net|dpreview\.com|soundguys\.com|whathifi\.com|choice\.com\.au|test\.de|tweakers\.net|quechoisir\.org|consumentenbond\.nl|goodhousekeeping\.com|reviewed\.com)$/;
+const TESTERS = /(^|\.)(rtings\.com|which\.co\.uk|consumerreports\.org|nytimes\.com|techradar\.com|tomsguide\.com|cnet\.com|theverge\.com|engadget\.com|pcmag\.com|notebookcheck\.net|dpreview\.com|soundguys\.com|whathifi\.com|choice\.com\.au|test\.de|tweakers\.net|quechoisir\.org|consumentenbond\.nl|goodhousekeeping\.com|reviewed\.com|gsmarena\.com|phonearena\.com|androidauthority\.com|androidcentral\.com|dxomark\.com|trustedreviews\.com|expertreviews\.co\.uk|techadvisor\.com|digitaltrends\.com|zdnet\.com|wired\.com|arstechnica\.com|tomshardware\.com|9to5google\.com|9to5mac\.com|stuff\.tv|t3\.com)$/;
+const about = (h) => {
+  const t = (h.title + ' ' + h.url).toLowerCase();
+  return words.length ? words.filter((w) => t.includes(w)).length / words.length : 0;
+};
 const score = (h) => {
   const s = siteOf(h.url);
-  return (TESTERS.test(s) ? 10 : 0) - (SHOPS.test(s) ? 8 : 0) - (brand.length > 2 && s.includes(brand) ? 6 : 0) - h.rank;
+  return (TESTERS.test(s) ? 10 : 0) - (SHOPS.test(s) ? 8 : 0) - (brand.length > 2 && s.includes(brand) ? 6 : 0) + 6 * about(h) - h.rank;
 };
 const best = hitsOf(input.reviews).sort((a, b) => score(b) - score(a))[0];
 const shops = hitsOf(input.prices)
   .slice(0, 8)
-  .map((h) => '- ' + h.title + ' (' + siteOf(h.url) + ', ' + h.url + ')' + (h.snippet ? ': ' + h.snippet : ''))
+  .map((h) => '- ' + h.title + ' (' + siteOf(h.url) + ', ' + h.url + (h.date ? ', ' + h.date : '') + ')' + (h.snippet ? ': ' + h.snippet : ''))
   .join('\n');
 return { url: best ? best.url : '', title: best ? best.title : '', shops };`,
               outputs: [{ id: 'url', label: 'Review', type: 'url' }, { id: 'title', label: 'Its title', type: 'text' }, { id: 'shops', label: 'Prices found', type: 'markdown' }],
@@ -1128,12 +1214,12 @@ return { url: best ? best.url : '', title: best ? best.title : '', shops };`,
               id: 'facts',
               title: 'Sum it up and score it',
               do: 'model',
-              instructions: `Sum up {{product}} for someone choosing, from the results below: today is {{today}}. Prefer independent testers and long-term owners to the maker's claims, and say when something could not be confirmed.
+              instructions: `Sum up {{product}} for someone choosing, from the results below: today is {{today}}. Prefer independent testers and long-term owners to the maker's claims, say when something could not be confirmed, and use only what the results say about this very model.
 
 What matters to them, with weights:
 {{understand.criteria}}
 
-Prices{{#region}} in {{region}}{{/region}}:
+Prices{{#understand.market}} in {{understand.market}}{{/understand.market}}:
 {{best.shops}}
 
 {{#review.text}}A review ({{best.url}}):
@@ -1142,12 +1228,21 @@ Prices{{#region}} in {{region}}{{/region}}:
 {{/review.text}}Other reviews:
 {{reviews.text}}
 
-- price: the current price from a real shop or the maker, with the shop and today's date, or "not found".
-- link: the address of the shop or the maker's page that price comes from, as written in the results.
-- scores: each criterion above, scored from 1 (poor) to 5 (excellent) for this product, with why in a few words.`,
+- found: yes when the results are about this very model; no when they are about something else, or say too little to judge it (then leave the rest empty rather than describe another product).
+- product: its brand and model, as the results write it.
+- price: what a shop or the maker asks for it new now{{#understand.market}} in {{understand.market}}{{/understand.market}}{{#understand.currency}}, in {{understand.currency}}{{/understand.currency}}, as the amount with its currency ("$1,199", "€1,449"); empty when the results give no such price. Never a price from another country, a used or refurbished one, or a listing site's estimate.
+- shop: the shop or the maker that price is from, and the result's date ("Best Buy, 12 Nov 2026"); empty when the results do not name one.
+- link: the address of that shop's or the maker's page, as written in the results.
+- strengths, weaknesses: short points, a few words each, one a line.
+- problems: faults that owners or testers report, one a line; empty when none were found.
+- status: on sale now, or replaced by a newer model (which).
+- best_for: who it suits, in a few words.
+- scores: each criterion above, scored from 1 (poor) to 5 (excellent) for this product, with why in a few words; no score when the results say nothing about it.`,
               outputs: [
+                { id: 'found', label: 'Found', type: 'yesno', required: true, description: 'Whether the results are about this very model' },
                 { id: 'product', label: 'Product', type: 'text', required: true },
                 { id: 'price', label: 'Price', type: 'text' },
+                { id: 'shop', label: 'Shop', type: 'text' },
                 { id: 'link', label: 'Link', type: 'text' },
                 { id: 'strengths', label: 'Strengths', type: 'text' },
                 { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
@@ -1170,17 +1265,20 @@ Prices{{#region}} in {{region}}{{/region}}:
           title: 'Weigh them up',
           do: 'code',
           language: 'javascript',
-          with: { criteria: '{{understand.criteria}}', facts: '{{each.items}}', products: '{{shortlist.items}}', media: '{{media.data}}' },
+          with: { criteria: '{{understand.criteria}}', facts: '{{each.items}}', products: '{{shortlist.items}}', media: '{{media.data}}', budget: '{{budget}}' },
           code:
             LIST +
-            String.raw`// Each product's score against what matters (out of 100, by the criteria's weights), the pick and a runner-up for
-// another priority (cheaper, when one nearly as good is), and the table to compare them by, best first, each with its
-// picture.
+            String.raw`// Each product the research found against what matters: its score out of 100 by the criteria's weights; the pick
+// (within the budget when one was given); a runner-up for another priority (cheaper and nearly as good, when one
+// is); and the table to compare them by, best first, each with its picture and its score on each criterion. Those
+// the research found nothing reliable on are left out and named. Prices are weighed against each other only in the
+// same currency.
 const criteria = rows(input.criteria).filter((c) => c.criterion);
 const facts = list(input.facts);
 const names = list(input.products);
 const media = list(input.media && input.media.items);
-const priceOf = (t) => {
+const no = (v) => v === false || /^(no|false)$/i.test(String(v == null ? '' : v).trim());
+const amountOf = (t) => {
   const m = /\d[\d.,]*/.exec(String(t || ''));
   if (!m) return null;
   let s = m[0].replace(/[.,]$/, '');
@@ -1192,43 +1290,90 @@ const priceOf = (t) => {
   const n = Number(s);
   return isFinite(n) && n > 0 ? n : null;
 };
+const CODES = 'USD|EUR|GBP|JPY|CNY|RMB|INR|KRW|AUD|CAD|NZD|CHF|SEK|NOK|DKK|PLN|CZK|HUF|RON|TRY|BRL|MXN|SGD|HKD|ZAR|AED';
+const SIGNS = { $: 'USD', US$: 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₹': 'INR', '₩': 'KRW', RMB: 'CNY', A$: 'AUD', C$: 'CAD', NZ$: 'NZD', HK$: 'HKD', S$: 'SGD', R$: 'BRL' };
+const currencyOf = (t) => {
+  const m = new RegExp('(US\\$|A\\$|C\\$|NZ\\$|HK\\$|S\\$|R\\$|[$€£¥₹₩]|\\b(?:' + CODES + ')\\b)').exec(String(t || ''));
+  return m ? SIGNS[m[1]] || m[1] : '';
+};
+const SHORT = new RegExp('(?:US\\$|A\\$|C\\$|NZ\\$|HK\\$|S\\$|R\\$|[$€£¥₹₩]|\\b(?:' + CODES + ')\\b)\\s?\\d[\\d.,]*|\\d[\\d.,]*\\s?(?:[€£₹₩]|\\b(?:' + CODES + ')\\b)');
+const shortPrice = (t) => {
+  if (t.length <= 32) return t;
+  const m = SHORT.exec(t);
+  return m ? m[0].trim() : t.slice(0, 30).trim() + '…';
+};
+const budgetText = String(input.budget || '');
+const budget = (budgetText.match(/\d[\d.,]*/g) || []).map(amountOf).filter(Boolean).reduce((a, b) => Math.max(a, b), 0) || null;
+const budgetCur = currencyOf(budgetText);
 const weight = (c) => Math.max(1, Math.min(5, Number(c.weight) || 3));
+// A score from 1 to 5, or null when the research found nothing to score it by.
+const scoreOf = (s) => {
+  const n = s && s.score !== null && s.score !== undefined && String(s.score).trim() !== '' ? Number(s.score) : NaN;
+  return isFinite(n) ? Math.max(1, Math.min(5, Math.round(n))) : null;
+};
 const all = names.map((name, i) => {
   const f = facts[i] && typeof facts[i] === 'object' ? facts[i] : {};
   const given = rows(f.scores);
-  let got = 0;
-  let most = 0;
   const cells = criteria.map((c, j) => {
     const s = given.find((x) => String(x.criterion || '').toLowerCase() === String(c.criterion).toLowerCase()) || given[j] || {};
-    const v = Math.max(0, Math.min(5, Number(s.score) || 0));
-    got += weight(c) * v;
-    most += weight(c) * 5;
-    return v;
+    return { v: scoreOf(s), why: String(s.why || '').trim() };
   });
-  return { product: String(f.product || name), total: most ? Math.round((1000 * got) / most) / 10 : 0, cells, price: priceOf(f.price), f, m: media[i] && typeof media[i] === 'object' ? media[i] : {} };
+  const price = String(f.price || '').trim();
+  const amount = amountOf(price);
+  const cur = currencyOf(price);
+  const over = !!(budget && amount && (!budgetCur || !cur || budgetCur === cur) && amount > budget * 1.1);
+  return { name: String(name), product: String(f.product || name).trim(), found: !no(f.found), total: 0, cells, price, amount, cur, over, f, m: media[i] && typeof media[i] === 'object' ? media[i] : {} };
 });
-const ranked = all.slice().sort((a, b) => b.total - a.total || (a.price || Infinity) - (b.price || Infinity));
+const found = all.filter((r) => r.found);
+const use = found.length ? found : all;
+// A score not found is no zero: it counts as the middle of the others' scores on that criterion (3 when none has
+// one), and shows as "?".
+const middle = criteria.map((c, j) => {
+  const known = use.map((r) => r.cells[j].v).filter((v) => v !== null).sort((a, b) => a - b);
+  const h = Math.floor(known.length / 2);
+  return !known.length ? 3 : known.length % 2 ? known[h] : (known[h - 1] + known[h]) / 2;
+});
+for (const r of all) {
+  let got = 0;
+  let most = 0;
+  criteria.forEach((c, j) => {
+    got += weight(c) * (r.cells[j].v === null ? middle[j] : r.cells[j].v);
+    most += weight(c) * 5;
+  });
+  r.total = most ? Math.round((100 * got) / most) : 0;
+}
+const missing = found.length ? all.filter((r) => !r.found).map((r) => r.name) : [];
+const sameCur = (a, b) => !a.cur || !b.cur || a.cur === b.cur;
+const ranked = use.slice().sort((a, b) => (a.over ? 1 : 0) - (b.over ? 1 : 0) || b.total - a.total || (a.amount && b.amount && sameCur(a, b) ? a.amount - b.amount : 0));
 const top = ranked[0];
 const next = ranked[1];
-const cheaper = ranked.slice(1).filter((r) => r.price && top && top.price && r.price < top.price && r.total >= top.total - 15).sort((a, b) => a.price - b.price)[0];
+const cheaper = ranked
+  .slice(1)
+  .filter((r) => !r.over && r.amount && top && top.amount && sameCur(r, top) && r.amount < top.amount * 0.9 && r.total >= top.total - 15)
+  .sort((a, b) => a.amount - b.amount)[0];
 const runner = cheaper || next;
-const cell = (t) => String(t).replace(/\|/g, '/');
-const matrix = [
-  '| Product | ' + criteria.map((c) => cell(c.criterion) + ' (×' + weight(c) + ')').join(' | ') + ' | Score |',
-  '|' + ' --- |'.repeat(criteria.length + 2),
-  ...ranked.map((r) => '| ' + cell(r.product) + ' | ' + r.cells.join(' | ') + ' | ' + r.total + ' |'),
-].join('\n');
+const cell = (t) => String(t).replace(/\|/g, '/').replace(/\s*\n\s*/g, ' ');
+const matrix = criteria.length
+  ? [
+      '| Product | ' + criteria.map((c) => cell(c.criterion) + ' (×' + weight(c) + ')').join(' | ') + ' | Score |',
+      '|' + ' --- |'.repeat(criteria.length + 2),
+      ...ranked.map((r) => '| ' + cell(r.product) + ' | ' + r.cells.map((c) => (c.v === null ? '?' : c.v)).join(' | ') + ' | ' + r.total + ' |'),
+    ].join('\n') + (ranked.some((r) => r.cells.some((c) => c.v === null)) ? '\n\n? Not found: counted as the middle of the others’ scores.' : '')
+  : '';
 const link = (v) => {
   const s = String(v || '').trim();
   return /^https?:\/\/\S+$/.test(s) ? s : null;
 };
+const lines = (v) => list(v).map((x) => String(x).trim()).filter(Boolean);
 const comparison = ranked.map((r) => ({
   product: r.product,
   score: r.total,
-  price: r.f.price || '',
-  strengths: r.f.strengths || '',
-  weaknesses: [r.f.weaknesses, r.f.problems ? 'Known problems: ' + r.f.problems : ''].filter(Boolean).join(' '),
-  best_for: r.f.best_for || '',
+  price: shortPrice(r.price),
+  shop: String(r.f.shop || '').trim(),
+  strengths: lines(r.f.strengths).join('\n'),
+  weaknesses: [...(r.over ? ['Over your budget'] : []), ...lines(r.f.weaknesses), ...lines(r.f.problems).map((p) => 'Known problem: ' + p)].join('\n'),
+  best_for: String(r.f.best_for || '').trim(),
+  scores: criteria.map((c, j) => c.criterion + ': ' + (r.cells[j].v === null ? 'not found' : r.cells[j].v + '/5') + (r.cells[j].why ? ' — ' + r.cells[j].why : '')).join('\n'),
   link: link(r.f.link),
   picture: link(r.m.picture),
 }));
@@ -1236,8 +1381,12 @@ return {
   matrix,
   pick: top ? top.product : '',
   runner_up: runner && runner !== top ? runner.product : '',
-  runner_up_why: runner === cheaper && cheaper ? 'cheaper, and nearly as good' : 'the next best overall',
+  runner_up_why: runner && runner === cheaper ? 'cheaper, and nearly as good' : 'the next best overall',
   close: !!(top && next && top.total - next.total < 5),
+  several: ranked.length > 1,
+  count: ranked.length,
+  missing: missing.join(', '),
+  status: ranked.filter((r) => r.f.status).map((r) => '- ' + r.product + ': ' + String(r.f.status).trim()).join('\n'),
   comparison,
 };`,
           outputs: [
@@ -1246,21 +1395,11 @@ return {
             { id: 'runner_up', label: 'Runner-up', type: 'text' },
             { id: 'runner_up_why', label: 'Why the runner-up', type: 'text' },
             { id: 'close', label: 'Close call', type: 'yesno' },
-            {
-              id: 'comparison',
-              label: 'Comparison',
-              type: 'table',
-              columns: [
-                { id: 'product', label: 'Product', type: 'text' },
-                { id: 'score', label: 'Score', type: 'number', description: 'Out of 100, by what matters to you' },
-                { id: 'price', label: 'Price', type: 'text' },
-                { id: 'strengths', label: 'Strengths', type: 'text' },
-                { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
-                { id: 'best_for', label: 'Best for', type: 'text' },
-                { id: 'link', label: 'Link', type: 'url' },
-                { id: 'picture', label: 'Picture', type: 'image' },
-              ],
-            },
+            { id: 'several', label: 'More than one', type: 'yesno' },
+            { id: 'count', label: 'How many', type: 'number' },
+            { id: 'missing', label: 'Too little found on', type: 'text' },
+            { id: 'status', label: 'Still sold', type: 'markdown' },
+            { id: 'comparison', label: 'Comparison', type: 'table', columns: COMPARE_COLUMNS },
           ],
           failed: 'agent',
         },
@@ -1268,55 +1407,57 @@ return {
           id: 'verdict',
           title: 'Make the call',
           do: 'model',
-          instructions: `Recommend one of these products to someone who cares about the criteria below, with a runner-up for a different priority (cheaper, or better at one thing). Be honest when the differences are small, and say what could not be confirmed.
+          instructions: `Write the call for someone choosing between these products. {{score.pick}} has the best score{{#score.runner_up}}, and {{score.runner_up}} is the runner-up ({{score.runner_up_why}}){{/score.runner_up}}.{{#score.close}} It is a close call: the top two are within five points of each other.{{/score.close}}{{^score.several}} Only this one product was compared: say so plainly, and judge it against what matters to them rather than calling it the best of its kind.{{/score.several}} Be honest about what could not be confirmed, and use only what was found below.
 
 What matters to them: {{needs}}
 {{#budget}}Budget: {{budget}}
-{{/budget}}Criteria and their weights:
+{{/budget}}{{#understand.market}}Buying in: {{understand.market}}
+{{/understand.market}}Criteria and their weights:
 {{understand.criteria}}
 
 Scores out of 100, weighted by what matters:
 {{score.matrix}}
 
-The scores put {{score.pick}} first{{#score.runner_up}}, and {{score.runner_up}} as the runner-up ({{score.runner_up_why}}){{/score.runner_up}}.{{#score.close}} The top two are within five points of each other.{{/score.close}}
-
 What was found about each:
-{{score.comparison}}`,
+{{score.comparison}}
+{{#score.status}}
+Still sold:
+{{score.status}}
+{{/score.status}}{{#score.missing}}
+Too little was found to compare these: {{score.missing}}.
+{{/score.missing}}`,
           outputs: [
-            { id: 'recommendation', label: 'Recommendation', type: 'text', required: true, description: 'The pick, in one sentence' },
-            { id: 'pick', label: 'The pick', type: 'text', required: true, description: 'The product recommended: its name exactly as it is written in the list above' },
-            { id: 'why', label: 'Why', type: 'markdown', required: true, description: 'The reasoning, against what matters to the user, and the runner-up' },
-            { id: 'watch_out', label: 'Watch out for', type: 'list', description: 'Known problems, models about to be replaced, prices that vary' },
+            { id: 'recommendation', label: 'Recommendation', type: 'text', required: true, description: 'The pick in one sentence, and who it suits' },
+            { id: 'why', label: 'Why', type: 'markdown', required: true, description: 'Why it wins against what matters to them, how close it is, and where the runner-up is better: a paragraph or two' },
+            { id: 'runner_up_why', label: 'Why the runner-up', type: 'text', description: 'Who should pick the runner-up instead, in a dozen words at most (on a tighter budget, for the best zoom); empty when there is none' },
+            { id: 'watch_out', label: 'Watch out for', type: 'list', description: 'Known problems, models about to be replaced, prices that vary, what could not be confirmed, and products too little was found on' },
           ],
         },
       ],
-      outputs: { recommendation: '{{verdict.recommendation}}', pick: '{{verdict.pick}}', why: '{{verdict.why}}', comparison: '{{score.comparison}}', watch_out: '{{verdict.watch_out}}' },
+      outputs: {
+        recommendation: '{{verdict.recommendation}}',
+        pick: '{{score.pick}}',
+        why: '{{verdict.why}}',
+        runner_up: '{{score.runner_up}}',
+        runner_up_why: '{{verdict.runner_up_why}}',
+        comparison: '{{score.comparison}}',
+        matrix: '{{score.matrix}}',
+        watch_out: '{{verdict.watch_out}}',
+      },
     },
     answer: [
       { id: 'recommendation', label: 'Recommendation', type: 'text', required: true, description: 'The pick, in one sentence' },
       { id: 'pick', label: 'The pick', type: 'text', description: 'The product recommended, by its name as the comparison lists it' },
       { id: 'why', label: 'Why', type: 'markdown', required: true, description: 'The reasoning, against what matters to the user, and the runner-up' },
-      {
-        id: 'comparison',
-        label: 'Comparison',
-        type: 'table',
-        required: true,
-        columns: [
-          { id: 'product', label: 'Product', type: 'text' },
-          { id: 'score', label: 'Score', type: 'number', description: 'Out of 100, by what matters to you' },
-          { id: 'price', label: 'Price', type: 'text' },
-          { id: 'strengths', label: 'Strengths', type: 'text' },
-          { id: 'weaknesses', label: 'Weaknesses', type: 'text' },
-          { id: 'best_for', label: 'Best for', type: 'text' },
-          { id: 'link', label: 'Link', type: 'url' },
-          { id: 'picture', label: 'Picture', type: 'image' },
-        ],
-      },
+      { id: 'runner_up', label: 'Runner-up', type: 'text', description: 'The next choice, by its name as the comparison lists it' },
+      { id: 'runner_up_why', label: 'Why the runner-up', type: 'text', description: 'Who should pick the runner-up instead, in a few words' },
+      { id: 'comparison', label: 'Comparison', type: 'table', required: true, columns: COMPARE_COLUMNS },
+      { id: 'matrix', label: 'Scores by what matters', type: 'markdown', description: 'Each product’s score from 1 to 5 on each thing that matters, and how much each matters' },
       { id: 'watch_out', label: 'Watch out for', type: 'list' },
     ],
     examples: [
-      { id: 'named-products', name: 'Two named headphones', inputs: { products: 'Sony WH-1000XM5\nBose QuietComfort Ultra', needs: 'Noise cancelling on flights, comfort, battery', budget: '$400' }, checks: ['{{answer.comparison}} is not empty', '{{answer.pick}} is not empty', '{{media.data.pictures}} > 0'] },
-      { id: 'a-need', name: 'A need, not products', inputs: { products: 'A quiet dishwasher under €900', needs: 'Quiet, reliable, fits 60 cm', region: 'Germany' }, checks: ['{{understand.named}} = no', '{{answer.comparison}} is not empty'] },
+      { id: 'named-products', name: 'Two named headphones', inputs: { products: 'Sony WH-1000XM5\nBose QuietComfort Ultra', needs: 'Noise cancelling on flights, comfort, battery', budget: '$400' }, checks: ['{{answer.comparison}} is not empty', '{{answer.pick}} is not empty', '{{answer.runner_up}} is not empty', '{{media.data.pictures}} > 0'] },
+      { id: 'a-need', name: 'A need, not products', inputs: { products: 'A quiet dishwasher under €900', needs: 'Quiet, reliable, fits 60 cm', region: 'Germany' }, checks: ['{{understand.named}} = no', '{{shortlist.count}} > 2', '{{answer.comparison}} is not empty'] },
     ],
   },
   {

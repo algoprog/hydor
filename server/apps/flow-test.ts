@@ -33,7 +33,7 @@ import { createPage, initPages, listPages, pageInfo, pageSource } from '../pages
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as vec from '../memory/vectors.ts';
 import { envDir, envOf, envTesting } from './env.ts';
-import { flowRunner, stepsOf as flowSteps } from './flow.ts';
+import { askOf, flowRunner, stepsOf as flowSteps } from './flow.ts';
 import { apps } from './index.ts';
 import { packageOf, zipPackage } from './package.ts';
 import { defaultScreen } from './screens.ts';
@@ -997,6 +997,59 @@ test('Ask a person: the run waits for the answer (its page, the inbox, a notice)
   } finally {
     sessions.off('notify', on);
   }
+});
+
+test('Ask a person: a choice takes its options from what an earlier step gave, may allow several picks, and is asked, checked and recorded as the person saw it', async () => {
+  const a = app({
+    name: 'Picks',
+    answer: [{ id: 'chosen', label: 'Chosen', type: 'text' }],
+    flow: {
+      steps: [
+        { id: 'v', do: 'code', language: 'javascript', code: "return { items: ['Alpha', 'Beta', { name: 'Gamma', n: 3 }, 'Alpha', ''], notes: '- Delta\\n2. Epsilon\\n\\n' };" },
+        {
+          id: 'pick',
+          do: 'ask',
+          question: 'Which of these for {{topic}}?',
+          fields: [
+            { id: 'some', label: 'Compare {{topic}}', type: 'choice', multi: true, options: ['{{v.items}}', 'Other {{topic}}'], default: '{{v.items}}' },
+            { id: 'one', label: 'Best', type: 'choice', options: ['{{v.notes}}'], default: '{{v.notes}}' },
+            { id: 'none', label: 'Nothing found', type: 'choice', multi: true, options: ['{{v.missing}}'], default: '{{v.missing}}' },
+            { id: 'solo', label: 'Nothing found alone', type: 'choice', options: ['{{v.nothing}}'] },
+          ],
+        },
+      ],
+      outputs: { chosen: '{{pick.some}}' },
+    },
+  });
+  const r = startRun({ app: a.id, slug: a.slug, recipe: a, source: 'web', inputs: { topic: 'tides' } });
+  let q: any;
+  for (let i = 0; i < 400 && !q; i++) {
+    q = (await http.inject({ method: 'GET', url: `/api/apps/runs/${r.id}` })).json().question;
+    if (!q) await sleep(25);
+  }
+  assert.ok(q, 'it asks');
+  const [some, one, none, solo] = q.fields;
+  assert.equal(some.label, 'Compare tides');
+  assert.deepEqual(some.options, ['Alpha', 'Beta', 'name: Gamma n: 3', 'Other tides'], 'a list’s items (an object as its text), the other option filled, no repeats');
+  assert.equal(some.multi, true);
+  assert.equal(some.default, 'Alpha\nBeta\nname: Gamma n: 3', 'a default that is a list gives its items one per line');
+  assert.deepEqual(one.options, ['Delta', 'Epsilon'], 'a text value’s lines, bullets and numbers stripped');
+  assert.equal(one.default, 'Delta', 'a single choice starts with the first item');
+  assert.deepEqual([none.type, none.options, none.multi], ['long', undefined, undefined], 'a multi choice with no options is a long text');
+  assert.deepEqual([solo.type, solo.options], ['text', undefined], 'a single choice with no options is a short text');
+  assert.deepEqual(askOf(store.getRun(db, r.id)!)!.fields!.map((f) => f.id), ['some', 'one', 'none', 'solo'], 'askOf gives what the person saw');
+  assert.equal(flowSteps(r.id, { values: true }).find((s) => s.id === 'pick')!.values!.fields, undefined, 'the steps view shows the question only');
+  const answer = (values: Record<string, unknown>) => http.inject({ method: 'POST', url: `/api/apps/runs/${r.id}/answer`, payload: { values } });
+  const bad = await answer({ some: ['Alpha', 'Zeta'], one: 'Delta' });
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.json().error ?? bad.body, /Compare tides: Zeta is not one of its options/);
+  assert.equal((await answer({ some: 'Epsilon' })).statusCode, 400, 'a value of another choice is not one of its options');
+  assert.equal((await answer({ some: ['other tides', 'NAME: gamma n: 3'], one: 'epsilon', none: 'Free words', solo: 'x' })).statusCode, 200);
+  const done = await ended(r.id);
+  assert.equal(done.status, 'done', done.error);
+  assert.equal(done.result!.chosen, 'name: Gamma n: 3\nOther tides');
+  const outs = store.listSteps(db, r.id).find((s) => s.id === 'pick')!.outputs!;
+  assert.deepEqual(outs, { some: 'name: Gamma n: 3\nOther tides', one: 'Epsilon', none: 'Free words', solo: 'x' }, 'its outputs are the answers only');
 });
 
 test('Run code: a program in JavaScript or Python gets its input and returns the step’s values, in a sandbox with no network and none of this computer’s files', async () => {

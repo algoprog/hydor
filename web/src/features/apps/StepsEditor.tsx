@@ -448,7 +448,7 @@ function AskForm({ fields, onChange }: { fields: AppField[]; onChange: (f: AppFi
               value={f.label}
               onChange={(e) => put(i, { ...f, label: e.target.value, ...(/^(answer|question)(_\d+)?$/.test(f.id) && e.target.value ? { id: fieldId(e.target.value, ids.filter((_, j) => j !== i)) } : {}) })}
             />
-            <select className={cx(bare, 'h-8.5 min-w-[110px] flex-1 text-[13.5px]')} value={f.type} onChange={(e) => put(i, { ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined })}>
+            <select className={cx(bare, 'h-8.5 min-w-[110px] flex-1 text-[13.5px]')} value={f.type} onChange={(e) => put(i, { ...f, type: e.target.value as AppField['type'], options: e.target.value === 'choice' ? (f.options ?? []) : undefined, multi: e.target.value === 'choice' ? f.multi : undefined })}>
               {FIELD_TYPES.filter((t) => t.value !== 'file').map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -464,7 +464,14 @@ function AskForm({ fields, onChange }: { fields: AppField[]; onChange: (f: AppFi
             </IconButton>
           </div>
           {f.type === 'choice' && (
-            <textarea className={cx(small, 'h-auto py-1.5 text-[13px]')} rows={Math.min(5, Math.max(2, (f.options?.length ?? 0) + 1))} placeholder="The choices, one per line" value={(f.options ?? []).join('\n')} onChange={(e) => put(i, { ...f, options: e.target.value.split('\n') })} />
+            <>
+              <textarea className={cx(small, 'h-auto py-1.5 text-[13px]')} rows={Math.min(5, Math.max(2, (f.options?.length ?? 0) + 1))} placeholder="The choices, one per line" value={(f.options ?? []).join('\n')} onChange={(e) => put(i, { ...f, options: e.target.value.split('\n') })} />
+              <div className="text-[12px] leading-snug text-fg-3">{`An option can be a value from a step before it, like {{find.items}}: the run then offers what it found.`}</div>
+              <label className="flex w-fit items-center gap-1.5 text-[12.5px] text-fg-2">
+                <Switch on={!!f.multi} onChange={(on) => put(i, { ...f, multi: on || undefined })} label="Several can be picked" />
+                Several can be picked
+              </label>
+            </>
           )}
         </div>
       ))}

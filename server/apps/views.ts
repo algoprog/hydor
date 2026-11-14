@@ -426,7 +426,8 @@ const COMPARE: AppUi = {
       title: 'The pick',
       blocks: [
         { element: 'winner' },
-        { title: 'Also considered', element: 'contender', data: 'result.comparison', each: true, layout: 'grid', where: { product: { '!=': '{{result.pick}}' } } },
+        { element: 'runner-up', data: 'result.comparison|where:product=$result.runner_up|first', if: 'result.runner_up' },
+        { title: 'Also considered', element: 'contender', data: 'result.comparison|where:product!=$result.pick|where:product!=$result.runner_up', each: true, layout: 'grid' },
       ],
     },
     {
@@ -434,7 +435,8 @@ const COMPARE: AppUi = {
       title: 'Side by side',
       if: 'result.comparison',
       blocks: [
-        { title: 'Score out of 100, by what matters to you', element: 'plot', data: 'result.comparison', if: 'result.comparison|sum:score', with: { kind: 'hbar', x: 'product', y: 'score', height: 240 } },
+        { title: 'Score out of 100, by what matters to you', element: 'plot', data: 'result.comparison', if: 'result.comparison|count|over:1', with: { kind: 'hbar', x: 'product', y: 'score' } },
+        { title: 'Scores by what matters', element: 'matrix', data: 'result.matrix', if: 'result.matrix' },
         { element: 'product', data: 'result.comparison', each: true, layout: 'grid' },
       ],
     },
@@ -448,27 +450,52 @@ const COMPARE: AppUi = {
   ],
   elements: {
     winner: {
-      description: 'The pick with its picture, its price and what it is best for, and why',
+      description: 'The pick with its picture, its price and where it is from, its score and what it is best for, and why; "the only one compared" when it was alone',
       html: String.raw`<section class="win">
   {{#result.pick}}{{#result.comparison|where:product=$result.pick|first}}{{#picture}}<img class="ph" src="{{picture}}" alt="">{{/picture}}{{/result.comparison}}{{/result.pick}}
-  <p class="kicker">🏆 The pick</p>
+  <p class="kicker">{{#result.comparison|count|is:1}}The only one compared{{/result.comparison}}{{^result.comparison|count|is:1}}🏆 The pick{{/result.comparison}}</p>
   {{#result.pick}}<h1>{{result.pick}}</h1><p class="lead">{{result.recommendation}}</p>{{/result.pick}}{{^result.pick}}<h1>{{result.recommendation}}</h1>{{/result.pick}}
-  {{#result.pick}}{{#result.comparison|where:product=$result.pick|first}}<div class="facts">{{#price}}<span class="price">{{price}}</span>{{/price}}{{#best_for}}<span class="for">Best for {{best_for}}</span>{{/best_for}}{{#link}}<a class="n-btn n-primary" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}</div>{{/result.comparison}}{{/result.pick}}
+  {{#result.pick}}{{#result.comparison|where:product=$result.pick|first}}<div class="facts">{{#price}}<span class="pricebox"><span class="price">{{price}}</span>{{#shop}}<span class="shop">Seen at {{shop}}</span>{{/shop}}</span>{{/price}}{{#score}}<span class="chip">{{score}}/100 for what matters to you</span>{{/score}}{{#best_for}}<span class="for">Best for {{best_for}}</span>{{/best_for}}{{#link}}<a class="n-btn n-primary" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}</div>{{/result.comparison}}{{/result.pick}}
   <div class="why">{{result.why|markdown}}</div>
 </section>`,
       css: String.raw`
 .win { display: flow-root; padding: 22px 24px; border: 1px solid color-mix(in srgb, var(--n-accent) 40%, var(--n-line)); border-radius: calc(var(--n-radius) + 4px); background: linear-gradient(135deg, var(--n-accent-soft), transparent 70%), var(--n-card); }
-.ph { float: right; width: min(34%, 220px); aspect-ratio: 1; margin: 0 0 12px 20px; object-fit: contain; border-radius: var(--n-radius); background: var(--n-card); }
-@media (max-width: 520px) { .ph { width: 38%; margin-left: 14px; } }
+.ph { float: right; max-width: min(40%, 260px); max-height: 200px; margin: 0 0 12px 20px; object-fit: contain; border-radius: var(--n-radius); background: var(--n-card); }
+@media (max-width: 520px) { .ph { max-width: 42%; max-height: 150px; margin-left: 14px; } }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 h1 { margin: 6px 0 12px !important; font-size: 26px !important; letter-spacing: -.015em; }
 .lead { margin: -6px 0 14px; font-size: 16px; line-height: 1.5; }
 .facts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
-.price { padding: 4px 12px; border-radius: 999px; background: var(--n-card); border: 1px solid var(--n-line); font-weight: 600; }
+.pricebox { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 100%; }
+.price { max-width: 100%; padding: 4px 12px; border-radius: 14px; background: var(--n-card); border: 1px solid var(--n-line); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.shop { padding-left: 4px; color: var(--n-muted); font-size: 12.5px; }
+.chip { padding: 4px 12px; border-radius: 999px; background: var(--n-accent-soft); color: var(--n-accent); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .for { color: var(--n-muted); font-size: 14px; }
 .facts .n-btn { margin-left: auto; }
 .why { font-size: 15px; line-height: 1.6; }
 .why p { margin: 0 0 10px; } .why p:last-child { margin: 0; }
+`,
+    },
+    'runner-up': {
+      description: 'The second choice under the pick: its picture, name and price, and in a few words why it came second; a click opens its page',
+      html: String.raw`{{#product|not:$result.pick}}<button type="button" class="r" data-event="open_product">
+  {{#picture}}<img class="th" src="{{picture}}" alt="" loading="lazy">{{/picture}}
+  <span class="t">
+    <span class="kicker"><span aria-hidden="true">🥈</span> Runner-up</span>
+    <b>{{product}}</b>
+    {{#price}}<span class="price">{{price|short:60}}</span>{{/price}}
+    {{#result.runner_up_why}}<span class="why">{{result.runner_up_why}}</span>{{/result.runner_up_why}}
+  </span>
+</button>{{/product}}`,
+      css: String.raw`
+.r { display: flex; gap: 14px; align-items: center; width: 100%; padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); color: inherit; font: inherit; text-align: left; }
+.r:hover { border-color: var(--n-accent); }
+.th { flex: none; width: 72px; height: 72px; object-fit: contain; border-radius: 8px; background: var(--n-soft); }
+.t { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.kicker { color: var(--n-muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+b { font-size: 16px; overflow-wrap: anywhere; }
+.price { font-size: 14px; font-weight: 600; }
+.why { color: var(--n-muted); font-size: 13.5px; line-height: 1.4; }
 `,
     },
     contender: {
@@ -476,7 +503,7 @@ h1 { margin: 6px 0 12px !important; font-size: 26px !important; letter-spacing: 
       html: String.raw`<button type="button" class="c" data-event="open_product">
   {{#picture}}<img class="th" src="{{picture}}" alt="" loading="lazy">{{/picture}}
   <span class="t"><b>{{product}}</b>
-  <span class="price">{{price}}</span>
+  {{#price}}<span class="price">{{price|short:60}}</span>{{/price}}
   {{#best_for}}<span class="for">Best for {{best_for}}</span>{{/best_for}}</span>
 </button>`,
       css: String.raw`
@@ -487,15 +514,34 @@ h1 { margin: 6px 0 12px !important; font-size: 26px !important; letter-spacing: 
 b { font-size: 15px; } .price { font-size: 14px; } .for { color: var(--n-muted); font-size: 13px; }
 `,
     },
+    matrix: {
+      description: 'The scores of every product on each thing that matters (a Markdown table, best first), in a card that scrolls sideways on a phone',
+      html: String.raw`<p class="cap">Each scored from 1 to 5; ×5 means it matters most</p><div class="m">{{.|markdown}}</div>`,
+      css: String.raw`
+.cap { margin: -4px 0 10px; color: var(--n-muted); font-size: 13px; }
+.m { border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); overflow: hidden; }
+.n-ui-scroll { margin: 0; }
+table { min-width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; border-bottom: 1px solid var(--n-line); text-align: center; vertical-align: middle; }
+th { min-width: 84px; color: var(--n-muted); font-size: 13px; font-weight: 500; line-height: 1.3; }
+tr:last-child td { border-bottom: 0; }
+th:first-child, td:first-child { position: sticky; left: 0; min-width: 130px; max-width: 220px; background: var(--n-card); box-shadow: 1px 0 0 var(--n-line); text-align: left; overflow-wrap: anywhere; }
+td:first-child { font-weight: 600; }
+th:last-child, td:last-child { font-weight: 700; }
+th:last-child { color: var(--n-muted); }
+.m p { margin: 0; padding: 8px 12px; border-top: 1px solid var(--n-line); color: var(--n-muted); font-size: 12.5px; }
+`,
+    },
     product: {
-      description: 'A product: its picture, price, strengths and weaknesses, what it is best for; the pick stands out',
+      description: 'A product: its picture, price and where it is from, score, strengths and weaknesses, what it is best for; the pick stands out, and the runner-up has a quiet badge',
       html: String.raw`<article class="p{{#product|is:$result.pick}} pick{{/product}}">
   {{#picture}}<img class="pic" src="{{picture}}" alt="" loading="lazy">{{/picture}}
-  {{#product|is:$result.pick}}<span class="badge">🏆 The pick</span>{{/product}}
+  {{#product|is:$result.pick}}<span class="badge">🏆 The pick</span>{{/product}}{{^product|is:$result.pick}}{{#product|is:$result.runner_up}}<span class="badge quiet">Runner-up</span>{{/product}}{{/product}}
   <h3>{{product}}</h3>
-  <p class="price">{{price|or:No price found}}{{#score}} · <span class="score">{{score}}/100</span>{{/score}}</p>
-  <ul class="pros">{{#strengths|split}}<li>{{.}}</li>{{/strengths}}</ul>
-  <ul class="cons">{{#weaknesses|split}}<li>{{.}}</li>{{/weaknesses}}</ul>
+  <div class="meta"><span class="price">{{price|short:60|or:No price found}}</span>{{#score}}<span class="score">{{score}}/100</span>{{/score}}</div>
+  {{#price}}{{#shop}}<p class="shop">Seen at {{shop}}</p>{{/shop}}{{/price}}
+  {{#strengths|count}}<ul class="pros">{{#strengths|split}}<li>{{.}}</li>{{/strengths}}</ul>{{/strengths}}
+  {{#weaknesses|count}}<ul class="cons">{{#weaknesses|split}}<li>{{.}}</li>{{/weaknesses}}</ul>{{/weaknesses}}
   {{#best_for}}<p class="for">Best for {{best_for}}</p>{{/best_for}}
   <div class="act"><button type="button" class="n-btn" data-event="open_product">More</button>{{#link}}<a class="n-btn" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}</div>
 </article>`,
@@ -507,9 +553,12 @@ b { font-size: 15px; } .price { font-size: 14px; } .for { color: var(--n-muted);
 .pic { aspect-ratio: 4 / 3; margin-bottom: 12px; object-fit: contain; }
 .pick { border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-accent-soft); }
 .badge { align-self: flex-start; margin-bottom: 8px; padding: 2px 10px; border-radius: 999px; background: var(--n-accent); color: var(--n-accent-fg); font-size: 12px; font-weight: 700; }
+.badge.quiet { padding: 1px 9px; border: 1px solid var(--n-line); background: transparent; color: var(--n-muted); font-weight: 600; }
 h3 { margin: 0; font-size: 16.5px; }
-.price { margin: 4px 0 10px; font-weight: 600; }
-.score { color: var(--n-accent); }
+.meta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin: 4px 0 10px; }
+.price { font-weight: 600; overflow-wrap: anywhere; }
+.score { color: var(--n-accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.shop { margin: -8px 0 10px; color: var(--n-muted); font-size: 12.5px; }
 ul { list-style: none; margin: 0 0 8px; padding: 0; font-size: 14px; line-height: 1.45; }
 li { position: relative; padding-left: 20px; margin: 4px 0; }
 .pros li::before { content: "✓"; position: absolute; left: 0; color: var(--n-ok); font-weight: 700; }
@@ -519,17 +568,18 @@ li { position: relative; padding-left: 20px; margin: 4px 0; }
 `,
     },
     'product-detail': {
-      description: 'One product on a page of its own, with its picture and research on how it holds up',
+      description: 'One product on a page of its own, with its picture, price and where it is from, how it scores on each thing that matters, and research on how it holds up',
       html: String.raw`<div class="d">
   <div class="top"><div>
-    <p class="kicker">{{#product|is:$result.pick}}🏆 The pick{{/product}}{{^product|is:$result.pick}}Also considered{{/product}}</p>
+    <p class="kicker">{{#product|is:$result.pick}}🏆 The pick{{/product}}{{^product|is:$result.pick}}{{#product|is:$result.runner_up}}Runner-up{{/product}}{{^product|is:$result.runner_up}}Also considered{{/product}}{{/product}}</p>
     <h2>{{product}}</h2>
-    <p class="price">{{price|or:No price found}}{{#best_for}} · best for {{best_for}}{{/best_for}}</p>
+    <div class="sub"><p class="price">{{price|or:No price found}}{{#best_for}} · best for {{best_for}}{{/best_for}}</p>{{#price}}{{#shop}}<p class="shop">Seen at {{shop}}</p>{{/shop}}{{/price}}</div>
   </div>{{#picture}}<img class="ph" src="{{picture}}" alt="">{{/picture}}</div>
   <div class="two">
-    <section><h3>Strengths</h3><ul class="pros">{{#strengths|split}}<li>{{.}}</li>{{/strengths}}</ul></section>
-    <section><h3>Weaknesses</h3><ul class="cons">{{#weaknesses|split}}<li>{{.}}</li>{{/weaknesses}}</ul></section>
+    {{#strengths|count}}<section><h3>Strengths</h3><ul class="pros">{{#strengths|split}}<li>{{.}}</li>{{/strengths}}</ul></section>{{/strengths}}
+    {{#weaknesses|count}}<section><h3>Weaknesses</h3><ul class="cons">{{#weaknesses|split}}<li>{{.}}</li>{{/weaknesses}}</ul></section>{{/weaknesses}}
   </div>
+  {{#scores|count}}<section class="how"><h3>How it scores</h3><ul>{{#scores|split}}<li>{{.}}</li>{{/scores}}</ul></section>{{/scores}}
   <div class="n-row act">
     {{#link}}<a class="n-btn n-primary" href="{{link}}" target="_blank" rel="noopener noreferrer">See it ↗</a>{{/link}}
     <button type="button" class="n-btn" data-event="reliability">Research how it holds up</button>
@@ -541,14 +591,18 @@ li { position: relative; padding-left: 20px; margin: 4px 0; }
 @media (max-width: 520px) { .ph { width: 96px; height: 96px; } }
 .kicker { margin: 0; color: var(--n-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
 h2 { margin: 4px 0 4px !important; font-size: 26px !important; }
-.price { margin: 0 0 16px; color: var(--n-muted); }
+.sub { margin: 0 0 16px; }
+.price { margin: 0; color: var(--n-muted); overflow-wrap: anywhere; }
+.shop { margin: 2px 0 0; color: var(--n-muted); font-size: 12.5px; }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 section { padding: 14px 16px; border: 1px solid var(--n-line); border-radius: var(--n-radius); background: var(--n-card); }
+.how { margin-top: 12px; }
 h3 { margin: 0 0 8px; font-size: 13px; color: var(--n-muted); }
 ul { list-style: none; margin: 0; padding: 0; font-size: 14.5px; line-height: 1.5; }
 li { position: relative; padding-left: 20px; margin: 5px 0; }
 .pros li::before { content: "✓"; position: absolute; left: 0; color: var(--n-ok); font-weight: 700; }
 .cons li::before { content: "✕"; position: absolute; left: 0; color: var(--n-err); font-weight: 700; }
+.how li::before { content: "•"; position: absolute; left: 5px; color: var(--n-muted); }
 .act { margin-top: 16px; }
 `,
     },

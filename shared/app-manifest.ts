@@ -31,7 +31,7 @@ export const STEP_KINDS = [
   { value: 'parallel', label: 'At the same time', hint: 'Branches side by side, joined at the end' },
   { value: 'app', label: 'Call an app', hint: 'Another of your apps, as one step' },
   { value: 'data', label: 'Keep data', hint: 'Add, find, change or remove records the app keeps' },
-  { value: 'ask', label: 'Ask a person', hint: 'Waits for your answer: yes or no, or a short form' },
+  { value: 'ask', label: 'Ask a person', hint: 'Waits for your answer: yes or no, or a short form, whose choices can be what the run found' },
   { value: 'code', label: 'Run code', hint: 'A program in JavaScript, TypeScript or Python, in a sandbox: it can ask models and agents too' },
   { value: 'value', label: 'Work out a value', hint: 'The first item, a count, a sum, values joined, a field of each…: at once, at no cost' },
 ] as const;
@@ -1227,6 +1227,11 @@ export function fillRefs(tpl: string, s: Scope, o: { max?: number } = {}): strin
     return r.found ? asText(r.value, o.max) : all;
   });
   return out.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** The name a text is made of alone ({{find.items}}), or null. */
+export function refAlone(text: string): string | null {
+  return new RegExp(`^\\s*\\{\\{\\s*(${REF})\\s*\\}\\}\\s*$`).exec(text)?.[1] ?? null;
 }
 
 /** A step's input as it goes to the tool: one {{name}} alone keeps its value as it is (a list stays a list); other text is filled. */

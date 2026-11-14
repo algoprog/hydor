@@ -498,7 +498,8 @@ agents that speak ACP and take MCP servers.
   result, asked on its page or in its session, which opens on that result with a switch to the conversation.
   An app can also work in steps (an agent, a quick model answer, a tool, a decision by a rule or in words, a
   repeat over a list or until something holds, branches side by side, another app, its own data, a question
-  to you that it waits for, built-in values (today, now, the day of the week, the time zone where you are, what
+  to you that it waits for (a short form whose choices can be what the run found, to tick one or several),
+  built-in values (today, now, the day of the week, the time zone where you are, what
   started the run), a program in JavaScript, TypeScript or Python in a sandbox, which can be the whole
   flow: its ctx calls to models, agents, tools, people, its data and other apps are steps of the run, kept
   and replayed after a restart, and values worked out at once and at no cost: the first, a count, a sum, a field

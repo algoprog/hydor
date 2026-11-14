@@ -134,7 +134,7 @@ A link can fill in the form for you: an app's address with `?in.`, a question's 
 - **Short text** and **Long text**: a line, or a box that grows as you type.
 - **Number**: plain numbers; "$1,250.50" is read as 1250.5.
 - **Date**: a date picker.
-- **Choice**: a few short choices show as chips; more show as a list. Click a picked chip again to clear an optional one.
+- **Choice**: a few short choices show as chips; more show as a list. Click a picked chip again to clear an optional one. A choice that allows several shows chips you tick, each ticked one with a check mark; what you tick is kept one choice a line.
 - **Yes / no**: a switch.
 - **File**: a file to attach.
 
@@ -291,7 +291,7 @@ The questions someone answers before each run. **Add a question** adds a row wit
 - The question, as the person reads it ("Where to?").
 - Its kind: **Short text**, **Long text**, **Number**, **Date**, **Choice**, **Yes / no** or **File**.
 - **Needed**: the run can't start without it.
-- For **Choice**: the choices, one per line (left empty, it offers Yes and No).
+- For **Choice**: the choices, one per line (left empty, it offers Yes and No), and **Several can be picked**, which lets people tick more than one (the answer then has one choice a line).
 - **Help text, example, default…** opens three more boxes: **Help under the question**, **An example answer** (shown greyed in the empty box) and **Filled in at first**.
 
 A question's **⋯** menu has **Move up**, **Move down** and **Remove**. Under each question you see its placeholder, such as `{{destination}}`: that is how the task refers to its answer, and the name programs use for it. A new question's placeholder follows its wording until the task uses it. An app can have up to 30 questions.
@@ -489,7 +489,7 @@ The kinds of steps:
 - **At the same time**: branches that run side by side; the flow goes on when they have all ended.
 - **Call an app**: another of your apps, as one step. Under the kinds, **Add a step** offers blocks: apps made to be steps of others, yours (those marked **A block**, under an app's answer fields, and those Collapse to a block makes) and the ready-made ones (**Sum up a page**, **Translate**, **Answer from the web**, **Sort into kinds** and **Pull out the facts**, each made yours as it goes in). A block goes in as a call with its form to fill in, its questions the app's own form has by the same name given already; a change to a block is a change for every app that calls it.
 - **Keep data**: add, find, change or remove the records the app keeps (see below).
-- **Ask a person**: the run waits for your answer, yes or no or a short form: a notice opens the run, where a card asks it, and the Inbox lists it. It waits a week unless you set another limit, then it fails.
+- **Ask a person**: the run waits for your answer, yes or no or a short form: a notice opens the run, where a card asks it, and the Inbox lists it. It waits a week unless you set another limit, then it fails. Its form's **Choice** questions can offer what the run found: write a value of an earlier step alone as a choice, such as `{{find.items}}`, and when the step asks, the card offers each item of that list (or each line of a text) as a choice, so a run can ask which of the things it found to look into. With **Several can be picked** you tick as many as you like, and `{{step.field}}` is the ticked ones, one a line. Other words in the question, its help text and its choices are filled in with values too, and a choice that comes out with nothing to offer becomes a plain text box.
 - **Run code**: a program of yours, in JavaScript, TypeScript or Python, gets the values you give it and gives back the step's values (**What it gives** names them, for the steps after it). It runs in a sandbox: no network, and none of this computer's files but the packages the app installs. It reaches out only through `ctx`, each call a step of the run: `ctx.model` asks a model, `ctx.agent` an agent, `ctx.tool` uses one of the app's tools, `ctx.ask` waits for your answer, `ctx.data` keeps records and `ctx.app` runs another app. So a whole flow can be one program, with ifs and loops of its own; its calls show on the run's page like steps, and when the run starts again after a restart, the program runs again and the calls it made before give what they gave then, without running again. An app file with code steps says so on its install card.
 - **Work out a value**: a value from another, at once and at no cost: the first or last item of a list, how many, a sum, average, smallest or largest (of a field of each), a field of each, the items joined into text, without repeats, sorted by a field, as a number, or a date some days later. It gives `{{id.value}}`, and shows in the graph as a small pill.
 
@@ -594,6 +594,7 @@ Agents in Hydor can make and run apps for you through its API, with your OK on a
 - "Uninstall the Weekly news digest app, and stop agents from running my Price check app in sessions."
 - "Make an app with steps that reads each link I send, sums it up with a quick model and keeps it in a reading list."
 - "Add a step to my Competitor watch app that tells me only when something changed."
+- "In my Shopping scout app, after it finds the products, ask me which ones to compare as choices I can tick, then compare only those."
 - "Install the app in reading-list.hydor-app from my Downloads folder."
 - "Make an app that sums up the weather for a city from OpenWeather. It needs my OpenWeather API key."
 - "Add a map of the stops and a chart of what each day costs to my City break app's view."

@@ -18,7 +18,7 @@ import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from 
 import type { NotifyEvent } from '../../shared/types.ts';
 import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
-import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
+import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refAlone, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { extractText } from '../documents/extract.ts';
 import { runTools } from '../features/registry.ts';
@@ -486,16 +486,61 @@ function forgetFrom(run: string, at: string, n: number) {
 /** Ask a person steps waiting now (by run and path): an answer ends the wait with its values. */
 const asking = new Map<string, (values: Record<string, unknown>) => void>();
 
+/** The items of a value, as short lines: a list's items, or a text's lines without their bullets or numbers. */
+function itemsOf(v: unknown): string[] {
+  const parts = Array.isArray(v) ? v.map((i) => asText(i, 400)) : typeof v === 'string' ? v.split(/\r?\n/).map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')) : v === null || v === undefined ? [] : [asText(v, 400)];
+  return parts.map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+
+/**
+ * An ask step's form as the person is asked it, now: a choice's options that are one {{step.value}} become that
+ * value's items, other text is filled like the question. A choice left with no options is a text box.
+ */
+export function askFields(fields: AppField[] | undefined, scope: Scope): AppField[] | undefined {
+  if (!fields?.length) return undefined;
+  const fill = (t: string | undefined, max: number) => (t === undefined ? undefined : fillRefs(t, scope).slice(0, max).trim() || undefined);
+  return fields.map((f): AppField => {
+    const out: AppField = { ...f, label: fill(f.label, 80) ?? f.label, help: fill(f.help, 240), placeholder: fill(f.placeholder, 160) };
+    out.default = fill(f.default, 4000);
+    if (f.type !== 'choice') return out;
+    const one = f.default !== undefined ? refAlone(f.default) : null;
+    const given = one ? lookup(one, scope) : null;
+    const options: string[] = [];
+    for (const o of f.options ?? []) {
+      const ref = refAlone(o);
+      const items = ref ? (lookup(ref, scope).found ? itemsOf(lookup(ref, scope).value) : []) : [fillRefs(o, scope).replace(/\s+/g, ' ').trim()].filter(Boolean);
+      for (const i of items) if (!options.includes(i.slice(0, 80))) options.push(i.slice(0, 80));
+    }
+    out.options = options.slice(0, 30);
+    if (!out.options.length) {
+      delete out.options;
+      delete out.multi;
+      out.type = f.multi ? 'long' : 'text';
+      return out;
+    }
+    if (given?.found) {
+      const picks = itemsOf(given.value).map((i) => out.options!.find((o) => o.toLowerCase() === i.slice(0, 80).toLowerCase())).filter((o): o is string => !!o);
+      out.default = (f.multi ? [...new Set(picks)].join('\n') : picks[0]) || undefined;
+    } else if (out.default) {
+      const lines = out.default.split(/\r?\n/).map((l) => l.trim());
+      const ok = lines.filter((l) => out.options!.some((o) => o.toLowerCase() === l.toLowerCase()));
+      out.default = (f.multi ? ok.join('\n') : ok.length === 1 && lines.length === 1 ? ok[0] : '') || undefined;
+    }
+    return out;
+  });
+}
+
 /**
  * Waits for the person: the run waits (Needs you), a notice opens its page, and the inbox lists it. The
- * question as it was asked stays on the step's record while it waits, so a restart asks the same.
+ * question and the form as they were asked stay on the step's record while it waits, so a restart asks the same.
  */
 async function askStep(x: Exec, s: AskStep, scope: Scope, at: string, before: StepRecord | null): Promise<Record<string, unknown>> {
   if (x.pub) throw new Error('A run from a public page cannot ask a person');
   const again = before?.status === 'waiting' && typeof before.outputs?.question === 'string';
   const question = again ? String(before!.outputs!.question) : fillRefs(s.question, scope).slice(0, 4000);
+  const fields = again && Array.isArray(before!.outputs!.fields) ? (before!.outputs!.fields as AppField[]) : askFields(s.fields, scope);
   const since = before?.startedAt ?? Date.now();
-  record(x, at, s, { status: 'waiting', outputs: { question } });
+  record(x, at, s, { status: 'waiting', outputs: { question, ...(fields?.length ? { fields } : {}) } });
   const key = `${x.run.id}:${at}`;
   x.waiting.add(`ask:${at}`);
   syncStatus(x);
@@ -527,7 +572,8 @@ export function askOf(r: RunRecord): { step: string; question: string; fields?: 
   if (!st) return null;
   const flow = r.flow ? r.recipe.flows?.[r.flow] : r.recipe.flow;
   const s = flow ? allSteps(flow.steps).find((x) => x.id === st.id) : undefined;
-  return { step: st.path, question: String(st.outputs?.question ?? ''), ...(s?.do === 'ask' && s.fields?.length ? { fields: s.fields } : {}), since: st.startedAt ?? r.createdAt };
+  const asked = Array.isArray(st.outputs?.fields) && st.outputs.fields.length ? (st.outputs.fields as AppField[]) : s?.do === 'ask' && s.fields?.length ? s.fields : undefined;
+  return { step: st.path, question: String(st.outputs?.question ?? ''), ...(asked ? { fields: asked } : {}), since: st.startedAt ?? r.createdAt };
 }
 
 /** The person's answer to a run's waiting step: false when nothing waits for it there (now). */
@@ -1045,8 +1091,10 @@ export function stepsOf(runId: string, o: { values?: boolean } = {}): RunStepVie
       if (st.endedAt) view.endedAt = st.endedAt;
     }
     if (o.values && st.outputs) {
-      const s = JSON.stringify(st.outputs);
-      view.values = s.length > 6000 ? Object.fromEntries(Object.entries(st.outputs).map(([k, v]) => [k, asText(v, 1500)])) : st.outputs;
+      // A step still asking shows its question; its form is on the run's card.
+      const outs = st.kind === 'ask' && st.status === 'waiting' ? { question: st.outputs.question } : st.outputs;
+      const s = JSON.stringify(outs);
+      view.values = s.length > 6000 ? Object.fromEntries(Object.entries(outs).map(([k, v]) => [k, asText(v, 1500)])) : outs;
     }
     return view;
   });

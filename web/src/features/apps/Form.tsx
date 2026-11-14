@@ -2,7 +2,7 @@
 // as chips or a list, yes/no, a file), with its help line and what to fix under it. Used by the app's
 // page, the builder's test run and the public page.
 import { useLayoutEffect, useRef, useState } from 'react';
-import { FileUp, X } from 'lucide-react';
+import { Check, FileUp, X } from 'lucide-react';
 import type { AppField } from '@shared/apps';
 import { bytes } from '../../lib/format';
 import { cx, inputCls, Switch } from '../../components/ui';
@@ -97,7 +97,7 @@ export function FieldInput({ f, value, onChange, file, onFile, disabled, maxMb =
     case 'choice': {
       const opts = f.options ?? [];
       if (f.multi) {
-        // Several at once (a form an MCP server asks for): the value has one per line.
+        // Several at once (an MCP server's form, an Ask a person step): the value has one per line.
         const picked = value.split('\n').filter(Boolean);
         const flip = (o: string) => onChange((picked.includes(o) ? picked.filter((x) => x !== o) : opts.filter((x) => x === o || picked.includes(x))).join('\n'));
         return (
@@ -111,10 +111,11 @@ export function FieldInput({ f, value, onChange, file, onFile, disabled, maxMb =
                 disabled={disabled}
                 onClick={() => flip(o)}
                 className={cx(
-                  'h-8.5 rounded-full px-3.5 text-[13.5px] ring-1 transition-colors ring-inset',
+                  'inline-flex h-8.5 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] ring-1 transition-colors ring-inset',
                   picked.includes(o) ? 'bg-accent-soft font-medium text-accent ring-accent/40' : 'bg-bg-1 text-fg-2 ring-line-2 hover:bg-bg-2 hover:text-fg',
                 )}
               >
+                {picked.includes(o) && <Check size={14} aria-hidden className="shrink-0" />}
                 {o}
               </button>
             ))}

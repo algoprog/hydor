@@ -53,6 +53,9 @@ topic says what each part does, and its API topic gives the format.
     ctx.tool, ctx.ask, ctx.data and ctx.app are steps of the run, kept and replayed after a restart (so make the
     same calls in the same order for the same input). Say what it gives (outputs).
   - **Ask a person** before anything that sends, spends or deletes, and when the choice is the user's.
+    Its form's choice can offer what an earlier step found: an option written as one `{{find.items}}` becomes that
+    list's items (or a text's lines) when it asks, and `multi: true` lets the person tick several (the value has one
+    a line). Use it to ask which of the things a run found to go on with, instead of a free-text box.
   - **Ask an agent** for the parts that need judgement and tools, with outputs it hands in.
 - Every step's outputs are what later steps use (`{{step.value}}`); the form's answers are `{{field}}`, a Repeat's
   item `{{item}}`, and the built-in values `{{today}}`, `{{now}}`, `{{weekday}}`, `{{timezone}}` (the user's) and
