@@ -319,6 +319,8 @@ const NO_WORDS = new Set([
   // A diagram's shapes, routes, layouts and drawing: their notes go to agents, the rest is code (the model's names of
   // arrows, fonts and looks, in diagram.ts, are the app's words).
   'shared/diagram-shapes.ts',
+  // The page a code playground runs its code in: a script, its words given by the view (uis/code.tsx) in the app's language.
+  'web/src/components/answer/playground-doc.ts',
   'shared/diagram-route.ts',
   'shared/diagram-layout.ts',
   'shared/diagram-render.ts',

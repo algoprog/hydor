@@ -93,7 +93,7 @@ export default function AnswersPage() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[820px] px-4 pt-5 pb-16 sm:px-6">
           <p className="mb-4 text-[13.5px] leading-relaxed text-fg-2">
-            {tr('When an answer reads better as something to look at or use, an agent shows it in one of these, filled with its own content, as the reply comes. It picks one only when it helps: other answers stay text. Ask for one in plain words too: “compare them in a table”, “put them on a map”, “quiz me on it”.')}
+            {tr('Agents show each part of an answer that is something to look at, compare, choose from, follow, try or practise in one of these, filled with its own content, as the reply comes; conversation and short answers stay text. Ask for one in plain words too: “compare them in a table”, “put them on a map”, “give me practice problems”.')}
           </p>
           <div className="sticky top-0 z-10 -mx-4 bg-bg/95 px-4 pt-1 pb-3 backdrop-blur sm:-mx-6 sm:px-6">
             <label className="relative block">

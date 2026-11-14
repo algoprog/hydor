@@ -582,16 +582,16 @@ export function Btn({ children, onClick, primary, icon, className, disabled, tit
   );
 }
 
-/** Puts words in the session's message box (the user sends them, or changes them first). */
-export function useAsk(): (text: string) => void {
+/** Puts words in the session's message box (the user sends them, or changes them first); with `send`, an empty box sends them at once. */
+export function useAsk(): (text: string, opts?: { send?: boolean }) => void {
   const { sessionKey, demo } = useAui();
   return useCallback(
-    (text: string) => {
+    (text: string, opts?: { send?: boolean }) => {
       if (demo || !sessionKey) {
         toast(tr('In a conversation, this goes to your message box'), 'info');
         return;
       }
-      composeInsert(text, sessionKey);
+      composeInsert(text, sessionKey, undefined, opts);
     },
     [sessionKey, demo],
   );

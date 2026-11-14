@@ -1,4 +1,4 @@
-// Answer UIs for code: code in tabs, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories.
+// Answer UIs for code: code in tabs, a playground to run code in, commands, API endpoints, errors, test results, JSON, regular expressions, shortcuts, repositories.
 import type { AnswerUiSpec } from './types.ts';
 
 export const CODE: AnswerUiSpec[] = [
@@ -660,6 +660,28 @@ Line = { time?: string, level?: "debug" | "info" | "warn" | "error" | "fatal", m
       ],
       next: 5,
       note: 'Cron reads these times on the server’s clock, set to **Chicago time**; a hosted scheduler such as GitHub Actions would read them in UTC.',
+    },
+  },
+  {
+    id: 'playground',
+    title: 'Code playground',
+    group: 'code',
+    use: 'Code to run and change in place: JavaScript, Python or a web page runs in a sealed-off frame with its output under it; edit it and run again, reset it, or send it to be checked.',
+    keywords: 'playground run code execute try it sandbox repl editor interactive learn programming snippet python javascript html live console output exercise',
+    shape: `{
+  title?: string
+  language: "javascript" | "python" | "html"   // html: a page with its CSS and scripts, shown as it looks
+  code: string
+  tasks?: md[]                   // things to try changing
+  packages?: string[]            // Python packages to load first (numpy, pandas, matplotlib…: those Pyodide has)
+  autorun?: boolean              // run it as soon as it is shown (html runs at once unless false; javascript and python wait for Run unless true)
+}`,
+    example: {
+      title: 'Count the words in a sentence',
+      language: 'python',
+      code: 'sentence = "the quick brown fox jumps over the lazy dog the end"\n\ncounts = {}\nfor word in sentence.split():\n    counts[word] = counts.get(word, 0) + 1\n\nfor word, n in sorted(counts.items(), key=lambda item: -item[1]):\n    print(word, n)\n',
+      tasks: ['Change the sentence and run it again.', 'Print only the words that appear more than once.', 'Sort the words alphabetically instead of by count.'],
+      autorun: true,
     },
   },
 ];

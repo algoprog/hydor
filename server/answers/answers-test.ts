@@ -143,6 +143,16 @@ const ASKS: [string, string, 1 | 3][] = [
   ['knockout tournament bracket', 'bracket', 1],
   ['server error logs', 'logs', 3],
   ['what does this cron expression mean', 'cron', 1],
+  ['suggest next questions to ask', 'follow-ups', 1],
+  ['related questions I can tap', 'follow-ups', 1],
+  ['is this claim true or false', 'fact-check', 1],
+  ['debunk myths with sources', 'fact-check', 1],
+  ['mark up my essay with corrections', 'annotated-text', 1],
+  ['proofread this paragraph and show grammar mistakes', 'annotated-text', 1],
+  ['practice problems with hints and a score', 'practice', 1],
+  ['maths exercises to answer and check', 'practice', 1],
+  ['a concept map of the ideas', 'network', 1],
+  ['relationships between characters', 'network', 1],
 ];
 
 test('find_ui by words: the UI a few words ask for comes first', async () => {
@@ -245,6 +255,25 @@ test('several parts of one answer: the UIs that fit each, each described once, a
   assert.match(typeof one === 'string' ? one : one.text, /^The answer UIs for each part/, 'one part given as queries');
 });
 
+test('names beside queries: the UIs named first with their examples, then what the queries find, none twice', async () => {
+  const tool = findUiTool();
+  const r = await tool.run({ names: ['comparison', 'no-such-ui'], queries: ['weather forecast for the week', 'compare products side by side'] }, ctx);
+  const text = typeof r === 'string' ? r : r.text;
+  assert.match(text, /^The UIs you named \(comparison\), then the answer UIs for each part of your answer/);
+  assert.match(text, /No UI is called “no-such-ui”/);
+  assert.match(text, /```ui comparison\n\{/, 'a named UI comes with its example');
+  assert.match(text, /## weather: /, 'and the queries’ finds');
+  const ids = [...text.matchAll(/^## ([a-z-]+):/gm)].map((m) => m[1]);
+  assert.equal(ids[0], 'comparison', 'the named first');
+  assert.equal(new Set(ids).size, ids.length, 'each UI described once');
+  const single = await tool.run({ names: ['recipe'], query: 'weather forecast' }, ctx);
+  const t2 = typeof single === 'string' ? single : single.text;
+  assert.match(t2, /^The UIs you named \(recipe\), then the answer UIs that fit “weather forecast”/);
+  assert.match(t2, /## recipe: [\s\S]*## weather: /);
+  const onlyBad = await tool.run({ names: ['no-such-ui'], query: 'weather forecast' }, ctx);
+  assert.match(typeof onlyBad === 'string' ? onlyBad : onlyBad.text, /## weather: /, 'an unknown name beside a query still finds what the query asks');
+});
+
 test('every agent hears of answer UIs when it starts', () => {
   assert.match(FORMATTING, /find_ui/);
   assert.match(FORMATTING, /```ui <name>/);
@@ -252,6 +281,17 @@ test('every agent hears of answer UIs when it starts', () => {
   assert.match(FORMATTING, /one answer may hold several/, 'and that an answer may hold several');
   assert.match(FORMATTING, /every answer you give, the first and every later one/, 'in every turn of the conversation, not only the first');
   assert.match(findUiTool().description, /any turn of the conversation/);
+  // The UIs it names by situation are real ones, so an agent can ask find_ui for them by name.
+  // Its names: the words joined by dashes, and each item of a list that is one word (what is in brackets is prose).
+  const lists = [...FORMATTING.matchAll(/^ {2}- [^:]+: (.+)$/gm)].map((m) => m[1].replace(/\([^)]*\)/g, ''));
+  assert.ok(lists.length >= 8, 'by kind of answer');
+  const named = new Set<string>();
+  for (const l of lists) {
+    for (const t of l.match(/\b[a-z]+(?:-[a-z]+)+\b/g) ?? []) named.add(t);
+    for (const p of l.split(/[,;]/).flatMap((p) => (p.split(':').pop() ?? '').split(/ or /))) if (/^[a-z]+$/.test(p.trim())) named.add(p.trim());
+  }
+  assert.ok(named.size >= 40, `it names UIs for each kind of answer (${named.size})`);
+  for (const n of named) assert.ok(ANSWER_UIS.some((s) => s.id === n), `${n}: the formatting rules name a UI that is in the catalog`);
 });
 
 let failed = 0;

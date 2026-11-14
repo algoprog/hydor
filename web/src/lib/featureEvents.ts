@@ -27,10 +27,11 @@ export function useFeatureEvent(id: string, fn: Handler) {
 
 /**
  * Asks the message box of the session on screen (or the start page's) to add text: a choice clicked in
- * a page. With `replace`, that earlier text gives way to this one where it still is (a choice changed).
+ * a page. With `replace`, that earlier text gives way to this one where it still is (a choice changed). With `send`,
+ * the text is sent at once as the next message when the box is empty and can send; otherwise it is added as usual.
  */
-export function composeInsert(text: string, key?: string, replace?: string) {
-  window.dispatchEvent(new CustomEvent('hydor:compose', { detail: { text, key, replace } }));
+export function composeInsert(text: string, key?: string, replace?: string, opts?: { send?: boolean }) {
+  window.dispatchEvent(new CustomEvent('hydor:compose', { detail: { text, key, replace, send: opts?.send } }));
 }
 
 /** The message box's text with `next` in: in place of `old` where that still is, else added at the end. */

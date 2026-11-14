@@ -85,7 +85,9 @@ Every agent here gets the same help from the app, whatever its model: Claude Cod
 agents that speak ACP and take MCP servers.
 
 - **Agents** (in the sidebar; assistants before 0.37.0): start as a Researcher, Writer, Tutor, Planner, Analyst, Coder or
-  App builder (it makes apps), or one of your own, and switch to another in the session's message box when the work
+  App builder (it makes apps; the others answer in the answer UIs that suit their work: the Tutor with practice
+  problems and flashcards, the Planner with itineraries and calendars, the Analyst with key figures and charts), or one
+  of your own, and switch to another in the session's message box when the work
   changes. The Agents page shows each of yours as a card with how it is doing (working, needs you, budget spent), its
   projects, tier, next run and what it spent this month. **New agent** drafts one from what you say it should do, with
   the helper model: its instructions, tools, tier and a schedule, read as sentences whose underlined words change it in
@@ -1049,10 +1051,14 @@ programs shows each program's version and what is out, with Check now, Update no
   place in a sealed-off frame as the reply comes, and pictures from the web (fetched by the app's own server, so the
   sites never see your browser) or from this computer, opened large on a click. The user's guidelines can ask for
   plain text instead.
-- Answer UIs: when an answer is something to look at, compare or use, the agent shows it in one of more than 140
-  ready-made UIs drawn in the app's look as the reply streams, by writing a ```` ```ui <name> ```` block of JSON. They
+- Answer UIs: when part of an answer is something to look at, compare, choose from, follow, try or practise, the agent
+  shows it in one of more than 140 ready-made UIs drawn in the app's look as the reply streams, by writing a
+  ```` ```ui <name> ```` block of JSON. Agents are told to use one for every such part, which is most of an answer of more
+  than a few lines (conversation, short answers and code changes stay text), to fill their pictures and to play a video
+  where watching helps more. They
   cover summaries and notes (key points, callouts, fact sheets, definitions, glossaries, FAQs, tabs, columns, quotes,
-  cards), comparing and deciding (comparison tables with the best values marked, pros and cons, a decision matrix whose
+  cards, fact checks that weigh each claim's evidence with a tally of verdicts that filters them, follow-up buttons at
+  the end of an answer that send the next question when tapped), comparing and deciding (comparison tables with the best values marked, pros and cons, a decision matrix whose
   weights re-rank the options, choices that go to the message box, picks, rankings, scorecards, head-to-heads, 2×2
   quadrants, SWOT, troubleshooters and wizards that ask one question at a time, a wheel, dice or coin that picks for
   you, Venn diagrams), shopping (products, product grids, spec sheets, price history, homes to buy or rent), places and travel (places on a map,
@@ -1069,15 +1075,17 @@ programs shows each program's version and what is out, with Check now, Update no
   money (stock quotes, loans, budgets, savings growth, pricing plans, splitting a bill, an investment portfolio), learning (quizzes, flashcards,
   worked solutions, explainers at several levels, vocabulary with pronunciation, translations, research papers with
   BibTeX, trees, resources, fill in the blanks, matching pairs, putting things in order, verb conjugations, dialogues to
-  listen to, grading rubrics, chess positions to step through), science (tonight's sky with the moon's phase and the planets, unit conversion, formulas, a function plotter with
+  listen to, grading rubrics, chess positions to step through, practice problems you answer in your own words or numbers that are checked in place
+  with hints, a worked solution and a score, network graphs of how things connect), science (tonight's sky with the moon's phase and the planets, unit conversion, formulas, a function plotter with
   sliders),
   media and events (galleries, videos with chapters, sounds, tracks, films, books and games, events with an .ics to add to
   a calendar, colour palettes with contrast checks, news, pictures with numbered notes, before-and-after sliders, chord
   charts, font pairings shown live), people and sports (profiles, people, org charts, matches,
   league tables, fixtures, contact cards with a vCard, knockout brackets), writing (emails, alternatives to pick from, social posts with character counts, changes to a
-  text, a reference in APA, MLA, Chicago, IEEE, Harvard and BibTeX) and code (code in tabs, commands, API endpoints, errors explained, test results, a JSON explorer, a regular
-  expression tester, shortcuts, repositories, a log viewer, cron schedules with their next runs). Agents find the ones that fit with `find_ui`: a few words on what the
-  answer shows, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
+  text, annotated text whose marked passages open a note and a suggested change, with the original and the corrected text
+  to switch between, a reference in APA, MLA, Chicago, IEEE, Harvard and BibTeX) and code (code in tabs, commands, API endpoints, errors explained, test results, a JSON explorer, a regular
+  expression tester, shortcuts, repositories, a log viewer, cron schedules with their next runs, a code playground that runs JavaScript, Python and web pages in place). Agents find the ones that fit with `find_ui`: the names of the ones they already know together with a few words on what
+  the other parts of the answer show, in one lookup, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
   with the data each takes and an example, or the best three for each part of an answer at once (`queries`), since one
   answer may hold a UI for each of its parts and a session as many as its answers need. What you tick or answer in one
   is kept on that device; an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data** and

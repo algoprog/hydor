@@ -189,10 +189,20 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     setText((cur) => (cur.trim() ? `${cur.replace(/\s*$/, '')} ${t}` : t));
     ta.current?.focus();
   };
+  // What the listener below needs fresh (it is set up once per session): the box as it is now, and the latest send.
+  const now = useRef({ text, atts, busy, locked, move: !!move });
+  now.current = { text, atts, busy, locked, move: !!move };
+  const sendRef = useRef<(opposite?: boolean, override?: string) => Promise<void>>(async () => {});
   useEffect(() => {
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{ text: string; key?: string; replace?: string; files?: Attachment[] }>).detail;
+      const d = (e as CustomEvent<{ text: string; key?: string; replace?: string; files?: Attachment[]; send?: boolean }>).detail;
       if (!d || (d.key && d.key !== key) || (!d.text && !d.replace && !d.files?.length)) return;
+      // A follow-up's button: into an empty box that can send, it goes at once, as if Enter were pressed.
+      const n = now.current;
+      if (d.send && d.text.trim() && !d.replace && !d.files?.length && !n.text.trim() && !n.atts.length && !n.busy && !n.locked && !n.move) {
+        void sendRef.current(false, d.text);
+        return;
+      }
       // A choice changed in a page: the new one takes the old one's place, if that is still there.
       setText((cur) => putText(cur, d.text, d.replace));
       // A picture of a part of a PDF asked about comes with its words (Files' reader).
@@ -293,8 +303,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   // The id a message goes with: the same each time it is sent again (its answer lost on the way, or Send pressed again
   // after an error), so the server sends it once; a new one once it went, or once what is sent changes.
   const sending = useRef<{ what: string; id: string } | null>(null);
-  const send = async (opposite = false) => {
-    const t = text.trim();
+  const send = async (opposite = false, override?: string) => {
+    const t = (override ?? text).trim();
     if (move) return handOff(t);
     if ((!t && !atts.length) || busy || locked) return;
     if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return;
@@ -331,6 +341,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
       setBusy(false);
     }
   };
+
+  sendRef.current = send;
 
   /** Continues the conversation in a new session of the other agent, which opens. */
   const handOff = async (t: string) => {

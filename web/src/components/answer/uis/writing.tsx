@@ -1,10 +1,10 @@
-// The answer UIs for writing (emails, alternatives to pick from, social posts, changes to a text): their views, by name (shared/answer-ui/writing.ts has what each takes).
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+// The answer UIs for writing (emails, alternatives to pick from, social posts, changes to a text, a text marked up with notes): their views, by name (shared/answer-ui/writing.ts has what each takes).
+import { Fragment, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Bookmark, ChartNoAxesColumn, Check, Copy as CopyIcon, Ellipsis, Globe, Heart, ImageIcon, Lightbulb, Mail, MessageCircle, MessageSquare, Repeat2, Send, Share, Share2, Star, ThumbsUp } from 'lucide-react';
+import { ArrowRight, Bookmark, ChartNoAxesColumn, Check, Copy as CopyIcon, Ellipsis, Globe, Heart, ImageIcon, Lightbulb, Mail, MessageCircle, MessageSquare, Repeat2, Send, Share, Share2, Star, ThumbsUp } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
-import { arr, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, isObj, Md, num, Pic, Ring, Seg, str, textOf, useAsk, useKept, words, type AnswerUiView, type Data } from '../kit';
+import { arr, Ask, Avatar, Btn, Card, Chip, Copy, fmtNum, Head, isObj, Md, num, obj, Pic, Ring, Seg, SpeakBtn, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 // ---- shared pieces ---------------------------------------------------------------------------------------------------
 
@@ -854,6 +854,355 @@ function Diff({ data, done }: { data: Data; done: boolean }) {
   );
 }
 
+// ---- a text with passages marked ----------------------------------------------------------------------------------------
+
+/** One note on a text: where its quote is (start −1: not marked), and its place in the text's order (n, from 1). */
+interface TextNote {
+  n: number;
+  quote: string;
+  /** Its kind as the filter groups it ("word choice"), and as it reads on a chip. */
+  key: string;
+  label: string;
+  tone: Tone;
+  note: string;
+  /** What to write instead, "" to cut the quote, null for no change. */
+  fix: string | null;
+  start: number;
+  end: number;
+  /** The quote is nowhere in the text (rather than: marked by an earlier note). */
+  missing: boolean;
+}
+
+const KIND_GOOD = /strength|good|praise|nice|positive|well done|great|keep|effective|excellent/;
+const KIND_BAD = /grammar|spell|punctuat|agreement|tense|typo|error|mistake|incorrect|wrong/;
+const KIND_WARN = /word choice|clarity|style|tone|wordi|flow|structure|phrasing|concise|vague|register|redundan|repetit|awkward|readab|formal|transition/;
+const KIND_INFO = /fact|meaning|reference|context|note|comment|definition|translation|vocab|allusion|theme|symbol|imagery|etymolog|history|background/;
+
+/** A note's colour: its tone when it has one, else what its kind says (mistakes red, style amber, facts blue, strengths green). */
+function noteTone(kind: string, tone: unknown): Tone {
+  const given = str(tone).trim().toLowerCase();
+  if (given) {
+    const t = toneOf(given);
+    if (t !== 'neutral' || given === 'neutral') return t;
+  }
+  const k = kind.toLowerCase();
+  return KIND_GOOD.test(k) ? 'good' : KIND_BAD.test(k) ? 'bad' : KIND_WARN.test(k) ? 'warn' : KIND_INFO.test(k) ? 'info' : 'accent';
+}
+
+/** Where `q` is in `text`: each place, exactly as written, else (when nowhere) with any spaces and quote marks alike and capitals ignored. */
+function quoteSpots(text: string, q: string): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = text.indexOf(q); i >= 0 && q; i = text.indexOf(q, i + q.length)) out.push([i, i + q.length]);
+  if (out.length || !q.trim()) return out;
+  const pattern = q
+    .trim()
+    .split(/\s+/)
+    .map((w) =>
+      w
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/['’‘]/g, '[\'’‘]')
+        .replace(/["“”]/g, '["“”]'),
+    )
+    .join('\\s+');
+  try {
+    for (const m of text.matchAll(new RegExp(pattern, 'giu'))) if (m[0]) out.push([m.index, m.index + m[0].length]);
+  } catch {}
+  return out;
+}
+
+/**
+ * The notes of an answer in the order of the text, each with where its quote is. A note takes the `at`-th place its quote
+ * appears (else the first one no earlier note has taken); one that falls on words an earlier note marked is left unmarked.
+ */
+function placeNotes(text: string, raw: unknown): TextNote[] {
+  const taken: [number, number][] = [];
+  const free = (o: [number, number]) => !taken.some(([s, e]) => o[0] < e && o[1] > s);
+  const notes: Omit<TextNote, 'n'>[] = [];
+  for (const r of arr(raw)) {
+    const o = obj(r);
+    const quote = str(o.quote ?? o.passage ?? o.span ?? o.target ?? o.original);
+    const note = str(o.note ?? o.comment ?? o.explanation ?? o.why ?? o.text);
+    if (!quote && !note) continue;
+    const fixed = o.fix ?? o.suggestion ?? o.replacement ?? o.correction;
+    const fix = typeof fixed === 'string' || typeof fixed === 'number' ? str(fixed) : null;
+    const kind = str(o.kind ?? o.type ?? o.category).trim();
+    const key = kind.toLowerCase().replace(/[-_\s]+/g, ' ');
+    const at = num(o.at ?? o.occurrence ?? o.nth);
+    let start = -1;
+    let end = -1;
+    let missing = false;
+    if (quote) {
+      const spots = quoteSpots(text, quote);
+      const spot = at !== null && at >= 1 ? spots[Math.floor(at) - 1] : spots.find(free);
+      if (!spots.length || (at !== null && at >= 1 && !spot)) missing = true;
+      else if (spot && free(spot)) {
+        [start, end] = spot;
+        taken.push(spot);
+      }
+    }
+    notes.push({ quote, key, label: kind ? kind[0].toUpperCase() + kind.slice(1) : '', tone: noteTone(kind, o.tone), note, fix: fix === quote ? null : fix, start, end, missing });
+  }
+  const placed = notes.filter((x) => x.start >= 0).sort((a, b) => a.start - b.start);
+  return [...placed, ...notes.filter((x) => x.start < 0)].map((x, i) => ({ ...x, n: i + 1 }));
+}
+
+const isSpace = (c: string | undefined) => c === ' ' || c === '\t';
+
+/**
+ * The text with each note's fix made (a fix of "" cuts the quote, and a space beside it so no gap is left): as pieces, those
+ * written in place of a quote carrying their note's number, and as the whole text.
+ */
+function applyFixes(text: string, notes: TextNote[]): { pieces: { v: string; n?: number }[]; text: string } {
+  const fixes = notes.filter((x) => x.start >= 0 && x.fix !== null).sort((a, b) => a.start - b.start);
+  const pieces: { v: string; n?: number }[] = [];
+  let cur = 0;
+  fixes.forEach((x, k) => {
+    const limit = fixes[k + 1]?.start ?? text.length;
+    let s = x.start;
+    let e = x.end;
+    let put = x.fix as string;
+    if (!put.trim()) {
+      put = '';
+      const after = text[e];
+      const closing = after === undefined || after === '\n' || /[.,;:!?)\]}…»”’]/.test(after);
+      if (closing && s > cur && isSpace(text[s - 1])) while (s > cur && isSpace(text[s - 1])) s--;
+      else if ((s === 0 || text[s - 1] === '\n' || isSpace(text[s - 1])) && isSpace(after)) while (e < limit && isSpace(text[e])) e++;
+      else if (/^\s/.test(x.quote) && /\s$/.test(x.quote) && s > 0 && after !== undefined && !/\s/.test(text[s - 1]) && !/\s/.test(after)) put = ' ';
+    }
+    if (s > cur) pieces.push({ v: text.slice(cur, s) });
+    if (put) pieces.push({ v: put, n: x.n });
+    cur = e;
+  });
+  if (cur < text.length) pieces.push({ v: text.slice(cur) });
+  return { pieces, text: pieces.map((p) => p.v).join('') };
+}
+
+// What a passage looks like by its note's colour: a soft tint with a line under it, stronger when selected; its marker.
+const MARKED: Record<Tone, string> = {
+  good: 'bg-ok/15 shadow-[inset_0_-2px_0_0_var(--ok)]',
+  warn: 'bg-warn/15 shadow-[inset_0_-2px_0_0_var(--warn)]',
+  bad: 'bg-err/15 shadow-[inset_0_-2px_0_0_var(--err)]',
+  info: 'bg-info/15 shadow-[inset_0_-2px_0_0_var(--info)]',
+  accent: 'bg-accent/15 shadow-[inset_0_-2px_0_0_var(--accent)]',
+  neutral: 'bg-fg-3/15 shadow-[inset_0_-2px_0_0_var(--fg-3)]',
+};
+const MARKED_ON: Record<Tone, string> = {
+  good: 'bg-ok/35',
+  warn: 'bg-warn/35',
+  bad: 'bg-err/35',
+  info: 'bg-info/35',
+  accent: 'bg-accent/35',
+  neutral: 'bg-fg-3/35',
+};
+const MARKER: Record<Tone, string> = {
+  good: 'bg-ok text-bg',
+  warn: 'bg-warn text-bg',
+  bad: 'bg-err text-bg',
+  info: 'bg-info text-bg',
+  accent: 'bg-accent text-accent-fg',
+  neutral: 'bg-fg-3 text-bg',
+};
+
+/** What a note changes: the quote struck through and its fix beside it (or that it goes), else just the quote. */
+function NoteChange({ n }: { n: TextNote }) {
+  if (!n.quote) return null;
+  if (n.fix === null) return <span className="text-fg-2 break-words">“{n.quote}”</span>;
+  return (
+    <span className="inline-flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 break-words">
+      <del className={DEL}>{n.quote}</del>
+      <ArrowRight size={12} className="shrink-0 self-center text-fg-3" aria-hidden />
+      {n.fix.trim() ? <ins className={cx(ADD, 'no-underline')}>{n.fix}</ins> : <span className="text-fg-3 italic">{tr('cut it')}</span>}
+    </span>
+  );
+}
+
+function AnnotatedText({ data, done }: { data: Data; done: boolean }) {
+  const text = str(data.text).replace(/\r\n?/g, '\n');
+  const notes = useMemo(() => placeNotes(text, data.notes), [text, data.notes]);
+  const fixed = useMemo(() => applyFixes(text, notes), [text, notes]);
+  const changed = fixed.text !== text;
+  const [mode, setMode] = useKept<'original' | 'corrected'>('mode', 'original');
+  const [filter, setFilter] = useState('');
+  const [sel, setSel] = useState<number | null>(null);
+  const marks = useRef<Record<number, HTMLElement | null>>({});
+  const corrected = changed && mode === 'corrected';
+
+  // The kinds there are, in the order they first appear, each with its notes' count and colour.
+  const kinds = useMemo(() => {
+    const m = new Map<string, { label: string; tone: Tone; count: number }>();
+    for (const n of notes) {
+      if (!n.key) continue;
+      const k = m.get(n.key) ?? { label: n.label, tone: n.tone, count: 0 };
+      k.count++;
+      m.set(n.key, k);
+    }
+    return [...m.entries()];
+  }, [notes]);
+  const active = kinds.some(([k]) => k === filter) ? filter : '';
+  const shows = (n: TextNote) => !active || n.key === active;
+  const open = done && sel !== null ? notes.find((n) => n.n === sel && shows(n)) : undefined;
+  const pick = (n: number, scroll?: boolean) => {
+    if (!done) return;
+    setSel((s) => (s === n ? null : n));
+    if (scroll && sel !== n) marks.current[n]?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  };
+  const keys = (n: number) => (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    pick(n);
+  };
+  const press = (n: TextNote) =>
+    done
+      ? { role: 'button', tabIndex: 0, 'aria-pressed': sel === n.n, onClick: () => pick(n.n), onKeyDown: keys(n.n) }
+      : {};
+  const focusRing = 'outline-none focus-visible:ring-2 focus-visible:ring-accent';
+
+  // The text, with the shown notes' quotes marked in it (the others, and the words between, as they are).
+  const body: ReactNode[] = [];
+  if (corrected) {
+    fixed.pieces.forEach((p, i) => {
+      const n = p.n ? notes.find((x) => x.n === p.n) : undefined;
+      body.push(
+        n ? (
+          <ins key={i} ref={(el) => void (marks.current[n.n] = el)} {...press(n)} className={cx(ADD, 'no-underline', done && 'cursor-pointer', focusRing, sel === n.n && 'ring-1 ring-ok')}>
+            {p.v}
+          </ins>
+        ) : (
+          <Fragment key={i}>{p.v}</Fragment>
+        ),
+      );
+    });
+  } else {
+    let at = 0;
+    for (const n of notes) {
+      if (n.start < 0) continue;
+      if (n.start > at) body.push(<Fragment key={`t${n.n}`}>{text.slice(at, n.start)}</Fragment>);
+      const words = text.slice(n.start, n.end);
+      body.push(
+        shows(n) ? (
+          <span key={n.n} ref={(el) => void (marks.current[n.n] = el)} {...press(n)} title={n.label || undefined} className={cx('rounded-[3px] [box-decoration-break:clone]', MARKED[n.tone], done && 'cursor-pointer', focusRing, sel === n.n && MARKED_ON[n.tone])}>
+            {words}
+            <span aria-hidden className={cx('relative -top-[0.3em] ml-[2px] inline-grid h-[15px] min-w-[15px] place-items-center rounded-full px-[3px] align-baseline text-[10px] leading-none font-bold tabular-nums select-none', MARKER[n.tone])}>
+              {n.n}
+            </span>
+          </span>
+        ) : (
+          <Fragment key={n.n}>{words}</Fragment>
+        ),
+      );
+      at = n.end;
+    }
+    if (at < text.length) body.push(<Fragment key="end">{text.slice(at)}</Fragment>);
+  }
+
+  const listed = notes.filter(shows);
+  return (
+    <Card>
+      <Head title={data.title} aside={done && text ? <SpeakBtn text={corrected ? fixed.text : text} lang={str(data.language).trim() || undefined} /> : undefined} />
+      {(kinds.length > 1 || (done && changed)) && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          {kinds.length > 1 ? (
+            <div className="flex min-w-0 flex-wrap gap-1.5">
+              {[['', { label: tr('All'), tone: 'neutral' as Tone, count: notes.length }] as const, ...kinds].map(([k, v]) => {
+                const on = active === k;
+                return (
+                  <button
+                    key={k || 'all'}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setFilter(k)}
+                    className={cx(
+                      'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] leading-none font-medium transition-colors',
+                      on ? (k ? cx(TONE[v.tone], 'border-current') : 'border-transparent bg-fg text-bg') : 'border-line text-fg-2 hover:bg-bg-2',
+                    )}
+                  >
+                    {k && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_FILL[v.tone] }} aria-hidden />}
+                    <span className="truncate">{v.label}</span>
+                    <span className="tabular-nums opacity-70">{v.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <span />
+          )}
+          {done && changed && (
+            <div className="flex items-center gap-2">
+              <Seg
+                size="sm"
+                options={[
+                  { value: 'original', label: tr('Original') },
+                  { value: 'corrected', label: tr('Corrected') },
+                ]}
+                value={mode}
+                onChange={setMode}
+              />
+              <Copy text={fixed.text} label={tr('Copy corrected text')} />
+            </div>
+          )}
+        </div>
+      )}
+      {text && (
+        <div
+          className="rounded-xl border border-line px-3.5 py-3 text-[15px] leading-[1.9] break-words whitespace-pre-wrap"
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape' || sel === null) return;
+            setSel(null);
+            e.stopPropagation();
+          }}
+        >
+          {body}
+        </div>
+      )}
+      {open && (
+        <div className="mt-2.5 rounded-xl border border-line border-l-[3px] bg-bg-1 px-3.5 py-3" style={{ borderLeftColor: TONE_FILL[open.tone] }}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px]">
+            <span className={cx('grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums', MARKER[open.tone])}>{open.n}</span>
+            {open.label && <Chip tone={open.tone}>{open.label}</Chip>}
+            <NoteChange n={open} />
+          </div>
+          {open.note && <Md text={open.note} className="mt-2 text-[13.5px] text-fg-2" />}
+          {open.quote && (
+            <div className="mt-2.5">
+              <Ask text={`About “${open.quote}”: `}>{tr('Ask about this')}</Ask>
+            </div>
+          )}
+        </div>
+      )}
+      {listed.length > 0 && (
+        <ol className="m-0 mt-3 list-none p-0">
+          {listed.map((n) => (
+            <li key={n.n} onClick={() => pick(n.n, true)} className={cx('flex min-w-0 gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors', done && 'cursor-pointer', open?.n === n.n && 'bg-accent-soft')}>
+              <button
+                type="button"
+                disabled={!done}
+                aria-pressed={done ? open?.n === n.n : undefined}
+                aria-label={`${n.n}. ${n.quote}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  pick(n.n, true);
+                }}
+                className={cx('mt-px grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums', n.start >= 0 ? MARKER[n.tone] : 'bg-bg-2 text-fg-3', focusRing)}
+              >
+                {n.n}
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  {n.label && <span className={cx('text-[11.5px] font-semibold', TONE[n.tone].split(' ')[0])}>{n.label}</span>}
+                  <NoteChange n={n} />
+                </div>
+                {n.note && <Md text={n.note} inline className="line-clamp-2 text-fg-2" />}
+                {n.missing && <div className="text-[12px] text-fg-3 italic">{tr('not found in the text')}</div>}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {str(data.summary).trim() && <Md text={data.summary} className="mt-3.5 rounded-xl bg-bg-2 px-3.5 py-2.5 text-[13.5px] text-fg-2" />}
+    </Card>
+  );
+}
+
 // ---- a citation: its sources, and the styles that write them out ----------------------------------------------------------
 
 /** A piece of a reference as a style writes it: words, in italics or not. */
@@ -1522,5 +1871,6 @@ export const WRITING_UIS: Record<string, AnswerUiView> = {
   variants: Variants,
   'social-post': SocialPost,
   diff: Diff,
+  'annotated-text': AnnotatedText,
   citation: Citation,
 };

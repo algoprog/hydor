@@ -1,10 +1,10 @@
 // The answer UIs that sum things up or lay out notes: their views, by name (shared/answer-ui/summary.ts has what each takes).
 import { useMemo, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, Info, Lightbulb, MessageSquareWarning, OctagonAlert, Search, X } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, CircleHelp, CircleX, CornerDownRight, Info, Lightbulb, MessageSquareWarning, OctagonAlert, Search, X } from 'lucide-react';
 import { tr } from '../../../i18n/runtime';
 import { cx } from '../../ui';
-import { arr, Card, Chip, fmtDate, Head, isObj, KeyValues, LinkOut, Md, num, Pic, Section, SpeakBtn, str, textOf, TONE_FILL, toneOf, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
+import { arr, Card, Chip, fmtDate, Head, hostOf, isObj, KeyValues, LinkOut, Md, num, Pic, Section, SpeakBtn, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, words, type AnswerUiView, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
 const mix = (color: string, pct: number, base = 'var(--panel)') => `color-mix(in srgb, ${color} ${pct}%, ${base})`;
@@ -566,6 +566,225 @@ function Cards({ data }: { data: Data }) {
   );
 }
 
+// ---- a fact check ---------------------------------------------------------------------------------------------------------
+
+/** The tone a verdict's words carry ("Mostly false" is bad, "Mixed" warns, "Unproven" is neutral); an explicit tone wins. */
+function verdictTone(verdict: string, tone: unknown): Tone {
+  if (str(tone).trim()) return toneOf(tone);
+  const v = verdict.trim().toLowerCase();
+  if (/\b(unproven|unverified|unverifiable|unknown|no evidence|unclear|not proven|unsubstantiated|undetermined|inconclusive|unsupported|untested)\b/.test(v)) return 'neutral';
+  if (/\b(mostly|largely|broadly|generally|substantially|essentially) (true|accurate|correct)\b/.test(v)) return 'good';
+  if (/\b(mostly|largely|generally|primarily) (false|untrue|incorrect|wrong|inaccurate)\b/.test(v)) return 'bad';
+  if (/\b(mixed|mixture|half|partly|partially|part|contested|disputed|misleading|needs? context|missing context|exaggerated|outdated|oversimplified|nuanced|it depends|complicated|debated|cherry-picked)\b/.test(v)) return 'warn';
+  if (/\b(false|incorrect|wrong|debunked|fabricated|untrue|fake|hoax|myth|not true|inaccurate|baseless|bogus)\b/.test(v)) return 'bad';
+  if (/\b(true|accurate|correct|established|confirmed|verified|supported|valid|right|fact|proven|holds up|checks out)\b/.test(v)) return 'good';
+  return 'neutral';
+}
+
+const VERDICT_ICON: Record<Tone, LucideIcon> = { good: Check, warn: AlertTriangle, bad: CircleX, info: Info, accent: Info, neutral: CircleHelp };
+
+const STANCE: Record<'supports' | 'refutes' | 'context', { icon: LucideIcon; cls: string; label: () => string }> = {
+  supports: { icon: Check, cls: 'text-ok bg-ok/12', label: () => tr('Supports') },
+  refutes: { icon: X, cls: 'text-err bg-err/12', label: () => tr('Refutes') },
+  context: { icon: Info, cls: 'text-fg-3 bg-bg-2', label: () => tr('Context') },
+};
+
+/** The stance an evidence item's word names ("supports", "against", "background"…); context otherwise. */
+function stanceOf(v: unknown): keyof typeof STANCE {
+  const s = str(v).trim().toLowerCase();
+  if (/^(support|supports|supporting|for|pro|confirms|confirming|backs|agrees|yes)$/.test(s)) return 'supports';
+  if (/^(refute|refutes|refuting|against|con|contradicts|contradicting|disputes|disagrees|opposes|no)$/.test(s)) return 'refutes';
+  return 'context';
+}
+
+/** Three steps filled to the confidence, with its word. */
+function ConfidenceMeter({ level }: { level: string }) {
+  const n = level === 'high' ? 3 : level === 'medium' ? 2 : 1;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[12px] text-fg-3" title={CONFIDENCE[level].label()}>
+      <span className="inline-flex gap-0.5" aria-hidden>
+        {[1, 2, 3].map((i) => (
+          <span key={i} className="h-1.5 w-3.5 rounded-full" style={{ background: i <= n ? 'var(--fg-2)' : 'var(--bg-3)' }} />
+        ))}
+      </span>
+      <span>{CONFIDENCE[level].label()}</span>
+    </span>
+  );
+}
+
+function EvidenceItem({ e }: { e: Data }) {
+  const st = STANCE[stanceOf(e.stance ?? e.verdict ?? e.position)];
+  const Icon = st.icon;
+  const source = str(e.source ?? e.title ?? e.publisher);
+  const url = str(e.url ?? e.link).trim();
+  const host = hostOf(url);
+  const when = str(e.date) ? fmtDate(e.date) : '';
+  const rest = [source && host && host !== source ? host : '', when].filter(Boolean).join(' · ');
+  return (
+    <li className="flex gap-2.5">
+      <span title={st.label()} className={cx('mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full', st.cls)}>
+        <Icon size={12} strokeWidth={2.5} aria-label={st.label()} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <Md text={e.text ?? e.quote ?? e.summary} className="text-[13.5px] text-fg-2" />
+        {(source || url || rest) && (
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[12px] text-fg-3">
+            {url ? <LinkOut url={url}>{source || undefined}</LinkOut> : source && <span className="min-w-0 truncate">{source}</span>}
+            {rest && <span className="min-w-0 truncate">{source || url ? `· ${rest}` : rest}</span>}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ClaimView({ c, tone }: { c: Data; tone: Tone }) {
+  const [open, setOpen] = useState(false);
+  const claim = c.claim ?? c.statement ?? c.text;
+  const verdict = str(c.verdict ?? c.rating ?? c.result).trim();
+  const conf = str(c.confidence).trim().toLowerCase();
+  const why = c.why ?? c.reason ?? c.reasoning ?? c.explanation;
+  const evidence = arr(c.evidence ?? c.sources)
+    .map((e) => (isObj(e) ? e : { text: e }))
+    .filter((e) => str(e.text ?? e.quote ?? e.summary) || str(e.source ?? e.title ?? e.publisher) || str(e.url ?? e.link));
+  const Icon = VERDICT_ICON[tone];
+  return (
+    <div className="min-w-0 py-3.5 first:pt-0 last:pb-0">
+      {str(claim) && (
+        <div className="border-l-[3px] pl-3" style={{ borderColor: TONE_FILL[tone] }}>
+          <Md text={claim} className="text-[14.5px] leading-snug font-medium text-fg" />
+          {str(c.who) && <div className="mt-0.5 text-[12px] text-fg-3">{str(c.who)}</div>}
+        </div>
+      )}
+      {(verdict || conf in CONFIDENCE) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {verdict && (
+            <Chip tone={tone} className="px-2.5 py-1 text-[12.5px]">
+              <Icon size={13} strokeWidth={2.5} className="shrink-0" aria-hidden />
+              {verdict}
+            </Chip>
+          )}
+          {conf in CONFIDENCE && <ConfidenceMeter level={conf} />}
+        </div>
+      )}
+      {str(why) && <Md text={why} className="mt-2 text-[13.5px] text-fg-2" />}
+      {evidence.length > 0 && (
+        <div className="mt-2">
+          <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-fg-3 transition-colors hover:text-fg">
+            <ChevronDown size={14} className={cx('transition-transform', open && 'rotate-180')} />
+            {tr('Evidence ({0})').replace('{0}', String(evidence.length))}
+          </button>
+          {open && (
+            <ul className="m-0 mt-2 list-none space-y-2.5 p-0">
+              {evidence.map((e, i) => (
+                <EvidenceItem key={i} e={e} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FactCheck({ data }: { data: Data }) {
+  const claims = arr(data.claims ?? data.items)
+    .map((c) => (isObj(c) ? c : { claim: c }))
+    .map((c) => ({ c, verdict: str(c.verdict ?? c.rating ?? c.result).trim() }))
+    .map((x) => ({ ...x, tone: verdictTone(x.verdict, x.c.tone) }))
+    .filter((x) => str(x.c.claim ?? x.c.statement ?? x.c.text) || x.verdict || str(x.c.why ?? x.c.reason ?? x.c.reasoning ?? x.c.explanation));
+  const [only, setOnly] = useState('');
+  // The tally: each verdict as the agent wrote it (the first spelling), counted case-insensitively, in order of appearance.
+  const tally: { key: string; label: string; tone: Tone; n: number }[] = [];
+  for (const x of claims) {
+    if (!x.verdict) continue;
+    const key = x.verdict.toLowerCase();
+    const t = tally.find((y) => y.key === key && y.tone === x.tone);
+    if (t) t.n++;
+    else tally.push({ key, label: x.verdict, tone: x.tone, n: 1 });
+  }
+  const tkey = (t: { key: string; tone: Tone }) => `${t.tone}:${t.key}`;
+  const picked = tally.find((t) => tkey(t) === only);
+  const shown = picked ? claims.filter((x) => x.verdict && x.verdict.toLowerCase() === picked.key && x.tone === picked.tone) : claims;
+  const checked = str(data.checked ?? data.date);
+  return (
+    <Card>
+      <Head title={data.title} aside={checked ? <span className="text-[12px] whitespace-nowrap text-fg-3">{tr('Checked {0}').replace('{0}', fmtDate(checked))}</span> : undefined} />
+      {tally.length > 0 && (
+        <div className={cx('mb-3.5 flex flex-wrap gap-1.5', shown.length > 0 && 'border-b border-line pb-3.5')}>
+          {tally.map((t) => {
+            const on = picked === t;
+            return (
+              <button
+                key={tkey(t)}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setOnly(on ? '' : tkey(t))}
+                className={cx('inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] leading-[1.35] font-medium transition-opacity', TONE[t.tone], on && 'ring-1 ring-current', picked && !on && 'opacity-60 hover:opacity-100')}
+              >
+                <span className="truncate">{t.label}</span>
+                <span className="tabular-nums opacity-80">{t.n}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="divide-y divide-line">
+        {shown.map((x) => (
+          <ClaimView key={claims.indexOf(x)} c={x.c} tone={x.tone} />
+        ))}
+      </div>
+      {str(data.summary) && <Md text={data.summary} className={cx('text-[13.5px] text-fg-2', claims.length > 0 && 'mt-3.5 border-t border-line pt-3.5')} />}
+    </Card>
+  );
+}
+
+// ---- follow-ups ----------------------------------------------------------------------------------------------------------
+
+function FollowUps({ data, done }: { data: Data; done: boolean }) {
+  const items = arr(data.items ?? data.questions ?? data.suggestions ?? data.options)
+    .map((x) => {
+      const label = textOf(x, 'label', 'text', 'title', 'question', 'ask').trim();
+      return { label, ask: isObj(x) ? str(x.ask ?? x.message ?? x.prompt).trim() : '' };
+    })
+    .filter((x) => x.label || x.ask)
+    .slice(0, 8);
+  const ask = useAsk();
+  const [used, setUsed] = useKept<Record<number, boolean>>('used', {});
+  if (!items.length && !str(data.title)) return null;
+  return (
+    <div className="min-w-0">
+      {str(data.title) && <div className="mb-1.5 text-[12px] font-medium text-fg-3">{str(data.title)}</div>}
+      <div className="flex flex-wrap gap-2">
+        {items.map((x, i) => {
+          const text = x.ask || x.label;
+          const was = !!used[i];
+          const Icon = was ? Check : CornerDownRight;
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={!done}
+              title={x.ask && x.ask !== x.label ? x.ask : undefined}
+              onClick={() => {
+                ask(text, { send: true });
+                setUsed((u) => ({ ...u, [i]: true }));
+              }}
+              className={cx(
+                'inline-flex max-w-full items-start gap-1.5 rounded-2xl border px-3 py-1.5 text-left text-[13px] leading-snug transition-colors disabled:cursor-default disabled:opacity-60',
+                was ? 'border-line/70 bg-bg-1 text-fg-3 hover:bg-bg-2' : 'border-line bg-panel text-fg hover:border-accent/50 hover:bg-bg-2',
+              )}
+            >
+              <Icon size={14} className={cx('mt-[2px] shrink-0', was ? 'text-ok' : 'text-accent')} aria-hidden />
+              <span className="min-w-0">{x.label || x.ask}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export const SUMMARY_UIS: Record<string, AnswerUiView> = {
   'key-points': KeyPoints,
   callout: Callout,
@@ -577,4 +796,6 @@ export const SUMMARY_UIS: Record<string, AnswerUiView> = {
   columns: Columns,
   quote: QuoteView,
   cards: Cards,
+  'fact-check': FactCheck,
+  'follow-ups': FollowUps,
 };
