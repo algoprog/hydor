@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import type { AppDef, AppRecipe, AppTemplate } from '../../shared/apps.ts';
-import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, toCsv } from '../../shared/apps.ts';
+import { answerSchema, checkAnswer, checkInputs, cleanRecipe, isActive, madeForSessions, PUBLIC_WEB_TOOLS, questionLine, toCsv } from '../../shared/apps.ts';
 import { checkFlow, cleanData, cleanExamples, cleanFlow, cleanFlows, cleanRequires, allSteps, DATA_LIMITS, STEP_ONLY_TOOLS, STEP_TOOLS } from '../../shared/app-manifest.ts';
 import { cleanSecrets } from '../../shared/app-secrets.ts';
 import { checkUi, cleanUi, pagesFor, type AppUi } from '../../shared/app-ui.ts';
@@ -1239,7 +1239,7 @@ export const apps: Feature = {
   inbox: (d) =>
     listRuns(d.db, { status: ['waiting'], limit: 100, steps: true }).flatMap((r) => {
       const q = isFlowRun(r) ? askOf(r) : null;
-      return q ? [{ id: `app-ask:${r.id}:${q.step}`, kind: q.fields ? ('form' as const) : ('question' as const), title: q.question.slice(0, 200), detail: r.appName, at: q.since, path: `/apps/runs/${encodeURIComponent(r.id)}` }] : [];
+      return q ? [{ id: `app-ask:${r.id}:${q.step}`, kind: q.fields ? ('form' as const) : ('question' as const), title: questionLine(q.question), detail: r.appName, at: q.since, path: `/apps/runs/${encodeURIComponent(r.id)}` }] : [];
     }),
   tools(ctx) {
     // A template's run gets what it hands in with and what it keeps; any other session what templates are built with.

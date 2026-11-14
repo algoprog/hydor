@@ -961,6 +961,40 @@ export function inputsLine(fields: AppField[], inputs: Record<string, string>, m
 }
 
 /**
+ * An Ask a person step's question as one line of plain words, for its notice and the inbox: its values come in as
+ * Markdown, so a table's rows read "cell · cell" (its header and rule left out), and a list's items and the
+ * paragraphs follow one another without their marks.
+ */
+export function questionLine(md: string, max = 200): string {
+  const lines = md.replace(/\r\n?/g, '\n').replace(/```[\s\S]*?(```|$)/g, ' ').split('\n');
+  const rule = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+  const out: string[] = [];
+  lines.forEach((line, i) => {
+    // A table's rule, and the header above it.
+    if (rule.test(line) || (line.includes('|') && rule.test(lines[i + 1] ?? ''))) return;
+    const t = line.trim();
+    if (t.startsWith('|'))
+      out.push(
+        t
+          .replace(/^\||(?<!\\)\|$/g, '')
+          .split(/(?<!\\)\|/)
+          .map((c) => c.trim())
+          .filter(Boolean)
+          .join(' · '),
+      );
+    else out.push(t.replace(/^(#{1,6}|>|[-*+]|\d+[.)])\s+/, ''));
+  });
+  const s = out
+    .join(' ')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*|__|[*`]/g, '')
+    .replace(/\\\|/g, '|')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+/**
  * The message a session gets when an app run its agent started ends after the call stopped waiting
  * ("[Trip planner finished] The run you started for the user…", then the run as JSON): its run's id, or null for any
  * other message. The conversation shows no bubble for it, and the run's card moves under the reply it brings.
