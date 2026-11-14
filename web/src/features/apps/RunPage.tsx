@@ -7,6 +7,7 @@ import { del, enc, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
+import { Markdown } from '../../components/Markdown';
 import { Button, cx, Empty, IconButton, Throbber, useConfirm } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { useSessionShow } from '../session/show';
@@ -60,9 +61,11 @@ export function AnswerCard({ runId, q }: { runId: string; q: NonNullable<RunDeta
   return (
     <section className="rounded-2xl border border-warn/40 bg-warn/5 px-4 py-3">
       <div className="text-[12px] font-medium text-warn">Needs your answer</div>
-      <p className="mt-1 text-[14px] leading-relaxed whitespace-pre-wrap" translate="no">
-        {q.question}
-      </p>
+      {/* Its values come in as Markdown (a table of rows, a list of lines), so it is read as such; a header's
+          first letter in capitals, as a table of a step's rows is headed by its fields' ids ("product"). */}
+      <div translate="no">
+        <Markdown text={q.question} breaks className="mt-1 text-[14px] leading-relaxed [&_th_.md-cell]:first-letter:uppercase" />
+      </div>
       {q.fields ? (
         <div className="mt-3 space-y-3">
           <AppForm fields={q.fields} values={values} files={{}} onChange={(k, v) => setValues((x) => ({ ...x, [k]: v }))} onFile={() => {}} />

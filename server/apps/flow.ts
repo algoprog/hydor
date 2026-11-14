@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AnswerField, AppField, AppRecipe, RunProgress, RunStepView } from '../../shared/apps.ts';
 import type { NotifyEvent } from '../../shared/types.ts';
-import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, readDate, readNumber } from '../../shared/apps.ts';
+import { checkAnswer, cleanRecipe, isActive, PUBLIC_WEB_TOOLS, questionLine, readDate, readNumber } from '../../shared/apps.ts';
 import type { AskStep, CodeStep, DataStep, Flow, RepeatStep, Scope, Step, ValueStep } from '../../shared/app-manifest.ts';
 import { allSteps, asText, cleanFlow, evalRule, fillRefs, FLOW_LIMITS, lookup, momentOf, order, refsIn, STEP_TOOLS, titleOf, usedFrom, valueOf } from '../../shared/app-manifest.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
@@ -500,7 +500,7 @@ async function askStep(x: Exec, s: AskStep, scope: Scope, at: string, before: St
   x.waiting.add(`ask:${at}`);
   syncStatus(x);
   if (!again)
-    runDeps().sessions.emit('notify', { key: `app-ask:${key}`, kind: 'waiting', title: x.run.appName, body: question.slice(0, 200), agent: 'claude', at: Date.now(), url: `/apps/runs/${encodeURIComponent(x.run.id)}` } satisfies NotifyEvent);
+    runDeps().sessions.emit('notify', { key: `app-ask:${key}`, kind: 'waiting', title: x.run.appName, body: questionLine(question), agent: 'claude', at: Date.now(), url: `/apps/runs/${encodeURIComponent(x.run.id)}` } satisfies NotifyEvent);
   try {
     return await new Promise<Record<string, unknown>>((resolve, reject) => {
       const left = (s.waitHours ?? 168) * 3_600_000 - (Date.now() - since);

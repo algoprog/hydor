@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
-import { cleanRecipe, isActive } from '../../shared/apps.ts';
+import { cleanRecipe, isActive, questionLine } from '../../shared/apps.ts';
 import { formatSearch } from '../../shared/search.ts';
 import { checkFlow, cleanData, cleanFlow, cleanRequires, collapseSteps, evalRule, fillRefs, flowOf, readRule, valueOf, type Collapsed, type Scope } from '../../shared/app-manifest.ts';
 import { HttpError } from '../auth.ts';
@@ -311,6 +311,14 @@ test('checks: values from later steps, from inside a Repeat, from another branch
   has(/no field “titel”/);
   assert.ok(warnings.some((w) => /\{\{e\.text\}\}, which is empty when the decision “d” goes the other way/.test(w)), warnings.join('\n'));
   assert.ok(!errors.some((e) => /index/.test(e)) && !warnings.some((w) => /\{\{index\}\}/.test(w)), 'a round knows its index');
+});
+
+test('a question as one line, for its notice and the inbox: a table’s rows without its header, no Markdown marks', () => {
+  const s: Scope = { inputs: {}, steps: { options: { why: [{ product: 'Pixel 11', why: 'Natural photos' }, { product: 'Galaxy S26', why: 'Zoom | gaming' }], tags: ['a', 'b'] } }, vars: {} };
+  const q = fillRefs('These look best:\n\n{{options.why}}\n\nWhich **two**? See [the list](https://example.com):\n\n{{options.tags}}', s);
+  assert.equal(questionLine(q), 'These look best: Pixel 11 · Natural photos Galaxy S26 · Zoom | gaming Which two? See the list: a b');
+  assert.equal(questionLine('Keep tides?'), 'Keep tides?');
+  assert.equal(questionLine('x'.repeat(300)), `${'x'.repeat(199)}…`);
 });
 
 test('values: text, tables and lists; one value alone keeps its kind; sections; rules in words', () => {
