@@ -748,40 +748,154 @@ export const useIsMobile = () => !useMediaQuery('(min-width: 768px)');
 
 // ---- page building blocks -------------------------------------------------------------
 
-/** Underline tabs for page and panel headers. `dense`: closer together, so six fit a phone's width. */
+/**
+ * Underline tabs for page and panel headers. `dense`: closer together and taller, for a phone. `fold`: the tabs that
+ * do not fit the row's width go under one at its end, More (named after the open tab when that is one of them), whose
+ * menu lists them with their icons; without it, a row too long scrolls sideways, keeping the open tab in view.
+ */
 export function Tabs<T extends string>({
   value,
   options,
   onChange,
   className,
   dense,
+  fold,
 }: {
   value: T;
-  options: { value: T; label: ReactNode; count?: ReactNode }[];
+  options: { value: T; label: ReactNode; count?: ReactNode; icon?: ReactNode }[];
   onChange: (v: T) => void;
   className?: string;
   dense?: boolean;
+  fold?: boolean;
 }) {
+  const row = useRef<HTMLDivElement>(null);
+  const ruler = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const [fits, setFits] = useState(options.length);
+  const [menu, setMenu] = useState(false);
+  const n = options.length;
+  const at = options.findIndex((o) => o.value === value);
+  const shown = fold ? Math.min(fits, n) : n;
+  const folded = options.slice(shown);
+  const openFolded = at >= shown ? options[at] : undefined;
+  const words = options.map((o) => `${o.value}:${typeof o.label === 'string' ? o.label : ''}:${o.count ?? ''}`).join('|');
+  // Its menu closes when More goes (a wider window, where every tab fits), so it does not open again by itself.
+  useEffect(() => {
+    if (!folded.length) setMenu(false);
+  }, [folded.length]);
+
+  // How many fit before More: each tab's width as drawn (the ruler, out of sight in the row), the last one's (More,
+  // or the open tab when it is folded) and the gaps, against the row's width; again when either changes size (a
+  // narrower window, the words translated, the font arriving).
+  useLayoutEffect(() => {
+    const box = row.current;
+    const kids = ruler.current ? ([...ruler.current.children] as HTMLElement[]) : [];
+    if (!fold || !box || kids.length !== 2 * n + 1) return;
+    const measure = () => {
+      const w = kids.map((k) => k.getBoundingClientRect().width);
+      const gap = parseFloat(getComputedStyle(box).columnGap) || 0;
+      const room = box.clientWidth + 0.5;
+      const width = (k: number) => {
+        const tabs = w.slice(0, k).reduce((a, b) => a + b, 0);
+        return k === n ? tabs + gap * (n - 1) : tabs + (at >= k ? w[n + at] : w[2 * n]) + gap * k;
+      };
+      let k = n;
+      while (k > 0 && width(k) > room) k--;
+      setFits(k);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    for (const k of kids) ro.observe(k);
+    return () => ro.disconnect();
+  }, [fold, n, at, words]);
+
+  // A row that scrolls: the open tab in view (an address that opens the last of many, on a phone).
+  useLayoutEffect(() => {
+    const box = row.current;
+    const t = box?.querySelector<HTMLElement>(':scope > [aria-selected="true"]');
+    if (!box || !t || box.scrollWidth <= box.clientWidth) return;
+    if (t.offsetLeft < box.scrollLeft) box.scrollLeft = t.offsetLeft - 8;
+    else if (t.offsetLeft + t.offsetWidth > box.scrollLeft + box.clientWidth) box.scrollLeft = t.offsetLeft + t.offsetWidth - box.clientWidth + 8;
+  }, [value, shown]);
+
+  const tabCls = (on: boolean) =>
+    cx('relative flex shrink-0 items-center gap-1.5 text-[13.5px] font-medium whitespace-nowrap transition-colors', dense ? 'h-10 px-2' : 'h-9 px-2.5', on ? 'text-fg' : 'text-fg-3 hover:text-fg-2');
+  const count = (o: (typeof options)[number]) =>
+    o.count != null && o.count !== 0 && <span className="tnum rounded-md bg-bg-2 px-1.5 text-[11.5px] font-normal text-fg-3">{o.count}</span>;
+  // The open tab's line, on the bottom edge (over the header's border when the row overlaps it).
+  const line = <span className={cx('absolute bottom-0 h-[2px] rounded-full bg-fg', dense ? 'inset-x-1.5' : 'inset-x-2')} />;
+  const chevron = <ChevronDown size={14} className="-mr-0.5 shrink-0 text-fg-3" />;
   return (
-    <div role="tablist" className={cx('flex items-end overflow-x-auto [&::-webkit-scrollbar]:hidden', dense ? 'gap-0' : 'gap-1', className)}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          role="tab"
-          aria-selected={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cx(
-            'relative flex h-9 shrink-0 items-center gap-1.5 text-[13.5px] font-medium transition-colors',
-            dense ? 'px-1.5' : 'px-2.5',
-            value === o.value ? 'text-fg' : 'text-fg-3 hover:text-fg-2',
-          )}
-        >
-          {o.label}
-          {o.count != null && o.count !== 0 && <span className="tnum rounded-md bg-bg-2 px-1.5 text-[11.5px] font-normal text-fg-3">{o.count}</span>}
-          {value === o.value && <span className={cx('absolute -bottom-px h-[2px] rounded-full bg-fg', dense ? 'inset-x-1' : 'inset-x-2')} />}
-        </button>
-      ))}
-    </div>
+    <>
+      <div
+        ref={row}
+        role="tablist"
+        className={cx('relative flex items-end overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', dense ? 'gap-0' : 'gap-1', className)}
+      >
+        {options.slice(0, shown).map((o) => (
+          <button key={o.value} role="tab" aria-selected={value === o.value} onClick={() => onChange(o.value)} className={tabCls(value === o.value)}>
+            {o.label}
+            {count(o)}
+            {value === o.value && line}
+          </button>
+        ))}
+        {folded.length > 0 && (
+          <button
+            ref={moreRef}
+            role="tab"
+            aria-selected={!!openFolded}
+            aria-haspopup="menu"
+            aria-expanded={menu}
+            onClick={() => setMenu((m) => !m)}
+            className={tabCls(!!openFolded || menu)}
+          >
+            {openFolded ? openFolded.label : 'More'}
+            {chevron}
+            {openFolded && line}
+          </button>
+        )}
+        {/* Each tab as a tab, each as the last one (with its chevron) and More: measured, never seen. */}
+        {fold && (
+          <div ref={ruler} aria-hidden className="pointer-events-none invisible absolute top-0 left-0 flex h-0 w-0 overflow-hidden">
+            {options.map((o) => (
+              <span key={`tab-${o.value}`} className={tabCls(false)}>
+                {o.label}
+                {count(o)}
+              </span>
+            ))}
+            {options.map((o) => (
+              <span key={`last-${o.value}`} className={tabCls(false)}>
+                {o.label}
+                {chevron}
+              </span>
+            ))}
+            <span className={tabCls(false)}>
+              <span>More</span>
+              {chevron}
+            </span>
+          </div>
+        )}
+      </div>
+      {folded.length > 0 && (
+        <Popover anchor={moreRef} open={menu} onClose={() => setMenu(false)} align="end" width={230}>
+          {folded.map((o) => (
+            <MenuItem
+              key={o.value}
+              icon={o.icon}
+              hint={o.count != null && o.count !== 0 ? o.count : undefined}
+              checked={o.value === value}
+              onClick={() => {
+                setMenu(false);
+                onChange(o.value);
+              }}
+            >
+              {o.label}
+            </MenuItem>
+          ))}
+        </Popover>
+      )}
+    </>
   );
 }
 

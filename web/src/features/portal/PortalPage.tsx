@@ -188,8 +188,8 @@ function Shell({ v, tab }: { v: PortalView; tab: PortalTab }) {
           </div>
           <Me v={v} />
         </div>
-        <div className="relative mx-auto max-w-[1120px] px-1.5 pt-1.5 sm:px-4 sm:pt-3">
-          <Tabs value={shown} dense={!wide} onChange={(t) => goTo({ tab: t }, true)} options={tabs} />
+        <div className="relative mx-auto -mb-px max-w-[1120px] px-1.5 pt-1 sm:px-4 sm:pt-3">
+          <Tabs value={shown} dense={!wide} fold onChange={(t) => goTo({ tab: t }, true)} options={tabs} />
         </div>
       </header>
       <main className="min-h-0 flex-1 overflow-y-auto">

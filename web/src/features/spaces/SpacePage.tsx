@@ -6,7 +6,7 @@
 // (SpaceSkills) and its settings. It shows at once from the spaces the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
-import { ArrowLeft, ArrowRight, BookOpen, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Sparkles, SquarePen, Trash2, UserPlus, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Bot, Boxes, Brain, Check, ChevronRight, FolderOpen, FolderPlus, LayoutDashboard, LibraryBig, ListFilter, MessagesSquare, MoreHorizontal, Plus, ScrollText, Settings, Sparkles, SquarePen, Trash2, UserPlus, UserRound } from 'lucide-react';
 import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type FoundIn, type Space, type SpaceView } from '@shared/spaces';
@@ -184,19 +184,21 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
         </Button>
         <SpaceMenu s={s} />
       </div>
-      <div className="relative mx-auto max-w-[1120px] px-1.5 pt-1.5 sm:px-4 sm:pt-3">
+      {/* The tabs that do not fit (on a phone) are under More at the row's end; the open one's line lies on the border. */}
+      <div className="relative mx-auto -mb-px max-w-[1120px] px-1.5 pt-1 sm:px-4 sm:pt-3">
         <Tabs
           value={tab}
           dense={!wide}
+          fold
           onChange={(t) => go(tabPath(s.id, t), true)}
           options={[
-            { value: 'overview', label: 'Overview' },
-            { value: 'library', label: 'Library', count: wide ? view?.library : undefined },
-            { value: 'files', label: 'Files' },
-            { value: 'knowledge', label: 'Knowledge', count: wide ? view?.docs : undefined },
-            { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined },
-            { value: 'agents', label: 'Agents' },
-            { value: 'settings', label: 'Settings' },
+            { value: 'overview', label: 'Overview', icon: <LayoutDashboard size={15} /> },
+            { value: 'library', label: 'Library', count: wide ? view?.library : undefined, icon: <LibraryBig size={15} /> },
+            { value: 'files', label: 'Files', icon: <FolderOpen size={15} /> },
+            { value: 'knowledge', label: 'Knowledge', count: wide ? view?.docs : undefined, icon: <BookOpen size={15} /> },
+            { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined, icon: <Sparkles size={15} /> },
+            { value: 'agents', label: 'Agents', icon: <Bot size={15} /> },
+            { value: 'settings', label: 'Settings', icon: <Settings size={15} /> },
           ]}
         />
       </div>
