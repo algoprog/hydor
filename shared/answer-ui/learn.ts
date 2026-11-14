@@ -695,7 +695,10 @@ Node = { name: string, note?: md, icon?: string, children?: Node[] }   // icon: 
   problems: {
     q: md                        // the problem
     image?: image
-    answer?: string | number | (string | number)[]   // the right answer, or several accepted ones; leave out for an open answer the tutor checks
+    answer?: string | number | (string | number)[]   // the right answer, or several accepted ones; leave out for an open answer the tutor checks.
+                                 // A number is matched however it is typed (1,250 · 3,5 · 3/4 · 1.2e3 · with its unit), within tolerance;
+                                 // words are matched without minding capitals, spaces or closing punctuation, so list each form you accept
+                                 // ("x = 2, x = 3", "x = 3, x = 2"), or ask for one value per problem
     tolerance?: number           // for a number: how far off still counts (absolute)
     unit?: string                // shown after the box ("m/s")
     hints?: md[]                 // revealed one at a time
