@@ -1429,6 +1429,26 @@ export interface StartupState {
   platform?: 'mac' | 'windows' | 'linux';
 }
 
+/**
+ * Settings → General → Keep the computer awake, in the desktop apps: while agents work and from a few minutes before a
+ * scheduled run (`tasks`, the default), only while agents work, or never.
+ */
+export type KeepAwakeMode = 'tasks' | 'working' | 'never';
+
+export interface KeepAwakeState {
+  /** Whether it does anything here: the server runs inside a desktop app (nothing changes for the Linux service). */
+  available: boolean;
+  /** The desktop app's system, where it is one. */
+  platform?: 'mac' | 'windows' | 'linux';
+  mode: KeepAwakeMode;
+  /** The app keeps the computer from going to sleep by itself now. */
+  awake: boolean;
+  /** What works here now: agent sessions at work, app runs, experiments. */
+  working: number;
+  /** The next scheduled run (watchers left out), when the choice is `tasks`: its task's name and when it is due. */
+  next?: { name: string; at: number };
+}
+
 export interface MachineInfo {
   /** NVIDIA graphics cards (nvidia-smi). */
   gpus: { index: number; name: string; totalBytes: number; freeBytes: number }[];

@@ -53,7 +53,9 @@ The app runs the server inside it, with the Node.js and tmux that come with it, 
 window. Closing the window keeps it running, with its icon in the menu bar (**Open Hydor**, **Open in
 Browser**, **Settings…**, **Quit Hydor**). Other devices reach it as they would any copy: see
 [Remote access](remote-access.md). It opens in the background when you log in (Settings → General → **Start
-when this computer starts**).
+when this computer starts**). While agents work, and from a few minutes before a scheduled task is due until it
+starts, it keeps the Mac from going to sleep by itself (Settings → General → **Keep the computer awake**); the screen
+may still turn off, and closing the lid still puts it to sleep.
 
 - Sessions run as you, with your `~/.claude` and `~/.codex`, and with the `PATH` your login shell sets up, so
   the programs you installed with Homebrew or npm are found.
@@ -88,7 +90,8 @@ Code does on Windows, and the app's terminals open it too (PowerShell without it
 The app runs the server with the Node.js that comes with it, and shows Hydor in its own window. Closing the window keeps
 it running, with its icon in the notification area of the taskbar: click it to open Hydor, or right-click it for **Open
 in Browser**, **Settings…** and **Quit Hydor**. It opens in the background when you sign in to Windows (Settings →
-General → **Start when this computer starts**).
+General → **Start when this computer starts**), and keeps the PC from going to sleep by itself while agents work and
+before scheduled tasks, as the Mac app does (**Keep the computer awake**).
 
 - Sessions run as you, with your `%USERPROFILE%\.claude` and `%USERPROFILE%\.codex`, and the environment Windows
   gives your apps (your `PATH`).
@@ -122,7 +125,9 @@ chmod +x Hydor-*.AppImage && ./Hydor-*.AppImage
 ```
 
 Like the Mac app, it brings its own Node.js and tmux, shows Hydor in a window of its own, keeps running in the system
-tray when the window is closed, and opens in the background when you log in.
+tray when the window is closed, opens in the background when you log in, and keeps the computer from going to sleep
+by itself while agents work and before scheduled tasks (**Keep the computer awake**; it asks your desktop, as GNOME's
+and KDE's power settings allow). The app installed as a service (below) leaves sleep to your system.
 
 - Its data is in `~/.hydor`, settings go in `~/.config/hydor.env`, and the server's log is in
   `~/.config/Hydor/logs/server.log`.

@@ -23514,5 +23514,22 @@
 "macOS’s sandbox cannot run here, so commands run without one":"macOS 的沙盒无法在这里运行，所以命令会在没有沙盒的情况下运行",
 "sandbox bubblewrap seatbelt macos windows low integrity security commands":"沙盒 bubblewrap seatbelt macos windows 低完整性 安全 命令",
 "The sandbox cannot run here, so commands run without one":"沙盒无法在这里运行，所以命令会在没有沙盒的情况下运行",
-"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"如果某个工具必须写入别处，例如要为整个系统安装东西，请把它关闭。完全访问不使用这个沙盒，也没有批准提示。"
+"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"如果某个工具必须写入别处，例如要为整个系统安装东西，请把它关闭。完全访问不使用这个沙盒，也没有批准提示。",
+"Awake now":"现在保持唤醒",
+"Awake now: a scheduled task is due at {0}":"现在保持唤醒：有一个定时任务将在 {0} 运行",
+"Awake now: agents are working":"现在保持唤醒：智能体正在工作",
+"From a few minutes before a task is due until its run starts":"从任务到时间前几分钟起，直到它开始运行",
+"In the desktop apps, the computer does not go to sleep by itself while agents work and before scheduled tasks":"在桌面应用中，智能体工作时和定时任务运行前，电脑不会自行进入睡眠",
+"It does not go to sleep by itself while an agent works (scheduled runs, app runs, subagents and experiments too), nor from a few minutes before a scheduled task is due until its run starts. Watchers that look every few minutes do not keep it awake on their own.":"智能体工作时（包括定时运行、应用运行、子智能体和实验），以及从定时任务到时间前几分钟起直到它开始运行，电脑都不会自行进入睡眠。每隔几分钟查看一次的监测本身不会让它保持唤醒。",
+"Keep the computer awake":"让电脑保持唤醒",
+"Keep the computer awake is one of {0}":"让电脑保持唤醒只能是以下之一：{0}",
+"Never":"从不",
+"Other machines and remote access":"其他机器和远程访问",
+"Scheduled tasks run when the computer is awake":"定时任务在电脑醒着时运行",
+"sleep awake caffeinate prevent sleep laptop lid power battery scheduled task overnight mac windows linux desktop app":"睡眠 唤醒 保持唤醒 防止睡眠 笔记本 合盖 电源 电池 定时任务 过夜 mac windows linux 桌面应用",
+"The computer sleeps as its own settings say":"电脑按它自己的设置进入睡眠",
+"The screen can still turn off; closing a laptop’s lid still puts it to sleep":"屏幕仍可关闭；合上笔记本的盖子仍会让它睡眠",
+"The screen can still turn off. Closing a laptop’s lid still puts it to sleep: your computer’s system decides that, not the app. For work that must run at any hour, use a computer that stays on, such as a desktop or a server, and reach it from here.":"屏幕仍可关闭。合上笔记本的盖子仍会让它睡眠：这由电脑的系统决定，而不是本应用。对于任何时候都必须运行的工作，请使用一台一直开着的电脑，例如台式机或服务器，并从这里使用它。",
+"While agents work":"智能体工作时",
+"While agents work and before scheduled tasks":"智能体工作时和定时任务运行前"
 }

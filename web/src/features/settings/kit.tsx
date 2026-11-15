@@ -218,6 +218,7 @@ export function Select<T extends string>({
   label,
   width = 260,
   disabled,
+  wide,
 }: {
   value: T;
   options: { value: T; label: ReactNode; hint?: ReactNode }[];
@@ -226,6 +227,8 @@ export function Select<T extends string>({
   label: string;
   width?: number;
   disabled?: boolean;
+  /** Room for a choice of several words on its button (it goes under the row's name when there is not). */
+  wide?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -240,7 +243,8 @@ export function Select<T extends string>({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cx(
-          'inline-flex h-8 max-w-[16rem] min-w-0 items-center gap-1.5 rounded-lg bg-bg-2 pr-2 pl-3 text-[13px] text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3 disabled:opacity-50',
+          'inline-flex h-8 min-w-0 items-center gap-1.5 rounded-lg bg-bg-2 pr-2 pl-3 text-[13px] text-fg ring-1 ring-line-2 transition-colors ring-inset hover:bg-bg-3 disabled:opacity-50',
+          wide ? 'max-w-[22rem]' : 'max-w-[16rem]',
           open && 'bg-bg-3',
         )}
       >

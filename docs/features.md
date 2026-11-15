@@ -1200,7 +1200,9 @@ programs shows each program's version and what is out, with Check now, Update no
   A task can also run one of your apps, with the answers you set (a webhook's call or what a watcher saw
   filling them in), made from the app's Runs. Each run reports how it went: its history keeps the outcome, a
   summary, the cost and the session (or the app's run), and runs again with the same input. Runs with
-  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Webhooks can
+  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. A run the computer
+  was off or asleep for runs at the next chance; the desktop apps keep the computer awake from a few minutes before
+  a run is due until it starts. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
@@ -1298,7 +1300,11 @@ programs shows each program's version and what is out, with Check now, Update no
   session, and while the window is away (closed, hidden, minimised or behind another app) their icon counts the
   sessions with new notices (the Dock on a Mac, the taskbar on Windows, the launcher on Linux desktops that show counts),
   even with Do Not Disturb on, until you bring the window to the front; they find your programs through your login
-  shell's PATH (on Windows, your own environment), and update
+  shell's PATH (on Windows, your own environment); they keep the computer from going to sleep by itself while agents
+  work (scheduled runs, app runs, subagents and running experiments too) and, by default, from a few minutes before
+  a scheduled task is due until its run starts, but not for watchers' looks (Settings → General → Keep the computer
+  awake: also only while agents work, or never; the screen may still turn off, and closing a laptop's lid still puts
+  it to sleep); and they update
   themselves release by release: they look every 4 hours, download and
   check a new build as soon as it is out (a download that breaks off, as when the computer sleeps, carries on from where
   it stopped, and one that gets nowhere tries again an hour later), say so (a notification, and a note in every open
