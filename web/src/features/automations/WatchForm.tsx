@@ -1,6 +1,8 @@
 // The task form's watcher: what to look at (a feed, a page, a value in JSON, a folder, a command's
-// output, new email in a connected mail account), how often, and a Test button that shows what it sees
-// now. Checks make no model call; the agent wakes only when something changed (for email: once per new email).
+// output, new email in a connected mail account, new items from a connected app's tool or the moment before
+// each event in a connected calendar: AccountWatch.tsx), how often, and a Test button that shows what it sees
+// now. Checks make no model call; the agent wakes only when something changed (for email and connected apps:
+// once per new email or item).
 import { useEffect, useState } from 'react';
 import { Eye } from 'lucide-react';
 import { JSON_OP_TEXT, type JsonOp, type TaskSchedule, type WatchPreview, type WatchSpec } from '@shared/automations';
@@ -10,6 +12,7 @@ import { go } from '../../lib/nav';
 import { FolderChip } from '../../components/FolderPicker';
 import { Button, cx, inputCls, Segmented } from '../../components/ui';
 import { boxCls, Field } from './parts';
+import { AccountWatchForm } from './AccountWatch';
 
 type Watch = Extract<TaskSchedule, { kind: 'watch' }>;
 
@@ -24,7 +27,9 @@ export const blankWatch = (kind: WatchSpec['kind'], home = '/'): WatchSpec =>
           ? { kind, path: home }
           : kind === 'mail'
             ? { kind, account: '' }
-            : { kind, command: '', on: 'output' };
+            : kind === 'account'
+              ? { kind, app: '', tool: '' }
+              : { kind, command: '', on: 'output' };
 
 /** New email: which connected account and folder, and which mail counts. */
 function MailWatch({ w, set }: { w: Extract<WatchSpec, { kind: 'mail' }>; set: (p: Record<string, unknown>) => void }) {
@@ -141,10 +146,12 @@ export function WatchForm({ value, onChange, cwd }: { value: Watch; onChange: (s
             { value: 'folder', label: 'Folder' },
             { value: 'command', label: 'Command' },
             { value: 'mail', label: 'Email' },
+            { value: 'account', label: 'Connected app' },
           ]}
         />
       </div>
       {w.kind === 'mail' && <MailWatch w={w} set={set} />}
+      {w.kind === 'account' && <AccountWatchForm w={w} set={set} cwd={cwd} minutes={value.minutes} />}
       {w.kind === 'feed' && (
         <>
           {url('https://example.com/feed.xml')}
@@ -244,17 +251,19 @@ export function WatchForm({ value, onChange, cwd }: { value: Watch; onChange: (s
           </label>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" icon={<Eye size={14} />} onClick={runTest} disabled={testing}>
-          {testing ? 'Looking…' : 'Test'}
-        </Button>
-        <span className="text-[12px] text-fg-3">
-          {w.kind === 'mail'
-            ? 'Shows the latest mail it would wake for. The first look after saving only takes note; each email after it wakes the agent once.'
-            : 'Shows what it sees now. The first look after saving only takes note; changes after it wake the agent.'}
-        </span>
-      </div>
-      {test && (
+      {w.kind !== 'account' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" icon={<Eye size={14} />} onClick={runTest} disabled={testing}>
+            {testing ? 'Looking…' : 'Test'}
+          </Button>
+          <span className="text-[12px] text-fg-3">
+            {w.kind === 'mail'
+              ? 'Shows the latest mail it would wake for. The first look after saving only takes note; each email after it wakes the agent once.'
+              : 'Shows what it sees now. The first look after saving only takes note; changes after it wake the agent.'}
+          </span>
+        </div>
+      )}
+      {test && w.kind !== 'account' && (
         <div className={cx('rounded-lg border px-3 py-2', test.ok ? 'border-line bg-bg-1' : 'border-err/30 bg-err/5')}>
           <div className={cx('text-[12.5px] font-medium', test.ok ? 'text-fg' : 'text-err')}>{test.note}</div>
           {test.sample && <pre className="mt-1.5 max-h-56 overflow-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-fg-2">{test.sample}</pre>}

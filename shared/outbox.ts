@@ -4,7 +4,7 @@
 import { toolWords } from './outbox-words.ts';
 import type { Agent } from './types.ts';
 
-export { actsOutside, askMarked, ASK_NOTE, DRY_RUN_NOTE, toolWords, type ToolFacts } from './outbox-words.ts';
+export { actsOutside, askMarked, ASK_NOTE, DRY_RUN_NOTE, onlyLooks, toolWords, type ToolFacts } from './outbox-words.ts';
 
 /** How agents get one of a connected account's tools: freely, held for your OK, or not at all. */
 export type ToolState = 'on' | 'ask' | 'off';

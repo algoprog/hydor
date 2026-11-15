@@ -14,6 +14,10 @@ export interface CallResult {
   /** What the tool answered, as text (pictures named, not kept). */
   text: string;
   isError: boolean;
+  /** Its structured content, when it gave one (a watcher reads its items from it). */
+  structured?: unknown;
+  /** Its text parts one by one (a watcher reads JSON from them). */
+  parts?: string[];
 }
 
 /** How long a held call may take once sent. */
@@ -34,23 +38,32 @@ export function resultText(r: { content?: unknown; structuredContent?: unknown }
   return out.join('\n').trim();
 }
 
+/** A tool's text parts, one by one. */
+const textParts = (r: { content?: unknown } | undefined): string[] =>
+  (Array.isArray(r?.content) ? (r!.content as { type?: string; text?: string }[]) : []).filter((p) => p?.type === 'text' && typeof p.text === 'string').map((p) => p.text!);
+
 const asResult = (m: Rpc | null | undefined, name: string): CallResult => {
   if (!m) return { text: `${name} gave no answer`, isError: true };
   if (m.error) return { text: m.error.message || `${name} answered with an error`, isError: true };
-  return { text: resultText(m.result) || '(no text in its answer)', isError: m.result?.isError === true };
+  return {
+    text: resultText(m.result) || '(no text in its answer)',
+    isError: m.result?.isError === true,
+    ...(m.result?.structuredContent !== undefined ? { structured: m.result.structuredContent } : {}),
+    parts: textParts(m.result),
+  };
 };
 
 /** What the app may ask of Hydor while it works: a ping is answered, a form declined (nobody waits on this call to fill one in). */
 const decline = async (m: Rpc): Promise<Rpc> => (m.method === 'ping' ? { jsonrpc: '2.0', id: m.id, result: {} } : m.method === 'elicitation/create' ? { jsonrpc: '2.0', id: m.id, result: { action: 'decline' } } : { jsonrpc: '2.0', id: m.id, error: { code: -32601, message: 'Not offered' } });
 
-async function viaHttp(d: Deps, c: Conn, call: Rpc, force = false): Promise<CallResult> {
+async function viaHttp(d: Deps, c: Conn, call: Rpc, force = false, ms = CALL_MS): Promise<CallResult> {
   const url = remoteUrl(c);
   const h = await authHeaders(d.db, c, force);
   const init = await postHttp(url, { jsonrpc: '2.0', id: 1, method: 'initialize', params: INIT_PARAMS }, h, { timeoutMs: 30_000, onRequest: decline });
   const r0 = init.replies[0];
   if (!r0) throw new Error(`${c.entry.name} answered ${init.status}${init.text ? `: ${init.text.replace(/\s+/g, ' ').slice(0, 200)}` : ''}`);
   if (r0.error) throw new Error(r0.error.message);
-  const o = { sessionId: init.sessionId, protocol: String(r0.result?.protocolVersion ?? INIT_PARAMS.protocolVersion), timeoutMs: CALL_MS, onRequest: decline };
+  const o = { sessionId: init.sessionId, protocol: String(r0.result?.protocolVersion ?? INIT_PARAMS.protocolVersion), timeoutMs: ms, onRequest: decline };
   await postHttp(url, { jsonrpc: '2.0', method: 'notifications/initialized' }, h, o).catch(() => {});
   try {
     const r = await postHttp(url, call, h, o);
@@ -61,7 +74,7 @@ async function viaHttp(d: Deps, c: Conn, call: Rpc, force = false): Promise<Call
   }
 }
 
-async function viaSse(d: Deps, c: Conn, call: Rpc, force = false): Promise<CallResult> {
+async function viaSse(d: Deps, c: Conn, call: Rpc, force = false, ms = CALL_MS): Promise<CallResult> {
   const url = remoteUrl(c);
   const h = await authHeaders(d.db, c, force);
   const link = await SseLink.open(url, h);
@@ -70,14 +83,14 @@ async function viaSse(d: Deps, c: Conn, call: Rpc, force = false): Promise<CallR
     const init = await link.send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: INIT_PARAMS }, h, { timeoutMs: 30_000 });
     if (init?.error) throw new Error(init.error.message);
     await link.send({ jsonrpc: '2.0', method: 'notifications/initialized' }, h);
-    return asResult(await link.send(call, h, { timeoutMs: CALL_MS }), c.entry.name);
+    return asResult(await link.send(call, h, { timeoutMs: ms }), c.entry.name);
   } finally {
     link.close();
   }
 }
 
 /** A local app: started for this call, introduced, called, stopped. */
-function viaStdio(d: Deps, c: Conn, call: Rpc, cwd?: string): Promise<CallResult> {
+function viaStdio(d: Deps, c: Conn, call: Rpc, cwd?: string, ms = CALL_MS): Promise<CallResult> {
   const lc = localCommand(d.db, c);
   return new Promise((resolve, reject) => {
     let p: ReturnType<typeof spawnProgram>;
@@ -100,7 +113,7 @@ function viaStdio(d: Deps, c: Conn, call: Rpc, cwd?: string): Promise<CallResult
       else resolve(v!);
     };
     const tail = () => redact(err.trim().split('\n').slice(-3).join(' ').slice(0, 300));
-    const timer = setTimeout(() => finish(new Error(`${c.entry.name} did not answer within ${CALL_MS / 60_000} minutes`)), CALL_MS);
+    const timer = setTimeout(() => finish(new Error(`${c.entry.name} did not answer within ${ms >= 60_000 ? `${Math.round(ms / 60_000)} minutes` : `${Math.round(ms / 1000)} seconds`}`)), ms);
     p.on('error', (e) => finish(new Error((e as NodeJS.ErrnoException).code === 'ENOENT' ? `${lc.command} is not installed here` : e.message)));
     p.on('exit', (code) => finish(new Error(`${c.entry.name} stopped (exit ${code})${err ? `: ${tail()}` : ''}`)));
     p.stdin!.on('error', () => {});
@@ -140,25 +153,37 @@ function viaStdio(d: Deps, c: Conn, call: Rpc, cwd?: string): Promise<CallResult
   });
 }
 
-/** Calls one of a connected account's tools now, with `args`: what it answered. Throws when it could not be reached. */
-export async function callTool(d: Deps, c: Conn, tool: string, args: Record<string, unknown>, o: { key?: string; cwd?: string } = {}): Promise<CallResult> {
+/**
+ * Calls one of a connected account's tools now, with `args`: what it answered. Throws when it could not be reached.
+ * `timeoutMs`: how long the call may take (5 minutes when unset; a watcher's check waits less).
+ */
+export async function callTool(d: Deps, c: Conn, tool: string, args: Record<string, unknown>, o: { key?: string; cwd?: string; timeoutMs?: number } = {}): Promise<CallResult> {
   const call: Rpc = { jsonrpc: '2.0', id: 'held', method: 'tools/call', params: { name: tool, arguments: args } };
   const t = c.entry.server.transport as string;
   let r: CallResult;
   if (t === 'builtin') {
     if (!builtin) throw new Error(`${c.entry.name} cannot be called from the Outbox in this version`);
     const x = await builtin(d, c, tool, args, o);
-    r = { text: resultText(x) || '(no text in its answer)', isError: x.isError === true };
-  } else if (t === 'stdio') r = await viaStdio(d, c, call, o.cwd);
+    r = { text: resultText(x) || '(no text in its answer)', isError: x.isError === true, ...(x.structuredContent !== undefined ? { structured: x.structuredContent } : {}), parts: textParts(x) };
+  } else if (t === 'stdio') r = await viaStdio(d, c, call, o.cwd, o.timeoutMs);
   else {
     const via = t === 'sse' ? viaSse : viaHttp;
     try {
-      r = await via(d, c, call);
+      r = await via(d, c, call, false, o.timeoutMs);
     } catch (e) {
       if (!(e instanceof Unauthorized) || c.entry.auth.type !== 'oauth') throw e;
       // The token may have ended early: renewed once, then tried again.
-      r = await via(d, c, call, true);
+      r = await via(d, c, call, true, o.timeoutMs);
     }
   }
-  return { text: redact(r.text), isError: r.isError };
+  // Known secrets masked in all it gave (a value in the structured content too: masked in its JSON, read back).
+  let structured = r.structured;
+  if (structured !== undefined) {
+    try {
+      structured = JSON.parse(redact(JSON.stringify(structured)));
+    } catch {
+      structured = undefined;
+    }
+  }
+  return { text: redact(r.text), isError: r.isError, ...(structured !== undefined ? { structured } : {}), ...(r.parts ? { parts: r.parts.map(redact) } : {}) };
 }
