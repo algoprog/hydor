@@ -175,6 +175,15 @@ const RESULT_ERRORS: Record<string, string> = {
   error_max_budget_usd: 'Stopped: the budget limit was reached',
 };
 
+/**
+ * What a local command printed (`/model`, as the app's own model switch runs it), which Claude Code echoes
+ * as a user message: the command is over by then and no turn follows it, so it does not start one.
+ */
+export function localCommandOutput(content: unknown): boolean {
+  const text = typeof content === 'string' ? content : Array.isArray(content) && content.length && content.every((b: Json) => b?.type === 'text') ? content.map((b: Json) => b.text).join('') : null;
+  return text !== null && /^\s*<local-command-(?:stdout|stderr)>[\s\S]*<\/local-command-(?:stdout|stderr)>\s*$/.test(text);
+}
+
 export class ClaudeLive extends LiveAdapter {
   readonly agent = 'claude' as const;
   init?: Json;
@@ -629,7 +638,7 @@ export class ClaudeLive extends LiveAdapter {
       }
     }
     const isPrompt = !(Array.isArray(content) && content.some((b: Json) => b?.type === 'tool_result'));
-    if (isPrompt && !m.isSynthetic && !m.isMeta) {
+    if (isPrompt && !m.isSynthetic && !m.isMeta && !localCommandOutput(content)) {
       this.setWorking();
       this.state.turnStartedAt = this.state.turnStartedAt ?? Date.now();
     }

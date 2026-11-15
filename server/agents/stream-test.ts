@@ -1,9 +1,10 @@
-// Script tests for what a Claude session shows of a call while the model is still writing it (ClaudeLive's live items):
+// Script tests for what a Claude session shows of a call while the model is still writing it (ClaudeLive's live items),
+// and for when it counts as working:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/agents/stream-test.ts && node dist/dev/stream-test.js
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { ToolItem } from '../../shared/types.ts';
-import { ClaudeLive } from './claude.ts';
+import { ClaudeLive, localCommandOutput } from './claude.ts';
 
 const make = () => {
   const runner = new EventEmitter() as any;
@@ -60,6 +61,27 @@ const tests: [string, () => void | Promise<void>][] = [
       t.start('mcp__naget-agent__save_page');
       t.piece('{"id":"0123456789","html":"<p>');
       assert.deepEqual(t.tool().tool.input, { id: '0123456789' });
+    },
+  ],
+  [
+    'a model switch after the turn ended: the echo of /model’s output does not set the session working again',
+    () => {
+      const runner = new EventEmitter() as any;
+      runner.writeLine = () => {};
+      const a = new ClaudeLive(runner, { sessionId: 's' } as any);
+      const line = (m: object) => runner.emit('line', JSON.stringify(m), false);
+      line({ type: 'user', message: { role: 'user', content: 'Check the build' } });
+      assert.equal(a.state.status, 'working', 'a prompt starts a turn');
+      line({ type: 'result', subtype: 'success', is_error: false, result: 'Done' });
+      assert.equal(a.state.status, 'idle');
+      line({ type: 'command_lifecycle', command_uuid: 'c1', state: 'completed' });
+      line({ type: 'user', message: { role: 'user', content: '<local-command-stdout>Set model to `claude-opus-5-5`</local-command-stdout>' }, isReplay: true });
+      line({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: '<local-command-stderr>Unknown model</local-command-stderr>' }] } });
+      assert.equal(a.state.status, 'idle', 'still idle after the command’s output');
+      assert.equal(a.state.turnStartedAt, undefined);
+      line({ type: 'user', message: { role: 'user', content: 'What does <local-command-stdout> mean?' } });
+      assert.equal(a.state.status, 'working', 'a prompt that only mentions it starts a turn');
+      assert.equal(localCommandOutput('<local-command-stdout>x</local-command-stdout> and more'), false);
     },
   ],
   [
