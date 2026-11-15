@@ -180,7 +180,7 @@ How they all work:
 
 | Command | What it does |
 | --- | --- |
-| `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `send`, `stop` and `delete`. |
+| `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `export` (the conversation as a Markdown file, `-o -` to print it, or `--library` a document in the Library), `send`, `stop` and `delete`. |
 | `hydor inbox` | What waits on you (approvals, questions, a key an agent asked for, a skill to review): `list`, and `show` for one item, with where to answer it. |
 | `hydor outbox` | Calls held for your OK (a connected account's tools on Ask first): `list`, `show` for one with its input, `send` (as it is, or with `--set NAME=value` to change a field) and `drop`. |
 
@@ -190,6 +190,7 @@ How they all work:
 hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
+hydor sessions export 6f1e -o notes.md  # the conversation as Markdown
 hydor inbox
 ```
 
@@ -312,5 +313,6 @@ Colours are on in a terminal (true colour where it has it) and off when the outp
 - "What does exit code 3 from hydor run mean?"
 - "Set up the hydor command on my laptop to use this computer's Hydor."
 - "Which hydor command lists my scheduled tasks, and how do I turn one off from the terminal?"
+- "Which hydor command saves a session's conversation as a Markdown file?"
 - "Make the terminal wait until a turn ends before it sends my message."
 - "Turn off the grey suggestions in the terminal."

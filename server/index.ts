@@ -50,6 +50,7 @@ import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAc
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
 import { moveFileComments } from './pages/filecomments.ts';
+import { keepPicture, markdownDoc } from './pages/index.ts';
 import { PART_FRAME_HTML } from './pages/slides.ts';
 import { movedPdfNotes } from './pdfnotes/index.ts';
 import * as setup from './setup.ts';
@@ -64,7 +65,7 @@ import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
-import { eventSent, featureContext, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
+import { eventSent, featureContext, featureDeps, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
 import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
@@ -74,6 +75,7 @@ import { setRunnerWrap } from './runner/client.ts';
 import { appWords } from './language/index.ts';
 import { noteEvents, notesOf } from './notes.ts';
 import { sessionExtra, setSessionExtra } from './sessionExtra.ts';
+import { exportRoutes } from './session-export.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { makeOf } from '../shared/content-asks.ts';
 import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from './confidential/index.ts';
@@ -484,6 +486,9 @@ app.get('/api/sessions/:key/timeline', async (req) => {
   const tl = await sessions.timeline(key);
   return tl.page(q.before != null ? Number(q.before) : undefined, Math.min(Number(q.limit) || 300, 2000), q.whole === '1');
 });
+
+// The conversation out of the chat: a Markdown file, or a document in the Library (server/session-export.ts).
+exportRoutes(app, { db, sessions, saveDoc: (o) => markdownDoc(featureDeps(), o), keepPicture: (b) => keepPicture(db, b) }, K);
 
 /** Messages in one session that contain the text (any case), oldest first: for find in the session. */
 app.get('/api/sessions/:key/find', async (req) => {

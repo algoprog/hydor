@@ -1,8 +1,8 @@
-// A session's menu (the … in its header). What you do most is on its main list; the rest is in three
-// submenus that open in its place: Folder and code, Session settings and More. Features add their items
-// through the registry, each saying which part they go in.
+// A session's menu (the … in its header). What you do most is on its main list; the rest is in submenus that open
+// in its place: Export, Folder and code, Session settings and More. Features add their items through the registry,
+// each saying which part they go in.
 import { useState, type ReactNode, type RefObject } from 'react';
-import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
+import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FileDown, FileText, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
 import type { Agent, SessionSummary } from '@shared/types';
 import { isConfidential } from '@shared/confidential';
 import { enc, post } from '../../lib/api';
@@ -18,11 +18,12 @@ import { deleteDialog } from '../sessions/SessionList';
 import { SnoozeItems } from '../sessions/SnoozeMenu';
 import { openTerminalAt } from '../terminal/TerminalPanel';
 import { continueIn, handoffName } from './Composer';
+import { copyMarkdown, downloadMarkdown, saveToLibrary } from './exportSession';
 import { GoalDialog } from './GoalBar';
 import { ShareDialog } from './ShareDialog';
 import { WorktreeDialog } from './WorktreeDialog';
 
-type Submenu = 'snooze' | 'code' | 'settings' | 'more';
+type Submenu = 'snooze' | 'export' | 'code' | 'settings' | 'more';
 type Shown = 'worktree' | 'goal' | 'share';
 
 interface Actions {
@@ -79,6 +80,22 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
       <>
         <MenuBack onClick={back}>Snooze until later</MenuBack>
         <SnoozeItems s={s} heading={false} onDone={close} />
+      </>
+    );
+  else if (at.sub === 'export')
+    // The conversation out of the chat: a confidential session's too (its document stays in the Library on this computer).
+    items = (
+      <>
+        <MenuBack onClick={back}>Export</MenuBack>
+        <MenuItem icon={<FileDown size={15} />} onClick={() => (close(), downloadMarkdown(s.key))}>
+          Export as Markdown
+        </MenuItem>
+        <MenuItem icon={<Copy size={15} />} onClick={() => (close(), copyMarkdown(s.key))}>
+          Copy as Markdown
+        </MenuItem>
+        <MenuItem icon={<FileText size={15} />} onClick={() => (close(), saveToLibrary(s.key))}>
+          Save to the Library as a document
+        </MenuItem>
       </>
     );
   else if (at.sub === 'code')
@@ -207,6 +224,9 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
             Share a read-only link
           </MenuItem>
         )}
+        <MenuItem icon={<FileDown size={15} />} submenu onClick={() => enter('export')}>
+          Export
+        </MenuItem>
         <MenuSep />
         {(s.cwd || s.worktree) && (
           <MenuItem icon={<FolderCode size={15} />} submenu onClick={() => enter('code')}>
@@ -237,9 +257,9 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
         </MenuItem>
       </>
     );
-  // Wider for the snooze times, as in the sidebar's menu.
+  // Wider for the snooze times, as in the sidebar's menu, and for Export's longer items.
   return (
-    <Popover anchor={anchor} open onClose={close} align="end" width={at.sub === 'snooze' ? 290 : 260}>
+    <Popover anchor={anchor} open onClose={close} align="end" width={at.sub === 'snooze' ? 290 : at.sub === 'export' ? 300 : 260}>
       <div key={at.sub ?? 'main'}>
         {items}
       </div>

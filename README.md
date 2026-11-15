@@ -89,7 +89,8 @@ with any model, and a strong model can lead cheaper subagents. Each comparison h
 - **Work that runs by itself**: scheduled tasks, watchers, webhooks, and goals an agent keeps working on.
 - **Answers you can use**: replies show maths, diagrams, pictures and more than 140 answer UIs (tables, charts, maps,
   recipes, forecasts, quizzes, practice problems checked as you answer, code you can run) that agents fill in as they
-  answer.
+  answer; each opens full screen and saves as a picture, and a whole conversation exports as Markdown or a Library
+  document.
 - **For researchers and engineers**: a paper radar and a check before you submit, experiments that wait for a free GPU,
   failed CI runs looked into, issues triaged, large changes made by a team of agents.
 - **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.
