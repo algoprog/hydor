@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { IconButton } from '../../components/ui';
 
-export function PageOverlay({ title, onClose, actions, children }: { title: string; onClose: () => void; actions?: ReactNode; children: ReactNode }) {
+export function PageOverlay({ title, onClose, actions, children }: { title: ReactNode; onClose: () => void; actions?: ReactNode; children: ReactNode }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', k);

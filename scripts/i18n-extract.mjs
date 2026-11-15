@@ -328,6 +328,8 @@ const NO_WORDS = new Set([
   'shared/diagram-edits.ts',
   'shared/diagram-ops.ts',
   'shared/draft-diagram.ts',
+  // An answer card as text and Markdown, for the clipboard and a conversation's export (files, not the pages' words).
+  'shared/answer-ui/text.ts',
 ]);
 for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(path.join(ROOT, 'shared'), /\.ts$/)]) {
   if (f.includes(`${path.sep}i18n${path.sep}`) || NO_WORDS.has(path.relative(ROOT, f).split(path.sep).join('/'))) continue;

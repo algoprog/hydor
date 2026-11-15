@@ -23499,5 +23499,13 @@
 "macOS’s sandbox cannot run here, so commands run without one":"Το απομονωμένο περιβάλλον του macOS δεν μπορεί να τρέξει εδώ, οπότε οι εντολές τρέχουν χωρίς αυτό",
 "sandbox bubblewrap seatbelt macos windows low integrity security commands":"απομόνωση bubblewrap seatbelt macos windows χαμηλή ακεραιότητα ασφάλεια εντολές",
 "The sandbox cannot run here, so commands run without one":"Το απομονωμένο περιβάλλον δεν μπορεί να τρέξει εδώ, οπότε οι εντολές τρέχουν χωρίς αυτό",
-"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"Απενεργοποιήστε το αν κάποιο εργαλείο πρέπει να γράψει αλλού, για παράδειγμα για να εγκαταστήσει κάτι σε όλο το σύστημα. Η Πλήρης πρόσβαση δεν χρησιμοποιεί αυτό το απομονωμένο περιβάλλον ούτε ζητά έγκριση."
+"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"Απενεργοποιήστε το αν κάποιο εργαλείο πρέπει να γράψει αλλού, για παράδειγμα για να εγκαταστήσει κάτι σε όλο το σύστημα. Η Πλήρης πρόσβαση δεν χρησιμοποιεί αυτό το απομονωμένο περιβάλλον ούτε ζητά έγκριση.",
+"A session exports as Markdown: format=md":"Μια συνεδρία εξάγεται ως Markdown: format=md",
+"Copied the card as a picture":"Η κάρτα αντιγράφηκε ως εικόνα",
+"Copied the conversation as Markdown":"Η συζήτηση αντιγράφηκε ως Markdown",
+"Copy as picture":"Αντιγραφή ως εικόνα",
+"Export as Markdown":"Εξαγωγή ως Markdown",
+"Save as picture":"Αποθήκευση ως εικόνα",
+"Save to the Library as a document":"Αποθήκευση στη Βιβλιοθήκη ως έγγραφο",
+"Saved to the Library as a document":"Αποθηκεύτηκε στη Βιβλιοθήκη ως έγγραφο"
 }

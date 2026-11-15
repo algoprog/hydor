@@ -3,7 +3,9 @@
 // connection. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/tui/areas/sessions-test.ts && DATA_DIR=/tmp/hydor-test-sessions node dist/dev/sessions-test.js
 import assert from 'node:assert/strict';
-import { ApiError } from '../client.ts';
+import fs from 'node:fs';
+import nodePath from 'node:path';
+import { ApiError, type Conn } from '../client.ts';
 import { Cancelled, UsageError } from './kit.ts';
 import { boldMatches, parseUntil } from './sessions.ts';
 import { fakeConn, run, type Answer } from './test-kit.ts';
@@ -265,6 +267,36 @@ test('list, search, show, send, stop as verbs', async () => {
   assert.match(r.out, /Stopped its turn/);
   const busy = fakeConn(routes({ [path(a, '/interrupt')]: new ApiError(409, 'not running') }));
   assert.match((await run(busy.conn, ['sessions', 'stop', 'fix the login'])).out, /It is not working\./);
+});
+
+test('export: the Markdown written to its title’s file, to -o, printed with -o -, or a Library document with --library', async () => {
+  const f = fakeConn(routes({ [path(a, '/export/doc')]: { page: { id: 'pg1', title: 'Fix the login bug' }, notes: ['A picture was left out.'] } }));
+  const asked: string[] = [];
+  (f.conn as Conn).raw = async (p) => {
+    asked.push(p);
+    return { type: 'text/markdown', data: Buffer.from('# Fix the login bug\n\n## You\n\nIt fails.\n') };
+  };
+  const dir = nodePath.join(DATA, 'export');
+  fs.mkdirSync(dir, { recursive: true });
+  const cwd = process.cwd();
+  process.chdir(dir);
+  try {
+    const t = await run(f.conn, ['sessions', 'export', 'aaaa']);
+    assert.deepEqual(asked, [path(a, '/export?format=md')]);
+    assert.equal(fs.readFileSync(nodePath.join(dir, 'Fix the login bug.md'), 'utf8'), '# Fix the login bug\n\n## You\n\nIt fails.\n');
+    assert.match(t.out.trimEnd(), /^Saved “Fix the login bug” as .*Fix the login bug\.md\.$/);
+    await refused(run(f.conn, ['sessions', 'export', 'aaaa']), /exists already: name the file with -o <file>/);
+    const j = await run(f.conn, ['sessions', 'export', 'aaaa', '-o', 'notes/login.md', '--json']);
+    assert.deepEqual(j.json, [{ key: a.key, file: nodePath.join(dir, 'notes/login.md'), bytes: 39 }]);
+    const printed = await run(f.conn, ['sessions', 'export', 'aaaa', '-o', '-']);
+    assert.equal(printed.out.trimEnd(), '# Fix the login bug\n\n## You\n\nIt fails.');
+  } finally {
+    process.chdir(cwd);
+  }
+  const lib = await run(f.conn, ['sessions', 'export', 'aaaa', '--library']);
+  assert.deepEqual(f.calls.at(-1), { method: 'POST', path: path(a, '/export/doc'), body: {} });
+  assert.match(lib.out.trimEnd(), /^Saved “Fix the login bug” in the Library as a document: http:\/\/fake\/pages\/pg1\nA picture was left out\.$/);
+  await refused(run(f.conn, ['sessions', 'export', 'aaaa', '--library', '-o', 'x.md']), /leave out -o, or --library/);
 });
 
 for (const [name, fn] of tests) {

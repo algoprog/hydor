@@ -180,7 +180,7 @@ hydor completion install
 
 | Εντολή | Τι κάνει |
 | --- | --- |
-| `hydor sessions` | Οι τελευταίες συνεδρίες σας, η καθεμία με ένα σημάδι: ● εργάζεται, ● σας χρειάζεται, ✓ ολοκληρώθηκε, ✗ σφάλμα. Τα ρήματά της κάνουν ό,τι κάνει το μενού μιας συνεδρίας: `search`, `rename`, `archive` και `unarchive`, `pin` και `unpin`, `read`, `snooze`, `move` (σε ένα έργο), `fork`, `goal`, `share` (ένας σύνδεσμος μόνο για ανάγνωση), `changes` (τα αρχεία που άλλαξε), `commands` (οι εντολές που εκτέλεσε), `queue` (τα μηνύματα που περιμένουν, και τα `queue clear` και `queue remove`), `show`, `send`, `stop` και `delete`. |
+| `hydor sessions` | Οι τελευταίες συνεδρίες σας, η καθεμία με ένα σημάδι: ● εργάζεται, ● σας χρειάζεται, ✓ ολοκληρώθηκε, ✗ σφάλμα. Τα ρήματά της κάνουν ό,τι κάνει το μενού μιας συνεδρίας: `search`, `rename`, `archive` και `unarchive`, `pin` και `unpin`, `read`, `snooze`, `move` (σε ένα έργο), `fork`, `goal`, `share` (ένας σύνδεσμος μόνο για ανάγνωση), `changes` (τα αρχεία που άλλαξε), `commands` (οι εντολές που εκτέλεσε), `queue` (τα μηνύματα που περιμένουν, και τα `queue clear` και `queue remove`), `show`, `export` (η συζήτηση ως αρχείο Markdown, με `-o -` τυπωμένη, ή με `--library` ένα έγγραφο στη Βιβλιοθήκη), `send`, `stop` και `delete`. |
 | `hydor inbox` | Ό,τι περιμένει εσάς (εγκρίσεις, ερωτήσεις, ένα κλειδί που ζήτησε ένας πράκτορας, μια δεξιότητα για έλεγχο): `list`, και `show` για ένα στοιχείο, με το πού να το απαντήσετε. |
 
 Το `hydor show 6f1e2a3b` είναι το ίδιο με το `hydor sessions show 6f1e2a3b`, και το ίδιο ισχύει για τα `send` και `stop`: οι σύντομες μορφές μένουν.
@@ -189,6 +189,7 @@ hydor completion install
 hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
+hydor sessions export 6f1e -o notes.md  # η συζήτηση ως Markdown
 hydor inbox
 ```
 
@@ -311,5 +312,6 @@ hydor --server https://hydor.example.com --token acm_… sessions
 - «Τι σημαίνει ο κωδικός εξόδου 3 από το hydor run;»
 - «Ρύθμισε την εντολή hydor στον φορητό μου υπολογιστή ώστε να χρησιμοποιεί το Hydor αυτού του υπολογιστή.»
 - «Ποια εντολή hydor απαριθμεί τις προγραμματισμένες εργασίες μου, και πώς απενεργοποιώ μία από το τερματικό;»
+- «Ποια εντολή hydor αποθηκεύει τη συζήτηση μιας συνεδρίας ως αρχείο Markdown;»
 - «Κάνε το τερματικό να περιμένει να τελειώσει ο γύρος πριν στείλει το μήνυμά μου.»
 - «Απενεργοποίησε τις γκρι προτάσεις στο τερματικό.»

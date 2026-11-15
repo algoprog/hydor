@@ -180,7 +180,7 @@ hydor completion install
 
 | 命令 | 作用 |
 | --- | --- |
-| `hydor sessions` | 你最近的会话，每个前面有一个标记：● 工作中、● 需要你处理、✓ 已完成、✗ 出错。它的动词做的是会话菜单所做的事：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`、`share`（只读链接）、`changes`（它修改过的文件）、`commands`（它运行过的命令）、`queue`（正在等待的消息，以及 `queue clear` 和 `queue remove`）、`show`、`send`、`stop` 和 `delete`。 |
+| `hydor sessions` | 你最近的会话，每个前面有一个标记：● 工作中、● 需要你处理、✓ 已完成、✗ 出错。它的动词做的是会话菜单所做的事：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`、`share`（只读链接）、`changes`（它修改过的文件）、`commands`（它运行过的命令）、`queue`（正在等待的消息，以及 `queue clear` 和 `queue remove`）、`show`、`export`（把对话保存为 Markdown 文件，`-o -` 直接打印出来，`--library` 则在资料库中生成一份文档）、`send`、`stop` 和 `delete`。 |
 | `hydor inbox` | 等你处理的事（批准、问题、智能体要的密钥、待审的技能）：`list`，以及 `show` 查看其中一项和在哪里回答它。 |
 
 `hydor show 6f1e2a3b` 与 `hydor sessions show 6f1e2a3b` 相同，`send` 和 `stop` 也是：短的那些仍然保留。
@@ -189,6 +189,7 @@ hydor completion install
 hydor sessions search login          # sessions about login
 hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
+hydor sessions export 6f1e -o notes.md  # 把对话保存为 Markdown
 hydor inbox
 ```
 
@@ -311,5 +312,6 @@ hydor --server https://hydor.example.com --token acm_… sessions
 - “hydor run 返回退出码 3 是什么意思？”
 - “在我的笔记本电脑上设置 hydor 命令，让它使用这台电脑上的 Hydor。”
 - “哪个 hydor 命令能列出我的定时任务？我怎样在终端里关掉其中一个？”
+- “哪个 hydor 命令能把一个会话的对话保存为 Markdown 文件？”
 - “让终端等这一轮结束后再发送我的消息。”
 - “关掉终端里的灰色建议。”
