@@ -1,13 +1,15 @@
-// A turn's time and cost, from the tokens beside its header: where the time went (the model, its steps by kind, waiting
-// for you, the rest), how soon its first reply or step came, its tokens by kind (read fresh, read from the provider's
-// cache, written to it, written out) and, when the model's price is known, what each cost and what the cache saved.
-// Its items give the steps' times; the server gives how long each card waited for you and the model's price
-// (GET /api/sessions/:key/breakdown), fetched when it opens.
+// A turn's time and cost, from its cost beside its header ("≈ $0.12"; its tokens when no price is known): where the time
+// went (the model, its steps by kind, waiting for you, the rest), how soon its first reply or step came, its tokens by
+// kind (read fresh, read from the provider's cache, written to it, written out) and, when the model's price is known,
+// what each cost and what the cache saved. Its items give the steps' times; the server gives how long each card waited
+// for you (GET /api/sessions/:key/breakdown, fetched when it opens) and the model's price (the same, once a model while
+// the page is open). On a plan (Claude Code, Codex) the cost is what the tokens would cost at API prices.
 import { useEffect, useRef, useState } from 'react';
-import type { TimelineItem } from '@shared/types';
+import type { Agent, TimelineItem, TokenUsage } from '@shared/types';
 import { cx, Popover } from '../../components/ui';
 import { api, enc } from '../../lib/api';
-import { compact, duration, money } from '../../lib/format';
+import { useSessions } from '../../lib/store';
+import { AT_API_PRICES, compact, duration, money, usd } from '../../lib/format';
 import { LOCALE } from '../../i18n/locale';
 import { PARTS, timeSplit, type Turn, type Wait } from './turnTime';
 
@@ -23,6 +25,34 @@ interface Breakdown {
 
 const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)}%` : '');
 
+/** Each model's price, asked for once while the page is open: it is the same in every session. */
+const prices = new Map<string, Promise<Rate | null>>();
+function priceOf(sessionKey: string, model: string): Promise<Rate | null> {
+  let p = prices.get(model);
+  if (!p) {
+    p = api<Breakdown>(`/api/sessions/${enc(sessionKey)}/breakdown?models=${enc(model)}`).then(
+      (r) => r.rates[model] ?? null,
+      () => {
+        // Asked again next time: the server may answer then.
+        prices.delete(model);
+        return null;
+      },
+    );
+    prices.set(model, p);
+  }
+  return p;
+}
+
+/** What a turn's tokens cost by kind at a model's price. */
+function costOf(tk: TokenUsage, rate: Rate) {
+  const fresh = Math.max(0, tk.input - (tk.cacheWrite ?? 0));
+  const written = tk.cacheWrite ?? 0;
+  const cached = tk.cacheRead ?? 0;
+  // Writing to Anthropic's cache costs a quarter more than reading fresh.
+  return { fresh: (fresh * rate.input) / 1e6, written: (written * rate.input * 1.25) / 1e6, cached: (cached * rate.cacheRead) / 1e6, out: (tk.output * rate.output) / 1e6 };
+}
+
+
 function Line({ label, hint, value, sub }: { label: string; hint?: string; value: string; sub?: string }) {
   return (
     <div className="flex items-baseline gap-3 py-0.5" title={hint}>
@@ -33,10 +63,23 @@ function Line({ label, hint, value, sub }: { label: string; hint?: string; value
   );
 }
 
-export function TurnCost({ sessionKey, turn, work, start, className }: { sessionKey: string; turn: Turn; work: TimelineItem[]; start?: number; className?: string }) {
+export function TurnCost({ sessionKey, agent, turn, work, start, className }: { sessionKey: string; agent?: Agent; turn: Turn; work: TimelineItem[]; start?: number; className?: string }) {
   const ref = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<Breakdown | null>(null);
+  // The model's price, for the cost beside the header: undefined while it is asked for.
+  const [price, setPrice] = useState<Rate | null | undefined>(turn.costUsd != null || !turn.model ? null : undefined);
+  // Claude Code and Codex run on a plan (unless on API credit): the cost is what the tokens would cost at API prices.
+  const credit = useSessions((x) => !!x.byKey[sessionKey]?.apiCredit);
+  const plan = (agent === 'claude' || agent === 'codex') && !credit;
+  useEffect(() => {
+    if (turn.costUsd != null || !turn.model || !turn.tokens) return;
+    let alive = true;
+    priceOf(sessionKey, turn.model).then((r) => alive && setPrice(r));
+    return () => {
+      alive = false;
+    };
+  }, [sessionKey, turn.model, turn.costUsd != null, !!turn.tokens]);
   useEffect(() => {
     if (!open || data) return;
     api<Breakdown>(`/api/sessions/${enc(sessionKey)}/breakdown?models=${enc(turn.model ?? '')}`)
@@ -48,23 +91,27 @@ export function TurnCost({ sessionKey, turn, work, start, className }: { session
   const total = tk.input + (tk.cacheRead ?? 0) + tk.output;
   const begin = start ?? (turn.ts && turn.durationMs ? turn.ts - turn.durationMs : 0);
   const split = timeSplit(turn, work, begin, data?.waits ?? []);
-  const rate = turn.model ? data?.rates[turn.model] : null;
+  const rate = turn.model ? (data?.rates[turn.model] ?? price ?? null) : null;
   const fresh = Math.max(0, tk.input - (tk.cacheWrite ?? 0));
   const written = tk.cacheWrite ?? 0;
   const cached = tk.cacheRead ?? 0;
-  // Writing to Anthropic's cache costs a quarter more than reading fresh.
-  const cost = rate ? { fresh: (fresh * rate.input) / 1e6, written: (written * rate.input * 1.25) / 1e6, cached: (cached * rate.cacheRead) / 1e6, out: (tk.output * rate.output) / 1e6 } : null;
+  const cost = rate ? costOf(tk, rate) : null;
   const saved = rate ? (cached * (rate.input - rate.cacheRead)) / 1e6 : 0;
   const read = fresh + written + cached;
+  // What the turn cost, as the agent said (Custom with a priced model) or from the model's price; null: no price known.
+  const spent = turn.costUsd ?? (cost ? cost.fresh + cost.written + cost.cached + cost.out : null);
+  // Beside the header: the cost ("≈" when it is worked out from the price), else the tokens; nothing while the price is on its way.
+  const shown = price === undefined && turn.costUsd == null ? null : spent != null ? (turn.costUsd != null && !plan ? usd(spent) : `≈ ${usd(spent)}`) : `${compact(total)} tokens`;
+  if (shown == null) return null;
   return (
     <>
       <button
         ref={ref}
         onClick={(e) => (e.stopPropagation(), setOpen((o) => !o))}
         className={cx('rounded-md px-1.5 py-0.5 text-[12px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2', open && 'bg-bg-2 text-fg-2', className)}
-        title="Time and cost"
+        title={spent != null && plan ? `Time and cost\n${AT_API_PRICES}` : 'Time and cost'}
       >
-        {compact(total)} tokens
+        {shown}
       </button>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" width={340} title="Time and cost">
         <div className="space-y-3 px-3 py-2.5 text-[12.5px]">
@@ -112,12 +159,13 @@ export function TurnCost({ sessionKey, turn, work, start, className }: { session
             />
             <Line label="Written out" hint="The model's replies, thoughts and steps" value={tk.output.toLocaleString(LOCALE)} sub={cost ? money(cost.out) : undefined} />
           </div>
-          {(cost || turn.costUsd != null) && (
+          {spent != null && (
             <div>
               <div className="flex items-baseline justify-between">
                 <span className="font-medium text-fg">Cost</span>
-                <span className="tnum text-fg">{money(turn.costUsd ?? (cost ? cost.fresh + cost.written + cost.cached + cost.out : 0))}</span>
+                <span className="tnum text-fg">{usd(spent)}</span>
               </div>
+              {plan && <div className="mt-0.5 text-fg-3">{AT_API_PRICES}</div>}
               {saved >= 0.005 && <div className="mt-0.5 text-fg-3">{`The cache saved about ${money(saved)}.`}</div>}
             </div>
           )}

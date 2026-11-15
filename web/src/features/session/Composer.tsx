@@ -550,7 +550,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                       ? hint
                       : running
                         ? `Message ${s.agent === 'claude' ? 'Claude' : s.agent === 'codex' ? 'Codex' : (s.acpName ?? 'the agent')}…`
-                        : 'Message to resume this session…'
+                        : 'Message to continue…'
             }
             className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />

@@ -87,7 +87,7 @@ import { setModelsHere } from './models.ts';
 import { hasMedia, mediaRoutes, putAsset, takeInAnswer } from './media.ts';
 import { missingSecrets, saveAppSecrets, secretsOf } from './secrets.ts';
 import { dropDaily, homeOf, saveHome } from './home.ts';
-import { pinsOf, recentApps, setPins, unpin, useCounts } from './pins.ts';
+import { pinsOf, recentApps, setPins, suggestedApps, unpin, useCounts } from './pins.ts';
 import { WORK_LOG } from './worklog.ts';
 
 const keyLimiter = new Limiter();
@@ -307,6 +307,12 @@ function routes(d: Deps) {
     const templates = builtinsOf(db).map((t) => ({ ...t, ...(last.get(`tpl:${t.id}`) ? { lastRunAt: last.get(`tpl:${t.id}`) } : {}), ...keyed(t) }));
     // At the top of the page: the apps pinned there, and the ones you ran lately (each once, with its latest run).
     return { apps, templates, recent, pins: pinsOf(db), used: recentApps(db) };
+  });
+
+  /** The apps the start page suggests under its empty message box: those you run most, else ready-made ones that suit anyone. */
+  app.get('/api/apps/suggested', async (req) => {
+    const n = Math.round(Number((req.query as { n?: string }).n));
+    return { apps: suggestedApps(db, Number.isFinite(n) && n >= 1 ? Math.min(n, 6) : 2) };
   });
 
   /** The apps pinned to the top of the Apps page, in their order: yours by id, ready-made ones as "tpl:<id>". */

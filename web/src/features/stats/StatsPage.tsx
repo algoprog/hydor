@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, BarChart3, CircleDollarSign, FileDiff, FolderGit2, 
 import type { StatsGranularity, StatsResponse, StatsTotals } from '@shared/types';
 import { api } from '../../lib/api';
 import { useCountUp } from '../../lib/motion';
-import { compact, tildify } from '../../lib/format';
+import { AT_API_PRICES, compact, tildify, usd } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toastError, useApp } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
@@ -464,30 +464,51 @@ export function StatsBody() {
   );
 }
 
-/** One line for the home page: today's numbers. */
 /** "$0.42", "$12.30", "$1,284". */
 function dollars(v: number): string {
   return v >= 1000 ? `$${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
 }
 
+/**
+ * Today in a line, in plain words: "Today · 7 sessions · 12 file edits · $0.84" (a part that is zero left out). The
+ * cost is Activity's API cost (est.): what the tokens cost at API prices, which on a plan is not what you pay, as its
+ * hover says with the lines, tokens and prompts.
+ */
 export function TodayStrip() {
-  const [t, setT] = useState<StatsTotals | null>(null);
+  const [r, setR] = useState<StatsResponse | null>(null);
   useEffect(() => {
     api<StatsResponse>(`/api/stats?granularity=day&count=1&tz=${encodeURIComponent(TZ)}`)
-      .then((r) => setT(r.totals))
+      .then(setR)
       .catch(() => {});
   }, []);
+  const t = r?.totals;
   if (!t || (!t.prompts && !t.tokensOut)) return null;
+  const cost = t.cost && t.cost >= 0.005 ? t.cost : 0;
+  // Claude Code and Codex ran today: on a plan, the cost is not what you pay.
+  const plan = !!r && ((r.byAgent?.claude?.tokensOut ?? 0) > 0 || (r.byAgent?.codex?.tokensOut ?? 0) > 0);
+  const parts = [t.sessions ? (t.sessions === 1 ? '1 session' : `${t.sessions} sessions`) : null, t.fileEdits ? (t.fileEdits === 1 ? '1 file edit' : `${t.fileEdits} file edits`) : null, cost ? usd(cost) : null].filter(
+    (x): x is string => !!x,
+  );
+  const hint = [
+    cost && plan ? AT_API_PRICES : cost ? 'At each model’s price' : null,
+    t.linesAdded || t.linesRemoved ? `+${t.linesAdded.toLocaleString(LOCALE)} −${t.linesRemoved.toLocaleString(LOCALE)} lines` : null,
+    `${compact(t.tokensIn + t.tokensCached)} tokens in · ${compact(t.tokensOut)} out`,
+    t.prompts === 1 ? '1 prompt' : `${t.prompts} prompts`,
+    'Click for Activity',
+  ]
+    .filter(Boolean)
+    .join('\n');
   return (
-    <button onClick={() => go('/stats')} title="Open stats" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md text-left text-[12.5px] text-fg-2 hover:text-fg">
+    <button onClick={() => go('/stats')} title={hint} className="mt-3 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-md text-[12.5px] text-fg-2 hover:text-fg">
       <span className="font-medium text-fg">Today</span>
-      <span>
-        <span className="text-add">+{compact(t.linesAdded)}</span> <span className="text-del">−{compact(t.linesRemoved)}</span> lines
-      </span>
-      <span className="max-md:hidden">{compact(t.tokensIn + t.tokensCached)} in</span>
-      <span>{compact(t.tokensOut)} out</span>
-      <span>{t.prompts} prompts</span>
-      <span className="max-md:hidden">{t.sessions} sessions</span>
+      {parts.map((p) => (
+        <span key={p} className="flex items-center gap-x-1.5">
+          <span className="text-fg-3" aria-hidden>
+            ·
+          </span>
+          <span className="tnum">{p}</span>
+        </span>
+      ))}
     </button>
   );
 }

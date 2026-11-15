@@ -15,6 +15,7 @@ import { cannotUpdate, UPDATE_PHASE as PHASE } from '../../lib/updates';
 import { followUpPref, type FollowUp } from '../session/Composer';
 import { startTour } from '../tour/Tour';
 import { setTipsOn, useTips } from '../tips/state';
+import { saveStart } from '../../lib/start';
 import { ThemeMode, ThemePicker } from './Themes';
 import { CPU_CHOICES, MEMORY_CHOICES, type SessionLimits, type SessionResources } from '../system/sessionUse';
 import { openReleaseNotes } from './Releases';
@@ -78,6 +79,7 @@ export function GeneralSettings() {
           }
         />
         <TipsSetting />
+        <StartersSetting />
       </Group>
     </Stack>
   );
@@ -249,6 +251,21 @@ function VersionRow() {
         </div>
       )}
     </Row>
+  );
+}
+
+/**
+ * Starter ideas under the start page's empty message box: on until hidden there or here, the same on every device
+ * (kept with the start page's picks).
+ */
+function StartersSetting() {
+  const on = useApp((s) => s.boot?.start?.starters !== false);
+  return (
+    <Row
+      label="Starter ideas"
+      hint="Examples, your apps and an automation under the empty message box"
+      control={<Switch on={on} label="Starter ideas" onChange={(v) => saveStart({ starters: v ? null : false }, true)} />}
+    />
   );
 }
 

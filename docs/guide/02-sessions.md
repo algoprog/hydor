@@ -154,9 +154,9 @@ What you write in the box waits there while you go to other pages: the message, 
 At the top of a session:
 
 - the agent's icon and the title (double-click it to rename), and a lock for a [confidential session](#keep-a-session-confidential);
-- a status: **Working**, **Needs you**, **Ready**, **Starting**, **Stopping**, **Stopped**, or "Open in VS Code" for a session running elsewhere;
+- a status: **Working**, **Needs you**, **Ready**, **Starting**, **Stopping**, or "Open in VS Code" for a session running elsewhere; once its agent is no longer running, how the work ended: **Done** when its last turn finished (with "· 2 files made" or "· 3 files changed" when it made or changed files), **Stopped** when you stopped it or it was cut off before it finished, **Failed** when it ended with an error. Point at it for what to do next;
 - the folder (click it to browse it in Files), a pull request badge, the account when it runs as an added one, and on wider screens the git branch and the model;
-- one button for what you can do now: **Stop** while a turn runs, **Resume** when the agent is stopped, or **Continue here** for a Claude Code session open in VS Code or a terminal;
+- one button for what you can do now: **Stop** while a turn runs, **Resume** when the agent is not running (after **Stopped** or **Failed**; quieter after **Done**, since a message in the box continues the session anyway), or **Continue here** for a Claude Code session open in VS Code or a terminal;
 - **Details** (showing the lines added and removed once files changed), which opens [the details panel](#the-details-panel-changes-commands-and-info);
 - the session's menu (⋯): see [Everything in the session's menu](#everything-in-the-sessions-menu).
 
@@ -165,7 +165,7 @@ At the top of a session:
 The conversation reads like a chat. Each turn is your message, the agent's work, and the reply it ended on:
 
 - **Your message** shows on the right, with its pictures and attached files. A long one folds to its first lines; **Show more** opens it.
-- **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with the tokens used on the right: click them for the turn's [time and cost](/guide/sessions#a-turns-time-and-cost). While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work's outline grows as it happens; after earlier turns it adds how long the session has worked in all, all its turns together: "Working · 1m 2s (47m)". A finished turn folds its work away; click the line to open it.
+- **The work** sits under a line that sums it up: "Worked for 2m 10s · 3 commands", "Thought", "Stopped after 40s" or "Failed after 5s", with what the turn cost on the right ("≈ $0.12"): click it for the turn's [time and cost](/guide/sessions#a-turns-time-and-cost). On a plan (Claude Code, Codex) that is what its tokens would cost at API prices, not what you pay; with no price known for the model, the tokens show there instead. While the turn runs, the line says "Working · 1m 2s" (or "Waiting for you") and the work's outline grows as it happens; after earlier turns it adds how long the session has worked in all, all its turns together: "Working · 1m 2s (47m)". A finished turn folds its work away; click the line to open it.
 - **The outline of the work**: each short note the agent writes between its steps (what it found, what it does next) starts a part, and the steps it then takes go in it. A finished part is one line with a check: the note in a few words ("Run the checkout tests first to see what fails", "Apply the discount first and round once"), how many steps it took and the lines it changed. Click it for the whole note and each step. The part under way shows the agent's note in full and, under it, the step being taken now, such as "Editing total.ts · 4 s"; click that line for the part's steps so far. Steps taken before the agent's first note make a part named for what they did ("Ran 3 commands, read 2 files"). A long turn shows its latest parts; **Show 12 earlier parts** shows the rest.
 - **Steps** are named in plain words: "Run the tests", "Read index.ts", "Searched the web", with the command itself in quieter type. Click one to see what it did. Claude Code runs a command, or another step that changes things, on its own; the steps of Hydor's own that the agent asked for after it in the same message (web searches, page reads…) wait until it ends. Such a step shows **Waiting** in place of its clock, quietly, until it really starts; then its clock counts from that moment, and a finished step shows the time it really took. The outline's line for the step under way names the step really running.
 - **Thoughts** show as "Thought for 12s" with their first heading; click to read them.
@@ -183,13 +183,13 @@ Hover over a reply for **Fork from this reply** (Claude Code and Custom), **Read
 
 ### A turn's time and cost
 
-The tokens on the right of a finished turn's line open **Time and cost**, to see why a turn took long or cost much:
+The cost on the right of a finished turn's line ("≈ $0.12", or the tokens when no price is known for the model) opens **Time and cost**, to see why a turn took long or cost much:
 
 - **Duration**: a bar of where the turn's time went, each part with its share and length: **The model** (reading what it was given, thinking and writing), **Commands**, **Reading and editing files**, **The web**, **Other steps** (subagents, connected apps' tools), **Waiting for you** (approvals, questions and forms, from when each card came to when you answered it) and **The rest** (starting, and between steps). Steps that ran side by side count once. Under it, "First reply or step after 3 s": how soon the agent began.
 - **Tokens**: **Read fresh**; **Written to the cache** (read fresh and kept by the model's provider, so the next request reads it for less); **Read from the cache**, with its share of all that was read; and **Written out** (replies, thoughts and steps).
-- **Cost**: the turn's cost and, when the model's price is known, each kind's, with "The cache saved about $0.80.". With no price known for the model, it says its cost is not counted.
+- **Cost**: the turn's cost and, when the model's price is known, each kind's, with "The cache saved about $0.80.". On a plan (Claude Code and Codex, unless a session runs on API credit) it says "At API prices: on a plan you pay your plan's fee". With no price known for the model, it says its cost is not counted.
 
-Claude Code's turns give the model's own time and the first reply; for other agents, the model's part is its thinking. The tokens and this panel show on wider screens.
+Claude Code's turns give the model's own time and the first reply; for other agents, the model's part is its thinking. The cost and this panel show on wider screens.
 
 ### Maths, diagrams, figures and pictures in replies
 
@@ -303,7 +303,7 @@ Press Ctrl+F (⌘F) in a session. **Find in this session** looks through your me
 - What you type is kept as a draft for each session in this browser, so it is still there when you come back.
 - Ctrl+S (⌘S) puts the draft aside and empties the box; Ctrl+S in an empty box brings it back.
 - A very long paste (32,000 characters or more) is attached as a text file instead of filling the box.
-- The placeholder tells you what sending will do: "Message Claude…", or "Message to resume this session…" when the agent is stopped.
+- The placeholder tells you what sending will do: "Message Claude…", or "Message to continue…" when the agent is not running: sending starts it again with the whole conversation.
 
 ## The details panel: changes, commands and info
 
@@ -311,7 +311,7 @@ Press Ctrl+F (⌘F) in a session. **Find in this session** looks through your me
 
 - **Changes**: every file the session changed, the most changed first, with lines added and removed. Click a file for each edit's diff; **Open** opens the file.
 - **Commands**: every shell command the agent ran, newest first, with **All**, **Failed** and **Background** filters. Click one for its output.
-- **Info**: the agent, status, folder, branch, model and effort, how much of the context is used, when it started and was last active, its activity (prompts, turns, tool calls, commands), tokens (in, cached, out), the API cost (what the same work would cost at API prices), output speed, where it was started (Hydor, VS Code, a terminal, Claude's desktop app…), and while its agent runs, **Its programs**: what they use now (CPU, memory and how many), with the [limits](/guide/app#limit-each-session) it runs under. Below: its background tasks (open one to see what it did, or **Stop** it), and **Continue in a terminal**: the command that resumes the session in a terminal, and the session id, each with a copy button (Claude Code and Codex).
+- **Info**: the agent, status (as in the header: **Done**, **Stopped**, **Failed** or what it does now), folder, branch, model and effort, how much of the context is used, when it started and was last active, its activity (prompts, turns, tool calls, commands), tokens (in, cached, out), the API cost (what the same work would cost at API prices), output speed, where it was started (Hydor, VS Code, a terminal, Claude's desktop app…), and while its agent runs, **Its programs**: what they use now (CPU, memory and how many), with the [limits](/guide/app#limit-each-session) it runs under. Below: its background tasks (open one to see what it did, or **Stop** it), and **Continue in a terminal**: the command that resumes the session in a terminal, and the session id, each with a copy button (Claude Code and Codex).
 
 ## Read the meters: context, cache and speed
 
@@ -326,8 +326,8 @@ A small ring with a percentage by the microphone fills as the conversation uses 
 The Stop button by the message box has a rotating ring while the agent is starting or working. The ring pauses when it needs you, and stays still if your device asks for reduced motion. Once the turn is over, the Stop button stays, with its ring, for as long as background tasks or subagents the agent started are still running, such as a Hydor subagent, a Claude Code subagent, a command left running or a monitor; the send button is beside it, and the box takes your messages as usual. Point at Stop to see what it stops: "Stops this turn, 2 subagents and 1 background task", or "Stops 2 subagents". It stops all of that at once: the turn, each subagent that runs, and each background task that runs, and the ones those started in turn. A Hydor subagent stopped this way does not report back to its parent, and a report that was already on its way waits in the parent's paused queue instead of waking it; press **Resume** to let the queue go.
 
 - **Stop a turn**: press **Stop** in the header, or the round square button by the message box, which also stops what the session started (above). (Esc doesn't stop it: it only closes what is open, such as the find bar or a list.) The agent stops what it is doing; the turn shows "Stopped after…". The agent stays ready for your next message, and the queue pauses until you resume it.
-- **Stop the agent process**: the session's menu (⋯) → **More** → **Stop the agent process**, when no turn is running. The agent's program ends; the session and its history stay, and it shows **Stopped**.
-- **Resume**: the header's **Resume** starts the agent again with the whole conversation, or just send a message ("Message to resume this session…"). If the session was written to seconds ago, perhaps from VS Code or a terminal, the app asks first, since two programs writing one session can damage its history.
+- **Stop the agent process**: the session's menu (⋯) → **More** → **Stop the agent process**, when no turn is running. The agent's program ends; the session and its history stay, and it shows how its last turn ended (**Done**, **Stopped** or **Failed**).
+- **Resume**: the header's **Resume** starts the agent again with the whole conversation, or just send a message ("Message to continue…"): that starts it again too, for Claude Code, Codex and Custom alike. After **Done**, **Resume** is a quieter button, since your next message is all it takes. If the session was written to seconds ago, perhaps from VS Code or a terminal, the app asks first, since two programs writing one session can damage its history.
 - An agent left idle stops by itself after three hours (when nothing waits for you and no background task runs); your next message starts it again.
 
 ## Give the session a goal
@@ -483,6 +483,8 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 
 - "Start a Claude Code session in ~/code/blog in a new worktree that adds an RSS feed, with a $5 spending cap."
 - "Which sessions finished since this morning? Settle the ones that are done and archive the ones from last week."
+- "Why does this session say Failed, and what should I send to try again?"
+- "What did the last turn of this session cost, and how much of it was the cache?"
 - "Snooze the session about the tax forms until Monday at 9."
 - "Give the session 'Fix upload' the goal: npm test passes and uploads of 2 GB work."
 - "Fork the release-notes session and try a shorter version."
