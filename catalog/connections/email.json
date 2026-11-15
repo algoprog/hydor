@@ -1,0 +1,38 @@
+{
+  "$schema": "../schema.json",
+  "id": "email",
+  "name": "Email",
+  "description": "Read, search, sort, draft and send email from your own mail accounts (Gmail, iCloud, Fastmail, Yahoo, work or school mail) with an app password.",
+  "category": "communication",
+  "icon": "mail",
+  "color": "#2563EB",
+  "homepage": "https://github.com/algoprog/hydor/blob/main/docs/guide/14-connections.md",
+  "server": {
+    "transport": "builtin"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "keywords": [
+    "email",
+    "mail",
+    "inbox",
+    "imap",
+    "smtp",
+    "app password",
+    "gmail",
+    "icloud",
+    "fastmail",
+    "yahoo",
+    "proton",
+    "outlook",
+    "hotmail",
+    "microsoft 365"
+  ],
+  "featured": true,
+  "verified": {
+    "by": "Hydor (built in)",
+    "date": "2026-11-15"
+  },
+  "notes": "Works with most mail through IMAP and SMTP. Outlook.com, Hotmail and Microsoft 365 can’t connect this way: Microsoft turned off app passwords for them."
+}

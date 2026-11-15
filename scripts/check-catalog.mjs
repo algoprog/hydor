@@ -93,7 +93,9 @@ function rules(a, file) {
   const used = [...JSON.stringify(s).matchAll(PLACEHOLDER)].map((m) => m[1]);
   for (const n of used) if (!names.has(n)) errs.push(`{{${n}}} is not one of the fields`);
   for (const f of fields) if (!used.includes(f.name)) warn.push(`field ${f.name} is not used in the server's address, arguments or environment`);
-  if (s.transport !== 'stdio') {
+  if (s.transport === 'builtin') {
+    if (a.id !== 'email') errs.push('server.transport builtin is only for the connections Hydor answers itself (email)');
+  } else if (s.transport !== 'stdio') {
     if (fields.some((f) => f.secret && used.includes(f.name))) errs.push('a secret field cannot go in an address (keys go in a header: auth.type api_key)');
     if (/[?&](api[_-]?key|key|token|secret)=/i.test(s.url ?? '')) errs.push('the address carries a key: use auth.type api_key with a header');
   } else {
@@ -278,7 +280,8 @@ if (!JSON_OUT) {
 }
 
 if (PROBE) {
-  const list = apps.filter((a) => !only.length || only.includes(a.id));
+  // The ones Hydor answers itself have no server to probe.
+  const list = apps.filter((a) => (!only.length || only.includes(a.id)) && a.server?.transport !== 'builtin');
   const results = {};
   let i = 0;
   // A few at a time.

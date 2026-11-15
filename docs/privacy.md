@@ -76,6 +76,8 @@ None of these happens until you do the thing in the first column.
 | Add another machine, or connect an app (MCP) | The address you give | Your requests for that machine or app, with the token you gave. |
 | Dictate with the browser's own recognition | Whoever makes your browser (Chrome: Google; Safari: Apple) | Your voice. This is the browser, not Hydor. Choose **The server** in the Voice settings to keep it on your machine. |
 | Schedule a task that watches a page | The page's own address | A plain request, as a browser would make. |
+| Type an address in the Email connection's form | `autoconfig.<your domain>`, `<your domain>`, `autoconfig.thunderbird.net` (Mozilla), your DNS | Only for a provider the app does not know: your address's domain (never the whole address), to find its mail servers. |
+| Connect an email account, or let agents and watchers use it | Your mail provider's IMAP and SMTP servers | Your address and app password, to sign in; the mail agents read, search, move, draft, send or delete, and the checks of a New email watcher. |
 | Install an app, a plugin or a skill that needs packages | `registry.npmjs.org`, `pypi.org`, `files.pythonhosted.org`, and what the plugin names | Package names, to install them (without running their install scripts for Node packages). |
 | Read or look at a PDF on a computer without poppler | `registry.npmjs.org`, once, or `cdn.jsdelivr.net` | A request for the pdf.js library. The PDF stays on your computer. |
 

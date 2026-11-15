@@ -1,6 +1,6 @@
 # Connected apps, keys and tools
 
-Connect the services you use (Notion, Gmail, GitHub, Stripe, a folder on this computer…) once, on the Apps page's **Connected apps**, and every agent and app can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
+Connect the services you use (your email, Notion, GitHub, Stripe, a folder on this computer…) once, on the Apps page's **Connected apps**, and every agent and app can work with them. Keep API keys and sign-ins in an encrypted vault that agents use without ever seeing them, add tool servers to Claude Code and Codex, and plugins to Claude Code. Use this when you want agents to act in your own accounts, call a service with your key, or have tools they don't come with.
 
 ![Apps → Connected apps: the services you connected, the marketplace and your keys](images/connections.webp)
 
@@ -39,13 +39,14 @@ Each card shows the service's name, what an agent can do with it, and how it con
 - **No sign-in**: there is nothing to enter.
 - **Runs on this computer**: a program Hydor starts here when an agent needs it.
 - **Runs here, with a key**: the same, with a key you give it.
+- **Address and app password**: your email address and a password made for mail programs (Email).
 
 A check mark beside the name means someone checked that the service's server answers as its entry says. **not checked** means nobody has yet. Services you connected show **Connected** (or **Sign in again**) where the others show **Connect**.
 
 Some of what is there:
 
 - **Notes, tasks and projects**: Notion, Craft, Linear, Asana, Atlassian (Jira and Confluence), ClickUp, monday.com, Todoist.
-- **Mail, chat and calendars**: Gmail, Slack, Fireflies, Granola, Google Calendar, Calendly.
+- **Mail, chat and calendars**: Email (any mail account, with an app password), Gmail, Slack, Fireflies, Granola, Google Calendar, Calendly.
 - **Files and design**: Google Drive, Dropbox, Box, Figma, Canva, Miro, Gamma, Cloudinary.
 - **Developer tools and hosting**: GitHub, GitLab, Sentry, CircleCI, Postman, Cloudflare, Vercel, Netlify, Railway, Context7, DeepWiki.
 - **Data and analytics**: Airtable, Supabase, Neon, PostgreSQL, MongoDB, SQLite, PostHog, Mixpanel, Amplitude, Datadog.
@@ -93,6 +94,56 @@ Some services only let you sign in through a sign-in client (an OAuth app) of yo
 ### Services that run on this computer
 
 These start a program here (with npx or uvx) for each session's agent. The first test can take a while if the program has to download first. A key such a service needs goes into its environment from the vault when it starts. It never appears on a command line, where other programs could read it.
+
+## Connect your email
+
+Agents can read, search, sort, draft and send your email once you connect your mail account with its address and an app password. It works with Gmail, iCloud Mail, Fastmail, Yahoo, AOL, GMX, WEB.DE, Zoho, Posteo, mailbox.org, Proton Mail (through Proton Mail Bridge) and most work and school mail.
+
+1. Open [the Marketplace tab](/apps/connected?tab=market) and click **Email** (under **Mail, chat & meetings**, or search for "email").
+2. Type your **Email address**. Hydor finds your mail servers by itself. For a provider it knows, it shows how to make an app password there, and **How to make one** opens the provider's own help page.
+3. Make an app password (see below) and paste it in **App password**.
+4. If you like, type **Your name**, as people see it on the mail you send.
+5. Click **Connect**. Hydor signs in to read and to send before it saves anything. If that fails, it says why: a wrong password or user name, that your provider wants an app password rather than your usual one, or that a server did not answer.
+
+The app password is kept encrypted in the vault on this computer; agents never see it. To connect another account, open **Email** again and click **Add another account**.
+
+### Make an app password
+
+An app password is a separate password for mail programs, made in your account's security settings, used instead of the password you sign in with on the web. Most providers ask you to turn on two-step verification first.
+
+- **Gmail**: turn on 2-Step Verification in your Google Account, then open **Security → App passwords**. Work and school accounts need their admin to allow it.
+- **iCloud Mail**: at account.apple.com, open **Sign-In and Security → App-Specific Passwords**.
+- **Fastmail**: **Settings → Privacy & Security → Manage app passwords**.
+- **Yahoo** and **AOL**: **Account Security → Generate app password**.
+- **GMX**, **WEB.DE** and **Zoho**: turn on IMAP in the mailbox's settings first.
+- **Proton Mail**: install Proton Mail Bridge and sign in to it on this computer, then use the password Bridge shows for your address.
+
+### When your servers are not found
+
+For a provider Hydor does not know, it reads the settings your provider publishes for mail programs. To find them, it asks Mozilla's public directory of mail providers about your domain (never your whole address). When there are none, it tries imap. and smtp. in front of your domain and lets the sign-in check them.
+
+If that fails, open **Servers and user name** and type the incoming (IMAP) and outgoing (SMTP) servers, their ports and their security (**SSL/TLS** or **STARTTLS**), as your provider's help pages give them, and the user name if it is not your whole address. A connection without encryption is only allowed to this computer (a bridge such as Proton Mail Bridge).
+
+### Outlook.com and Microsoft 365
+
+Outlook.com, Hotmail and Live accounts, and work or school accounts on Microsoft 365, can't connect this way yet. Microsoft turned off app passwords for them, so they need a Microsoft sign-in, which Hydor does not have yet. The Email dialog says so when you type such an address.
+
+### Your mail accounts
+
+On the **Connected** tab, Email's row lists your accounts by address. **Test** signs in to each one. **Accounts** opens the dialog, where each account has **Test**, **Change** (a new app password, name or servers) and **Remove**: its app password is deleted here, and nothing in the mailbox changes. Removing the last account disconnects Email; **Disconnect** removes them all.
+
+### What agents can do with your email
+
+Agents get these tools under "email". Each takes the account's address when you have more than one; without it, they use the first.
+
+- **list_folders**, **search_email** (by sender, recipient, subject, words, dates, unread, flagged or with attachments, newest first) and **read_email** (who sent it and to whom, its text, and its attachments' names and sizes). Reading does not mark an email as read.
+- **save_attachments** saves an email's attachments into the session's folder.
+- **mark_email** marks emails read or unread, flagged or not. **move_email** moves them to another folder, never to the bin.
+- **save_draft** puts an email in your Drafts folder for you to send yourself. Nothing is sent.
+- **send_email** sends an email at once, as a new email or as a reply in its thread, with files from the session's folder attached, and keeps a copy in Sent.
+- **delete_email** moves emails to the bin, or deletes them for good.
+
+To keep agents from sending or deleting, turn **send_email** and **delete_email** off under **Tools** (see [Turn an account or some of its tools off](/guide/connections#turn-an-account-or-some-of-its-tools-off)). What an email says reaches agents as outside data, which they are told never to follow as instructions. A scheduled task can start for each new email: see [Watch for a change](/guide/tasks#watch-for-a-change).
 
 ## Check that a connected account works
 
@@ -347,6 +398,9 @@ Hydor asks Claude Code for the list of plugins at most every 10 minutes, and aga
 Agents can do these for you, with your OK on a card. They never type a key's value into the app: for a key or a sign-in, they show the card where you enter it.
 
 - "Which accounts are connected? Test Notion and tell me if it works."
+- "Find this week's unread emails from my landlord and summarize them."
+- "Draft a reply to Anna's last email saying I can meet on Thursday, and save it in my Drafts."
+- "Save the attachments of the invoices I got this month into this folder."
 - "Connect Context7 so agents can look up library docs."
 - "Turn Gmail off for every session, but keep it on in this one."
 - "Show me Notion's tools and turn off the ones that delete pages."

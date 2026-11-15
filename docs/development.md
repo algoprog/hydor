@@ -20,7 +20,8 @@ The app's capabilities (search, the browser, memory, the guide…) each live in 
 `web/src/features/<name>/`. Each capability's tests are a script beside it (`*-test.ts`), built and run with a
 scratch data folder. `npm test` runs every one that needs nothing beyond a checkout, a few at a time (pull requests run
 it on GitHub too); `npm test -- memory guide/` runs those whose path has those words, and `npm test -- --all` those
-that need a display, another system or the network as well. One by hand:
+that need a display, another system or the network as well (email's `server/mail/live-test.ts` needs a throwaway test
+mail server, GreenMail in Docker: its first lines say how to start one). One by hand:
 
 ```bash
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js

@@ -1,7 +1,8 @@
 // Where agents reach their connected apps, so no key or token is ever written into an agent's settings
 // (which the app keeps on disk to restart it) or its command line:
 //
-//   POST /connections/mcp/<run token>/<app>      a remote app, through this server: it adds the sign-in
+//   POST /connections/mcp/<run token>/<app>      a remote app, through this server (or one this server answers
+//                                                itself, Email: server/mail/mcp.ts): it adds the sign-in
 //                                                (renewed as needed, so long sessions keep working), keeps
 //                                                only the tools that are on, holds calls to those on Ask
 //                                                first in the Outbox (server/outbox), masks known secrets in
@@ -32,6 +33,7 @@ import { askMarked, gateCall, heldResult, isDry } from '../outbox/index.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { actsOutside } from '../../shared/outbox.ts';
 import { askTools, authHeaders, connection, localCommand, onFor, remoteUrl, setStatus, toolFilter, toolOn, toolState, type Conn } from './apps.ts';
+import { viaBuiltin } from '../mail/mcp.ts';
 import { answerApp, askForm, withForms } from './forms.ts';
 import { isRequest, postHttp, SseLink, Unauthorized, type Rpc } from './upstream.ts';
 import { redact } from './vault.ts';
@@ -287,7 +289,12 @@ export function relayRoutes(d: Deps) {
     let sessionId: string | undefined;
     if (forward.length) {
       try {
-        const r = c.entry.server.transport === 'sse' ? await viaSse(d, c, run, req, forward, ac.signal) : await viaHttp(d, c, run, req, forward, ac.signal);
+        const r =
+          c.entry.server.transport === 'builtin'
+            ? await viaBuiltin(d, c, run, forward)
+            : c.entry.server.transport === 'sse'
+              ? await viaSse(d, c, run, req, forward, ac.signal)
+              : await viaHttp(d, c, run, req, forward, ac.signal);
         if (r.status !== undefined) {
           // The app forgot the session (it restarted): told so, the agent starts a new one.
           if (r.status === 404 && req.headers['mcp-session-id']) return reply.code(404).send({ error: 'No such session' });
