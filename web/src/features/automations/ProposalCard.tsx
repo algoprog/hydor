@@ -75,6 +75,11 @@ function When({ p, t }: { p: TaskProposal; t: TaskDraft }) {
         {s.kind === 'watch' ? `${watchText(s.watch)}, checked every ${s.minutes} min` : p.when}
       </span>
       {s.kind === 'watch' && s.watch.kind === 'command' && <code className="mt-1 block truncate rounded-md bg-bg-1 px-2 py-1 font-mono text-[11.5px] text-fg-2">{s.watch.command}</code>}
+      {s.kind === 'watch' && s.watch.kind === 'account' && (
+        <code translate="no" className="mt-1 block truncate rounded-md bg-bg-1 px-2 py-1 font-mono text-[11.5px] text-fg-2">
+          {`${s.watch.tool}${s.watch.args ? ` ${JSON.stringify(s.watch.args)}` : ''}`}
+        </code>
+      )}
       {s.kind === 'watch' && 'url' in s.watch && <span className="block truncate text-[12px] text-fg-3">{s.watch.url}</span>}
       {s.kind === 'watch' && p.status === 'pending' && <span className="block text-[12px] text-fg-3">It looks right after you confirm, and the agent wakes only when something changed.</span>}
       {p.status !== 'declined' && p.next.length > 0 && (

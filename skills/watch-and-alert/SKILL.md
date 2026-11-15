@@ -37,6 +37,7 @@ with delivery, or comes back in stock. Check hourly, for 30 days."
 | Part of a web page (a price, "Out of stock") | a **page watcher** on the lines near a text, or a CSS selector |
 | News about a company or topic | a scheduled run with `web_search` (news, from the last run's date), or a news search's RSS feed |
 | New files in a folder | a **folder watcher** |
+| New records in a connected app (a CRM's deals, a drive's files, tickets, payments), or the time before each meeting in a connected calendar | an **account watcher** (`kind: "account"`: the account's id, one of its tools that lists or searches, its arguments; with `before` for a calendar) |
 | Something a command shows (a disk, a service, a build) | a **command watcher** |
 | A page that needs a login or runs scripts to show its content | `browser_open` and `browser_read` in a scheduled run (slower and dearer) |
 

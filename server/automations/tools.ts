@@ -259,9 +259,9 @@ function draftFrom(d: Deps, ctx: RunCtx, a: Record<string, any>, tz: string): Ta
 const WATCH_SCHEMA = {
   type: 'object',
   description:
-    'kind watch only. A cheap check without a model that wakes the agent only when something changed. feed: url of an RSS or Atom feed (new items). page: url (its text changed; match keeps only the lines with that text, selector a part by a simple CSS selector). json: url and path like "data.price"; op changed (default), eq, ne, gt, lt or contains, with value. folder: path (new files; pattern like "*.pdf"). command: command (its output changing, or with on "exit" its exit code). mail: new email in a connected mail account (account: its address; folder: default the Inbox; from and subject: text they contain; unread: only unread mail): each new email starts its own run with the email as outside data and its attachments saved in the task\'s folder.',
+    'kind watch only. A cheap check without a model that wakes the agent only when something changed. feed: url of an RSS or Atom feed (new items). page: url (its text changed; match keeps only the lines with that text, selector a part by a simple CSS selector). json: url and path like "data.price"; op changed (default), eq, ne, gt, lt or contains, with value. folder: path (new files; pattern like "*.pdf"). command: command (its output changing, or with on "exit" its exit code). mail: new email in a connected mail account (account: its address; folder: default the Inbox; from and subject: text they contain; unread: only unread mail): each new email starts its own run with the email as outside data and its attachments saved in the task\'s folder. account: new items in what one of a connected account\'s tools answers (a CRM\'s new deals or contacts, a drive\'s new files, new tickets, new payments): app is the account\'s id (list_connections), tool one of its tools that only looks (lists or searches; tools that send, change, delete or pay are refused, and it must be On), args its arguments (text may hold {{now}}, {{now+2d}}, {{now-1h}}, {{today}} or {{tomorrow}}, filled in at each check; ask for newest first and enough of them when the tool can). list (where the items are in its answer, like "results") and id (the field that tells them apart, like "id") are found by themselves when left out. Each new item starts its own run with the item as outside data, at most 10 a check. With before, a calendar instead: a run that long before each event its list tool gives (args such as timeMin "{{now}}" and timeMax "{{now+2d}}"); before.minutes (15, 30, 60…) or before.evening "18:00" for the evening before; before.start the field with the start time (found by itself when left out); before.title only events whose title contains it; before.others only events with other people. A moved event gets its run before its new time; a cancelled one none.',
   properties: {
-    kind: { type: 'string', enum: ['feed', 'page', 'json', 'folder', 'command', 'mail'] },
+    kind: { type: 'string', enum: ['feed', 'page', 'json', 'folder', 'command', 'mail', 'account'] },
     url: { type: 'string' },
     match: { type: 'string' },
     selector: { type: 'string' },
@@ -276,6 +276,22 @@ const WATCH_SCHEMA = {
     from: { type: 'string', description: 'mail: only mail whose sender contains this.' },
     subject: { type: 'string', description: 'mail: only mail whose subject contains this.' },
     unread: { type: 'boolean', description: 'mail: only mail still unread.' },
+    app: { type: 'string', description: 'account: the connected account, by its id (list_connections).' },
+    tool: { type: 'string', description: 'account: its tool to call at each check, one that only looks (lists or searches).' },
+    args: { type: 'object', description: 'account: the tool\'s arguments.' },
+    list: { type: 'string', description: 'account: where the items are in its answer ("" for the answer itself); found by itself when left out.' },
+    id: { type: 'string', description: 'account: the field that tells items apart; found by itself when left out.' },
+    before: {
+      type: 'object',
+      description: 'account, a calendar: a run before each event instead of one per new item.',
+      properties: {
+        minutes: { type: 'number', description: 'How long before its start, in minutes (15, 30, 60…).' },
+        evening: { type: 'string', description: 'Or the evening before, at this local time ("18:00").' },
+        start: { type: 'string', description: 'The field with the event\'s start ("start.dateTime"); found by itself when left out.' },
+        title: { type: 'string', description: 'Only events whose title contains this.' },
+        others: { type: 'boolean', description: 'Only events with other people in them.' },
+      },
+    },
   },
   required: ['kind'],
 };
