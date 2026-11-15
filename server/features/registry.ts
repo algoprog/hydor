@@ -87,7 +87,7 @@ export function runTools(ctx: RunCtx): RunTool[] {
 
 /** Everything the capabilities give a starting agent (their tools' guides in its instructions: Custom reads them apart, featureContext). */
 export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
-  const out: GivenAdditions = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], strictMcp: false, codexConfig: {} };
+  const out: GivenAdditions = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {} };
   if (!deps) return out;
   // A confidential session gets no MCP server but the app's own (server/confidential): connected apps and plugins' servers reach outside.
   const closed = s.extra?.confidential === true;
@@ -102,6 +102,7 @@ export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
       out.args.push(...(a.args ?? []));
       out.skillRoots.push(...(a.skillRoots ?? []));
       out.disallowedTools.push(...(a.disallowedTools ?? []));
+      out.allowedTools.push(...(a.allowedTools ?? []));
       out.strictMcp ||= !!a.strictMcp;
       Object.assign(out.codexConfig, a.codexConfig);
     } catch (e) {

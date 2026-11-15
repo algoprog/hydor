@@ -1,9 +1,11 @@
 // The inbox: everything waiting on the user (approvals, questions, forms, a browser that needs them, a
-// key an agent asked for, a skill to review, a comment from someone a project is shared with), across sessions,
+// key an agent asked for, a skill to review, a comment from someone a project is shared with, a call held in the
+// Outbox for your OK), across sessions,
 // scheduled tasks and template runs. Each machine lists its own (GET /api/inbox); the page asks the other machines too.
+import type { HeldCall } from './outbox.ts';
 import type { Agent, ApprovalOption, ApprovalRequest } from './types.ts';
 
-export type InboxKind = 'approval' | 'question' | 'form' | 'browser' | 'key' | 'skill' | 'elsewhere' | 'comment';
+export type InboxKind = 'approval' | 'question' | 'form' | 'browser' | 'key' | 'skill' | 'elsewhere' | 'comment' | 'outbox';
 
 export interface InboxItem {
   /** Stable while it waits: "approval:<session>:<id>", "browser:<session>:<ask>"… */
@@ -22,6 +24,8 @@ export interface InboxItem {
   path: string;
   /** An approval card, answered right in the inbox. */
   approval?: ApprovalRequest;
+  /** A call held in the Outbox: a draft to change, then send or drop, right in the inbox. */
+  outbox?: HeldCall;
 }
 
 /** A push notification's buttons for an approval that is a plain yes or no. */

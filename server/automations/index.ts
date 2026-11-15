@@ -45,8 +45,8 @@ export const automations: Feature = {
         return { ok: false, note: (e as Error).message };
       }
     });
-    // A run of the form as it is, without saving it.
-    app.post('/api/automations/test-run', async (req) => scheduler.testRun((body(req).task ?? {}) as Partial<ScheduledTask>));
+    // A run of the form as it is, without saving it; `dry`: one that sends nothing (calls that act outside are held as "would have sent").
+    app.post('/api/automations/test-run', async (req) => scheduler.testRun((body(req).task ?? {}) as Partial<ScheduledTask>, { dry: body(req).dry === true }));
     // "Make this an automation".
     app.post('/api/automations/draft', async (req) => draftFromSession(d, String(body(req).key ?? '')));
     // Tasks agents proposed from chat: the card asks, the answer goes back to the agent.

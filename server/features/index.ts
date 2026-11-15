@@ -33,6 +33,7 @@ import { soundEdit } from '../mediaedit/audio.ts';
 import { memory } from '../memory/index.ts';
 import { profile } from '../memory/profile.ts';
 import { opinion } from '../opinion/index.ts';
+import { outbox } from '../outbox/index.ts';
 import { pages } from '../pages/index.ts';
 import { myThemesFeature } from '../pages/my-themes.ts';
 import { papers } from '../papers/index.ts';
@@ -60,4 +61,4 @@ import { slack } from '../chatapps/slack.ts';
 
 // The user's guidelines lead what an agent is told, their profile right after them, then what a confidential session
 // may not do; how to format replies follows the pages it may show instead.
-export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips, telegram, discord, slack];
+export const FEATURES: Feature[] = [guidelines, profile, confidential, pages, myThemesFeature, slidesShow, formatting, answers, shots, search, browser, computer, memory, knowledge, spaces, sharing, children, swarm, research, opinion, commits, budget, documents, fileAsk, pdfNotes, images, plots, pictureTools, photos, write, media, mediaEdit, videoEdit, soundEdit, connections, outbox, signatures, automations, experiments, voice, assistants, apps, papers, plugins, skillpack, cleanup, custom, arena, language, guide, keep, find, releaseNotes, sidebar, tips, telegram, discord, slack];

@@ -182,6 +182,7 @@ How they all work:
 | --- | --- |
 | `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `send`, `stop` and `delete`. |
 | `hydor inbox` | What waits on you (approvals, questions, a key an agent asked for, a skill to review): `list`, and `show` for one item, with where to answer it. |
+| `hydor outbox` | Calls held for your OK (a connected account's tools on Ask first): `list`, `show` for one with its input, `send` (as it is, or with `--set NAME=value` to change a field) and `drop`. |
 
 `hydor show 6f1e2a3b` is the same as `hydor sessions show 6f1e2a3b`, and so are `send` and `stop`: the short ones stay.
 

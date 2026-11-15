@@ -25,6 +25,7 @@ import { MachineSwitcher } from '../machines/MachineSwitcher';
 import { features } from '../registry';
 import type { AgentUsage } from '@shared/types';
 import { loadToolOrder, setToolOrder, useToolOrder } from './toolOrder';
+import { useOutbox } from '../outbox/store';
 import { systemTabOf } from '../system/SystemHeader';
 
 /** A subscription on a free plan (Codex "free", a Claude free account); any other plan counts as paid. */
@@ -70,7 +71,10 @@ function UsageHint() {
 function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) => void }) {
   const here = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
   const there = useMachines((s) => s.list.filter((m) => m.id !== machineId && m.status.state === 'online').reduce((n, m) => n + m.status.waiting, 0));
-  const n = here + there;
+  // Calls held in the Outbox for your OK wait on you too.
+  const held = useOutbox((s) => s.held);
+  useEffect(() => void useOutbox.getState().load(), []);
+  const n = here + there + held;
   return (
     <span data-tip={n > 0 ? 'inbox' : undefined} className="relative inline-flex">
       <IconButton label={n ? `Inbox: ${n} waiting on you` : 'Inbox: everything waiting on you'} active={active} onClick={() => onGo('/inbox')}>
