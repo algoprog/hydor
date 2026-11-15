@@ -2,13 +2,15 @@
 // the manifest Settings gives), its two tokens kept in the vault (SLACK_BOT_TOKEN, SLACK_APP_TOKEN); only the people you
 // link with a one-time code may use it, in a direct message to the app or where it is mentioned in a channel. The app
 // opens Socket Mode (a WebSocket Slack hands it the address of, for messages and button presses, each acknowledged) and
-// uses Slack's Web API to send, so it needs no address on the internet.
+// uses Slack's Web API to send, so it needs no address on the internet. Files, pictures and audio clips shared with the
+// app are fetched with its token (the files:read scope, up to 25 MB each) into the session's folder.
 import WebSocket from 'ws';
 import { HttpError } from '../auth.ts';
 import { deleteSecret, readSecret, saveSecret, vaultTables } from '../connections/vault.ts';
 import { kvGet, kvSet } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { chatApp, MAX_PARTS, tuning, type Rows, type Wire } from './core.ts';
+import { download, type ChatFile } from './files.ts';
 import { chunks, plainText, SLACK_CHARS, slackMrkdwn } from './format.ts';
 
 export const BOT_TOKEN = 'SLACK_BOT_TOKEN';
@@ -237,12 +239,17 @@ export class SocketMode {
 
 // ---- the app --------------------------------------------------------------------------------------
 
+/** The biggest file taken from Slack. */
+export const SLACK_MAX = 25 * 1024 * 1024;
+
 const slackApp = chatApp({
   id: 'slack',
   label: 'Slack',
   where: 'Settings → Chat apps → Slack',
   wire: wireOf,
   connected: (d) => !!botToken(d) && !!appToken(d),
+  maxBytes: SLACK_MAX,
+  limitSays: 'Hydor takes files of up to 25 MB from a chat',
 });
 
 let state: { state: 'off' | 'connecting' | 'running' | 'error'; error?: string; bot?: { id: string; username: string; team: string } } = { state: 'off' };
@@ -268,6 +275,17 @@ async function nameOf(d: Deps, user: string): Promise<string> {
   }
 }
 
+export interface SlackFile {
+  id: string;
+  name?: string;
+  title?: string;
+  mimetype?: string;
+  size?: number;
+  url_private_download?: string;
+  /** "slack_audio": an audio clip recorded in Slack. */
+  subtype?: string;
+}
+
 interface SlackEvent {
   type: string;
   channel?: string;
@@ -277,11 +295,52 @@ interface SlackEvent {
   ts?: string;
   subtype?: string;
   bot_id?: string;
+  files?: SlackFile[];
+}
+
+/** Slack's own addresses for files (and the stand-in's, in tests): the only ones the bot's token goes to. */
+function fileAddress(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'https:' && /(^|\.)slack\.com$/.test(u.hostname)) return true;
+    return !!process.env.SLACK_API && u.origin === new URL(process.env.SLACK_API).origin;
+  } catch {
+    return false;
+  }
+}
+
+const NO_FILES_SCOPE = 'the Slack app needs the files:read scope for files: add it under OAuth & Permissions, then reinstall the app';
+
+/** What a message shared, to fetch with the bot's token (a file's address is asked for when the event leaves it out). */
+function filesOf(d: Deps, list: SlackFile[] = []): ChatFile[] {
+  return list.map(
+    (f): ChatFile => ({
+      kind: f.subtype === 'slack_audio' ? 'voice' : /^image\//.test(f.mimetype ?? '') ? 'photo' : 'file',
+      name: f.name || f.title,
+      size: f.size,
+      mime: f.mimetype,
+      async fetch(max: number) {
+        const token = botToken(d) ?? '';
+        let url = f.url_private_download;
+        if (!url) {
+          const info = await web<{ file: SlackFile }>(token, 'files.info', { file: f.id }).catch((e: SlackError) => {
+            throw new Error(e.code === 'missing_scope' ? NO_FILES_SCOPE : e.message);
+          });
+          url = info.file.url_private_download;
+        }
+        if (!url || !fileAddress(url)) throw new Error('it is not at one of Slack’s addresses');
+        const got = await download(url, { max, what: 'Slack', headers: { authorization: `Bearer ${token}` } });
+        // Without the scope Slack answers with its sign-in page instead of the file.
+        if (/text\/html/i.test(got.type) && !/html/i.test(f.mimetype ?? '')) throw new Error(NO_FILES_SCOPE);
+        return got.data;
+      },
+    }),
+  );
 }
 
 /** A message the app was sent: in a direct message always, in a channel when it is mentioned. */
 export async function handleEvent(d: Deps, e: SlackEvent) {
-  if (!e.channel || !e.user || e.bot_id || e.subtype || e.user === botUser) return;
+  if (!e.channel || !e.user || e.bot_id || (e.subtype && e.subtype !== 'file_share') || e.user === botUser) return;
   const direct = e.type === 'message';
   if (direct && e.channel_type !== 'im') return;
   if (!direct && e.type !== 'app_mention') return;
@@ -291,7 +350,7 @@ export async function handleEvent(d: Deps, e: SlackEvent) {
   text = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   if (e.ts) lastTs.set(e.channel, e.ts);
   const name = slackApp.isLinked(d.db, e.channel, e.user) ? '' : await nameOf(d, e.user);
-  await slackApp.incoming(d, wireOf(d), { chat: e.channel, user: e.user, name, text, direct });
+  await slackApp.incoming(d, wireOf(d), { chat: e.channel, user: e.user, name, text, direct, files: filesOf(d, e.files) });
 }
 
 interface BlockActions {
@@ -342,7 +401,7 @@ export async function handleSlash(d: Deps, c: SlashCommand) {
     return;
   }
   const words = String(c.text ?? '').trim();
-  const sub = /^(new|sessions|stop|status|help)\b/i.exec(words);
+  const sub = /^(new|as|agents|sessions|stop|status|help)\b/i.exec(words);
   const text = words ? (sub ? `/${words}` : words) : '/help';
   try {
     await slackApp.incoming(d, wireOf(d), { chat: c.channel_id, user: c.user_id, name: '', text, direct: true });

@@ -10,16 +10,18 @@ export const discordInvite = (applicationId: string) =>
 
 /**
  * The Slack app as a manifest (Create New App → From a manifest): Socket Mode, so no address on the internet; direct
- * messages and mentions in channels as events; buttons as interactivity; the /hydor command; and the scopes it needs.
+ * messages and mentions in channels as events; buttons as interactivity; the /hydor command; and the scopes it needs
+ * (files:read for what people send beside words).
  */
 export const SLACK_MANIFEST = {
   display_information: { name: 'Hydor', description: 'Your Hydor agents, in Slack' },
   features: {
     app_home: { home_tab_enabled: false, messages_tab_enabled: true, messages_tab_read_only_enabled: false },
     bot_user: { display_name: 'Hydor', always_online: true },
-    slash_commands: [{ command: '/hydor', description: 'Steer your agents', usage_hint: 'new | sessions | stop | status | help', should_escape: false }],
+    slash_commands: [{ command: '/hydor', description: 'Steer your agents', usage_hint: 'new | as <agent> | agents | sessions | stop | status | help', should_escape: false }],
   },
-  oauth_config: { scopes: { bot: ['app_mentions:read', 'chat:write', 'commands', 'im:history', 'reactions:write', 'users:read'] } },
+  // files:read: the files, pictures and audio clips people send the app (without it, words still come through).
+  oauth_config: { scopes: { bot: ['app_mentions:read', 'chat:write', 'commands', 'files:read', 'im:history', 'reactions:write', 'users:read'] } },
   settings: {
     event_subscriptions: { bot_events: ['app_mention', 'message.im'] },
     interactivity: { is_enabled: true },

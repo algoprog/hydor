@@ -66,8 +66,10 @@ your machine. See [keep a session confidential](docs/guide/02-sessions.md#keep-a
 - **Your projects come along.** The folders you work in with Claude Code and Codex, and Codex's own projects, become
   Hydor projects by themselves, with their sessions, and get documents, skills and guidelines of their own
   ([projects](docs/guide/04-projects.md#projects-found-in-claude-code-and-codex)).
-- **Talk to your agents from a chat app.** Telegram, Discord or Slack, under **Settings → Chat apps**
-  ([devices](docs/guide/20-devices.md)).
+- **Talk to your agents from a chat app.** Telegram, Discord or Slack, under **Settings → Chat apps**: send a photo of a
+  receipt, a file or a voice message to one of your own agents with `/as` ([devices](docs/guide/20-devices.md)).
+- **Share to Hydor.** Installed on Android or a computer, the app is in the share sheet: what you share opens in the
+  start page's message box ([devices](docs/guide/20-devices.md#share-to-hydor-from-other-apps)).
 
 ## Learns, with your OK
 

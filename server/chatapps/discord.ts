@@ -2,7 +2,8 @@
 // (made in Discord's Developer Portal), its token kept in the vault (DISCORD_BOT_TOKEN); only the people you link with a
 // one-time code may use it, in a direct message to the bot or where it is mentioned in a server's channel. The app
 // connects to Discord's Gateway (a WebSocket the bot opens itself) for messages and button presses, and uses Discord's
-// REST API to send, so it needs no address on the internet.
+// REST API to send, so it needs no address on the internet. Files, pictures and voice messages sent to the bot are
+// fetched from Discord's own file addresses (up to 25 MB each) into the session's folder.
 import crypto from 'node:crypto';
 import WebSocket from 'ws';
 import { discordInvite } from '../../shared/chat-apps.ts';
@@ -11,7 +12,9 @@ import { deleteSecret, readSecret, saveSecret, vaultTables } from '../connection
 import { kvGet, kvSet } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { chatApp, MAX_PARTS, tuning, type Btn, type Incoming, type Rows, type Wire } from './core.ts';
+import { download, type ChatFile } from './files.ts';
 import { chunks, DISCORD_CHARS, discordMarkdown, plainText } from './format.ts';
+import { agentChoices } from './start.ts';
 
 export const TOKEN_NAME = 'DISCORD_BOT_TOKEN';
 const api = () => (process.env.DISCORD_API ?? 'https://discord.com/api/v10').replace(/\/+$/, '');
@@ -324,16 +327,31 @@ export class Gateway {
 
 // ---- the bot --------------------------------------------------------------------------------------
 
+/** The biggest file taken from Discord. */
+export const DISCORD_MAX = 25 * 1024 * 1024;
+
 const discordApp = chatApp({
   id: 'discord',
   label: 'Discord',
   where: 'Settings → Chat apps → Discord',
   wire: wireOf,
   connected: (d) => !!readSecret(d.db, TOKEN_NAME),
+  maxBytes: DISCORD_MAX,
+  limitSays: 'Hydor takes files of up to 25 MB from a chat',
 });
 
 const COMMANDS = [
   { name: 'new', description: 'A new session', type: 1, options: [{ type: 3, name: 'prompt', description: 'What it should do', required: false }] },
+  {
+    name: 'as',
+    description: 'A new session as one of your agents',
+    type: 1,
+    options: [
+      { type: 3, name: 'agent', description: 'Which of your agents', required: true, autocomplete: true },
+      { type: 3, name: 'prompt', description: 'What it should do', required: false },
+    ],
+  },
+  { name: 'agents', description: 'Your agents, to start a session as one', type: 1 },
   { name: 'sessions', description: 'The latest sessions, to go on with one', type: 1 },
   { name: 'stop', description: 'Stop the agent', type: 1 },
   { name: 'status', description: 'This chat’s session and what it is doing', type: 1 },
@@ -346,6 +364,13 @@ interface DiscordUser {
   global_name?: string | null;
   bot?: boolean;
 }
+export interface DiscordAttachment {
+  id: string;
+  filename: string;
+  size?: number;
+  url: string;
+  content_type?: string;
+}
 export interface DiscordMessage {
   id: string;
   channel_id: string;
@@ -354,6 +379,11 @@ export interface DiscordMessage {
   content?: string;
   author: DiscordUser;
   mentions?: DiscordUser[];
+  attachments?: DiscordAttachment[];
+  flags?: number;
+  /** A forward is a reference of type 1, with the message forwarded as a snapshot. */
+  message_reference?: { type?: number };
+  message_snapshots?: { message?: { content?: string; attachments?: DiscordAttachment[]; flags?: number } }[];
 }
 export interface DiscordInteraction {
   id: string;
@@ -362,7 +392,7 @@ export interface DiscordInteraction {
   channel_id?: string;
   user?: DiscordUser;
   member?: { user: DiscordUser };
-  data?: { custom_id?: string; name?: string; options?: { name: string; value?: unknown }[] };
+  data?: { custom_id?: string; name?: string; options?: { name: string; value?: unknown; focused?: boolean }[] };
 }
 
 let state: { state: 'off' | 'connecting' | 'running' | 'error'; error?: string; bot?: { id: string; username: string } } = { state: 'off' };
@@ -374,6 +404,35 @@ let events: Promise<unknown> = Promise.resolve();
 
 const nameOf = (u: DiscordUser) => u.global_name || u.username || u.id;
 
+/** A voice message: one recording, made in Discord's app. */
+const IS_VOICE_MESSAGE = 1 << 13;
+
+/** Discord's own addresses for files (and the stand-in's, in tests): the only ones fetched. */
+function fileAddress(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'https:' && /(^|\.)(discordapp\.com|discordapp\.net|discord\.com)$/.test(u.hostname)) return true;
+    return !!process.env.DISCORD_API && u.origin === new URL(process.env.DISCORD_API).origin;
+  } catch {
+    return false;
+  }
+}
+
+/** What a message's attachments are, to fetch from Discord's file addresses (no token needed: they are signed). */
+function filesOf(list: DiscordAttachment[] = [], flags = 0, forwarded = false): ChatFile[] {
+  return list.map((a): ChatFile => ({
+    kind: flags & IS_VOICE_MESSAGE ? 'voice' : /^image\//.test(a.content_type ?? '') ? 'photo' : 'file',
+    name: a.filename,
+    size: a.size,
+    mime: a.content_type,
+    ...(forwarded ? { forwarded: true } : {}),
+    async fetch(max: number) {
+      if (!fileAddress(a.url)) throw new Error('it is not at one of Discord’s addresses');
+      return (await download(a.url, { max, what: 'Discord', headers: { 'user-agent': USER_AGENT } })).data;
+    },
+  }));
+}
+
 /** A message the bot was sent: in a direct message always, in a server's channel when it is mentioned. */
 export async function handleMessage(d: Deps, m: DiscordMessage) {
   if (m.author.bot || (m.type !== undefined && m.type !== 0 && m.type !== 19)) return;
@@ -384,7 +443,14 @@ export async function handleMessage(d: Deps, m: DiscordMessage) {
     if (!me || !(m.mentions ?? []).some((u) => u.id === me)) return;
     text = text.replace(new RegExp(`<@!?${me}>`, 'g'), '');
   }
-  const i: Incoming = { chat: m.channel_id, user: m.author.id, name: nameOf(m.author), text, direct };
+  const files = filesOf(m.attachments, m.flags);
+  // A message forwarded from elsewhere: its words and files are someone else's.
+  const fwd = m.message_reference?.type === 1 ? m.message_snapshots?.[0]?.message : undefined;
+  if (fwd) {
+    files.push(...filesOf(fwd.attachments, fwd.flags, true));
+    text = String(fwd.content ?? '');
+  }
+  const i: Incoming = { chat: m.channel_id, user: m.author.id, name: nameOf(m.author), text, direct, files, ...(fwd ? { forwarded: true } : {}) };
   await discordApp.incoming(d, wireOf(d), i);
 }
 
@@ -395,6 +461,16 @@ export async function handleInteraction(d: Deps, i: DiscordInteraction) {
   if (!user || !chat) return;
   const w = wireOf(d);
   const ephemeral = (content: string) => answerInteraction(i, 4, { content, flags: 64 });
+  // Typing an agent's name after /as: the agents whose names (or ids) hold what is typed, for Discord to offer.
+  if (i.type === 4) {
+    if (!discordApp.isLinked(d.db, chat, user.id)) return answerInteraction(i, 8, { choices: [] });
+    const typed = String(i.data?.options?.find((o) => o.focused)?.value ?? '').trim().toLowerCase();
+    const choices = agentChoices(d.db, 100)
+      .filter((a) => !typed || a.name.toLowerCase().includes(typed) || a.id.toLowerCase().startsWith(typed))
+      .slice(0, 25)
+      .map((a) => ({ name: a.name.slice(0, 100), value: a.id }));
+    return answerInteraction(i, 8, { choices });
+  }
   if (i.type === 3) {
     const r = await discordApp.pressed(d, w, { chat, user: user.id, id: i.data?.custom_id ?? '' });
     if (!r.ok) return ephemeral(r.text);
@@ -417,7 +493,8 @@ export async function handleInteraction(d: Deps, i: DiscordInteraction) {
       await answerInteraction(i, 4, { content: text.slice(0, 2000), allowed_mentions: NO_PINGS, flags: SUPPRESS_EMBEDS, ...components(rows) });
     };
     const prompt = String(i.data?.options?.find((o) => o.name === 'prompt')?.value ?? '');
-    await discordApp.incoming(d, w, { chat, user: user.id, name: nameOf(user), text: `/${name} ${prompt}`.trim(), direct: true });
+    const agent = String(i.data?.options?.find((o) => o.name === 'agent')?.value ?? '');
+    await discordApp.incoming(d, w, { chat, user: user.id, name: nameOf(user), text: [`/${name}`, agent, prompt].filter(Boolean).join(' '), direct: true });
     if (!answered) await ephemeral('Done.');
   }
 }

@@ -4,6 +4,28 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
+// Share to Hydor (the manifest's share_target): what another app shares comes as a form to /share. Sent on from here, as
+// the page's own request, it goes with your sign-in (a share the system sends may not carry it); then the start page
+// opens with it in the message box. Every other request goes on as it would without this.
+self.addEventListener('fetch', (e) => {
+  const r = e.request;
+  if (r.method !== 'POST') return;
+  const u = new URL(r.url);
+  if (u.origin !== self.location.origin || u.pathname !== '/share') return;
+  const to = (q) => Response.redirect(new URL(`/?share=${encodeURIComponent(q)}`, self.location.origin).href, 303);
+  e.respondWith(
+    (async () => {
+      try {
+        const res = await fetch('/share', { method: 'POST', body: await r.formData(), headers: { accept: 'application/json' }, credentials: 'same-origin' });
+        const j = await res.json().catch(() => ({}));
+        return to(res.ok && j.id ? j.id : res.status === 401 ? 'signed-out' : res.status === 413 ? 'too-big' : 'failed');
+      } catch {
+        return to('failed');
+      }
+    })(),
+  );
+});
+
 self.addEventListener('push', (e) => {
   let n = {};
   try {
