@@ -23728,5 +23728,8 @@
 "The screen can still turn off; closing a laptop’s lid still puts it to sleep":"屏幕仍可关闭；合上笔记本的盖子仍会让它睡眠",
 "The screen can still turn off. Closing a laptop’s lid still puts it to sleep: your computer’s system decides that, not the app. For work that must run at any hour, use a computer that stays on, such as a desktop or a server, and reach it from here.":"屏幕仍可关闭。合上笔记本的盖子仍会让它睡眠：这由电脑的系统决定，而不是本应用。对于任何时候都必须运行的工作，请使用一台一直开着的电脑，例如台式机或服务器，并从这里使用它。",
 "While agents work":"智能体工作时",
-"While agents work and before scheduled tasks":"智能体工作时和定时任务运行前"
+"While agents work and before scheduled tasks":"智能体工作时和定时任务运行前",
+"no marker at byte {0}":"在第 {0} 字节处没有标记",
+"not a JPEG":"不是 JPEG 图片",
+"the canvas gave nothing back":"画布没有返回任何内容"
 }
