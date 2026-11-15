@@ -1,6 +1,6 @@
 # Scheduled tasks
 
-A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, or when something you watch changes. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report, a review of each new pull request or a look into each failed CI run, and the result comes to you without you having to start a session.
+A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, or when something you watch changes or a new email arrives. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report, each new invoice that comes by email, a review of each new pull request or a look into each failed CI run, and the result comes to you without you having to start a session.
 
 ![Settings → Scheduled tasks: work that starts by itself](images/tasks.webp)
 
@@ -13,7 +13,7 @@ A task can start:
 - **At a time**: a time of day on the days of the week you pick, or by a cron expression.
 - **Repeating**: every so many minutes (at least 5) or hours.
 - **Once**: at a date and time.
-- **Watch**: when a watcher sees a change in a feed, a web page, a value in JSON, a folder or a command's output. A watcher looks without a model, so its checks cost no tokens; the agent wakes only when something changed.
+- **Watch**: when a watcher sees a change in a feed, a web page, a value in JSON, a folder or a command's output, or a new email in one of your mail accounts. A watcher looks without a model, so its checks cost no tokens; the agent wakes only when something changed.
 - **Webhook**: when another service (GitHub, Gitea, a form, a script of yours) calls the task's own address.
 
 A task can also run one of your apps in place of a prompt: each time its trigger fires, the app runs with the answers you set, and the task's history links to that run (see [Run an app by itself](/guide/apps#run-an-app-by-itself)).
@@ -109,6 +109,7 @@ A watcher is a cheap check that runs every few minutes without a model and wakes
 - **JSON**: the **Address** of a JSON answer (the data format many services' APIs give), **Value at** a path such as `data.price` or `data.items[0].price`, and **Wake when it** changes, equals, is not, is above, is below or contains a **Value**. Numbers compare as numbers. A condition wakes the agent when it starts to hold, not at every check while it holds.
 - **Folder**: a **Folder** on this computer and, if you like, **Only files like** a pattern such as `*.pdf` (`*` stands for any text, `?` for one character). New files wake the agent, with their names, sizes and dates. Hidden files and subfolders are left out.
 - **Command**: a **Command** that runs with your shell in the task's folder at each check, for a minute at most, and whether to wake **When its output changes** or **When its exit code changes** (the number a command ends with: 0 usually means it worked). The run gets the output and what changed in it.
+- **Email**: new email in a mail account you connected (see [Connect your email](/guide/connections#connect-your-email)). Pick the **Account** and the **Folder** (the Inbox unless you pick another), and if you like only mail whose **From contains** or **Subject contains** some text, or **Only mail still unread**. Each new email starts a run of its own, at most 10 at a check: who sent it and to whom, the date, the subject and its text, as outside data, with its attachments saved in the task's folder under email-attachments. When more than 10 arrive between two checks, the newest 10 get runs and the first run lists the older ones in a line. An email never starts two runs, even after the app restarts.
 
 Then:
 
@@ -120,7 +121,7 @@ How a watcher behaves:
 
 - Its first look after you save only takes note; changes after that wake the agent. Changing what a task watches starts it afresh.
 - What it read reaches the agent marked as outside data, to work with and never to follow as instructions.
-- A change that comes while the run for the last one is still going waits for the next look.
+- A change that comes while the run for the last one is still going waits for the next look. New email is the exception: each email starts its own run.
 - When a look fails (the site is down, the text is no longer on the page), the row says so. After as many failed looks in a row as **Pause after … failures in a row** allows, the task pauses: "Paused after its check failed 3 times in a row: …".
 - **Run now** on a watcher task runs the agent with what the watcher sees now, rather than with a change.
 
@@ -282,6 +283,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Every weekday at 7:30, give me the weather in Athens and the AI news since yesterday."
 - "Remind me on Friday at 9 to call the dentist."
 - "Watch this product page and tell me when the price drops below €99."
+- "Whenever an email with an invoice arrives from my accountant, save the PDF in ~/Invoices and add a row to my expenses sheet."
 - "Which of my scheduled tasks failed this week, and why?"
 - "Pause my Morning brief", or "Run the weekly report now."
 - "Make this conversation a task that runs every Monday at 9."

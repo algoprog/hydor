@@ -43,7 +43,12 @@ export type CatalogServer =
   /** A remote MCP server: Streamable HTTP ("http") or the older HTTP with server-sent events ("sse"). */
   | { transport: 'http' | 'sse'; url: string }
   /** A command this computer runs (npx, uvx, docker…), talking over stdin and stdout. */
-  | { transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
+  | { transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
+  /** Answered by Hydor itself (Email: server/mail), reached through the relay like a remote app; only for the ids in BUILTIN_APPS. */
+  | { transport: 'builtin' };
+
+/** The connections Hydor answers itself, and the catalog entry each has. */
+export const BUILTIN_APPS = ['email'] as const;
 
 export type CatalogAuth =
   | { type: 'none' }

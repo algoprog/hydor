@@ -250,7 +250,7 @@ export const sessionList = (db: DB, extra: SessionExtra): SessionConnection[] =>
 
 /** A remote app's address, its fields filled in. */
 export function remoteUrl(c: Conn): string {
-  if (c.entry.server.transport === 'stdio') throw new Error('Not a remote service');
+  if (c.entry.server.transport !== 'http' && c.entry.server.transport !== 'sse') throw new Error('Not a remote service');
   return fill(c.entry.server.url, c.fields);
 }
 

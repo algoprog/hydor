@@ -1,10 +1,12 @@
 // The task form's watcher: what to look at (a feed, a page, a value in JSON, a folder, a command's
-// output), how often, and a Test button that shows what it sees now. Checks make no model call; the
-// agent wakes only when something changed.
-import { useState } from 'react';
+// output, new email in a connected mail account), how often, and a Test button that shows what it sees
+// now. Checks make no model call; the agent wakes only when something changed (for email: once per new email).
+import { useEffect, useState } from 'react';
 import { Eye } from 'lucide-react';
 import { JSON_OP_TEXT, type JsonOp, type TaskSchedule, type WatchPreview, type WatchSpec } from '@shared/automations';
-import { post } from '../../lib/api';
+import type { MailAccountView, MailFolderView } from '@shared/mail';
+import { api, enc, post } from '../../lib/api';
+import { go } from '../../lib/nav';
 import { FolderChip } from '../../components/FolderPicker';
 import { Button, cx, inputCls, Segmented } from '../../components/ui';
 import { boxCls, Field } from './parts';
@@ -12,7 +14,91 @@ import { boxCls, Field } from './parts';
 type Watch = Extract<TaskSchedule, { kind: 'watch' }>;
 
 export const blankWatch = (kind: WatchSpec['kind'], home = '/'): WatchSpec =>
-  kind === 'feed' ? { kind, url: '' } : kind === 'page' ? { kind, url: '' } : kind === 'json' ? { kind, url: '', path: '' } : kind === 'folder' ? { kind, path: home } : { kind, command: '', on: 'output' };
+  kind === 'feed'
+    ? { kind, url: '' }
+    : kind === 'page'
+      ? { kind, url: '' }
+      : kind === 'json'
+        ? { kind, url: '', path: '' }
+        : kind === 'folder'
+          ? { kind, path: home }
+          : kind === 'mail'
+            ? { kind, account: '' }
+            : { kind, command: '', on: 'output' };
+
+/** New email: which connected account and folder, and which mail counts. */
+function MailWatch({ w, set }: { w: Extract<WatchSpec, { kind: 'mail' }>; set: (p: Record<string, unknown>) => void }) {
+  const [accounts, setAccounts] = useState<MailAccountView[] | null>(null);
+  const [folders, setFolders] = useState<MailFolderView[] | null>(null);
+  useEffect(() => {
+    api<{ accounts: MailAccountView[] }>('/api/mail/accounts')
+      .then((r) => {
+        setAccounts(r.accounts);
+        if (!w.account && r.accounts[0]) set({ account: r.accounts[0].address });
+      })
+      .catch(() => setAccounts([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const acc = accounts?.find((a) => a.address === w.account);
+  useEffect(() => {
+    setFolders(null);
+    if (!acc) return;
+    api<{ folders: MailFolderView[] }>(`/api/mail/accounts/${enc(acc.id)}/folders`)
+      .then((r) => setFolders(r.folders))
+      .catch(() => setFolders([]));
+  }, [acc?.id]);
+  if (accounts && !accounts.length)
+    return (
+      <p className="text-[12.5px] leading-relaxed text-fg-2">
+        Connect a mail account first, with its address and an app password:{' '}
+        <button type="button" onClick={() => go('/apps/connected?tab=market')} className="text-accent hover:underline">
+          Apps → Connected apps → Email
+        </button>
+        .
+      </p>
+    );
+  const folder = w.folder ?? 'INBOX';
+  return (
+    <>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="Account" className="min-w-[12rem] flex-1">
+          <select value={w.account} onChange={(e) => set({ account: e.target.value, folder: undefined })} className={cx(small, 'w-full')} translate="no">
+            {(accounts ?? []).map((a) => (
+              <option key={a.id} value={a.address}>
+                {a.address}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Folder" className="min-w-[9rem] flex-1">
+          <select value={folder} onChange={(e) => set({ folder: e.target.value === 'INBOX' ? undefined : e.target.value })} className={cx(small, 'w-full')} translate="no">
+            {!folders?.some((f) => f.path === folder) && <option value={folder}>{folder === 'INBOX' ? 'Inbox' : folder}</option>}
+            {(folders ?? []).map((f) => (
+              <option key={f.path} value={f.path}>
+                {f.path === 'INBOX' ? 'Inbox' : f.path}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="From contains" className="min-w-[9rem] flex-1">
+          <input value={w.from ?? ''} onChange={(e) => set({ from: e.target.value || undefined })} placeholder="invoices@shop.com" className={cx(small, 'w-full')} />
+        </Field>
+        <Field label="Subject contains" className="min-w-[9rem] flex-1">
+          <input value={w.subject ?? ''} onChange={(e) => set({ subject: e.target.value || undefined })} placeholder="Invoice" className={cx(small, 'w-full')} />
+        </Field>
+      </div>
+      <label className="flex items-center gap-2 text-[12.5px] text-fg-2">
+        <input type="checkbox" checked={!!w.unread} onChange={(e) => set({ unread: e.target.checked || undefined })} className="accent-[var(--accent)]" />
+        Only mail still unread
+      </label>
+      <p className="text-[12px] leading-relaxed text-fg-3">
+        Each new email starts a run of its own (at most 10 at a check), with its sender, subject and text as outside data; its attachments are saved in the task’s folder, under email-attachments.
+      </p>
+    </>
+  );
+}
 
 const small = cx(boxCls, 'h-8.5 text-[13px]');
 
@@ -54,9 +140,11 @@ export function WatchForm({ value, onChange, cwd }: { value: Watch; onChange: (s
             { value: 'json', label: 'JSON' },
             { value: 'folder', label: 'Folder' },
             { value: 'command', label: 'Command' },
+            { value: 'mail', label: 'Email' },
           ]}
         />
       </div>
+      {w.kind === 'mail' && <MailWatch w={w} set={set} />}
       {w.kind === 'feed' && (
         <>
           {url('https://example.com/feed.xml')}
@@ -160,7 +248,11 @@ export function WatchForm({ value, onChange, cwd }: { value: Watch; onChange: (s
         <Button size="sm" icon={<Eye size={14} />} onClick={runTest} disabled={testing}>
           {testing ? 'Looking…' : 'Test'}
         </Button>
-        <span className="text-[12px] text-fg-3">Shows what it sees now. The first look after saving only takes note; changes after it wake the agent.</span>
+        <span className="text-[12px] text-fg-3">
+          {w.kind === 'mail'
+            ? 'Shows the latest mail it would wake for. The first look after saving only takes note; each email after it wakes the agent once.'
+            : 'Shows what it sees now. The first look after saving only takes note; changes after it wake the agent.'}
+        </span>
       </div>
       {test && (
         <div className={cx('rounded-lg border px-3 py-2', test.ok ? 'border-line bg-bg-1' : 'border-err/30 bg-err/5')}>

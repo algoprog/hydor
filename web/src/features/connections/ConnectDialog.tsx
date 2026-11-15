@@ -8,6 +8,7 @@ import { api, ApiError, enc, post } from '../../lib/api';
 import { toast } from '../../lib/store';
 import { CopyButton } from '../../components/Markdown';
 import { Badge, Button, cx, Dialog, inputCls, Throbber, useIsMobile } from '../../components/ui';
+import { MailConnectDialog } from './MailConnect';
 import { AppIcon, authLabel, serverLine, useConn } from './store';
 
 /** Where a sign-in started in this tab goes on, after the browser comes back (phones). */
@@ -117,6 +118,8 @@ export function ConnectDialog({ app, open, onClose, onConnected }: { app: Catalo
   }, [waiting, app?.id]);
 
   if (!app) return null;
+  // Email has a form of its own: its accounts, an address and an app password each.
+  if (app.server.transport === 'builtin') return <MailConnectDialog app={app} open={open} onClose={onClose} onConnected={onConnected} />;
   const a = app;
   const oauth = a.auth.type === 'oauth';
   const remoteKey = a.auth.type === 'api_key' && a.server.transport !== 'stdio';

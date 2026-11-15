@@ -287,9 +287,9 @@ function ConnectedApp({ c, onReconnect }: { c: ConnectionView; onReconnect: () =
             Tools
           </Button>
         )}
-        {(c.status === 'signin' || c.app.fields?.length || c.app.auth.type !== 'none') && (
+        {(c.status === 'signin' || c.app.fields?.length || c.app.auth.type !== 'none' || c.app.server.transport === 'builtin') && (
           <Button size="sm" variant="ghost" onClick={onReconnect}>
-            {c.status === 'signin' ? 'Sign in again' : c.app.auth.type === 'oauth' ? 'Sign in again' : 'Change'}
+            {c.app.server.transport === 'builtin' ? 'Accounts' : c.status === 'signin' ? 'Sign in again' : c.app.auth.type === 'oauth' ? 'Sign in again' : 'Change'}
           </Button>
         )}
         <span className="flex-1" />
