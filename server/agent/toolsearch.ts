@@ -1,11 +1,17 @@
 // Many tools (the app's own server has dozens, and the user's MCP servers add more) crowd a model's
 // context and its choices, small models most. Past a threshold the model gets its built-in tools and a
-// few of the app's in full, a one-line catalog of the rest, and find_tools, which gives a tool's whole
-// description and makes it callable. Tools found stay offered for the rest of the session.
+// few of the app's in full, a one-line catalog of the rest (their names alone for a small model), and
+// find_tools, which gives a tool's whole description and makes it callable. Tools found stay offered for
+// the rest of the session, and the guides that go with them (the app's instructions on using them) come
+// into the instructions with them (prompt.ts).
 import type { Tool } from './tools.ts';
 
-/** The app's tools offered in full even when the rest wait in the catalog (submit_result: an app run's answer). */
+/**
+ * The app's tools offered in full even when the rest wait in the catalog (submit_result: an app run's answer). A model
+ * of a small context gets fewer: the others' guides (Pages' with show_html) wait in the catalog with them.
+ */
 const PINNED = new Set(['web_search', 'read_page', 'show_html', 'remember', 'recall', 'submit_result']);
+const PINNED_SMALL = new Set(['web_search', 'read_page', 'remember', 'recall', 'submit_result']);
 
 export interface Offer {
   /** Tools whose schemas the model gets. */
@@ -28,11 +34,13 @@ export function offer(all: Tool[], o: { window: number; active: string[]; small:
   const size = extra.reduce((n, t) => n + t.name.length + t.description.length + JSON.stringify(t.parameters ?? {}).length, 0);
   const crowded = extra.length > (o.small ? 8 : 20) || size > o.window * 4 * (o.small ? 0.06 : 0.1);
   if (!crowded) return { visible: all.filter((t) => t.name !== 'find_tools'), deferred: [], catalog: '' };
-  const keep = (t: Tool) => o.builtin.has(t.name) || PINNED.has(t.name) || o.active.includes(t.name);
+  const pinned = o.small ? PINNED_SMALL : PINNED;
+  const keep = (t: Tool) => o.builtin.has(t.name) || pinned.has(t.name) || o.active.includes(t.name);
   const visible = all.filter(keep);
   const deferred = all.filter((t) => !keep(t));
   if (!deferred.length) return { visible: visible.filter((t) => t.name !== 'find_tools'), deferred, catalog: '' };
-  const catalog = deferred.map((t) => `- ${t.name}: ${summary(t)}`).join('\n');
+  // A small model gets the names alone (find_tools searches their descriptions); a larger one a line on each.
+  const catalog = o.small ? deferred.map((t) => t.name).join(', ') : deferred.map((t) => `- ${t.name}: ${summary(t)}`).join('\n');
   return { visible, deferred, catalog };
 }
 

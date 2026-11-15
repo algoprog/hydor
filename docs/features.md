@@ -873,7 +873,7 @@ agents that speak ACP and take MCP servers.
   every session (a project can switch any skill the other way for its own sessions, and the row says so: "Off in
   Thesis"); write your own for every agent or for one, copy the ones you made in other agents (Memory → Bring in…), change a built-in one (your version takes its place),
   remove and bring back. Agents propose new skills or fixes to them, saved only when you approve, in the library or, in a project,
-  for the project alone. Other ACP agents get the list of skills to read when one fits. A new session's agent
+  for the project alone. Other ACP agents get the list of skills to read when one fits; Custom's instructions name them by group, and it can find one by what the work is. A new session's agent
   hears which skills fit its first message, found by words and by meaning, when any clearly do.
 - **Plugins** for every agent (Settings → Plugins): skills, tool servers (MCP), instructions, files of their own
   and what they need (other plugins, Python and Node packages in an environment of their own, programs, files to
@@ -994,7 +994,21 @@ about risky ones, and commands can run in a sandbox that lets them change files 
 - **Made for any model**: long output is kept in a file the model can page through, repeated or stuck steps
   are caught, malformed tool calls are repaired, independent reads run together, servers run in the
   background, and each model family gets its maker's sampling, edit format and reasoning effort. With many
-  tools, the model sees a short catalog and looks up the ones it needs.
+  tools, the model sees a short catalog and looks up the ones it needs, and a feature's instructions about its own
+  tools (pictures, apps, the browser, documents, signatures, experiments, Pages, the guide, keys and the vault) come
+  with those tools, added when the model looks one up or uses it; the rules that hold whatever tools are in use
+  (how replies look, memory, keys never typed into the chat, cleaning up) always stay. A model with a short context
+  (about 32,000 tokens or less, not through OpenRouter) gets a leaner set: no guidance on answer UIs, the tool list
+  by name only and fewer tools in full.
+- **Skills by group**: Custom's instructions name its skills by group (the project's, yours, then the library's
+  groups such as Coding or Documents) rather than listing each, up to 200 skills (at most 40 of the project's and
+  yours); the ones that fit a new session's first message come with what each is for, and its skill tool loads one
+  by name or finds one by what the work is.
+- **How full the context is**: the ring beside the message box shows it as a percentage (point at it for the
+  tokens), and the Options menu has a Context row ("42% in use") with an arrow that shows or hides a breakdown (folded at first): Instructions, Project
+  instructions, Memory, App features, Skills, Tools and Conversation, each with its tokens and a bar for its share,
+  estimated from the text and scaled to what the model's server counted. Custom condenses by itself, so there is no
+  Compact for it.
 
 Its models come from Settings → Models:
 

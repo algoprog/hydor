@@ -433,7 +433,7 @@ export const pdfNotes: Feature = {
   tools: (ctx) => (anyNotes(ctx.deps.db) ? [NOTES_TOOL] : []),
   spawn: (_s, d) =>
     anyNotes(d.db)
-      ? { instructions: ['PDF highlights: in Files the user highlights passages, equations and figures of PDFs and writes notes on them; pdf_notes lists a PDF’s highlights and notes by page. Use it when they mention their highlights or notes on a paper.'] }
+      ? { guides: [{ tools: ['pdf_notes'], text: 'PDF highlights: in Files the user highlights passages, equations and figures of PDFs and writes notes on them; pdf_notes lists a PDF’s highlights and notes by page. Use it when they mention their highlights or notes on a paper.' }] }
       : undefined,
 };
 

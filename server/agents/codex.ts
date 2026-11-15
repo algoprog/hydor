@@ -10,7 +10,7 @@ import { elicitCard, elicitCheck, elicitResult } from './elicit.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { RpcPeer } from './rpc.ts';
 import { splitHandoff } from '../handoff.ts';
-import type { SpawnAdditions } from '../features/types.ts';
+import type { GivenAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 
 type Json = Record<string, any>;
@@ -28,7 +28,7 @@ export interface CodexOpts {
   effort?: string;
   mode?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
-  add?: Required<SpawnAdditions>;
+  add?: GivenAdditions;
 }
 
 /** MCP servers in Codex's own config format; the app's tools need no approval. */

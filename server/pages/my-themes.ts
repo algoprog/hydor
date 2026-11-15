@@ -140,8 +140,9 @@ export const myThemesFeature: Feature = {
   routes({ app, db }) {
     routes(app, db);
   },
+  // For save_slides alone: a guide that comes with it.
   spawn(_s, d) {
     const note = myThemesNote(d.db);
-    return note ? { instructions: [note] } : undefined;
+    return note ? { guides: [{ tools: ['save_slides'], text: note }] } : undefined;
   },
 };

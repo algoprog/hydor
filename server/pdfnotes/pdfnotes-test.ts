@@ -450,7 +450,7 @@ const annotsOf = (data: Buffer) => {
   assert.match(other.text, /^No highlights or notes on form\.pdf yet/);
   await assert.rejects(NOTES_TOOL.run({ path: 'nothing.pdf' }, ctx), /No such file/);
   assert.ok(pdfNotes.tools!(ctx).some((t) => t.name === 'pdf_notes'), 'offered once there are notes');
-  assert.match(String((await pdfNotes.spawn!({ extra: {} } as never, { db } as unknown as Deps))?.instructions?.[0]), /pdf_notes lists/);
+  assert.match(String((await pdfNotes.spawn!({ extra: {} } as never, { db } as unknown as Deps))?.guides?.[0]?.text), /pdf_notes lists/);
   // Asked from a PDF in Files: the agent knows to read it, that a quote or a picture is a part of it, and where the notes are.
   const asked = fileAskInstructions(file)!;
   assert.match(asked, /read it with read_document/);

@@ -568,7 +568,8 @@ test('ask_form never expires: a form not answered by the end of its step stays, 
 
 test('every agent hears of the tools, by name', async () => {
   const add = await guide.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: {} }, {} as Deps);
-  assert.deepEqual(add?.instructions, [GUIDE_INSTRUCTIONS]);
+  assert.deepEqual(add?.guides, [{ tools: ['app_guide', 'app_api', 'ask_form'], text: GUIDE_INSTRUCTIONS }]);
+  assert.equal(add?.instructions, undefined, 'a guide to the tools, not a rule for every tool in use');
   for (const name of ['app_guide', 'app_api', 'ask_form']) assert.ok(GUIDE_INSTRUCTIONS.includes(name));
   assert.deepEqual(
     guide.tools!({} as RunCtx).map((t) => t.name),
@@ -578,8 +579,9 @@ test('every agent hears of the tools, by name', async () => {
 
 test('a question asked on Help: its agent answers it from the guide, knowing the topic being read', async () => {
   const add = await guide.spawn!({ agent: 'claude', cwd: tmp, runId: 'r', resume: false, extra: { help: 'projects' } }, {} as Deps);
-  assert.equal(add?.instructions?.length, 2);
+  assert.equal(add?.instructions?.length, 2, 'a session asked from Help is about the app: the guide’s instructions are in from the start');
   assert.equal(add!.instructions![0], GUIDE_INSTRUCTIONS);
+  assert.equal(add?.guides, undefined);
   assert.match(add!.instructions![1], /Help page, while reading the guide's topic "Projects and knowledge"/);
   assert.match(helpInstructions(true)!, /from the guide \(app_guide\)/);
   assert.doesNotMatch(helpInstructions('no-such-topic')!, /while reading/);

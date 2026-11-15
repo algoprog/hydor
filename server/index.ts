@@ -1930,15 +1930,19 @@ app.put('/api/me/timezone', async (req) => {
 });
 /**
  * Custom reads what the capabilities add to its instructions before each turn; its run's token is the permission.
- * `epoch` counts the times it condensed its conversation: memory's block stays the same within one.
+ * `epoch` counts the times it condensed its conversation: memory's block stays the same within one. `lean=1`: its
+ * model has a small context. Each capability's part comes apart, and its tools' guides, which Custom adds while one
+ * of their tools is offered.
  */
 app.get('/agent/run/:token/context', async (req, reply) => {
   const runId = runOf((req.params as { token: string }).token);
   const live = runId ? sessions.liveByRun(runId) : null;
   if (!runId || !live) return reply.code(403).send({ error: 'Not a running agent' });
-  const epoch = Number((req.query as { epoch?: string }).epoch);
-  const text = await featureContext({ key: live.key, cwd: live.cwd, extra: sessionExtra(db, live.key), runId, epoch: Number.isInteger(epoch) && epoch >= 0 ? epoch : 0 });
-  return { text, now: localNow(db), tz: userTimezone(db) };
+  const q = req.query as { epoch?: string; lean?: string };
+  const epoch = Number(q.epoch);
+  const { parts, guides } = await featureContext({ key: live.key, cwd: live.cwd, extra: sessionExtra(db, live.key), runId, epoch: Number.isInteger(epoch) && epoch >= 0 ? epoch : 0, lean: q.lean === '1' });
+  // `text` for a Custom from before the parts: everything, as it was.
+  return { text: [...parts.map((p) => p.text), ...guides.map((g) => g.text)].join('\n\n'), parts, guides, now: localNow(db), tz: userTimezone(db) };
 });
 mcpRoutes(app, db, sessions, (key) => `${publicBase()}/s/${encodeURIComponent(key)}`);
 

@@ -3,7 +3,7 @@
 import type { SessionExtra } from '../../shared/features.ts';
 import type { InboxItem } from '../../shared/inbox.ts';
 import type { ServerEvent } from '../../shared/types.ts';
-import type { Deps, Feature, RunCtx, RunTool, SpawnAdditions, SpawnInfo, TurnInfo } from './types.ts';
+import type { Deps, Feature, GivenAdditions, RunCtx, RunTool, SpawnInfo, ToolGuide, TurnInfo } from './types.ts';
 
 let list: Feature[] = [];
 let deps: Deps | null = null;
@@ -85,9 +85,9 @@ export function runTools(ctx: RunCtx): RunTool[] {
   }));
 }
 
-/** Everything the capabilities give a starting agent. */
-export async function spawnAdditions(s: SpawnInfo): Promise<Required<SpawnAdditions>> {
-  const out: Required<SpawnAdditions> = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], strictMcp: false, codexConfig: {} };
+/** Everything the capabilities give a starting agent (their tools' guides in its instructions: Custom reads them apart, featureContext). */
+export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
+  const out: GivenAdditions = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], strictMcp: false, codexConfig: {} };
   if (!deps) return out;
   // A confidential session gets no MCP server but the app's own (server/confidential): connected apps and plugins' servers reach outside.
   const closed = s.extra?.confidential === true;
@@ -95,7 +95,7 @@ export async function spawnAdditions(s: SpawnInfo): Promise<Required<SpawnAdditi
     try {
       const a = await f.spawn?.(s, deps);
       if (!a) continue;
-      out.instructions.push(...(a.instructions ?? []).filter((t) => t.trim()));
+      out.instructions.push(...[...(a.instructions ?? []), ...(a.guides ?? []).map((g) => g.text)].filter((t) => t.trim()));
       out.notes.push(...(a.notes ?? []).filter((t) => t.trim()));
       if (!closed) Object.assign(out.mcpServers, a.mcpServers);
       Object.assign(out.env, a.env);
@@ -111,23 +111,36 @@ export async function spawnAdditions(s: SpawnInfo): Promise<Required<SpawnAdditi
   return out;
 }
 
+/** What the capabilities give Custom for a turn: each one's instructions (by its id), and its tools' guides, which Custom adds while one of their tools is offered. */
+export interface CustomContext {
+  parts: { id: string; text: string }[];
+  guides: ToolGuide[];
+}
+
 /**
  * Custom's instructions from the capabilities, for its next turn: each one's `context`, or for one
- * without it, the instructions its `spawn` gives every agent. `epoch` counts the times Custom condensed
- * the conversation (memory gives the same block within one).
+ * without it, the instructions and guides its `spawn` gives every agent. `epoch` counts the times Custom
+ * condensed the conversation (memory gives the same block within one); `lean`, a model of a small context.
  */
-export async function featureContext(s: { key: string; cwd: string; extra: SessionExtra; runId: string; epoch?: number }): Promise<string> {
-  if (!deps) return '';
-  const parts: string[] = [];
+export async function featureContext(s: { key: string; cwd: string; extra: SessionExtra; runId: string; epoch?: number; lean?: boolean }): Promise<CustomContext> {
+  const out: CustomContext = { parts: [], guides: [] };
+  if (!deps) return out;
   for (const f of list) {
     try {
-      const t = f.context ? await f.context(s, deps) : (await f.spawn?.({ agent: 'acp', acpAgent: 'console', key: s.key, cwd: s.cwd, runId: s.runId, resume: true, extra: s.extra }, deps))?.instructions?.join('\n\n');
-      if (t?.trim()) parts.push(t.trim());
+      if (f.context) {
+        const t = await f.context(s, deps);
+        if (t?.trim()) out.parts.push({ id: f.id, text: t.trim() });
+        continue;
+      }
+      const a = await f.spawn?.({ agent: 'acp', acpAgent: 'console', key: s.key, cwd: s.cwd, runId: s.runId, resume: true, extra: s.extra, lean: s.lean }, deps);
+      const t = (a?.instructions ?? []).filter((x) => x.trim()).join('\n\n');
+      if (t.trim()) out.parts.push({ id: f.id, text: t.trim() });
+      for (const g of a?.guides ?? []) if (g.text.trim() && g.tools.length) out.guides.push({ tools: g.tools, text: g.text.trim() });
     } catch (e) {
       warn(f, 'context', e);
     }
   }
-  return parts.join('\n\n');
+  return out;
 }
 
 /** A turn ended: each capability does its work in the background. */

@@ -755,6 +755,9 @@ const PUBLISH_SITE: RunTool = {
  * tools only by name (Claude Code defers MCP tools' descriptions), and one asked for "a tracker I can
  * keep" wrote an HTML file that never reached Pages.
  */
+/** The tools Pages' instructions are about (their guide comes with any of them). */
+export const PAGE_TOOLS = ['show_html', 'save_page', 'save_slides', 'save_doc', 'save_sheet', 'save_latex', 'save_notebook', 'save_diagram', 'get_page', 'page_action', 'export_page', 'how_to_make'];
+
 const INSTRUCTIONS =
   `Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, and a diagram to keep and change (a flowchart, an org chart, a mind map, an architecture, network, UML or ER diagram) with save_diagram rather than an image or a Mermaid file (a \`\`\`mermaid block stays right for a quick diagram inside a reply), unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in, and its query finds the ones that fit what you look for; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing), and their description says what it is (under ${DESCRIPTION_WORDS} words, given with each new one): the Library shows it, and its search finds things by it. page_action does to a saved one what its editor does in a click to the whole of it (every slide animated, the accessibility check’s fixes, PowerPoint compatible, a theme; suggested changes accepted; a table sorted, duplicates removed, rows and columns put in or taken out with formulas following; a LaTeX project’s files renamed; a notebook’s outputs cleared; a diagram laid out again or restyled; a copy), rather than writing it all out with the save tool. export_page saves one as a file to hand over (PDF, Word, OpenDocument, PowerPoint, Excel, CSV, Markdown, EPUB, plain text, LaTeX, a notebook, a Python script, SVG, PNG or a draw.io file). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget, an org chart, a swimlane diagram), read how to make it well with how_to_make before you make it.`;
 
@@ -1385,7 +1388,10 @@ export const pages: Feature = {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     // Something asked for from the gallery or Turn it into (`extra.make`): the request in full, the message being short.
     const make = s.extra?.make ? makeInstructions(s.extra.make) : null;
-    return { instructions: [INSTRUCTIONS, ...(ask ? [ask] : []), ...(make ? [make] : [])] };
+    // How to use the page tools is a guide to them, except in a session asked from a page or the gallery: that one is
+    // about pages from the start, so it starts with them, and with what it was asked.
+    if (ask || make) return { instructions: [INSTRUCTIONS, ...(ask ? [ask] : []), ...(make ? [make] : [])] };
+    return { guides: [{ tools: PAGE_TOOLS, text: INSTRUCTIONS }] };
   },
   // The pages the user changed in the editor, with their next message (which starts a new turn of saves).
   beforeMessage: (key, d) => {

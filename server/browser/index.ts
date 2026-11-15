@@ -24,7 +24,7 @@ export const browser: Feature = {
     browserRoutes(d);
   },
   tools: (ctx) => (usable(ctx.deps.db) ? browserTools(ctx) : []),
-  spawn: (_s, d) => (usable(d.db) ? { instructions: [BROWSER_INSTRUCTIONS] } : undefined),
+  spawn: (_s, d) => (usable(d.db) ? { guides: [{ tools: ['browser_open', 'browser_act', 'browser_read', 'browser_tabs', 'browser_upload', 'browser_ask_user'], text: BROWSER_INSTRUCTIONS }] } : undefined),
   // A session's browser waiting on the user: to log in, before paying, or to open a local address.
   inbox: (d) =>
     openBrowsers()

@@ -259,8 +259,8 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
   ok(!!makeInstructions(turned)?.includes('(Turn it into, in their Library)') && !!makeInstructions(turned)?.includes(turnAsk({ ...turned.turn, folder: 'Reports' })), 'Turn it into: what to make from which page, in full');
   const spawn = async (extra: Record<string, unknown>) => (await pages.spawn!({ agent: 'claude', cwd: '/tmp', runId: 'r', resume: false, extra } as SpawnInfo, {} as Deps))?.instructions ?? [];
   const withMake = await spawn({ make: { type: 'block.faq', words: 'our cafe' } });
-  ok(withMake.length === 2 && withMake[1] === makeInstructions({ type: 'block.faq', words: 'our cafe' }), 'the pages capability tells a session’s agent what it was asked to make');
-  ok((await spawn({})).length === 1 && (await spawn({ make: { kind: 'slide' } })).length === 1, 'and nothing more without it');
+  ok(withMake.length === 2 && withMake[1] === makeInstructions({ type: 'block.faq', words: 'our cafe' }), 'the pages capability tells a session’s agent what it was asked to make, with Pages’ instructions from the start');
+  ok((await spawn({})).length === 0 && (await spawn({ make: { kind: 'slide' } })).length === 0, 'and nothing more without it (its tools’ guide is not an instruction)');
   ok(
     cleanExtra({ make: { type: 'slide.swot' }, memory: false })?.make === undefined && cleanExtra({ make: { type: 'slide.swot' }, memory: false })?.memory === false,
     'a scheduled task’s runs do not carry what the session that made it was asked to make',

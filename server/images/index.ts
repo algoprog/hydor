@@ -1019,7 +1019,15 @@ export const images: Feature = {
   // Tools alone are not enough for agents to reach for them unasked: what to use when, as they make slides, documents and pages.
   spawn(s, d) {
     if (s.extra?.confidential) return undefined;
-    return { instructions: [pictureInstructions(imagesSettings(d.db).enabled, settings(d.db, 'videos').enabled, audioSettings(d.db).enabled)] };
+    // A guide to its tools and to the ones that make what it illustrates (slides, documents, pages): it comes with either.
+    return {
+      guides: [
+        {
+          tools: ['generate_image', 'make_svg', 'generate_video', 'generate_audio', 'save_slides', 'save_doc', 'save_page'],
+          text: pictureInstructions(imagesSettings(d.db).enabled, settings(d.db, 'videos').enabled, audioSettings(d.db).enabled),
+        },
+      ],
+    };
   },
 };
 

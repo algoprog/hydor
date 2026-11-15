@@ -286,6 +286,13 @@ export interface TaskLog {
 
 export type LiveStatus = 'starting' | 'idle' | 'working' | 'waiting' | 'stopping' | 'exited' | 'error';
 
+/**
+ * The parts of what an agent sends its model, for the breakdown of its context (Custom's): its own rules, the
+ * project's instructions, memory, what the app's features say, skills, the tools, and the conversation.
+ */
+export const CONTEXT_PARTS = ['instructions', 'project', 'memory', 'features', 'skills', 'tools', 'conversation'] as const;
+export type ContextPart = (typeof CONTEXT_PARTS)[number];
+
 export interface LiveState {
   status: LiveStatus;
   startedAt: number;
@@ -298,6 +305,8 @@ export interface LiveState {
   error?: string;
   contextTokens?: number;
   contextWindow?: number;
+  /** Where the context in use goes, in tokens by part (Custom says so): estimated from the text, scaled to the model's own count. */
+  contextParts?: Partial<Record<ContextPart, number>>;
   backgroundTasks?: BackgroundTask[];
   /** Background tasks that ended in this run of the session (done, failed or stopped), newest first, a few: the work tray lists them under the running ones. */
   endedTasks?: BackgroundTask[];

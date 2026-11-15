@@ -399,7 +399,9 @@ test('only in a desktop app with Computer use on: no tools and no instructions o
   assert.equal(computer.spawn!({} as never, deps), undefined);
   access.setComputerSettings(db, { enabled: true });
   assert.deepEqual(computer.tools!(ctxOf('a') as never).map((t) => t.name), ['computer_screenshot', 'computer_act']);
-  const told = (computer.spawn!({} as never, deps) as { instructions: string[] }).instructions.join(' ');
+  const given = computer.spawn!({} as never, deps) as { guides: { tools: string[]; text: string }[] };
+  assert.deepEqual(given.guides[0].tools, ['computer_screenshot', 'computer_act']);
+  const told = given.guides.map((g) => g.text).join(' ');
   assert.match(told, /browser tools/);
   assert.match(told, /screenshot before acting/);
   assert.match(told, /passwords/);
@@ -508,7 +510,7 @@ test('on Windows and Linux: their own words, keys and examples; what keeps it fr
   assert.match(act.description, /this PC/);
   assert.match(act.description, /ctrl\+c/);
   assert.match(act.description, /backspace erases before the cursor, delete after it/);
-  assert.match((computer.spawn!({} as never, deps) as { instructions: string[] }).instructions.join(' '), /use this PC/);
+  assert.match((computer.spawn!({} as never, deps) as { guides: { text: string }[] }).guides.map((g) => g.text).join(' '), /use this PC/);
   await call('w', 'computer_screenshot');
   assert.equal(cards.at(-1)?.title, 'Let the agent use your PC?');
   assert.match(cards.at(-1)?.detail ?? '', /notification area/);

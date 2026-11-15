@@ -13,7 +13,7 @@ import { fitImage, IMAGE_TYPES, imageSize, imageType, type Img } from './media.t
 import { APPLY_PATCH, shellPatch } from './patch.ts';
 import type { AcpKind, Ask } from './permissions.ts';
 import { PROC_TOOLS, settle, startProc, unread } from './procs.ts';
-import type { Skill } from './prompt.ts';
+import { skillsFor, type Skill } from './prompt.ts';
 import { checkCommand, riskyWrite } from './shell.ts';
 import { keep, spill } from './spill.ts';
 import { FIND_TOOLS } from './toolsearch.ts';
@@ -686,12 +686,22 @@ export const TOOLS: Tool[] = [
     name: 'skill',
     kind: 'read',
     readOnly: true,
-    description: 'Load a skill by name (the list is in your instructions): its full guide, and the files it comes with.',
-    parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
-    title: (a) => `Skill ${a.name ?? ''}`,
+    description: 'Load a skill by its name (your instructions name them): its full guide, and the files it comes with. Or find skills by what the work is (query): the ones that fit, each with what it is for.',
+    parameters: {
+      type: 'object',
+      properties: { name: { type: 'string', description: 'The skill to load' }, query: { type: 'string', description: 'Instead of a name: what the work is, in a few words' } },
+    },
+    title: (a) => (a.name ? `Skill ${a.name}` : `Find skills: ${a.query ?? ''}`),
     async run(a, ctx) {
-      const s = ctx.skills.find((x) => x.name === a.name) ?? ctx.skills.find((x) => x.name.toLowerCase() === String(a.name).toLowerCase());
-      if (!s) return { ok: false, output: `No skill named ${a.name}. Skills: ${ctx.skills.map((x) => x.name).join(', ') || 'none'}` };
+      const name = String(a.name ?? '').trim();
+      const s = name ? (ctx.skills.find((x) => x.name === name) ?? ctx.skills.find((x) => x.name.toLowerCase() === name.toLowerCase())) : undefined;
+      if (!s) {
+        const query = String(a.query ?? '').trim() || name.replace(/[-_]+/g, ' ');
+        const found = query ? skillsFor(ctx.skills, query) : [];
+        const none = name ? `No skill named ${name}.` : query ? `No skill fits "${query}".` : 'Give a skill’s name, or a query.';
+        if (!found.length) return { ok: false, output: `${none} Skills: ${ctx.skills.map((x) => x.name).join(', ') || 'none'}` };
+        return { ok: !name, output: `${name ? `${none} ` : ''}Skills that fit "${query}" (load one by its name):\n${found.map((x) => `- ${x.name}: ${x.description}`).join('\n')}` };
+      }
       const dir = path.dirname(s.file);
       const others = walk(dir, 200)
         .filter((f) => f !== s.file)

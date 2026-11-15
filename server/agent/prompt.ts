@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { SKILL_CATEGORIES, isSkillCategory } from '../../shared/skillpack.ts';
+import type { ContextPart } from '../../shared/types.ts';
 import type { Family } from './families.ts';
 import type { ToolSchema } from './llm.ts';
 
@@ -14,6 +16,8 @@ export interface Skill {
   name: string;
   description: string;
   file: string;
+  /** Where its name is listed: the project's, the user's own, or its group in the app's library ("Coding"…). */
+  group: string;
 }
 
 export const MODES = [
@@ -51,18 +55,24 @@ function frontmatter(src: string): Record<string, string> {
 
 /** At most this many of the project's and the user's own skills, so a big collection of them cannot crowd the library out. */
 const MAX_OWN_SKILLS = 40;
-/** At most this many skills in all: each costs a line of the prompt. */
-const MAX_SKILLS = 120;
+/** At most this many skills in all: the instructions name each (a few tokens), and only those can be loaded. */
+const MAX_SKILLS = 200;
+
+const PROJECT_GROUP = 'This project';
+const OWN_GROUP = 'Your own';
+const OTHER_GROUP = 'More';
 
 /** Skills of the project and of the user (Claude Code's and Codex's folders included), then the app's library (HYDOR_SKILL_DIRS). */
 export function findSkills(cwd: string): Skill[] {
   const home = os.homedir();
-  const own = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills'), path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
+  const project = [path.join(cwd, '.claude/skills'), path.join(cwd, '.agents/skills')];
+  const own = [...project, path.join(home, '.claude/skills'), path.join(home, '.agents/skills'), path.join(home, '.codex/skills')];
   const library = (process.env.HYDOR_SKILL_DIRS ?? '').split(path.delimiter).filter(Boolean);
   const seen = new Set<string>();
   const out: Skill[] = [];
   const take = (dirs: string[], max: number) => {
     for (const d of dirs) {
+      const lib = !own.includes(d);
       let list: string[];
       try {
         list = fs.readdirSync(d);
@@ -77,7 +87,8 @@ export function findSkills(cwd: string): Skill[] {
           const name = fm.name || n;
           if (seen.has(name)) continue;
           seen.add(name);
-          out.push({ name, description: (fm.description ?? '').slice(0, 240), file });
+          const group = !lib ? (project.includes(d) && cwd !== home ? PROJECT_GROUP : OWN_GROUP) : isSkillCategory(fm.category) ? SKILL_CATEGORIES[fm.category] : OTHER_GROUP;
+          out.push({ name, description: (fm.description ?? '').slice(0, 240), file, group });
         } catch {}
       }
     }
@@ -105,6 +116,35 @@ export function instructions(cwd: string): string {
     d = up;
   }
   return parts.join('\n\n').slice(0, 24_000);
+}
+
+/** The skills' names by group, for the instructions: the project's, the user's own, then the library's groups in their order. */
+export function skillGroups(skills: Skill[]): [string, string[]][] {
+  const order = [PROJECT_GROUP, OWN_GROUP, ...Object.values(SKILL_CATEGORIES), OTHER_GROUP];
+  const by = new Map<string, string[]>();
+  const rank = (group: string) => (order.includes(group) ? order.indexOf(group) : order.length);
+  for (const k of skills) by.set(k.group, [...(by.get(k.group) ?? []), k.name]);
+  return [...by.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
+}
+
+/** Words a query may have that say nothing of the kind of work. */
+const FILLER = new Set('a an and are as at be by can do does for from get help how i in into is it its me my need of on or our so some that the their this to use using want we what when which with you your'.split(' '));
+
+/** The skills that fit a query best, by its words in their names (counting most), groups and descriptions. */
+export function skillsFor(skills: Skill[], query: string, k = 5): Skill[] {
+  const words = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1 && !FILLER.has(w));
+  if (!words.length) return [];
+  const has = (text: string, w: string) => text.split(/[^\p{L}\p{N}]+/u).some((x) => x === w || (w.length > 2 && x.startsWith(w)));
+  return skills
+    .map((sk) => {
+      const name = sk.name.toLowerCase();
+      const about = `${sk.group} ${sk.description}`.toLowerCase();
+      return { sk, score: words.reduce((n, w) => n + (has(name, w) ? 3 : 0) + (has(about, w) ? 1 : 0), 0) };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k)
+    .map((x) => x.sk);
 }
 
 // ---- the folder ----------------------------------------------------------------------------------
@@ -177,20 +217,52 @@ function gitBranch(cwd: string): string | null {
 
 // ---- the instructions ----------------------------------------------------------------------------
 
-export function systemPrompt(o: {
+/** What the app's capabilities give Custom for a turn (GET /agent/run/:token/context). */
+export interface AppContext {
+  /** Each capability's instructions, by its id (an older server sends them as one `text`). */
+  parts?: { id: string; text: string }[];
+  /** Instructions about some tools alone: given while one of them is offered in full. */
+  guides?: { tools: string[]; text: string }[];
+  text?: string;
+  now?: string;
+}
+
+export interface PromptOptions {
   cwd: string;
   mode: Mode;
   skills: Skill[];
   textTools?: ToolSchema[];
   small: boolean;
-  app?: { text: string; now?: string };
+  app?: AppContext;
   project?: Project;
   /** The tools offered, by name, so the guidance names only those. */
   tools?: string[];
-  /** Tools waiting in the catalog, one line each. */
+  /** Tools waiting in the catalog, one line each (by name alone for a small model). */
   catalog?: string;
   family?: Family;
-}): string {
+}
+
+/** The instructions as one text. */
+export const systemPrompt = (o: PromptOptions): string => promptParts(o).map((x) => x.text).join('\n\n');
+
+/** The parts of a request (estimated from their text) scaled to the tokens the model's server counted, the reply joining the conversation. */
+export function scaleParts(parts: Partial<Record<ContextPart, number>>, prompt: number, completion: number): Partial<Record<ContextPart, number>> {
+  const sum = Object.values(parts).reduce((n: number, x) => n + (x ?? 0), 0);
+  const k = sum > 0 && prompt > 0 ? prompt / sum : 1;
+  const out: Partial<Record<ContextPart, number>> = {};
+  for (const [part, n] of Object.entries(parts) as [ContextPart, number][]) if (n > 0) out[part] = Math.round(n * k);
+  if (completion > 0) out.conversation = (out.conversation ?? 0) + completion;
+  return out;
+}
+
+/** Capabilities whose text says how to work (the agent's instructions, the user's guidelines, the language to answer in): counted with Custom's own rules. */
+const RULES = new Set(['assistants', 'guidelines', 'language']);
+
+/** Which part of the context breakdown each capability's instructions count in. */
+const partOf = (id: string): ContextPart => (id === 'memory' ? 'memory' : id === 'skillpack' ? 'skills' : RULES.has(id) ? 'instructions' : 'features');
+
+/** The instructions in their parts (Custom's own, the project's, memory, the app's features, skills, tools), for the breakdown of the context. */
+export function promptParts(o: PromptOptions): { part: ContextPart; text: string }[] {
   const has = (t: string) => !o.tools || o.tools.includes(t);
   /** A tool of the app's own server (named mcp__<server>__<tool>) or a built-in one. */
   const hasAny = (t: string) => !!o.tools?.some((n) => n === t || n.endsWith(`__${t}`));
@@ -240,19 +312,33 @@ export function systemPrompt(o: {
   }
   const git = gitBranch(o.cwd);
   lines.push('', `Mode: ${MODE_TEXT[o.mode]}`, '', `Environment: folder ${o.cwd}${git ? ` (git branch ${git})` : ''}; ${os.type()} ${os.release()}; today is ${new Date().toISOString().slice(0, 10)}.${process.platform === 'win32' ? ' Commands run in Git for Windows\' bash, where C:\\Users is /c/Users; the file tools take Windows paths.' : ''}`);
+  const out: { part: ContextPart; text: string }[] = [{ part: 'instructions', text: lines.join('\n') }];
+  const add = (part: ContextPart, ...xs: string[]) => out.push({ part, text: xs.join('\n') });
   const ins = instructions(o.cwd);
-  if (ins) lines.push('', 'Project instructions:', ins);
-  // What the app's capabilities add (memory, the assistant's instructions…).
-  if (o.app?.text) lines.push('', o.app.text);
-  if (o.skills.length) {
-    lines.push('', 'Skills: written guides for particular kinds of work. Before starting, load any that bear on the task (skill tool):');
-    for (const s of o.skills) lines.push(`- ${s.name}: ${s.description}`);
-  }
-  if (o.catalog) lines.push('', 'More tools, not shown in full to save room. To use one, call find_tools with what you want to do (or its name) first:', o.catalog);
-  if (o.family?.notes.length) lines.push('', ...o.family.notes);
+  if (ins) add('project', 'Project instructions:', ins);
+  // What the app's capabilities add (memory, the assistant's instructions…), and the guides to the tools offered in
+  // full: one for tools still in the catalog comes once find_tools brings one of them in.
+  const app = o.app?.parts ?? (o.app?.text ? [{ id: 'features', text: o.app.text }] : []);
+  for (const x of app) if (x.text.trim()) add(partOf(x.id), x.text);
+  const offered = (t: string) => !o.tools || hasAny(t);
+  const guides = (o.app?.guides ?? []).filter((g) => g.tools.some(offered));
+  if (guides.length) add('features', guides.map((g) => g.text).join('\n\n'));
+  if (o.skills.length)
+    add(
+      'skills',
+      'Skills: written guides for kinds of work, named by group below. Before work that one fits, load it with the skill tool and follow it; to find skills by what the work is, call skill with a query.',
+      ...skillGroups(o.skills).map(([group, names]) => `- ${group}: ${names.join(', ')}`),
+    );
+  if (o.catalog)
+    add(
+      'tools',
+      `More tools, ${o.small ? 'by name only' : 'not shown in full'} to save room. To use one, call find_tools with what you want to do (or its name) first: it makes the tool callable, and adds any instructions for it here.`,
+      o.catalog,
+    );
+  if (o.family?.notes.length) add('instructions', ...o.family.notes);
   if (o.textTools?.length) {
-    lines.push(
-      '',
+    add(
+      'tools',
       'Tools. To call one, write a tool call in exactly this form (one block per call), then stop and wait for the result:',
       '<tool_call>',
       '{"name": "read_file", "arguments": {"path": "src/app.py"}}',
@@ -263,6 +349,6 @@ export function systemPrompt(o: {
       '</tools>',
     );
   }
-  if (o.small) lines.push('', 'Keep each step small: one or two tool calls, then look at the results.');
-  return lines.join('\n');
+  if (o.small) add('instructions', 'Keep each step small: one or two tool calls, then look at the results.');
+  return out;
 }

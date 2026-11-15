@@ -31,6 +31,6 @@ export const search: Feature = {
     });
   },
   tools: () => (svc ? searchTools(svc) : []),
-  spawn: () => ({ instructions: [INSTRUCTIONS] }),
+  spawn: () => ({ guides: [{ tools: ['web_search', 'read_page', 'find_media'], text: INSTRUCTIONS }] }),
   start: () => svc?.start(),
 };

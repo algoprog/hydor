@@ -579,7 +579,7 @@ const modelOf = async (id: string) => (await req('GET', `/api/pages/${id}`)).jso
   const fresh = await req('POST', '/api/pages', { title: 'Blank', kind: 'diagram' });
   ok(fresh.statusCode === 200 && (await modelOf(fresh.json().page.id)).pages.length === 1, 'New makes an empty diagram');
   // The rest of the kinds' lists name diagrams.
-  ok(/save_diagram/.test((await pages.spawn!({ extra: {} } as never, deps))!.instructions!.join(' ')), 'every agent hears of save_diagram');
+  ok(/save_diagram/.test((await pages.spawn!({ extra: {} } as never, deps))!.guides!.map((g) => g.text).join(' ')), 'every agent hears of save_diagram');
 }
 
 await app.close();

@@ -9,12 +9,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AcpAgentDef, ApprovalOption, ModelOption } from '../../shared/types.ts';
+import { CONTEXT_PARTS, type AcpAgentDef, type ApprovalOption, type LiveState, type ModelOption } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { AGENT_FILE, MODELS_DIR } from '../models/config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
-import type { SpawnAdditions } from '../features/types.ts';
+import type { GivenAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 import { acpBriefing, acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
@@ -163,7 +163,7 @@ export interface AcpOpts {
   /** This app's MCP address for the session (show_html), for agents that take HTTP MCP servers. */
   pageServer?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
-  add?: Required<SpawnAdditions>;
+  add?: GivenAdditions;
 }
 
 export class AcpLive extends LiveAdapter {
@@ -370,6 +370,14 @@ export class AcpLive extends LiveAdapter {
     const of = this.acpSession ?? '';
     const n = u._meta?.hydor ?? u._meta?.naget ?? {};
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
+    // How full the model's context is (ACP's used and size), and where it goes by part when Custom says so.
+    if (num(u.used) && num(u.size)) {
+      this.state.contextTokens = u.used;
+      this.state.contextWindow = u.size;
+      const parts = n.context && typeof n.context === 'object' ? Object.entries(n.context as Record<string, unknown>).filter(([k, v]) => (CONTEXT_PARTS as readonly string[]).includes(k) && num(v)) : [];
+      this.state.contextParts = parts.length ? (Object.fromEntries(parts) as LiveState['contextParts']) : undefined;
+      this.changed();
+    }
     const usd = num(u.cost?.amount) !== undefined && (u.cost.currency ?? 'USD') === 'USD' ? u.cost.amount : undefined;
     const was = this.usage?.of === of ? this.usage : lastUsage(this.o.transcript, of);
     const now = { of, in: num(n.tokensIn) ?? was?.in ?? 0, out: num(n.tokensOut) ?? was?.out ?? 0, cached: num(n.tokensCached) ?? was?.cached ?? 0, usd: usd ?? was?.usd };

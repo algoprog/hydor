@@ -87,8 +87,11 @@ export const signatures: Feature = {
   routes,
   tools: signatureTools,
   spawn: () => ({
-    instructions: [
-      'Signatures: the user can keep their signature (a picture of it, drawn once) to sign documents and files with. To sign one for them, use place_signature with a saved signature by name (look first with look: true; the user allows each placement on a card); if none is saved, ask_signature has them draw one. A placed signature is a picture of their signature, not a cryptographic digital signature.',
+    guides: [
+      {
+        tools: ['place_signature', 'ask_signature'],
+        text: 'Signatures: the user can keep their signature (a picture of it, drawn once) to sign documents and files with. To sign one for them, use place_signature with a saved signature by name (look first with look: true; the user allows each placement on a card); if none is saved, ask_signature has them draw one. A placed signature is a picture of their signature, not a cryptographic digital signature.',
+      },
     ],
   }),
 };
