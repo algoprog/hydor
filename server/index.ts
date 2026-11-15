@@ -65,6 +65,7 @@ import { SystemMonitor } from './system.ts';
 import { readTaskLog, taskOutputPath } from './tasklog.ts';
 import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
+import { shareRoutes } from './share-target.ts';
 import { eventSent, featureContext, featureDeps, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
 import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
@@ -672,6 +673,9 @@ app.put('/api/prices', async (req) => {
   setPriceOverrides(db, ((req.body ?? {}) as any).prices ?? {});
   return { prices: priceOverrides(db) };
 });
+
+// Share to Hydor: what another app shares with the installed web app, into the start page's message box (server/share-target.ts).
+shareRoutes(app, { signedIn: authed, uploads: paths.uploads });
 
 /** Attachments saved ahead of the message or answer that will name them (answers to agent questions). */
 app.post('/api/uploads', async (req) => {
