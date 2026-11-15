@@ -12,6 +12,7 @@ import { hookRoutes } from './hooks.ts';
 import { nextRuns } from './schedule.ts';
 import { automationTools, decide, getProposal, migrateProposals, noteSpawn } from './tools.ts';
 import { checkWatch, validWatch } from './watch.ts';
+import { findOf, useAccountDeps, watchAccounts } from './account-watch.ts';
 
 const home = (p: string) => (!p || p === '~' ? os.homedir() : p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p);
 
@@ -19,6 +20,8 @@ export const automations: Feature = {
   id: 'automations',
   routes(d) {
     migrateProposals(d.db);
+    // A connected account's watcher calls its tools as the Outbox does.
+    useAccountDeps(d);
     const { app, scheduler } = d;
     const id = (req: { params: unknown }) => (req.params as { id: string }).id;
     const body = (req: { body: unknown }) => (req.body ?? {}) as Record<string, any>;
@@ -35,16 +38,18 @@ export const automations: Feature = {
       const s = validSchedule(body(req).schedule);
       return { tz, text: scheduleText(s, tz), next: nextRuns(s, Date.now(), tz, 3) };
     });
-    // What a watcher sees now (its Test button).
+    // What a watcher sees now (its Test button; a connected account's Try it, with where it found the items).
     app.post('/api/automations/watch/test', async (req) => {
       const w = validWatch(body(req).watch);
       try {
         const r = await checkWatch(w, undefined, { cwd: home(String(body(req).cwd ?? '')) });
-        return { ok: true, note: r.note, sample: r.sample };
+        return { ok: true, note: r.note, sample: r.sample, ...(r.find ? { find: r.find } : {}) };
       } catch (e) {
-        return { ok: false, note: (e as Error).message };
+        return { ok: false, note: (e as Error).message, ...(findOf(e) ? { find: findOf(e) } : {}) };
       }
     });
+    // The connected accounts a watcher may call, with their tools that only look and the starting points that fit them.
+    app.get('/api/automations/accounts', async () => ({ accounts: watchAccounts() }));
     // A run of the form as it is, without saving it; `dry`: one that sends nothing (calls that act outside are held as "would have sent").
     app.post('/api/automations/test-run', async (req) => scheduler.testRun((body(req).task ?? {}) as Partial<ScheduledTask>, { dry: body(req).dry === true }));
     // "Make this an automation".

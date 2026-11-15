@@ -1,10 +1,11 @@
 // `hydor tasks`: scheduled tasks, the page Settings → Scheduled tasks. List (as it always printed), show, new, edit, pause,
 // resume, run now, runs (the latest ones) and remove. A task starts by itself: on a schedule (--every, --at, --cron,
-// --once), when a webhook is called (--webhook) or when a watcher sees a change (--watch-…); the options after that are
+// --once), when a webhook is called (--webhook) or when a watcher sees a change (--watch-…: a feed, a page, a folder, or a
+// connected app's tool, new items or a time before each event); the options after that are
 // the page's (agent, model, folder, project, spending cap). The API replaces a whole task when it saves one, so `edit`
 // reads the task, changes the fields named and sends it all.
 import path from 'node:path';
-import { scheduleText, type ScheduledTask, type TaskRun, type TaskSchedule } from '../../../shared/automations.ts';
+import { scheduleText, type ScheduledTask, type TaskRun, type TaskSchedule, type WatchSpec } from '../../../shared/automations.ts';
 import { enc } from '../client.ts';
 import { tildify, timeAgo, truncate } from '../term.ts';
 import { choose, fields, flag, markdown, mark, num, pickOne, str, table, UsageError, type Area, type Ctx, type Values } from './kit.ts';
@@ -61,7 +62,7 @@ export function parseDays(text: string): number[] | undefined {
 /** A folder as the server wants it: a full path here, as typed (`~/x` too) for another computer's Hydor. */
 const folderArg = (ctx: Ctx, f: string) => (ctx.conn.here && !f.startsWith('~') ? path.resolve(f) : f);
 
-const SCHEDULE_OPTIONS = ['every', 'at', 'cron', 'once', 'webhook', 'watch-feed', 'watch-page', 'watch-folder'] as const;
+const SCHEDULE_OPTIONS = ['every', 'at', 'cron', 'once', 'webhook', 'watch-feed', 'watch-page', 'watch-folder', 'watch-account'] as const;
 
 /** The schedule the options say, or undefined when none of them is given. */
 export function scheduleOf(ctx: Ctx, v: Values): TaskSchedule | undefined {
@@ -109,6 +110,7 @@ export function scheduleOf(ctx: Ctx, v: Values): TaskSchedule | undefined {
       const minutes = str(v, 'check-every') ? parseMinutes(str(v, 'check-every')!, '--check-every') : 60;
       if (minutes < 1 || minutes > 10080) throw new UsageError('--check-every takes 1 minute to 7 days');
       if (k === 'watch-feed') return { kind: 'watch', minutes, watch: { kind: 'feed', url: str(v, 'watch-feed')! } };
+      if (k === 'watch-account') return { kind: 'watch', minutes, watch: accountWatch(v) };
       if (k === 'watch-page')
         return {
           kind: 'watch',
@@ -118,6 +120,28 @@ export function scheduleOf(ctx: Ctx, v: Values): TaskSchedule | undefined {
       return { kind: 'watch', minutes, watch: { kind: 'folder', path: folderArg(ctx, str(v, 'watch-folder')!), ...(str(v, 'pattern') ? { pattern: str(v, 'pattern') } : {}) } };
     }
   }
+}
+
+/** A connected app's watcher: its tool (one that only looks), the tool's arguments, and for a calendar how long before each event. */
+function accountWatch(v: Values): Extract<WatchSpec, { kind: 'account' }> {
+  const tool = str(v, 'tool');
+  if (!tool) throw new UsageError('--watch-account needs --tool: one of the account’s tools that only looks, such as list_deals (hydor connections show <account> lists them)');
+  let args: unknown;
+  if (str(v, 'args')) {
+    try {
+      args = JSON.parse(str(v, 'args')!);
+    } catch {}
+    if (!args || typeof args !== 'object' || Array.isArray(args)) throw new UsageError('--args takes the tool’s arguments as JSON, such as {"limit": 50}');
+  }
+  const b = str(v, 'before')?.trim();
+  let before: { minutes?: number; evening?: string } | undefined;
+  if (b) {
+    const evening = /^evening(?:\s+(\d{1,2}):(\d{2}))?$/i.exec(b);
+    if (evening) before = { evening: evening[1] ? `${evening[1].padStart(2, '0')}:${evening[2]}` : '18:00' };
+    else before = { minutes: parseMinutes(b, '--before') };
+    if (before.minutes !== undefined && before.minutes < 1) throw new UsageError('--before takes a time such as 15m, 30m or 1h, or “evening 18:00”');
+  }
+  return { kind: 'account', app: str(v, 'watch-account')!, tool, ...(args ? { args: args as Record<string, unknown> } : {}), ...(before ? { before } : {}) };
 }
 
 // ---- the task's fields ----------------------------------------------------------------------------------------------
@@ -158,6 +182,10 @@ const WHEN_OPTIONS = {
   'watch-feed': { type: 'string', value: '<url>', desc: 'When a feed has something new' },
   'watch-page': { type: 'string', value: '<url>', desc: 'When a page changes (--match, --selector narrow it)' },
   'watch-folder': { type: 'string', value: '<folder>', desc: 'When a folder gets new files (--pattern “*.pdf”)', kind: 'dir' },
+  'watch-account': { type: 'string', value: '<account>', desc: 'When a connected app lists something new (--tool, --args)' },
+  tool: { type: 'string', value: '<tool>', desc: 'With --watch-account: a tool of it that lists or searches' },
+  args: { type: 'string', value: '<json>', desc: 'With --watch-account: the tool’s arguments, as JSON' },
+  before: { type: 'string', value: '<time>', desc: 'With --watch-account: a run before each event (30m, evening)' },
   'check-every': { type: 'string', value: '<time>', desc: 'With --watch-…: how often it looks (default 1h)' },
   match: { type: 'string', value: '<text>', desc: 'With --watch-page: only lines holding this' },
   selector: { type: 'string', value: '<css>', desc: 'With --watch-page: only this part of the page' },

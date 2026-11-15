@@ -347,7 +347,8 @@ agents that speak ACP and take MCP servers.
   program or permission mode the agent runs in (Full access too), while the agent goes on. Tools that send, post,
   publish, reply, invite, share, delete or pay are marked as acting outside, and start on Ask first in an account
   connected now; one connected before Ask first keeps its tools as they were, and its card offers to set them all
-  to Ask first in one click.
+  to Ask first in one click. A scheduled task can start for each new item in an account (a deal, a file, a ticket,
+  a payment) or before each event in a connected calendar (see Scheduled tasks).
 - **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
   session of its own that Hydor starts, with any agent and model, each a card in its conversation that opens to
   the reply; it shows under its parent in the sidebar and in the work tray above the prompt bar, and you can talk to
@@ -1245,9 +1246,19 @@ programs shows each program's version and what is out, with Check now, Update no
 - Scheduled tasks: agent work, by any agent (Custom included), that starts at a time of day in your time zone,
   every few minutes, once, by a cron expression, when a webhook is called, or when a watcher sees a change (new
   items in a feed, a page or a value in JSON changing, new files in a folder, a command's output, new email in a
-  connected mail account): watchers check without a model and wake the agent only then. New email starts one run
+  connected mail account, new items in a connected app, or a set time before each event in a connected calendar):
+  watchers check without a model and wake the agent only then. New email starts one run
   per email (at most 10 a check, the rest summed up in a line), with the email as outside data and its attachments
-  saved in the task's folder, and never the same email twice. Ask in any conversation ("remind me Friday at 9", "every Monday
+  saved in the task's folder, and never the same email twice. A connected app's watcher calls one of the account's
+  tools that only looks (never one that sends, changes, deletes or pays), as the Outbox does, at each check: Try it
+  shows its answer and where the items are in it (the first list of records, told apart by an id, a key or an
+  address, both changeable), starting points fill in the tool and its fields for a CRM's new contacts or deals, a
+  drive's new files, new tickets, issues, payments and more (from the account's own tools), and `{{now}}` or
+  `{{now+2d}}` in a field stand for the time of each check. Each new item starts its own run with the item as outside
+  data, at most 10 a check, never twice, across restarts too. For a calendar, "Before each event" starts a run 15 or
+  30 minutes or an hour before each event, or the evening before at a set time, for events with a title or with
+  other people if you like, following an event that moves and skipping one cancelled. A signed-out account, a tool
+  gone or an answer that changed shows on the task and starts no run. Ask in any conversation ("remind me Friday at 9", "every Monday
   summarize…") and confirm the task in a card; or start from an example, or turn a session that worked into one.
   A task can also run one of your apps, with the answers you set (a webhook's call or what a watcher saw
   filling them in), made from the app's Runs. Each run reports how it went: its history keeps the outcome, a
