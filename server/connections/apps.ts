@@ -2,6 +2,7 @@
 // on, and whether a session gets each one.
 import type { CatalogApp, ConnectionStatus, ConnectionView, SessionConnection } from '../../shared/connections.ts';
 import type { SessionExtra } from '../../shared/features.ts';
+import { actsOutside, type ToolState } from '../../shared/outbox.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { catalogApp, fill } from './catalog.ts';
@@ -39,9 +40,18 @@ interface Row {
   hint: string | null;
   tools: string | null;
   tool_prefs: string;
+  ask_default: number;
   tested_at: number | null;
   created_at: number;
   updated_at: number;
+}
+
+/** A tool as the last test found it: what the Tools list shows, the Outbox's form and whether it acts outside. */
+export interface StoredTool {
+  name: string;
+  description?: string;
+  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean; idempotentHint?: boolean; title?: string };
+  inputSchema?: { type?: string; properties?: Record<string, unknown>; required?: string[] };
 }
 
 /** A connected app with its catalog entry (the current one, or as it was when connected). */
@@ -56,8 +66,11 @@ export interface Conn {
   fields: Record<string, string>;
   hasCred: boolean;
   hint?: string;
-  tools?: { name: string; description?: string }[];
-  prefs: Record<string, boolean>;
+  tools?: StoredTool[];
+  /** The person's choice per tool: on (true), off (false) or Ask first ('ask'). */
+  prefs: Record<string, boolean | 'ask'>;
+  /** Connected since Ask first came: its tools that act outside start on Ask first. */
+  askDefault: boolean;
   testedAt?: number;
   createdAt: number;
   updatedAt: number;
@@ -70,6 +83,10 @@ export function appTables(db: DB) {
     created_at integer not null, updated_at integer not null
   );
   create table if not exists conn_clients (k text primary key, client text not null, created_at integer not null);`);
+  // Accounts connected before Ask first keep their tools as they were (0); those connected since start their
+  // tools that act outside on Ask first (saveConnection sets 1).
+  const cols = new Set((db.prepare('pragma table_info(conn_apps)').all() as { name: string }[]).map((c) => c.name));
+  if (!cols.has('ask_default')) db.exec('alter table conn_apps add column ask_default integer not null default 0');
 }
 
 const json = <T>(s: string | null | undefined, d: T): T => {
@@ -107,6 +124,7 @@ function conn(r: Row): Conn {
     ...(r.hint ? { hint: r.hint } : {}),
     ...(r.tools ? { tools: json(r.tools, []) } : {}),
     prefs: json(r.tool_prefs, {}),
+    askDefault: !!r.ask_default,
     ...(r.tested_at ? { testedAt: r.tested_at } : {}),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -123,17 +141,36 @@ export function connection(db: DB, id: string): Conn | null {
 
 export const isRemote = (a: CatalogApp) => a.server.transport !== 'stdio';
 
-/** Whether an agent gets the tool: the person's choice, else the catalog's default (all when it names none). */
-export const toolOn = (c: Conn, name: string) => (Object.hasOwn(c.prefs, name) ? !!c.prefs[name] : c.entry.defaultTools ? c.entry.defaultTools.includes(name) : true);
+/** What the last test said of a tool (only its name when it was not listed then). */
+export const toolFacts = (c: Conn, name: string): StoredTool => c.tools?.find((t) => t.name === name) ?? { name };
+
+/**
+ * How agents get the tool: the person's choice, else the catalog's default (all when it names none), where a tool
+ * that acts outside starts on Ask first for an account connected since that came (`askDefault`).
+ */
+export function toolState(c: Conn, name: string): ToolState {
+  if (Object.hasOwn(c.prefs, name)) {
+    const p = c.prefs[name];
+    return p === 'ask' ? 'ask' : p ? 'on' : 'off';
+  }
+  if (c.entry.defaultTools && !c.entry.defaultTools.includes(name)) return 'off';
+  return c.askDefault && actsOutside(toolFacts(c, name)) ? 'ask' : 'on';
+}
+
+/** Whether an agent gets the tool (listed, and its calls answered, or held when it is on Ask first). */
+export const toolOn = (c: Conn, name: string) => toolState(c, name) !== 'off';
+
+/** The tools known to be on Ask first now. */
+export const askTools = (c: Conn) => (c.tools ?? []).map((t) => t.name).filter((n) => toolState(c, n) === 'ask');
 
 /**
  * Which tools a bridge lets through, without needing to know them all: `only` those (when the catalog
  * names defaults) and never the ones in `skip`. Null when every tool is on.
  */
 export function toolFilter(c: Conn): { only: string[] | null; skip: string[] } | null {
-  const skip = Object.entries(c.prefs).filter(([, v]) => !v).map(([k]) => k);
+  const skip = Object.entries(c.prefs).filter(([, v]) => v === false).map(([k]) => k);
   if (!c.entry.defaultTools && !skip.length) return null;
-  const only = c.entry.defaultTools ? [...new Set([...c.entry.defaultTools, ...Object.entries(c.prefs).filter(([, v]) => v).map(([k]) => k)])].filter((n) => !skip.includes(n)) : null;
+  const only = c.entry.defaultTools ? [...new Set([...c.entry.defaultTools, ...Object.entries(c.prefs).filter(([, v]) => v !== false).map(([k]) => k)])].filter((n) => !skip.includes(n)) : null;
   return { only, skip };
 }
 
@@ -149,7 +186,15 @@ export function view(c: Conn, cred?: Cred): ConnectionView {
     ...(c.hint ? { hint: c.hint } : {}),
     fields: c.fields,
     secretFields,
-    ...(c.tools ? { tools: c.tools.map((t) => ({ ...t, on: toolOn(c, t.name) })) } : {}),
+    ...(c.tools
+      ? {
+          tools: c.tools.map((t) => {
+            const state = toolState(c, t.name);
+            return { name: t.name, ...(t.description ? { description: t.description } : {}), on: state !== 'off', state, outside: actsOutside(t) };
+          }),
+        }
+      : {}),
+    ...(askOffer(c).length ? { askOffer: askOffer(c) } : {}),
     ...(c.catalogChanged ? { catalogChanged: true } : {}),
     ...(c.testedAt ? { testedAt: c.testedAt } : {}),
     ...(cred?.oauth?.expires_at ? { expiresAt: cred.oauth.expires_at } : {}),
@@ -157,6 +202,9 @@ export function view(c: Conn, cred?: Cred): ConnectionView {
     updatedAt: c.updatedAt,
   };
 }
+
+/** Tools that act outside and are On only because nobody chose (an account connected before Ask first). */
+export const askOffer = (c: Conn) => (c.tools ?? []).filter((t) => !Object.hasOwn(c.prefs, t.name) && toolState(c, t.name) === 'on' && actsOutside(t)).map((t) => t.name);
 
 export function readCred(db: DB, id: string): Cred {
   const r = db.prepare('select cred from conn_apps where id = ?').get(id) as { cred: string | null } | undefined;
@@ -179,7 +227,7 @@ export function saveConnection(db: DB, entry: CatalogApp, o: { fields?: Record<s
   const now = Date.now();
   const old = connection(db, entry.id);
   db.prepare(
-    `insert into conn_apps (id, app, enabled, status, fields, cred, hint, created_at, updated_at) values (?, ?, 1, ?, ?, ?, ?, ?, ?)
+    `insert into conn_apps (id, app, enabled, status, fields, cred, hint, ask_default, created_at, updated_at) values (?, ?, 1, ?, ?, ?, ?, 1, ?, ?)
      on conflict(id) do update set app = excluded.app, status = excluded.status, error = null, fields = excluded.fields, cred = excluded.cred,
        hint = excluded.hint, updated_at = excluded.updated_at`,
   ).run(
@@ -205,18 +253,29 @@ export function setStatus(db: DB, id: string, status: ConnectionStatus, error?: 
   db.prepare('update conn_apps set status = ?, error = ? where id = ?').run(status, error ? error.slice(0, 400) : null, id);
 }
 
-export function setTested(db: DB, id: string, tools: { name: string; description?: string }[]) {
-  const list = tools.slice(0, 500).map((t) => ({ name: String(t.name).slice(0, 120), ...(t.description ? { description: String(t.description).replace(/\s+/g, ' ').trim().slice(0, 300) } : {}) }));
+export function setTested(db: DB, id: string, tools: { name: string; description?: string; annotations?: unknown; inputSchema?: unknown }[]) {
+  const list = tools.slice(0, 500).map((t): StoredTool => {
+    const a = t.annotations && typeof t.annotations === 'object' ? (t.annotations as Record<string, unknown>) : null;
+    const hints = a ? Object.fromEntries(['readOnlyHint', 'destructiveHint', 'openWorldHint', 'idempotentHint'].filter((k) => typeof a[k] === 'boolean').map((k) => [k, a[k]])) : {};
+    // Its fields, for the Outbox's form: kept when they are of a sensible size.
+    const schema = t.inputSchema && typeof t.inputSchema === 'object' && JSON.stringify(t.inputSchema).length <= 8000 ? (t.inputSchema as StoredTool['inputSchema']) : undefined;
+    return {
+      name: String(t.name).slice(0, 120),
+      ...(t.description ? { description: String(t.description).replace(/\s+/g, ' ').trim().slice(0, 300) } : {}),
+      ...(Object.keys(hints).length ? { annotations: hints } : {}),
+      ...(schema ? { inputSchema: schema } : {}),
+    };
+  });
   db.prepare("update conn_apps set status = 'ok', error = null, tools = ?, tested_at = ? where id = ?").run(JSON.stringify(list), Date.now(), id);
 }
 
-export function patchConnection(db: DB, id: string, p: { enabled?: boolean; tools?: Record<string, boolean> }) {
+export function patchConnection(db: DB, id: string, p: { enabled?: boolean; tools?: Record<string, boolean | 'ask'> }) {
   const c = connection(db, id);
   if (!c) throw new HttpError(404, 'That service is not connected');
   if (p.enabled !== undefined) db.prepare('update conn_apps set enabled = ? where id = ?').run(p.enabled ? 1 : 0, id);
   if (p.tools) {
     const prefs = { ...c.prefs };
-    for (const [k, v] of Object.entries(p.tools)) if (typeof v === 'boolean') prefs[String(k).slice(0, 120)] = v;
+    for (const [k, v] of Object.entries(p.tools)) if (typeof v === 'boolean' || v === 'ask') prefs[String(k).slice(0, 120)] = v;
     db.prepare('update conn_apps set tool_prefs = ? where id = ?').run(JSON.stringify(prefs), id);
   }
   db.prepare('update conn_apps set updated_at = ? where id = ?').run(Date.now(), id);

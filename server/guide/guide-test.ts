@@ -261,6 +261,9 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['POST', '/api/terminals'],
     ['POST', '/api/git/push'],
     ['POST', '/api/sessions/claude:x/approvals/a1'],
+    // A call held in the Outbox goes out with the user's OK alone.
+    ['POST', '/api/outbox/h1/send'],
+    ['POST', '/api/outbox/send-all'],
     ['POST', '/api/skillpack/proposals/p1/approve'],
     ['POST', '/api/mcp/tokens'],
     ['POST', '/api/access-tokens'],
@@ -322,6 +325,7 @@ async function testApp() {
   app.delete('/api/projects/:id', async () => ({ ok: true }));
   app.post('/api/sessions/:key/config', async (req) => ({ ok: true, key: (req.params as { key: string }).key, ...(req.body as object) }));
   app.patch('/api/sessions/:key/extra', async (req) => ({ extra: req.body }));
+  app.patch('/api/connections/:id', async (req) => ({ connection: { id: (req.params as { id: string }).id, ...(req.body as object) } }));
   await app.ready();
   return app;
 }
@@ -485,6 +489,12 @@ test('app_api: a session’s permissions and spending cap: a card each time, in 
   assert.equal(full.cards.length, 2, 'a spending cap asks too');
   r = await appApi({ method: 'POST', path: '/api/sessions/this/config', body: { model: 'opus' } }, ctxOf(app, full));
   assert.equal(full.cards.length, 2, 'the model alone asks nothing in Full access');
+  // A connected account's tools On, Ask first or Off: a card too, so a tool on Ask first is not turned On behind the user's back.
+  r = await appApi({ method: 'PATCH', path: '/api/connections/gmail', body: { tools: { send_email: true } } }, ctxOf(app, full));
+  assert.equal(full.cards.length, 3, 'tool states ask in Full access too');
+  assert.match(full.cards[2].card.detail!, /wait for your OK in the Outbox/);
+  r = await appApi({ method: 'PATCH', path: '/api/connections/gmail', body: { enabled: false } }, ctxOf(app, full));
+  assert.equal(full.cards.length, 3, 'the account on or off for every session asks nothing in Full access');
   // Said no: nothing changes.
   const no = session('default', () => ({ decision: 'decline' }));
   r = await appApi({ method: 'POST', path: '/api/sessions/this/config', body: { mode: 'bypassPermissions' } }, ctxOf(app, no));

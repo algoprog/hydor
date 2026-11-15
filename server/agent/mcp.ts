@@ -29,6 +29,8 @@ export interface McpTool {
   inputSchema: Record<string, unknown>;
   /** The server says it only reads (MCP's readOnlyHint). */
   readOnly?: boolean;
+  /** A connected account's tool on Ask first: Hydor holds each call in the Outbox for the user's OK (server/outbox). */
+  held?: boolean;
 }
 
 const readJson = (f: string): any => {
@@ -258,6 +260,7 @@ export class McpClient {
       description: String(t.description ?? '').slice(0, 1000),
       inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
       readOnly: t.annotations?.readOnlyHint === true,
+      ...(t._meta?.['hydor/askFirst'] === true ? { held: true } : {}),
     }));
   }
 

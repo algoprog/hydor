@@ -3,14 +3,15 @@
 // vault. Its tab is in the address (?tab=market, ?tab=keys), so a link can open any of them.
 // (It was Settings → Connections; /settings?s=connections comes here.)
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, ExternalLink, GitPullRequest, PlugZap, RefreshCw, Search, Store, Unplug } from 'lucide-react';
+import { BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, ExternalLink, GitPullRequest, PlugZap, RefreshCw, Search, ShieldCheck, Store, Unplug } from 'lucide-react';
+import type { ToolState } from '@shared/outbox';
 import { CONNECTION_CATEGORIES, type CatalogApp, type ConnectionCategory, type ConnectionView } from '@shared/connections';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { ago } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
 import { useFeatureEvent } from '../../lib/featureEvents';
-import { Badge, Button, cx, Empty, IconButton, inputCls, Section, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, Empty, IconButton, inputCls, Section, Segmented, Switch, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { ConnectDialog, FLOW_KEY } from './ConnectDialog';
 import { Keys } from './Keys';
 import { AppIcon, authLabel, REPO_CATALOG, useConn } from './store';
@@ -216,11 +217,12 @@ function Featured({ apps, byId, onOpen }: { apps: CatalogApp[]; byId: Map<string
 }
 
 function statusLine(c: ConnectionView): { text: string; tone: 'ok' | 'warn' | 'err' | 'muted' } {
+  const ask = c.tools?.filter((t) => t.state === 'ask').length ?? 0;
   const tools = c.tools ? `${c.tools.filter((t) => t.on).length} of ${c.tools.length} tools on` : '';
   if (c.status === 'signin') return { text: 'Needs signing in again', tone: 'warn' };
   if (c.status === 'error') return { text: c.error ? `Not working: ${c.error}` : 'Not working', tone: 'err' };
   if (c.status === 'untested') return { text: 'Not tested yet', tone: 'muted' };
-  return { text: [`Working${c.testedAt ? `, checked ${ago(c.testedAt)}` : ''}`, tools].filter(Boolean).join(' · '), tone: 'ok' };
+  return { text: [`Working${c.testedAt ? `, checked ${ago(c.testedAt)}` : ''}`, tools, ask ? `${ask} ask first` : ''].filter(Boolean).join(' · '), tone: 'ok' };
 }
 
 function ConnectedApp({ c, onReconnect }: { c: ConnectionView; onReconnect: () => void }) {
@@ -241,7 +243,7 @@ function ConnectedApp({ c, onReconnect }: { c: ConnectionView; onReconnect: () =
       setTesting(false);
     }
   };
-  const set = async (p: { enabled?: boolean; tools?: Record<string, boolean> }) => {
+  const set = async (p: { enabled?: boolean; tools?: Record<string, boolean | 'ask'> }) => {
     await patch(`/api/connections/${enc(c.id)}`, p).catch(toastError);
     await useConn.getState().load();
   };
@@ -263,6 +265,16 @@ function ConnectedApp({ c, onReconnect }: { c: ConnectionView; onReconnect: () =
             {st.tone === 'ok' ? <CircleCheck size={13} className="mt-px shrink-0 text-ok" /> : st.tone === 'muted' ? null : <CircleAlert size={13} className="mt-px shrink-0" />}
             <span className="min-w-0 break-words">{st.text}</span>
           </div>
+          {c.askOffer && c.askOffer.length > 0 && (
+            <button
+              type="button"
+              onClick={() => set({ tools: Object.fromEntries(c.askOffer!.map((n) => [n, 'ask' as const])) })}
+              className="mt-1 flex items-start gap-1.5 text-left text-[12.5px] leading-snug text-accent hover:underline"
+            >
+              <ShieldCheck size={13} className="mt-px shrink-0" />
+              <span>{c.askOffer.length === 1 ? 'Ask first for the tool that sends, posts, deletes or pays' : `Ask first for the ${c.askOffer.length} tools that send, post, delete or pay`}</span>
+            </button>
+          )}
           {c.catalogChanged && (
             <div className="mt-1 text-[12px] leading-snug text-warn">
               The catalog has a new address or sign-in for it. It keeps using the old one until you{' '}
@@ -299,14 +311,37 @@ function ConnectedApp({ c, onReconnect }: { c: ConnectionView; onReconnect: () =
       </div>
       {tools && c.tools && (
         <div className="mt-2.5 divide-y divide-line rounded-xl border border-line sm:ml-12">
+          <p className="px-3 py-2 text-[12px] leading-snug text-fg-3">On: agents use it freely. Ask first: each call waits in your Outbox, in the Inbox, until you send it. Off: agents don’t get it.</p>
           {c.tools.map((t) => (
-            <label key={t.name} className="flex cursor-pointer items-start gap-3 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <div className="font-mono text-[12.5px] break-all">{t.name}</div>
-                {t.description && <div className="line-clamp-2 text-[12px] leading-snug text-fg-3">{t.description}</div>}
+            <div key={t.name} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-3 py-2">
+              <div className="min-w-0 flex-1 basis-[220px]">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span translate="no" className="font-mono text-[12.5px] break-all">
+                    {t.name}
+                  </span>
+                  {t.outside && (
+                    <Badge tone="warn" className="!text-[10.5px]">
+                      <span title="It sends, posts, deletes or pays: something others see, or that can’t be undone">acts outside</span>
+                    </Badge>
+                  )}
+                </div>
+                {t.description && (
+                  <div translate="no" className="line-clamp-2 text-[12px] leading-snug text-fg-3">
+                    {t.description}
+                  </div>
+                )}
               </div>
-              <Switch on={t.on} onChange={(on) => set({ tools: { [t.name]: on } })} label={`${t.name} ${t.on ? 'on' : 'off'}`} />
-            </label>
+              <Segmented<ToolState>
+                size="sm"
+                value={t.state}
+                onChange={(v) => v !== t.state && set({ tools: { [t.name]: v === 'ask' ? 'ask' : v === 'on' } })}
+                options={[
+                  { value: 'on', label: 'On' },
+                  { value: 'ask', label: 'Ask first' },
+                  { value: 'off', label: 'Off' },
+                ]}
+              />
+            </div>
           ))}
         </div>
       )}

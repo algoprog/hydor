@@ -98,7 +98,7 @@ These start a program here (with npx or uvx) for each session's agent. The first
 
 On the **Connected** tab, each account says how it is:
 
-- **Working**, when it was last checked, and how many of its tools are on ("12 of 14 tools on").
+- **Working**, when it was last checked, how many of its tools are on ("12 of 14 tools on"), and how many of those ask first ("3 ask first").
 - **Not tested yet**.
 - **Needs signing in again**: its sign-in ended and could not renew.
 - **Not working**, with the reason.
@@ -108,7 +108,18 @@ On the **Connected** tab, each account says how it is:
 ## Turn an account or some of its tools off
 
 - **Every session** (on a phone, just the switch): when it's on, every session's agent gets the account, unless a session turns it off. When it's off, no session gets it unless that session turns it on. A newly connected account starts on.
-- **Tools**: once a test has listed an account's tools, this button opens them, each with a switch and what it does. Turn off the ones agents should not use, such as deleting or sending. An agent that tries a tool you turned off is told it is off.
+- **Tools**: once a test has listed an account's tools, this button opens them, each with what it does and three choices: **On** (agents use it freely), **Ask first** (each call waits in your Outbox until you send it: see below) and **Off** (agents don't get it). Tools that send, post, publish, reply, invite, share, delete, remove, pay, transfer or refund are marked **acts outside**. An agent that tries a tool you turned off is told it is off.
+
+## Ask first: calls that wait for your OK
+
+A tool on **Ask first** is never called straight away. When an agent calls it (Claude Code, Codex, Custom, another agent, a scheduled task's run or one of your apps), Hydor holds the call. The agent is told at once that the call waits for your OK, and goes on with the rest of its work or ends its turn saying so: it doesn't wait, and it is told not to try again another way. The call waits in the **Outbox**, at the top of the [Inbox](/inbox), as a draft you can change before you **Send** it or **Drop** it ([The Outbox](/guide/inbox#the-outbox-calls-held-for-your-ok)).
+
+- Accounts you connect from now on start every tool that acts outside on **Ask first**, and the others **On**. Change any of them in **Tools**.
+- Accounts you connected before keep their tools as they were, so what already uses them keeps working. Their card offers one line, such as **Ask first for the 3 tools that send, post, delete or pay**: click it to set all of them to Ask first at once. It shows while such tools are On without your having chosen.
+- Ask first is your own setting for the account, so it holds in every session and every permission mode, **Full access** included. Agents can't change it without asking you on a card, and can't send a held call themselves. Where an agent would also ask before using the tool (Claude Code's or Custom's own card), it doesn't: you say yes once, in the Outbox.
+- Whether a tool acts outside is judged from its name, its description and the hints its service gives (such as "only reads" or "deletes"). Look at the marks, and set any other tool to Ask first yourself.
+
+To try a scheduled task without anything going out, use **Test without sending** ([Scheduled tasks](/guide/tasks#try-a-task-with-a-test-run)).
 
 ## Change a connection or sign in again
 
@@ -139,6 +150,7 @@ An agent can also turn accounts on for the sessions that start as it: see [Agent
 - At the start of a session, the agent is told which of your accounts are connected and to use them when a task involves them. It can also list what is connected and which keys are saved, by name only.
 - An agent only gets the accounts that are on for its session and signed in. Sign-ins renew in the background, even for accounts no session is using, so long sessions keep working.
 - Keys and tokens never go into an agent's settings or command line. Known key values are masked in whatever the service's tools send back.
+- A tool on Ask first says so in its description, and the agent is told that a call to it waits for your OK. Once you send or drop the call, the session shows what happened, and its agent hears it with your next message.
 - The search box (Ctrl+K, ⌘K on a Mac) finds your connected accounts too.
 
 ## Add a service to the marketplace
@@ -338,6 +350,7 @@ Agents can do these for you, with your OK on a card. They never type a key's val
 - "Connect Context7 so agents can look up library docs."
 - "Turn Gmail off for every session, but keep it on in this one."
 - "Show me Notion's tools and turn off the ones that delete pages."
+- "Set Gmail's tools that send or delete to Ask first, and leave the rest on."
 - "Add an MCP server for Claude Code and Codex that runs npx -y @modelcontextprotocol/server-memory, then check that it connects."
 - "Show me the most installed Claude Code plugins, then install the one I pick."
 - "Sign in to my Voltaro account and download this year's bills into this folder." (The first time, it asks for the sign-in on a card.)

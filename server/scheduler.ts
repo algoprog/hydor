@@ -9,6 +9,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DRY_RUN_NOTE } from '../shared/outbox.ts';
 import { OUTCOME_LABEL, runHead, scheduleText, watchText, type RunOutcome, type RunStatus, type RunTrigger, type ScheduledTask, type TaskApp, type TaskExtra, type TaskRun, type TaskSchedule, type WatchSpec } from '../shared/automations.ts';
 import type { NotifyEvent } from '../shared/types.ts';
 import { acpAgents } from './agents/acp.ts';
@@ -442,7 +443,7 @@ export class Scheduler extends EventEmitter {
   }
 
   /** Runs a task as the form has it now, without saving it (a saved task's own history keeps it). */
-  async testRun(input: Partial<ScheduledTask>): Promise<{ runId?: string; key?: string }> {
+  async testRun(input: Partial<ScheduledTask>, o: { dry?: boolean } = {}): Promise<{ runId?: string; key?: string }> {
     const t = this.normalize(input);
     const saved = input.id ? this.get(input.id) : null;
     const row: Row = {
@@ -464,7 +465,7 @@ export class Scheduler extends EventEmitter {
       notepad: saved?.notepad ?? null,
       app: t.app ? JSON.stringify(t.app) : null,
     };
-    return this.run(row, { trigger: 'test', input: await this.watchNow(row), saved: !!saved });
+    return this.run(row, { trigger: 'test', input: await this.watchNow(row), saved: !!saved, dry: o.dry === true });
   }
 
   /** For a watch task run by hand: what its watcher sees now, quoted as its input. */
@@ -748,10 +749,12 @@ export class Scheduler extends EventEmitter {
     }
   }
 
-  private preamble(r: Row, s: TaskSchedule, trigger: RunTrigger): string {
+  private preamble(r: Row, s: TaskSchedule, trigger: RunTrigger, dry = false): string {
     const notes = r.notepad?.trim();
     return [
       runHead({ task: r.name, when: scheduleText(s, this.tz()), trigger, now: localNow(this.db) }),
+      // A test that sends nothing (server/outbox): its calls that act outside answer at once without being made.
+      ...(dry ? [DRY_RUN_NOTE] : []),
       'When you finish, call report_outcome once: done, partial, blocked (you need the user) or failed, with a one-line summary the user will see. If there is nothing worth telling them this time, report silent (or begin your reply with [SILENT]): no notification goes out.',
       notes
         ? `Your notes from earlier runs (task_notes reads and changes them):\n<task-notes>\n${notes}\n</task-notes>`
@@ -759,7 +762,7 @@ export class Scheduler extends EventEmitter {
     ].join('\n');
   }
 
-  private async run(r: Row, o: { trigger: RunTrigger; input?: string; rerunOf?: string; saved?: boolean; answers?: Record<string, string>; tier?: Tier }): Promise<{ runId?: string; key?: string }> {
+  private async run(r: Row, o: { trigger: RunTrigger; input?: string; rerunOf?: string; saved?: boolean; answers?: Record<string, string>; tier?: Tier; dry?: boolean }): Promise<{ runId?: string; key?: string }> {
     if (this.starting.has(r.id)) throw new HttpError(409, `${r.name} is starting already`);
     this.starting.add(r.id);
     const schedule = JSON.parse(r.schedule) as TaskSchedule;
@@ -788,9 +791,10 @@ export class Scheduler extends EventEmitter {
     const app = parse<TaskApp>(r.app);
     const answers = app ? (o.answers ?? appInputs(app, o.input ?? '')) : undefined;
     const body = answers ? JSON.stringify(answers) : (o.input ?? r.prompt);
-    const prompt = `${this.preamble(r, schedule, o.trigger)}\n\n${body}`;
+    const dry = test && o.dry === true;
+    const prompt = `${this.preamble(r, schedule, o.trigger, dry)}\n\n${body}`;
     const taskId = test && !o.saved ? '' : r.id;
-    const runId = startRun(this.db, { taskId, trigger: o.trigger, input: body, rerunOf: o.rerunOf });
+    const runId = startRun(this.db, { taskId, trigger: o.trigger, input: body, rerunOf: o.rerunOf, dry });
     if (o.tier) this.runTier.set(runId, o.tier);
     let key: string | undefined;
     let standingKey: string | null = null;
@@ -810,7 +814,7 @@ export class Scheduler extends EventEmitter {
         await this.sessions.deliverOrQueue(key, prompt);
       } else {
         const stamp = new Date(now).toLocaleString('en-GB', { timeZone: this.tz(), month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        const extra = { ...parse<TaskExtra>(r.extra), automations: { task: taskId, run: runId, ...(test ? { test: true } : {}) } };
+        const extra = { ...parse<TaskExtra>(r.extra), automations: { task: taskId, run: runId, ...(test ? { test: true } : {}), ...(dry ? { dry: true } : {}) } };
         key = await this.sessions.create({
           agent: r.agent,
           acpAgent: r.agent === 'acp' ? (r.acp_agent ?? undefined) : undefined,

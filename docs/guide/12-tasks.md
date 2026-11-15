@@ -41,7 +41,7 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 - Dots for its latest runs (up to six, oldest first: green for done, amber for partly done or blocked, red for failed or an error, grey for nothing new) with **History** beside them; **Last run 3h ago** (in red, with the reason, when the last run could not start); and **Open**, which opens the last run's session.
 - For a webhook task, its address with a copy button, and, for one made from an example, where to paste it in the service that calls it.
 
-At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
+At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Test without sending**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
 
 With no tasks yet, the list says "No scheduled tasks yet: start from an example below, or ask an agent to set one up".
 
@@ -190,6 +190,8 @@ A webhook example's form says, under its fields, where its address will go; once
 
 **Test run**, in the form's footer, runs the task once now, as the form has it, without saving it. It runs like a real run, in a session of its own titled "Test: <name> · <time>", and a strip in the form shows **Test run** with how it went once it ends, and **Open its session**. A test run never counts toward the failures that pause a task. Testing a task you are editing reads its notes and shows in its history as a **Test run**; a new task has no notes yet.
 
+To try a task that sends, posts or deletes without anything going out, open the menu beside **Test run** (**More ways to test**) and pick **Test without sending**, or pick **Test without sending** in a saved task's menu (⋯). It runs the same way, but every call to a connected account's tool that acts outside (sends, posts, publishes, replies, invites, shares, deletes or pays), and every call to a tool on Ask first, is kept as "would have sent" and never made. The agent is told so, and carries on as if it had gone. Its strip, its run in **History** and its session list what it **Would have sent**, and nothing waits in the Outbox afterwards. Reading works as usual. See [Connected apps, keys and tools](/guide/connections#ask-first-calls-that-wait-for-your-ok).
+
 ## Run a task now
 
 The task's menu (⋯) → **Run now** starts a run at once, whether the task is on or paused, and opens its session.
@@ -199,7 +201,8 @@ The task's menu (⋯) → **Run now** starts a run at once, whether the task is 
 The task's menu (⋯) → **History**, or **History** beside the dots, opens the task's runs, newest first (the latest 50 show; the app keeps 100 per task). Each run shows:
 
 - How it went: **Running**, **Done**, **Partly done**, **Blocked** (the agent needs you: access, or a decision), **Failed**, **Nothing new** or **Error** (it could not start, or its turn stopped with an error).
-- When it started, what started it (**On schedule**, **Webhook**, **Watcher**, **Run now**, **Re-run** or **Test run**), how long it took and what it cost.
+- When it started, what started it (**On schedule**, **Webhook**, **Watcher**, **Run now**, **Re-run**, **Test run** or **Test without sending**), how long it took and what it cost.
+- For a test without sending, what it **Would have sent**: each call, with the account, the tool and who it would have gone to.
 - The agent's one-line summary. Select a long one to read the agent's whole last reply.
 - **Open its session**, and **Run again with the same input**, which runs the task again with what that run got: the same webhook call, or the same change a watcher saw.
 
@@ -284,6 +287,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Watch this product page and tell me when the price drops below €99."
 - "Which of my scheduled tasks failed this week, and why?"
 - "Pause my Morning brief", or "Run the weekly report now."
+- "Test my invoice reminders without sending anything, and show me the emails it would have sent."
 - "Make this conversation a task that runs every Monday at 9."
 - "Run my Reading list app whenever this feed has a new post, with the post's link."
 - "Set up a CI doctor for ~/code/shop on GitHub Actions that may re-run flaky jobs."

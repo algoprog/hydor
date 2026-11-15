@@ -132,7 +132,7 @@ export const connections: Area = {
                 p.bold('Tools'),
                 ...table(
                   ctx,
-                  c.tools.map((t) => [t.on ? p.green('on') : p.dim('off'), t.name, p.dim(t.description ?? '')]),
+                  c.tools.map((t) => [t.state === 'ask' ? p.yellow('ask first') : t.on ? p.green('on') : p.dim('off'), t.name, p.dim(t.description ?? '')]),
                   { grow: 1, free: [1, 2], indent: 2 },
                 ),
               ]

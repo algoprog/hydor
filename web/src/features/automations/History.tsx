@@ -11,6 +11,7 @@ import { toast, toastError } from '../../lib/store';
 import { ReplyMarkdown } from '../../components/Markdown';
 import { Button, cx, IconButton, inputCls, Throbber } from '../../components/ui';
 import { localTime, OutcomeBadge, TriggerIcon } from './parts';
+import { WouldHaveSent } from '../outbox/WouldHaveSent';
 
 function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,7 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
           <OutcomeBadge status={r.status} />
           <span className="text-fg-2">{localTime(r.startedAt)}</span>
           <span className="text-fg-3">
-            {TRIGGER_LABEL[r.trigger]}
+            {r.dry ? 'Test without sending' : TRIGGER_LABEL[r.trigger]}
             {r.endedAt ? ` · ${duration(r.endedAt - r.startedAt)}` : ''}
             {r.costUsd ? ` · ${money(r.costUsd)}` : ''}
           </span>
@@ -34,6 +35,7 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
             {r.summary ?? r.error}
           </button>
         )}
+        {r.dry && <WouldHaveSent run={r.id} />}
         {open && r.reply && (
           <div className="mt-1.5 rounded-lg border border-line px-3 py-2">
             <ReplyMarkdown text={r.reply} breaks className="!text-[13px]" />

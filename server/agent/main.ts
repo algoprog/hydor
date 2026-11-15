@@ -199,8 +199,9 @@ function mcpTools(clients: McpClient[]): Tool[] {
         parameters: t.inputSchema,
         title: () => `${t.server}: ${t.name}`,
         async run(a, ctx) {
-          // The app's own tools ask the user in the conversation themselves when they need to.
-          if (!own && !(await ctx.ask({ kind: 'other', title: `${t.server}: ${t.name}`, key: `mcp:${t.fullName}`, rawInput: a }))) return { ok: false, output: 'The user declined this call. Do not retry it.' };
+          // The app's own tools ask the user in the conversation themselves when they need to; a connected account's
+          // tool on Ask first is held in the Outbox for the user's OK, so it is not asked about here as well.
+          if (!own && !t.held && !(await ctx.ask({ kind: 'other', title: `${t.server}: ${t.name}`, key: `mcp:${t.fullName}`, rawInput: a }))) return { ok: false, output: 'The user declined this call. Do not retry it.' };
           const r = await c.call(t.name, a, ctx.signal);
           // What a server returns is data from outside, never instructions.
           const body = spill(r.text, { dir: ctx.dir, max: ctx.maxOutput, label: t.name, tail: 0.3 });

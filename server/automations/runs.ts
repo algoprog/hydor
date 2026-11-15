@@ -28,6 +28,8 @@ export interface RunRow {
   notified: number;
   error: string | null;
   rerun_of: string | null;
+  /** 1: a test that sends nothing (calls that act outside are held as "would have sent", server/outbox). */
+  dry?: number | null;
   /** The template run it started (a task that runs a template). */
   app_run: string | null;
 }
@@ -47,6 +49,7 @@ export function migrateRuns(db: DB) {
   create table if not exists hook_deliveries (task_id text not null, delivery text not null, run_id text, at integer not null, primary key (task_id, delivery));`);
   const cols = new Set((db.prepare('pragma table_info(task_runs)').all() as { name: string }[]).map((c) => c.name));
   if (!cols.has('app_run')) db.exec('alter table task_runs add column app_run text');
+  if (!cols.has('dry')) db.exec('alter table task_runs add column dry integer');
   db.exec('create index if not exists task_runs_app on task_runs(app_run)');
 }
 
@@ -66,18 +69,20 @@ export function toRun(r: RunRow): TaskRun {
     rerunOf: r.rerun_of ?? undefined,
     hasInput: !!r.input,
     ...(r.app_run ? { appRun: r.app_run } : {}),
+    ...(r.dry ? { dry: true } : {}),
   };
 }
 
-export function startRun(db: DB, r: { taskId: string; trigger: RunTrigger; input: string; rerunOf?: string }): string {
+export function startRun(db: DB, r: { taskId: string; trigger: RunTrigger; input: string; rerunOf?: string; dry?: boolean }): string {
   const id = crypto.randomBytes(8).toString('hex');
-  db.prepare(`insert into task_runs (id, task_id, trigger, started_at, status, input, rerun_of) values (?, ?, ?, ?, 'running', ?, ?)`).run(
+  db.prepare(`insert into task_runs (id, task_id, trigger, started_at, status, input, rerun_of, dry) values (?, ?, ?, ?, 'running', ?, ?, ?)`).run(
     id,
     r.taskId,
     r.trigger,
     Date.now(),
     r.input.slice(0, MAX_INPUT),
     r.rerunOf ?? null,
+    r.dry ? 1 : null,
   );
   if (r.taskId) {
     // The oldest go once a task has many.
