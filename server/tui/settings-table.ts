@@ -168,6 +168,16 @@ row('general', 'Start when this computer starts', 'switch', {
   write: put('/api/startup', (v) => ({ on: v })),
   note: 'Changing it needs a service of your user (or passwordless sudo for a system service); Docker’s restart policy decides there.',
 });
+row('general', 'Keep the computer awake', 'choice', {
+  choices: [
+    { value: 'tasks', label: 'While agents work and before scheduled tasks' },
+    { value: 'working', label: 'While agents work' },
+    { value: 'never', label: 'Never' },
+  ],
+  read: rd('/api/keep-awake', 'mode'),
+  write: put('/api/keep-awake', (v) => ({ mode: v })),
+  note: 'Only in the desktop apps. The screen can still turn off, and closing a laptop’s lid still puts it to sleep.',
+});
 row('general', 'Update automatically', 'switch', {
   read: { endpoint: '/api/bootstrap', pick: (d) => (d.update ? !!(d.update.auto && d.update.canRestart) : undefined) },
   write: put('/api/update/auto', (v) => ({ on: v })),

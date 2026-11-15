@@ -3,9 +3,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { CircleHelp } from 'lucide-react';
 import { isLang, LANGS } from '@shared/i18n';
-import type { RetentionSettings, StartupState, UpdateState } from '@shared/types';
+import type { KeepAwakeMode, KeepAwakeState, RetentionSettings, StartupState, UpdateState } from '@shared/types';
 import { api, post, put } from '../../lib/api';
 import { ago, MOD } from '../../lib/format';
+import { go } from '../../lib/nav';
 import { toast, toastError, useApp, useUI } from '../../lib/store';
 import { Button, cx, Throbber, Segmented, Switch } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
@@ -64,6 +65,7 @@ export function GeneralSettings() {
       </Group>
       <Group title="Startup and updates">
         <StartupSetting />
+        <KeepAwakeSetting />
         <AutoUpdateSetting />
         <VersionRow />
       </Group>
@@ -351,6 +353,72 @@ function StartupSetting() {
             }}
           />
         )
+      }
+    />
+  );
+}
+
+/**
+ * The desktop apps keep the computer from going to sleep by itself while agents work and, by default, from a few minutes
+ * before a scheduled run until it starts (the server decides, the app holds the system's blocker). Only where the server
+ * runs inside a desktop app: the row stays out elsewhere.
+ */
+function KeepAwakeSetting() {
+  const [st, setSt] = useState<KeepAwakeState | null>(null);
+  useEffect(() => {
+    api<KeepAwakeState>('/api/keep-awake').then(setSt, () => setSt(null));
+  }, []);
+  if (!st?.available) return null;
+  const save = (mode: KeepAwakeMode) => {
+    const was = st;
+    setSt({ ...st, mode });
+    put<KeepAwakeState>('/api/keep-awake', { mode }).then(setSt, (e) => (setSt(was), toastError(e)));
+  };
+  const at = st.next ? new Date(st.next.at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) : '';
+  const hint = !st.awake
+    ? 'The screen can still turn off; closing a laptop’s lid still puts it to sleep'
+    : st.working > 0
+      ? 'Awake now: agents are working'
+      : st.next
+        ? `Awake now: a scheduled task is due at ${at}`
+        : 'Awake now';
+  const guide = '/guide/devices#use-other-machines-from-one-app';
+  return (
+    <Row
+      label="Keep the computer awake"
+      hint={hint}
+      info={
+        <>
+          <p>It does not go to sleep by itself while an agent works (scheduled runs, app runs, subagents and experiments too), nor from a few minutes before a scheduled task is due until its run starts. Watchers that look every few minutes do not keep it awake on their own.</p>
+          <p>The screen can still turn off. Closing a laptop’s lid still puts it to sleep: your computer’s system decides that, not the app. For work that must run at any hour, use a computer that stays on, such as a desktop or a server, and reach it from here.</p>
+          <p>
+            <a
+              href={guide}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                e.preventDefault();
+                go(guide);
+              }}
+              className="text-fg underline decoration-fg-3/40 underline-offset-2 hover:decoration-fg/60"
+            >
+              Other machines and remote access
+            </a>
+          </p>
+        </>
+      }
+      control={
+        <Select<KeepAwakeMode>
+          label="Keep the computer awake"
+          wide
+          width={320}
+          value={st.mode}
+          onChange={save}
+          options={[
+            { value: 'tasks', label: 'While agents work and before scheduled tasks', hint: 'From a few minutes before a task is due until its run starts' },
+            { value: 'working', label: 'While agents work', hint: 'Scheduled tasks run when the computer is awake' },
+            { value: 'never', label: 'Never', hint: 'The computer sleeps as its own settings say' },
+          ]}
+        />
       }
     />
   );

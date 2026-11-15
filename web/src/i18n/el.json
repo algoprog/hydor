@@ -23499,5 +23499,22 @@
 "macOS’s sandbox cannot run here, so commands run without one":"Το απομονωμένο περιβάλλον του macOS δεν μπορεί να τρέξει εδώ, οπότε οι εντολές τρέχουν χωρίς αυτό",
 "sandbox bubblewrap seatbelt macos windows low integrity security commands":"απομόνωση bubblewrap seatbelt macos windows χαμηλή ακεραιότητα ασφάλεια εντολές",
 "The sandbox cannot run here, so commands run without one":"Το απομονωμένο περιβάλλον δεν μπορεί να τρέξει εδώ, οπότε οι εντολές τρέχουν χωρίς αυτό",
-"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"Απενεργοποιήστε το αν κάποιο εργαλείο πρέπει να γράψει αλλού, για παράδειγμα για να εγκαταστήσει κάτι σε όλο το σύστημα. Η Πλήρης πρόσβαση δεν χρησιμοποιεί αυτό το απομονωμένο περιβάλλον ούτε ζητά έγκριση."
+"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"Απενεργοποιήστε το αν κάποιο εργαλείο πρέπει να γράψει αλλού, για παράδειγμα για να εγκαταστήσει κάτι σε όλο το σύστημα. Η Πλήρης πρόσβαση δεν χρησιμοποιεί αυτό το απομονωμένο περιβάλλον ούτε ζητά έγκριση.",
+"Awake now":"Σε εγρήγορση τώρα",
+"Awake now: a scheduled task is due at {0}":"Σε εγρήγορση τώρα: μια προγραμματισμένη εργασία ξεκινά στις {0}",
+"Awake now: agents are working":"Σε εγρήγορση τώρα: πράκτορες εργάζονται",
+"From a few minutes before a task is due until its run starts":"Από λίγα λεπτά πριν από την ώρα μιας εργασίας μέχρι να ξεκινήσει η εκτέλεσή της",
+"In the desktop apps, the computer does not go to sleep by itself while agents work and before scheduled tasks":"Στις εφαρμογές υπολογιστή, ο υπολογιστής δεν πέφτει μόνος του σε αναστολή όσο εργάζονται πράκτορες και πριν από προγραμματισμένες εργασίες",
+"It does not go to sleep by itself while an agent works (scheduled runs, app runs, subagents and experiments too), nor from a few minutes before a scheduled task is due until its run starts. Watchers that look every few minutes do not keep it awake on their own.":"Δεν πέφτει μόνος του σε αναστολή όσο εργάζεται ένας πράκτορας (και προγραμματισμένες εκτελέσεις, εκτελέσεις εφαρμογών, υποπράκτορες και πειράματα), ούτε από λίγα λεπτά πριν από την ώρα μιας προγραμματισμένης εργασίας μέχρι να ξεκινήσει η εκτέλεσή της. Οι παρακολουθήσεις που κοιτάζουν κάθε λίγα λεπτά δεν τον κρατούν μόνες τους σε εγρήγορση.",
+"Keep the computer awake":"Ο υπολογιστής σε εγρήγορση",
+"Keep the computer awake is one of {0}":"Η ρύθμιση «Ο υπολογιστής σε εγρήγορση» είναι ένα από: {0}",
+"Never":"Ποτέ",
+"Other machines and remote access":"Άλλα μηχανήματα και απομακρυσμένη πρόσβαση",
+"Scheduled tasks run when the computer is awake":"Οι προγραμματισμένες εργασίες εκτελούνται όταν ο υπολογιστής είναι ξύπνιος",
+"sleep awake caffeinate prevent sleep laptop lid power battery scheduled task overnight mac windows linux desktop app":"αναστολή ύπνος εγρήγορση ξύπνιος αποτροπή αναστολής φορητός καπάκι ρεύμα μπαταρία προγραμματισμένη εργασία νύχτα mac windows linux εφαρμογή υπολογιστή",
+"The computer sleeps as its own settings say":"Ο υπολογιστής πέφτει σε αναστολή όπως λένε οι δικές του ρυθμίσεις",
+"The screen can still turn off; closing a laptop’s lid still puts it to sleep":"Η οθόνη μπορεί ακόμη να σβήσει· αν κλείσετε το καπάκι ενός φορητού, πέφτει πάλι σε αναστολή",
+"The screen can still turn off. Closing a laptop’s lid still puts it to sleep: your computer’s system decides that, not the app. For work that must run at any hour, use a computer that stays on, such as a desktop or a server, and reach it from here.":"Η οθόνη μπορεί ακόμη να σβήσει. Αν κλείσετε το καπάκι ενός φορητού, πέφτει πάλι σε αναστολή: αυτό το αποφασίζει το σύστημα του υπολογιστή σας, όχι η εφαρμογή. Για εργασία που πρέπει να τρέχει οποιαδήποτε ώρα, χρησιμοποιήστε έναν υπολογιστή που μένει ανοιχτός, όπως έναν επιτραπέζιο ή έναν διακομιστή, και χρησιμοποιήστε τον από εδώ.",
+"While agents work":"Όσο εργάζονται πράκτορες",
+"While agents work and before scheduled tasks":"Όσο εργάζονται πράκτορες και πριν από προγραμματισμένες εργασίες"
 }

@@ -18,7 +18,7 @@ A task can start:
 
 A task can also run one of your apps in place of a prompt: each time its trigger fires, the app runs with the answers you set, and the task's history links to that run (see [Run an app by itself](/guide/apps#run-an-app-by-itself)).
 
-Times are in your time zone, which the app takes from your browser. A run that could not start at its time, because the computer was off or the app was not running, runs at the next chance.
+Times are in your time zone, which the app takes from your browser. A run that could not start at its time, because the computer was off or asleep or the app was not running, runs at the next chance.
 
 Your tasks are in [Settings → Scheduled tasks](/settings?s=tasks) (**Settings → Agents → Scheduled tasks**). The search box (Ctrl+K, ⌘K on a Mac) also finds a task by its name and opens it there. There are five ways to make one:
 
@@ -86,6 +86,8 @@ Each run's first message carries more than your prompt: a line naming the task, 
 - **Once**: a date and time (an hour from now to start with). After its run the task turns itself off but stays in the list: you can run it again with **Run now**, or delete it.
 - **Watch**: see [Watch for a change](/guide/tasks#watch-for-a-change).
 - **Webhook**: see [Start runs from another service with a webhook](/guide/tasks#start-runs-from-another-service-with-a-webhook).
+
+In the desktop apps, the computer doesn't go to sleep by itself from a few minutes before a run is due until it starts, nor while it works (see [Keep the computer awake](/guide/app#keep-the-computer-awake)); a watcher's looks don't keep it awake. Closing a laptop's lid still puts it to sleep, and a computer that is asleep at the time runs the task once it wakes. For runs that must happen at any hour, use a computer that stays on.
 
 ### Each run
 
