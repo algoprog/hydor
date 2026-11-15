@@ -16,7 +16,7 @@ An agent can hold:
 - **What it thinks with**: Automatic, or a tier (Quick, Standard, Best or Max) whose model you set once for each program (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
 - **Its team**: the other agents it may hand parts of its work to, and whether other agents may hand it work (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
 - **A monthly budget**: what its sessions may spend in a month (see [A monthly budget](#a-monthly-budget)).
-- **What it hands back**: the fields of each result, checked, and where each goes: a file, the Library, a webhook, a notification (see [What an agent hands back](#what-an-agent-hands-back)).
+- **What it hands back**: the fields of each result, checked, and where each goes: a page in the Library, a row in a spreadsheet, an email to people, a notification, a file, a webhook (see [What an agent hands back](#what-an-agent-hands-back)).
 - **A conversation of its own**: it can keep one conversation, with an inbox for messages from you and other agents, where its scheduled runs post too (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 - **What it may use**: reading files, creating and changing files, running commands, using the web, and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills it loads before it starts when they fit the task (see [Skills](/guide/skills)).
@@ -42,7 +42,7 @@ Click a card for the agent's own page:
 - **All settings** opens every setting in the editor (see [All settings](#all-settings)). **Duplicate** makes a copy to change; **Delete** removes one of yours.
 - **Schedules** lists the scheduled tasks that run as it, with **Add a schedule**.
 - **Inbox**, for an agent that keeps a conversation of its own: its messages and their answers, a box to send it one, and **Its conversation** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
-- **What it handed back**, for an agent with fields or places for its results: its latest results, each with where it went (see [What an agent hands back](#what-an-agent-hands-back)).
+- **What it handed back**, for an agent with fields or places for its results: a table of its results, one row for each, with where each went (see [What an agent hands back](#what-an-agent-hands-back)).
 - **This month**: how many sessions started as it and what they spent, against its budget when it has one; and its **Recent sessions**, each opening its conversation.
 
 ## The built-in agents
@@ -304,12 +304,22 @@ Without anything set, an agent hands back its reply in the conversation. Give it
 
 - **Fields of each result**: a name and a kind for each (text, long text, number, yes or no, date, link, list, or table with its columns), and whether it is required. The agent fills them in with its hand_back tool; a result that does not fit goes back to it with what to fix.
 - **Where each result goes**, besides the conversation:
-  - **A page in the Library**, named after the agent and the day, in its project when it works in one;
+  - **A page in the Library**: **The same page, updated** (the one new agents get): its first run makes a page named after the agent, in its project when it works in one, and each run after puts a new version of that page, so you always open the latest and the earlier ones wait in its versions. A page you rename keeps its name. Pick **A new page each run** instead for a page of its own each time, named after the agent and the day (agents made before this choice keep doing so).
+  - **A row in a spreadsheet**: each run adds one row to the same spreadsheet in the Library: a **Date** column for when it ran, then a column for each field, in the fields' order. Numbers go in as numbers, dates as dates and links as links, so totals, formulas and charts work on them; a list or a table goes in one cell as readable text ("milk; eggs"). Leave the spreadsheet as **A new one** and the first run makes one named after the agent, or pick one of yours and the tab it goes in (a tab not there is added). See [A row in a spreadsheet](#a-row-in-a-spreadsheet).
+  - **An email**: the result as an email to the people you name (one address or more), with a subject (`{date}`, `{time}` and `{agent}` fill in; left empty, the agent's name and the day), from one of your connected mail accounts (**From**; the first one if you pick none; see [Connected apps, keys and tools](/guide/connections#connect-your-email)). It reads well in any mail program, each field under its name, tables as tables. Since you chose the people here yourself, it goes out as soon as each result is ready, without waiting in the Outbox.
   - **A notification**, with the result's first line;
   - **A file in the folder it works in**, such as `reports/{date}.md`: `{date}`, `{time}` and `{agent}` fill in, a name ending in `.json` gets the fields as JSON and any other Markdown, and a path never leads out of the folder;
   - **A webhook**: the result as JSON in a POST to an https address, signed with a key from the vault when you name one, only to the hosts that key is allowed for (see [Connected apps, keys and tools](/guide/connections)).
 
-The agent's page lists **What it handed back**: its latest results, each with where it went and what could not go.
+What you type in these boxes counts once you leave the box or press Enter. The settings show the page and the spreadsheet its first run made, with a link to open them.
+
+### A row in a spreadsheet
+
+The columns are found by their headings in the table's first row, so the spreadsheet stays yours to arrange: move columns, restyle them (a column you format as euros stays in euros), and add columns of your own beside them. A formula in a column of your own (a running total, say) is carried down to each new row, as in a spreadsheet's table, and a chart that reads the rows so far takes in the new one too. Totals under the table get in the way of new rows: put them in a column of their own or on another tab, over whole columns (`=SUM(B:B)`). When you add a field to the agent later, it gets a new column at the end, and the old ones stay where they are; a heading you rename no longer matches its field, which then gets a new column (name the field the same to keep them together). Each run's row is a new version of the spreadsheet, as any change is, so its formulas, charts and comments stay as they were.
+
+### Its history of results
+
+The agent's page shows **What it handed back** as a table: a row for each result, newest first, with when it came, a column for each field, and where it went (**Went to**: a mark for each place, red where it could not go; point at one for what happened, click a Library one to open the page). Click a row to see the whole result, every field in full, with **Open its session**. The table scrolls, and **Show older** brings earlier results. An agent keeps its results for a year, up to 500 of them (a daily agent keeps a whole year; one that runs every hour about three weeks); a field too long to keep there says so, and is whole in the places it went. The Library page and the spreadsheet it fills show as links above the table.
 
 ## An agent with a conversation of its own
 
@@ -365,7 +375,7 @@ A session started without an agent (in VS Code or a terminal, or before agents c
 On an agent's page:
 
 - **Duplicate** (on every agent): opens the editor as a new agent with everything filled in and the name "*name* (copy)". Change what you like and **Save**. This is how you make your own version of a built-in.
-- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again.
+- **Delete** (your own only): asks "Delete *name*?" first. Sessions started as it keep going without its instructions; its schedules stay, as plain scheduled tasks; agents that could hand it work no longer list it. Projects that started their sessions as it are cleared of it: their sessions start as General (or the agent you pick) again. Its history of results goes with it; the pages and spreadsheets it filled stay in your Library.
 
 The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too; picking one opens its page.
 
@@ -454,6 +464,9 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Import my Claude Code agent file ~/.claude/agents/code-reviewer.md as an agent."
 - "Which agents do I have, what does each think with, and what did they spend this month?"
 - "Make my Paper scout hand back a list of papers, each with a title, a link and why it matters, as a page in the Library and a notification."
+- "Make my Bookkeeper add a row with this week's spending and its biggest items to my Household budget spreadsheet every Friday."
+- "Have my Weekly report agent email its report to maria@example.com every Monday, with the subject Weekly report {date}."
+- "What did my Bookkeeper hand back this month, and how much did it add up to?"
 - "Let my Docs keeper keep one conversation of its own, and send it: update the guide for the new Agents page."
 - "Switch my session about the Lisbon trip to the Planner agent."
 - "Put new task folders in ~/Documents/Tasks from now on."

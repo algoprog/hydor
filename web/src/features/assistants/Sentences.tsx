@@ -267,7 +267,7 @@ export function AgentSentences({ a, editable, onChange, all, spaces, when }: Sen
       </Phrase>{' '}
       for help. It hands back{' '}
       <Phrase text={outputText(a.output)} editable={editable} title="What it hands back" width={400}>
-        {() => <OutputEditor value={a.output} onChange={(output) => onChange({ output })} />}
+        {() => <OutputEditor value={a.output} onChange={(output) => onChange({ output })} agent={a} />}
       </Phrase>
       . {a.budgetUsd ? 'It spends at most ' : 'It has '}
       <Phrase text={a.budgetUsd ? `$${a.budgetUsd}` : 'no monthly budget'} editable={editable} title="Its monthly budget" width={280}>

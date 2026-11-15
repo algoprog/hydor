@@ -462,7 +462,7 @@ test('hand_back: offered to an agent with an output; checked; then to a file, th
     instructions: 'Report.',
     output: {
       fields: [{ id: 'summary', label: 'Summary', type: 'markdown', required: true }, { id: 'count', label: 'Count', type: 'number', required: true }],
-      to: [{ kind: 'file', path: 'out/{date}.md' }, { kind: 'file', path: 'out/last.json' }, { kind: 'library' }, { kind: 'webhook', url: 'https://127.0.0.1/hook' }, { kind: 'notify' }],
+      to: [{ kind: 'file', path: 'out/{date}.md' }, { kind: 'file', path: 'out/last.json' }, { kind: 'library', each: 'new' }, { kind: 'webhook', url: 'https://127.0.0.1/hook' }, { kind: 'notify' }],
     },
   });
   const plain = saveAssistant(db, { name: 'Plain', instructions: 'Nothing to hand back.' });
