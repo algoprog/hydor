@@ -69,7 +69,8 @@ when this computer starts**).
   menu bar, or ⌘⇧Esc) stops it. The permissions carry over when the app updates: macOS ties them to the app's
   signature, and every version since 0.28.1 is signed with the same certificate. Coming from an earlier version, give
   them once more: **Allow…** clears the old switch first.
-- Not in the Mac app yet: **Run code** steps in apps and the agent sandbox need Linux's bubblewrap.
+- Not in the Mac app yet: **Run code** steps in apps need Linux's bubblewrap. The agent sandbox works on the Mac (it
+  uses Seatbelt, which comes with macOS).
 
 Opened from the disk image or the Downloads folder, the app offers to move itself to Applications, where it can
 update itself.
@@ -101,8 +102,8 @@ General → **Start when this computer starts**).
   Computer use (nothing to allow in Windows). Each session asks you first; a glow lines the screen while an agent
   works, and **Esc** (or **Stop** from the icon in the notification area) stops it. Programs running as
   administrator are out of its reach.
-- Not in the Windows app yet: the agent sandbox and **Run code** steps in apps (they need macOS or
-  Linux), local voice transcription, and the figures on the System page.
+- Not in the Windows app yet: **Run code** steps in apps (they need Linux's bubblewrap), local voice
+  transcription, and the figures on the System page.
 
 ## The Linux app
 

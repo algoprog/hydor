@@ -11,8 +11,32 @@ import type { WebFeature } from '../registry';
 interface CustomSettingsView {
   sandbox: boolean;
   goalRounds: number;
-  /** bubblewrap works on this machine. */
+  /** A sandbox for commands works on this machine (named when it was bubblewrap alone). */
   bwrap: boolean;
+  /** Which one (a server before 0.66 sends neither this nor platform: it is bubblewrap there). */
+  sandboxKind?: 'bwrap' | 'seatbelt' | 'lowbox' | null;
+  platform?: string;
+}
+
+/** The words beside the sandbox switch, for the sandbox this machine has, or the reason it has none. */
+function sandboxWords(st: CustomSettingsView | null): { hint: string; info: string } {
+  const off = 'Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.';
+  if (st && !st.bwrap) {
+    if (st.platform === 'darwin') return { hint: 'macOS’s sandbox cannot run here, so commands run without one', info: 'It uses Seatbelt, the sandbox that comes with macOS (sandbox-exec). It could not start on this Mac.' };
+    if (st.platform === 'win32')
+      return {
+        hint: 'The sandbox cannot run here, so commands run without one',
+        info: 'It needs Git for Windows and the .NET Framework that comes with Windows, to build its small helper the first time. One of them is missing here, or the helper could not start.',
+      };
+    return { hint: 'bubblewrap is not installed here, or cannot run, so commands run without one', info: 'Install bubblewrap (bwrap) to use a sandbox. Some containers cannot run it.' };
+  }
+  if (st?.sandboxKind === 'seatbelt') return { hint: 'In Auto mode, commands change files only in the session’s folder and the temporary folders', info: `It uses Seatbelt, the sandbox that comes with macOS. ${off}` };
+  if (st?.sandboxKind === 'lowbox')
+    return {
+      hint: 'In Auto mode, commands change files only in the session’s folder and a temporary folder of their own',
+      info: `Commands run at low integrity, a protection Windows has: the session’s folder is marked once so they may change files in it, and they can only read the rest. Your home folder, a whole drive and system folders are never marked: there, commands run without the sandbox. ${off}`,
+    };
+  return { hint: 'In Auto mode, commands change files only in the session’s folder and /tmp', info: `It uses bubblewrap. ${off}` };
 }
 
 function CustomSettings() {
@@ -43,12 +67,8 @@ function CustomSettings() {
         />
         <Row
           label="Sandbox for commands"
-          hint={st && !st.bwrap ? 'bubblewrap is not installed here, or cannot run, so commands run without one' : 'In Auto mode, commands change files only in the session’s folder and /tmp'}
-          info={
-            st && !st.bwrap
-              ? 'Install bubblewrap (bwrap) to use a sandbox. Some containers cannot run it.'
-              : 'It uses bubblewrap. Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.'
-          }
+          hint={sandboxWords(st).hint}
+          info={sandboxWords(st).info}
           control={st ? <Switch on={st.sandbox} onChange={(on) => void save({ sandbox: on })} label="Sandbox for commands" disabled={!st.bwrap} /> : wait}
         />
       </Group>

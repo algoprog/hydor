@@ -25,7 +25,7 @@ import { runningOf } from './procs.ts';
 import { findSkills, MODES, projectOf, promptParts, scaleParts, type AppContext, type Mode, type Skill } from './prompt.ts';
 import { adapt, checkArgs, cleanPath, closeNames, findTool, fitArgs, repairJson } from './repair.ts';
 import { autoReview } from './review.ts';
-import { CONFIDENTIAL_ENV, confidentialSession, NET_NOTE, netRefused, SANDBOX_NOTE, sandboxShell } from './sandbox.ts';
+import { CONFIDENTIAL_ENV, confidentialSession, NET_NOTE, netRefused, SANDBOX_NOTE, sandboxShell, wallsHit } from './sandbox.ts';
 import { checkCommand } from './shell.ts';
 import { beforeEdit, snapDir } from './snapshots.ts';
 import { spill, sweep } from './spill.ts';
@@ -747,7 +747,7 @@ async function execute(s: Session, p: Prepared, guard: Guard, base: Omit<ToolCtx
     const loaded = tool.name === 'skill' && r.ok && args.name ? base.skills.find((x) => x.name.toLowerCase() === String(args.name).trim().toLowerCase())?.name : undefined;
     if (loaded) s.skillsUsed = [...(s.skillsUsed ?? []).filter((n) => n !== loaded), loaded].slice(-5);
     guard.after(tool.name, args, r.ok, tool.name === 'bash' && checkCommand(String(args.command ?? ''), s.cwd).parts.every((x) => x.safe));
-    if (shell && /Read-only file system/.test(r.output)) r.output += SANDBOX_NOTE;
+    if (shell && wallsHit(r.output)) r.output += SANDBOX_NOTE;
     if (shell && conf && netRefused(r.output)) r.output += NET_NOTE;
     update(s.id, { sessionUpdate: 'tool_call_update', toolCallId: c.id, status: r.ok ? 'completed' : 'failed', content: r.content ?? [{ type: 'content', content: { type: 'text', text: clip(r.output, 20_000) } }] });
     // Output a tool did not keep short itself goes to a file, its start and end to the model.

@@ -64,7 +64,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
 - **Confidential sessions** (Options → Confidential): for a submission you review, patient data or a client's code. The
   session runs on Custom with a model on this computer or your private network; web search, the browser, connected
   apps, apps and models elsewhere are off (an allowlist of tools, so new ones stay off too); its commands run without
-  network (bubblewrap), or ask each time where that can't be done; its title, notices and memory send nothing out; a
+  network (bubblewrap on Linux, Seatbelt on a Mac), or ask each time where that can't be done (Windows, some containers); its title, notices and memory send nothing out; a
   lock and a calm tint show it. Enforced on the server, not only in the page.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode,
   Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own). Their approvals become approval cards you can answer
@@ -979,7 +979,7 @@ Custom is the app's own agent, for models beyond Claude Code's and Codex's. Its 
 edits and searches files, runs commands, keeps a plan, loads skills, uses the MCP servers set up for Claude
 Code and for Codex (and the project's `.mcp.json`), asks before edits and commands (or not, by mode), and condenses a
 long conversation to stay within the model's context. In Auto mode routine steps go ahead and a quick check asks you
-about risky ones, and commands can run in a sandbox that lets them change files only in the folder and /tmp. Forks,
+about risky ones, and commands can run in a sandbox that lets them change files only in the folder and the temporary folders (bubblewrap on Linux, Seatbelt on a Mac; on Windows, low integrity, with the folder marked once and a temporary folder of their own). Forks,
 "Edit from here" (with the files put back) and `/goal` work for it as they do for Claude Code and Codex.
 
 - **A helper for anything**: research, writing, documents and everyday tasks, with an engineer's habits in a code

@@ -3,6 +3,20 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.66.0 · 15 November 2026
+
+Custom's sandbox for commands now works on a Mac and on Windows too, and a Claude Code session no longer stays
+"working" after its turn ended when its model is switched.
+
+- **The sandbox for commands on a Mac and on Windows**: in Auto mode, Custom's commands can change files only in the
+  session's folder and the temporary folders, everywhere Hydor runs. On a Mac it uses Seatbelt, the sandbox that comes
+  with macOS, which also keeps a confidential session's commands off the network. On Windows commands run at low
+  integrity, a protection Windows has: they can read everything but change files only in the session's folder, which
+  Hydor marks for it the first time, and in a temporary folder of their own; your home folder, a whole drive and
+  system folders are never marked. Before, the sandbox needed bubblewrap, so it worked on Linux only.
+- **Sessions that finished show as finished**: a Claude Code session whose model was switched after its turn ended
+  showed as working until the app restarted. What the model switch prints no longer counts as a new turn.
+
 ## 0.65.0 · 14 November 2026
 
 Compare products asks which of the options it found to compare as choices you tick, reads what you add in your own
