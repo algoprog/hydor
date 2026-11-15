@@ -97,7 +97,8 @@ with any model, and a strong model can lead cheaper subagents. Each comparison h
   request from a script, and does everything the app does (sessions, projects, agents, memory, skills, keys, every
   setting…), with Tab completion for bash, zsh and fish.
 - **Your choice of permissions**: approvals for risky steps, Auto mode that checks them, a command sandbox, or Full
-  access when you want none of it.
+  access when you want none of it. And whatever the mode, a connected account's tools that send, post, delete or pay
+  can be set to Ask first: each call waits in your Outbox, as a draft you can change, until you send it.
 - **English, Chinese and Greek.**
 
 See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.

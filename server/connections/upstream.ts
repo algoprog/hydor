@@ -18,7 +18,18 @@ export interface Rpc {
 export interface ToolInfo {
   name: string;
   description?: string;
+  /** MCP's hints (readOnlyHint, destructiveHint…) and its input's schema: kept, to tell tools that act outside and to show a held call's fields. */
+  annotations?: Record<string, unknown>;
+  inputSchema?: Record<string, unknown>;
 }
+
+/** A tools/list entry as kept: its name, description, hints and input schema. */
+const toolInfo = (t: ToolInfo): ToolInfo => ({
+  name: String(t.name),
+  description: t.description ? String(t.description) : undefined,
+  ...(t.annotations && typeof t.annotations === 'object' ? { annotations: t.annotations } : {}),
+  ...(t.inputSchema && typeof t.inputSchema === 'object' ? { inputSchema: t.inputSchema } : {}),
+});
 
 /** The app refused the sign-in (401): renew it and try again, or ask the person to connect again. */
 export class Unauthorized extends Error {}
@@ -298,7 +309,7 @@ export async function httpTools(url: string, headers: Record<string, string>, ti
     if (!cursor) break;
   }
   if (init.sessionId) void fetch(url, { method: 'DELETE', headers: { 'mcp-session-id': init.sessionId, ...headers }, redirect: 'manual' }).catch(() => {});
-  return { tools: tools.map((t) => ({ name: String(t.name), description: t.description ? String(t.description) : undefined })), server: r0.result?.serverInfo?.name };
+  return { tools: tools.map(toolInfo), server: r0.result?.serverInfo?.name };
 }
 
 /** The same over the older SSE transport. */
@@ -317,7 +328,7 @@ export async function sseTools(url: string, headers: Record<string, string>, tim
       cursor = r?.result?.nextCursor;
       if (!cursor) break;
     }
-    return { tools: tools.map((t) => ({ name: String(t.name), description: t.description ? String(t.description) : undefined })), server: init?.result?.serverInfo?.name };
+    return { tools: tools.map(toolInfo), server: init?.result?.serverInfo?.name };
   } finally {
     link.close();
   }
@@ -382,7 +393,7 @@ export function stdioTools(o: { command: string; args: string[]; env: Record<str
           cursor = r.nextCursor;
           if (!cursor) break;
         }
-        finish(null, { tools: tools.map((t) => ({ name: String(t.name), description: t.description ? String(t.description) : undefined })), server: init.serverInfo?.name });
+        finish(null, { tools: tools.map(toolInfo), server: init.serverInfo?.name });
       } catch (e) {
         finish(e as Error);
       }

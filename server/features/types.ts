@@ -113,6 +113,11 @@ export interface SpawnAdditions {
   skillRoots?: string[];
   /** Tools it may not use (an assistant's limits), as Claude Code names them ("Bash", "mcp__server__tool"); Codex gets the MCP ones. */
   disallowedTools?: string[];
+  /**
+   * Tools it may use without its program asking first, as Claude Code names them ("mcp__server__tool"): a connected
+   * account's tools on Ask first, whose calls Hydor holds for the person's OK in the Outbox anyway.
+   */
+  allowedTools?: string[];
   /** Claude Code: only the MCP servers the app gives it (--strict-mcp-config), none of the user's own. */
   strictMcp?: boolean;
   /** Codex: more settings for its thread ({ web_search: "disabled" }). */

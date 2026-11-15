@@ -247,6 +247,8 @@ The buttons come from the agent:
 
 **Deny** first opens a box, "Optional: tell the agent what to do instead"; press **Deny** again to send, with or without a note. (Custom's **Reject** and Codex's **Deny and stop** answer at once.)
 
+A connected account's tool you set to **Ask first** doesn't ask in the session: the call is held in the Outbox and the agent goes on. A line in the conversation says **Waits for your OK in the Outbox**, and later whether it was sent or dropped ([The Outbox](/guide/inbox#the-outbox-calls-held-for-your-ok)).
+
 In Claude Code's **Auto** mode, the safety check can refuse a command outright instead of asking. A card above the message box then says "Claude blocked a command" and why. **Approve & retry** switches the session to Ask and has the agent run it again, so it comes back to you as a normal approval; **Dismiss** leaves it.
 
 ## Answer questions and approve plans

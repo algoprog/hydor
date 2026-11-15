@@ -1,6 +1,6 @@
 # Inbox and notifications
 
-Agents work on their own, but now and then they need you: an approval, an answer, a form, a key. This topic covers the inbox, which gathers everything waiting on you from every session and machine so you can answer it in one place, and the notifications that tell you when a session finishes, fails or needs you, in the app, on your computer or on a phone with the app closed.
+Agents work on their own, but now and then they need you: an approval, an answer, a form, a key, or your OK before something goes out. This topic covers the inbox, which gathers everything waiting on you from every session and machine so you can answer it in one place, its Outbox of calls held for your OK, and the notifications that tell you when a session finishes, fails or needs you, in the app, on your computer or on a phone with the app closed.
 
 ![The inbox: what waits on you, from every session](images/inbox.webp)
 
@@ -25,6 +25,7 @@ Everything an agent is waiting on you for, from every session on this machine, i
 - **A session waiting for you elsewhere**: "Waiting for you in VS Code" (or in a terminal), for sessions running outside the app.
 - **An app's question**: a run of one of your apps waiting at an **Ask a person** step.
 - **A comment from someone you shared a project or a thing with**: "Maria commented on “Thesis, chapter 3”", with what they wrote, until you or an agent reply or it is resolved. **Open** opens the document, the picture, the video or the sound.
+- **Calls held in the Outbox**: an agent called a connected account's tool you set to Ask first, such as one that sends an email. They come first, under **Outbox**.
 
 Each item shows which session it waits in (with the agent's icon) and how long it has waited.
 
@@ -38,6 +39,29 @@ Approvals, questions and forms show as the same card you see in the session, so 
 - **A form from a service** shows the service's message and its fields. Fill them in and click **Send**, or **Decline**, or **Not now**. A form with nothing to fill in asks **Allow** instead of **Send**. When the service asks you to open a page, **Open it** opens it in a new tab.
 
 Once answered, the item leaves the inbox and the agent goes on. What each choice means is explained in [Approve or deny what the agent wants to do](/guide/sessions#approve-or-deny-what-the-agent-wants-to-do) and [Answer questions and approve plans](/guide/sessions#answer-questions-and-approve-plans).
+
+## The Outbox: calls held for your OK
+
+When an agent calls a connected account's tool you set to **Ask first** ([Connected apps, keys and tools](/guide/connections#ask-first-calls-that-wait-for-your-ok)), the call isn't made. It waits at the top of the inbox, under **Outbox**, one card per call, until you send it or drop it. The agent didn't wait for you: it was told at once that the call waits for your OK.
+
+Each card shows:
+
+- the account and the tool ("Gmail · send_email"), and how long it has waited;
+- **Held for your OK**, the agent's icon and the session it came from (click the session's name to open it), and the scheduled task, when a task's run made the call;
+- what the tool does, in the service's words;
+- the call as a form you can change. An email shows **To**, **Cc**, **Subject** and **Body**; a chat message where it goes and its **Text**; a post its **Text**. Other tools show their own fields, with a red * on the ones the tool needs. Several addresses go in one field, separated by commas.
+
+Then:
+
+- **Send** makes the call with what the form holds now. Hydor makes it itself, even when the agent has long finished. The card leaves the inbox and a notice says it was sent.
+- **Drop** throws the call away: it is never made.
+- **Send all**, above a session's cards when it holds more than one, sends them all as they are, in the order they were held.
+
+If the service answers with an error, the card stays, with **It did not go:** and the reason, and **Send again**. Held calls wait over restarts, and are kept for 30 days.
+
+In the session, a line marks where the call was held: **Waits for your OK in the Outbox**, with **Open the Outbox**. Once you decide, it says **Sent with your OK**, with the start of the service's answer, or **Dropped: not sent**. When you write to the session again, its agent hears what became of its calls.
+
+A held call notifies you like an approval does, in the app, on your computer and on your phone: "Waits for your OK in the Outbox: …". Tap it to open the inbox, where you can read the draft, change it and send it from the phone.
 
 ## Open the rest where it waits
 
@@ -59,7 +83,7 @@ A machine that can't send its list (one running an older version, for example) s
 
 A small number on the corner of the inbox button counts the sessions waiting for your approval or answer: on this machine, and on your other machines that are online. Past 99 it shows **99+**. Point at the button to read "Inbox: 3 waiting on you".
 
-The number counts sessions, not items, so a session with two approvals counts once. Some things in the inbox don't add to it: a key asked for, a browser that needs you, a skill to review.
+The number counts sessions, not items, so a session with two approvals counts once. Calls held in the Outbox add one each. Some things in the inbox don't add to it: a key asked for, a browser that needs you, a skill to review.
 
 ## The count in the browser tab
 
@@ -85,7 +109,8 @@ A notification's title is the session's name (cut short when it is long). Its te
   - for a plain yes-or-no approval, what the agent wants to do, with its first line ("Run a command: npm test");
   - otherwise "Needs your approval" or "Has a question for you";
   - for its browser, what the browser needs: "Needs you in the browser: …", "Stopped before paying: …", "Asks to open …" or "The page asks: …";
-  - for a session in VS Code or a terminal, "Waiting for you in VS Code", sent only if it still waits a minute later (you are likely right there).
+  - for a session in VS Code or a terminal, "Waiting for you in VS Code", sent only if it still waits a minute later (you are likely right there);
+  - for a call held in the Outbox, "Waits for your OK in the Outbox:", the account and tool, and who it goes to. Tapping it opens the inbox.
 - **Failed**, then the error.
 
 A session working on a goal says "Goal met: …" when the goal holds, and "The goal needs you: …" or "Goal paused: …" when it stops ([Give the session a goal](/guide/sessions#give-the-session-a-goal)).
@@ -123,6 +148,7 @@ When a session waits on a plain yes-or-no approval (a command, a file change or 
 - If the answer can't go through (the browser was signed out, or you already answered elsewhere), the session opens so you can answer there.
 - Tap the notification itself to open the session, in a window of the app that is already open when there is one.
 - A desktop app's notifications have no buttons: click one to open the session, and answer there.
+- A call held in the Outbox has no buttons either, so you read what would go out first: tap the notification and send it from the inbox.
 
 Approvals from your other machines can be answered the same way: the answer goes to that machine through this one.
 
@@ -132,5 +158,6 @@ Agents can read what waits on you and send a test notification. They can't answe
 
 - "What's waiting on me right now? Most urgent first."
 - "Which sessions are asking me for a key, and what for?"
+- "What's waiting in my Outbox? Read me the emails before I send them."
 - "Sum up what each waiting session needs from me, in a line each."
 - "Send a test notification so I can check my phone gets them."

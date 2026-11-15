@@ -138,7 +138,10 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   if (o.pageServer) servers[PAGE_SERVER] = { type: 'http', url: o.pageServer, timeout: TOOL_TIMEOUT_MS };
   // In a file only this user can read, not on the command line: its addresses carry the run's token.
   if (Object.keys(servers).length) args.push('--mcp-config', mcpConfigFile(o.sessionId, { mcpServers: servers }));
-  if (o.pageServer) args.push('--allowedTools', `mcp__${PAGE_SERVER}`);
+  // The page server's tools, and a connected account's tools on Ask first (Hydor holds their calls for your OK
+  // in the Outbox, so Claude Code asking first as well would only ask twice).
+  const allowed = [...(o.pageServer ? [`mcp__${PAGE_SERVER}`] : []), ...(o.add?.allowedTools ?? [])];
+  if (allowed.length) args.push('--allowedTools', allowed.join(','));
   if (o.add?.instructions.length) {
     const text = o.add.instructions.join('\n\n');
     // Windows takes command lines of 32,767 characters at most: there the instructions go in a file of their own.

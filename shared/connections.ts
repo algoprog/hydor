@@ -1,6 +1,7 @@
 // Connections: apps every agent can use, signed in once (Notion, Linear, GitHub…), from a catalog anyone
 // can add to with a pull request (catalog/connections/*.json), and the vault for keys. What the server
 // and the pages share. Secret values never travel in any of these: only masked hints.
+import type { ToolState } from './outbox.ts';
 
 export const CONNECTION_CATEGORIES = {
   docs: 'Notes & docs',
@@ -97,8 +98,13 @@ export interface ConnectionView {
   fields: Record<string, string>;
   /** The secret fields that are set (values stay in the vault). */
   secretFields: string[];
-  /** From the last test; `on` says whether agents get it. */
-  tools?: { name: string; description?: string; on: boolean }[];
+  /**
+   * From the last test; `on` says whether agents get it, `state` how (On, Ask first: held in the Outbox for your OK,
+   * Off), `outside` whether it sends, posts, deletes or pays.
+   */
+  tools?: { name: string; description?: string; on: boolean; state: ToolState; outside: boolean }[];
+  /** Tools that act outside and are On only because nobody chose for them (an account connected before Ask first): one click sets them to Ask first. */
+  askOffer?: string[];
   testedAt?: number;
   /** When the current sign-in ends (it renews by itself while it can). */
   expiresAt?: number;

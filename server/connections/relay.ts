@@ -3,10 +3,13 @@
 //
 //   POST /connections/mcp/<run token>/<app>      a remote app, through this server: it adds the sign-in
 //                                                (renewed as needed, so long sessions keep working), keeps
-//                                                only the tools that are on, masks known secrets in the
-//                                                answers, speaks the older SSE transport for apps still on
-//                                                it, and refuses an app turned off for the session. JSON in,
-//                                                JSON out.
+//                                                only the tools that are on, holds calls to those on Ask
+//                                                first in the Outbox (server/outbox), masks known secrets in
+//                                                the answers, speaks the older SSE transport for apps still
+//                                                on it, and refuses an app turned off for the session. JSON
+//                                                in, JSON out.
+//   POST /connections/gate/<run token>/<app>     a local app's tool call, from the bridge, before it is made:
+//                                                held (Ask first, a test that sends nothing) or let through.
 //   GET  /connections/launch/<run token>/<app>   a local app's command and environment, for the bridge
 //                                                (bridge.ts) that starts it for the agent.
 //   POST /connections/elicit/<run token>/<app>   a form a local app asks for mid-call, from the bridge:
@@ -25,8 +28,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
 import { runOf } from '../mcp.ts';
+import { askMarked, gateCall, heldResult, isDry } from '../outbox/index.ts';
 import { sessionExtra } from '../sessionExtra.ts';
-import { authHeaders, connection, localCommand, onFor, remoteUrl, setStatus, toolFilter, toolOn, type Conn } from './apps.ts';
+import { actsOutside } from '../../shared/outbox.ts';
+import { askTools, authHeaders, connection, localCommand, onFor, remoteUrl, setStatus, toolFilter, toolOn, toolState, type Conn } from './apps.ts';
 import { answerApp, askForm, withForms } from './forms.ts';
 import { isRequest, postHttp, SseLink, Unauthorized, type Rpc } from './upstream.ts';
 import { redact } from './vault.ts';
@@ -51,7 +56,27 @@ function launchSpec(d: Deps, token: string, app: string): { status: number; body
   if (!onFor(c, sessionExtra(d.db, live.key))) return { status: 403, body: { error: `${c.entry.name} is turned off for this session` } };
   const lc = localCommand(d.db, c);
   const f = toolFilter(c);
-  return { status: 200, body: { name: c.entry.name, command: lc.command, args: lc.args, env: lc.env, only: f?.only ?? null, skip: f?.skip ?? [], mask: lc.secrets } };
+  // `ask`: the tools on Ask first now, marked so in its list; `hold`: those whose calls are refused should the gate
+  // (which decides each call) be out of reach, with every tool that acts outside during a test that sends nothing.
+  const ask = askTools(c);
+  const hold = isDry(d.db, live.key) ? [...new Set([...ask, ...(c.tools ?? []).filter((t) => toolOn(c, t.name) && actsOutside(t)).map((t) => t.name)])] : ask;
+  return { status: 200, body: { name: c.entry.name, command: lc.command, args: lc.args, env: lc.env, only: f?.only ?? null, skip: f?.skip ?? [], mask: lc.secrets, ask, hold } };
+}
+
+/** A local app's tool call, before the bridge makes it: { hold: what the agent gets instead } when it is held, else {}. */
+function gateSpec(d: Deps, token: string, app: string, raw: string): { status: number; body: unknown } {
+  const runId = runOf(token);
+  const live = runId ? d.sessions.liveByRun(runId) : null;
+  const c = connection(d.db, app);
+  if (!runId || !live || !c) return { status: 404, body: { error: 'No session runs with that address' } };
+  let m: { name?: unknown; arguments?: unknown };
+  try {
+    m = JSON.parse(raw);
+  } catch {
+    return { status: 400, body: { error: 'Not JSON' } };
+  }
+  const held = gateCall(d, { key: live.key, conn: c, tool: String(m?.name ?? ''), args: m?.arguments });
+  return { status: 200, body: held ? { hold: held.text } : {} };
 }
 
 export function startLaunchSocket(d: Deps) {
@@ -64,6 +89,21 @@ export function startLaunchSocket(d: Deps) {
   const srv = http.createServer((req, res) => {
     const f = /^\/elicit\/([^/]+)\/([a-z0-9-]+)$/.exec(req.url ?? '');
     if (f && req.method === 'POST') return void elicitFromBridge(d, decodeURIComponent(f[1]), f[2], req, res);
+    const g = /^\/gate\/([^/]+)\/([a-z0-9-]+)$/.exec(req.url ?? '');
+    if (g && req.method === 'POST') {
+      let raw = '';
+      req.setEncoding('utf8');
+      req.on('data', (x: string) => {
+        raw += x;
+        if (raw.length > 8 * 1024 * 1024) req.destroy();
+      });
+      req.on('end', () => {
+        const r = gateSpec(d, decodeURIComponent(g[1]), g[2], raw);
+        res.writeHead(r.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        res.end(JSON.stringify(r.body));
+      });
+      return;
+    }
     const m = /^\/launch\/([^/]+)\/([a-z0-9-]+)$/.exec(req.url ?? '');
     const r = m && req.method === 'GET' ? launchSpec(d, decodeURIComponent(m[1]), m[2]) : { status: 404, body: { error: 'Not found' } };
     res.writeHead(r.status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
@@ -236,6 +276,12 @@ export function relayRoutes(d: Deps) {
       // A call to a tool that is off never reaches the app, answered or not (a call without an id is dropped).
       if (m.method === 'tools/call' && !toolOn(c, tool)) {
         if (isRequest(m)) replies.push({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${c.entry.name}'s ${tool} tool is turned off (Apps → Connected apps).` }], isError: true } });
+        continue;
+      }
+      // One on Ask first (or that acts outside, in a test that sends nothing) is held in the Outbox: the agent hears so at once.
+      const held = m.method === 'tools/call' ? gateCall(d, { key: run.key, conn: c, tool, args: m.params?.arguments }) : null;
+      if (held) {
+        if (isRequest(m)) replies.push({ jsonrpc: '2.0', id: m.id, result: heldResult(held.text) });
       } else forward.push(m);
     }
     let sessionId: string | undefined;
@@ -258,9 +304,11 @@ export function relayRoutes(d: Deps) {
         return fail(`${c.entry.name}: ${(e as Error).message}`);
       }
     }
-    // Only the tools that are on are listed.
+    // Only the tools that are on are listed; those on Ask first say so.
     const lists = new Set(forward.filter((m) => m.method === 'tools/list').map((m) => String(m.id)));
-    for (const r of replies) if (lists.has(String(r.id)) && Array.isArray(r.result?.tools)) r.result.tools = r.result.tools.filter((t: { name?: unknown }) => toolOn(c, String(t?.name)));
+    for (const r of replies)
+      if (lists.has(String(r.id)) && Array.isArray(r.result?.tools))
+        r.result.tools = r.result.tools.filter((t: { name?: unknown }) => toolOn(c, String(t?.name))).map((t: { name?: unknown }) => (toolState(c, String(t?.name)) === 'ask' ? askMarked(t) : t));
     return out(replies, sessionId);
   });
 
@@ -293,6 +341,12 @@ export function relayRoutes(d: Deps) {
     const ac = new AbortController();
     reply.raw.once('close', () => ac.abort());
     return askForm(d, runOf(p.token)!, c.entry.name, (req.body ?? {}) as Record<string, unknown>, ac.signal);
+  });
+  d.app.post('/connections/gate/:token/:app', { bodyLimit: 8 * 1024 * 1024 }, async (req, reply) => {
+    if (socketFile || !runFor(d, req)) return reply.code(404).send({ error: 'No session runs with that address' });
+    const p = req.params as { token: string; app: string };
+    const r = gateSpec(d, p.token, p.app, JSON.stringify(req.body ?? {}));
+    return reply.code(r.status).header('cache-control', 'no-store').send(r.body);
   });
   d.app.get('/connections/launch/:token/:app', async (req, reply) => {
     if (socketFile || !runFor(d, req)) return reply.code(404).send({ error: 'No session runs with that address' });
