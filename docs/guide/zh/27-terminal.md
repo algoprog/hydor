@@ -218,11 +218,12 @@ hydor library export "Q3 report" --to pdf -o q3.pdf
 | --- | --- |
 | `hydor models` 和 `hydor tiers` | 每个程序提供的模型，以及每个[档位](/guide/agents-models#tiers-a-model-for-each-kind-of-job)对应哪个模型（`hydor tiers set claude best opus --effort high`、`hydor tiers reset`；`hydor tiers team off` 和 `hydor tiers hard off` 分别关闭**主智能体带领子智能体**和**难题用最高档位**，`on` 再把它们打开）。 |
 | `hydor usage` | 每个套餐的用量和限额，以及它们何时重置。 |
-| `hydor agents` | [你的智能体](/guide/agents)：`list`、`show`、`new`、`edit` 和 `remove`（内置的可以复制，不能更改）。智能体的输出字段和结果去向在它自己的页面上设置（`hydor open agents`）。 |
+| `hydor agents` | [你的智能体](/guide/agents)：`list`、`show`、`new`、`edit`、`results` 和 `remove`（内置的可以复制，不能更改）。智能体的结果去向用 `new` 和 `edit` 的 `--results-to` 设置，每个去处一次：`library`（同一个页面，更新）、`library:new`、`sheet`（它自己的电子表格中的一行）、`sheet:<电子表格>#<工作表>`、`email:<地址>`、`notify`、`file:<路径>`、`webhook:<地址>`，或 `none`。它的输出字段在它自己的页面上设置（`hydor open agents`）；`results` 列出它交回的结果，每个结果一行。 |
 | `hydor accounts` | Claude Code 和 Codex 的登录：`list`、`show`（一个账户：谁已登录及套餐、新会话是否用它开始、它的用量和限额、是否保存了 API 密钥（绝不显示密钥）、会话在限额时是否切换）、`add <程序> <名称>`（再添加一个账户，并立即登录）、`sign-in`、`sign-out`、`remove` 和 `use`（新会话用哪一个开始）。用于 API 额度的 API 密钥和用量限额时的开关是设置（`accounts.*`）。 |
 
 ```bash
 hydor agents new Bookkeeper --tools read,edit --tier standard
+hydor agents edit bookkeeper --results-to sheet --results-to email:sam@example.com
 hydor tiers set claude best opus --effort high
 hydor accounts add claude Work
 hydor accounts use work

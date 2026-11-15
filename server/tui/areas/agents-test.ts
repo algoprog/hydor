@@ -213,6 +213,63 @@ test('remove: asks, says no to a built-in one, --json', async () => {
   await refused(run(server.conn, ['agents', 'remove', 'scribe', '-y']), /^No$/, ApiError);
 });
 
+test('--results-to: where results go, each kept as it was where it names the same; show says it; results lists the history', async () => {
+  const withOut = {
+    ...books,
+    output: {
+      fields: [
+        { id: 'spent', label: 'Spent', type: 'number' },
+        { id: 'shops', label: 'Shops', type: 'list' },
+      ],
+      to: [{ kind: 'email', to: ['old@example.org'], subject: 'Books {date}', account: 'me@example.net' }, { kind: 'notify' }],
+    },
+  };
+  const list = [researcher, coder, withOut, scribe];
+  const r0 = routes({
+    'GET /api/assistants': reply(list),
+    'PUT /api/assistants/bookkeeper-3f9a': (b: unknown) => ({ assistant: b }),
+    'GET /api/pages': { pages: [{ id: 'pg1', title: 'Household budget', kind: 'sheet' }, { id: 'pg2', title: 'Notes' }] },
+  });
+  const { conn, calls } = fakeConn(r0);
+  const r = await run(conn, ['agents', 'edit', 'bookkeeper', '--results-to', 'sheet:household#2026', '--results-to', 'email:anna@example.org, sam@example.com', '--results-to', 'library']);
+  assert.deepEqual((calls.at(-1)?.body as { output: unknown }).output, {
+    fields: withOut.output.fields,
+    to: [
+      { kind: 'sheet', page: 'pg1', tab: '2026' },
+      { kind: 'email', to: ['anna@example.org', 'sam@example.com'], subject: 'Books {date}', account: 'me@example.net' },
+      { kind: 'library' },
+    ],
+  });
+  assert.match(r.out, /^Changed “Bookkeeper”: where results go\.$/m);
+  await run(conn, ['agents', 'edit', 'bookkeeper', '--results-to', 'none']);
+  assert.deepEqual((calls.at(-1)?.body as { output: unknown }).output, { fields: withOut.output.fields });
+  await refused(run(conn, ['agents', 'edit', 'bookkeeper', '--results-to', 'fax']), /--results-to takes library/);
+  await refused(run(conn, ['agents', 'edit', 'bookkeeper', '--results-to', 'email:']), /takes the addresses/);
+  // show
+  const shown = await run(fakeConn(r0).conn, ['agents', 'show', 'bookkeeper']);
+  assert.match(shown.out, /^Hands back +Spent, Shops$/m);
+  assert.match(shown.out, /^Results go to +an email to old@example\.org from me@example\.net$/m);
+  assert.match(shown.out, /^ +a notification$/m);
+  // results
+  const history = {
+    results: [
+      { id: 2, at: new Date(2026, 10, 15, 9, 0).getTime(), key: 'k2', line: '42', value: { spent: 42, shops: ['Lidl', 'Market'] }, sent: [{ kind: 'sheet', ok: true, detail: 'row 3', page: 'pg1' }, { kind: 'email', ok: false, detail: 'no account' }] },
+      { id: 1, at: new Date(2026, 10, 14, 9, 0).getTime(), key: 'k1', line: '7', value: { spent: 7 }, sent: [] },
+    ],
+    total: 9,
+    more: true,
+    made: { sheet: { id: 'pg1', title: 'Household budget' } },
+  };
+  const h = fakeConn({ ...r0, 'GET /api/assistants/bookkeeper-3f9a/results?limit=2': history });
+  const out = await run(h.conn, ['agents', 'results', 'bookkeeper', '--limit', '2']);
+  assert.match(out.out, /When +Spent +Shops +Went to/);
+  assert.match(out.out, /2026-11-15 09:00 +42 +Lidl; Market +✓ sheet, ✗ email/);
+  assert.match(out.out, /2 of 9: --limit for more\./);
+  assert.match(out.out, /Its runs go into “Household budget” in the Library\./);
+  const j = await run(fakeConn({ ...r0, 'GET /api/assistants/bookkeeper-3f9a/results?limit=20': history }).conn, ['agents', 'results', 'bookkeeper', '--json']);
+  assert.deepEqual(j.json, [history]);
+});
+
 test('list on a narrow terminal: the description goes whole before the name is cut', async () => {
   const w = await atWidths(fakeConn(routes()).conn, ['agents']);
   for (const [n, lines] of Object.entries(w)) assert.ok(lines.every((l) => [...l].length <= Number(n) - 1), `${n} columns`);
