@@ -3,6 +3,16 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.67.1 · 15 November 2026
+
+A session you delete leaves the list at once, and stays gone.
+
+- **Deleting a session**: it leaves the sidebar as soon as you confirm, a running one too, though the app still stops
+  its agent first. Before, it stayed for a few seconds while the agent stopped.
+- **No coming back**: a deleted session could show up in the list again when something reached it just after the
+  delete: its agent's last lines being read as it stopped, a page still open on it marking it read, or a pull request
+  check on its way. None of these brings it back now.
+
 ## 0.67.0 · 15 November 2026
 
 Custom sends far less to its model before your message: about 10,000 tokens instead of 17,700 for a first "hi", and
