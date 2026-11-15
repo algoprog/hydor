@@ -1103,8 +1103,11 @@ programs shows each program's version and what is out, with Check now, Update no
   the other parts of the answer show, in one lookup, searched by words (BM25) and by meaning (the shipped vectors of each UI), fused by rank, the best five
   with the data each takes and an example, or the best three for each part of an answer at once (`queries`), since one
   answer may hold a UI for each of its parts and a session as many as its answers need. What you tick or answer in one
-  is kept on that device; an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data** and
-  **Copy as text** sit on each. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
+  is kept on that device; an entry without a picture, or whose picture cannot load, shows without one (no empty box); **Show the data**,
+  **Copy as text** and **Full screen** (the card alone over the page, as wide as the window, scrolling when tall) sit on each, and under
+  its … **Save as picture** (a PNG of the card as it looks, in the current theme, at twice its size, named after its title) and **Copy as
+  picture** where the browser allows it; a card with a map, a library-drawn plot, a video player or a playground's output inside has no
+  picture buttons. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen. Before showing one, an agent can picture it as the app shows it, in the dark theme or
   the light, to see what would not read well.
@@ -1145,6 +1148,11 @@ programs shows each program's version and what is out, with Check now, Update no
 - Review what a branch changes file by file, mark files viewed, and let a guide put them in an order that is
   easy to read, with a note on each.
 - Share a session with a read-only link that ends when you want.
+- Export a conversation from the session's menu: as a Markdown file, copied as Markdown, or as a document in the Library
+  to edit, print and share (the title and date, your messages and the replies in order, a turn's steps as one line,
+  files handed over by name, answer cards as text and tables, Mermaid and maths as written; in the document, your
+  pictures and the handed-over ones too). A confidential session's stays on this computer. Also `hydor sessions export`
+  and `GET /api/sessions/:key/export?format=md`.
 
 ## Around the agents
 - Files: places to start from (recent files, home, pinned folders, your projects' folders, the folders sessions

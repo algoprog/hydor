@@ -456,6 +456,29 @@ function keepModel(ctx: RunCtx, id: string | null, kind: PageKind, title: unknow
   return { ...p, folded, describeNote: !id && !p.description ? [DESCRIBE_NOTE] : [] };
 }
 
+/**
+ * A document made of Markdown for the person, not by an agent (a conversation exported from its session's menu,
+ * server/session-export.ts): its pictures taken in as save_doc takes them, kept in the session's project (or the folder
+ * or project asked for), described by the helper. What could not be taken in is in `notes`.
+ */
+export async function markdownDoc(d: Deps, o: { title: string; markdown: string; cwd: string; sessionKey: string; folder?: unknown; space?: unknown }) {
+  const { doc, notes } = await agentDoc(d.db, { markdown: o.markdown }, o.cwd);
+  const p = createPage(d.db, { title: o.title, kind: 'doc', model: doc, by: 'made', sessionKey: o.sessionKey, ...placeFor(d.db, o.folder, spaceChoice(d.db, o.space, sessionSpace(d.db, o.sessionKey))) });
+  tell(d, { what: 'pages' });
+  refreshThumbs(d, [p.id]);
+  if (!p.description) describeLater(d, p.id);
+  return { page: pageInfo(d.db, p.id) ?? p, notes };
+}
+
+/** Keeps a picture in the Library's store; its address in a document (naget-asset:…), or null when it is not one. */
+export function keepPicture(db: Deps['db'], data: Buffer): string | null {
+  try {
+    return `naget-asset:${putAsset(db, data)}`;
+  } catch {
+    return null;
+  }
+}
+
 /** A saved page an agent changed, put in the folder it names (made when missing), when it names one. */
 function moveForAgent(db: Deps['db'], id: string, folder: unknown, key: string) {
   if (typeof folder !== 'string' || !folder.trim()) return;

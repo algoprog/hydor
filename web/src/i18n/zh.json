@@ -23514,5 +23514,13 @@
 "macOS’s sandbox cannot run here, so commands run without one":"macOS 的沙盒无法在这里运行，所以命令会在没有沙盒的情况下运行",
 "sandbox bubblewrap seatbelt macos windows low integrity security commands":"沙盒 bubblewrap seatbelt macos windows 低完整性 安全 命令",
 "The sandbox cannot run here, so commands run without one":"沙盒无法在这里运行，所以命令会在没有沙盒的情况下运行",
-"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"如果某个工具必须写入别处，例如要为整个系统安装东西，请把它关闭。完全访问不使用这个沙盒，也没有批准提示。"
+"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"如果某个工具必须写入别处，例如要为整个系统安装东西，请把它关闭。完全访问不使用这个沙盒，也没有批准提示。",
+"A session exports as Markdown: format=md":"会话只能导出为 Markdown：format=md",
+"Copied the card as a picture":"已将卡片复制为图片",
+"Copied the conversation as Markdown":"已将对话复制为 Markdown",
+"Copy as picture":"复制为图片",
+"Export as Markdown":"导出为 Markdown",
+"Save as picture":"另存为图片",
+"Save to the Library as a document":"作为文档保存到资料库",
+"Saved to the Library as a document":"已作为文档保存到资料库"
 }

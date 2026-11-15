@@ -215,7 +215,7 @@ When part of an answer is something to look at, compare, choose from, follow, tr
   - **A fact check** goes through claims one by one, each with its verdict, why, how sure the agent is and the evidence for and against, with sources. The tally of verdicts on top filters the claims when you tap it.
   - **Follow-ups** are two to five buttons with next questions or steps at the end of an answer: tap one to send it as your next message when your message box is empty, or to add it to what you are writing. A button you used gets a check mark.
 - **Pictures**: an entry without a picture, or whose picture cannot load, shows without one, its text taking the space, so no empty box is left.
-- **On hover**: **Show the data** shows what the agent wrote (**Show it** goes back), and **Copy as text** copies it as plain text.
+- **On hover** (or when you reach it with the keyboard), a small bar at its top right: **Show the data** shows what the agent wrote (**Show it** goes back), **Copy as text** copies it as plain text, and **Full screen** shows the card alone over the page, as wide as your window (on a phone, the whole screen), scrolling when it is tall; **Esc**, **Close** or a click beside it brings you back. Under **More** (…): **Save as picture** saves a PNG of the card as it looks, in the theme you see it in and at twice its size so it stays sharp, named after its title, and **Copy as picture** puts the same picture on the clipboard, to paste into a message or a document (where your browser lets pages do that). Full screen has the same two at its top. A card with a map, a plot drawn by a charting library, a video player or a code playground's output inside has no picture buttons: those parts can't be drawn into a picture.
 - **When agents use them**: agents are told to use one for every part of an answer that is something to look at, compare, choose from, follow, try, practise or keep, which is most of the time in an answer of more than a few lines: options to weigh, things with pictures and details (places, products, films, books, people, papers, news), numbers, time and plans, things to do, things to learn, writing to check, claims to verify, and next steps you may want to take. They fill the pictures, and play a video where watching helps more than a photo. What a card cannot say (the reasoning, the advice, the caveats) stays in the agent's words. Plain conversation, a short answer to a short question and code changes stay text. Every answer, the first and each one after it, can hold several, one for each of its parts (a trip's itinerary, its weather and a packing list), so a conversation gathers as many as its answers need; a later answer can show one again with its data brought up to date. The agent finds the ones that fit with one lookup: by name for those it already knows, and with a few words on what each other part shows (by words and, when **Search by meaning** is on in [Settings → Memory](/settings?s=memory), by meaning too), so it is never handed them all. The [built-in agents](/guide/agents#the-built-in-agents) each lean on the ones that suit their work.
 - **See them all**: [Answer UIs](/answers) shows every one with an example, by group: summaries, comparisons, shopping, places and travel, food, plans, work and business, numbers and charts, money, learning, science, media, people and sports, writing, and code. **Play as it streams** shows one coming in as a reply would bring it.
 
@@ -395,6 +395,18 @@ Pin, unpin, archive, unarchive and snooze show a notice with **Undo**, and Ctrl+
 
 The session's menu (⋯) → **Share a read-only link** makes a link anyone can open without your password (not for a [confidential session](#keep-a-session-confidential)). They see the conversation as it happens (messages, the steps by name, file changes and pages the agent showed), not command output or the agent's thinking, and cannot type or change anything. Choose how long it works (**A day**, **A week**, **A month**, **Until turned off**) and press **Make a link**; the link shows once. The same dialog lists the links that work now, how often each was opened, and turns one off. See [Phones, other machines and sharing](/guide/devices).
 
+## Export a conversation
+
+The session's menu (⋯) → **Export** takes the conversation out of the chat:
+
+- **Export as Markdown** downloads it as a Markdown file named after the session's title, to keep, send or open in any notes app.
+- **Copy as Markdown** puts the same text on the clipboard, to paste into notes, an email or another app.
+- **Save to the Library as a document** makes a document of it in the [Library](/guide/library), in the session's project, to read, edit, comment on, print and export as Word or PDF there. A message says when it is ready; **Open** takes you to it.
+
+What goes in: the title and the date, then each of your messages and each of the agent's replies, in order, with their times. The steps of a turn are left out, with one line such as "Worked for 2 min · 5 steps" in their place. Files the agent handed over are listed by name. Answer cards become text you can read, with tables as tables (a comparison, a data table, a chart's numbers). Diagrams stay as their Mermaid code and maths as LaTeX, as the agent wrote them. In the document, the pictures you attached to your messages and the pictures the agent handed over are in it too.
+
+A [confidential session](#keep-a-session-confidential) exports as well, and its document stays on this computer like the rest of its work: pictures from the web are left as links rather than fetched. From a terminal, `hydor sessions export` does the same ([Hydor in a terminal](/guide/terminal)).
+
 ## Work in a worktree
 
 A worktree is a separate copy of a repository's files on a new branch, so an agent can change things without touching your own copy, and several agents can work on one repository at once.
@@ -456,6 +468,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - **Set a goal**: keep working until a condition holds (Claude Code, Codex, Custom; while no goal is set).
 - **Second opinion**: another company's model checks a turn's work against what you asked, and its findings show under that turn. See [Deep research, second opinions and several agents](/guide/research).
 - **Share a read-only link**.
+- **Export** (a submenu): **Export as Markdown**, **Copy as Markdown** and **Save to the Library as a document**. See [Export a conversation](#export-a-conversation).
 - **Folder and code** (a submenu, for sessions with a folder):
   - **Review the changes**: what the branch changes, file by file.
   - **Open a pull request**, or **Pull request #12** once there is one.
@@ -494,6 +507,7 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Which of these subagents did Hydor start, and which did Claude Code?"
 - "Explain how a heat pump works, with a diagram of the cycle and a picture of one."
 - "Compare the three e-readers in a table and pick one for me."
+- "Save our conversation about e-bikes as a document in my Library."
 - "Show the best ramen places near Shibuya station on a map."
 - "Quiz me on the French Revolution: five questions."
 - "Give me practice problems on solving quadratic equations, with hints."
