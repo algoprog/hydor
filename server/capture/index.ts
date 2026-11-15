@@ -9,6 +9,7 @@ import { config } from '../config.ts';
 import type { DB } from '../db.ts';
 import { Cdp, CdpSession } from '../browser/cdp.ts';
 import { launchChrome, pickChrome } from '../browser/chrome.ts';
+import { captureJpeg } from '../browser/jpeg.ts';
 import { browserSettings } from '../browser/settings.ts';
 
 const DIR = path.join(config.dataDir, 'capture');
@@ -224,34 +225,33 @@ async function inTab<T>(o: TabOpts, job: (tab: Tab) => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * One picture of the tab, base64. A JPEG is made by the page's canvas from a PNG (browser/jpeg.ts): the full Chromium's
+ * own JPEGs reach models as two half-width copies with the text shredded.
+ */
+async function shoot(s: CdpSession, format: 'webp' | 'jpeg' | 'png', quality: number, clip: { x: number; y: number; width: number; height: number; scale: number }, beyond: boolean): Promise<string> {
+  if (format === 'jpeg') return captureJpeg(s, { clip, captureBeyondViewport: beyond }, quality, 30_000);
+  const r = await s.send('Page.captureScreenshot', { format, quality: format === 'png' ? undefined : quality, clip, captureBeyondViewport: beyond }, 30_000);
+  return r.data;
+}
+
 async function take(o: CaptureOpts): Promise<Captured> {
   return inTab(o, async ({ s, info }) => {
     const url = o.html !== undefined ? DOC_URL : o.url!;
     const height = o.fullPage ? Math.max(o.height, Math.min(Math.ceil(info.h ?? o.height), o.maxHeight ?? 8000)) : o.height;
     const out = o.outWidth && o.outWidth < o.width * (o.scale ?? 1) ? o.outWidth / (o.width * (o.scale ?? 1)) : 1;
-    const shot = await s.send(
-      'Page.captureScreenshot',
-      {
-        format: o.format ?? 'webp',
-        quality: o.format === 'png' ? undefined : (o.quality ?? 80),
-        clip: { x: 0, y: 0, width: o.width, height, scale: out },
-        captureBeyondViewport: !!o.fullPage,
-      },
-      30_000,
-    );
+    const shot = await shoot(s, o.format ?? 'webp', o.quality ?? 80, { x: 0, y: 0, width: o.width, height, scale: out }, !!o.fullPage);
     const dpr = (o.scale ?? 1) * out;
     let alt: Buffer | undefined;
     if (o.alt) {
       const h2 = o.alt.fullPage ? height : o.height;
       const s2 = o.alt.outWidth && o.alt.outWidth < o.width * (o.scale ?? 1) ? o.alt.outWidth / (o.width * (o.scale ?? 1)) : 1;
-      const r2 = await s
-        .send('Page.captureScreenshot', { format: o.alt.format, quality: o.alt.format === 'png' ? undefined : (o.alt.quality ?? 70), clip: { x: 0, y: 0, width: o.width, height: h2, scale: s2 }, captureBeyondViewport: !!o.alt.fullPage }, 30_000)
-        .catch(() => null);
-      if (r2?.data) alt = Buffer.from(r2.data, 'base64');
+      const r2 = await shoot(s, o.alt.format, o.alt.quality ?? 70, { x: 0, y: 0, width: o.width, height: h2, scale: s2 }, !!o.alt.fullPage).catch(() => null);
+      if (r2) alt = Buffer.from(r2, 'base64');
     }
     return {
       alt,
-      data: Buffer.from(shot.data, 'base64'),
+      data: Buffer.from(shot, 'base64'),
       width: Math.round(o.width * dpr),
       height: Math.round(height * dpr),
       title: String(info.t ?? '').slice(0, 200),

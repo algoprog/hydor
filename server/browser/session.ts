@@ -17,6 +17,7 @@ import { BrowserProxy, contextProxy } from './proxy.ts';
 import { browserSettings, profileDir, profiles, sessionOptions } from './settings.ts';
 import { shownUrl } from './outline.ts';
 import { sleep, Tab, type ElRef, type TabOwner } from './tab.ts';
+import { captureJpeg } from './jpeg.ts';
 
 const DESKTOP = { w: 1280, h: 800 };
 /** How long the agent's pointer takes to glide to where it acts, while someone watches (the action waits for it). */
@@ -326,8 +327,7 @@ class Chromium {
       const tree = await s.send('Page.getFrameTree');
       await s.send('Page.setDocumentContent', { frameId: tree.frameTree.frame.id, html });
       await s.send('Runtime.evaluate', { expression: 'document.getElementById("i").decode().then(() => 1)', awaitPromise: true });
-      const r = await s.send('Page.captureScreenshot', { format: 'jpeg', quality: 75 });
-      return r.data as string;
+      return captureJpeg(s, {}, 75);
     });
   }
 
