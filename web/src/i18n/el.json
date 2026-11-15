@@ -23713,5 +23713,8 @@
 "The screen can still turn off; closing a laptop’s lid still puts it to sleep":"Η οθόνη μπορεί ακόμη να σβήσει· αν κλείσετε το καπάκι ενός φορητού, πέφτει πάλι σε αναστολή",
 "The screen can still turn off. Closing a laptop’s lid still puts it to sleep: your computer’s system decides that, not the app. For work that must run at any hour, use a computer that stays on, such as a desktop or a server, and reach it from here.":"Η οθόνη μπορεί ακόμη να σβήσει. Αν κλείσετε το καπάκι ενός φορητού, πέφτει πάλι σε αναστολή: αυτό το αποφασίζει το σύστημα του υπολογιστή σας, όχι η εφαρμογή. Για εργασία που πρέπει να τρέχει οποιαδήποτε ώρα, χρησιμοποιήστε έναν υπολογιστή που μένει ανοιχτός, όπως έναν επιτραπέζιο ή έναν διακομιστή, και χρησιμοποιήστε τον από εδώ.",
 "While agents work":"Όσο εργάζονται πράκτορες",
-"While agents work and before scheduled tasks":"Όσο εργάζονται πράκτορες και πριν από προγραμματισμένες εργασίες"
+"While agents work and before scheduled tasks":"Όσο εργάζονται πράκτορες και πριν από προγραμματισμένες εργασίες",
+"no marker at byte {0}":"δεν υπάρχει δείκτης στο byte {0}",
+"not a JPEG":"δεν είναι εικόνα JPEG",
+"the canvas gave nothing back":"ο καμβάς δεν επέστρεψε τίποτα"
 }
