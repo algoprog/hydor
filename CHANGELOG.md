@@ -3,6 +3,29 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.67.0 · 15 November 2026
+
+Custom sends far less to its model before your message: about 10,000 tokens instead of 17,700 for a first "hi", and
+about 5,900 for a model with a small context, such as one on your own computer. Its sessions now show how full the
+model's context is, and what fills it.
+
+- **Skills by name**: Custom is told its skills' names, by group (the project's own, yours, then the library's groups
+  such as Coding or Documents), instead of a description of each one. The skills that fit your first message still
+  come with what each is for, and Custom can look a skill up by what the work is. It now takes up to 200 skills, so
+  none of the library's are left out when you have many of your own.
+- **Instructions that come with their tools**: what a feature tells Custom about its own tools (pictures, apps, the
+  browser, PDFs and documents, signatures, Pages, the guide, keys in the vault…) now comes when Custom brings one of
+  those tools in, not with every message. The rules that always hold stay: how replies look, never asking you to type a
+  password into the chat, your knowledge bases, experiments on your GPUs only when you ask, cleaning up. A session you
+  start from Help or from a page has its feature's instructions from the start. Claude Code and Codex are told
+  everything as before.
+- **Lean for small models**: a model with a context of about 32,000 tokens or less (not through OpenRouter) gets no
+  guidance on answer UIs, the list of its other tools by name only, and fewer tools in full.
+- **How full the context is**: a Custom session shows the ring beside the message box, as Claude Code and Codex
+  sessions do, without Compact, since Custom condenses its conversation by itself. Under **Options**, click the
+  **Context** row to see what fills it: instructions, the project's instructions, memory, the app's features, skills,
+  tools and the conversation.
+
 ## 0.66.0 · 15 November 2026
 
 Custom's sandbox for commands now works on a Mac and on Windows too, and a Claude Code session no longer stays
