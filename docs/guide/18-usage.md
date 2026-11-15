@@ -117,11 +117,11 @@ Below, in both views:
 
 On a phone the tiles sit two to a row, and some table columns are left out.
 
-The start page shows today's numbers under the message box once the agents did something today: lines added and removed, input and output tokens, prompts and sessions. Click them to open Activity.
+The start page sums up today in a line under the message box once the agents did something today: "Today · 7 sessions · 12 file edits · $0.84", leaving out a part that is zero. The money is the day's **API cost (est.)**: on a plan (Claude Code, Codex) you pay your plan's fee instead, as its hover says. Hover over the line for the lines added and removed, the input and output tokens, and the prompts; click it to open Activity.
 
 ## How costs are estimated
 
-Claude and ChatGPT plans are flat-rate, so the app shows what the same work would cost at API prices (pay-per-use prices). This tells you how much use you get from a plan, and what a model through the API would cost.
+Claude and ChatGPT plans are flat-rate, so the app shows what the same work would cost at API prices (pay-per-use prices). This tells you how much use you get from a plan, and what a model through the API would cost. The same estimate shows on each finished turn's line in a session ("≈ $0.12", with its parts under **Time and cost**) and in the start page's **Today** line; on a plan, both say so when you point at them.
 
 - The prices come from a public price table (LiteLLM's), which the app fetches at most once a day and keeps for when it is offline.
 - Prices you set yourself win over the table.
@@ -174,6 +174,7 @@ There is no button to clear Activity. Deleting a session yourself (its menu → 
 - "Turn on resuming sessions after usage limits."
 - "Continue my session 'Refactor auth' when the Codex limit resets."
 - "What would last month's work have cost at API prices, by model?"
+- "Why does the Today line on my start page show $3.10 when I am on a plan?"
 - "Count my Ollama models as free in the cost estimates."
 - "How much did Custom do this month, and with which models?"
 - "Delete sessions after two years of inactivity instead of one."

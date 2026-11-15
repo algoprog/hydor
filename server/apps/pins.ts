@@ -101,6 +101,48 @@ export function useCounts(db: DB): Map<string, number> {
   return new Map((db.prepare("select app_id as id, count(*) as n from app_runs where source not in ('step', 'chat', 'test') group by app_id").all() as { id: string; n: number }[]).map((r) => [r.id, r.n]));
 }
 
+/** Ready-made apps that suit anyone: suggested on the start page until you have run apps of your own choosing. */
+export const STARTER_APPS = ['deep-research', 'trip-planner'];
+
+/** An app suggested on the start page: enough to show it and open its form ("tpl:<id>" for a ready-made one). */
+export interface SuggestedApp {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+  /** How many times it ran, when it did. */
+  uses?: number;
+}
+
+/**
+ * The apps to suggest (the start page's starters): the ones you run most (most runs first, then the one run last), each
+ * still here; to make `n`, the ready-made ones that suit anyone (STARTER_APPS), when installed.
+ */
+export function suggestedApps(db: DB, n = 2): SuggestedApp[] {
+  const uses = useCounts(db);
+  const last = new Map((db.prepare("select app_id as id, max(created_at) as at from app_runs where source not in ('step', 'chat', 'test') group by app_id").all() as { id: string; at: number }[]).map((r) => [r.id, r.at]));
+  const view = (id: string): SuggestedApp | null => {
+    const r = id.startsWith('tpl:') ? templateById(id.slice(4)) : getApp(db, id);
+    return r ? { id, name: r.name, ...(r.description ? { description: r.description } : {}), icon: r.icon ?? 'sparkles', color: r.color ?? 'blue' } : null;
+  };
+  const out: SuggestedApp[] = [];
+  const ranked = [...uses].filter(([, k]) => k > 0).sort((a, b) => b[1] - a[1] || (last.get(b[0]) ?? 0) - (last.get(a[0]) ?? 0));
+  for (const [id, k] of ranked) {
+    if (out.length >= n) break;
+    if (appIdOf(db, id) !== id) continue;
+    const v = view(id);
+    if (v) out.push({ ...v, uses: k });
+  }
+  for (const t of STARTER_APPS) {
+    const id = `tpl:${t}`;
+    if (out.length >= n || out.some((o) => o.id === id) || appIdOf(db, id) !== id) continue;
+    const v = view(id);
+    if (v) out.push(v);
+  }
+  return out;
+}
+
 /**
  * The user's apps in the order agents get them (find_apps): the pinned ones first, as they are pinned, then those used
  * lately, newest first, then the others as they came. `idOf` names each one's app ("tpl:<id>" for a ready-made one).

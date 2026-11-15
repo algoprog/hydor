@@ -110,6 +110,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Update automatically', 'updates upgrade auto update new version restart install', 'Installs new versions by itself: the desktop apps as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while'],
   ['general', 'Take the tour', 'tour help guide onboarding welcome', 'See what each part of the app does', 'Welcome tour'],
   ['general', 'Tips', 'tips hints help onboarding introduce features skip guide', 'Points out a part of the app the first time you come to it, after the welcome tour'],
+  ['general', 'Starter ideas', 'starters examples suggestions ideas start page empty message box hide show apps automation', 'Examples, your apps and an automation under the empty message box on the start page'],
   ['general', 'Check now', 'update upgrade new version about', 'Look for a newer version now', 'Check for updates'],
   // App › Notifications
   ['notifications', 'Notify this device', 'push notifications alerts phone browser when an agent is done finishes fails needs you', 'A notice when a session finishes, fails or needs your answer, even with the app closed'],

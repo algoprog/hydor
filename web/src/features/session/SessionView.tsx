@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MessagesSquare, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
+import { Check, ChevronRight, FilePen, FilePlus2, FolderOpen, GitBranch, GitFork, MessagesSquare, MoreHorizontal, PanelRight, Play, Square, SquareTerminal, UserRound, X } from 'lucide-react';
 import type { FileChange, SessionSummary, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { activityLabel, activityOf, backgroundLine, canTakeOver, confirmResume, inBackground, isBusy, isWorking, takeoverDialog } from '../../lib/activity';
@@ -31,12 +31,38 @@ import { isConfidential } from '@shared/confidential';
 import { useSessionShow, type SessionShow } from './show';
 import { LOCALE } from '../../i18n/locale';
 import { startedIn } from '../../lib/origin';
+import { endingLabel, sessionEnd, type SessionEnd } from './ending';
 
-function StatusPill({ s }: { s: SessionSummary }) {
+/**
+ * How the session's work ended while nothing runs (Done, Stopped, Failed), from its timeline; undefined until that is
+ * loaded. With earlier turns not loaded, its files are the session's own count of those it changed, all told.
+ */
+function useSessionEnd(s: SessionSummary): SessionEnd | null | undefined {
+  const tl = useTimeline((x) => x.byKey[s.key]);
+  const all = s.stats?.filesChanged ?? 0;
+  return useMemo(() => {
+    if (!tl || (tl.loading && !tl.items.length)) return undefined;
+    const end = sessionEnd(tl.items);
+    return end && tl.start > 0 ? { ...end, made: 0, changed: Math.max(all, end.made + end.changed) } : end;
+  }, [tl?.items, tl?.loading, tl?.start, all]);
+}
+
+/** What a session's status says while nothing runs, and its hover: as its work ended, else (nothing to tell) "Stopped". */
+function endedText(end: SessionEnd | null | undefined): { label: string; hint: string } {
+  if (!end) return { label: 'Stopped', hint: 'Not running' };
+  if (end.ended === 'done') return { label: endingLabel(end), hint: 'Its last turn finished. A message in the box continues it.' };
+  if (end.ended === 'failed') return { label: endingLabel(end), hint: 'It ended with an error. Resume, or send a message, to try again.' };
+  return { label: endingLabel(end), hint: 'Stopped before it finished. Resume, or send a message, to go on.' };
+}
+
+function StatusPill({ s, end }: { s: SessionSummary; end: SessionEnd | null | undefined }) {
   const a = activityOf(s);
-  let label = 'Stopped';
-  let tone = 'text-fg-3';
-  let dot = 'bg-fg-3/60';
+  // Not running, and its timeline not read yet: no word rather than one that changes a moment later.
+  if (!a && end === undefined) return null;
+  const ended = endedText(end);
+  let label = ended.label;
+  let tone = end?.ended === 'done' ? 'text-fg-2' : end?.ended === 'failed' ? 'text-err' : 'text-fg-3';
+  let dot = end?.ended === 'done' ? 'bg-ok/70' : end?.ended === 'failed' ? 'bg-err' : 'bg-fg-3/60';
   if (a) {
     const where = a.kind === 'external' ? ` in ${a.client}` : '';
     if (isBusy(a)) [label, tone, dot] = [a.status === 'starting' ? 'Starting' : `Working${where}`, 'text-busy', 'bg-busy'];
@@ -46,14 +72,15 @@ function StatusPill({ s }: { s: SessionSummary }) {
     else [label, tone, dot] = a.kind === 'external' ? [`Open${where}`, 'text-fg-2', 'bg-fg-3'] : ['Ready', 'text-ok', 'bg-ok'];
   }
   return (
-    <span title={a ? activityLabel(a) : 'Not running'} className={cx('inline-flex h-5.5 max-w-[60%] min-w-0 shrink-0 items-center gap-1.5 rounded-full bg-bg-2 px-2 text-[12px] font-medium', tone)}>
-      <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', dot, isWorking(a) && 'breathe')} />
+    <span title={a ? activityLabel(a) : ended.hint} className={cx('inline-flex h-5.5 max-w-[60%] min-w-0 shrink-0 items-center gap-1.5 rounded-full bg-bg-2 px-2 text-[12px] font-medium', tone)}>
+      {!a && end?.ended === 'done' ? <Check size={12} strokeWidth={2.6} className="shrink-0 text-ok" /> : <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', dot, isWorking(a) && 'breathe')} />}
       <span className="truncate">{label}</span>
     </span>
   );
 }
 
 function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; detailsOpen: boolean; onDetails: () => void; onFork: () => void }) {
+  const end = useSessionEnd(s);
   const home = useApp((x) => x.boot?.home);
   const cat = useCatalog(s.agent);
   const mobile = useIsMobile();
@@ -92,8 +119,18 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
       </Button>
     );
   } else if (!running) {
+    // Done: a message in the box goes on from here (it starts the agent again), so Resume steps back; after a stop or a
+    // failure it stays to hand.
+    const done = end?.ended === 'done';
     action = (
-      <Button size="sm" variant="secondary" icon={<Play size={14} />} onClick={async () => (await confirmResume(s)) && post(`/api/sessions/${enc(s.key)}/start`).catch(toastError)}>
+      <Button
+        size="sm"
+        variant={done ? 'ghost' : 'secondary'}
+        className={cx(done && 'text-fg-3')}
+        icon={<Play size={done ? 13 : 14} />}
+        title={done ? 'Start its agent again now; sending a message does this too' : 'Start its agent again, with the whole conversation'}
+        onClick={async () => (await confirmResume(s)) && post(`/api/sessions/${enc(s.key)}/start`).catch(toastError)}
+      >
         <span className="hidden sm:inline">Resume</span>
       </Button>
     );
@@ -126,7 +163,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
             <ConfidentialLock s={s} />
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12.5px] text-fg-3">
-            <StatusPill s={s} />
+            <StatusPill s={s} end={end} />
             {s.cwd && (
               <button className="min-w-0 truncate hover:text-fg" onClick={() => (useUI.getState().set({ explorerRoot: s.cwd! }), go('/files'))} title={s.cwd}>
                 {tildify(s.cwd, home)}
@@ -419,6 +456,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
   const lv = useLive((x) => x.byKey[s.key]?.live) ?? s.live;
   const st = s.stats;
   const a = activityOf(s);
+  const end = useSessionEnd(s);
   // Tasks of a session open elsewhere are listed, not stoppable from here.
   const here = !!lv && lv.status !== 'exited';
   const tasks = (here ? [...(lv.backgroundTasks ?? []), ...(lv.endedTasks ?? [])] : s.external?.backgroundTasks) ?? [];
@@ -431,7 +469,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
     <div className="px-5 py-3">
       <dl className="divide-y divide-line">
         <InfoRow label="Agent">{agentName(s.agent, s.acpName)}</InfoRow>
-        <InfoRow label="Status">{a ? activityLabel(a) : 'Stopped'}</InfoRow>
+        <InfoRow label="Status">{a ? activityLabel(a) : endedText(end).label}</InfoRow>
         {s.cwd && (
           <InfoRow label="Folder">
             <button className="text-left font-mono text-[12.5px] hover:text-accent" onClick={() => (useUI.getState().set({ explorerRoot: s.cwd! }), go('/files'))}>

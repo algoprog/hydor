@@ -27,6 +27,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Update automatically**](/settings?s=general&find=Update%20automatically): Installs new versions by itself: the desktop apps as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while.
 - [**Take the tour**](/settings?s=general&find=Take%20the%20tour): See what each part of the app does.
 - [**Tips**](/settings?s=general&find=Tips): Points out a part of the app the first time you come to it, after the welcome tour.
+- [**Starter ideas**](/settings?s=general&find=Starter%20ideas): Examples, your apps and an automation under the empty message box on the start page.
 - [**Check now**](/settings?s=general&find=Check%20now): Look for a newer version now.
 
 ### Notifications

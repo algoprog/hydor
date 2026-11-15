@@ -540,6 +540,8 @@ export interface StartSettings {
   capUsd?: number;
   /** Confidential: local models only, nothing leaves this computer. */
   confidential?: boolean;
+  /** false: no starters (examples, your apps, an automation) under the empty message box (Hide, or Settings → General). */
+  starters?: boolean;
   /**
    * What was picked in each place, by its name (placeKey in shared/start.ts: a project, a new task folder or a
    * folder), so the start page opens that way there again; a place without one opens with the defaults.

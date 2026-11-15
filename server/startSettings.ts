@@ -1,7 +1,7 @@
 // What the start page had picked last (the agent and each agent's model, effort and mode, the assistant,
-// the folder, memory, a spending cap and Confidential), and the picks made in each place (a project, the new task
-// folder, a folder), so it opens that way again, on every device. The page sends what changed; this keeps the whole,
-// tidied, and leaves out a folder that is gone.
+// the folder, memory, a spending cap and Confidential; whether it shows starters), and the picks made in each place
+// (a project, the new task folder, a folder), so it opens that way again, on every device. The page sends what
+// changed; this keeps the whole, tidied, and leaves out a folder that is gone.
 import fs from 'node:fs';
 import { isAbsPath } from './platform.ts';
 import type { StartPlace, StartRun, StartSettings } from '../shared/types.ts';
@@ -80,6 +80,7 @@ function tidy(x: unknown): StartSettings {
   if (typeof o.worktree === 'boolean') s.worktree = o.worktree;
   if (o.memory === false) s.memory = false;
   if (o.confidential === true) s.confidential = true;
+  if (o.starters === false) s.starters = false;
   const capUsd = cap(o.capUsd);
   if (capUsd !== undefined) s.capUsd = capUsd;
   if (o.places && typeof o.places === 'object' && !Array.isArray(o.places)) {

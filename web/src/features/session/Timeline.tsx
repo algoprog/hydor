@@ -897,7 +897,7 @@ const SegmentView = memo(function SegmentView({
               className={cx(k === 0 && isNew && seg.prompt && 'anim-in [animation-delay:140ms]', k > 0 && fresh(r.id) && 'anim-in')}
               cost={
                 // Its time and cost: where the time went, the tokens by kind, what they cost.
-                isLast && tk && !live && seg.end ? <TurnCost sessionKey={sessionKey} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" /> : null
+                isLast && tk && !live && seg.end ? <TurnCost sessionKey={sessionKey} agent={agent} turn={seg.end} work={seg.work} start={first} className="hidden shrink-0 sm:inline-flex" /> : null
               }
             />
           );

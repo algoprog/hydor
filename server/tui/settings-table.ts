@@ -175,6 +175,10 @@ row('general', 'Update automatically', 'switch', {
 });
 row('general', 'Take the tour', 'page', { note: 'The welcome tour starts in the browser.' });
 row('general', 'Tips', 'switch', { read: rd('/api/tips', 'on'), write: put('/api/tips', (v) => ({ on: v })) });
+row('general', 'Starter ideas', 'switch', {
+  read: { endpoint: '/api/bootstrap', pick: (d) => d.start?.starters !== false },
+  write: put('/api/start', (v) => ({ starters: v ? null : false })),
+});
 row('general', 'Check now', 'action', {
   act: {
     run: async (api) => {
