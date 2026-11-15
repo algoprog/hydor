@@ -87,6 +87,41 @@ function byWords(w: string[]): boolean | null {
   return null;
 }
 
+/** Verbs of tools that change things without sending them anywhere: never only looking. */
+const CHANGE = new Set(
+  'set mark move archive assign unassign tag rename upload sync run execute exec trigger import write insert upsert save append replace complete reschedule toggle enable disable approve reject cancel join leave subscribe unsubscribe star pin lock unlock restore copy duplicate convert reset clear apply install uninstall upgrade build generate'.split(' '),
+);
+
+/**
+ * Whether a tool only looks (gets, lists, searches, reads…), for what may be called without anyone asking (a watcher):
+ * MCP's read-only hint, else the first verb in its name (or, when its name has none, in its description) is one that
+ * looks, and it does not act outside.
+ */
+export function onlyLooks(t: ToolFacts): boolean {
+  const a = t.annotations ?? {};
+  if (a.readOnlyHint === true) return true;
+  if (a.destructiveHint === true || actsOutside(t)) return false;
+  // A word as it is, or as a verb's plain form ("lists", "searches", "queries").
+  const kind = (x: string, look: Set<string>): 'look' | 'act' | null => {
+    for (const y of new Set([x, x.replace(/ies$/, 'y'), x.replace(/(?<=[^s])s$/, ''), x.replace(/(?<=sh|ch)es$/, '')])) {
+      if (look.has(y)) return 'look';
+      if ((OUT.has(y) && !NOUNISH.has(y)) || MAKE.has(y) || CHANGE.has(y)) return 'act';
+    }
+    return null;
+  };
+  // In its name, the first verb (words that are also things, such as message or order, are passed over).
+  for (const x of toolWords(t.name)) {
+    const k = NOUNISH.has(x) ? null : kind(x, LOOK);
+    if (k) return k === 'look';
+  }
+  // A name that has none: its description's first word ("Lists…", "Returns…").
+  const first = toolWords(t.description ?? '')[0];
+  return !!first && kind(first, DESCRIBE_LOOK) === 'look';
+}
+
+/** What a description of a tool that only looks starts with. */
+const DESCRIBE_LOOK = new Set([...LOOK, 'return', 'give', 'provide']);
+
 /** Words of OUT that are also things (an email, a post): they act outside only where they read as a verb. */
 const NOUNISH = new Set(['message', 'email', 'mail', 'text', 'sms', 'dm', 'order', 'comment', 'post', 'share', 'tweet', 'trade', 'transfer', 'tip', 'charge', 'refund', 'payout']);
 

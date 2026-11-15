@@ -1,8 +1,10 @@
 // Watchers: cheap checks that make no model call and wake a task's agent only when something
 // changed: new items in an RSS or Atom feed, a page's readable text (or a part of it), a value in
-// JSON, new files in a folder, a command's output or exit code. Each keeps what it saw last (its
-// state) to compare with; the first look only takes note. What they read comes from outside: the
-// scheduler quotes it to the agent as data, never as instructions.
+// JSON, new files in a folder, a command's output or exit code, new email, new items in what a
+// connected account's tool answers, or the moment before each event in a connected calendar
+// (account-watch.ts). Each keeps what it saw last (its state) to compare with; the first look only
+// takes note. What they read comes from outside: the scheduler quotes it to the agent as data,
+// never as instructions.
 import { spawn } from 'node:child_process';
 import { bashCommand, killTree, WIN } from '../platform.ts';
 import crypto from 'node:crypto';
@@ -15,6 +17,8 @@ import { assertPublic, decodeEntities, htmlText } from '../web/fetch.ts';
 import { parseSelector, selectText } from './select.ts';
 import { listAccounts, mailDbOrNull } from '../mail/accounts.ts';
 import { checkMail, type MailWatchState } from '../mail/watch.ts';
+import type { AccountFind } from '../../shared/automations.ts';
+import { checkAccount, validAccountWatch } from './account-watch.ts';
 
 export interface WatchResult {
   /** Something new: the agent should wake. */
@@ -32,6 +36,10 @@ export interface WatchResult {
    * and the state to keep once its run has started.
    */
   runs?: { report: string; state: unknown }[];
+  /** Look again by then at the latest (the moment before a calendar's next event). */
+  nextAt?: number;
+  /** A connected account's watcher: where it found the items, for Try it. */
+  find?: AccountFind;
 }
 
 const hash = (s: string) => crypto.createHash('sha1').update(s).digest('hex');
@@ -384,8 +392,11 @@ async function checkCommand(w: Extract<WatchSpec, { kind: 'command' }>, prev: { 
 
 // ---- running a watcher -----------------------------------------------------------------------------
 
-/** Looks once; `prev` is what the last look kept (undefined the first time, which only takes note). `save` (a real check, not a test): new mail's attachments are saved in the task's folder. */
-export async function checkWatch(w: WatchSpec, prev: unknown, o: { cwd: string; save?: boolean }): Promise<WatchResult> {
+/**
+ * Looks once; `prev` is what the last look kept (undefined the first time, which only takes note). `save` (a real
+ * check, not a test): new mail's attachments are saved in the task's folder. `now` stands in for the clock in tests.
+ */
+export async function checkWatch(w: WatchSpec, prev: unknown, o: { cwd: string; save?: boolean; now?: number }): Promise<WatchResult> {
   const p = prev as any;
   switch (w.kind) {
     case 'feed':
@@ -403,6 +414,8 @@ export async function checkWatch(w: WatchSpec, prev: unknown, o: { cwd: string; 
       if (!db) throw new Error('Email is not set up on this server');
       return checkMail(db, w, p as MailWatchState | undefined, { cwd: o.save ? o.cwd : undefined });
     }
+    case 'account':
+      return checkAccount(w, p, { cwd: o.cwd, now: o.now });
   }
 }
 
@@ -459,6 +472,8 @@ export function validWatch(x: unknown): WatchSpec {
         ...(w.unread === true ? { unread: true } : {}),
       };
     }
+    case 'account':
+      return validAccountWatch(w);
   }
   throw new HttpError(400, 'Pick what the watcher looks at');
 }

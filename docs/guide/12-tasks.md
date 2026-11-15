@@ -1,6 +1,6 @@
 # Scheduled tasks
 
-A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, or when something you watch changes or a new email arrives. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report, each new invoice that comes by email, a review of each new pull request or a look into each failed CI run, and the result comes to you without you having to start a session.
+A scheduled task is agent work that starts by itself: at a time of day, every few minutes or hours, once, when another service calls its webhook, when something you watch changes, when a new email or a new record in a connected app arrives, or a set time before each event in your calendar. Use one for a morning brief, a reminder, a price or a page to keep an eye on, a weekly report, each new invoice that comes by email, a first reply to each new lead, a brief before each client call, a review of each new pull request or a look into each failed CI run, and the result comes to you without you having to start a session.
 
 ![Settings → Scheduled tasks: work that starts by itself](images/tasks.webp)
 
@@ -13,7 +13,7 @@ A task can start:
 - **At a time**: a time of day on the days of the week you pick, or by a cron expression.
 - **Repeating**: every so many minutes (at least 5) or hours.
 - **Once**: at a date and time.
-- **Watch**: when a watcher sees a change in a feed, a web page, a value in JSON, a folder or a command's output, or a new email in one of your mail accounts. A watcher looks without a model, so its checks cost no tokens; the agent wakes only when something changed.
+- **Watch**: when a watcher sees a change in a feed, a web page, a value in JSON, a folder or a command's output, a new email in one of your mail accounts, or something new in a connected app (a deal, a file, a ticket, a payment), or a set time before each event in a connected calendar. A watcher looks without a model, so its checks cost no tokens; the agent wakes only when something changed.
 - **Webhook**: when another service (GitHub, Gitea, a form, a script of yours) calls the task's own address.
 
 A task can also run one of your apps in place of a prompt: each time its trigger fires, the app runs with the answers you set, and the task's history links to that run (see [Run an app by itself](/guide/apps#run-an-app-by-itself)).
@@ -112,6 +112,8 @@ A watcher is a cheap check that runs every few minutes without a model and wakes
 - **Folder**: a **Folder** on this computer and, if you like, **Only files like** a pattern such as `*.pdf` (`*` stands for any text, `?` for one character). New files wake the agent, with their names, sizes and dates. Hidden files and subfolders are left out.
 - **Command**: a **Command** that runs with your shell in the task's folder at each check, for a minute at most, and whether to wake **When its output changes** or **When its exit code changes** (the number a command ends with: 0 usually means it worked). The run gets the output and what changed in it.
 - **Email**: new email in a mail account you connected (see [Connect your email](/guide/connections#connect-your-email)). Pick the **Account** and the **Folder** (the Inbox unless you pick another), and if you like only mail whose **From contains** or **Subject contains** some text, or **Only mail still unread**. Each new email starts a run of its own, at most 10 at a check: who sent it and to whom, the date, the subject and its text, as outside data, with its attachments saved in the task's folder under email-attachments. When more than 10 arrive between two checks, the newest 10 get runs and the first run lists the older ones in a line. An email never starts two runs, even after the app restarts.
+- **Connected app**: something new in one of the apps you connected (see [Connected apps](/guide/connections)), such as a new deal or contact in a CRM, a new file in a cloud drive, a new ticket or a new payment. Pick the **Account**, then the **Tool** it calls at each check: only its tools that look (list or search) are offered, never one that sends, changes, deletes or pays, and only those that are On for it. **Start from** offers ready starting points where the app holds such things (**New files**, **New contacts**, **New deals**, **New tickets**, **New payments** and others): each picks one of the account's own tools and fills in its fields. Fill in the tool's fields as you like; in a field, `{{now}}` stands for the time of each check and `{{now+2d}}` for two days later (`{{today}}` and `{{tomorrow}}` too). **Try it** calls the tool once and shows what came back: where the items are in its answer (**The items are in**), the field that tells them apart (**Told apart by**, such as an id or an address), the first items, and **What it answered** in full. Pick another list or field there if the one it found is not right. Each new item then starts a run of its own, at most 10 at a check, with the item as outside data; when more come at once, the first run names the others in a line. An item never starts two runs, even after the app restarts. Ask the tool for the newest first, and enough of them, where its fields let you.
+  - **Before each event**: for a connected calendar, a run a set time before each of its events rather than one for each new item. **Start a run** **15 min**, **30 min** or **1 hour** before each event, or **The evening before** **At** a time you pick, and if you like only events whose **Title contains** a text, or **Only events with other people**. Use the tool that lists your events, with fields from `{{now}}` to `{{now+2d}}` or so, and pick the field with each event's start under **Start time in** after **Try it**. The watcher reads the upcoming events at each check and once more at each event's moment. An event that moves gets its run before its new time; a cancelled one gets none.
 
 Then:
 
@@ -123,8 +125,8 @@ How a watcher behaves:
 
 - Its first look after you save only takes note; changes after that wake the agent. Changing what a task watches starts it afresh.
 - What it read reaches the agent marked as outside data, to work with and never to follow as instructions.
-- A change that comes while the run for the last one is still going waits for the next look. New email is the exception: each email starts its own run.
-- When a look fails (the site is down, the text is no longer on the page), the row says so. After as many failed looks in a row as **Pause after … failures in a row** allows, the task pauses: "Paused after its check failed 3 times in a row: …".
+- A change that comes while the run for the last one is still going waits for the next look. New email, a connected app's new items and calendar events are the exception: each starts its own run.
+- When a look fails (the site is down, the text is no longer on the page, a connected app is signed out or its answer changed), the row says so, and no run starts on what it could not read. After as many failed looks in a row as **Pause after … failures in a row** allows, the task pauses: "Paused after its check failed 3 times in a row: …".
 - **Run now** on a watcher task runs the agent with what the watcher sees now, rather than with a change.
 
 ## Start runs from another service with a webhook
@@ -242,7 +244,7 @@ Ask in any conversation, in your own words: "remind me Friday at 9 to call the d
 
 The card asks **Schedule this task?**, with the task's name and **Waiting for you**, and shows:
 
-- **When**: the schedule in words, with the next runs in your time zone. For a watcher, what it watches and how often, with the address or command, and "It looks right after you confirm, and the agent wakes only when something changed."
+- **When**: the schedule in words, with the next runs in your time zone. For a watcher, what it watches and how often, with the address, the command or a connected app's tool, and "It looks right after you confirm, and the agent wakes only when something changed."
 - **Does**: the prompt (**All of it** opens a long one).
 - **Runs**: the agent, its model, and where: a new session in a folder, or in this conversation.
 
@@ -289,6 +291,8 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Remind me on Friday at 9 to call the dentist."
 - "Watch this product page and tell me when the price drops below €99."
 - "Whenever an email with an invoice arrives from my accountant, save the PDF in ~/Invoices and add a row to my expenses sheet."
+- "Start a task when a new deal comes in HubSpot: look up the company and draft a first reply to its contact."
+- "Thirty minutes before each client call in my Google Calendar, brief me on who I'm meeting and what we last discussed."
 - "Which of my scheduled tasks failed this week, and why?"
 - "Pause my Morning brief", or "Run the weekly report now."
 - "Test my invoice reminders without sending anything, and show me the emails it would have sent."

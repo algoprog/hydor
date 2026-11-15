@@ -140,6 +140,12 @@ test('new takes webhooks and watchers, and says the webhook’s address', async 
   assert.deepEqual(post().schedule, { kind: 'watch', minutes: 60, watch: { kind: 'page', url: 'https://x.example', match: 'price' } });
   await run(conn, ['tasks', 'new', '--watch-feed', 'https://x.example/feed', 'News']);
   assert.equal(post().schedule.watch.kind, 'feed');
+  await run(conn, ['tasks', 'new', '--watch-account', 'hubspot', '--tool', 'list_deals', '--args', '{"limit":50}', '--check-every', '15m', 'Reply to each new deal']);
+  assert.deepEqual(post().schedule, { kind: 'watch', minutes: 15, watch: { kind: 'account', app: 'hubspot', tool: 'list_deals', args: { limit: 50 } } });
+  await run(conn, ['tasks', 'new', '--watch-account', 'google-calendar', '--tool', 'list_events', '--before', '30m', 'Brief me']);
+  assert.deepEqual(post().schedule.watch.before, { minutes: 30 });
+  await run(conn, ['tasks', 'new', '--watch-account', 'google-calendar', '--tool', 'list_events', '--before', 'evening 19:30', 'Brief me']);
+  assert.deepEqual(post().schedule.watch.before, { evening: '19:30' });
 });
 
 test('new refuses what does not make sense, and calls nothing', async () => {
@@ -158,6 +164,8 @@ test('new refuses what does not make sense, and calls nothing', async () => {
   await bad(['--every', '1h', '--budget', 'lots', 'x'], /--budget takes a number/);
   await bad(['--every', '1h', '--fail-limit', '99', 'x'], /0 to 50/);
   await bad(['--every', '1h', '--input', '{}', 'x'], /goes with --app/);
+  await bad(['--watch-account', 'hubspot', 'x'], /needs --tool/);
+  await bad(['--watch-account', 'hubspot', '--tool', 'list_deals', '--args', '[1]', 'x'], /--args takes the tool’s arguments as JSON/);
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
 });
 

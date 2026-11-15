@@ -202,6 +202,7 @@ An agent can also turn accounts on for the sessions that start as it: see [Agent
 - An agent only gets the accounts that are on for its session and signed in. Sign-ins renew in the background, even for accounts no session is using, so long sessions keep working.
 - Keys and tokens never go into an agent's settings or command line. Known key values are masked in whatever the service's tools send back.
 - A tool on Ask first says so in its description, and the agent is told that a call to it waits for your OK. Once you send or drop the call, the session shows what happened, and its agent hears it with your next message.
+- A scheduled task can start when something new appears in an account (a new deal, file, ticket or payment), or a set time before each event in a connected calendar. At each check Hydor calls one of the account's tools that only looks, itself and without a model, and never one that sends, changes, deletes or pays (see [Watch for a change](/guide/tasks#watch-for-a-change)).
 - The search box (Ctrl+K, ⌘K on a Mac) finds your connected accounts too.
 
 ## Add a service to the marketplace

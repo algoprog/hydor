@@ -20,7 +20,81 @@ export type WatchSpec =
   | { kind: 'folder'; path: string; pattern?: string }
   | { kind: 'command'; command: string; on?: 'output' | 'exit' }
   /** New email in a folder of a connected mail account (Apps → Connected apps → Email): one run per email. */
-  | { kind: 'mail'; account: string; folder?: string; from?: string; subject?: string; unread?: boolean };
+  | { kind: 'mail'; account: string; folder?: string; from?: string; subject?: string; unread?: boolean }
+  /**
+   * New items in what one of a connected account's tools that only looks answers (a CRM's deals, a drive's files, a
+   * helpdesk's tickets): one run per new item. Or, with `before`, a run a set time before each event a calendar's list
+   * tool gives (server/automations/account-watch.ts).
+   */
+  | AccountWatch;
+
+/** A connected account's tool, called at each check without a model. */
+export interface AccountWatch {
+  kind: 'account';
+  /** The connected account (its id in Apps → Connected apps). */
+  app: string;
+  /** Its name when the watcher was saved, for the task list. */
+  name?: string;
+  /** A tool of it that only looks (lists or searches). */
+  tool: string;
+  /** Its arguments; text may hold {{now}}, {{now+2d}}, {{now-1h}}, {{today}} or {{tomorrow}}, filled in at each check. */
+  args?: Record<string, unknown>;
+  /** Where the items are in its answer, like "results" or "data.items" ("" for the answer itself); found at the first look when unset. */
+  list?: string;
+  /** The field that tells items apart, like "id" or "url" ("*" for the whole item); found at the first look when unset. */
+  id?: string;
+  /** A run a set time before each event instead of one per new item (a calendar). */
+  before?: EventBefore;
+}
+
+/** "Before each event": how long before, which field holds the start, and which events count. */
+export interface EventBefore {
+  /** Minutes before its start (15, 30, 60…). */
+  minutes?: number;
+  /** Or the evening before, at this time ("18:00", in your time zone). */
+  evening?: string;
+  /** The field with its start time ("start.dateTime", "start_time"); found at the first look when unset. */
+  start?: string;
+  /** Only events whose title contains this. */
+  title?: string;
+  /** Only events with other people in them. */
+  others?: boolean;
+}
+
+/** A connected account as the watcher's form offers it (GET /api/automations/accounts). */
+export interface WatchAccount {
+  id: string;
+  name: string;
+  /** The catalog's category ("calendar", "sales"…), and whether "Before each event" fits it. */
+  category: string;
+  calendar: boolean;
+  /** Not signed in, or never tested: why it cannot be watched yet. */
+  problem?: string;
+  /** Its tools that only look and are On: the ones a watcher may call. */
+  tools: { name: string; description?: string; schema?: { properties?: Record<string, any>; required?: string[] } }[];
+  /** How many of its tools it does not offer: those that send, change or delete things, and those set to Ask first or Off. */
+  skipped: { outside: number; notOn: number };
+  /** Starting points that fit it (new files, new deals…): the tool and arguments they fill in. */
+  presets: { id: string; label: string; tool: string; args: Record<string, unknown>; before?: boolean }[];
+}
+
+/** What Try it found in a connected account's answer: the lists of items, the fields of the one chosen, its items. */
+export interface AccountFind {
+  /** Each list of items in the answer: where it is, how many, and a label ("results: 12 items"). */
+  lists: { path: string; count: number }[];
+  /** The list it uses ("" for the answer itself); null when the answer has none. */
+  list: string | null;
+  /** The fields of its items that could tell them apart, or hold a start time, with a value of the first. */
+  fields: { path: string; sample: string; unique: boolean; time: boolean }[];
+  /** The field it uses to tell items apart. */
+  id: string | null;
+  /** For "Before each event": the field with the start time. */
+  start?: string | null;
+  /** The items as lines (the first 8). */
+  items: string[];
+  /** The answer as it came, shortened. */
+  raw: string;
+}
 
 export type JsonOp = 'changed' | 'eq' | 'ne' | 'gt' | 'lt' | 'contains';
 
@@ -173,6 +247,8 @@ export interface WatchPreview {
   note: string;
   /** What it read, shortened. */
   sample?: string;
+  /** A connected account's watcher: where the items are, and the fields to pick from. */
+  find?: AccountFind;
 }
 
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -241,8 +317,18 @@ export function watchText(w: WatchSpec): string {
       return `${w.on === 'exit' ? 'The exit code' : 'The output'} of “${w.command.length > 40 ? `${w.command.slice(0, 39)}…` : w.command}” changing`;
     case 'mail':
       return `New email in ${w.account}${w.folder && !/^inbox$/i.test(w.folder) ? ` (${w.folder})` : ''}${w.from ? ` from “${w.from}”` : ''}${w.subject ? ` about “${w.subject}”` : ''}${w.unread ? ', unread' : ''}`;
+    case 'account': {
+      const who = w.name || w.app;
+      if (!w.before) return `New items from ${who} (${w.tool})`;
+      const b = w.before;
+      const which = `each event in ${who}${b.title ? ` titled “${b.title}”` : ''}${b.others ? ' with other people' : ''}`;
+      return b.evening ? `The evening before ${which}, at ${b.evening}` : `${leadText(b.minutes ?? 30)} before ${which}`;
+    }
   }
 }
+
+/** "30 min", "1 hour", "2 hours". */
+export const leadText = (m: number) => (m % 60 === 0 ? (m === 60 ? '1 hour' : `${m / 60} hours`) : `${m} min`);
 
 export const JSON_OP_TEXT: Record<JsonOp, string> = { changed: 'changes', eq: 'equals', ne: 'is not', gt: 'is above', lt: 'is below', contains: 'contains' };
 
