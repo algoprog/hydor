@@ -6,6 +6,7 @@ import { isConfidential } from '@shared/confidential';
 import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
 import { openSession } from '../../lib/nav';
+import { LOCALE } from '../../i18n/locale';
 import { toast, toastError, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
@@ -16,7 +17,7 @@ import { clearDraft, draftFiles, draftText, keepDraftFiles, keepDraftText } from
 import { QUOTE_EVENT, quoteBlock } from './QuoteSelection';
 import { AttachmentList } from '../../components/Attachments';
 import { BlockedApproval } from './BlockedApproval';
-import { SessionMeters } from './SessionMeters';
+import { ContextBreakdown, contextLines, contextRows, SessionMeters } from './SessionMeters';
 import { stopWords, taskKindOf } from '../../lib/work';
 import { stopEverything } from './WorkRow';
 import { WorkTray } from './WorkTray';
@@ -117,25 +118,29 @@ function AddButton({ onFiles, onScreen, disabled }: { onFiles: () => void; onScr
   );
 }
 
-/** How full the context is: a small ring and its percentage, amber above 85%. */
-function ContextRing({ pct, title, disabled, onClick }: { pct: number; title: string; disabled?: boolean; onClick: () => void }) {
+/** How full the context is: a small ring and its percentage, amber above 85%. A button that compacts when `onClick` is given; else (the agent condenses by itself) only a reading. */
+function ContextRing({ pct, title, disabled, onClick }: { pct: number; title: string; disabled?: boolean; onClick?: () => void }) {
   const r = 7;
   const len = 2 * Math.PI * r;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      data-tip="context"
-      title={title}
-      aria-label={`${pct}% of the context in use`}
-      className={cx('tnum inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px] transition-colors hover:bg-bg-2 disabled:pointer-events-none', pct > 85 ? 'text-warn' : 'text-fg-3')}
-    >
+  const cls = cx('tnum inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12px]', pct > 85 ? 'text-warn' : 'text-fg-3');
+  const inner = (
+    <>
       <svg viewBox="0 0 18 18" width="15" height="15" className="-rotate-90" aria-hidden>
         <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" opacity="0.25" />
         <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray={`${(len * Math.min(100, pct)) / 100} ${len}`} />
       </svg>
       {pct}%
+    </>
+  );
+  if (!onClick)
+    return (
+      <span data-tip="context" title={title} role="img" aria-label={`${pct}% of the context in use`} className={cls}>
+        {inner}
+      </span>
+    );
+  return (
+    <button type="button" disabled={disabled} onClick={onClick} data-tip="context" title={title} aria-label={`${pct}% of the context in use`} className={cx(cls, 'transition-colors hover:bg-bg-2 disabled:pointer-events-none')}>
+      {inner}
     </button>
   );
 }
@@ -374,6 +379,14 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const agentTasks = runningTasks.filter((t) => taskKindOf(t.kind) === 'subagent').length;
   const stops = stopWords(working, (activity?.helpers ?? 0) + agentTasks, runningTasks.length - agentTasks);
   const ctx = live?.contextTokens && live?.contextWindow ? Math.round((live.contextTokens / live.contextWindow) * 100) : null;
+  // A Custom or other ACP agent condenses its conversation by itself: only Claude Code and Codex sessions compact on request.
+  const canCompact = s.agent !== 'acp';
+  // Where the context goes (Custom says so): folded under the options menu's Context row until it is clicked.
+  const hasParts = contextRows(live).length > 0;
+  const [partsOpen, setPartsOpen] = useState(false);
+  const tokensNow = live?.contextTokens?.toLocaleString(LOCALE);
+  const tokensMax = live?.contextWindow?.toLocaleString(LOCALE);
+  const ctxTitle = [canCompact ? `${ctx}% of the context in use (${tokensNow} of ${tokensMax} tokens) · click to compact` : `${ctx}% of the context in use (${tokensNow} of ${tokensMax} tokens)`, ...contextLines(live)].join('\n');
   const touch = isTouch();
   const canSend = (!!(text.trim() || atts.length) || !!move) && !busy && !locked;
   // The options chip: the assistant and the model, then the effort and permissions when they are not the usual.
@@ -571,19 +584,37 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                     <ModePicker label="Permissions" agent={s.agent} acp={s.acpAgent} value={mode} onChange={(v) => configure({ mode: v })} />
                     <SessionAccount s={s} />
                     <FeatureSessionOptions s={s} />
-                    {ctx != null && (
-                      <button
-                        type="button"
-                        disabled={working}
-                        onClick={() => void compact()}
-                        title="Compact the conversation: the history so far becomes a summary, which frees context"
-                        className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]"
-                      >
-                        <span className="shrink-0 text-fg-2">Context</span>
-                        <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
-                        <span className="shrink-0 text-[12.5px] font-medium text-accent">Compact</span>
-                      </button>
-                    )}
+                    {ctx != null &&
+                      (canCompact ? (
+                        <button
+                          type="button"
+                          disabled={working}
+                          onClick={() => void compact()}
+                          title="Compact the conversation: the history so far becomes a summary, which frees context"
+                          className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 disabled:opacity-50 max-sm:h-11 max-sm:text-[14.5px]"
+                        >
+                          <span className="shrink-0 text-fg-2">Context</span>
+                          <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
+                          <span className="shrink-0 text-[12.5px] font-medium text-accent">Compact</span>
+                        </button>
+                      ) : hasParts ? (
+                        <button
+                          type="button"
+                          onClick={() => setPartsOpen((v) => !v)}
+                          aria-expanded={partsOpen}
+                          className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-left text-[13.5px] transition-colors hover:bg-bg-2 max-sm:h-11 max-sm:text-[14.5px]"
+                        >
+                          <span className="shrink-0 text-fg-2">Context</span>
+                          <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
+                          <ChevronDown size={14} className={cx('shrink-0 text-fg-3', partsOpen && 'rotate-180')} aria-hidden />
+                        </button>
+                      ) : (
+                        <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-[13.5px] max-sm:h-11 max-sm:text-[14.5px]">
+                          <span className="shrink-0 text-fg-2">Context</span>
+                          <span className={cx('tnum ml-auto min-w-0 truncate pl-3 font-medium', ctx > 85 ? 'text-warn' : 'text-fg')}>{ctx}% in use</span>
+                        </div>
+                      ))}
+                    {ctx != null && partsOpen && <ContextBreakdown live={live} />}
                     <SessionMeters live={live} />
                   </>
                 )}
@@ -593,8 +624,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
               <ContextRing
                 pct={ctx}
                 disabled={working}
-                onClick={() => void compact()}
-                title={`${ctx}% of the context in use (${live?.contextTokens?.toLocaleString()} of ${live?.contextWindow?.toLocaleString()} tokens) · click to compact`}
+                onClick={canCompact ? () => void compact() : undefined}
+                title={ctxTitle}
               />
             )}
             <FeatureComposerButtons s={s} insert={insertText} disabled={locked} />

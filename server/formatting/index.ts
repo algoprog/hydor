@@ -8,7 +8,8 @@
 // to use one "when the answer is something to look at", agents kept to text for nearly everything.
 import type { Feature } from '../features/types.ts';
 
-export const FORMATTING = [
+/** Every agent's rules for its replies, line by line. */
+const LINES = [
   'Formatting your replies: the app shows them as rich text, so write them for reading, not for a terminal.',
   '- Markdown where it helps: short paragraphs; headings for a long answer; numbered steps; bullets for a few short points; **bold** for the key point; code in fenced blocks named by their language. A short answer stays a sentence or two. Comparisons, things each with details and rows of data go in answer UIs (below), not in Markdown tables: keep those for a few short cells that no UI fits.',
   '- Maths in LaTeX, which the app draws: $…$ inside a sentence, $$…$$ on lines of their own for an equation set apart (aligned, cases and matrices inside it), \\ce{…} for chemistry; never as code or plain text. Write a dollar sign that means money as \\$.',
@@ -27,9 +28,22 @@ export const FORMATTING = [
   '- Figures and small interactive tools (when no answer UI fits): a ```html live block runs in place, in a sandboxed frame sized to its content: a chart, an annotated figure, a calculator or a simulation with sliders, a short quiz. A fragment is enough (a <title> names it); keep it self-contained (inline CSS and JavaScript, libraries from cdn.jsdelivr.net, unpkg.com or cdnjs.cloudflare.com; it cannot reach this app or the user’s files). It takes the app’s look and theme by itself: colour it with var(--n-fg), var(--n-muted), var(--n-line), var(--n-accent), and var(--n-c1) to var(--n-c6) for series; no background or font of its own. A plain ```html block stays code. A whole page (a report, a dashboard) goes in show_html, and one the user will keep in save_page.',
   '- Pictures and videos: where seeing helps (a place, a product, a plant or animal, an artwork, a building, a dish, a person in the news, a figure from a paper), show one to three pictures, each as ![what it shows](address) on a line of its own: the address of the image file itself, as find_media, a search or a page you read gave it, never a guessed one. A picture on this computer shows by its path. Where watching helps more (how to do something by hand, a trailer, a performance, a place to visit), play a video in place with the video UI (find_media finds one with videos: true).',
   'Use these where they make the answer clearer; when the user’s guidelines or messages ask for plain text, write plain text.',
-].join('\n');
+];
+
+export const FORMATTING = LINES.join('\n');
+
+/** The lines on answer UIs (the bullet, its list and how to write one). */
+const answerUiLine = (l: string) => /^- Answer UIs:|^ {2}- |^Call find_ui first/.test(l);
+
+/**
+ * The rules for a model of a small context (Custom's lean instructions): without answer UIs, which such a model
+ * rarely fills well and which cost a fifth of what every agent is told.
+ */
+export const FORMATTING_LEAN = LINES.filter((l) => !answerUiLine(l))
+  .map((l) => l.replace(/ Comparisons, things each with details and rows of data go in answer UIs \(below\)[^.]*\./, '').replace(' (when no answer UI fits)', ''))
+  .join('\n');
 
 export const formatting: Feature = {
   id: 'formatting',
-  spawn: () => ({ instructions: [FORMATTING] }),
+  spawn: (s) => ({ instructions: [s.lean ? FORMATTING_LEAN : FORMATTING] }),
 };

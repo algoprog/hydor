@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { toolAllowed } from '../../shared/assistants.ts';
-import type { AgentModel } from '../../shared/types.ts';
+import type { AgentModel, ContextPart } from '../../shared/types.ts';
 import { PUBLIC_RUN_ENV, publicRunOf, publicRunPrompt } from '../apps/publicRun.ts';
 import { checkpoint, estimate, NOTES_START, pinned, prune, summaryRequest, tailStart, type Pins } from './compact.ts';
 import { callId, familyOf, requestOptions } from './families.ts';
@@ -22,7 +22,7 @@ import { parseCalls, StreamFilter, stripMarkup } from './parse.ts';
 import { parsePatch, shellPatch } from './patch.ts';
 import { alwaysLabel, decide, type Ask } from './permissions.ts';
 import { runningOf } from './procs.ts';
-import { findSkills, MODES, projectOf, systemPrompt, type Mode, type Skill } from './prompt.ts';
+import { findSkills, MODES, projectOf, promptParts, scaleParts, type AppContext, type Mode, type Skill } from './prompt.ts';
 import { adapt, checkArgs, cleanPath, closeNames, findTool, fitArgs, repairJson } from './repair.ts';
 import { autoReview } from './review.ts';
 import { CONFIDENTIAL_ENV, confidentialSession, NET_NOTE, netRefused, SANDBOX_NOTE, sandboxShell } from './sandbox.ts';
@@ -296,8 +296,9 @@ function pinsOf(s: Session, skills: Skill[], w: number): Pins {
  * Adds a model call's tokens and cost to the session's totals and tells the app (an ACP usage_update,
  * kept in the transcript): its spending, and its cap. OpenRouter says what each call cost; a model on
  * this machine costs nothing; for other servers the app prices the tokens itself, so no cost is sent.
+ * A call of the conversation itself also says how full the context is, and where it goes by part.
  */
-function account(s: Session, m: AgentModel, u: Reply['usage']) {
+function account(s: Session, m: AgentModel, u: Reply['usage'], parts?: Partial<Record<ContextPart, number>>) {
   if (!u) return;
   const t = s.spent?.session === s.id ? s.spent : (s.spent = { session: s.id, in: 0, out: 0, cached: 0, usd: 0, unpriced: 0 });
   const cached = Math.min(u.cached ?? 0, u.prompt);
@@ -309,12 +310,16 @@ function account(s: Session, m: AgentModel, u: Reply['usage']) {
   else t.usd += cost;
   update(s.id, {
     sessionUpdate: 'usage_update',
-    used: u.prompt + u.completion,
-    size: window(s, m),
+    // How full the context is: from a call of the conversation itself, not one that summarizes it.
+    ...(parts ? { used: u.prompt + u.completion, size: window(s, m) } : {}),
     ...(t.unpriced ? {} : { cost: { amount: Math.round(t.usd * 1e6) / 1e6, currency: 'USD' } }),
-    _meta: { hydor: { tokensIn: t.in, tokensOut: t.out, tokensCached: t.cached, model: m.id } },
+    _meta: { hydor: { tokensIn: t.in, tokensOut: t.out, tokensCached: t.cached, model: m.id, ...(parts ? { context: scaleParts(parts, u.prompt, u.completion) } : {}) } },
   });
 }
+
+
+/** Whether a model's context is small (32k tokens or so): it gets the lean instructions, fewer tools in full and a catalog by name. */
+const isSmall = (s: Session, m: AgentModel) => m.provider !== 'openrouter' && window(s, m) <= 33_000;
 
 const textOf = (c: ChatMessage['content']) => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => (p.type === 'text' ? p.text : '')).join('') : '');
 
@@ -394,14 +399,16 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
  * What the app's capabilities add to the instructions for this turn (memory, the assistant…), and the local time.
  * Memory's part stays the same until the conversation is condensed (`epoch`), so the instructions do too.
  */
-async function appContext(epoch = 0): Promise<{ text: string; now?: string }> {
-  if (!RUNTIME) return { text: '' };
+async function appContext(epoch = 0, lean = false): Promise<AppContext> {
+  if (!RUNTIME) return {};
   try {
-    const r = await fetch(`${RUNTIME}/context?epoch=${epoch}`, { signal: AbortSignal.timeout(5000) });
+    const r = await fetch(`${RUNTIME}/context?epoch=${epoch}${lean ? '&lean=1' : ''}`, { signal: AbortSignal.timeout(5000) });
     const d: any = r.ok ? await r.json() : {};
-    return { text: String(d.text ?? ''), now: d.now ? String(d.now) : undefined };
+    const parts = Array.isArray(d.parts) ? d.parts.map((x: any) => ({ id: String(x?.id ?? ''), text: String(x?.text ?? '') })) : undefined;
+    const guides = Array.isArray(d.guides) ? d.guides.map((g: any) => ({ tools: Array.isArray(g?.tools) ? g.tools.map(String) : [], text: String(g?.text ?? '') })) : undefined;
+    return { parts, guides, text: parts ? undefined : String(d.text ?? ''), now: d.now ? String(d.now) : undefined };
   } catch {
-    return { text: '' };
+    return {};
   }
 }
 
@@ -447,7 +454,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   const skills: Skill[] = PUBLIC_RUN ? [] : findSkills(s.cwd);
   s.skillDirs = skills.map((k) => path.dirname(k.file));
   // A public run hears nothing from the app's capabilities (memory, connections…), only the time.
-  const app = PUBLIC_RUN ? { text: '', now: (await appContext()).now } : await appContext(s.epoch ?? 0);
+  const app: AppContext = PUBLIC_RUN ? { now: (await appContext()).now } : await appContext(s.epoch ?? 0, isSmall(s, m));
   s.condensed = undefined;
   // Reasoning from earlier turns is not sent again: it only weighed on the saved conversation.
   for (const x of s.messages) {
@@ -490,7 +497,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
   let overflowed = false;
   let cuts = 0;
   let budget: number | undefined;
-  let system: { key: string; text: string } | undefined;
+  let system: { key: string; text: string; parts: { part: ContextPart; text: string }[] } | undefined;
   for (let step = 1; ; step++) {
     if (ac.signal.aborted) return 'cancelled';
     await receive();
@@ -502,7 +509,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
     const w = window(s, m);
     const fam = familyOf(m);
     const textMode = m.tools === 'text' || s.textTools.includes(m.id);
-    const small = m.provider !== 'openrouter' && w <= 33_000;
+    const small = isSmall(s, m);
     // The background tools stay offered once something has run there: the tools (and the instructions that name them)
     // then change once in a session, not each time a command starts or ends, so the provider's cache of the
     // conversation holds.
@@ -522,18 +529,21 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
     const schemas = o.visible.map(schemaOf);
     // The instructions stay the same through the turn (servers reuse what they computed for the same start), unless the tools change.
     const key = `${m.id}|${textMode}|${o.visible.map((t) => t.name).join(',')}`;
-    if (system?.key !== key)
-      system = {
-        key,
-        text: PUBLIC_RUN
-          ? publicRunPrompt({ tools: o.visible.map((t) => t.name), textTools: textMode ? schemas : undefined, small, catalog: o.catalog, notes: fam.notes })
-          : systemPrompt({ cwd: s.cwd, mode: s.mode, skills, textTools: textMode ? schemas : undefined, small, app, project, tools: o.visible.map((t) => t.name), catalog: o.catalog, family: fam }),
-      };
+    if (system?.key !== key) {
+      const parts = PUBLIC_RUN
+        ? [{ part: 'instructions' as const, text: publicRunPrompt({ tools: o.visible.map((t) => t.name), textTools: textMode ? schemas : undefined, small, catalog: o.catalog, notes: fam.notes }) }]
+        : promptParts({ cwd: s.cwd, mode: s.mode, skills, textTools: textMode ? schemas : undefined, small, app, project, tools: o.visible.map((t) => t.name), catalog: o.catalog, family: fam });
+      system = { key, text: parts.map((x) => x.text).join('\n\n'), parts };
+    }
     const filter = new StreamFilter({ text: (t) => say(s.id, 'agent_message_chunk', t), thought: (t) => say(s.id, 'agent_thought_chunk', t) }, all.map((t) => t.name));
     const used = s.usage && s.usage.at <= s.messages.length ? s.usage.tokens + estimate(s.messages.slice(s.usage.at)) : estimate(s.messages) + system.text.length / 4;
     // Room for the reply: what the model gives at most (more for one that reasons first), within what is left of its context.
     const cap = m.maxOutput ?? (m.reasoning || fam.effort ? 32_768 : 16_384);
     const room = m.contextLength || s.limits?.[m.id] ? Math.max(1024, Math.min(cap, w - used - 256)) : undefined;
+    // What this request holds, part by part, estimated from the text (the server counts the whole): the breakdown of the context.
+    const sizes: Partial<Record<ContextPart, number>> = { conversation: estimate(s.messages, imagesFor(w)) };
+    for (const x of system.parts) sizes[x.part] = (sizes[x.part] ?? 0) + x.text.length / 4;
+    if (!textMode) sizes.tools = (sizes.tools ?? 0) + JSON.stringify(schemas).length / 4;
     let reply;
     try {
       reply = await chat(m, {
@@ -577,7 +587,7 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
       throw e;
     }
     s.usage = reply.usage ? { tokens: reply.usage.prompt + reply.usage.completion, at: s.messages.length + 1 } : undefined;
-    account(s, m, reply.usage);
+    account(s, m, reply.usage, sizes);
     // Its tool calls: returned as such, or written in the text.
     let calls: Call[] = reply.calls.map((c) => ({ id: c.id, name: c.name, raw: c.arguments }));
     let inText = false;
@@ -733,7 +743,9 @@ async function execute(s: Session, p: Prepared, guard: Guard, base: Omit<ToolCtx
   const kept = files.map((f) => beforeEdit(snapDir(STATE_DIR, s.id), s.turnId, path.resolve(s.cwd, f)));
   try {
     const r = await tool.run(args, ctx);
-    if (tool.name === 'skill' && r.ok) s.skillsUsed = [...(s.skillsUsed ?? []).filter((n) => n !== args.name), String(args.name)].slice(-5);
+    // A skill loaded (not a search for one) is kept in view whatever is condensed (pinsOf).
+    const loaded = tool.name === 'skill' && r.ok && args.name ? base.skills.find((x) => x.name.toLowerCase() === String(args.name).trim().toLowerCase())?.name : undefined;
+    if (loaded) s.skillsUsed = [...(s.skillsUsed ?? []).filter((n) => n !== loaded), loaded].slice(-5);
     guard.after(tool.name, args, r.ok, tool.name === 'bash' && checkCommand(String(args.command ?? ''), s.cwd).parts.every((x) => x.safe));
     if (shell && /Read-only file system/.test(r.output)) r.output += SANDBOX_NOTE;
     if (shell && conf && netRefused(r.output)) r.output += NET_NOTE;

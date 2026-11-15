@@ -28,7 +28,7 @@ Every session the app starts gets the skill library:
 
 - **Claude Code** gets it as a plugin named "hydor", so its skills show with that name in front: hydor:research, hydor:writing and so on.
 - **Codex** gets it as an extra folder of skills.
-- **Custom**, the app's own agent, gets it in its list of skills. See [Custom](/guide/custom).
+- **Custom**, the app's own agent, gets its skills by name, in groups, and can also look for one by what the work is. See [Custom](/guide/custom).
 - **Other agents** (Gemini CLI, OpenCode and the rest) get the list of skills, each with the file to read when one fits.
 
 Sessions started outside the app, in a terminal or in VS Code, don't see the library. Nothing of it is written into your Claude Code or Codex settings.
@@ -37,7 +37,7 @@ A session in a project gets the project's own skills with the library's, each as
 
 Your own skills come before the built-in ones: one of yours with the name of a built-in skill takes its place. A plugin's skill with a name the library already has is left out, and its plugin's page says which skill agents get instead.
 
-Custom reads skills from several folders, in this order: the project's own skills (in its `.claude/skills` and `.agents/skills` folders), Claude Code's and Codex's own skills in your home folder, then the library. Where two skills share a name, the first one found wins. So a skill you write for Claude Code or for Codex reaches Custom too.
+Custom reads skills from several folders, in this order: the project's own skills (in its `.claude/skills` and `.agents/skills` folders), Claude Code's and Codex's own skills in your home folder, then the library. Where two skills share a name, the first one found wins. So a skill you write for Claude Code or for Codex reaches Custom too. Custom takes up to 200 skills, at most 40 of them the project's and yours; its instructions name them by group (the project's own, yours, then the library's groups such as Coding or Documents) rather than listing each one.
 
 ## See when an agent uses a skill
 
@@ -318,7 +318,7 @@ A proposal waits in three places, and an answer in any one of them shows everywh
 
 ## Skills that fit a new session
 
-When a session starts with a message, its agent also hears which skills fit that message, if any clearly do: up to three, each with what it is for, and how that agent loads one (Claude Code with its Skill tool, Codex and other agents by reading its SKILL.md, Custom with its skill tool). The agent loads the one that fits before it starts, or carries on when none does. It hears this once, with your first message, not with every message (Custom, in the instructions it works with).
+When a session starts with a message, its agent also hears which skills fit that message, if any clearly do: up to three, each with what it is for, and how that agent loads one (Claude Code with its Skill tool, Codex and other agents by reading its SKILL.md, Custom with its skill tool, which can also find a skill by what the work is, in a few words). The agent loads the one that fits before it starts, or carries on when none does. It hears this once, with your first message, not with every message (Custom, in the instructions it works with).
 
 The skills are found the way memory finds notes (see [What an agent starts with](/guide/memory#what-an-agent-starts-with)): by their words, a skill's name counting most, then its keywords and what it is for; and, with search by meaning on in [Settings → Memory](/settings?s=memory&find=Search%20by%20meaning), by what they mean, so a request in other words, or in another language, still finds its skill. Only clear matches count: by words, at least two of yours and well ahead of the rest; by meaning, the closest skill alone, when it is alike enough. Common words of a request, such as "help", "need" or "after", don't count toward a match. Small talk, short replies and requests that no skill fits get none.
 

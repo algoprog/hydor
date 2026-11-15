@@ -62,11 +62,13 @@ function instructions(apps: Conn[]): string {
     lines.push(
       `Connected accounts (the user's own, in other services, set up in Apps → Connected apps), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those services.`,
     );
-  lines.push(
-    'Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across. When a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).',
-  );
+  lines.push('Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across.');
   return lines.join('\n');
 }
+
+/** How to use the vault and its tools: a guide, given while one of them is offered. */
+const VAULT_GUIDE =
+  'Keys and sign-ins: when a task needs one, use what is set up already (list_connections shows the vault and the connected accounts; a program on this computer may be signed in already). If it is not there, call request_secret (name, why, domains; fields for a sign-in in several parts; commands: true for use in commands): the user fills in a card, the values go to the vault, and a message tells you when they are saved. You never see them: use them by name, in http_request (auth: NAME, or {{NAME}} in the address, headers or body), in browser_act (a type step with "secret": NAME, to sign in on a site) and in run_with_secrets ($NAME in a command).';
 
 /** The address the person reaches this app at, from the page that asked (sign-ins come back there). */
 function originOf(d: Deps, h: Record<string, unknown>): string {
@@ -340,7 +342,7 @@ export const connections: Feature = {
         console.warn(`[connections] ${c.id} left out: ${(e as Error).message}`);
       }
     }
-    return { mcpServers, instructions: [instructions(apps.filter((c) => mcpServers[c.id]))] };
+    return { mcpServers, instructions: [instructions(apps.filter((c) => mcpServers[c.id]))], guides: [{ tools: ['request_secret', 'http_request', 'run_with_secrets', 'list_connections'], text: VAULT_GUIDE }] };
   },
   scrub: redact,
   // Keys agents asked for that the user has not entered yet (in a session still kept).

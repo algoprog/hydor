@@ -15,7 +15,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { skillLoaded, type SkillProposal } from '../../shared/skillpack.ts';
 import type { ServerEvent } from '../../shared/types.ts';
-import { findSkills } from '../agent/prompt.ts';
+import { findSkills, skillsFor, systemPrompt } from '../agent/prompt.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
 import { openDb } from '../db.ts';
@@ -210,6 +210,30 @@ await test("Custom's skills list: a big collection of your own leaves room for t
   }
 });
 
+await test("Custom's instructions name its skills by group, without their descriptions; its skill tool finds them by what the work is", () => {
+  const proj = path.join(root, 'grouped');
+  write(path.join(proj, '.agents', 'skills', 'deploy', 'SKILL.md'), '---\nname: deploy\ndescription: Use when shipping this project to its servers.\n---\n\n# Deploy\n');
+  const before = process.env.HYDOR_SKILL_DIRS;
+  process.env.HYDOR_SKILL_DIRS = viewSkills();
+  try {
+    const list = findSkills(proj);
+    assert.equal(list.find((s) => s.name === 'deploy')?.group, 'This project');
+    assert.equal(list.find((s) => s.name === 'pdf')?.group, 'Documents');
+    const text = systemPrompt({ cwd: proj, mode: 'ask', skills: list, small: false });
+    assert.match(text, /^- This project: deploy$/m);
+    assert.match(text, /^- Documents: (.+, )?pdf(, .+)?$/m);
+    assert.match(text, /^- Research and the web: (.+, )?research(, .+)?$/m);
+    assert.doesNotMatch(text, /Use when shipping this project/, 'descriptions stay out of the instructions');
+    assert.ok(text.indexOf('- This project:') < text.indexOf('- Documents:'), 'the project’s own come first');
+    assert.equal(skillsFor(list, 'fill in the form in a PDF')[0]?.name, 'pdf');
+    assert.equal(skillsFor(list, 'deploy this project')[0]?.name, 'deploy');
+    assert.deepEqual(skillsFor(list, 'zzqx'), []);
+  } finally {
+    if (before === undefined) delete process.env.HYDOR_SKILL_DIRS;
+    else process.env.HYDOR_SKILL_DIRS = before;
+  }
+});
+
 await test('what each agent is given: a plugin folder, an extra skills folder, an environment variable, a list to read from', async () => {
   const base = { cwd: root, runId: 'r', resume: false, extra: {} };
   // Stand-ins for Claude Code: an older one without --plugin-dir gets nothing (it would not start).
@@ -271,7 +295,7 @@ await test("Custom's instructions: the routing rule, the triggered skill's text,
   const say = (id: string, text: string) => sessions.items.set(key, [...(sessions.items.get(key) ?? []), { kind: 'user', id, seq: 0, text }]);
   say('u1', 'Please research the best e-bikes for steep hills under 3000 euros');
   const c1 = String(await skillpack.context!({ key, cwd: root, extra: {} }, deps));
-  assert.match(c1, /look through the list\. When one fits, load it with the skill tool, say “Using skill <name>”/);
+  assert.match(c1, /with the skill tool’s query for what the work is\. When one fits, load it with the skill tool, say “Using skill <name>”/);
   assert.doesNotMatch(c1, /[A-Z]{5,}/, 'no shouting');
   assert.match(c1, /<skill name="research" folder="[^"]+">\n# Research/);
   assert.doesNotMatch(c1, /^---$/m, 'frontmatter left out');

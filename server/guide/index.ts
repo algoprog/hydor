@@ -180,6 +180,9 @@ export const guide: Feature = {
   tools: () => [APP_GUIDE, APP_API, ASK_FORM],
   spawn: (s) => {
     const help = helpInstructions(s.extra?.help);
-    return { instructions: help ? [GUIDE_INSTRUCTIONS, help] : [GUIDE_INSTRUCTIONS] };
+    // About app_guide, app_api and ask_form alone: a guide to those tools, except in a session asked from the Help page,
+    // which is about the app from its first word, so it starts with the guide's instructions and the topic being read.
+    if (help) return { instructions: [GUIDE_INSTRUCTIONS, help] };
+    return { guides: [{ tools: ['app_guide', 'app_api', 'ask_form'], text: GUIDE_INSTRUCTIONS }] };
   },
 };

@@ -75,12 +75,20 @@ export interface SpawnInfo {
   prompt?: string;
   /** The model it starts with, when one is named (none: the program's own default). */
   model?: string;
+  /** Custom with a model of a small context (32k tokens or less): give only what such a model needs. */
+  lean?: boolean;
 }
 
 /** An MCP server for an agent: at an address, or a command it starts. */
 export type McpServerSpec =
   | { type: 'http'; url: string; headers?: Record<string, string> }
   | { type: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
+
+/** Instructions that matter only once one of these tools (by their names on the app's own server) is in use. */
+export interface ToolGuide {
+  tools: string[];
+  text: string;
+}
 
 /** What a starting agent gets from the capabilities. */
 export interface SpawnAdditions {
@@ -90,6 +98,13 @@ export interface SpawnAdditions {
   /** With the first message after the agent starts, once, ahead of it in a <system-reminder>: what bears on that
    * request alone (memory's notes for it, the skills that fit it, what the project's folder holds now). */
   notes?: string[];
+  /**
+   * Instructions about some of the capability's tools alone: how and when to use them. Every agent gets them with its
+   * instructions, except Custom, which gets one only while one of its `tools` is offered to the model in full: tools
+   * waiting in its catalog cost a line each until find_tools brings them in, and their instructions come with them.
+   * Rules that hold whatever tools are in use (keys and passwords, how replies look) stay in `instructions`.
+   */
+  guides?: ToolGuide[];
   mcpServers?: Record<string, McpServerSpec>;
   env?: Record<string, string>;
   /** More arguments for the agent's command (Claude Code: --plugin-dir). */
@@ -103,6 +118,9 @@ export interface SpawnAdditions {
   /** Codex: more settings for its thread ({ web_search: "disabled" }). */
   codexConfig?: Record<string, unknown>;
 }
+
+/** All the capabilities give a starting agent together: the tools' guides are in its instructions by then. */
+export type GivenAdditions = Required<Omit<SpawnAdditions, 'guides'>>;
 
 export interface TurnInfo {
   key: string;
@@ -136,7 +154,7 @@ export interface Feature {
    * condensed: what may change from turn to turn (memory) keeps the same text within one, so the instructions
    * stay as the provider cached them.
    */
-  context?(s: { key: string; cwd: string; extra: SessionExtra; epoch?: number }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
+  context?(s: { key: string; cwd: string; extra: SessionExtra; epoch?: number; lean?: boolean }, d: Deps): string | null | undefined | Promise<string | null | undefined>;
   /** A turn ended (every session counts, also ones run outside the app). */
   turnEnd?(t: TurnInfo, d: Deps): void | Promise<void>;
   /** Told of every event sent to the pages: a session changed, a capability's list changed… */

@@ -317,7 +317,7 @@ Press Ctrl+F (⌘F) in a session. **Find in this session** looks through your me
 
 A small ring with a percentage by the microphone fills as the conversation uses up the model's context window; the rest is at the foot of the Options chip's menu:
 
-- **Context**: the ring, and the **Context** row in Options ("42% in use"). Point at the ring for the exact number of tokens. It turns amber above 85%. Click the ring, or **Compact** in Options, to compact the conversation (not while a turn runs).
+- **Context**: the ring, and the **Context** row in Options ("42% in use"). Point at the ring for the exact number of tokens. It turns amber above 85%. Click the ring, or **Compact** in Options, to compact the conversation (not while a turn runs). In a Custom session, point at the ring for the tokens and a breakdown of what they go to, and the breakdown is under the arrow of the **Context** row; Custom condenses by itself, so there is no **Compact** and clicking the ring does nothing (see [Long conversations and long output](/guide/custom#long-conversations-and-long-output)).
 - **cache 4m** (Claude Code): the prompt cache keeps the conversation ready for a while (5 minutes or an hour), so the next message is cheaper and quicker. It counts down while you send nothing; a message before then reuses it and starts the count again. **cache cold** means the next message rebuilds it.
 - **85 tok/s**: how fast the last reply was written, in tokens a second.
 

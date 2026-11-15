@@ -1259,7 +1259,14 @@ export const apps: Feature = {
   },
   spawn(s, d) {
     const mark = markOf(s.extra);
-    if (!mark) return { instructions: [BUILDER_NOTE, useNote(d.db)].filter((x): x is string => !!x) };
+    // How to make apps and how to run the user's are about those tools alone (guides: Custom gets each while its tools are offered in full).
+    if (!mark)
+      return {
+        guides: [
+          { tools: ['app_get', 'app_save', 'app_try', 'app_screen', 'app_data'], text: BUILDER_NOTE },
+          ...[useNote(d.db)].filter((x): x is string => !!x).map((text) => ({ tools: ['use_app', 'find_apps'], text })),
+        ],
+      };
     noteAgentRun(s.runId, mark);
     const hit = runOfCtx({ runId: s.runId, key: s.key ?? '' });
     if (!hit) return;

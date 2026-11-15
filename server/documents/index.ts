@@ -234,9 +234,13 @@ export const documents: Feature = {
   },
   tools: (_ctx: RunCtx) => [READ, PRESENT, ...PDF_TOOLS],
   spawn: () => ({
+    // Reading documents and the PDF tools are about those tools alone (guides); presenting what a turn made holds whatever tools are in use.
     instructions: [
-      'Documents: read PDF, Word, Excel, PowerPoint and other documents with read_document. Whenever a turn makes or changes files for the user (a document, a paper, a spreadsheet, slides, a PDF, a notebook, images), updates included, finish it by calling present_files with them: they show as cards the user can open and download (a notebook opens in the notebook page, to run). In your reply, name each file as a Markdown link to its path ([report.pdf](/full/path/report.pdf)): a click opens it in the app’s file viewer.',
-      PDF_INSTRUCTIONS,
+      'Whenever a turn makes or changes files for the user (a document, a paper, a spreadsheet, slides, a PDF, a notebook, images), updates included, finish it by calling present_files with them: they show as cards the user can open and download (a notebook opens in the notebook page, to run). In your reply, name each file as a Markdown link to its path ([report.pdf](/full/path/report.pdf)): a click opens it in the app’s file viewer.',
+    ],
+    guides: [
+      { tools: ['read_document'], text: 'Documents: read PDF, Word, Excel, PowerPoint and other documents with read_document.' },
+      { tools: ['pdf_look', 'pdf_form', 'pdf_fill', 'pdf_write', 'pdf_pages'], text: PDF_INSTRUCTIONS },
     ],
     // Where the office skills' helper scripts keep their Python environment.
     env: { HYDOR_DATA_DIR: config.dataDir },

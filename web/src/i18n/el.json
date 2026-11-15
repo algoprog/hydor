@@ -1,4 +1,6 @@
 {
+"App features":"Λειτουργίες της εφαρμογής",
+"Project instructions":"Οδηγίες έργου",
 "doc::Number format":"Μορφή αρίθμησης",
 "Instagram story":"Ιστορία Instagram",
 "media::Sans serif":"Χωρίς πατούρες",
@@ -130,6 +132,7 @@
 "What should change in the part you picked?":"Τι να αλλάξει στο επιλεγμένο μέρος;",
 "Words, or a regular expression, in every file of the document.":"Λέξεις ή κανονική έκφραση σε κάθε αρχείο του εγγράφου.",
 ", where you made it":", εκεί που το φτιάξατε",
+"{0}% of the context in use ({1} of {2} tokens)":"Σε χρήση το {0}% του πλαισίου ({1} από {2} tokens)",
 "“{0}” is not a spreadsheet file: use an .xlsx, .ods, .csv or .tsv file.":"Το “{0}” δεν είναι αρχείο υπολογιστικού φύλλου: χρησιμοποιήστε αρχείο .xlsx, .ods, .csv ή .tsv.",
 "{0} · {1} × {2} mm":"{0} · {1} × {2} mm",
 "{0} × {1} pixels.":"{0} × {1} pixel.",

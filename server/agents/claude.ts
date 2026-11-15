@@ -10,7 +10,7 @@ import { firstLine, snippetDiff, stripWrappers, wholeFileDiff } from '../history
 import type { Runner, RunSpec } from '../runner/client.ts';
 import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { splitHandoff } from '../handoff.ts';
-import type { SpawnAdditions } from '../features/types.ts';
+import type { GivenAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 import { JsonFields } from '../pages/drafts.ts';
 
@@ -36,7 +36,7 @@ export interface ClaudeOpts {
   /** This app's MCP address for the session (show_html, web_search…). */
   pageServer?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
-  add?: Required<SpawnAdditions>;
+  add?: GivenAdditions;
 }
 
 export const CLAUDE_MODES = [

@@ -61,7 +61,7 @@ export const computer: Feature = {
     routes(d);
   },
   tools: (ctx) => (usable(ctx.deps.db) ? computerTools(ctx) : []),
-  spawn: (_s, d) => (usable(d.db) ? { instructions: [computerInstructions()] } : undefined),
+  spawn: (_s, d) => (usable(d.db) ? { guides: [{ tools: ['computer_screenshot', 'computer_act'], text: computerInstructions() }] } : undefined),
   // A turn's end: the agent is no longer at the computer.
   turnEnd: (t) => clearActive(t.key),
   start(d) {

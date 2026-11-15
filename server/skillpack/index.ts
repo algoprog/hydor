@@ -283,8 +283,8 @@ const SKILL_PATCH: RunTool = {
 // ---- Custom's instructions -----------------------------------------------------------------------
 
 const RULE = [
-  'Skills: the skills listed in these instructions are written methods for kinds of work (planning something big or vague, research, troubleshooting, writing, documents and more).',
-  'Before you start on a task, look through the list. When one fits, load it with the skill tool, say “Using skill <name>” in a short line, and follow it. Skip skills for greetings, quick questions and small, clear changes.',
+  'Skills: the skills named in these instructions are written methods for kinds of work (planning something big or vague, research, troubleshooting, writing, documents and more).',
+  'Before you start on a task, see whether one fits: by the names, or with the skill tool’s query for what the work is. When one fits, load it with the skill tool, say “Using skill <name>” in a short line, and follow it. Skip skills for greetings, quick questions and small, clear changes.',
   'A skill shown in full below is loaded already: follow it without loading it again.',
   'After a task that took real effort (several attempts, or a method the user had to explain), you may propose keeping the method as a skill with skill_save, or improving a skill you followed with skill_patch: the user approves first.',
 ].join(' ');

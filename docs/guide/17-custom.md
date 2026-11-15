@@ -39,7 +39,7 @@ You can switch the model during a session from the menu under the message box. C
 - **Commands**: run shell commands in the session's folder, for up to two minutes by default and ten at most. Servers, watchers and other commands that keep running go in the background: Custom reads their output when it needs to, and can stop them. They also stop when Custom exits, and its next turn is told which ones still run.
 - **Web pages**: fetch a page as clean text with its headings, links, lists and tables; PDFs and Office files online are read as text. It only reaches public addresses; for this computer or its network it uses a command such as `curl`.
 - **A plan**: for work with several steps it keeps a checklist, shown in the session, and ticks items off.
-- **Skills**: it loads the skills that fit the task: the project's, yours (Claude Code's and Codex's skill folders) and the app's [skill library](/guide/skills).
+- **Skills**: it loads the skills that fit the task: the project's, yours (Claude Code's and Codex's skill folders) and the app's [skill library](/guide/skills). It knows them by group and name, and can also look for one by what the work is, in a few words.
 - **MCP servers**: tool servers you set up for Claude Code (for all folders and for this folder), the project's `.mcp.json`, and Codex's.
 - **The app's own tools**: web search, the browser, memory, pages, your [connections](/guide/connections) and the rest, as every agent here gets them.
 
@@ -167,7 +167,24 @@ If a model's server says the conversation is too long, Custom learns that model'
 
 What memory gave Custom at the start stays the same while it works, so the model's server can reuse what it kept of the conversation, which is quicker and costs less. Each time it condenses, it reads memory again, for your latest message (see [What an agent starts with](/guide/memory#what-an-agent-starts-with)).
 
+The ring beside the message box shows how full the model's context is, as a percentage; point at it for the tokens and what they go to. Under **Options** (the chip under the message box) the **Context** row says "42% in use", with a small arrow: click it to show (or hide) the breakdown, which is folded at first: **Instructions**, **Project instructions**, **Memory**, **App features**, **Skills**, **Tools** and **Conversation**, each with its tokens and a thin bar for its share. A part with nothing in it is left out. The figures are estimated from the text and scaled to what the model's server counted. Clicking the ring does nothing in a Custom session, since Custom condenses by itself; Claude Code and Codex sessions keep their ring and **Compact** (see [Read the meters](/guide/sessions#read-the-meters-context-cache-and-speed)).
+
 Long output doesn't fill the conversation either. When a command, a page or a tool gives back more than a share of the model's context, Custom keeps the whole of it in a file in the session's own folder. The model gets the start and the end (for a command, mostly the end, where errors show up) and the file's location, and reads the rest in pieces or searches it. These files are deleted after a week.
+
+## What the model reads
+
+Before your message, the model is given, in this order:
+
+- Custom's own rules (how to work, the mode, the folder), the agent's instructions and your Agent Guidelines: **Instructions** in the breakdown;
+- the project's instructions, its `AGENTS.md` or `CLAUDE.md`: **Project instructions**;
+- what [memory](/guide/memory#what-an-agent-starts-with) has for your request: **Memory**;
+- what the app's features say: how replies look, keeping keys and passwords out of the chat, cleaning up, and how to use the tools it has in full (pictures, apps, the browser, documents and so on): **App features**;
+- its skills (**Skills**), named by group: the project's own, yours, then the library's groups such as Coding or Documents. Custom can load one by name, or look for one by what the work is. Custom takes up to 200 skills, at most 40 of them the project's and yours. The skills that fit your first message come with what each is for;
+- its tools, those it has in full and a short list of the rest: **Tools**.
+
+A feature's instructions about its own tools come with those tools. While a tool waits in Custom's short list of tools, its instructions wait too; they are added when the model looks the tool up or uses it. The rules that hold whatever tools are in use always stay. Claude Code and Codex get all of the app's instructions at the start, as before.
+
+So a first message to a model with a small context is shorter than it used to be, and what each part takes is in the breakdown under **Options**: see [Long conversations and long output](#long-conversations-and-long-output).
 
 ## How Custom copes with weaker models
 
@@ -181,7 +198,7 @@ Not every model is as practised with tools as Claude or GPT. Custom catches the 
 - **Broken tool calls**: calls written as text are read and run, calls with almost-right arguments are repaired, and a misspelt tool name is matched to the right one or answered with the list of tools.
 - **Models without tool calling**: when a model's server takes no tools, Custom describes them in the instructions and reads the model's calls from what it writes.
 - **Hiccups**: when the connection breaks mid-reply, or the server is busy, Custom waits and tries again a few times.
-- **Many tools**: when there are many (from MCP servers and connections), the model sees a short list and looks up the full description of the ones it needs. A model with a short context (about 32,000 tokens or less, not through OpenRouter) gets fewer tools and is asked to take small steps.
+- **Many tools**: when there are many (from MCP servers and connections), the model sees a short list and looks up the full description of the ones it needs; a feature's instructions about a tool come with it, when the model looks it up or uses it (see [What the model reads](#what-the-model-reads)). A model with a short context (about 32,000 tokens or less, not through OpenRouter) gets a leaner set: no guidance on answer UIs, a list of tools by name only, and fewer tools in full (the one that shows a page of HTML waits in the list too). It is also asked to take small steps.
 - **Each model family** gets its maker's recommended settings, the edit format it was trained on, and a reasoning effort where it has one. Steps that only read run at the same time, to save waiting.
 
 When Custom stops a turn for one of these reasons, the reply ends with "(Stopped: …)".
@@ -227,3 +244,5 @@ Custom's models are in [Settings → Agents → Models](/settings?s=models), and
 - "Can this computer run my confidential sessions' commands without network?"
 - "Add Qwen3 Coder from OpenRouter so I can use it with Custom." (once your OpenRouter key is set)
 - "Show my OpenRouter usage and costs without entering model prices."
+- "Why is my first message to Custom so long for a local model?"
+- "How full is the context of my Custom session, and what takes the most?"
