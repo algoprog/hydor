@@ -47,6 +47,8 @@ export interface RunMark {
   task: string;
   run: string;
   test?: boolean;
+  /** A test that sends nothing (server/outbox): calls that act outside are held as "would have sent". */
+  dry?: boolean;
 }
 
 /** Agent work that starts by itself; each run starts a new session or sends a message into one. */
@@ -134,6 +136,8 @@ export interface TaskRun {
   hasInput: boolean;
   /** The template run it started (a task that runs a template). */
   appRun?: string;
+  /** A test that sent nothing: calls to tools that send, post, delete or pay were held as "would have sent" (the Outbox keeps them). */
+  dry?: boolean;
 }
 
 /** What a task would be: everything needed to save it (an id when it changes one). */

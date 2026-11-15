@@ -5,6 +5,9 @@
 //                                 keys among them) on the app's own socket, which only this user can open
 //                                 (or at an http address when that socket is off), runs it, and passes its
 //                                 MCP messages through: only the tools that are on, keys masked in replies.
+//                                 Each tool call goes to Hydor's gate first, beside that address: a call to
+//                                 a tool on Ask first is held in the Outbox there, and the agent gets
+//                                 Hydor's answer instead (server/outbox).
 //                                 A form the app asks for mid-call (MCP elicitation) goes to Hydor,
 //                                 which shows it in the session; the answer goes back to the app.
 //   connbridge relay <address>    MCP over stdin and stdout, for an agent that cannot reach an address
@@ -12,6 +15,7 @@
 //
 // Messages are JSON-RPC, one per line. Imports nothing from the server.
 import { spawn } from 'node:child_process';
+import { askMarked } from '../../shared/outbox-words.ts';
 import { spawnProgram } from '../platform.ts';
 import http from 'node:http';
 
@@ -87,7 +91,7 @@ function postUnix(socket: string, path: string, body: string, signal: AbortSigna
 const each = (v: unknown, fn: (m: Msg) => void) => (Array.isArray(v) ? v : [v]).forEach((m) => m && typeof m === 'object' && fn(m as Msg));
 
 async function launch() {
-  let spec: { name: string; command: string; args: string[]; env: Record<string, string>; only: string[] | null; skip: string[]; mask: string[] };
+  let spec: { name: string; command: string; args: string[]; env: Record<string, string>; only: string[] | null; skip: string[]; mask: string[]; ask?: string[]; hold?: string[] };
   try {
     const r = address.startsWith('unix:') ? await getUnix(address.slice(5), socketPath ?? '') : await fetch(address, { signal: AbortSignal.timeout(20_000) }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => ({})) }));
     if (r.status !== 200) return die(r.body?.error ?? `Hydor answered ${r.status}`);
@@ -99,6 +103,9 @@ async function launch() {
   const skip = new Set(spec.skip ?? []);
   const filtering = !!only || skip.size > 0;
   const on = (name: unknown) => (!only || only.has(String(name))) && !skip.has(String(name));
+  // Tools on Ask first (marked in the list), and those whose calls go nowhere when Hydor cannot be asked.
+  const ask = new Set(spec.ask ?? []);
+  const hold = new Set(spec.hold ?? spec.ask ?? []);
   const masks = [...new Set(spec.mask.filter((s) => s.length >= 6).flatMap((s) => [s, JSON.stringify(s).slice(1, -1), encodeURIComponent(s), new URLSearchParams({ v: s }).toString().slice(2)]))].sort((a, b) => b.length - a.length);
   const mask = (t: string) => masks.reduce((s, m) => (s.includes(m) ? s.split(m).join('[hidden]') : s), t);
   const child = spawnProgram(spec.command, spec.args, { env: { ...process.env, ...spec.env }, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -133,32 +140,66 @@ async function launch() {
       asking.delete(ac);
     }
   };
+  /**
+   * Hydor's word on a tool call before it is made: what the agent gets instead when it is held, null to make it. When
+   * Hydor cannot be asked, a call to a tool it would hold is refused, and the others go as before.
+   */
+  const gate = async (m: Msg): Promise<{ text: string; error?: boolean } | null> => {
+    const body = JSON.stringify({ name: m.params?.name, arguments: m.params?.arguments });
+    try {
+      const signal = AbortSignal.timeout(20_000);
+      const r = address.startsWith('unix:')
+        ? await postUnix(address.slice(5), (socketPath ?? '').replace(/^\/launch\//, '/gate/'), body, signal)
+        : await fetch(address.replace('/launch/', '/gate/'), { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => ({})) }));
+      if (r.status === 200) return typeof r.body?.hold === 'string' ? { text: r.body.hold } : null;
+    } catch {}
+    const name = String(m.params?.name ?? '');
+    return hold.has(name) ? { text: `${spec.name}'s ${name} waits for the user's OK, and Hydor could not be reached to hold the call for it, so it was not made. Tell the user.`, error: true } : null;
+  };
+  /** One line from the agent, after the ones before it (a call waits for the gate, and what follows waits behind it). */
+  const fromAgent = async (line: string) => {
+    // Only lines that may need a change are read: the introduction, a call given up, tool calls, lists to mark, calls to tools that are off.
+    if (!filtering && !line.includes('"initialize"') && !line.includes('notifications/cancelled') && !line.includes('tools/call') && !(ask.size && line.includes('tools/list'))) return void child.stdin!.write(`${line}\n`);
+    let v: unknown;
+    try {
+      v = JSON.parse(line);
+    } catch {
+      return void child.stdin!.write(`${line}\n`);
+    }
+    // Calls to tools that are off, and calls held, are answered here (or dropped, without an id), in a batch too.
+    const held = new Set<Msg>();
+    for (const m of (Array.isArray(v) ? v : [v]) as Msg[]) {
+      if (!m || typeof m !== 'object') continue;
+      // The app may ask for forms: Hydor shows them, whatever the agent itself can.
+      if (m.method === 'initialize') m.params = { ...(m.params ?? {}), capabilities: { ...(m.params?.capabilities ?? {}), elicitation: { form: {}, url: {} } } };
+      // The agent gave up on a call: a form it was waiting on ends.
+      if (m.method === 'notifications/cancelled') for (const ac of asking) ac.abort();
+      if (off(m)) {
+        if (m.id != null) out({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${spec.name}'s ${m.params?.name} tool is turned off (Apps → Connected apps).` }], isError: true } });
+        continue;
+      }
+      if (m.method === 'tools/list' && m.id != null) listing.add(String(m.id));
+      if (m.method === 'tools/call') {
+        const h = await gate(m);
+        if (h) {
+          held.add(m);
+          if (m.id != null) out({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: h.text }], isError: !!h.error } });
+        }
+      }
+    }
+    const gone = (m: unknown) => !!m && typeof m === 'object' && (off(m as Msg) || held.has(m as Msg));
+    let rest = Array.isArray(v) ? v.filter((m) => !gone(m)) : gone(v) ? null : v;
+    // A batch down to one message goes as that message (newer servers take no batches).
+    if (Array.isArray(rest) && rest.length === 1 && Array.isArray(v) && v.length > 1) rest = rest[0];
+    if (rest && (!Array.isArray(rest) || rest.length)) child.stdin!.write(`${JSON.stringify(rest)}\n`);
+  };
+  let queue: Promise<void> = Promise.resolve();
   lines(
     process.stdin,
     (line) => {
-      // Only lines that may need a change are read: the introduction, a call given up, calls to tools that are off.
-      if (!filtering && !line.includes('"initialize"') && !line.includes('notifications/cancelled')) return void child.stdin!.write(`${line}\n`);
-      let v: unknown;
-      try {
-        v = JSON.parse(line);
-      } catch {
-        return void child.stdin!.write(`${line}\n`);
-      }
-      // Calls to tools that are off are answered here (or dropped, without an id), in a batch too.
-      each(v, (m) => {
-        // The app may ask for forms: Hydor shows them, whatever the agent itself can.
-        if (m.method === 'initialize') m.params = { ...(m.params ?? {}), capabilities: { ...(m.params?.capabilities ?? {}), elicitation: { form: {}, url: {} } } };
-        // The agent gave up on a call: a form it was waiting on ends.
-        if (m.method === 'notifications/cancelled') for (const ac of asking) ac.abort();
-        if (off(m) && m.id != null) out({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `${spec.name}'s ${m.params?.name} tool is turned off (Apps → Connected apps).` }], isError: true } });
-        if (m.method === 'tools/list' && m.id != null) listing.add(String(m.id));
-      });
-      let rest = Array.isArray(v) ? v.filter((m) => !(m && typeof m === 'object' && off(m as Msg))) : off(v as Msg) ? null : v;
-      // A batch down to one message goes as that message (newer servers take no batches).
-      if (Array.isArray(rest) && rest.length === 1 && Array.isArray(v) && v.length > 1) rest = rest[0];
-      if (rest && (!Array.isArray(rest) || rest.length)) child.stdin!.write(`${JSON.stringify(rest)}\n`);
+      queue = queue.then(() => fromAgent(line)).catch(() => {});
     },
-    () => child.stdin!.end(),
+    () => void queue.then(() => child.stdin!.end()),
   );
   lines(child.stdout!, (line) => {
     // A form the app asks for goes to the user, not the agent.
@@ -172,14 +213,15 @@ async function launch() {
         line = JSON.stringify(rest);
       } catch {}
     }
-    if (filtering && listing.size) {
+    if ((filtering || ask.size) && listing.size) {
       try {
         const v = JSON.parse(line);
         let changed = false;
         each(v, (m) => {
           if (m.id != null && listing.has(String(m.id)) && Array.isArray(m.result?.tools)) {
             listing.delete(String(m.id));
-            m.result.tools = m.result.tools.filter((t: { name?: unknown }) => on(t?.name));
+            // Only the tools that are on; those on Ask first say so.
+            m.result.tools = m.result.tools.filter((t: { name?: unknown }) => on(t?.name)).map((t: { name?: unknown }) => (ask.has(String(t?.name)) ? askMarked(t) : t));
             changed = true;
           }
         });

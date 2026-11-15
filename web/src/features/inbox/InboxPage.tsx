@@ -1,7 +1,8 @@
 // The inbox: everything waiting on you, on this machine and the others (Settings → Machines), newest
-// first. Approvals, questions and forms are answered right here; the rest open where they wait.
+// first. Approvals, questions and forms are answered right here; the rest open where they wait. On top, the
+// Outbox: calls to connected accounts held for your OK, each a draft to change and send, or drop.
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowUpRight, Globe, Inbox, KeyRound, Library, MessageSquare, MonitorSmartphone, Server } from 'lucide-react';
+import { ArrowUpRight, Globe, Inbox, KeyRound, Library, MessageSquare, MonitorSmartphone, Send, Server } from 'lucide-react';
 import type { InboxItem } from '@shared/inbox';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, Empty, Throbber } from '../../components/ui';
@@ -14,6 +15,10 @@ import { useSessions } from '../../lib/store';
 import { activityOf } from '../../lib/activity';
 import { PageHeader } from '../layout/PageHeader';
 import { ApprovalCard } from '../session/Approval';
+import { useConn } from '../connections/store';
+import { OutboxCard } from '../outbox/OutboxCard';
+import { useOutbox } from '../outbox/store';
+import { toast, toastError } from '../../lib/store';
 
 /** One machine's list: '' is this server's own, "/m/<id>" another (null: it could not say, an older version). */
 interface Source {
@@ -72,6 +77,61 @@ function Where({ it }: { it: InboxItem }) {
   );
 }
 
+/** One session's (or run's) held calls, with Send all when there are several. */
+function OutboxGroup({ items, base, reload }: { items: InboxItem[]; base: string; reload: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const first = items[0].outbox!;
+  const sendAll = async () => {
+    setBusy(true);
+    try {
+      const r = await api<{ calls: { status: string }[] }>('/api/outbox/send-all', { method: 'POST', body: { key: first.key }, base });
+      const sent = r.calls.filter((c) => c.status === 'sent').length;
+      toast(sent === r.calls.length ? `Sent ${sent}` : `Sent ${sent} of ${r.calls.length}: the others wait with what went wrong`, sent === r.calls.length ? 'ok' : 'error');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setBusy(false);
+      reload();
+    }
+  };
+  return (
+    <div className="space-y-2">
+      {items.length > 1 && first.key && (
+        <div className="flex items-center gap-2 px-1">
+          <span className="min-w-0 flex-1 truncate text-[12px] text-fg-3">{first.session ? `${items.length} held in “${first.session}”` : `${items.length} held in one session`}</span>
+          <Button size="sm" variant="secondary" icon={<Send size={13} />} disabled={busy} onClick={sendAll}>
+            {busy ? 'Sending…' : `Send all ${items.length}`}
+          </Button>
+        </div>
+      )}
+      {items.map((it) => (
+        <OutboxCard key={it.id} c={it.outbox!} base={base} onDone={reload} />
+      ))}
+    </div>
+  );
+}
+
+/** The Outbox: held calls, grouped by the session that made them, newest group first. */
+function Outbox({ items, base, reload }: { items: InboxItem[]; base: string; reload: () => void }) {
+  const groups = new Map<string, InboxItem[]>();
+  for (const it of items) {
+    const k = it.outbox?.key ?? it.id;
+    groups.set(k, [...(groups.get(k) ?? []), it]);
+  }
+  return (
+    <div className="space-y-3">
+      <h3 className="flex items-center gap-1.5 px-1 text-[13px] font-medium">
+        <Send size={14} className="text-warn" />
+        Outbox
+        <span className="font-normal text-fg-3">· held for your OK: change one if you like, then send or drop it</span>
+      </h3>
+      {[...groups.values()].map((g) => (
+        <OutboxGroup key={g[0].id} items={g} base={base} reload={reload} />
+      ))}
+    </div>
+  );
+}
+
 function Item({ it, base, reload }: { it: InboxItem; base: string; reload: () => void }) {
   if (!it.approval || !it.key || !it.agent) return <Row it={it} base={base} />;
   return (
@@ -97,6 +157,8 @@ export function InboxPage() {
       .join(','),
   );
   const machineSig = machines.map((m) => `${m.id}:${m.status.state}:${m.status.waiting}`).join(',');
+  // A call held or settled: the list is asked again.
+  const outboxSig = useOutbox((s) => s.version);
 
   const load = useCallback(async () => {
     const others = useMachines.getState().list.filter((m) => m.status.state === 'online');
@@ -106,10 +168,12 @@ export function InboxPage() {
 
   useEffect(() => {
     useMachines.getState().load().catch(() => {});
+    // The accounts' icons, for held calls.
+    if (!useConn.getState().connections) void useConn.getState().load();
   }, []);
   useEffect(() => {
     void load();
-  }, [load, waitingSig, machineSig]);
+  }, [load, waitingSig, machineSig, outboxSig]);
   // Things that wait without a session changing (a browser's ask, a key asked for) are picked up every few seconds.
   useEffect(() => {
     const t = setInterval(() => document.visibilityState === 'visible' && void load(), 8000);
@@ -131,7 +195,7 @@ export function InboxPage() {
             </div>
           ) : !total ? (
             <Empty icon={<Inbox size={22} />} title="Nothing is waiting on you">
-              When an agent asks for your approval, a question or a form, needs you in its browser or asks for a key, it shows up here, from every session, scheduled task and machine.
+              When an agent asks for your approval, a question or a form, needs you in its browser or asks for a key, or calls a connected account’s tool you set to Ask first, it shows up here, from every session, scheduled task and machine.
             </Empty>
           ) : (
             sources.map((s) =>
@@ -154,7 +218,14 @@ export function InboxPage() {
                       </Button>
                     </div>
                   ) : (
-                    s.items.map((it) => <Item key={it.id} it={it} base={s.base} reload={() => void load()} />)
+                    <>
+                      {s.items.some((it) => it.outbox) && <Outbox items={s.items.filter((it) => it.outbox)} base={s.base} reload={() => void load()} />}
+                      {s.items
+                        .filter((it) => !it.outbox)
+                        .map((it) => (
+                          <Item key={it.id} it={it} base={s.base} reload={() => void load()} />
+                        ))}
+                    </>
                   )}
                 </section>
               ),

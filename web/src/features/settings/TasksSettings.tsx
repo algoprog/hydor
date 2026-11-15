@@ -3,7 +3,7 @@
 // starts a new session (or posts into one you pick) with the task's prompt, and the task's history
 // keeps how each run went. Examples start common ones from a short form.
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
+import { CalendarClock, ChevronDown, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MailX, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
 import { hookHelp } from '@shared/engineering';
 import type { AppDef } from '@shared/apps';
@@ -26,6 +26,7 @@ import { defaultMode, lastAgent, TemplateGallery } from '../automations/Template
 import { blankWatch, WatchForm } from '../automations/WatchForm';
 import { LOCALE } from '../../i18n/locale';
 import { EmptyRow, Group, Notice, Row, SectionActions, Stack } from './kit';
+import { WouldHaveSent } from '../outbox/WouldHaveSent';
 
 export { scheduleText };
 
@@ -113,6 +114,24 @@ export function TaskRow({ t, onEdit, onDuplicate, onChanged, flush }: { t: Sched
               }}
             >
               Run now
+            </MenuItem>
+            <MenuItem
+              icon={<MailX size={14} />}
+              onClick={async () => {
+                setMenu(false);
+                try {
+                  // A test of the task as saved, in which nothing goes out: calls that send, post, delete or pay are kept as "would have sent".
+                  const r = await post<{ key?: string }>('/api/automations/test-run', { task: t, dry: true });
+                  toast(`Testing ${t.name} without sending`, 'ok');
+                  if (r.key) openSession(r.key);
+                } catch (e) {
+                  toastError(e);
+                } finally {
+                  onChanged();
+                }
+              }}
+            >
+              Test without sending
             </MenuItem>
             <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(false), onEdit())}>
               Edit
@@ -222,7 +241,7 @@ function TestStrip({ run }: { run: TaskRun }) {
       <FlaskConical size={14} className="mt-0.5 shrink-0 text-fg-3" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
-          <span className="font-medium text-fg-2">Test run</span>
+          <span className="font-medium text-fg-2">{run.dry ? 'Test without sending' : 'Test run'}</span>
           <OutcomeBadge status={run.status} />
           {run.status === 'running' && <Throbber className="h-3.5 text-fg-3" />}
           {run.appRun ? (
@@ -237,7 +256,17 @@ function TestStrip({ run }: { run: TaskRun }) {
             )
           )}
         </div>
-        <p className="mt-0.5 line-clamp-3 text-[12.5px] leading-snug text-fg-2">{run.summary ?? (run.status === 'running' ? (run.appRun ? 'It runs like a real run of the app; this updates when it ends.' : 'It runs like a real run, in a session of its own; this updates when it ends.') : '')}</p>
+        <p className="mt-0.5 line-clamp-3 text-[12.5px] leading-snug text-fg-2">
+          {run.summary ??
+            (run.status === 'running'
+              ? run.dry
+                ? 'It runs in a session of its own, and nothing goes out: calls that would send, post, delete or pay are kept as “would have sent”. This updates when it ends.'
+                : run.appRun
+                  ? 'It runs like a real run of the app; this updates when it ends.'
+                  : 'It runs like a real run, in a session of its own; this updates when it ends.'
+              : '')}
+        </p>
+        {run.dry && <WouldHaveSent run={run.id} />}
       </div>
     </div>
   );
@@ -390,10 +419,13 @@ export function TaskEditor({
       setBusy(false);
     }
   };
-  const runTest = async () => {
+  const [testMenu, setTestMenu] = useState(false);
+  const [testAnchor, setTestAnchor] = useState<HTMLElement | null>(null);
+  const runTest = async (dry = false) => {
+    setTestMenu(false);
     setTesting(true);
     try {
-      const r = await post<{ runId: string }>('/api/automations/test-run', { task: d });
+      const r = await post<{ runId: string }>('/api/automations/test-run', { task: d, ...(dry ? { dry: true } : {}) });
       setTest((await api<{ run: TaskRun }>(`/api/automations/runs/${enc(r.runId)}`)).run);
     } catch (e) {
       toastError(e);
@@ -411,9 +443,24 @@ export function TaskEditor({
       width={620}
       footer={
         <>
-          <Button variant="ghost" className="mr-auto" icon={<FlaskConical size={14} />} onClick={runTest} disabled={testing || !d.name.trim() || (!d.app && !d.prompt.trim())} title="Run it once now, as the form is, without saving">
-            {testing ? 'Starting…' : 'Test run'}
-          </Button>
+          <span className="mr-auto inline-flex items-center">
+            <Button variant="ghost" icon={<FlaskConical size={14} />} onClick={() => runTest()} disabled={testing || !d.name.trim() || (!d.app && !d.prompt.trim())} title="Run it once now, as the form is, without saving">
+              {testing ? 'Starting…' : 'Test run'}
+            </Button>
+            <IconButton ref={setTestAnchor} label="More ways to test" size="sm" disabled={testing || !d.name.trim() || (!d.app && !d.prompt.trim())} onClick={() => setTestMenu((m) => !m)}>
+              <ChevronDown size={14} />
+            </IconButton>
+            <Popover anchor={{ current: testAnchor }} open={testMenu} onClose={() => setTestMenu(false)} align="start" prefer="above" width={340}>
+              <MenuItem icon={<FlaskConical size={14} />} onClick={() => runTest()}>
+                <span className="block">Test run</span>
+                <span className="block text-[11.5px] leading-snug text-fg-3">Runs like a real run, in a session of its own</span>
+              </MenuItem>
+              <MenuItem icon={<MailX size={14} />} onClick={() => runTest(true)}>
+                <span className="block">Test without sending</span>
+                <span className="block text-[11.5px] leading-snug text-fg-3">Nothing goes out: what it would send is listed</span>
+              </MenuItem>
+            </Popover>
+          </span>
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>

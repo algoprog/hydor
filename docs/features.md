@@ -334,7 +334,12 @@ agents that speak ACP and take MCP servers.
   fields), and uses it by name without ever seeing it, in API calls and site sign-ins on the hosts you allow, and
   in commands on this computer that you allow (what they print comes back masked). When an app needs something from
   you partway through (a date, a choice, a page to approve on), its form shows as a card in the session,
-  whichever agent is working; Codex's own servers ask the same way.
+  whichever agent is working; Codex's own servers ask the same way. Each of an account's tools is On, Ask first or
+  Off: a call to a tool on Ask first is never made straight away, but held in the Outbox for your OK, whichever
+  program or permission mode the agent runs in (Full access too), while the agent goes on. Tools that send, post,
+  publish, reply, invite, share, delete or pay are marked as acting outside, and start on Ask first in an account
+  connected now; one connected before Ask first keeps its tools as they were, and its card offers to set them all
+  to Ask first in one click.
 - **Subagents**: an agent hands parts of a job to subagents and gets their results back. A Hydor subagent is a
   session of its own that Hydor starts, with any agent and model, each a card in its conversation that opens to
   the reply; it shows under its parent in the sidebar and in the work tray above the prompt bar, and you can talk to
@@ -1137,7 +1142,10 @@ programs shows each program's version and what is out, with Check now, Update no
   apps' steps can also send you one themselves (notify_user) for what cannot wait. A plain yes-or-no approval has
   Approve and Deny right on the notification (where the browser shows buttons; a desktop app's have none: click to
   open the session), and the Inbox lists everything waiting on you across sessions, scheduled tasks and machines,
-  with approvals, questions and forms answered right there.
+  with approvals, questions and forms answered right there. Its Outbox holds the calls held for your OK, one card
+  each, as a draft you can change (an email as To, Cc, Subject and Body; a chat message; a post; else the tool's
+  fields): Send (Hydor makes the call, the session shows its answer and its agent hears it with your next message),
+  Drop, or Send all for one session; they notify you like approvals, wait over restarts and are kept 30 days.
 - Chat apps (Settings → Chat apps): your agents in Telegram, Discord or Slack, each through a bot or app of your own
   (a Telegram bot from @BotFather, a Discord bot from the Developer Portal, a Slack app from a manifest the app gives
   you, with the exact scopes). Only the chats you link with a one-time code can use it. A message starts a session or
@@ -1212,7 +1220,9 @@ programs shows each program's version and what is out, with Check now, Update no
   A task can also run one of your apps, with the answers you set (a webhook's call or what a watcher saw
   filling them in), made from the app's Runs. Each run reports how it went: its history keeps the outcome, a
   summary, the cost and the session (or the app's run), and runs again with the same input. Runs with
-  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Webhooks can
+  nothing to report stay quiet, failures always tell you, and failures in a row pause the task. Test without
+  sending runs a task as it would run, but keeps every call that would send, post, delete or pay as "would have
+  sent" (listed in the run's history and its session) and makes none of them. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
@@ -1274,7 +1284,8 @@ programs shows each program's version and what is out, with Check now, Update no
 - Everything the app does is a command with verbs, grouped in `hydor help`: sessions (search, rename, archive, pin,
   snooze, move, fork, goal, share, changes, commands, the queue, delete; marks show what each is doing), projects and
   their documents, guidelines, agents, memory (notes, forgetting and restoring, your profile), skills, plugins, MCP
-  servers, the vault's keys (a value is never typed as an option or printed), the inbox, experiments, scheduled
+  servers, the vault's keys (a value is never typed as an option or printed), the inbox and the Outbox (send a held
+  call as it is or with fields changed, or drop it), experiments, scheduled
   tasks, apps, the Library, connections and accounts, machines, models, tiers and plan usage. Each takes ids, the
   start of an id, or names, asks before removing, and has `--json`. `hydor settings` reads and changes every option
   of the Settings page (`list`, `get`, `set`, `run` for buttons, `open`; alone on a terminal it is a browser of the

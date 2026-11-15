@@ -13,9 +13,11 @@ import { APP_ROOT, config } from '../config.ts';
 import type { Deps, Feature, McpServerSpec, SpawnInfo } from '../features/types.ts';
 import { runToken } from '../mcp.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
+import { actsOutside } from '../../shared/outbox.ts';
 import {
   activeFor,
   appTables,
+  askTools,
   connection,
   connections as connected,
   connectionView,
@@ -26,6 +28,7 @@ import {
   renewSoon,
   sessionChoices,
   sessionList,
+  toolOn,
   type Conn,
 } from './apps.ts';
 import { catalog, catalogApp } from './catalog.ts';
@@ -61,6 +64,8 @@ function instructions(apps: Conn[]): string {
   if (apps.length)
     lines.push(
       `Connected accounts (the user's own, in other services, set up in Apps → Connected apps), each an MCP server of that name: ${apps.map((c) => `${c.id} (${c.entry.name})`).join(', ')}. Use them when a task involves those services.`,
+      // Ask first (server/outbox): the call is held for the person's OK, and the agent goes on.
+      "A tool of theirs set to Ask first (its description says so) is not called at once: the call waits in the user's Outbox for their OK, and Hydor makes it when they send it. You get an answer saying so straight away: do not call it again or try another way, carry on, and tell the user it waits for their OK.",
     );
   lines.push('Keys and sign-ins: never ask the user to type a password, token, API key or other secret into the chat, and never print one you come across.');
   return lines.join('\n');
@@ -342,7 +347,21 @@ export const connections: Feature = {
         console.warn(`[connections] ${c.id} left out: ${(e as Error).message}`);
       }
     }
-    return { mcpServers, instructions: [instructions(apps.filter((c) => mcpServers[c.id]))], guides: [{ tools: ['request_secret', 'http_request', 'run_with_secrets', 'list_connections'], text: VAULT_GUIDE }] };
+    // Claude Code does not ask first itself about calls Hydor holds for the person's OK anyway (Ask first, and in a
+    // test that sends nothing every tool that acts outside).
+    const dry = (s.extra.automations as { dry?: boolean } | undefined)?.dry === true;
+    const allowedTools =
+      s.agent === 'claude'
+        ? apps
+            .filter((c) => mcpServers[c.id])
+            .flatMap((c) => [...new Set([...askTools(c), ...(dry ? (c.tools ?? []).filter((t) => toolOn(c, t.name) && actsOutside(t)).map((t) => t.name) : [])])].map((t) => `mcp__${c.id}__${t}`))
+        : [];
+    return {
+      mcpServers,
+      instructions: [instructions(apps.filter((c) => mcpServers[c.id]))],
+      guides: [{ tools: ['request_secret', 'http_request', 'run_with_secrets', 'list_connections'], text: VAULT_GUIDE }],
+      ...(allowedTools.length ? { allowedTools } : {}),
+    };
   },
   scrub: redact,
   // Keys agents asked for that the user has not entered yet (in a session still kept).
