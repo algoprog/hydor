@@ -18,7 +18,9 @@ export type WatchSpec =
   | { kind: 'page'; url: string; match?: string; selector?: string; local?: boolean }
   | { kind: 'json'; url: string; path: string; op?: JsonOp; value?: string; local?: boolean }
   | { kind: 'folder'; path: string; pattern?: string }
-  | { kind: 'command'; command: string; on?: 'output' | 'exit' };
+  | { kind: 'command'; command: string; on?: 'output' | 'exit' }
+  /** New email in a folder of a connected mail account (Apps → Connected apps → Email): one run per email. */
+  | { kind: 'mail'; account: string; folder?: string; from?: string; subject?: string; unread?: boolean };
 
 export type JsonOp = 'changed' | 'eq' | 'ne' | 'gt' | 'lt' | 'contains';
 
@@ -233,6 +235,8 @@ export function watchText(w: WatchSpec): string {
       return `New files in ${w.path}${w.pattern ? ` (${w.pattern})` : ''}`;
     case 'command':
       return `${w.on === 'exit' ? 'The exit code' : 'The output'} of “${w.command.length > 40 ? `${w.command.slice(0, 39)}…` : w.command}” changing`;
+    case 'mail':
+      return `New email in ${w.account}${w.folder && !/^inbox$/i.test(w.folder) ? ` (${w.folder})` : ''}${w.from ? ` from “${w.from}”` : ''}${w.subject ? ` about “${w.subject}”` : ''}${w.unread ? ', unread' : ''}`;
   }
 }
 

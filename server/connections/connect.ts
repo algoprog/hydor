@@ -25,6 +25,7 @@ import { fill } from './catalog.ts';
 import { authorizeUrl, discover, exchangeCode, OAuthError, pkce, register, type AuthServer, type OAuthClient } from './oauth.ts';
 import { httpTools, sseTools, stdioTools, Unauthorized, type ToolInfo } from './upstream.ts';
 import { redact } from './vault.ts';
+import { testBuiltin } from '../mail/mcp.ts';
 
 const clip = (v: unknown, n: number) => String(v ?? '').trim().slice(0, n);
 
@@ -46,7 +47,7 @@ function readFields(entry: CatalogApp, given: Record<string, unknown> | undefine
       else if (!f.optional) throw new HttpError(400, `Enter ${f.label}`);
     }
   }
-  if (entry.server.transport !== 'stdio') {
+  if (entry.server.transport === 'http' || entry.server.transport === 'sse') {
     try {
       const u = new URL(fill(entry.server.url, fields));
       if (u.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(u.hostname)) throw new Error();
@@ -69,6 +70,7 @@ const oldOf = (db: DB, id: string) => {
 /** Connects an app that needs no sign-in in the browser: nothing, a key, or fields. */
 export function connectPlain(db: DB, entry: CatalogApp, body: { fields?: Record<string, unknown>; key?: unknown }): Conn {
   if (entry.auth.type === 'oauth') throw new HttpError(400, `${entry.name} signs in in the browser`);
+  if (entry.server.transport === 'builtin') throw new HttpError(400, `${entry.name} connects from its own form (Apps → Connected apps → ${entry.name})`);
   const old = oldOf(db, entry.id);
   const { fields, secrets } = readFields(entry, body.fields, old);
   const cred: Cred = {};
@@ -115,7 +117,7 @@ export const flowResult = (id: string) => results.get(id) ?? null;
 
 /** Starts signing in: returns the address to send the person to. `origin` is where they reach this app. */
 export async function startOAuth(db: DB, entry: CatalogApp, o: { origin: string; fields?: Record<string, unknown>; clientId?: string; clientSecret?: string }): Promise<{ url?: string; flow?: string; connected?: Conn }> {
-  if (entry.auth.type !== 'oauth' || entry.server.transport === 'stdio') throw new HttpError(400, `${entry.name} does not sign in in the browser`);
+  if (entry.auth.type !== 'oauth' || (entry.server.transport !== 'http' && entry.server.transport !== 'sse')) throw new HttpError(400, `${entry.name} does not sign in in the browser`);
   sweep();
   const old = oldOf(db, entry.id);
   const { fields } = readFields(entry, o.fields, old);
@@ -193,7 +195,9 @@ export async function finishOAuth(db: DB, q: Record<string, string | undefined>)
 export async function testConnection(db: DB, c: Conn): Promise<{ tools: ToolInfo[]; server?: string }> {
   try {
     let r: { tools: ToolInfo[]; server?: string };
-    if (c.entry.server.transport === 'stdio') {
+    if (c.entry.server.transport === 'builtin') {
+      r = await testBuiltin(db, c);
+    } else if (c.entry.server.transport === 'stdio') {
       const lc = localCommand(db, c);
       r = await stdioTools({ command: lc.command, args: lc.args, env: lc.env, cwd: os.homedir(), mask: redact });
     } else {

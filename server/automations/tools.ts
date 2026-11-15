@@ -259,9 +259,9 @@ function draftFrom(d: Deps, ctx: RunCtx, a: Record<string, any>, tz: string): Ta
 const WATCH_SCHEMA = {
   type: 'object',
   description:
-    'kind watch only. A cheap check without a model that wakes the agent only when something changed. feed: url of an RSS or Atom feed (new items). page: url (its text changed; match keeps only the lines with that text, selector a part by a simple CSS selector). json: url and path like "data.price"; op changed (default), eq, ne, gt, lt or contains, with value. folder: path (new files; pattern like "*.pdf"). command: command (its output changing, or with on "exit" its exit code).',
+    'kind watch only. A cheap check without a model that wakes the agent only when something changed. feed: url of an RSS or Atom feed (new items). page: url (its text changed; match keeps only the lines with that text, selector a part by a simple CSS selector). json: url and path like "data.price"; op changed (default), eq, ne, gt, lt or contains, with value. folder: path (new files; pattern like "*.pdf"). command: command (its output changing, or with on "exit" its exit code). mail: new email in a connected mail account (account: its address; folder: default the Inbox; from and subject: text they contain; unread: only unread mail): each new email starts its own run with the email as outside data and its attachments saved in the task\'s folder.',
   properties: {
-    kind: { type: 'string', enum: ['feed', 'page', 'json', 'folder', 'command'] },
+    kind: { type: 'string', enum: ['feed', 'page', 'json', 'folder', 'command', 'mail'] },
     url: { type: 'string' },
     match: { type: 'string' },
     selector: { type: 'string' },
@@ -271,6 +271,11 @@ const WATCH_SCHEMA = {
     pattern: { type: 'string' },
     command: { type: 'string' },
     on: { type: 'string', enum: ['output', 'exit'] },
+    account: { type: 'string', description: 'mail: the connected mail account, by its address.' },
+    folder: { type: 'string', description: 'mail: the folder (default the Inbox).' },
+    from: { type: 'string', description: 'mail: only mail whose sender contains this.' },
+    subject: { type: 'string', description: 'mail: only mail whose subject contains this.' },
+    unread: { type: 'boolean', description: 'mail: only mail still unread.' },
   },
   required: ['kind'],
 };
