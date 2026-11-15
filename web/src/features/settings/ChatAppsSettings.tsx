@@ -1,7 +1,8 @@
 // Settings → Chat apps: your agents in a chat (server/telegram, server/chatapps). Telegram, Discord and Slack each
 // take a bot or app of your own: its token (or tokens) goes to the server's vault and never comes back here; then each
-// chat you link with a one-time code can start sessions, get their replies and answer what agents ask. One row each;
-// the one you open shows its steps, or its chats, with the rest of its options behind one menu.
+// chat you link with a one-time code can start sessions, get their replies and answer what agents ask, and send photos,
+// files and voice messages; new sessions can start as one of your agents. One row each; the one you open shows its
+// steps, or its chats, with the rest of its options behind one menu.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
 import { Copy, ExternalLink, Hash, Link2, MessageCircle, Send, Trash2, type LucideIcon } from 'lucide-react';
@@ -11,6 +12,7 @@ import { toast, toastError } from '../../lib/store';
 import { Button, cx, IconButton, inputCls, MenuItem, MenuSep, Switch, Throbber, useConfirm } from '../../components/ui';
 import { EmptyRow, Group, MoreMenu, Notice, Row, Select, Stack } from './kit';
 import { LOCALE } from '../../i18n/locale';
+import { useAssistantsState } from '../assistants/state';
 
 type AppId = 'telegram' | 'discord' | 'slack';
 
@@ -25,6 +27,8 @@ interface ChatView {
   chats: { id: string | number; name: string; at: number; kind?: 'dm' | 'channel' }[];
   notify: boolean;
   agent: 'claude' | 'codex';
+  /** One of your agents new sessions start as (an assistant's id); null: none. */
+  as?: string | null;
   pairing?: { code: string; link?: string; until: number };
   invite?: string;
 }
@@ -69,6 +73,8 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
   const [confirm, confirmNode] = useConfirm();
   const name = APPS.find((a) => a.id === id)!.name;
   const slack = id === 'slack';
+  // Your agents (the Agents page), to start new sessions as one.
+  const agents = useAssistantsState()?.assistants ?? [];
 
   const change = async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -258,6 +264,19 @@ function Panel({ id, v, setV }: { id: AppId; v: ChatView; setV: (v: ChatView) =>
         label="New sessions use"
         hint="The agent a message starts when the chat is in no session"
         control={<Select<'claude' | 'codex'> label="New sessions use" width={200} value={v.agent} onChange={(agent) => void change({ agent })} options={[{ value: 'claude', label: 'Claude Code' }, { value: 'codex', label: 'Codex' }]} />}
+      />
+      <Row
+        label="New sessions as"
+        hint="One of your agents a new session starts as. In the chat, /as and an agent’s name picks another for the next one"
+        control={
+          <Select<string>
+            label="New sessions as"
+            width={200}
+            value={v.as ?? ''}
+            onChange={(as) => void change({ as: as || null })}
+            options={[{ value: '', label: 'None of your agents' }, ...agents.map((a) => ({ value: a.id, label: <span translate="no">{a.name}</span> }))]}
+          />
+        }
       />
       <Row
         label="Notices from every session"

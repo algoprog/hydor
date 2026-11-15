@@ -14,10 +14,10 @@ import { activityOf } from '../../lib/activity';
 import { attachmentPayload, canCaptureScreen, captureScreen, readAttachments, releaseAttachments, type Attachment } from '../../lib/attachments';
 import { keepStartDraft, startDraft } from '../../lib/drafts';
 import { timeAgo } from '../../lib/format';
-import { openSession } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { startSession, warmMemory } from '../../lib/starting';
 import { agentKey, lastAgent, parseAgentKey, picksAt, placePicks, placeRecord, saveStart, startSettings } from '../../lib/start';
-import { toast, useApp, useSessions, useUI } from '../../lib/store';
+import { toast, toastError, useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { EffortPicker, findModel, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { AttachmentList } from '../../components/Attachments';
@@ -39,7 +39,8 @@ import { assistantIn, useAssistants } from '../assistants/state';
 import { NewSpaceDialog } from '../spaces/parts';
 import { useSpaces, useSpacesStore } from '../spaces/state';
 import type { Space } from '@shared/spaces';
-import { doneStartFiles, waitingStartFiles } from '../../lib/startFiles';
+import { doneStartFiles, startSessionWith, waitingStartFiles } from '../../lib/startFiles';
+import { boxOf, SHARE_TROUBLE, type Shared } from '@shared/share-target';
 import { useConfidentialInfo } from '../confidential/state';
 
 /** Custom, the app's own agent (its ACP id is still "console"): the one a confidential session runs on. */
@@ -776,6 +777,24 @@ export function HomePage() {
   useEffect(() => {
     if (link.stripped) toast('Invisible characters were removed from the linked prompt', 'error');
   }, [link]);
+  // Share to Hydor: opened by a share from another app (/?share=<id>), the box gets its words, link and files, in place
+  // of the share's address (Back does not open it again).
+  const shareId = new URLSearchParams(search).get('share');
+  useEffect(() => {
+    if (!shareId) return;
+    if (SHARE_TROUBLE[shareId]) {
+      toast(SHARE_TROUBLE[shareId], 'error');
+      go('/', true);
+      return;
+    }
+    api<Shared>(`/api/share/${encodeURIComponent(shareId)}`).then(
+      (s) => {
+        const box = boxOf(s);
+        startSessionWith(box.files, box.prompt ? `/?prompt=${encodeURIComponent(box.prompt)}` : '/', true);
+      },
+      (e) => (toastError(e), go('/', true)),
+    );
+  }, [shareId]);
   // A place picked in the box, or a project picked elsewhere while this page shows (the sidebar), opens the box again
   // there: round n of this page's box. Only the first takes a link's folder, program and model; the box carries on
   // what else the link set while it is still set.

@@ -1,7 +1,8 @@
 // Script tests for Telegram (Settings → Telegram): Markdown as Telegram's HTML and cut to fit, linking a chat with its
 // code, a message starting a session or going on with one, the reply when the turn ends, an approval's buttons
-// answering it, notices, commands, HTML Telegram refuses sent as plain text, the routes, and asking Telegram for
-// updates; against a stand-in for Telegram's API and for the session manager.
+// answering it, notices, commands, photos, albums, voice messages and files too big, /as and /agents, HTML Telegram
+// refuses sent as plain text, the routes, and asking Telegram for updates; against a stand-in for Telegram's API (its
+// files too) and for the session manager.
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/telegram/telegram-test.ts && DATA_DIR=/tmp/hydor-test-telegram node dist/dev/telegram-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,12 +10,15 @@ import http from 'node:http';
 import path from 'node:path';
 import Fastify from 'fastify';
 import type { NotifyEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
+import type { ImageInput } from '../agents/live.ts';
+import { saveAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
+import { hearing } from '../chatapps/files.ts';
 import { readSecret } from '../connections/vault.ts';
 import { kvSet, openDb } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import { chunks, plainText, telegramHtml } from './format.ts';
-import { handleUpdate, linkedChats, MAX_PARTS, notice, stopTelegram, telegram, TOKEN_NAME, type TgUpdate } from './index.ts';
+import { handleUpdate, linkedChats, MAX_PARTS, notice, stopTelegram, telegram, telegramTuning, TOKEN_NAME, type TgUpdate } from './index.ts';
 
 const tmp = fs.mkdtempSync(path.join(process.env.DATA_DIR ?? '/tmp', 'telegram-'));
 const db = openDb(path.join(tmp, 'test.db'));
@@ -30,6 +34,9 @@ const queue: TgUpdate[] = [];
 let meCalls = 0;
 let meFailFrom = Infinity;
 let throttled = 0;
+/** Files the stand-in holds, by their path, and the ids getFile was asked for. */
+const tgFiles = new Map<string, Buffer>();
+const fileAsks: string[] = [];
 /** While set, getUpdates answers 409 with this description; conflictOnce clears it after one answer. */
 let updatesConflict: string | null = null;
 let conflictOnce = false;
@@ -37,11 +44,22 @@ const tg = http.createServer((req, res) => {
   let raw = '';
   req.on('data', (c) => (raw += c));
   req.on('end', async () => {
+    const f = /^\/file\/bot([^/]+)\/(.+)$/.exec(req.url ?? '');
+    if (f) {
+      const data = f[1] === TOKEN ? tgFiles.get(f[2]) : undefined;
+      if (!data) return (res.writeHead(404), res.end());
+      return (res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': String(data.length) }), res.end(data));
+    }
     const m = /^\/bot([^/]+)\/(\w+)$/.exec(req.url ?? '');
     const body = raw ? JSON.parse(raw) : {};
     const answer = (o: unknown) => (res.writeHead(200, { 'content-type': 'application/json' }), res.end(JSON.stringify(o)));
     if (!m || m[1] !== TOKEN) return answer({ ok: false, error_code: 401, description: 'Unauthorized' });
     const method = m[2];
+    if (method === 'getFile') {
+      fileAsks.push(body.file_id);
+      if (body.file_id === 'huge') return answer({ ok: false, error_code: 400, description: 'Bad Request: file is too big' });
+      return answer({ ok: true, result: { file_id: body.file_id, file_path: `files/${body.file_id}`, file_size: tgFiles.get(`files/${body.file_id}`)?.length } });
+    }
     if (method === 'getMe') {
       if (++meCalls >= meFailFrom) return answer({ ok: false, error_code: 502, description: 'Bad Gateway' });
       return answer({ ok: true, result: { id: 42, is_bot: true, first_name: 'Test', username: 'test_hydor_bot' } });
@@ -69,24 +87,26 @@ await new Promise<void>((r) => tg.listen(0, '127.0.0.1', r));
 process.env.TELEGRAM_API = `http://127.0.0.1:${(tg.address() as { port: number }).port}`;
 
 // ---- a stand-in for the sessions ------------------------------------------------------------------
-const did: { what: string; key?: string; text?: string; a?: unknown }[] = [];
+const did: { what: string; key?: string; text?: string; a?: unknown; images?: number; agent?: string; as?: string }[] = [];
 const summaries = new Map<string, SessionSummary>();
 const items = new Map<string, TimelineItem[]>();
 let made = 0;
+const files: Record<string, string[]> = {};
 const sessions = {
-  async create(o: { prompt?: string; cwd: string }) {
+  async create(o: { prompt?: string; cwd: string; paths?: string[]; agent: string; extra?: { assistant?: string } }) {
     const key = `claude:made-${++made}`;
-    did.push({ what: 'create', key, text: o.prompt });
+    did.push({ what: 'create', key, text: o.prompt, ...(o.agent !== 'claude' ? { agent: o.agent } : {}), ...(o.extra?.assistant ? { as: o.extra.assistant } : {}) });
+    if (o.paths) files[key] = o.paths;
     assert.ok(o.cwd.startsWith(path.join(tmp, 'tasks')), 'a task folder of its own');
-    summaries.set(key, { key, agent: 'claude', title: o.prompt ?? '', live: { status: 'working' } } as unknown as SessionSummary);
+    summaries.set(key, { key, agent: 'claude', cwd: o.cwd, title: o.prompt ?? '', live: { status: 'working' } } as unknown as SessionSummary);
     return key;
   },
   summary: (key: string) => summaries.get(key) ?? null,
-  async send(key: string, text: string) {
-    did.push({ what: 'send', key, text });
+  async send(key: string, text: string, images: ImageInput[] = []) {
+    did.push({ what: 'send', key, text, ...(images.length ? { images: images.length } : {}) });
   },
-  enqueue(key: string, text: string) {
-    did.push({ what: 'enqueue', key, text });
+  enqueue(key: string, text: string, images: ImageInput[] = []) {
+    did.push({ what: 'enqueue', key, text, ...(images.length ? { images: images.length } : {}) });
   },
   async interrupt(key: string) {
     did.push({ what: 'interrupt', key });
@@ -234,7 +254,106 @@ test('commands: /sessions to go on with another, /status, /stop, /new', async ()
   assert.deepEqual(did.at(-1), { what: 'create', key: 'claude:made-2', text: 'Write a haiku' });
 });
 
-test('HTML Telegram refuses goes as plain text; pictures are asked for in words', async () => {
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 8, 7]);
+const media = (o: Record<string, unknown>): TgUpdate => ({ update_id: uid++, message: { message_id: uid, from, chat: { id: CHAT, type: 'private' }, ...o } });
+const lastCreate = () => did.filter((x) => x.what === 'create').at(-1)!;
+
+test('a photo with a caption: its largest size fetched from Telegram into a new session’s folder, the caption with it', async () => {
+  await handleUpdate(d, TOKEN, msg('/new'));
+  tgFiles.set('files/p-big', JPEG);
+  fileAsks.length = 0;
+  await handleUpdate(d, TOKEN, media({ caption: 'Add this receipt to my expenses', photo: [{ file_id: 'p-small', file_size: 10 }, { file_id: 'p-big', file_size: JPEG.length }] }));
+  assert.deepEqual(fileAsks, ['p-big'], 'the largest size');
+  const c = lastCreate();
+  assert.ok(c.text!.startsWith('Add this receipt to my expenses\n\nThe file below came from Telegram'), c.text);
+  const [p] = files[c.key!];
+  assert.match(path.basename(p), /^photo-.*\.jpg$/);
+  assert.equal(path.dirname(p), summaries.get(c.key!)!.cwd);
+  assert.deepEqual(fs.readFileSync(p), JPEG);
+  assert.match(lastSent().body.text, /^On it/);
+  // A document to the same session, which is free now: listed by its path, the PDF saved under its own name.
+  summaries.get(c.key!)!.live = { status: 'idle' } as never;
+  tgFiles.set('files/doc1', Buffer.from('%PDF-1.4'));
+  await handleUpdate(d, TOKEN, media({ document: { file_id: 'doc1', file_name: 'Delivery note.pdf', mime_type: 'application/pdf', file_size: 8 } }));
+  const s = did.at(-1)!;
+  assert.equal(s.what, 'send');
+  assert.ok(s.text!.endsWith(`Attached files:\n- ${path.join(summaries.get(c.key!)!.cwd!, 'Delivery note.pdf')}`), s.text);
+});
+
+test('an album’s parts arrive together, as one message with its caption', async () => {
+  telegramTuning.albumMs = 60;
+  await handleUpdate(d, TOKEN, msg('/new'));
+  tgFiles.set('files/a1', JPEG);
+  tgFiles.set('files/a2', JPEG);
+  const n = did.length;
+  await handleUpdate(d, TOKEN, media({ media_group_id: 'G7', caption: 'Both pages of the school letter', photo: [{ file_id: 'a1' }] }));
+  await handleUpdate(d, TOKEN, media({ media_group_id: 'G7', photo: [{ file_id: 'a2' }] }));
+  assert.equal(did.length, n, 'waits for the rest of the album');
+  for (let i = 0; i < 100 && did.length === n; i++) await settle();
+  assert.equal(did.length, n + 1, 'one session for the album');
+  const c = lastCreate();
+  assert.ok(c.text!.startsWith('Both pages of the school letter'));
+  assert.equal(files[c.key!].length, 2);
+});
+
+test('a voice message: its words go to the agent; without speech recognition the sound file goes and the chat says how to turn it on', async () => {
+  await handleUpdate(d, TOKEN, msg('/new'));
+  tgFiles.set('files/v1', Buffer.from('OggS voice'));
+  hearing.transcribe = async () => 'Book a table for four on Saturday';
+  await handleUpdate(d, TOKEN, media({ voice: { file_id: 'v1', mime_type: 'audio/ogg', file_size: 10 } }));
+  const c = lastCreate();
+  assert.ok(c.text!.startsWith('Book a table for four on Saturday'), c.text);
+  assert.equal(files[c.key!], undefined, 'words, not a file');
+  assert.ok(fs.readdirSync(summaries.get(c.key!)!.cwd!).some((f) => /^voice-.*\.ogg$/.test(f)), 'the recording stays in the folder');
+  await handleUpdate(d, TOKEN, msg('/new'));
+  hearing.transcribe = async () => {
+    throw new HttpError(409, 'Speech recognition on the server is off: turn it on in Settings → Voice.');
+  };
+  await handleUpdate(d, TOKEN, media({ voice: { file_id: 'v1', mime_type: 'audio/ogg', file_size: 10 } }));
+  assert.equal(files[lastCreate().key!].length, 1, 'the sound file');
+  assert.ok(texts().some((t) => /turn on Speech recognition on the server in Hydor: Settings → Voice/.test(t)));
+});
+
+test('a file too big for Telegram’s bots is said plainly, and not asked for', async () => {
+  await handleUpdate(d, TOKEN, msg('/new'));
+  fileAsks.length = 0;
+  const n = did.length;
+  await handleUpdate(d, TOKEN, media({ document: { file_id: 'v2', file_name: 'holiday.mov', file_size: 30 * 1024 * 1024 } }));
+  assert.deepEqual(fileAsks, []);
+  assert.equal(did.length, n, 'no session for nothing');
+  assert.equal(lastSent().body.text, '“holiday.mov” (30 MB) is too big to come through Telegram: Telegram lets bots fetch files of up to 20 MB. Send a smaller one, or add it in the Hydor app instead.');
+  // Telegram saying so when asked, with words beside it that still go.
+  await handleUpdate(d, TOKEN, media({ caption: 'Summarise the video', document: { file_id: 'huge', file_name: 'talk.mp4' } }));
+  assert.ok(texts().some((t) => t.startsWith('“talk.mp4” is too big to come through Telegram')));
+  assert.equal(lastCreate().text, 'Summarise the video');
+});
+
+test('/as and /agents: your agents in the chat, with buttons; a session started as one; the bot’s own agent in Settings', async () => {
+  const keeper = saveAssistant(db, { name: 'Bookkeeper', instructions: 'Keep my books.', agent: 'codex' });
+  await handleUpdate(d, TOKEN, msg('/as Bookkeeper Pay the March invoices'));
+  assert.deepEqual(lastCreate(), { what: 'create', key: `claude:made-${made}`, text: 'Pay the March invoices', agent: 'codex', as: keeper.id });
+  assert.match(lastSent().body.text, /^On it, as Bookkeeper/);
+  await handleUpdate(d, TOKEN, msg('/as Accountant do it'));
+  assert.match(lastSent().body.text, /^No agent of yours is called “Accountant do it”\. Yours: Bookkeeper, General/);
+  await handleUpdate(d, TOKEN, msg('/agents'));
+  const rows = lastSent().body.reply_markup.inline_keyboard as { text: string; callback_data: string }[][];
+  assert.deepEqual(rows[0].map((b) => b.text), ['Bookkeeper', 'General'], 'yours first, two a row');
+  await handleUpdate(d, TOKEN, { update_id: uid++, callback_query: { id: 'qa', from, data: rows[0][0].callback_data } });
+  assert.equal(lastSent().body.text, 'The next session here starts as Bookkeeper: send what it should do.');
+  await handleUpdate(d, TOKEN, msg('File the gas bill'));
+  assert.equal(lastCreate().as, keeper.id);
+  // Settings: new sessions as one of your agents.
+  assert.equal((await app.inject({ method: 'PUT', url: '/api/telegram', payload: { as: 'nobody-1234' } })).statusCode, 404);
+  const v = (await app.inject({ method: 'PUT', url: '/api/telegram', payload: { as: keeper.id } })).json();
+  assert.equal(v.as, keeper.id);
+  await handleUpdate(d, TOKEN, msg('/new Reconcile October'));
+  assert.equal(lastCreate().as, keeper.id);
+  assert.equal((await app.inject({ method: 'PUT', url: '/api/telegram', payload: { as: null } })).json().as, null);
+  await handleUpdate(d, TOKEN, msg('/new Write a limerick'));
+  assert.equal(lastCreate().as, undefined);
+});
+
+test('HTML Telegram refuses goes as plain text; a message with nothing for the agents (a sticker) is asked for in words', async () => {
   items.set('claude:made-2', [{ kind: 'user', id: 'u2', text: 'x' } as TimelineItem, { kind: 'assistant', id: 'a2', text: 'REFUSE **this** please' } as TimelineItem]);
   await telegram.turnEnd!({ key: 'claude:made-2', agent: 'claude', status: 'idle', startedAt: 0, endedAt: 1, external: false }, d);
   assert.equal(lastSent().body.parse_mode, undefined);
@@ -329,6 +448,8 @@ test('updates are asked for by the app itself, from where it stopped; a chat rem
     texts().some((t) => t.startsWith('Send what you want done')),
     'the update was handled',
   );
+  const menu = sent.find((x) => x.method === 'setMyCommands')?.body.commands.map((c: { command: string }) => c.command);
+  assert.deepEqual(menu, ['new', 'as', 'agents', 'sessions', 'stop', 'status', 'help'], 'the menu of commands');
   const v = (await app.inject({ method: 'GET', url: '/api/telegram' })).json();
   assert.equal(v.state, 'running');
   assert.equal(v.bot.username, 'test_hydor_bot');

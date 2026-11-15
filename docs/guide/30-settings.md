@@ -41,7 +41,7 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Chat apps
 
-[Settings → Chat apps](/settings?s=chat): talk to your agents from Telegram, Discord or Slack: start sessions, get their replies, answer what they ask. More in [Phones, other machines and sharing](/guide/devices).
+[Settings → Chat apps](/settings?s=chat): talk to your agents from Telegram, Discord or Slack: start sessions, send photos, files and voice messages, get their replies, answer what they ask. More in [Phones, other machines and sharing](/guide/devices).
 
 - [**Telegram**](/settings?s=chat&find=Telegram): A Telegram bot of your own, made with @BotFather, that your chats talk to.
 - [**Discord**](/settings?s=chat&find=Discord): A Discord bot of your own, made in the Developer Portal, that your chats talk to.
@@ -50,6 +50,7 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Add the bot to a server**](/settings?s=chat&find=Add%20the%20bot%20to%20a%20server): The link that adds your Discord bot to a server of yours, with the permissions it needs.
 - [**Copy manifest**](/settings?s=chat&find=Copy%20manifest): The Slack app’s manifest, with Socket Mode and the scopes it needs, to paste when you create the app.
 - [**New sessions use**](/settings?s=chat&find=New%20sessions%20use): The agent a message from a chat starts when the chat is in no session.
+- [**New sessions as**](/settings?s=chat&find=New%20sessions%20as): One of your agents a new session from a chat starts as; /as in the chat picks another.
 - [**Notices from every session**](/settings?s=chat&find=Notices%20from%20every%20session): Every session’s notices in your chats, not only those of the sessions a chat started.
 
 ### Password
