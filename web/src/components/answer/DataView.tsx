@@ -1,11 +1,11 @@
 // Any data, laid out as it is: what an answer UI shows when its name is unknown or its view fails. Text as Markdown, a
 // picture's address as the picture, a list of objects as a table (or cards, when they are wide), a list of words as a
-// list, an object as label and value rows. Also the data as plain text, for copying a UI.
+// list, an object as label and value rows. Also the data as plain text, for copying a UI (shared/answer-ui/text.ts).
 import type { ReactNode } from 'react';
+import { humanize } from '@shared/answer-ui/text';
 import { Card, isObj, KeyValues, Md, Pic, str, usePicOk } from './kit';
 
 const PIC = /\.(png|jpe?g|gif|webp|avif|svg)(\?|#|$)/i;
-const humanize = (k: string) => (k.charAt(0).toUpperCase() + k.slice(1)).replace(/[_-]+/g, ' ');
 
 /** A picture given as a value; its address as text when it cannot be shown. */
 function ValuePic({ v }: { v: string }) {
@@ -106,32 +106,5 @@ export function DataView({ data }: { data: unknown }) {
   );
 }
 
-/** The data as plain text: a title, then label: value lines, lists as points, nested parts indented. */
-export function dataText(data: unknown, title?: string): string {
-  const out: string[] = [];
-  const walk = (v: unknown, pad: string, label?: string) => {
-    const head = label ? `${pad}${humanize(label)}: ` : pad;
-    if (v === null || v === undefined || v === '') return;
-    if (!isObj(v) && !Array.isArray(v)) return void out.push(`${head}${typeof v === 'boolean' ? (v ? 'yes' : 'no') : String(v)}`);
-    if (Array.isArray(v)) {
-      if (label) out.push(`${pad}${humanize(label)}:`);
-      for (const x of v) {
-        if (!isObj(x) && !Array.isArray(x)) out.push(`${pad}- ${String(x)}`);
-        else if (isObj(x)) {
-          const o = x as Record<string, unknown>;
-          const nameKey = ['name', 'title', 'label', 'text', 'q'].find((k) => str(o[k]));
-          out.push(`${pad}- ${nameKey ? str(o[nameKey]) : ''}`.trimEnd());
-          for (const [k, y] of Object.entries(o)) if (k !== nameKey) walk(y, `${pad}  `, k);
-        } else walk(x, `${pad}  `);
-      }
-      return;
-    }
-    if (label) out.push(`${pad}${humanize(label)}:`);
-    for (const [k, y] of Object.entries(v)) if (k !== 'ui') walk(y, label ? `${pad}  ` : pad, k);
-  };
-  const d = isObj(data) ? data : {};
-  out.push(str(d.title) || title || '');
-  const { title: _t, ...rest } = d;
-  walk(rest, '');
-  return out.filter((l, i) => l || i).join('\n').trim();
-}
+/** The data as plain text, for Copy as text (shared: the same as a conversation's export writes as Markdown). */
+export { answerText as dataText } from '@shared/answer-ui/text';

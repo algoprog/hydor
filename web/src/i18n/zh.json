@@ -23632,5 +23632,13 @@
 "outbox::Title":"标题",
 "connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp tools ask first":"连接 已连接的账户 服务 集成 日历 登录 connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp 工具 先问我",
 "Calls to your connected accounts held for your OK, as drafts: change, send or drop them":"发给已连接账户、等你确认的调用，以草稿形式：修改、发送或丢弃",
-"outbox held calls ask first waiting for my ok approve before sending emails messages posts drafts send drop":"发件箱 等待确认的调用 先问我 等我确认 发送前批准 邮件 消息 帖子 草稿 发送 丢弃"
+"outbox held calls ask first waiting for my ok approve before sending emails messages posts drafts send drop":"发件箱 等待确认的调用 先问我 等我确认 发送前批准 邮件 消息 帖子 草稿 发送 丢弃",
+"A session exports as Markdown: format=md":"会话只能导出为 Markdown：format=md",
+"Copied the card as a picture":"已将卡片复制为图片",
+"Copied the conversation as Markdown":"已将对话复制为 Markdown",
+"Copy as picture":"复制为图片",
+"Export as Markdown":"导出为 Markdown",
+"Save as picture":"另存为图片",
+"Save to the Library as a document":"作为文档保存到资料库",
+"Saved to the Library as a document":"已作为文档保存到资料库"
 }

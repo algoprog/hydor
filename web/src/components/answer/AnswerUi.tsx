@@ -2,16 +2,18 @@
 // place of the code. While the reply streams, what has arrived of the JSON is read as far as it can be (readPartial) and
 // drawn as it comes, an address still being written left out (no picture loads half an address); once whole it is read
 // as JSON (or as far as it can be, when the agent wrote it a little wrong). A name it does not know, or a view that fails,
-// shows the data laid out as it is (DataView). On hover: the data itself, and a copy of it as text. Loaded the first time
-// a reply has one (Markdown.tsx).
-import { Component, memo, useContext, useMemo, useState, type ReactNode } from 'react';
-import { Braces, Shapes } from 'lucide-react';
+// shows the data laid out as it is (DataView). On hover or keyboard focus, its toolbar: the data itself, a copy of it as
+// text, Full screen, and under "…" the card as a picture (CardTools.tsx). Loaded the first time a reply has one
+// (Markdown.tsx).
+import { Component, memo, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Braces, Expand, Shapes } from 'lucide-react';
 import { answerUi } from '@shared/answer-ui';
 import { readPartial, type JsonPath } from '@shared/partial-json';
 import { tr } from '../../i18n/runtime';
 import { BarButton, CodeBlock, CopyButton, MdCtx } from '../Markdown';
 import { cx } from '../ui';
-import { AuiCtx, isObj, type AuiInfo, type Data } from './kit';
+import { CardFullScreen, PictureMenu, picturable } from './CardTools';
+import { AuiCtx, isObj, str, type AuiInfo, type Data } from './kit';
 import { DataView, dataText } from './DataView';
 import { UIS } from './registry';
 
@@ -86,6 +88,10 @@ export function AnswerBlock({ name, code, done, demo }: { name: string; code: st
   const spec = answerUi(asked);
   const View = spec ? UIS[spec.id] : undefined;
   const [raw, setRaw] = useState(false);
+  const [full, setFull] = useState(false);
+  // Whether it can be a picture: asked as its toolbar shows (a map or a figure inside comes in its own time).
+  const [pictures, setPictures] = useState(false);
+  const card = useRef<HTMLDivElement>(null);
   const keep = done && !demo && md.sessionKey ? `${md.sessionKey}:${sum(code.trim())}` : '';
   const info = useMemo<AuiInfo>(() => ({ sessionKey: md.sessionKey, cwd: md.cwd, offline: md.offline, done, keep, demo }), [md.sessionKey, md.cwd, md.offline, done, keep, demo]);
   const pretty = useMemo(() => {
@@ -104,26 +110,38 @@ export function AnswerBlock({ name, code, done, demo }: { name: string; code: st
       </div>
     );
   const fallback = <DataView data={parsed.value} />;
+  const drawn = (
+    <Guard done={done} fallback={fallback}>
+      {View ? <View data={parsed.value} done={done} /> : fallback}
+    </Guard>
+  );
+  const title = str(parsed.value.title) || spec?.title || asked || tr('Card');
+  const look = () => setPictures(!raw && picturable(card.current));
   return (
     <AuiCtx.Provider value={info}>
-      <div className="aui group/aui relative my-3" data-ui={spec?.id ?? asked} translate="no">
-        {raw ? (
-          <CodeBlock code={pretty} lang="json" />
-        ) : (
-          <Guard done={done} fallback={fallback}>
-            {View ? <View data={parsed.value} done={done} /> : fallback}
-          </Guard>
-        )}
+      <div ref={card} className="aui group/aui relative my-3" data-ui={spec?.id ?? asked} translate="no" onPointerEnter={done ? look : undefined} onFocus={done ? look : undefined}>
+        {raw ? <CodeBlock code={pretty} lang="json" /> : drawn}
         {!done && <span className="aui-live breathe" aria-hidden />}
         {done && (
-          <div className="absolute -top-2.5 right-1 z-10 flex rounded-md border border-line bg-elevated opacity-0 shadow-sm transition-opacity group-hover/aui:opacity-100 focus-within:opacity-100">
+          <div data-aui-bar className="absolute -top-2.5 right-1 z-10 flex rounded-md border border-line bg-elevated opacity-0 shadow-sm transition-opacity group-hover/aui:opacity-100 focus-within:opacity-100">
             <BarButton label={raw ? tr('Show it') : tr('Show the data')} onClick={() => setRaw((x) => !x)}>
               {raw ? <Shapes size={13} /> : <Braces size={13} />}
             </BarButton>
             <CopyButton text={() => dataText(parsed.value, spec?.title)} label={tr('Copy as text')} />
+            {!raw && (
+              <BarButton label={tr('Full screen')} onClick={() => setFull(true)}>
+                <Expand size={13} />
+              </BarButton>
+            )}
+            {!raw && pictures && <PictureMenu card={() => card.current} title={title} />}
           </div>
         )}
       </div>
+      {full && (
+        <CardFullScreen title={title} uiId={spec?.id ?? asked} pictures={pictures} onClose={() => setFull(false)}>
+          {drawn}
+        </CardFullScreen>
+      )}
     </AuiCtx.Provider>
   );
 }

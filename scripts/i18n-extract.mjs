@@ -330,6 +330,8 @@ const NO_WORDS = new Set([
   'shared/draft-diagram.ts',
   // Which tools act outside (word lists), and what agents are told of Ask first: none of it is shown.
   'shared/outbox-words.ts',
+  // An answer card as text and Markdown, for the clipboard and a conversation's export (files, not the pages' words).
+  'shared/answer-ui/text.ts',
 ]);
 for (const f of [...files(path.join(ROOT, 'web/src'), /\.(tsx|ts)$/), ...files(path.join(ROOT, 'shared'), /\.ts$/)]) {
   if (f.includes(`${path.sep}i18n${path.sep}`) || NO_WORDS.has(path.relative(ROOT, f).split(path.sep).join('/'))) continue;

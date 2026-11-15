@@ -23617,5 +23617,13 @@
 "outbox::Title":"Τίτλος",
 "connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp tools ask first":"συνδέσεις συνδεδεμένοι λογαριασμοί συνδεδεμένες εφαρμογές υπηρεσίες ενσωματώσεις ημερολόγιο σύνδεση connections connected accounts services integrations notion linear github google gmail slack calendar sign in oauth mcp εργαλεία ερώτηση πρώτα",
 "Calls to your connected accounts held for your OK, as drafts: change, send or drop them":"Κλήσεις προς τους συνδεδεμένους λογαριασμούς σας που περιμένουν το OK σας, ως πρόχειρα: αλλάξτε, στείλτε ή απορρίψτε τες",
-"outbox held calls ask first waiting for my ok approve before sending emails messages posts drafts send drop":"εξερχόμενα κλήσεις σε αναμονή ερώτηση πρώτα περιμένει το ok μου έγκριση πριν την αποστολή email μηνύματα αναρτήσεις πρόχειρα αποστολή απόρριψη"
+"outbox held calls ask first waiting for my ok approve before sending emails messages posts drafts send drop":"εξερχόμενα κλήσεις σε αναμονή ερώτηση πρώτα περιμένει το ok μου έγκριση πριν την αποστολή email μηνύματα αναρτήσεις πρόχειρα αποστολή απόρριψη",
+"A session exports as Markdown: format=md":"Μια συνεδρία εξάγεται ως Markdown: format=md",
+"Copied the card as a picture":"Η κάρτα αντιγράφηκε ως εικόνα",
+"Copied the conversation as Markdown":"Η συζήτηση αντιγράφηκε ως Markdown",
+"Copy as picture":"Αντιγραφή ως εικόνα",
+"Export as Markdown":"Εξαγωγή ως Markdown",
+"Save as picture":"Αποθήκευση ως εικόνα",
+"Save to the Library as a document":"Αποθήκευση στη Βιβλιοθήκη ως έγγραφο",
+"Saved to the Library as a document":"Αποθηκεύτηκε στη Βιβλιοθήκη ως έγγραφο"
 }
