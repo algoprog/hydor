@@ -179,6 +179,8 @@ The app installs like an app and opens full screen:
 - **iPhone or iPad**: open it in Safari, then Share → **Add to Home Screen**.
 - **Android**: open it in Chrome, then ⋮ → **Add to Home screen** (or **Install app**).
 
+Installed on Android, or with Chrome or Edge on a computer, Hydor is in the share sheet too: share a photo, a file or a link from another app to it, and the start page opens with it in the message box. See [Share to Hydor from other apps](/guide/devices#share-to-hydor-from-other-apps).
+
 On an iPhone or iPad, notifications work only in the app added to the home screen: open it from there, then turn on [Notify this device](/settings?s=notifications&find=Notify%20this%20device) in Settings → App → Notifications. See [Inbox and notifications](/guide/inbox).
 
 ### The sidebar is a drawer

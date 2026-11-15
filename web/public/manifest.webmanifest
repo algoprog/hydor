@@ -31,5 +31,21 @@
       "purpose": "any"
     }
   ],
-  "description": "A self-hosted agent harness: Claude Code, Codex and any model, on your computer, from any browser."
+  "description": "A self-hosted agent harness: Claude Code, Codex and any model, on your computer, from any browser.",
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": ["image/*", "video/*", "audio/*", "text/*", "application/pdf", "application/zip", "application/json", ".pdf", ".doc", ".docx", ".odt", ".rtf", ".xls", ".xlsx", ".ods", ".csv", ".ppt", ".pptx", ".odp", ".txt", ".md", ".zip", ".json", ".heic"]
+        }
+      ]
+    }
+  }
 }

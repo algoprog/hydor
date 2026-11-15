@@ -3,16 +3,18 @@
 // with the session the chat is in, or starts one (in a task folder of its own, as the start page does); the agent's
 // reply comes back when its turn ends; what it asks comes with buttons that answer it; and the other sessions'
 // notices can come too. The app asks Telegram for what was sent (long polling), so it needs no address on the internet.
+// Photos, files and voice messages (an album's together) reach the session's folder, fetched from Telegram (up to 20
+// MB, its limit for bots), and /as starts a session as one of the person's own agents (server/chatapps/start.ts).
 import crypto from 'node:crypto';
 import { NOTICE_VERB, shortTitle } from '../../shared/notice.ts';
 import type { Agent, NotifyEvent } from '../../shared/types.ts';
-import { taskRoot } from '../assistants/store.ts';
-import { dayIn, makeTaskFolder } from '../assistants/taskFolder.ts';
+import { findAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
+import { download, TooBig, type ChatFile } from '../chatapps/files.ts';
+import { agentChoices, asCommand, defaultAgent, deliver, pressedAs, type ChatSide } from '../chatapps/start.ts';
 import { deleteSecret, readSecret, saveSecret, vaultTables } from '../connections/vault.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
-import { userTimezone } from '../userPrefs.ts';
 import { chunks, plainText, telegramHtml } from './format.ts';
 
 export const TOKEN_NAME = 'TELEGRAM_BOT_TOKEN';
@@ -35,12 +37,29 @@ interface TgUser {
   last_name?: string;
   username?: string;
 }
+interface TgFile {
+  file_id: string;
+  file_size?: number;
+  file_name?: string;
+  mime_type?: string;
+}
 interface TgMessage {
   message_id: number;
   from?: TgUser;
   chat: { id: number; type: string };
   text?: string;
   caption?: string;
+  /** A photo in its sizes, the largest last. */
+  photo?: TgFile[];
+  document?: TgFile;
+  voice?: TgFile;
+  audio?: TgFile;
+  video?: TgFile;
+  video_note?: TgFile;
+  /** The parts of an album share it. */
+  media_group_id?: string;
+  /** Forwarded from someone else. */
+  forward_origin?: unknown;
 }
 interface TgCallback {
   id: string;
@@ -84,6 +103,16 @@ const setChats = (db: DB, list: TelegramChat[]) => kvSet(db, 'telegram.chats', J
 const tokenOf = (db: DB) => readSecret(db, TOKEN_NAME)?.value ?? null;
 const notifyOn = (db: DB) => kvGet(db, 'telegram.notify') !== '0';
 const agentFor = (db: DB): Agent => (kvGet(db, 'telegram.agent') === 'codex' ? 'codex' : 'claude');
+/** The agent (an assistant's id) new sessions start as (Settings → Chat apps → Telegram): none for the program alone. */
+const ownAgent = (db: DB) => defaultAgent(db, kvGet(db, 'telegram.as'));
+/** The agent /as picked for a chat's next new session, until one starts. */
+const nextAs = (db: DB, chat: number): string | undefined => readJson<Record<string, string>>(db, 'telegram.asNext', {})[chat];
+const setNextAs = (db: DB, chat: number, id: string | null) => {
+  const all = readJson<Record<string, string>>(db, 'telegram.asNext', {});
+  if (id) all[chat] = id;
+  else delete all[chat];
+  kvSet(db, 'telegram.asNext', JSON.stringify(all));
+};
 /** The session each chat is in. */
 const currentOf = (db: DB, chat: number): string | undefined => readJson<Record<string, string>>(db, 'telegram.current', {})[chat];
 const setCurrent = (db: DB, chat: number, key: string | null) => {
@@ -126,7 +155,7 @@ async function call<T>(token: string, method: string, body: Record<string, unkno
 }
 
 /** Buttons' data: Telegram keeps 64 bytes a button, so each stands for what it does, kept here (the latest 500). */
-type Action = { kind: 'answer'; key: string; id: string; decision: string; label: string } | { kind: 'switch'; key: string };
+type Action = { kind: 'answer'; key: string; id: string; decision: string; label: string } | { kind: 'switch'; key: string } | { kind: 'as'; id: string };
 const actions = new Map<string, Action>();
 function button(text: string, a: Action): Button {
   const id = crypto.randomBytes(9).toString('base64url');
@@ -223,8 +252,10 @@ async function link(d: Deps, token: string, m: TgMessage, text: string) {
 // ---- a chat speaking ------------------------------------------------------------------------------
 
 const HELP = [
-  'Send what you want done: it goes to the session this chat is in, or starts one, and the reply comes back here.',
+  'Send what you want done: it goes to the session this chat is in, or starts one, and the reply comes back here. Photos, files and voice messages go with it (a caption too).',
   '/new: a new session (/new and what it should do starts it at once)',
+  '/as and an agent’s name: a new session as one of your agents (/as Bookkeeper and what it should do starts it at once)',
+  '/agents: your agents, to pick one',
   '/sessions: the latest sessions, to go on with one',
   '/stop: stop the agent of this chat’s session',
   '/status: which session this chat is in, and what it is doing',
@@ -232,6 +263,8 @@ const HELP = [
 
 const COMMANDS = [
   { command: 'new', description: 'A new session' },
+  { command: 'as', description: 'A new session as one of your agents: /as and its name' },
+  { command: 'agents', description: 'Your agents, to pick one' },
   { command: 'sessions', description: 'The latest sessions, to go on with one' },
   { command: 'stop', description: 'Stop the agent' },
   { command: 'status', description: 'This chat’s session and what it is doing' },
@@ -240,36 +273,67 @@ const COMMANDS = [
 
 const busy = (status?: string) => status === 'working' || status === 'waiting' || status === 'starting';
 
-/** A message from a linked chat to its session: a new one when it is in none. */
-async function toSession(d: Deps, token: string, chat: number, text: string) {
-  const key = currentOf(d.db, chat);
-  const s = key ? d.sessions.summary(key) : null;
-  if (!key || !s) {
-    const cwd = makeTaskFolder(taskRoot(d.db), text, dayIn(userTimezone(d.db)));
-    const made = await d.sessions.create({ agent: agentFor(d.db), cwd, prompt: text, remember: false });
-    setCurrent(d.db, chat, made);
-    setChatOfSession(d.db, made, chat);
-    startTyping(token, chat);
-    await say(token, chat, 'On it: the reply comes here when it is done.', [openButton(d, `/s/${encodeURIComponent(made)}`)]);
-    return;
+/** Telegram lets bots fetch files of up to 20 MB. */
+export const TELEGRAM_MAX = 20 * 1024 * 1024;
+
+/** The chat as server/chatapps/start.ts sees it: where its messages go, and how it is answered. */
+const side = (d: Deps, token: string, chat: number): ChatSide => ({
+  app: 'Telegram',
+  program: agentFor(d.db),
+  as: nextAs(d.db, chat) ?? ownAgent(d.db),
+  tookAs: () => setNextAs(d.db, chat, null),
+  current: () => currentOf(d.db, chat),
+  setCurrent: (k) => setCurrent(d.db, chat, k),
+  own: (k) => setChatOfSession(d.db, k, chat),
+  say: (text, open) => say(token, chat, text, open ? [openButton(d, `/s/${encodeURIComponent(open)}`)] : []),
+  busy: (on) => (on ? startTyping(token, chat) : stopTyping(chat)),
+  maxBytes: TELEGRAM_MAX,
+  limitSays: 'Telegram lets bots fetch files of up to 20 MB',
+});
+
+/** What a message sent beside words, to fetch from Telegram: a photo at its largest, a document, a voice message… */
+function filesOf(token: string, m: TgMessage): ChatFile[] {
+  const fetchOf = (id: string) => async (max: number) => {
+    const f = await call<{ file_path?: string; file_size?: number }>(token, 'getFile', { file_id: id }).catch((e: Error) => {
+      if (/too big/i.test(e.message)) throw new TooBig();
+      throw e;
+    });
+    if (f.file_size && f.file_size > max) throw new TooBig();
+    if (!f.file_path) throw new Error('Telegram gave no address for it');
+    return (await download(`${api()}/file/bot${token}/${f.file_path}`, { max, what: 'Telegram' })).data;
+  };
+  const forwarded = m.forward_origin ? { forwarded: true } : {};
+  const out: ChatFile[] = [];
+  const photo = m.photo?.[m.photo.length - 1];
+  if (photo) out.push({ kind: 'photo', size: photo.file_size, mime: 'image/jpeg', fetch: fetchOf(photo.file_id), ...forwarded });
+  if (m.voice) out.push({ kind: 'voice', size: m.voice.file_size, mime: m.voice.mime_type ?? 'audio/ogg', fetch: fetchOf(m.voice.file_id), ...forwarded });
+  for (const f of [m.document, m.audio, m.video, m.video_note]) {
+    if (!f) continue;
+    out.push({ kind: /^image\//.test(f.mime_type ?? '') ? 'photo' : 'file', name: f.file_name, size: f.file_size, mime: f.mime_type ?? (f === m.video_note ? 'video/mp4' : undefined), fetch: fetchOf(f.file_id), ...forwarded });
   }
-  setChatOfSession(d.db, key, chat);
-  if (busy(s.live?.status)) {
-    d.sessions.enqueue(key, text);
-    await say(token, chat, 'It is still working: this goes to it when its turn ends.');
-    return;
-  }
-  await d.sessions.send(key, text);
-  startTyping(token, chat);
+  return out;
 }
 
-async function command(d: Deps, token: string, chat: number, name: string, rest: string) {
+/** The person's agents as buttons, two a row: pressing one starts the chat's next session as it. */
+function agentsList(d: Deps, token: string, chat: number) {
+  const list = agentChoices(d.db, 24);
+  const rows: Button[][] = [];
+  for (let i = 0; i < list.length; i += 2) rows.push(list.slice(i, i + 2).map((a) => button(a.name, { kind: 'as', id: a.id })));
+  return say(token, chat, 'Start a new session as one of your agents (or send /as and its name):', rows);
+}
+
+async function command(d: Deps, token: string, chat: number, name: string, rest: string, files: ChatFile[] = []) {
   const key = currentOf(d.db, chat);
   const s = key ? d.sessions.summary(key) : null;
   if (name === 'new') {
     setCurrent(d.db, chat, null);
-    if (rest) return toSession(d, token, chat, rest);
+    if (rest || files.length) return deliver(d, side(d, token, chat), { text: rest, files });
     return say(token, chat, 'Send what the new session should do.');
+  }
+  if (name === 'agents') return agentsList(d, token, chat);
+  if (name === 'as') {
+    if ((await asCommand(d, side(d, token, chat), (id) => setNextAs(d.db, chat, id), rest, files)) === 'list') return agentsList(d, token, chat);
+    return;
   }
   if (name === 'sessions') {
     const list = d.sessions.list({ limit: 8 }).sessions.filter((x) => !x.external);
@@ -315,6 +379,12 @@ async function onCallback(d: Deps, token: string, q: TgCallback) {
     await call(token, 'answerCallbackQuery', { callback_query_id: q.id, text: why });
     return;
   }
+  if (a.kind === 'as') {
+    const r = await pressedAs(d, side(d, token, q.from.id), (id) => setNextAs(d.db, q.from.id, id), a.id);
+    await call(token, 'answerCallbackQuery', { callback_query_id: q.id, text: r.toast });
+    await say(token, q.from.id, r.text);
+    return;
+  }
   if (a.kind === 'switch') {
     setCurrent(d.db, q.from.id, a.key);
     const title = d.sessions.summary(a.key)?.title || 'Untitled';
@@ -341,17 +411,43 @@ async function onCallback(d: Deps, token: string, q: TgCallback) {
   }
 }
 
-/** One update from Telegram: a message, or a press of one of the bot's buttons. */
+/** For tests: how long the parts of an album are waited for. */
+export const telegramTuning = { albumMs: 1500 };
+/** Albums coming in, by chat and album: their parts so far, and the wait for the next. */
+const albums = new Map<string, { parts: TgMessage[]; timer: NodeJS.Timeout }>();
+
+/** One message (or an album's parts, as one): a command, or words and files for the chat's session. */
+async function onMessage(d: Deps, token: string, parts: TgMessage[]) {
+  const chat = parts[0].chat.id;
+  const text = parts.map((m) => String(m.text ?? m.caption ?? '').trim()).find(Boolean) ?? '';
+  const files = parts.flatMap((m) => filesOf(token, m));
+  const forwarded = !!parts[0].forward_origin;
+  if (!text && !files.length) return say(token, chat, 'Send words, photos, files or voice messages: stickers, polls and the like do not reach the agents.');
+  const cmd = forwarded ? null : /^\/(\w+)(?:@\w+)?(?:\s+([\s\S]*))?$/.exec(text);
+  if (cmd) return command(d, token, chat, cmd[1].toLowerCase(), (cmd[2] ?? '').trim(), files);
+  return deliver(d, side(d, token, chat), { text, files, forwarded });
+}
+
+/** One update from Telegram: a message, or a press of one of the bot's buttons. An album's parts wait for each other. */
 export async function handleUpdate(d: Deps, token: string, u: TgUpdate) {
   if (u.callback_query) return onCallback(d, token, u.callback_query);
   const m = u.message;
   if (!m || m.chat.type !== 'private' || !m.from || m.from.is_bot) return;
   const text = String(m.text ?? m.caption ?? '').trim();
   if (!linkedChats(d.db).some((c) => c.id === m.chat.id)) return link(d, token, m, text);
-  if (!text) return say(token, m.chat.id, 'Send words: pictures, files and voice messages do not reach the agents from Telegram yet.');
-  const cmd = /^\/(\w+)(?:@\w+)?(?:\s+([\s\S]*))?$/.exec(text);
-  if (cmd) return command(d, token, m.chat.id, cmd[1].toLowerCase(), (cmd[2] ?? '').trim());
-  return toSession(d, token, m.chat.id, text);
+  if (m.media_group_id) {
+    const id = `${m.chat.id}:${m.media_group_id}`;
+    const album = albums.get(id) ?? { parts: [], timer: undefined as unknown as NodeJS.Timeout };
+    album.parts.push(m);
+    clearTimeout(album.timer);
+    album.timer = setTimeout(() => {
+      albums.delete(id);
+      onMessage(d, token, album.parts).catch((e) => console.warn(`[telegram] ${(e as Error).message}`));
+    }, telegramTuning.albumMs);
+    albums.set(id, album);
+    return;
+  }
+  return onMessage(d, token, [m]);
 }
 
 // ---- notices --------------------------------------------------------------------------------------
@@ -484,6 +580,8 @@ export function stopTelegram() {
   stopped = true;
   restart();
   for (const chat of typing.keys()) stopTyping(chat);
+  for (const a of albums.values()) clearTimeout(a.timer);
+  albums.clear();
 }
 
 // ---- the capability -------------------------------------------------------------------------------
@@ -500,6 +598,7 @@ function view(d: Deps) {
     chats: linkedChats(d.db),
     notify: notifyOn(d.db),
     agent: agentFor(d.db),
+    as: ownAgent(d.db) ?? null,
     pairing: pairing && Date.now() < pairing.until ? { code: pairing.code, link: bot?.username ? `https://t.me/${bot.username}?start=${pairing.code}` : undefined, until: pairing.until } : undefined,
   };
 }
@@ -512,7 +611,7 @@ export const telegram: Feature = {
     vaultTables(db);
     app.get('/api/telegram', async () => view(d));
     app.put('/api/telegram', async (req) => {
-      const b = (req.body ?? {}) as { token?: unknown; notify?: unknown; agent?: unknown };
+      const b = (req.body ?? {}) as { token?: unknown; notify?: unknown; agent?: unknown; as?: unknown };
       if (typeof b.token === 'string') {
         const token = b.token.trim();
         if (!/^\d{5,16}:[A-Za-z0-9_-]{30,64}$/.test(token)) throw new HttpError(400, 'That does not look like a bot’s token: @BotFather gives one like 123456789:AA…');
@@ -543,6 +642,11 @@ export const telegram: Feature = {
       }
       if (typeof b.notify === 'boolean') kvSet(db, 'telegram.notify', b.notify ? '1' : '0');
       if (b.agent === 'claude' || b.agent === 'codex') kvSet(db, 'telegram.agent', b.agent);
+      if (b.as === null || b.as === '') kvSet(db, 'telegram.as', '');
+      else if (typeof b.as === 'string') {
+        if (!findAssistant(db, b.as)) throw new HttpError(404, 'No such agent: the Agents page lists yours');
+        kvSet(db, 'telegram.as', b.as);
+      }
       return view(d);
     });
     app.post('/api/telegram/pair', async () => {
@@ -558,6 +662,7 @@ export const telegram: Feature = {
         linkedChats(db).filter((c) => c.id !== id),
       );
       setCurrent(db, id, null);
+      setNextAs(db, id, null);
       return view(d);
     });
   },

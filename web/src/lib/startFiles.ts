@@ -14,11 +14,14 @@ export interface StartFile {
 
 let waiting: StartFile[] = [];
 
-/** Opens the start page with these in its box, after any picked before that it has not taken yet; `to` adds a prompt or a folder (/?prompt=…&cwd=…). */
-export function startSessionWith(list: StartFile[], to = '/') {
+/**
+ * Opens the start page with these in its box, after any picked before that it has not taken yet; `to` adds a prompt or a
+ * folder (/?prompt=…&cwd=…); `replace`: in place of the address shown (a share's, which should not open again on Back).
+ */
+export function startSessionWith(list: StartFile[], to = '/', replace = false) {
   const have = new Set(waiting.map((f) => f.path));
   waiting = [...waiting, ...list.filter((f) => !have.has(f.path))].slice(0, 20);
-  go(to);
+  go(to, replace);
 }
 
 /** What waits for the start page's box, as attachments (it calls doneStartFiles once it has them). */

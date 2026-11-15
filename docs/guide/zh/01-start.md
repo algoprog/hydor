@@ -179,6 +179,8 @@ Custom 工作或启动时，工作指示器使用 Hydor 加载动画（Ω 中的
 - **iPhone 或 iPad**：在 Safari 中打开它，然后点“分享”→ **添加到主屏幕**。
 - **Android**：在 Chrome 中打开它，然后点 ⋮ → **添加到主屏幕**（或**安装应用**）。
 
+在 Android 上安装后，或在电脑上用 Chrome 或 Edge 安装后，Hydor 也会出现在分享面板中：从其他应用把照片、文件或链接分享给它，开始页就会打开，内容已在消息框里。见[从其他应用分享到 Hydor](/guide/devices#share-to-hydor-from-other-apps)。
+
 在 iPhone 或 iPad 上，通知只在添加到主屏幕的应用中有效：从主屏幕打开它，然后在设置 → 应用 → 通知中开启[通知此设备](/settings?s=notifications&find=Notify%20this%20device)。见[收件箱和通知](/guide/inbox)。
 
 ### 侧边栏是一个抽屉
