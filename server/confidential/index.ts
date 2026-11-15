@@ -16,7 +16,7 @@
 import { CONFIDENTIAL_EXTRA, firstWordsTitle, isConfidential } from '../../shared/confidential.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { AgentModel, NotifyEvent } from '../../shared/types.ts';
-import { sandboxAvailable } from '../agent/sandbox.ts';
+import { netCutAvailable } from '../agent/sandbox.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -285,7 +285,7 @@ export const confidential: Feature = {
   },
 
   context(s) {
-    return isConfidential(s.extra) ? confidentialInstructions(!!sandboxAvailable()) : null;
+    return isConfidential(s.extra) ? confidentialInstructions(netCutAvailable()) : null;
   },
 
   async beforeSend(key, d) {
@@ -304,7 +304,7 @@ export const confidential: Feature = {
      */
     d.app.get('/api/confidential', async (req) => {
       const prefer = String((req.query as Record<string, string>).prefer ?? '') || null;
-      return { models: d.models.localModels(prefer).map((m) => m.id), sandbox: !!sandboxAvailable(), helper: !!localHelper(d.db) };
+      return { models: d.models.localModels(prefer).map((m) => m.id), sandbox: netCutAvailable(), helper: !!localHelper(d.db) };
     });
   },
 };

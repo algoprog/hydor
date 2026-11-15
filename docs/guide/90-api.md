@@ -779,7 +779,7 @@ Settings → Chat apps: each of the three has the same four routes under its own
 
 ## Custom (Settings → Capabilities → Custom)
 
-- `GET /api/custom/settings` — Custom's settings. Returns: `{ sandbox: boolean — commands in Auto mode run in the sandbox; Full access bypasses it (default true); goalRounds: number — Rounds before a goal pauses: the next steps a goal sends before it pauses (default 30); bwrap: boolean — the sandbox can run on this computer }`.
+- `GET /api/custom/settings` — Custom's settings. Returns: `{ sandbox: boolean — commands in Auto mode run in the sandbox; Full access bypasses it (default true); goalRounds: number — Rounds before a goal pauses: the next steps a goal sends before it pauses (default 30); bwrap: boolean — a sandbox can run on this computer (bubblewrap, Seatbelt or low integrity; the name is from when only bubblewrap existed); sandboxKind: "bwrap" | "seatbelt" | "lowbox" | null — which one; platform: string — the system's name ("linux", "darwin", "win32") }`.
 - `PUT /api/custom/settings` — changes them; merges. Body: `{ sandbox?: boolean; goalRounds?: integer 1–500 (the UI offers 10, 30, 100) }`. Returns: as GET.
 
 ## Usage and limits

@@ -1,43 +1,70 @@
-// The sandbox for Custom's commands in Auto mode: with bubblewrap (bwrap) here, a command
-// runs with the system read-only except the session folder and /tmp (the network stays open), so it
-// cannot change files elsewhere. Without bwrap, or where it cannot start (some containers), commands
-// run as before. Settings → Custom turns it off.
-// A confidential session (server/confidential) runs every command without network, in every mode and
-// whatever that setting: in a network of its own with nothing in it (--unshare-net). Where that cannot run,
-// main.ts has each command ask the user.
+// The sandbox for Custom's commands in Auto mode: a command can read everything but change files only in the session
+// folder, the temporary folder and the repository's own folder (the network stays open), so it cannot change files
+// elsewhere. Each system has its own:
+// - Linux: bubblewrap (bwrap), the system read-only but for those folders.
+// - macOS: Seatbelt (Apple's sandbox-exec), with a profile that refuses writes outside them.
+// - Windows: low integrity (lowbox.ts): the command runs below the user's level, and only the session's folders are
+//   marked so it may write there.
+// Without one, or where it cannot start (some containers), commands run as before. Settings → Custom turns it off.
+// A confidential session (server/confidential) runs every command without network, in every mode and whatever that
+// setting: bubblewrap gives it a network of its own with nothing in it (--unshare-net), Seatbelt refuses it any.
+// Where that cannot run (Windows), main.ts has each command ask the user.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { bashCommand, bashPath } from '../platform.ts';
+import { labelLow, lowboxAvailable, lowboxPath, lowboxProblem, lowTemp, type Lowbox } from './lowbox.ts';
+
+export { lowboxProblem };
 
 const RUNTIME = process.env.HYDOR_RUNTIME ?? '';
 /** This process runs a confidential session (the app started it so). */
 export const CONFIDENTIAL_ENV = process.env.HYDOR_CONFIDENTIAL === '1';
 
-let bwrap: string | null | undefined;
+/** The sandbox this system has: its kind, and the program that runs a command in it. */
+export interface Sandbox {
+  kind: 'bwrap' | 'seatbelt' | 'lowbox';
+  bin: string;
+  /** Windows: the helper and Git's bash as sandboxed commands reach it. */
+  lowbox?: Lowbox;
+}
 
-/** bwrap's path when it runs here (tried once). */
-export function sandboxAvailable(): string | null {
-  if (bwrap !== undefined) return bwrap;
-  bwrap = null;
-  if (process.platform !== 'linux') return bwrap;
-  for (const d of [...(process.env.PATH ?? '').split(':'), '/usr/bin', '/bin']) {
-    const p = d && path.join(d, 'bwrap');
-    if (!p || !fs.existsSync(p)) continue;
-    const r = spawnSync(p, ['--ro-bind', '/', '/', '--dev-bind', '/dev', '/dev', '--proc', '/proc', '--die-with-parent', '/bin/true'], { timeout: 5000, stdio: 'ignore' });
-    if (r.status === 0) bwrap = p;
-    break;
+const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
+
+let found: Sandbox | null | undefined;
+
+/** The sandbox that runs here (tried once). */
+export function sandboxAvailable(): Sandbox | null {
+  if (found !== undefined) return found;
+  found = null;
+  if (process.platform === 'linux') {
+    for (const d of [...(process.env.PATH ?? '').split(':'), '/usr/bin', '/bin']) {
+      const p = d && path.join(d, 'bwrap');
+      if (!p || !fs.existsSync(p)) continue;
+      const r = spawnSync(p, ['--ro-bind', '/', '/', '--dev-bind', '/dev', '/dev', '--proc', '/proc', '--die-with-parent', '/bin/true'], { timeout: 5000, stdio: 'ignore' });
+      if (r.status === 0) found = { kind: 'bwrap', bin: p };
+      break;
+    }
+  } else if (process.platform === 'darwin') {
+    // Its full path, never one found on PATH.
+    if (fs.existsSync(SANDBOX_EXEC) && spawnSync(SANDBOX_EXEC, ['-p', seatbeltProfile(0, { walls: true, cut: false }), '/usr/bin/true'], { timeout: 5000, stdio: 'ignore' }).status === 0) found = { kind: 'seatbelt', bin: SANDBOX_EXEC };
+  } else if (process.platform === 'win32') {
+    const box = lowboxAvailable(bashPath());
+    if (box) found = { kind: 'lowbox', bin: box.exe, lowbox: box };
   }
-  return bwrap;
+  return found;
 }
 
 let cutter: boolean | undefined;
 
-/** Whether bwrap can also give a command a network of its own, with nothing in it (tried once). */
+/** Whether the sandbox can also keep a command off the network: no internet, no other computer, not this one's servers (tried once). */
 export function netCutAvailable(): boolean {
   if (cutter !== undefined) return cutter;
-  const bin = sandboxAvailable();
-  cutter = !!bin && spawnSync(bin, ['--bind', '/', '/', '--dev-bind', '/dev', '/dev', '--proc', '/proc', '--unshare-net', '--die-with-parent', '/bin/true'], { timeout: 5000, stdio: 'ignore' }).status === 0;
+  const sb = sandboxAvailable();
+  if (sb?.kind === 'bwrap') cutter = spawnSync(sb.bin, ['--bind', '/', '/', '--dev-bind', '/dev', '/dev', '--proc', '/proc', '--unshare-net', '--die-with-parent', '/bin/true'], { timeout: 5000, stdio: 'ignore' }).status === 0;
+  else if (sb?.kind === 'seatbelt') cutter = spawnSync(sb.bin, ['-p', seatbeltProfile(0, { walls: false, cut: true }), '/usr/bin/true'], { timeout: 5000, stdio: 'ignore' }).status === 0;
+  else cutter = false;
   return cutter;
 }
 
@@ -80,9 +107,10 @@ const real = (p: string) => {
 
 /** The repository's own folder when it lies outside the session folder (a worktree, a subfolder), so git can commit. */
 function gitDir(cwd: string): string | null {
-  const r = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, encoding: 'utf8', timeout: 3000 });
+  const r = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, encoding: 'utf8', timeout: 3000, windowsHide: true });
   const dir = r.status === 0 ? real(r.stdout.trim()) : '';
-  return dir && !dir.startsWith(real(cwd) + '/') ? dir : null;
+  const own = real(cwd);
+  return dir && dir !== own && !dir.startsWith(own + path.sep) && !dir.startsWith(own + '/') ? dir : null;
 }
 
 export interface Shell {
@@ -97,18 +125,38 @@ export interface Shell {
  * them. Undefined: as it is (main.ts then has a confidential session's commands ask each time).
  */
 export async function sandboxShell(cwd: string, mode: string, confidential = false): Promise<((command: string) => Shell) | undefined> {
-  // Full access uses the host shell, not bubblewrap (which also prevents sudo).
+  // Full access uses the host shell, not the sandbox (which also prevents sudo).
   // Confidential network isolation is independent of the permission mode.
   if (mode === 'full' && !confidential) return undefined;
-  const bin = sandboxAvailable();
-  if (!bin) return undefined;
+  const sb = sandboxAvailable();
+  if (!sb) return undefined;
   const walls = mode === 'auto' && (await wanted());
   const cut = confidential && netCutAvailable();
   if (confidential && !cut) return undefined;
   if (!walls && !cut) return undefined;
-  const args = sandboxArgs(cwd, { walls, cut });
-  const env = walls ? cacheEnv() : undefined;
-  return (command) => ({ cmd: bin, args: [...args, '/bin/bash', '-c', command], ...(env ? { env } : {}) });
+  if (sb.kind === 'bwrap') {
+    const args = sandboxArgs(cwd, { walls, cut });
+    const env = walls ? cacheEnv(path.join(real(os.tmpdir()), `hydor-sandbox-${os.userInfo().uid}`)) : undefined;
+    return (command) => ({ cmd: sb.bin, args: [...args, '/bin/bash', '-c', command], ...(env ? { env } : {}) });
+  }
+  if (sb.kind === 'seatbelt') {
+    const dirs = walls ? writable(cwd) : [];
+    const args = ['-p', seatbeltProfile(dirs.length, { walls, cut }), ...dirs.flatMap((d, i) => ['-D', `W${i}=${d}`])];
+    const env = walls ? cacheEnv(path.join(real(os.tmpdir()), `hydor-sandbox-${os.userInfo().uid}`)) : undefined;
+    return (command) => {
+      const b = bashCommand(command);
+      return { cmd: sb.bin, args: [...args, b.cmd, ...b.args], ...(env ? { env } : {}) };
+    };
+  }
+  // Windows: walls only (it has no way to cut the network). Folders it must not mark leave the command as it is.
+  const dirs = [cwd, gitDir(cwd)].filter((d): d is string => !!d && fs.existsSync(d));
+  if (!dirs.every((d) => labelLow(sb.bin, d))) return undefined;
+  const tmp = path.join(lowTemp(), 'tmp');
+  fs.mkdirSync(tmp, { recursive: true });
+  const box = sb.lowbox!;
+  // Git's bash and the programs it runs through the sandbox's junction (lowbox.ts says why).
+  const env = { ...cacheEnv(path.join(lowTemp(), 'cache')), ...lowboxPath(process.env, box), TMP: tmp, TEMP: tmp, TMPDIR: tmp };
+  return (command) => ({ cmd: sb.bin, args: [box.bash, '-c', command], env });
 }
 
 /**
@@ -123,25 +171,59 @@ export function sandboxArgs(cwd: string, o: { walls: boolean; cut: boolean }): s
   return [...files, ...(o.cut ? ['--unshare-net'] : []), '--die-with-parent', '--chdir', cwd];
 }
 
-/** Package managers keep their caches in the home folder, which is read-only in the sandbox: these go to /tmp. */
-function cacheEnv(): Record<string, string> {
+/**
+ * The folders a command may change on a Mac, as Seatbelt sees them (their real paths: /tmp is /private/tmp): the
+ * session folder, the temporary folders (the user's own, with its cache folder beside it, and /tmp) and the
+ * repository's own folder.
+ */
+export function writable(cwd: string): string[] {
   const tmp = real(os.tmpdir());
-  const cache = path.join(tmp, `hydor-sandbox-${os.userInfo().uid}`);
+  // The user's temporary folder is …/T, its caches (compilers', Xcode's) …/C beside it.
+  const perUser = /^\/private\/var\/folders\/[^/]+\/[^/]+\/T$/.test(tmp) ? path.dirname(tmp) : tmp;
+  return [...new Set([real(cwd), perUser, real('/tmp'), gitDir(cwd)].filter((d): d is string => !!d && fs.existsSync(d)))];
+}
+
+/**
+ * Seatbelt's profile: everything allowed but, with `walls`, writes outside the `n` folders given as parameters W0…
+ * (and the terminal devices); with `cut`, the network, any of it.
+ */
+export function seatbeltProfile(n: number, o: { walls: boolean; cut: boolean }): string {
+  const lines = ['(version 1)', '(allow default)'];
+  if (o.cut) lines.push('(deny network*)');
+  if (o.walls) {
+    const dirs = Array.from({ length: n }, (_, i) => `(subpath (param "W${i}"))`);
+    lines.push('(deny file-write*)', `(allow file-write* ${[...dirs, '(literal "/dev/null")', '(literal "/dev/zero")', '(literal "/dev/dtracehelper")', '(literal "/dev/ptmx")', '(regex #"^/dev/tty")', '(regex #"^/dev/fd/")'].join(' ')})`);
+  }
+  return lines.join('\n');
+}
+
+/** Package managers keep their caches in the home folder, which is read-only in the sandbox: these go to `base`. */
+function cacheEnv(base: string): Record<string, string> {
   return {
-    npm_config_cache: path.join(cache, 'npm'),
-    YARN_CACHE_FOLDER: path.join(cache, 'yarn'),
-    npm_config_store_dir: path.join(cache, 'pnpm'),
-    GOCACHE: path.join(cache, 'go-build'),
-    BUN_INSTALL_CACHE_DIR: path.join(cache, 'bun'),
+    npm_config_cache: path.join(base, 'npm'),
+    YARN_CACHE_FOLDER: path.join(base, 'yarn'),
+    npm_config_store_dir: path.join(base, 'pnpm'),
+    GOCACHE: path.join(base, 'go-build'),
+    BUN_INSTALL_CACHE_DIR: path.join(base, 'bun'),
   };
 }
 
+/** Whether a sandboxed command's output shows it ran into the sandbox's walls, as this system words it. */
+export function wallsHit(out: string, platform: string = process.platform): boolean {
+  if (platform === 'darwin') return /Operation not permitted/.test(out);
+  if (platform === 'win32') return /Permission denied|Access is denied|EPERM|EACCES/.test(out);
+  return /Read-only file system/.test(out);
+}
+
 /** What the model is told when a command ran into the sandbox's walls. */
-export const SANDBOX_NOTE = '\n(This command ran in a sandbox: it can change files only in the session folder and /tmp. Work within those, or tell the user what needs doing elsewhere.)';
+export const SANDBOX_NOTE =
+  process.platform === 'win32'
+    ? '\n(This command ran in a sandbox: it can change files only in the session folder and its temporary folder, $TMP. Work within those, or tell the user what needs doing elsewhere.)'
+    : '\n(This command ran in a sandbox: it can change files only in the session folder and /tmp. Work within those, or tell the user what needs doing elsewhere.)';
 
 /** Output of a command that tried the network and found none. */
 export const netRefused = (out: string) =>
-  /Could not resolve host|Temporary failure in name resolution|Name or service not known|getaddrinfo|ENOTFOUND|EAI_AGAIN|Network is unreachable|ENETUNREACH|Connection refused|ECONNREFUSED|No route to host|Failed to establish a new connection|unable to access '/i.test(out);
+  /Could not resolve host|Temporary failure in name resolution|Name or service not known|nodename nor servname provided|getaddrinfo|ENOTFOUND|EAI_AGAIN|Network is unreachable|ENETUNREACH|Connection refused|ECONNREFUSED|No route to host|Failed to establish a new connection|unable to access '|Couldn't connect to server|connect EPERM|connect: Operation not permitted/i.test(out);
 
 /** What the model is told when a command of a confidential session tried the network. */
 export const NET_NOTE = '\n(This is a confidential session: commands run without network, so nothing can be downloaded, sent or reached from here. Work with what is on this computer, or tell the user what would need the internet.)';

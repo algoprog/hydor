@@ -682,7 +682,7 @@ row('custom', 'Auto mode', 'page', { note: 'Nothing to set here: Auto mode is on
 row('custom', 'Sandbox for commands', 'switch', {
   read: rd('/api/custom/settings', 'sandbox'),
   write: put('/api/custom/settings', (v) => ({ sandbox: v })),
-  note: 'It needs bubblewrap on this computer.',
+  note: 'It uses bubblewrap on Linux, Seatbelt on a Mac and low integrity on Windows; where it cannot run, commands run without it.',
 });
 row('custom', 'Rounds before a goal pauses', 'number', { range: { min: 1, max: 500 }, read: rd('/api/custom/settings', 'goalRounds'), write: put('/api/custom/settings', (v) => ({ goalRounds: v })) });
 

@@ -18,6 +18,7 @@ import { bashCommand, bashPath, isAbsPath, launch, linkPath, killTree, pathDirs,
 import { Runner } from './runner/client.ts';
 import { encodeFrame, FRAME_CONTROL, readAddress } from './runner/frames.ts';
 import { attachTerminal, createTerminal, killTerminal, listTerminals, paneContext, terminalHistory } from './terminals.ts';
+import { lowboxProblem, netCutAvailable, netRefused, sandboxAvailable, sandboxShell, wallsHit } from './agent/sandbox.ts';
 
 if (!path.resolve(config.dataDir).startsWith(path.resolve(os.tmpdir())) && !config.dataDir.includes('hydor-test')) {
   console.error('Run with DATA_DIR in a scratch folder (…/hydor-test-platform), so the test touches no real data.');
@@ -210,6 +211,86 @@ await Promise.race([exited, sleep(15_000)]);
 assert.ok(again.exit, 'the agent ended when asked to stop');
 again.cleanup();
 ok('the agent stops when asked');
+
+// ---- the sandbox for Custom's commands --------------------------------------------------------------------------
+// Seatbelt on a Mac, low integrity on Windows, bubblewrap on Linux where it can run (CI's Linux has none). In Auto mode
+// a command changes files in the session's folder (those there before too) and the temporary folder, and nothing
+// elsewhere; it stops with what it started; in a confidential session it reaches no network where the sandbox can cut it.
+const sb = sandboxAvailable();
+if (!sb) {
+  assert.equal(process.platform, 'linux', `a sandbox for commands on ${process.platform}${WIN ? `: ${lowboxProblem()}` : ''}`);
+  console.log('  --  no bubblewrap here: the sandbox is not tried');
+} else {
+  const box = fs.mkdtempSync(path.join(scratch, 'sandbox-'));
+  fs.writeFileSync(path.join(box, 'before.txt'), 'old\n');
+  fs.mkdirSync(path.join(box, 'sub'));
+  fs.writeFileSync(path.join(box, 'sub', 'deep.txt'), 'old\n');
+  // Outside: the home folder, which no sandbox lets a command change (the temporary folder is open to them all).
+  const away = fs.mkdtempSync(path.join(os.homedir(), '.hydor-sandbox-test-'));
+  fs.writeFileSync(path.join(away, 'existing.txt'), 'old\n');
+  try {
+    const shellOf = await sandboxShell(box, 'auto');
+    assert.ok(shellOf, `Auto mode runs commands in ${sb.kind}`);
+    const inBox = shellOf!('echo new > inside.txt && echo more >> before.txt && echo more >> sub/deep.txt && mkdir made && echo x > made/x.txt && t="${TMPDIR:-/tmp}/hydor-sandbox-probe-$$" && echo t > "$t" && rm "$t" && rm sub/deep.txt && echo done');
+    const r = await run(inBox.cmd, inBox.args, { cwd: box, env: { ...env, ...inBox.env } });
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /done/);
+    assert.equal(fs.readFileSync(path.join(box, 'before.txt'), 'utf8'), 'old\nmore\n', 'a file that was there before');
+    assert.equal(fs.readFileSync(path.join(box, 'inside.txt'), 'utf8'), 'new\n');
+    assert.ok(!fs.existsSync(path.join(box, 'sub', 'deep.txt')), 'a file in a subfolder that was there before, removed');
+    ok(`${sb.kind}: a command changes files in its folder (new and old, in subfolders too) and the temporary folder`);
+
+    // git in it, with a hook (git runs it with its sh: on Windows the sandbox's own too).
+    const gitIn = shellOf!('git init -q && printf "#!/bin/sh\\necho hooked > hooked.txt\\n" > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && git -c user.email=a@b.c -c user.name=a commit -q --allow-empty -m first && git log --oneline | wc -l');
+    const rg = await run(gitIn.cmd, gitIn.args, { cwd: box, env: { ...env, ...gitIn.env } });
+    assert.equal(rg.code, 0, rg.out);
+    assert.match(rg.out, /^\s*1\s*$/m, rg.out);
+    assert.ok(fs.existsSync(path.join(box, 'hooked.txt')), `the hook ran: ${rg.out}`);
+    ok(`${sb.kind}: git commits in it, and runs its hooks`);
+
+    const slash = (p: string) => p.replace(/\\/g, '/');
+    const out = shellOf!(`echo x > '${slash(path.join(away, 'new.txt'))}'; echo x >> '${slash(path.join(away, 'existing.txt'))}'; mkdir '${slash(path.join(away, 'made'))}'`);
+    const r2 = await run(out.cmd, out.args, { cwd: box, env: { ...env, ...out.env } });
+    assert.notEqual(r2.code, 0, r2.out);
+    assert.ok(!fs.existsSync(path.join(away, 'new.txt')) && !fs.existsSync(path.join(away, 'made')), `nothing made outside: ${r2.out}`);
+    assert.equal(fs.readFileSync(path.join(away, 'existing.txt'), 'utf8'), 'old\n', 'nothing changed outside');
+    assert.ok(wallsHit(r2.out), `what it printed shows the walls: ${r2.out}`);
+    ok(`${sb.kind}: and none outside it (the agent hears why)`);
+
+    const long = shellOf!(WIN ? 'cat /proc/$$/winpid > pid.txt; sleep 60' : 'echo $$ > pid.txt; sleep 60');
+    const held = spawn(long.cmd, long.args, { cwd: box, env: { ...env, ...long.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const pidFile = path.join(box, 'pid.txt');
+    await until(() => fs.existsSync(pidFile) && /\d+/.test(fs.readFileSync(pidFile, 'utf8')), 'the sandboxed command to start');
+    const inner = Number(fs.readFileSync(pidFile, 'utf8').trim());
+    assert.ok(alive(inner));
+    killTree(held.pid!, 'SIGKILL');
+    await until(() => !alive(inner), 'the sandboxed command to stop', 10_000);
+    ok(`${sb.kind}: a sandboxed command stops with what it started`);
+
+    const conf = await sandboxShell(box, 'ask', true);
+    if (!netCutAvailable()) {
+      assert.equal(conf, undefined, 'no way to cut the network here: a confidential session’s commands ask each time');
+      ok(`${sb.kind}: cannot keep a command off the network, so a confidential session’s commands ask`);
+    } else {
+      const server = net.createServer((s) => s.end('hello-from-here\n'));
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const port = (server.address() as net.AddressInfo).port;
+      const tryIt = `exec 3<>/dev/tcp/127.0.0.1/${port} && cat <&3`;
+      const plain = bashCommand(tryIt);
+      const open = await run(plain.cmd, plain.args);
+      assert.match(open.out, /hello-from-here/, 'an ordinary command reaches it');
+      const cut = conf!(tryIt);
+      const r3 = await run(cut.cmd, cut.args, { cwd: box, env: { ...env, ...cut.env } });
+      server.close();
+      assert.notEqual(r3.code, 0, r3.out);
+      assert.ok(!r3.out.includes('hello-from-here'), r3.out);
+      assert.ok(netRefused(r3.out), `the agent hears it had no network: ${r3.out}`);
+      ok(`${sb.kind}: a confidential session’s command reaches no network, not even this computer’s servers`);
+    }
+  } finally {
+    fs.rmSync(away, { recursive: true, force: true, maxRetries: 5 });
+  }
+}
 
 // ---- links ------------------------------------------------------------------------------------------------------
 const real = path.join(scratch, 'real-folder');
