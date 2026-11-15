@@ -5,9 +5,9 @@ import { useState, type ReactNode, type RefObject } from 'react';
 import { AlarmClock, Archive, ArrowRightLeft, CheckCheck, CircleEllipsis, Copy, FileDiff, FolderCode, FolderOpen, GitBranch, GitFork, GitPullRequest, Link2, Pencil, Pin, Shrink, SlidersHorizontal, Square, SquareTerminal, Target, Trash2 } from 'lucide-react';
 import type { Agent, SessionSummary } from '@shared/types';
 import { isConfidential } from '@shared/confidential';
-import { del, enc, post } from '../../lib/api';
+import { enc, post } from '../../lib/api';
 import { activityOf, isBusy } from '../../lib/activity';
-import { setFlags, settle } from '../../lib/flags';
+import { deleteSession, setFlags, settle } from '../../lib/flags';
 import { go } from '../../lib/nav';
 import { toast, toastError, useUI } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
@@ -229,12 +229,8 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
           onClick={async () => {
             close();
             if (!(await confirm(deleteDialog(s)))) return;
-            try {
-              await del(`/api/sessions/${enc(s.key)}`);
-              go('/');
-            } catch (e) {
-              toastError(e);
-            }
+            go('/');
+            deleteSession(s.key).catch(toastError);
           }}
         >
           Delete session

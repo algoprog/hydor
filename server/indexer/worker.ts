@@ -235,7 +235,11 @@ async function indexFile(f: FileRef): Promise<string | null> {
   const parentKey = f.parent ?? (codexParent ? `codex:${codexParent}` : undefined);
   const title = f.agent === 'codex' ? codexNames.get(id) ?? parser.title() : parser.title();
 
-  db.transaction(() => {
+  // Written under the database's write lock, and only while the transcript is still there. Deleting a session removes
+  // its transcript first and its rows after (SessionManager.remove), which must wait for this lock: a transcript read
+  // just before its session was deleted (often its agent's last lines as it stopped) does not bring the session back.
+  const wrote = db.transaction(() => {
+    if (!fs.existsSync(f.path)) return false;
     if (!incremental) {
       delChunks.run(key);
       delActivity.run(key);
@@ -286,8 +290,9 @@ async function indexFile(f: FileRef): Promise<string | null> {
       hidden: parentKey || st.userMessages === 0 ? 1 : 0,
       bg_tasks: parser instanceof ClaudeParser && parser.bg.size ? JSON.stringify([...parser.bg.values()]) : null,
     });
-  })();
-  return key;
+    return true;
+  }).immediate();
+  return wrote ? key : null;
 }
 
 const yieldTick = () => new Promise((r) => setImmediate(r));

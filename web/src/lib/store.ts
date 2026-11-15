@@ -149,6 +149,25 @@ function sortKeys(byKey: Record<string, SessionSummary>): string[] {
 }
 
 const upsertedAt = new Map<string, number>();
+/** When each session left the list, so that a list read before that does not bring it back. */
+const removedAt = new Map<string, number>();
+/**
+ * Sessions deleted from this page. Each leaves the list as you confirm and stays out: deleting a running one takes the
+ * server a few seconds (its agent stops first), and what still arrives for it meanwhile is older than the delete.
+ */
+const deleted = new Set<string>();
+
+/** Takes a session you are deleting off the list now (deleteSession, lib/flags.ts). */
+export function markDeleted(key: string) {
+  deleted.add(key);
+  useSessions.getState().remove([key]);
+}
+
+/** The delete did not go through: the session is listed again. */
+export function unmarkDeleted(key: string) {
+  deleted.delete(key);
+  useSessions.getState().load().catch(() => {});
+}
 
 export const useSessions = create<{
   byKey: Record<string, SessionSummary>;
@@ -168,14 +187,21 @@ export const useSessions = create<{
     const r = await api<{ sessions: SessionSummary[]; total: number }>('/api/sessions?limit=600');
     const prev = get().byKey;
     const byKey: Record<string, SessionSummary> = {};
-    // Updates that arrived while the list was in flight are newer than the list.
-    for (const s of r.sessions) byKey[s.key] = (upsertedAt.get(s.key) ?? 0) > started && prev[s.key] ? prev[s.key] : s;
+    // Updates that arrived while the list was in flight are newer than the list: a session deleted or removed
+    // meanwhile stays out, one started meanwhile stays in.
+    for (const s of r.sessions) {
+      const gone = removedAt.get(s.key) ?? 0;
+      if (deleted.has(s.key) || (gone > started && gone >= (upsertedAt.get(s.key) ?? 0))) continue;
+      byKey[s.key] = (upsertedAt.get(s.key) ?? 0) > started && prev[s.key] ? prev[s.key] : s;
+    }
+    for (const [k, s] of Object.entries(prev)) if (!byKey[k] && (upsertedAt.get(k) ?? 0) > started) byKey[k] = s;
     set({ byKey, order: sortKeys(byKey), loaded: true, total: r.total });
   },
   upsert: (list) => {
     const byKey = { ...get().byKey };
     const now = Date.now();
     for (const s of list) {
+      if (deleted.has(s.key)) continue;
       byKey[s.key] = s;
       upsertedAt.set(s.key, now);
     }
@@ -183,7 +209,11 @@ export const useSessions = create<{
   },
   remove: (keys) => {
     const byKey = { ...get().byKey };
-    for (const k of keys) delete byKey[k];
+    const now = Date.now();
+    for (const k of keys) {
+      delete byKey[k];
+      removedAt.set(k, now);
+    }
     set({ byKey, order: sortKeys(byKey) });
   },
 }));
