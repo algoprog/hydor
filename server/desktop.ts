@@ -4,7 +4,7 @@
 //
 // The channel both ways: the server tells the app what to show (a new version ready, an agent using the computer, with
 // the glow around the screen and its pointer over the real one, a session's notice as the system's own notification)
-// and what to do (install), asks it what only it can find out or do (macOS's permissions
+// and what to do (install; keep the computer awake while agents work, server/awake.ts), asks it what only it can find out or do (macOS's permissions
 // for computer use, and asking for them; hiding the glow for a moment while it looks at the screen; letting go of Esc
 // while the agent itself presses it; on Linux, a picture of the screen), and hears what you chose in its menus
 // (Restart to Update, Stop, Esc) and, on Windows, that it should stop (quit: Windows has no signal a program can catch
@@ -117,6 +117,11 @@ export type ToDesktop =
    * not show (not allowed in its settings) goes to the window's page, which shows it inside the app.
    */
   | { type: 'notice'; n: NotifyEvent; title: string; body: string; path: string }
+  /**
+   * Keep the computer from going to sleep by itself (on), or let it (off): sent each time the answer changes, and once
+   * as the server starts (server/awake.ts). `why` is for the app's log. The app lets go when the server exits.
+   */
+  | { type: 'awake'; on: boolean; why: string }
   | ({ type: 'ask'; id: string } & DesktopAsk);
 
 /** Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, Esc, ⌘⇧Esc), quit (Windows), and answers. */

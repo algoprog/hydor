@@ -38,11 +38,16 @@
 // Notices (a session finished, failed or needs you): the server sends each one here ({ type: 'notice' }), and the app
 // shows it as the system's own notification, even with the window closed; clicking it opens that session. The page in
 // the window shows none itself, only those the system did not show (not allowed in its settings), handed to it here.
+//
+// Keeping the computer awake: while agents work, and from a few minutes before a scheduled task is due, the server
+// says so ({ type: 'awake', on }, Settings → General → Keep the computer awake) and the app keeps the computer from
+// going to sleep by itself (awake.cjs); it lets go when the server says, when the server exits, and when it quits.
 'use strict';
-const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, session, shell, systemPreferences } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, powerSaveBlocker, session, shell, systemPreferences } = require('electron');
 const glow = require('./glow.cjs');
 const { createNotices } = require('./notices.cjs');
 const { badgeBitmap } = require('./badge.cjs');
+const { createAwake } = require('./awake.cjs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -429,6 +434,8 @@ function startServer() {
   child.on('exit', (code, signal) => {
     if (server === child) server = null;
     fs.rmSync(PIDFILE, { force: true });
+    // The computer may sleep again: the next server says whether it should stay awake.
+    awake.release('the server stopped');
     if (quitting || installing) return;
     // What it showed here goes with it: the next one says again what waits.
     forgetShown();
@@ -493,6 +500,8 @@ function onMessage(m) {
     onUpdate(m);
   } else if (m.type === 'notice') {
     sessionNotices.show(m);
+  } else if (m.type === 'awake') {
+    awake.onMessage(m);
   } else if (m.type === 'computer') {
     onComputer(m);
   } else if (m.type === 'pointer') {
@@ -598,6 +607,16 @@ const sessionNotices = createNotices({
   },
   open: openAt,
   showApp: () => go(),
+});
+
+// ---- keeping the computer awake while agents work and before scheduled tasks (awake.cjs) ---------------------------
+
+const awake = createAwake({
+  powerSaveBlocker,
+  log: (...what) => {
+    console.log('[hydor]', ...what);
+    trace(...what);
+  },
 });
 
 /**
@@ -1321,4 +1340,7 @@ app.on('window-all-closed', () => {
   // Stays in the menu bar (the notification area, the tray).
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  awake.release('the app quits');
+});
