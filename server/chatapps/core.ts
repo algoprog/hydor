@@ -4,15 +4,17 @@
 // with buttons; /new, /sessions, /stop and /status steer it; and the other sessions' notices can come too.
 // A platform (discord.ts, slack.ts) brings its connection and a `Wire`: how words, replies, notices and "working…"
 // look there. Everything it keeps is under its own id in the key-value store ("discord.chats", "slack.notify"…).
+// Photos, files and voice messages sent with a message reach the session too, and /as starts one as one of the
+// person's own agents (start.ts and files.ts, which Telegram shares).
 import crypto from 'node:crypto';
 import { NOTICE_VERB, shortTitle } from '../../shared/notice.ts';
 import type { Agent, NotifyEvent } from '../../shared/types.ts';
-import { taskRoot } from '../assistants/store.ts';
-import { dayIn, makeTaskFolder } from '../assistants/taskFolder.ts';
+import { findAssistant } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, TurnInfo } from '../features/types.ts';
-import { userTimezone } from '../userPrefs.ts';
+import type { ChatFile } from './files.ts';
+import { agentChoices, asCommand, defaultAgent, deliver, pressedAs, type ChatSide } from './start.ts';
 
 /** A button: `id` is what pressing it does (made by `button`), `url` opens a page instead. */
 export interface Btn {
@@ -52,17 +54,21 @@ export interface Incoming {
   text: string;
   /** A direct message to the bot (a channel's messages count when they address it). */
   direct: boolean;
+  /** Photos, files and voice messages sent with it. */
+  files?: ChatFile[];
+  /** Forwarded from someone else (its words are outside data). */
+  forwarded?: boolean;
 }
 
 /** A reply longer than this many messages ends with a word that the rest is in the app. */
 export const MAX_PARTS = 10;
 
 /** The commands, typed after "/" or "!" . */
-const COMMAND_NAMES = ['new', 'sessions', 'stop', 'status', 'help'];
+const COMMAND_NAMES = ['new', 'as', 'agents', 'sessions', 'stop', 'status', 'help'];
 
 const busyStatus = (status?: string) => status === 'working' || status === 'waiting' || status === 'starting';
 
-export type Action = { kind: 'answer'; key: string; id: string; decision: string; label: string } | { kind: 'switch'; key: string };
+export type Action = { kind: 'answer'; key: string; id: string; decision: string; label: string } | { kind: 'switch'; key: string } | { kind: 'as'; id: string };
 
 export type Pressed = { ok: false; text: string } | { ok: true; kind: 'switch'; text: string; toast: string } | { ok: true; kind: 'answer'; label: string };
 
@@ -90,6 +96,9 @@ export interface ChatAppSpec {
   wire(d: Deps): Wire;
   /** Whether the bot is connected (its tokens are saved). */
   connected(d: Deps): boolean;
+  /** The biggest file it lets a bot fetch, in bytes, and that said in a few words ("Discord files of up to 25 MB…"). */
+  maxBytes: number;
+  limitSays: string;
 }
 
 export function chatApp(spec: ChatAppSpec) {
@@ -108,6 +117,16 @@ export function chatApp(spec: ChatAppSpec) {
     if (k) all[chat] = k;
     else delete all[chat];
     kvSet(db, key('current'), JSON.stringify(all));
+  };
+  /** The agent (an assistant's id) new sessions start as (Settings → Chat apps): none for the program alone. */
+  const ownAgent = (db: DB) => defaultAgent(db, kvGet(db, key('as')));
+  /** The agent /as picked for a chat's next new session, until one starts. */
+  const nextAs = (db: DB, chat: string): string | undefined => readJson<Record<string, string>>(db, key('asNext'), {})[chat];
+  const setNextAs = (db: DB, chat: string, id: string | null) => {
+    const all = readJson<Record<string, string>>(db, key('asNext'), {});
+    if (id) all[chat] = id;
+    else delete all[chat];
+    kvSet(db, key('asNext'), JSON.stringify(all));
   };
   /** Sessions a chat spoke to, and which chat: their replies go there (the latest 300). */
   const chatOfSession = (db: DB, k: string): string | undefined => readJson<Record<string, string>>(db, key('sessions'), {})[k];
@@ -169,43 +188,50 @@ export function chatApp(spec: ChatAppSpec) {
 
   // ---- a chat speaking --------------------------------------------------------------------------
   const HELP = [
-    'Send what you want done: it goes to the session this chat is in, or starts one, and the reply comes back here.',
+    'Send what you want done: it goes to the session this chat is in, or starts one, and the reply comes back here. Photos, files and voice messages go with it (a caption too).',
     '/new: a new session (/new and what it should do starts it at once)',
+    '/as and an agent’s name: a new session as one of your agents (/as Bookkeeper and what it should do starts it at once)',
+    '/agents: your agents, to pick one',
     '/sessions: the latest sessions, to go on with one',
     '/stop: stop the agent of this chat’s session',
     '/status: which session this chat is in, and what it is doing',
   ].join('\n');
 
-  /** A message from a linked chat to its session: a new one when it is in none. */
-  async function toSession(d: Deps, w: Wire, chat: string, text: string) {
-    const k = currentOf(d.db, chat);
-    const s = k ? d.sessions.summary(k) : null;
-    if (!k || !s) {
-      const cwd = makeTaskFolder(taskRoot(d.db), text, dayIn(userTimezone(d.db)));
-      const made = await d.sessions.create({ agent: agentFor(d.db), cwd, prompt: text, remember: false });
-      setCurrent(d.db, chat, made);
-      setChatOfSession(d.db, made, chat);
-      w.busy(chat, true);
-      await w.say(chat, 'On it: the reply comes here when it is done.', [openButton(d, `/s/${encodeURIComponent(made)}`)]);
-      return;
-    }
-    setChatOfSession(d.db, k, chat);
-    if (busyStatus(s.live?.status)) {
-      d.sessions.enqueue(k, text);
-      await w.say(chat, 'It is still working: this goes to it when its turn ends.');
-      return;
-    }
-    await d.sessions.send(k, text);
-    w.busy(chat, true);
+  /** The chat as start.ts sees it: where its messages go, and how it is answered. */
+  const side = (d: Deps, w: Wire, chat: string): ChatSide => ({
+    app: label,
+    program: agentFor(d.db),
+    as: nextAs(d.db, chat) ?? ownAgent(d.db),
+    tookAs: () => setNextAs(d.db, chat, null),
+    current: () => currentOf(d.db, chat),
+    setCurrent: (k) => setCurrent(d.db, chat, k),
+    own: (k) => setChatOfSession(d.db, k, chat),
+    say: (text, open) => w.say(chat, text, open ? [openButton(d, `/s/${encodeURIComponent(open)}`)] : []),
+    busy: (on) => w.busy(chat, on),
+    maxBytes: spec.maxBytes,
+    limitSays: spec.limitSays,
+  });
+
+  /** The person's agents as buttons, four a row: pressing one starts the chat's next session as it. */
+  function agentsList(d: Deps, w: Wire, chat: string) {
+    const list = agentChoices(d.db, 20);
+    const rows: Rows = [];
+    for (let i = 0; i < list.length; i += 4) rows.push(list.slice(i, i + 4).map((a) => button(a.name, { kind: 'as', id: a.id })));
+    return w.say(chat, 'Start a new session as one of your agents (or send /as and its name):', rows);
   }
 
-  async function command(d: Deps, w: Wire, chat: string, name: string, rest: string) {
+  async function command(d: Deps, w: Wire, chat: string, name: string, rest: string, files: ChatFile[] = []) {
     const k = currentOf(d.db, chat);
     const s = k ? d.sessions.summary(k) : null;
     if (name === 'new') {
       setCurrent(d.db, chat, null);
-      if (rest) return toSession(d, w, chat, rest);
+      if (rest || files.length) return deliver(d, side(d, w, chat), { text: rest, files });
       return w.say(chat, 'Send what the new session should do.');
+    }
+    if (name === 'agents') return agentsList(d, w, chat);
+    if (name === 'as') {
+      if ((await asCommand(d, side(d, w, chat), (id) => setNextAs(d.db, chat, id), rest, files)) === 'list') return agentsList(d, w, chat);
+      return;
     }
     if (name === 'sessions') {
       const list = d.sessions.list({ limit: 8 }).sessions.filter((x) => !x.external);
@@ -233,11 +259,12 @@ export function chatApp(spec: ChatAppSpec) {
   /** One message to the bot: linked chats' words go to the agents, anyone else's is a try at linking (or is told whose bot this is). */
   async function incoming(d: Deps, w: Wire, m: Incoming) {
     const text = m.text.trim();
+    const files = m.files ?? [];
     if (!isLinked(d.db, m.chat, m.user)) return tryLink(d, w, { ...m, text });
-    if (!text) return w.say(m.chat, `Send words: pictures, files and voice messages do not reach the agents from ${label} yet.`);
-    const cmd = /^[/!](\w+)(?:\s+([\s\S]*))?$/.exec(text);
-    if (cmd && COMMAND_NAMES.includes(cmd[1].toLowerCase())) return command(d, w, m.chat, cmd[1].toLowerCase(), (cmd[2] ?? '').trim());
-    return toSession(d, w, m.chat, text);
+    if (!text && !files.length) return w.say(m.chat, 'Send words, photos, files or voice messages: nothing else reaches the agents.');
+    const cmd = m.forwarded ? null : /^[/!](\w+)(?:\s+([\s\S]*))?$/.exec(text);
+    if (cmd && COMMAND_NAMES.includes(cmd[1].toLowerCase())) return command(d, w, m.chat, cmd[1].toLowerCase(), (cmd[2] ?? '').trim(), files);
+    return deliver(d, side(d, w, m.chat), { text, files, forwarded: m.forwarded });
   }
 
   /** A press of one of the bot's buttons: what it did, for the platform to show (it edits its message, answers the press). */
@@ -245,6 +272,10 @@ export function chatApp(spec: ChatAppSpec) {
     const a = actions.get(p.id);
     if (!isLinked(d.db, p.chat, p.user)) return { ok: false, text: 'This chat is not linked to Hydor.' };
     if (!a) return { ok: false, text: 'This button is from before Hydor restarted, or already answered: open the session there.' };
+    if (a.kind === 'as') {
+      const r = await pressedAs(d, side(d, w, p.chat), (id) => setNextAs(d.db, p.chat, id), a.id);
+      return { ok: true, kind: 'switch', ...r };
+    }
     if (a.kind === 'switch') {
       setCurrent(d.db, p.chat, a.key);
       const title = d.sessions.summary(a.key)?.title || 'Untitled';
@@ -335,11 +366,13 @@ export function chatApp(spec: ChatAppSpec) {
     chats: linked(d.db),
     notify: notifyOn(d.db),
     agent: agentFor(d.db),
+    as: ownAgent(d.db) ?? null,
     pairing: pairing && Date.now() < pairing.until ? { code: pairing.code, until: pairing.until } : undefined,
   });
   const unlinkAll = (d: Deps) => {
     setLinked(d.db, []);
     kvSet(d.db, key('current'), '{}');
+    kvSet(d.db, key('asNext'), '{}');
     stopPairing();
   };
 
@@ -358,6 +391,11 @@ export function chatApp(spec: ChatAppSpec) {
       const did = await o.connect(b);
       if (typeof b.notify === 'boolean') kvSet(db, key('notify'), b.notify ? '1' : '0');
       if (b.agent === 'claude' || b.agent === 'codex') kvSet(db, key('agent'), b.agent);
+      if (b.as === null || b.as === '') kvSet(db, key('as'), '');
+      else if (typeof b.as === 'string') {
+        if (!findAssistant(db, b.as)) throw new HttpError(404, 'No such agent: the Agents page lists yours');
+        kvSet(db, key('as'), b.as);
+      }
       // Asked again a moment later, the bot's name is there.
       if (did === 'connected') await new Promise((r) => setTimeout(r, 300));
       return o.view();
@@ -374,6 +412,7 @@ export function chatApp(spec: ChatAppSpec) {
         linked(db).filter((c) => c.id !== chat),
       );
       setCurrent(db, chat, null);
+      setNextAs(db, chat, null);
       return o.view();
     });
   }

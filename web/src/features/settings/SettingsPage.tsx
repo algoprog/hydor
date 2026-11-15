@@ -51,7 +51,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'general', label: 'General', icon: SlidersHorizontal, sub: 'Theme, and what Enter does while an agent works' },
       { id: 'notifications', label: 'Notifications', icon: Bell, sub: 'When a session finishes, fails or needs your answer' },
-      { id: 'chat', label: 'Chat apps', icon: MessagesSquare, sub: 'Talk to your agents from Telegram, Discord or Slack: start sessions, get their replies, answer what they ask' },
+      { id: 'chat', label: 'Chat apps', icon: MessagesSquare, sub: 'Talk to your agents from Telegram, Discord or Slack: start sessions, send photos, files and voice messages, get their replies, answer what they ask' },
       { id: 'security', label: 'Password', icon: KeyRound, sub: 'The password for this app, and signing out' },
       { id: 'signatures', label: 'Signatures', icon: Signature, sub: 'Your signature and initials, drawn once and kept encrypted, for the documents you sign' },
       { id: 'scm', label: 'Source control', icon: GitPullRequest, sub: 'GitHub and Gitea accounts for opening pull requests' },

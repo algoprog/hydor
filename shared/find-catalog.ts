@@ -65,7 +65,7 @@ export const SECTION_TOPIC: Record<string, string> = {
 export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', string][] = [
   ['general', 'General', 'App', 'Theme, and what Enter does while an agent works'],
   ['notifications', 'Notifications', 'App', 'When a session finishes, fails or needs your answer'],
-  ['chat', 'Chat apps', 'App', 'Talk to your agents from Telegram, Discord or Slack: start sessions, get their replies, answer what they ask'],
+  ['chat', 'Chat apps', 'App', 'Talk to your agents from Telegram, Discord or Slack: start sessions, send photos, files and voice messages, get their replies, answer what they ask'],
   ['security', 'Password', 'App', 'The password for this app, and signing out'],
   ['signatures', 'Signatures', 'App', 'Your signature and initials, drawn once and kept encrypted, for the documents you sign'],
   ['scm', 'Source control', 'App', 'GitHub and Gitea accounts for opening pull requests'],
@@ -124,6 +124,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['chat', 'Add the bot to a server', 'discord invite server add bot permissions', 'The link that adds your Discord bot to a server of yours, with the permissions it needs'],
   ['chat', 'Copy manifest', 'slack manifest copy create app scopes socket mode', 'The Slack app’s manifest, with Socket Mode and the scopes it needs, to paste when you create the app'],
   ['chat', 'New sessions use', 'agent claude code codex new session start telegram discord slack', 'The agent a message from a chat starts when the chat is in no session'],
+  ['chat', 'New sessions as', 'one of your agents as bookkeeper assistant /as agents new session start telegram discord slack', 'One of your agents a new session from a chat starts as; /as in the chat picks another'],
   ['chat', 'Notices from every session', 'notifications notices alerts finished fails needs you telegram discord slack', 'Every session’s notices in your chats, not only those of the sessions a chat started'],
   // App › Password
   ['security', 'Change password', 'password reset new security', 'Changing it signs out every other browser'],

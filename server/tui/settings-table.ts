@@ -277,6 +277,12 @@ row('chat', 'New sessions use', 'choice', {
   write: { cur: true, apply: (api, v, cur) => chatApply(() => ({ agent: v }))(api, v, cur) },
   note: 'Set for every chat app that is connected.',
 });
+row('chat', 'New sessions as', 'choice', {
+  load: async (api) => [{ value: 'none', label: 'None of your agents' }, ...((await api<any>('GET', '/api/assistants')).assistants ?? []).map((a: any) => ({ value: a.id, label: a.name }))],
+  read: { endpoint: chatEndpoints, pick: (_d, all) => (all.find((x) => x?.connected) ?? all[0])?.as ?? 'none' },
+  write: { cur: true, apply: (api, v, cur) => chatApply(() => ({ as: v === 'none' ? null : v }))(api, v, cur) },
+  note: 'One of your agents a new session from a chat starts as; /as in the chat picks another. Set for every chat app that is connected.',
+});
 row('chat', 'Notices from every session', 'switch', {
   read: { endpoint: chatEndpoints, pick: (_d, all) => !!(all.find((x) => x?.connected) ?? all[0])?.notify },
   write: { cur: true, apply: (api, v, cur) => chatApply(() => ({ notify: v }))(api, v, cur) },

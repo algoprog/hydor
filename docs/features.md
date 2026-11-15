@@ -1163,12 +1163,26 @@ programs shows each program's version and what is out, with Check now, Update no
   goes on with the chat's own, its reply comes back when the turn ends (formatted for the app: Telegram's HTML,
   Discord Markdown, Slack mrkdwn in blocks; in up to ten messages when long; "typing…" in Telegram and Discord, an
   hourglass in Slack while it works), a yes-or-no question comes with buttons that answer it, /new, /sessions, /stop
-  and /status steer it (slash commands in Discord, /hydor in Slack), and every session's notices can come too. In
+  and /status steer it (slash commands in Discord, /hydor in Slack), and every session's notices can come too. Photos,
+  files and voice messages come with a message (a caption with them, an album together): fetched within each service's
+  limit (Telegram's 20 MB for bots, 25 MB from Discord and Slack; one too big is said plainly), saved in the folder of
+  the session they go to under their own names (never outside it), and passed on as the message box's attachments are
+  (pictures to look at, files by their paths); a voice message is turned into words with Settings → Voice's speech
+  recognition (its recording stays in the folder; without it the recording goes as a file and the chat says how to turn
+  it on); what files hold and what is forwarded from someone else reach the agent marked as outside data. /as and an
+  agent's name starts a session as one of your own agents (Discord completes the name; /hydor as in Slack), /agents
+  lists them with buttons, a standing agent takes the chat into its own conversation, and New sessions as makes one of
+  them every new session's agent. In
   Discord and Slack a channel works too, when the person who linked it mentions the bot. The app connects out (it
   asks Telegram for messages, opens Discord's Gateway and Slack's Socket Mode WebSockets itself), so none needs an
   address on the internet; the tokens are kept in the vault. Connect refuses a token only when the service says no to
   it: when Telegram, Discord or Slack is slow or not reached, the token is kept, the row says Connecting… and why, and
   the bot connects by itself once the service answers (a Telegram bot taken by another program is said too).
+- Share to Hydor: the web app installed on Android (Chrome, Edge) or on a computer (Chrome, Edge) is in the system's
+  share sheet; a photo, a file, a page or text shared from another app opens the start page with it in the message box
+  (the words and the link as text, the files as attachments, up to 25 MB), for you to add a word and send; signed in
+  only. Safari on iPhone and iPad takes no shares from web apps: the chat apps take photos and files there, and a
+  Shortcuts shortcut can open the start page with shared text (/?prompt=).
 
 ## Shipping the work
 - Open a pull request on GitHub or Gitea from a session's branch, with a description written for you; its
