@@ -107,6 +107,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['general', 'Delete inactive sessions', 'delete old sessions clean up retention history keep conversations inactive year months', 'Deletes sessions nobody used for a year, or as long as you choose; until then every conversation is kept'],
   ['general', 'Limit each session', 'memory cpu processors cores cap limit ram resources cgroup systemd oom heavy session', 'The most memory and processors one session’s programs may use', 'Limit each session'],
   ['general', 'Start when this computer starts', 'boot startup login service autostart systemd', 'Starts the app when the computer starts'],
+  ['general', 'Keep the computer awake', 'sleep awake caffeinate prevent sleep laptop lid power battery scheduled task overnight mac windows linux desktop app', 'In the desktop apps, the computer does not go to sleep by itself while agents work and before scheduled tasks'],
   ['general', 'Update automatically', 'updates upgrade auto update new version restart install', 'Installs new versions by itself: the desktop apps as soon as they are out, after a minute’s notice; a copy from git when you have not used it for a while'],
   ['general', 'Take the tour', 'tour help guide onboarding welcome', 'See what each part of the app does', 'Welcome tour'],
   ['general', 'Tips', 'tips hints help onboarding introduce features skip guide', 'Points out a part of the app the first time you come to it, after the welcome tour'],

@@ -1,6 +1,6 @@
 # Look, language and updates
 
-How the app looks and behaves for you, and how it keeps itself up to date: dark or light mode, the built-in themes and your own, the language, what Enter does while an agent works, starting with the computer, updates and release notes. It also covers your password, signing out, and where the app keeps its data.
+How the app looks and behaves for you, and how it keeps itself up to date: dark or light mode, the built-in themes and your own, the language, what Enter does while an agent works, starting with the computer, keeping it awake while agents work, updates and release notes. It also covers your password, signing out, and where the app keeps its data.
 
 ![Settings → General: the themes](images/app.webp)
 
@@ -134,6 +134,20 @@ In the **Startup and updates** group, [**Start when this computer starts**](/set
 
 While the app loads, in a browser or while a desktop app starts, its logo shows with water rising in the Ω. As soon as the app is ready it is there under the logo, which fades away as the water drains from the Ω and the screen around it clears. You can click and type straight away. If your device asks for reduced motion, the logo simply goes.
 
+## Keep the computer awake
+
+In the desktop apps (Mac, Windows and Linux), [**Keep the computer awake**](/settings?s=general&find=Keep%20the%20computer%20awake), under **Start when this computer starts**, stops the computer from going to sleep by itself while there is work to do: a long run isn't cut off halfway, and a task set for 7:00 runs at 7:00 rather than when you next open the lid. It has three choices:
+
+- **While agents work and before scheduled tasks** (the default): while any agent works on this computer (scheduled runs, app runs, subagents and running experiments count too), and from a few minutes before a scheduled task, one of your agents' schedules or an app's schedule is due until its run has started.
+- **While agents work**: only while agents work. A scheduled task runs when the computer is awake.
+- **Never**: the computer sleeps as its own settings say.
+
+A session waiting for your answer doesn't count as working. Watchers that look every few minutes (see [Watch for a change](/guide/tasks#watch-for-a-change)) don't keep the computer awake on their own: only the run a change starts does, while it works. Only what runs on this computer counts, not what runs on your other machines. The line under the option says when the computer is kept awake now, and why ("Awake now: agents are working"); a few seconds after the work ends it may sleep again.
+
+Only the computer is kept running: the screen can still turn off as usual. Closing a laptop's lid still puts it to sleep, and so does choosing Sleep yourself: the operating system decides that, not the app. A computer that is already asleep doesn't wake up for a task; the run starts as soon as it is awake again. For work that must run at any hour, use a computer that stays on, such as a desktop or a server, and reach it from your laptop or phone (see [Use other machines from one app](/guide/devices#use-other-machines-from-one-app) and [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
+
+The option shows only in the desktop apps. The app installed as a service (or in Docker) leaves the computer's sleep alone.
+
 ## Keep the app up to date
 
 A copy installed from git (the installer's, or Docker's) looks for a newer version a few minutes after it starts and then once a day; the desktop apps look a minute after they open and then every 4 hours. The version row, the last row of **Startup and updates** in [Settings → App → General](/settings?s=general&find=Check%20now), is named after the version you run (**Hydor …**) and shows how things stand:
@@ -242,5 +256,6 @@ The rest is kept by the app and is the same on every device: themes you made, **
 - "Install the new version of Hydor that is waiting, now."
 - "Turn off automatic updates."
 - "Make sure the app starts when this computer starts."
+- "Keep my computer awake only while agents work, not before scheduled tasks."
 - "Turn on resuming sessions after usage limits."
 - "Turn the tips back on, and show them all again from the start."

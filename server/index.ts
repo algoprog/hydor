@@ -57,6 +57,7 @@ import * as setup from './setup.ts';
 import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
+import { KeepAwake, setAwakeMode } from './awake.ts';
 import { isAbsPath, trimSep, within } from './platform.ts';
 import { startSettings, updateStartSettings } from './startSettings.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
@@ -96,6 +97,8 @@ const codex = new CodexControl();
 const sessions = new SessionManager(db, indexer, claude, codex);
 const scheduler = new Scheduler(db, sessions);
 sessions.onLimited = (key, at) => scheduler.resumeAt(key, at);
+/** In the desktop apps: keeps the computer from sleeping while agents work and before scheduled runs (server/awake.ts). */
+const keepAwake = new KeepAwake({ db, lives: sessions.lives });
 const gitRepos = new GitRepos(db);
 const system = new SystemMonitor();
 const kernels = new Kernels();
@@ -304,6 +307,17 @@ app.put('/api/start', async (req) => {
   return start;
 });
 app.put('/api/startup', async (req) => setStartup(!!(req.body as { on?: boolean } | undefined)?.on));
+/** In the desktop apps: whether the computer is kept from sleeping while agents work and before scheduled runs. */
+app.get('/api/keep-awake', async () => keepAwake.state());
+app.put('/api/keep-awake', async (req) => {
+  try {
+    setAwakeMode(db, ((req.body ?? {}) as { mode?: unknown }).mode);
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
+  keepAwake.evaluate();
+  return keepAwake.state();
+});
 watchUpdates(db, (update) => broadcast({ t: 'update', update }));
 
 /** The web build the server hands out (its entry script), so open pages notice a newer one. */
@@ -1574,6 +1588,8 @@ function broadcast(e: ServerEvent) {
   const s = JSON.stringify(e);
   for (const c of clients) if (c.ws.readyState === c.ws.OPEN) c.ws.send(s);
   eventSent(e);
+  // Sessions, tasks, app runs and experiments changing may change whether the computer stays awake.
+  if (e.t === 'sessions' || e.t === 'tasks' || (e.t === 'feature' && (e.id === 'apps' || e.id === 'experiments'))) keepAwake.poke();
 }
 function toSubscribers(key: string, e: ServerEvent) {
   const s = JSON.stringify(e);

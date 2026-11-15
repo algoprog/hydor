@@ -2,6 +2,7 @@
 // the agent does in it (one action at a time): read it as an outline, look at it, click, type, scroll.
 import type { BrowserDialog } from '../../shared/browser.ts';
 import { CdpError, CdpSession } from './cdp.ts';
+import { captureJpeg } from './jpeg.ts';
 import { keyEvents, parseKey } from './keys.ts';
 import { buildOutline, SNAPSHOT_STYLES, type AxInfo, type El, type FrameSnap, type Outline } from './outline.ts';
 
@@ -357,7 +358,9 @@ export class Tab {
       const scale = Math.min(1, o.width / (v.clientWidth * dsf), o.height ? o.height / (v.clientHeight * dsf) : 1);
       clip = { x: v.pageX, y: v.pageY, width: v.clientWidth, height: v.clientHeight, scale };
     }
-    const r = await this.s.send('Page.captureScreenshot', { ...(o.format === 'png' ? { format: 'png' } : { format: 'jpeg', quality: o.quality ?? 70 }), ...(clip ? { clip } : {}), captureBeyondViewport: false }, 20_000);
+    // A JPEG made the way every decoder reads it (jpeg.ts): the full Chromium's own reach models garbled.
+    if (o.format !== 'png') return captureJpeg(this.s, { ...(clip ? { clip } : {}), captureBeyondViewport: false }, o.quality ?? 70, 20_000);
+    const r = await this.s.send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip } : {}), captureBeyondViewport: false }, 20_000);
     return r.data;
   }
 
