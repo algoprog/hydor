@@ -20,6 +20,7 @@ import { act, askUser, open, read, tabs, upload, type OpCtx } from './ops.ts';
 import { browserOf, closeAll, GLIDE_MS, setBrowserDeps } from './session.ts';
 import { setSessionOptions, setBrowserSettings } from './settings.ts';
 import { pickChrome } from './chrome.ts';
+import { jpegLayout } from './jpeg.ts';
 import { browserTools } from './tools.ts';
 import { readMarks, stepFile } from './steps.ts';
 
@@ -373,6 +374,8 @@ async function main() {
     assert.ok(r.images?.length === 1);
     const jpeg = Buffer.from(r.images![0].data, 'base64');
     assert.equal(jpeg[0], 0xff);
+    // One interleaved scan, as models' image readers expect (the full Chromium's own JPEGs reach them garbled).
+    assert.deepEqual(jpegLayout(jpeg), { frame: [1, 2, 3], scans: [[1, 2, 3]] });
     fs.writeFileSync(path.join(process.env.DATA_DIR!, 'labeled.jpg'), jpeg);
     const text = await read({ ...ctx, vision: false }, 'screenshot', {});
     assert.match(text.text, /cannot see images/);
