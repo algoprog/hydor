@@ -117,15 +117,19 @@ In the session, a step Auto let through carries a small **Auto** label; hover ov
 
 ## The sandbox for commands
 
-In Auto mode, Custom's commands can run in a sandbox: they can change files only in the session's folder and the temporary folder (`/tmp`), and everything else on the computer is read-only. They can still use the network. When the session works in a git worktree or a subfolder of a repository, the repository's own folder stays writable too, so git can commit. Package managers' caches move to the temporary folder.
+In Auto mode, Custom's commands can run in a sandbox: they can change files only in the session's folder and in temporary folders, and everything else on the computer is read-only. They can still use the network. When the session works in a git worktree or a subfolder of a repository, the repository's own folder stays writable too, so git can commit. Package managers' caches move to a temporary folder. How the sandbox is made depends on your computer:
+
+- **Linux**: it uses bubblewrap. Commands can change files in the session's folder, the temporary folder (`/tmp`) and the repository's own folder.
+- **Mac**: it uses Seatbelt, the sandbox that comes with macOS. The rule is the same: the session's folder, the temporary folders and the repository's own folder.
+- **Windows**: commands run at low integrity, a protection Windows has: they can read everything, but change files only in folders marked for it. The first time, Hydor marks the session's folder (and the repository's own folder) and the mark stays. Commands get a temporary folder of their own, in `AppData\LocalLow\Hydor`, for temporary files and package caches. Your home folder, a whole drive, Windows, Program Files and the app-data folders are never marked: in such a folder commands run without the sandbox. Git's bash can't share its workings with your ordinary bash windows at low integrity, so the first time Hydor also makes a copy of Git's programs for sandboxed commands, in `AppData\Local\Hydor\sandbox` (made of links to the same files, so it takes no room when Git is on the same drive).
 
 When a command runs into the sandbox's walls, Custom is told it ran in a sandbox, and either works within it or tells you what needs doing elsewhere.
 
 To turn it on or off, open [Settings → Capabilities → Custom](/settings?s=custom&find=Sandbox%20for%20commands) and use the switch by **Sandbox for commands**. It's on by default. Turn it off if a tool must write elsewhere, for example to install something for the whole system. The change applies to running sessions within about 15 seconds.
 
-The sandbox uses bubblewrap, a Linux tool. If it isn't installed, or can't run (as in some containers), the switch is greyed out and the row says so; commands then run without a sandbox. In Ask and Accept edits, commands don't use the sandbox: there, every command that does more than look around waits for your OK, or for a rule you saved with **Always allow**.
+If the sandbox can't run, the switch is greyed out and the row says why; commands then run without a sandbox. On Linux that means bubblewrap isn't installed or can't run (as in some containers). On a Mac it means Seatbelt couldn't start. On Windows the first time Hydor builds a small helper with the .NET Framework that comes with Windows, and it also needs Git for Windows (which commands need anyway): the row says so when either is missing or the helper can't start. In Ask and Accept edits, commands don't use the sandbox: there, every command that does more than look around waits for your OK, or for a rule you saved with **Always allow**.
 
-In a [confidential session](/guide/sessions#keep-a-session-confidential) every command runs without network, in every mode and whatever this switch says: in a network of its own with nothing in it, so it can't reach the internet, your other computers or this one's servers. Its files stay as the mode has them. Where bubblewrap can't do that, each command asks you first, in every mode, with no **Always allow**. Custom is told, and a command that tries the network hears why it failed.
+In a [confidential session](/guide/sessions#keep-a-session-confidential) every command runs without network, in every mode and whatever this switch says, so it can't reach the internet, your other computers or this one's servers. Its files stay as the mode has them. This works on Linux (bubblewrap) and on a Mac (Seatbelt). Windows can't cut the network this way, so there, and wherever the sandbox can't run, each command asks you first, in every mode, with no **Always allow**. Custom is told, and a command that tries the network hears why it failed.
 
 ## Give Custom a goal
 
@@ -213,7 +217,7 @@ A [spending cap](/guide/usage#cap-what-a-session-spends) works for Custom sessio
 [Settings → Capabilities → Custom](/settings?s=custom) ("Auto mode, a sandbox for commands, and how long goals run") has three rows:
 
 - **Auto mode** (one of Custom's modes, beside Ask, Accept edits, Full access and Plan): its (i) says what Auto lets through, what always asks, and that the helper model does the check. Nothing to switch: you pick Auto per session under **Permissions**.
-- **Sandbox for commands** (in Auto mode, commands change files only in the session's folder and /tmp; Full access runs without this sandbox or approval prompts): a switch, on by default. Greyed out when bubblewrap can't run here.
+- **Sandbox for commands** (in Auto mode, commands change files only in the session's folder and /tmp on Linux, the temporary folders on a Mac, or a temporary folder of their own on Windows; Full access runs without this sandbox or approval prompts): a switch, on by default. Greyed out when the sandbox can't run here (bubblewrap on Linux, Seatbelt on a Mac, Git for Windows and the .NET Framework on Windows), and the row says why.
 - **Rounds before a goal pauses**, in the **Goals** group (with /goal, Custom works turn after turn until the goal holds; after this many rounds it pauses for you): **10**, **30** (the default) or **100** rounds. It also pauses after three rounds without progress.
 
 Custom's models are in [Settings → Agents → Models](/settings?s=models), and the model that does the checks is the **Helper model** there.

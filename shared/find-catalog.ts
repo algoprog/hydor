@@ -264,7 +264,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['apps', 'Run without asking', 'auto approve allow always permission ask before agent runs app trust', 'The apps agents run for you without asking first; remove one to be asked again'],
   // Capabilities › Custom
   ['custom', 'Auto mode', 'auto mode approvals permissions', 'Custom approves safe steps by itself'],
-  ['custom', 'Sandbox for commands', 'sandbox bubblewrap security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
+  ['custom', 'Sandbox for commands', 'sandbox bubblewrap seatbelt macos windows low integrity security commands', 'Auto mode commands run in a sandbox; Full access runs without it'],
   ['custom', 'Rounds before a goal pauses', 'goals rounds autonomous long running', 'How many rounds a goal may run before it pauses for you'],
 ];
 

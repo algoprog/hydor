@@ -23500,5 +23500,16 @@
 "Who should pick the runner-up instead, in a few words (on a tighter budget, for the best zoom); empty when there is none":"用几个字说明谁更该选次选（预算更紧时、想要最好的变焦时）；没有次选时留空",
 "Why it wins against what matters to them, how close it is, and where the runner-up is better: a paragraph or two":"对照对方看重的方面说明它为何胜出、差距有多小、次选在哪些方面更好：一两段",
 "Who should pick the runner-up instead, in a dozen words at most (on a tighter budget, for the best zoom); empty when there is none":"用不超过十几个字说明谁更该选次选（预算更紧时、想要最好的变焦时）；没有次选时留空",
-"Why each is among the strongest, in one short line":"每个为何位列最强之列，一句短话"
+"Why each is among the strongest, in one short line":"每个为何位列最强之列，一句短话",
+"Commands run at low integrity, a protection Windows has: the session’s folder is marked once so they may change files in it, and they can only read the rest. Your home folder, a whole drive and system folders are never marked: there, commands run without the sandbox. {0}":"命令以低完整性级别运行，这是 Windows 自带的一种保护：会话的文件夹只需标记一次，命令就可以更改其中的文件，而其余部分它们只能读取。你的主文件夹、整个磁盘和系统文件夹永远不会被标记：在这些地方，命令不使用沙盒运行。{0}",
+"In Auto mode, commands change files only in the session’s folder and a temporary folder of their own":"在自动模式下，命令只会修改会话的文件夹和它们自己专属的临时文件夹中的文件",
+"In Auto mode, commands change files only in the session’s folder and the temporary folders":"在自动模式下，命令只会修改会话的文件夹和临时文件夹中的文件",
+"It needs Git for Windows and the .NET Framework that comes with Windows, to build its small helper the first time. One of them is missing here, or the helper could not start.":"它需要 Git for Windows 和 Windows 自带的 .NET Framework，第一次使用时用来构建它的小助手程序。这里缺少其中之一，或者助手程序无法启动。",
+"It uses bubblewrap. {0}":"它使用 bubblewrap。{0}",
+"It uses Seatbelt, the sandbox that comes with macOS (sandbox-exec). It could not start on this Mac.":"它使用 Seatbelt，即 macOS 自带的沙盒（sandbox-exec）。它无法在这台 Mac 上启动。",
+"It uses Seatbelt, the sandbox that comes with macOS. {0}":"它使用 Seatbelt，即 macOS 自带的沙盒。{0}",
+"macOS’s sandbox cannot run here, so commands run without one":"macOS 的沙盒无法在这里运行，所以命令会在没有沙盒的情况下运行",
+"sandbox bubblewrap seatbelt macos windows low integrity security commands":"沙盒 bubblewrap seatbelt macos windows 低完整性 安全 命令",
+"The sandbox cannot run here, so commands run without one":"沙盒无法在这里运行，所以命令会在没有沙盒的情况下运行",
+"Turn it off if a tool must write elsewhere, for example to install something for the whole system. Full access runs without this sandbox or approval prompts.":"如果某个工具必须写入别处，例如要为整个系统安装东西，请把它关闭。完全访问不使用这个沙盒，也没有批准提示。"
 }

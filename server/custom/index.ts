@@ -35,7 +35,9 @@ export const custom: Feature = {
       if (!live) return reply.code(403).send({ error: 'Not a running agent' });
       return { sandbox: customSettings(d.db).sandbox, confidential: confidentialKey(d.db, live.key) };
     });
-    const state = () => ({ ...customSettings(d.db), bwrap: !!sandboxAvailable() });
+    // bwrap: a sandbox for commands works here (the name from when it was Linux's alone, which older web apps read);
+    // sandboxKind says which, and platform which system it is on, for the words beside the switch.
+    const state = () => ({ ...customSettings(d.db), bwrap: !!sandboxAvailable(), sandboxKind: sandboxAvailable()?.kind ?? null, platform: process.platform });
     d.app.get('/api/custom/settings', async () => state());
     d.app.put('/api/custom/settings', async (req) => {
       setCustomSettings(d.db, (req.body ?? {}) as Partial<CustomSettings>);

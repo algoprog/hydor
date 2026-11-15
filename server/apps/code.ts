@@ -139,7 +139,9 @@ const MOST_CALLS = 500;
 const CALL_LINE = 1 << 20;
 
 export async function runCode(o: { language: 'javascript' | 'typescript' | 'python'; code: string; input: Record<string, unknown>; slug: string; requires?: Requires; seconds: number; signal?: AbortSignal; onCall?: CtxCall }): Promise<CodeOut> {
-  const bwrap = sandboxAvailable();
+  // bubblewrap alone: the mounts below are its own (a Mac's Seatbelt or Windows' low integrity don't run code steps).
+  const sb = sandboxAvailable();
+  const bwrap = sb?.kind === 'bwrap' ? sb.bin : null;
   if (!bwrap) throw new Error('Code steps run in a sandbox (bubblewrap, bwrap), which this computer lacks');
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-code-'));
   try {
