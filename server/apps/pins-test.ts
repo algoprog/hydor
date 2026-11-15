@@ -18,7 +18,7 @@ import { vaultTables } from '../connections/vault.ts';
 import { openDb } from '../db.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { apps } from './index.ts';
-import { MAX_PINS, pinsOf, recentApps, RECENT_APPS, theirsFirst } from './pins.ts';
+import { MAX_PINS, pinsOf, recentApps, RECENT_APPS, STARTER_APPS, suggestedApps, theirsFirst } from './pins.ts';
 import { dropAppIndex, findApps } from './search.ts';
 import * as store from './store.ts';
 import { TEMPLATES } from './templates.ts';
@@ -263,6 +263,58 @@ test('find_apps: the best fits, those the user pinned first (as pinned), then th
   assert.match(named[1], new RegExp(`^- "${esc(pinB.ref)}": ${esc(pinB.recipe.name)} \\(ready-made, pinned\\)`));
   await call('PUT', '/api/apps/pins', { ids: [] });
   assert.match(useNote(db)!, /Those they run most:/, 'none pinned: as before');
+  db.prepare('delete from app_runs').run();
+});
+
+test('suggested on the start page: the apps run most (then the one run last), still here; to make two, Deep research report and Trip planner when installed', async () => {
+  db.prepare('delete from app_runs').run();
+  assert.deepEqual(STARTER_APPS, ['deep-research', 'trip-planner']);
+  // Nothing run yet: the two that suit anyone.
+  let r = await call('GET', '/api/apps/suggested');
+  assert.equal(r.status, 200);
+  assert.deepEqual(
+    r.body.apps.map((a: any) => [a.id, a.name]),
+    [
+      ['tpl:deep-research', 'Deep research report'],
+      ['tpl:trip-planner', 'Trip planner'],
+    ],
+  );
+  assert.ok(r.body.apps.every((a: any) => a.icon && a.color && a.description && a.uses === undefined));
+  // One of yours run three times, a ready-made one twice, another once: most runs first, filled up no more.
+  const a = mine('Packing list');
+  for (let i = 0; i < 3; i++) run(a.id, 'web');
+  run('tpl:quiz', 'web');
+  run('tpl:quiz', 'session');
+  run('tpl:book-finder', 'web');
+  // Tries in the builder, steps and conversations are not runs of the app.
+  for (let i = 0; i < 5; i++) run('tpl:gift-ideas', 'test');
+  r = await call('GET', '/api/apps/suggested');
+  assert.deepEqual(
+    r.body.apps.map((x: any) => [x.id, x.name, x.uses]),
+    [
+      [a.id, 'Packing list', 3],
+      ['tpl:quiz', 'Quiz on any topic', 2],
+    ],
+  );
+  // As many as asked (at most six), ties to the one run last.
+  run('tpl:book-finder', 'web');
+  assert.deepEqual(
+    suggestedApps(db, 4).map((x) => x.id),
+    [a.id, 'tpl:book-finder', 'tpl:quiz', 'tpl:deep-research'],
+  );
+  // At most six asked for: the three run, then the two that suit anyone.
+  assert.equal((await call('GET', '/api/apps/suggested?n=99')).body.apps.length, 5);
+  assert.equal((await call('GET', '/api/apps/suggested?n=0')).body.apps.length, 2, 'the two by default');
+  // An app deleted, or a ready-made one uninstalled, is not suggested; nor is an uninstalled one that suits anyone.
+  store.deleteApp(db, a.id);
+  await call('POST', '/api/apps/tpl:book-finder/uninstall');
+  await call('POST', '/api/apps/tpl:deep-research/uninstall');
+  assert.deepEqual(
+    suggestedApps(db, 3).map((x) => x.id),
+    ['tpl:quiz', 'tpl:trip-planner'],
+  );
+  await call('POST', '/api/apps/tpl:book-finder/install');
+  await call('POST', '/api/apps/tpl:deep-research/install');
   db.prepare('delete from app_runs').run();
 });
 

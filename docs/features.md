@@ -32,6 +32,14 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   app what came of the start once it can: the session opens if it started, and one press of Start never makes two
   sessions (after a minute out of reach, the page says so, with Try again). Pages, tabs, menus and dialogs open at
   once, with no fade.
+- Starter ideas under the start page's empty message box ("Ask for anything: research, documents, plans, code."):
+  three example requests that change each day (everyday work, research, documents, and code in a code folder), two
+  of your apps (the ones you run most, else Deep research report and Trip planner) and an automation ("Every Monday
+  at 8:00, send me …"). An example or the automation fills the box to change and send; an app opens its form. They
+  fold away as you type; Hide puts them away on every device (Settings → General → Starter ideas brings them back);
+  on a phone they are one row that scrolls sideways. Under them, Today in a line: "Today · 7 sessions · 12 file
+  edits · $0.84", the money at API prices, which on a plan is not what you pay (its hover says so, with the lines,
+  tokens and prompts).
 - Sessions name themselves: a moment after one starts with a request, the helper model gives it a title of a few
   words ("Weekend trip to Lisbon"), shown in the sidebar, the header and the search box instead of the start of the
   message, and passed to Claude Code and Codex for their own lists. Nothing shows in the conversation; sessions
@@ -60,7 +68,10 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   by day. Each row's ⋯ (or a right-click) renames, pins, snoozes
   (until later), settles (done for now), archives or deletes the session, on phones too.
 - While a session works, its line says how long this turn has run and, after earlier turns, how long it has worked in
-  all ("Working · 2m 10s · 47m in all"), in the session and in the sidebar.
+  all ("Working · 2m 10s · 47m in all"), in the session and in the sidebar. Once its agent is no longer running, its
+  status says how the work ended: Done (with "· 3 files changed" or "· 2 files made"), Stopped (you stopped it, or it
+  was cut off) or Failed (it ended with an error). After Done, Resume steps back, since a message in the box
+  ("Message to continue…") starts the agent again anyway.
 - **Confidential sessions** (Options → Confidential): for a submission you review, patient data or a client's code. The
   session runs on Custom with a model on this computer or your private network; web search, the browser, connected
   apps, apps and models elsewhere are off (an allowlist of tools, so new ones stay off too); its commands run without
@@ -1054,7 +1065,8 @@ programs shows each program's version and what is out, with Check now, Update no
   stops at its first line as it grows, so you read it from its beginning; a short one sits under what came before,
   with no empty space below it. A page still being written shows the app's mark and "Writing the page…" until it has
   something to show.
-- A turn's time and cost: the tokens beside a finished turn open where its time went (the model, commands, files, the
+- A turn's time and cost: its cost beside a finished turn ("≈ $0.12", at API prices on a plan; the tokens when no
+  price is known) opens where its time went (the model, commands, files, the
   web, other steps, waiting for you on approvals, questions and forms, and the rest), how soon its first reply or step
   came, its tokens by kind (read fresh, written to the provider's cache, read from it, with the hit rate, written out),
   and, with the model's price known, what each kind cost and what the cache saved.

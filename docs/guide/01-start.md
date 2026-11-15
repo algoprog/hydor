@@ -84,7 +84,7 @@ That is their usual order. To change it, drag a tool to another place among them
 
 ### The start page
 
-**New session** opens the start page. It asks "What should we work on?" and holds a large message box with a row of choices under it:
+**New session** opens the start page. It asks "What should we work on?", says "Ask for anything: research, documents, plans, code.", and holds a large message box with a row of choices under it:
 
 - **Runs on**: the program that does the work (Claude Code, Codex, Custom, or another agent you added).
 - **Model**: that agent's model.
@@ -92,7 +92,17 @@ That is their usual order. To change it, drag a tool to another place among them
 - **Agent**: who the session works as (General, Researcher, Writer, Coder, Tutor, Planner, Analyst, App builder, or one of your own; see [Agents](/guide/agents)).
 - **Options**: effort, permissions, memory, a spending cap and more. The chip names any of them you set away from the usual.
 
-On a computer, a line under the box reminds you: "Enter to start · Shift+Enter for a new line". Below it, **Today** sums up the day so far (lines changed, tokens, prompts, sessions); click it for the Activity page. When an agent's plan has run out of usage, a banner above the box says so and when it resets. On a phone, **Recent** lists your six latest sessions under the box.
+On a computer, a line under the box reminds you: "Enter to start · Shift+Enter for a new line". When an agent's plan has run out of usage, a banner above the box says so and when it resets.
+
+While the box is empty, **starter ideas** sit under it: three example requests, two of your apps and an automation.
+
+- Click an example to put it in the box. Change it as you like, then send it: nothing is sent until you do. Where it says "…", your own words go. The examples change each day, and in a folder with code they are about code.
+- Click an app to open its form: the two apps you run most, or **Deep research report** and **Trip planner** until you have run some (see [Apps](/guide/apps)).
+- Click the automation ("Every Monday at 8:00, send me …") to put it in the box: finish it and send it, and the agent sets it up as a [scheduled task](/guide/tasks).
+
+The ideas fold away as soon as you type. **Hide** puts them away for good, on every device; turn on [Starter ideas](/settings?s=general&find=Starter%20ideas) in Settings → App → General to bring them back. On a phone they are one row you scroll sideways.
+
+Below them, **Today** sums up the day in a line: "Today · 7 sessions · 12 file edits · $0.84", leaving out a part that is zero. The money is what the day's tokens would cost at API prices, the same estimate as **API cost (est.)** on the Activity page: on a plan (Claude Code, Codex) you pay your plan's fee instead. Hover over the line for the lines changed, the tokens and the prompts; click it for the Activity page. On a phone, **Recent** lists your six latest sessions under the box.
 
 At the top right, **Explore** opens a magazine made for you: articles and recent news on what you work on and care about, picked from your profile and your latest sessions (see [Explore](/guide/apps#explore)). A dot on it means a new edition is ready that you haven't opened yet.
 
@@ -243,6 +253,8 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Why is a session waiting for its usage reset still in Active?"
 - "List my sessions in the sidebar by day, without the folder groups."
 - "Next time I open the start page, have it set to Claude Code with the Researcher agent."
+- "Hide the starter ideas under the message box on the start page."
+- "What did my sessions today cost at API prices?"
 - "Make my search box look only in my sessions and pages."
 - "Put Settings and Search first among the tools at the bottom of my sidebar."
 - "Put my Thesis project first among the groups in my sidebar."

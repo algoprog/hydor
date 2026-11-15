@@ -87,6 +87,18 @@ export function money(n?: number | null): string {
   return n >= 100 ? `$${Math.round(n)}` : `$${n.toFixed(2)}`;
 }
 
+const cents = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dollarsOnly = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+/** Said of a cost worked out at API prices (Activity's, a turn's): on a plan (Claude Code, Codex) it is not what you pay. */
+export const AT_API_PRICES = 'At API prices: on a plan you pay your plan’s fee';
+
+/** Dollars as the language in use writes them ("$0.84", "0,84 $", "US$0.84"); under a cent, "< $0.01" in its way. */
+export function usd(n: number): string {
+  if (n > 0 && n < 0.005) return `< ${cents.format(0.01)}`;
+  return n >= 1000 ? dollarsOnly.format(n) : cents.format(n);
+}
+
 const homeRe = /^\/home\/[^/]+/;
 export function tildify(p?: string | null, home?: string): string {
   if (!p) return '';

@@ -30,6 +30,7 @@ import { useComposerMenu } from '../../components/ComposerMenu';
 import { AccountPicker } from './AccountPicker';
 import { AgentPicker } from './AgentPicker';
 import { ExploreButton } from './ExploreButton';
+import { Starters } from './Starters';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
@@ -549,6 +550,18 @@ function StartComposer({
     .filter(Boolean)
     .join('\n');
 
+  // A starter picked: its words in the box, to change and send; the "…" left for your own words is selected.
+  const startersOn = useApp((x) => x.boot?.start?.starters !== false);
+  const fill = (t: string) => {
+    setText(t);
+    requestAnimationFrame(() => {
+      const el = ta.current;
+      if (!el) return;
+      el.focus();
+      const end = el.value.length;
+      el.setSelectionRange(el.value.endsWith('…') ? end - 1 : end, end);
+    });
+  };
   // Confidential with no model on this computer can't start: its option says how to get one.
   const ready = !!cwd && !(confidential && local && !local.models.length);
   const iconBtn = 'shrink-0 rounded-lg p-2 text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg';
@@ -712,6 +725,8 @@ function StartComposer({
           Enter to start · Shift+Enter for a new line
         </div>
       )}
+      {/* Examples, your apps and an automation while the box is empty (until hidden), leaning towards code in a code folder. */}
+      {startersOn && !text.trim() && !atts.length && <Starters place={!task && repo ? 'code' : space ? 'project' : 'any'} onFill={fill} />}
     </div>
   );
 }
@@ -786,7 +801,9 @@ export function HomePage() {
           <div className={cx('text-center', mobile ? 'pt-3' : 'pt-[11vh]')}>
             <div data-tour="home-title">
               <h1 className="text-[23px] font-semibold tracking-tight sm:text-[30px]">What should we work on?</h1>
-              <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">Start an agent in any folder on {machineId ? (host ?? 'this machine') : 'this machine'}: Claude Code, Codex, or any model.</p>
+              <p className="mt-1.5 text-[13.5px] text-fg-3 sm:mt-2 sm:text-[14.5px]">
+                {machineId ? `Ask for anything, on ${host ?? 'this machine'}: research, documents, plans, code.` : 'Ask for anything: research, documents, plans, code.'}
+              </p>
             </div>
           </div>
           <div className="mt-6 sm:mt-8">

@@ -47,6 +47,20 @@ assert.equal(startSettings(fresh()).places, undefined);
   assert.deepEqual(startSettings(db).places, { 'folder:/tmp': want });
 }
 
+// Starters hidden (Hide under the message box, or Settings → General): kept, on every device, until shown again (null);
+// what is not false is the default (shown), and is not kept; a pick of a place does not change it.
+{
+  const db = fresh();
+  assert.equal(startSettings(db).starters, undefined);
+  assert.equal(updateStartSettings(db, { starters: false }).starters, false);
+  assert.equal(startSettings(db).starters, false);
+  updateStartSettings(db, { agent: 'codex', cwd: '/tmp' });
+  assert.equal(startSettings(db).starters, false);
+  assert.equal(updateStartSettings(db, { starters: null }).starters, undefined);
+  assert.equal(updateStartSettings(db, { starters: 'no' }).starters, undefined);
+  assert.equal(updateStartSettings(db, { starters: true }).starters, undefined);
+}
+
 // Keys that are not a place's name are dropped, and so is a record without a time or with a bad one.
 {
   const db = fresh();
