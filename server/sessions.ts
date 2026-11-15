@@ -675,8 +675,24 @@ export class SessionManager extends EventEmitter {
     return undefined;
   }
 
+  /**
+   * Whether the session is still there: running, listed (indexed or started here) or running elsewhere. What makes a
+   * session's own row when it has none (read, renamed, pinned, its order, its pull request) does nothing to one that is
+   * not: arriving just after a delete (a page still open on it marking it read, a pull request check on its way), it
+   * would have brought the deleted session back to the list.
+   */
+  private exists(key: string): boolean {
+    return (
+      this.lives.has(key) ||
+      !!this.db.prepare('select 1 from app_sessions where key = ?').get(key) ||
+      !!this.db.prepare('select 1 from sessions where key = ?').get(key) ||
+      !!this.external.get(key)
+    );
+  }
+
   /** The session was looked at: it is no longer unread. */
   markSeen(key: string) {
+    if (!this.exists(key)) return;
     const now = Date.now();
     const agent = agentOfKey(key);
     this.db.prepare('insert into app_sessions (key, agent, seen_at, created_at, updated_at) values (?, ?, ?, ?, ?) on conflict(key) do update set seen_at = excluded.seen_at').run(key, agent, now, now, now);
@@ -2218,6 +2234,7 @@ export class SessionManager extends EventEmitter {
   }
 
   async rename(key: string, title: string) {
+    if (!this.exists(key)) return;
     const t = title.trim().slice(0, 200);
     const agent = agentOfKey(key);
     this.db
@@ -2231,6 +2248,7 @@ export class SessionManager extends EventEmitter {
 
   /** Saves a sidebar group's order as dragged: each key gets its position (1..n). */
   setOrder(keys: string[]) {
+    keys = keys.filter((k) => this.exists(k));
     const ensure = this.db.prepare(`insert into app_sessions (key, agent, created_at, updated_at) values (?, ?, ?, ?) on conflict(key) do nothing`);
     const set = this.db.prepare('update app_sessions set sort_order = ? where key = ?');
     this.db.transaction(() => {
@@ -2243,6 +2261,7 @@ export class SessionManager extends EventEmitter {
   }
 
   setFlags(key: string, flags: { archived?: boolean; pinned?: boolean; snoozedUntil?: number | null }) {
+    if (!this.exists(key)) return;
     const agent = agentOfKey(key);
     this.db.prepare(`insert into app_sessions (key, agent, created_at, updated_at) values (?, ?, ?, ?) on conflict(key) do nothing`).run(key, agent, Date.now(), Date.now());
     if (flags.archived !== undefined) this.db.prepare('update app_sessions set archived = ? where key = ?').run(flags.archived ? 1 : 0, key);
@@ -2303,6 +2322,7 @@ export class SessionManager extends EventEmitter {
 
   /** Links a pull request to the session, or unlinks it (it stays on its host). */
   setPr(key: string, pr: PullRequestInfo | null) {
+    if (!this.exists(key)) return;
     const agent = agentOfKey(key);
     this.db.prepare(`insert into app_sessions (key, agent, created_at, updated_at) values (?, ?, ?, ?) on conflict(key) do nothing`).run(key, agent, Date.now(), Date.now());
     this.db.prepare('update app_sessions set pr = ? where key = ?').run(pr ? JSON.stringify(pr) : null, key);
@@ -2344,6 +2364,8 @@ export class SessionManager extends EventEmitter {
   async remove(key: string, o: { keepActivity?: boolean } = {}) {
     dropNotes(this.db, key);
     const l = this.lives.get(key);
+    // Its transcript as the running agent knows it: the index may not have it yet.
+    const livePath = l?.adapter.transcriptPath;
     if (l) {
       const exited = new Promise<void>((resolve) => {
         if (l.adapter.exited) return resolve();
@@ -2354,7 +2376,7 @@ export class SessionManager extends EventEmitter {
       await exited;
       this.lives.delete(key);
     }
-    const file = this.transcriptFor(key);
+    const file = livePath ?? this.transcriptFor(key);
     // The app's own link to it goes first, or the indexer would bring the transcript back.
     const kept = file ? keptOfTranscript(file) : null;
     if (kept) forgetKept(kept);
@@ -2379,6 +2401,9 @@ export class SessionManager extends EventEmitter {
         fs.rmdirSync(dir);
       } catch {}
     }
+    // And once more now that the transcript is gone: the indexer, in its own thread, may have linked it again meanwhile.
+    // Its rows go after the transcript, which the indexer checks for before it writes one (indexer/worker.ts).
+    if (kept) forgetKept(kept);
     // Messages still waiting to go out, and their attachments, go with it.
     this.loadQueues();
     for (const m of [...(this.queues.get(key) ?? [])]) this.dropQueued(key, m.id);

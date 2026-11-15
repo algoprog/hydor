@@ -1,8 +1,8 @@
 // Pin, unpin, archive, unarchive and snooze, each undoable for a few seconds: from its toast, or with
-// Ctrl+Z. Settling a session (finished work out of the way) is here too.
+// Ctrl+Z. Settling a session (finished work out of the way) and deleting one are here too.
 import type { SessionSummary } from '@shared/types';
-import { enc, post } from './api';
-import { toastError, useSessions, useToasts } from './store';
+import { del, enc, post } from './api';
+import { markDeleted, toastError, unmarkDeleted, useSessions, useToasts } from './store';
 import { LOCALE } from '../i18n/locale';
 
 type Flags = { pinned?: boolean; archived?: boolean; snoozedUntil?: number | null };
@@ -26,6 +26,20 @@ export function whenLabel(ts: number): string {
   if (days === 1) return `tomorrow ${time}`;
   if (days > 1 && days < 7) return `${d.toLocaleDateString(LOCALE, { weekday: 'short' })} ${time}`;
   return `${d.toLocaleDateString(LOCALE, { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+/**
+ * Deletes a session (after you confirmed). It leaves the list at once, though the server first stops its agent when it
+ * is running; if the delete fails, it is listed again and the error is thrown.
+ */
+export async function deleteSession(key: string) {
+  markDeleted(key);
+  try {
+    await del(`/api/sessions/${enc(key)}`);
+  } catch (e) {
+    unmarkDeleted(key);
+    throw e;
+  }
 }
 
 /** Finished work out of the way: the agent process stops and the session counts as read. */

@@ -20,7 +20,7 @@ import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities';
 import type { AgentAccount, SearchHit, SessionSummary } from '@shared/types';
 import { isConfidential } from '@shared/confidential';
-import { api, del, enc, patch, post } from '../../lib/api';
+import { api, enc, patch, post } from '../../lib/api';
 import { basename, markRuns, tildify, timeAgo } from '../../lib/format';
 import { filePath, go, openSession, sessionPath } from '../../lib/nav';
 import { isStartingKey, startingRows, useStarting } from '../../lib/starting';
@@ -36,7 +36,7 @@ import { newSessionIn } from '../files/actions';
 import { SpaceMark, startInSpace } from '../spaces/parts';
 import { loadSpaces, useSpaces } from '../spaces/state';
 import { ACTIVE_MS, GROUP_ROWS, groupSessions, hasBackgroundWork, isFolded, isPlaceKind, lastActivityAt, unpickedFolders, type GroupKind, type SessionGroup } from './groups';
-import { setFlags, settle } from '../../lib/flags';
+import { deleteSession, setFlags, settle } from '../../lib/flags';
 import { SnoozeItems } from './SnoozeMenu';
 import { PrBadge } from '../session/PullRequest';
 import { ChildNest, nestChildren } from '../children/Nest';
@@ -951,12 +951,8 @@ export function SessionList({ query }: { query: string }) {
   const onDelete = useCallback(
     async (s: SessionSummary) => {
       if (!(await confirm(deleteDialog(s)))) return;
-      try {
-        await del(`/api/sessions/${enc(s.key)}`);
-        if (s.key === openKey.current) go('/');
-      } catch (e) {
-        toastError(e);
-      }
+      if (s.key === openKey.current) go('/');
+      deleteSession(s.key).catch(toastError);
     },
     [confirm],
   );
