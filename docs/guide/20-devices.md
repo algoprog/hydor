@@ -22,6 +22,16 @@ Installed on your home screen, the app opens full screen with its own icon, like
 - **iPhone or iPad**: open the app in the browser, tap **Share**, then **Add to Home Screen**. Open Hydor from its new icon from then on.
 - **Android**: open the app in your browser and use its menu's option to install the app or add it to the home screen.
 
+### Share to Hydor from other apps
+
+Installed, Hydor shows in the share sheet of your phone or computer like a messaging app does. Share a photo, a PDF, a web page or a few lines of text from any other app, pick **Hydor**, and the start page opens with what you shared already in its message box: the words and the link as text, the files as attachments. Add a word on what to do with it, pick the agent if you like, and send.
+
+- **Android**: works in Chrome, Edge and other browsers built on Chromium, once the app is installed from the browser's menu (**Install app** or **Add to Home screen**).
+- **A computer**: works in Chrome and Edge once the app is installed (the install button in the address bar, or the browser's menu → **Install Hydor**), from apps that share through the system's share sheet.
+- **iPhone and iPad**: Safari doesn't let web apps take shares. Send a photo or a file to your agents from a chat app instead (see [What a chat can do](/guide/devices#what-a-chat-can-do)). For text and links, a shortcut does it: in the Shortcuts app make one that shows in the share sheet and takes text and URLs, add **URL Encode** for its input, then **Open URLs** with your app's address followed by `/?prompt=` and the encoded text (like `https://hydor.example.com/?prompt=` and the result). It opens the start page in Safari with the text in the box.
+
+A share needs you to be signed in on that device: one made while signed out doesn't reach Hydor, and the start page says so. Up to 25 MB of files go with a share, as with the message box, saved where the message box keeps its attachments.
+
 ### Get notifications on your phone
 
 A notification can reach your phone when a session finishes, fails or needs your answer, even with the app closed.
@@ -34,7 +44,7 @@ On an iPhone or iPad, add the app to your Home Screen first and open it from the
 
 ## Talk to your agents from Telegram, Discord and Slack
 
-From a chat in Telegram, Discord or Slack, on any phone or computer, you can start sessions, read their replies and answer what agents ask. Each works through a bot or app of your own, set up in [Settings → App → Chat apps](/settings?s=chat). Hydor connects out to them (it asks Telegram for new messages, and opens a WebSocket to Discord's Gateway and to Slack's Socket Mode), so none of them needs the app to have an address on the internet.
+From a chat in Telegram, Discord or Slack, on any phone or computer, you can start sessions (as one of your own agents too), send them photos, files and voice messages, read their replies and answer what agents ask. Each works through a bot or app of your own, set up in [Settings → App → Chat apps](/settings?s=chat). Hydor connects out to them (it asks Telegram for new messages, and opens a WebSocket to Discord's Gateway and to Slack's Socket Mode), so none of them needs the app to have an address on the internet.
 
 ### Connect a bot or app
 
@@ -42,7 +52,7 @@ Open [Chat apps](/settings?s=chat) and press the row of the one you want in the 
 
 - **Telegram**: in Telegram, open @BotFather, send `/newbot` and give the bot a name and a username. Paste the token it answers with, like `123456789:AA…`, in the box of the [Telegram](/settings?s=chat&find=Telegram) row, and press **Connect**.
 - **Discord**: in the Developer Portal (discord.com/developers/applications) make a **New Application**. Under **Bot**, press **Reset Token** and copy it, and turn on **Message Content Intent** so the bot can read what you write. Paste the token in the [Discord](/settings?s=chat&find=Discord) row and press **Connect**. Then add the bot to a server of yours with its **Add the bot to a server** row (Discord only lets you message a bot you share a server with, so a small server of your own does). The invitation asks for View Channels, Send Messages and Read Message History, and Hydor makes its slash commands known.
-- **Slack**: at api.slack.com/apps choose **Create New App → From a manifest**, pick your workspace and paste the manifest that **Copy manifest** (in the [Slack](/settings?s=chat&find=Slack) row's steps, and a row of its own once connected) copies: it turns on Socket Mode, subscribes to direct messages and mentions, adds the `/hydor` command and asks for the bot scopes `app_mentions:read`, `chat:write`, `commands`, `im:history`, `reactions:write` and `users:read`. Under **Basic Information → App-Level Tokens** generate a token with the `connections:write` scope (it starts with `xapp-`); under **Install App** install the app to your workspace and copy the Bot User OAuth Token (it starts with `xoxb-`). Paste both and press **Connect**.
+- **Slack**: at api.slack.com/apps choose **Create New App → From a manifest**, pick your workspace and paste the manifest that **Copy manifest** (in the [Slack](/settings?s=chat&find=Slack) row's steps, and a row of its own once connected) copies: it turns on Socket Mode, subscribes to direct messages and mentions, adds the `/hydor` command and asks for the bot scopes `app_mentions:read`, `chat:write`, `commands`, `files:read` (for the files you send it), `im:history`, `reactions:write` and `users:read`. Under **Basic Information → App-Level Tokens** generate a token with the `connections:write` scope (it starts with `xapp-`); under **Install App** install the app to your workspace and copy the Bot User OAuth Token (it starts with `xoxb-`). Paste both and press **Connect**.
 
 Connected, the first row under it shows the bot's name and what it is doing ("Listening for messages", or what is wrong: Discord's Message Content Intent off, a scope Slack's app lacks). **Connect** turns a token down only when the service itself says no to it: when Telegram, Discord or Slack is slow to answer or can't be reached just then (as can happen in a new bot's first minutes), Hydor keeps the token, the row says **Connecting…** and why, and the bot connects by itself as soon as the service answers. A Telegram bot gets its messages in one place only, so when another copy of Hydor or another program uses the same bot, the row says so. The row's **⋯** menu has **Change token** (**Change tokens** for Slack), which puts in others (another bot's chats link again), and **Disconnect**, which takes it out of Hydor, and the bot or app stays yours.
 
@@ -57,13 +67,15 @@ A channel links to the person who sent the code: only they are heard there, and 
 
 ### What a chat can do
 
-- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set in the **New sessions use** row (**Claude Code** or **Codex**). What you send while the agent works waits in the session's queue.
+- **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set in the **New sessions use** row (**Claude Code** or **Codex**), as the agent of yours in the **New sessions as** row if you picked one. What you send while the agent works waits in the session's queue.
+- **Photos, files and voice messages**: send them as you would to a person, with a caption if you like: the caption goes with them, and several sent at once (an album) arrive together. Each is saved in the folder of the session it goes to, under its own name (photos and voice messages are named by when they came, like `photo-2026-11-15-0930.jpg`), and reaches the agent as the message box's attachments do: pictures to look at, other files to open. A voice message reaches the agent as words when [Speech recognition on the server](/settings?s=voice&find=Speech%20recognition%20on%20the%20server) is on in Settings → Capabilities → Voice, and its recording stays in the folder; without it, the recording goes as a sound file, and the chat says how to turn it on. Telegram lets bots fetch files of up to 20 MB, and Hydor takes files of up to 25 MB from Discord and Slack: the chat says when one is too big. What files hold, and messages forwarded from someone else, reach the agent marked as outside data, to work with, never as instructions. In Slack, files need the `files:read` scope: an app made from an older manifest needs it added under **OAuth & Permissions**, then installed again (the chat says so when a file can't come through).
+- **Your own agents**: `/as` and an agent's name starts a new session as one of your [agents](/agents), like `/as Bookkeeper add this to October` with a photo of a receipt. `/as` and the name alone makes the chat's next new session start as it, and `/agents` (or `/as` alone) lists them with a button each, your own first. An agent that keeps one conversation of its own takes the chat into that conversation. Discord completes the agent's name as you type `/as`; in Slack, write `/hydor as Bookkeeper …`. The [New sessions as](/settings?s=chat&find=New%20sessions%20as) row makes every new session from that chat app start as one of your agents.
 - **The reply** comes back when the agent's turn ends, formatted for the app (Telegram's formatting; Discord's Markdown, in messages of 2,000 characters; Slack's mrkdwn in blocks), in up to ten messages when it is long (the rest stays in the session). Telegram and Discord show "typing…" while it works; Slack puts an hourglass on your message. **Open in Hydor** opens the session in the app, when the app has an address on the internet.
 - **What an agent asks**: a plain yes-or-no question comes with buttons that answer it; anything more (a form, a plan) comes with a link to answer it in the app.
-- **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them. Discord lists them as slash commands; in Slack they come after `/hydor` (`/hydor new`, and `/hydor` with other words is a message to the session); in Discord and Slack `!new`, `!status` and the rest also work typed as a message.
+- **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/as` and `/agents` start one as one of your agents (above), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them. Telegram shows them in its menu of commands, and Discord as slash commands; in Slack they come after `/hydor` (`/hydor new`, and `/hydor` with other words is a message to the session); in Discord and Slack `!new`, `!as`, `!status` and the rest also work typed as a message.
 - **Notices**: with the **Notices from every session** row on, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
 
-Pictures, files and voice messages don't reach the agents from a chat yet: send words.
+Stickers, polls and locations don't reach the agents: the chat asks for words, photos, files or voice messages instead.
 
 ## Reach the app from another device
 
@@ -219,4 +231,5 @@ How pull requests are opened and followed: [Open a pull request from a session](
 - "Send my chats in Telegram, Discord and Slack the notices of every session, not only the ones they started."
 - "Which chats are linked to this app, in each chat app?"
 - "Make new sessions from my Discord chat use Codex."
+- "Make new sessions from my Telegram chat start as my Bookkeeper agent."
 - "Disconnect the Slack app."

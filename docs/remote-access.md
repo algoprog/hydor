@@ -24,4 +24,5 @@ The app takes it from the `X-Forwarded-For` header that a proxy on this computer
 Tunnel and Caddy add it by themselves, and nginx needs `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`.
 Without it every visitor counts as the proxy, so one person's wrong passwords would pause everyone.
 
-HTTPS is also what phones need for push notifications and to install the app.
+HTTPS is also what phones need for push notifications and to install the app (and, installed, to take what other apps
+share with it: [Share to Hydor](guide/20-devices.md#share-to-hydor-from-other-apps)).
