@@ -90,6 +90,7 @@ export function AppIcon({ app, size = 36, className }: { app: CatalogApp; size?:
 
 /** How an app is connected, in a few words. */
 export function authLabel(a: CatalogApp): string {
+  if (a.server.transport === 'builtin') return 'Address and app password';
   if (a.server.transport === 'stdio') return a.auth.type === 'api_key' ? 'Runs here, with a key' : 'Runs on this computer';
   return a.auth.type === 'oauth' ? 'Browser sign-in' : a.auth.type === 'api_key' ? 'API key' : 'No sign-in';
 }
@@ -98,6 +99,7 @@ export function authLabel(a: CatalogApp): string {
 export function serverLine(a: CatalogApp): string {
   const s = a.server;
   if (s.transport === 'stdio') return [s.command, ...(s.args ?? [])].join(' ');
+  if (s.transport === 'builtin') return 'Built into Hydor';
   try {
     return new URL(s.url.replace(/\{\{[A-Z0-9_]+\}\}/g, 'x')).host.replace(/^x\./, '');
   } catch {

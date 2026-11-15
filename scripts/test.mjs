@@ -22,6 +22,7 @@ const NEEDS = {
   'server/computer/windows-test.ts': 'Windows',
   'server/computer/x11-test.ts': 'an X display',
   'server/desktop-test.ts': 'the desktop app built (desktop/)',
+  'server/mail/live-test.ts': 'a test mail server (GreenMail; see the file)',
 };
 
 const found = [];

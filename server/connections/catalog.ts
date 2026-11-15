@@ -3,7 +3,7 @@
 // when the folder changes; a file that does not hold together is left out with a warning.
 import fs from 'node:fs';
 import path from 'node:path';
-import { CONNECTION_CATEGORIES, type CatalogApp, type CatalogField } from '../../shared/connections.ts';
+import { BUILTIN_APPS, CONNECTION_CATEGORIES, type CatalogApp, type CatalogField } from '../../shared/connections.ts';
 import { APP_ROOT } from '../config.ts';
 
 export const CATALOG_DIR = path.join(APP_ROOT, 'catalog', 'connections');
@@ -51,6 +51,8 @@ export function problem(a: any, file?: string): string | null {
     if (!str(s.command, 200) || /[\s;&|`$<>]/.test(s.command)) return 'server.command: one program, without spaces or shell signs';
     if (s.args !== undefined && (!Array.isArray(s.args) || s.args.some((x: unknown) => typeof x !== 'string'))) return 'server.args: a list of strings';
     if (s.env !== undefined && (typeof s.env !== 'object' || Object.entries(s.env).some(([k, v]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) || typeof v !== 'string'))) return 'server.env: names to strings';
+  } else if (s.transport === 'builtin') {
+    if (!(BUILTIN_APPS as readonly string[]).includes(a.id)) return 'server.transport builtin is only for the connections Hydor answers itself';
   } else return 'server.transport: http, sse or stdio';
   const auth = a.auth;
   if (!auth || !['none', 'oauth', 'api_key'].includes(auth.type)) return 'auth.type: none, oauth or api_key';

@@ -45,6 +45,14 @@
             "args": { "type": "array", "items": { "type": "string" } },
             "env": { "type": "object", "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }, "additionalProperties": { "type": "string" } }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transport"],
+          "properties": {
+            "transport": { "const": "builtin", "description": "Answered by Hydor itself (only for email)." }
+          }
         }
       ]
     },

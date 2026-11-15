@@ -13,6 +13,8 @@ import type { JsonOp, WatchSpec } from '../../shared/automations.ts';
 import { HttpError } from '../auth.ts';
 import { assertPublic, decodeEntities, htmlText } from '../web/fetch.ts';
 import { parseSelector, selectText } from './select.ts';
+import { listAccounts, mailDbOrNull } from '../mail/accounts.ts';
+import { checkMail, type MailWatchState } from '../mail/watch.ts';
 
 export interface WatchResult {
   /** Something new: the agent should wake. */
@@ -25,6 +27,11 @@ export interface WatchResult {
   sample: string;
   /** What to compare with next time. */
   state: unknown;
+  /**
+   * A run for each thing that is new (an email each), in order, instead of one for the change: each with its report
+   * and the state to keep once its run has started.
+   */
+  runs?: { report: string; state: unknown }[];
 }
 
 const hash = (s: string) => crypto.createHash('sha1').update(s).digest('hex');
@@ -377,8 +384,8 @@ async function checkCommand(w: Extract<WatchSpec, { kind: 'command' }>, prev: { 
 
 // ---- running a watcher -----------------------------------------------------------------------------
 
-/** Looks once; `prev` is what the last look kept (undefined the first time, which only takes note). */
-export async function checkWatch(w: WatchSpec, prev: unknown, o: { cwd: string }): Promise<WatchResult> {
+/** Looks once; `prev` is what the last look kept (undefined the first time, which only takes note). `save` (a real check, not a test): new mail's attachments are saved in the task's folder. */
+export async function checkWatch(w: WatchSpec, prev: unknown, o: { cwd: string; save?: boolean }): Promise<WatchResult> {
   const p = prev as any;
   switch (w.kind) {
     case 'feed':
@@ -391,6 +398,11 @@ export async function checkWatch(w: WatchSpec, prev: unknown, o: { cwd: string }
       return checkFolder(w, p);
     case 'command':
       return checkCommand(w, p, o.cwd);
+    case 'mail': {
+      const db = mailDbOrNull();
+      if (!db) throw new Error('Email is not set up on this server');
+      return checkMail(db, w, p as MailWatchState | undefined, { cwd: o.save ? o.cwd : undefined });
+    }
   }
 }
 
@@ -430,6 +442,23 @@ export function validWatch(x: unknown): WatchSpec {
     case 'command':
       if (!str(w.command)) throw new HttpError(400, 'Give the command to run');
       return { kind: 'command', command: str(w.command), on: w.on === 'exit' ? 'exit' : 'output' };
+    case 'mail': {
+      const account = str(w.account, 320).toLowerCase();
+      const db = mailDbOrNull();
+      const accounts = db ? listAccounts(db) : [];
+      if (!accounts.length) throw new HttpError(400, 'Connect a mail account first: Apps → Connected apps → Email');
+      const hit = account ? accounts.find((a) => a.address.toLowerCase() === account || a.id === account) : accounts[0];
+      if (!hit) throw new HttpError(400, `${account} is not a connected mail account. The accounts: ${accounts.map((a) => a.address).join(', ')}`);
+      const folder = str(w.folder, 300);
+      return {
+        kind: 'mail',
+        account: hit.address,
+        ...(folder && !/^inbox$/i.test(folder) ? { folder } : {}),
+        ...(str(w.from, 200) ? { from: str(w.from, 200) } : {}),
+        ...(str(w.subject, 300) ? { subject: str(w.subject, 300) } : {}),
+        ...(w.unread === true ? { unread: true } : {}),
+      };
+    }
   }
   throw new HttpError(400, 'Pick what the watcher looks at');
 }

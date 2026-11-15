@@ -329,7 +329,15 @@ agents that speak ACP and take MCP servers.
   a new session with one in the message box, and agents can work from them.
 - **Connected apps**: on the Apps page beside your agent apps (Apps → Connected apps, which was Settings →
   Connections), a marketplace of services (Notion, Linear, GitHub, Google, Stripe and more), signed
-  in once for every agent and app; anyone can add one with a pull request to `catalog/`. Keys and sign-ins live in an
+  in once for every agent and app; anyone can add one with a pull request to `catalog/`. **Email** connects any
+  mail account (Gmail, iCloud, Fastmail, Yahoo, GMX, Zoho, Proton Mail through its Bridge, most work and school mail)
+  with its address and an app password, several at once: the servers fill in by themselves (the app's own list of
+  providers with how to make an app password at each, else what the provider publishes for mail programs, else
+  typed by hand), and signing in to read and to send is checked before anything is saved. Agents get tools to list
+  folders, search, read (HTML as text, attachments' names), save attachments, mark, move, save drafts, send (replies
+  in their thread, files from the session's folder attached, a copy in Sent) and delete; the server can send with
+  `sendMail` (server/mail/send.ts). Outlook.com and Microsoft 365 are not possible this way: Microsoft turned off app
+  passwords for them. Keys and sign-ins live in an
   encrypted vault: when a task needs one that isn't there, the agent asks with a card (one key, or a sign-in's
   fields), and uses it by name without ever seeing it, in API calls and site sign-ins on the hosts you allow, and
   in commands on this computer that you allow (what they print comes back masked). When an app needs something from
@@ -1222,8 +1230,10 @@ programs shows each program's version and what is out, with Check now, Update no
   phones.
 - Scheduled tasks: agent work, by any agent (Custom included), that starts at a time of day in your time zone,
   every few minutes, once, by a cron expression, when a webhook is called, or when a watcher sees a change (new
-  items in a feed, a page or a value in JSON changing, new files in a folder, a command's output): watchers check
-  without a model and wake the agent only then. Ask in any conversation ("remind me Friday at 9", "every Monday
+  items in a feed, a page or a value in JSON changing, new files in a folder, a command's output, new email in a
+  connected mail account): watchers check without a model and wake the agent only then. New email starts one run
+  per email (at most 10 a check, the rest summed up in a line), with the email as outside data and its attachments
+  saved in the task's folder, and never the same email twice. Ask in any conversation ("remind me Friday at 9", "every Monday
   summarize…") and confirm the task in a card; or start from an example, or turn a session that worked into one.
   A task can also run one of your apps, with the answers you set (a webhook's call or what a watcher saw
   filling them in), made from the app's Runs. Each run reports how it went: its history keeps the outcome, a
