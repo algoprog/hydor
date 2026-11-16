@@ -95,7 +95,7 @@ When an agent cites the pages it used, its reply shows them in two places, inste
 - **In the text**: where it cites a page, a small chip with the site's icon and name, like **ign**. A chip that stands for several pages says how many more (**ign +1**). On a computer, point at a chip to see its pages, with their titles and sites; click it to open its page (one of several from the card). On a phone, tap it to see them, then tap one to open it.
 - **Under the reply**: a **Sources** line with the first sites' icons and how many pages the reply cites. Click it to open a card for each page: its title, its site and a link.
 
-Only the pages the reply cites show, by the numbers the agent gave them, not every search it ran: what it searched and read is in its steps (open **Worked for…** above the reply). **Copy message** (on the reply, when you point at it) copies it as the agent wrote it, with its list of sources; reading it aloud leaves the numbers and the list out. A site's icon comes from the site itself the first time it shows, and is kept; a site without one shows its first letter.
+Only the pages the reply cites show, by the numbers the agent gave them, not every search it ran: what it searched and read is in its steps (open **Worked for…** above the reply). **Copy message** (under the reply) copies it as the agent wrote it, with its list of sources; reading it aloud leaves the numbers and the list out. A site's icon comes from the site itself the first time it shows, and is kept; a site without one shows its first letter.
 
 ## Read whole pages, or only the parts that answer a question
 

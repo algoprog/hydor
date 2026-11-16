@@ -12,6 +12,8 @@ Hydor runs AI agents on your own computer, and you use them from any browser, at
 
 The screen has two parts: the **sidebar** on the left, and the page you are on (the start page, a session, Settings…) beside it. On a phone the sidebar is a drawer that slides in (see [Use the app on a phone](#use-the-app-on-a-phone)).
 
+On a computer you can make the sidebar wider or narrower, from 180 to 560 pixels: drag its right edge, or click the edge and press the left and right arrow keys. The width is kept in this browser.
+
 ### The top of the sidebar
 
 - **Hydor**, with the logo. A crossed-out Wi-Fi icon appears beside the name while the page reconnects to the app.
@@ -33,6 +35,8 @@ Under the search field is every session, in groups:
 - **Snoozed**: at the bottom, until their time comes.
 
 Only folders you picked get a group. The home folder, the default folder, new task folders, the folders apps run in and temporary folders get none, so their sessions go by day. A session in a worktree goes in the group of the folder the worktree was made from, and any session working in a project's folder, or in a folder inside it, in the project's group, wherever it was started: in Hydor, Claude Code or Codex. A folder of a Codex project shows under the project's name. The folders the Codex app makes for your ChatGPT projects are named only by an id, so unless Codex knows the project's name they get no group either, and their sessions show **ChatGPT project** as their folder. Give one a name with **Rename folder** in one of its sessions' menus, and it gets a group under that name. Two folders of the same name show as many of the folders above them as it takes to tell them apart ("client/app", "server/app").
+
+The **Active** and **Projects** headings fold too: click one to hide everything under it, and again to show it. They stay as you left them on this computer, apart from the folding of each project or folder inside **Projects**.
 
 Click a group's heading to fold it to one line, with how many sessions it holds and a dot when one of them finished since you last looked; click it again to open it. A group with no session active in the past week starts folded. The open session stays in sight in its group, folded or not. How you fold the groups is kept in this browser. The pen at the end of a heading (on a computer, when you point at the heading) starts a new session in that folder or project, and the **⋯** beside it (or a right-click on the heading) opens its menu: **Rename**, **Use the folder's own name** for a folder you renamed, and **Open the project** or **Open in Files**. To rename a group, you can also double-click its name: type the new one and press Enter (Esc leaves it as it was). A project's new name is its name everywhere; a folder's is what the app calls it, in the sidebar, under each session and in the folder menus, on every device (the folder itself keeps its name on disk). Empty the name to give a folder its own back.
 

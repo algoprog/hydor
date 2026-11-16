@@ -4,5 +4,3 @@ dist/
 .env
 workspace/
 __pycache__/
-
-/.wiki/
