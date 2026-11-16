@@ -46,6 +46,8 @@ if (!WIN) {
 }
 
 // On Windows, npm's .cmd launchers run through Node.js (see launch).
+// The scoped token never enters spec.json or the detached runner's output files.
+if (process.env.HYDOR_WIKI_HOOK_TOKEN) spec.env.HYDOR_WIKI_HOOK_TOKEN = process.env.HYDOR_WIKI_HOOK_TOKEN;
 const program = launch(spec.cmd, spec.args, spec.env);
 const child = spawn(program.cmd, program.args, {
   cwd: spec.cwd,

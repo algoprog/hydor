@@ -9,12 +9,16 @@ export interface WikiMemorySettings {
   fromDocuments: boolean;
   /** The shared wiki's folder, an absolute path; project wikis kept there are under its projects/ folder. */
   hubPath: string;
-  /** Where each project's wiki is kept: 'hub' (default: in the shared wiki's folder) or 'folder' (inside the project's own folder, at projectPath). */
+  /** Where each project's wiki is kept: 'hub' or 'folder' (default: inside the project's own folder, at projectPath). */
   projectWikis: 'hub' | 'folder';
   /** With projectWikis 'folder': the wiki's folder, relative to each project's folder. Default ".wiki". */
   projectPath: string;
-  /** With projectWikis 'folder': add that folder to the project's .gitignore, in Git repositories only. Default off. */
+  /** Add a project-local wiki folder to the project's .gitignore, in Git repositories only. Default on. */
   gitIgnore: boolean;
+  /** Wiki access for chats without a session-specific choice. Default on. */
+  defaultChatEnabled: boolean;
+  /** Automatically suggest lessons in chats without a session-specific choice. Default off. */
+  defaultAutoLessons: boolean;
 }
 
 /** An article or a source in a wiki, by its path inside the wiki. */
@@ -34,6 +38,8 @@ export interface ProjectWikiView {
   root?: string;
   articles?: WikiItem[];
   sources?: WikiItem[];
+  /** Active project plans and execution evidence under output/projects/. */
+  plans?: WikiItem[];
   truncated?: boolean;
   error?: string;
 }

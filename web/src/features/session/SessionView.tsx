@@ -17,6 +17,7 @@ import { CopyButton } from '../../components/Markdown';
 import { Badge, Button, cx, Dialog, Throbber, Empty, IconButton, inputCls, Segmented, Tabs, useConfirm, useIsMobile, useMediaQuery } from '../../components/ui';
 import { NavButton } from '../layout/PageHeader';
 import { Composer, handoffName } from './Composer';
+import { WikiCheckpoint } from './WikiCheckpoint';
 import { SessionCtx, ToolRow } from './items';
 import { useTaskPanel } from './TaskLog';
 import { TaskItem } from './WorkRow';
@@ -485,6 +486,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
           {(lv?.effort ?? s.prefs?.effort) && <span className="text-fg-3"> · {lv?.effort ?? s.prefs?.effort} effort</span>}
         </InfoRow>
         {ctx != null && <InfoRow label="Context">{ctx}% of {compact(lv!.contextWindow)} tokens</InfoRow>}
+        <WikiCheckpoint sessionKey={s.key} />
         <InfoRow label="Started">{s.createdAt ? new Date(s.createdAt).toLocaleString(LOCALE) : '—'}</InfoRow>
         <InfoRow label="Last active">{ago(s.updatedAt) || '—'}</InfoRow>
         <InfoRow label="Activity">

@@ -76,13 +76,15 @@ export class Runner extends EventEmitter {
     const dir = path.join(paths.runs, meta.runId);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    fs.writeFileSync(path.join(dir, 'spec.json'), JSON.stringify(spec), { mode: 0o600 });
+    // The short-lived wiki hook bearer is delivered only through the runner's process environment.
+    const { HYDOR_WIKI_HOOK_TOKEN: hookToken, ...storedEnv } = spec.env;
+    fs.writeFileSync(path.join(dir, 'spec.json'), JSON.stringify({ ...spec, env: storedEnv }), { mode: 0o600 });
     const runnerJs = path.join(APP_ROOT, 'dist/server/runner.js');
     const plain: Wrapped = { cmd: process.execPath, args: [runnerJs, dir] };
     const w = wrap?.(meta.runId, plain.cmd, plain.args) ?? plain;
     if (w.scope) Object.assign(meta, { scope: w.scope, limits: w.limits });
     fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta), { mode: 0o600 });
-    const go = (c: Wrapped) => spawn(c.cmd, c.args, { detached: true, stdio: 'ignore', cwd: dir, windowsHide: true, ...(c.env ? { env: c.env } : {}) });
+    const go = (c: Wrapped) => spawn(c.cmd, c.args, { detached: true, stdio: 'ignore', cwd: dir, windowsHide: true, ...((c.env || hookToken) ? { env: { ...(c.env ?? process.env), ...(hookToken ? { HYDOR_WIKI_HOOK_TOKEN: hookToken } : {}) } } : {}) });
     const began = Date.now();
     const p = go(w);
     if (w.scope) {

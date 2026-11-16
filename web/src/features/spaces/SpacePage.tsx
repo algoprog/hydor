@@ -410,7 +410,7 @@ function MemoryTab({ s, onSaved, memory }: { s: Space; onSaved: (next: Space) =>
           </div>
         )
       ) : part === 'wiki' ? (
-        <SpaceWiki id={s.id} view={memory.wiki} version={memory.version} />
+        <SpaceWiki id={s.id} view={memory.wiki} version={memory.version} onStart={(prompt) => startInSpace(s, prompt)} />
       ) : (
         <DocumentsPart s={s} onSaved={onSaved} wikiOn={memory.wiki?.on === true} />
       )}

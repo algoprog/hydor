@@ -12,7 +12,7 @@ Memory has three parts. Each is for something else, and they work together:
 - **Wiki memory** is articles: longer, linked, with their sources, kept for a project (and one shared wiki). Agents read them when they need the detail, and add to them as they work.
 - **Documents** are the files themselves, which agents search and cite (see [Projects and knowledge](/guide/projects#give-a-project-documents-of-its-own)).
 
-The idea comes from a wiki that an AI agent maintains: keep the original sources, then bring what they say together in articles that point back to them. When something new arrives, the agent updates the articles instead of starting again, so you can build on earlier work and check where a claim came from.
+The idea follows Andrej Karpathy’s description of a wiki that an AI agent maintains: keep the original sources, then bring what they say together in articles that point back to them. When something new arrives, the agent updates the articles instead of starting again, so you can build on earlier work and check where a claim came from.
 
 When a document is added or changed, Hydor can read it and add what it says to the other two parts: a few memory notes (for a project's documents) and updates to the wiki (see [Learn from new documents](#learn-from-new-documents)).
 
@@ -25,17 +25,19 @@ Wiki memory is on for every project unless you turn it off. Two places decide:
 
 With wiki memory off for a project, its Memory tab says "Wiki memory is off for this project", agents' wiki tools there say it is off, and nothing is written. What is already in the folder stays.
 
+In chat options, **LLM Wiki** and **Auto lessons learned** apply to that chat. Their defaults are in Settings → Capabilities → Memory → Wiki memory. Automatic lesson suggestions also need Memory; saving a reviewed suggestion requires your confirmation. A native agent started before Wiki was enabled needs a restart to register its checkpoint hook.
+
 Learning from documents and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
 
 ## Where wikis are kept
 
-By default, in one folder: **Wiki folder** in [Settings → Memory → Wiki memory](/settings?s=memory&find=Wiki%20folder). It starts as `.wiki` in Hydor's task folder (for example `~/Hydor/.wiki`). The shared wiki is that folder, and each project's wiki is a folder of its own inside it, under `projects/`, made when first needed. The folder is named after the project and kept even if you rename the project. Nothing is written into your project folders, which are often Git repositories.
+The shared wiki is the **Wiki folder** in [Settings → Memory → Wiki memory](/settings?s=memory&find=Wiki%20folder). It starts as `.wiki` in Hydor's task folder (for example `~/Hydor/.wiki`). Each project keeps its wiki in its own `.wiki` folder by default. You can instead keep project wikis under `projects/` in the shared folder; their folder names remain stable if the projects are renamed.
 
 The folder is an absolute path on the computer running Hydor (when Hydor runs in a container, a path the container can reach). Press **Browse** to pick it: the desktop app opens the system folder dialog; in a browser or on another machine, Hydor shows the folders of the machine running it, and you can make a folder there.
 
-**Project wikis** can instead be **In each project’s folder**. Each project then keeps its wiki in its own folder, at **Folder inside each project** (`.wiki` at first; a path inside the project, never `.git`). **Leave it out of Git** adds that folder to the project's `.gitignore` when the wiki is written, in Git repositories only. It is off at first; turning it off later keeps an entry already added, and files Git already tracks stay tracked.
+**Project wikis** are **In each project’s folder** by default, at **Folder inside each project** (`.wiki` at first; a path inside the project, never `.git`). You can switch to keeping them in the shared folder. **Leave it out of Git** adds that folder to the project's `.gitignore` when the wiki is written, in Git repositories only. It is on at first; turning it off later keeps an entry already added, and files Git already tracks stay tracked.
 
-A project can also name its wiki folder itself: a line in its `AGENTS.md` such as ``- Wiki: `knowledge/wiki` `` makes that folder, inside the project, its wiki. That wins over the settings above. A path that is absolute, starts with `~`, climbs out with `..`, goes through a Git or hidden Hydor folder or leaves the project through a link is ignored.
+A project can also name its wiki folder itself: a line in its `AGENTS.md` such as ``- Wiki: `knowledge/wiki` `` makes that folder, inside the project, its wiki. That wins over the settings above. A relative binding or link may also point to the configured shared wiki itself. Other external paths, absolute paths, `~`, Git and hidden Hydor folders are not accepted.
 
 Whatever the settings say, every wiki is a folder inside the wiki folder or inside its own project, never anywhere else.
 
@@ -81,11 +83,13 @@ In a project, an agent gets a few tools for the project's wiki, and nothing for 
 - It can name "the shared wiki" to work in that one instead, when it is on.
 - It finds what is in a wiki with its ordinary document search, so an answer can cite the article.
 
+For an existing project plan, ask the agent for a revision preview. The old bytes are protected in a snapshot before the reviewed replacement; approving a plan change does not start implementation.
+
 What it cannot do: reach another project's wiki; read or write hidden files and folders, Git and archive folders, retired or archived articles, or a link that leads out of the wiki; keep text with passwords or keys in it; or use wiki memory at all in a Confidential session. Ask the agent to check the wiki and it reports a basic problem list; it does not change the files for that.
 
 ## Checkpoints and lessons learned
 
-With wiki memory and memory both on, Hydor's Custom agent can save a checkpoint of a session when it compacts its own context, to carry on from afterwards. There is one checkpoint per session, written over each time, in the shared wiki folder. It holds a redacted summary or only the event: never a full transcript. For Claude Code and Codex, Hydor tries a checkpoint when you start the compaction from Hydor; compaction those agents do on their own is not covered. A failed checkpoint does not stop compaction. Turning memory off for a session, or all of it, prevents checkpoints and their use; existing ones stay.
+With wiki memory and memory both on, Hydor's Custom agent can save a checkpoint of a session when it compacts its own context, to carry on from afterwards. There is one checkpoint per session, written over each time, in the shared wiki folder. It holds a redacted summary or only the event: never a full transcript. For Claude Code and Codex, Hydor attempts a checkpoint when you start compaction from Hydor and, when its native hook is registered, before automatic compaction. Existing or hidden hooks, plugins, policy or unavailable hook discovery can prevent registration. A checkpoint can contain only metadata when no summary is available. Check the session details to see its latest outcome. A failed checkpoint does not stop compaction. Turning memory off for a session, or all of it, prevents checkpoints and their use; existing ones stay.
 
 Ask an agent to preview lessons learned from a session: it writes nothing. It uses the indexed messages, so the latest may be missing. Saving selected lessons asks for your confirmation first.
 

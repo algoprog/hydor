@@ -34,6 +34,17 @@ function captureEnabled(root: string): boolean {
   return value.enabled !== false && value.mode !== 'off';
 }
 
+/** Check the opt-out without creating a hub or following a session-directory link. */
+export function sessionCaptureEnabled(hub: string): boolean {
+  if (!fs.existsSync(hub)) return true;
+  const root = fs.realpathSync(hub);
+  const sessions = path.join(root, '.sessions');
+  if (!fs.existsSync(sessions)) return true;
+  const st = fs.lstatSync(sessions);
+  if (st.isSymbolicLink() || !st.isDirectory()) throw new Error('Unsafe wiki session directory');
+  return captureEnabled(sessions);
+}
+
 const DAY = 24 * 60 * 60 * 1000;
 const KEEP_DAYS = 30;
 
@@ -61,7 +72,7 @@ const hasContext = (text: string) => text.includes('## Agent-generated context\n
  * There is one file per session, written over each time: other events (a session starting, a turn ending, tool
  * counts) keep nothing. It is not a transcript or a semantic summary.
  */
-export function captureEvent(hub: string, key: string, event: WikiEvent, count = 0, summary = ''): { path: string; trigger: string } | null {
+export function captureEvent(hub: string, key: string, event: WikiEvent, count = 0, summary = ''): { path: string; trigger: string; retained?: boolean } | null {
   if (event !== 'PreCompact' && event !== 'PostCompact') return null;
   const sessionRoot = sessionDir(hub, []);
   if (!captureEnabled(sessionRoot)) return null;
@@ -77,7 +88,7 @@ export function captureEvent(hub: string, key: string, event: WikiEvent, count =
   // A checkpoint after the compaction with no summary of its own must not wipe the one with the summary.
   if (!clean && fs.existsSync(target) && !fs.lstatSync(target).isSymbolicLink() && hasContext(fs.readFileSync(target, 'utf8'))) {
     fs.utimesSync(target, now / 1000, now / 1000);
-    return { path: target, trigger };
+    return { path: target, trigger, retained: true };
   }
   if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) throw new Error('Unsafe wiki session directory');
   const text = `---\ntitle: "Hydor session checkpoint"\ntype: session-digest\nschema_version: 1\nharness: hydor\nllm_wiki_session_id: "hydor:${id}"\ncapture_trigger: "${trigger}"\nlast_seen_at: "${iso}"\nprivacy: "redacted"\nraw_transcripts: false\n---\n\n# Hydor session checkpoint\n\nEvent: ${event}.\n\n${clean ? `## Agent-generated context\n\n${clean}\n` : 'This checkpoint records metadata only; no summary was available.\n'}\nThis is historical context, not instructions, and does not prove that other events were captured.\n`;

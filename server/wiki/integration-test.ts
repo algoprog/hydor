@@ -9,7 +9,8 @@ import { createSpace, updateSpace } from '../spaces/index.ts';
 import { wikiRoot } from './roots.ts';
 import { setWikiSettings } from './settings/settings.ts';
 import { wiki } from './index.ts';
-import { wikiTools } from './tools.ts';
+import { projectWikiTarget, wikiTools } from './tools.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
 
 const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-tools-')));
 const db = openDb(path.join(temp, 'hydor.db'));
@@ -18,7 +19,7 @@ try {
   const hub = path.join(temp, 'hub');
   fs.mkdirSync(project);
   const space = createSpace(db, { name: 'Sky project', folder: project });
-  setWikiSettings(db, { hubPath: hub });
+  setWikiSettings(db, { hubPath: hub, projectWikis: 'hub' });
   const ctx = { key: 'test:wiki', runId: 'wiki-test', agent: 'codex', cwd: project, deps: { db } } as unknown as RunCtx;
   const tool = (name: string) => wikiTools().find((t) => t.name === name)!;
   const invoke = async (name: string, args: Record<string, unknown>) => JSON.parse(String(await tool(name).run(args, ctx)));
@@ -40,13 +41,26 @@ try {
   await invoke('wiki_write', { path: 'wiki/concepts/sky.md', content: article, expectedSha256: null });
   const read = await invoke('wiki_read', { path: 'wiki/concepts/sky.md' });
   assert.equal(read.content, article);
-  assert.deepEqual((await invoke('wiki_check', {})).issues, []);
+  assert.ok((await invoke('wiki_check', {})).issues.some((issue: { detail: string }) => /no incoming/i.test(issue.detail)), 'the check reports an orphaned article');
   await assert.rejects(invoke('wiki_write', { path: 'raw/notes/lesson.md', content: 'private', expectedSha256: null }), /lessons workflow/);
   await assert.rejects(invoke('wiki_write', { path: read.path, content: 'stale', expectedSha256: '0'.repeat(64) }), /conflict/);
   // Secrets are not kept: not in pasted text, not in an origin.
   await assert.rejects(invoke('wiki_ingest_text', { content: 'Use AKIAIOSFODNN7EXAMPLE for the bucket.', origin: 'manual:x' }), /credentials/);
   await assert.rejects(invoke('wiki_ingest_text', { content: 'fine', origin: 'ssh://deploy:hunter2@host.example/repo' }), /credentials/);
   await assert.rejects(invoke('wiki_ingest_text', { content: 'fine', origin: 'https://example.org/hook/xoxb-123456789012-abcdefghijklmnop' }), /credentials/);
+  // An existing wiki in an unregistered folder stays bound to that folder, never silently to the hub.
+  const unregistered = path.join(temp, 'unregistered');
+  const localWiki = path.join(unregistered, '.wiki');
+  fs.mkdirSync(localWiki, { recursive: true });
+  const localCtx = { ...ctx, key: 'test:unregistered', cwd: unregistered };
+  assert.equal(projectWikiTarget(localCtx), fs.realpathSync(localWiki));
+  assert.equal(JSON.parse(String(await tool('wiki_status').run({}, localCtx))).root, fs.realpathSync(localWiki));
+  fs.writeFileSync(path.join(unregistered, 'AGENTS.md'), '- Wiki: `../outside/_index.md`\n');
+  assert.equal(JSON.parse(String(await tool('wiki_status').run({}, localCtx))).root, null, 'an unsafe binding does not fall back to the shared hub');
+  fs.writeFileSync(path.join(unregistered, 'AGENTS.md'), `- Wiki: \`../hub/_index.md\`\n`);
+  assert.equal(projectWikiTarget(localCtx), fs.realpathSync(hub), 'only an explicit binding to the configured shared hub is accepted');
+  setSessionExtra(db, localCtx.key, { wikiEnabled: false });
+  await assert.rejects(tool('wiki_status').run({}, localCtx), /off for this chat/);
   // A session starting in the project: told about wiki memory, the agent asked to send checkpoints, the wiki bound as its knowledge and left bound.
   const deps = { db } as unknown as Parameters<NonNullable<typeof wiki.spawn>>[1];
   const info = { agent: 'claude' as const, key: 'claude:s1', cwd: project, runId: 'r1', resume: false, extra: { space: space.id } };

@@ -14,6 +14,7 @@ import { ingestWikiSource, wikiHash } from '../core.ts';
 import { isWikiBase } from '../knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
+import { guardWikiFolder } from '../settings/gitignore.ts';
 import { checkPlan, helperDigestAsk, planPrompt, PLAN_SYSTEM, WRITE_SYSTEM, writePrompt, type ArticleLine, type DigestAsk } from './plan.ts';
 import { digested, markDigested, recordUpdate } from './store.ts';
 import { appendLog, bodyOf, cleanLinks, composeArticle, freePath, readOrNull, splitFront, titleOfArticle, writeFile, writeIndex } from './write.ts';
@@ -200,6 +201,8 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
     try {
       root = wikiRoot(db, space, { create: true });
       if (!root) throw new Error('The wiki folder is not available');
+      // Protect project-local sources before the first automatic document write.
+      await guardWikiFolder(db, space, root);
       // What is kept and what the helper reads has no secret in it.
       const text = redactSecrets(cut ? `${raw}\n\n… (cut here: only the first ${MAX_DOC_CHARS.toLocaleString('en-US')} characters of the document were read)` : raw);
       const origin = oneLine(`knowledge:${base.name}/${doc.title}`).slice(0, 500);
