@@ -15,6 +15,7 @@ import { openDb } from '../db.ts';
 import { registerFeatures, spawnAdditions } from '../features/registry.ts';
 import type { Deps } from '../features/types.ts';
 import { appWords, language, userLang } from './index.ts';
+import { readLanguageCatalog } from './catalog.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
@@ -127,7 +128,9 @@ test('the translator leaves what it has no entry for in English, whole, and take
 test('the browser’s language picks one the app has, else English', () => {
   assert.equal(preferred(['el-GR', 'en']), 'el');
   assert.equal(preferred(['zh-CN']), 'zh');
-  assert.equal(preferred(['fr-FR', 'de']), 'en');
+  assert.equal(preferred(['de-AT', 'en']), 'de');
+  assert.equal(preferred(['fr-FR', 'de']), 'de');
+  assert.equal(preferred(['fr-FR']), 'en');
 });
 
 test('every shipped translation keeps its values, and covers nearly all the app', () => {
@@ -142,11 +145,90 @@ test('every shipped translation keeps its values, and covers nearly all the app'
   }
 });
 
+test('language supplements stay scoped, ordered and behind base translations', () => {
+  // A separate directory keeps the fixture independent of the installed catalogs.
+  const directory = fs.mkdtempSync(path.join(tmp, 'supplements-'));
+  fs.writeFileSync(path.join(directory, 'de.json'), JSON.stringify({ shared: 'base' }));
+  fs.writeFileSync(path.join(directory, 'de.a.json'), JSON.stringify({ shared: 'module', added: 'first' }));
+  fs.writeFileSync(path.join(directory, 'de.b.json'), JSON.stringify({ added: 'second', next: 'next' }));
+  fs.writeFileSync(path.join(directory, 'el.a.json'), JSON.stringify({ other: 'other' }));
+  assert.deepEqual(readLanguageCatalog(directory, 'de'), { shared: 'base', added: 'first', next: 'next' });
+  assert.throws(() => readLanguageCatalog(directory, '../de'));
+});
+
+test('German covers the extracted catalog and preserves interpolation values', () => {
+  const strings = read('strings.json');
+  const dict = readLanguageCatalog(path.join(APP_ROOT, 'web/src/i18n'), 'de');
+  // Missing or empty translations must not silently fall back to English.
+  const missing = Object.keys(strings).filter((key) => !dict[key]?.trim());
+  const broken = Object.entries(dict).filter(([key, value]) => !keepsValues(key, value));
+  assert.deepEqual(missing, [], 'German catalog entries missing');
+  assert.deepEqual(broken, [], 'German translations that lose a value');
+  // Named template variables must retain their exact spelling.
+  for (const [key, value] of Object.entries(dict)) {
+    const tokens = key.match(/\{\{[^{}]+\}\}/g) ?? [];
+    for (const token of tokens) assert.ok(value.includes(token), `German lost ${token} in ${key}`);
+  }
+  // These named placeholders are filled by the application rather than the translator.
+  for (const token of ['{agent}', '{date}', '{time}', '{page}', '{pages}', '{column}']) {
+    for (const [key, value] of Object.entries(dict)) {
+      if (key.includes(token)) assert.ok(value.includes(token), `German lost ${token} in ${key}`);
+    }
+  }
+  // Quoted theme names remain literal inside translated accessible labels.
+  assert.equal(translator(dict)('More for “Midnight”'), 'Mehr für „Midnight“');
+  assert.equal(dict['Memory (RAM)'], 'Arbeitsspeicher (RAM)');
+  // English plural suffixes must not leak into German timeout messages.
+  const german = translator(dict);
+  assert.equal(german('Too many wrong links from this address. Try again in 1 minute.'), 'Zu viele falsche Links von dieser Adresse. Versuche es nach 1 Min. erneut.');
+  assert.equal(german('Too many wrong links from this address. Try again in 2 minutes.'), 'Zu viele falsche Links von dieser Adresse. Versuche es nach 2 Min. erneut.');
+  assert.equal(german('1 file changed'), '1 Datei geändert');
+  assert.equal(german('2 files changed'), '2 Dateien geändert');
+  assert.equal(german('Confidential: on'), 'Vertraulich: ein');
+  assert.equal(german('codex resume 123'), 'codex resume 123');
+  // Shell and configuration examples must remain executable.
+  assert.ok(dict['In Docker its restart policy brings it back: restart: unless-stopped in compose.yaml.'].includes('restart: unless-stopped'));
+  assert.ok(dict['I approve this command — please run it now: ``` {0} ```'].includes('``` {0} ```'));
+  // Authentication examples must remain copyable after translation.
+  assert.equal(german('Bearer abc123'), 'Bearer abc123');
+  assert.equal(german('Authorization: Bearer …'), 'Authorization: Bearer …');
+  assert.equal(
+    german('claude mcp add --transport http hydor http://localhost --header "Authorization: Bearer xyz"'),
+    'claude mcp add --transport http hydor http://localhost --header "Authorization: Bearer xyz"',
+  );
+  // Protocol names, time zones and tool identifiers keep their exact spelling.
+  for (const [key, token] of [
+    ['Send the recording as application/octet-stream', 'application/octet-stream'],
+    ['No answer to tools/list', 'tools/list'],
+    ['Where those are, as Europe/Athens', 'Europe/Athens'],
+    ['It is still working: wait for its reply, or message_child it.', 'message_child'],
+  ]) assert.ok(dict[key].includes(token), `German lost ${token}`);
+  // Example schemas, formula identifiers and LUT headers must remain usable as written.
+  const databaseExample = Object.entries(dict).find(([key]) => key.startsWith('To change a database, save_page with this id and databases:'));
+  assert.ok(databaseExample);
+  for (const token of ['"YYYY-MM-DD"', '"page"', 'true', 'page_action fill_column']) assert.ok(databaseExample[1].includes(token));
+  const formulas = Object.entries(dict).find(([key]) => key.startsWith('SUM AVERAGE COUNT COUNTA COUNTIF'));
+  assert.ok(formulas);
+  assert.equal(formulas[1], formulas[0]);
+  assert.equal(dict['TITLE "Hydor grade"'], 'TITLE "Hydor grade"');
+  assert.equal(dict['YYYY-MM-DD HH:MM'], 'YYYY-MM-DD HH:MM');
+  assert.ok(dict['The start is a day written as YYYY-MM-DD'].includes('YYYY-MM-DD'));
+  // Guide topic titles are translated even when the guide body is in English.
+  assert.equal(german('Research: papers, writing and the lab'), 'Forschung: Publikationen, Schreiben und Labor');
+  // Product names and executable fragments are not ordinary prose.
+  for (const key of ['Codex', 'Anthropic', 'Mermaid', 'Markdown', 'NORM.DIST(x, mean, standard_dev, cumulative)', 'linear infinite', 'codex resume {0}', 'npm install', 'kubectl rollout undo deployment/web', 'input, textarea, select, [contenteditable]', '“{0} (filled).pdf”']) {
+    assert.equal(dict[key], key, `German must preserve ${key}`);
+  }
+});
+
 test('agents are asked to write in the user’s language; English asks nothing', async () => {
   registerFeatures([language], { db, app: { get() {}, put() {} } } as unknown as Deps);
   const info = { agent: 'claude' as const, key: 'claude:k', cwd: tmp, runId: 'r', resume: false, extra: {} };
   assert.equal(userLang(db), 'en');
   assert.deepEqual((await spawnAdditions(info)).instructions, []);
+  // German selection must also reach agent instructions.
+  db.prepare("insert or replace into kv (k, v) values ('ui.language', 'de')").run();
+  assert.match((await spawnAdditions(info)).instructions.join('\n'), /reads this app in German\. Write to them in German/);
   db.prepare("insert or replace into kv (k, v) values ('ui.language', 'zh')").run();
   assert.match((await spawnAdditions(info)).instructions.join('\n'), /reads this app in Chinese \(Simplified\)\. Write to them in Chinese \(Simplified\)/);
 });
@@ -154,6 +236,9 @@ test('agents are asked to write in the user’s language; English asks nothing',
 test('what the server says outside the pages (a phone’s notifications) comes in the user’s language', () => {
   db.prepare("insert or replace into kv (k, v) values ('ui.language', 'en')").run();
   assert.equal(appWords(db)('Finished'), 'Finished');
+  // Server-side words use the same German dictionary as the browser.
+  db.prepare("insert or replace into kv (k, v) values ('ui.language', 'de')").run();
+  assert.equal(appWords(db)('Settings'), 'Einstellungen');
   db.prepare("insert or replace into kv (k, v) values ('ui.language', 'el')").run();
   const tr = appWords(db);
   const el = read('el.json');
