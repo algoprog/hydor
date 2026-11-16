@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type AgentOutput, type Assistant, type AssistantMode, type OutputTarget, type ToolKind } from '../../shared/assistants.ts';
+import { agentChanges, cleanAgentExamples, type AgentVersionBy } from '../../shared/agent-files.ts';
 import { cleanAnswer } from '../../shared/apps.ts';
 import { isTier } from '../../shared/tiers.ts';
 import { HttpError } from '../auth.ts';
@@ -11,6 +12,8 @@ import { config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { BUILTINS } from './builtins.ts';
 import { forgetResults } from './results.ts';
+import { forgetExampleRuns } from './exampleRuns.ts';
+import { agentVersion, forgetVersions, keepVersion } from './versions.ts';
 
 const MINE = 'assistants.mine';
 const TONE = 'assistants.tone';
@@ -143,6 +146,13 @@ function budgetOf(v: unknown): number | undefined {
   return c > 0 ? c : undefined;
 }
 
+/** An agent's examples, checked: a mistake in one is said, as an app's are. */
+function examplesOf(v: unknown) {
+  const { examples, errors } = cleanAgentExamples(v);
+  if (errors.length) throw new HttpError(400, errors.join('; '));
+  return examples.length ? examples : undefined;
+}
+
 /** An assistant as given by the pages or an import, checked and trimmed (without its id). */
 export function cleanAssistant(b: Partial<Record<keyof Assistant, unknown>>): Omit<Assistant, 'id'> {
   const name = str(b.name, 60);
@@ -175,6 +185,7 @@ export function cleanAssistant(b: Partial<Record<keyof Assistant, unknown>>): Om
     stepUp: b.stepUp === false ? false : undefined,
     standing: b.standing === true ? true : undefined,
     output: outputOf(b.output),
+    examples: examplesOf(b.examples),
     source: str(b.source, 1000) || undefined,
   };
   // Empty lists and unset choices are left out of what is kept.
@@ -194,14 +205,26 @@ const newId = (name: string) =>
       .slice(0, 24) || 'assistant'
   }-${crypto.randomBytes(2).toString('hex')}`;
 
-/** Adds an assistant (no id) or changes one of the user's own. */
-export function saveAssistant(db: DB, b: Partial<Record<keyof Assistant, unknown>>): Assistant {
+/** How a save came about, for the version it keeps: who saved it, and what they said they changed. */
+export interface SaveHow {
+  by?: AgentVersionBy;
+  why?: string;
+  /** A project's or an agent's name by its id, for what changed in words. */
+  name?: (kind: 'agent' | 'project', id: string) => string;
+}
+
+/**
+ * Adds an assistant (no id) or changes one of the user's own, and keeps a version of it when what it is changed (who
+ * saved it: you unless `how` says). Its examples stay as they were when the save names none.
+ */
+export function saveAssistant(db: DB, b: Partial<Record<keyof Assistant, unknown>>, how: SaveHow = {}): Assistant {
   const id = typeof b.id === 'string' ? b.id : '';
   if (id && BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in agents stay as they are: duplicate one to make it your own');
   const list = mine(db);
   const at = id ? list.findIndex((a) => a.id === id) : -1;
   if (id && at < 0) throw new HttpError(404, 'There is no such agent');
-  const a: Assistant = { id: id || newId(str(b.name, 60)), ...cleanAssistant(b) };
+  const prev = at >= 0 ? list[at] : null;
+  const a: Assistant = { id: id || newId(str(b.name, 60)), ...cleanAssistant(b.examples === undefined && prev?.examples ? { ...b, examples: prev.examples } : b) };
   // It cannot ask itself.
   if (a.canAsk?.includes(a.id)) {
     a.canAsk = a.canAsk.filter((x) => x !== a.id);
@@ -213,12 +236,31 @@ export function saveAssistant(db: DB, b: Partial<Record<keyof Assistant, unknown
     list.push(a);
   }
   putMine(db, list);
+  const all = [...BUILTINS, ...list];
+  keepVersion(db, prev, a, how.by ?? 'you', how.why, how.name ?? ((kind, x) => (kind === 'agent' ? (all.find((y) => y.id === x)?.name ?? x) : x)));
   return a;
+}
+
+/**
+ * Bring it back: an earlier version of an agent becomes the current one, as a new version that says so. Its examples
+ * stay as they are now; agents and projects gone since (`projects`: the ids there are now) are left out.
+ */
+export function bringBack(db: DB, id: string, n: number, how: SaveHow & { projects: Set<string> }): Assistant {
+  const a = findAssistant(db, id);
+  if (!a || a.builtin) throw new HttpError(404, 'There is no such agent');
+  const v = agentVersion(db, id, n);
+  if (!v) throw new HttpError(404, 'There is no such version: only the latest 50 are kept');
+  const agents = new Set(allAssistants(db).map((x) => x.id));
+  const back = { ...v.agent, canAsk: v.agent.canAsk?.filter((x) => agents.has(x)), projects: v.agent.projects?.filter((x) => how.projects.has(x)) };
+  const said = agentChanges(a, back, how.name).join(' ');
+  return saveAssistant(db, { ...back, id, examples: a.examples ?? [] }, { ...how, why: `Brought back version ${n}.${said ? ` ${said}` : ''}` });
 }
 
 export function removeAssistant(db: DB, id: string) {
   if (BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in agents cannot be deleted');
   forgetResults(db, id);
+  forgetVersions(db, id);
+  forgetExampleRuns(db, id);
   // Agents that could ask it no longer can.
   putMine(
     db,

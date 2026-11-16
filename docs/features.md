@@ -133,7 +133,22 @@ agents that speak ACP and take MCP servers.
   year (up to 500 an agent) and shown on its page as a table, a row per result and a column per field, with where each
   went, paged, each row opening to the whole result (`hydor agents results` too); can keep one conversation of its own, with an inbox: messages from you and other
   agents go in one at a time and each answer goes back to its sender, its scheduled runs post there too; and keeps
-  to a monthly budget, which caps each of its sessions at what is left and refuses new ones once it is spent. A
+  to a monthly budget, which caps each of its sessions at what is left and refuses new ones once it is spent. Each
+  save that changes one of yours keeps a version (by you, an agent through the API, its draft, a file installed or an
+  import; the latest 50), listed under its page's More → **Versions** with what changed in sentences, compared two at a
+  time (its settings in sentences, its instructions as a diff) and brought back as a new version. Its **Examples** are
+  messages to try it with and what its answer must do (sentences the helper model reads it against, or rules on
+  {{reply}} and {{result.field}}, as an app's checks): **Try the examples** says first what it costs (from its last tries
+  or its sessions this month, against its budget), then runs each in a throwaway session as the agent on its tier, in an
+  empty folder removed once its result is kept, sending nothing (its connected apps' calls kept as would-have-sent, what it hands back kept with the
+  try), and shows which passed, each version with how its examples went; after a change the page offers to try them
+  again; they never run by themselves. **Download as a file** saves an agent (built-in ones too) as a `.hydor-agent`
+  file: its settings, instructions, team by name, fields, the kinds of place its results go, schedules by the clock as
+  suggestions and examples, with nothing of the person's own (projects, connected accounts, Library pages, email
+  recipients, webhook addresses and keys are left out, and listed as what to set again); **Install** on the Agents page
+  shows what a file brings and needs before saving, installs beside an agent of the same name unless you choose to
+  replace it (as a new version), adds its schedules paused if you like, starts Full access as Accept edits, and says
+  plainly what is wrong with a broken file or one from a newer Hydor (`hydor agents export` and `install` too). A
   project's Agents tab shows its agents as a team (what starts each, whom it hands work to), and a project can have an
   agent made for it as it is made, or later: drafted to fit it when it says enough about itself, else the template for
   its kind (software, a website, ML experiments, data, a LaTeX paper, research reading, writing, design and media,

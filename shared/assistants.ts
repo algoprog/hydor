@@ -2,6 +2,7 @@
 // works, what it may use, and the agent, model and mode it suggests. Shared by the server (instructions,
 // Custom's tool limits) and the pages (the pickers on the start page and in a session's message box,
 // Settings → Assistants).
+import type { AgentExample } from './agent-files.ts';
 import type { AnswerField } from './apps.ts';
 import type { TaskSchedule } from './automations.ts';
 import type { SessionExtra } from './features.ts';
@@ -58,6 +59,8 @@ export interface Assistant {
   standing?: boolean;
   /** What it hands back (fields, checked) and where each result goes, besides the conversation. */
   output?: AgentOutput;
+  /** Messages to try it with and what its answer must do (Try the examples): kept beside its versions, not in them. */
+  examples?: AgentExample[];
   /** Comes with the app: it can be duplicated, not changed. */
   builtin?: boolean;
   /** The .claude/agents file it was imported from. */

@@ -19,6 +19,7 @@ import { addVersion, createPage, pageInfo, pageSource } from '../pages/store.ts'
 import { refreshThumbs } from '../pages/thumbs.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { resultMail, sendMailOfResult } from './resultMail.ts';
+import { setExampleRun } from './exampleRuns.ts';
 import { keepResult, madeOf, PLACE, setMade } from './results.ts';
 import { userLang } from '../language/index.ts';
 import { addResultRow, resultsBook, SHEET_WORDS } from './resultSheet.ts';
@@ -300,6 +301,12 @@ export function handBackTool(ctx: RunCtx): RunTool | null {
       if (!checked.ok)
         return { text: `The result does not fit ${now.name}'s fields yet:\n${checked.errors.map((e) => `- ${e}`).join('\n')}\nFix these and call hand_back again with every field.`, isError: true };
       const x = sessionExtra(c.deps.db, c.key);
+      // A try of one of its examples: the result is kept with the try, and goes nowhere else.
+      const ex = x.agentExample as { run?: string } | undefined;
+      if (ex?.run) {
+        setExampleRun(c.deps.db, ex.run, { result: checked.value });
+        return 'Handed back. Finish with a short reply; no need to repeat the result.';
+      }
       const markdown = resultMarkdown(fs2, checked.value);
       const sent = await handOn({
         db: c.deps.db,
