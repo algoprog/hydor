@@ -189,7 +189,7 @@ The sidebar's **Search sessions** field is a simpler search: it lists only sessi
 
 ## Use the app on a phone
 
-To reach the app from your phone, it needs an HTTPS address (Tailscale, a Cloudflare tunnel or your own proxy). See [Phones, other machines and sharing](/guide/devices).
+To reach the app from your phone, it needs an HTTPS address. [Settings → App → Use on your phone](/settings?s=phone) gives it one in a few clicks, privately with Tailscale: only your own devices reach it, and a QR code opens it on the phone. A Cloudflare tunnel or your own proxy works too. See [Phones, other machines and sharing](/guide/devices).
 
 ### Add it to your home screen
 
@@ -262,7 +262,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 
 **Ask an agent**, at the top of every Help page, opens the same panel; so does "Ask an agent about the app" in the search box. The topics are grouped under the box. Each one opens its sections one at a time (**Open all** shows them all) and ends with things to ask an agent: click one to put it in the panel's box, change it if you like, and send it.
 
-- The welcome tour shows you around and sets up the agents you want to use. Start it with **Take the tour** at the top of Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box. If Hydor finds the folder of another agent you used before (Claude Code, Codex or another) on this computer, the tour has one more step, **Coming from another agent?**: it names what it found, and **Bring in what they know** opens [Bring in](/guide/memory#bring-in-from-other-assistants) over the tour, to bring over what they know about you and the skills you made. With none of them here, there is no such step. After it, tips point out the rest of the app, one part at a time, the first time you come to each (see [Take the tour](/guide/app#take-the-tour)).
+- The welcome tour shows you around and sets up the agents you want to use. Start it with **Take the tour** at the top of Help, from [Take the tour](/settings?s=general&find=Take%20the%20tour) in Settings → App → General, or by typing "tour" in the search box. If Hydor finds the folder of another agent you used before (Claude Code, Codex or another) on this computer, the tour has one more step, **Coming from another agent?**: it names what it found, and **Bring in what they know** opens [Bring in](/guide/memory#bring-in-from-other-assistants) over the tour, to bring over what they know about you and the skills you made. With none of them here, there is no such step. In a desktop app, one more step asks **Use it on your phone too?**: **Set it up** ends the tour at [Use on your phone](/settings?s=phone), and **Not now** goes on. After it, tips point out the rest of the app, one part at a time, the first time you come to each (see [Take the tour](/guide/app#take-the-tour)).
 - **Release notes** (in Settings → App → General, or from the search box) say what changed in each version. After an update, a "What's new" note shows once.
 - Agents in the app read this guide too: ask any session "how do I…" and it can answer, or do it for you (see [Let agents work the app for you](/guide/ask-agents)).
 
@@ -283,3 +283,4 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Put my Thesis project first among the groups in my sidebar."
 - "Which of my projects did Hydor make from my Claude Code and Codex sessions?"
 - "What is in my inbox?"
+- "Set the app up so I can use it on my phone."

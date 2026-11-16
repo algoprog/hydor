@@ -124,6 +124,7 @@ import { describeLater, enableDescriptions } from './describe.ts';
 import { searchLibrary } from './search.ts';
 import { meaningStarting } from '../memory/embed.ts';
 import { DESCRIPTION_WORDS, type LibFolder } from '../../shared/pages.ts';
+import { originListed } from '../origins.ts';
 
 export { MAX_PAGE } from './store.ts';
 
@@ -838,7 +839,7 @@ function outcome(r: PublishRequest, base: string): string {
 function sameOrigin(req: FastifyRequest): boolean {
   const o = req.headers.origin;
   if (!o) return false;
-  if (config.allowedOrigins.includes(o)) return true;
+  if (originListed(o)) return true;
   try {
     return new URL(o).host === req.headers.host;
   } catch {

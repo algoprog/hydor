@@ -26,6 +26,10 @@ To take a shot from uncommitted changes, apply them to the worktree before build
 pictures somewhere else to compare first; `--serve` starts the demo app alone until Ctrl+C, to look around (port
 8795, password "a demo password").
 
+Settings → App → Use on your phone runs `tailscale`: the demo app finds the computer's own when it is installed
+(only to read its state, unless a shot presses a button), so point `TAILSCALE_BIN` at a stand-in
+(`server/phone/fake-tailscale.mjs`, copied as `tailscale` and made executable) to show that section; run.mjs passes it on.
+
 The demo's home is its own, so the app finds no Chromium for its pictures (each page's in Pages, screenshots,
 Preview's) unless `PLAYWRIGHT_BROWSERS_PATH` says where Playwright's are (`~/.cache/ms-playwright`); run.mjs
 passes it on. Preview is off in the demo unless `PREVIEW_PORT` gives it a port of its own (the usual 8791 may be
