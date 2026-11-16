@@ -171,7 +171,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
             )}
             {!mobile && s.gitBranch && s.gitBranch !== 'HEAD' && (
               <span className="flex shrink-0 items-center gap-1">
-                · <GitBranch size={12} /> {s.gitBranch}
+                · <GitBranch size={12} /> <span translate="no">{s.gitBranch}</span>
               </span>
             )}
             {s.pr && <PrBadge pr={s.pr} onClick={() => setPrOpen(true)} />}
@@ -477,7 +477,9 @@ function InfoPanel({ s }: { s: SessionSummary }) {
             </button>
           </InfoRow>
         )}
-        {s.gitBranch && s.gitBranch !== 'HEAD' && <InfoRow label="Branch">{s.gitBranch}</InfoRow>}
+        {s.gitBranch && s.gitBranch !== 'HEAD' && <InfoRow label="Branch">
+          <span translate="no">{s.gitBranch}</span>
+        </InfoRow>}
         <InfoRow label="Model">
           {modelLabel(cat, lv?.model ?? s.model)}
           {(lv?.effort ?? s.prefs?.effort) && <span className="text-fg-3"> · {lv?.effort ?? s.prefs?.effort} effort</span>}

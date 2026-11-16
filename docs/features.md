@@ -155,7 +155,7 @@ agents that speak ACP and take MCP servers.
   agent made for it as it is made, or later: drafted to fit it when it says enough about itself, else the template for
   its kind (software, a website, ML experiments, data, a LaTeX paper, research reading, writing, design and media,
   slides) from its files or description, else a default one, named and described in the app's language (English,
-  Chinese or Greek). A task without a folder gets one of its own
+  German, Chinese or Greek). A task without a folder gets one of its own
   (`~/Hydor/<date>-<task>`).
 - **Agent Guidelines**: what you want every agent to follow (how you like to work, what to always or never do,
   how to talk to you), written once and given to every agent by the app itself, whichever it is: Claude Code,
@@ -992,7 +992,7 @@ agents that speak ACP and take MCP servers.
   the background; else, or when the GPU fails, on the processor); replies can be read aloud. Hands-free mode (the
   headphones by the message box) is for walking: say what you want, and it starts, steers and checks sessions,
   answers approvals and reads you the results, telling you when the session it follows finishes or needs you.
-- **Your language**: the app in English, Chinese (Simplified) or Greek (Settings → General → Language), with
+- **Your language**: the app in English, German, Chinese (Simplified) or Greek (Settings → General → Language), with
   dates and times written that way and notifications in it too, and agents write to you in it. Translations
   live in `web/src/i18n`: `npm run i18n:extract` lists every string, the server's messages and what ships with
   the app (skills, connections, search providers) included.

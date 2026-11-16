@@ -136,7 +136,7 @@ export function TrashView() {
                   <span className="max-sm:hidden">Put back</span>
                 </Button>
                 <IconButton
-                  label={`More for ${t.name}`}
+                  label={`More for “${t.name}”`}
                   onClick={(e) => {
                     anchor.current = e.currentTarget;
                     setMenu({ t });
@@ -255,7 +255,7 @@ export function RecentView({ onFile }: { onFile: (path: string) => void }) {
                 </div>
                 {!missing && (
                   <IconButton
-                    label={`More for ${basename(p)}`}
+                    label={`More for “${basename(p)}”`}
                     onClick={(e) => {
                       e.stopPropagation();
                       anchor.current = e.currentTarget;

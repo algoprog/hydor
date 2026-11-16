@@ -199,7 +199,7 @@ function FileMenu({ ctx, f, always }: { ctx: RepoCtx; f: GitFileStatus; always?:
     <>
       <IconButton
         ref={ref}
-        label={`More for ${f.path}`}
+        label={`More for “${f.path}”`}
         size="sm"
         active={open}
         onClick={(e) => {

@@ -75,6 +75,7 @@ The theme is added to your own and used at once. If the text isn't a theme, the 
 [Settings → App → General → Appearance → Language](/settings?s=general&find=Language) is a menu with the languages the app is shown in:
 
 - **English**
+- **Deutsch** (German)
 - **中文（简体）** (Chinese, Simplified)
 - **Ελληνικά** (Greek)
 

@@ -48,8 +48,10 @@ export function WorktreeDialog({ s, open, onClose }: { s: SessionSummary; open: 
         <div className="space-y-4 text-[13.5px]">
           <div className="space-y-1.5 rounded-xl border border-line bg-bg-1 px-3.5 py-3">
             <div className="flex items-center gap-2 font-medium">
-              <GitBranch size={14} className="text-fg-3" /> {st.branch}
-              <span className="font-normal text-fg-3">from {st.base}</span>
+              <GitBranch size={14} className="text-fg-3" /> <span translate="no">{st.branch}</span>
+              <span className="font-normal text-fg-3">
+                from <span translate="no">{st.base}</span>
+              </span>
             </div>
             <div className="truncate font-mono text-[12px] text-fg-3" title={st.path}>
               {tildify(st.path, home)}

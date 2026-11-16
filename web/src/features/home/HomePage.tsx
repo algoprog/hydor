@@ -701,7 +701,10 @@ function StartComposer({
                     <GitBranch size={15} className="shrink-0 text-fg-3" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px] text-fg">
-                        New worktree <span className="text-[12px] text-fg-3">from {repo.branch}</span>
+                        New worktree{' '}
+                        <span className="text-[12px] text-fg-3">
+                          from <span translate="no">{repo.branch}</span>
+                        </span>
                       </span>
                       <span className="block truncate text-[11.5px] text-fg-3">{`A new branch, in a copy of ${folderName(repo.repo, home)}`}</span>
                     </span>

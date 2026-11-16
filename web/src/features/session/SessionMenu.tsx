@@ -116,7 +116,7 @@ function MenuBody({ s, anchor, close, show, confirm, onRename, onFork, onPullReq
         )}
         {s.worktree && (
           <MenuItem icon={<GitBranch size={15} />} onClick={() => (close(), show('worktree'))}>
-            Worktree: {s.worktree.branch}
+            Worktree: <span translate="no">{s.worktree.branch}</span>
           </MenuItem>
         )}
         {s.cwd && (

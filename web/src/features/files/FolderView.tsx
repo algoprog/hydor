@@ -329,7 +329,7 @@ const ListRow = memo(function ListRow({ e, depth, open, picked, picking, focused
       <button
         type="button"
         tabIndex={-1}
-        aria-label={`More for ${e.name}`}
+        aria-label={`More for “${e.name}”`}
         onClick={(ev) => {
           ev.stopPropagation();
           onMenu(ev.currentTarget);
@@ -422,7 +422,7 @@ const Tile = memo(function Tile({
       <button
         type="button"
         tabIndex={-1}
-        aria-label={`More for ${e.name}`}
+        aria-label={`More for “${e.name}”`}
         onClick={(ev) => {
           ev.stopPropagation();
           onMenu(ev.currentTarget);
@@ -864,7 +864,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
         spellCheck={false}
         autoCapitalize="none"
         autoCorrect="off"
-        placeholder={`Find in ${base?.path === dir ? base.label : basename(dir) || 'this folder'}`}
+        placeholder={base?.path === dir ? `Find in “${base.label}”` : basename(dir) ? `Find in “${basename(dir)}”` : 'Find in this folder'}
         aria-label="Find in this folder"
         className="h-8 w-full rounded-lg border border-line bg-bg-1 pr-7 pl-8 text-[13px] outline-none placeholder:text-fg-3 focus:border-accent/60 max-md:h-10 max-md:text-[15px]"
       />
@@ -1131,7 +1131,7 @@ export function FolderView({ dir, onDir, base, select, onFile = openFile, onSear
         ref={listRef}
         tabIndex={0}
         role="grid"
-        aria-label={`What is in ${basename(dir) || dir}`}
+        aria-label={`What is in “${basename(dir) || dir}”`}
         aria-multiselectable
         onKeyDown={onKeyDown}
         onPointerDown={() => keys && setKeys(false)}

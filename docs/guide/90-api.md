@@ -18,7 +18,7 @@ Everything the app's pages do goes through its HTTP API, and agents use the same
 
 These live in the user's browser, one set per device, so they are not in the API. An agent changes them on the devices showing its session, with no card:
 
-- `PUT /device` — Body: `{ theme?: 'dark'|'light'|'system', themeName?: string — a theme's name ("Midnight", "Sage", or one of the user's), language?: 'en'|'zh'|'el' — reloads the page, sound?: boolean — a chime with each notice, enter?: 'join'|'queue' — what Enter does while an agent works, terminalSuggestions?: boolean, sidebar?: boolean — shown on a computer, groupSessions?: boolean — the sidebar's groups for projects and folders (false: the sessions by day only) }`.
+- `PUT /device` — Body: `{ theme?: 'dark'|'light'|'system', themeName?: string — a theme's name ("Midnight", "Sage", or one of the user's), language?: 'en'|'de'|'zh'|'el' — reloads the page, sound?: boolean — a chime with each notice, enter?: 'join'|'queue' — what Enter does while an agent works, terminalSuggestions?: boolean, sidebar?: boolean — shown on a computer, groupSessions?: boolean — the sidebar's groups for projects and folders (false: the sessions by day only) }`.
 
 ## The guide and Agent Guidelines
 
@@ -909,8 +909,8 @@ Settings → Chat apps: each of the three has the same four routes under its own
 
 ## Language (Settings → App → General → Language)
 
-- `GET /api/me/language` — the language agents are asked to write in. Returns: `{ lang: 'en'|'zh'|'el' }`.
-- `PUT /api/me/language` — sets it. Body: `{ lang: 'en'|'zh'|'el' }` (other values are ignored). Returns: `{ lang }`. It reaches agents as they start or resume. The language the pages show is chosen in each browser, and every page sends its own when it opens, which replaces this: to change the app's language, the user picks it in Settings → General.
+- `GET /api/me/language` — the language agents are asked to write in. Returns: `{ lang: 'en'|'de'|'zh'|'el' }`.
+- `PUT /api/me/language` — sets it. Body: `{ lang: 'en'|'de'|'zh'|'el' }` (other values are ignored). Returns: `{ lang }`. It reaches agents as they start or resume. The language the pages show is chosen in each browser, and every page sends its own when it opens, which replaces this: to change the app's language, the user picks it in Settings → General.
 
 ## Updates, startup and the app's switches (Settings → App → General)
 

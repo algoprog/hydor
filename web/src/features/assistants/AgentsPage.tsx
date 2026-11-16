@@ -78,12 +78,12 @@ function AgentCard({ a, spaces }: { a: Assistant; spaces: SpaceView[] | null }) 
         <AssistantIcon icon={a.icon} size={16} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span translate="no" className="min-w-0 flex-1 text-[14px] leading-snug font-semibold break-words">
+            <span translate={a.builtin ? undefined : 'no'} className="min-w-0 flex-1 text-[14px] leading-snug font-semibold break-words">
               {a.name}
             </span>
             <Status s={statusOf(a, act)} />
           </div>
-          <div translate="no" className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-fg-2">
+          <div translate={a.builtin ? undefined : 'no'} className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-fg-2">
             {a.description || a.instructions.slice(0, 160) || tr('No description')}
           </div>
         </div>
@@ -345,7 +345,7 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
         <AssistantIcon icon={a.icon} size={18} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 translate="no" className="text-[18px] font-semibold tracking-tight break-words">
+            <h2 translate={a.builtin ? undefined : 'no'} className="text-[18px] font-semibold tracking-tight break-words">
               {a.name}
             </h2>
             {a.builtin && <Badge>Built in</Badge>}
@@ -613,14 +613,13 @@ export function AgentsPage() {
               <section>
                 <h2 className="mb-2 text-[13px] font-medium text-fg-3">Built in</h2>
                 <div className="flex flex-wrap gap-1.5">
-                  {/* Built-in names and descriptions remain in their original language. */}
+                  {/* Built-in agents are the app's own text and are translated; agents the user made keep their words. */}
                   {builtins.map((a) => (
                     <button
                       key={a.id}
                       type="button"
                       onClick={() => go(`/agents/${enc(a.id)}`)}
                       title={a.description}
-                      translate="no"
                       className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pr-3 pl-1 text-[13px] hover:border-line-2"
                     >
                       <AssistantIcon icon={a.icon} size={12} />

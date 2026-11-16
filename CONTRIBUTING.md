@@ -15,7 +15,7 @@ Much of Hydor can grow without touching its core, and those are the best first c
 - **An app template** (`server/apps/templates*.ts`): a small tool for one job, with a form, steps and a view.
 - **An answer UI** (`shared/answer-ui/`, drawn by `web/src/components/answer/`): a card, chart or table agents fill in
   as they answer.
-- **A translation**: the app is in English, Chinese and Greek (`web/src/i18n/`, `docs/guide/zh/`, `docs/guide/el/`);
+- **A translation**: the app is in English, German, Chinese and Greek (`web/src/i18n/`; the guide is also in Chinese and Greek: `docs/guide/zh/`, `docs/guide/el/`);
   a new language, or better words in one, is welcome.
 - **The guide** (`docs/guide/`): what it says wrong or leaves out.
 
