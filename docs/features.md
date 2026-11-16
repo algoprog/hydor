@@ -112,9 +112,14 @@ agents that speak ACP and take MCP servers.
   error) runs again a tier up (its later replies, to messages, are not checked), as far as Best, the lead told why, and a scheduled run that fails goes again a tier up, unless the
   agent turns it off; hands
   back results: the fields of each (an app's answer fields: text, numbers, dates, links, lists, tables), checked by its
-  hand_back tool, sent to a file in its folder (Markdown or JSON, with {date}, {time} and {agent} in the name), a page
-  in the Library, an https webhook (signed with a vault key, to the hosts it allows) and a notification, and listed on
-  its page with where each went; can keep one conversation of its own, with an inbox: messages from you and other
+  hand_back tool, sent to a page in the Library (the same page each run as a new version of it, or a new page each
+  run), a row in a Library spreadsheet each run (when it ran, then a column per field, found by their headings: new
+  fields add columns at the end, the person's own columns, formats and formulas stay, formulas carry down and charts
+  over the rows grow), an email to people from a connected mail account (HTML and plain text, a subject with {date},
+  {time} and {agent}, sent at once without the Outbox), a file in its folder (Markdown or JSON, with {date}, {time} and
+  {agent} in the name), an https webhook (signed with a vault key, to the hosts it allows) and a notification; kept for a
+  year (up to 500 an agent) and shown on its page as a table, a row per result and a column per field, with where each
+  went, paged, each row opening to the whole result (`hydor agents results` too); can keep one conversation of its own, with an inbox: messages from you and other
   agents go in one at a time and each answer goes back to its sender, its scheduled runs post there too; and keeps
   to a monthly budget, which caps each of its sessions at what is left and refuses new ones once it is spent. A
   project's Agents tab shows its agents as a team (what starts each, whom it hands work to), and a project can have an

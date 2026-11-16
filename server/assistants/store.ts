@@ -10,6 +10,7 @@ import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { BUILTINS } from './builtins.ts';
+import { forgetResults } from './results.ts';
 
 const MINE = 'assistants.mine';
 const TONE = 'assistants.tone';
@@ -21,12 +22,38 @@ export const MAX_INSTRUCTIONS = 20_000;
 export const MAX_TONE = 600;
 
 function mine(db: DB): Assistant[] {
+  let list: Assistant[];
   try {
     const v = JSON.parse(kvGet(db, MINE) ?? '[]');
-    return Array.isArray(v) ? v : [];
+    list = Array.isArray(v) ? v : [];
   } catch {
     return [];
   }
+  if (!settled.has(db)) {
+    settled.add(db);
+    list = keepNewPages(db, list);
+  }
+  return list;
+}
+
+const EACH_NEW = 'assistants.libraryEachNew';
+const settled = new WeakSet<DB>();
+
+/**
+ * Once: agents saved before a Library target could update one page kept making a new page each run, so they keep doing
+ * so (each: 'new'); a Library target saved since updates the same page unless it says otherwise.
+ */
+function keepNewPages(db: DB, list: Assistant[]): Assistant[] {
+  if (kvGet(db, EACH_NEW) === '1') return list;
+  let changed = false;
+  const out = list.map((a) => {
+    if (!a.output?.to?.some((t) => t.kind === 'library' && !t.each && !t.page)) return a;
+    changed = true;
+    return { ...a, output: { ...a.output, to: a.output.to.map((t) => (t.kind === 'library' && !t.each && !t.page ? { kind: 'library' as const, each: 'new' as const } : t)) } };
+  });
+  if (changed) putMine(db, out);
+  kvSet(db, EACH_NEW, '1');
+  return out;
 }
 
 const putMine = (db: DB, list: Assistant[]) => kvSet(db, MINE, JSON.stringify(list));
@@ -42,14 +69,47 @@ const str = (v: unknown, max: number) =>
     .slice(0, max);
 const names = (v: unknown, max: number) => (Array.isArray(v) ? [...new Set(v.map((x) => str(x, 120)).filter(Boolean))].slice(0, max) : []);
 
-/** Where an agent's results go, checked: paths inside its folder, https addresses, a key's name; at most eight. */
+/** An email address as people type it ("anna@example.org", or "Anna Berg <anna@example.org>"), checked loosely. */
+const MAIL = /^[^\s@<>()",;:]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+export const isMailAddress = (s: string) => {
+  const bare = /<([^<>]+)>\s*$/.exec(s)?.[1] ?? s;
+  return MAIL.test(bare.trim()) && !/[\r\n]/.test(s);
+};
+
+/** A Library page's id as a target names it; none for anything else. */
+const pageId = (v: unknown) => {
+  const s = str(v, 80);
+  return /^[\w-]+$/.test(s) ? s : undefined;
+};
+
+/**
+ * Where an agent's results go, checked: paths inside its folder, https addresses, a key's name, email addresses; at
+ * most eight, one of each kind but files and webhooks.
+ */
 function targetsOf(v: unknown): OutputTarget[] {
   if (!Array.isArray(v)) return [];
   const out: OutputTarget[] = [];
+  const once = (k: OutputTarget['kind']) => !out.some((t) => t.kind === k);
   for (const t of v.slice(0, 8)) {
     const x = (t ?? {}) as Record<string, unknown>;
-    if (x.kind === 'library' || x.kind === 'notify') out.push({ kind: x.kind });
-    else if (x.kind === 'file') {
+    if (x.kind === 'notify' && once('notify')) out.push({ kind: 'notify' });
+    else if (x.kind === 'library' && once('library')) {
+      const page = pageId(x.page);
+      out.push({ kind: 'library', ...(x.each === 'new' ? { each: 'new' as const } : page ? { page } : {}) });
+    } else if (x.kind === 'sheet' && once('sheet')) {
+      const page = pageId(x.page);
+      const tab = str(x.tab, 31).replace(/[[\]:*?/\\]/g, '').trim();
+      out.push({ kind: 'sheet', ...(page ? { page } : {}), ...(tab ? { tab } : {}) });
+    } else if (x.kind === 'email' && once('email')) {
+      const to = [...new Set((Array.isArray(x.to) ? x.to.map(String) : String(x.to ?? '').split(/[,;\n]/)).map((s) => s.trim()).filter(Boolean))];
+      if (!to.length) throw new HttpError(400, 'Say who the email goes to: one address or more');
+      if (to.length > 20) throw new HttpError(400, 'An email of results goes to at most 20 people');
+      const bad = to.find((a) => !isMailAddress(a) || a.length > 200);
+      if (bad) throw new HttpError(400, `“${bad.slice(0, 80)}” is not an email address`);
+      const subject = str(x.subject, 200).replace(/[\r\n]+/g, ' ');
+      const account = str(x.account, 200);
+      out.push({ kind: 'email', to, ...(subject ? { subject } : {}), ...(account ? { account } : {}) });
+    } else if (x.kind === 'file') {
       const p = str(x.path, 300).replace(/\\/g, '/');
       if (!p || path.isAbsolute(p) || p.split('/').includes('..')) throw new HttpError(400, 'A file it writes to is a path inside the folder it works in, like reports/{date}.md');
       out.push({ kind: 'file', path: p });
@@ -158,6 +218,7 @@ export function saveAssistant(db: DB, b: Partial<Record<keyof Assistant, unknown
 
 export function removeAssistant(db: DB, id: string) {
   if (BUILTINS.some((a) => a.id === id)) throw new HttpError(400, 'Built-in agents cannot be deleted');
+  forgetResults(db, id);
   // Agents that could ask it no longer can.
   putMine(
     db,

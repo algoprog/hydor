@@ -1,39 +1,30 @@
 // What an agent hands back, and where it goes. An agent with an output (fields to fill in, places to send each result)
 // gets hand_back in its sessions: the result is checked against its fields as an app's answer is (the agent fixes what
-// the check says and calls again), then written to a file in its folder, kept as a page in the Library, posted to a
-// webhook (signed with a key from the vault, only to the hosts the key is allowed for) and sent as a notification, as
-// its output says. The last results are kept with the agent, for its page.
+// the check says and calls again), then written to a file in its folder, kept as a page in the Library (the same page
+// each run, as a new version, or a new page each run), added as a row to a Library spreadsheet (resultSheet.ts),
+// emailed to people from a connected mail account (resultMail.ts), posted to a webhook (signed with a key from the
+// vault, only to the hosts the key is allowed for) and sent as a notification, as its output says. Every result is kept
+// in the agent's history (results.ts), for its page.
 import fs from 'node:fs';
 import path from 'node:path';
-import { hasOutput, outputFields, type AgentResult, type Assistant, type OutputTarget } from '../../shared/assistants.ts';
+import { hasOutput, outputFields, type AgentResult, type Assistant, type OutputTarget, type ResultSent } from '../../shared/assistants.ts';
 import { answerSchema, checkAnswer, type AnswerField } from '../../shared/apps.ts';
 import type { Agent, NotifyEvent } from '../../shared/types.ts';
 import { httpCall } from '../connections/http.ts';
 import { readSecret, touchSecret } from '../connections/vault.ts';
-import { kvGet, kvSet, type DB } from '../db.ts';
+import type { DB } from '../db.ts';
 import type { Deps, RunCtx, RunTool } from '../features/types.ts';
-import { createPage } from '../pages/store.ts';
+import { readBook } from '../pages/sheets.ts';
+import { addVersion, createPage, pageInfo, pageSource } from '../pages/store.ts';
+import { refreshThumbs } from '../pages/thumbs.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { resultMail, sendMailOfResult } from './resultMail.ts';
+import { keepResult, madeOf, PLACE, setMade } from './results.ts';
+import { userLang } from '../language/index.ts';
+import { addResultRow, resultsBook, SHEET_WORDS } from './resultSheet.ts';
 import { findAssistant } from './store.ts';
 
-const KEEP = 20;
-const resultsKey = (id: string) => `assistants.results.${id}`;
-
-/** The results an agent handed back lately, newest first. */
-export function resultsOf(db: DB, id: string): AgentResult[] {
-  try {
-    const v = JSON.parse(kvGet(db, resultsKey(id)) ?? '[]');
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
-}
-
-function keepResult(db: DB, id: string, r: AgentResult) {
-  // Kept short: the list shows a line, and a big table is in the places it went.
-  const small = JSON.stringify(r.value).length > 20_000 ? { note: 'Too long to keep here: see where it went.' } : r.value;
-  kvSet(db, resultsKey(id), JSON.stringify([{ ...r, value: small }, ...resultsOf(db, id)].slice(0, KEEP)));
-}
+export { resultsOf } from './results.ts';
 
 // ---- in words ----------------------------------------------------------------------------------------------
 
@@ -146,23 +137,78 @@ interface Delivery {
   fields: AnswerField[];
   value: Record<string, unknown>;
   markdown: string;
+  now?: Date;
 }
 
-async function deliver(t: OutputTarget, x: Delivery): Promise<string> {
-  const now = new Date();
+/** The Library changed: its lists and an open editor hear of it, and the page's picture is taken again. */
+function libraryChanged(x: Delivery, id: string) {
+  x.deps.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
+  refreshThumbs(x.deps as Deps, [id]);
+}
+
+/**
+ * The page a place that keeps one page goes to: the one picked (`picked`, by id), else the one its first run made, while
+ * it is there and of its kind; null when there is none yet (a new one is made). `gone`: the one picked is not there.
+ */
+function pageFor(x: Delivery, kind: 'library' | 'sheet', picked?: string): { id: string | null; gone: boolean } {
+  const fits = (id: string) => {
+    const p = pageInfo(x.db, id);
+    if (!p) return false;
+    if (kind === 'sheet' ? p.kind !== 'sheet' : !!p.kind) throw new Error(`“${p.title}” is not ${kind === 'sheet' ? 'a spreadsheet' : 'a page'}: pick another in its settings`);
+    return true;
+  };
+  if (picked && fits(picked)) return { id: picked, gone: false };
+  const made = madeOf(x.db, x.agent.id)[kind];
+  return { id: made && fits(made) ? made : null, gone: !!picked };
+}
+
+const pageHtmlOf = (title: string, markdown: string) =>
+  `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body class="n-page"><h1>${esc(title)}</h1>\n${markdownHtml(markdown)}</body></html>`;
+
+async function deliver(t: OutputTarget, x: Delivery): Promise<Omit<ResultSent, 'kind' | 'ok'>> {
+  const now = x.now ?? new Date();
   if (t.kind === 'file') {
     const file = targetPath(x.cwd, t.path, x.agent, now);
     if (!file) throw new Error(`${t.path} leads out of the folder it works in`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, file.endsWith('.json') ? `${JSON.stringify(x.value, null, 2)}\n` : `${x.markdown}\n`);
-    return file;
+    return { detail: file };
   }
   if (t.kind === 'library') {
-    const title = `${x.agent.name} · ${stamp(now).date}`;
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body class="n-page"><h1>${esc(title)}</h1>\n${markdownHtml(x.markdown)}</body></html>`;
-    const p = createPage(x.db, { title, html, by: 'agent', sessionKey: x.key, space: x.space ?? null, description: `What ${x.agent.name} handed back on ${stamp(now).date}` });
-    x.deps.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
-    return `the Library, as "${p.title}"`;
+    const heading = `${x.agent.name} · ${stamp(now).date}`;
+    const html = pageHtmlOf(heading, x.markdown);
+    if (t.each === 'new') {
+      const p = createPage(x.db, { title: heading, html, by: 'agent', sessionKey: x.key, space: x.space ?? null, description: `What ${x.agent.name} handed back on ${stamp(now).date}` });
+      libraryChanged(x, p.id);
+      return { detail: `the Library, as "${p.title}"`, page: p.id };
+    }
+    // The same page each run, as a new version of it: made by the first run, named after the agent.
+    const { id, gone } = pageFor(x, 'library', t.page);
+    const p = id
+      ? addVersion(x.db, id, { html, by: 'agent' })
+      : createPage(x.db, { title: x.agent.name, html, by: 'agent', sessionKey: x.key, space: x.space ?? null, description: `What ${x.agent.name} handed back last: a new version each run` });
+    if (!id) setMade(x.db, x.agent.id, 'library', p.id);
+    libraryChanged(x, p.id);
+    return { detail: `the Library, "${p.title}" version ${p.version}${gone ? ' (the page picked is no longer there)' : ''}`, page: p.id };
+  }
+  if (t.kind === 'sheet') {
+    // Read, add the row and save with nothing in between, so two runs at once each add their own.
+    const { id, gone } = pageFor(x, 'sheet', t.page);
+    const src = id ? pageSource(x.db, id) : null;
+    const words = SHEET_WORDS[userLang(x.db)] ?? SHEET_WORDS.en;
+    const r = addResultRow(src ? readBook(src.text) : resultsBook(t.tab || words.tab), { tab: src ? t.tab : undefined, fields: x.fields, value: x.value, at: now, when: words.when });
+    const p = id
+      ? addVersion(x.db, id, { model: r.book, by: 'agent' })
+      : createPage(x.db, { title: x.agent.name, kind: 'sheet', model: r.book, by: 'agent', sessionKey: x.key, space: x.space ?? null, description: `What ${x.agent.name} handed back: a row for each run` });
+    if (!id) setMade(x.db, x.agent.id, 'sheet', p.id);
+    libraryChanged(x, p.id);
+    return { detail: `"${p.title}", row ${r.row} of ${r.tab}${r.added.length && id ? ` (new columns: ${r.added.join(', ')})` : ''}${gone ? ' (the spreadsheet picked is no longer there)' : ''}`, page: p.id };
+  }
+  if (t.kind === 'email') {
+    const mail = resultMail(t, x.agent, { fields: x.fields, markdown: x.markdown, html: markdownHtml(x.markdown), now, lang: userLang(x.db) });
+    const r = await sendMailOfResult(x.db, t.account, mail);
+    if (!r.accepted.length && r.rejected.length) throw new Error(`the mail server refused ${r.rejected.join(', ')}`);
+    return { detail: `an email to ${(r.accepted.length ? r.accepted : mail.to).join(', ')}${r.rejected.length ? ` (refused: ${r.rejected.join(', ')})` : ''}${r.note ? `. ${r.note}` : ''}` };
   }
   if (t.kind === 'webhook') {
     const body = JSON.stringify({ agent: { id: x.agent.id, name: x.agent.name }, session: x.key, at: now.toISOString(), result: x.value });
@@ -175,7 +221,7 @@ async function deliver(t: OutputTarget, x: Delivery): Promise<string> {
     }
     const r = await httpCall({ method: 'POST', url: t.url, headers: { 'content-type': 'application/json' }, body, ...(auth ? { auth } : {}) }, { timeoutMs: 30_000, maxBytes: 200_000 });
     if (r.status >= 400) throw new Error(`${new URL(t.url).host} answered ${r.status} ${r.statusText}`);
-    return `${new URL(t.url).host} (${r.status})`;
+    return { detail: `${new URL(t.url).host} (${r.status})` };
   }
   const line = x.markdown.split('\n').find((l) => l.trim() && !l.startsWith('#')) ?? 'A new result';
   x.deps.sessions.emit('notify', {
@@ -189,7 +235,7 @@ async function deliver(t: OutputTarget, x: Delivery): Promise<string> {
     agent: x.program,
     at: Date.now(),
   } satisfies NotifyEvent);
-  return 'a notification';
+  return { detail: 'a notification' };
 }
 
 /** Hands a checked result on to every place its agent's output names; what happened at each. */
@@ -197,7 +243,7 @@ export async function handOn(x: Delivery): Promise<AgentResult['sent']> {
   const sent: AgentResult['sent'] = [];
   for (const t of x.agent.output?.to ?? []) {
     try {
-      sent.push({ kind: t.kind, ok: true, detail: await deliver(t, x) });
+      sent.push({ kind: t.kind, ok: true, ...(await deliver(t, x)) });
     } catch (e) {
       sent.push({ kind: t.kind, ok: false, detail: (e as Error).message || 'it failed' });
     }
@@ -207,17 +253,26 @@ export async function handOn(x: Delivery): Promise<AgentResult['sent']> {
 
 // ---- the tool ----------------------------------------------------------------------------------------------
 
-const PLACE: Record<OutputTarget['kind'], string> = { file: 'a file', library: 'the Library', webhook: 'a webhook', notify: 'a notification' };
+/** A place an agent's results go, in words for it: which file, which page, who an email goes to. */
+export function placeWords(t: OutputTarget): string {
+  if (t.kind === 'file') return `the file ${t.path}`;
+  if (t.kind === 'library') return t.each === 'new' ? 'a new page in the Library each time' : 'a page in the Library, updated each time';
+  if (t.kind === 'email') return `an email to ${t.to.join(', ')}`;
+  return PLACE[t.kind];
+}
 
 /** What an agent with an output is told, in its instructions. */
 export function outputNote(a: Assistant): string {
   if (!hasOutput(a)) return '';
   const fields = outputFields(a.output);
-  const to = (a.output?.to ?? []).map((t) => (t.kind === 'file' ? `the file ${t.path}` : PLACE[t.kind]));
+  const to = (a.output?.to ?? []).map(placeWords);
+  const has = (k: OutputTarget['kind']) => a.output?.to?.some((t) => t.kind === k);
   return [
     `When you finish a task, hand back its result with hand_back: ${fields.map((f) => `${f.id} (${f.label}, ${f.type}${f.required ? ', required' : ''})`).join('; ')}.`,
     'It is checked: when it answers with problems, fix them and call it again with every field.',
     to.length ? `It then goes to ${to.join(', ')}, as the user set it up.` : '',
+    has('sheet') ? 'Each result becomes a row of a spreadsheet, a column for each field: give numbers as plain numbers (no units or words in them) and dates as dates, so they add up and chart over time.' : '',
+    has('email') ? 'It is emailed to people as it is: write it for them to read, complete in itself.' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -230,7 +285,7 @@ export function handBackTool(ctx: RunCtx): RunTool | null {
   const fields = outputFields(a.output);
   return {
     name: 'hand_back',
-    description: `Hand back the result of your task as ${a.name}: one object with its fields. It is checked; if it answers with problems, fix them and call again. It then goes where the user set ${a.name}'s results to go${a.output?.to?.length ? ` (${a.output.to.map((t) => PLACE[t.kind]).join(', ')})` : ''}.`,
+    description: `Hand back the result of your task as ${a.name}: one object with its fields. It is checked; if it answers with problems, fix them and call again. It then goes where the user set ${a.name}'s results to go${a.output?.to?.length ? ` (${a.output.to.map(placeWords).join('; ')})` : ''}, and is kept in ${a.name}'s history of results.`,
     inputSchema: answerSchema(fields),
     async run(args, c) {
       const now = findAssistant(c.deps.db, sessionExtra(c.deps.db, c.key).assistant);

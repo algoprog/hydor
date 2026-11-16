@@ -369,12 +369,8 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
         }}
       />
 
-      {(a.standing || hasOutput(a)) && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {a.standing && <InboxPanel a={a} />}
-          {hasOutput(a) && <ResultsPanel a={a} />}
-        </div>
-      )}
+      {a.standing && <InboxPanel a={a} />}
+      {hasOutput(a) && <ResultsPanel a={a} />}
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-line bg-panel p-4">
           <div className="mb-2 flex items-center gap-2">

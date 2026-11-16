@@ -439,7 +439,7 @@ export function EditAssistant({ value, onClose, onSaved }: { value: Draft | null
           </label>
         </Field>
         <Field label="Hands back" hint="The fields of each result, checked when it hands one back (hand_back), and where each goes.">
-          <OutputEditor value={d.output} onChange={(output) => set({ output })} />
+          <OutputEditor value={d.output} onChange={(output) => set({ output })} agent={{ id: d.id, name: d.name ?? '' }} />
         </Field>
       </div>
     </Dialog>
