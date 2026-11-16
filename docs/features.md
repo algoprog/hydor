@@ -104,7 +104,7 @@ agents that speak ACP and take MCP servers.
   the helper model: its instructions, tools, tier and a schedule, read as sentences whose underlined words change it in
   place; **All settings** has every setting; Claude Code's agent files import. An agent works everywhere or only in
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
-  listed on its page); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
+  listed on its page, and on a week with every other task in the page's Schedules tab); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for
   Claude Code, Codex and Custom (Automatic keeps the model picked where it starts); hands parts of its work to other
   agents: plain subagents on a tier the lead picks (never above its own, nor the highest its agent allows) or named agents
   with their own settings, only those its Team lists (built-in agents may ask any), never a freer mode than the lead's;
@@ -1274,6 +1274,12 @@ programs shows each program's version and what is out, with Check now, Update no
   for runs at the next chance; the desktop apps keep the computer awake from a few minutes before a run is due until
   it starts. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
+  Schedules (the Agents page's tab, Settings → Scheduled tasks → Week view) shows everything that runs by itself,
+  scheduled tasks, agents' and apps' schedules, watchers and webhooks, on a week or a month in your time zone: each
+  run that happened as a block at its time coloured by how it went (opening its session or its app run), the runs to
+  come drawn faintly with their names, what runs more than eight times a day, watchers and webhooks as one band a
+  day with counts, five at once gathered under "+N", each day's cost, filters by kind, and a list of them all with
+  the last result, the next run, a pause switch and a link to where each is changed; on a phone, a day at a time.
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
   usage limits is on); one you stopped yourself never does.

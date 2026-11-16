@@ -31,6 +31,7 @@ An agent is a role a session takes on. Text that every agent should follow in ev
 Open **Agents** in the sidebar, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first. [Settings → Capabilities → Your agents](/settings?s=assistants&find=Your%20agents) has a **Your agents** row that opens this page too (it says how many agents are your own); the rest of that section is about task folders and clean-up, below.
 
 - **New agent**, at the top, makes one (see [Make an agent](#make-an-agent)); **Import** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)).
+- Two tabs under the title: **Your agents**, this page, and **Schedules**, everything that runs by itself on a week: your agents' schedules with your other scheduled tasks, your apps' schedules, watchers and webhooks, each run coloured by how it went, what runs next, and a list of them all with a switch to pause each (see [See the week: what ran and what runs next](/guide/tasks#see-the-week-what-ran-and-what-runs-next)).
 - Your agents show as cards. Each card has the agent's name, its line, how it is doing (**Working**, **Needs you** when one of its sessions waits for your answer, **Budget spent**, or **Idle**), the projects it works in (or **Everywhere**), its tier, when it runs next, how many messages wait in its inbox, and what it spent this month.
 - Chips above the cards show **All**, **Everywhere**, each project that has agents of its own, **On a schedule** and **Needs you**.
 - The agents that come with the app are under **Built in**.
@@ -251,7 +252,7 @@ An agent works when you start a session as it, when another agent hands it work,
 - Click a schedule in the list to change it, pause it or run it now.
 - A schedule drafted with a new agent is made with it.
 
-Every schedule is also in [Settings → Agents → Scheduled tasks](/settings?s=tasks), with all the others; a task's **Agent** option is the agent its runs work as.
+Every schedule is also in [Settings → Agents → Scheduled tasks](/settings?s=tasks), with all the others; a task's **Agent** option is the agent its runs work as. The [**Schedules**](/agents/schedules) tab at the top of the Agents page shows them on a week with every other task: what ran, how it went and what runs next, with **Agent ·** and the agent's name on each in its list; its pencil opens the agent's page.
 
 ## What an agent thinks with: tiers
 
@@ -467,6 +468,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "Make my Bookkeeper add a row with this week's spending and its biggest items to my Household budget spreadsheet every Friday."
 - "Have my Weekly report agent email its report to maria@example.com every Monday, with the subject Weekly report {date}."
 - "What did my Bookkeeper hand back this month, and how much did it add up to?"
+- "Which of my agents run by themselves tomorrow morning, and when?"
 - "Let my Docs keeper keep one conversation of its own, and send it: update the guide for the new Agents page."
 - "Switch my session about the Lisbon trip to the Planner agent."
 - "Put new task folders in ~/Documents/Tasks from now on."

@@ -13,6 +13,7 @@ import { nextRuns } from './schedule.ts';
 import { automationTools, decide, getProposal, migrateProposals, noteSpawn } from './tools.ts';
 import { checkWatch, validWatch } from './watch.ts';
 import { findOf, useAccountDeps, watchAccounts } from './account-watch.ts';
+import { scheduleWeek } from './week.ts';
 
 const home = (p: string) => (!p || p === '~' ? os.homedir() : p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p);
 
@@ -29,6 +30,13 @@ export const automations: Feature = {
     app.get('/api/automations/tasks/:id/runs', async (req) => ({ runs: scheduler.runs(id(req), 50) }));
     app.get('/api/automations/runs/:id', async (req) => ({ run: scheduler.run1(id(req)) }));
     app.post('/api/automations/runs/:id/rerun', async (req) => scheduler.rerun(id(req)));
+    // Schedules: everything that runs by itself over a week or a month, what ran and what will (the Agents page's view).
+    app.get('/api/automations/week', async (req) => {
+      const q = (req.query ?? {}) as { start?: string; days?: string };
+      return scheduleWeek(d.db, scheduler.list(), { tz: userTimezone(d.db), now: Date.now(), start: q.start || undefined, days: q.days ? Number(q.days) : undefined });
+    });
+    // Pause a task or turn it on (its switch, wherever it shows).
+    app.post('/api/automations/tasks/:id/enabled', async (req) => ({ task: scheduler.setEnabled(id(req), body(req).on === true) }));
     // The notepad a task's runs keep.
     app.get('/api/automations/tasks/:id/notes', async (req) => ({ text: scheduler.notes(id(req)) }));
     app.put('/api/automations/tasks/:id/notes', async (req) => ({ text: scheduler.setNotes(id(req), String(body(req).text ?? '')) }));

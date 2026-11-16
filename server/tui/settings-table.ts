@@ -405,6 +405,10 @@ row('plugins', 'From a .zip file', 'command', { command: 'hydor plugins add' });
 row('plugins', 'Pack into a .zip', 'page', { note: 'The page downloads a plugin as one file.' });
 row('plugins', 'Claude Code', 'page', { note: 'Claude Code’s own plugins and marketplaces are managed on the page.' });
 row('plugins', 'Codex', 'page', { note: 'Codex’s own plugins and marketplaces are managed on the page.' });
+row('tasks', 'Week view', 'command', {
+  command: 'hydor tasks list',
+  note: 'The week of what ran and what runs next is a page (Agents → Schedules); hydor tasks list shows each task with its next run and how the last one went.',
+});
 for (const [label, what] of [
   ['New task', 'Agent work that starts by itself'],
   ['Start from an example', 'Ready-made scheduled tasks'],
