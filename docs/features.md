@@ -40,6 +40,18 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   on a phone they are one row that scrolls sideways. Under them, Today in a line: "Today · 7 sessions · 12 file
   edits · $0.84", the money at API prices, which on a plan is not what you pay (its hover says so, with the lines,
   tokens and prompts).
+- While you were away, under the start page's message box (above the starter ideas): what happened since your last
+  visit, folded to a line, what matters first ("1 needs you · 1 failed · 3 done · next: Morning brief at 07:30 · Since
+  yesterday 18:40"), each part opening it to just those (on a phone the whole line opens it, the time in the opened
+  header). Open, up to six rows, most important first:
+  what waits on you (approvals, questions, forms and calls held in the Outbox answered right there with the Inbox's
+  own cards), sessions that finished Done or Failed and that you have not opened since (the start of the last reply or
+  the error, and the files made, each opening in Files), runs of scheduled tasks, agents' schedules and apps with how
+  they went (done, failed, nothing new) and their cost, and what runs next today. It stays folded until you open it,
+  and as you left it on each device; Mark all as seen clears it and marks its sessions as opened on every device. Your last visit is kept on
+  the server for every device: the end of the last time the app was open, in front and in use for a minute or more
+  (a reload or a glance does not move it). How each session's turn ended is kept when it ends; one route gives it all
+  (GET /api/away); `hydor away` in a terminal; another machine on an older version shows none.
 - Sessions name themselves: a moment after one starts with a request, the helper model gives it a title of a few
   words ("Weekend trip to Lisbon"), shown in the sidebar, the header and the search box instead of the start of the
   message, and passed to Claude Code and Codex for their own lists. Nothing shows in the conversation; sessions
@@ -1335,7 +1347,7 @@ programs shows each program's version and what is out, with Check now, Update no
   snooze, move, fork, goal, share, changes, commands, the queue, delete; marks show what each is doing), projects and
   their documents, guidelines, agents, memory (notes, forgetting and restoring, your profile), skills, plugins, MCP
   servers, the vault's keys (a value is never typed as an option or printed), the inbox and the Outbox (send a held
-  call as it is or with fields changed, or drop it), experiments, scheduled
+  call as it is or with fields changed, or drop it), what happened while you were away (`hydor away`, and `seen`), experiments, scheduled
   tasks, apps, the Library, connections and accounts, machines, models, tiers and plan usage. Each takes ids, the
   start of an id, or names, asks before removing, and has `--json`. `hydor settings` reads and changes every option
   of the Settings page (`list`, `get`, `set`, `run` for buttons, `open`; alone on a terminal it is a browser of the

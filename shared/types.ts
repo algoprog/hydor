@@ -372,6 +372,11 @@ export interface SessionSummary {
   /** When a turn last finished, and when the session was last looked at: newer `doneAt` means unread. */
   doneAt?: number;
   seenAt?: number;
+  /**
+   * When its latest turn ended, however it ended (failed or quick ones too, which `doneAt` leaves out): looking at the
+   * session after that marks it seen, so the start page's "While you were away" does not list it.
+   */
+  endedAt?: number;
   /** Messages waiting for the running turn to end; `queueHeld` after you stopped the agent (or a restart). */
   queue?: QueuedMessage[];
   queueHeld?: boolean;

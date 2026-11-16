@@ -31,6 +31,7 @@ import { AccountPicker } from './AccountPicker';
 import { AgentPicker } from './AgentPicker';
 import { ExploreButton } from './ExploreButton';
 import { Starters } from './Starters';
+import { Away } from './Away';
 import { machineId } from '../../lib/machine';
 import { FeatureComposerButtons, FeatureStartOptions } from '../registry';
 import { taskFolderFor, useAssistantDefaults, useTaskFolder, WorkFolderChip } from '../assistants/start';
@@ -726,6 +727,8 @@ function StartComposer({
           Enter to start · Shift+Enter for a new line
         </div>
       )}
+      {/* What happened since your last visit: folded to a line, open when something waits on you; gone when there is nothing. */}
+      <Away />
       {/* Examples, your apps and an automation while the box is empty (until hidden), leaning towards code in a code folder. */}
       {startersOn && !text.trim() && !atts.length && <Starters place={!task && repo ? 'code' : space ? 'project' : 'any'} onFill={fill} />}
     </div>
