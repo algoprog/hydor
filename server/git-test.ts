@@ -580,7 +580,8 @@ await test('find what broke it: the method finds the planted commit in a worktre
   sh(wt, 'checkout', '-q', 'agent/find-what-broke-sum-1a2b');
   sh(wt, 'bisect', 'start', head, 'v1.0');
   const out = execFileSync('git', ['bisect', 'run', 'sh', check], { cwd: wt, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  assert.match(out, new RegExp(`^${culprit} is the first bad commit`, 'm'));
+  // Git versions differ in whether they quote the word bad.
+  assert.match(out, new RegExp(`^${culprit} is the first '?bad'? commit`, 'm'));
   assert.match(out, /Accept empty arguments/);
   // Only the worktree was bisecting: the user's own checkout stayed where it was.
   assert.equal(sh(calc, 'rev-parse', 'HEAD'), head);
