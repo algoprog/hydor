@@ -2,13 +2,15 @@
 // itself, working (its storage is the page's own), with Open for Pages. publish_site: a card that
 // needs the user, private or public link, Publish or Not now; then the link, or what happened.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppWindow, ChevronRight, Expand, ExternalLink, FileText, Globe, GlobeLock, NotebookText, PenLine, Presentation, Sheet, Sigma, Workflow } from 'lucide-react';
+import { AppWindow, ChevronRight, Expand, ExternalLink, FileText, GitCompareArrows, Globe, GlobeLock, NotebookText, PenLine, Presentation, Sheet, Sigma, Workflow } from 'lucide-react';
 import type { PublishRequest, SiteVisibility } from '@shared/pages';
 import type { ToolInfo, ToolItem } from '@shared/types';
 import { api, enc, post } from '../../lib/api';
 import { bytes, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
-import { toastError, useApp } from '../../lib/store';
+import { portalToken } from '../../lib/machine';
+import { toast, toastError, useApp } from '../../lib/store';
+import { tr } from '../../i18n/runtime';
 import { CopyButton } from '../../components/Markdown';
 import { Button, cx, IconButton, Segmented, Throbber, useMediaQuery } from '../../components/ui';
 import { editPage, SmallPageCard, useOpensBeside, usePicks } from '../session/HtmlPage';
@@ -164,6 +166,26 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
   const max = kind === 'slides' ? Math.max(fit, 900) : fit;
   const noun = kind === 'slides' ? 'the slides' : kind === 'doc' ? 'the document' : kind === 'sheet' ? 'the spreadsheet' : kind === 'tex' ? 'the LaTeX document' : kind === 'notebook' ? 'the notebook' : kind === 'diagram' ? 'the diagram' : 'the page';
   const status = saving ? ' · saving a new version…' : ref && !current ? ' · a newer one is there' : '';
+  // A spreadsheet this turn changed (every save of it named one already there): what changed, against the version
+  // before the turn's first save (its saves in a row are one version, store.ts addVersion).
+  const changed =
+    kind === 'sheet' &&
+    !!ref &&
+    !saving &&
+    !portalToken &&
+    [item, ...(more ?? [])].every((m) => /page_action$/.test(m.tool.name) || typeof (m.tool.input as { id?: unknown } | undefined)?.id === 'string');
+  const seeChanged = async () => {
+    if (!ref) return;
+    const first = Math.min(...[item, ...(more ?? [])].map((m) => savedRef(m.tool.output)).flatMap((x) => (x && x.id === ref.id ? [x.version] : [])));
+    try {
+      const r = await api<{ page: { version: number }; versions: { version: number }[] }>(`/api/pages/${enc(ref.id)}`);
+      const prev = r.versions.filter((v) => v.version < first).sort((a, b) => b.version - a.version)[0];
+      if (!prev) return void toast(tr('The version before this turn is no longer kept.'));
+      go(`/pages/${ref.id}?compare=${prev.version}${ref.version !== r.page.version ? `&v=${ref.version}` : ''}`);
+    } catch (e) {
+      toastError(e);
+    }
+  };
   if (item.tool.status === 'error') return <Note>{`Could not save ${noun}`}: {failure(item)}</Note>;
   if (wide && besideOpen) {
     // What is being written, and how much of the call has come (nothing to count for an agent that hands over whole calls).
@@ -181,7 +203,7 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
                 ? `Drawing the diagram${size}`
                 : `Writing the page${size}`
       : `Saved in the Library · version ${ref?.version ?? 1}${status}`;
-    return (
+    const card = (
       <SmallPageCard
         sessionKey={sessionKey}
         item={item}
@@ -192,6 +214,16 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
         also={more?.map((m) => m.id)}
         pageId={current ? ref?.id : undefined}
       />
+    );
+    if (!changed || writing) return card;
+    return (
+      <>
+        {card}
+        <button type="button" onClick={() => void seeChanged()} className="tl-item -mt-0.5 mb-1 flex items-center gap-1.5 px-1 text-[12.5px] font-medium text-fg-3 hover:text-accent">
+          <GitCompareArrows size={14} />
+          See what changed
+        </button>
+      </>
     );
   }
   if (writing && deck) {
@@ -264,6 +296,11 @@ export function SavedPageCard({ item, sessionKey, more }: { item: ToolItem; sess
           </span>
         </button>
         <div className="flex shrink-0 items-center gap-0.5">
+          {changed && (
+            <Button size="sm" variant="ghost" icon={<GitCompareArrows size={14} />} onClick={() => void seeChanged()} title="See what changed" aria-label="See what changed" className="h-8 px-2.5">
+              <span className="hidden sm:inline">See what changed</span>
+            </Button>
+          )}
           <Button size="sm" variant="subtle" onClick={open} className="h-8 px-2.5">
             Open
           </Button>

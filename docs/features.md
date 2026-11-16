@@ -714,7 +714,13 @@ agents that speak ACP and take MCP servers.
   and paste with Excel, Google Sheets and web tables (their bold, italic, underline, colours, alignment and number
   formats come along; cells cut move for real: the formulas, names, charts and rules that used
   them follow), cells, rows and columns moved by dragging (Ctrl to copy; references follow), and the sum, average and
-  count of what is picked. Find and replace with regular expressions, within the cells picked or across sheets; a list of every
+  count of what is picked. Compare with the version before (or any version, or See what changed under the agent's turn
+  that changed it): the sheet with what changed marked in place (cells whose value or formula changed, number formats
+  and looks alone, formulas whose results changed with them, rows and columns added and the ones removed where they
+  were, tabs added, removed or renamed), the changes listed with what each was and is and a click to its cell, counts on
+  top, rows lined up by a key column or by what they hold so a row put in marks only itself, Put back the version (a new
+  version: nothing is lost) and Put this back on one cell, row, column or tab (a change to undo or save); agents get the
+  same list in words (page_action compare). Find and replace with regular expressions, within the cells picked or across sheets; a list of every
   function with its help (Insert → Function → All functions…); Ctrl+wheel to zoom; Ctrl+P for the print setup; an
   Excel, ODS, CSV or TSV file dropped on the editor adds its sheets. AI in them uses the
   helper model, saying what it costs: the AI function (=AI(prompt, cells…), as Google Sheets has it: each answer
