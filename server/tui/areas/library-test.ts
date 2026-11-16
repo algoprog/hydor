@@ -263,6 +263,47 @@ test('list on a narrow terminal: where it is, size and change go whole, the id i
   assert.match(w[40][2], /^doc +Q3 report +d0c1111111$/, 'the id is whole');
 });
 
+test('what refreshes on the boards, and a card or a whole board refreshed now', async () => {
+  const board = { id: 'b0d7777777', title: 'Shop', version: 4, versions: 4, bytes: 3000, storageBytes: 0, createdAt: now, updatedAt: now - 60_000, kind: 'board' };
+  const r = {
+    ...routes,
+    'GET /api/pages': { pages: [board, ...pages], folders },
+    'GET /api/boards/refreshes': {
+      boards: [{ id: board.id, title: 'Shop', cap: 5, spentUsd: 1.2, reached: false }],
+      cards: [
+        { board: board.id, boardTitle: 'Shop', card: 'c1', title: 'Weekly sales', ui: 'chart', when: 'every day at 07:00', tier: 'quick', perRefreshUsd: 0.04, refreshedAt: now - 3600_000, nextAt: now + 5 * 3600_000 },
+        { board: board.id, boardTitle: 'Shop', card: 'c2', title: 'Visitors', ui: 'stats', when: 'every hour', tier: 'quick', lastError: 'the agent answered without a card' },
+      ],
+    },
+    'GET /api/pages/b0d7777777': {
+      page: board,
+      model: {
+        format: 1,
+        cards: [
+          { id: 'c1', ui: 'chart', title: 'Weekly sales', size: 'l', pinnedAt: now, data: {} },
+          { id: 'c2', ui: 'stats', size: 's', pinnedAt: now, data: { title: 'Visitors' } },
+        ],
+      },
+    },
+    'POST /api/boards/b0d7777777/cards/c2/refresh': { runId: 'r1', key: 'claude:k1' },
+    'POST /api/boards/b0d7777777/refresh': { started: 2, skipped: [] },
+  };
+  const { conn, calls } = fakeConn(r);
+  const t = await run(conn, ['library', 'refreshes'], { width: 160 });
+  assert.match(t.out, /Weekly sales\s+Shop\s+every day at 07:00\s+quick\s+~\$0\.04\s+1h ago\s+next in 5h/);
+  assert.match(t.out, /Visitors\s+Shop\s+every hour\s+quick\s+\?\s+not yet\s+failed: the agent answered without a card/);
+  assert.match(t.out, /Shop: \$1\.20 of its \$5 cap this month/);
+  assert.equal(((await run(conn, ['library', 'refreshes', '--json'])).json[0] as { cards: unknown[] }).cards.length, 2);
+  assert.match((await run(conn, ['library', 'refresh', 'shop', '2'])).out, /Refreshing “Visitors” on “Shop”/);
+  assert.match((await run(conn, ['library', 'refresh', 'shop', 'visit'])).out, /Refreshing “Visitors”/);
+  assert.ok(calls.filter((c) => c.method === 'POST' && c.path.endsWith('/cards/c2/refresh')).length === 2, 'by its number or the start of its title');
+  assert.match((await run(conn, ['library', 'refresh', 'shop'])).out, /Refreshing 2 cards of “Shop”/);
+  await assert.rejects(run(conn, ['library', 'refresh', 'shop', 'nothing']), (e) => e instanceof UsageError && /has no card “nothing”/.test((e as Error).message));
+  await assert.rejects(run(conn, ['library', 'refresh', 'Budget']), (e) => e instanceof UsageError && /is not a board/.test((e as Error).message));
+  const none = fakeConn({ ...r, 'GET /api/boards/refreshes': { boards: [], cards: [] } });
+  assert.match((await run(none.conn, ['library', 'refreshes'])).out, /No board card refreshes yet/);
+});
+
 test('show prints the whole id even where the list had to cut it', async () => {
   const { conn } = fakeConn({ ...routes, 'GET /api/pages/d0c1111111/export?format=md': '# Q3\n\nRevenue grew.\n' });
   const cut = await atWidths(conn, ['library'], [24]);

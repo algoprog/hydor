@@ -25,6 +25,8 @@
 //   GET  /p-api/:token/pages/:id/thumb, GET /p-api/:token/pages/assets/:sha, POST /p-api/:token/pages/assets, GET /p-api/:token/pages/videos/:sha, GET /p-api/:token/pages/:id/export,
 //   GET  /p-api/:token/pages/tex/setup, POST …/tex/compile, GET …/tex/:key/(pdf|sync|place|:page)   the editors' own calls
 //   GET  /p-api/:token/pages/picture?url=   a picture a shared board's card shows, from the web (only an address the board holds)
+//   POST /p-api/:token/answers/data         { board, ui, data } a shared board's card that reads a spreadsheet or a file, its
+//                                           data worked out with the owner's access (only a source one of its cards names)
 import fs from 'node:fs';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { newCommentId, type Comment } from '../../shared/comments.ts';
@@ -50,6 +52,9 @@ import { EXPORT_TYPES, exportPage, type ExportFormat } from '../pages/export.ts'
 import { compileTex, forEditor, texPagePicture, texPdfFile, texPlaceOf, texSetup, texSourceAt } from '../pages/latex.ts';
 import { addVersion, changeComments, listPages, pageComments, pageHtml, pageInfo, pageModel, pageSource, storageOp } from '../pages/store.ts';
 import { serveWebPicture } from '../pages/index.ts';
+import { readBoard } from '../pages/boards.ts';
+import { cardData } from '../answers/data.ts';
+import { answerUi } from '../../shared/answer-ui/index.ts';
 import { getVideo, sendVideo } from '../pages/videos.ts';
 import { codeOf, sameCode, webAddressesOf } from '../pages/html-code.ts';
 import { isDesignHtml, withDesignKit } from '../../shared/design.ts';
@@ -632,6 +637,28 @@ export function portalRoutes(d: Deps) {
     return serveWebPicture(url, reply);
   });
 
+  // A shared board's card that reads its numbers from a spreadsheet or a file (answers/data.ts), drawn for the person: the
+  // source read with the owner's access as the board's own page reads it, but only for a card the board holds, whose own
+  // data (what it reads, its filter, its sort) is used rather than what the request says. Nothing else is read for them,
+  // and no path of the owner's computer goes back.
+  app.post('/p-api/:token/answers/data', { bodyLimit: 256 * 1024 }, async (req) => {
+    const p = person(req);
+    const b = (req.body ?? {}) as { board?: unknown; ui?: unknown; data?: unknown };
+    const page = itemOf(db, p, b.board);
+    if (page.kind !== 'board') throw new HttpError(404, 'This link does not open that');
+    const name = (u: unknown) => {
+      const n = typeof u === 'string' ? u.trim().toLowerCase() : '';
+      return answerUi(n)?.id ?? n;
+    };
+    const want = sortedJson(b.data);
+    const card = readBoard(pageSource(db, page.id)!.text).cards.find((c) => name(c.ui) === name(b.ui) && sortedJson(c.data) === want);
+    if (!card) throw new HttpError(403, 'Not a card of this board');
+    take(p, 'card-data', 600, 'Too many of this board’s cards were read lately.');
+    const got = await cardData(db, name(card.ui), card.data, { board: page.id });
+    const source = got.source.kind === 'file' ? { kind: 'file' as const, name: got.source.name, mtime: got.source.mtime } : { ...got.source, id: '' };
+    return { ...got, source };
+  });
+
   app.get('/p-api/:token/pages/:id/thumb', async (req, reply) => {
     const p = person(req);
     const page = itemOf(db, p, P(req).id);
@@ -888,4 +915,10 @@ export function portalRoutes(d: Deps) {
       return reply.code(404).send({ error: 'A shared link does not open that' });
     },
   });
+}
+
+/** JSON with every object's keys in order: two values that hold the same read the same. */
+function sortedJson(v: unknown): string {
+  const walk = (x: unknown): unknown => (Array.isArray(x) ? x.map(walk) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x as object).sort().map((k) => [k, walk((x as Record<string, unknown>)[k])])) : x);
+  return JSON.stringify(walk(v)) ?? '';
 }

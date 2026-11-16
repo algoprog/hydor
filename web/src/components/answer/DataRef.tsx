@@ -14,6 +14,7 @@ import { LOCALE } from '../../i18n/locale';
 import { tr } from '../../i18n/runtime';
 import { api } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
+import { viaLink } from '../../lib/machine';
 import { goApp, openFile } from '../../lib/nav';
 import { cx } from '../ui';
 import { Card, fmtNum, isObj, str, type Data } from './kit';
@@ -125,8 +126,9 @@ function readAtText(ms: number): string {
   }
 }
 
-/** Opens a card's source: the spreadsheet in the Library, or the file in the file viewer. */
+/** Opens a card's source: the spreadsheet in the Library, or the file in the file viewer (not at a shared link: the source is the owner's). */
 function openSource(s: CardSource) {
+  if (viaLink) return;
   if (s.kind === 'sheet' && s.id) goApp(`/pages/${s.id}`);
   else if (s.path) openFile(s.path);
 }
@@ -141,6 +143,9 @@ export function FromLine({ card, loading, again }: { card: CardData; loading: bo
       <Icon size={12} className="shrink-0" aria-hidden />
       <span>
         {tr('Data from')}{' '}
+        {viaLink ? (
+          <span className="font-medium text-fg-2">{where}</span>
+        ) : (
         <a
           href={s.kind === 'sheet' && s.id ? `/pages/${s.id}` : `/file?path=${encodeURIComponent(s.path ?? '')}`}
           onClick={(e) => {
@@ -152,6 +157,7 @@ export function FromLine({ card, loading, again }: { card: CardData; loading: bo
         >
           {where}
         </a>
+        )}
       </span>
       <span aria-hidden>·</span>
       <span>{tr('read at {0}').replace('{0}', readAtText(card.readAt))}</span>

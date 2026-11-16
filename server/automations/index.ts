@@ -30,10 +30,11 @@ export const automations: Feature = {
     app.get('/api/automations/tasks/:id/runs', async (req) => ({ runs: scheduler.runs(id(req), 50) }));
     app.get('/api/automations/runs/:id', async (req) => ({ run: scheduler.run1(id(req)) }));
     app.post('/api/automations/runs/:id/rerun', async (req) => scheduler.rerun(id(req)));
-    // Schedules: everything that runs by itself over a week or a month, what ran and what will (the Agents page's view).
+    // Schedules: everything that runs by itself over a week or a month, what ran and what will (the Agents page's view),
+    // board cards' refreshes too.
     app.get('/api/automations/week', async (req) => {
       const q = (req.query ?? {}) as { start?: string; days?: string };
-      return scheduleWeek(d.db, scheduler.list(), { tz: userTimezone(d.db), now: Date.now(), start: q.start || undefined, days: q.days ? Number(q.days) : undefined });
+      return scheduleWeek(d.db, scheduler.list({ boards: true }), { tz: userTimezone(d.db), now: Date.now(), start: q.start || undefined, days: q.days ? Number(q.days) : undefined });
     });
     // Pause a task or turn it on (its switch, wherever it shows).
     app.post('/api/automations/tasks/:id/enabled', async (req) => ({ task: scheduler.setEnabled(id(req), body(req).on === true) }));

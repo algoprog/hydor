@@ -979,13 +979,13 @@ A note says where it went, with **Open**. The board keeps a copy of the card as 
 
 ### Arrange a board
 
-A board opens in the Library like anything else kept, its cards drawn just as they were in the reply, in the light or dark theme you use. On a computer they sit in a grid of twelve columns; on a narrower window, in two; on a phone, one under the other. Above each card are its title and a line such as "Pinned 2 days ago · from Weekly sales report": click the conversation's name to open it at that reply.
+A board opens in the Library like anything else kept, its cards drawn just as they were in the reply, in the light or dark theme you use. On a computer they sit in a grid of twelve columns; on a narrower window, in two; on a phone, one under the other. Above each card are its title and a line such as "Pinned 2 days ago · from Weekly sales report": click the conversation's name to open it at that reply. When the card shows the same title as its own heading, the line above it leaves the title out, so you read it once. A card that keeps itself up to date says when it was last updated instead ([Keep cards up to date](#keep-cards-up-to-date)).
 
 Point at a card (on a phone, its buttons always show) for:
 
 - **Size**: **S** (a quarter of the width), **M** (a third), **L** (half) or **Wide** (the whole width).
 - **Full screen**: the card alone, as wide as fits.
-- **More** (…): **Rename** (or double-click its title), **Move up** and **Move down**, **Save as picture**, **Open the conversation** (or the app's run, or the scheduled task, it came from) and **Remove** (a note has **Undo**).
+- **More** (…): **Refresh now** and **Keep it up to date…** ([Keep cards up to date](#keep-cards-up-to-date)), **Rename** (or double-click its title), **Move up** and **Move down**, **Save as picture**, **Open the conversation** (or the app's run, or the scheduled task, it came from) and **Remove** (a note has **Undo**).
 
 On a computer, drag a card by the handle at the left of its title to move it. Each change is saved at once, as a new version: **Versions** at the top shows them all and brings an earlier one back ([Go back to an earlier version](#go-back-to-an-earlier-version)). **Save the board as a picture**, the picture button at the top, saves the whole board as a PNG, as it shows (not while a card holds a map, a figure or a player).
 
@@ -995,7 +995,27 @@ A board with no cards yet says how to fill it.
 
 **New** in the Library, then **Board** ([or New board from the search box](/library?new=board)), makes an empty board to pin cards to; or pin a card to **New board…**. Or ask an agent: "make me a board of my GPU usage, my experiments and the weather", or "pin this to my Shop board". It makes the cards and puts them on the board, at the sizes that suit them; the cards it adds say they came from its conversation. Agents can also change a board's cards for you: "bring my Shop board up to date", "make the weather card wide".
 
-A board shares, exports and moves like anything else in the Library: **Share** gives people a link to look at it (they see its cards as you do, and change nothing: [Share with people](#share-with-people)); **Export** saves its cards' titles and data as text and tables, as a **PDF**, **Markdown (.md)** or a **Web page (.html)**; **More** (⋯) has **Duplicate**, **Move to a project** and **Delete**.
+A board shares, exports and moves like anything else in the Library: **Share** gives people a link to look at it (they see its cards as you do, and change nothing: [Share with people](#share-with-people)); **Export** saves its cards' titles and data as text and tables, as a **PDF**, **Markdown (.md)** or a **Web page (.html)**; **More** (⋯) has **Duplicate**, **Move to a project** and **Delete**. At a shared link, a card that reads its numbers from one of your spreadsheets or data files shows them too: the app reads that source for the person, and nothing else of yours. Cards that keep themselves up to date show their latest data there, with when it was updated; only you can refresh them.
+
+### Keep cards up to date
+
+A card keeps a copy of what it showed when you pinned it. To have it brought up to date for you, an agent can ask its question again, on a schedule or when you say, and draw the card anew with what it finds. (A card that reads its numbers from a spreadsheet or a data file needs none of this: it reads them each time the board opens.)
+
+1. Open the card's **More** (…) and pick **Keep it up to date…**.
+2. **The question** is what the agent finds out each time. For a card you pinned, it starts as the request it came from: change it as you like ("How are this week's sales going, by day?").
+3. **How often**: **When I ask** (only with **Refresh now**), **Every hour**, **Every day**, **Weekdays** or **Every week**, at a time (and for every week, on a day) in your time zone.
+4. **The agent thinks with**: **Quick** (the cheapest, and enough for most cards), **Standard**, **Best** or **Max**.
+5. Before you save, the box under them says about what one refresh costs and what that comes to a month, from what this card's refreshes cost before, or else what refreshes on that tier cost. Click **Save**, or **Save and refresh now**.
+
+Each refresh runs an agent in a conversation of its own that stays out of your list, and it sends nothing: whatever it would send, post or pay is held instead, as in a test that sends nothing. Its answer must be a card of the same kind, with data that fits it; then the card's data is replaced, as a new version of the board, and nothing else on the board changes.
+
+On the board, a card that refreshes says so in the line above it: "Updated 07:00 · ≈$0.04 · every day at 07:00" (when it was last updated, about what a refresh costs, how often). While a refresh runs, the line says **Updating…**. **Refresh now** in its **More** (…) runs one at once; **Refresh all**, at the top of the board, refreshes every card that keeps itself up to date. **Stop refreshing** (in **More**, or in its settings) turns it off; the card keeps what it shows.
+
+When a refresh fails (the agent could not find what the card needs, or answered with another kind of card), the card keeps its last good data, and a line above it says "Could not update:" and why, with **Try again**. After three failed refreshes in a row, the card's schedule pauses and says so, and you get one notice; **Try again** that works turns it on again.
+
+**What it costs, and a cap**: each board has a monthly cap for its refreshes, $5 unless you change it. The coin button at the top of the board shows what its refreshes spent this month of it ("$1.20 of $5"): click it to change the cap, or pick **No cap**. When the cap is reached, refreshes stop until the month ends, the board says so at the top (with **Raise the cap**), and you get one notice. Each refresh's conversation is also capped at what is left.
+
+Refreshes show in [Agents → Schedules](/agents/schedules) with everything else that runs by itself, as the board's ([See the week](/guide/tasks#see-the-week-what-ran-and-what-runs-next)): each run, how it went and what it cost. Its switch there pauses a card's schedule too. On a phone, the same buttons are on the card and at the top of the board.
 
 ## Make pictures, drawings, plots and videos with AI
 
@@ -1531,3 +1551,6 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Make me a board of my GPU usage, my experiments and the weather in Amherst."
 - "Pin this chart to my Shop board, wide."
 - "Bring every card on my Shop board up to date, and put the sales chart first."
+- "Keep the weather card on my Shop board updated every morning at 7."
+- "What refreshes on my Shop board, when, and what does it cost a month?"
+- "Stop refreshing the visitors card, and make the sales chart refresh on weekdays with Standard."
