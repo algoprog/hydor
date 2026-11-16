@@ -36,6 +36,7 @@ const nameOf = (t: ShareTarget) => (t.kind === 'project' ? t.space.name : t.titl
 function whatTheyDo(t: ShareTarget, role: ShareRole): string {
   if (t.kind === 'project') return '';
   if (t.kind === 'page' && t.pageKind === 'notebook') return 'A notebook is shared to read: it never runs through a link.';
+  if (t.kind === 'page' && t.pageKind === 'board') return 'A board is shared to read: they see its cards as you do, and change nothing.';
   const k = t.kind === 'media' ? t.mediaKind : t.design ? 'design' : (t.pageKind ?? 'page');
   if (role === 'comment')
     return ({

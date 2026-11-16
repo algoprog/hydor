@@ -47,6 +47,7 @@ const TOOLS: Record<string, { icon: ReactNode; text: string }> = {
   save_slides: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
   save_latex: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
   save_diagram: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
+  save_board: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
   save_page: { icon: <LibraryBig size={14} />, text: 'Keeps what it makes in your Library' },
 };
 

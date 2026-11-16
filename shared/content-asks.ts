@@ -16,7 +16,7 @@ export const NEW_START: Record<'deck' | 'doc' | 'page' | 'sheet' | 'design' | 'd
 };
 
 /** The kinds of page the Library holds, as "Turn it into" names them. */
-export type PageKindName = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
+export type PageKindName = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
 /** What Turn it into makes. */
 export type TurnTo = 'slides' | 'doc' | 'page' | 'diagram';
 
@@ -29,6 +29,7 @@ export const TURN_INTO: Record<PageKindName, TurnTo[]> = {
   tex: ['slides', 'doc', 'page', 'diagram'],
   notebook: ['slides', 'doc', 'page', 'diagram'],
   diagram: ['slides', 'doc', 'page'],
+  board: ['slides', 'doc', 'page'],
 };
 
 /** Where it goes and what it is made for: as much of it as the editor or the New dialog knows. */
@@ -102,13 +103,13 @@ export function composeAsk(t: ContentType | null, words: string, c: ComposeConte
   return `${start}${what}${named}${look}${design}${diagram}${into}${lang}`;
 }
 
-const NOUN: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram' };
+const NOUN: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram', board: 'board' };
 
 /** The request that makes another kind from something in the Library, which stays as it is. */
 export function turnAsk(o: { from: PageKindName; to: TurnTo; id: string; title: string; folder?: string }): string {
   const noun = NOUN[o.from];
   const mine = `my ${noun} “${quoted(o.title)}” (saved page ${o.id})`;
-  const numbers = o.from === 'sheet' || o.from === 'notebook';
+  const numbers = o.from === 'sheet' || o.from === 'notebook' || o.from === 'board';
   const body =
     o.to === 'diagram'
       ? `Make a diagram from ${mine} and keep it in my Library: read it with get_page, then draw what it says with save_diagram, as the diagram that shows it best: its steps and decisions as a flowchart, its parts and how they connect as a block or architecture diagram, its ideas as a mind map, its people as an org chart, its stages as a timeline${numbers ? ', its table’s rows as shapes and the links between them as connectors' : ''}; short words in each shape, a calm palette, one look for each kind of thing.`

@@ -1,17 +1,19 @@
 // What an answer card's toolbar adds beside Show the data and Copy as text: Full screen (the card alone over the page,
-// as wide as fits, scrolling when tall) and, under its "…", Save as picture (a PNG of the card as it looks, in the theme
-// it shows in, at twice its size) and Copy as picture where the browser lets a page put pictures on the clipboard.
+// as wide as fits, scrolling when tall) and, under its "…", Pin to a board (PinToBoard.tsx), Save as picture (a PNG of
+// the card as it looks, in the theme it shows in, at twice its size) and Copy as picture where the browser lets a page
+// put pictures on the clipboard.
 //
 // The picture is drawn from the card's own HTML, SVG and canvases by modern-screenshot, loaded the first time one is
 // made. A card with a frame inside (a map, a Plotly figure, a video's player, code's output) cannot be drawn so: the
 // frame's content is out of the page's reach, so such a card has no picture buttons rather than one with a hole in it.
 import { useRef, useState, type ReactNode } from 'react';
-import { ClipboardCopy, Ellipsis, ImageDown } from 'lucide-react';
+import { ClipboardCopy, Ellipsis, ImageDown, Pin } from 'lucide-react';
 import { tr } from '../../i18n/runtime';
 import { toast, toastError } from '../../lib/store';
 import { PageOverlay } from '../../features/pages/overlay';
 import { BarButton } from '../Markdown';
-import { MenuItem, Popover } from '../ui';
+import { MenuItem, MenuSep, Popover } from '../ui';
+import { PinPane, type PinCard } from './PinToBoard';
 
 /** Whether a card can be drawn as a picture: nothing in it is a frame (a map, a figure, a player), whose content the page cannot read. */
 export const picturable = (el: HTMLElement | null) => !!el && !el.querySelector('iframe,embed,object');
@@ -96,15 +98,21 @@ export async function copyPicture(el: HTMLElement) {
   }
 }
 
-/** The "…" on a card's toolbar: Save as picture, and Copy as picture where the browser can. `card` gives the card's element. */
-export function PictureMenu({ card, title }: { card: () => HTMLElement | null; title: string }) {
+/**
+ * The "…" on a card's toolbar: Pin to a board (`pin`: what it pins; none where there is no Library to pin to), then Save
+ * as picture and Copy as picture where the card can be one (`pictures`) and the browser can. `card` gives its element.
+ */
+export function CardMenu({ card, title, pictures, pin }: { card: () => HTMLElement | null; title: string; pictures: boolean; pin?: PinCard }) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [pinning, setPinning] = useState(false);
   const run = (fn: (el: HTMLElement) => unknown) => () => {
     setOpen(false);
     const el = card();
     if (el) fn(el);
   };
+  const close = () => (setOpen(false), setPinning(false));
+  if (!pin && !pictures) return null;
   return (
     <>
       <button
@@ -114,19 +122,33 @@ export function PictureMenu({ card, title }: { card: () => HTMLElement | null; t
         aria-label={tr('More')}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((x) => !x)}
+        onClick={() => (open ? close() : setOpen(true))}
         className="inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
       >
         <Ellipsis size={13} />
       </button>
-      <Popover anchor={anchor} open={open} onClose={() => setOpen(false)} align="end" width={210}>
-        <MenuItem icon={<ImageDown size={15} />} onClick={run((el) => savePicture(el, title))}>
-          {tr('Save as picture')}
-        </MenuItem>
-        {canCopyPicture() && (
-          <MenuItem icon={<ClipboardCopy size={15} />} onClick={run(copyPicture)}>
-            {tr('Copy as picture')}
-          </MenuItem>
+      <Popover anchor={anchor} open={open} onClose={close} align="end" width={pinning ? 280 : 210}>
+        {pinning && pin ? (
+          <PinPane card={pin} onBack={() => setPinning(false)} onDone={close} />
+        ) : (
+          <>
+            {pin && (
+              <MenuItem icon={<Pin size={15} />} submenu onClick={() => setPinning(true)}>
+                {tr('Pin to a board')}
+              </MenuItem>
+            )}
+            {pin && pictures && <MenuSep />}
+            {pictures && (
+              <MenuItem icon={<ImageDown size={15} />} onClick={run((el) => savePicture(el, title))}>
+                {tr('Save as picture')}
+              </MenuItem>
+            )}
+            {pictures && canCopyPicture() && (
+              <MenuItem icon={<ClipboardCopy size={15} />} onClick={run(copyPicture)}>
+                {tr('Copy as picture')}
+              </MenuItem>
+            )}
+          </>
         )}
       </Popover>
     </>

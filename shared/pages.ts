@@ -66,8 +66,8 @@ export interface PageInfo {
   thumb?: string;
   /** Published at a link. */
   published?: boolean;
-  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts), a Jupyter notebook (shared/notebook.ts), a diagram (shared/diagram.ts). */
-  kind?: 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
+  /** Another kind than a page of HTML: slides (shared/slides.ts), a document (shared/docs.ts), a spreadsheet (shared/sheets.ts), LaTeX (shared/latex.ts), a Jupyter notebook (shared/notebook.ts), a diagram (shared/diagram.ts), a board of answer cards (shared/boards.ts). */
+  kind?: 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
   /** A template's screen: the template it belongs to (it is not in the library). */
   app?: string;
   /** The space it is in (the Library shows each space's together); none when unset. */
