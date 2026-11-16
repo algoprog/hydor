@@ -467,7 +467,9 @@ export async function seedApi(api, home, now, s) {
   await api('POST', '/api/plugins/library-docs/disable').catch(() => {});
 
   const space = async (b) => (await api('POST', '/api/projects', b)).id ?? (await api('GET', '/api/projects')).spaces.find((x) => x.name === b.name)?.id;
-  const thesis = await space({ name: 'Thesis', color: 'violet', description: 'Chapter drafts, sources and the defense in March', instructions: 'Cite in APA 7. My advisor prefers short paragraphs and plain words.' });
+  // Its folder is the one its session works in.
+  fs.mkdirSync(path.join(home, 'Hydor/Projects/thesis'), { recursive: true });
+  const thesis = await space({ name: 'Thesis', color: 'violet', description: 'Chapter drafts, sources and the defense in March', folder: path.join(home, 'Hydor/Projects/thesis'), instructions: 'Cite in APA 7. My advisor prefers short paragraphs and plain words.' });
   const garden = await space({ name: 'The garden', color: 'green', description: 'Beds, seeds and the greenhouse', instructions: 'We live in Portland, Maine (zone 5b). No chemical sprays.' });
   const taxes = await space({ name: 'Taxes 2026', color: 'amber', description: 'Receipts, forms and deadlines', instructions: 'Amounts in EUR. I am self-employed in Greece.' });
   const shopSpace = await space({ name: 'Shop website', color: 'blue', description: 'The online shop’s API and storefront', folder: path.join(home, 'code/shop-api'), assistant: 'coder' });
@@ -489,6 +491,28 @@ export async function seedApi(api, home, now, s) {
   await note('Prices are integers in cents: round once, at the end of a calculation.', 'repo', path.join(home, 'code/shop-api'));
   await note('Shortlist so far: Velora Ridge E5 and Urbana Climb 2; budget $2,000.', 'session', s.ebike.key);
   // Alex's profile: what every agent gets at the start of a session (Settings → Memory → Your profile).
+  // The Thesis project's own notes and wiki memory (its Memory tab): the wiki is files in the hub, where the app keeps a
+  // project's wiki unless Settings say otherwise (<hub>/projects/<name>-<id>); what new documents did is in wikiData.
+  const thesisFolder = (await api('GET', '/api/projects')).spaces.find((x) => x.id === thesis)?.folder;
+  if (thesisFolder) {
+    await note('Chapter 3 is about the interviews: quote librarians by role, not by name.', 'repo', thesisFolder);
+    await note('Cite in APA 7; the advisor wants short paragraphs and plain words.', 'repo', thesisFolder);
+    await note('From the library survey: 62% of the towns surveyed have a single branch.', 'repo', thesisFolder);
+  }
+  const wikiDir = path.join((await api('GET', '/api/wiki/settings')).hubPath, 'projects', `thesis-${thesis.replace(/^sp/, '').replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 6)}`);
+  const wikiFiles = {
+    'wiki/public-libraries-in-small-towns.md': ['Public libraries in small towns', ['raw/articles/library-survey-2024.md', 'raw/articles/maple-falls-interview.md'], 'Small towns keep one branch open for fewer hours than a city library, and most depend on a few volunteers.\n\n## What the survey found\n\n- 62% of the towns surveyed have a single branch.\n- The median branch is open 28 hours a week.\n- Programs for children and for older readers are the most used.\n\nSee also [Survey methods](survey-methods.md) and [Interviews with librarians](interviews-with-librarians.md).'],
+    'wiki/survey-methods.md': ['Survey methods', ['raw/articles/library-survey-2024.md'], 'The 2024 survey went to 214 town libraries by mail and e-mail, with a response rate of 41%.\n\nQuestions covered opening hours, staff, volunteers, budget and programs. Answers are the librarians’ own reports, not audited figures.'],
+    'wiki/interviews-with-librarians.md': ['Interviews with librarians', ['raw/articles/maple-falls-interview.md'], 'Six librarians were interviewed between January and March.\n\n- Funding is the first worry in every interview.\n- Volunteers run the weekend hours in four of the six towns.\n- The library is the only public place with free internet in two towns.\n\nLinked to [Public libraries in small towns](public-libraries-in-small-towns.md).'],
+    'raw/articles/library-survey-2024.md': ['Library survey 2024', [], 'Survey of 214 town libraries: results by question, with the questionnaire.'],
+    'raw/articles/maple-falls-interview.md': ['Maple Falls librarian interview', [], 'Interview, 41 minutes, with the head librarian of Maple Falls.'],
+  };
+  for (const [rel, [title, sources, body]] of Object.entries(wikiFiles)) {
+    const file = path.join(wikiDir, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const front = ['---', `title: ${JSON.stringify(title)}`, ...(sources.length ? ['sources:', ...sources.map((x) => `  - ${x}`)] : []), 'updated: 2026-11-10', '---'];
+    fs.writeFileSync(file, `${front.join('\n')}\n\n# ${title}\n\n${body}\n`);
+  }
   await api('PUT', '/api/memory/profile', {
     text: [
       'Alex: self-employed graphic designer in Portland, Maine; files taxes in Greece, amounts in EUR.',
@@ -687,6 +711,21 @@ export function awayData(db, s, now) {
     const id = task(name);
     if (id) run.run(crypto.randomBytes(8).toString('hex'), id, at - 3 * MIN, at, status, summary, cost, key);
   }
+}
+
+/** What new and changed documents did to the Thesis project's memory (its Memory tab → Wiki → Recent updates), as the app keeps it. */
+export function wikiData(db, spaces, now) {
+  db.exec(`create table if not exists wiki_updates (
+    id integer primary key autoincrement, space text, base text not null, document text not null, path text not null,
+    at integer not null, articles text not null, notes integer not null default 0, error text
+  )`);
+  const add = db.prepare('insert into wiki_updates (space, base, document, path, at, articles, notes, error) values (?, ?, ?, ?, ?, ?, ?, ?)');
+  const rows = [
+    ['Budget tables 2019–2024', 'budget-tables.xlsx', now - 26 * HOUR, [], 0, 'Nothing in it to add to the wiki or to memory'],
+    ['Interview notes: Maple Falls', 'interviews/maple-falls.docx', now - 3 * HOUR, ['wiki/interviews-with-librarians.md'], 1, null],
+    ['Library survey 2024', 'library-survey-2024.pdf', now - 40 * MIN, ['wiki/public-libraries-in-small-towns.md', 'wiki/survey-methods.md'], 2, null],
+  ];
+  for (const [document, file, at, articles, notes, error] of rows) add.run(spaces.thesis, 'demo', document, file, at, JSON.stringify(articles), notes, error);
 }
 
 // ---- answered to the page ---------------------------------------------------------------------------

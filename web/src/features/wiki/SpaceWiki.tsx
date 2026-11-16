@@ -7,8 +7,9 @@ import type { ProjectWikiView, WikiItem, WikiUpdate } from '@shared/wiki';
 import { Markdown } from '../../components/Markdown';
 import { Button, Throbber } from '../../components/ui';
 import { api, enc } from '../../lib/api';
-import { ago } from '../../lib/format';
+import { ago, tildify } from '../../lib/format';
 import { go } from '../../lib/nav';
+import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { wikiDocument, wikiRelative } from './SpaceWikiPaths';
 
@@ -59,6 +60,7 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
 }
 
 export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWikiView | undefined; version: number }) {
+  const home = useApp((s) => s.boot?.home);
   const [selected, setSelected] = useState<string | null>(null);
   const [file, setFile] = useState<WikiFile | null>(null);
   const [error, setError] = useState('');
@@ -161,7 +163,7 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
       {view && on && view.status !== 'error' && !ready && <p className="text-[13px] text-fg-3">Nothing here yet. Agents add to it as they work, and new documents update it.</p>}
       {view && on && view.root && (
         <p className="text-[12px] break-all text-fg-3">
-          <span>Folder</span>: <span translate="no">{view.root}</span>
+          <span>Folder</span>: <span translate="no">{tildify(view.root, home)}</span>
         </p>
       )}
       {error && (
