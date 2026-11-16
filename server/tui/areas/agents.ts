@@ -14,7 +14,7 @@ import { choose, fields, flag, markdown, num, pickOne, str, strs, table, UsageEr
 
 const AGENT_HINT = 'hydor agents lists them';
 const agent = { name: 'agent', kind: 'agent', pick: true } as const;
-const TOOLS = ['read', 'edit', 'run', 'web', 'mcp'];
+const TOOLS = ['read', 'edit', 'run', 'web', 'browser', 'computer', 'mcp'];
 const TIERS = ['quick', 'standard', 'best', 'max'];
 const MODES = ['ask', 'edits', 'full', 'plan'];
 
@@ -41,7 +41,7 @@ const FIELD_OPTIONS: Record<string, OptionSpec> = {
   model: { type: 'string', value: '<model>', desc: 'The model it suggests, in that program’s names' },
   tier: { type: 'string', value: '<tier>', desc: 'The tier it thinks with (auto: Automatic)', values: [...TIERS, 'auto'] },
   'helper-max': { type: 'string', value: '<tier>', desc: 'The highest tier of the subagents it starts (auto: any)', values: [...TIERS, 'auto'] },
-  tools: { type: 'strings', value: '<tools>', desc: 'What it may use: read, edit, run, web, mcp, all, none', values: [...TOOLS, 'all', 'none'] },
+  tools: { type: 'strings', value: '<tools>', desc: 'What it may use: kinds (Tab lists them), all, none', values: [...TOOLS, 'all', 'none'] },
   mode: { type: 'string', value: '<mode>', desc: 'Its permission mode ("" keeps the start page’s)', values: MODES },
   folder: { type: 'string', value: 'task|project', desc: 'Where its sessions start: a new task folder, or here', values: ['task', 'project'] },
   projects: { type: 'strings', value: '<project>', desc: 'The projects it works in (again for more; "" for everywhere)', kind: 'project' },

@@ -106,7 +106,15 @@ export function whereText(a: Pick<Assistant, 'projects'>, spaces: SpaceView[] | 
   return names.length <= 2 ? `in ${names.join(' and ')}` : `in ${names.length} projects`;
 }
 
-const DOES: Record<ToolKind, string> = { read: 'read files', edit: 'change files', run: 'run commands', web: 'use the web', mcp: 'use other tools' };
+const DOES: Record<ToolKind, string> = {
+  read: 'read files',
+  edit: 'change files',
+  run: 'run commands',
+  web: 'use the web',
+  browser: 'use a browser',
+  computer: 'use the computer',
+  mcp: 'use other tools',
+};
 
 /** "read files and use the web"; "do anything" when it may use everything. */
 export function toolsText(a: Pick<Assistant, 'tools'>): string {

@@ -20,6 +20,8 @@ const DOING: Record<ToolKind, string> = {
   edit: 'create or change files',
   run: 'run commands or programs',
   web: 'use the web',
+  browser: 'use a web browser',
+  computer: 'use the computer’s screen, mouse and keyboard',
   mcp: 'use other tools (MCP servers and plugins beyond the app’s own and the connected accounts)',
 };
 

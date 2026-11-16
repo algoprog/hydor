@@ -24754,5 +24754,11 @@
 "Wiki must be inside the project":"wiki 必须位于项目之内",
 "Wiki root does not exist":"wiki 根文件夹不存在",
 "Wiki root must be a directory":"wiki 根文件夹必须是目录",
-"wikiMemory: true, false or null":"wikiMemory: true, false or null"
+"wikiMemory: true, false or null":"wikiMemory: true, false or null",
+"Use a browser":"使用浏览器",
+"Open websites, click and fill in forms in a real browser":"在真实的浏览器中打开网站、点击和填写表单",
+"Use the computer":"使用电脑",
+"See the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on)":"查看屏幕，并在任何应用中使用鼠标和键盘（桌面应用中，需开启电脑操控）",
+"use a browser":"使用浏览器",
+"use the computer":"使用电脑"
 }

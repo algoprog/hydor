@@ -18,7 +18,7 @@ An agent can hold:
 - **A monthly budget**: what its sessions may spend in a month (see [A monthly budget](#a-monthly-budget)).
 - **What it hands back**: the fields of each result, checked, and where each goes: a page in the Library, a row in a spreadsheet, an email to people, a notification, a file, a webhook (see [What an agent hands back](#what-an-agent-hands-back)).
 - **A conversation of its own**: it can keep one conversation, with an inbox for messages from you and other agents, where its scheduled runs post too (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
-- **What it may use**: reading files, creating and changing files, running commands, using the web, and other tools. Leave all of them on, or switch some off.
+- **What it may use**: reading files, creating and changing files, running commands, using the web, using a browser, using the computer (its screen, mouse and keyboard, in the desktop apps with Computer use on), and other tools. Leave all of them on, or switch some off.
 - **Skills to favor**: skills it loads before it starts when they fit the task (see [Skills](/guide/skills)).
 - **Connections**: connected accounts to turn on in its sessions (see [Connected apps, keys and tools](/guide/connections)).
 - **A program, model and permission mode** to suggest: picked with it on the start page, and still yours to change before you start.
@@ -188,7 +188,7 @@ The editor that **All settings** opens has every setting of an agent; on a phone
 
   Claude Code, Codex and Custom each have a mode that matches these. Other agents (Gemini CLI, OpenCode…) keep their own.
 - **Thinks with**: **Automatic**, **Quick**, **Standard**, **Best** or **Max**; under it **Subagents it starts, never above**: **Any**, or a tier; and **Step up when a check fails**, on unless you turn it off (see [What an agent thinks with: tiers](#what-an-agent-thinks-with-tiers)).
-- **What it may use**: five switches, all on for a new agent (see below).
+- **What it may use**: seven switches, all on for a new agent (see below).
 - **Skills to favor**: skill names, one at a time (see below).
 - **Connections**: shown when you have connected accounts (see below).
 - **Team**: a switch for each other agent it may hand work to, and **Other agents may hand it work** (see [Agents that hand work to other agents](#agents-that-hand-work-to-other-agents)).
@@ -204,15 +204,18 @@ Each switch covers a kind of tool:
 - **Create and change files**: write new files and edit existing ones.
 - **Run commands**: programs and scripts on this computer.
 - **Use the web**: search and read web pages.
+- **Use a browser**: open websites, click and fill in forms in a real browser.
+- **Use the computer**: see the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on).
 - **Other tools**: MCP servers (tool servers) and plugins set up for the agents.
 
 What happens to the ones you switch off depends on the program:
 
 - **Claude Code and Custom** have those tools switched off. With **Other tools** off, Claude Code gets only the app's own tools and your connected accounts, none of the MCP servers you set up yourself.
 - **Codex** is told not to use them. With **Use the web** off, its own web search is turned off too. With **Run commands** off but **Read files** on, Codex is told to use its shell only to read and search files, since it reads files through the shell.
+- **Claude Code, Codex and Custom** also have the browser and the computer's tools switched off when **Use a browser** or **Use the computer** is off.
 - **Other agents** are told not to use them.
 
-The app's own tools (pages, memory and the like) stay on, except those that fall under a switch you turned off: with **Use the web** off, the app's web search, page reading and browser go too; with **Read files** off, its document reader. Connected accounts are not "other tools": the **Connections** below decide those. When a task needs something the agent can't use, it is told to say so instead of working around it.
+The app's own tools (pages, memory and the like) stay on, except those that fall under a switch you turned off: with **Use the web** off, the app's web search and page reading go too; with **Use a browser** off, its browser goes; with **Use the computer** off, its screen, mouse and keyboard tools go; with **Read files** off, its document reader. Connected accounts are not "other tools": the **Connections** below decide those. When a task needs something the agent can't use, it is told to say so instead of working around it.
 
 ### Skills to favor
 
@@ -229,7 +232,7 @@ On an agent's page, its settings read as sentences: what it does, "It works *eve
 - **Where it works**: **Everywhere**, or a switch for each project.
 - **When it works**: its schedules, each opening its editor, **Add a schedule**, and **Keeps one conversation, with an inbox**.
 - **What it thinks with**: Automatic or a tier, **Subagents it starts, never above**, and **Step up when a check fails**.
-- **What it may use**: the five switches.
+- **What it may use**: the seven switches.
 - **Whom it asks for help**: a switch for each other agent, and **Other agents may hand it work**.
 - **What it hands back**: its fields and where each result goes.
 - **Its monthly budget**: dollars a month, or none.

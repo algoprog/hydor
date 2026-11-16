@@ -239,7 +239,7 @@ Open [Settings → Capabilities → Browser](/settings?s=browser) ("A web browse
 
 ### A browser for agents
 
-[A browser for agents](/settings?s=browser&find=A%20browser%20for%20agents) is the switch beside the section's title. It turns the browser on or off for every agent. It is on by itself once a Chromium is found, and can't be turned on until one is. When it is off, agents don't get the browser's tools.
+[A browser for agents](/settings?s=browser&find=A%20browser%20for%20agents) is the switch beside the section's title. It turns the browser on or off for every agent. It is on by itself once a Chromium is found, and can't be turned on until one is. When it is off, agents don't get the browser's tools. Each agent also has its own **Use a browser** switch, under [What it may use](/guide/agents#what-it-may-use): an agent with it off doesn't get the browser's tools, whatever is set here.
 
 ### Chromium
 
@@ -285,7 +285,7 @@ Each profile in the list has **Log in to sites** (to log in to more), and a **�
 
 ## Let agents use your computer
 
-In the desktop app, on a Mac, on Windows and on Linux, agents can also use the computer itself, like a person at it: they see its screen and use its mouse and keyboard, in any app (Notes or Calendar on a Mac, Notepad or Excel on Windows, Files on Linux, an app the browser can't reach). For websites they keep to the browser, which is quicker and safer. Computer use is off at first.
+In the desktop app, on a Mac, on Windows and on Linux, agents can also use the computer itself, like a person at it: they see its screen and use its mouse and keyboard, in any app (Notes or Calendar on a Mac, Notepad or Excel on Windows, Files on Linux, an app the browser can't reach). For websites they keep to the browser, which is quicker and safer. Computer use is off at first. Each agent also has its own **Use the computer** switch, under [What it may use](/guide/agents#what-it-may-use): an agent with it off can't use the computer, even with Computer use on.
 
 ### Turn on computer use
 

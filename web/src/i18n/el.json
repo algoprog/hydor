@@ -24738,5 +24738,11 @@
 "Wiki must be inside the project":"Το wiki πρέπει να βρίσκεται μέσα στο έργο",
 "Wiki root does not exist":"Η ρίζα του wiki δεν υπάρχει",
 "Wiki root must be a directory":"Η ρίζα του wiki πρέπει να είναι κατάλογος",
-"wikiMemory: true, false or null":"wikiMemory: true, false or null"
+"wikiMemory: true, false or null":"wikiMemory: true, false or null",
+"Use a browser":"Χρήση προγράμματος περιήγησης",
+"Open websites, click and fill in forms in a real browser":"Ανοίγει ιστότοπους, κάνει κλικ και συμπληρώνει φόρμες σε πραγματικό πρόγραμμα περιήγησης",
+"Use the computer":"Χρήση υπολογιστή",
+"See the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on)":"Βλέπει την οθόνη και χρησιμοποιεί το ποντίκι και το πληκτρολόγιο σε οποιαδήποτε εφαρμογή (στις εφαρμογές υπολογιστή, με τη Χρήση υπολογιστή ενεργή)",
+"use a browser":"χρησιμοποιεί πρόγραμμα περιήγησης",
+"use the computer":"χρησιμοποιεί τον υπολογιστή"
 }

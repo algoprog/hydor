@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
-import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, type AgentOutput, type Assistant, type AssistantMode, type OutputTarget, type ToolKind } from '../../shared/assistants.ts';
+import { ASSISTANT_ICONS, ASSISTANT_MODES, TOOL_KINDS, upgradeKinds, type AgentOutput, type Assistant, type AssistantMode, type OutputTarget, type ToolKind } from '../../shared/assistants.ts';
 import { agentChanges, cleanAgentExamples, type AgentVersionBy } from '../../shared/agent-files.ts';
 import { cleanAnswer } from '../../shared/apps.ts';
 import { isTier } from '../../shared/tiers.ts';
@@ -35,8 +35,35 @@ function mine(db: DB): Assistant[] {
   if (!settled.has(db)) {
     settled.add(db);
     list = keepNewPages(db, list);
+    list = splitKinds(db, list);
   }
   return list;
+}
+
+/** When the browser and the computer got switches of their own here (ms); agents' versions kept before then are upgraded when brought back. */
+const KINDS_SPLIT = 'assistants.kindsSplitAt';
+
+/** Once: agents saved with some switches off get the browser and the computer as upgradeKinds says (they had them before). */
+function splitKinds(db: DB, list: Assistant[]): Assistant[] {
+  if (kvGet(db, KINDS_SPLIT)) return list;
+  let changed = false;
+  const out = list.map((a) => {
+    if (!a.tools) return a;
+    const tools = upgradeKinds(a.tools);
+    if (JSON.stringify(tools) === JSON.stringify(a.tools)) return a;
+    changed = true;
+    const { tools: _old, ...rest } = a;
+    return tools ? { ...rest, tools } : rest;
+  });
+  if (changed) putMine(db, out);
+  kvSet(db, KINDS_SPLIT, String(Date.now()));
+  return out;
+}
+
+/** Its kinds as they are now, for a version kept before the browser and the computer had switches. */
+function keptKinds(db: DB, at: number, tools: ToolKind[] | undefined): ToolKind[] | undefined {
+  const split = Number(kvGet(db, KINDS_SPLIT) || 0);
+  return tools && at < split ? upgradeKinds(tools) : tools;
 }
 
 const EACH_NEW = 'assistants.libraryEachNew';
@@ -251,7 +278,7 @@ export function bringBack(db: DB, id: string, n: number, how: SaveHow & { projec
   const v = agentVersion(db, id, n);
   if (!v) throw new HttpError(404, 'There is no such version: only the latest 50 are kept');
   const agents = new Set(allAssistants(db).map((x) => x.id));
-  const back = { ...v.agent, canAsk: v.agent.canAsk?.filter((x) => agents.has(x)), projects: v.agent.projects?.filter((x) => how.projects.has(x)) };
+  const back = { ...v.agent, tools: keptKinds(db, v.at, v.agent.tools), canAsk: v.agent.canAsk?.filter((x) => agents.has(x)), projects: v.agent.projects?.filter((x) => how.projects.has(x)) };
   const said = agentChanges(a, back, how.name).join(' ');
   return saveAssistant(db, { ...back, id, examples: a.examples ?? [] }, { ...how, why: `Brought back version ${n}.${said ? ` ${said}` : ''}` });
 }

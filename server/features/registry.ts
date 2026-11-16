@@ -85,17 +85,22 @@ export function runTools(ctx: RunCtx): RunTool[] {
   }));
 }
 
-/** Everything the capabilities give a starting agent (their tools' guides in its instructions: Custom reads them apart, featureContext). */
+/**
+ * Everything the capabilities give a starting agent (their tools' guides in its instructions: Custom reads them apart,
+ * featureContext). A guide whose tools are all switched off for it (its agent may not use the browser, say) is left out.
+ */
 export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
   const out: GivenAdditions = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {} };
   if (!deps) return out;
   // A confidential session gets no MCP server but the app's own (server/confidential): connected apps and plugins' servers reach outside.
   const closed = s.extra?.confidential === true;
+  // The instructions in the capabilities' order, each guide with the tools it is about.
+  const texts: { text: string; tools?: string[] }[] = [];
   for (const f of list) {
     try {
       const a = await f.spawn?.(s, deps);
       if (!a) continue;
-      out.instructions.push(...[...(a.instructions ?? []), ...(a.guides ?? []).map((g) => g.text)].filter((t) => t.trim()));
+      texts.push(...(a.instructions ?? []).map((text) => ({ text })), ...(a.guides ?? []).map((g) => ({ text: g.text, tools: g.tools })));
       out.notes.push(...(a.notes ?? []).filter((t) => t.trim()));
       if (!closed) Object.assign(out.mcpServers, a.mcpServers);
       Object.assign(out.env, a.env);
@@ -109,6 +114,9 @@ export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
       warn(f, 'spawn', e);
     }
   }
+  // The tools switched off, by their short names (the app's own are "mcp__hydor__browser_open" there).
+  const off = new Set(out.disallowedTools.map((t) => /^mcp__.+?__(.+)$/.exec(t)?.[1] ?? t));
+  out.instructions.push(...texts.filter((x) => x.text.trim() && !(x.tools?.length && x.tools.every((t) => off.has(t)))).map((x) => x.text));
   return out;
 }
 

@@ -56,7 +56,7 @@ test('versions: each kind of save keeps one, with who saved it and what changed;
   vs = agentVersions(db, a.id);
   assert.equal(vs[0].n, 2);
   assert.equal(vs[0].by, 'agent');
-  assert.equal(vs[0].line, 'It thinks with Best now (it was Quick). It may no longer create and change files, run commands and use other tools. Its monthly budget is $5 now.');
+  assert.equal(vs[0].line, 'It thinks with Best now (it was Quick). It may no longer create and change files, run commands, use a browser, use the computer and use other tools. Its monthly budget is $5 now.');
   // The same again, and only its examples changed: no version.
   saveAssistant(db, as(b));
   saveAssistant(db, { ...as(b), examples: [{ message: 'Find three papers on retrieval.' }] });
@@ -138,7 +138,7 @@ test('what changed, in sentences: names for ids, places, fields, switches', () =
   );
   assert.deepEqual(said, [
     'Its name went from “A” to “B”.',
-    'It may create and change files, run commands, use the web and use other tools now.',
+    'It may create and change files, run commands, use the web, use a browser, use the computer and use other tools now.',
     'It works in Thesis now.',
     'It may hand work to Coder now.',
     'Other agents may no longer hand it work.',
@@ -315,6 +315,16 @@ test('a file from a newer Hydor installs what it knows and says so; a broken fil
   assert.throws(() => readAgentFile({ hydor: 'agent', format: 1, agent: { name: ' ' } }), /no agent in it/);
   assert.throws(() => readAgentFile('x'.repeat(600 * 1024)), /too big/);
   assert.throws(() => previewInstall(db, { hydor: 'agent', format: 1, agent: { name: 'Bad', budgetUsd: -4 } }), /could not be read: A budget/);
+});
+
+test('a file from before the browser and the computer had switches: its agent keeps the browser with the web, the computer with commands', () => {
+  const old = (tools: string[]) => previewInstall(db, { hydor: 'agent', format: 1, agent: { name: 'Old hand', instructions: 'x', tools } }).agent.tools;
+  assert.deepEqual(old(['read', 'web']), ['read', 'web', 'browser']);
+  assert.deepEqual(old(['read', 'run']), ['read', 'run', 'computer']);
+  assert.equal(old(['read', 'edit', 'run', 'web', 'mcp']), undefined, 'every kind it knew: everything');
+  // A file made since says what it means.
+  assert.deepEqual(previewInstall(db, { hydor: 'agent', format: 2, agent: { name: 'New hand', instructions: 'x', tools: ['read', 'web'] } }).agent.tools, ['read', 'web']);
+  assert.equal(AGENT_FILE_FORMAT, 2);
 });
 
 // ---- examples ------------------------------------------------------------------------------------------------

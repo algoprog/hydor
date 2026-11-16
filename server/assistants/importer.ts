@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CLAUDE_TOOLS, TOOL_KINDS, type Assistant, type AssistantMode, type ToolKind } from '../../shared/assistants.ts';
+import { CLAUDE_TOOLS, TOOL_KINDS, toolKind, type Assistant, type AssistantMode, type ToolKind } from '../../shared/assistants.ts';
 import { HttpError } from '../auth.ts';
 
 type Value = string | string[];
@@ -73,12 +73,15 @@ function oneLine(d: string): string {
   return first.length > 140 ? `${first.slice(0, 139).replace(/\s+\S*$/, '')}…` : first;
 }
 
-/** Claude Code's tool names as kinds; tools of every kind (Task, TodoWrite, Skill) count for none. */
+/**
+ * Claude Code's tool names as kinds; tools of every kind (Task, TodoWrite, Skill) count for none. An MCP tool is "other
+ * tools", unless it is one of the app's own that has a kind (mcp__hydor__browser_open is the browser).
+ */
 function kindsOf(tools: string[]): ToolKind[] {
   const kinds = new Set<ToolKind>();
   for (const t of tools) {
     const name = t.replace(/\(.*$/, '').trim();
-    if (name.startsWith('mcp__')) kinds.add('mcp');
+    if (name.startsWith('mcp__')) kinds.add(toolKind(name) ?? 'mcp');
     for (const k of TOOL_KINDS) if (CLAUDE_TOOLS[k.id].includes(name)) kinds.add(k.id);
   }
   return TOOL_KINDS.map((k) => k.id).filter((k) => kinds.has(k));

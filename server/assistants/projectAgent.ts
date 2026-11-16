@@ -372,7 +372,7 @@ const DRAFT = [
   'You write the agent for one project: who it is there and how it works. Answer with one JSON object and nothing else:',
   '{"name": 1 to 4 words, "icon": one of ICONS, "description": one line of at most 120 characters on what it does in the project,',
   '"instructions": second person, 4 to 12 short lines: what the project is, how to work in it (its conventions, tools and checks), and what to hand back,',
-  '"tools": the kinds it needs, from read, edit, run, web, mcp; "tier": "quick", "standard" or "best"}.',
+  '"tools": the kinds it needs, from read, edit, run, web, browser (a real browser: sites to click through, forms, sign-ins), computer (the screen, mouse and keyboard), mcp; "tier": "quick", "standard" or "best"}.',
   'Start from the template given and make it fit this project. Never invent facts the project does not state; write in the language the project is described in.',
 ].join(' ');
 

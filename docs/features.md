@@ -115,7 +115,8 @@ agents that speak ACP and take MCP servers.
   of your own, and switch to another in the session's message box when the work
   changes. The Agents page shows each of yours as a card with how it is doing (working, needs you, budget spent), its
   projects, tier, next run and what it spent this month. **New agent** drafts one from what you say it should do, with
-  the helper model: its instructions, tools, tier and a schedule, read as sentences whose underlined words change it in
+  the helper model: its instructions, tools (switches for reading, editing, commands, the web, a browser, the computer
+  and other tools), tier and a schedule, read as sentences whose underlined words change it in
   place; **All settings** has every setting; Claude Code's agent files import. An agent works everywhere or only in
   some projects (offered only there, in the project's folder); runs on its schedules (scheduled tasks that run as it,
   listed on its page, and on a week with every other task in the page's Schedules tab); thinks with a tier, Quick, Standard, Best or Max, whose model Settings → Models → Tiers sets for

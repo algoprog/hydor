@@ -189,7 +189,15 @@ export const programName = (a: Pick<Assistant, 'agent' | 'acpAgent'>): string =>
   !a.agent ? 'the one picked on the start page' : a.agent === 'claude' ? 'Claude Code' : a.agent === 'codex' ? 'Codex' : a.acpAgent === 'console' ? 'Custom' : (a.acpAgent ?? 'another agent');
 
 /** What each kind of tool lets it do, as words after "It may". */
-export const TOOL_VERBS: Record<string, string> = { read: 'read files', edit: 'create and change files', run: 'run commands', web: 'use the web', mcp: 'use other tools' };
+export const TOOL_VERBS: Record<string, string> = {
+  read: 'read files',
+  edit: 'create and change files',
+  run: 'run commands',
+  web: 'use the web',
+  browser: 'use a browser',
+  computer: 'use the computer',
+  mcp: 'use other tools',
+};
 
 /** A place results go, in a few words. */
 export function placeName(t: OutputTarget): string {
@@ -256,7 +264,8 @@ export function agentChanges(before: Partial<Assistant>, after: Partial<Assistan
 
 /** What the file is: the word in its "hydor" field, and the format version this Hydor writes and reads. */
 export const AGENT_FILE_KIND = 'agent';
-export const AGENT_FILE_FORMAT = 1;
+/** 2 (0.72.0): the browser and the computer are kinds of tools of their own (format 1 had them with the web and every agent). */
+export const AGENT_FILE_FORMAT = 2;
 export const AGENT_FILE_EXT = '.hydor-agent';
 /** The largest agent file read. */
 export const AGENT_FILE_MAX = 512 * 1024;

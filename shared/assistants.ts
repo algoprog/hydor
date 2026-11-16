@@ -10,7 +10,7 @@ import type { Tier } from './tiers.ts';
 import type { Agent } from './types.ts';
 
 /** What an assistant may use, by kind: each agent's own tools fall under one of these. */
-export type ToolKind = 'read' | 'edit' | 'run' | 'web' | 'mcp';
+export type ToolKind = 'read' | 'edit' | 'run' | 'web' | 'browser' | 'computer' | 'mcp';
 
 /** When the agent asks first, in words every agent's modes map to. */
 export type AssistantMode = 'ask' | 'edits' | 'full' | 'plan';
@@ -237,6 +237,8 @@ export const TOOL_KINDS: { id: ToolKind; label: string; hint: string }[] = [
   { id: 'edit', label: 'Create and change files', hint: 'Write new files and edit existing ones' },
   { id: 'run', label: 'Run commands', hint: 'Programs and scripts on this computer' },
   { id: 'web', label: 'Use the web', hint: 'Search and read web pages' },
+  { id: 'browser', label: 'Use a browser', hint: 'Open websites, click and fill in forms in a real browser' },
+  { id: 'computer', label: 'Use the computer', hint: 'See the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on)' },
   { id: 'mcp', label: 'Other tools', hint: 'MCP servers and plugins set up for the agents' },
 ];
 
@@ -308,6 +310,8 @@ export const CLAUDE_TOOLS: Record<ToolKind, string[]> = {
   edit: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'],
   run: ['Bash', 'BashOutput', 'KillShell', 'KillBash', 'PowerShell'],
   web: ['WebFetch', 'WebSearch'],
+  browser: [],
+  computer: [],
   mcp: [],
 };
 
@@ -317,9 +321,14 @@ const APP_SERVERS = ['hydor', 'naget-agent', 'naget_agent'];
 /** How Custom writes a server's name inside its tools' names. */
 const cleanServer = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_');
 
-/** A tool name's kind, from what it does (web_search, read_page, http_request and browser tools are the web; read_document reads files). */
+/**
+ * A tool name's kind, from what it does: the app's browser (browser_open…) and computer use (computer_screenshot,
+ * computer_act) are kinds of their own; web_search, read_page and http_request are the web; read_document reads files.
+ */
 function kindByName(n: string): ToolKind | null {
-  if (/^(web_|fetch|browse|browser|http|read_page)/.test(n)) return 'web';
+  if (/^browser_/.test(n)) return 'browser';
+  if (/^computer_/.test(n)) return 'computer';
+  if (/^(web_|fetch|browse|http|read_page)/.test(n)) return 'web';
   if (/^(bash|shell|run_|exec|python|terminal)/.test(n)) return 'run';
   if (/^(write_|edit_|create_file|delete_|move_|rename_|apply_patch)/.test(n)) return 'edit';
   if (/^(read_file|read_document|list_dir|glob|grep|find_files|search_files)$/.test(n)) return 'read';
@@ -345,6 +354,18 @@ export function toolAllowed(name: string, allowed?: readonly string[] | null, gi
   if (!allowed) return true;
   const k = toolKind(name, given);
   return k === null || allowed.includes(k);
+}
+
+/**
+ * An agent's kinds as saved before the browser and the computer had switches of their own (0.72.0), as they are now: the
+ * browser was part of the web, so it stays where the web is on; computer use was open to every agent, and stays with
+ * those that may run commands (the nearest in what it lets an agent do). Unknown kinds go; all of them is everything.
+ */
+export function upgradeKinds(tools: readonly unknown[] | undefined): ToolKind[] | undefined {
+  if (!tools) return undefined;
+  const has = (k: string) => tools.includes(k);
+  const next = TOOL_KINDS.map((k) => k.id).filter((k) => has(k) || (k === 'browser' && has('web')) || (k === 'computer' && has('run')));
+  return next.length === TOOL_KINDS.length ? undefined : next;
 }
 
 /** The kinds an assistant leaves out; none when it allows everything. */

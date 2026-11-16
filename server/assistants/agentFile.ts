@@ -20,7 +20,7 @@ import {
   type AgentInstallPreview,
   type SuggestedSchedule,
 } from '../../shared/agent-files.ts';
-import { agentMode, TOOL_KINDS, type Assistant, type OutputTarget } from '../../shared/assistants.ts';
+import { agentMode, TOOL_KINDS, upgradeKinds, type Assistant, type OutputTarget } from '../../shared/assistants.ts';
 import type { ScheduledTask } from '../../shared/automations.ts';
 import { tierLabel } from '../../shared/tiers.ts';
 import type { Agent } from '../../shared/types.ts';
@@ -121,6 +121,12 @@ export function previewInstall(db: DB, raw: unknown): AgentInstallPreview {
   const given = { ...(file.agent as Record<string, unknown>) };
   // What is the person's own never comes in, whatever the file says.
   for (const k of ['id', 'builtin', 'source', 'projects', 'connections', 'canAsk', 'examples', 'standingKey']) delete given[k];
+  // A file from before the browser and the computer had switches of their own: its agent keeps what it could use.
+  if (Number(file.format) < 2 && Array.isArray(given.tools)) {
+    const tools = upgradeKinds(given.tools);
+    if (tools) given.tools = tools;
+    else delete given.tools;
+  }
   // The places its results go that need something of yours first are left out until you set them.
   const out = given.output && typeof given.output === 'object' ? { ...(given.output as Record<string, unknown>) } : undefined;
   if (out && Array.isArray(out.to)) {

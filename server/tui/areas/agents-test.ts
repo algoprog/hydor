@@ -169,7 +169,7 @@ test('new: instructions from a file, or the editor on a terminal when nothing el
     'a copy has no id and is not built in',
   );
   await refused(run(t.conn, ['agents', 'new', 'Q', '--tier', 'huge']), /--tier takes quick, standard, best, max or auto/);
-  await refused(run(t.conn, ['agents', 'new', 'Q', '--tools', 'read,fly']), /--tools takes read, edit, run, web, mcp, all or none \(it was “fly”\)/);
+  await refused(run(t.conn, ['agents', 'new', 'Q', '--tools', 'read,fly']), /--tools takes read, edit, run, web, browser, computer, mcp, all or none \(it was “fly”\)/);
   await refused(run(t.conn, ['agents', 'new', 'Q', '--budget', 'lots']), /--budget takes a number/);
   await refused(run(t.conn, ['agents', 'new', 'Q', '--askable', 'maybe']), /--askable takes on or off/);
   await refused(run(t.conn, ['agents', 'new', 'Q', '--projects', 'nothing']), /No project “nothing”/);

@@ -13,7 +13,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
-import { agentMode, assistantExtra, toolAllowed, toolKind, type Assistant } from '../../shared/assistants.ts';
+import { agentMode, assistantExtra, toolAllowed, toolKind, upgradeKinds, type Assistant } from '../../shared/assistants.ts';
 import { AcpLive } from '../agents/acp.ts';
 import { claudeSpec } from '../agents/claude.ts';
 import { CodexLive } from '../agents/codex.ts';
@@ -29,7 +29,9 @@ import { BUILTINS } from './builtins.ts';
 import { assistants, assistantById, assistantStart, listAssistants } from './index.ts';
 import { findAgentFiles, parseAgentFile, parseFrontmatter } from './importer.ts';
 import { instructionsFor, spawnFor, switchNote } from './instructions.ts';
-import { cleanAssistant, cleanUpOn, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { allAssistants, bringBack, cleanAssistant, cleanUpOn, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { kvGet, kvSet } from '../db.ts';
+import { latestAgentVersion } from './versions.ts';
 import { cleanup } from '../cleanup/index.ts';
 import { createSpace, spaceById } from '../spaces/index.ts';
 import { dayIn, makeTaskFolder, slugOf, taskFolderName } from './taskFolder.ts';
@@ -81,15 +83,15 @@ test('no assistant and no tone: nothing; the tone alone for every session', () =
 
 test('limits: switched off for Claude Code and Custom, asked of Codex, which keeps its shell to read', () => {
   const c = instructionsFor(reader, '', claude);
-  assert.match(c, /Limits: in this session you cannot create or change files, run commands or programs or use other tools .*; those tools are switched off\./);
+  assert.match(c, /Limits: in this session you cannot create or change files, run commands or programs, use a web browser, use the computer’s screen, mouse and keyboard or use other tools .*; those tools are switched off\./);
   assert.equal(instructionsFor(reader, '', custom).match(/Limits:.*/)?.[0], c.match(/Limits:.*/)?.[0]);
   const x = instructionsFor(reader, '', codex);
-  assert.match(x, /Limits: in this session do not create or change files or use other tools/);
+  assert.match(x, /Limits: in this session do not create or change files, use a web browser, use the computer’s screen, mouse and keyboard or use other tools/);
   assert.match(x, /Use the shell only to read and search files/);
   assert.doesNotMatch(x, /do not .*run commands/);
   // Without reading too, Codex is asked not to run commands at all.
   const none: Assistant = { ...offline, tools: [] };
-  assert.match(instructionsFor(none, '', codex), /do not read files, create or change files, run commands or programs, use the web or use other tools/);
+  assert.match(instructionsFor(none, '', codex), /do not read files, create or change files, run commands or programs, use the web, use a web browser, use the computer’s screen, mouse and keyboard or use other tools/);
 });
 
 test('skills to favor, worded for each agent', () => {
@@ -119,6 +121,61 @@ test('Codex: web_search "disabled" and the app’s web tools off, only without t
   assert.equal(b.disallowedTools, undefined);
 });
 
+test('the browser and the computer: switched off for Claude Code and Codex when their kinds are off, said in the limits', () => {
+  const tools = [...appTools, 'mcp__hydor__browser_open', 'mcp__hydor__browser_act', 'mcp__hydor__computer_screenshot', 'mcp__hydor__computer_act'];
+  // The web without the browser or the computer.
+  const a = spawnFor(reader, '', claude, tools);
+  for (const t of ['mcp__hydor__browser_open', 'mcp__hydor__browser_act', 'mcp__hydor__computer_screenshot', 'mcp__hydor__computer_act']) assert.ok(a.disallowedTools!.includes(t), t);
+  assert.ok(!a.disallowedTools!.includes('mcp__hydor__web_search') && !a.disallowedTools!.includes('WebFetch'));
+  assert.match(instructionsFor(reader, '', claude), /cannot .*use a web browser.*use the computer’s screen, mouse and keyboard/);
+  // The browser and the computer without the web: Codex gets the web's own tools off, and keeps the others.
+  const surfer: Assistant = { ...offline, id: 'surfer-0001', tools: ['read', 'browser', 'computer'] };
+  const b = spawnFor(surfer, '', codex, tools);
+  assert.deepEqual(b.disallowedTools, ['mcp__hydor__web_search', 'mcp__hydor__read_page', 'mcp__hydor__http_request']);
+  assert.deepEqual(b.codexConfig, { web_search: 'disabled' });
+  const c = spawnFor(surfer, '', claude, tools);
+  assert.ok(!c.disallowedTools!.some((t) => /browser|computer/.test(t)));
+  assert.doesNotMatch(instructionsFor(surfer, '', claude), /web browser|computer’s screen/);
+});
+
+test('kinds saved before the browser and the computer had switches: the browser with the web, the computer with commands', () => {
+  assert.deepEqual(upgradeKinds(['read', 'web']), ['read', 'web', 'browser']);
+  assert.deepEqual(upgradeKinds(['run', 'edit']), ['edit', 'run', 'computer']);
+  assert.deepEqual(upgradeKinds(['read']), ['read']);
+  assert.deepEqual(upgradeKinds([]), []);
+  assert.equal(upgradeKinds(['read', 'edit', 'run', 'web', 'mcp']), undefined, 'every old kind: everything');
+  assert.equal(upgradeKinds(undefined), undefined);
+  assert.deepEqual(upgradeKinds(['web', 'teleport']), ['web', 'browser'], 'unknown kinds go');
+});
+
+test('saved agents get the browser and the computer once; a version kept before comes back with them', () => {
+  const sdb = openDb(path.join(tmp, 'kinds.db'));
+  // As 0.71.0 kept them: the old kinds, and no mark of the split yet.
+  const old: Assistant[] = [
+    { id: 'web-reader-1', name: 'Web reader', icon: 'bot', description: '', instructions: 'Read.', tools: ['read', 'web'] },
+    { id: 'runner-1', name: 'Runner', icon: 'bot', description: '', instructions: 'Run.', tools: ['read', 'edit', 'run', 'web'] },
+    { id: 'quiet-1', name: 'Quiet', icon: 'bot', description: '', instructions: 'Answer.', tools: [] },
+    { id: 'all-1', name: 'All', icon: 'bot', description: '', instructions: 'Anything.' },
+  ];
+  kvSet(sdb, 'assistants.mine', JSON.stringify(old));
+  sdb.prepare('create table if not exists agent_versions (agent text not null, n integer not null, at integer not null, by text not null, line text not null, data text not null, primary key (agent, n))').run();
+  sdb.prepare('insert into agent_versions (agent, n, at, by, line, data) values (?, ?, ?, ?, ?, ?)').run('web-reader-1', 1, Date.now() - 60_000, 'you', 'Made it.', JSON.stringify({ name: 'Web reader', instructions: 'Read.', tools: ['read', 'web'] }));
+  const byId = (id: string) => allAssistants(sdb).find((a) => a.id === id)!;
+  assert.deepEqual(byId('web-reader-1').tools, ['read', 'web', 'browser']);
+  assert.deepEqual(byId('runner-1').tools, ['read', 'edit', 'run', 'web', 'browser', 'computer'], 'all but other tools');
+  assert.deepEqual(byId('quiet-1').tools, []);
+  assert.equal(byId('all-1').tools, undefined);
+  assert.ok(Number(kvGet(sdb, 'assistants.kindsSplitAt')) > 0);
+  // Switched off since, it stays off.
+  saveAssistant(sdb, { ...byId('web-reader-1'), tools: ['read', 'web'] });
+  assert.deepEqual(byId('web-reader-1').tools, ['read', 'web']);
+  // The version kept before the split comes back as it is now: with the browser.
+  const back = bringBack(sdb, 'web-reader-1', 1, { by: 'you', projects: new Set() });
+  assert.deepEqual(back.tools, ['read', 'web', 'browser']);
+  assert.deepEqual(latestAgentVersion(sdb, 'web-reader-1')!.agent.tools, ['read', 'web', 'browser']);
+  sdb.close();
+});
+
 // ---- through the registry and the real adapters ------------------------------------------------------
 
 const fakeApp = Fastify();
@@ -127,6 +184,7 @@ const fakeSearch: Feature = {
   id: 'fake-search',
   tools: () =>
     ['web_search', 'read_page'].map((name) => ({ name, description: name, inputSchema: { type: 'object', properties: {} }, run: async () => 'ok' })),
+  spawn: () => ({ guides: [{ tools: ['web_search', 'read_page'], text: 'Search guide: how to search.' }] }),
 };
 const deps = {
   app: fakeApp,
@@ -148,6 +206,9 @@ test('the feature through the registry: Claude Code’s command line', async () 
   assert.match(own[0], /# Agent: Offline/);
   assert.ok(add.instructions.some((t) => t.startsWith('Pages:')));
   assert.ok(add.disallowedTools.includes('mcp__hydor__web_search') && add.disallowedTools.includes('mcp__hydor__read_page'));
+  // The guide to tools it cannot use is left out; an agent that may use them gets it.
+  assert.ok(!add.instructions.some((t) => t.startsWith('Search guide:')));
+  assert.ok((await spawnAdditions(info('claude', { assistant: saveAssistant(db, { ...reader, id: undefined }).id }))).instructions.some((t) => t.startsWith('Search guide:')));
   const spec = claudeSpec({ cwd: tmp, sessionId: '00000000-0000-4000-8000-000000000001', pageServer: 'http://127.0.0.1:1/mcp/run/x', add }, {});
   const at = spec.args.indexOf('--disallowedTools');
   assert.ok(at > 0, 'has --disallowedTools');
@@ -162,6 +223,7 @@ test('the feature through the registry: Claude Code’s command line', async () 
   assert.ok(!plain.args.includes('--disallowedTools') && !plain.args.includes('--strict-mcp-config'));
   const prompt = plain.args[plain.args.indexOf('--append-system-prompt') + 1];
   assert.match(prompt, /^Pages:/);
+  assert.match(prompt, /Search guide:/);
   assert.doesNotMatch(prompt, /# Agent:/);
 });
 
@@ -499,7 +561,7 @@ test('the store: built-ins first and fixed, the user’s own saved, changed and 
   const ids = listAssistants(db).map((a) => a.id);
   assert.deepEqual(ids.slice(0, 7), ['general', 'researcher', 'writer', 'coder', 'tutor', 'planner', 'analyst']);
   assert.throws(() => saveAssistant(db, { id: 'writer', name: 'Mine now' }), /duplicate one/);
-  const made = saveAssistant(db, { name: 'Bookkeeper', icon: 'wallet', instructions: 'Keep the books.', agent: 'acp', acpAgent: 'console', model: 'qwen3', tools: ['read', 'edit', 'run', 'web', 'mcp'], connections: ['gmail', 'gmail', ''], mode: 'edits' });
+  const made = saveAssistant(db, { name: 'Bookkeeper', icon: 'wallet', instructions: 'Keep the books.', agent: 'acp', acpAgent: 'console', model: 'qwen3', tools: ['read', 'edit', 'run', 'web', 'browser', 'computer', 'mcp'], connections: ['gmail', 'gmail', ''], mode: 'edits' });
   assert.match(made.id, /^bookkeeper-[0-9a-f]{4}$/);
   assert.equal(made.tools, undefined, 'every kind is the same as no limit');
   assert.deepEqual(made.connections, ['gmail']);
@@ -724,7 +786,13 @@ test('tool kinds: Custom’s own, the app’s (by name, both spellings), given s
   assert.equal(k('mcp__naget_agent__show_html'), null);
   assert.equal(k('mcp__naget_agent__remember'), null);
   // Custom calls the app's own tools by their short names.
-  assert.deepEqual(['web_search', 'read_page', 'browser_open', 'read_document', 'show_html', 'remember', 'generate_image'].map(k), ['web', 'web', 'web', 'read', null, null, null]);
+  assert.deepEqual(['web_search', 'read_page', 'browser_open', 'read_document', 'show_html', 'remember', 'generate_image'].map(k), ['web', 'web', 'browser', 'read', null, null, null]);
+  // The browser and computer use are kinds of their own, in both spellings.
+  assert.deepEqual(['browser_act', 'browser_ask_user', 'mcp__hydor__browser_read', 'computer_screenshot', 'computer_act', 'mcp__hydor__computer_act'].map(k), ['browser', 'browser', 'browser', 'computer', 'computer', 'computer']);
+  assert.equal(toolAllowed('browser_open', ['read', 'web']), false, 'the web no longer brings the browser');
+  assert.equal(toolAllowed('computer_act', ['read', 'web', 'browser']), false, 'computer use is no longer open to every agent');
+  assert.equal(toolAllowed('computer_screenshot', ['computer']), true);
+  assert.equal(toolAllowed('web_search', ['browser']), false);
   assert.equal(k('mcp__my_notion__search_pages'), null, 'a connected app the app gave the session');
   assert.equal(k('mcp__filesystem__read'), 'mcp', 'the user’s own server');
   assert.equal(toolAllowed('bash', null), true);
