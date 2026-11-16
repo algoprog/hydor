@@ -1021,7 +1021,7 @@ function EditFromHere({ item, initial, onDone }: { item: Extract<TimelineItem, {
  * (Timeline.tsx), in smaller, quieter type than the reply, and never a text the view holds as it grows.
  * The sources it cites show as chips in its text and as one line under it, not as a list at its end.
  */
-export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean; quiet?: boolean }) {
+export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet, allowFork = true }: { item: Extract<TimelineItem, { kind: 'assistant' }>; note?: boolean; quiet?: boolean; allowFork?: boolean }) {
   const { text, revealing } = useSmoothText(item.text, !!item.streaming);
   const { fork, sessionKey, cwd } = useContext(SessionCtx);
   // A confidential session's replies are read aloud only with a voice on this device.
@@ -1038,20 +1038,20 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet }
         className={cx(quiet ? '!text-[13.5px] !leading-[1.55] !text-fg-2' : !note && item.phase === 'commentary' && '!text-fg-2')}
       />
       {!item.streaming && !quiet && (
-        <div className="absolute -top-1 -right-1 flex opacity-0 transition-opacity group-hover:opacity-100">
-          {fork && item.entry && !note && (
+        <div className="mt-1 flex items-center gap-1">
+          <CopyButton text={item.text} label="Copy message" className="h-8 w-8" />
+          {fork && item.entry && !note && allowFork && (
             <button
               type="button"
               title="Fork from this reply: a new session with the conversation up to here"
               aria-label="Fork from this reply"
               onClick={() => fork(item.entry)}
-              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-fg-3 transition-colors hover:bg-bg-3 hover:text-fg"
             >
-              <GitFork size={13} />
+              <GitFork size={15} />
             </button>
           )}
           <ReadAloudButton id={item.id} text={spokenReply(item.text)} local={confidential} />
-          <CopyButton text={item.text} label="Copy message" />
         </div>
       )}
     </div>

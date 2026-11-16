@@ -25,6 +25,7 @@ import {
   restoreSpaceSkill,
   saveSpaceSkill,
   setSpaceSwitch,
+  switchSpaceSkillsOff,
   spaceSkillsDir,
   spaceSkillsView,
   spaceSkillText,
@@ -330,6 +331,31 @@ test('a space switches skills on or off for its own sessions: the library’s, i
   deleteSpace(db, sp.id);
   assert.deepEqual(spaceSwitches(db, sp.id), {}, 'they go with the space');
   setOffSkills([]);
+});
+
+test('bulk project skill switches are atomic and reject stale snapshots', async () => {
+  const sp = createSpace(db, { name: 'Bulk switches' });
+  const other = createSpace(db, { name: 'Other switches' });
+  setSpaceSwitch(db, sp.id, { name: 'research', on: true });
+  const expected = spaceSwitches(db, sp.id);
+  const skills = [{ name: 'research', usual: false }, { name: 'docker', usual: true }, { name: 'deploy', agent: 'claude', usual: true }, { name: 'imagegen', agent: 'codex', usual: true }];
+  assert.deepEqual(switchSpaceSkillsOff(db, sp.id, { skills, expected }), { docker: false, 'claude:deploy': false, 'codex:imagegen': false });
+  assert.deepEqual(spaceSwitches(db, other.id), {});
+  // The same switches reach each agent's session configuration.
+  const base = { cwd: tmp, runId: 'bulk', resume: false, extra: { space: sp.id } };
+  const deps = { db } as unknown as Deps;
+  const codex = await skillpack.spawn!({ ...base, agent: 'codex' }, deps);
+  assert.deepEqual(codex?.codexConfig, { skills: { config: [{ name: 'imagegen', enabled: false }] } });
+  const claude = await skillpack.spawn!({ ...base, agent: 'claude' }, deps);
+  assert.ok(claude?.args?.some((arg) => arg.includes('\"deploy\":\"off\"')));
+  assert.throws(() => switchSpaceSkillsOff(db, sp.id, { skills, expected }), /changed/);
+  const before = spaceSwitches(db, sp.id);
+  assert.throws(() => switchSpaceSkillsOff(db, sp.id, { skills: Array.from({ length: 401 }, (_, i) => ({ name: `skill-${i}`, usual: true })), expected: before }), /at most/);
+  assert.deepEqual(spaceSwitches(db, sp.id), before);
+  assert.throws(() => switchSpaceSkillsOff(db, sp.id, { skills: [{ name: 'docker', usual: true }, { name: 'docker', usual: false }], expected: before }), /different settings/);
+  assert.deepEqual(spaceSwitches(db, sp.id), before);
+  deleteSpace(db, sp.id);
+  deleteSpace(db, other.id);
 });
 
 test('deleting a space puts its skills in the skill library, named for the space when the library has one of the name', () => {
