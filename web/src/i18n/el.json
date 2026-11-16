@@ -24391,5 +24391,22 @@
 "Write the question to ask each time":"Γράψτε την ερώτηση που θα γίνεται κάθε φορά",
 "board::Day":"Ημέρα",
 "board::The question":"Η ερώτηση",
-"board::How often":"Πόσο συχνά"
+"board::How often":"Πόσο συχνά",
+"(and some whose cost is not known yet)":"(και κάποιες των οποίων το κόστος δεν είναι γνωστό ακόμα)",
+"a board card’s refresh":"ανανέωση κάρτας ταμπλό",
+"a month in all":"τον μήνα συνολικά",
+"About {0} a month in all":"Περίπου {0} τον μήνα συνολικά",
+"cap.":"όριο.",
+"cards?":"καρτών;",
+"Its refreshes are paused, as on a copy: Save turns them on.":"Οι ανανεώσεις της είναι σε παύση, όπως σε ένα αντίγραφο: το Αποθήκευση τις ενεργοποιεί.",
+"Open the board":"Άνοιγμα του ταμπλό",
+"Refreshes are paused on this copy: turn them on card by card, or all at once.":"Οι ανανεώσεις είναι σε παύση σε αυτό το αντίγραφο: ενεργοποιήστε τες κάρτα κάρτα, ή όλες μαζί.",
+"Refreshes stop for the month at this board’s {0} cap.":"Οι ανανεώσεις σταματούν για τον μήνα στο όριο των {0} αυτού του ταμπλό.",
+"Refreshing {0}":"Ανανεώνεται: {0}",
+"This is a board card’s refresh: stop it on its board (the card’s … menu → Stop refreshing).":"Αυτή είναι ανανέωση κάρτας ταμπλό: σταματήστε την στο ταμπλό της (μενού … της κάρτας → Διακοπή ανανέωσης).",
+"Turn all on":"Ενεργοποίηση όλων",
+"Turn on the refreshes of":"Ενεργοποίηση των ανανεώσεων",
+"Turn on the refreshes of {0} cards?":"Ενεργοποίηση των ανανεώσεων {0} καρτών;",
+"Turn on the refreshes of one card?":"Ενεργοποίηση των ανανεώσεων μίας κάρτας;",
+"What they cost is not known yet: it shows on each card after its first refresh.":"Το κόστος τους δεν είναι γνωστό ακόμα: φαίνεται σε κάθε κάρτα μετά την πρώτη της ανανέωση."
 }

@@ -107,6 +107,8 @@ export interface BoardRunner {
   ended(o: { task: string; run: string; key: string; reply: string; ended: 'idle' | 'error'; why: string; costUsd: number; question: string }): Promise<{ status: RunStatus; summary: string; error?: string }>;
   /** Where a notice about a card's refreshes opens (its board), and what it is called. */
   noticeOf(taskId: string): { url: string; title: string };
+  /** The board and card a task refreshes, as the task lists show them; null when the board is gone. */
+  describe(taskId: string): ScheduledTask['board'] | null;
 }
 
 /** How long a board card's refresh may take before it is stopped. */
@@ -322,16 +324,17 @@ export class Scheduler extends EventEmitter {
       check: w?.at ? { at: w.at, ok: !!w.ok, note: w.note } : undefined,
       origin: r.origin ?? undefined,
       ...(app ? { app, appName: this.apps?.name(app.id) } : {}),
+      ...(this.boards?.owns(r.id) ? { board: this.boards.describe(r.id) ?? undefined } : {}),
     };
   }
 
   /**
-   * The tasks, oldest first. Those that refresh a board's cards are the board's to change (its cards' Keep it up to
-   * date…): only Schedules' week view, which shows everything that runs by itself, asks for them (`boards`).
+   * The tasks, oldest first. Those that refresh a board's cards come with `board` (where they are changed: the board's
+   * card, not the task forms); `boards: false` leaves them out.
    */
   list(o: { boards?: boolean } = {}): ScheduledTask[] {
     const recent = recentByTask(this.db);
-    return (this.db.prepare('select * from tasks where resume = 0 order by created_at').all() as Row[]).filter((r) => o.boards || !this.isBoard(r.id)).map((r) => this.toTask(r, recent.get(r.id)));
+    return (this.db.prepare('select * from tasks where resume = 0 order by created_at').all() as Row[]).filter((r) => o.boards !== false || !this.isBoard(r.id)).map((r) => this.toTask(r, recent.get(r.id)));
   }
 
   /** Whether a task refreshes a board's card. */

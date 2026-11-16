@@ -17,7 +17,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ArrowDown, ArrowUp, CalendarClock, CircleSlash, Ellipsis, Expand, GripVertical, ImageDown, MessageSquareText, Pencil, Pin, RefreshCw, Trash2 } from 'lucide-react';
 import { answerUi } from '@shared/answer-ui';
 import { cardTitle, changeCard, newBoard, removeCard, setBoardCap, SIZE_LABEL, CARD_SIZES, type Board, type BoardCard, type CardSize } from '@shared/boards';
-import type { BoardRefreshState, CardRefresh } from '@shared/board-refresh';
+import { allOn, type BoardRefreshState, type CardRefresh } from '@shared/board-refresh';
 import type { PageInfo } from '@shared/pages';
 import { CardView } from '../../../components/answer/AnswerUi';
 import { CardFullScreen, cardPicture, picturable, savePicture } from '../../../components/answer/CardTools';
@@ -31,7 +31,7 @@ import { go, sessionPath } from '../../../lib/nav';
 import { toastError, useSessions, useToasts } from '../../../lib/store';
 import { saveBlob } from '../exportFile';
 import type { ModelEditorProps } from '../kinds';
-import { CapBand, CapButton, readsSource, refreshable, refreshBoard, refreshCard, RefreshDialog, RefreshMeta, RefreshProblem, useBoardRefresh } from './Refresh';
+import { CapBand, CapButton, PausedBand, readsSource, refreshable, refreshBoard, refreshCard, RefreshDialog, RefreshMeta, RefreshProblem, useBoardRefresh } from './Refresh';
 
 /** How many of the grid's columns each size spans: of six on a narrower window, of twelve on a computer (one on a phone). */
 const SPAN: Record<CardSize, string> = {
@@ -530,6 +530,7 @@ export function BoardEditor({ doc, pageId, layout, readOnly, lead, tail, band }:
       </div>
       {band}
       {live && state && anyRefresh && <CapBand state={state} onRaise={() => setCapOpen(true)} />}
+      {live && <PausedBand board={board} state={state} onAllOn={() => run((b) => allOn(b))} />}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto w-full max-w-[1600px] px-3 pt-4 pb-[max(24px,var(--safe-bottom))] sm:px-6 sm:pt-5">
           <BoardGrid board={board} pageId={pageId} run={readOnly ? undefined : run} phone={phone} gridRef={grid} refreshes={refreshes} />

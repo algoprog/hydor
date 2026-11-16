@@ -954,7 +954,12 @@ agents that speak ACP and take MCP servers.
   notice, and one that works turns it on again. Each board has a monthly cap for its refreshes ($5 unless changed, or
   off), counted from its refresh sessions' spending as agents' monthly budgets are, each refresh capped at what is left;
   once reached, refreshes wait for the next month, the board says so at the top and you get one notice. Refreshes show
-  in Schedules as the board's, with their runs, costs and a pause switch.
+  in Schedules as the board's, with their runs, costs and a pause switch, and in Settings → Scheduled tasks and `hydor
+  tasks` as "Shop · Sales by day: refresh", changed on the board (Open the board), never through the task form; a card
+  taken off, a refresh stopped or a board deleted takes its schedule away. A copy never starts spending by itself: a
+  board made from cards that refresh (Duplicate, page_action's duplicate, one made through the API, an agent's board
+  made from another's cards) keeps their settings paused, says so at the top, and Turn all on (which shows what they
+  come to a month first) or a card's own settings turn them on.
 - **Made with AI from a kind**: 254 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
   sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs, 19 diagrams), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a

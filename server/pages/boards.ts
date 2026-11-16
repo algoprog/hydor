@@ -194,6 +194,7 @@ export const SAVE_BOARD_DESCRIPTION = [
   'With id: change ([{id, title?, size?, data?}]), remove ([card ids]) and order ([card ids], the new order) change the cards it has; cards adds new ones at the end (or at: their place from 1).',
   'A card keeps a copy of its data as it was given: to bring one up to date once, give its new data in change.',
   'To keep a card up to date by itself ("keep this updated every morning"), give it refresh: {ask: the question an agent answers again each time (the user’s request, as it would be asked now; for a card they pinned, left out, their request it came from), every: hour, day, weekdays or week (left out: only when they press Refresh now), at: its time ("07:00", in their time zone), on: the day for week ("monday"), tier: quick (the default), standard, best or max}; refresh: null stops it. Each refresh is an agent’s session on that tier that sends nothing and answers with a new ```ui block of the same UI, which replaces the card’s data (a failed one keeps it; three in a row pause it). It costs money: the result says about what a refresh and a month come to, and each board has a monthly cap for its refreshes ($5 unless the user changes it on the board). Say so when you set one. A card that reads a spreadsheet or a file (its data has from) needs none.',
+  'A board made from cards that refresh (a copy, or yours made from another board’s cards) gets them paused: it never starts spending by itself; the user turns them on (Turn all on at the top of the board, which shows what they cost, or card by card), or you with refresh: {paused: false} when they ask.',
   'get_page with a board’s id says, for each card that refreshes, when, on which tier, what it costs, when it was last updated and whether its last refresh failed, and the board’s cap and what its refreshes spent this month: answer questions about them from it.',
   `Give each new board a description (under 100 words): the Library shows it and its search finds the board by it.`,
 ].join(' ');
@@ -207,6 +208,7 @@ const REFRESH_SCHEMA = {
     at: { type: 'string', description: 'For day, weekdays and week: the time, "07:00", in the user’s time zone (07:00 when left out).' },
     on: { type: 'string', description: 'For week: the day ("monday").' },
     tier: { type: 'string', enum: ['quick', 'standard', 'best', 'max'], description: 'The tier the agent thinks with: quick (the default and cheapest) unless the question needs more.' },
+    paused: { type: 'boolean', description: 'false turns on a card whose refreshes are paused (a copy’s come paused), only when the user asks; true pauses it, keeping its settings.' },
   },
 };
 
@@ -339,8 +341,10 @@ export function agentRefresh(v: unknown, card: BoardCard, label: string): CardRe
   }
   const tier = v.tier === undefined ? cur?.tier : String(v.tier).toLowerCase();
   if (tier !== undefined && !isTier(tier)) throw new CardError(`${label}: refresh’s tier is quick, standard, best or max.`);
+  // Paused stays paused (a copy's) unless the agent says otherwise.
+  const paused = v.paused === undefined ? cur?.paused : v.paused === true ? true : undefined;
   try {
-    return cleanRefresh({ ask, schedule: scheduleOf(every as RefreshEvery, at.padStart(5, '0'), day), tier, costUsd: cur?.costUsd });
+    return cleanRefresh({ ask, schedule: scheduleOf(every as RefreshEvery, at.padStart(5, '0'), day), tier, costUsd: cur?.costUsd, paused });
   } catch (e) {
     if (e instanceof RefreshError) throw new CardError(`${label}: ${e.message}`);
     throw e;

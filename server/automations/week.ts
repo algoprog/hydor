@@ -6,7 +6,6 @@
 import { MAX_RANGE_DAYS, addDate, mondayOf, type ScheduleItem, type ScheduleSource, type ScheduleWeek, type WeekBand, type WeekDay, type WeekNext, type WeekRun } from '../../shared/schedules.ts';
 import { scheduleText, type RunStatus, type RunTrigger, type ScheduledTask, type TaskSchedule } from '../../shared/automations.ts';
 import { allAssistants } from '../assistants/store.ts';
-import { pageInfo } from '../pages/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import { cronDay, parseCron, wallAt, zonedTime, type Cron } from './schedule.ts';
@@ -37,20 +36,14 @@ export function dateIn(tz: string, at: number): string {
   return `${w.y}-${String(w.mo).padStart(2, '0')}-${String(w.d).padStart(2, '0')}`;
 }
 
-/** A board card's refreshes (server/pages/board-refresh.ts): its task's id is board-<page>-<card>. */
-const BOARD_TASK = /^board-([a-z0-9]{4,40})-(c[a-z0-9]{4,40})$/;
-
 /** What a task is for, the agent, app or board it belongs to, and where it is changed. */
-function itemOf(db: DB, t: ScheduledTask, agents: Map<string, { name: string; icon?: string }>, tz: string, band: boolean): ScheduleItem {
+function itemOf(t: ScheduledTask, agents: Map<string, { name: string; icon?: string }>, tz: string, band: boolean): ScheduleItem {
   const agentId = typeof t.extra?.assistant === 'string' ? t.extra.assistant : undefined;
   const agent = agentId ? agents.get(agentId) : undefined;
   const daily = t.origin?.startsWith('daily:') ? t.origin.slice('daily:'.length) : undefined;
   const appId = t.app?.id ?? daily;
-  // A board card's refreshes: changed on its board (the card's … → Keep it up to date…), which its run opens too.
-  const bm = BOARD_TASK.exec(t.id);
-  const page = bm ? pageInfo(db, bm[1]) : null;
-  if (bm && page) {
-    const prefix = `${page.title}: `;
+  // A board card's refreshes: changed on its board (the card's … → Keep it up to date…), which its pencil opens.
+  if (t.board) {
     return {
       id: t.id,
       name: t.name,
@@ -62,8 +55,8 @@ function itemOf(db: DB, t: ScheduledTask, agents: Map<string, { name: string; ic
       ...(t.enabled && t.nextAt ? { nextAt: t.nextAt } : {}),
       ...(t.recent?.length ? { recent: t.recent } : {}),
       ...(t.lastStatus ? { lastStatus: t.lastStatus } : {}),
-      board: { id: page.id, name: page.title, card: t.name.startsWith(prefix) ? t.name.slice(prefix.length) : t.name },
-      edit: `/pages/${encodeURIComponent(page.id)}?card=${bm[2]}`,
+      board: { id: t.board.page, name: t.board.title, card: t.board.cardTitle },
+      edit: `/pages/${encodeURIComponent(t.board.page)}?card=${encodeURIComponent(t.board.card)}`,
       band,
     };
   }
@@ -207,7 +200,7 @@ export function scheduleWeek(db: DB, tasks: ScheduledTask[], o: WeekOptions): Sc
   for (const t of tasks) {
     const p = plan(t);
     planned.set(t.id, p);
-    items.push(itemOf(db, t, agents, tz, p.band));
+    items.push(itemOf(t, agents, tz, p.band));
   }
   const byId = new Map(items.map((it) => [it.id, it]));
 

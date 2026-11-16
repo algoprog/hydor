@@ -182,6 +182,11 @@ export interface ScheduledTask {
   app?: TaskApp;
   /** That template's name now (gone: unset). */
   appName?: string;
+  /**
+   * A board card's refreshes (its id is board-<page>-<card>): its board and card, where it is changed (the card's …
+   * → Keep it up to date…), not in the task forms.
+   */
+  board?: { page: string; card: string; title: string; cardTitle: string };
 }
 
 /** How a run ended, as its agent reported it (report_outcome), or as the app saw it. */

@@ -24,6 +24,7 @@ import {
   REFRESH_FAIL_LIMIT,
   runsPerMonth,
   type BoardRefreshState,
+  refreshesByItself,
   type CardRefresh,
   type CardRefreshState,
 } from '../../shared/board-refresh.ts';
@@ -290,7 +291,8 @@ export function readAnswer(c: BoardCard, reply: string): { data: Record<string, 
 // ---- keeping schedules in step with the boards ---------------------------------------------------------------------
 
 /** A task's name: the board's and the card's. */
-const taskName = (board: string, c: BoardCard) => `${board}: ${cardTitle(c)}`.slice(0, 120);
+/** A card's refreshes as the task lists say them: "Shop · Sales by day: refresh". */
+export const taskName = (board: string, c: Pick<BoardCard, 'title' | 'data' | 'ui'>) => `${board} · ${cardTitle(c)}`.slice(0, 110) + ': refresh';
 
 /**
  * A board's cards and their refreshes' scheduled tasks made to agree: a task for each card that refreshes by itself
@@ -301,7 +303,8 @@ export function syncBoard(d: Pick<Deps, 'db' | 'scheduler' | 'sessions'>, page: 
   const { db, scheduler } = d;
   const b = boardOf(db, page);
   const want = new Map<string, BoardCard>();
-  for (const c of b?.board.cards ?? []) if (c.refresh?.schedule && !readsSource(c)) want.set(refreshTaskId(page, c.id), c);
+  // A paused card (a copy's, until it is turned on) has none: it does not run by itself.
+  for (const c of b?.board.cards ?? []) if (refreshesByItself(c.refresh) && !readsSource(c)) want.set(refreshTaskId(page, c.id), c);
   const have = db.prepare('select id, name, prompt, schedule, enabled, paused_reason from tasks where resume = 0 and id like ?').all(`board-${page}-%`) as {
     id: string;
     name: string;
@@ -462,6 +465,13 @@ export function boardRunner(d: Deps): BoardRunner {
       return { status: 'done' as RunStatus, summary: `Updated “${cardTitle(next)}”` };
     },
 
+    describe(taskId) {
+      const o = refreshOwner(taskId);
+      const b = o ? boardOf(db, o.page) : null;
+      const c = b?.board.cards.find((x) => x.id === o!.card);
+      return o && b ? { page: o.page, card: o.card, title: b.title, cardTitle: c ? cardTitle(c) : o.card } : null;
+    },
+
     noticeOf(taskId) {
       const o = refreshOwner(taskId);
       const title = o ? (pageInfo(db, o.page)?.title ?? 'A board') : 'A board';
@@ -545,7 +555,7 @@ export function refreshLines(d: Pick<Deps, 'db' | 'scheduler'>, page: string): s
       per !== null && per !== undefined ? `about $${per.toFixed(2)} a time${r?.schedule ? `, about $${(per * runsPerMonth(r.schedule)).toFixed(2)} a month` : ''}` : 'its cost is not known yet',
       c.refreshedAt ? `last updated ${new Date(c.refreshedAt).toISOString()}` : 'not refreshed yet',
       s?.nextAt ? `next ${new Date(s.nextAt).toISOString()}` : '',
-      s?.pausedReason ? `paused: ${s.pausedReason}` : s?.enabled === false ? 'paused' : '',
+      r?.paused ? 'paused, as on a copy: it does not refresh by itself until the user turns it on (the card’s settings, or Turn all on at the top of the board)' : s?.pausedReason ? `paused: ${s.pausedReason}` : s?.enabled === false ? 'paused' : '',
       s?.running ? 'refreshing now' : s?.last && s.last.status !== 'done' ? `its last refresh failed: ${s.last.error ?? 'no reason given'}` : '',
       r ? `question: ${JSON.stringify(r.ask.length > 200 ? `${r.ask.slice(0, 199)}…` : r.ask)}` : '',
     ].filter(Boolean);
@@ -576,7 +586,8 @@ export async function refreshAll(d: Deps, page: string): Promise<{ started: numb
   let started = 0;
   const skipped: string[] = [];
   for (const c of b.board.cards) {
-    if (!c.refresh || readsSource(c)) continue;
+    // A paused card (a copy's) waits to be turned on.
+    if (!c.refresh || c.refresh.paused || readsSource(c)) continue;
     try {
       await refreshNow(d, page, c.id);
       started++;
@@ -591,3 +602,29 @@ export async function refreshAll(d: Deps, page: string): Promise<{ started: numb
 
 /** For the tests: the blocks of a reply. */
 export const _test = { uiBlocks };
+
+/**
+ * Of an agent's new board's cards, those that refresh on a schedule copied from another board's card (the same question,
+ * or the same data): they come paused, as a copy's do, so a board made from another's cards never starts spending by
+ * itself. Cards whose refresh the agent set on purpose (a question of their own) stay on.
+ */
+export function pauseCopied(db: DB, cards: BoardCard[]): { cards: BoardCard[]; paused: number } {
+  const asks = new Set<string>();
+  const datas = new Set<string>();
+  for (const p of listPages(db).filter((x) => x.kind === 'board')) {
+    const src = pageSource(db, p.id);
+    if (!src) continue;
+    for (const c of readBoard(src.text).cards) {
+      if (c.refresh?.ask) asks.add(c.refresh.ask.trim().toLowerCase());
+      datas.add(`${c.ui}\u0001${JSON.stringify(c.data)}`);
+    }
+  }
+  let paused = 0;
+  const out = cards.map((c) => {
+    if (!refreshesByItself(c.refresh)) return c;
+    if (!asks.has(c.refresh!.ask.trim().toLowerCase()) && !datas.has(`${c.ui}\u0001${JSON.stringify(c.data)}`)) return c;
+    paused++;
+    return { ...c, refresh: { ...c.refresh!, paused: true as const } };
+  });
+  return { cards: out, paused };
+}

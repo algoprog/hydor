@@ -43,6 +43,8 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 
 At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Test without sending**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
 
+A board card that keeps itself up to date is listed too, as the board's: "Shop · Sales by day: refresh". Its row has its switch, **Refresh now** and **Open the board**, which opens the card's settings on the board: its question, schedule and tier are changed there, and **Stop refreshing** there (or taking the card off, or deleting the board) removes it from this list ([Keep cards up to date](/guide/library#keep-cards-up-to-date)).
+
 With no tasks yet, the list says "No scheduled tasks yet: start from an example below, or ask an agent to set one up".
 
 ## See the week: what ran and what runs next

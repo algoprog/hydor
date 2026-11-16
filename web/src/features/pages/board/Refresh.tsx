@@ -127,7 +127,7 @@ export function RefreshMeta({ card, s, state, guest }: { card: BoardCard; s?: Ca
   if (!card.refresh && !s?.running && !s?.last) return null;
   const cost = guest ? undefined : costOf(card, s, state);
   const sched = card.refresh?.schedule;
-  const paused = !!s?.task && s.enabled === false;
+  const paused = !!card.refresh?.paused || (!!s?.task && s.enabled === false);
   return (
     <>
       {s?.running ? (
@@ -192,6 +192,82 @@ export function RefreshProblem({ card, s, onTry }: { card: BoardCard; s?: CardRe
       <button type="button" onClick={onTry} className="shrink-0 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-accent hover:bg-bg-2">
         Try again
       </button>
+    </div>
+  );
+}
+
+// ---- a copy's refreshes, paused ---------------------------------------------------------------------------------------
+
+/**
+ * At the top of a board whose cards' refreshes came paused (a copy never starts spending by itself): turn them on card by
+ * card, or all at once, after seeing what that comes to a month.
+ */
+export function PausedBand({ board, state, onAllOn }: { board: Board; state: BoardRefreshState | null; onAllOn: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const paused = board.cards.filter((c) => c.refresh?.paused);
+  if (!paused.length) return null;
+  let month = 0;
+  let unknown = 0;
+  for (const c of paused) {
+    const t = refreshTier(c.refresh);
+    const per = perRefresh(state, state?.cards[c.id], t, t);
+    if (per === undefined) unknown++;
+    else month += per * runsPerMonth(c.refresh!.schedule);
+  }
+  const cap = boardCap(board);
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-bg-1 px-4 py-2 text-[12.5px] text-fg-2">
+      <PauseCircle size={14} className="shrink-0 text-fg-3" aria-hidden />
+      <span className="min-w-0 flex-1">Refreshes are paused on this copy: turn them on card by card, or all at once.</span>
+      <button type="button" onClick={() => setAsking(true)} className="shrink-0 rounded-md px-2 py-0.5 font-medium text-accent hover:bg-bg-2">
+        Turn all on
+      </button>
+      {asking && (
+        <Dialog
+          open
+          onClose={() => setAsking(false)}
+          part="board"
+          width={460}
+          title={paused.length === 1 ? <>Turn on the refreshes of one card?</> : <>Turn on the refreshes of {paused.length} cards?</>}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setAsking(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={() => (setAsking(false), onAllOn())}>
+                Turn all on
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-2 text-[13px] leading-relaxed text-fg-2">
+            <ul className="space-y-0.5">
+              {paused.map((c) => (
+                <li key={c.id} className="flex min-w-0 gap-1.5">
+                  <span translate="no" className="min-w-0 truncate font-medium text-fg">
+                    {cardTitle(c)}
+                  </span>
+                  <span className="shrink-0 text-fg-3">
+                    · <ScheduleWords s={c.refresh!.schedule!} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="rounded-xl border border-line bg-bg-1 px-3 py-2.5 text-[12.5px]">
+              {paused.length === unknown ? (
+                <span>What they cost is not known yet: it shows on each card after its first refresh.</span>
+              ) : (
+                <>
+                  <span className="font-medium text-fg">About {aboutUsd(month)} a month in all</span>
+                  {unknown ? <span> (and some whose cost is not known yet)</span> : null}
+                  <span>.</span>
+                </>
+              )}{' '}
+              {cap === null ? <span>This board has no monthly cap for refreshes.</span> : <span>Refreshes stop for the month at this board’s {aboutUsd(cap)} cap.</span>}
+            </p>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -379,6 +455,7 @@ export function RefreshDialog({
     >
       <div className="space-y-4 text-[13px]">
         <p className="leading-relaxed text-fg-2">An agent asks this again and draws the card anew with what it finds. It sends nothing: anything it would send or post is held instead.</p>
+        {r?.paused && <p className="rounded-lg bg-bg-1 px-3 py-2 text-[12.5px] text-fg-2">Its refreshes are paused, as on a copy: Save turns them on.</p>}
         <label className="block space-y-1.5">
           <span className="font-medium text-fg">The question</span>
           <textarea

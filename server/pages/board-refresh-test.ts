@@ -28,6 +28,7 @@ import type { SessionManager } from '../sessions.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { sharing } from '../spaces/share.ts';
 import { _test, capState, readAnswer, refreshNow, refreshState, refreshTaskId, startRefreshes } from './board-refresh.ts';
+import { allOn } from '../../shared/board-refresh.ts';
 import { readBoard } from './boards.ts';
 import { pages } from './index.ts';
 import { addVersion, createPage, deletePage, pageInfo, pageSource, restoreVersion } from './store.ts';
@@ -190,6 +191,8 @@ const shop = createPage(db, {
   title: 'Shop',
   kind: 'board',
   by: 'made',
+  // Set on purpose (as the board page or an agent sets them), not copied.
+  asIs: true,
   model: {
     format: 1,
     cards: [
@@ -201,9 +204,10 @@ const shop = createPage(db, {
 const salesTask = refreshTaskId(shop.id, 'csales1');
 {
   const t = taskRow(salesTask);
-  ok(t && t.enabled === 1 && t.next_at! > Date.now() && t.schedule === JSON.stringify(sched) && t.prompt === 'How did sales go this week?' && t.origin === `board:${shop.id}` && t.name === 'Shop: Weekly sales', `a card that refreshes by itself is a scheduled task of its own (${JSON.stringify(t)})`);
+  ok(t && t.enabled === 1 && t.next_at! > Date.now() && t.schedule === JSON.stringify(sched) && t.prompt === 'How did sales go this week?' && t.origin === `board:${shop.id}` && t.name === 'Shop · Weekly sales: refresh', `a card that refreshes by itself is a scheduled task of its own, named as the board’s (${JSON.stringify(t)})`);
   ok(!taskRow(refreshTaskId(shop.id, 'cstats1')), 'and one that does not, none');
-  ok(!scheduler.list().some((x) => x.id === salesTask) && scheduler.list({ boards: true }).some((x) => x.id === salesTask), 'it is the board’s: not in Settings → Scheduled tasks, but in Schedules');
+  const listed = scheduler.list().find((x) => x.id === salesTask);
+  ok(JSON.stringify(listed?.board) === JSON.stringify({ page: shop.id, card: 'csales1', title: 'Shop', cardTitle: 'Weekly sales' }) && !scheduler.list({ boards: false }).some((x) => x.id === salesTask), `the task lists (Settings → Scheduled tasks, hydor tasks) show it as the board card’s, to change there (${JSON.stringify(listed?.board)})`);
   let refused = '';
   try {
     scheduler.save({ ...scheduler.list({ boards: true }).find((x) => x.id === salesTask)!, prompt: 'Something else' });
@@ -323,10 +327,74 @@ const salesTask = refreshTaskId(shop.id, 'csales1');
   restoreVersion(db, shop.id, v);
   ok(taskRow(salesTask)?.schedule === '{"kind":"every","minutes":60}', 'a version brought back brings its schedule back');
   const copy = createPage(db, { title: 'Shop copy', kind: 'board', by: 'made', model: boardNow(shop.id) });
-  ok(!!taskRow(refreshTaskId(copy.id, 'csales1')), 'a copy refreshes as its original did');
+  ok(!taskRow(refreshTaskId(copy.id, 'csales1')) && boardNow(copy.id).cards.find((c) => c.id === 'csales1')?.refresh?.paused === true, 'a board made from another’s cards keeps their refreshes, paused: it does not start spending by itself');
+  addVersion(db, copy.id, { model: allOn(boardNow(copy.id)), by: 'edit' });
+  ok(!!taskRow(refreshTaskId(copy.id, 'csales1')) && !boardNow(copy.id).cards.some((c) => c.refresh?.paused), 'Turn all on gives them their schedules');
   deletePage(db, copy.id);
-  ok(!taskRow(refreshTaskId(copy.id, 'csales1')), 'a board deleted takes its schedules with it');
+  ok(!taskRow(refreshTaskId(copy.id, 'csales1')) && !runsOf(refreshTaskId(copy.id, 'csales1')).length, 'a board deleted takes its schedules with it');
+  // A card taken off the board takes its schedule (and its past refreshes) with it.
+  const other = createPage(db, { title: 'Other', kind: 'board', by: 'made', asIs: true, model: { format: 1, cards: [{ id: 'cgone1', ui: 'chart', data: CHART, size: 'l', pinnedAt: 1, refresh: { ask: 'q?', schedule: sched } }] } });
+  ok(!!taskRow(refreshTaskId(other.id, 'cgone1')), 'a board saved as it is (save_board’s own) keeps its refreshes on');
+  addVersion(db, other.id, { model: { format: 1, cards: [] }, by: 'edit' });
+  ok(!taskRow(refreshTaskId(other.id, 'cgone1')), 'a card taken off takes its schedule with it');
+  deletePage(db, other.id);
   addVersion(db, shop.id, { model: { ...b, cards: b.cards.map((c) => (c.id === 'csales1' ? { ...c, refresh: { ...c.refresh!, schedule: sched } } : c)) }, by: 'edit' });
+}
+
+// ---- copies never start spending by themselves ---------------------------------------------------------------------------
+{
+  const n = sessions.made.length;
+  // Duplicate in the Library.
+  const dup = (await req('POST', `/api/pages/${shop.id}/copy`)).json() as { page: { id: string } };
+  const d = boardNow(dup.page.id);
+  ok(d.cards.find((c) => c.id === 'csales1')?.refresh?.paused === true && d.cards.find((c) => c.id === 'csales1')?.refresh?.ask === 'How did sales go this week?' && !taskRow(refreshTaskId(dup.page.id, 'csales1')), 'Duplicate keeps a card’s refresh settings, paused, with no schedule');
+  ok(((await req('GET', `/api/boards/${dup.page.id}/refresh`)).json() as BoardRefreshState).cards.csales1 !== undefined, 'the copy’s page hears of the paused card');
+  const all = (await req('POST', `/api/boards/${dup.page.id}/refresh`)).json() as { started: number };
+  ok(all.started === 0 && sessions.made.length === n, 'Refresh all leaves paused cards alone');
+  // An agent's page_action duplicate.
+  const said = await tools.page_action.run({ id: shop.id, action: 'duplicate' }, ctx);
+  const text = typeof said === 'string' ? said : said.text;
+  const dupId = /\(page ([a-f0-9]{10})/.exec(text)?.[1] ?? '';
+  ok(dupId && boardNow(dupId).cards.find((c) => c.id === 'csales1')?.refresh?.paused === true && /refreshes are paused on the copy/.test(text), `page_action duplicate: paused too, and the agent hears so (${text.slice(-200)})`);
+  // A board made through the API with cards that refresh.
+  const api = (await req('POST', '/api/pages', { kind: 'board', title: 'Imported', model: { format: 1, cards: [{ ui: 'chart', data: CHART, refresh: { ask: 'Sales?', schedule: sched } }] } })).json() as { page: { id: string } };
+  ok(boardNow(api.page.id).cards[0].refresh?.paused === true, 'and one made through the API');
+  // save_board making a new board from another board's cards: those come paused; one set on purpose stays on.
+  const made = await tools.save_board.run(
+    {
+      title: 'Shop again',
+      cards: [
+        { ui: 'chart', data: NEW_CHART, refresh: { ask: 'How did sales go this week?', every: 'day', at: '07:00' } },
+        { ui: 'stats', data: { title: 'Orders today', stats: [{ label: 'Orders', value: 12 }] }, refresh: { ask: 'How many orders came in today?', every: 'hour' } },
+      ],
+    },
+    ctx,
+  );
+  const madeText = typeof made === 'string' ? made : made.text;
+  const again = boardNow(/\(page ([a-f0-9]{10})/.exec(madeText)![1]);
+  ok(again.cards[0].refresh?.paused === true && !again.cards[1].refresh?.paused, `save_board: a card copied from another board comes paused, one of its own stays on (${JSON.stringify(again.cards.map((c) => c.refresh))})`);
+  ok(/One card’s refreshes are paused, copied from another board’s/.test(madeText) && /\(paused until it is turned on\)/.test(madeText), `and the agent hears so (${madeText})`);
+  // An agent turning it on when asked, card by card.
+  const page = /\(page ([a-f0-9]{10})/.exec(madeText)![1];
+  await tools.save_board.run({ id: page, change: [{ id: again.cards[0].id, refresh: { paused: false } }] }, ctx);
+  ok(!boardNow(page).cards[0].refresh?.paused && !!taskRow(refreshTaskId(page, again.cards[0].id)), 'refresh: {paused: false} turns one on');
+  const got = await tools.get_page.run({ id: dup.page.id }, ctx);
+  ok(/paused, as on a copy/.test(typeof got === 'string' ? got : got.text), 'get_page says a copy’s refreshes are paused');
+  for (const id of [dup.page.id, dupId, api.page.id, page]) deletePage(db, id);
+}
+
+// ---- the agents' task tools ------------------------------------------------------------------------------------------------
+{
+  const atools = Object.fromEntries((automations.tools!(ctx) ?? []).map((t) => [t.name, t]));
+  const list = await atools.list_tasks.run({}, ctx);
+  ok(new RegExp(`${salesTask} · Shop · Weekly sales: refresh \\(a board card’s refresh`).test(typeof list === 'string' ? list : list.text), 'list_tasks shows a board’s refreshes, marked as the board’s');
+  let err = '';
+  try {
+    await atools.update_task.run({ id: salesTask, action: 'delete' }, ctx);
+  } catch (e) {
+    err = (e as Error).message;
+  }
+  ok(/is a board card’s refresh: change or stop it with save_board/.test(err), `update_task leaves it to save_board (${err})`);
 }
 
 // ---- the cap -----------------------------------------------------------------------------------------------------------------------

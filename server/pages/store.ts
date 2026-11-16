@@ -309,10 +309,14 @@ export function createPage(
     folder?: string | null;
     turn?: string;
     description?: unknown;
+    /** Keep the model as given: a board whose refreshes were set on purpose (save_board's), not copied. */
+    asIs?: boolean;
   },
 ): PageInfo {
   const kind = p.kind ?? 'page';
-  const { text: html, sources } = contentOf(db, kind, p);
+  // A new page of a kind made from a model: what it keeps of it (a copied board's refreshes come paused).
+  const asNew = kind !== 'page' && p.model !== undefined && !p.asIs ? kindOf(kind)?.asNew : undefined;
+  const { text: html, sources } = contentOf(db, kind, asNew ? { ...p, model: asNew(p.model) } : p);
   const title = cleanTitle(p.title, DEFAULT_TITLE[kind] ?? 'Page');
   if ((db.prepare('select count(*) as n from pages').get() as { n: number }).n >= MAX_PAGES) throw new HttpError(409, `Pages holds at most ${MAX_PAGES} pages; delete some first.`);
   const now = Date.now();

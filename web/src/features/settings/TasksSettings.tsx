@@ -4,7 +4,7 @@
 // keeps how each run went. Examples start common ones from a short form.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
-import { CalendarClock, CalendarDays, ChevronDown, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MailX, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
+import { CalendarClock, CalendarDays, ChevronDown, Copy, CopyPlus, Eye, FlaskConical, LayoutDashboard, ListChecks, MailX, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
 import { hookHelp } from '@shared/engineering';
 import type { AppDef } from '@shared/apps';
@@ -42,7 +42,74 @@ export function draftOf(t: ScheduledTask): TaskDraft {
   return { name, prompt, schedule, agent, acpAgent, cwd, model, effort, mode, target, extra, failLimit, app };
 }
 
+/** Where a board card's refreshes are changed: the board, with that card's settings open. */
+const boardCardPath = (b: NonNullable<ScheduledTask['board']>) => `/pages/${enc(b.page)}?card=${enc(b.card)}`;
+
+/**
+ * A board card's refreshes ("Shop · Sales by day: refresh"): they read as the board's, and are changed on its card (Keep
+ * it up to date…), not in the task form, which would part them from the card's settings. Its switch pauses them.
+ */
+function BoardTaskRow({ t, onChanged, flush }: { t: ScheduledTask; onChanged: () => void; flush?: boolean }) {
+  const b = t.board!;
+  const [busy, setBusy] = useState(false);
+  return (
+    <Row
+      className={flush ? 'px-0!' : undefined}
+      icon={<LayoutDashboard size={16} />}
+      label={
+        <span translate="no" className="truncate">
+          {t.name}
+        </span>
+      }
+      hint={
+        <>
+          {scheduleText(t.schedule, undefined, LOCALE)} · <span>a board card’s refresh</span>
+          {t.enabled && t.nextAt ? ` · next ${untilText(t.nextAt)}` : ''}
+        </>
+      }
+      control={
+        <>
+          <Switch on={t.enabled} label={t.enabled ? 'Pause' : 'Turn on'} onChange={(on) => post(`/api/automations/tasks/${enc(t.id)}/enabled`, { on }).then(onChanged).catch(toastError)} />
+          <IconButton
+            label="Refresh now"
+            size="sm"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await post(`/api/boards/${enc(b.page)}/cards/${enc(b.card)}/refresh`, {});
+                toast(`Refreshing ${b.cardTitle}`, 'ok');
+              } catch (e) {
+                toastError(e);
+              } finally {
+                setBusy(false);
+                onChanged();
+              }
+            }}
+          >
+            {busy ? <Throbber /> : <Play size={14} />}
+          </IconButton>
+          <Button size="sm" variant="ghost" icon={<LayoutDashboard size={13} />} title="Change it on its board" onClick={() => go(boardCardPath(b))}>
+            Open the board
+          </Button>
+        </>
+      }
+    >
+      {t.pausedReason && !t.enabled ? (
+        <Notice tone="warn" className="px-2.5 py-1.5">
+          <span className="text-[12px]">{t.pausedReason}</span>
+        </Notice>
+      ) : null}
+    </Row>
+  );
+}
+
 export function TaskRow({ t, onEdit, onDuplicate, onChanged, flush }: { t: ScheduledTask; onEdit: () => void; onDuplicate: () => void; onChanged: () => void; flush?: boolean }) {
+  if (t.board) return <BoardTaskRow t={t} onChanged={onChanged} flush={flush} />;
+  return <PlainTaskRow t={t} onEdit={onEdit} onDuplicate={onDuplicate} onChanged={onChanged} flush={flush} />;
+}
+
+function PlainTaskRow({ t, onEdit, onDuplicate, onChanged, flush }: { t: ScheduledTask; onEdit: () => void; onDuplicate: () => void; onChanged: () => void; flush?: boolean }) {
   const home = useApp((s) => s.boot?.home);
   const acpName = useApp((s) => (t.agent === 'acp' ? s.boot?.acpAgents?.find((a) => a.id === t.acpAgent)?.name : undefined));
   const [menu, setMenu] = useState(false);
@@ -673,7 +740,9 @@ export function TasksSettings() {
   const opened = useRef<string | null>(null);
   useEffect(() => {
     const t = asked && asked !== opened.current ? tasks?.find((x) => x.id === asked) : undefined;
-    if (t) (opened.current = asked, setEditing({ task: t }));
+    // A board card's refreshes open on its board, where they are changed.
+    if (t?.board) (opened.current = asked, go(boardCardPath(t.board)));
+    else if (t) (opened.current = asked, setEditing({ task: t }));
   }, [asked, tasks]);
   const load = () =>
     api<{ tasks: ScheduledTask[] }>('/api/tasks')

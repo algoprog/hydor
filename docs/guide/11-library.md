@@ -1013,6 +1013,8 @@ On the board, a card that refreshes says so in the line above it: "Updated 07:00
 
 When a refresh fails (the agent could not find what the card needs, or answered with another kind of card), the card keeps its last good data, and a line above it says "Could not update:" and why, with **Try again**. After three failed refreshes in a row, the card's schedule pauses and says so, and you get one notice; **Try again** that works turns it on again.
 
+**A copy starts paused**: a board made from cards that refresh (**Duplicate**, or a board an agent makes from another board's cards) keeps their settings, but they do not refresh by themselves: a copy never starts spending on its own. The board says so at the top: "Refreshes are paused on this copy: turn them on card by card, or all at once." **Turn all on** first lists them with what they come to a month, then turns them on; or open a card's **Keep it up to date…**, where **Save** turns that one on.
+
 **What it costs, and a cap**: each board has a monthly cap for its refreshes, $5 unless you change it. The coin button at the top of the board shows what its refreshes spent this month of it ("$1.20 of $5"): click it to change the cap, or pick **No cap**. When the cap is reached, refreshes stop until the month ends, the board says so at the top (with **Raise the cap**), and you get one notice. Each refresh's conversation is also capped at what is left.
 
 Refreshes show in [Agents → Schedules](/agents/schedules) with everything else that runs by itself, as the board's ([See the week](/guide/tasks#see-the-week-what-ran-and-what-runs-next)): each run, how it went and what it cost. Its switch there pauses a card's schedule too. On a phone, the same buttons are on the card and at the top of the board.
