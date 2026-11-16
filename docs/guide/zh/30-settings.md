@@ -167,6 +167,7 @@
 [设置 → 定时任务](/settings?s=tasks)：自动开始的智能体工作：按计划、仅一次，或在 webhook 调用时。详见[定时任务](/guide/tasks)。
 
 - [**新建任务**](/settings?s=tasks&find=New%20task)：自动开始的智能体工作。
+- [**周视图**](/settings?s=tasks&find=Week%20view)：所有自己运行的工作，按周显示：运行过什么，接下来运行什么。
 - [**从示例开始**](/settings?s=tasks&find=Start%20from%20an%20example)：现成的定时任务。
 - [**晨间简报**](/settings?s=tasks&find=Morning%20brief)：现成的定时任务。
 - [**某个话题的新闻**](/settings?s=tasks&find=News%20on%20a%20topic)：现成的定时任务。
