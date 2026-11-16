@@ -640,8 +640,9 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     if (finding) useSessionShow.getState().show(sessionKey, 'conversation');
   }, [finding, sessionKey]);
 
-  // Looking at a session that finished since you last did marks it read (on every device).
-  const unread = !!summary && (summary.doneAt ?? 0) > (summary.seenAt ?? 0);
+  // Looking at a session that finished since you last did marks it read (on every device); one whose turn ended another
+  // way (it failed, or was quick) is marked seen too, for the start page's "While you were away".
+  const unread = !!summary && Math.max(summary.doneAt ?? 0, summary.endedAt ?? 0) > (summary.seenAt ?? 0);
   useEffect(() => {
     if (!unread) return;
     const mark = () => document.visibilityState === 'visible' && post(`/api/sessions/${enc(sessionKey)}/seen`).catch(() => {});

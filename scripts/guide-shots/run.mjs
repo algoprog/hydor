@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Browser, sleep } from './cdp.mjs';
-import { CATALOG, EMAIL, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi } from './demo.mjs';
+import { awayData, CATALOG, EMAIL, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi } from './demo.mjs';
 import { SHOTS as GUIDE_SHOTS } from './shots.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -171,6 +171,7 @@ async function main() {
      on conflict(key) do update set created_by_app = 1, created_at = excluded.created_at, updated_at = excluded.updated_at`,
   );
   for (const x of Object.values(sessions)) own.run(x.key, x.at - 60_000, x.at);
+  awayData(db, sessions, now);
   db.close();
   // The sessions once the app has read their transcripts.
   const keys = [...Object.values(sessions), ...Object.values(imported)].map((s) => s.key);
@@ -213,10 +214,10 @@ async function main() {
   }
 }
 
-/** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox, Settings → Models
- * and the models it suggests, and Experiments' GPUs. */
+/** The faked parts: sessions waiting on a card, Claude Code's models, the plans' usage, the inbox (and what waits on you
+ * in While you were away), Settings → Models and the models it suggests, and Experiments' GPUs. */
 async function route(p, api, fake) {
-  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue)/, async (req) => {
+  await p.route(/\/api\/(sessions(\?|\/[^/?]+(\?|$))|usage|inbox|away(\?|$)|catalog\/claude|models(\?|$)|models\/picks|experiments\/queue)/, async (req) => {
     if (req.method !== 'GET') return null;
     const u = new URL(req.url);
     if (u.pathname === '/api/models') return { json: fake.models(await api('GET', u.pathname)) };
@@ -224,6 +225,7 @@ async function route(p, api, fake) {
     if (u.pathname === '/api/catalog/claude') return { json: { ...(await api('GET', u.pathname)), models: CATALOG.claude } };
     if (u.pathname === '/api/usage') return { json: { ...fake.usage, accounts: {} } };
     if (u.pathname === '/api/inbox') return { json: { items: fake.inbox } };
+    if (u.pathname === '/api/away') return { json: fake.away(await api('GET', u.pathname + u.search)) };
     if (u.pathname === '/api/experiments/queue') {
       const { gpuNote, ...q } = await api('GET', u.pathname);
       return { json: { ...q, gpus: fake.gpus } };

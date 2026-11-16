@@ -42,9 +42,11 @@ the real app's).
   its last commit, and one change not committed, sessions written as Claude Code transcripts (steps, a web
   search, files handed over, a picture and a clip made), and what the app's own API keeps (projects, guidelines,
   memory notes, scheduled tasks at times well away from now, pages, the Library's images and videos, apps, learned
-  skills). The pictures and clips are in `media/`: made once through OpenRouter, kept small. What only a running agent or a real account has
+  skills). The pictures and clips are in `media/`: made once through OpenRouter, kept small. How some sessions ended and a few scheduled runs (`awayData`) go straight into its
+  database, for the start page's While you were away. What only a running agent or a real account has
   is answered to the page instead (`overrides`): two sessions waiting on a card, Claude Code's model list, the
-  plans' usage, the inbox, and Settings → Models with the models it suggests.
+  plans' usage, the inbox (and what waits on you in While you were away), and Settings → Models with the models it
+  suggests.
 - `shots.mjs` lists the shots: the page, what to open on it (a menu, a folded group of steps) and the part to
   keep. Desktop shots are 1280×800 CSS pixels (taller where a page needs it) at twice the resolution, cut to
   that part and at most 1600 pixels wide; `devices` is a 390×844 phone at 780 pixels wide.
