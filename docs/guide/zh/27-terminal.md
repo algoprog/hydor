@@ -201,7 +201,7 @@ hydor away                           # 你不在时发生了什么
 | 命令 | 作用 |
 | --- | --- |
 | `hydor projects` | `list`、`show`、`new`、`rename`、`edit`（描述、准则、它以哪个智能体开始、文件夹）、`sessions`、`files`（它读取的文档：`files add` 和 `files remove`）和 `remove`。 |
-| `hydor tasks` | 你的[定时任务](/guide/tasks)，以及其他自己启动的工作：`list`、`show`、`new`（何时运行：`--every 2h`、`--at 09:00 --days weekdays`、`--cron`、`--once`；或者 `--webhook`、`--watch-feed`、`--watch-page`、`--watch-folder`，或者用 `--watch-account` 加 `--tool` 监测已连接应用里的新条目，再加 `--before 30m` 则在日历中每个日程开始前的某个时间运行）、`edit`、`pause`、`resume`、`run`（立即运行，暂停时也可以）、`runs`（最近的几次运行，`--reply` 显示最后一次的回复）和 `remove`。监视某条命令或某个 JSON 地址要在页面上做。 |
+| `hydor tasks` | 你的[定时任务](/guide/tasks)，以及其他自己启动的工作：`list`、`show`、`new`（何时运行：`--every 2h`、`--at 09:00 --days weekdays`、`--cron`、`--once`；或者 `--webhook`、`--watch-feed`、`--watch-page`、`--watch-folder`，或者用 `--watch-account` 加 `--tool` 监测已连接应用里的新条目，再加 `--before 30m` 则在日历中每个日程开始前的某个时间运行）、`edit`、`pause`、`resume`、`run`（立即运行，暂停时也可以）、`runs`（最近的几次运行，`--reply` 显示最后一次的回复）和 `remove`。监视某条命令或某个 JSON 地址要在页面上做。看板卡片的刷新会作为看板的列出（“Shop · Sales by day: refresh”）：`pause`、`resume` 和 `run` 对它们有效，`show` 会说明要在看板上修改它们。 |
 | `hydor apps` | 你的[应用](/guide/apps)和现成的应用：`list`、`show`、`run`（表单的答案写成 `字段=值`，或者用 `--input` 给出 JSON；它会打印答案和花费）、`runs`、`run-show`（查看某一次运行）和 `remove`。`hydor app …`（不带 s）用来把应用做成文件：`new`、`folder`、`dev`、`try`、`export`、`import`。 |
 | `hydor library` | [资料库](/guide/library)：`list`（`--kind`、`--project`）、`search`、`show`（文档的文字、看板的卡片，或者这一项是什么）、`export`（`--to pdf`、`docx`、`pptx`……，`-o 文件`）、`open`（它的编辑器的地址）、`remove`、`refreshes`（你的看板上有哪些会刷新、什么时候刷新、要花多少钱）和 `refresh`（立即刷新看板的一张卡片，或者全部卡片）。 |
 | `hydor experiments` | 训练和评估运行：`list`、`show` 和 `stop`。开始一次运行是智能体和页面的事。 |

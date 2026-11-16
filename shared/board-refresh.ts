@@ -24,6 +24,11 @@ export interface CardRefresh {
   tier?: Tier;
   /** What its last refresh cost, in dollars (its session's cost at API prices). */
   costUsd?: number;
+  /**
+   * It does not refresh by itself until it is turned on: a board made from cards that refresh (a copy, an import, an
+   * agent's board made from another's cards) never starts spending by itself.
+   */
+  paused?: true;
 }
 
 /** The longest question a card keeps. */
@@ -73,7 +78,25 @@ export function cleanRefresh(v: unknown): CardRefresh | undefined {
     if (v.tier !== DEFAULT_REFRESH_TIER) out.tier = v.tier;
   }
   if (typeof v.costUsd === 'number' && Number.isFinite(v.costUsd) && v.costUsd >= 0) out.costUsd = Math.round(v.costUsd * 10_000) / 10_000;
+  if (v.paused === true) out.paused = true;
   return out;
+}
+
+/** Whether a card refreshes by itself now: it has a schedule, and is not paused. */
+export const refreshesByItself = (r: CardRefresh | undefined): boolean => !!r?.schedule && !r.paused;
+
+/**
+ * A board's model as a new board gets it (a copy, an import, one made through the API): each card that refreshes on a
+ * schedule comes paused, to be turned on card by card or all at once. Anything else is left as it is (checked later).
+ */
+export function pausedCopy(model: unknown): unknown {
+  if (!isObj(model) || !Array.isArray(model.cards)) return model;
+  return { ...model, cards: model.cards.map((c) => (isObj(c) && isObj(c.refresh) && c.refresh.schedule ? { ...c, refresh: { ...c.refresh, paused: true } } : c)) };
+}
+
+/** The board with every card's refreshes turned on (Turn all on). */
+export function allOn<B extends { cards: { refresh?: CardRefresh }[] }>(b: B): B {
+  return { ...b, cards: b.cards.map((c) => (c.refresh?.paused ? { ...c, refresh: Object.fromEntries(Object.entries(c.refresh).filter(([k]) => k !== 'paused')) as unknown as CardRefresh } : c)) };
 }
 
 /** A card's tier for refreshes. */

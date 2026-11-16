@@ -654,7 +654,10 @@ app.post('/api/sessions/:key/message', async (req) => {
 app.get('/api/tasks', async () => ({ tasks: scheduler.list() }));
 app.post('/api/tasks', async (req) => ({ task: scheduler.save((req.body ?? {}) as any) }));
 app.delete('/api/tasks/:id', async (req) => {
-  scheduler.remove((req.params as { id: string }).id);
+  const id = (req.params as { id: string }).id;
+  // A board card's refreshes go with the card's setting: stopped there, its task goes too.
+  if (scheduler.isBoard(id)) throw new HttpError(400, 'This is a board card’s refresh: stop it on its board (the card’s … menu → Stop refreshing).');
+  scheduler.remove(id);
   return { ok: true };
 });
 app.post('/api/tasks/:id/run', async (req) => ({ key: await scheduler.runNow((req.params as { id: string }).id) }));

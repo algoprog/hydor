@@ -233,6 +233,34 @@ test('run, runs and remove call their routes; remove asks first', async () => {
   assert.match((await run(fakeConn({ ...routes, 'GET /api/automations/tasks/t2def/runs': { runs: [] } }).conn, ['tasks', 'runs', 'disk'])).out, /has not run yet/);
 });
 
+test('a board card’s refresh reads as the board’s, and is changed or stopped there, not here', async () => {
+  const refresh = {
+    id: 'board-b0d7777777-csales1',
+    name: 'Shop · Sales by day: refresh',
+    prompt: 'How did sales go each day this week?',
+    schedule: { kind: 'daily', time: '07:00' },
+    agent: 'claude',
+    cwd: '/home/u',
+    enabled: true,
+    nextAt: Date.now() + 3600_000,
+    createdAt: 4,
+    origin: 'board:b0d7777777',
+    board: { page: 'b0d7777777', card: 'csales1', title: 'Shop', cardTitle: 'Sales by day' },
+  };
+  const { conn, calls } = fakeConn({
+    'GET /api/tasks': { tasks: [brief, refresh] },
+    [`POST /api/automations/tasks/${refresh.id}/enabled`]: (b: unknown) => ({ task: { ...refresh, enabled: (b as { on: boolean }).on } }),
+  });
+  assert.match((await run(conn, ['tasks'], { width: 140 })).out, /Shop · Sales by day: refresh/);
+  const shown = (await run(conn, ['tasks', 'show', 'Shop · Sales'], { width: 160 })).out;
+  assert.match(shown, /Refreshes\s+the card “Sales by day” on the board “Shop”: change it there \(http:\/\/fake\/pages\/b0d7777777\?card=csales1\)/);
+  assert.match(shown, /The question it asks again/);
+  await assert.rejects(run(conn, ['tasks', 'edit', 'Shop · Sales', '--at', '08:00']), (e) => e instanceof UsageError && /is a board card’s refresh: change it on the board/.test((e as Error).message));
+  await assert.rejects(run(conn, ['tasks', 'remove', 'Shop · Sales', '-y']), (e) => e instanceof UsageError && /stop it on the board/.test((e as Error).message));
+  assert.match((await run(conn, ['tasks', 'pause', 'Shop · Sales'])).out, /Paused “Shop · Sales by day: refresh”/);
+  assert.deepEqual(calls.filter((c) => c.method === 'POST').map((c) => [c.path, c.body]), [[`/api/automations/tasks/${refresh.id}/enabled`, { on: false }]], 'paused by its switch alone, never saved through the task form');
+});
+
 test('times, days and intervals are read as people write them', () => {
   assert.equal(parseMinutes('30'), 30);
   assert.equal(parseMinutes('30m'), 30);

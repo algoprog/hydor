@@ -24407,5 +24407,22 @@
 "Write the question to ask each time":"写下每次要问的问题",
 "board::Day":"星期",
 "board::The question":"问题",
-"board::How often":"多久一次"
+"board::How often":"多久一次",
+"(and some whose cost is not known yet)":"（还有一些的花费尚不清楚）",
+"a board card’s refresh":"看板卡片的刷新",
+"a month in all":"每月合计",
+"About {0} a month in all":"每月合计大约 {0}",
+"cap.":"上限。",
+"cards?":"张卡片的刷新？",
+"Its refreshes are paused, as on a copy: Save turns them on.":"它的刷新已暂停，就像在副本上一样：点 保存 即可开启。",
+"Open the board":"打开看板",
+"Refreshes are paused on this copy: turn them on card by card, or all at once.":"这个副本上的刷新已暂停：可以逐张卡片开启，也可以一次全部开启。",
+"Refreshes stop for the month at this board’s {0} cap.":"刷新会在达到这个看板 {0} 的上限时停止，直到本月结束。",
+"Refreshing {0}":"正在刷新 {0}",
+"This is a board card’s refresh: stop it on its board (the card’s … menu → Stop refreshing).":"这是看板卡片的刷新：请在它的看板上停止（卡片的 … 菜单 → 停止刷新）。",
+"Turn all on":"全部开启",
+"Turn on the refreshes of":"开启以下卡片的刷新：",
+"Turn on the refreshes of {0} cards?":"开启 {0} 张卡片的刷新？",
+"Turn on the refreshes of one card?":"开启一张卡片的刷新？",
+"What they cost is not known yet: it shows on each card after its first refresh.":"还不知道它们要花多少钱：每张卡片第一次刷新后会显示。"
 }
