@@ -3,7 +3,7 @@
 // sections in a menu beside the open one; on phones a list, each section on its own page.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
-import { Bell, Blocks, Bot, Cable, CalendarClock, ChevronRight, Cpu, GitPullRequest, KeyRound, MessagesSquare, Plug, ScrollText, Server, Signature, SlidersHorizontal, Sparkles, type LucideIcon, UserRound } from 'lucide-react';
+import { Bell, Blocks, Bot, Cable, CalendarClock, ChevronRight, Cpu, GitPullRequest, KeyRound, MessagesSquare, Plug, ScrollText, Server, Signature, SlidersHorizontal, Smartphone, Sparkles, type LucideIcon, UserRound } from 'lucide-react';
 import { featureSections } from '../registry';
 import { SECTION_TOPIC } from '@shared/find-catalog';
 import { HeaderSlot } from './kit';
@@ -30,6 +30,7 @@ import { GuidelinesSettings } from '../guidelines/parts';
 import { SignatureSettings } from '../signatures/SignatureSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { NotificationSettings } from './NotificationSettings';
+import { PhoneSettings } from './PhoneSettings';
 import { SecuritySettings } from './SecuritySettings';
 import { AccountSettings } from './AccountSettings';
 
@@ -51,6 +52,7 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
     items: [
       { id: 'general', label: 'General', icon: SlidersHorizontal, sub: 'Theme, and what Enter does while an agent works' },
       { id: 'notifications', label: 'Notifications', icon: Bell, sub: 'When a session finishes, fails or needs your answer' },
+      { id: 'phone', label: 'Use on your phone', icon: Smartphone, sub: 'Open the app on your own phone, privately with Tailscale, and get its notifications there' },
       { id: 'chat', label: 'Chat apps', icon: MessagesSquare, sub: 'Talk to your agents from Telegram, Discord or Slack: start sessions, send photos, files and voice messages, get their replies, answer what they ask' },
       { id: 'security', label: 'Password', icon: KeyRound, sub: 'The password for this app, and signing out' },
       { id: 'signatures', label: 'Signatures', icon: Signature, sub: 'Your signature and initials, drawn once and kept encrypted, for the documents you sign' },
@@ -94,6 +96,8 @@ function SectionBody({ id, cwd, agent, onAgent, onCwd }: { id: SettingsSection; 
       return <GeneralSettings />;
     case 'notifications':
       return <NotificationSettings />;
+    case 'phone':
+      return <PhoneSettings />;
     case 'chat':
       return <ChatAppsSettings />;
     case 'security':

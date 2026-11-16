@@ -39,6 +39,16 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Sound**](/settings?s=notifications&find=Sound): A short chime with each notice while the app is open.
 - [**Send a test**](/settings?s=notifications&find=Send%20a%20test): Send a notice to this device now.
 
+### Use on your phone
+
+[Settings → Use on your phone](/settings?s=phone): open the app on your own phone, privately with Tailscale, and get its notifications there. More in [Phones, other machines and sharing](/guide/devices).
+
+- [**Serve it on my devices**](/settings?s=phone&find=Serve%20it%20on%20my%20devices): Publishes the app over HTTPS to the devices signed in to your Tailscale account only, never the public internet.
+- [**Tailscale on this computer**](/settings?s=phone&find=Tailscale%20on%20this%20computer): Whether Tailscale is installed and signed in here, and this computer’s name on your tailnet.
+- [**Open it on your phone**](/settings?s=phone&find=Open%20it%20on%20your%20phone): A QR code of the app’s address for your phone’s camera, and the steps on the phone.
+- [**Stop serving**](/settings?s=phone&find=Stop%20serving): Takes the app off your tailnet again, undoing exactly what Serve it on my devices did.
+- [**Add to Home Screen**](/settings?s=phone&find=Add%20to%20Home%20Screen): On the phone: Hydor with its own icon, full screen; iPhone notifications need it.
+
 ### Chat apps
 
 [Settings → Chat apps](/settings?s=chat): talk to your agents from Telegram, Discord or Slack: start sessions, send photos, files and voice messages, get their replies, answer what they ask. More in [Phones, other machines and sharing](/guide/devices).
