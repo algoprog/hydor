@@ -6,7 +6,7 @@ export const DATA: AnswerUiSpec[] = [
     id: 'chart',
     title: 'Chart',
     group: 'data',
-    use: 'Numbers drawn as a line, area, bar, stacked bar, horizontal bar, pie, donut, scatter or radar chart, with a legend and values on hover.',
+    use: 'Numbers drawn as a line, area, bar, stacked bar, horizontal bar, pie, donut, scatter or radar chart, with a legend and values on hover. It can read its numbers from a spreadsheet or a data file.',
     keywords: 'chart graph plot trend over time line bar pie donut scatter radar series data visualization statistics',
     shape: `{
   title?: string
@@ -25,6 +25,22 @@ export const DATA: AnswerUiSpec[] = [
   note?: md                    // under the chart
   source?: { name: string, url?: url }
 }`,
+    ref: {
+      shape: `{
+  title?: string
+  kind: "line" | "area" | "bar" | "stacked-bar" | "hbar" | "pie" | "donut" | "scatter" | "radar"
+  from: { sheet: string, range?: string } | { file: string }
+  x: string                    // the column of labels along the x axis (a pie's slices), by its heading
+  y: string | string[]         // a series each: "sum(Revenue)", "count()", "avg(Price) as Average price"; a column as it is adds up for each label
+  groupBy?: string             // instead, a series for each of this column's values (a region, a product), of one y
+  where?: string
+  sort?: string | string[]     // the labels' order: by x, or by a y ("-sum(Revenue)": highest first); else as they come
+  limit?: number               // how many labels (1000 at most)
+  label?: string               // scatter: the column naming each point (x and y are then columns of numbers)
+  unit?: string, prefix?: string, y_label?: string, x_label?: string, min?: number, note?: md
+}`,
+      example: { title: 'Sales by month', kind: 'line', from: { sheet: 'Shop numbers', range: 'Sales' }, x: 'Month', y: 'sum(Revenue)', groupBy: 'Region', prefix: '$' },
+    },
     example: {
       title: 'Average daily high, Athens and Boston',
       kind: 'line',
@@ -43,7 +59,7 @@ export const DATA: AnswerUiSpec[] = [
     id: 'table',
     title: 'Data table',
     group: 'data',
-    use: 'Rows of data with typed columns (numbers, money, dates, links, pictures, tags, bars, ratings): sort by any column, filter, add totals, copy or download as CSV.',
+    use: 'Rows of data with typed columns (numbers, money, dates, links, pictures, tags, bars, ratings): sort by any column, filter, add totals, copy or download as CSV. It can read its numbers from a spreadsheet or a data file.',
     keywords: 'table rows columns data dataset spreadsheet list records sortable filter csv results numbers',
     shape: `{
   title?: string
@@ -59,6 +75,21 @@ export const DATA: AnswerUiSpec[] = [
   totals?: string[]            // number columns to add up in a last row
   note?: md
 }`,
+    ref: {
+      shape: `{
+  title?: string
+  from: { sheet: string, range?: string } | { file: string }
+  columns?: (string | { key: string, label?: string, type?: string, unit?: string, currency?: string })[]
+                               // by heading, or "sum(Total) as Revenue", "count() as Orders"; left out: every column (with groupBy, its columns and a count)
+  groupBy?: string | string[]
+  where?: string
+  sort?: string | string[]     // "-Revenue": highest first
+  limit?: number               // how many rows (1000 at most)
+  totals?: string[]            // columns, by label, to add up in a last row
+  note?: md
+}`,
+      example: { title: 'Orders by region', from: { file: 'data/orders.csv' }, columns: ['Region', 'count() as Orders', 'sum(Total) as Revenue'], groupBy: 'Region', sort: '-Revenue', totals: ['Orders', 'Revenue'] },
+    },
     example: {
       title: 'The ten largest moons in the Solar System',
       columns: [
@@ -88,7 +119,7 @@ export const DATA: AnswerUiSpec[] = [
     id: 'stats',
     title: 'Key figures',
     group: 'data',
-    use: 'Key numbers as tiles, each with its change since before (green when better, red when worse), a small trend line and a note.',
+    use: 'Key numbers as tiles, each with its change since before (green when better, red when worse), a small trend line and a note. It can read its numbers from a spreadsheet or a data file.',
     keywords: 'kpi metrics key figures stats dashboard numbers tiles change growth trend sparkline scorecard',
     shape: `{
   title?: string
@@ -106,6 +137,23 @@ export const DATA: AnswerUiSpec[] = [
   }[]                          // 2 to 8
   note?: md
 }`,
+    ref: {
+      shape: `{
+  title?: string
+  period?: string
+  from: { sheet: string, range?: string } | { file: string }
+  where?: string               // for every tile
+  stats: {
+    label: string
+    value: string              // "sum(Total)", "count()", "avg(Delivery days)"; a column as it is: its last value
+    where?: string             // this tile's own filter, besides the card's
+    by?: string                // a column of periods ("Month"): the value is the last period's, with a trend line of them all and the change from the one before (in %)
+    change?: "diff"            // with by: the change as a difference instead of a percentage
+    unit?: string, prefix?: string, good?: "up" | "down", note?: string
+  }[]
+}`,
+      example: { title: 'Clay & Kiln shop', from: { sheet: 'Shop numbers', range: 'Orders' }, stats: [{ label: 'Revenue this month', value: 'sum(Total)', by: 'Month', prefix: '$' }, { label: 'Orders this month', value: 'count()', by: 'Month' }, { label: 'Open orders', value: 'count()', where: 'Status = \'Open\'', good: 'down' }] },
+    },
     example: {
       title: 'Clay & Kiln shop',
       period: 'October 2026, against September',
@@ -467,7 +515,7 @@ export const DATA: AnswerUiSpec[] = [
     id: 'distribution',
     title: 'Histogram and box plots',
     group: 'data',
-    use: 'How values spread: a histogram marking the mean and median, the summary (count, quartiles, spread), or groups compared as box plots; counts on hover.',
+    use: 'How values spread: a histogram marking the mean and median, the summary (count, quartiles, spread), or groups compared as box plots; counts on hover. It can read its numbers from a spreadsheet or a data file.',
     keywords: 'distribution histogram box plot spread frequency bins quartiles median mean standard deviation outliers percentiles exam scores',
     shape: `{
   title?: string
@@ -480,6 +528,17 @@ export const DATA: AnswerUiSpec[] = [
   note?: md
 }
 Values or bins draw a histogram, groups draw box plots; give both to show both.`,
+    ref: {
+      shape: `{
+  title?: string
+  from: { sheet: string, range?: string } | { file: string }
+  values: string               // the column of numbers, as they are (no sum): a histogram of them
+  groupBy?: string             // and a box plot for each of this column's values
+  where?: string
+  bin_width?: number, unit?: string, marks?: { value: number, label: string }[], note?: md
+}`,
+      example: { title: 'Delivery times by carrier', from: { file: 'data/deliveries.csv' }, values: 'Days', groupBy: 'Carrier', where: 'Country = \'GR\'', unit: 'days' },
+    },
     example: {
       title: 'Physics midterm, 58 students',
       values: [58, 89, 85, 80, 78, 38, 68, 87, 81, 23, 76, 70, 62, 72, 70, 58, 71, 68, 76, 52, 70, 69, 72, 91, 77, 58, 80, 61, 71, 31, 69, 84, 71, 86, 67, 61, 70, 46, 78, 64, 66, 78, 64, 80, 71, 61, 77, 85, 69, 67, 53, 68, 58, 94, 67, 69, 70, 67],
@@ -600,7 +659,7 @@ Values or bins draw a histogram, groups draw box plots; give both to show both.`
     id: 'map-values',
     title: 'Values on a map',
     group: 'data',
-    use: 'Numbers at places (city populations, earthquakes, sales by store): circles sized by value on a map, beside a ranked list with bars.',
+    use: 'Numbers at places (city populations, earthquakes, sales by store): circles sized by value on a map, beside a ranked list with bars. It can read its numbers from a spreadsheet or a data file.',
     keywords: 'map values bubble map circles sized by value cities populations earthquakes sales by store region geography per city choropleth',
     shape: `{
   title?: string
@@ -609,6 +668,18 @@ Values or bins draw a histogram, groups draw box plots; give both to show both.`
   prefix?: string              // before them ("$")
   note?: md
 }`,
+    ref: {
+      shape: `{
+  title?: string
+  from: { sheet: string, range?: string } | { file: string }
+  points: { name: string, lat: string, lng: string, value: string, note?: string }   // the columns of each: value "Orders", or "sum(Orders)" for each name
+  where?: string
+  sort?: string                // highest value first unless set
+  limit?: number               // how many places (500 unless set; 2000 at most)
+  unit?: string, prefix?: string, note?: md
+}`,
+      example: { title: 'Orders by city', from: { sheet: 'Shop numbers', range: 'Cities' }, points: { name: 'City', lat: 'Lat', lng: 'Lng', value: 'sum(Orders)' }, unit: 'orders' },
+    },
     example: {
       title: 'Where Clay & Kiln’s October orders went',
       unit: 'orders',

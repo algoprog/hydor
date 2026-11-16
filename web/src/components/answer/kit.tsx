@@ -38,6 +38,8 @@ export interface AuiInfo {
   keep: string;
   /** The gallery's example: there is no message box to put words in. */
   demo?: boolean;
+  /** The board (a Library page) it is pinned to, when it is drawn on one: what a card reading a source may read. */
+  board?: string;
 }
 
 export const AuiCtx = createContext<AuiInfo>({ done: true, keep: '' });
