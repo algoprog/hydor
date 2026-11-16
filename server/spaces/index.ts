@@ -21,7 +21,7 @@ import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
 import { claimSessions } from './found.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
-import { clearSpaceSwitches, copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, setSpaceSwitch, skillsOf, spaceSkillDoc, spaceSkillsView, spaceSwitches } from '../skillpack/spaceSkills.ts';
+import { clearSpaceSwitches, copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, setSpaceSwitch, switchSpaceSkillsOff, skillsOf, spaceSkillDoc, spaceSkillsView, spaceSwitches } from '../skillpack/spaceSkills.ts';
 
 const made = new WeakSet<DB>();
 function tables(db: DB) {
@@ -366,6 +366,13 @@ export const spaces: Feature = {
     d.app.put('/api/projects/:id/skill-switches', async (req) => {
       const s = space(req);
       const switches = setSpaceSwitch(d.db, s.id, body(req));
+      d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
+      return { switches };
+    });
+    // Apply the complete snapshot in one write, or leave every switch unchanged.
+    d.app.post('/api/projects/:id/skill-switches/off', async (req) => {
+      const s = space(req);
+      const switches = switchSpaceSkillsOff(d.db, s.id, body(req));
       d.broadcast({ t: 'feature', id: 'skillpack', data: { space: s.id, switches: true } });
       return { switches };
     });
