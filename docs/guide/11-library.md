@@ -1,6 +1,6 @@
 # Library: pages, images, videos and sites
 
-Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in your Library, by project, with the pictures, videos and sounds you saved. This topic covers watching a page as it is written, changing and keeping it (versions, data, an address for your phone), images, videos and sounds, making your own, designs, diagrams, slides, pictures made with AI and edited, exporting, asking an agent for changes, and publishing.
+Agents can answer with a page instead of plain text: a report, a chart, a table to compare options, or a small tool such as a tracker or a checklist. They also make slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams you edit as in PowerPoint, Word, Excel, Overleaf, Jupyter or draw.io. What you keep goes in your Library, by project, with the pictures, videos and sounds you saved. This topic covers watching a page as it is written, changing and keeping it (versions, data, an address for your phone), images, videos and sounds, making your own, designs, diagrams, boards, slides, pictures made with AI and edited, exporting, asking an agent for changes, and publishing.
 
 ![The Library: everything kept, each project's things together, with its places beside them](images/library.webp)
 
@@ -260,7 +260,7 @@ Above the cards:
 
 - **Search by name or description** finds what fits your words, the best first: by their titles and descriptions (see [Descriptions](#descriptions)), and, with [search by meaning](/guide/memory#search-by-meaning) on, by what they mean, so "costs of the Lisbon trip" finds a spreadsheet called "Four days away" whose description says so. What has your words in its title or description shows at once, as you type. It looks through the whole place, every folder of it, and each card then says the folder it is in.
 - The button beside it sorts them by **Last changed**, **Name** or **Newest made**. The app remembers the order on this device.
-- When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image).
+- When a place holds more than one kind, **All**, **Pages**, **Slides**, **Documents**, **Spreadsheets**, **LaTeX**, **Boards**, **Pictures** and **Videos** show one kind at a time. [Show the pictures](/library?kind=image).
 
 With nothing kept yet, the Library says "Your Library is empty", that files dropped there are added, and has **New page** and **New slides**.
 
@@ -344,7 +344,7 @@ Below, the picture (click it for full size), or the video or the sound, to play 
 
 ## Make a page
 
-**New**, at the top right of the Library (or **New page** [from the search box](/library?new=1)), makes a page of your own: pick **Page**, **Design**, **Slides**, **Document**, **Spreadsheet**, **LaTeX document**, **Notebook**, **Diagram** or **Picture** in its menu (it also has **Folder** and **Import a folder**: see [Folders](#folders)). What opens lists them down its left side (across the top on a phone), so you can still switch what to make: **Page**, **Design** (a poster, a flyer, a social post or a card: see [Designs: posters, flyers and social posts](#designs-posters-flyers-and-social-posts)), **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet**, **LaTeX**, **Notebook**, **Diagram** or **Picture** (a blank picture: pick its size and background, and the picture editor opens on it; see [Documents](#documents), [Spreadsheets](#spreadsheets), [LaTeX documents](#latex-documents), [Notebooks](#notebooks) and [Diagrams](#diagrams)). A line at the top says what each is, then come two ways to make it: describe it in the box under that line, for an agent to make, or pick what it starts from under **Or start from**, each drawn as it will look. In a folder, what you make goes in it. For a page:
+**New**, at the top right of the Library (or **New page** [from the search box](/library?new=1)), makes a page of your own: pick **Page**, **Design**, **Slides**, **Document**, **Spreadsheet**, **LaTeX document**, **Notebook**, **Diagram**, **Board** or **Picture** in its menu (it also has **Folder** and **Import a folder**: see [Folders](#folders)). What opens lists them down its left side (across the top on a phone), so you can still switch what to make: **Page**, **Design** (a poster, a flyer, a social post or a card: see [Designs: posters, flyers and social posts](#designs-posters-flyers-and-social-posts)), **Slides** (see [Make slides](#make-slides)), **Document**, **Spreadsheet**, **LaTeX**, **Notebook**, **Diagram**, **Board** (an empty board, to pin answer cards to: see [Boards](#boards)) or **Picture** (a blank picture: pick its size and background, and the picture editor opens on it; see [Documents](#documents), [Spreadsheets](#spreadsheets), [LaTeX documents](#latex-documents), [Notebooks](#notebooks) and [Diagrams](#diagrams)). A line at the top says what each is, then come two ways to make it: describe it in the box under that line, for an agent to make, or pick what it starts from under **Or start from**, each drawn as it will look. In a folder, what you make goes in it. For a page:
 
 1. Under **Or start from**, pick where it starts: **Blank page** (a heading and some words, to build on), **Notes** (a page to write in, kept as you type), **Checklist** (things to do, ticked off as you go), **Tracker** (a number a day, with the last 30 days drawn), or a page made of the editor's blocks and databases, to change as anything you make: **Meeting notes** (the agenda, decisions and action items), **Project plan** (goals, milestones, and tasks on a board and a timeline), **Wiki** (a table of contents, people, questions and answers), **Journal** (an entry a day on a calendar, each its own page), **Reading list** (a gallery of books with their status and rating), **Trip plan** (days on a calendar, what to pack, a budget that adds up) or **Habit tracker** (a row a day, a box for each habit, a score worked out). Or **Import a page**, the last card: a page made from Markdown, a Notion export (.zip of **Markdown & CSV**, with its databases), a Word file or a web page, which opens in **Edit**.
 2. Change its **Name**, at the bottom, if you like. With projects, **In a project**, under the list on the left (under the cards on a phone), says where it goes (the project you are looking at, or **No project**): click it to pick another. Click **Make it**, or double-click a card to make it at once. A blank page opens in **Edit**; the others open ready to use.
@@ -400,7 +400,7 @@ A page opens full screen inside the app, at its own place in the Library. The ba
 
 On a phone, **Use**, **Edit** and **Code** are icons, **Share** is the share icon, **Ask** is the sparkles icon, **Export** is under **More** (⋯) as **Download as**, and the sizes are left out (the phone is the size).
 
-Slides, documents, spreadsheets, LaTeX documents, notebooks and diagrams open in their own editors instead, with the same bar (see [Edit slides](#edit-slides), [Documents](#documents), [Spreadsheets](#spreadsheets), [LaTeX documents](#latex-documents), [Notebooks](#notebooks) and [Diagrams](#diagrams)).
+Slides, documents, spreadsheets, LaTeX documents, notebooks, diagrams and boards open in their own editors instead, with the same bar (see [Edit slides](#edit-slides), [Documents](#documents), [Spreadsheets](#spreadsheets), [LaTeX documents](#latex-documents), [Notebooks](#notebooks) and [Diagrams](#diagrams)).
 
 Pages made with the app's ready-made look follow the app's light or dark theme.
 
@@ -415,7 +415,8 @@ Pages made with the app's ready-made look follow the app's light or dark theme.
 - a spreadsheet: **Excel (.xlsx)** (every sheet, with its formulas, formats, column widths and row heights as they are here, frozen rows, filters, rules for how cells look and what they take (a list's coloured options in their colours), merged cells, notes, comments and charts, printing as the app prints it: its name on top, its header row on each page, across the page when it is wide; Excel cannot carry fonts, so its cells are in Arial, the Office font nearest the app's; for Excel, Google Sheets or LibreOffice), **CSV (.csv)** (the first sheet's values as they show) or **PDF** (every sheet as a table);
 - a LaTeX document: **PDF** (typeset by LaTeX, as the preview shows it), **LaTeX source (.tex)** (the main file), **LaTeX project (.zip)** (every file and picture, to typeset elsewhere, in Overleaf say) or **arXiv package (.zip)** (made ready for arXiv first: see [The arXiv package](/guide/researchers#the-arxiv-package));
 - a notebook: **Jupyter notebook (.ipynb)** (its cells with their outputs, for Jupyter, VS Code or Colab), **Python script (.py)** (its code, its text as comments, each cell marked `# %%`), **PDF** (its cells and outputs as they show) or **Web page (.html)**;
-- a diagram: **Picture (.png)** (twice its size, on white), **SVG picture (.svg)** (sharp at any size, for slides, documents and websites; its pictures inside it), **PDF** (each page on paper its own size), **draw.io file (.drawio)** (every page, its shapes, connectors and looks, to open in draw.io or diagrams.net) or **Web page (.html)** (the diagram to pan and zoom, in any browser). A diagram of several pages gives a picture or an SVG of each, in a .zip.
+- a diagram: **Picture (.png)** (twice its size, on white), **SVG picture (.svg)** (sharp at any size, for slides, documents and websites; its pictures inside it), **PDF** (each page on paper its own size), **draw.io file (.drawio)** (every page, its shapes, connectors and looks, to open in draw.io or diagrams.net) or **Web page (.html)** (the diagram to pan and zoom, in any browser). A diagram of several pages gives a picture or an SVG of each, in a .zip;
+- a board: **PDF**, **Markdown (.md)** or **Web page (.html)**, each card under its title with its data as text and tables (the cards themselves draw only in the app; the picture button at the board's top saves it as it shows: see [Boards](#boards)).
 
 An older version on view exports as it is. The PDF and Word files of pages, the PDFs of slides, documents and spreadsheets, and the pictures of slides, are made by the browser the app takes pictures with; without one, the app says so and **Settings → Browser** can download one ([Browser settings](/settings?s=browser)). Slides then still print as a PDF from your own browser: pick **Save as PDF** in its print window. A LaTeX document's PDF is made by LaTeX on the computer the app runs on (see [LaTeX documents](#latex-documents)).
 
@@ -963,6 +964,39 @@ Zoom with Ctrl+wheel or a pinch, pan with the wheel, a drag with Space held or t
 
 **File → Download as a picture…** saves the page (or **Only what is picked**) as **PNG** (1× to 4× its size) or **SVG**, with a **See-through background** or **Dark** if you like; **Copy as a picture** puts it on the clipboard, to paste into a message or a document. **Export** at the top saves the whole diagram as a picture, an SVG, a PDF, a draw.io file or a web page ([Export to a file](#export-to-a-file)), and its own address shows it to pan and zoom.
 
+## Boards
+
+A board keeps answer cards together: the charts, key figures, forecasts, tables, checklists and other cards agents answer with, pinned from their replies and laid out in a grid you arrange. Keep this week's sales beside your reading streak and the weather, and come back to them instead of asking again.
+
+### Pin a card to a board
+
+Point at an answer card in a reply (on a phone, tap it), open its **More** (…) at the top right, and pick **Pin to a board**:
+
+1. **Its title on the board** is the card's own title: change it if you like.
+2. Under **Pin it to**, click one of your boards (the one changed last comes first), or **New board…**, type its name and click **Pin it** (or press Enter).
+
+A note says where it went, with **Open**. The board keeps a copy of the card as it is now: its data, its title, and the conversation and reply it came from. Pinning works wherever answer cards show: in a conversation, in an app run's follow-ups, in a scheduled task's **History**, and in the gallery of answer cards. A board holds up to 100 cards.
+
+### Arrange a board
+
+A board opens in the Library like anything else kept, its cards drawn just as they were in the reply, in the light or dark theme you use. On a computer they sit in a grid of twelve columns; on a narrower window, in two; on a phone, one under the other. Above each card are its title and a line such as "Pinned 2 days ago · from Weekly sales report": click the conversation's name to open it at that reply.
+
+Point at a card (on a phone, its buttons always show) for:
+
+- **Size**: **S** (a quarter of the width), **M** (a third), **L** (half) or **Wide** (the whole width).
+- **Full screen**: the card alone, as wide as fits.
+- **More** (…): **Rename** (or double-click its title), **Move up** and **Move down**, **Save as picture**, **Open the conversation** (or the app's run, or the scheduled task, it came from) and **Remove** (a note has **Undo**).
+
+On a computer, drag a card by the handle at the left of its title to move it. Each change is saved at once, as a new version: **Versions** at the top shows them all and brings an earlier one back ([Go back to an earlier version](#go-back-to-an-earlier-version)). **Save the board as a picture**, the picture button at the top, saves the whole board as a PNG, as it shows (not while a card holds a map, a figure or a player).
+
+A board with no cards yet says how to fill it.
+
+### Make a board, or ask an agent for one
+
+**New** in the Library, then **Board** ([or New board from the search box](/library?new=board)), makes an empty board to pin cards to; or pin a card to **New board…**. Or ask an agent: "make me a board of my GPU usage, my experiments and the weather", or "pin this to my Shop board". It makes the cards and puts them on the board, at the sizes that suit them; the cards it adds say they came from its conversation. Agents can also change a board's cards for you: "bring my Shop board up to date", "make the weather card wide".
+
+A board shares, exports and moves like anything else in the Library: **Share** gives people a link to look at it (they see its cards as you do, and change nothing: [Share with people](#share-with-people)); **Export** saves its cards' titles and data as text and tables, as a **PDF**, **Markdown (.md)** or a **Web page (.html)**; **More** (⋯) has **Duplicate**, **Move to a project** and **Delete**.
+
 ## Make pictures, drawings, plots and videos with AI
 
 Slides, documents and pages make pictures with AI right where you put one in: a picture, a drawing (SVG), a plot, and in slides a video. Each has a dialog (a sheet from the bottom on a phone) that says what it will cost before anything is spent, and shows what it made before you use it. Where they are:
@@ -1260,7 +1294,7 @@ To see what a page keeps, open it and use **More** (⋯) → **What it keeps**. 
 
 ## Share with people
 
-You can share one thing of your Library alone (a document, slides, a spreadsheet, a LaTeX document, a notebook, a page, a design, a picture, a video or a sound) with the people you choose, each with a link of their own. Without your password, they open that one thing, comment on it under their own name and, if you let them, change it. They never reach your agents, your files, your settings or anything else in the app. To share a whole project instead, see [Share a project with people](/guide/projects#share-a-project-with-people).
+You can share one thing of your Library alone (a document, slides, a spreadsheet, a LaTeX document, a notebook, a board, a page, a design, a picture, a video or a sound) with the people you choose, each with a link of their own. Without your password, they open that one thing, comment on it under their own name and, if you let them, change it. They never reach your agents, your files, your settings or anything else in the app. To share a whole project instead, see [Share a project with people](/guide/projects#share-a-project-with-people).
 
 ### Invite someone
 
@@ -1276,7 +1310,7 @@ A thing that is shared shows people beside when it last changed on its card, and
 
 Their link opens the thing alone, in the app's look: its name at the top, **Download** (its files: a PDF, a Word document, the picture, the video…) and, on the right, their own name, whose menu says what they may do, until when and who shared it with them, with **Language** and **Theme** for their browser.
 
-- **Comments**, with either: on a document's, a LaTeX document's or a page's words (they paste the words it is about, or leave them out for the whole of it), on a slide (they pick it), on a spreadsheet's cell (its sheet, and the cell as B4), on a spot of a picture (they click it: a numbered pin), or at a moment of a video or a sound (where it is playing: a mark along its time). They reply to any comment and resolve or reopen one, but change or delete only their own. A notebook is shared to read: it never runs through a link, and takes no comments.
+- **Comments**, with either: on a document's, a LaTeX document's or a page's words (they paste the words it is about, or leave them out for the whole of it), on a slide (they pick it), on a spreadsheet's cell (its sheet, and the cell as B4), on a spot of a picture (they click it: a numbered pin), or at a moment of a video or a sound (where it is playing: a mark along its time). They reply to any comment and resolve or reopen one, but change or delete only their own. A notebook is shared to read: it never runs through a link, and takes no comments. A board is shared to read too: its cards show as they do for you, with nothing to change.
 - **Edit**: documents, spreadsheets, slides and LaTeX documents open in the Library's own editors (LaTeX only where this computer typesets it shut in, on Linux), as with a [project's Edit documents](/guide/projects#changes-under-their-name). A page or a design opens in its editor too: they change its words, pictures and layout, but never its code (its scripts, and what runs when something is clicked), and a picture comes from their device, not from a web address. A picture, a video or a sound has **Edit** at the top, which opens the [picture editor](#the-picture-editor), the [video editor](#the-video-editor) or the [sound editor](#the-sound-editor); its **Save** puts the new one in its place. Through a link these editors have no AI tools and nothing of yours to add (only what they bring from their device), and a video is made on this computer's processor, never its graphics card.
 
 What they save is a new version under their name, and you keep the one before: a page's among its **Versions**, a picture's, a video's or a sound's among its **Earlier versions** (see [Go back to an earlier version](#go-back-to-an-earlier-version)). If a document or a page changed while they had it open, they are asked before saving theirs on top.
@@ -1494,3 +1528,6 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Turn my 'Onboarding' document into a swimlane diagram, a lane for each role."
 - "Lay out my 'Checkout flow' diagram from left to right, and send it to me as an SVG and a draw.io file."
 - "Open checkout.drawio from my Downloads as a diagram in my Library."
+- "Make me a board of my GPU usage, my experiments and the weather in Amherst."
+- "Pin this chart to my Shop board, wide."
+- "Bring every card on my Shop board up to date, and put the sales chart first."

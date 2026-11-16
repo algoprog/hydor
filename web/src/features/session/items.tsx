@@ -1026,6 +1026,8 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet }
   const { fork, sessionKey, cwd } = useContext(SessionCtx);
   // A confidential session's replies are read aloud only with a voice on this device.
   const confidential = useSessions((x) => (sessionKey ? x.byKey[sessionKey]?.extra?.confidential === true : false));
+  // Its answer cards pinned to a board say where they came from: this reply, in this session.
+  const pinFrom = useMemo(() => (sessionKey ? { session: sessionKey, at: item.seq, ...(cwd ? { cwd } : {}) } : undefined), [sessionKey, item.seq, cwd]);
   return (
     <div data-seq={item.seq} data-text={quiet ? undefined : item.id} data-quote className="tl-item group relative">
       <ReplyMarkdown
@@ -1035,6 +1037,7 @@ export const AssistantBlock = memo(function AssistantBlock({ item, note, quiet }
         sessionKey={sessionKey}
         cwd={cwd}
         offline={confidential}
+        pinFrom={pinFrom}
         className={cx(quiet ? '!text-[13.5px] !leading-[1.55] !text-fg-2' : !note && item.phase === 'commentary' && '!text-fg-2')}
       />
       {!item.streaming && !quiet && (

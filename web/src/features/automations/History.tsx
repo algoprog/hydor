@@ -38,7 +38,7 @@ function RunRow({ r, onRerun }: { r: TaskRun; onRerun: () => void }) {
         {r.dry && <WouldHaveSent run={r.id} />}
         {open && r.reply && (
           <div className="mt-1.5 rounded-lg border border-line px-3 py-2">
-            <ReplyMarkdown text={r.reply} breaks className="!text-[13px]" />
+            <ReplyMarkdown text={r.reply} breaks className="!text-[13px]" pinFrom={{ ...(r.taskId ? { task: r.taskId } : {}), ...(r.key ? { session: r.key } : {}) }} />
           </div>
         )}
       </div>

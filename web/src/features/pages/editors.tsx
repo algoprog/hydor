@@ -1,4 +1,4 @@
-// Which editor each kind of page opens in (a page of HTML opens in the Studio; a notebook in the notebook page's view). Each loads the first time a page
+// Which editor each kind of page opens in (a page of HTML opens in the Studio; a notebook in the notebook page's view; a board in its grid of cards). Each loads the first time a page
 // of its kind opens (the Pages library asks for them once it shows), so the app itself starts no slower for them.
 import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
 import type { PageInfo } from '@shared/pages';
@@ -17,6 +17,7 @@ const LOADS: Partial<Record<Kind, Load>> = {
   tex: () => import('./latex/LatexEditor').then((m) => ({ default: m.LatexEditor })),
   notebook: () => import('./notebook/NotebookEditor').then((m) => ({ default: m.NotebookEditor })),
   diagram: () => import('./diagram/DiagramEditor').then((m) => ({ default: m.DiagramEditor })),
+  board: () => import('./board/BoardEditor').then((m) => ({ default: m.BoardEditor })),
 };
 
 /** A spinner only when loading takes a moment (most times the editor is there before it would show). */

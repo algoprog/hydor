@@ -922,6 +922,20 @@ agents that speak ACP and take MCP servers.
   picked at 1× to 4×, see-through or dark, and Copy as a picture. Agents draw with save_diagram (nodes and edges laid
   out by the app, Mermaid, the model itself, or changes by id: change, add, remove, layout), read one with get_page,
   lay it out again or restyle it with page_action, and export it with export_page.
+- **Boards of answer cards**: New → Board (or a card's … → Pin to a board → New board…, or save_board) keeps answer cards
+  together in a grid, each drawn by the same view as in a reply (light and dark, phone and computer): twelve columns on a
+  computer where S, M, L and Wide span 3, 4, 6 and 12, six on a narrower window, one on a phone. Each card keeps its UI's
+  name and its data as the ```ui block held it (inline, or a reference it reads from), a title (its own, or changed), a
+  size, its place, when it was pinned and where from (a conversation's reply, opened there; an app run; a scheduled task),
+  and room for how it refreshes (a later change). On hover (a tap on a phone): Size, Full screen and … (Rename, Move up and
+  down, Save as picture, Open the conversation, Remove with Undo); a drag by its handle moves it on a computer. Each change
+  is a version (a change made over a newer one, an agent's, is made again on it); the whole board saves as a PNG as it
+  shows; Export gives its cards' titles and data as a PDF, Markdown or a web page, and its picture in the Library is a
+  drawing of its tiles. Shared, a board is read only, its cards drawn in the person's browser (their web pictures
+  through the app, only those the board holds). Agents make and change boards with save_board (cards checked against
+  their UI's type as find_ui gives it, refused with a plain reason; add by id or by name, a new one for a name there is
+  not; change, remove, order), read them with get_page and export them with export_page; `hydor library show` lists a
+  board's cards and `hydor library export` makes its files.
 - **Made with AI from a kind**: 254 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
   sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs, 19 diagrams), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
@@ -1171,7 +1185,9 @@ programs shows each program's version and what is out, with Check now, Update no
   **Copy as text** and **Full screen** (the card alone over the page, as wide as the window, scrolling when tall) sit on each, and under
   its … **Save as picture** (a PNG of the card as it looks, in the current theme, at twice its size, named after its title) and **Copy as
   picture** where the browser allows it; a card with a map, a library-drawn plot, a video player or a playground's output inside has no
-  picture buttons. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
+  picture buttons. **Pin to a board**, first under its …, keeps a copy of the card on a board of the Library (one picked, the one
+  changed last first, or a New board… named in place; its title changeable first), with where it came from: in replies, an app
+  run's follow-ups, a task's History and the gallery. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen. Before showing one, an agent can picture it as the app shows it, in the dark theme or
   the light, to see what would not read well.

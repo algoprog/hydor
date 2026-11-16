@@ -111,7 +111,7 @@ function ShareMenu({
           <MenuItem icon={<UserPlus size={14} />} hint={people ? tr(people === 1 ? '1 person' : `${people} people`) : undefined} onClick={onPeople}>
             Share with people
           </MenuItem>
-          <div className="px-2.5 pb-1.5 text-[12px] leading-relaxed text-fg-3">{page.kind === 'notebook' ? 'A link of their own, to read it.' : 'A link of their own, to comment on it or change it.'}</div>
+          <div className="px-2.5 pb-1.5 text-[12px] leading-relaxed text-fg-3">{page.kind === 'notebook' || page.kind === 'board' ? 'A link of their own, to read it.' : 'A link of their own, to comment on it or change it.'}</div>
           <MenuSep />
         </>
       )}
@@ -355,9 +355,9 @@ function PageView({ id }: { id: string }) {
   const slides = kind === 'slides';
   // An agent saving a new version of it, from any session: shown as it comes (live.ts), unless an older version is on view.
   const draft = usePageDraft(kind ? id : undefined, { watch: !!kind });
-  const live = useLiveDraft(kind === 'notebook' ? null : kind, data?.model, data?.page.version, old ? null : draft);
+  const live = useLiveDraft(kind === 'notebook' || kind === 'board' ? null : kind, data?.model, data?.page.version, old ? null : draft);
   // Said under the title while it is written, and while its version is being kept (a LaTeX document is typeset first).
-  const writing = !old && !!kind && kind !== 'notebook' && ((!!draft && !draft.done && !draft.failed) || !!live);
+  const writing = !old && !!kind && kind !== 'notebook' && kind !== 'board' && ((!!draft && !draft.done && !draft.failed) || !!live);
   const keeping = writing && !!draft?.done;
 
   const viewVersion = async (v: number) => {
@@ -559,7 +559,7 @@ function PageView({ id }: { id: string }) {
     Editor ? (
       <Editor
         key={id}
-        doc={data?.model !== undefined ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, model: old?.model ?? data.model } : null}
+        doc={data?.model !== undefined ? { key: old ? `${id}:v${old.version}` : `${id}:${data.page.version}`, title, model: old?.model ?? data.model, ...(old ? {} : { version: data.page.version }) } : null}
         pageId={id}
         layout={mobile ? 'sheet' : 'page'}
         readOnly={!!old}

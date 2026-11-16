@@ -26,7 +26,7 @@ function Bubble({ text, at, note }: { text: string; at?: number; note?: string }
 }
 
 /** The agent's side of one follow-up: at work on it, or its reply and whether the result changed. */
-function Answer({ a, working, progress, results }: { a: RunAsk; working: boolean; progress?: RunProgress; results: boolean }) {
+function Answer({ a, working, progress, results, run }: { a: RunAsk; working: boolean; progress?: RunProgress; results: boolean; run: RunDetail['run'] }) {
   const step = progress?.steps.at(-1);
   return (
     <div className="space-y-1.5">
@@ -47,7 +47,7 @@ function Answer({ a, working, progress, results }: { a: RunAsk; working: boolean
           </div>
         )
       ) : a.reply ? (
-        <ReplyMarkdown text={a.reply} className="text-[14px]" />
+        <ReplyMarkdown text={a.reply} className="text-[14px]" pinFrom={{ run: run.id, title: run.appName, ...(run.key ? { session: run.key } : {}) }} />
       ) : (
         !a.updated && <div className="text-[13px] text-fg-3">No reply</div>
       )}
@@ -70,7 +70,7 @@ export function FollowUps({ d }: { d: RunDetail }) {
       {d.asks.map((a, i) => (
         <div key={a.id} className="space-y-2.5">
           <Bubble text={a.text} at={a.at} />
-          <Answer a={a} working={active && i === d.asks.length - 1} progress={d.progress} results={results} />
+          <Answer a={a} working={active && i === d.asks.length - 1} progress={d.progress} results={results} run={d.run} />
         </div>
       ))}
       {d.queued.map((q) => (

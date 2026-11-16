@@ -169,7 +169,7 @@ const ROOT = process.env.NAGET_AGENT_ROOT ?? process.cwd();
 // ---- Turn it into ---------------------------------------------------------------------------------------------------------
 
 {
-  const NOUNS: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram' };
+  const NOUNS: Record<PageKindName, string> = { page: 'page', slides: 'deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram', board: 'board' };
   for (const from of Object.keys(TURN_INTO) as PageKindName[]) {
     ok(TURN_INTO[from].length >= 2 && !TURN_INTO[from].includes(from as never), `${from}: turns into others, never itself`);
     for (const to of TURN_INTO[from]) {

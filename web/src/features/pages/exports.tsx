@@ -44,4 +44,8 @@ export const EXPORTS = (kind: PageInfo['kind'], design = false): Item[] =>
                   { format: 'drawio', label: 'draw.io file (.drawio)', icon: <Workflow size={14} /> },
                   HTML,
                 ]
+            : kind === 'board'
+              ? // Its cards' titles and data as text and tables (the cards themselves draw only in the app; the board's own
+                // picture is its bar's Save the board as a picture).
+                [PDF, { format: 'md', label: 'Markdown (.md)', icon: <FileCode2 size={14} /> }, HTML]
             : [PDF, { format: 'docx', label: 'Word document (.docx)', icon: <FileType2 size={14} /> }, HTML];

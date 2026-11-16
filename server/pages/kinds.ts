@@ -1,4 +1,4 @@
-// The kinds of page Pages keeps besides pages of HTML: slide decks, documents, spreadsheets, LaTeX, notebooks and diagrams. Each keeps a
+// The kinds of page Pages keeps besides pages of HTML: slide decks, documents, spreadsheets, LaTeX, notebooks, diagrams and boards. Each keeps a
 // model as text (a line per part, so two versions read as a diff of lines), checked as it comes in, and knows
 // how to make its own page from it (a viewer, every page to print, or a still picture), what an agent is told
 // of it, which files it exports as, and which files it can be made from.
@@ -23,8 +23,9 @@ import type { EmbeddedFont } from './word-fonts.ts';
 import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFromFile, notebookPage, notebookScript, readNotebook } from './notebooks.ts';
 import { DIAGRAM_OPENS, diagramForAgent, diagramFromFile, diagramPage, diagramSvgFile, drawioFile, freshDiagram, keepDiagram, MAX_DIAGRAM, readDiagram } from './diagrams.ts';
 import { diagramSources } from '../../shared/diagram.ts';
+import { boardMarkdown, boardForAgent, boardPage, freshBoard, keepBoard, MAX_BOARD, readBoard } from './boards.ts';
 
-export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
+export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
 export type PageMode = 'viewer' | 'print' | 'still';
 export type ExportFormat = 'pdf' | 'docx' | 'odt' | 'pptx' | 'xlsx' | 'csv' | 'md' | 'epub' | 'txt' | 'tex' | 'zip' | 'html' | 'ipynb' | 'py' | 'png' | 'jpg' | 'svg' | 'drawio';
 
@@ -229,13 +230,31 @@ KINDS.set('diagram', {
   opens: DIAGRAM_OPENS,
 });
 
+KINDS.set('board', {
+  noun: 'board',
+  tool: 'save_board',
+  max: MAX_BOARD,
+  // The editor's own saves (sizes, order, titles, a card taken off) and the API's: each card's UI known, its data an
+  // object a card holds; save_board checks an agent's new data against its UI's type too (boards.ts agentBoard).
+  keep: (_db, input) => ({ text: keepBoard(input).text, sources: [] }),
+  read: readBoard,
+  page: (_db, text, title, mode) => boardPage(readBoard(text), title, mode),
+  forAgent: boardForAgent,
+  sources: () => [],
+  files: {
+    md: (_db, text, title) => boardMarkdown(readBoard(text), title),
+  },
+  still: () => ({ width: 1280, height: 800 }),
+  fresh: () => freshBoard(),
+});
+
 export function kindOf(k: string | null | undefined): KindDef | null {
   return k ? (KINDS.get(k as PageKind) ?? null) : null;
 }
 
 export function mustKind(k: string): KindDef {
   const d = kindOf(k);
-  if (!d) throw new HttpError(400, `Pages has no kind “${k}”: slides, doc, sheet, tex, notebook or diagram`);
+  if (!d) throw new HttpError(400, `Pages has no kind “${k}”: slides, doc, sheet, tex, notebook, diagram or board`);
   return d;
 }
 

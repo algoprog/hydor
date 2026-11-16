@@ -36,6 +36,7 @@ export const pagesFeature: WebFeature = {
     save_sheet: saved,
     save_latex: saved,
     save_diagram: saved,
+    save_board: saved,
     // Nothing is published until the user says so on its card.
     publish_site: { place: 'attention', Row: PublishCard },
     // A step of the work, counted with the agent's other reads.

@@ -3,8 +3,8 @@
 // drawn as it comes, an address still being written left out (no picture loads half an address); once whole it is read
 // as JSON (or as far as it can be, when the agent wrote it a little wrong). A name it does not know, or a view that fails,
 // shows the data laid out as it is (DataView). On hover or keyboard focus, its toolbar: the data itself, a copy of it as
-// text, Full screen, and under "…" the card as a picture (CardTools.tsx). Loaded the first time a reply has one
-// (Markdown.tsx).
+// text, Full screen, and under "…" Pin to a board and the card as a picture (CardTools.tsx). Loaded the first time a reply
+// has one (Markdown.tsx). A board (features/pages/board) draws its cards with CardView, the same views.
 import { Component, memo, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Braces, Expand, Shapes } from 'lucide-react';
 import { answerUi } from '@shared/answer-ui';
@@ -12,7 +12,9 @@ import { readPartial, type JsonPath } from '@shared/partial-json';
 import { tr } from '../../i18n/runtime';
 import { BarButton, CodeBlock, CopyButton, MdCtx } from '../Markdown';
 import { cx } from '../ui';
-import { CardFullScreen, PictureMenu, picturable } from './CardTools';
+import { viaLink } from '../../lib/machine';
+import { CardFullScreen, CardMenu, picturable } from './CardTools';
+import type { PinCard } from './PinToBoard';
 import { AuiCtx, isObj, str, type AuiInfo, type Data } from './kit';
 import { DataView, dataText } from './DataView';
 import { UIS } from './registry';
@@ -80,6 +82,23 @@ class Guard extends Component<{ children: ReactNode; fallback: ReactNode; done: 
   }
 }
 
+/**
+ * A card drawn by its UI's view (unknown, or failing: its data as it is), with nothing around it: what a board shows for
+ * each of its cards. `info` is what the views read of where they are (AuiCtx).
+ */
+export function CardView({ name, data, info }: { name: string; data: Data; info: AuiInfo }) {
+  const spec = answerUi(name);
+  const View = spec ? UIS[spec.id] : undefined;
+  const fallback = <DataView data={data} />;
+  return (
+    <AuiCtx.Provider value={info}>
+      <Guard done fallback={fallback}>
+        {View ? <View data={data} done /> : fallback}
+      </Guard>
+    </AuiCtx.Provider>
+  );
+}
+
 /** The block, drawn: `name` is the word after ```ui (the UI's name), `code` the JSON so far, `done` whether it is whole. */
 export function AnswerBlock({ name, code, done, demo }: { name: string; code: string; done: boolean; demo?: boolean }) {
   const md = useContext(MdCtx);
@@ -102,6 +121,19 @@ export function AnswerBlock({ name, code, done, demo }: { name: string; code: st
       return code;
     }
   }, [raw, code]);
+  // What Pin to a board keeps: the UI and its data as the block holds it (copied now), and the reply it is in. Not at a
+  // shared link (no Library there), nor from a confidential session (what it says stays in it), nor for a UI the app
+  // does not know.
+  const pin = useMemo<PinCard | undefined>(() => {
+    if (!done || !spec || viaLink || md.offline) return undefined;
+    let data: Data = parsed.value;
+    try {
+      const v = JSON.parse(code);
+      if (isObj(v)) data = v;
+    } catch {}
+    const from = md.pinFrom ?? (md.sessionKey ? { session: md.sessionKey, ...(md.cwd ? { cwd: md.cwd } : {}) } : undefined);
+    return { ui: spec.id, data, title: str(data.title) || spec.title, from };
+  }, [done, spec, code, parsed.value, md.pinFrom, md.sessionKey, md.cwd, md.offline]);
   if (done && parsed.bad)
     return (
       <div className="my-3">
@@ -133,7 +165,7 @@ export function AnswerBlock({ name, code, done, demo }: { name: string; code: st
                 <Expand size={13} />
               </BarButton>
             )}
-            {!raw && pictures && <PictureMenu card={() => card.current} title={title} />}
+            {!raw && <CardMenu card={() => card.current} title={title} pictures={pictures} pin={pin} />}
           </div>
         )}
       </div>
