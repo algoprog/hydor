@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Browser, sleep } from './cdp.mjs';
-import { awayData, CATALOG, EMAIL, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi } from './demo.mjs';
+import { awayData, CATALOG, EMAIL, makeData, makeFiles, makeImported, makeSessions, overrides, seedApi, wikiData } from './demo.mjs';
 import { SHOTS as GUIDE_SHOTS } from './shots.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -162,7 +162,7 @@ async function main() {
   makeData(path.join(home, '.hydor'));
   const cookie = await startServer();
   const api = apiFor(cookie);
-  await seedApi(api, home, now, sessions);
+  const seeded = await seedApi(api, home, now, sessions);
   // Alex's sessions were started in Hydor (the app's own are, and so they show); those the API touched (a space, a
   // pin) take the time of their last message again. The imported ones stay as they came.
   const Database = createRequire(path.join(REPO, 'package.json'))('better-sqlite3');
@@ -174,6 +174,7 @@ async function main() {
   );
   for (const x of Object.values(sessions)) own.run(x.key, x.at - 60_000, x.at);
   awayData(db, sessions, now);
+  wikiData(db, seeded.spaces, now);
   db.close();
   // The sessions once the app has read their transcripts.
   const keys = [...Object.values(sessions), ...Object.values(imported)].map((s) => s.key);

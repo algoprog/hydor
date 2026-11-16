@@ -102,7 +102,7 @@ export function WikiSettings() {
   };
   if (!settings) return null;
   return (
-    <Group title="Wiki memory" hint="Articles agents keep for each project, from its documents and its work." actions={<a href="/guide/llm-wiki" className="text-[12px] text-accent hover:underline">Learn more</a>}>
+    <Group title="Wiki memory" hint="Articles agents keep for each project, from its documents and its work." actions={<a href="/guide/wiki-memory" className="text-[12px] text-accent hover:underline">Learn more</a>}>
       <Row label="Wiki memory" hint="On for every project unless its own settings say otherwise." control={<Switch label="Wiki memory" on={settings.enabled} onChange={(enabled) => { setSettings((current) => current && { ...current, enabled }); save('enabled', enabled); }} />} />
       <Row label="Learn from new documents" hint="New and changed documents add memory notes and update the wiki, with the helper model." control={<Switch label="Learn from new documents" on={settings.fromDocuments} onChange={(fromDocuments) => { setSettings((current) => current && { ...current, fromDocuments }); save('fromDocuments', fromDocuments); }} />} />
       <Row label="Wiki folder" hint="Where the shared wiki is kept, and project wikis unless set below. An absolute path on the computer running Hydor.">

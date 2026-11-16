@@ -194,6 +194,18 @@ export const SHOTS = [
   settingsShot('guidelines', 'guidelines', { until: button('The garden') }),
   // The switches and the first notes fit in one picture.
   settingsShot('memory', 'memory', { height: 900 }),
+  {
+    // A project's Memory tab on its Wiki part: the articles of its wiki memory, one open, and what new documents did lately.
+    id: 'wiki-memory',
+    height: 980,
+    async take(p, ctx) {
+      const id = (await ctx.api('GET', '/api/projects')).spaces.find((x) => x.name === 'Thesis')?.id;
+      await ctx.go(`/projects/${id}/memory?part=wiki`, { settle: 2000 });
+      await p.click(button('Public libraries in small towns'), { wait: 900 });
+      await p.park();
+      return p.shot(ctx.file, { clip: await main(p) });
+    },
+  },
   // The list's card, by the first of the demo's tasks there: those due within three hours are left out (demo.mjs).
   settingsShot('tasks', 'tasks', { until: cardWithAny(['Water the greenhouse reminder', 'Weekly shop report', 'Ridge E5 price watch', 'Morning brief'], '.rounded-xl') }),
   settingsShot('skills', 'skills'),
