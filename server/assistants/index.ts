@@ -38,7 +38,7 @@ import { findAgentFiles, parseAgentFile, readAgentFile } from './importer.ts';
 import { instructionsFor, spawnFor, switchNote, type Target } from './instructions.ts';
 import { allAssistants, bringBack, cleanAssistant, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf, type SaveHow } from './store.ts';
 import { exportAgent, installAgent, previewInstall } from './agentFile.ts';
-import { exampleTurnEnded, examplesByVersion, examplesState, tryExamples } from './examples.ts';
+import { exampleTurnEnded, examplesByVersion, examplesState, sweepExampleFolders, tryExamples } from './examples.ts';
 import { agentVersion, agentVersions } from './versions.ts';
 import { dayIn, makeTaskFolder } from './taskFolder.ts';
 
@@ -425,6 +425,10 @@ export const assistants: Feature = {
       if (a.budgetUsd && monthSpend(d.db, a.id).usd >= a.budgetUsd) throw new Error(`${a.name} has spent its $${a.budgetUsd} budget for this month`);
       return ensureStanding(d, a);
     });
+    // Example tries' folders left behind (a try that ended, or any older than a day).
+    try {
+      sweepExampleFolders(d.db);
+    } catch {}
     setTimeout(() => void sweepInboxes(d).catch(() => {}), 30_000).unref();
     setInterval(() => void sweepInboxes(d).catch(() => {}), 60_000).unref();
   },

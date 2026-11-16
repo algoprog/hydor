@@ -21,8 +21,8 @@ import { isDry } from '../outbox/index.ts';
 import { initPages } from '../pages/store.ts';
 import { sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import { exportAgent, installAgent, previewInstall, readAgentFile } from './agentFile.ts';
-import { exampleRun, exampleRuns } from './exampleRuns.ts';
-import { estimateTries, examplesByVersion, examplesState, exampleTurnEnded, setJudge, tryExamples } from './examples.ts';
+import { addExampleRun, exampleRun, exampleRuns } from './exampleRuns.ts';
+import { estimateTries, exampleFolder, examplesByVersion, examplesDir, examplesState, exampleTurnEnded, setJudge, sweepExampleFolders, tryExamples } from './examples.ts';
 import { handBackTool, resultsOf } from './output.ts';
 import { bringBack, findAssistant, removeAssistant, saveAssistant } from './store.ts';
 import { agentVersion, agentVersions, currentVersion } from './versions.ts';
@@ -34,6 +34,8 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 process.env.CUDA_VISIBLE_DEVICES = '';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-agentfiles-test-'));
+// Example tries' folders go in a temp folder of the test's own.
+process.env.TMPDIR = tmp;
 const db = openDb(path.join(tmp, 'test.db'));
 initPages(db);
 let passed = 0;
@@ -392,7 +394,9 @@ test('trying examples: each in a throwaway session as the agent that sends nothi
   assert.equal(m1.agent, 'claude');
   assert.equal(m1.extra?.assistant, a.id);
   assert.deepEqual(m1.extra?.agentExample, { agent: a.id, run: started[0].id, example: 'two' });
-  assert.ok(m1.cwd.startsWith(os.tmpdir()) && fs.readdirSync(m1.cwd).length === 0);
+  assert.equal(m1.cwd, exampleFolder(started[0].id));
+  assert.ok(m1.cwd.startsWith(path.join(tmp, 'hydor-agent-examples')) && fs.readdirSync(m1.cwd).length === 0);
+  fs.writeFileSync(path.join(m1.cwd, 'draft.md'), 'what it made along the way');
   assert.ok(f.archived.has(m1.key) && f.archived.has(m2.key));
   // It sends nothing: connected apps' calls that act are held as ones it would have sent.
   assert.equal(isDry(db, m1.key), true);
@@ -418,6 +422,8 @@ test('trying examples: each in a throwaway session as the agent that sends nothi
   await exampleTurnEnded(deps, { key: m2.key, status: 'idle' });
   const r1 = exampleRun(db, started[0].id)!;
   assert.equal(r1.status, 'passed');
+  // Their results kept, their folders go.
+  assert.ok(!fs.existsSync(m1.cwd) && !fs.existsSync(m2.cwd));
   assert.equal(r1.reply, 'There were two commits this week.');
   assert.equal(r1.costUsd, 0.25);
   assert.deepEqual(
@@ -453,6 +459,7 @@ test('trying examples: each in a throwaway session as the agent that sends nothi
   const [failed] = await tryExamples(deps, poor, { only: ['two'] });
   assert.equal(failed.status, 'error');
   assert.match(failed.error!, /budget/);
+  assert.ok(!fs.existsSync(exampleFolder(failed.id)));
   assert.equal(exampleRuns(db, a.id).length, 3);
   // Built-in agents and agents without examples have none to try.
   await assert.rejects(tryExamples(deps, findAssistant(db, 'general')!), /Built-in agents have no examples/);
@@ -461,6 +468,35 @@ test('trying examples: each in a throwaway session as the agent that sends nothi
   removeAssistant(db, a.id);
   assert.equal(exampleRuns(db, a.id).length, 0);
   assert.equal(sessionExtra(db, m1.key).assistant, a.id);
+});
+
+test('tries’ folders left behind are swept at start-up: those of tries that ended, and any older than a day', () => {
+  const day = 24 * 3600_000;
+  const now = Date.now();
+  const make = (name: string, ageMs = 0) => {
+    const p = path.join(examplesDir(), name);
+    fs.mkdirSync(p, { recursive: true });
+    fs.writeFileSync(path.join(p, 'notes.txt'), 'x');
+    const t = new Date(now - ageMs);
+    fs.utimesSync(p, t, t);
+    return p;
+  };
+  addExampleRun(db, { id: 'ended1', agent: 'someone', example: 'e', version: 1, status: 'running' });
+  db.prepare("update agent_example_runs set status = 'passed' where id = 'ended1'").run();
+  addExampleRun(db, { id: 'going1', agent: 'someone', example: 'e', version: 1, status: 'running' });
+  addExampleRun(db, { id: 'stuck1', agent: 'someone', example: 'e', version: 1, status: 'running' });
+  const ended = make('ended1');
+  const going = make('going1');
+  const stuck = make('stuck1', 2 * day);
+  const old = make('from-another-hydor', 2 * day);
+  const fresh = make('from-another-hydor-now');
+  assert.deepEqual(sweepExampleFolders(db, now).sort(), ['ended1', 'from-another-hydor', 'stuck1']);
+  for (const p of [ended, stuck, old]) assert.ok(!fs.existsSync(p), p);
+  // A try still going, and a young folder this data folder does not know of (another Hydor's try), stay.
+  for (const p of [going, fresh]) assert.ok(fs.existsSync(p), p);
+  // Nothing there at all: nothing to do.
+  fs.rmSync(examplesDir(), { recursive: true, force: true });
+  assert.deepEqual(sweepExampleFolders(db, now), []);
 });
 
 // ---- run ------------------------------------------------------------------------------------------------------

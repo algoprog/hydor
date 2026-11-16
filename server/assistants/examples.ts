@@ -3,7 +3,9 @@
 // that would act are kept as ones it would have sent; what it hands back goes nowhere but the try). When its turn
 // ends, its checks are read: a sentence by the helper model against its reply and what it handed back, a rule as an
 // app's check is ({{reply}}, {{result.field}}). Nothing runs by itself: only Try the examples (or a call to it) starts
-// them, and the page says first what that costs.
+// them, and the page says first what that costs. Each try's folder (hydor-agent-examples/<try> in the temp folder) goes
+// once its result is kept (its session's transcript lives elsewhere and stays); at start-up, those of tries that ended
+// and any older than a day go too.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -125,6 +127,48 @@ export function estimateTries(db: DB, a: Assistant, count: number): ExampleEstim
 
 const changed = (d: Pick<Deps, 'broadcast'>, id: string) => d.broadcast({ t: 'feature', id: 'assistants', data: { examples: id } });
 
+// ---- their folders -----------------------------------------------------------------------------------------------
+
+/** Where tries work: a folder each, by the try's id, in the temp folder (read each time, so a test can move it). */
+export const examplesDir = () => path.join(os.tmpdir(), 'hydor-agent-examples');
+export const exampleFolder = (run: string) => path.join(examplesDir(), run);
+
+const OPEN = new Set<AgentExampleRun['status']>(['running', 'waiting', 'judging']);
+const DAY = 24 * 3600_000;
+
+/** A try's folder, gone once its result is kept: what it made there was only for the try. */
+const dropFolder = (run: string) => fs.rmSync(exampleFolder(run), { recursive: true, force: true });
+
+/**
+ * At start-up: the folders of tries that ended (a restart came between the end and its removal), and any older than a
+ * day, whoever's they were (no try takes a day). A folder of a try still going, or one this data folder does not know
+ * that is younger (another Hydor on this computer may be trying one now), stays. The names of those removed.
+ */
+export function sweepExampleFolders(db: DB, now = Date.now()): string[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(examplesDir());
+  } catch {
+    return [];
+  }
+  const gone: string[] = [];
+  for (const n of names) {
+    const p = path.join(examplesDir(), n);
+    let age: number;
+    try {
+      age = now - fs.statSync(p).mtimeMs;
+    } catch {
+      continue;
+    }
+    const r = /^[\w-]+$/.test(n) ? exampleRun(db, n) : null;
+    if (age > DAY || (r && !OPEN.has(r.status))) {
+      fs.rmSync(p, { recursive: true, force: true });
+      gone.push(n);
+    }
+  }
+  return gone;
+}
+
 /** The version an agent is at, kept now when it has none yet (an agent saved before versions were kept). */
 function versionNow(db: DB, a: Assistant): number {
   return currentVersion(db, a.id) || keepVersion(db, null, a, 'before', 'As it was before versions were kept.') || currentVersion(db, a.id);
@@ -146,8 +190,9 @@ export async function tryExamples(d: Deps, a: Assistant, o: { only?: string[]; u
   for (const ex of list) {
     if (going.has(ex.id)) continue;
     const id = crypto.randomBytes(6).toString('hex');
+    const cwd = exampleFolder(id);
     try {
-      const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-agent-example-'));
+      fs.mkdirSync(cwd, { recursive: true, mode: 0o700 });
       const key = await d.sessions.create({
         agent,
         acpAgent,
@@ -165,6 +210,7 @@ export async function tryExamples(d: Deps, a: Assistant, o: { only?: string[]; u
       addExampleRun(d.db, { id, agent: a.id, example: ex.id, version, key, status: 'running' });
     } catch (e) {
       addExampleRun(d.db, { id, agent: a.id, example: ex.id, version, status: 'error', error: (e as Error).message || 'It could not start' });
+      dropFolder(id);
     }
     out.push(exampleRun(d.db, id)!);
   }
@@ -203,6 +249,8 @@ export async function exampleTurnEnded(d: Deps, t: Pick<TurnInfo, 'key'> & { sta
     }
   } finally {
     judging.delete(run.id);
+    // Its result is kept: its folder goes (its transcript stays with the session).
+    if (!OPEN.has(exampleRun(d.db, run.id)?.status ?? 'error')) dropFolder(run.id);
     changed(d, run.agent);
   }
 }

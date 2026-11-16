@@ -128,7 +128,7 @@ agents that speak ACP and take MCP servers.
   messages to try it with and what its answer must do (sentences the helper model reads it against, or rules on
   {{reply}} and {{result.field}}, as an app's checks): **Try the examples** says first what it costs (from its last tries
   or its sessions this month, against its budget), then runs each in a throwaway session as the agent on its tier, in an
-  empty folder, sending nothing (its connected apps' calls kept as would-have-sent, what it hands back kept with the
+  empty folder removed once its result is kept, sending nothing (its connected apps' calls kept as would-have-sent, what it hands back kept with the
   try), and shows which passed, each version with how its examples went; after a change the page offers to try them
   again; they never run by themselves. **Download as a file** saves an agent (built-in ones too) as a `.hydor-agent`
   file: its settings, instructions, team by name, fields, the kinds of place its results go, schedules by the clock as
