@@ -1195,7 +1195,9 @@ function duplicate(x: Here, a: Args): string {
   const p = cur.kind === 'page' ? createPage(db, { title, html: cur.text, ...place }) : createPage(db, { title, kind: cur.kind, model: mustKind(cur.kind).read(cur.text), ...place });
   ctx.deps.broadcast({ t: 'feature', id: 'pages', data: { what: 'pages' } });
   refreshThumbs(ctx.deps, [p.id]);
-  return `Saved "${p.title}" (page ${p.id}, version 1): a copy of “${page.title}” (page ${page.id}), beside it in the Library${cur.kind === 'page' ? ', without the data the page stores' : ''}. The first is as it was.`;
+  // A board's copy never starts spending by itself: its cards' refreshes came paused (kinds.ts asNew).
+  const paused = cur.kind === 'board' && /"paused":true/.test(pageSource(db, p.id)?.text ?? '');
+  return `Saved "${p.title}" (page ${p.id}, version 1): a copy of “${page.title}” (page ${page.id}), beside it in the Library${cur.kind === 'page' ? ', without the data the page stores' : ''}. The first is as it was.${paused ? ' Its cards’ refreshes are paused on the copy: the user turns them on (Turn all on at its top shows what they cost first), or save_board with refresh: {paused: false} when they ask.' : ''}`;
 }
 
 const DESCRIPTION = [

@@ -115,7 +115,9 @@ const STATS = { title: 'This week', stats: [{ label: 'Orders', value: 128 }, { l
   const c = checkCard({ ui: 'forecast', data: { location: 'Amherst', days: [] }, title: '  Amherst\n weather ', size: 'huge', from: { session: 'claude:s9', at: 12, title: 'Trip', evil: 1 }, refresh: { every: 'day', how: 'ask' }, refreshedAt: 5 });
   ok(c.ui === 'weather' && c.title === 'Amherst weather' && c.size === defaultSize('weather') && /^c[a-z0-9]{10}$/.test(c.id), 'another name for a UI is its own; a title made one line; a size it does not know is its UI’s');
   ok(JSON.stringify(c.from) === '{"session":"claude:s9","at":12,"title":"Trip"}', 'where it came from, made sound');
-  ok(JSON.stringify(c.refresh) === '{"every":"day","how":"ask"}' && c.refreshedAt === 5, 'how it refreshes is carried as it is (for later), with when it last did');
+  ok(c.refresh === undefined && c.refreshedAt === 5, 'a refresh setting with no question to ask (from before refreshes were built) is dropped; when it last refreshed stays');
+  const kept = checkCard({ ui: 'chart', data: CHART, refresh: { ask: ' How did sales go? ', schedule: { kind: 'daily', time: '7:00' }, extra: 1 } });
+  ok(JSON.stringify(kept.refresh) === '{"ask":"How did sales go?","schedule":{"kind":"daily","time":"07:00"}}', 'one with a question is kept, tidied (board-refresh-test.ts has the rest)');
   ok(checkCard({ ui: 'checklist', data: [{ text: 'Milk' }] }).data.items !== undefined, 'a list as data is its items, as a reply’s block is');
   ok(refused(() => checkCard({ ui: 'chart', data: { kind: 'bar', series: [], blob: 'x'.repeat(BOARD_LIMITS.data) } }), /more than a card holds/), 'data larger than a card holds is refused');
   ok(refused(() => checkBoard({ cards: Array.from({ length: BOARD_LIMITS.cards + 1 }, () => ({ ui: 'chart', data: CHART })) }), /at most 100 cards/), 'a board holds at most 100 cards');

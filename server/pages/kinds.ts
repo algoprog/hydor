@@ -24,6 +24,7 @@ import { freshNotebook, keepNotebook, MAX_NOTEBOOK, notebookForAgent, notebookFr
 import { DIAGRAM_OPENS, diagramForAgent, diagramFromFile, diagramPage, diagramSvgFile, drawioFile, freshDiagram, keepDiagram, MAX_DIAGRAM, readDiagram } from './diagrams.ts';
 import { diagramSources } from '../../shared/diagram.ts';
 import { boardMarkdown, boardForAgent, boardPage, freshBoard, keepBoard, MAX_BOARD, readBoard } from './boards.ts';
+import { pausedCopy } from '../../shared/board-refresh.ts';
 
 export type PageKind = 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
 export type PageMode = 'viewer' | 'print' | 'still';
@@ -70,6 +71,8 @@ export interface KindDef {
   still: (text: string) => { width: number; height: number };
   /** A new one, empty but for its title (what New makes). */
   fresh: (title: string) => unknown;
+  /** What a new page of this kind keeps of the model it is made from (a copy, an import, one made through the API): a board's refreshes come paused. */
+  asNew?: (model: unknown) => unknown;
   /** Made from a file someone opens (a .docx, a .csv…): the model, given to `keep`, and what could not come along (`db` keeps what goes beside the model, a deck's videos). */
   fromFile?: (buf: Buffer, name: string, db?: DB) => FromFile | Promise<FromFile>;
   /** The file names it is made from. */
@@ -246,6 +249,8 @@ KINDS.set('board', {
   },
   still: () => ({ width: 1280, height: 800 }),
   fresh: () => freshBoard(),
+  // A copy never starts spending by itself: its cards' refreshes come paused (shared/board-refresh.ts).
+  asNew: pausedCopy,
 });
 
 export function kindOf(k: string | null | undefined): KindDef | null {

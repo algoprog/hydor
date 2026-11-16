@@ -26,8 +26,8 @@ export const portalToken: string | null = /^(?:\/m\/[a-z0-9-]{1,40})?\/p\/([A-Za
  */
 export const viaLink = portalToken !== null;
 
-/** The app's calls a link answers itself (portal.ts, portal-media.ts). */
-const LINKED = /^\/api\/(pages|media|mediaedit)\//;
+/** The app's calls a link answers itself (portal.ts, portal-media.ts): a shared board's cards that read a spreadsheet or a file too. */
+const LINKED = /^\/api\/((pages|media|mediaedit)\/|answers\/data$)/;
 
 /** A URL on the server of the machine this page shows. */
 export function mu(path: string): string {

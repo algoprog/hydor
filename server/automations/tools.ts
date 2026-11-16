@@ -352,7 +352,7 @@ function scheduleTask(tz: string): RunTool {
       if (!draft.prompt && !draft.app) throw new Error('Give the prompt each run gets (or an app to run)');
       Object.assign(draft, strip(d.scheduler.normalize(draft)));
       if (draft.app) draft.appName = d.scheduler.templateName(draft.app.id);
-      if (d.scheduler.list().length >= 100) throw new Error('There are 100 scheduled tasks already: the user should remove some first.');
+      if (d.scheduler.list({ boards: false }).length >= 100) throw new Error('There are 100 scheduled tasks already: the user should remove some first.');
       const p = addProposal(d.db, { key: ctx.key, action: 'create', task: draft });
       const first = p.next[0] ? `, first run ${localText(p.next[0], tz)}` : '';
       return `The user is now looking at a card to confirm “${draft.name}”: ${p.when}${first} (${tz}), ${draft.app ? `running the app “${draft.appName}”` : `run by ${agentLabel(d.db, draft)}`}. Nothing is saved until they confirm, and their answer will come to you as a message. (proposal ${p.id})`;
@@ -388,6 +388,7 @@ function updateTask(tz: string): RunTool {
       } catch {
         throw new Error('There is no task with that id: list_tasks gives them.');
       }
+      if (t.board) throw new Error(`“${t.name}” is a board card’s refresh: change or stop it with save_board on its board (id ${t.board.page}, card ${t.board.card}: change [{id, refresh}], refresh null stops it).`);
       const action = (['update', 'pause', 'resume', 'delete'].includes(a.action) ? a.action : 'update') as TaskProposal['action'];
       const before = strip(t);
       const after: TaskDraft = { ...before };
@@ -413,16 +414,16 @@ function updateTask(tz: string): RunTool {
 function listTasks(tz: string): RunTool {
   return {
     name: 'list_tasks',
-    description: 'The user’s scheduled tasks: id, name, when each runs (in their time zone), the next run, how the last one went, and whether it is paused.',
+    description: 'The user’s scheduled tasks: id, name, when each runs (in their time zone), the next run, how the last one went, and whether it is paused. Board cards that keep themselves up to date are among them, marked so: they are changed on their board (save_board), not with update_task.',
     inputSchema: { type: 'object', properties: {} },
     annotations: { readOnlyHint: true },
     async run(_a, ctx) {
       const d = ctx.deps;
-      const tasks = d.scheduler.list();
+      const tasks = d.scheduler.list({ boards: true });
       if (!tasks.length) return 'There are no scheduled tasks yet.';
       const lines = tasks.map((t) =>
         [
-          `- ${t.id} · ${t.name}`,
+          `- ${t.id} · ${t.name}${t.board ? ` (a board card’s refresh, board ${t.board.page}: get_page on it says more, and save_board changes it)` : ''}`,
           scheduleText(t.schedule, tz),
           t.enabled ? (t.nextAt ? `next ${localText(t.nextAt, tz)}` : 'no run to come') : `paused${t.pausedReason ? ` (${t.pausedReason})` : ''}`,
           t.recent?.[0] ? `last: ${OUTCOME_LABEL[t.recent[0].status].toLowerCase()}, ${localText(t.recent[0].at, tz)}` : 'not run yet',

@@ -43,11 +43,13 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 
 At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Test without sending**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
 
+A board card that keeps itself up to date is listed too, as the board's: "Shop · Sales by day: refresh". Its row has its switch, **Refresh now** and **Open the board**, which opens the card's settings on the board: its question, schedule and tier are changed there, and **Stop refreshing** there (or taking the card off, or deleting the board) removes it from this list ([Keep cards up to date](/guide/library#keep-cards-up-to-date)).
+
 With no tasks yet, the list says "No scheduled tasks yet: start from an example below, or ask an agent to set one up".
 
 ## See the week: what ran and what runs next
 
-Everything that runs by itself is in one place: [Agents → Schedules](/agents/schedules), the **Schedules** tab at the top of the Agents page. **Week view** in Settings → Scheduled tasks opens it too, and so does the search box. It brings together your scheduled tasks, your agents' schedules, your apps' schedules (**Update automatically** too), watchers and webhooks, so you can see what runs tomorrow, why several started at 08:00, and how last week went.
+Everything that runs by itself is in one place: [Agents → Schedules](/agents/schedules), the **Schedules** tab at the top of the Agents page. **Week view** in Settings → Scheduled tasks opens it too, and so does the search box. It brings together your scheduled tasks, your agents' schedules, your apps' schedules (**Update automatically** too), the board cards that keep themselves up to date, watchers and webhooks, so you can see what runs tomorrow, why several started at 08:00, and how last week went.
 
 - **The week**: seven days side by side, Monday to Sunday, the hours down the side and today marked, with a line at the time now. Each run that happened is a block at its time, coloured by how it went: green for **Done**, grey for **Nothing new**, amber for **Needs you** (partly done or blocked), red for **Failed** (or an error). Runs still to come are drawn faintly, with a dashed edge and their name. When more than three start at once, two show and a **+2** block (or more) lists the rest.
 - **Each day's column** says what its runs cost and how many failed.
@@ -55,9 +57,9 @@ Everything that runs by itself is in one place: [Agents → Schedules](/agents/s
 - **Click a block** for its card: how it went, when, how long it took and what it cost, what started it (when it was not its schedule), the agent's one-line summary, **Open its session** (or **Open its run**, for an app) and **Edit**. A run to come says when it runs, with **Edit**. A band's day counts its runs by how they went, with **Open the latest** when it has a session.
 - **‹** and **›** go to the week before or after, and **Today** comes back. **Week** and **Month**, at the top right, switch to a month: each day with a bar of how its runs went, how many ran and failed, how many are to come (and **+48 repeats** for what runs every few minutes), and its cost. Click a day to open its week.
 - The line above the calendar adds up what is shown: how many ran, how many failed, what they cost and how many are to come, then what the colours mean and your time zone.
-- **The chips** at the top (**All**, **Tasks**, **Agents**, **Apps**, **Watchers**, **Webhooks**, **Paused**, each with how many) show only those: on the calendar, in its totals and in the list.
+- **The chips** at the top (**All**, **Tasks**, **Agents**, **Apps**, **Boards**, **Watchers**, **Webhooks**, **Paused**, each with how many) show only those: on the calendar, in its totals and in the list.
 
-Under the calendar, **Everything that runs by itself** lists each one: what runs next first, then watchers and webhooks, then what is paused. A row shows its name and whose it is (**Agent ·** and the agent, **App ·** and the app, or **Task**), when it runs and when next, why it paused itself, dots for its latest runs with **Last run 3h ago:** and how it went, the agent's summary and **Open**. The switch pauses it or turns it on. The pencil opens it where you change it: an agent's schedule on the agent's page, an app's under the app's **Runs** (or its page's **Settings**, for **Update automatically**), any other task here in Settings → Scheduled tasks, with its form open.
+Under the calendar, **Everything that runs by itself** lists each one: what runs next first, then watchers and webhooks, then what is paused. A row shows its name and whose it is (**Agent ·** and the agent, **App ·** and the app, **Board ·** and the board, or **Task**), when it runs and when next, why it paused itself, dots for its latest runs with **Last run 3h ago:** and how it went, the agent's summary and **Open**. The switch pauses it or turns it on. The pencil opens it where you change it: an agent's schedule on the agent's page, an app's under the app's **Runs** (or its page's **Settings**, for **Update automatically**), a board card's refreshes on its board (its **Keep it up to date…**: [Keep cards up to date](/guide/library#keep-cards-up-to-date)), any other task here in Settings → Scheduled tasks, with its form open.
 
 Times are in your time zone. On a phone, Schedules shows one day at a time: **‹** and **›**, or a swipe sideways, go to the day before or after.
 
@@ -310,6 +312,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Start a task when a new deal comes in HubSpot: look up the company and draft a first reply to its contact."
 - "Thirty minutes before each client call in my Google Calendar, brief me on who I'm meeting and what we last discussed."
 - "Which of my scheduled tasks failed this week, and why?"
+- "What on my boards refreshes tomorrow morning, and what do those refreshes cost a month?"
 - "What runs by itself tomorrow, and at what time?"
 - "Why did so many of my tasks start at 08:00 on Monday? Spread them out."
 - "Pause my Morning brief", or "Run the weekly report now."

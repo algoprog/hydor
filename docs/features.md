@@ -927,15 +927,39 @@ agents that speak ACP and take MCP servers.
   computer where S, M, L and Wide span 3, 4, 6 and 12, six on a narrower window, one on a phone. Each card keeps its UI's
   name and its data as the ```ui block held it (inline, or a reference it reads from), a title (its own, or changed), a
   size, its place, when it was pinned and where from (a conversation's reply, opened there; an app run; a scheduled task),
-  and room for how it refreshes (a later change). On hover (a tap on a phone): Size, Full screen and … (Rename, Move up and
-  down, Save as picture, Open the conversation, Remove with Undo); a drag by its handle moves it on a computer. Each change
+  and how it refreshes. A title the card draws as its own heading shows once. On hover (a tap on a phone): Size, Full screen
+  and … (Refresh now, Keep it up to date…, Rename, Move up and down, Save as picture, Open the conversation, Remove with
+  Undo); a drag by its handle moves it on a computer. Each change
   is a version (a change made over a newer one, an agent's, is made again on it); the whole board saves as a PNG as it
   shows; Export gives its cards' titles and data as a PDF, Markdown or a web page, and its picture in the Library is a
   drawing of its tiles. Shared, a board is read only, its cards drawn in the person's browser (their web pictures
-  through the app, only those the board holds). Agents make and change boards with save_board (cards checked against
+  through the app, only those the board holds; cards that read a spreadsheet or a data file through the link's own route,
+  the owner's source read for them, only those its cards name; refreshed cards with their latest data, which guests
+  cannot refresh). Agents make and change boards with save_board (cards checked against
   their UI's type as find_ui gives it, refused with a plain reason; add by id or by name, a new one for a name there is
-  not; change, remove, order), read them with get_page and export them with export_page; `hydor library show` lists a
-  board's cards and `hydor library export` makes its files.
+  not; change, remove, order; set or stop a card's refresh), read them with get_page (with what refreshes when, what it
+  costs and how the last went) and export them with export_page; `hydor library show` lists a
+  board's cards, `hydor library export` makes its files, `hydor library refreshes` lists what refreshes on every board
+  and `hydor library refresh` refreshes a card or a whole board now.
+- **Board cards that keep themselves up to date**: a card's … → Keep it up to date… asks an agent its question again (the
+  request it was pinned from, editable, or one you write) when you ask, every hour, every day, on weekdays or every week
+  at a time in your time zone (the scheduler's own schedules), on a tier (Quick unless picked), saying first about what a
+  refresh and a month cost (from the card's own refreshes, else refreshes on that tier, else the tier's model's price).
+  Each refresh is a session of its own, clearly a board refresh, archived, sending nothing (calls that act outside are
+  held as "would have sent", as in a test that sends nothing), quiet; its answer must be a ```ui block of the same UI
+  whose data fits its type, which replaces the card's data in a new version of the board (nothing else changes; several
+  close together are one version), with when and what it cost. A card's line says "Updated 07:00 · ≈$0.04 · every day at
+  07:00", Updating… while one runs; Refresh now, Try again, Stop refreshing, and Refresh all for the board. A refresh that
+  fails keeps the last good data and says "Could not update:" and why; three in a row pause the card's schedule, with one
+  notice, and one that works turns it on again. Each board has a monthly cap for its refreshes ($5 unless changed, or
+  off), counted from its refresh sessions' spending as agents' monthly budgets are, each refresh capped at what is left;
+  once reached, refreshes wait for the next month, the board says so at the top and you get one notice. Refreshes show
+  in Schedules as the board's, with their runs, costs and a pause switch, and in Settings → Scheduled tasks and `hydor
+  tasks` as "Shop · Sales by day: refresh", changed on the board (Open the board), never through the task form; a card
+  taken off, a refresh stopped or a board deleted takes its schedule away. A copy never starts spending by itself: a
+  board made from cards that refresh (Duplicate, page_action's duplicate, one made through the API, an agent's board
+  made from another's cards) keeps their settings paused, says so at the top, and Turn all on (which shows what they
+  come to a month first) or a card's own settings turn them on.
 - **Made with AI from a kind**: 254 kinds the app knows how to make well (56 slides, 29 decks, 43 documents, 19
   sections, 39 pages, 17 blocks of a page, 13 spreadsheets, 19 designs, 19 diagrams), in a gallery with a find box and chips by group: Insert
   → Slide made with AI (and a slide's own menu, A slide made with AI after it), Insert → Section made with AI, Add a
@@ -1353,7 +1377,7 @@ programs shows each program's version and what is out, with Check now, Update no
   it starts. Webhooks can
   require a signature, skip repeated deliveries, filter on the payload, and wait for the reply (`?wait=60`).
   Schedules (the Agents page's tab, Settings → Scheduled tasks → Week view) shows everything that runs by itself,
-  scheduled tasks, agents' and apps' schedules, watchers and webhooks, on a week or a month in your time zone: each
+  scheduled tasks, agents' and apps' schedules, board cards' refreshes, watchers and webhooks, on a week or a month in your time zone: each
   run that happened as a block at its time coloured by how it went (opening its session or its app run), the runs to
   come drawn faintly with their names, what runs more than eight times a day, watchers and webhooks as one band a
   day with counts, five at once gathered under "+N", each day's cost, filters by kind, and a list of them all with
