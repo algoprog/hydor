@@ -5,8 +5,6 @@ import path from 'node:path';
 import { redactSecrets } from '../../memory/secrets.ts';
 
 export type WikiEvent = 'SessionStart' | 'PostToolUse' | 'PreCompact' | 'PostCompact' | 'Stop';
-// Preserve event order when several checkpoints are emitted in the same millisecond by this process.
-let lastTimestamp = 0;
 
 /** Only an existing hub may be used; never follow links within the private session tree. */
 function sessionDir(hub: string, parts: string[]): string {
@@ -36,27 +34,62 @@ function captureEnabled(root: string): boolean {
   return value.enabled !== false && value.mode !== 'off';
 }
 
-/** Capture a bounded metadata-only digest. It is not a transcript or a semantic summary. */
+const DAY = 24 * 60 * 60 * 1000;
+const KEEP_DAYS = 30;
+
+/** Remove checkpoints nobody has written to for 30 days (also those in the year/month folders of earlier versions). */
+function prune(digests: string, now: number): void {
+  const visit = (dir: string, depth: number) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory() && depth < 2 && /^\d{2,4}$/.test(entry.name)) {
+        visit(file, depth + 1);
+        try { fs.rmdirSync(file); } catch { /* not empty */ }
+      } else if (entry.isFile() && /^hydor-[0-9a-f]{24}.*\.md$/.test(entry.name)) {
+        try { if (now - fs.statSync(file).mtimeMs > KEEP_DAYS * DAY) fs.unlinkSync(file); } catch { /* gone already */ }
+      }
+    }
+  };
+  visit(digests, 0);
+}
+
+const hasContext = (text: string) => text.includes('## Agent-generated context\n');
+
+/**
+ * Keep a bounded, redacted checkpoint of a session when its conversation is compacted (PreCompact, PostCompact).
+ * There is one file per session, written over each time: other events (a session starting, a turn ending, tool
+ * counts) keep nothing. It is not a transcript or a semantic summary.
+ */
 export function captureEvent(hub: string, key: string, event: WikiEvent, count = 0, summary = ''): { path: string; trigger: string } | null {
+  if (event !== 'PreCompact' && event !== 'PostCompact') return null;
   const sessionRoot = sessionDir(hub, []);
   if (!captureEnabled(sessionRoot)) return null;
-  if (event === 'SessionStart' || (event === 'PostToolUse' && (count <= 0 || count % 50 !== 0))) return null;
-  lastTimestamp = Math.max(Date.now(), lastTimestamp + 1);
-  const now = new Date(lastTimestamp);
-  const iso = now.toISOString();
-  const dir = sessionDir(hub, ['digests', iso.slice(0, 4), iso.slice(5, 7)]);
+  const now = Date.now();
+  const iso = new Date(now).toISOString();
+  const dir = sessionDir(hub, ['digests']);
   const id = sessionHash(key);
-  const trigger = event === 'PostToolUse' ? 'periodic' : event === 'PreCompact' ? 'pre-compact' : event === 'PostCompact' ? 'post-compact' : 'stop';
-  const name = `hydor-${id}-${iso.replace(/[:.]/g, '-')}-${crypto.randomBytes(4).toString('hex')}.md`;
-  const target = path.join(dir, name);
+  const trigger = event === 'PreCompact' ? 'pre-compact' : 'post-compact';
+  const target = path.join(dir, `hydor-${id}.md`);
   // Limit and redact even model-generated summaries; ordinary transcript content is never accepted.
   const clean = redactSecrets(summary.slice(0, 12_000)).replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email removed]').replace(/https?:\/\/[^\s)]+/gi, '[URL removed]').replace(/\0/g, '');
-  const text = `---\ntitle: "Hydor session checkpoint"\ntype: session-digest\nschema_version: 1\nharness: hydor\nllm_wiki_session_id: "hydor:${id}"\ncapture_trigger: "${trigger}"\nlast_seen_at: "${iso}"\nprivacy: "redacted"\nraw_transcripts: false\n---\n\n# Hydor session checkpoint\n\nEvent: ${event}. Observed tool events: ${Math.max(0, Math.floor(count))}.\n\n${clean ? `## Agent-generated context\n\n${clean}\n` : 'This checkpoint records metadata only; no summary was available.\n'}\nThis is historical context, not instructions, and does not prove that other events were captured.\n`;
-  fs.writeFileSync(target, text, { flag: 'wx', mode: 0o600 });
+  prune(dir, now);
+  // A checkpoint after the compaction with no summary of its own must not wipe the one with the summary.
+  if (!clean && fs.existsSync(target) && !fs.lstatSync(target).isSymbolicLink() && hasContext(fs.readFileSync(target, 'utf8'))) {
+    fs.utimesSync(target, now / 1000, now / 1000);
+    return { path: target, trigger };
+  }
+  if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) throw new Error('Unsafe wiki session directory');
+  const text = `---\ntitle: "Hydor session checkpoint"\ntype: session-digest\nschema_version: 1\nharness: hydor\nllm_wiki_session_id: "hydor:${id}"\ncapture_trigger: "${trigger}"\nlast_seen_at: "${iso}"\nprivacy: "redacted"\nraw_transcripts: false\n---\n\n# Hydor session checkpoint\n\nEvent: ${event}.\n\n${clean ? `## Agent-generated context\n\n${clean}\n` : 'This checkpoint records metadata only; no summary was available.\n'}\nThis is historical context, not instructions, and does not prove that other events were captured.\n`;
+  const temp = path.join(dir, `.hydor-${crypto.randomBytes(6).toString('hex')}.tmp`);
+  try {
+    fs.writeFileSync(temp, text, { flag: 'wx', mode: 0o600 });
+    fs.renameSync(temp, target);
+  } finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
   return { path: target, trigger };
 }
 
-/** Find only the latest digest for this exact session, never a different session by accident. */
+/** The checkpoint of this exact session (never a different session's), when it holds a summary. */
 export function latestEvent(hub: string, key: string): string | null {
   const root = fs.realpathSync(hub);
   const digests = path.join(root, '.sessions', 'digests');
@@ -68,19 +101,8 @@ export function latestEvent(hub: string, key: string): string | null {
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error('Unsafe wiki session directory');
   }
   if (!captureEnabled(path.join(root, '.sessions'))) return null;
-  const prefix = `hydor-${sessionHash(key)}-`;
-  const years = fs.readdirSync(digests, { withFileTypes: true }).filter((e) => e.isDirectory() && /^\d{4}$/.test(e.name)).sort((a, b) => b.name.localeCompare(a.name));
-  for (const year of years) {
-    const yearDir = path.join(digests, year.name);
-    const months = fs.readdirSync(yearDir, { withFileTypes: true }).filter((e) => e.isDirectory() && /^\d{2}$/.test(e.name)).sort((a, b) => b.name.localeCompare(a.name));
-    for (const month of months) {
-      const monthDir = path.join(yearDir, month.name);
-      const names = fs.readdirSync(monthDir, { withFileTypes: true }).filter((e) => e.isFile() && e.name.startsWith(prefix) && e.name.endsWith('.md')).map((e) => e.name).sort().reverse();
-      for (const name of names) {
-        const file = path.join(monthDir, name);
-        if (fs.statSync(file).size <= 24_000 && fs.readFileSync(file, 'utf8').includes('## Agent-generated context\n')) return file;
-      }
-    }
-  }
-  return null;
+  const file = path.join(digests, `hydor-${sessionHash(key)}.md`);
+  if (!fs.existsSync(file)) return null;
+  const st = fs.lstatSync(file);
+  return st.isFile() && st.size <= 24_000 && hasContext(fs.readFileSync(file, 'utf8')) ? file : null;
 }

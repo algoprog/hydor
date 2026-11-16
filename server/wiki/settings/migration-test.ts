@@ -22,9 +22,9 @@ function pair(name: string) {
 try {
   for (const policy of ['source', 'target', 'oldest'] as WikiConflict[]) {
     const { source, target } = pair(policy);
-    const preview = previewWikiMigration(source, target);
+    const preview = await previewWikiMigration(source, target);
     assert.equal(preview.conflicts.length, 1);
-    const result = applyWikiMigration(preview, 'merge', policy);
+    const result = await applyWikiMigration(preview, 'merge', policy);
     assert.equal(fs.existsSync(source), false);
     assert.equal(fs.readFileSync(path.join(target, 'wiki/conflict.md'), 'utf8'), policy === 'target' ? 'from target' : 'from source');
     assert.equal(fs.readFileSync(path.join(target, 'wiki/source.md'), 'utf8'), 'only source');
@@ -36,7 +36,7 @@ try {
   }
   {
     const { source, target } = pair('replace');
-    const result = applyWikiMigration(previewWikiMigration(source, target), 'replace');
+    const result = await applyWikiMigration(await previewWikiMigration(source, target), 'replace');
     assert.equal(fs.readFileSync(path.join(target, 'wiki/conflict.md'), 'utf8'), 'from source');
     assert.equal(fs.existsSync(path.join(target, 'wiki/target.md')), false);
     assert.equal(fs.readFileSync(path.join(result.targetBackup!, 'wiki/target.md'), 'utf8'), 'only target');
@@ -46,21 +46,21 @@ try {
   }
   {
     const { source, target } = pair('changed');
-    const preview = previewWikiMigration(source, target);
+    const preview = await previewWikiMigration(source, target);
     fs.writeFileSync(path.join(source, 'wiki/source.md'), 'changed');
-    assert.throws(() => applyWikiMigration(preview, 'merge'), /changed since/);
+    await assert.rejects(async () => await applyWikiMigration(preview, 'merge'), /changed since/);
     assert.ok(fs.existsSync(source)); assert.ok(fs.existsSync(target));
   }
   {
     const { source, target } = pair('rename-error');
-    const preview = previewWikiMigration(source, target);
+    const preview = await previewWikiMigration(source, target);
     const originalRename = fs.renameSync;
     // Simulate failure after the staged target was installed, before the source moved.
     fs.renameSync = ((from, to) => {
       if (String(from) === source) throw new Error('simulated source rename failure');
       return originalRename(from, to);
     }) as typeof fs.renameSync;
-    try { assert.throws(() => applyWikiMigration(preview, 'replace'), /simulated source rename failure/); }
+    try { await assert.rejects(async () => await applyWikiMigration(preview, 'replace'), /simulated source rename failure/); }
     finally { fs.renameSync = originalRename; }
     assert.equal(fs.readFileSync(path.join(source, 'wiki/conflict.md'), 'utf8'), 'from source');
     assert.equal(fs.readFileSync(path.join(target, 'wiki/conflict.md'), 'utf8'), 'from target');
@@ -68,19 +68,19 @@ try {
   {
     const { source, target } = pair('tie');
     fs.utimesSync(path.join(target, 'wiki/conflict.md'), 100, 100);
-    assert.throws(() => applyWikiMigration(previewWikiMigration(source, target), 'merge', 'oldest'), /equal modification times/);
+    await assert.rejects(async () => await applyWikiMigration(await previewWikiMigration(source, target), 'merge', 'oldest'), /equal modification times/);
     assert.ok(fs.existsSync(source)); assert.ok(fs.existsSync(target));
-    assert.throws(() => previewWikiMigration(source, path.join(source, 'sub')), /overlap/);
+    await assert.rejects(async () => await previewWikiMigration(source, path.join(source, 'sub')), /overlap/);
   }
   {
     const { source, target } = pair('symbolic');
     fs.symlinkSync(path.join(source, 'wiki/source.md'), path.join(target, 'link'));
-    assert.throws(() => previewWikiMigration(source, target), /Symbolic links/);
+    await assert.rejects(async () => await previewWikiMigration(source, target), /Symbolic links/);
   }
   {
     const { source, target } = pair('no-target');
     fs.rmSync(target, { recursive: true });
-    const result = applyWikiMigration(previewWikiMigration(source, target), 'merge', 'source');
+    const result = await applyWikiMigration(await previewWikiMigration(source, target), 'merge', 'source');
     assert.equal(result.targetBackup, null);
     assert.equal(fs.readFileSync(path.join(target, 'wiki/source.md'), 'utf8'), 'only source');
     result.rollback();
@@ -90,7 +90,7 @@ try {
     const { source, target } = pair('registry');
     const registry = JSON.stringify({ wikis: { portable: { path: '<HUB>/topics/one' }, relative: { path: 'topics/two' }, absolute: { path: path.join(source, 'topics', 'three') }, external: { path: path.join(temp, 'other') } } });
     fs.writeFileSync(path.join(source, 'wikis.json'), registry);
-    const result = applyWikiMigration(previewWikiMigration(source, target), 'merge', 'source');
+    const result = await applyWikiMigration(await previewWikiMigration(source, target), 'merge', 'source');
     const read = JSON.parse(fs.readFileSync(path.join(target, 'wikis.json'), 'utf8'));
     assert.equal(read.wikis.portable.path, '<HUB>/topics/one');
     assert.equal(read.wikis.relative.path, 'topics/two');
@@ -101,14 +101,47 @@ try {
   {
     const { source, target } = pair('bad-registry');
     fs.writeFileSync(path.join(source, 'wikis.json'), '{broken');
-    assert.throws(() => previewWikiMigration(source, target), /valid JSON/);
+    await assert.rejects(async () => await previewWikiMigration(source, target), /valid JSON/);
     assert.ok(fs.existsSync(source)); assert.ok(fs.existsSync(target));
   }
   {
     const { source, target } = pair('external-relative');
     fs.writeFileSync(path.join(source, 'wikis.json'), JSON.stringify({ wikis: { external: { path: '../outside' } } }));
-    assert.throws(() => applyWikiMigration(previewWikiMigration(source, target), 'merge', 'source'), /outside the source hub/);
+    await assert.rejects(async () => await applyWikiMigration(await previewWikiMigration(source, target), 'merge', 'source'), /outside the source hub/);
     assert.ok(fs.existsSync(source)); assert.ok(fs.existsSync(target));
+  }
+  {
+    // Session checkpoints, locks and backups are not wiki contents: writing them neither changes the fingerprint nor is moved.
+    const { source, target } = pair('transient');
+    const before = await previewWikiMigration(source, target);
+    fs.mkdirSync(path.join(source, '.sessions', 'digests'), { recursive: true });
+    fs.writeFileSync(path.join(source, '.sessions', 'digests', 'hydor-a.md'), 'checkpoint');
+    fs.mkdirSync(path.join(source, '.hydor-wiki-write.lock'));
+    fs.mkdirSync(path.join(source, '.hydor-wiki-backup-1-source'));
+    fs.mkdirSync(path.join(source, '.archive'));
+    fs.writeFileSync(path.join(source, '.archive', 'old.md'), 'kept');
+    const during = await previewWikiMigration(source, target);
+    assert.equal(during.sourceTree.files.some((f) => f.path.startsWith('.sessions') || f.path.startsWith('.hydor-')), false);
+    // User-made hidden folders (.archive) still count and are moved.
+    assert.ok(during.sourceTree.files.some((f) => f.path === '.archive/old.md'));
+    const same = await previewWikiMigration(source, target);
+    // A session writing another checkpoint between preview and apply does not fail the move.
+    fs.writeFileSync(path.join(source, '.sessions', 'digests', 'hydor-b.md'), 'another');
+    const result = await applyWikiMigration(same, 'merge', 'source');
+    assert.equal(fs.readFileSync(path.join(target, '.archive', 'old.md'), 'utf8'), 'kept');
+    assert.equal(fs.existsSync(path.join(target, '.sessions')), false);
+    assert.ok(fs.existsSync(path.join(result.sourceBackup, '.sessions', 'digests', 'hydor-b.md')), 'the old folder is kept whole as the backup');
+    assert.notEqual(before.fingerprint, during.fingerprint, 'only .archive changed the fingerprint');
+  }
+  {
+    // Hashing yields to the event loop between files, so the server keeps answering.
+    const { source, target } = pair('yield');
+    for (let i = 0; i < 40; i++) fs.writeFileSync(path.join(source, 'wiki', `f${i}.md`), `file ${i}`);
+    let ticks = 0;
+    const timer = setInterval(() => { ticks++; }, 0);
+    await previewWikiMigration(source, target);
+    clearInterval(timer);
+    assert.ok(ticks > 5, `the event loop ran while hashing (${ticks} ticks)`);
   }
   console.log('Wiki migration tests passed');
 } finally {

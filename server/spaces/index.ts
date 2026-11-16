@@ -135,6 +135,9 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
   if (!name) throw new HttpError(400, 'Give the project a name');
   const color = b.color !== undefined ? String(b.color) : (prev?.color ?? nextColor);
   const shared = b.sharedKnowledge !== undefined ? b.sharedKnowledge !== false : prev?.sharedKnowledge !== false;
+  // Wiki memory for this project: true or false is its own switch, null follows Settings → Memory, absent keeps what it was.
+  if (b.wikiMemory !== undefined && b.wikiMemory !== null && typeof b.wikiMemory !== 'boolean') throw new HttpError(400, 'wikiMemory: true, false or null');
+  const wikiMemory: boolean | null = b.wikiMemory !== undefined ? (b.wikiMemory as boolean | null) : (prev?.wikiMemory ?? null);
   return {
     name,
     color: color in SPACE_COLORS ? color : 'blue',
@@ -142,6 +145,7 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
     instructions: (b.instructions !== undefined ? clean(b.instructions, MAX_SPACE_INSTRUCTIONS) : prev?.instructions) || undefined,
     assistant: (b.assistant !== undefined ? clean(b.assistant, 80) : prev?.assistant) || undefined,
     ...(shared ? {} : { sharedKnowledge: false }),
+    ...(wikiMemory === null ? {} : { wikiMemory }),
   };
 }
 /**
@@ -185,7 +189,7 @@ export function createSpace(db: DB, b: Record<string, unknown>, own?: { found?: 
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
   if (!prev) throw new HttpError(404, 'No such project');
-  const { sharedKnowledge: _was, members: _had, folders: _also, ...kept } = prev;
+  const { sharedKnowledge: _was, wikiMemory: _wm, members: _had, folders: _also, ...kept } = prev;
   const members = membersOf(db, b, prev);
   const folders = foldersOf(b, prev, prev.folder);
   const next: Space = { ...kept, ...fields(b, prev), ...(members ? { members } : {}), ...(folders ? { folders } : {}) };
@@ -332,8 +336,11 @@ export const spaces: Feature = {
       return { space: s, sessions: sessionsIn(d.db, s.id) };
     });
     d.app.patch('/api/projects/:id', async (req) => {
+      const was = spaceById(d.db, id(req))?.wikiMemory;
       const s = updateSpace(d.db, id(req), body(req));
       changed();
+      // The project's wiki memory pages refresh when its switch moves.
+      if (was !== s.wikiMemory) d.broadcast({ t: 'feature', id: 'wiki', data: { space: s.id } });
       return s;
     });
     d.app.delete('/api/projects/:id', async (req) => {

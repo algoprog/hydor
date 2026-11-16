@@ -25,9 +25,10 @@ const call = async (event: string, summary = '') => {
 };
 
 try {
+  setWikiSettings(db, { enabled: false, hubPath: hub });
   assert.equal((await call('PreCompact')).body.status, 'disabled');
   assert.deepEqual(fs.readdirSync(hub), []);
-  setWikiSettings(db, { enabled: true, hubPath: hub });
+  setWikiSettings(db, { enabled: true });
   const invalid = await app.inject({ method: 'POST', url: '/agent/run/not-a-valid-token/wiki-event', payload: { event: 'PreCompact' } });
   assert.equal(invalid.statusCode, 403);
   assert.equal((await call('invalid')).code, 400);
@@ -40,7 +41,10 @@ try {
   const post = await call('PostCompact', 'Goal: continue after compaction.');
   assert.deepEqual(post.body, { status: 'saved', trigger: 'post-compact' });
   // Rehydration should not confuse later metadata-only events with a useful summary.
-  await call('Stop');
+  // Only compaction keeps a checkpoint: starting, tool counts and the end of a turn are accepted and ignored.
+  for (const event of ['Stop', 'SessionStart', 'PostToolUse']) assert.equal((await call(event)).body.status, 'skipped');
+  assert.equal(fs.readdirSync(path.join(hub, '.sessions', 'digests')).length, 1, 'one checkpoint file for the session');
+  assert.deepEqual((await call('PostCompact')).body, { status: 'saved', trigger: 'post-compact' });
   assert.match((await wikiSession.context!({ key, cwd: hub, extra: {} }, deps))!, /Goal: continue after compaction/);
   db.prepare('insert into kv (k,v) values (?,?)').run('memory.enabled', '0');
   assert.equal((await call('PreCompact')).body.status, 'disabled');
@@ -53,7 +57,13 @@ try {
   assert.equal((await call('PreCompact')).body.status, 'disabled');
   assert.equal(await wikiSession.context!({ key, cwd: hub, extra: {} }, deps), null);
   setSessionExtra(db, key, { confidential: null });
+  // The hub is made on first use, not an error.
   setWikiSettings(db, { hubPath: path.join(hub, 'missing') });
+  assert.equal((await call('PreCompact', 'Goal: first.')).body.status, 'saved');
+  assert.ok(fs.existsSync(path.join(hub, 'missing', '.sessions', 'digests')));
+  // A project with wiki memory off keeps no checkpoint, whatever Settings say.
+  fs.writeFileSync(path.join(hub, 'a-file'), 'x');
+  setWikiSettings(db, { hubPath: path.join(hub, 'a-file', 'inside') });
   assert.equal((await call('PreCompact')).body.status, 'failed');
   process.stdout.write('Wiki session route tests passed\n');
 } finally {
