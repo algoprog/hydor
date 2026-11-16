@@ -4,7 +4,7 @@
 // opens All settings (every setting, in the editor).
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { CalendarClock, Copy, FileUp, MessageSquarePlus, Plus, Settings2, Sparkles, Trash2, X } from 'lucide-react';
+import { CalendarClock, CalendarDays, Copy, FileUp, MessageSquarePlus, Plus, Settings2, Sparkles, Trash2, X } from 'lucide-react';
 import { agentMode, DEFAULT_ASSISTANT, hasOutput, type AgentDraft, type Assistant, type AssistantsState } from '@shared/assistants';
 import type { ScheduledTask, TaskDraft, TaskSchedule } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
@@ -13,9 +13,10 @@ import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { lastAgent } from '../../lib/start';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
-import { Badge, Button, cx, inputCls, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, inputCls, Tabs, Throbber, useConfirm } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { PageHeader } from '../layout/PageHeader';
+import { SchedulesView } from '../automations/SchedulesView';
 import { TaskEditor } from '../settings/TasksSettings';
 import { useSpaces } from '../spaces/state';
 import { EditAssistant, ImportDialog } from './AssistantsSettings';
@@ -460,7 +461,9 @@ export function AgentsPage() {
   const [edit, setEdit] = useState<Partial<Assistant> | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [importing, setImporting] = useState(false);
-  const id = path.startsWith('/agents/') ? decodeURIComponent(path.slice('/agents/'.length)) : null;
+  // Schedules (/agents/schedules): everything that runs by itself, on a week; agents' own ids always end in -xxxx.
+  const schedules = path === '/agents/schedules';
+  const id = !schedules && path.startsWith('/agents/') ? decodeURIComponent(path.slice('/agents/'.length)) : null;
   const q = new URLSearchParams(search);
   const making = q.get('new') === '1';
   const forProject = q.get('project') ?? undefined;
@@ -497,7 +500,7 @@ export function AgentsPage() {
     <div data-i18n="agents" className="flex h-full min-h-0 flex-col">
       <PageHeader
         title="Agents"
-        sub="Each agent: what it does, where and when it works, what it thinks with, and whom it asks"
+        sub={schedules ? 'Everything that runs by itself: what ran, how it went, and what runs next' : 'Each agent: what it does, where and when it works, what it thinks with, and whom it asks'}
         back={id ? { label: 'All agents', onClick: () => go('/agents') } : undefined}
         actions={
           <>
@@ -509,10 +512,23 @@ export function AgentsPage() {
             </Button>
           </>
         }
-      />
+      >
+        {!id && (
+          <Tabs
+            value={schedules ? 'schedules' : 'agents'}
+            onChange={(t) => go(t === 'schedules' ? '/agents/schedules' : '/agents')}
+            options={[
+              { value: 'agents', label: 'Your agents' },
+              { value: 'schedules', label: 'Schedules', icon: <CalendarDays size={14} /> },
+            ]}
+          />
+        )}
+      </PageHeader>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1120px] space-y-6 px-3 py-5 sm:px-6 sm:py-6">
-          {id ? (
+          {schedules ? (
+            <SchedulesView />
+          ) : id ? (
             <AgentDetail id={id} onEdit={setEdit} />
           ) : !st ? (
             <div className="flex justify-center py-10 text-fg-3">
