@@ -627,6 +627,16 @@ const NOTICE_SETTINGS = MAC ? 'x-apple.systempreferences:com.apple.preference.no
 
 // What the page in the window asks (preload.cjs): only the app's own pages.
 const fromOwnPage = (e) => sameOrigin((e.senderFrame && e.senderFrame.url) || '');
+// A forwarded machine's folders belong to its server, not this desktop computer.
+ipcMain.handle('hydor:choose-folder', async (e, current) => {
+  if (!fromOwnPage(e) || /^\/m\//.test(new URL(e.senderFrame.url).pathname)) return null;
+  const owner = BrowserWindow.fromWebContents(e.sender);
+  if (!owner) return null;
+  const options = { properties: ['openDirectory', 'createDirectory', 'showHiddenFiles'] };
+  if (typeof current === 'string' && path.isAbsolute(current) && fs.existsSync(current)) options.defaultPath = current;
+  const selected = await dialog.showOpenDialog(owner, options);
+  return selected.canceled ? null : selected.filePaths[0] || null;
+});
 ipcMain.handle('hydor:notices', (e) => (fromOwnPage(e) ? sessionNotices.state() : null));
 ipcMain.handle('hydor:notice-test', (e, t) => (fromOwnPage(e) ? sessionNotices.test(t) : null));
 ipcMain.handle('hydor:notice-settings', async (e) => {

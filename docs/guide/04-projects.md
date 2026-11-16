@@ -113,7 +113,7 @@ Click a project on the Projects page to open it. The top of its page is in the p
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
-Below them are seven tabs: **Overview**, **Library**, **Files**, **Knowledge**, **Skills**, **Agents** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
+Below them are eight tabs: **Overview**, **Library**, **Files**, **Knowledge**, **LLM Wiki**, **Skills**, **Agents** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
 
 ### Overview
 
@@ -143,6 +143,10 @@ To add files from elsewhere, use **Add to a project** on the Files page, in a fi
 ### Knowledge
 
 The project's own documents, which only its sessions search, and whether they search the shared knowledge too. See [Give a project documents of its own](#give-a-project-documents-of-its-own).
+
+### LLM Wiki
+
+The **LLM Wiki** tab shows the articles and sources in this project's wiki. Select an article or source to read it; links to other wiki files and the article's listed sources can be opened there. The tab says when the wiki is off or its configured folder is missing. Configure the folder in [Settings → Memory → LLM Wiki](/guide/memory#llm-wiki).
 
 ### Skills
 

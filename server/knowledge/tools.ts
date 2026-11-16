@@ -8,6 +8,7 @@ import { meaningOn } from '../memory/embed.ts';
 import { basesFor, basesOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { baseRow, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
+import { wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 
 const MAX_READ = 14_000;
 const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Projects: shared knowledge for every session, or a project’s own).';
@@ -94,7 +95,7 @@ const READ: RunTool = {
       if (!a.from) from = Math.max(0, c.seq - 1);
     } else if (a.path) doc = docByPath(db, String(a.path), within);
     else throw new Error('Give a ref (from knowledge_search) or a path');
-    if (!doc || !within.includes(doc.base)) throw new Error('That document is not in a knowledge base this session searches');
+    if (!doc || !within.includes(doc.base) || !wikiDocumentVisible(db, doc.base, doc.path)) throw new Error('That document is not in a knowledge base this session searches');
     const rows = chunksOf(db, doc.id, from, count);
     if (!rows.length) return `${doc.title} has ${doc.passages} passages; there is nothing from passage ${from + 1}.`;
     let out = `${doc.title} (${doc.path}), passages ${from + 1}–${from + rows.length} of ${doc.passages}:\n`;
@@ -123,7 +124,7 @@ const LIST: RunTool = {
     if (a.base) {
       const b = rows.find((x) => x.name.toLowerCase() === String(a.base).toLowerCase() || x.id === a.base);
       if (!b) return `No knowledge base is called that. There are: ${rows.map((x) => x.name).join(', ')}.`;
-      const docs = docsOf(db, baseRow(db, b.id).id, { limit: 300 }).filter((d) => d.status === 'indexed');
+      const docs = docsOf(db, baseRow(db, b.id).id, { limit: 300 }).filter((d) => d.status === 'indexed' && wikiDocumentVisible(db, d.base, d.path));
       return `${b.name}: ${docs.length} document${docs.length === 1 ? '' : 's'}${docs.length >= 300 ? ' (the first 300)' : ''}\n${docs.map((d) => `- ${d.path} (${d.passages} passages)`).join('\n')}`;
     }
     return rows
