@@ -11,6 +11,7 @@ import { embed, meaningHeld, meaningOn } from '../memory/embed.ts';
 import { quantize, VECTOR_MODEL } from '../memory/vectors.ts';
 import { htmlMarkdown } from '../web/fetch.ts';
 import { baseRow, baseRows, docsOf, dropDoc, knowledgeSchema, saveDoc, sourcesOf } from './store.ts';
+import { wikiFileActive, wikiSourceRoot } from '../wiki/knowledge/bindings.ts';
 
 /** Folders never read: tools' caches, dependencies, version control. */
 const SKIP_DIRS = new Set(['node_modules', '.git', '.hg', '.svn', '__pycache__', '.venv', 'venv', 'dist', 'build', '.next', '.cache', 'target', '.idea', '.vscode']);
@@ -202,7 +203,9 @@ async function scan(db: DB, base: string) {
   const found: { file: string; source: string }[] = [];
   for (const s of sources) {
     if (!fs.existsSync(s.path)) continue;
-    for (const file of filesUnder(s.path)) found.push({ file, source: s.id });
+    const wiki = wikiSourceRoot(db, s.id);
+    if (wiki && !wiki.active) continue;
+    for (const file of filesUnder(s.path)) if (!wiki || wikiFileActive(wiki.root, file)) found.push({ file, source: s.id });
   }
   const seen = new Set(found.map((f) => f.file));
   // Gone from the folder (or the folder is gone): out of the base.

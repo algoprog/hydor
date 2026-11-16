@@ -32,6 +32,7 @@ const TOOL_STATES = 'This changes which of a connected account’s tools agents 
 /** The first rule that matches decides. */
 const RULES: Rule[] = [
   // Never an agent's.
+  ['POST', /^\/api\/wiki\/migration\/apply$/, 'refuse', 'The user chooses wiki folder moves in Settings.'],
   ['*', /^\/api\/auth\//, 'refuse', 'The password and signing in are the user’s alone (Settings → App → Password).'],
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
   ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],

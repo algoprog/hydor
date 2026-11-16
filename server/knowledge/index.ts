@@ -14,9 +14,10 @@ import { basesFor, spaceOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docById, docsOf, dropDoc, filesDir, removeSource, sourcesOf, toDoc, updateBase } from './store.ts';
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
+import { wikiBaseVisible, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 
 function state(d: Deps): KnowledgeState {
-  const bases = baseRows(d.db).map((r) => baseView(d.db, r, progress.get(r.id)));
+  const bases = baseRows(d.db).filter((r) => wikiBaseVisible(d.db, r.id)).map((r) => baseView(d.db, r, progress.get(r.id)));
   // Why passages wait for their vectors, while some do.
   const waiting = bases.some((b) => b.embedded < b.passages);
   return { bases, meaning: meaningOn(d.db), meaningHeld: waiting ? meaningHeld(d.db) : undefined };
@@ -82,7 +83,7 @@ function routes(d: Deps) {
     rescan(id(req), { failed: true });
     return { ok: true };
   });
-  app.get('/api/knowledge/:id/docs', async (req) => ({ docs: docsOf(db, baseRow(db, id(req)).id, { limit: 2000 }).map(toDoc) }));
+  app.get('/api/knowledge/:id/docs', async (req) => ({ docs: docsOf(db, baseRow(db, id(req)).id, { limit: 2000 }).filter((d) => wikiDocumentVisible(db, d.base, d.path)).map(toDoc) }));
   /** Removes a document: one dropped on the page is deleted; one in a folder stays there and is left out until it changes. */
   app.delete('/api/knowledge/:id/docs/:doc', async (req) => {
     const doc = docById(db, Number((req.params as { doc: string }).doc));
