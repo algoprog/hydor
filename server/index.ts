@@ -68,6 +68,7 @@ import * as terms from './terminals.ts';
 import { FEATURES } from './features/index.ts';
 import { shareRoutes } from './share-target.ts';
 import { eventSent, featureContext, featureDeps, inboxItems, registerFeatures, startFeatures } from './features/registry.ts';
+import { registerAway } from './away/index.ts';
 import { arenaOf } from '../shared/arena.ts';
 import { startMatch } from './arena/index.ts';
 import { helper, helperOptions, helperSees, setHelperModel, setHelperModels } from './helper.ts';
@@ -1927,6 +1928,13 @@ registerFeatures(FEATURES, { app, db, sessions, scheduler, models, broadcast, to
 
 // Everything waiting on the user on this machine, newest first: the inbox (the page asks the other machines too).
 app.get('/api/inbox', async () => ({ items: [...sessions.inbox(), ...inboxItems()].sort((a, b) => b.at - a.at) }));
+// While you were away: what finished, what waits on you, what ran by itself and what runs next, since your last visit.
+registerAway(app, {
+  db,
+  inbox: () => [...sessions.inbox(), ...inboxItems()],
+  acpName: (id) => acpAgents(db).find((a) => a.id === id)?.name,
+  markSeen: (key) => sessions.markSeen(key),
+});
 
 // Notes the app adds to conversations (memory updates, second opinions…), and each session's settings beyond its agent's own.
 app.get('/api/sessions/:key/notes', async (req) => ({ notes: notesOf(db, (req.params as { key: string }).key) }));

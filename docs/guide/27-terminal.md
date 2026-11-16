@@ -183,6 +183,7 @@ How they all work:
 | `hydor sessions` | Your latest sessions, each with a mark: ● working, ● needs you, ✓ finished, ✗ error. Its verbs do what a session's menu does: `search`, `rename`, `archive` and `unarchive`, `pin` and `unpin`, `read`, `snooze`, `move` to a project, `fork`, `goal`, `share` (a read-only link), `changes` (the files it changed), `commands` (the commands it ran), `queue` (the messages waiting, and `queue clear` and `queue remove`), `show`, `export` (the conversation as a Markdown file, `-o -` to print it, or `--library` a document in the Library), `send`, `stop` and `delete`. |
 | `hydor inbox` | What waits on you (approvals, questions, a key an agent asked for, a skill to review): `list`, and `show` for one item, with where to answer it. |
 | `hydor outbox` | Calls held for your OK (a connected account's tools on Ask first): `list`, `show` for one with its input, `send` (as it is, or with `--set NAME=value` to change a field) and `drop`. |
+| `hydor away` | What happened since your last visit, as the start page's **While you were away** shows it: what waits on you, sessions that finished or failed, what ran by itself with its cost, and what runs next today. `hydor away seen` marks it all as seen. |
 
 `hydor show 6f1e2a3b` is the same as `hydor sessions show 6f1e2a3b`, and so are `send` and `stop`: the short ones stay.
 
@@ -192,6 +193,7 @@ hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
 hydor sessions export 6f1e -o notes.md  # the conversation as Markdown
 hydor inbox
+hydor away                           # what happened while you were away
 ```
 
 ### Your work

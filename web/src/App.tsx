@@ -10,6 +10,7 @@ import { useMachines } from './lib/machines';
 import { newerBuild, useApp, useSessions, useUI, useUsage, type Bootstrap } from './lib/store';
 import { applyTheme, setCustomThemes, useThemes } from './lib/theme';
 import { handleNotify, initNotifications } from './lib/notify';
+import { startPresence } from './lib/presence';
 import { live, ownLive } from './lib/ws';
 import { MachineDown } from './features/machines/MachineSwitcher';
 import { MachineOld, openedAnyway } from './features/machines/MachineOld';
@@ -117,10 +118,13 @@ export function App() {
     });
     live.start();
     initNotifications();
+    // Your visits, for the start page's "While you were away".
+    const offPresence = startPresence();
     const t = setInterval(() => useUsage.getState().refresh().catch(() => {}), 5 * 60_000);
     return () => {
       off();
       offOwn();
+      offPresence();
       clearInterval(t);
     };
   }, [auth]);
