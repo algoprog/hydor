@@ -1,8 +1,10 @@
 // `hydor machines`: Settings → App → Machines, the other computers running Hydor that this one uses (their sessions and pages
 // show here under /m/<id>). List them, add one (by its address, or by SSH, with the access token typed hidden) and remove one.
-// `hydor access-token` (a token for another machine to use this one) is a command of its own and stays.
+// `hydor access-token` (a token for another machine to use this one) is a command of its own and stays. Reaching this one from
+// your phone (Settings → App → Use on your phone) is `hydor machines phone`, its verbs in phone.ts.
 import { enc } from '../client.ts';
 import { Cancelled, choose, mark, str, num, table, UsageError, type Area, type Ctx } from './kit.ts';
+import { phoneVerbs } from './phone.ts';
 
 interface Machine {
   id: string;
@@ -26,8 +28,8 @@ const STATE = { online: 'on', connecting: 'busy', offline: 'error' } as const;
 export const machines: Area = {
   name: 'machines',
   aliases: ['machine'],
-  summary: 'Other computers running Hydor',
-  help: 'Machines this Hydor uses: their sessions and pages show here. Add one by its address (--url) or through SSH (--ssh, a host of ~/.ssh/config or user@host), with an access token made there (hydor access-token there). The token is typed hidden, or comes from stdin with --file -. hydor access-token here makes one for another machine to use this one.',
+  summary: 'Other computers, and this one by phone',
+  help: 'Machines this Hydor uses: their sessions and pages show here. Add one by its address (--url) or through SSH (--ssh, a host of ~/.ssh/config or user@host), with an access token made there (hydor access-token there). The token is typed hidden, or comes from stdin with --file -. hydor access-token here makes one for another machine to use this one. hydor machines phone reaches this one from your phone, privately with Tailscale.',
   group: 'this',
   verbs: [
     {
@@ -111,5 +113,6 @@ export const machines: Area = {
         ctx.out(`Removed “${m.name}”.`);
       },
     },
+    ...phoneVerbs,
   ],
 };

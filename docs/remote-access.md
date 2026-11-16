@@ -8,7 +8,7 @@ layer in front instead of opening the port.
 
 ## Use on your phone, with Tailscale
 
-The app does this itself: **Settings → App → Use on your phone** (or `hydor phone serve` in a terminal).
+The app does this itself: **Settings → App → Use on your phone** (or `hydor machines phone serve` in a terminal).
 
 1. Install [Tailscale](https://tailscale.com/download) on the computer that runs Hydor and sign in. The section says
    whether it is installed, running and signed in, and this computer's name on your tailnet.
@@ -24,7 +24,9 @@ When something stands in the way, the section says what to do: turn on Serve and
 something else is already published at the address. **Stop serving** undoes exactly what was done: the one handler
 it added (`tailscale serve --https=443 --set-path=/ off`) and the address it added to the ones the server accepts.
 It runs the `tailscale` command it finds on `PATH` or where Tailscale's installers put it; `TAILSCALE_BIN` names
-another (see [configuration](configuration.md)). Agents can turn it on only through a card you answer each time.
+another (see [configuration](configuration.md)). Agents can turn it on only through a card you answer each time. While
+it serves, the links the app hands out (chat apps' Open in Hydor, links agents give to sessions and Library pages)
+start with that address, unless `ALLOWED_ORIGINS` names one, which they keep using.
 
 ## Other ways
 

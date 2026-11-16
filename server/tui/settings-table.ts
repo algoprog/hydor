@@ -217,12 +217,12 @@ row('notifications', 'Send a test', 'action', {
 
 // ---- App › Use on your phone ------------------------------------------------------------------------------------------
 row('phone', 'Serve it on my devices', 'command', {
-  command: 'hydor phone serve',
+  command: 'hydor machines phone serve',
   note: 'Publishes the app with Tailscale Serve to the devices signed in to your Tailscale account only, never the public internet.',
 });
-row('phone', 'Tailscale on this computer', 'command', { command: 'hydor phone', note: 'Whether Tailscale is installed and signed in here, and this computer’s name on your tailnet.' });
-row('phone', 'Open it on your phone', 'command', { command: 'hydor phone --qr', note: 'The address, with a QR code for the phone’s camera.' });
-row('phone', 'Stop serving', 'command', { command: 'hydor phone stop', note: 'Undoes exactly what Serve it on my devices did.' });
+row('phone', 'Tailscale on this computer', 'command', { command: 'hydor machines phone', note: 'Whether Tailscale is installed and signed in here, and this computer’s name on your tailnet.' });
+row('phone', 'Open it on your phone', 'command', { command: 'hydor machines phone --qr', note: 'The address, with a QR code for the phone’s camera.' });
+row('phone', 'Stop serving', 'command', { command: 'hydor machines phone stop', note: 'Undoes exactly what Serve it on my devices did.' });
 row('phone', 'Add to Home Screen', 'page', { note: 'Done on the phone itself: Share → Add to Home Screen on an iPhone, the browser’s menu on Android.' });
 
 // ---- App › Chat apps --------------------------------------------------------------------------------------------------

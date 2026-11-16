@@ -1196,7 +1196,7 @@ programs shows each program's version and what is out, with Check now, Update no
   each, as a draft you can change (an email as To, Cc, Subject and Body; a chat message; a post; else the tool's
   fields): Send (Hydor makes the call, the session shows its answer and its agent hears it with your next message),
   Drop, or Send all for one session; they notify you like approvals, wait over restarts and are kept 30 days.
-- Use on your phone (Settings → App → Use on your phone, and `hydor phone`): the app on your own phone, privately,
+- Use on your phone (Settings → App → Use on your phone, and `hydor machines phone`): the app on your own phone, privately,
   with Tailscale. It says whether Tailscale is installed (looked for on PATH and where its installers put it on macOS,
   Windows and Linux), running and signed in, and this computer's name on the tailnet; Serve it on my devices publishes
   the app with Tailscale Serve over HTTPS to the devices signed in to your Tailscale account only (never Funnel, which is
@@ -1207,8 +1207,9 @@ programs shows each program's version and what is out, with Check now, Update no
   stands in the way comes with one thing to do: Serve or HTTPS certificates not on in the tailnet (Tailscale's link,
   as a button), Linux wanting you to be Tailscale's operator (the command to run once), something else published at
   that address (served on port 8443 instead, the other left alone), Funnel turned on by hand (flagged). Stop serving
-  undoes exactly what was done, from a record kept for it; agents can serve it only through a card each time, Full
-  access too. Desktop apps offer it in their welcome tour (Use it on your phone too?, skipped with one click).
+  undoes exactly what was done, from a record kept for it; while it serves, the links the app hands out (chat apps'
+  Open in Hydor, links agents give to sessions and Library pages) start with that address unless ALLOWED_ORIGINS names
+  one; agents can serve it only through a card each time, Full access too. Desktop apps offer it in their welcome tour (Use it on your phone too?, skipped with one click).
 - Chat apps (Settings → Chat apps): your agents in Telegram, Discord or Slack, each through a bot or app of your own
   (a Telegram bot from @BotFather, a Discord bot from the Developer Portal, a Slack app from a manifest the app gives
   you, with the exact scopes). Only the chats you link with a one-time code can use it. A message starts a session or

@@ -2,7 +2,8 @@
 // It says where things stand (Tailscale found, running, signed in; this machine's name on the tailnet), publishes the
 // app with Tailscale Serve over HTTPS to the devices signed in to the same Tailscale account only (never Funnel, which
 // is public), adds that address to the ones the server accepts requests from (server/origins.ts), and keeps a record
-// of what it did, so Stop serving undoes exactly that: the one handler it added, and the address if it added it.
+// of what it did, so Stop serving undoes exactly that: the one handler it added, and the address if it added it. While
+// it serves, the links the app hands out start with that address too, unless ALLOWED_ORIGINS names one (server/index.ts).
 // The password is asked as before. Agents get Serve only through a card each time (server/guide/api.ts).
 //
 // GET  /api/phone        where things stand
@@ -110,6 +111,11 @@ export class Phone {
     } catch {
       return null;
     }
+  }
+
+  /** The address this page serves the app at on the tailnet (from its record, so links need not ask Tailscale), or null. */
+  servedUrl(): string | null {
+    return this.record()?.url ?? null;
   }
 
   private setRecord(r: ServeRecord | null) {

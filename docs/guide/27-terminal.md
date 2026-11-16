@@ -295,7 +295,7 @@ What the app keeps in each browser (the theme, the language, the notification so
 - `hydor status` says whether Hydor runs, its version and address, where its data is, whether it is a service, and which sessions are working or need you (with the same marks as `hydor sessions`).
 - `hydor serve` runs Hydor here, in the foreground, until Ctrl+C. `hydor service install` keeps it running as a background service, `hydor update` pulls the latest code, builds it and restarts, and `hydor set-password`, `hydor setup-token` and `hydor access-token` do what their names say. In the Mac app, `hydor update`, `hydor service install` and `hydor serve` say that the app does that itself.
 - `hydor open` prints the app's address; `--browser` opens it.
-- `hydor phone` says whether Tailscale is installed and signed in here, and the address the app is served at on your tailnet, with a QR code for your phone's camera. `hydor phone serve` publishes the app to your own devices (`--port 8443` when something else is at the usual address) and `hydor phone stop` takes it off again, as [Settings → App → Use on your phone](/settings?s=phone) does.
+- `hydor machines phone` says whether Tailscale is installed and signed in here, and the address the app is served at on your tailnet, with a QR code for your phone's camera. `hydor machines phone serve` publishes the app to your own devices (`--port 8443` when something else is at the usual address) and `hydor machines phone stop` takes it off again, as [Settings → App → Use on your phone](/settings?s=phone) does.
 
 ## Use another computer's Hydor
 
