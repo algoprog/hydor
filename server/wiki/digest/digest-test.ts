@@ -130,7 +130,8 @@ test('a new project document: source, article, index, log, notes, an update, a b
   assert.match(asked[0].prompt, /Project: Alpha — The travel booking tool/);
   assert.match(asked[0].prompt, /<document>[\s\S]*Flights over 500 euros/);
   const root = wikiRoot(db, alpha.id)!;
-  assert.equal(root, fs.realpathSync(path.join(hub, 'projects', alpha.id)));
+  // A project's wiki is a folder of its own in the hub's projects/ (named after the project: the core chooses the name).
+  assert.equal(path.dirname(root), fs.realpathSync(path.join(hub, 'projects')));
   const article = readWiki(root, 'wiki/travel-policy.md').content;
   assert.match(article, /^---\ntitle: "Travel policy"\nsources:\n {2}- raw\/articles\/source-[0-9a-f]{64}-[0-9a-f]{64}\.md\nupdated: \d{4}-\d\d-\d\d\n---\n\n# Travel policy/);
   assert.match(article, /See the other and \[index\]\(\.\.\/index\.md\)/);

@@ -28,7 +28,7 @@ const LIST_ARTICLES = 80;
 const KEEP_SHARE = 0.8;
 
 /** Whether documents may update wiki memory (Settings → Memory → Wiki memory), as the settings say; on unless off. */
-const fromDocumentsOn = (db: DB) => (wikiSettings(db) as { fromDocuments?: boolean }).fromDocuments !== false;
+const fromDocumentsOn = (db: DB) => wikiSettings(db).fromDocuments;
 
 /** A document's text from its passages, without the overlap each passage repeats of the one before; at most MAX_DOC_CHARS. */
 export function documentText(db: DB, docId: number, max = MAX_DOC_CHARS): { text: string; cut: boolean } {
