@@ -38,11 +38,11 @@ export interface ProjectWikiView {
   error?: string;
 }
 
-/** GET /api/projects/:id/wiki/updates: what new and changed documents did to the project's memory, newest first. */
+/** GET /api/projects/:id/wiki/updates: what new and changed documents and the project's conversations did to the project's memory, newest first. */
 export interface WikiUpdate {
   id: number;
   at: number;
-  /** The document's title and path, as knowledge has them. */
+  /** The document's title and path, as knowledge has them; for a conversation, the session's title and `session:<session key>`. */
   document: string;
   path: string;
   /** The wiki articles it created or changed, by path. */

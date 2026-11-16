@@ -26,7 +26,8 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   Wiki memory is linked Markdown articles with their sources, kept in plain files in a folder of yours (a shared
   wiki, and one folder for each project, by default inside it); documents are the files in knowledge bases, indexed
   for search. When the indexer reads a new or changed document, the helper model adds a few notes and updates the
-  wiki, a little at a time, and agents read and write the wiki only through tools that keep it inside its folder.
+  wiki, a little at a time; about once a day it also adds what a project's recent conversations settled to that
+  project's wiki. Agents read and write the wiki only through tools that keep it inside its folder.
 - **Your accounts, your machine.** The app talks to the agents through their official command-line tools and
   never sees your model credentials; sign-in happens in the agents' own login flows.
 

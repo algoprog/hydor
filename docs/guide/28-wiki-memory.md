@@ -1,6 +1,6 @@
 # Wiki memory
 
-Wiki memory is a set of linked articles that agents keep for each of your projects, and one shared set, in plain Markdown files. The articles are written from the project's documents and its work, and each one lists the sources it came from. It is one part of Hydor's memory, beside memory notes and documents. This topic covers how the three fit together, where wiki memory is kept, how new documents update it, what you see on a project's Memory tab, and what agents can and cannot do with it. Use it to let what a project learns build up over time instead of being found again each session.
+Wiki memory is a set of linked articles that agents keep for each of your projects, and one shared set, in plain Markdown files. The articles are written from the project's documents and its work, and each one lists the sources it came from. It is one part of Hydor's memory, beside memory notes and documents. This topic covers how the three fit together, where wiki memory is kept, how new documents and a project's own work update it, what you see on a project's Memory tab, and what agents can and cannot do with it. Use it to let what a project learns build up over time instead of being found again each session.
 
 ![A project's Memory tab: its notes, wiki memory and documents](images/wiki-memory.webp)
 
@@ -14,7 +14,7 @@ Memory has three parts. Each is for something else, and they work together:
 
 The idea comes from a wiki that an AI agent maintains: keep the original sources, then bring what they say together in articles that point back to them. When something new arrives, the agent updates the articles instead of starting again, so you can build on earlier work and check where a claim came from.
 
-When a document is added or changed, Hydor can read it and add what it says to the other two parts: a few memory notes (for a project's documents) and updates to the wiki (see [Learn from new documents](#learn-from-new-documents)).
+When a document is added or changed, Hydor can read it and add what it says to the other two parts: a few memory notes (for a project's documents) and updates to the wiki (see [Learn from new documents](#learn-from-new-documents)). About once a day, Hydor also reads the project's recent conversations and adds what is worth keeping to the wiki (see [Learn from the project's work](#learn-from-the-projects-work)).
 
 ## Turn it on or off
 
@@ -25,7 +25,7 @@ Wiki memory is on for every project unless you turn it off. Two places decide:
 
 With wiki memory off for a project, its Memory tab says "Wiki memory is off for this project", agents' wiki tools there say it is off, and nothing is written. What is already in the folder stays.
 
-Learning from documents and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
+Learning from documents, learning from a project's work and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
 
 ## Where wikis are kept
 
@@ -55,9 +55,21 @@ The helper model (set in [Settings → Models](/settings?s=models)) does the rea
 - It keeps the document's text, with passwords and keys taken out, as a source in the wiki's `raw/` folder, then picks up to three articles to add to, up to two new articles, and up to three short notes for the project.
 - An article only grows: a rewrite that drops a fifth or more of what the article said is refused, and an article over 20,000 characters is left as it was. Anything that holds a secret is left out. The notes are short, new, and never repeat one the project has.
 - A document with the same text is not read twice. A change to a document reads it again.
+- Documents already in a project's knowledge when you update Hydor are read too, once, at the same pace (the newest first, up to 400), so an existing project's wiki fills in over a few hours.
 - Wiki memory's own folder is a knowledge base too, but never digests itself.
 
 If the helper cannot be reached or finds nothing worth adding, nothing is lost: the update is listed with the reason, and the document is tried again when it changes.
+
+## Learn from the project's work
+
+About once a day, with Memory's [Learn from conversations](/settings?s=memory&find=Learn%20from%20conversations) on (it is at first), the helper model reads a project's recent conversations and adds what is worth keeping to that project's wiki. It reads only what you and the agents said: your own words (not files you attached or text you pasted) and each agent's last reply to you, never the output of tools. It never reads a Confidential session, a session with memory off, a helper session or a scheduled run.
+
+- It runs when the last time was a day ago or more and nobody has written to an agent for ten minutes, so it does not get in the way of your work. The first time, it looks back two weeks, so a project that already has sessions gets its wiki soon after you update. Each time after, it reads what is new since the last.
+- For each conversation it keeps the text, with passwords and keys taken out, as a source in the wiki's `raw/` folder, named after the session and its day, then adds to or updates articles, or starts a new one. It keeps lasting knowledge about the project: decisions and why they were made, how things work, conventions, commands that worked, pitfalls and their fixes, results, and open questions. "Nothing worth keeping" is a fine answer.
+- It never keeps personal details about you, secrets, instructions for agents, or a step-by-step log of what an agent did. An article only grows, as with documents.
+- It reads at most four conversations for a project and twelve in all each time, the latest first, and skips short ones. It adds no memory notes: those come from [Learn from conversations](/guide/memory#learn-from-conversations) in the tidy-up.
+
+Each conversation shows up under **Recent updates** on the project's Memory tab, and you can open the session from there. To stop it, turn off [Learn from conversations](/settings?s=memory&find=Learn%20from%20conversations) (this also stops memory's own learning from conversations), or turn wiki memory off for the project.
 
 ## A project's Memory tab
 
@@ -67,7 +79,7 @@ Open [Projects](/projects), pick a project and open its **Memory** tab. It repla
 - **Wiki**: the project's articles and sources. Select one to read it, follow its links, and open its listed sources. It is read-only here: agents write it. If wiki memory is off, the tab says so and has **Open its Settings**; if nothing is in it yet, "Nothing here yet. Agents add to it as they work, and new documents update it." The wiki's folder is shown under the list.
 - **Documents**: the project's own documents and whether its sessions search the shared knowledge too, as before (see [Give a project documents of its own](/guide/projects#give-a-project-documents-of-its-own)). A line says when new and changed documents also update the project's notes and wiki.
 
-Under the articles, **Recent updates** lists what new and changed documents did lately, newest first, up to 20: the document, how long ago, the articles it added or changed, how many notes it added, or "Nothing to add", or why it did nothing or what went wrong. Click an article to read it.
+Under the articles, **Recent updates** lists what new and changed documents and the project's conversations did lately, newest first, up to 20: the document, or **Session:** and the session's title (click it to open the session), how long ago, the articles it added or changed, how many notes it added, or "Nothing to add", or why it did nothing or what went wrong. Click an article to read it.
 
 The Overview tab's **Memory** card sums it up ("12 notes · 8 articles · 5 documents"). On a phone, the switch is the same and the lists stack.
 
@@ -100,7 +112,9 @@ When the current **Wiki folder** has files, changing it opens a review. You can 
 - "Keep each project's wiki in its own folder, in `.wiki`, and leave it out of Git."
 - "Move the wiki folder to ~/Notes/wiki."
 - "Stop reading my new documents into memory."
+- "Why is this project's wiki still empty?"
 - "What did my last documents add to this project's wiki?"
+- "Which conversations did this project's wiki learn from this week?"
 - "Add this paper to the project's wiki, then write what it says about retrieval in an article."
 - "Check this project's wiki for broken links and missing sources."
 - "Preview the lessons learned in this session, and save the first two."

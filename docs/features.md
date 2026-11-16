@@ -238,7 +238,13 @@ agents that speak ACP and take MCP servers.
   characters, one document at a time, after its base has been quiet for half a minute, at most 40 an hour), keeps its text as a
   source, adds to up to three articles and writes up to two new ones, and, for a project's documents, adds up to three short notes to its
   memory; a rewrite that would drop a fifth of an article, anything with a secret and an article over 20,000 characters are left out,
-  and each outcome is listed under Recent updates. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
+  and each outcome is listed under Recent updates; documents already in a project's knowledge when you update are read once too,
+  at the same pace (the newest 400). Learn from the project's work (about once a day, when memory's Learn from conversations is on,
+  nobody has written for ten minutes, and the last pass was 20 hours ago; the first time it looks back two weeks): the helper reads the
+  project's recent conversations (your own words and each agent's last reply of a turn, never tool output; not confidential
+  sessions, sessions with memory off, child sessions or scheduled runs), at most four a project and twelve a pass, keeps each as a
+  source with the secrets taken out and adds to or starts articles with lasting knowledge only (no memory notes, nothing personal),
+  and an update opens its session. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
   write articles with the hash of what they read, and check its sources and links, only in their own project's wiki (or the shared one),
   never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools. Changing the wiki
   folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). The Custom agent keeps

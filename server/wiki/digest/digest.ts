@@ -14,7 +14,7 @@ import { ingestWikiSource, wikiHash } from '../core.ts';
 import { isWikiBase } from '../knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
-import { checkPlan, helperDigestAsk, planPrompt, PLAN_SYSTEM, WRITE_SYSTEM, writePrompt, type ArticleLine, type DigestAsk } from './plan.ts';
+import { checkPlan, helperDigestAsk, planPrompt, planSystem, writePrompt, writeSystem, type ArticleLine, type DigestAsk, type TextKind } from './plan.ts';
 import { digested, markDigested, recordUpdate } from './store.ts';
 import { appendLog, bodyOf, cleanLinks, composeArticle, freePath, readOrNull, splitFront, titleOfArticle, writeFile, writeIndex } from './write.ts';
 
@@ -73,6 +73,152 @@ function listArticles(root: string, docText: string): { lines: ArticleLine[]; al
     return { path: a.path, title: a.title, first: oneLine(first) };
   });
   return { lines, all: new Set(all.map((a) => a.path)), more: Math.max(0, all.length - shown.length), titles: new Map(all.map((a) => [a.path, a.title])) };
+}
+
+export interface DigestTextInput {
+  /** The project (null: the shared wiki) whose wiki and memory the text goes to. */
+  space: string | null;
+  /** What the update is listed under: the knowledge base (documents) or another label (conversations). */
+  base: string;
+  title: string;
+  /** A document's path, or `session:<key>`. */
+  path: string;
+  /** Where the kept source says it came from. */
+  origin: string;
+  text: string;
+  /** Only part of it is given (a long document's beginning, a long conversation's first request and latest turns). */
+  cut: boolean;
+  kind: TextKind;
+  /** Short memory notes for the project too (documents; memory's own learning does them for conversations). */
+  notes: boolean;
+  /** Its hash (wikiHash of the text), marked as read once the helper has answered. */
+  hash: string;
+  now: () => number;
+  onUpdate?: (space: string | null) => void;
+}
+
+/**
+ * Everything after the text is at hand, for a document and a conversation alike: keep it as a source, ask the helper
+ * which articles it bears on, write them (never shorter than they were, never with a secret), refresh the index and
+ * log, add the notes, mark the text as read and record the update. Never throws: what goes wrong is the update's error.
+ */
+export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Promise<void> {
+  const { space, text: raw, cut, kind, title, hash, now } = i;
+  const project = space ? spaceById(db, space) : null;
+  const rec = (articles: string[], notes: number, error?: string) => {
+    recordUpdate(db, { space, base: i.base, document: i.title, path: i.path, articles, notes, error }, now());
+    i.onUpdate?.(space);
+  };
+  const problems: string[] = [];
+  let root: string | null;
+  let sourcePath: string;
+  let docText: string;
+  try {
+    root = wikiRoot(db, space, { create: true });
+    if (!root) throw new Error('The wiki folder is not available');
+    // What is kept and what the helper reads has no secret in it.
+    const text = redactSecrets(cut ? `${raw}\n\n… (cut here: ${kind === 'conversation' ? 'only its first request and its latest turns were read' : `only the first ${MAX_DOC_CHARS.toLocaleString('en-US')} characters of the document were read`})` : raw);
+    const origin = oneLine(i.origin).slice(0, 500);
+    sourcePath = ingestWikiSource(root, text, origin).path;
+    docText = text;
+  } catch (e) {
+    rec([], 0, `Could not keep the ${kind} as a source: ${(e as Error).message}`);
+    return;
+  }
+
+  let articles: string[] = [];
+  let notes = 0;
+  try {
+    const listing = listArticles(root, docText);
+    const place = project ? repoRoot(project.folder) : null;
+    const noteTitles = place ? entries(db, { scope: 'repo', scopeKey: place, limit: 100 }).map(titleOf) : [];
+    const plan = checkPlan(await ask({ system: planSystem(kind), prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title, text: docText, cut, kind }, articles: listing.lines, more: listing.more, noteTitles }), maxTokens: 2000 }), listing.all);
+
+    // The articles to write: existing ones with their text, new ones with a free path.
+    const targets: { path: string; title: string; current?: string }[] = [];
+    for (const p of plan.update) {
+      const cur = readOrNull(root, p);
+      if (!cur) continue;
+      if (cur.content.length > MAX_ARTICLE_CHARS) {
+        problems.push(`${p} is too long to rewrite: left as it was`);
+        continue;
+      }
+      targets.push({ path: p, title: titleOfArticle(cur.content, listing.titles.get(p) ?? p), current: cur.content });
+    }
+    const taken = new Set<string>([...listing.all, ...targets.map((t) => t.path)]);
+    for (const c of plan.create) {
+      const p = freePath(root, c.title, taken);
+      taken.add(p);
+      targets.push({ path: p, title: c.title });
+    }
+
+    if (targets.length) {
+      const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ document: { title, text: docText, cut, kind }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown }[] };
+      const accepted: { target: (typeof targets)[number]; body: string }[] = [];
+      for (const a of Array.isArray(answer?.articles) ? answer.articles : []) {
+        const target = targets.find((t) => t.path === a.path);
+        if (!target || accepted.some((x) => x.target === target) || typeof a.content !== 'string') continue;
+        const body = bodyOf(a.content);
+        if (body.length < 20) continue;
+        if (secretIn(body)) {
+          problems.push(`${target.path}: left out, it held a secret`);
+          continue;
+        }
+        if (target.current != null && body.length < splitFront(target.current).body.trim().length * KEEP_SHARE) {
+          problems.push(`${target.path}: left as it was, the new text dropped what it said`);
+          continue;
+        }
+        accepted.push({ target, body });
+      }
+      // A link may go to an article, the source, the index and the log, not to anything else.
+      const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), sourcePath, 'index.md', 'log.md']);
+      const written: { path: string; title: string }[] = [];
+      const at = now();
+      for (const { target, body } of accepted) {
+        try {
+          const text = cleanLinks(body, target.path, known);
+          const did = await writeFile(root, target.path, (cur) => {
+            // Another writer may have grown the article since it was read: never drop what it says now.
+            if (cur != null && text.length < splitFront(cur).body.trim().length * KEEP_SHARE) return null;
+            return composeArticle(cur, text, { title: target.title, source: sourcePath, now: at });
+          });
+          if (did) written.push({ path: target.path, title: target.title });
+          else problems.push(`${target.path}: changed meanwhile, left as it is now`);
+        } catch (e) {
+          problems.push(`${target.path}: ${(e as Error).message}`);
+        }
+      }
+      articles = written.map((w) => w.path);
+      if (written.length) {
+        try {
+          await writeIndex(root);
+          await appendLog(root, { document: title, articles: written.map((w) => ({ path: w.path, title: titleOfArticle(readOrNull(root, w.path)?.content ?? '', w.title) })), now: at });
+        } catch (e) {
+          problems.push(`index or log: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // Notes for a project's documents: short, new, with nothing secret and nothing that steers.
+    if (i.notes && project && place) {
+      for (const n of plan.notes) {
+        const body = cleanText(/^from\b/i.test(n.text) ? n.text : `From ${title}: ${n.text}`);
+        if (secretIn(body) || steeringIn(body) || sameText(db, { scope: 'repo', scopeKey: place }, body)) continue;
+        try {
+          addEntry(db, { scope: 'repo', scopeKey: place, text: body, title: n.title || undefined, basis: 'inferred' }, { source: 'auto', why: `Read ${title}` });
+          notes++;
+        } catch (e) {
+          problems.push(`note: ${(e as Error).message}`);
+        }
+      }
+    }
+    markDigested(db, space, hash, now());
+    if (!articles.length && !notes && !problems.length) problems.push('Nothing in it to add to the wiki or to memory');
+    rec(articles, notes, problems.length ? problems.join('; ').slice(0, 600) : undefined);
+  } catch (e) {
+    // The helper failed (not there, a refused answer…): recorded; the document is tried again when it changes.
+    rec(articles, notes, `${(e as Error).message}`.slice(0, 300));
+  }
 }
 
 export interface DigestOptions {
@@ -189,120 +335,7 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
     }
     starts.push(now());
 
-    const rec = (articles: string[], notes: number, error?: string) => {
-      recordUpdate(db, { space, base: base.id, document: doc.title, path: doc.path, articles, notes, error }, now());
-      o.onUpdate?.(space);
-    };
-    const problems: string[] = [];
-    let root: string | null;
-    let sourcePath: string;
-    let docText: string;
-    try {
-      root = wikiRoot(db, space, { create: true });
-      if (!root) throw new Error('The wiki folder is not available');
-      // What is kept and what the helper reads has no secret in it.
-      const text = redactSecrets(cut ? `${raw}\n\n… (cut here: only the first ${MAX_DOC_CHARS.toLocaleString('en-US')} characters of the document were read)` : raw);
-      const origin = oneLine(`knowledge:${base.name}/${doc.title}`).slice(0, 500);
-      sourcePath = ingestWikiSource(root, text, origin).path;
-      docText = text;
-    } catch (e) {
-      rec([], 0, `Could not keep the document as a source: ${(e as Error).message}`);
-      return 'done';
-    }
-
-    let articles: string[] = [];
-    let notes = 0;
-    try {
-      const listing = listArticles(root, docText);
-      const place = project ? repoRoot(project.folder) : null;
-      const noteTitles = place ? entries(db, { scope: 'repo', scopeKey: place, limit: 100 }).map(titleOf) : [];
-      const plan = checkPlan(await ask({ system: PLAN_SYSTEM, prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title: doc.title, text: docText, cut }, articles: listing.lines, more: listing.more, noteTitles }), maxTokens: 2000 }), listing.all);
-
-      // The articles to write: existing ones with their text, new ones with a free path.
-      const targets: { path: string; title: string; current?: string }[] = [];
-      for (const p of plan.update) {
-        const cur = readOrNull(root, p);
-        if (!cur) continue;
-        if (cur.content.length > MAX_ARTICLE_CHARS) {
-          problems.push(`${p} is too long to rewrite: left as it was`);
-          continue;
-        }
-        targets.push({ path: p, title: titleOfArticle(cur.content, listing.titles.get(p) ?? p), current: cur.content });
-      }
-      const taken = new Set<string>([...listing.all, ...targets.map((t) => t.path)]);
-      for (const c of plan.create) {
-        const p = freePath(root, c.title, taken);
-        taken.add(p);
-        targets.push({ path: p, title: c.title });
-      }
-
-      if (targets.length) {
-        const answer = (await ask({ system: WRITE_SYSTEM, prompt: writePrompt({ document: { title: doc.title, text: docText, cut }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown }[] };
-        const accepted: { target: (typeof targets)[number]; body: string }[] = [];
-        for (const a of Array.isArray(answer?.articles) ? answer.articles : []) {
-          const target = targets.find((t) => t.path === a.path);
-          if (!target || accepted.some((x) => x.target === target) || typeof a.content !== 'string') continue;
-          const body = bodyOf(a.content);
-          if (body.length < 20) continue;
-          if (secretIn(body)) {
-            problems.push(`${target.path}: left out, it held a secret`);
-            continue;
-          }
-          if (target.current != null && body.length < splitFront(target.current).body.trim().length * KEEP_SHARE) {
-            problems.push(`${target.path}: left as it was, the new text dropped what it said`);
-            continue;
-          }
-          accepted.push({ target, body });
-        }
-        // A link may go to an article, the source, the index and the log, not to anything else.
-        const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), sourcePath, 'index.md', 'log.md']);
-        const written: { path: string; title: string }[] = [];
-        const at = now();
-        for (const { target, body } of accepted) {
-          try {
-            const text = cleanLinks(body, target.path, known);
-            const did = await writeFile(root, target.path, (cur) => {
-              // Another writer may have grown the article since it was read: never drop what it says now.
-              if (cur != null && text.length < splitFront(cur).body.trim().length * KEEP_SHARE) return null;
-              return composeArticle(cur, text, { title: target.title, source: sourcePath, now: at });
-            });
-            if (did) written.push({ path: target.path, title: target.title });
-            else problems.push(`${target.path}: changed meanwhile, left as it is now`);
-          } catch (e) {
-            problems.push(`${target.path}: ${(e as Error).message}`);
-          }
-        }
-        articles = written.map((w) => w.path);
-        if (written.length) {
-          try {
-            await writeIndex(root);
-            await appendLog(root, { document: doc.title, articles: written.map((w) => ({ path: w.path, title: titleOfArticle(readOrNull(root, w.path)?.content ?? '', w.title) })), now: at });
-          } catch (e) {
-            problems.push(`index or log: ${(e as Error).message}`);
-          }
-        }
-      }
-
-      // Notes for a project's documents: short, new, with nothing secret and nothing that steers.
-      if (project && place) {
-        for (const n of plan.notes) {
-          const body = cleanText(/^from\b/i.test(n.text) ? n.text : `From ${doc.title}: ${n.text}`);
-          if (secretIn(body) || steeringIn(body) || sameText(db, { scope: 'repo', scopeKey: place }, body)) continue;
-          try {
-            addEntry(db, { scope: 'repo', scopeKey: place, text: body, title: n.title || undefined, basis: 'inferred' }, { source: 'auto', why: `Read ${doc.title}` });
-            notes++;
-          } catch (e) {
-            problems.push(`note: ${(e as Error).message}`);
-          }
-        }
-      }
-      markDigested(db, space, hash, now());
-      if (!articles.length && !notes && !problems.length) problems.push('Nothing in it to add to the wiki or to memory');
-      rec(articles, notes, problems.length ? problems.join('; ').slice(0, 600) : undefined);
-    } catch (e) {
-      // The helper failed (not there, a refused answer…): recorded; the document is tried again when it changes.
-      rec(articles, notes, `${(e as Error).message}`.slice(0, 300));
-    }
+    await digestText(db, ask, { space, base: base.id, title: doc.title, path: doc.path, origin: `knowledge:${base.name}/${doc.title}`, text: raw, cut, kind: 'document', notes: true, hash, now, onUpdate: o.onUpdate });
     return 'done';
   }
 

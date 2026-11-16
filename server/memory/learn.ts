@@ -92,7 +92,7 @@ export function ownWords(text: string): string {
 }
 
 /** A session's turns from the indexer's chunks: each message the user wrote (their own words), with the agent's last reply after it. */
-function turnsOf(db: DB, key: string, o: { since?: number; until?: number } = {}): Convo['turns'] {
+export function turnsOf(db: DB, key: string, o: { since?: number; until?: number } = {}): Convo['turns'] {
   const rows = db.prepare("select kind, coalesce(ts, 0) as ts, text from chunk_text where key = ? and kind in ('user', 'assistant') order by id").all(key) as { kind: string; ts: number; text: string }[];
   const turns: Convo['turns'] = [];
   for (const r of rows) {

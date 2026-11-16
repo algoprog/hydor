@@ -1,5 +1,5 @@
 // A project's wiki memory, read only: its articles and sources, an article or source whole, and what new and changed
-// documents did to the project's memory lately. It comes from the project's view (spaceMemory.ts); the list of recent
+// documents and the project's work (a session an update came from opens) did to the project's memory lately. It comes from the project's view (spaceMemory.ts); the list of recent
 // updates and an open article load again when the server says the wiki changed.
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { FileText } from 'lucide-react';
@@ -8,7 +8,7 @@ import { Markdown } from '../../components/Markdown';
 import { Button, Throbber } from '../../components/ui';
 import { api, enc } from '../../lib/api';
 import { ago, tildify } from '../../lib/format';
-import { go } from '../../lib/nav';
+import { go, openSession } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { wikiDocument, wikiRelative } from './SpaceWikiPaths';
@@ -18,16 +18,26 @@ type WikiFile = { path: string; content: string; sha256: string };
 /** How many of an update's articles show before "and 2 more". */
 const FEW = 3;
 
-/** One recent update: the document, when, what it did to the wiki and the notes (or why it did nothing). */
+/** One recent update: the document (or the session it was learned from), when, what it did to the wiki and the notes (or why it did nothing). */
 function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => void }) {
+  const session = u.path.startsWith('session:') ? u.path.slice('session:'.length) : null;
   const first = u.articles.slice(0, FEW);
   const more = u.articles.length - first.length;
   return (
     <li className="px-4 py-2.5">
       <div className="flex min-w-0 items-baseline gap-2">
-        <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px]" title={u.path}>
-          {u.document}
-        </span>
+        {session ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]">
+            <span className="text-fg-3">Session</span>:{' '}
+            <button type="button" translate="no" onClick={() => openSession(session)} className="text-accent hover:underline">
+              {u.document}
+            </button>
+          </span>
+        ) : (
+          <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px]" title={u.path}>
+            {u.document}
+          </span>
+        )}
         <span className="shrink-0 text-[12px] text-fg-3" title={new Date(u.at).toLocaleString()}>
           {ago(u.at)}
         </span>
