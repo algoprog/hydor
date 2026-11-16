@@ -334,6 +334,7 @@ export function MenuItem({
   checked,
   disabled,
   submenu,
+  wrap,
 }: {
   icon?: ReactNode;
   children: ReactNode;
@@ -344,18 +345,21 @@ export function MenuItem({
   disabled?: boolean;
   /** It opens a submenu in the menu's place: a chevron at its end. */
   submenu?: boolean;
+  /** Allow longer labels to wrap on narrow screens. */
+  wrap?: boolean;
 }) {
   return (
     <button
       disabled={disabled}
       onClick={onClick}
       className={cx(
-        'flex h-8.5 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors disabled:opacity-40',
+        'flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] transition-colors disabled:opacity-40',
+        wrap ? 'min-h-8.5 py-1.5' : 'h-8.5',
         danger ? 'text-err hover:bg-err/10' : 'text-fg hover:bg-bg-2',
       )}
     >
       <span className="flex w-4 shrink-0 items-center justify-center text-fg-3">{icon}</span>
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className={cx('min-w-0 flex-1', wrap ? 'whitespace-normal leading-snug' : 'truncate')}>{children}</span>
       {hint && <span className="shrink-0 text-[11.5px] text-fg-3">{hint}</span>}
       {checked && <Check size={14} className="shrink-0 text-fg" strokeWidth={2.5} />}
       {submenu && <ChevronRight size={14} className="shrink-0 text-fg-3" />}

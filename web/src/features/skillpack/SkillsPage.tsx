@@ -21,6 +21,7 @@ import {
   Palette,
   PenLine,
   Plus,
+  Power,
   PowerOff,
   Puzzle,
   RotateCcw,
@@ -982,32 +983,32 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
     }
   };
 
-  /** Apply the unfiltered loaded snapshot as one project-only change. */
-  const switchAllOff = async () => {
+  /** Apply the current unfiltered snapshot as one project-only change. */
+  const switchAll = async (on: boolean) => {
     if (!sp || !mine || !agents || switchingAll) return;
-    const ok = await confirm({
-      title: 'Turn off all skills for this project?',
-      body: (
-        <div className="space-y-2">
-          <p>Every skill listed here goes off for this project’s sessions, including the ones the filters hide. Skills added later follow their usual setting, and sessions already running keep theirs until they start again.</p>
-          {agents.errors.length > 0 && <p>Codex’s skills could not be read, so Codex’s own skills stay as they are.</p>}
-        </div>
-      ),
-      confirm: 'Turn off',
-    });
-    if (!ok) return;
     setSwitchingAll(true);
     try {
-      // Refresh every source so a long-open page does not act on an old skill list.
+      // Refresh all sources before explaining which skills the operation can reach.
       const [freshLib, freshAgents, freshMine] = await Promise.all([
         api<SkillLibrary>('/api/skillpack'),
         api<{ skills: SkillEntry[]; errors: string[] }>(`/api/setup/skills${cwd ? `?cwd=${enc(cwd)}` : ''}`),
         api<SpaceSkills>(`/api/projects/${enc(sp.id)}/skills`),
       ]);
+      const ok = await confirm({
+        title: on ? 'Turn on all skills for this project?' : 'Turn off all skills for this project?',
+        body: (
+          <div className="space-y-2">
+            <p>Every available skill listed here changes for this project’s sessions, including the ones the filters hide. Skills added later follow their usual setting, and sessions already running keep theirs until they start again.</p>
+            {freshAgents.errors.length > 0 && <p>Some agents’ skills could not be read and will stay as they are.</p>}
+          </div>
+        ),
+        confirm: on ? 'Turn on' : 'Turn off',
+      });
+      if (!ok) return;
       const skills = spaceItems(sp, freshLib, freshAgents.skills, freshMine).flatMap((i) => i.here ? [{ name: i.here.name, agent: i.here.agent ?? null, usual: i.here.usual }] : []);
-      const r = await post<{ switches: Record<string, boolean> }>(`/api/projects/${enc(sp.id)}/skill-switches/off`, { skills, expected: freshMine.switches });
+      const r = await post<{ switches: Record<string, boolean> }>(`/api/projects/${enc(sp.id)}/skill-switches/bulk`, { skills, expected: freshMine.switches, on });
       setMine((m) => m && { ...m, switches: r.switches });
-      toast('Skills turned off for this project', 'ok');
+      toast(freshAgents.errors.length ? 'Available skills updated for this project' : on ? 'Skills turned on for this project' : 'Skills turned off for this project', 'ok');
     } catch (e) { toastError(e); void loadMine(); } finally { setSwitchingAll(false); }
   };
 
@@ -1121,14 +1122,18 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       {(close) =>
         sp ? (
           <>
-            <MenuItem icon={<PowerOff size={14} />} disabled={loading || switchingAll || !all.some((i) => i.on)} onClick={() => (close(), void switchAllOff())}>
+            <MenuItem icon={<Power size={14} />} disabled={loading || !agents || switchingAll || !all.some((i) => !i.on)} onClick={() => (close(), void switchAll(true))}>
+              Turn on all skills
+            </MenuItem>
+            <MenuItem icon={<PowerOff size={14} />} disabled={loading || !agents || switchingAll || !all.some((i) => i.on)} onClick={() => (close(), void switchAll(false))}>
               Turn off all skills
             </MenuItem>
+            <MenuSep />
             <MenuItem icon={<Undo2 size={14} />} disabled={!switched} onClick={() => (close(), void resetAll())}>
-              Reset every switch here
+              Follow default settings for all skills
             </MenuItem>
-            <MenuItem icon={<Settings2 size={14} />} onClick={() => (close(), go('/settings?s=skills'))}>
-              Skills for every project
+            <MenuItem icon={<Settings2 size={14} />} wrap onClick={() => (close(), go('/settings?s=skills'))}>
+              Change default skill settings for all projects
             </MenuItem>
             <MenuSep />
             <MenuItem icon={<Info size={14} />} onClick={() => (close(), setHow(true))}>
