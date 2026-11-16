@@ -32,7 +32,7 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 
 ## See your scheduled tasks
 
-[Settings → Scheduled tasks](/settings?s=tasks) has a group, **Your tasks**, whose line names your time zone (its (i) adds that a run that could not start, because the computer was off, runs at the next chance), and lists your tasks, oldest first. The list updates by itself as runs start and end. Each row shows:
+[Settings → Scheduled tasks](/settings?s=tasks) has a group, **Your tasks**, whose line names your time zone (its (i) adds that a run that could not start, because the computer was off, runs at the next chance), and lists your tasks, oldest first. The list updates by itself as runs start and end. **Week view**, beside **New task**, shows them all on a calendar (see [See the week: what ran and what runs next](#see-the-week-what-ran-and-what-runs-next)). Each row shows:
 
 - An icon for the trigger (a calendar, an eye for a watcher, a webhook sign), the task's name and its agent's icon.
 - When it runs and where, such as "Weekdays at 09:00 · new session in reports · next in 14 h 20 min", or "posts into a session".
@@ -44,6 +44,22 @@ Continuing a session by itself once a plan's usage limit resets is a separate sw
 At the right of each row are a switch that pauses the task or turns it on, and the task's menu (⋯): **Run now**, **Test without sending**, **Edit**, **History**, **Duplicate**, **New address** (webhook tasks only) and **Delete**.
 
 With no tasks yet, the list says "No scheduled tasks yet: start from an example below, or ask an agent to set one up".
+
+## See the week: what ran and what runs next
+
+Everything that runs by itself is in one place: [Agents → Schedules](/agents/schedules), the **Schedules** tab at the top of the Agents page. **Week view** in Settings → Scheduled tasks opens it too, and so does the search box. It brings together your scheduled tasks, your agents' schedules, your apps' schedules (**Update automatically** too), watchers and webhooks, so you can see what runs tomorrow, why several started at 08:00, and how last week went.
+
+- **The week**: seven days side by side, Monday to Sunday, the hours down the side and today marked, with a line at the time now. Each run that happened is a block at its time, coloured by how it went: green for **Done**, grey for **Nothing new**, amber for **Needs you** (partly done or blocked), red for **Failed** (or an error). Runs still to come are drawn faintly, with a dashed edge and their name. When more than three start at once, two show and a **+2** block (or more) lists the rest.
+- **Each day's column** says what its runs cost and how many failed.
+- **Every few minutes, watchers and webhooks**: what runs more than eight times a day, watchers and webhooks show as one band per task above the hours, rather than a block for each run. Each day has a bar of how its runs went, how many ran, and **+48** (say) for those still to come. Click the line to fold them away.
+- **Click a block** for its card: how it went, when, how long it took and what it cost, what started it (when it was not its schedule), the agent's one-line summary, **Open its session** (or **Open its run**, for an app) and **Edit**. A run to come says when it runs, with **Edit**. A band's day counts its runs by how they went, with **Open the latest** when it has a session.
+- **‹** and **›** go to the week before or after, and **Today** comes back. **Week** and **Month**, at the top right, switch to a month: each day with a bar of how its runs went, how many ran and failed, how many are to come (and **+48 repeats** for what runs every few minutes), and its cost. Click a day to open its week.
+- The line above the calendar adds up what is shown: how many ran, how many failed, what they cost and how many are to come, then what the colours mean and your time zone.
+- **The chips** at the top (**All**, **Tasks**, **Agents**, **Apps**, **Watchers**, **Webhooks**, **Paused**, each with how many) show only those: on the calendar, in its totals and in the list.
+
+Under the calendar, **Everything that runs by itself** lists each one: what runs next first, then watchers and webhooks, then what is paused. A row shows its name and whose it is (**Agent ·** and the agent, **App ·** and the app, or **Task**), when it runs and when next, why it paused itself, dots for its latest runs with **Last run 3h ago:** and how it went, the agent's summary and **Open**. The switch pauses it or turns it on. The pencil opens it where you change it: an agent's schedule on the agent's page, an app's under the app's **Runs** (or its page's **Settings**, for **Update automatically**), any other task here in Settings → Scheduled tasks, with its form open.
+
+Times are in your time zone. On a phone, Schedules shows one day at a time: **‹** and **›**, or a swipe sideways, go to the day before or after.
 
 ## Make a new task
 
@@ -283,7 +299,7 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 
 ## On a phone
 
-[Settings → Scheduled tasks](/settings?s=tasks) works the same on a phone. The task form, the examples' forms and the confirmations (before **Delete** or **New address**) open as sheets from the bottom of the screen. The choices under **When** and a watcher's kinds scroll sideways when they do not fit, and the examples are one column of rows. To hear from your tasks with the app closed, turn on notifications for the phone (see [Inbox and notifications](/guide/inbox)).
+[Settings → Scheduled tasks](/settings?s=tasks) works the same on a phone, and [Schedules](/agents/schedules) shows one day at a time. The task form, the examples' forms and the confirmations (before **Delete** or **New address**) open as sheets from the bottom of the screen. The choices under **When** and a watcher's kinds scroll sideways when they do not fit, and the examples are one column of rows. To hear from your tasks with the app closed, turn on notifications for the phone (see [Inbox and notifications](/guide/inbox)).
 
 ## Ask an agent
 
@@ -294,6 +310,8 @@ A reminder is a task whose run tells you something at a set time, as a notificat
 - "Start a task when a new deal comes in HubSpot: look up the company and draft a first reply to its contact."
 - "Thirty minutes before each client call in my Google Calendar, brief me on who I'm meeting and what we last discussed."
 - "Which of my scheduled tasks failed this week, and why?"
+- "What runs by itself tomorrow, and at what time?"
+- "Why did so many of my tasks start at 08:00 on Monday? Spread them out."
 - "Pause my Morning brief", or "Run the weekly report now."
 - "Test my invoice reminders without sending anything, and show me the emails it would have sent."
 - "Make this conversation a task that runs every Monday at 9."
