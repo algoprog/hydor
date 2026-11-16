@@ -1,8 +1,15 @@
 // Plan and move a wiki without discarding either original tree or following symbolic links.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+
+/** Let the server answer other requests between files: a big wiki is hashed in the background, not in one blocking run. */
+const yieldNow = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+/** What Hydor writes while it works (session checkpoints, locks, backups, staging) is not part of a wiki's contents: it is left out of the comparison and is not moved. */
+export const transient = (name: string, top: boolean) => name.startsWith('.hydor-') || (top && name === '.sessions');
 
 export type WikiConflict = 'source' | 'target' | 'oldest';
 export type WikiMigrationMode = 'merge' | 'replace';
@@ -79,54 +86,56 @@ function noLinks(value: string): void {
 }
 
 /** Hash a file incrementally so a large source does not exhaust process memory. */
-function hashFile(file: string): string {
-  const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+async function hashFile(file: string): Promise<string> {
+  const handle = await fsp.open(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
   try {
-    const before = fs.fstatSync(fd);
+    const before = await handle.stat();
     if (!before.isFile()) throw new Error('Only regular files can be moved');
     const hash = crypto.createHash('sha256');
     const buffer = Buffer.allocUnsafe(1024 * 1024);
     let pos = 0;
     for (;;) {
-      const n = fs.readSync(fd, buffer, 0, buffer.length, pos);
-      if (!n) break;
-      hash.update(buffer.subarray(0, n));
-      pos += n;
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, pos);
+      if (!bytesRead) break;
+      hash.update(buffer.subarray(0, bytesRead));
+      pos += bytesRead;
     }
-    const after = fs.fstatSync(fd);
+    const after = await handle.stat();
     if (before.size !== pos || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ino !== after.ino) throw new Error('A wiki file changed while it was read');
     return hash.digest('hex');
-  } finally { fs.closeSync(fd); }
+  } finally { await handle.close(); }
 }
 
-/** Snapshot a tree including hidden files and empty folders without inspecting their content semantically. */
-function inspect(root: string): Tree {
+/** Snapshot a tree including hidden files and empty folders (but not Hydor's own transient ones) without inspecting their content semantically. */
+async function inspect(root: string): Promise<Tree> {
   noLinks(root);
   if (!fs.existsSync(root)) return { exists: false, files: [], directories: [] };
   if (!fs.lstatSync(root).isDirectory()) throw new Error('A wiki path is not a directory');
   const files: WikiMigrationFile[] = [];
   const directories: string[] = [];
   let bytes = 0;
-  const walk = (dir: string, rel: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+  const walk = async (dir: string, rel: string) => {
+    for (const entry of (await fsp.readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (transient(entry.name, !rel)) continue;
       const sub = rel ? `${rel}/${entry.name}` : entry.name;
       const file = path.join(dir, entry.name);
-      const st = fs.lstatSync(file);
+      const st = await fsp.lstat(file);
       if (st.isSymbolicLink()) throw new Error('Symbolic links cannot be moved');
-      if (st.isDirectory()) { directories.push(sub); walk(file, sub); }
+      if (st.isDirectory()) { directories.push(sub); await walk(file, sub); }
       else if (st.isFile()) {
         bytes += st.size;
         if (files.length >= MAX_FILES || bytes > MAX_BYTES) throw new Error('The wiki is too large for this migration');
-        files.push({ path: sub, size: st.size, mtimeMs: st.mtimeMs, sha256: hashFile(file) });
+        files.push({ path: sub, size: st.size, mtimeMs: st.mtimeMs, sha256: await hashFile(file) });
+        await yieldNow();
       } else throw new Error('Only regular files and folders can be moved');
     }
   };
-  walk(root, '');
+  await walk(root, '');
   return { exists: true, files, directories };
 }
 
 /** List byte-level conflicts and produce a fingerprint that binds approval to the inspected trees. */
-export function previewWikiMigration(source: string, target: string): WikiMigrationPreview {
+export async function previewWikiMigration(source: string, target: string): Promise<WikiMigrationPreview> {
   if (!path.isAbsolute(source) || !path.isAbsolute(target) || /[\0\r\n]/.test(source + target)) throw new Error('Wiki paths must be absolute');
   source = path.resolve(source); target = path.resolve(target);
   const overlap = (a: string, b: string) => b === a || b.startsWith(a + path.sep);
@@ -138,7 +147,7 @@ export function previewWikiMigration(source: string, target: string): WikiMigrat
     const realTarget = fs.existsSync(target) ? fs.realpathSync(target) : path.join(fs.realpathSync(path.dirname(target)), path.basename(target));
     if (overlap(realSource, realTarget) || overlap(realTarget, realSource)) throw new Error('Wiki paths must not overlap');
   }
-  const sourceTree = inspect(source), targetTree = inspect(target);
+  const sourceTree = await inspect(source), targetTree = await inspect(target);
   if (!sourceTree.exists) throw new Error('Source wiki does not exist');
   registry(source);
   if (targetTree.exists) registry(target);
@@ -154,19 +163,20 @@ export function previewWikiMigration(source: string, target: string): WikiMigrat
 }
 
 /** Copy the selected tree and verify exact bytes; preserve modification time for the oldest rule. */
-function copyFile(from: string, to: string, expected: WikiMigrationFile): void {
-  fs.mkdirSync(path.dirname(to), { recursive: true, mode: 0o700 });
+async function copyFile(from: string, to: string, expected: WikiMigrationFile): Promise<void> {
+  await fsp.mkdir(path.dirname(to), { recursive: true, mode: 0o700 });
   noLinks(from); noLinks(path.dirname(to));
-  if (hashFile(from) !== expected.sha256) throw new Error('A wiki file changed after the preview');
-  fs.copyFileSync(from, to);
-  if (hashFile(to) !== expected.sha256 || hashFile(from) !== expected.sha256) throw new Error('Wiki copy verification failed');
-  fs.utimesSync(to, expected.mtimeMs / 1000, expected.mtimeMs / 1000);
+  if (await hashFile(from) !== expected.sha256) throw new Error('A wiki file changed after the preview');
+  await fsp.copyFile(from, to);
+  if (await hashFile(to) !== expected.sha256 || await hashFile(from) !== expected.sha256) throw new Error('Wiki copy verification failed');
+  await fsp.utimes(to, expected.mtimeMs / 1000, expected.mtimeMs / 1000);
+  await yieldNow();
 }
 
 /** Install the approved result; originals remain as full backups and can be restored if settings fail. */
-export function applyWikiMigration(preview: WikiMigrationPreview, mode: WikiMigrationMode, conflict: WikiConflict = 'target'): WikiMigrationResult {
+export async function applyWikiMigration(preview: WikiMigrationPreview, mode: WikiMigrationMode, conflict: WikiConflict = 'target'): Promise<WikiMigrationResult> {
   if (!['merge', 'replace'].includes(mode) || !['source', 'target', 'oldest'].includes(conflict)) throw new Error('Invalid migration choice');
-  const current = previewWikiMigration(preview.source, preview.target);
+  const current = await previewWikiMigration(preview.source, preview.target);
   if (current.fingerprint !== preview.fingerprint) throw new Error('Wiki contents changed since the preview');
   const source = current.source, target = current.target;
   if (!fs.existsSync(path.dirname(target)) || !fs.statSync(path.dirname(target)).isDirectory()) throw new Error('The target parent folder does not exist');
@@ -181,25 +191,25 @@ export function applyWikiMigration(preview: WikiMigrationPreview, mode: WikiMigr
     const targetMap = new Map(current.targetTree.files.map((f) => [f.path, f]));
     if (mode === 'merge') {
       for (const dir of current.targetTree.directories) fs.mkdirSync(path.join(staging, dir), { recursive: true, mode: 0o700 });
-      for (const file of current.targetTree.files) copyFile(path.join(target, file.path), path.join(staging, file.path), file);
+      for (const file of current.targetTree.files) await copyFile(path.join(target, file.path), path.join(staging, file.path), file);
     }
     for (const dir of current.sourceTree.directories) fs.mkdirSync(path.join(staging, dir), { recursive: true, mode: 0o700 });
     for (const file of current.sourceTree.files) {
       const existing = targetMap.get(file.path);
       const chooseSource = mode === 'replace' || !existing || (conflict === 'source') || (conflict === 'oldest' && file.mtimeMs < existing.mtimeMs);
-      if (chooseSource) copyFile(path.join(source, file.path), path.join(staging, file.path), file);
+      if (chooseSource) await copyFile(path.join(source, file.path), path.join(staging, file.path), file);
     }
     // Only the staged registry changes; full source and destination backups retain their original bytes.
     rebaseRegistry(staging, source, target);
-    if (previewWikiMigration(source, target).fingerprint !== current.fingerprint) throw new Error('Wiki contents changed during migration');
+    if ((await previewWikiMigration(source, target)).fingerprint !== current.fingerprint) throw new Error('Wiki contents changed during migration');
     if (fs.existsSync(backupSource) || fs.existsSync(backupTarget)) throw new Error('Backup path already exists');
     if (current.targetTree.exists) {
       fs.renameSync(target, backupTarget); targetMoved = true;
-      if (JSON.stringify(inspect(backupTarget)) !== JSON.stringify(current.targetTree)) throw new Error('Target changed while it was being moved');
+      if (JSON.stringify(await inspect(backupTarget)) !== JSON.stringify(current.targetTree)) throw new Error('Target changed while it was being moved');
     }
     fs.renameSync(staging, target); installed = true;
     fs.renameSync(source, backupSource); sourceMoved = true;
-    if (JSON.stringify(inspect(backupSource)) !== JSON.stringify(current.sourceTree)) throw new Error('Source changed while it was being moved');
+    if (JSON.stringify(await inspect(backupSource)) !== JSON.stringify(current.sourceTree)) throw new Error('Source changed while it was being moved');
     return {
       sourceBackup: backupSource,
       targetBackup: targetMoved ? backupTarget : null,

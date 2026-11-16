@@ -1,11 +1,10 @@
 // File-backed wiki primitives: paths stay in one active wiki and writes use a shared lock and expected hashes.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { secretIn } from '../memory/secrets.ts';
 
 const MAX_BYTES = 4 * 1024 * 1024;
-const ARCHIVES = new Set(['.archive', '.history']);
 const LOCK = '.hydor-wiki-write.lock';
 
 /** A digest of exact bytes, used to detect stale edits and identify unchanged sources. */
@@ -32,11 +31,16 @@ function noSymlinks(root: string, target: string): void {
   }
 }
 
-/** Resolve a bounded active file path without following wiki-internal symlinks or archives. */
+/**
+ * Resolve a bounded active file path without following wiki-internal symlinks. Hidden names (a part starting with a
+ * dot: .git, .sessions, .archive, locks) are never reachable, and only wiki/, raw/ and the Markdown files at the
+ * root (index.md, log.md…) are: another folder in a wiki's root (the hub's projects/) is somebody else's.
+ */
 function filePath(root: string, relative: string, missing = false): string {
   if (!relative || relative.includes('\0') || relative.includes('\\') || path.posix.isAbsolute(relative)) throw new Error('Expected a relative wiki path');
   const parts = relative.split('/');
-  if (parts.some((p) => !p || p === '.' || p === '..' || ARCHIVES.has(p.toLowerCase()) || p === LOCK)) throw new Error('Invalid or archived wiki path');
+  if (parts.some((p) => !p || p.startsWith('.'))) throw new Error('Invalid or hidden wiki path');
+  if (parts.length === 1 ? !/\.md$/i.test(parts[0]) : !['wiki', 'raw'].includes(parts[0])) throw new Error('A wiki holds its files in wiki/, raw/ and Markdown files at its root');
   const target = path.resolve(root, ...parts);
   noSymlinks(root, target);
   if (fs.existsSync(target)) {
@@ -46,6 +50,13 @@ function filePath(root: string, relative: string, missing = false): string {
   return target;
 }
 
+/** Where a write may go: articles (wiki/**.md), the index and log at the root, and Markdown notes in raw/ (never existing ones). */
+function writable(relative: string): boolean {
+  const parts = relative.split('/');
+  if (parts.length === 1) return /^(?:index|log)\.md$/.test(parts[0]);
+  return ['wiki', 'raw'].includes(parts[0]) && /\.md$/i.test(relative);
+}
+
 /** Read bounded UTF-8 content without accepting binary files. */
 function readText(file: string): string {
   const st = fs.statSync(file);
@@ -53,29 +64,6 @@ function readText(file: string): string {
   const data = fs.readFileSync(file);
   if (data.includes(0)) throw new Error('Wiki file is binary');
   return new TextDecoder('utf-8', { fatal: true }).decode(data);
-}
-
-/** Resolve an existing hub, a project binding or a named active registry entry. */
-export function resolveWiki(o: { hub: string; cwd: string; projectWiki?: string; name?: string }): string {
-  const expand = (p: string) => p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p;
-  const hub = path.resolve(expand(o.hub));
-  let candidate: string;
-  if (o.name && o.name !== 'hub') {
-    const registry = JSON.parse(readText(path.join(hub, 'wikis.json'))) as { wikis?: Record<string, { path?: string; status?: string }> };
-    const entry = registry.wikis?.[o.name];
-    if (!entry) throw new Error('Wiki is not registered');
-    if (['archived', 'superseded', 'retired'].includes(String(entry.status ?? '').toLowerCase())) throw new Error('Archived wikis are excluded');
-    const spec = expand((entry.path ?? `topics/${o.name}`).replace('<HUB>', hub));
-    candidate = path.resolve(hub, spec);
-  } else if (!o.name && o.projectWiki) candidate = path.resolve(o.cwd, expand(o.projectWiki));
-  else candidate = hub;
-  if (candidate.split(path.sep).some((p) => ARCHIVES.has(p.toLowerCase()))) throw new Error('Archived wikis are excluded');
-  if (!fs.statSync(candidate).isDirectory()) throw new Error('Wiki root is not a directory');
-  const root = fs.realpathSync(candidate);
-  const config = path.join(root, 'config.md');
-  noSymlinks(root, config);
-  if (fs.existsSync(config) && !activeWikiDocument(readText(config))) throw new Error('Retired wiki is excluded');
-  return root;
 }
 
 /** Read a document and return the hash needed for a conflict-checked update. */
@@ -119,18 +107,51 @@ function applyOne(root: string, change: WikiChange): void {
 /** Apply one change at a time; partial multi-file transactions are deliberately refused. */
 export function applyWikiChanges(root: string, changes: WikiChange[]): { paths: string[] } {
   if (changes.length !== 1) throw new Error('Apply exactly one wiki file per operation');
+  if (!writable(changes[0].path)) throw new Error('A wiki is written only in wiki/, in index.md and log.md, and in raw/ by its ingestion');
+  // The path is judged before the lock is taken, so a refused path never waits on (or leaves) a lock.
+  filePath(root, changes[0].path, true);
   return locked(root, () => { applyOne(root, changes[0]); return { paths: [changes[0].path] }; });
+}
+
+const SECRET_NAME = /token|secret|passw|passwd|pwd|api[-_]?key|apikey|key|sig(?:nature)?|auth|credential|bearer|session|cookie/i;
+/** A long mixed run of letters and digits that is not a plain hash or a UUID: what a token looks like in a path. */
+const tokenLike = (s: string) => s.length >= 32 && /^[A-Za-z0-9_\-+=]+$/.test(s) && /[A-Za-z]/.test(s) && /\d/.test(s) && !/^[a-f0-9]+$/i.test(s) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+const secretValue = (v: string) => !!secretIn(v) || tokenLike(v);
+
+/** Refuse an origin (a URL, a file, a name) that carries credentials: user info, or secret-looking keys or values in the query, path or fragment. */
+export function checkOrigin(origin: string): void {
+  if (!origin.trim() || /[\r\n\0]/.test(origin) || origin.length > 2000) throw new Error('A single-line source origin is required');
+  const credentials = () => new Error('Remove credentials from the source origin');
+  if (secretIn(origin)) throw credentials();
+  // User info in any scheme (ssh://user:pw@host), found without parsing so that no scheme escapes the check.
+  if (/\/\/[^/?#\s]*@/.test(origin) || /^(?!mailto:)[^\s/@]+:[^\s/@]+@/i.test(origin)) throw credentials();
+  let url: URL | null = null;
+  try { url = new URL(origin); } catch { /* not a URL: a name or a path */ }
+  const decode = (v: string) => { try { return decodeURIComponent(v); } catch { return v; } };
+  const pieces: string[] = [];
+  if (url) {
+    if (url.username || url.password) throw credentials();
+    for (const [k, v] of url.searchParams) {
+      if (SECRET_NAME.test(k) && v) throw credentials();
+      pieces.push(v);
+    }
+    pieces.push(...url.pathname.split('/').map(decode));
+    // A fragment is a list of parameters (#access_token=…) or one value.
+    const hash = decode(url.hash.slice(1));
+    for (const part of hash.split(/[&;]/)) {
+      const eq = part.indexOf('=');
+      if (eq > 0 && SECRET_NAME.test(part.slice(0, eq)) && part.slice(eq + 1)) throw credentials();
+      pieces.push(eq > 0 ? part.slice(eq + 1) : part);
+    }
+  } else pieces.push(...origin.split(/[\s/]+/));
+  if (pieces.some((v) => v && secretValue(v))) throw credentials();
 }
 
 /** Preserve exact text once while retaining a distinct, immutable note for each origin. */
 export function ingestWikiSource(root: string, content: string, origin: string): { path: string; originalPath: string; sha256: string; existing: boolean } {
-  if (!origin.trim() || /[\r\n]/.test(origin) || origin.length > 2000) throw new Error('A single-line source origin is required');
-  // Origin metadata must never persist credentials embedded in a source URL.
-  if (/^https?:\/\//i.test(origin)) {
-    const url = new URL(origin);
-    if (url.username || url.password || [...url.searchParams.keys()].some((key) => /token|secret|password|key|signature|auth/i.test(key))) throw new Error('Remove credentials from the source URL');
-  }
+  checkOrigin(origin);
   if (!content.trim() || Buffer.byteLength(content) > MAX_BYTES - 4096 || content.includes('\0')) throw new Error('A bounded text source is required');
+  if (secretIn(content)) throw new Error('The text may contain credentials; review it before it is kept');
   const sha256 = wikiHash(content);
   const originalPath = `raw/articles/source-${sha256}.txt`;
   // The same bytes can arrive from independent sources; never silently discard the second origin.
@@ -197,9 +218,10 @@ export function checkWiki(root: string): { checked: number; issues: { path: stri
   const visit = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (checked >= 5000) { truncated = true; return; }
-      if (entry.isSymbolicLink() || ARCHIVES.has(entry.name.toLowerCase()) || ['.git', LOCK, 'node_modules'].includes(entry.name)) continue;
+      if (entry.isSymbolicLink() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
       const file = path.join(dir, entry.name);
-      if (entry.isDirectory()) { visit(file); continue; }
+      // Only a wiki's own folders: not what else the root holds (the hub's projects/ are other wikis).
+      if (entry.isDirectory()) { if (dir !== root || ['wiki', 'raw'].includes(entry.name)) visit(file); continue; }
       if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.md')) continue;
       const relative = path.relative(root, file).split(path.sep).join('/');
       let content: string;

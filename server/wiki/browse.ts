@@ -6,6 +6,18 @@ import { wikiFileActive } from './knowledge/bindings.ts';
 
 export interface WikiEntry { path: string; title: string }
 
+/** The `title:` of a document's frontmatter, without its quotes ("Bob's guide" stays whole). */
+export function titleOf(content: string): string {
+  const front = /^---\s*\r?\n([\s\S]*?)\r?\n---/.exec(content)?.[1];
+  const value = front && /^title\s*:[ \t]*(.+?)[ \t]*$/im.exec(front)?.[1];
+  if (!value) return '';
+  if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
+    try { return String(JSON.parse(value)).trim(); } catch { /* not JSON: take it as written */ }
+  }
+  const quoted = /^(["'])([\s\S]*)\1$/.exec(value);
+  return (quoted ? quoted[2] : value).trim();
+}
+
 /** List active Markdown articles and source notes, without opening hidden or linked directories. */
 export function browseWiki(root: string): { articles: WikiEntry[]; sources: WikiEntry[]; truncated: boolean } {
   const articles: WikiEntry[] = [];
@@ -24,8 +36,7 @@ export function browseWiki(root: string): { articles: WikiEntry[]; sources: Wiki
         try {
           if (!wikiFileActive(root, path.join(root, name))) continue;
           const document = readWiki(root, name);
-          const match = /^---\s*\r?\n[\s\S]*?^title\s*:\s*["']?([^\r\n"']+)/im.exec(document.content);
-          out.push({ path: name, title: match?.[1]?.trim() || entry.name.replace(/\.md$/i, '') });
+          out.push({ path: name, title: titleOf(document.content) || entry.name.replace(/\.md$/i, '') });
         } catch {
           // Inactive, inaccessible or unsafe documents are not listed.
         }

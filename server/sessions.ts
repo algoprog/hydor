@@ -50,7 +50,7 @@ import { opensTurn } from './opinion/turns.ts';
 import { filesOf, sessionEnd } from '../shared/ending.ts';
 import { recordEnding } from './away/index.ts';
 import { ancestorsOf, runningBelow, runningChildren } from './children/family.ts';
-import { wikiSettings } from './wiki/settings/settings.ts';
+import { hubDir, wikiMemoryOn, wikiSpaceOfSession } from './wiki/roots.ts';
 import { sessionMemoryOn } from './memory/store.ts';
 import { captureEvent } from './wiki/session/store.ts';
 import { helper } from './helper.ts';
@@ -1855,8 +1855,8 @@ export class SessionManager extends EventEmitter {
     const l = this.live(key);
     if (l.adapter.state.status === 'working' || l.adapter.state.status === 'waiting') throw new HttpError(409, 'Wait for the turn to end, or stop it, then compact');
     // Prepare a bounded redacted summary, without copying the transcript to the wiki.
-    const wiki = wikiSettings(this.db);
-    if (wiki.enabled && wiki.hubPath && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key))) {
+    const wikiSpace = () => wikiSpaceOfSession(this.db, key, l.cwd);
+    if (wikiMemoryOn(this.db, wikiSpace()) && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key))) {
       try {
         const timeline = await this.timeline(key);
         await timeline.readMore();
@@ -1872,15 +1872,14 @@ export class SessionManager extends EventEmitter {
             // A metadata-only checkpoint remains honest if the helper is unavailable.
           }
         }
-        const current = wikiSettings(this.db);
-        if (current.enabled && current.hubPath === wiki.hubPath && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key))) {
-          const saved = captureEvent(wiki.hubPath, key, 'PreCompact', 0, redactVault(summary));
-          if (saved && !summary.trim()) this.emit('toast', { level: 'info', text: 'Wiki checkpoint saved event metadata only; a conversation summary was unavailable.' });
+        if (wikiMemoryOn(this.db, wikiSpace()) && sessionMemoryOn(this.db, key) && !isConfidential(sessionExtra(this.db, key))) {
+          const saved = captureEvent(hubDir(this.db, { create: true })!, key, 'PreCompact', 0, redactVault(summary));
+          if (saved && !summary.trim()) this.emit('toast', { level: 'info', text: 'Wiki memory saved a checkpoint with event metadata only; a conversation summary was unavailable.' });
         }
       } catch {
         // Compaction is still allowed; the log never claims the checkpoint succeeded.
         console.warn('[wiki-session] PreCompact checkpoint failed before manual compaction');
-        this.emit('toast', { level: 'error', text: 'The wiki checkpoint could not be saved; compaction continues without it.' });
+        this.emit('toast', { level: 'error', text: 'Wiki memory could not save a checkpoint; compaction continues without it.' });
       }
     }
     if (l.adapter instanceof CodexLive) await l.adapter.compact();

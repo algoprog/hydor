@@ -1,47 +1,41 @@
-// Native wiki capability, with Hydor's own search and session mechanisms rather than parallel implementations.
-import type { Feature } from '../features/types.ts';
+// Wiki memory: the project's articles (with sources, kept from its documents and its work), as part of memory.
+import type { Feature, RunCtx } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { sessionMemoryOn } from '../memory/store.ts';
-import { wikiSettings } from './settings/settings.ts';
 import { lessonsTools } from './lessons/tools.ts';
 import { guardProject, wikiTarget, wikiTools } from './tools.ts';
 import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge/index.ts';
-import { spaceOfSession } from '../knowledge/scope.ts';
-import { allSpaces } from '../spaces/index.ts';
-import { projectOfFolder } from '../spaces/found.ts';
-import fs from 'node:fs';
-import os from 'node:os';
-import type { RunCtx } from '../features/types.ts';
+import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 
 const INSTRUCTIONS = [
-  'An LLM Wiki is enabled. Use wiki_status to resolve its active root and wiki_read to inspect its index and relevant files.',
-  'For an authorized document file, use wiki_ingest_document to preserve its original bytes and extract its text with Hydor. For text or web sources use existing web tools and wiki_ingest_text. Preserve original sources and provenance.',
-  'Incrementally compile new sources into linked Markdown articles: read each affected article first, cite exact raw source paths in frontmatter, use wiki_write with its expected hash, and update relevant indexes and log.md. Do not reprocess unchanged sources unnecessarily.',
-  'Use Hydor knowledge_search and knowledge_read for indexed knowledge rather than creating another search system. Check results and source citations; do not assume a project wiki is indexed merely because its folder exists.',
-  'Use wiki_check for basic structural and source checks. Archives and retired documents remain excluded. Sessions and lesson previews are operational evidence, not automatically approved wiki knowledge. Use the separate lessons approval flow for session-derived lessons; never use general ingestion or article writing to bypass it.',
+  'Wiki memory is on: this project keeps articles (wiki/…) with their sources (raw/…), made from its documents and its work. It is one part of memory, beside memory notes (recall, remember: short facts) and documents (knowledge_search, knowledge_read: the files themselves).',
+  'Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, then the articles it names. Cite the articles you use.',
+  'To keep something: wiki_ingest_document or wiki_ingest_text save a source (never with passwords or keys); then read the articles it touches, update or add them with wiki_write (give the sha256 you read), cite the source in their frontmatter, and note it in index.md and log.md. Do not redo sources that have not changed.',
+  'wiki_check finds missing sources and broken links. Lessons from a session are kept only through wiki_lessons_preview and wiki_lessons_save, which ask the user.',
 ].join(' ');
 
-/** Supply workflow instructions and tools to every agent only while the capability is enabled. */
+/** Supply workflow instructions and tools to an agent only while wiki memory is on for its project. */
 export const wiki: Feature = {
   id: 'wiki',
-  tools: (ctx) => wikiSettings(ctx.deps.db).enabled && !confidentialRun(ctx) ? [...wikiTools(), ...(sessionMemoryOn(ctx.deps.db, ctx.key) ? lessonsTools((c) => wikiTarget(c), guardProject) : [])] : [],
+  tools: (ctx) => !confidentialRun(ctx) && wikiMemoryOn(ctx.deps.db, wikiSpaceOfSession(ctx.deps.db, ctx.key, ctx.cwd))
+    ? [...wikiTools(), ...(sessionMemoryOn(ctx.deps.db, ctx.key) ? lessonsTools((c: RunCtx) => wikiTarget(c), guardProject) : [])]
+    : [],
   spawn: (s, d) => {
-    const settings = wikiSettings(d.db);
-    if (!settings.enabled || s.extra.confidential) return undefined;
-    // A broken or unavailable wiki must not prevent an otherwise usable session from starting.
-    try { if (settings.hubPath) ensureWikiKnowledge(d.db, { root: settings.hubPath, space: null }); } catch (e) { console.warn(`[wiki] shared index unavailable: ${(e as Error).message}`); }
-    const space = spaceOfSession(d.db, s.extra);
-    try {
-      if (space) deactivateProjectWikiKnowledge(d.db, space);
-      const match = projectOfFolder(allSpaces(d.db), s.cwd, os.homedir());
-      if (space && match?.id === space) {
-        const ctx = { key: s.key ?? '', runId: s.runId, agent: s.agent, cwd: s.cwd, deps: d } as RunCtx;
-        const root = wikiTarget(ctx);
-        let hub: string | null = null;
-        try { if (settings.hubPath) hub = fs.realpathSync(settings.hubPath); } catch { /* A missing shared hub does not hide an accessible project wiki. */ }
-        if (root !== hub) ensureWikiKnowledge(d.db, { root, space });
+    if (s.extra.confidential) return undefined;
+    const space = wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
+    // Wiki knowledge: each wiki that exists is bound as its project's (or the shared) documents and stays bound; off unbinds it.
+    for (const sp of space ? [space, null] : [null]) {
+      try {
+        const root = wikiMemoryOn(d.db, sp) ? wikiRoot(d.db, sp) : null;
+        if (root) ensureWikiKnowledge(d.db, { root, space: sp });
+        else if (sp) deactivateProjectWikiKnowledge(d.db, sp);
+      } catch (e) {
+        // A broken or unavailable wiki must not prevent an otherwise usable session from starting.
+        console.warn(`[wiki] index unavailable: ${(e as Error).message}`);
       }
-    } catch (e) { console.warn(`[wiki] project index unavailable: ${(e as Error).message}`); }
-    return { instructions: [INSTRUCTIONS] };
+    }
+    if (!wikiMemoryOn(d.db, space)) return undefined;
+    // Custom's own agent asks the app for compaction checkpoints only when this is set.
+    return { instructions: [INSTRUCTIONS], env: sessionMemoryOn(d.db, s.key ?? '') ? { HYDOR_WIKI_EVENTS: '1' } : undefined };
   },
 };

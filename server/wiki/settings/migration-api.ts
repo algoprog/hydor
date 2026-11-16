@@ -6,7 +6,7 @@ import type { Deps } from '../../features/types.ts';
 import { HttpError } from '../../auth.ts';
 import { taskRoot } from '../../assistants/store.ts';
 import { invalidateWikiKnowledge } from '../knowledge/index.ts';
-import { applyWikiMigration, previewWikiMigration, type WikiConflict, type WikiMigrationPreview } from './migration.ts';
+import { applyWikiMigration, previewWikiMigration, transient, type WikiConflict, type WikiMigrationPreview } from './migration.ts';
 import { setWikiSettings, wikiSettings } from './settings.ts';
 
 interface Pending { source: string; target: string; preview: WikiMigrationPreview | null; expires: number }
@@ -29,7 +29,7 @@ export function guardHubChange(db: Deps['db'], input: Partial<{ hubPath: string 
   if (source === target || !fs.existsSync(source)) return;
   try {
     const st = fs.lstatSync(source);
-    if (st.isSymbolicLink() || !st.isDirectory() || fs.readdirSync(source).length) throw new HttpError(409, 'Review the wiki hub move before changing its location');
+    if (st.isSymbolicLink() || !st.isDirectory() || fs.readdirSync(source).some((name) => !transient(name, true))) throw new HttpError(409, 'Review the wiki hub move before changing its location');
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(409, 'The current wiki hub cannot be inspected');
@@ -44,7 +44,7 @@ export function wikiMigrationRoutes(d: Deps): void {
     if (source === target) throw new HttpError(400, 'The wiki hub is already at that location');
     let preview: WikiMigrationPreview | null = null;
     if (fs.existsSync(source)) {
-      try { preview = previewWikiMigration(source, target); }
+      try { preview = await previewWikiMigration(source, target); }
       catch (error) { throw new HttpError(400, (error as Error).message); }
     }
     const now = Date.now();
@@ -66,7 +66,7 @@ export function wikiMigrationRoutes(d: Deps): void {
     if (body.action === 'keep') {
       // Recheck even a path-only change: files may have appeared after the preview.
       try {
-        if (plan.preview ? previewWikiMigration(plan.source, plan.target).fingerprint !== plan.preview.fingerprint : fs.existsSync(plan.source)) throw new Error('Wiki contents changed since the preview');
+        if (plan.preview ? (await previewWikiMigration(plan.source, plan.target)).fingerprint !== plan.preview.fingerprint : fs.existsSync(plan.source)) throw new Error('Wiki contents changed since the preview');
       } catch (error) { throw new HttpError(409, (error as Error).message); }
       return d.db.transaction(() => {
         const settings = setWikiSettings(d.db, { hubPath: plan.target });
@@ -78,7 +78,7 @@ export function wikiMigrationRoutes(d: Deps): void {
     const conflicts = plan.preview.conflicts.some((item) => !item.identical);
     if (body.action === 'merge' && conflicts && !['source', 'target', 'oldest'].includes(String(body.conflict))) throw new HttpError(400, 'Choose how to resolve conflicting files');
     let migration;
-    try { migration = applyWikiMigration(plan.preview, body.action as 'merge' | 'replace', (body.conflict ?? 'target') as WikiConflict); }
+    try { migration = await applyWikiMigration(plan.preview, body.action as 'merge' | 'replace', (body.conflict ?? 'target') as WikiConflict); }
     catch (error) { throw new HttpError(409, (error as Error).message); }
     try {
       // Keep the configured hub and its Knowledge bindings in one database transaction.

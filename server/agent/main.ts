@@ -140,8 +140,6 @@ interface Session {
 }
 
 const sessions = new Map<string, Session>();
-// The counter is process-local and never written to the session transcript or wiki while capture is off.
-const wikiToolCounts = new Map<string, number>();
 const stateFile = (id: string) => path.join(STATE_DIR, `${id.replace(/[^\w-]/g, '')}.json`);
 /** The session's own folder for what it keeps beside the conversation. */
 const dirOf = (s: Session) => path.join(STATE_DIR, s.id.replace(/[^\w-]/g, ''));
@@ -326,15 +324,18 @@ const isSmall = (s: Session, m: AgentModel) => m.provider !== 'openrouter' && wi
 
 const textOf = (c: ChatMessage['content']) => (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p) => (p.type === 'text' ? p.text : '')).join('') : '');
 
-/** Ask the app to record only a lifecycle event; it enforces wiki and session privacy settings. */
-async function wikiEvent(s: Session, event: 'SessionStart' | 'PostToolUse' | 'PreCompact' | 'PostCompact' | 'Stop', count = 0, summary = '') {
-  if (!RUNTIME || PUBLIC_RUN || CONFIDENTIAL_ENV) return;
+/**
+ * Ask the app to keep a compaction checkpoint (one file per session) in wiki memory. The app says at spawn whether
+ * wiki memory is on for this session (HYDOR_WIKI_EVENTS): when it is not, nothing is asked.
+ */
+async function wikiEvent(s: Session, event: 'PreCompact' | 'PostCompact', summary = '') {
+  if (!RUNTIME || PUBLIC_RUN || CONFIDENTIAL_ENV || process.env.HYDOR_WIKI_EVENTS !== '1') return;
   try {
-    const response = await fetch(`${RUNTIME}/wiki-event`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event, count, ...(summary ? { summary } : {}) }), signal: AbortSignal.timeout(3000) });
+    const response = await fetch(`${RUNTIME}/wiki-event`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ event, ...(summary ? { summary } : {}) }), signal: AbortSignal.timeout(3000) });
     const result = response.ok ? await response.json() as { status?: string } : { status: 'failed' };
-    if (result.status === 'failed' && (event === 'PreCompact' || event === 'PostCompact')) say(s.id, 'agent_thought_chunk', `Wiki ${event} checkpoint failed; the conversation will continue.\n`);
+    if (result.status === 'failed' && (event === 'PreCompact' || event === 'PostCompact')) say(s.id, 'agent_thought_chunk', `Wiki memory could not save its ${event} checkpoint; the conversation will continue.\n`);
   } catch {
-    if (event === 'PreCompact' || event === 'PostCompact') say(s.id, 'agent_thought_chunk', `Wiki ${event} checkpoint is unavailable; the conversation will continue.\n`);
+    if (event === 'PreCompact' || event === 'PostCompact') say(s.id, 'agent_thought_chunk', `Wiki memory’s ${event} checkpoint is unavailable; the conversation will continue.\n`);
   }
 }
 
@@ -346,14 +347,14 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
   if (!force && used < limit) return;
   const pruned = prune(s.messages);
   if (!force && estimate(pruned, imgs) + 2500 < limit * 0.85) {
-    await wikiEvent(s, 'PreCompact', 0, s.notes);
+    await wikiEvent(s, 'PreCompact', s.notes);
     s.messages = pruned;
     s.usage = undefined;
     // The conversation's start changed, so the provider's cache of it is gone anyway: memory may be read afresh.
     s.epoch = (s.epoch ?? 0) + 1;
     say(s.id, 'agent_thought_chunk', 'Cleared old tool output to keep within the model’s context.\n');
     save(s);
-    await wikiEvent(s, 'PostCompact', 0, s.notes);
+    await wikiEvent(s, 'PostCompact', s.notes);
     return;
   }
   // Summarize what came before the latest message when that frees enough; else, within one long
@@ -381,10 +382,10 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
     // replaced, so the messages after it keep their order (turns.ts maps positions by that).
     const from = pruned.findIndex((x, i) => i > start + 1 && i >= pruned.length - 6 && x.role === 'assistant');
     if (from < 0) {
-      await wikiEvent(s, 'PreCompact', 0, s.notes);
+      await wikiEvent(s, 'PreCompact', s.notes);
       s.messages = pruned;
       save(s);
-      await wikiEvent(s, 'PostCompact', 0, s.notes);
+      await wikiEvent(s, 'PostCompact', s.notes);
       return;
     }
     const c = s.condensed;
@@ -414,12 +415,12 @@ async function keepInContext(s: Session, m: AgentModel, signal: AbortSignal, ski
     }
   }
   // A real pre-compaction checkpoint is written after summarizing but before replacing the context.
-  await wikiEvent(s, 'PreCompact', 0, summary || previous);
+  await wikiEvent(s, 'PreCompact', summary || previous);
   s.messages = rebuild(summary || previous || '(The earlier steps could not be summarized. If something seems missing, check again or ask the user.)');
   s.usage = undefined;
   s.epoch = (s.epoch ?? 0) + 1;
   save(s);
-  await wikiEvent(s, 'PostCompact', 0, summary || previous);
+  await wikiEvent(s, 'PostCompact', summary || previous);
 }
 
 /**
@@ -477,8 +478,6 @@ interface Call {
 async function turn(s: Session, blocks: any[]): Promise<string> {
   const ac = new AbortController();
   s.abort = ac;
-  let wikiToolCount = wikiToolCounts.get(s.id) ?? 0;
-  await wikiEvent(s, 'SessionStart');
   let m = await ready(s);
   const skills: Skill[] = PUBLIC_RUN ? [] : findSkills(s.cwd);
   s.skillDirs = skills.map((k) => path.dirname(k.file));
@@ -683,11 +682,6 @@ async function turn(s: Session, blocks: any[]): Promise<string> {
       if (guard.stopped) break;
     }
     const done = results.filter(Boolean);
-    // Only completed tool events count; a periodic checkpoint is not a pre-compaction event.
-    const previousWikiCount = wikiToolCount;
-    wikiToolCount += done.length;
-    wikiToolCounts.set(s.id, wikiToolCount);
-    if (Math.floor(previousWikiCount / 50) < Math.floor(wikiToolCount / 50)) await wikiEvent(s, 'PostToolUse', Math.floor(wikiToolCount / 50) * 50);
     // A tool from the catalog called straight away stays offered from now on.
     const fromCatalog = prepared.filter((p) => p.tool && o.deferred.includes(p.tool)).map((p) => p.tool!.name);
     if (fromCatalog.length) catalog.activate(fromCatalog);
@@ -851,7 +845,6 @@ async function handle(m: any): Promise<unknown> {
       try {
         return { stopReason: await turn(s, p.prompt ?? []) };
       } finally {
-        await wikiEvent(s, 'Stop');
         endTurn(s, s.turnId);
         s.turnId = undefined;
         s.abort = undefined;

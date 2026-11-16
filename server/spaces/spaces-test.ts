@@ -95,6 +95,20 @@ test('a space searches the shared knowledge too unless it leaves it out; changin
   deleteSpace(db, g.id);
 });
 
+test('a project has its own wiki memory switch: absent follows Settings, null clears it, other values are refused', () => {
+  const w = createSpace(db, { name: 'Wiki memory', wikiMemory: false });
+  assert.equal(w.wikiMemory, false, 'a new project can start with it off');
+  assert.equal(updateSpace(db, w.id, { description: 'Something else' }).wikiMemory, false, 'changing something else keeps it');
+  assert.equal(updateSpace(db, w.id, { wikiMemory: true }).wikiMemory, true);
+  assert.equal('wikiMemory' in updateSpace(db, w.id, { wikiMemory: null }), false, 'null: follow Settings again');
+  assert.equal(spaceById(db, w.id)!.wikiMemory, undefined);
+  assert.equal(createSpace(db, { name: 'Follows' }).wikiMemory, undefined);
+  assert.equal(createSpace(db, { name: 'Follows too', wikiMemory: null }).wikiMemory, undefined);
+  assert.throws(() => updateSpace(db, w.id, { wikiMemory: 'yes' }), /true, false or null/);
+  assert.throws(() => createSpace(db, { name: 'Bad', wikiMemory: 1 }), /true, false or null/);
+  deleteSpace(db, w.id);
+});
+
 test('a session in a space is told what it is, where its files go, and its guidelines (with the others)', async () => {
   const [a] = spaceViews(db);
   const add = await spawnAdditions({ agent: 'claude', key: 'claude:t9', cwd: a.folder, runId: 'r', resume: false, extra: { space: a.id } });

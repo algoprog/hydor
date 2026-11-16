@@ -10,7 +10,7 @@ import { docsOf } from '../../knowledge/store.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './index.ts';
 import { wikiBaseVisible, wikiDocumentVisible } from './bindings.ts';
 import { basesFor } from '../../knowledge/scope.ts';
-import { createSpace, deleteSpace } from '../../spaces/index.ts';
+import { createSpace, deleteSpace, updateSpace } from '../../spaces/index.ts';
 import { applyWikiChanges, ingestWikiSource } from '../core.ts';
 
 const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-knowledge-')));
@@ -19,11 +19,13 @@ try {
   const hub = path.join(temp, '.wiki');
   fs.mkdirSync(path.join(hub, 'wiki'), { recursive: true });
   fs.mkdirSync(path.join(hub, '.archive'), { recursive: true });
+  // A project's own wiki lives under the hub's projects/: the shared base must not index it.
+  fs.mkdirSync(path.join(hub, 'projects', 'shop-123abc', 'wiki'), { recursive: true });
+  fs.writeFileSync(path.join(hub, 'projects', 'shop-123abc', 'wiki', 'plan.md'), 'A remarkable private telescope.');
   const active = path.join(hub, 'wiki', 'active.md');
   fs.writeFileSync(active, 'A remarkable orange telescope.');
   fs.writeFileSync(path.join(hub, '.archive', 'secret.md'), 'A remarkable hidden telescope.');
   fs.writeFileSync(path.join(hub, 'wiki', 'retired.md'), '---\ndocument_status: retired\n---\nA remarkable retired telescope.');
-  kvSet(db, 'wiki.enabled', '1');
   kvSet(db, 'wiki.hubPath', hub);
   kvSet(db, 'memory.meaning', '0');
   const binding = ensureWikiKnowledge(db, { root: hub, space: null });
@@ -31,7 +33,7 @@ try {
   assert.equal(binding.base, again.base);
   for (let i = 0; i < 100 && (!docsOf(db, binding.base).length || progress.size); i++) await new Promise((r) => setTimeout(r, 20));
   const docs = docsOf(db, binding.base);
-  assert.deepEqual(docs.map((d) => d.path), [active]);
+  assert.deepEqual(docs.map((d) => d.path), [active], 'hidden, retired and other projects’ files are not indexed');
   assert.equal((await searchKnowledge(db, { query: 'telescope', mode: 'words', within: [binding.base] })).hits.length, 1);
   // A newly ingested source and compiled article become searchable through the existing Knowledge index.
   const sourceText = 'The violet observatory is situated on a hill.\n';
@@ -60,6 +62,15 @@ try {
   const project = ensureWikiKnowledge(db, { root: projectWiki, space: space.id });
   assert.equal(basesFor(db, space.id).some((b) => b.id === project.base), true);
   assert.equal(basesFor(db, null).some((b) => b.id === project.base), false);
+  // The project's wiki stays bound across sessions (no flapping), and is hidden while wiki memory is off for the project.
+  assert.equal(ensureWikiKnowledge(db, { root: projectWiki, space: space.id }).base, project.base);
+  assert.equal(wikiBaseVisible(db, project.base), true);
+  updateSpace(db, space.id, { wikiMemory: false });
+  assert.equal(wikiBaseVisible(db, project.base), false, 'the project’s switch hides it at once');
+  assert.throws(() => ensureWikiKnowledge(db, { root: projectWiki, space: space.id }), /off/);
+  updateSpace(db, space.id, { wikiMemory: null });
+  assert.equal(wikiBaseVisible(db, project.base), true, 'back on: the same binding is visible again');
+  assert.equal(wikiBaseVisible(db, binding.base), true, 'the shared wiki follows Settings, not the project');
   deleteSpace(db, space.id);
   assert.equal(basesFor(db, null).some((b) => b.id === project.base), false);
   kvSet(db, 'wiki.enabled', '0');
