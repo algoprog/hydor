@@ -235,6 +235,12 @@
 [设置 → 记忆](/settings?s=memory)：智能体记住的关于你、你的项目和每个会话的内容，以及记录时间。详见[记忆](/guide/memory)。
 
 - [**记忆**](/settings?s=memory&find=Memory)：智能体开始时会带上之前会话记下的内容，并在你要求时保存笔记。
+- [**Wiki 记忆**](/settings?s=memory&find=Wiki%20memory)：智能体为每个项目根据其文档和工作保存的文章：对每个项目都开启，除非项目自己的设置另有规定。
+- [**从新文档中学习**](/settings?s=memory&find=Learn%20from%20new%20documents)：新添加和修改的文档会添加记忆笔记，并用辅助模型更新 wiki。
+- [**Wiki 文件夹**](/settings?s=memory&find=Wiki%20folder)：共享 wiki 保存的位置，以及下面没有另行设置时项目 wiki 保存的位置。
+- [**项目 Wiki**](/settings?s=memory&find=Project%20wikis)：每个项目的 wiki 保存在哪里：保存在 wiki 文件夹中，或保存在每个项目的文件夹中。
+- [**每个项目内的文件夹**](/settings?s=memory&find=Folder%20inside%20each%20project)：每个项目在自己的文件夹里的什么位置保存 wiki。
+- [**不纳入 Git**](/settings?s=memory&find=Leave%20it%20out%20of%20Git)：把项目的 wiki 文件夹加入它的 .gitignore，仅限 Git 仓库。
 - [**按含义搜索**](/settings?s=memory&find=Search%20by%20meaning)：按含义查找笔记，以及此搜索中的任何内容。
 - [**每个智能体开始时获得的笔记**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with)：除了你的档案：最多这么多条与你的请求相关的笔记，以及其余笔记的标题。
 - [**自动整理**](/settings?s=memory&find=Tidy%20up%20automatically)：大约每天一次，有新内容之后：合并内容相同的笔记，归纳相关笔记并为它们加上标题。

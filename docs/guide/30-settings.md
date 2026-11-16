@@ -235,6 +235,12 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Memory](/settings?s=memory): what agents remember about you, your projects and each session, and when it was written. More in [Memory](/guide/memory).
 
 - [**Memory**](/settings?s=memory&find=Memory): Agents start with what earlier sessions kept, and save notes when you ask.
+- [**Wiki memory**](/settings?s=memory&find=Wiki%20memory): Articles agents keep for each project, from its documents and its work: on for every project unless its own settings say otherwise.
+- [**Learn from new documents**](/settings?s=memory&find=Learn%20from%20new%20documents): New and changed documents add memory notes and update the wiki, with the helper model.
+- [**Wiki folder**](/settings?s=memory&find=Wiki%20folder): Where the shared wiki is kept, and project wikis unless set below.
+- [**Project wikis**](/settings?s=memory&find=Project%20wikis): Where each project’s wiki is kept: in the wiki folder, or in each project’s folder.
+- [**Folder inside each project**](/settings?s=memory&find=Folder%20inside%20each%20project): Where inside its folder each project keeps its wiki.
+- [**Leave it out of Git**](/settings?s=memory&find=Leave%20it%20out%20of%20Git): Adds the project’s wiki folder to its .gitignore, in Git repositories only.
 - [**Search by meaning**](/settings?s=memory&find=Search%20by%20meaning): Finds notes, and anything in this search, by what it means.
 - [**Notes each agent starts with**](/settings?s=memory&find=Notes%20each%20agent%20starts%20with): Besides your profile: at most this many notes that bear on what you ask, and the titles of the rest.
 - [**Tidy up automatically**](/settings?s=memory&find=Tidy%20up%20automatically): About once a day, after something new: merges notes that say the same thing, sums related ones up and titles them.
