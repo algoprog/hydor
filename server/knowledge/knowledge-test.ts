@@ -16,10 +16,10 @@ import { words } from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { createSpace, deleteSpace, updateSpace } from '../spaces/index.ts';
-import { fileText, fillVectors, filesUnder, passages, progress, scanSoon } from './indexer.ts';
+import { fileText, fillSoon, fillVectors, filesUnder, passages, progress, scanSoon } from './indexer.ts';
 import { basesFor } from './scope.ts';
 import { searchKnowledge } from './search.ts';
-import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docsOf, filesDir } from './store.ts';
+import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docsOf, filesDir, saveDoc } from './store.ts';
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -259,6 +259,51 @@ test('reading again: a changed file is read anew, a deleted one leaves, one that
   assert.equal((db.prepare('select count(*) as n from kb_vectors').get() as { n: number }).n, 0);
   assert.equal(knowledgeInstructions(db), null);
   assert.ok(fs.existsSync(folder), 'the folder itself stays');
+});
+
+test('scheduled vector work tolerates a closed database', async () => {
+  // A caller can close its database before the deferred indexing timer fires.
+  const closed = openDb(path.join(tmp, 'closed.db'));
+  fillSoon(closed, 10);
+  closed.close();
+  assert.equal(await fillVectors(closed), 0);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+});
+
+test('vector work stops safely when the database closes during embedding', async () => {
+  // Exercise both a late successful answer and a rejected asynchronous operation.
+  for (const fails of [false, true]) {
+    const closing = openDb(path.join(tmp, `embedding-close-${fails}.db`));
+    kvSet(closing, 'memory.meaning', '1');
+    const base = createBase(closing, { name: 'Closing' });
+    const source = addSource(closing, base.id, 'files', path.join(tmp, `closing-${fails}`));
+    saveDoc(closing, { base: base.id, source: source.id, path: 'note.md', title: 'Note', format: 'md', size: 4, mtime: 1, status: 'indexed', chunks: [{ text: 'Note' }] });
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => { started = resolve; });
+    let finish!: () => void;
+    const release = new Promise<void>((resolve) => { finish = resolve; });
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (message) => { warnings.push(String(message)); };
+    setEmbedderForTests(async (texts) => {
+      started();
+      await release;
+      if (fails) throw new Error('test embedder stopped');
+      return texts.map(fake);
+    });
+    try {
+      const work = fillVectors(closing);
+      await entered;
+      closing.close();
+      finish();
+      assert.equal(await work, 0);
+      assert.deepEqual(warnings, fails ? ['[knowledge] vectors: test embedder stopped'] : []);
+    } finally {
+      console.warn = warn;
+      if (closing.open) closing.close();
+      setEmbedderForTests(async (texts) => texts.map(fake));
+    }
+  }
 });
 
 for (const [name, fn] of tests) {
