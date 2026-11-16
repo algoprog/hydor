@@ -328,25 +328,28 @@ function endOfDay(now: number): number {
 export interface AwayDeps extends AwaySources {
   /** Marks a session as looked at (as opening it does), on every device. */
   markSeen: (key: string) => void;
+  /** The time now (the server's clock unless given: tests give their own). */
+  now?: () => number;
 }
 
 export function registerAway(app: FastifyInstance, deps: AwayDeps) {
+  const clock = deps.now ?? Date.now;
   // What happened since your last visit. `until`: the end of your day, for what runs next today.
   app.get('/api/away', async (req) => {
     const q = req.query as Record<string, string | undefined>;
     const until = Number(q.until);
-    return awaySummary(deps, { until: Number.isFinite(until) && until > 0 ? until : undefined });
+    return awaySummary(deps, { now: clock(), until: Number.isFinite(until) && until > 0 ? until : undefined });
   });
   // The app has been open, in front and in use for a minute (and each minute after): your visit goes on.
   app.post('/api/away/here', async () => {
-    const now = Date.now();
+    const now = clock();
     const v = heard(visitsOf(deps.db), now);
     kvSet(deps.db, KEY, JSON.stringify(v));
     return { since: sinceOf(v, now) };
   });
   // Mark all as seen: what the start page showed (up to `at`, its `now`) goes, and the sessions in it count as opened.
   app.post('/api/away/seen', async (req) => {
-    const now = Date.now();
+    const now = clock();
     const at = Number((req.body as { at?: unknown } | null)?.at);
     const upto = Number.isFinite(at) && at > 0 ? Math.min(at, now) : now;
     const v = visitsOf(deps.db);

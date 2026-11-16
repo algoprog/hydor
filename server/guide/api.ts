@@ -53,6 +53,9 @@ const RULES: Rule[] = [
   ['*', /^\/api\/accounts\/[^/]+\/(login|logout)/, 'refuse', 'Signing in and out of an agent’s account is the user’s to do, in Settings → Agents → Accounts.'],
   ['*', /^\/api\/accounts\/claude\/api-keys\//, 'refuse', 'An API key is the user’s to add, in Settings → Agents → Accounts (an account’s ⋯ menu → Add API key…).'],
   ['W', /^\/api\/budget\//, 'ask', CAP],
+  // Reaching the app from other devices: a card each time, Full access too (Settings → App → Use on your phone).
+  ['POST', /^\/api\/phone\/serve$/, 'ask', 'This publishes the app with Tailscale Serve: every device signed in to your Tailscale account can then open it over HTTPS (never the public internet), and the password is still asked.'],
+  ['POST', /^\/api\/phone\/stop$/, 'always', 'This stops serving the app on your tailnet: your phone and other devices no longer reach it.'],
   ['W', /^\/api\/sessions\/[^/]+\/(takeover|seen|queue)/, 'refuse', 'That is for the session’s own page.'],
   ['W', /^\/api\/sites$/, 'refuse', 'Publish with your publish_site tool: the user confirms on its card.'],
   ['PUT', /^\/api\/memory\/bring-in\/file$/, 'refuse', 'An export comes from the user’s own browser: they add it with Bring in… in Settings → Memory.'],

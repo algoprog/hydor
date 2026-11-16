@@ -295,6 +295,7 @@ hydor settings run notifications.send-a-test
 - `hydor status` 会说明 Hydor 是否在运行、它的版本和地址、它的数据在哪里、它是否是服务，以及哪些会话在工作或需要你处理（用的标记和 `hydor sessions` 相同）。
 - `hydor serve` 在这里于前台运行 Hydor，直到按 Ctrl+C。`hydor service install` 让它作为后台服务持续运行，`hydor update` 拉取最新代码、构建并重启，`hydor set-password`、`hydor setup-token` 和 `hydor access-token` 做的就是它们名字所说的事。在 Mac 应用里，`hydor update`、`hydor service install` 和 `hydor serve` 会说明这些由应用自己完成。
 - `hydor open` 打印应用的地址；`--browser` 会把它打开。
+- `hydor machines phone` 说明这里是否安装并登录了 Tailscale，以及应用在你的 tailnet 上发布的地址，并画出供手机相机扫描的二维码。`hydor machines phone serve` 把应用发布到你自己的设备（常用地址上已有别的东西时用 `--port 8443`），`hydor machines phone stop` 再把它撤下，和[设置 → 应用 → 在手机上使用](/settings?s=phone)做的一样。
 
 ## 使用另一台电脑上的 Hydor
 

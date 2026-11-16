@@ -39,6 +39,16 @@
 - [**声音**](/settings?s=notifications&find=Sound)：应用打开时，每条通知都会响起简短的提示音。
 - [**发送测试**](/settings?s=notifications&find=Send%20a%20test)：现在向这台设备发送一条通知。
 
+### 在手机上使用
+
+[设置 → 在手机上使用](/settings?s=phone)：用 Tailscale 在你自己的手机上私密地打开本应用，并在手机上接收通知。详见[手机、其他机器和分享](/guide/devices)。
+
+- [**发布到我的设备**](/settings?s=phone&find=Serve%20it%20on%20my%20devices)：通过 HTTPS 把应用只发布给登录了你的 Tailscale 账户的设备，绝不发布到公共互联网。
+- [**这台电脑上的 Tailscale**](/settings?s=phone&find=Tailscale%20on%20this%20computer)：这里是否安装并登录了 Tailscale，以及这台电脑在你的 tailnet 上的名字。
+- [**在手机上打开**](/settings?s=phone&find=Open%20it%20on%20your%20phone)：应用地址的二维码，供手机相机扫描，以及在手机上要做的几步。
+- [**停止发布**](/settings?s=phone&find=Stop%20serving)：把应用从你的 tailnet 上撤下，正好撤销“发布到我的设备”所做的一切。
+- [**添加到主屏幕**](/settings?s=phone&find=Add%20to%20Home%20Screen)：在手机上：Hydor 有自己的图标，全屏打开；iPhone 的通知需要这样。
+
 ### 聊天应用
 
 [设置 → 聊天应用](/settings?s=chat)：在 Telegram、Discord 或 Slack 中与你的智能体对话：开始会话，发送照片、文件和语音消息，收到回复，回答它们的提问。详见[手机、其他机器和分享](/guide/devices)。
