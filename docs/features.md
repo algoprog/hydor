@@ -60,15 +60,17 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   did not start as the app asked for them, why, with Try again), and another assistant applies from your next
   message, the conversation carrying on. "Continue in Codex" (or
   Claude Code, or Custom Agent) in the session's menu hands the conversation over to another agent.
-- Fork a session from any reply (a Claude Code reply from before a compaction too, with the conversation as it was
-  then), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
+- Fork a session from the button under a reply (any reply of Claude Code, one from before a compaction too, with the
+  conversation as it was then; the last reply of a finished turn for Codex and Custom), or edit an earlier message and go on from there, with the files put back as they were. Compact a long session, stop a turn, resume an old one.
 - Give a session a goal (`/goal`): the agent keeps working, turn after turn, until it holds.
+- The sidebar's width, 180 to 560 pixels, is set by dragging its edge or with the arrow keys on it, and kept.
 - Every session on the machine is listed, including ones open in VS Code or a terminal, with what each is
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
   agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages). Pinned comes next, then Projects: a group for each project and each folder you picked
-  (task folders, the home folder and temporary ones go by day), foldable, a line per session, with a pen to
+  (task folders, the home folder and temporary ones go by day), foldable (so are the Active and Projects headings themselves,
+  kept on each computer), a line per session, with a pen to
   start a new session there, and dragged by their headings into the order you like, the same on every device;
   a heading's ⋯, a right-click or a double-click renames the project or the folder (a folder's name is the app's
   for it, on every device, shown under sessions and in the folder menus too; Codex projects' folders, such as the
@@ -240,7 +242,8 @@ agents that speak ACP and take MCP servers.
   sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own
   skills, written there, copied from the library to change for the project alone, or proposed by an agent working
   in it and kept for the project when you approve; the library's; and Claude Code's and Codex's own for its folder,
-  switched for its sessions through their settings for the session, not their own files. A group brings several projects
+  switched for its sessions through their settings for the session, not their own files. Turn off all skills, in the tab's
+  menu, asks first and switches off every skill it lists for the project (Codex's own stay as they are when they could not be read). A group brings several projects
   together: its sessions work with all of them, their folders, documents, guidelines and skills. The sidebar
   groups each project's sessions under its name, and its filter shows one project's sessions. New project asks only for a
   name (its colour on the mark beside it) and where its files go, a new folder or one you have, with the folders you

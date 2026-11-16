@@ -197,7 +197,7 @@ Every skill on the tab has a switch at the end of its row: your library's (built
 
 - A skill switched the other way from Settings says **On here** or **Off here**, and the filter **Changed here** shows only those. A skill turned off in Settings shows as **Off**: switch it on to have it in this project alone.
 - In its window, a skill switched here says what Settings has for every other session, and **Follow Settings** goes back to that. Switching it back by hand does the same.
-- In the **⋯** menu, **Reset every switch here** puts every skill back to what Settings says, after you confirm, and **Skills for every project** opens Settings → Skills.
+- In the **⋯** menu, **Turn off all skills** switches off every skill the tab lists for this project, after you confirm, and **Reset every switch here** puts every skill back to what Settings says, after you confirm. **Skills for every project** opens Settings → Skills. Turning all off covers every skill on the tab, including the ones the filters hide; skills added later follow their usual setting, and sessions already running keep theirs until they start again. If Codex's own skills could not be read, the confirmation says so, and they stay as they are.
 
 A new session in the project gets the switches as they are when it starts; one already going keeps what it started with, though Custom follows a change from its next turn. Claude Code's and Codex's own skills are switched for the project's sessions without changing those agents' own settings. In Settings → Skills, a skill a project switches the other way says so on its row ("Off in Thesis").
 

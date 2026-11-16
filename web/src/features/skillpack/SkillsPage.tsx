@@ -21,6 +21,7 @@ import {
   Palette,
   PenLine,
   Plus,
+  PowerOff,
   Puzzle,
   RotateCcw,
   Search,
@@ -983,7 +984,18 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
 
   /** Apply the unfiltered loaded snapshot as one project-only change. */
   const switchAllOff = async () => {
-    if (!sp || !mine || !agents || agents.errors.length || switchingAll) return;
+    if (!sp || !mine || !agents || switchingAll) return;
+    const ok = await confirm({
+      title: 'Turn off all skills for this project?',
+      body: (
+        <div className="space-y-2">
+          <p>Every skill listed here goes off for this project’s sessions, including the ones the filters hide. Skills added later follow their usual setting, and sessions already running keep theirs until they start again.</p>
+          {agents.errors.length > 0 && <p>Codex’s skills could not be read, so Codex’s own skills stay as they are.</p>}
+        </div>
+      ),
+      confirm: 'Turn off',
+    });
+    if (!ok) return;
     setSwitchingAll(true);
     try {
       // Refresh every source so a long-open page does not act on an old skill list.
@@ -992,7 +1004,6 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
         api<{ skills: SkillEntry[]; errors: string[] }>(`/api/setup/skills${cwd ? `?cwd=${enc(cwd)}` : ''}`),
         api<SpaceSkills>(`/api/projects/${enc(sp.id)}/skills`),
       ]);
-      if (freshAgents.errors.length) throw new Error('Some skills could not be loaded. Reload before turning all skills off.');
       const skills = spaceItems(sp, freshLib, freshAgents.skills, freshMine).flatMap((i) => i.here ? [{ name: i.here.name, agent: i.here.agent ?? null, usual: i.here.usual }] : []);
       const r = await post<{ switches: Record<string, boolean> }>(`/api/projects/${enc(sp.id)}/skill-switches/off`, { skills, expected: freshMine.switches });
       setMine((m) => m && { ...m, switches: r.switches });
@@ -1110,6 +1121,9 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       {(close) =>
         sp ? (
           <>
+            <MenuItem icon={<PowerOff size={14} />} disabled={loading || switchingAll || !all.some((i) => i.on)} onClick={() => (close(), void switchAllOff())}>
+              Turn off all skills
+            </MenuItem>
             <MenuItem icon={<Undo2 size={14} />} disabled={!switched} onClick={() => (close(), void resetAll())}>
               Reset every switch here
             </MenuItem>
@@ -1158,9 +1172,6 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       )}
       {!sp && lib && lib.pending.length > 0 && <Waiting list={lib.pending} onReview={setReview} />}
       {sp && <p className="text-[13px] leading-snug text-fg-3">The skills this project’s sessions get. A switch here is for this project alone.</p>}
-      {sp && <Button size="sm" disabled={loading || !agents || agents.errors.length > 0 || switchingAll || !all.some((i) => i.on)} onClick={() => void switchAllOff()}>Turn off all skills</Button>}
-      {sp && <p className="text-[13px] text-fg-3">This affects all listed skills, including those hidden by filters. New skills follow their settings. Existing sessions may keep their starting settings until restarted.</p>}
-      {sp && agents && agents.errors.length > 0 && <p className="text-[13px] text-fg-3">Some skills could not be loaded. Reload before turning all skills off.</p>}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1">

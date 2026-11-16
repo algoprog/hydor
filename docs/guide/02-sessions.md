@@ -179,7 +179,7 @@ The agent may also keep a checklist (**Plan** or **To-dos**, with how many are d
 
 Day lines ("Yesterday", "Today") separate the days; a conversation all from today has none. Older messages load as you scroll up, or with **Show earlier messages**. New messages and replies come in at the end of the conversation, with no empty space left under them. Once a reply is long enough to fill the screen, the view stops at its first line and stays there as it grows, so you read a long reply from its beginning; a short one simply sits under what came before. When you scroll up while the agent works, the view stays where you are; **Latest** takes you back to the end, and also shows while a reply runs on below the screen.
 
-Hover over a reply for **Fork from this reply** (Claude Code and Custom), **Read aloud**, and **Copy message**. Hover over your own message for **Edit from here** and the time it was sent.
+Under each finished reply are **Copy message**, **Fork from this reply** and **Read aloud**. **Fork from this reply** works on any reply of Claude Code, and on the last reply of a finished turn for Codex and Custom, since those fork a whole turn. Hover over your own message for **Edit from here** and the time it was sent.
 
 ### A turn's time and cost
 
@@ -347,7 +347,7 @@ While a goal is set, a bar above the message box shows it and how it stands (wor
 
 A fork is a new session that starts with this conversation and then tries something else; this session stays as it is.
 
-1. Open the session's menu (⋯) → **Fork**, or hover over a reply and press **Fork from this reply** (Claude Code and Custom) to keep the conversation only up to there.
+1. Open the session's menu (⋯) → **Fork**, or press **Fork from this reply** under a reply (any reply of Claude Code; the last reply of a finished turn for Codex and Custom) to keep the conversation only up to there.
 2. Write what the fork should do ("What should the fork try instead?").
 3. Press **Fork** (or Ctrl+Enter).
 
