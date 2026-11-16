@@ -24754,5 +24754,14 @@
 "Wiki must be inside the project":"wiki 必须位于项目之内",
 "Wiki root does not exist":"wiki 根文件夹不存在",
 "Wiki root must be a directory":"wiki 根文件夹必须是目录",
-"wikiMemory: true, false or null":"wikiMemory: true, false or null"
+"wikiMemory: true, false or null":"wikiMemory: true, false or null",
+"Skills turned on for this project":"已为此项目开启技能",
+"Some skills could not be loaded. Reload before changing all skills.":"部分技能无法加载。请重新加载后再更改所有技能。",
+"Turn on all skills":"开启所有技能",
+"Follow default settings for all skills":"所有技能遵循默认设置",
+"Change default skill settings for all projects":"更改所有项目的默认技能设置",
+  "Turn on all skills for this project?": "为此项目开启所有技能？",
+  "Every available skill listed here changes for this project’s sessions, including the ones the filters hide. Skills added later follow their usual setting, and sessions already running keep theirs until they start again.": "此处列出的所有可用技能都会为此项目的会话更改，包括被筛选器隐藏的技能。以后添加的技能遵循其通常设置；已运行的会话在重新启动前保持原有设置。",
+  "Some agents’ skills could not be read and will stay as they are.": "无法读取某些代理的技能，这些技能将保持不变。",
+  "Available skills updated for this project": "已更新此项目的可用技能"
 }
