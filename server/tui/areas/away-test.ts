@@ -49,7 +49,7 @@ test('away: the folded line, the rows most important first, next today, where to
   const r = await run(t.conn, ['away']);
   const lines = r.out.split('\n');
   assert.equal(lines[0], awayLine(sum));
-  assert.match(lines[0], /^Since .+ · 1 done · 1 needs you · 1 failed · 1 with nothing new · next: Lunch reminder at .+$/);
+  assert.match(lines[0], /^1 needs you · 1 failed · 1 done · 1 with nothing new · next: Lunch reminder at .+ · Since .+$/);
   assert.match(r.out, /^1 +● +needs you +Run a command +Fix the tests +20m ago$/m);
   assert.match(r.out, /^2 +✗ +failed +Deploy the website +API Error: 529 overloaded +10m ago$/m);
   assert.match(r.out, /^3 +✓ +done +Morning brief +Three stories +\$0\.12 +5m ago$/m);

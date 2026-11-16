@@ -112,7 +112,7 @@ The start page keeps its picks for each project, each folder and **New task fold
 
 ### While you were away
 
-Coming back to the app, you see in one place what happened while you were away, under the start page's message box (above the starter ideas). It folds to one line, such as "Since yesterday 18:40 · 3 done · 1 needs you · 1 failed · next: Morning brief at 07:30", leaving out a part that is zero. Click the line to open it, or click one of its parts: **done**, **needs you** or **failed** opens it to just those (**Show all** brings back the rest), and **next** opens the scheduled tasks. On a phone the whole line is one button that opens it.
+Coming back to the app, you see in one place what happened while you were away, under the start page's message box (above the starter ideas). It is folded to one line, what matters most first, such as "1 needs you · 1 failed · 3 done · next: Morning brief at 07:30 · Since yesterday 18:40", leaving out a part that is zero. Click the line to open it, or click one of its parts: **needs you**, **failed** or **done** opens it to just those (**Show all** brings back the rest), **next** opens the scheduled tasks, and the time shows everything. On a phone the whole line is one button that opens it, and the time is in the opened block's header.
 
 Open, it shows up to six rows, the most important first (**Show … more** lists the rest):
 
@@ -121,7 +121,7 @@ Open, it shows up to six rows, the most important first (**Show … more** lists
 - **Ran by itself**: runs of your [scheduled tasks](/guide/tasks), of your agents' schedules and of your apps (started from the Apps page, a link, the API or a chat app), each with how it went (**Done**, **Failed** or **Nothing new**) and what it cost. Click one to open the session it ran in, or the app's run.
 - **Next today**: the scheduled tasks due later today, under the rows.
 
-It opens by itself when something needs you, and stays folded otherwise. **Mark all as seen** clears it: what it lists counts as seen, and the sessions in it as opened, on every device (their dots in the sidebar go too). What happens after that shows again. Runs that found nothing new, and what runs next, never make it appear on their own.
+It stays folded until you open it, even when something needs you. Open or folded, it stays as you left it on this device. **Mark all as seen** clears it: what it lists counts as seen, and the sessions in it as opened, on every device (their dots in the sidebar go too). What happens after that shows again. Runs that found nothing new, and what runs next, never make it appear on their own.
 
 Your last visit is the end of the last time the app was open, in front and in use for more than a minute, on any of your devices: a visit on your phone counts on your computer too. Reloading the page, or a glance of less than a minute, does not move it, and a window left open while you are away from the computer does not count. Opening a session marks it as seen, as before. Until your first visit, it looks back one day. Another machine's start page (Settings → Machines) shows that machine's; one with an older version of Hydor shows none.
 

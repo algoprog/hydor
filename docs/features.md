@@ -41,13 +41,14 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   edits · $0.84", the money at API prices, which on a plan is not what you pay (its hover says so, with the lines,
   tokens and prompts).
 - While you were away, under the start page's message box (above the starter ideas): what happened since your last
-  visit, folded to a line ("Since yesterday 18:40 · 3 done · 1 needs you · 1 failed · next: Morning brief at 07:30"),
-  each part opening it to just those (on a phone the whole line opens it). Open, up to six rows, most important first:
+  visit, folded to a line, what matters first ("1 needs you · 1 failed · 3 done · next: Morning brief at 07:30 · Since
+  yesterday 18:40"), each part opening it to just those (on a phone the whole line opens it, the time in the opened
+  header). Open, up to six rows, most important first:
   what waits on you (approvals, questions, forms and calls held in the Outbox answered right there with the Inbox's
   own cards), sessions that finished Done or Failed and that you have not opened since (the start of the last reply or
   the error, and the files made, each opening in Files), runs of scheduled tasks, agents' schedules and apps with how
-  they went (done, failed, nothing new) and their cost, and what runs next today. It opens by itself when something
-  needs you; Mark all as seen clears it and marks its sessions as opened on every device. Your last visit is kept on
+  they went (done, failed, nothing new) and their cost, and what runs next today. It stays folded until you open it,
+  and as you left it on each device; Mark all as seen clears it and marks its sessions as opened on every device. Your last visit is kept on
   the server for every device: the end of the last time the app was open, in front and in use for a minute or more
   (a reload or a glance does not move it). How each session's turn ended is kept when it ends; one route gives it all
   (GET /api/away); `hydor away` in a terminal; another machine on an older version shows none.
