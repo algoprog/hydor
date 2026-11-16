@@ -7,11 +7,7 @@ import { LANGS } from '../../../../shared/i18n.ts';
 const directory = path.resolve('web/src/i18n');
 const catalog = JSON.parse(fs.readFileSync(path.join(directory, 'strings.json'), 'utf8')) as Record<string, string>;
 const keys = Object.entries(catalog).filter(([, source]) => source.includes('features/wiki/') || source.includes('server/wiki/')).map(([key]) => key);
-// strings.json is made again by npm run i18n:extract once the pages are final: until then it still holds the old texts.
 assert.ok(keys.includes('Wiki folder') && keys.includes('Folder inside each project'), 'The wiki strings are registered');
-// German is supplied separately until the independent language package is present.
-const german = JSON.parse(fs.readFileSync(path.join(directory, 'de.wiki.json'), 'utf8')) as Record<string, string>;
-assert.deepEqual(keys.filter((key) => !german[key]?.trim()), [], 'Missing German wiki translations');
 for (const { id } of LANGS) {
   // English is the source language; all other configured languages use their normal dictionaries.
   if (id === 'en') continue;

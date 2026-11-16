@@ -33,7 +33,9 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
         </span>
       </div>
       {u.error ? (
-        <div className="mt-0.5 text-[12.5px] leading-snug break-words text-fg-3">{u.error}</div>
+        <div translate="no" className="mt-0.5 text-[12.5px] leading-snug break-words text-fg-3">
+          {u.error}
+        </div>
       ) : (
         <div className="mt-0.5 text-[12.5px] leading-snug text-fg-3">
           {first.length > 0 && (
@@ -157,7 +159,7 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
       )}
       {view && on && view.status === 'error' && (
         <p role="alert" className="text-[13px] text-fg-3">
-          {view.error || 'The project’s wiki memory could not be opened.'}
+          {view.error ? <span translate="no">{view.error}</span> : 'The project’s wiki memory could not be opened.'}
         </p>
       )}
       {view && on && view.status !== 'error' && !ready && <p className="text-[13px] text-fg-3">Nothing here yet. Agents add to it as they work, and new documents update it.</p>}
@@ -167,7 +169,7 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
         </p>
       )}
       {error && (
-        <div role="alert" className="rounded-xl border border-line bg-panel p-4 text-[13px]">
+        <div role="alert" translate="no" className="rounded-xl border border-line bg-panel p-4 text-[13px]">
           {error}
         </div>
       )}
