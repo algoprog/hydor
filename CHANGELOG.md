@@ -3,6 +3,34 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.70.0 · 16 November 2026
+
+Boards: pin answer cards from any reply to a page of the Library and have them keep themselves up to date. Answer
+cards can read their numbers from a spreadsheet or a file, and the app can be opened on your own phone in one step.
+
+- **Boards**: a new kind of Library page, a grid of answer cards. **Pin to a board**, first under any answer card's
+  **…**, keeps a copy of the card on a board you pick, or on a **New board…** named there. On the board, set each card's
+  size (S, M, L or Wide), move it, open it full screen, save it as a picture, rename it, remove it or open the
+  conversation it came from; on a phone, one card under another. Boards keep a version of each change, sit in folders
+  and projects, and can be shared by a read-only link. Agents can make a board or add cards to one when you ask.
+- **Cards that keep themselves up to date**: **Keep it up to date…** in a card's menu asks an agent the card's question
+  again on a schedule (every hour, every day or weekday at a time, or every week), on the tier you choose, after
+  telling you about what each update and a month of them cost. Each update runs in a session of its own that sends
+  nothing, changes only that card, and shows when it was updated and what it cost; **Refresh now** and **Refresh all**
+  do it at once. A card that fails three times in a row pauses. Each board has a monthly cap for its updates ($5 unless
+  you change it). Updates show in the week view of everything that runs by itself, and in **Settings → Scheduled
+  tasks**. A copy of a board keeps its cards' updates paused until you turn them on.
+- **Numbers from a spreadsheet or a file**: a table, a chart, key figures, a ranking, a histogram or values on a map can
+  read its numbers from one of your Library spreadsheets, or from a CSV, TSV, JSON or JSONL file in the conversation's
+  folder or its project's, with totals, averages, groups and filters, instead of an agent typing them. It redraws when
+  the spreadsheet changes, says where its numbers come from, and stays current on a board without any update. Shared
+  boards show these cards to the people you share them with.
+- **Use on your phone**: **Settings → Use on your phone** checks for Tailscale on this computer, serves the app over
+  HTTPS to your own devices only (never the public internet; the password is still asked), and shows a QR code to scan.
+  On the phone, it walks you through **Add to Home Screen**, **Notify this device** and a test notification. **Stop
+  serving** undoes it. Links the app sends you use that address when no other is set. The desktop apps offer it in
+  their first-run tour; in a terminal, `hydor machines phone`.
+
 ## 0.69.0 · 16 November 2026
 
 See what happened while you were away, everything that runs by itself on one week, exactly what changed in a
