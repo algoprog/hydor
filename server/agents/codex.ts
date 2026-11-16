@@ -1,5 +1,10 @@
 // Live Codex session through `codex app-server` (JSON-RPC over stdio), one process per thread.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
 import type { ApprovalOption, ApprovalRequest, ModelOption, Question, TimelineItem, ToolInfo } from '../../shared/types.ts';
 import { config } from '../config.ts';
 import { clip, firstLine, stripWrappers } from '../history/common.ts';
@@ -8,12 +13,45 @@ import type { Runner, RunSpec } from '../runner/client.ts';
 import { HttpError } from '../auth.ts';
 import { elicitCard, elicitCheck, elicitResult } from './elicit.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
-import { RpcPeer } from './rpc.ts';
+import { RpcError, RpcPeer } from './rpc.ts';
 import { splitHandoff } from '../handoff.ts';
 import type { GivenAdditions } from '../features/types.ts';
 import { PAGE_SERVER } from '../mcp.ts';
 
 type Json = Record<string, any>;
+
+/** Aggregated configuration only: this does not prove that a hook captured a checkpoint. */
+export interface CodexHookCounts { trusted: number; needsReview: number; disabled: number }
+export interface CodexHookCoverage {
+  complete: boolean;
+  events: Record<'sessionStart' | 'preCompact' | 'postCompact' | 'stop', CodexHookCounts>;
+}
+
+/** Keep only event counts; hook commands, source paths and other private configuration never leave this adapter. */
+export function summarizeCodexHooks(response: unknown): CodexHookCoverage | null {
+  if (!response || typeof response !== 'object' || !Array.isArray((response as Json).data) || !(response as Json).data.length) return null;
+  const events: CodexHookCoverage['events'] = {
+    sessionStart: { trusted: 0, needsReview: 0, disabled: 0 },
+    preCompact: { trusted: 0, needsReview: 0, disabled: 0 },
+    postCompact: { trusted: 0, needsReview: 0, disabled: 0 },
+    stop: { trusted: 0, needsReview: 0, disabled: 0 },
+  };
+  let complete = true;
+  for (const item of (response as Json).data) {
+    if (!item || !Array.isArray(item.hooks) || !Array.isArray(item.errors) || !Array.isArray(item.warnings)) { complete = false; continue; }
+    if (item.errors.length || item.warnings.length) complete = false;
+    for (const hook of item.hooks) {
+      if (!hook || typeof hook !== 'object' || !Object.hasOwn(events, hook.eventName)) continue;
+      const count = events[hook.eventName as keyof typeof events];
+      if (hook.enabled === false) count.disabled++;
+      else if (hook.enabled !== true) complete = false;
+      else if (hook.trustStatus === 'trusted' || hook.trustStatus === 'managed') count.trusted++;
+      else if (hook.trustStatus === 'untrusted' || hook.trustStatus === 'modified') count.needsReview++;
+      else complete = false;
+    }
+  }
+  return { complete, events };
+}
 
 export interface CodexOpts {
   cwd: string;
@@ -29,6 +67,81 @@ export interface CodexOpts {
   mode?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
   add?: GivenAdditions;
+  /** Hydor-owned, credential-free command for the native automatic compaction checkpoint. */
+  wikiHookCommand?: string;
+}
+
+/** Accept only the uniquely identified command from the isolated session-flags layer. */
+export function codexWikiHookConfig(command: string, response: unknown): Json | null {
+  const rows = (response as Json)?.data;
+  if (!Array.isArray(rows) || rows.length !== 1 || !Array.isArray(rows[0].hooks) || !Array.isArray(rows[0].errors) || !Array.isArray(rows[0].warnings) || rows[0].errors.length || rows[0].warnings.length) return null;
+  const hooks = rows[0].hooks.filter((h: Json) => h.source === 'sessionFlags' && h.eventName === 'preCompact');
+  if (hooks.length !== 1) return null;
+  const h = hooks[0];
+  if (h.command !== command || h.handlerType !== 'command' || h.async !== false || h.matcher !== null || h.timeoutSec !== 20 || h.enabled !== true || h.isManaged !== false || h.trustStatus !== 'untrusted' || !/^\/<session-flags>\/config\.toml:pre_compact:0:0$/.test(h.key) || !/^sha256:[a-f0-9]{64}$/.test(h.currentHash)) return null;
+  // Keep hook definition and trust in one table to avoid conflicting config merge order.
+  return { hooks: { PreCompact: [{ hooks: [{ type: 'command', command, timeout: 20 }] }], state: { [h.key]: { trusted_hash: h.currentHash } } } };
+}
+
+/** Avoid overlapping existing compaction hooks or plugins whose capture behavior is unknown. */
+export function codexWikiHooksMayOverlap(response: unknown): boolean {
+  const rows = (response as Json)?.data;
+  if (!Array.isArray(rows) || rows.length !== 1 || !Array.isArray(rows[0].hooks) || !Array.isArray(rows[0].errors) || !Array.isArray(rows[0].warnings) || rows[0].errors.length || rows[0].warnings.length) return true;
+  return rows[0].hooks.some((h: Json) => h.enabled !== false && (h.eventName === 'preCompact' || h.source === 'plugin' || !!h.pluginId));
+}
+
+/** A not-yet-trusted project layer can be invisible to hooks/list until a thread starts. */
+export function codexProjectHooksMayExist(cwd: string): boolean {
+  let canonicalHome: string;
+  let canonicalCwd: string;
+  try { canonicalHome = fs.realpathSync(os.homedir()); canonicalCwd = fs.realpathSync(cwd); } catch { return true; }
+  const homes = new Set([path.resolve(os.homedir()), canonicalHome]);
+  for (const start of new Set([path.resolve(cwd), canonicalCwd])) {
+    for (let dir = start; ; dir = path.dirname(dir)) {
+      // The user's home config is already covered by hooks/list and is not a project layer.
+      if (!homes.has(dir)) for (const name of ['hooks.json', 'config.toml']) {
+        try { fs.lstatSync(path.join(dir, '.codex', name)); return true; }
+        catch (error) { if (!['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return true; }
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+    }
+  }
+  return false;
+}
+
+/** Discover the exact hook hash without loading a user's configuration or executing their hooks. */
+async function discoverWikiHook(command: string): Promise<Json | null> {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-codex-hook-'));
+  const keep = ['PATH', 'HOME', 'USERPROFILE', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP'];
+  const env = Object.fromEntries(keep.filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]!])) as Record<string, string>;
+  // TOML basic strings use JSON-compatible quoting; each override is a distinct argv item, never shell text.
+  const definition = `hooks.PreCompact=[{hooks=[{type="command",command=${JSON.stringify(command)},timeout=20}]}]`;
+  const child = spawn(config.codexBin, ['app-server', '-c', 'features.hooks=true', '-c', definition], { cwd: home, env: codexEnv({ ...env, CODEX_HOME: home }), stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+  // Spawn failures remain an unavailable hook rather than crashing the Hydor server.
+  child.on('error', () => {});
+  const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
+  const rpc = new RpcPeer((message) => child.stdin.write(`${JSON.stringify(message)}\n`), `wiki-discovery-${crypto.randomBytes(3).toString('hex')}`);
+  child.stdin.on('error', () => rpc.failAll('Codex hook discovery unavailable'));
+  child.once('close', () => rpc.failAll('Codex hook discovery exited'));
+  const lines = createInterface({ input: child.stdout });
+  lines.on('line', (line) => { try { rpc.settle(JSON.parse(line)); } catch { /* Ignore non-protocol output. */ } });
+  try {
+    await rpc.call('initialize', { clientInfo: { name: 'hydor-wiki-discovery', version: config.version }, capabilities: { experimentalApi: true } }, 8000);
+    rpc.notify('initialized');
+    return codexWikiHookConfig(command, await rpc.call('hooks/list', { cwds: [home] }, 8000));
+  } catch {
+    return null;
+  } finally {
+    lines.close();
+    child.kill();
+    // Bound shutdown even if a broken app-server ignores termination.
+    const wait = (ms: number) => new Promise<void>((resolve) => { const timer = setTimeout(resolve, ms); closed.then(() => { clearTimeout(timer); resolve(); }); });
+    await wait(1000);
+    if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await wait(1000); }
+    // The isolated home contains no user configuration, tokens or sessions.
+    try { fs.rmSync(home, { recursive: true, force: true }); } catch { /* Best-effort temporary cleanup. */ }
+  }
 }
 
 /** MCP servers in Codex's own config format; the app's tools need no approval. */
@@ -185,6 +298,7 @@ export class CodexLive extends LiveAdapter {
   private calls = 0;
   private serverReqs = new Map<string, { id: string | number; method: string; params: Json }>();
   private next: Json = {};
+  private threadHookQuerySupported?: boolean;
 
   constructor(
     runner: Runner,
@@ -197,6 +311,19 @@ export class CodexLive extends LiveAdapter {
     this.state.mode = opts.mode ?? 'auto';
     this.rpc = new RpcPeer((o) => runner.writeLine(o), `wa-${crypto.randomBytes(3).toString('hex')}`);
     runner.on('line', (line: string, replay: boolean) => this.onLine(line, replay));
+  }
+
+  /** Inspect this running thread's hook configuration without trusting or executing any hook. */
+  async hookCoverage(): Promise<CodexHookCoverage | null> {
+    if (!this.sessionId) return null;
+    if (this.threadHookQuerySupported === undefined) {
+      // Older servers silently ignore threadId; distinguish them through the newer mutual-exclusion validation.
+      try { await this.rpc.call('hooks/list', { threadId: this.sessionId, cwds: [this.opts.cwd] }, 5000); this.threadHookQuerySupported = false; }
+      catch (error) { this.threadHookQuerySupported = error instanceof RpcError && error.code === -32600 && /either threadId or cwds/i.test(error.message); }
+    }
+    if (!this.threadHookQuerySupported) return null;
+    try { return summarizeCodexHooks(await this.rpc.call('hooks/list', { threadId: this.sessionId }, 5000)); }
+    catch { return null; }
   }
 
   /** Initializes a freshly started app server and starts or resumes the thread. */
@@ -226,6 +353,17 @@ export class CodexLive extends LiveAdapter {
       sandbox: mode.sandbox,
       ...(mode.reviewer ? { approvalsReviewer: mode.reviewer } : {}),
     };
+    // Do not overwrite a capability's hook configuration or enable hooks against an explicit user setting.
+    if (this.opts.wikiHookCommand && !codexProjectHooksMayExist(this.opts.cwd) && !Object.keys(common.config).some((key) => key === 'hooks' || key.startsWith('hooks.'))) {
+      try {
+        const current = await this.rpc.call('config/read', { cwd: this.opts.cwd }, 5000);
+        const existing = await this.rpc.call('hooks/list', { cwds: [this.opts.cwd] }, 5000);
+        if (current?.config?.features?.hooks !== false && (common.config as Json)['features.hooks'] !== false && (common.config as Json).features?.hooks !== false && !codexWikiHooksMayOverlap(existing)) {
+          const wikiHook = await discoverWikiHook(this.opts.wikiHookCommand);
+          if (wikiHook) Object.assign(common.config, wikiHook);
+        }
+      } catch { /* Continue without automatic coverage if discovery is unavailable. */ }
+    }
     const r = this.opts.forkFrom
       ? await this.rpc.call('thread/fork', { threadId: this.opts.forkFrom, ...(this.opts.forkLastTurn ? { lastTurnId: this.opts.forkLastTurn } : {}), ...common }, 120_000)
       : this.opts.threadId

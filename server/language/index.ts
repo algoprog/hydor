@@ -20,7 +20,11 @@ const dicts = new Map<Lang, (s: string) => string | null>();
 
 /** The app's own words in the user's language (web/src/i18n), read when first needed; anything else as it is. */
 export function appWords(db: DB): (s: string) => string {
-  const lang = userLang(db);
+  return wordsForLang(userLang(db));
+}
+
+/** Translate generated labels with the same configured catalogs as the rest of Hydor. */
+export function wordsForLang(lang: Lang): (s: string) => string {
   if (lang === 'en') return (s) => s;
   let t = dicts.get(lang);
   if (!t) {

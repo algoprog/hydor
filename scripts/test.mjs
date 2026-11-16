@@ -17,6 +17,7 @@ const LIMIT_MS = 15 * 60_000;
 
 /** Tests that need what a plain checkout does not give them, and what that is. */
 const NEEDS = {
+  'server/wiki/session/codex-live-test.ts': 'a locally installed Codex CLI and local loopback networking',
   'server/browser/selftest.ts': 'a browser and the network',
   'server/connections/selftest.ts': 'the network',
   'server/computer/windows-test.ts': 'Windows',

@@ -9,7 +9,8 @@ import { searchKnowledge } from '../../knowledge/search.ts';
 import { docsOf } from '../../knowledge/store.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './index.ts';
 import { wikiBaseVisible, wikiDocumentVisible } from './bindings.ts';
-import { basesFor } from '../../knowledge/scope.ts';
+import { basesFor, basesOfSession } from '../../knowledge/scope.ts';
+import { setSessionExtra } from '../../sessionExtra.ts';
 import { createSpace, deleteSpace, updateSpace } from '../../spaces/index.ts';
 import { applyWikiChanges, ingestWikiSource } from '../core.ts';
 
@@ -29,6 +30,10 @@ try {
   kvSet(db, 'wiki.hubPath', hub);
   kvSet(db, 'memory.meaning', '0');
   const binding = ensureWikiKnowledge(db, { root: hub, space: null });
+  setSessionExtra(db, 'codex:wiki-off', { wikiEnabled: false });
+  setSessionExtra(db, 'codex:wiki-on', { wikiEnabled: true });
+  assert.equal(basesOfSession(db, 'codex:wiki-off').some((b) => b.id === binding.base), false);
+  assert.equal(basesOfSession(db, 'codex:wiki-on').some((b) => b.id === binding.base), true);
   const again = ensureWikiKnowledge(db, { root: hub, space: null });
   assert.equal(binding.base, again.base);
   for (let i = 0; i < 100 && (!docsOf(db, binding.base).length || progress.size); i++) await new Promise((r) => setTimeout(r, 20));

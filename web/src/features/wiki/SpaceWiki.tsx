@@ -61,7 +61,7 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
   );
 }
 
-export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWikiView | undefined; version: number }) {
+export function SpaceWiki({ id, view, version, onStart }: { id: string; view: ProjectWikiView | undefined; version: number; onStart?: (prompt: string) => void }) {
   const home = useApp((s) => s.boot?.home);
   const [selected, setSelected] = useState<string | null>(null);
   const [file, setFile] = useState<WikiFile | null>(null);
@@ -124,10 +124,10 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
     else if (href && !/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(href)) e.preventDefault();
   };
   const doc = file ? wikiDocument(file.content) : null;
-  const list = (items: WikiItem[], label: 'articles' | 'sources') =>
+  const list = (items: WikiItem[], label: 'articles' | 'sources' | 'plans') =>
     items.length ? (
       <section>
-        <h3 className="mb-2 text-[12px] font-semibold text-fg-3">{label === 'articles' ? 'Articles' : 'Sources'}</h3>
+        <h3 className="mb-2 text-[12px] font-semibold text-fg-3">{label === 'articles' ? 'Articles' : label === 'sources' ? 'Sources' : 'Plans and evidence'}</h3>
         <div className="space-y-1">
           {items.map((item) => (
             <button
@@ -145,7 +145,7 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
         </div>
       </section>
     ) : null;
-  const ready = view?.status === 'ready' && (view.articles?.length || view.sources?.length);
+  const ready = view?.status === 'ready' && (view.articles?.length || view.sources?.length || view.plans?.length);
   return (
     <div className="space-y-4">
       {!view && <Throbber />}
@@ -168,6 +168,13 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
           <span>Folder</span>: <span translate="no">{tildify(view.root, home)}</span>
         </p>
       )}
+      {view && on && onStart && <div className="flex flex-wrap gap-2">
+        {/* Each action opens an editable draft in the existing project chat flow. */}
+        <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me add a source to this project's wiki. First ask me for the document or URL; do not add anything until I choose the source."))}>Add a source</Button>
+        <Button size="sm" variant="secondary" onClick={() => onStart(tr("Check this project's wiki for missing sources, broken links, orphaned articles and inconsistent indexes. Show the findings without changing files."))}>Check the wiki</Button>
+        <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me capture lessons learned for this project's wiki. First ask me for the work or session context. Preview the lessons without writing anything; save selected lessons only after my explicit approval."))}>Suggest lessons learned</Button>
+        <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me adopt a plan into this project's wiki. First ask me for the plan, then show existing plans and a preview. Save only after my approval; start implementation only on my separate instruction."))}>Adopt a plan</Button>
+      </div>}
       {error && (
         <div role="alert" translate="no" className="rounded-xl border border-line bg-panel p-4 text-[13px]">
           {error}
@@ -180,6 +187,7 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
             <aside className="max-h-72 space-y-4 overflow-auto rounded-xl border border-line bg-panel p-3 md:max-h-[70vh]">
               {list(view.articles ?? [], 'articles')}
               {list(view.sources ?? [], 'sources')}
+              {list(view.plans ?? [], 'plans')}
             </aside>
             <section className="min-w-0 rounded-xl border border-line bg-panel p-4 sm:p-6">
               {loading && <Throbber />}

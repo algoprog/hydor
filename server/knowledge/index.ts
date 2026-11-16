@@ -15,6 +15,7 @@ import { searchKnowledge, type SearchMode } from './search.ts';
 import { addSource, baseRow, baseRows, baseView, createBase, deleteBase, docById, docsOf, dropDoc, filesDir, removeSource, sourcesOf, toDoc, updateBase } from './store.ts';
 import { knowledgeInstructions, knowledgeTools } from './tools.ts';
 import { wikiBaseVisible, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
+import { wikiChatEnabled } from '../wiki/access.ts';
 
 function state(d: Deps): KnowledgeState {
   const bases = baseRows(d.db).filter((r) => wikiBaseVisible(d.db, r.id)).map((r) => baseView(d.db, r, progress.get(r.id)));
@@ -112,7 +113,7 @@ export const knowledge: Feature = {
   // searches only the session's own bases (a new session's space may not be saved yet when tools are listed).
   tools: (ctx) => (baseRows(ctx.deps.db).length ? knowledgeTools() : []),
   spawn: (s, d) => {
-    const t = knowledgeInstructions(d.db, spaceOfSession(d.db, s.extra));
+    const t = knowledgeInstructions(d.db, spaceOfSession(d.db, s.extra), wikiChatEnabled(d.db, s.extra));
     return t ? { instructions: [t] } : undefined;
   },
   event(e, d) {

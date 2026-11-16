@@ -30,7 +30,7 @@ export const wikiBrowse: Feature = {
         if (!on) return { status: 'off', on, inherited };
         if (!root) return { status: 'empty', on, inherited };
         const view = browseWiki(root);
-        return { status: view.articles.length || view.sources.length ? 'ready' : 'empty', on, inherited, root, ...view };
+        return { status: view.articles.length || view.sources.length || view.plans.length ? 'ready' : 'empty', on, inherited, root, ...view };
       } catch {
         return { status: 'error', on: wikiMemoryOn(d.db, p.id), inherited, error: 'The project wiki cannot be read safely.' };
       }
@@ -41,7 +41,7 @@ export const wikiBrowse: Feature = {
       try {
         const { root } = target(p.id);
         if (!root) throw new Error('No wiki');
-        if (!/^(?:wiki|raw)\//.test(relative) || !/\.md$/i.test(relative) || !wikiFileActive(root, path.resolve(root, relative))) throw new Error('Not an active article or source');
+        if (!/^(?:wiki|raw|output\/projects)\//.test(relative) || !/\.md$/i.test(relative) || !wikiFileActive(root, path.resolve(root, relative))) throw new Error('Not an active wiki document');
         return readWiki(root, relative);
       } catch { throw new HttpError(404, 'This wiki file is unavailable'); }
     });

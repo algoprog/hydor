@@ -54,14 +54,16 @@ export function validateLessons(value: unknown, items: { id: string }[]): Lesson
 }
 
 // A plain, bounded preview is suitable for explicit review and later use by the normal wiki write path.
-export function previewLessons(options: { session: string; target: string; items: TimelineItem[]; candidates: unknown; date?: string }): LessonPreview {
+export function previewLessons(options: { session: string; target: string; items: TimelineItem[]; candidates: unknown; date?: string; translate?: (text: string) => string }): LessonPreview {
   const context = lessonContext(options.items);
   const session = redact(options.session).replace(/[^\w:.-]/g, '_').slice(0, 120);
   const date = options.date ?? new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid lesson date');
   const lessons = validateLessons({ lessons: options.candidates }, context);
-  const blocks = lessons.map((l) => `## ${l.title}\n\n${l.lesson}\n\nEvidence: ${l.evidence}\n\nUncertainty: ${l.uncertainty || 'Not specified'}\n\nSession messages: ${l.sourceIds.join(', ')}\n`);
-  const content = `---\ntitle: "Lessons Learned"\ntype: notes\ntags: [lessons-learned]\n---\n\n# Lessons Learned\n\nSession: ${session}\nDate: ${date}\n\n${blocks.join('\n')}`;
+  // Translate only generated labels; candidate text, evidence identifiers and source material stay intact.
+  const t = options.translate ?? ((text: string) => text);
+  const blocks = lessons.map((l) => `## ${l.title}\n\n${l.lesson}\n\n${t('Evidence')}: ${l.evidence}\n\n${t('Uncertainty')}: ${l.uncertainty || t('Not specified')}\n\n${t('Session messages')}: ${l.sourceIds.join(', ')}\n`);
+  const content = `---\ntitle: ${JSON.stringify(t('Lessons Learned'))}\ntype: notes\ntags: [lessons-learned]\n---\n\n# ${t('Lessons Learned')}\n\n${t('Session')}: ${session}\n${t('Date')}: ${date}\n\n${blocks.join('\n')}`;
   const hash = crypto.createHash('sha256').update(content).digest('hex');
   return { session, target: options.target, path: `raw/notes/${date}-lessons-${hash.slice(0, 12)}.md`, content, sha256: hash, lessons };
 }
