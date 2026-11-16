@@ -93,6 +93,30 @@ export function setSpaceSwitch(db: DB, id: string, b: { name?: unknown; agent?: 
   return sw;
 }
 
+/** Atomically switch a snapshot of skills off without overwriting newer project switches. */
+export function switchSpaceSkillsOff(db: DB, id: string, b: { skills?: unknown; expected?: unknown }): Record<string, boolean> {
+  spaceData(id);
+  if (!Array.isArray(b.skills) || b.skills.length > 10000 || !b.expected || typeof b.expected !== 'object' || Array.isArray(b.expected)) throw new HttpError(400, 'Invalid skill snapshot');
+  const current = spaceSwitches(db, id);
+  const expected = b.expected as Record<string, unknown>;
+  if (Object.keys(current).length !== Object.keys(expected).length || Object.entries(current).some(([key, value]) => expected[key] !== value)) throw new HttpError(409, 'Project switches changed. Reload and try again.');
+  const next = { ...current };
+  const seen = new Map<string, boolean>();
+  for (const item of b.skills) {
+    if (!item || typeof item !== 'object') throw new HttpError(400, 'Invalid skill snapshot');
+    const { name, agent, usual } = item as { name?: unknown; agent?: unknown; usual?: unknown };
+    if (typeof name !== 'string' || (agent != null && agent !== 'claude' && agent !== 'codex') || typeof usual !== 'boolean' || !(agent ? AGENT_SKILL : SKILL_NAME).test(name)) throw new HttpError(400, 'Invalid skill snapshot');
+    const key = switchKey(name, agent ?? undefined);
+    if (seen.has(key) && seen.get(key) !== usual) throw new HttpError(409, 'Skills with the same name have different settings.');
+    seen.set(key, usual);
+    if (usual) next[key] = false;
+    else delete next[key];
+  }
+  if (Object.keys(next).length > MAX_SWITCHES) throw new HttpError(400, `A project switches at most ${MAX_SWITCHES} skills on or off.`);
+  writeSwitches(db, id, next);
+  return next;
+}
+
 /** Every skill of a space back to what Settings → Skills says. */
 export function clearSpaceSwitches(db: DB, id: string) {
   spaceData(id);

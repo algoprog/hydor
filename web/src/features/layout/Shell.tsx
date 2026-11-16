@@ -218,6 +218,17 @@ export function Shell() {
   const mobile = useIsMobile();
   // Only what the shell lays out: the drawer listens for itself (MobileDrawer).
   const sideOpen = useUI((s) => s.sideOpen);
+  const navigationWidth = useUI((s) => s.navigationWidth);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  // Keep the navigation bounded when the window changes size.
+  useEffect(() => {
+    const resize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+  const maxNavigation = Math.max(180, Math.min(560, windowWidth - 320));
+  const navWidth = Math.max(180, Math.min(maxNavigation, Number.isFinite(navigationWidth) ? navigationWidth : 280));
+  const setNavWidth = (width: number) => useUI.getState().set({ navigationWidth: Math.max(180, Math.min(maxNavigation, width)) });
   const panelOpen = useUI((s) => s.panelOpen);
   const panelHeight = useUI((s) => s.panelHeight);
   const [loc] = useLocation();
@@ -287,8 +298,16 @@ export function Shell() {
   return (
     <div data-shell className="flex h-dvh overflow-hidden bg-bg">
       {sideOpen && (
-        <div className="w-[280px] shrink-0">
+        <div className="relative shrink-0" style={{ width: navWidth }}>
           <Sidebar />
+          <div
+            role="separator" aria-label="Resize navigation" aria-orientation="vertical" aria-valuemin={180} aria-valuemax={maxNavigation} aria-valuenow={navWidth} tabIndex={0}
+            className="absolute top-0 right-0 z-20 h-full w-2 translate-x-1/2 cursor-col-resize touch-none hover:bg-accent/30 focus-visible:bg-accent/30 focus-visible:outline-none"
+            onPointerDown={(e) => { if (e.button === 0) { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); } }}
+            onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) setNavWidth(e.clientX); }}
+            onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+            onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setNavWidth(navWidth + (e.key === 'ArrowLeft' ? -10 : 10)); } }}
+          />
         </div>
       )}
       <main className="flex min-w-0 flex-1 flex-col">

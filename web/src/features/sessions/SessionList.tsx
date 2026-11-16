@@ -807,6 +807,12 @@ export function SessionList({ query }: { query: string }) {
   // Spaces and the folders you picked have groups of their own; how you fold them is kept for this machine.
   const byFolder = useUI((s) => s.groupByFolder);
   const folds = useUI((s) => s.groupFolds);
+  const sectionFolds = useUI((s) => s.sidebarSectionFolds);
+  // Top-level sections are independent of the project and folder folds inside them.
+  const foldSection = (section: 'active' | 'projects') => {
+    const current = useUI.getState().sidebarSectionFolds;
+    useUI.getState().set({ sidebarSectionFolds: { ...current, [section]: !current?.[section] } });
+  };
   const spaces = useSpaces();
   const defaultCwd = useApp((s) => s.boot?.defaultCwd);
   const autoFolders = useApp((s) => s.boot?.autoFolders);
@@ -977,6 +983,7 @@ export function SessionList({ query }: { query: string }) {
   const now = Date.now();
   const shut = new Set(groups.filter((g) => isPlace(g) && (!!dragPlace || isFolded(g, folds, now))).map((g) => g.id));
   const shownRows = groups.map((g) => {
+    if (g.kind === 'active' && sectionFolds?.active) return [];
     if (!isPlace(g)) return g.items;
     if (dragPlace) return [];
     const rows = shut.has(g.id) ? [] : shownWhole.has(g.id) ? g.items : g.items.slice(0, GROUP_ROWS);
@@ -1037,6 +1044,10 @@ export function SessionList({ query }: { query: string }) {
       <>
         {place ? (
           <PlaceHead g={g} folded={shutNow} home={home} onFold={() => fold(g)} handle={handle} />
+        ) : g.kind === 'active' ? (
+          <button type="button" aria-expanded={!sectionFolds?.active} onClick={() => foldSection('active')} className="sticky top-0 z-[1] flex w-full items-center gap-1 bg-sidebar px-2.5 pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2">
+            <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.active && 'rotate-90')} />{g.label}
+          </button>
         ) : (
           <div className="sticky top-0 z-[1] bg-sidebar px-2.5 pt-1.5 pb-1 text-[12px] font-medium text-fg-3">{g.label}</div>
         )}
@@ -1105,14 +1116,16 @@ export function SessionList({ query }: { query: string }) {
         {listed.map((part) =>
           part.kind === 'places' ? (
             <Fragment key={`places:${part.first}`}>
-              <div className={cx('px-[18px] pt-1.5 pb-1 text-[12px] font-medium text-fg-3', part.first > 0 && 'mt-2')}>Projects</div>
-              <SortableContext items={part.items.map((x) => PLACE + x.g.id)} strategy={verticalListSortingStrategy}>
+              <button type="button" aria-expanded={!sectionFolds?.projects} onClick={() => foldSection('projects')} className={cx('flex w-full items-center gap-1 px-[18px] pt-1.5 pb-1 text-left text-[12px] font-medium text-fg-3 hover:text-fg-2', part.first > 0 && 'mt-2')}>
+                <ChevronRight size={12} className={cx('shrink-0 transition-transform duration-200', !sectionFolds?.projects && 'rotate-90')} />Projects
+              </button>
+              {!sectionFolds?.projects && <SortableContext items={part.items.map((x) => PLACE + x.g.id)} strategy={verticalListSortingStrategy}>
                 {part.items.map((x) => (
                   <SortablePlace key={x.g.id} id={x.g.id} className={x.frame}>
                     {(handle) => x.body(handle)}
                   </SortablePlace>
                 ))}
-              </SortableContext>
+              </SortableContext>}
             </Fragment>
           ) : (
             <Fragment key={part.item.g.id}>
