@@ -35,6 +35,8 @@ export interface ModelDoc<M> {
   key: string;
   title: string;
   model: M;
+  /** Its version, when it is the latest (an editor that saves each change at once saves over it: a board). */
+  version?: number;
 }
 
 export interface ModelEditorProps<M> {

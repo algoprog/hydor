@@ -1,6 +1,6 @@
 // `hydor library`: the Library page. What agents made and you kept: pages, documents, slides, spreadsheets, diagrams, LaTeX
-// documents, notebooks (the pages of the API's /api/pages) and pictures, videos and sounds (/api/media). List and search them,
-// show one (a document as its text; the rest as what it is), export one to a file in the format its menu offers, open it
+// documents, notebooks, boards of answer cards (the pages of the API's /api/pages) and pictures, videos and sounds (/api/media). List and search them,
+// show one (a document as its text, a board as its cards; the rest as what it is), export one to a file in the format its menu offers, open it
 // (the editors are visual, so that prints the address), and remove it.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,8 +13,8 @@ const ITEM_HINT = 'hydor library lists them';
 const item = { name: 'item', kind: 'page', pick: true } as const;
 
 /** What a thing of the Library is: the kinds of pages, and the media. */
-export type LibKind = 'page' | 'doc' | 'slides' | 'sheet' | 'diagram' | 'tex' | 'notebook' | 'image' | 'video' | 'audio';
-const KINDS: LibKind[] = ['page', 'doc', 'slides', 'sheet', 'diagram', 'tex', 'notebook', 'image', 'video', 'audio'];
+export type LibKind = 'page' | 'doc' | 'slides' | 'sheet' | 'diagram' | 'tex' | 'notebook' | 'board' | 'image' | 'video' | 'audio';
+const KINDS: LibKind[] = ['page', 'doc', 'slides', 'sheet', 'diagram', 'tex', 'notebook', 'board', 'image', 'video', 'audio'];
 const KIND_WORDS: Record<string, LibKind> = {
   html: 'page',
   pages: 'page',
@@ -29,6 +29,8 @@ const KIND_WORDS: Record<string, LibKind> = {
   latex: 'tex',
   notebooks: 'notebook',
   diagrams: 'diagram',
+  boards: 'board',
+  dashboard: 'board',
   picture: 'image',
   photo: 'image',
   images: 'image',
@@ -73,6 +75,7 @@ const EXPORTS: Record<LibKind, { formats: string[]; default: string }> = {
   diagram: { formats: ['svg', 'png', 'jpg', 'drawio', 'pdf'], default: 'svg' },
   tex: { formats: ['pdf', 'tex', 'zip'], default: 'pdf' },
   notebook: { formats: ['ipynb', 'py', 'html', 'pdf'], default: 'ipynb' },
+  board: { formats: ['md', 'pdf', 'html'], default: 'md' },
   image: { formats: [], default: 'original' },
   video: { formats: [], default: 'original' },
   audio: { formats: [], default: 'original' },
@@ -99,7 +102,7 @@ async function loadLibrary(ctx: Ctx): Promise<Library> {
       .filter((p) => !p.app)
       .map((p): Thing => ({
         id: p.id,
-        kind: (p.kind === 'doc' || p.kind === 'slides' || p.kind === 'sheet' || p.kind === 'diagram' || p.kind === 'tex' || p.kind === 'notebook' ? p.kind : 'page') as LibKind,
+        kind: (p.kind === 'doc' || p.kind === 'slides' || p.kind === 'sheet' || p.kind === 'diagram' || p.kind === 'tex' || p.kind === 'notebook' || p.kind === 'board' ? p.kind : 'page') as LibKind,
         title: p.title,
         description: p.description ?? '',
         bytes: p.bytes,
@@ -162,7 +165,7 @@ export const library: Area = {
   name: 'library',
   aliases: ['lib'],
   summary: 'Pages, documents, slides, pictures…',
-  help: 'What agents made for you and what you kept, by kind: pages, documents (doc), slides, spreadsheets (sheet), diagrams, LaTeX documents (latex), notebooks, pictures (image), videos and sounds (audio). Name one by its id or its title (or the start of either); on a terminal, leave it out to pick from a list. The editors are visual: open prints the address of an item’s page.',
+  help: 'What agents made for you and what you kept, by kind: pages, documents (doc), slides, spreadsheets (sheet), diagrams, LaTeX documents (latex), notebooks, boards of answer cards (board), pictures (image), videos and sounds (audio). Name one by its id or its title (or the start of either); on a terminal, leave it out to pick from a list. The editors are visual: open prints the address of an item’s page.',
   group: 'work',
   verbs: [
     {
@@ -173,7 +176,7 @@ export const library: Area = {
           type: 'string',
           value: '<kind>',
           desc: 'Only this kind (page, doc, slides, sheet, image…)',
-          values: ['page', 'doc', 'slides', 'sheet', 'diagram', 'latex', 'notebook', 'image', 'video', 'audio'],
+          values: ['page', 'doc', 'slides', 'sheet', 'diagram', 'latex', 'notebook', 'board', 'image', 'video', 'audio'],
         },
         project: { type: 'string', value: '<project>', desc: 'Only what is in this project', kind: 'project' },
       },
@@ -203,7 +206,7 @@ export const library: Area = {
       name: 'search',
       aliases: ['find'],
       args: [{ name: 'words', kind: 'text', rest: true }],
-      options: { kind: { type: 'string', value: '<kind>', desc: 'Only this kind', values: ['page', 'doc', 'slides', 'sheet', 'diagram', 'latex', 'notebook', 'image', 'video', 'audio'] } },
+      options: { kind: { type: 'string', value: '<kind>', desc: 'Only this kind', values: ['page', 'doc', 'slides', 'sheet', 'diagram', 'latex', 'notebook', 'board', 'image', 'video', 'audio'] } },
       summary: 'Find things by their titles and descriptions',
       help: 'Every word must be in a title or a description; with search by meaning on (Settings → Memory), what is alike in meaning follows.',
       examples: ['hydor library search budget', 'hydor library search quarterly report --kind sheet'],
@@ -232,8 +235,8 @@ export const library: Area = {
     {
       name: 'show',
       args: [item],
-      summary: 'A document’s text, or what an item is',
-      help: 'A document prints as its text (Markdown; piped, as it is). Everything else says what it is: its kind, size, place, when it changed, and its address. --json gives the item as the API has it.',
+      summary: 'A document’s text or a board’s cards',
+      help: 'A document prints as its text (Markdown; piped, as it is); a board lists its cards (their titles, kinds and sizes). Everything else says what it is: its kind, size, place, when it changed, and its address. --json gives the item as the API has it.',
       examples: ['hydor library show "Q3 report"', 'hydor library show 3f9a1c2b7d | less'],
       async run(ctx, [given]) {
         const { thing: t, lib } = await find(ctx, given);
@@ -257,6 +260,17 @@ export const library: Area = {
           ['Locked', i.locked ? 'yes' : undefined],
           ['Page', `${ctx.conn.base}${t.at}`],
         ]);
+        if (t.kind === 'board') {
+          const r = await ctx.conn.api<{ model?: { cards?: { id: string; ui: string; title?: string; size?: string; pinnedAt?: number; data?: { title?: unknown } }[] } }>('GET', `/api/pages/${enc(t.id)}`);
+          const cards = r.model?.cards ?? [];
+          const SIZE: Record<string, string> = { s: 'S', m: 'M', l: 'L', wide: 'Wide' };
+          const list = table(
+            ctx,
+            cards.map((c, n) => [p.dim(String(n + 1)), p.bold(c.title || (typeof c.data?.title === 'string' ? c.data.title : '') || c.ui), p.dim(c.ui), p.dim(SIZE[c.size ?? ''] ?? c.size ?? ''), p.dim(c.pinnedAt ? timeAgo(c.pinnedAt) : '')]),
+            { head: ['#', 'CARD', 'KIND', 'SIZE', 'PINNED'], grow: 1, fixed: [0], drop: [4, 3] },
+          );
+          return ctx.out([p.bold(t.title), ...head, '', ...(cards.length ? list : [p.dim('No cards yet: pin any answer card from a reply (its … menu → Pin to a board).')]), '', p.dim(`The cards draw in the app: hydor library open ${t.id}. hydor library export ${t.id} --to md|pdf|html makes a file of their data.`)]);
+        }
         if (t.kind !== 'doc') {
           const f = EXPORTS[t.kind];
           return ctx.out([
@@ -282,7 +296,7 @@ export const library: Area = {
         output: { type: 'string', short: 'o', value: '<file>', desc: 'Where to write it (default: its title, here)', kind: 'file' },
       },
       summary: 'Save an item as a file',
-      help: 'The formats are those of the editor’s Export menu: documents docx, pdf, odt, md, epub, txt, html; slides pptx, pdf, png (a zip of the slides), md; spreadsheets xlsx, csv, pdf; diagrams svg, png, jpg, drawio, pdf; LaTeX pdf, tex, zip; notebooks ipynb, py, html, pdf; pages pdf, html, md, txt. A picture, video or sound is saved as it is. Without --to, the kind’s usual one (docx, pptx, xlsx, ipynb, svg, pdf).',
+      help: 'The formats are those of the editor’s Export menu: documents docx, pdf, odt, md, epub, txt, html; slides pptx, pdf, png (a zip of the slides), md; spreadsheets xlsx, csv, pdf; diagrams svg, png, jpg, drawio, pdf; LaTeX pdf, tex, zip; notebooks ipynb, py, html, pdf; boards md, pdf, html (their cards’ data as text and tables); pages pdf, html, md, txt. A picture, video or sound is saved as it is. Without --to, the kind’s usual one (docx, pptx, xlsx, ipynb, svg, md, pdf).',
       examples: ['hydor library export "Q3 report" --to pdf -o q3.pdf', 'hydor library export deck1 --to pptx', 'hydor library export 7ac3 -o photo.png'],
       async run(ctx, [given], v) {
         const { thing: t } = await find(ctx, given);

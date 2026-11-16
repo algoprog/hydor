@@ -173,7 +173,7 @@ export const BLOCKS: Block[] = [
 const DB_WORDS: Record<string, string> = {
   untitled: 'Untitled database',
   table: 'Table',
-  // (not "Board": the dictionaries have that word as a leaderboard)
+  // (not "Board": that word is the Library's boards of answer cards)
   board: 'Board view',
   sort: 'Sort',
   filter: 'Filter',

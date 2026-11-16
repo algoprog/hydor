@@ -35,6 +35,7 @@ import {
   Globe,
   ImageIcon,
   Layers,
+  LayoutDashboard,
   LibraryBig,
   MessageSquarePlus,
   NotebookText,
@@ -88,9 +89,9 @@ import { DropHint } from './UploadTray';
 
 // ---- what the Library holds ----------------------------------------------------------------------------
 
-type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'image' | 'video' | 'audio';
+type ItemKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio';
 /** What a place shows: everything, one kind, or pictures and videos together. */
-type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'image' | 'video' | 'audio' | 'media';
+type Show = 'all' | 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'image' | 'video' | 'audio' | 'media';
 
 interface Item {
   key: string;
@@ -114,6 +115,7 @@ const KIND: Record<ItemKind, { label: string; icon: ReactNode }> = {
   tex: { label: 'LaTeX', icon: <Sigma size={12} /> },
   notebook: { label: 'Notebook', icon: <NotebookText size={12} /> },
   diagram: { label: 'Diagram', icon: <Workflow size={12} /> },
+  board: { label: 'Board', icon: <LayoutDashboard size={12} /> },
   image: { label: 'Picture', icon: <ImageIcon size={12} /> },
   video: { label: 'Video', icon: <Play size={12} /> },
   audio: { label: 'Audio', icon: <AudioLines size={12} /> },
@@ -128,6 +130,7 @@ const SHOWS: { value: Show; label: string; has: (k: ItemKind) => boolean }[] = [
   { value: 'tex', label: 'LaTeX', has: (k) => k === 'tex' },
   { value: 'notebook', label: 'Notebooks', has: (k) => k === 'notebook' },
   { value: 'diagram', label: 'Diagrams', has: (k) => k === 'diagram' },
+  { value: 'board', label: 'Boards', has: (k) => k === 'board' },
   { value: 'image', label: 'Pictures', has: (k) => k === 'image' },
   { value: 'video', label: 'Videos', has: (k) => k === 'video' },
   { value: 'audio', label: 'Audio', has: (k) => k === 'audio' },
@@ -671,7 +674,7 @@ export function Library() {
     if (!newAsked) return;
     if (newAsked === 'folder') setFolderAsk(true);
     else if (newAsked === 'import') setImporting(true);
-    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' || newAsked === 'diagram' || newAsked === 'picture' ? newAsked : 'page');
+    else setMaking(newAsked === 'design' || newAsked === 'slides' || newAsked === 'doc' || newAsked === 'sheet' || newAsked === 'tex' || newAsked === 'notebook' || newAsked === 'diagram' || newAsked === 'board' || newAsked === 'picture' ? newAsked : 'page');
     go('/library', true);
   }, [newAsked]);
   // A space that is gone: everything again.
@@ -772,6 +775,7 @@ export function Library() {
     ['tex', 'LaTeX document', <Sigma size={14} />],
     ['notebook', 'Notebook', <NotebookText size={14} />],
     ['diagram', 'Diagram', <Workflow size={14} />],
+    ['board', 'Board', <LayoutDashboard size={14} />],
     ['picture', 'Picture', <ImageIcon size={14} />],
   ];
   const newButton = (

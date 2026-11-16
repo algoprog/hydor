@@ -16,7 +16,7 @@
 // fetch something new from the web.
 //
 //   GET  /p-api/:token                      what it opens: a project's documents, sessions, runs and reading list, or the one thing (?visit=1 counts a visit)
-//   GET  /p-api/:token/items/:id            a document: its own page to read (or its model, or a page's HTML, to edit) and its comments
+//   GET  /p-api/:token/items/:id            a document: its own page to read (or its model, or a page's HTML, to edit) and its comments; a board's model, to draw its cards
 //   POST /p-api/:token/items/:id/storage    a page's stored data, to read (get, keys)
 //   POST /p-api/:token/items/:id/comments   { text, quote? | slide | sheet?, cell } a comment; { id, reply }; { id, resolved }; one's own: { id, text }, { id, delete: true }
 //   POST /p-api/:token/items/:id/versions   Edit: { model | html, base, force? } a new version
@@ -24,6 +24,7 @@
 //   GET/POST /p-api/:token/pages/:id/comments   a page's comments, as its editor reads and changes them ({ ops })
 //   GET  /p-api/:token/pages/:id/thumb, GET /p-api/:token/pages/assets/:sha, POST /p-api/:token/pages/assets, GET /p-api/:token/pages/videos/:sha, GET /p-api/:token/pages/:id/export,
 //   GET  /p-api/:token/pages/tex/setup, POST …/tex/compile, GET …/tex/:key/(pdf|sync|place|:page)   the editors' own calls
+//   GET  /p-api/:token/pages/picture?url=   a picture a shared board's card shows, from the web (only an address the board holds)
 import fs from 'node:fs';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { newCommentId, type Comment } from '../../shared/comments.ts';
@@ -47,7 +48,8 @@ import { Limiter, waitText } from '../apps/limits.ts';
 import { dropRefs, getAsset, putAsset } from '../pages/assets.ts';
 import { EXPORT_TYPES, exportPage, type ExportFormat } from '../pages/export.ts';
 import { compileTex, forEditor, texPagePicture, texPdfFile, texPlaceOf, texSetup, texSourceAt } from '../pages/latex.ts';
-import { addVersion, changeComments, listPages, pageComments, pageHtml, pageInfo, pageModel, storageOp } from '../pages/store.ts';
+import { addVersion, changeComments, listPages, pageComments, pageHtml, pageInfo, pageModel, pageSource, storageOp } from '../pages/store.ts';
+import { serveWebPicture } from '../pages/index.ts';
 import { getVideo, sendVideo } from '../pages/videos.ts';
 import { codeOf, sameCode, webAddressesOf } from '../pages/html-code.ts';
 import { isDesignHtml, withDesignKit } from '../../shared/design.ts';
@@ -126,6 +128,14 @@ function itemOf(db: DB, p: Person, id: unknown): PageInfo {
   const ours = !!page && !page.app && (p.scope.kind === 'project' ? page.space === p.scope.space.id : p.scope.kind === 'page' && page.id === p.scope.page.id);
   if (!ours) throw new HttpError(404, p.scope.kind === 'project' ? 'This project has no such document' : 'This link does not open that');
   return page!;
+}
+
+/** Whether a board the link opens (the one shared, or one of its project's) holds this address: a picture one of its cards shows. */
+function boardHolds(db: DB, p: Person, url: string): boolean {
+  if (!/^https?:\/\//i.test(url) || url.length > 4096) return false;
+  const boards = p.scope.kind === 'page' ? [p.scope.page] : p.scope.kind === 'project' ? listPages(db).filter((x) => x.space === (p.scope as { space: Space }).space.id) : [];
+  const as = JSON.stringify(url).slice(1, -1);
+  return boards.some((b) => b.kind === 'board' && !b.app && (pageSource(db, b.id)?.text.includes(as) ?? false));
 }
 
 /** Where pictures and videos a page shows are noted (page_asset_refs) for what the link opens: its project's pages, or the one shared. */
@@ -609,7 +619,17 @@ export function portalRoutes(d: Deps) {
       const owner = ownerName(db);
       return { page: itemView(page), editable: true, model: mapLists(page.kind, model, (l) => forPerson(l, owner)), ...(comments ? { comments } : {}), ...places };
     }
-    return { page: itemView(page), editable: false, html, ...(comments ? { comments } : {}), ...places };
+    // A board's cards draw in the person's browser by the replies' own views, from its model (read only).
+    return { page: itemView(page), editable: false, html, ...(page.kind === 'board' ? { model } : {}), ...(comments ? { comments } : {}), ...places };
+  });
+
+  // A picture a shared board's card shows, from the web through this server: only an address a board the link opens
+  // holds, so the link is no way to fetch anything else.
+  app.get('/p-api/:token/pages/picture', async (req, reply) => {
+    const p = person(req);
+    const url = String((req.query as { url?: string }).url ?? '');
+    if (!boardHolds(db, p, url)) return reply.code(404).send({ error: 'Not a picture of what this link opens' });
+    return serveWebPicture(url, reply);
   });
 
   app.get('/p-api/:token/pages/:id/thumb', async (req, reply) => {

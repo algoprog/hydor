@@ -168,7 +168,8 @@ export interface PortalItemView {
   /** It opens in its editor (Edit, a kind people may change): `model` is what to edit, or for a page of HTML its `html`. */
   editable: boolean;
   model?: unknown;
-  /** Otherwise its own page, to read (shown in the sandboxed frame); a page of HTML's own, to edit too. */
+  /** Otherwise its own page, to read (shown in the sandboxed frame); a page of HTML's own, to edit too. A board's cards
+   * draw from its `model` instead, read only, by the replies' own views. */
   html?: string;
   /** Its comments (every kind but a notebook), the owner's under their name. */
   comments?: PortalComment[];

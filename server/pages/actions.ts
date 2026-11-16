@@ -1157,12 +1157,14 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
   tex: { move_files: moveFiles, tidy_source: tidySource, tidy_bibliography: tidyBibliography },
   notebook: { clear_outputs: clearOutputs },
   diagram: { layout: layoutDiagram, restyle: restyleDiagram },
+  // A board's cards change with save_board; Duplicate and Turn it into are every kind's.
+  board: {},
 };
 
 /** Every action's name: those of each kind, and those of any kind. */
 export const PAGE_ACTIONS = [...Object.values(ACTIONS).flatMap((m) => Object.keys(m)), ...Object.keys(HTML_ACTIONS), 'turn_into', 'duplicate'];
 
-const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram', page: 'page' };
+const NOUN: Record<PageKind | 'page', string> = { slides: 'slide deck', doc: 'document', sheet: 'spreadsheet', tex: 'LaTeX document', notebook: 'notebook', diagram: 'diagram', board: 'board', page: 'page' };
 
 /** The actions there are for a kind of page, for the agent beside one (index.ts askInstructions) and for errors. */
 export const actionsFor = (kind: PageKind | 'page') => [...(kind === 'page' ? Object.keys(HTML_ACTIONS) : Object.keys(ACTIONS[kind])), 'turn_into', 'duplicate'];

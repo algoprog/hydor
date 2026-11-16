@@ -1910,7 +1910,7 @@ export function writing(E: Core): Writing {
       .slice(0, 8)
       .map((x) => x.p);
   };
-  const KIND_ICON: Record<string, string> = { page: 'page', doc: 'doc', slides: 'slides', sheet: 'table', tex: 'math', notebook: 'code', diagram: 'diagram' };
+  const KIND_ICON: Record<string, string> = { page: 'page', doc: 'doc', slides: 'slides', sheet: 'table', tex: 'math', notebook: 'code', diagram: 'diagram', board: 'card' };
   const mentionQuery = (): string | null => {
     if (!mention) return null;
     const r = caretIn(mention.h);

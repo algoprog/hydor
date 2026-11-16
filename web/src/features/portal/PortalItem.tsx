@@ -1,6 +1,6 @@
 // A document, as the person at a link opens it: one of a shared project's, or the one thing shared with them alone (a
-// document, slides, a spreadsheet, a LaTeX document, a notebook, a page or a design). To read: its own page, made by
-// the server, in the sandboxed frame every page shows in (a page's stored data read as it is; what it changes stays in
+// document, slides, a spreadsheet, a LaTeX document, a notebook, a board, a page or a design). To read: its own page, made by
+// the server, in the sandboxed frame every page shows in (a board: its cards, drawn here by the replies' own views) (a page's stored data read as it is; what it changes stays in
 // this browser), with its comments beside it on a wide screen (over it on a phone), every kind's but a notebook's:
 // theirs under their name, the owner's under the owner's, a new one on words they copy from it (or the whole of it), on
 // a slide, or on a spreadsheet's cell. With Edit, documents, spreadsheets, slides, pages and designs (and LaTeX where
@@ -9,6 +9,7 @@
 // its top has who they are instead.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, Download, MessageSquare, MessageSquarePlus } from 'lucide-react';
+import type { Board as BoardModel } from '@shared/boards';
 import type { Comment } from '@shared/comments';
 import { kindKey, PORTAL_COMMENTS, type PortalComment, type PortalItemView, type PortalView } from '@shared/share';
 import { Logo } from '../../components/Logo';
@@ -24,8 +25,10 @@ import { memoryStore, PageFrame, type Store } from '../pages/frame';
 import { LinkError, papi } from './api';
 import { kindOf, Me } from './PortalPage';
 
-// A page of HTML (or a design) is edited in the Studio, loaded only when one is.
+// A page of HTML (or a design) is edited in the Studio, loaded only when one is; a board's cards draw in its grid, loaded
+// only when one opens.
 const Studio = lazy(() => import('../pages/studio/Studio').then((m) => ({ default: m.Studio })));
+const BoardGrid = lazy(() => import('../pages/board/BoardEditor').then((m) => ({ default: m.BoardGrid })));
 
 /** A shared page's stored data: read from the server as it is; what the page changes is kept here only, while it is open. */
 function portalStore(id: string): Store {
@@ -157,6 +160,7 @@ const subOf = (it: PortalItemView, v: PortalView) => `${tr(kindOf(it.page).label
 /** To read: its own page, with its comments beside it (or over it on a phone). */
 function ReadView({ v, it, onBack, onChanged }: { v: PortalView; it: PortalItemView; onBack?: () => void; onChanged: () => void }) {
   const store = useMemo(() => portalStore(it.page.id), [it.page.id]);
+  const phone = useIsMobile();
   const commented = PORTAL_COMMENTS.includes(kindKey(it.page.kind));
   const wide = useMediaQuery('(min-width: 1024px)');
   const [comments, setComments] = useState<PortalComment[]>(it.comments ?? []);
@@ -187,7 +191,17 @@ function ReadView({ v, it, onBack, onChanged }: { v: PortalView; it: PortalItemV
       </Bar>
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1">
-          <PageFrame key={`${it.page.id}:${it.page.version}`} html={it.html ?? ''} store={store} title={it.page.title} fill className="absolute inset-0 h-full w-full" />
+          {it.page.kind === 'board' && it.model ? (
+            <div className="absolute inset-0 overflow-y-auto overscroll-contain" data-i18n="board">
+              <div className="mx-auto w-full max-w-[1600px] px-3 pt-4 pb-[max(24px,var(--safe-bottom))] sm:px-6 sm:pt-5">
+                <Suspense fallback={<Throbber size={24} />}>
+                  <BoardGrid board={it.model as BoardModel} pageId={it.page.id} phone={phone} />
+                </Suspense>
+              </div>
+            </div>
+          ) : (
+            <PageFrame key={`${it.page.id}:${it.page.version}`} html={it.html ?? ''} store={store} title={it.page.title} fill className="absolute inset-0 h-full w-full" />
+          )}
         </div>
         {commented && wide && open && <aside className="w-[340px] shrink-0 overflow-y-auto border-l border-line bg-panel">{panel}</aside>}
       </div>

@@ -42,6 +42,7 @@ import {
   Wallet,
   Image as ImageIcon,
   Workflow,
+  LayoutDashboard,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -75,7 +76,7 @@ import { AutoWidth, BlankArt, OpenTile, PictureArt, StarterArt, Tile } from './n
 import { fitNewSize, NEW_PRESETS, newPictureName, blankSrc, presetOf, type NewBackground } from '../mediaedit/picture/newpicture';
 import { openEditor, pageName } from '../mediaedit/host';
 
-export type NewKind = 'page' | 'design' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'picture';
+export type NewKind = 'page' | 'design' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board' | 'picture';
 
 const KINDS: { value: NewKind; label: string; icon: LucideIcon; colour: string }[] = [
   { value: 'page', label: 'Page', icon: AppWindow, colour: 'var(--accent)' },
@@ -86,6 +87,7 @@ const KINDS: { value: NewKind; label: string; icon: LucideIcon; colour: string }
   { value: 'tex', label: 'LaTeX', icon: Sigma, colour: 'var(--viz-7)' },
   { value: 'notebook', label: 'Notebook', icon: NotebookText, colour: 'var(--viz-4)' },
   { value: 'diagram', label: 'Diagram', icon: Workflow, colour: 'var(--viz-8)' },
+  { value: 'board', label: 'Board', icon: LayoutDashboard, colour: 'var(--viz-3)' },
   { value: 'picture', label: 'Picture', icon: ImageIcon, colour: 'var(--viz-6)' },
 ];
 const kindOf = (k: NewKind) => KINDS.find((x) => x.value === k)!;
@@ -99,6 +101,7 @@ const HEAD: Record<NewKind, string> = {
   tex: 'A new LaTeX document',
   notebook: 'A new notebook',
   diagram: 'A new diagram',
+  board: 'A new board',
   picture: 'A new picture',
 };
 const ABOUT: Record<NewKind, string> = {
@@ -110,11 +113,12 @@ const ABOUT: Record<NewKind, string> = {
   tex: 'LaTeX source beside its typeset pages, as in Overleaf, to save as a PDF or the .tex project.',
   notebook: 'A Jupyter notebook: text and code cells you run here, with their outputs, to save as an .ipynb file, a Python script or a PDF.',
   diagram: 'A diagram to draw and edit as in draw.io, and save as a picture, a PDF or a draw.io file.',
+  board: 'Answer cards you pin from replies (charts, numbers, the weather, lists), kept together in a grid you size and arrange.',
   picture: 'A blank picture to paint and edit as in Photoshop, in a size you pick, saved in your Library as a PNG, JPEG or WebP.',
 };
-const NEW_TITLE: Record<NewKind, string> = { page: '', design: 'Design', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook', diagram: 'Diagram', picture: 'Picture' };
+const NEW_TITLE: Record<NewKind, string> = { page: '', design: 'Design', slides: 'Slides', doc: 'Document', sheet: 'Spreadsheet', tex: 'LaTeX document', notebook: 'Notebook', diagram: 'Diagram', board: 'Board', picture: 'Picture' };
 /** What an agent is asked for a LaTeX document or a notebook, which the gallery has no kinds of: these words, then the person's. */
-const ASK_FOR: Partial<Record<NewKind, string>> = { tex: 'Write me a LaTeX document and keep it in my Library: ', notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ', picture: 'Make me a picture and keep it in my Library: ' };
+const ASK_FOR: Partial<Record<NewKind, string>> = { tex: 'Write me a LaTeX document and keep it in my Library: ', notebook: 'Make me a Jupyter notebook, run it, and keep it in my Library: ', board: 'Make me a board of answer cards and keep it in my Library: ', picture: 'Make me a picture and keep it in my Library: ' };
 const EXAMPLE: Record<NewKind, string> = {
   page: 'A packing list for a week of hiking',
   design: 'A poster for our summer street party',
@@ -124,6 +128,7 @@ const EXAMPLE: Record<NewKind, string> = {
   tex: 'A two-page paper on my results, with equations',
   notebook: 'A notebook that charts my monthly spending from a CSV',
   diagram: 'A flowchart of how we handle a refund',
+  board: 'My GPU usage, my experiments and the weather in Amherst',
   picture: 'A watercolour of a lighthouse at dusk',
 };
 /** The gallery's kinds for each (shared/content-types.ts): its chips pick one, as More kinds does from all of them. */
@@ -176,7 +181,7 @@ const OPENS: Partial<Record<NewKind, { accept: string; label: string }>> = {
   notebook: { accept: '.ipynb', label: 'Open a notebook (.ipynb)' },
   diagram: { accept: '.drawio,.dio,.xml,.mmd,.mermaid,.svg,.png', label: 'Open a draw.io or Mermaid file' },
 };
-const BLANK: Record<'doc' | 'sheet' | 'notebook' | 'diagram', string> = { doc: 'Blank document', sheet: 'Blank spreadsheet', notebook: 'Blank notebook', diagram: 'Blank diagram' };
+const BLANK: Record<'doc' | 'sheet' | 'notebook' | 'diagram' | 'board', string> = { doc: 'Blank document', sheet: 'Blank spreadsheet', notebook: 'Blank notebook', diagram: 'Blank diagram', board: 'Empty board' };
 
 /** A file's bytes as base64, for the import. */
 const base64Of = (f: File) =>
@@ -579,6 +584,14 @@ export function NewPageDialog({ open, onClose, kind: startKind = 'page', space, 
         </div>
       );
     }
+    // A board: empty, to pin cards to from replies.
+    if (kind === 'board')
+      return (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-4" role="radiogroup" aria-label="Start from">
+          <Tile on onClick={() => undefined} onOpen={makeNow} ratio="16 / 10" art={<BlankArt kind="board" />} label={BLANK.board} />
+          <p className="self-center text-[12.5px] leading-relaxed text-fg-3">Pin any answer card from a reply to it: the card’s … menu → Pin to a board.</p>
+        </div>
+      );
     // A document, a spreadsheet, a notebook or a diagram: blank, or from a file of yours.
     const k = kind as 'doc' | 'sheet' | 'notebook' | 'diagram';
     return (

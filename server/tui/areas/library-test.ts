@@ -120,7 +120,7 @@ test('list filters by kind (with other words for it) and by project, and cuts to
   assert.match((await run(conn, ['library', '--kind', 'video'])).out, /Nothing of that kind/);
   await assert.rejects(
     run(conn, ['library', '--kind', 'poem']),
-    (e) => e instanceof UsageError && /--kind takes one of page, doc, slides, sheet, diagram, latex, notebook, image, video, audio/.test((e as Error).message),
+    (e) => e instanceof UsageError && /--kind takes one of page, doc, slides, sheet, diagram, latex, notebook, board, image, video, audio/.test((e as Error).message),
   );
   assert.match((await run(conn, ['library', '-n', '2'])).out, /… 3 more/);
   assert.equal(kindOf('LaTeX'), 'tex');
@@ -165,6 +165,37 @@ test('show prints a document’s text and says what anything else is', async () 
   assert.match(pic.out, /Page\s+http:\/\/fake\/media\/img6666666/);
   assert.equal((await run(conn, ['library', 'show', 'notes', '--json'])).json[0] && ((await run(conn, ['library', 'show', 'notes', '--json'])).json[0] as any).kind, 'page');
   await assert.rejects(run(conn, ['library', 'show', 'zzz']), (e) => e instanceof UsageError && /No item “zzz”/.test((e as Error).message));
+});
+
+test('a board shows its cards; it exports as its cards’ data', async () => {
+  const board = { id: 'b0d7777777', title: 'Shop', version: 4, versions: 4, bytes: 3000, storageBytes: 0, createdAt: now, updatedAt: now - 60_000, kind: 'board', description: 'This week’s numbers' };
+  const r = { ...routes, 'GET /api/pages': { pages: [board, ...pages], folders } };
+  const { conn } = fakeConn({
+    ...r,
+    'GET /api/pages/b0d7777777': {
+      page: board,
+      model: {
+        format: 1,
+        cards: [
+          { id: 'c1', ui: 'chart', title: 'Weekly sales', size: 'l', pinnedAt: now - 7200_000, data: { kind: 'bar', series: [] } },
+          { id: 'c2', ui: 'stats', size: 's', pinnedAt: now - 3600_000, data: { title: 'This week', stats: [] } },
+        ],
+      },
+    },
+  });
+  assert.match((await run(conn, ['library', '--kind', 'boards'])).out, /Shop/);
+  const shown = (await run(conn, ['library', 'show', 'shop'])).out;
+  assert.match(shown, /Kind\s+board/);
+  assert.match(shown, /Weekly sales\s+chart\s+L/);
+  assert.match(shown, /This week\s+stats\s+S/);
+  assert.match(shown, /--to md\|pdf\|html/);
+  const empty = fakeConn({ ...r, 'GET /api/pages/b0d7777777': { page: board, model: { format: 1, cards: [] } } });
+  assert.match((await run(empty.conn, ['library', 'show', 'shop'])).out, /No cards yet: pin any answer card from a reply/);
+  const f = withFiles(r, { '/api/pages/b0d7777777/export?format=md': { data: Buffer.from('# Shop\n') } });
+  const out = path.join(DATA, 'board.md');
+  await run(f.conn, ['library', 'export', 'shop', '-o', out]);
+  assert.equal(fs.readFileSync(out, 'utf8'), '# Shop\n', 'a board is Markdown unless told');
+  await assert.rejects(run(f.conn, ['library', 'export', 'shop', '--to', 'docx']), (e) => e instanceof UsageError && /exports as md, pdf, html/.test((e as Error).message));
 });
 
 test('export fetches the format’s route and writes the bytes where asked', async () => {

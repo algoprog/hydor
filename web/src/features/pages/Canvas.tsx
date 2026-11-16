@@ -42,7 +42,7 @@ export function pageCall(t: ToolInfo | undefined): PageCall | null {
   const bare = nagetTool(t.name);
   if (bare === 'show_html' || bare === 'save_page') return bare;
   // A deck, a document or a spreadsheet is a saved page too, opened by its id.
-  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex' || bare === 'save_diagram') return 'save_page';
+  if (bare === 'save_slides' || bare === 'save_doc' || bare === 'save_sheet' || bare === 'save_latex' || bare === 'save_diagram' || bare === 'save_board') return 'save_page';
   // A change page_action saved: the page it changed, as a save of it.
   if (bare === 'page_action' && savedRef(t.output)) return 'save_page';
   const p = (t.input as { file_path?: unknown } | undefined)?.file_path;
@@ -213,7 +213,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
         ...(page.info.kind && page.model !== undefined
           ? {
               kind: page.info.kind,
-              model: { key: `page:${id}:${page.info.version}`, title: page.info.title, model: page.model },
+              model: { key: `page:${id}:${page.info.version}`, title: page.info.title, model: page.model, version: page.info.version },
               saveModel: async (model: unknown, force?: boolean) => {
                 await post(`/api/pages/${enc(id)}/versions`, { model, base: page.info.version, sessionKey: key, force: !!force });
                 toast('Saved. The agent sees your changes with your next message.', 'ok');
@@ -222,7 +222,7 @@ function useLoaded(key: string, target: CanvasTarget, item: ToolItem | undefined
               },
             }
           : {}),
-        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : page.info.kind === 'notebook' ? 'A notebook in the Library' : page.info.kind === 'diagram' ? 'A diagram in the Library' : 'In the Library'} · version ${page.info.version}`,
+        sub: `${page.info.kind === 'slides' ? 'Slides in the Library' : page.info.kind === 'doc' ? 'A document in the Library' : page.info.kind === 'sheet' ? 'A spreadsheet in the Library' : page.info.kind === 'tex' ? 'LaTeX in the Library' : page.info.kind === 'notebook' ? 'A notebook in the Library' : page.info.kind === 'diagram' ? 'A diagram in the Library' : page.info.kind === 'board' ? 'A board in the Library' : 'In the Library'} · version ${page.info.version}`,
         save: async (html, force) => {
           await post(`/api/pages/${enc(id)}/versions`, { html, base: page.info.version, sessionKey: key, force: !!force });
           toast('Saved. The agent sees your changes with your next message.', 'ok');
@@ -289,7 +289,7 @@ export function SessionPage({ sessionKey: key, target, layout, onClose }: { sess
   // A new one's editor once the call says more than a title (before that, an id may still come: the page it changes).
   const begun = !!draft && (draft.done || /"(?!(?:id|title)")\w+"\s*:/.test(draft.text));
   const fresh = !!saving && !changing && !loaded && begun;
-  const liveKind = loaded?.kind && loaded.kind !== 'notebook' ? loaded.kind : fresh ? saving : null;
+  const liveKind = loaded?.kind && loaded.kind !== 'notebook' && loaded.kind !== 'board' ? loaded.kind : fresh ? saving : null;
   const live = useLiveDraft(liveKind, fresh ? null : loaded?.model?.model, fresh ? undefined : loaded?.version, draft);
   useEffect(() => {
     const id = loaded?.pageId;
