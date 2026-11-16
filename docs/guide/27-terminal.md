@@ -220,12 +220,14 @@ hydor library export "Q3 report" --to pdf -o q3.pdf
 | --- | --- |
 | `hydor models` and `hydor tiers` | The models each program offers, and which model each [tier](/guide/agents-models#tiers-a-model-for-each-kind-of-job) means (`hydor tiers set claude best opus --effort high`, `hydor tiers reset`; `hydor tiers team off` and `hydor tiers hard off` turn off **Lead with subagents** and **Max for hard problems**, and `on` turns them back on). |
 | `hydor usage` | Each plan's usage and limits, and when they reset. |
-| `hydor agents` | [Your agents](/guide/agents): `list`, `show`, `new`, `edit`, `results` and `remove` (the built-in ones can be copied, not changed). Where an agent's results go is `--results-to` on `new` and `edit`, once for each place: `library` (the same page, updated), `library:new`, `sheet` (a row in a spreadsheet of its own), `sheet:<spreadsheet>#<tab>`, `email:<addresses>`, `notify`, `file:<path>`, `webhook:<url>`, or `none`. Its output fields are set on its page (`hydor open agents`); `results` lists what it handed back, a row for each result. |
+| `hydor agents` | [Your agents](/guide/agents): `list`, `show`, `new`, `edit`, `results`, `export`, `install` and `remove` (the built-in ones can be copied, not changed). Where an agent's results go is `--results-to` on `new` and `edit`, once for each place: `library` (the same page, updated), `library:new`, `sheet` (a row in a spreadsheet of its own), `sheet:<spreadsheet>#<tab>`, `email:<addresses>`, `notify`, `file:<path>`, `webhook:<url>`, or `none`. Its output fields are set on its page (`hydor open agents`); `results` lists what it handed back, a row for each result. `export` saves one as a `.hydor-agent` file (`-o` to name it) and says what was left out; `install <file>` says what a file brings and needs, then asks, and installs it beside yours of the same name unless `--replace` (`--schedules` adds the schedules it suggests, paused). See [Share an agent as a file](/guide/agents#share-an-agent-as-a-file). |
 | `hydor accounts` | The sign-ins of Claude Code and Codex: `list`, `show` (one account: who is signed in and the plan, whether new sessions start with it, its usage and limits, whether an API key is on file (never the key), and whether a session switches at a limit), `add <program> <name>` (another account, signed in at once), `sign-in`, `sign-out`, `remove` and `use` (the one new sessions start with). The API key for API credit and the switches at a usage limit are settings (`accounts.*`). |
 
 ```bash
 hydor agents new Bookkeeper --tools read,edit --tier standard
 hydor agents edit bookkeeper --results-to sheet --results-to email:sam@example.com
+hydor agents export bookkeeper -o ~/Desktop/bookkeeper.hydor-agent
+hydor agents install bookkeeper.hydor-agent --schedules
 hydor tiers set claude best opus --effort high
 hydor accounts add claude Work
 hydor accounts use work
