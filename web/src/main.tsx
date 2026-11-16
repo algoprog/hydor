@@ -5,6 +5,7 @@ import { App } from './App';
 import { startLanguage } from './i18n';
 import { startHoverScroll } from './lib/hoverScroll';
 import { endBoot } from './lib/boot';
+import { watchInstall } from './lib/install';
 
 // A read-only link (/g/<token>, or /m/<machine>/g/<token> for another machine's session) opens the
 // shared session alone, without signing in.
@@ -20,6 +21,8 @@ const portal = /^(?:\/m\/[a-z0-9-]+)?\/p\/([^/]+)\/?$/.test(location.pathname);
 
 // Text cut short with an ellipsis scrolls while a mouse rests on it, so all of it can be read.
 startHoverScroll();
+// The browser's offer to install the app comes once, as the page loads: kept for Settings → App → Use on your phone.
+watchInstall();
 
 /** A page of its own (a shared session or project, an app's public page): the logo shown while loading goes once it is here. */
 function Arrived({ children }: { children: ReactNode }) {

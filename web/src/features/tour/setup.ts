@@ -22,5 +22,8 @@ export function takeAfterSetup(): boolean {
   return was;
 }
 
+/** In a desktop app (desktop/main.cjs names it in the user agent), the tour offers to set the app up on a phone too. */
+export const PHONE_STEP = /\b(?:HydorMac|HydorWindows|HydorLinux|NagetAgentMac)\//.test(navigator.userAgent);
+
 /** Steps of a new install's tour before anything is picked, the password included (Tour.tsx checks it against its steps). */
-export const TOUR_SETUP_STEPS = 9;
+export const TOUR_SETUP_STEPS = PHONE_STEP ? 10 : 9;

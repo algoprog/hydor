@@ -131,7 +131,7 @@ Notices from your other machines come through this one, so one device hears from
 
 To set it up on a phone:
 
-1. Open the app on the phone. It has to be served over HTTPS for this ([Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
+1. Open the app on the phone. It has to be served over HTTPS for this: [Settings → App → Use on your phone](/settings?s=phone) does it privately with Tailscale, and its QR code opens the app on the phone at the steps below ([Use it on your phone with Tailscale](/guide/devices#use-it-on-your-phone-with-tailscale)).
 2. On an iPhone or iPad, first add the app to your Home Screen (**Share** → **Add to Home Screen**) and open it from there. Until then the setting says so, and can't be turned on.
 3. Open **Settings → App → Notifications** and turn on **Notify this device**. Allow notifications when the phone asks.
 4. Tap **Send a test**, then leave the app to see it arrive.

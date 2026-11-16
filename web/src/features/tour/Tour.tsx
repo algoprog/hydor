@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
-import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { go } from '../../lib/nav';
@@ -29,7 +29,7 @@ import { TourLocal, TourMedia, TourOpenRouter } from './TourModels';
 import { Sea, SourcesMap, TideMark, TourProgress, WelcomeFilm, type Use } from './scenes';
 import { machineBase, machineId } from '../../lib/machine';
 import { tourDone } from '../tips/state';
-import { build, setupDone, takeAfterSetup, TOUR_SETUP_STEPS } from './setup';
+import { build, PHONE_STEP, setupDone, takeAfterSetup, TOUR_SETUP_STEPS } from './setup';
 
 export { Sea, setupDone, TOUR_SETUP_STEPS, TourProgress, type Use };
 
@@ -466,6 +466,23 @@ function SystemNotifySetup() {
   );
 }
 
+/** The desktop apps' offer to set the app up on a phone: Set it up ends the tour there; Not now (the step's Next) goes on. */
+function PhoneSetup() {
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      icon={<Smartphone size={14} />}
+      onClick={() => {
+        endTour(true);
+        go('/settings?s=phone');
+      }}
+    >
+      Set it up
+    </Button>
+  );
+}
+
 /** First things to try: each puts its words in the message box (and, at the end, ends the tour there). */
 /** The assistants found, and the button that opens Bring in over the tour (the dialog lists what would come first). */
 function BringInStep() {
@@ -697,6 +714,20 @@ function steps(uses: Use[], fresh: boolean, found: string[]): Step[] {
       body: 'Get a notification when an agent finishes or needs you, even with the app closed. Settings holds this, and everything else you can change.',
       Extra: systemNotices ? SystemNotifySetup : NotifySetup,
     },
+  );
+  // In a desktop app: the same on a phone, through Tailscale (Settings → App → Use on your phone); skipped with one click.
+  if (PHONE_STEP)
+    list.push({
+      id: 'phone',
+      target: 'nav-settings',
+      sidebar: true,
+      icon: <Smartphone size={16} />,
+      title: 'Use it on your phone too?',
+      body: 'Follow your agents and answer them from your phone, with notifications there. Only your own devices can reach the app, through Tailscale, a free app for them. It takes a few minutes, now or later in Settings.',
+      next: 'Not now',
+      Extra: PhoneSetup,
+    });
+  list.push(
     {
       id: 'done',
       icon: <Check size={16} />,

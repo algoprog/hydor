@@ -1,6 +1,6 @@
 # Phones, other machines and sharing
 
-Hydor works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone, reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
+Hydor works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone (reached privately through Tailscale, set up in a few clicks), reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
 
 ![The app on a phone: a session that needs you](images/devices.webp)
 
@@ -13,11 +13,11 @@ The app on a phone is the same app as on a computer, laid out for a small screen
 - **One thing at a time.** Settings is a list, each section on a page of its own. Files shows one folder, named at the top (tap the name for the places, **‹** for the folder above), then a file on its own page with **Back**. The Git page lists your repositories, then opens one with a back arrow.
 - **Touch instead of a mouse.** In Files, a row's ⋯ opens its menu, and pressing and holding a row picks it, to act on several at once. The editor wraps long lines. The Terminal page adds a row of keys phones lack (Ctrl, Alt, Esc, Tab, the arrows and more).
 
-To reach the app on your phone at all, it has to be reachable from outside this computer: see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device).
+To reach the app on your phone at all, it has to be reachable from outside this computer. [Settings → App → Use on your phone](/settings?s=phone) does that in a few clicks, privately, with Tailscale: see [Use it on your phone with Tailscale](/guide/devices#use-it-on-your-phone-with-tailscale).
 
 ### Add it to your home screen
 
-Installed on your home screen, the app opens full screen with its own icon, like any other app. This needs the app to be served over HTTPS (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
+Installed on your home screen, the app opens full screen with its own icon, like any other app. This needs the app to be served over HTTPS, as Use on your phone does. Opened on the phone, [Use on your phone](/settings?s=phone&find=Add%20to%20Home%20Screen) shows the steps for the phone in your hand under **On this phone → Add to Home Screen**, with an **Install** button where the browser offers one.
 
 - **iPhone or iPad**: open the app in the browser, tap **Share**, then **Add to Home Screen**. Open Hydor from its new icon from then on.
 - **Android**: open the app in your browser and use its menu's option to install the app or add it to the home screen.
@@ -39,6 +39,8 @@ A notification can reach your phone when a session finishes, fails or needs your
 1. On the phone, open [Settings → App → Notifications](/settings?s=notifications&find=Notify%20this%20device).
 2. Turn on **Notify this device** and allow notifications when the browser asks. Each device turns this on for itself.
 3. **Send a test** checks that it works (it shows when the app is not in view).
+
+Opened on the phone, [Use on your phone](/settings?s=phone) has the same **Notify this device** switch under **On this phone**, after **Add to Home Screen**, and its **Send a test** goes to that phone only.
 
 On an iPhone or iPad, add the app to your Home Screen first and open it from there: the browser can't receive them otherwise. If notifications are blocked for the site, allow them in the browser's settings first. A plain yes-or-no approval comes with **Approve** and **Deny** on the notification itself, where the phone shows buttons. More in [Inbox and notifications](/guide/inbox).
 
@@ -70,7 +72,7 @@ A channel links to the person who sent the code: only they are heard there, and 
 - **Send what you want done**: it goes to the session the chat is in, or starts a new one, in a task folder of its own as the start page does, with the agent set in the **New sessions use** row (**Claude Code** or **Codex**), as the agent of yours in the **New sessions as** row if you picked one. What you send while the agent works waits in the session's queue.
 - **Photos, files and voice messages**: send them as you would to a person, with a caption if you like: the caption goes with them, and several sent at once (an album) arrive together. Each is saved in the folder of the session it goes to, under its own name (photos and voice messages are named by when they came, like `photo-2026-11-15-0930.jpg`), and reaches the agent as the message box's attachments do: pictures to look at, other files to open. A voice message reaches the agent as words when [Speech recognition on the server](/settings?s=voice&find=Speech%20recognition%20on%20the%20server) is on in Settings → Capabilities → Voice, and its recording stays in the folder; without it, the recording goes as a sound file, and the chat says how to turn it on. Telegram lets bots fetch files of up to 20 MB, and Hydor takes files of up to 25 MB from Discord and Slack: the chat says when one is too big. What files hold, and messages forwarded from someone else, reach the agent marked as outside data, to work with, never as instructions. In Slack, files need the `files:read` scope: an app made from an older manifest needs it added under **OAuth & Permissions**, then installed again (the chat says so when a file can't come through).
 - **Your own agents**: `/as` and an agent's name starts a new session as one of your [agents](/agents), like `/as Bookkeeper add this to October` with a photo of a receipt. `/as` and the name alone makes the chat's next new session start as it, and `/agents` (or `/as` alone) lists them with a button each, your own first. An agent that keeps one conversation of its own takes the chat into that conversation. Discord completes the agent's name as you type `/as`; in Slack, write `/hydor as Bookkeeper …`. The [New sessions as](/settings?s=chat&find=New%20sessions%20as) row makes every new session from that chat app start as one of your agents.
-- **The reply** comes back when the agent's turn ends, formatted for the app (Telegram's formatting; Discord's Markdown, in messages of 2,000 characters; Slack's mrkdwn in blocks), in up to ten messages when it is long (the rest stays in the session). Telegram and Discord show "typing…" while it works; Slack puts an hourglass on your message. **Open in Hydor** opens the session in the app, when the app has an address on the internet.
+- **The reply** comes back when the agent's turn ends, formatted for the app (Telegram's formatting; Discord's Markdown, in messages of 2,000 characters; Slack's mrkdwn in blocks), in up to ten messages when it is long (the rest stays in the session). Telegram and Discord show "typing…" while it works; Slack puts an hourglass on your message. **Open in Hydor** opens the session in the app, when the app has an address on the internet or is served on your tailnet (see [Use it on your phone with Tailscale](/guide/devices#use-it-on-your-phone-with-tailscale)).
 - **What an agent asks**: a plain yes-or-no question comes with buttons that answer it; anything more (a form, a plan) comes with a link to answer it in the app.
 - **Commands**: `/new` starts a new session (`/new` and what it should do starts it at once), `/as` and `/agents` start one as one of your agents (above), `/sessions` lists the latest to go on with one, `/stop` stops the agent, `/status` says which session the chat is in and what it is doing, and `/help` lists them. Telegram shows them in its menu of commands, and Discord as slash commands; in Slack they come after `/hydor` (`/hydor new`, and `/hydor` with other words is a message to the session); in Discord and Slack `!new`, `!as`, `!status` and the rest also work typed as a message.
 - **Notices**: with the **Notices from every session** row on, as it is unless you turn it off, every session that finishes, fails or needs you says so in your chats, not only the ones a chat started.
@@ -79,15 +81,47 @@ Stickers, polls and locations don't reach the agents: the chat asks for words, p
 
 ## Reach the app from another device
 
-Out of the box, the app answers only on the computer it runs on (port 8790 of `127.0.0.1`). Anyone who can reach it and knows the password can run any command as your user there, so treat access to it like SSH access to the computer. To use it from your phone or another computer, put HTTPS in front of it rather than opening the port to the network:
+Out of the box, the app answers only on the computer it runs on (port 8790 of `127.0.0.1`). Anyone who can reach it and knows the password can run any command as your user there, so treat access to it like SSH access to the computer. To use it from your phone or another computer, put HTTPS in front of it rather than opening the port to the network. The simplest way is built in: [Use it on your phone with Tailscale](/guide/devices#use-it-on-your-phone-with-tailscale), below. HTTPS is also what phones need to install the app and receive push notifications.
 
-- **Tailscale**: on this computer, `tailscale serve --bg 8790` serves the app at `https://<machine>.<tailnet>.ts.net`, reachable only from your own devices.
+### Use it on your phone with Tailscale
+
+Tailscale is a free app that links your own devices in a private network of their own, called a tailnet. [Settings → App → Use on your phone](/settings?s=phone) publishes Hydor on it, at an address like `https://laptop.tail1234.ts.net`. Only phones and computers signed in to your Tailscale account can open that address, never the public internet, and the app still asks for its password. It never turns on Tailscale Funnel, which would make the app public.
+
+1. Install Tailscale on this computer and sign in ([tailscale.com/download](https://tailscale.com/download)). The section's **Tailscale on this computer** row says when it is ready ("Signed in. This computer is laptop on you@example.com."). Until then it says what is missing (not installed, not running, not signed in, turned off) with **Get Tailscale** or the one thing to do, and **Check again**.
+2. Press [**Serve it on my devices**](/settings?s=phone&find=Serve%20it%20on%20my%20devices). The **Address** row shows the app's address, with **Copy** and **Open**. The app accepts that address by itself: there is no file to edit.
+3. Install Tailscale on your phone too, signed in to the same account.
+4. Scan the QR code under [**Open it on your phone**](/settings?s=phone&find=Open%20it%20on%20your%20phone) with the phone's camera (or type the address), and sign in with the app's password.
+5. The phone opens at **Use on your phone**, with **On this phone**: **Add to Home Screen** (on an iPhone, in Safari: Share → **Add to Home Screen**, which notifications need there; on Android, **Install**, or Chrome's menu → **Install app**), then **Notify this device**, and **Send a test**, which sends a notification to that phone only.
+
+**Stop serving** takes the app off your tailnet again. It undoes exactly what **Serve it on my devices** did: the one address it published, and the address it added to the ones the app accepts. Anything else you serve with Tailscale stays as it was. If you had already served the app with Tailscale by hand, the section shows it ("Set up outside this page, with Tailscale itself"), and **Stop serving** turns it off too.
+
+While the app is served, the links it hands out start with this address, so they open on your phone too: a session's **Open in Hydor** in a chat app, and the links agents give you to sessions and Library pages. If `ALLOWED_ORIGINS` names an address of its own (see [Other ways to reach it](/guide/devices#other-ways-to-reach-it)), links keep using that one.
+
+In a terminal, `hydor machines phone` says the same and draws the QR code; `hydor machines phone serve` and `hydor machines phone stop` do the rest (see [The terminal](/guide/terminal)).
+
+### When something stands in the way
+
+The section says what happened in a sentence, with the one thing to do:
+
+- **Serve and HTTPS certificates aren't turned on in your tailnet yet.** Tailscale gives a link that turns them on: **Turn them on** opens it (you sign in to Tailscale and confirm once), then **Try again**.
+- **On Linux, Tailscale lets only its operator change what it serves.** Run the command shown, once, in a terminal (`sudo tailscale set --operator=$USER`, with your user name in it), then **Try again**.
+- **Something else is already published at the address.** Hydor never replaces it: **Serve on port 8443** publishes the app at `https://laptop.tail1234.ts.net:8443` instead.
+- **Funnel is on for this address.** Tailscale Funnel was turned on by hand, so anyone on the internet can reach it: the section says so, with the command that turns it off.
+- **HTTPS certificates are off in your tailnet.** **Turn them on** opens Tailscale's DNS settings, where you turn on MagicDNS and HTTPS Certificates.
+
+### Other ways to reach it
+
+To set it up yourself instead, any of these work too:
+
+- **Tailscale by hand**: on this computer, `tailscale serve --bg 8790` serves the app at `https://<machine>.<tailnet>.ts.net`, reachable only from your own devices.
 - **Cloudflare Tunnel**: point a tunnel at `http://localhost:8790`. Cloudflare Access can add a second login in front.
 - **Your own reverse proxy**, such as Caddy, sending a hostname of yours to `127.0.0.1:8790`.
 
 If the proxy changes the `Host` header, tell the app the address people open it at: `ALLOWED_ORIGINS=https://agents.example.com`. Settings like this go in `~/.config/hydor.env` (one `NAME=value` per line) for an app installed as a service, or in `.env` for Docker Compose; restart the app afterwards.
 
-HTTPS is also what phones need to install the app and receive push notifications. Previews of dev servers use a port of their own (8791); see [Look at a dev server with Preview](/guide/files-git#look-at-a-dev-server-with-preview).
+Previews of dev servers use a port of their own (8791); see [Look at a dev server with Preview](/guide/files-git#look-at-a-dev-server-with-preview).
+
+### The password guards everything
 
 The password guards everything. A browser stays signed in for 30 days after you sign in. Wrong passwords are counted by the address they come from, over the last hour:
 
@@ -222,6 +256,9 @@ How pull requests are opened and followed: [Open a pull request from a session](
 
 ## Ask an agent
 
+- "Make this app reachable from my phone with Tailscale."
+- "What's this app's address on my tailnet? Is anything stopping my phone from opening it?"
+- "Stop serving the app on my tailnet."
 - "Make a read-only link to this session that works for a week."
 - "Turn off every share link on this session."
 - "Which of my machines are offline? Try reconnecting them."

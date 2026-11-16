@@ -47,7 +47,9 @@ tour does the rest. Until the releases are signed with an Apple Developer ID, ma
 to open an app from an unidentified developer: right-click the app, choose **Open**, then **Open** again (or
 **System Settings → Privacy & Security → Open Anyway**). macOS also asks once whether Hydor may send
 notifications: allow it to get one when a session finishes or needs you (**System Settings → Notifications →
-Hydor** sets how they show).
+Hydor** sets how they show). Near its end the tour asks **Use it on your phone too?** (in every desktop app): **Set it
+up** opens Settings → App → Use on your phone, which serves the app to your own devices with Tailscale; **Not now**
+skips it ([remote access](remote-access.md)).
 
 The app runs the server inside it, with the Node.js and tmux that come with it, and shows Hydor in its own
 window. Closing the window keeps it running, with its icon in the menu bar (**Open Hydor**, **Open in
@@ -236,7 +238,8 @@ node dist/server/cli.js service install     # put it back
 ```
 
 Settings such as `PORT`, `HOST`, `DATA_DIR` or `ALLOWED_ORIGINS` go in `~/.config/hydor.env`, one
-`NAME=value` per line. Restarting the service never interrupts a running agent: the server reconnects to it. A program an
+`NAME=value` per line. To reach the app from your phone, Settings → App → Use on your phone serves it with Tailscale
+and accepts its address by itself, with nothing to put in that file ([remote access](remote-access.md)). Restarting the service never interrupts a running agent: the server reconnects to it. A program an
 agent started that runs out of memory is ended alone, and the app goes on (`OOMPolicy=continue`; a service installed
 before 0.45.0 gets it from `node dist/server/cli.js service install`).
 

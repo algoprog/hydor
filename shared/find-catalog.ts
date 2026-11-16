@@ -34,6 +34,7 @@ export const catalogText = (it: { title: string; keywords?: string; text?: strin
 export const SECTION_TOPIC: Record<string, string> = {
   general: 'app',
   notifications: 'inbox',
+  phone: 'devices',
   chat: 'devices',
   security: 'app',
   signatures: 'library',
@@ -65,6 +66,7 @@ export const SECTION_TOPIC: Record<string, string> = {
 export const SECTIONS: [string, string, 'App' | 'Agents' | 'Capabilities', string][] = [
   ['general', 'General', 'App', 'Theme, and what Enter does while an agent works'],
   ['notifications', 'Notifications', 'App', 'When a session finishes, fails or needs your answer'],
+  ['phone', 'Use on your phone', 'App', 'Open the app on your own phone, privately with Tailscale, and get its notifications there'],
   ['chat', 'Chat apps', 'App', 'Talk to your agents from Telegram, Discord or Slack: start sessions, send photos, files and voice messages, get their replies, answer what they ask'],
   ['security', 'Password', 'App', 'The password for this app, and signing out'],
   ['signatures', 'Signatures', 'App', 'Your signature and initials, drawn once and kept encrypted, for the documents you sign'],
@@ -117,6 +119,12 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['notifications', 'Notify this device', 'push notifications alerts phone browser when an agent is done finishes fails needs you', 'A notice when a session finishes, fails or needs your answer, even with the app closed'],
   ['notifications', 'Sound', 'chime sound beep audio when done', 'A short chime with each notice while the app is open'],
   ['notifications', 'Send a test', 'test notification try', 'Send a notice to this device now', 'Send a test notification'],
+  // App › Use on your phone
+  ['phone', 'Serve it on my devices', 'phone mobile iphone android tailscale serve tailnet https remote access reach the app from another device away from home private', 'Publishes the app over HTTPS to the devices signed in to your Tailscale account only, never the public internet', 'Use the app on your phone'],
+  ['phone', 'Tailscale on this computer', 'tailscale install sign in vpn tailnet magicdns machine name', 'Whether Tailscale is installed and signed in here, and this computer’s name on your tailnet'],
+  ['phone', 'Open it on your phone', 'qr code scan camera phone mobile address link', 'A QR code of the app’s address for your phone’s camera, and the steps on the phone', 'QR code for your phone'],
+  ['phone', 'Stop serving', 'stop tailscale serve unpublish turn off remote access phone', 'Takes the app off your tailnet again, undoing exactly what Serve it on my devices did'],
+  ['phone', 'Add to Home Screen', 'install home screen icon app iphone ipad android pwa', 'On the phone: Hydor with its own icon, full screen; iPhone notifications need it'],
   ['chat', 'Telegram', 'telegram bot token botfather connect chat app messenger phone', 'A Telegram bot of your own, made with @BotFather, that your chats talk to', 'Connect a Telegram bot'],
   ['chat', 'Discord', 'discord bot token developer portal gateway server direct message dm connect chat app', 'A Discord bot of your own, made in the Developer Portal, that your chats talk to', 'Connect a Discord bot'],
   ['chat', 'Slack', 'slack app tokens socket mode manifest workspace bot connect chat app', 'A Slack app of your own, made from a manifest, that your chats talk to', 'Connect a Slack app'],
