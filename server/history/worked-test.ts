@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { AcpParser } from './acp.ts';
 import { ClaudeParser } from './claude.ts';
 import { CodexParser } from './codex.ts';
+import type { TimelineItem } from '../../shared/types.ts';
 
 const opts = { retain: false, collectChunks: false };
 const at = (s: string) => `2026-11-05T10:${s}.000Z`;
@@ -62,6 +63,28 @@ const lines = (xs: object[]) => xs.map((x) => JSON.stringify(x));
   ]))
     p.feed(l);
   assert.equal(p.stats.workMs, 40_000 + 25_000, 'two finished turns (one by its duration, one by its times); the third still runs');
+}
+
+// Codex replies carry only server-provided turn IDs as fork boundaries, including after parser state is restored.
+{
+  const p = new CodexParser({ ...opts, retain: true });
+  const ev = (payload: object) => JSON.stringify({ timestamp: at('00:00'), type: 'event_msg', payload });
+  const reply = (items: TimelineItem[], id: string) => items.find((i): i is Extract<TimelineItem, { kind: 'assistant' }> => i.id === id && i.kind === 'assistant');
+  p.feed(ev({ type: 'task_started', turn_id: 'real-turn-1' }));
+  p.feed(ev({ type: 'item_completed', item: { type: 'AgentMessage', id: 'a1', content: [{ text: 'First' }] } }));
+  assert.equal(reply(p.items, 'a1')?.entry, 'real-turn-1');
+  const restored = CodexParser.fromState(p.toState(), { ...opts, retain: true });
+  restored.feed(ev({ type: 'item_completed', item: { type: 'AgentMessage', id: 'a2', content: [{ text: 'Second' }] } }));
+  assert.equal(reply(restored.items, 'a2')?.entry, 'real-turn-1');
+  restored.feed(ev({ type: 'task_complete' }));
+  restored.feed(ev({ type: 'task_started' }));
+  restored.feed(ev({ type: 'item_completed', item: { type: 'AgentMessage', id: 'a3', content: [{ text: 'Unknown turn' }] } }));
+  assert.equal(reply(restored.items, 'a3')?.entry, undefined);
+  restored.feed(ev({ type: 'task_complete' }));
+  restored.feed(ev({ type: 'task_started', turn_id: 'real-turn-2' }));
+  restored.feed(JSON.stringify({ timestamp: at('00:00'), type: 'response_item', payload: { type: 'message', role: 'assistant', id: 'a4', content: [{ type: 'output_text', text: 'Legacy reply' }] } }));
+  assert.equal(reply(restored.items, 'a4')?.entry, 'real-turn-2');
+  assert.equal(reply(restored.items, 'a2')?.entry, 'real-turn-1');
 }
 
 // ---- ACP agents (Custom, Gemini CLI…): a prompt, then the end --------------------------------------------------------

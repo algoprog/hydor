@@ -839,6 +839,7 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
   const [file, setFile] = useState<string | null>(null);
   const [review, setReview] = useState<SkillProposal | null>(null);
   const [how, setHow] = useState(false);
+  const [switchingAll, setSwitchingAll] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [confirm, confirmNode] = useConfirm();
 
@@ -978,6 +979,25 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       loadLib();
       loadAgents();
     }
+  };
+
+  /** Apply the unfiltered loaded snapshot as one project-only change. */
+  const switchAllOff = async () => {
+    if (!sp || !mine || !agents || agents.errors.length || switchingAll) return;
+    setSwitchingAll(true);
+    try {
+      // Refresh every source so a long-open page does not act on an old skill list.
+      const [freshLib, freshAgents, freshMine] = await Promise.all([
+        api<SkillLibrary>('/api/skillpack'),
+        api<{ skills: SkillEntry[]; errors: string[] }>(`/api/setup/skills${cwd ? `?cwd=${enc(cwd)}` : ''}`),
+        api<SpaceSkills>(`/api/projects/${enc(sp.id)}/skills`),
+      ]);
+      if (freshAgents.errors.length) throw new Error('Some skills could not be loaded. Reload before turning all skills off.');
+      const skills = spaceItems(sp, freshLib, freshAgents.skills, freshMine).flatMap((i) => i.here ? [{ name: i.here.name, agent: i.here.agent ?? null, usual: i.here.usual }] : []);
+      const r = await post<{ switches: Record<string, boolean> }>(`/api/projects/${enc(sp.id)}/skill-switches/off`, { skills, expected: freshMine.switches });
+      setMine((m) => m && { ...m, switches: r.switches });
+      toast('Skills turned off for this project', 'ok');
+    } catch (e) { toastError(e); void loadMine(); } finally { setSwitchingAll(false); }
   };
 
   const resetAll = async () => {
@@ -1138,6 +1158,9 @@ export function SkillsSettings({ space: sp }: { space?: Space } = {}) {
       )}
       {!sp && lib && lib.pending.length > 0 && <Waiting list={lib.pending} onReview={setReview} />}
       {sp && <p className="text-[13px] leading-snug text-fg-3">The skills this project’s sessions get. A switch here is for this project alone.</p>}
+      {sp && <Button size="sm" disabled={loading || !agents || agents.errors.length > 0 || switchingAll || !all.some((i) => i.on)} onClick={() => void switchAllOff()}>Turn off all skills</Button>}
+      {sp && <p className="text-[13px] text-fg-3">This affects all listed skills, including those hidden by filters. New skills follow their settings. Existing sessions may keep their starting settings until restarted.</p>}
+      {sp && agents && agents.errors.length > 0 && <p className="text-[13px] text-fg-3">Some skills could not be loaded. Reload before turning all skills off.</p>}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1">

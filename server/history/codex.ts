@@ -35,6 +35,7 @@ interface CodexState {
   files: Record<string, [number, number]>;
   seq: number;
   turnId?: string;
+  turnForkable?: boolean;
   turnStart?: number;
   turnItems: boolean;
   turnModel?: string;
@@ -88,6 +89,8 @@ export class CodexParser {
   private files: Record<string, [number, number]> = {};
   private seq = 0;
   private turnId?: string;
+  /** Only a turn ID supplied by Codex can be used as a fork boundary. */
+  private turnForkable = false;
   private turnStart?: number;
   /** The current turn has item_completed records, so raw response items are ignored. */
   private turnItems = false;
@@ -117,6 +120,7 @@ export class CodexParser {
     p.files = s.files;
     p.seq = s.seq ?? 0;
     p.turnId = s.turnId;
+    p.turnForkable = !!s.turnForkable;
     p.turnStart = s.turnStart;
     p.turnItems = !!s.turnItems;
     p.turnModel = s.turnModel;
@@ -139,6 +143,7 @@ export class CodexParser {
       files: this.files,
       seq: this.seq,
       turnId: this.turnId,
+      turnForkable: this.turnForkable,
       turnStart: this.turnStart,
       turnItems: this.turnItems,
       turnModel: this.turnModel,
@@ -276,9 +281,10 @@ export class CodexParser {
 
   // ---- turns -------------------------------------------------------------
 
-  private startTurn(id: string, ts?: number) {
+  private startTurn(id: string, ts?: number, forkable = false) {
     this.endTurn();
     this.turnId = id;
+    this.turnForkable = forkable;
     this.turnStart = ts;
     this.turnItems = false;
     this.turnTokens = { in: 0, out: 0, cached: 0 };
@@ -290,6 +296,7 @@ export class CodexParser {
     if (!this.turnId) return;
     const id = this.turnId;
     this.turnId = undefined;
+    this.turnForkable = false;
     this.turnItems = false;
     const dur = durationMs ?? (ts && this.turnStart ? ts - this.turnStart : undefined);
     if (dur && dur > 0) this.stats.workMs = (this.stats.workMs ?? 0) + dur;
@@ -348,7 +355,7 @@ export class CodexParser {
   private onEvent(p: Json, ts?: number) {
     switch (p.type) {
       case 'task_started':
-        this.startTurn(p.turn_id ?? `t${this.seq++}`, parseTs(p.started_at) ?? ts);
+        this.startTurn(p.turn_id ?? `t${this.seq++}`, parseTs(p.started_at) ?? ts, typeof p.turn_id === 'string' && p.turn_id.length > 0);
         break;
       case 'task_complete':
         // A turn the model API refused ends "complete" with only an error to show for it.
@@ -456,7 +463,7 @@ export class CodexParser {
         this.stats.assistantMessages++;
         this.act?.bump(ts, 'messages');
         this.chunk('assistant', text, ts);
-        this.upsert({ kind: 'assistant', id, seq: 0, ts, text, phase: it.phase ?? undefined });
+        this.upsert({ kind: 'assistant', id, seq: 0, ts, text, phase: it.phase ?? undefined, entry: this.turnForkable ? this.turnId : undefined });
         break;
       }
       case 'Reasoning': {
@@ -573,7 +580,7 @@ export class CodexParser {
           this.stats.assistantMessages++;
           this.act?.bump(ts, 'messages');
           this.chunk('assistant', text, ts);
-          this.upsert({ kind: 'assistant', id: p.id ?? `a${this.seq++}`, seq: 0, ts, text, phase: p.phase });
+          this.upsert({ kind: 'assistant', id: p.id ?? `a${this.seq++}`, seq: 0, ts, text, phase: p.phase, entry: this.turnForkable ? this.turnId : undefined });
         }
         break;
       }

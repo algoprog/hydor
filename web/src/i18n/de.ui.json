@@ -1,0 +1,10 @@
+{
+  "Invalid skill snapshot": "Ungültiger Stand der Skills",
+  "Project switches changed. Reload and try again.": "Die Projekteinstellungen haben sich geändert. Lade die Seite neu und versuche es erneut.",
+  "Resize navigation": "Breite der Navigation ändern",
+  "Skills turned off for this project": "Skills für dieses Projekt ausgeschaltet",
+  "Skills with the same name have different settings.": "Skills mit demselben Namen haben unterschiedliche Einstellungen.",
+  "Some skills could not be loaded. Reload before turning all skills off.": "Einige Skills konnten nicht geladen werden. Lade die Seite neu, bevor du alle Skills ausschaltest.",
+  "This affects all listed skills, including those hidden by filters. New skills follow their settings. Existing sessions may keep their starting settings until restarted.": "Dies betrifft alle aufgeführten Skills, auch die durch Filter ausgeblendeten. Neue Skills verwenden ihre jeweiligen Einstellungen. Bestehende Sitzungen behalten möglicherweise ihre ursprünglichen Einstellungen, bis du sie neu startest.",
+  "Turn off all skills": "Alle Skills ausschalten"
+}

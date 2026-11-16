@@ -875,7 +875,7 @@ const SegmentView = memo(function SegmentView({
           if (r.kind === 'said') {
             return (
               <div key={`text:${r.id}`} className={cx(fresh(r.id) && 'anim-in')}>
-                <AssistantBlock item={r.item} />
+                <AssistantBlock item={r.item} allowFork={agent === 'claude'} />
               </div>
             );
           }
@@ -909,7 +909,7 @@ const SegmentView = memo(function SegmentView({
         )),
         ...answer.map(({ key, item: a, more }) => (
           <div key={a.kind === 'assistant' ? `text:${a.id}` : `reply:${key}`} className={cx(fresh(key) && 'anim-in')}>
-            {a.kind === 'assistant' && <AssistantBlock item={a} />}
+            {a.kind === 'assistant' && <AssistantBlock item={a} allowFork={agent === 'claude' || (!live && !!seg.end && a.id === [...answer].reverse().find((x) => x.item.kind === 'assistant')?.item.id)} />}
             {a.kind === 'tool' && <ToolRow item={a} sessionKey={sessionKey} more={more} />}
           </div>
         )),

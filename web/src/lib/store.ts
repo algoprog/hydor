@@ -404,6 +404,8 @@ interface UIState {
   detailsTab: DetailsTab;
   /** A file to expand in the Changes tab (not persisted). */
   detailsFocus: string | null;
+  /** Width of the desktop navigation, distinct from the file tree. */
+  navigationWidth: number;
   sideWidth: number;
   panelOpen: boolean;
   panelHeight: number;
@@ -417,6 +419,8 @@ interface UIState {
   groupByFolder: boolean;
   /** The sidebar's space and folder groups you folded (true) or opened (false), by their ids; the others follow sessions/groups.ts. */
   groupFolds: Record<string, boolean>;
+  /** Collapsed top-level session sections on this machine. */
+  sidebarSectionFolds: { active?: boolean; projects?: boolean };
   /** The start page's While you were away opened (it starts folded). */
   awayOpen: boolean;
   set: (p: Partial<Omit<UIState, 'set' | 'openTab' | 'closeTab'>>) => void;
@@ -426,7 +430,7 @@ interface UIState {
 
 const UI_KEY = 'wa.ui.v1';
 /** Folders, open files and the sidebar's folded groups are each machine's own (Settings → Machines); the rest of the layout is shared. */
-const PER_MACHINE = ['explorerRoot', 'tabs', 'groupFolds'] as const;
+const PER_MACHINE = ['explorerRoot', 'tabs', 'groupFolds', 'sidebarSectionFolds'] as const;
 const read = (k: string): Record<string, unknown> => {
   try {
     return JSON.parse(localStorage.getItem(k) ?? '{}') ?? {};
@@ -453,6 +457,7 @@ export const useUI = create<UIState>((set, get) => ({
   detailsOpen: false,
   detailsTab: 'changes',
   detailsFocus: null,
+  navigationWidth: 280,
   sideWidth: 300,
   panelOpen: false,
   panelHeight: 280,
@@ -463,6 +468,7 @@ export const useUI = create<UIState>((set, get) => ({
   spaceFilter: null,
   groupByFolder: true,
   groupFolds: {},
+  sidebarSectionFolds: {},
   awayOpen: false,
   ...loadUI(),
   set: (p) => set(p),

@@ -196,7 +196,7 @@ export interface PeerFrom {
   mode?: string;
   address?: string;
 }
-/** `entry`: the transcript entry it came from (Claude), so a fork can resume up to it. */
+/** `entry`: the agent-specific transcript or turn identifier used as a fork boundary. */
 export type AssistantItem = BaseItem & { kind: 'assistant'; text: string; phase?: string; streaming?: boolean; entry?: string };
 export type ThinkingItem = BaseItem & { kind: 'thinking'; text: string; durationMs?: number; streaming?: boolean };
 export type ToolItem = BaseItem & { kind: 'tool'; tool: ToolInfo };
