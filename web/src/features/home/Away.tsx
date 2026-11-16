@@ -1,9 +1,11 @@
 // While you were away: under the start page's message box, what happened since your last visit (GET /api/away,
-// server/away). Folded to one line ("Since yesterday 18:40 · 3 done · 1 needs you · 1 failed · next: Morning brief at
-// 07:30"), each part of which opens it to those rows (on a phone the whole line opens it); open, it shows up to six rows,
+// server/away). Folded to one line, what matters first ("1 needs you · 1 failed · 3 done · next: Morning brief at 07:30
+// · Since yesterday 18:40"), each part of which opens it to those rows (on a phone the whole line opens it, and the time
+// is in the opened header alone); open, it shows up to six rows,
 // most important first: what waits on you (an approval or a held call answered right here, with the Inbox's own cards),
 // sessions that finished (with a line of their last reply and the files they made), what ran by itself (with how it went
-// and its cost), and what runs next today. It opens by itself when something waits on you. Mark all as seen clears it.
+// and its cost), and what runs next today. It stays folded until you open it, and as you left it on this device. Mark
+// all as seen clears it.
 // With nothing to show, or on a machine whose older server has no such route, it is not there.
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CircleAlert, CircleCheck, CircleMinus, ChevronDown, ChevronRight, CalendarClock, FileText, Hand, History } from 'lucide-react';
@@ -13,7 +15,7 @@ import { activityOf } from '../../lib/activity';
 import { basename, timeAgo, usd } from '../../lib/format';
 import { machineBase } from '../../lib/machine';
 import { go, openFile } from '../../lib/nav';
-import { toastError, useSessions } from '../../lib/store';
+import { toastError, useSessions, useUI } from '../../lib/store';
 import { LOCALE } from '../../i18n/locale';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, useIsMobile } from '../../components/ui';
@@ -233,15 +235,15 @@ function Part({ children, onClick, tone, title, plain }: { children: ReactNode; 
 export function Away() {
   const mobile = useIsMobile();
   const { sum, reload } = useAway();
-  // Folded unless something waits on you, until you open or fold it yourself.
-  const [opened, setOpened] = useState<boolean | null>(null);
+  // Folded until you open it; open or folded, it stays as you left it on this device.
+  const open = useUI((s) => s.awayOpen);
+  const setOpen = (v: boolean) => useUI.getState().set({ awayOpen: v });
   const [only, setOnly] = useState<Only>(null);
   const [all, setAll] = useState(false);
   const [clearing, setClearing] = useState(false);
   if (!sum || !awayHasNews(sum)) return null;
   const c = sum.counts;
-  const open = opened ?? c.needs > 0;
-  const show = (o: Only) => (setOnly(o), setAll(false), setOpened(true));
+  const show = (o: Only) => (setOnly(o), setAll(false), setOpen(true));
   const rows = sum.rows.filter((r) => fits(r, only));
   const shown = all ? rows : rows.slice(0, AWAY_SHOWN);
   const next = sum.next[0];
@@ -250,7 +252,6 @@ export function Away() {
     setClearing(true);
     try {
       await post('/api/away/seen', { at: sum.now });
-      setOpened(null);
       setOnly(null);
       reload();
     } catch (e) {
@@ -260,15 +261,12 @@ export function Away() {
     }
   };
 
-  const parts: ReactNode[] = [
-    <Part key="since" plain={mobile} onClick={() => show(null)} title="Show everything since your last visit" tone="font-medium text-fg">
-      {sinceText(sum.since)}
-    </Part>,
-  ];
-  if (c.done) parts.push(<Part key="done" plain={mobile} onClick={() => show('done')} title="Show what finished">{`${c.done} done`}</Part>);
+  // What matters first, so a phone never cuts it: what needs you, what failed, what is done, what runs next; since when
+  // last (on a phone only in the opened header).
+  const parts: ReactNode[] = [];
   if (c.needs)
     parts.push(
-      <Part key="needs" plain={mobile} onClick={() => show('needs')} title="Show what waits on you" tone="text-warn">
+      <Part key="needs" plain={mobile} onClick={() => show('needs')} title="Show what waits on you" tone="font-medium text-warn">
         {c.needs === 1 ? '1 needs you' : `${c.needs} need you`}
       </Part>,
     );
@@ -278,10 +276,22 @@ export function Away() {
         {`${c.failed} failed`}
       </Part>,
     );
+  if (c.done)
+    parts.push(
+      <Part key="done" plain={mobile} onClick={() => show('done')} title="Show what finished">
+        {`${c.done} done`}
+      </Part>,
+    );
   if (nextLine)
     parts.push(
       <Part key="next" plain={mobile} onClick={() => go(next.path)} title="Open the task">
         {nextLine}
+      </Part>,
+    );
+  if (!mobile)
+    parts.push(
+      <Part key="since" plain={mobile} onClick={() => show(null)} title="Show everything since your last visit" tone="text-fg-3">
+        {sinceText(sum.since)}
       </Part>,
     );
 
@@ -308,8 +318,8 @@ export function Away() {
         tabIndex={0}
         aria-expanded={open}
         title={open ? 'Fold' : 'While you were away: open'}
-        onClick={() => setOpened(!open)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setOpened(!open))}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setOpen(!open))}
         className={cx('flex cursor-pointer items-center gap-2 px-3 text-left', mobile ? 'min-h-11 py-2' : 'py-2', open && 'border-b border-line')}
       >
         <History size={14} className="shrink-0 text-fg-3" />

@@ -417,6 +417,8 @@ interface UIState {
   groupByFolder: boolean;
   /** The sidebar's space and folder groups you folded (true) or opened (false), by their ids; the others follow sessions/groups.ts. */
   groupFolds: Record<string, boolean>;
+  /** The start page's While you were away opened (it starts folded). */
+  awayOpen: boolean;
   set: (p: Partial<Omit<UIState, 'set' | 'openTab' | 'closeTab'>>) => void;
   openTab: (t: OpenTab) => void;
   closeTab: (id: string) => void;
@@ -461,6 +463,7 @@ export const useUI = create<UIState>((set, get) => ({
   spaceFilter: null,
   groupByFolder: true,
   groupFolds: {},
+  awayOpen: false,
   ...loadUI(),
   set: (p) => set(p),
   openTab: (t) => {

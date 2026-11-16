@@ -27,17 +27,17 @@ export function sinceWords(t: number, now = Date.now()): string {
   return `Since ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
 }
 
-/** The start page's folded line. */
+/** The start page's folded line, what matters first: what needs you, what failed, what is done, what runs next, since when. */
 export function awayLine(s: AwaySummary, now = Date.now()): string {
   const c = s.counts;
   const next = s.next[0];
   return [
-    sinceWords(s.since, now),
-    c.done ? `${c.done} done` : '',
     c.needs ? (c.needs === 1 ? '1 needs you' : `${c.needs} need you`) : '',
     c.failed ? `${c.failed} failed` : '',
+    c.done ? `${c.done} done` : '',
     c.quiet ? `${c.quiet} with nothing new` : '',
     next ? `next: ${next.name} at ${clock(next.at)}` : '',
+    sinceWords(s.since, now),
   ]
     .filter(Boolean)
     .join(' · ');
