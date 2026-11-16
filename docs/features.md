@@ -1172,6 +1172,21 @@ programs shows each program's version and what is out, with Check now, Update no
   its … **Save as picture** (a PNG of the card as it looks, in the current theme, at twice its size, named after its title) and **Copy as
   picture** where the browser allows it; a card with a map, a library-drawn plot, a video player or a playground's output inside has no
   picture buttons. The gallery (`/answers`) shows every UI with an example and plays one as it streams.
+- Answer cards from a spreadsheet or a file: a table, a chart, key figures, a ranking, a histogram with box plots or values
+  on a map can take, in place of its numbers, where they are (`from`: a Library spreadsheet by name or id, with a tab and a
+  range or a named range, its first row the headings; or a CSV, TSV, JSON, JSONL or GeoJSON file in the session's folder
+  or its project's) and what of them to show: columns by heading, `sum`, `avg`, `median`, `count`, `distinct`, `min`,
+  `max`, `first` and `last`, `groupBy`, a filter in a small language of its own (`where: "Region = 'EU' and Revenue >
+  1000"`: comparisons, `in`, `contains`, `starts with`, `is empty`, `between`, `and`, `or`, `not`; read, never run), a sort
+  and a limit. The server works the card's data out in its own shape (`POST /api/answers/data`), so the views are the same
+  and nothing is retyped: files of up to 50 MB (JSON 20 MB) and 1,000,000 rows, results capped for each card (a table's
+  1,000 rows, a chart's 8 series), what was read kept a few minutes under the spreadsheet's version or the file's time of
+  change. Under the card, **Data from** names the source with a link that opens it, when it was read and how much shows,
+  with **Read again**; the card redraws when the spreadsheet is saved and when the app comes back into view. A missing
+  spreadsheet, tab, column or file shows as a plain message in the card. Files outside the conversation's folders, and
+  spreadsheets made in a confidential session (for other sessions), are not read. Agents are told to use one for numbers
+  that live in a spreadsheet or a file, more than a few dozen rows, or a card to keep; `find_ui` gives each such card's
+  form with an example.
 - Agents can answer with a page (a report, a dashboard, a mock-up), shown in the conversation as it is written, or
   beside it on a wide screen. Before showing one, an agent can picture it as the app shows it, in the dark theme or
   the light, to see what would not read well.
