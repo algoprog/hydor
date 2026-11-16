@@ -163,7 +163,7 @@ export function Starters({ place, onFill }: { place: StarterPlace; onFill: (text
           Hide
         </button>
       </div>
-      <div className={cx(mobile ? '-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]' : 'grid grid-cols-3 gap-2')}>
+      <div className={cx(mobile ? '-mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]' : 'grid grid-cols-3 gap-2')}>
         {examples.map((e) => (
           <Tile key={e.text} icon={ICON[e.kind]} onClick={() => onFill(tr(e.text))} title="Put it in the box, to change and send">
             <span className="line-clamp-2">{e.text}</span>

@@ -3,6 +3,13 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.68.1 · 16 November 2026
+
+Starter ideas line up on a phone.
+
+- **Starter ideas on a phone**: the row of ideas under an empty message box now starts in line with the box, instead of
+  with its first card cut off at the edge of the screen.
+
 ## 0.68.0 · 16 November 2026
 
 Work that starts with an email and ends with something sent: connect your mail with an app password, start a task for
