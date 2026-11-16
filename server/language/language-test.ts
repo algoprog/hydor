@@ -180,6 +180,38 @@ test('German covers the extracted catalog and preserves interpolation values', (
   assert.equal(dict['Memory (RAM)'], 'Arbeitsspeicher (RAM)');
   // English plural suffixes must not leak into German timeout messages.
   const german = translator(dict);
+  // The same English label denotes RAM in system views and persistent notes everywhere else.
+  assert.equal(german('system::Memory'), 'Arbeitsspeicher');
+  assert.equal(german('Memory'), 'Memory');
+  assert.equal(german('Memory for this session'), 'Memory für diese Sitzung');
+  // Deep research is the feature's name in German, including its dynamic status.
+  assert.equal(german('Deep research'), 'Deep research');
+  assert.equal(german('Deep research: on'), 'Deep research: ein');
+  // Options and dynamic status labels retain the related feature names as well.
+  assert.equal(german('Swarm'), 'Swarm');
+  assert.equal(german('Swarm: on'), 'Swarm: ein');
+  assert.equal(german('Research'), 'Research');
+  // Known structured server failures are extracted too; arbitrary tool diagnostics remain literal values.
+  for (const key of ['the agent gave no answer', 'Tailscale didn’t publish the app{0}.{1}']) assert.ok(read('strings.json')[key], `Missing visible server failure: ${key}`);
+  assert.equal(german('the agent gave no answer'), 'der Agent hat keine Antwort geliefert');
+  const phoneFailure = german('Tailscale didn’t publish the app (it took too long). It said: E_TIMEOUT');
+  assert.ok(phoneFailure?.startsWith('Tailscale konnte die App nicht bereitstellen'));
+  assert.ok(phoneFailure?.includes('E_TIMEOUT'));
+  // Library boards, leaderboards and the agents' shared work overview have distinct German names.
+  assert.equal(german('Board'), 'Board');
+  assert.equal(german('arena::Board'), 'Rangliste');
+  assert.equal(german('swarm::Board'), 'Arbeitsübersicht');
+  // Whole reset notices must keep spacing and German singular/plural forms.
+  assert.equal(german('1 reset available'), '1 Reset verfügbar');
+  assert.equal(german('2 resets available'), '2 Resets verfügbar');
+  assert.equal(german('Put {name} where each setting’s value goes: python train.py --lr {lr}'), 'Setze {name} als Platzhalter für den jeweiligen Parameterwert ein, zum Beispiel: python train.py --lr {lr}');
+  // Short tip actions are contextual so longer labels elsewhere stay descriptive.
+  assert.equal(german('tips::Skip tips'), 'Überspringen');
+  assert.equal(german('tips::Learn more'), 'Mehr');
+  // Product Skills retain their name in project views and search placeholders.
+  assert.equal(german('New skill'), 'Neuer Skill');
+  assert.equal(german('Search 286 skills'), '286 Skills durchsuchen');
+  assert.equal(german('Its own'), 'Eigene');
   assert.equal(german('Too many wrong links from this address. Try again in 1 minute.'), 'Zu viele falsche Links von dieser Adresse. Versuche es nach 1 Min. erneut.');
   assert.equal(german('Too many wrong links from this address. Try again in 2 minutes.'), 'Zu viele falsche Links von dieser Adresse. Versuche es nach 2 Min. erneut.');
   assert.equal(german('1 file changed'), '1 Datei geändert');
@@ -214,7 +246,7 @@ test('German covers the extracted catalog and preserves interpolation values', (
   assert.equal(dict['YYYY-MM-DD HH:MM'], 'YYYY-MM-DD HH:MM');
   assert.ok(dict['The start is a day written as YYYY-MM-DD'].includes('YYYY-MM-DD'));
   // Guide topic titles are translated even when the guide body is in English.
-  assert.equal(german('Research: papers, writing and the lab'), 'Forschung: Publikationen, Schreiben und Labor');
+  assert.equal(german('Research: papers, writing and the lab'), 'Research: Publikationen, Schreiben und Labor');
   // Product names and executable fragments are not ordinary prose.
   for (const key of ['Codex', 'Anthropic', 'Mermaid', 'Markdown', 'NORM.DIST(x, mean, standard_dev, cumulative)', 'linear infinite', 'codex resume {0}', 'npm install', 'kubectl rollout undo deployment/web', 'input, textarea, select, [contenteditable]', '“{0} (filled).pdf”']) {
     assert.equal(dict[key], key, `German must preserve ${key}`);

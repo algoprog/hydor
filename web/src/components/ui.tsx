@@ -411,6 +411,7 @@ export function Picker({
   width = 260,
   disabled,
   className,
+  translate,
 }: {
   icon?: ReactNode;
   label?: string;
@@ -420,6 +421,8 @@ export function Picker({
   width?: number;
   disabled?: boolean;
   className?: string;
+  /** Keep authored names and their tooltips in their original language. */
+  translate?: 'yes' | 'no';
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
@@ -427,7 +430,7 @@ export function Picker({
   if (label)
     return (
       <>
-        <SettingChip ref={ref} label={label} icon={icon} value={value} title={title} open={open} disabled={disabled} onClick={() => setOpen((o) => !o)} className={className} />
+        <SettingChip ref={ref} label={label} icon={icon} value={value} title={title} translate={translate} open={open} disabled={disabled} onClick={() => setOpen((o) => !o)} className={className} />
         <Popover anchor={ref} open={open} onClose={close} width={width} title={label}>
           {children(close)}
         </Popover>
@@ -440,6 +443,7 @@ export function Picker({
         type="button"
         disabled={disabled}
         title={title}
+        translate={translate}
         onClick={() => setOpen((o) => !o)}
         className={cx(
           'inline-flex h-8 max-w-[11rem] min-w-0 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[13px] text-fg-2 transition-colors hover:bg-bg-2 hover:text-fg disabled:opacity-50',
@@ -471,8 +475,8 @@ export const SettingLayout = createContext<'chip' | 'bare' | 'row'>('chip');
  */
 export const SettingChip = forwardRef<
   HTMLButtonElement,
-  { label: string; value: ReactNode; icon?: ReactNode; title?: string; open?: boolean; on?: boolean; disabled?: boolean; onClick: () => void; className?: string }
->(function SettingChip({ label, value, icon, title, open, on, disabled, onClick, className }, ref) {
+  { label: string; value: ReactNode; icon?: ReactNode; title?: string; open?: boolean; on?: boolean; disabled?: boolean; onClick: () => void; className?: string; translate?: 'yes' | 'no' }
+>(function SettingChip({ label, value, icon, title, open, on, disabled, onClick, className, translate }, ref) {
   const layout = useContext(SettingLayout);
   if (layout === 'row')
     return (
@@ -480,6 +484,7 @@ export const SettingChip = forwardRef<
         ref={ref}
         type="button"
         title={title}
+        translate={translate}
         disabled={disabled}
         onClick={onClick}
         aria-expanded={open}
@@ -501,6 +506,7 @@ export const SettingChip = forwardRef<
       ref={ref}
       type="button"
       title={title}
+      translate={translate}
       disabled={disabled}
       onClick={onClick}
       aria-expanded={open}

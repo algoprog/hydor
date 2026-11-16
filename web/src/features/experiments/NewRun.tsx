@@ -261,9 +261,8 @@ export function NewRun({ open, onClose, from, sweep: asSweep, onStarted }: NewRu
           label="Command"
           hint={
             mode === 'sweep' ? (
-              <>
-                Put {'{name}'} where each setting’s value goes: python train.py --lr {'{lr}'}
-              </>
+              // Keep technical placeholders in one complete translatable sentence.
+              'Put {name} where each setting’s value goes: python train.py --lr {lr}'
             ) : (
               'As you would type it in its folder. Metrics are read from what it prints: loss=0.42, or a JSON object on a line.'
             )
