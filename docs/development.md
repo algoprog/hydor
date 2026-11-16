@@ -27,6 +27,12 @@ mail server, GreenMail in Docker: its first lines say how to start one). One by 
 OUTDIR=dist/dev node scripts/build-server.mjs server/guide/guide-test.ts && DATA_DIR=/tmp/hydor-test-guide node dist/dev/guide-test.js
 ```
 
+Use on your phone (`server/phone/`) never runs the computer's own `tailscale` in tests: `phone-test.ts` plays it with
+`server/phone/fake-tailscale.mjs`, a stand-in that answers `version`, `status --json` and `serve` from a state file
+beside it (its first lines say how). To try the section in a scratch copy of the app, copy the fake into a folder of its
+own as `tailscale`, make it executable, and start the copy with `TAILSCALE_BIN` pointing at it (`scripts/guide-shots`
+passes it on).
+
 The terminal client (`hydor`, `server/tui/`) is a client of the same API and event socket as the web app, started
 from `server/cli.ts` (`bin/hydor.mjs` runs it). `server/tui/tui-test.ts` checks its parts (arguments, widths and
 wrapping, Markdown, each step's line, approvals, the input line's keys), `hydor run` against a small fake server

@@ -80,9 +80,9 @@ export class Push {
     return `vapid t=${head}.${claims}.${b64url(sig)}, k=${this.publicKey}`;
   }
 
-  /** Sends to every subscribed device; subscriptions the push service says are gone are forgotten. */
-  async send(message: object): Promise<number> {
-    const subs = this.db.prepare('select endpoint, p256dh, auth, origin from push_subs').all() as Sub[];
+  /** Sends to every subscribed device, or only to the one of `only` (its subscription's endpoint); subscriptions the push service says are gone are forgotten. */
+  async send(message: object, only?: string): Promise<number> {
+    const subs = (this.db.prepare('select endpoint, p256dh, auth, origin from push_subs').all() as Sub[]).filter((s) => !only || s.endpoint === only);
     const payload = Buffer.from(JSON.stringify(message));
     let sent = 0;
     await Promise.all(

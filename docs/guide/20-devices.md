@@ -1,6 +1,6 @@
 # Phones, other machines and sharing
 
-Hydor works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone, reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
+Hydor works from any browser: on your phone, on another computer, and across several machines that each run it. This topic covers using it on a phone (reached privately through Tailscale, set up in a few clicks), reaching it safely from elsewhere, working with other machines from one app, sharing a session with a read-only link, letting agents elsewhere start and steer sessions here, and adding the GitHub or Gitea accounts that pull requests open with.
 
 ![The app on a phone: a session that needs you](images/devices.webp)
 
@@ -13,11 +13,11 @@ The app on a phone is the same app as on a computer, laid out for a small screen
 - **One thing at a time.** Settings is a list, each section on a page of its own. Files shows one folder, named at the top (tap the name for the places, **‹** for the folder above), then a file on its own page with **Back**. The Git page lists your repositories, then opens one with a back arrow.
 - **Touch instead of a mouse.** In Files, a row's ⋯ opens its menu, and pressing and holding a row picks it, to act on several at once. The editor wraps long lines. The Terminal page adds a row of keys phones lack (Ctrl, Alt, Esc, Tab, the arrows and more).
 
-To reach the app on your phone at all, it has to be reachable from outside this computer: see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device).
+To reach the app on your phone at all, it has to be reachable from outside this computer. [Settings → App → Use on your phone](/settings?s=phone) does that in a few clicks, privately, with Tailscale: see [Use it on your phone with Tailscale](/guide/devices#use-it-on-your-phone-with-tailscale).
 
 ### Add it to your home screen
 
-Installed on your home screen, the app opens full screen with its own icon, like any other app. This needs the app to be served over HTTPS (see [Reach the app from another device](/guide/devices#reach-the-app-from-another-device)).
+Installed on your home screen, the app opens full screen with its own icon, like any other app. This needs the app to be served over HTTPS, as Use on your phone does. Opened on the phone, [Use on your phone](/settings?s=phone&find=Add%20to%20Home%20Screen) shows the steps for the phone in your hand under **On this phone → Add to Home Screen**, with an **Install** button where the browser offers one.
 
 - **iPhone or iPad**: open the app in the browser, tap **Share**, then **Add to Home Screen**. Open Hydor from its new icon from then on.
 - **Android**: open the app in your browser and use its menu's option to install the app or add it to the home screen.
@@ -39,6 +39,8 @@ A notification can reach your phone when a session finishes, fails or needs your
 1. On the phone, open [Settings → App → Notifications](/settings?s=notifications&find=Notify%20this%20device).
 2. Turn on **Notify this device** and allow notifications when the browser asks. Each device turns this on for itself.
 3. **Send a test** checks that it works (it shows when the app is not in view).
+
+Opened on the phone, [Use on your phone](/settings?s=phone) has the same **Notify this device** switch under **On this phone**, after **Add to Home Screen**, and its **Send a test** goes to that phone only.
 
 On an iPhone or iPad, add the app to your Home Screen first and open it from there: the browser can't receive them otherwise. If notifications are blocked for the site, allow them in the browser's settings first. A plain yes-or-no approval comes with **Approve** and **Deny** on the notification itself, where the phone shows buttons. More in [Inbox and notifications](/guide/inbox).
 
@@ -79,15 +81,45 @@ Stickers, polls and locations don't reach the agents: the chat asks for words, p
 
 ## Reach the app from another device
 
-Out of the box, the app answers only on the computer it runs on (port 8790 of `127.0.0.1`). Anyone who can reach it and knows the password can run any command as your user there, so treat access to it like SSH access to the computer. To use it from your phone or another computer, put HTTPS in front of it rather than opening the port to the network:
+Out of the box, the app answers only on the computer it runs on (port 8790 of `127.0.0.1`). Anyone who can reach it and knows the password can run any command as your user there, so treat access to it like SSH access to the computer. To use it from your phone or another computer, put HTTPS in front of it rather than opening the port to the network. The simplest way is built in: [Use it on your phone with Tailscale](/guide/devices#use-it-on-your-phone-with-tailscale), below. HTTPS is also what phones need to install the app and receive push notifications.
 
-- **Tailscale**: on this computer, `tailscale serve --bg 8790` serves the app at `https://<machine>.<tailnet>.ts.net`, reachable only from your own devices.
+### Use it on your phone with Tailscale
+
+Tailscale is a free app that links your own devices in a private network of their own, called a tailnet. [Settings → App → Use on your phone](/settings?s=phone) publishes Hydor on it, at an address like `https://laptop.tail1234.ts.net`. Only phones and computers signed in to your Tailscale account can open that address, never the public internet, and the app still asks for its password. It never turns on Tailscale Funnel, which would make the app public.
+
+1. Install Tailscale on this computer and sign in ([tailscale.com/download](https://tailscale.com/download)). The section's **Tailscale on this computer** row says when it is ready ("Signed in. This computer is laptop on you@example.com."). Until then it says what is missing (not installed, not running, not signed in, turned off) with **Get Tailscale** or the one thing to do, and **Check again**.
+2. Press [**Serve it on my devices**](/settings?s=phone&find=Serve%20it%20on%20my%20devices). The **Address** row shows the app's address, with **Copy** and **Open**. The app accepts that address by itself: there is no file to edit.
+3. Install Tailscale on your phone too, signed in to the same account.
+4. Scan the QR code under [**Open it on your phone**](/settings?s=phone&find=Open%20it%20on%20your%20phone) with the phone's camera (or type the address), and sign in with the app's password.
+5. The phone opens at **Use on your phone**, with **On this phone**: **Add to Home Screen** (on an iPhone, in Safari: Share → **Add to Home Screen**, which notifications need there; on Android, **Install**, or Chrome's menu → **Install app**), then **Notify this device**, and **Send a test**, which sends a notification to that phone only.
+
+**Stop serving** takes the app off your tailnet again. It undoes exactly what **Serve it on my devices** did: the one address it published, and the address it added to the ones the app accepts. Anything else you serve with Tailscale stays as it was. If you had already served the app with Tailscale by hand, the section shows it ("Set up outside this page, with Tailscale itself"), and **Stop serving** turns it off too.
+
+In a terminal, `hydor phone` says the same and draws the QR code; `hydor phone serve` and `hydor phone stop` do the rest (see [The terminal](/guide/terminal)).
+
+### When something stands in the way
+
+The section says what happened in a sentence, with the one thing to do:
+
+- **Serve and HTTPS certificates aren't turned on in your tailnet yet.** Tailscale gives a link that turns them on: **Turn them on** opens it (you sign in to Tailscale and confirm once), then **Try again**.
+- **On Linux, Tailscale lets only its operator change what it serves.** Run the command shown, once, in a terminal (`sudo tailscale set --operator=$USER`, with your user name in it), then **Try again**.
+- **Something else is already published at the address.** Hydor never replaces it: **Serve on port 8443** publishes the app at `https://laptop.tail1234.ts.net:8443` instead.
+- **Funnel is on for this address.** Tailscale Funnel was turned on by hand, so anyone on the internet can reach it: the section says so, with the command that turns it off.
+- **HTTPS certificates are off in your tailnet.** **Turn them on** opens Tailscale's DNS settings, where you turn on MagicDNS and HTTPS Certificates.
+
+### Other ways to reach it
+
+To set it up yourself instead, any of these work too:
+
+- **Tailscale by hand**: on this computer, `tailscale serve --bg 8790` serves the app at `https://<machine>.<tailnet>.ts.net`, reachable only from your own devices.
 - **Cloudflare Tunnel**: point a tunnel at `http://localhost:8790`. Cloudflare Access can add a second login in front.
 - **Your own reverse proxy**, such as Caddy, sending a hostname of yours to `127.0.0.1:8790`.
 
 If the proxy changes the `Host` header, tell the app the address people open it at: `ALLOWED_ORIGINS=https://agents.example.com`. Settings like this go in `~/.config/hydor.env` (one `NAME=value` per line) for an app installed as a service, or in `.env` for Docker Compose; restart the app afterwards.
 
-HTTPS is also what phones need to install the app and receive push notifications. Previews of dev servers use a port of their own (8791); see [Look at a dev server with Preview](/guide/files-git#look-at-a-dev-server-with-preview).
+Previews of dev servers use a port of their own (8791); see [Look at a dev server with Preview](/guide/files-git#look-at-a-dev-server-with-preview).
+
+### The password guards everything
 
 The password guards everything. A browser stays signed in for 30 days after you sign in. Wrong passwords are counted by the address they come from, over the last hour:
 
@@ -222,6 +254,9 @@ How pull requests are opened and followed: [Open a pull request from a session](
 
 ## Ask an agent
 
+- "Make this app reachable from my phone with Tailscale."
+- "What's this app's address on my tailnet? Is anything stopping my phone from opening it?"
+- "Stop serving the app on my tailnet."
 - "Make a read-only link to this session that works for a week."
 - "Turn off every share link on this session."
 - "Which of my machines are offline? Try reconnecting them."

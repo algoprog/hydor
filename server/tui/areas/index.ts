@@ -20,6 +20,7 @@ import { mcp } from './mcp.ts';
 import { memory } from './memory.ts';
 import { open } from './open.ts';
 import { outbox } from './outbox.ts';
+import { phone } from './phone.ts';
 import { plugins } from './plugins.ts';
 import { projects } from './projects.ts';
 import { sessions } from './sessions.ts';
@@ -29,7 +30,7 @@ import { tasks } from './tasks.ts';
 import type { Area, Verb } from './kit.ts';
 
 // The order help lists them in, within their groups.
-export const AREAS: Area[] = [projects, tasks, apps, library, experiments, sessions, inbox, outbox, away, agents, accounts, memory, guidelines, skills, plugins, mcp, connections, keys, settings, find, guide, open, api, machines];
+export const AREAS: Area[] = [projects, tasks, apps, library, experiments, sessions, inbox, outbox, away, agents, accounts, memory, guidelines, skills, plugins, mcp, connections, keys, settings, find, guide, open, api, machines, phone];
 
 /** An area by its name or an alias of it. */
 export const areaByName = (name: string): Area | undefined => AREAS.find((a) => a.name === name || a.aliases?.includes(name));

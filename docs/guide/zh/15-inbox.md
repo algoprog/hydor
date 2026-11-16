@@ -131,7 +131,7 @@
 
 在手机上设置：
 
-1. 在手机上打开应用。为此，应用必须通过 HTTPS 提供（[从其他设备访问应用](/guide/devices#reach-the-app-from-another-device)）。
+1. 在手机上打开应用。为此，应用必须通过 HTTPS 提供：[设置 → 应用 → 在手机上使用](/settings?s=phone)用 Tailscale 私密地做到这一点，它的二维码会在手机上打开应用，停在下面这些步骤处（[用 Tailscale 在手机上使用](/guide/devices#use-it-on-your-phone-with-tailscale)）。
 2. 在 iPhone 或 iPad 上，先把应用添加到主屏幕（**分享** → **添加到主屏幕**），然后从那里打开它。在此之前，这个设置会提示你这一点，并且无法开启。
 3. 打开**设置 → 应用 → 通知**，开启**通知此设备**。手机询问时，允许通知。
 4. 轻点**发送测试**，然后离开应用，看着通知送达。

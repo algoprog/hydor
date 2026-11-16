@@ -141,7 +141,8 @@ git clone https://github.com/algoprog/hydor && cd hydor
 ```
 
 Open the setup link, choose a password, and a short tour sets up the plans or models you want to use. To reach it from
-your phone, put HTTPS in front of it: see [remote access](docs/remote-access.md).
+your phone, Settings → App → Use on your phone serves it privately to your own devices with Tailscale and shows a QR
+code to scan; a tunnel or a proxy of your own works too: see [remote access](docs/remote-access.md).
 
 The installer also links the `hydor` command, to use Hydor from a terminal:
 
@@ -159,7 +160,7 @@ On a Mac, the app puts the command on your PATH by itself.
 - [Features](docs/features.md): everything the app does
 - [Installation](docs/install.md): requirements, the Mac app, Docker, the installer and the service, updates
 - [Configuration](docs/configuration.md): settings, where data lives, resetting the password
-- [Remote access](docs/remote-access.md): your phone and other devices, over HTTPS
+- [Remote access](docs/remote-access.md): your phone and other devices, over HTTPS (Tailscale in a few clicks)
 - [Several machines](docs/machines.md): agents on other machines, from one place
 - [How it works](docs/how-it-works.md): architecture and security
 - [Privacy](docs/privacy.md): what leaves your computer, host by host: no telemetry, and how to turn each connection off
