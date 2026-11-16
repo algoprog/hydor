@@ -6,7 +6,15 @@ Agents in Hydor remember what matters from one session to the next: facts about 
 
 ## What agents remember
 
-Memory is a set of short notes, called memory notes. Each is a sentence or two, at most 500 characters. Every agent the app runs shares them: Claude Code, Codex, Custom and the agents that speak ACP, such as Gemini CLI. Claude Code's and Codex's own memories stay off in the sessions the app runs, so these notes are the one memory they all share, and you can see and undo everything they keep. Each note belongs to one of three places:
+Memory has three parts, which work as one:
+
+- **Memory notes**: short facts every agent starts with, about you, a project or a session. Most of this topic is about them.
+- **Wiki memory**: longer articles, with their sources, that agents keep for each project (and one shared set), written from its documents and its work (see [Wiki memory](/guide/wiki-memory)).
+- **Documents**: the files themselves, which agents search and cite. They are kept in [Shared knowledge](/knowledge) and on each project's **Memory** tab, under **Documents** (see [Projects and knowledge](/guide/projects)).
+
+A project's **Memory** tab shows all three. When a document is added or changed, the helper model reads it, adds a few notes to the project's memory and updates its wiki (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)).
+
+Memory notes are short: each is a sentence or two, at most 500 characters. Every agent the app runs shares them: Claude Code, Codex, Custom and the agents that speak ACP, such as Gemini CLI. Claude Code's and Codex's own memories stay off in the sessions the app runs, so these notes are the one memory they all share, and you can see and undo everything they keep. Each note belongs to one of three places:
 
 - **About you**: lasting facts and preferences about you ("Prefers metric units", "Likes short answers", "Works mostly in Python"). Every session gets these.
 - **A project**: facts about one project, such as its conventions, the commands that build and test it, where things are, and decisions made. The project is the folder a session works in: the top folder of its Git repository when it is in one, or the folder itself otherwise. A worktree (a separate copy of a repository on its own branch) shares its main repository's notes, so the sessions on every branch see the same ones. A session in your home folder itself has no project notes: it gets only what is about you and its own.
@@ -110,26 +118,27 @@ While it is off:
 
 ## Settings → Memory
 
-Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". The **Memory** switch is beside the section's title, and **Learn more** under the title opens this topic. Below it, top to bottom, the page has six groups:
+Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". The **Memory** switch is beside the section's title, and **Learn more** under the title opens this topic. Below it, top to bottom, the page has six groups, and a line above them that names memory's three parts:
 
 - **Your profile**: what every agent gets about you, with **Edit** and a **⋯** menu (see [Your profile](/guide/memory#your-profile)).
 - **Notes**: every note kept, with **Add a note**, a search field and an index of places (see [Notes](/guide/memory#notes)).
 - **Learning**: **Learn from conversations**, **Tidy up automatically**, and the **Last tidy-up** with **What changed** and **Tidy up now**.
+- **Wiki memory**: whether projects keep a wiki, learning from new documents, and where wikis are kept (see [Wiki memory](#wiki-memory)).
 - **What agents get**: **Search by meaning**, **Notes each agent starts with** and **Profile length**.
-- **LLM Wiki**: wiki folders, Git exclusion and session checkpoints (see [LLM Wiki](#llm-wiki)).
 - **Your data**: **Bring in…** from other assistants, **Export** (Markdown, JSON) and **Clear all…**.
 
 A row's name can have an **(i)** button beside it, which says more about what the row does. On a phone, Settings opens as a list: tap **Memory** to open it on its own page. There the notes take the screen's whole width, and every menu on the page opens as a sheet from the bottom of the screen.
 
-### LLM Wiki
+### Wiki memory
 
-Turn **LLM Wiki** on, enter the **Wiki hub folder** as an absolute path on the computer running Hydor, and choose the **Project wiki folder**, relative to each project. Its default is `.wiki`; an existing project binding takes precedence. Press **Save**. When Hydor runs in a container, the paths must be accessible inside that container. Existing folders are not moved.
+The **Wiki memory** group has the settings for the articles agents keep for each project (see [Wiki memory](/guide/wiki-memory), which says what they are and how they work):
 
-**Ignore project wikis in Git** is on by default and can be turned off. It adds the project wiki to `.gitignore` when the project wiki is written. Files already tracked by Git remain tracked. Turning the option off does not remove an existing ignore entry.
+- **Wiki memory**: on at first, for the shared wiki and for every project unless its own **Settings** tab says otherwise.
+- **Learn from new documents**: on at first. New and changed documents add memory notes (a project's own only) and update the wiki, with the helper model.
+- **Wiki folder**: where the shared wiki is kept, and project wikis unless set below: an absolute path on the computer running Hydor, with **Browse**. Changing it when it has files opens a review to keep, combine or move them (see [Move the wiki folder](/guide/wiki-memory#move-the-wiki-folder)).
+- **Project wikis**: **In the wiki folder** (at first: nothing is written into your project folders) or **In each project’s folder**. With the second, **Folder inside each project** says where, and **Leave it out of Git** keeps it out of the project's repository.
 
-With memory and LLM Wiki on, Hydor's Custom agent can record session checkpoints in the hub before and after its own context compaction, as well as periodic event checkpoints. A checkpoint may contain a redacted agent summary or only event metadata; it is not a full transcript. For Claude Code and Codex, Hydor attempts a checkpoint when you start compaction from Hydor. Automatic compaction inside those agents does not have verified hook coverage. If a checkpoint fails, compaction can continue. Turning memory off for the session or globally prevents its wiki session capture and rehydration; existing checkpoints remain.
-
-Ask an agent to preview lessons learned from the session before saving them. The preview writes nothing; saving the selected lessons requires your confirmation. The preview uses indexed session messages, so the most recent messages may not be present yet.
+Memory itself must be on for new documents to add anything, and for session checkpoints: with memory turned off for a session or all of them, no checkpoints are saved and existing ones stay (see [Checkpoints and lessons learned](/guide/wiki-memory#checkpoints-and-lessons-learned)).
 
 ### Notes
 
@@ -308,6 +317,7 @@ You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a 
 - "Start every session with 20 notes instead of 10."
 - "Keep search by meaning on the CPU, so the graphics card stays free."
 - "Tidy up memory now, then tell me what it merged."
+- "Turn wiki memory off for the Taxes 2026 project and keep it on for the rest."
 - "Which notes has no agent needed for months? Delete the ones about the old website."
 - "The note about my trip to Lisbon is only true until 12 May: give it that end date."
 - "Which notes about this project are not checked yet? Check them against the code."

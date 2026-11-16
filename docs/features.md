@@ -214,6 +214,7 @@ agents that speak ACP and take MCP servers.
   Settings → Memory lists every note with when it was written, changed and last needed (each place its three
   newest first, with Show N more; each note two lines until you open it), lets you add your
   own, and suggests removing the ones no agent needed for months. Turn it off for one session or for all.
+  Memory is one system of three parts, notes, Wiki memory and documents (below), and Settings → Memory has the Wiki memory group.
   Bring in… there brings what other assistants know into memory, as notes you pick from: Claude Code's memory files
   (each project's, and CLAUDE.md), Codex's memories and AGENTS.md, the memory and instruction files of other agents on
   this computer (a memory store is read from a copy, so the agent can keep running), and the export ChatGPT or Claude
@@ -225,6 +226,23 @@ agents that speak ACP and take MCP servers.
   Keys and sign-in files are never copied, a skill's folder is capped (200 files, 512 KB each, 2 MB in all), and a
   skill whose name your skills have already is left out with a note. MCP servers are not brought over. Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
   background).
+- **Wiki memory** (formerly the LLM Wiki; Settings → Memory → Wiki memory): linked Markdown articles that agents keep for each
+  project, and one shared wiki, from its documents and its work, each with its sources (`wiki/` articles, `raw/` sources,
+  `index.md`, `log.md`). On for every project unless turned off: Settings has the default (it decides the shared wiki too) and
+  each project's Settings tab has its own switch (As in Settings, On or Off). By default the shared wiki is a folder in the task folders'
+  root (`~/Hydor/.wiki`) and each project's wiki is a folder inside it (`projects/<name>-<id>`), so nothing is written into your project
+  folders; or each project keeps it in its own folder (`.wiki`, left out of Git if you like), or a line in the project's `AGENTS.md`
+  (``- Wiki: `path` ``) names it. Every wiki folder is inside the wiki folder or its project, however it is set. Learn from new documents
+  (on unless turned off): when a document is added or changed in knowledge, the helper model reads it (its first 40,000
+  characters, one document at a time, after its base has been quiet for half a minute, at most 40 an hour), keeps its text as a
+  source, adds to up to three articles and writes up to two new ones, and, for a project's documents, adds up to three short notes to its
+  memory; a rewrite that would drop a fifth of an article, anything with a secret and an article over 20,000 characters are left out,
+  and each outcome is listed under Recent updates. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
+  write articles with the hash of what they read, and check its sources and links, only in their own project's wiki (or the shared one),
+  never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools. Changing the wiki
+  folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). The Custom agent keeps
+  one checkpoint per session when it compacts, and agents preview and, with your OK, save lessons learned. A project's Memory tab shows
+  its wiki read-only, with the updates.
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
@@ -234,9 +252,10 @@ agents that speak ACP and take MCP servers.
   once under a band of its colour, with the way back on the left, New session and one menu (its folder in Files,
   only its sessions in the sidebar, delete it), and its tabs under them (on a phone, those that do not fit under More
   at the row's end); its Overview has its sessions (with what each is doing), what it
-  holds in the Library and what every session in it gets (its folder, guidelines, documents, skills, assistant and
-  memory), a group's projects too, and its Library tab everything it holds there; its Settings tab sets its name,
-  colour, guidelines, the assistant its sessions start as (one tap among them) and its group, saved from a bar
+  holds in the Library and what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents,
+  skills and assistant), a group's projects too, and its Library tab everything it holds there; its Memory tab has its notes, its
+  wiki memory and its documents, one part at a time (`?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); its Settings tab sets its name,
+  colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch (saved at once) and its group, saved from a bar
   that shows once something changed. Its Files tab shows its folders; files come in from
   Files, a file's window or an agent's file cards with Add to a project. Its Skills tab lists every skill its
   sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own
@@ -294,8 +313,8 @@ agents that speak ACP and take MCP servers.
   text, as grep would; each passage cites its file and page. A folder on this computer is read where it is and
   kept up to date (of a text file over 4 MB, its first 4 MB). The page shows how far search by meaning has come,
   live, and why it waits when it does (setting itself up, starting, short of memory, stopped). Shared knowledge (Projects → Shared knowledge) is searched by every session; a project's own
-  documents (its Knowledge tab) by its sessions alone, which search the shared knowledge too unless the project
-  turns that off.
+  documents (its Memory tab, under Documents) by its sessions alone, which search the shared knowledge too unless the project
+  turns that off. A new or changed document also updates the project's notes and wiki memory (above), or the shared wiki for shared knowledge.
 - **Documents**: agents read PDF, Word, Excel, PowerPoint, OpenDocument and EPUB files, and make them with the
   app's document skills; the file viewer previews them, and finished files show as cards to open or download.
   Under every reply the documents the agent made or changed in the turn (PDF, Word, Excel, PowerPoint, OpenDocument,

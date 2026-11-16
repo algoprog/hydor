@@ -44,6 +44,11 @@ environment (`memory/venv`: set up a minute after the app first starts, unless i
 (`~/.cache/huggingface`, or `memory/hf` in Docker). Conversations themselves stay where the agents
 write them (`~/.claude/projects`, `~/.codex/sessions`); the app only reads them.
 
+Wiki memory's files are not in `DATA_DIR`: they are plain Markdown in the wiki folder from Settings → Memory → Wiki memory, an
+absolute path on the computer running Hydor (at first `.wiki` in the task folders' root, `~/Hydor/.wiki`), with each project's wiki
+inside it under `projects/` (or, if you choose that setting, in each project's own folder). In Docker, keep it in a folder you
+mount, so it outlives the container. The setting itself, and whether wiki memory is on, are kept in `DATA_DIR`.
+
 ## Password
 
 Change it in Settings → Password. If you forget it:

@@ -22,6 +22,11 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   them, talk to it over a message channel (its address, updates, quitting), and start it again whenever it exits. On
   Windows and from an AppImage, each version runs from a copy of itself in your local data folder, so agents that
   outlive the app and its updates never hold the app's own files.
+- **One memory, three parts.** Memory notes (short facts, in the app's database) are what every agent starts with;
+  Wiki memory is linked Markdown articles with their sources, kept in plain files in a folder of yours (a shared
+  wiki, and one folder for each project, by default inside it); documents are the files in knowledge bases, indexed
+  for search. When the indexer reads a new or changed document, the helper model adds a few notes and updates the
+  wiki, a little at a time, and agents read and write the wiki only through tools that keep it inside its folder.
 - **Your accounts, your machine.** The app talks to the agents through their official command-line tools and
   never sees your model credentials; sign-in happens in the agents' own login flows.
 

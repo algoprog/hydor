@@ -91,7 +91,7 @@ const APP_API: RunTool = {
     'To have the user fill in or check details on that card, give form: fields as a JSON schema’s properties, each named by its address in body ("name", "settings.results") and filled in from body; their answers go into body.',
     'Some things are only the user’s (the password, keys’ values, files and commands, answering approvals): those are refused, with where the user does them. A session’s permissions mode and spending caps change only on a card the user answers each time, even in Full access.',
     'This session is /api/sessions/this: when the user asks to change its model, effort or permissions, POST /api/sessions/this/config { model?, effort?, mode? } (values from GET /api/catalog/<agent>); memory off or on: PATCH /api/sessions/this/extra { memory: false | null }. A session in Plan mode only reads, but it can change its own settings that way (on a card), such as leaving Plan mode when asked.',
-    'Settings kept on each device: PUT /device { theme: dark|light|system, themeName, language: en|zh|el, sound, enter: join|queue, terminalSuggestions, sidebar, groupSessions }, for the pages showing this session.',
+    'Settings kept on each device: PUT /device { theme: dark|light|system, themeName, language: en|de|zh|el, sound, enter: join|queue, terminalSuggestions, sidebar, groupSessions }, for the pages showing this session.',
     'Links into the app for the user: its address plus the page (/projects/<id>, /settings?s=<section>, /guide/<topic>).',
   ].join(' '),
   inputSchema: {

@@ -210,6 +210,6 @@ fails when the guide no longer matches the app (a link that points nowhere, a Se
 it does not describe, a picture that is missing). The guide's pictures (`docs/guide/images`) come from a demo copy
 of the app with made-up data: `scripts/guide-shots` takes them again when a page they show changes.
 
-## LLM Wiki module
+## Wiki memory module
 
-The native LLM Wiki capability and its integration boundaries are described in [LLM Wiki development](llm-wiki-development.md).
+The native Wiki memory capability and its integration boundaries are described in [Wiki memory development](wiki-memory-development.md).
