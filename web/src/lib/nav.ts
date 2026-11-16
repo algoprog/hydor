@@ -37,10 +37,12 @@ export function filePath(path: string, line?: number) {
 }
 
 /**
- * The file shown in a dialog over the page (features/files/FilePeek), if any. `leave` closes it the way its own close does
- * (asking first about changes not saved) and says whether it did: what goes elsewhere from the dialog awaits it.
+ * The file shown in a dialog over the page (features/files/FilePeek), if any: a folder too (`dir` when it is known to be
+ * one; `sel`, the item picked in it), and a file opened from a folder there (`from`) has a way back to it. `leave` closes
+ * it the way its own close does (asking first about changes not saved) and says whether it did: what goes elsewhere from
+ * the dialog awaits it.
  */
-export const useFilePeek = create<{ file: { path: string; line?: number } | null; leave?: () => Promise<boolean> }>(() => ({ file: null }));
+export const useFilePeek = create<{ file: { path: string; line?: number; dir?: boolean; sel?: string; from?: string } | null; leave?: () => Promise<boolean> }>(() => ({ file: null }));
 
 /** Opens a file. From a session it shows in a dialog over the conversation, which stays where it was; elsewhere on the Files page. */
 export function openFile(path: string, line?: number) {
