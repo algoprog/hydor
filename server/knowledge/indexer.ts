@@ -279,7 +279,8 @@ export function fillSoon(db: DB, ms = 3000) {
 const vectorText = (r: { title: string; part: string | null; text: string }) => `${r.title}${r.part ? ` · ${r.part}` : ''}\n${r.text}`.slice(0, 2400);
 
 export async function fillVectors(db: DB): Promise<number> {
-  if (filling || !meaningOn(db)) return 0;
+  // Scheduled work may outlive the database that requested it.
+  if (!db.open || filling || !meaningOn(db)) return 0;
   filling = true;
   let made = 0;
   let held = false;
@@ -296,6 +297,8 @@ export async function fillVectors(db: DB): Promise<number> {
       if (!rows.length) break;
       // Starts the worker when memory allows; null when it cannot run now (tried again in a while).
       const vecs = await embed(db, rows.map(vectorText), 'document', { wait: true, timeoutMs: 180_000 });
+      // The database can close while the embedder is running.
+      if (!db.open) return made;
       if (!vecs || vecs.length !== rows.length) {
         held = true;
         break;
@@ -318,7 +321,7 @@ export async function fillVectors(db: DB): Promise<number> {
   // The pages hear the end, or why it waits (setting itself up, short of memory…), and it tries again in a while;
   // stopped, once Try again in Settings → Memory starts it again (the memory feature's event).
   if (made || held) tell('');
-  if (held && meaningHeld(db)?.why !== 'failed') fillSoon(db, RETRY_MS);
+  if (held && db.open && meaningHeld(db)?.why !== 'failed') fillSoon(db, RETRY_MS);
   return made;
 }
 

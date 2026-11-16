@@ -691,9 +691,13 @@ test('a sweep through the route: runs of one group, each with its settings; mist
   notices.length = 0;
   forgetNotices();
   await until(() => res.runs.every((r: RunRecord) => ended(r.id)()), 20_000, 'the sweep');
-  assert.equal(notices.length, 1, 'one notice for the whole sweep');
-  assert.match(notices[0].body, /^2 done\. Best loss 0\.25: lr=0\.25\.$/);
-  assert.equal(notices[0].title, 'Sweep sw');
+  // Earlier tests may finish runs asynchronously: count only this sweep and its runs.
+  const sweepUrls = new Set([`/system/experiments?sweep=${res.sweep.id}`, ...res.runs.map((r: RunRecord) => `/system/experiments/${r.id}`)]);
+  const sweepNotices = notices.filter((n) => sweepUrls.has(n.url ?? ''));
+  assert.equal(sweepNotices.length, 1, 'one notice for the whole sweep, none for individual runs');
+  assert.equal(sweepNotices[0].url, `/system/experiments?sweep=${res.sweep.id}`);
+  assert.match(sweepNotices[0].body, /^2 done\. Best loss 0\.25: lr=0\.25\.$/);
+  assert.equal(sweepNotices[0].title, 'Sweep sw');
   const got = (await http.inject({ method: 'GET', url: `/api/experiments/sweeps/${res.sweep.id}` })).json();
   assert.equal(got.runs.length, 2);
 });
