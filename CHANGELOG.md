@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.71.0 · 16 November 2026
+
+Wiki memory: each project keeps a wiki that grows from its documents and its work, beside its notes and documents on
+one Memory tab. Hydor in German, a sidebar you can resize and fold, and the buttons under every reply. With thanks to
+wirrockendigital, whose contributions brought German, the wiki this grew from, and the new navigation.
+
+- **Wiki memory**: each project keeps a wiki of Markdown articles with their sources. Agents read it and add to it as
+  they work, and when you add or change a document in a project's knowledge, the helper model reads it, updates or adds
+  a few articles and keeps a few short notes in the project's memory. It is on for every project: turn it off for all
+  of them in **Settings → Memory → Wiki memory**, or for one in its **Settings** tab. Project wikis are kept in the wiki
+  folder (`~/Hydor/.wiki`), so nothing is written into your project folders, unless you choose each project's own
+  folder. Agents only reach their own project's wiki and the shared one, never hidden files, and a folder move keeps
+  the old folder as a backup.
+- **One Memory tab per project**: a project's notes, its wiki and its documents in one place (**Notes · Wiki ·
+  Documents**), with what new documents changed lately. It replaces the Knowledge tab. **Learn from new documents** in
+  Settings → Memory stops the updates from documents, if you'd rather the helper model didn't read them.
+- **Hydor in German**: **Settings → General → Language → Deutsch**, and agents write to you in German too. A browser set
+  to German starts in German.
+- **The sidebar**: drag its edge to make it wider or narrower, and fold **Active** and **Projects**.
+- **Under each reply**: **Copy message**, **Fork from this reply** and **Read aloud** sit under every finished reply,
+  no longer only when you point at it. A Codex reply can be forked too, from the last reply of a finished turn.
+- **Turn off all skills** for a project, in its Skills tab's **⋯** menu, after you confirm.
+- **Fixes**: in Chinese and Greek, **Recent files**, **Home folder** and **Trash** in the file browser are translated;
+  branch names, the steps an agent writes in its plan and the names in menu labels are never translated.
+
 ## 0.70.0 · 16 November 2026
 
 Boards: pin answer cards from any reply to a page of the Library and have them keep themselves up to date. Answer
