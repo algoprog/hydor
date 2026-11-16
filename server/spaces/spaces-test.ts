@@ -41,6 +41,10 @@ if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-spaces-test-'));
 const db = openDb(path.join(tmp, 'test.db'));
+// The Claude capability probe must not depend on a locally installed agent.
+const claudeStub = path.join(tmp, process.platform === 'win32' ? 'claude-stub.cmd' : 'claude-stub');
+fs.writeFileSync(claudeStub, process.platform === 'win32' ? '@echo --plugin-dir\r\n' : '#!/bin/sh\nprintf "%s\\n" "--plugin-dir"\n', { mode: 0o755 });
+config.claudeBin = claudeStub;
 // The skill library: the app's own skills, learned ones and the views agents read, in the scratch folder.
 setFolders({ bundled: path.join(APP_ROOT, 'skills'), learned: path.join(tmp, 'learned'), view: path.join(tmp, 'view', 'naget') });
 setSettings(db, { taskRoot: path.join(tmp, 'Naget') });
