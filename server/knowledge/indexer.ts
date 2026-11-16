@@ -12,6 +12,7 @@ import { quantize, VECTOR_MODEL } from '../memory/vectors.ts';
 import { htmlMarkdown } from '../web/fetch.ts';
 import { baseRow, baseRows, docsOf, dropDoc, knowledgeSchema, saveDoc, sourcesOf } from './store.ts';
 import { wikiFileActive, wikiSourceRoot } from '../wiki/knowledge/bindings.ts';
+import { emitIndexed } from './events.ts';
 
 /** Folders never read: tools' caches, dependencies, version control. */
 const SKIP_DIRS = new Set(['node_modules', '.git', '.hg', '.svn', '__pycache__', '.venv', 'venv', 'dist', 'build', '.next', '.cache', 'target', '.idea', '.vscode']);
@@ -248,6 +249,8 @@ async function indexFile(db: DB, base: string, source: string, file: string) {
     if (!t) return;
     const chunks = passages(t.text);
     saveDoc(db, { ...doc, format: t.format, status: chunks.length ? 'indexed' : 'empty', error: chunks.length ? undefined : (t.note ?? 'No text in it'), chunks });
+    // New or changed, and read: whatever listens (wiki memory) may learn from it.
+    if (chunks.length) emitIndexed({ base, path: file, title: doc.title });
   } catch (e) {
     saveDoc(db, { ...doc, format: path.extname(file).slice(1).toLowerCase(), status: 'error', error: String((e as Error).message ?? e).slice(0, 300), chunks: [] });
   }
