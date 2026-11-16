@@ -38,10 +38,10 @@ export function WikiMigration({ preview, onCancel, onApply }: {
     </label>
   );
   return (
-    <Dialog open onClose={() => { if (!busy) onCancel(); }} title="Move the wiki?" width={620}>
+    <Dialog open onClose={() => { if (!busy) onCancel(); }} title="Move the wiki memory?" width={620}>
       <div className="space-y-4 text-[13.5px]">
-        <p className="text-fg-3">The current wiki contains files. Choose how to change its folder.</p>
-        <p className="text-fg-3">Pause other programs that write to either folder until the move is complete.</p>
+        <p className="text-fg-3">The shared wiki already has files. Choose what happens to them when its folder changes.</p>
+        <p className="text-fg-3">Pause other programs that write to either folder until the move is done.</p>
         <dl className="space-y-2 rounded-xl bg-bg-2 p-3">
           <div><dt className="font-medium">Current folder</dt><dd className="break-all text-fg-3" translate="no">{preview.source}</dd></div>
           <div><dt className="font-medium">New folder</dt><dd className="break-all text-fg-3" translate="no">{preview.target}</dd></div>
@@ -56,8 +56,8 @@ export function WikiMigration({ preview, onCancel, onApply }: {
         <fieldset className="space-y-2" disabled={busy}>
           <legend className="mb-2 font-medium">What should happen to the files?</legend>
           {option('keep', 'Use the new folder without moving files', 'The files in the current folder stay where they are.')}
-          {option('merge', preview.targetFiles ? 'Combine and move the files' : 'Move the wiki files', preview.targetFiles ? 'Combine both folders, then remove the original files after the transfer succeeds.' : 'Transfer the files, then remove them from the current folder after the transfer succeeds.')}
-          {preview.targetFiles > 0 && option('replace', 'Replace the files in the new folder', 'Replace the new folder with the current wiki, then remove the original files after the transfer succeeds.')}
+          {option('merge', preview.targetFiles ? 'Combine and move the files' : 'Move the wiki files', preview.targetFiles ? 'Combine both folders into the new one. The old folder is not deleted: it is kept as a hidden backup beside it.' : 'Move the files to the new folder. The old folder is not deleted: it is kept as a hidden backup beside it.')}
+          {preview.targetFiles > 0 && option('replace', 'Replace the files in the new folder', 'Use the current wiki in the new folder. Both old folders are kept as hidden backups beside them.')}
         </fieldset>
         {needsConflict && <fieldset className="space-y-2" disabled={busy}>
           <legend className="mb-2 font-medium">When a file exists in both folders</legend>
@@ -68,7 +68,7 @@ export function WikiMigration({ preview, onCancel, onApply }: {
           ] as const).map(([value, label]) => <label key={value} className="flex items-center gap-2"><input type="radio" name="wiki-migration-conflict" value={value} checked={conflict === value} onChange={() => setConflict(value)} />{label}</label>)}
           {conflict === 'oldest' && <p className="text-fg-3">Age is determined by the file modification time.</p>}
         </fieldset>}
-        {action && action !== 'keep' && <p className="text-fg-3">Files that are replaced or removed are saved in a backup before changes are applied.</p>}
+        {action && action !== 'keep' && <p className="text-fg-3">Nothing is lost: the old folder stays as a hidden backup beside the new one, and its path is shown after the move.</p>}
         <div className="flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button><Button variant="primary" disabled={!action || (needsConflict && !conflict) || busy} onClick={() => void apply()}>{busy ? 'Working…' : 'Continue'}</Button></div>
       </div>
     </Dialog>

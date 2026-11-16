@@ -45,7 +45,7 @@ export function NotesMenu({ path, hs, kept, onView, onFileSaved }: { path: strin
       onView(v);
       if (v.kept) {
         const id = v.kept.space;
-        useToasts.getState().push('ok', `${tr('Kept in the knowledge of')} ${v.kept.spaceName ?? ''}`, { label: tr('Open'), run: () => go(`/projects/${id}/knowledge`) });
+        useToasts.getState().push('ok', `${tr('Kept in the knowledge of')} ${v.kept.spaceName ?? ''}`, { label: tr('Open'), run: () => go(`/projects/${id}/memory?part=documents`) });
       } else toast(tr('No longer kept in the project'), 'ok');
     } catch (e) {
       toastError(e);
@@ -136,7 +136,7 @@ export function NotesMenu({ path, hs, kept, onView, onFileSaved }: { path: strin
               Keep in a project
             </MenuItem>
             {kept && (
-              <MenuItem icon={<BookOpen size={14} />} onClick={() => (close(), go(`/projects/${kept.space}/knowledge`))}>
+              <MenuItem icon={<BookOpen size={14} />} onClick={() => (close(), go(`/projects/${kept.space}/memory?part=documents`))}>
                 Open the project’s knowledge
               </MenuItem>
             )}
@@ -357,7 +357,7 @@ export function NotesList({
           ))
         )}
         {kept && (
-          <button type="button" onClick={() => go(`/projects/${kept.space}/knowledge`)} className="mx-4 mt-3 flex items-start gap-2 text-left text-[12px] leading-snug text-fg-3 hover:text-fg-2">
+          <button type="button" onClick={() => go(`/projects/${kept.space}/memory?part=documents`)} className="mx-4 mt-3 flex items-start gap-2 text-left text-[12px] leading-snug text-fg-3 hover:text-fg-2">
             <BookOpen size={13} className="mt-0.5 shrink-0" />
             <span>
               Kept in the knowledge of <span translate="no">{kept.spaceName ?? '…'}</span>, and updated as you change them.

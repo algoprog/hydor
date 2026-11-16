@@ -1,6 +1,8 @@
-// Settings for the native wiki; paths refer to the computer running Hydor.
+// Settings → Memory → Wiki memory: on for every project unless its own settings say otherwise, learning from new
+// documents, where the shared wiki and the project wikis are kept (paths refer to the computer running Hydor).
 import { useEffect, useRef, useState } from 'react';
-import { Popover, Switch } from '../../components/ui';
+import type { WikiMemorySettings } from '@shared/wiki';
+import { Popover, Segmented, Switch } from '../../components/ui';
 import { api, post, put } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { toastError } from '../../lib/store';
@@ -8,12 +10,7 @@ import { Group, Row } from '../settings/kit';
 import { WikiMigration, type WikiMigrationAction, type WikiMigrationConflict, type WikiMigrationPreview } from './WikiMigration';
 import { WikiFolderFinder } from './WikiFolderFinder';
 
-interface WikiSettingsState {
-  enabled: boolean;
-  hubPath: string;
-  projectPath: string;
-  gitIgnore: boolean;
-}
+type WikiSettingsState = WikiMemorySettings;
 type WikiMigrationResult = WikiSettingsState & { migration?: { sourceBackup: string; targetBackup: string | null } };
 
 /** Configure wiki defaults and review changes that may move existing files. */
@@ -105,22 +102,28 @@ export function WikiSettings() {
   };
   if (!settings) return null;
   return (
-    <Group title="LLM Wiki" hint="Keep linked knowledge from your sources in your own wiki folders." actions={<a href="/guide/llm-wiki" className="text-[12px] text-accent hover:underline">Learn more</a>}>
-      <Row label="LLM Wiki" control={<Switch label="LLM Wiki" on={settings.enabled} onChange={(enabled) => { setSettings((current) => current && { ...current, enabled }); save('enabled', enabled); }} />} />
-      <Row label="Wiki hub folder" hint="An absolute path on the computer running Hydor.">
+    <Group title="Wiki memory" hint="Articles agents keep for each project, from its documents and its work." actions={<a href="/guide/llm-wiki" className="text-[12px] text-accent hover:underline">Learn more</a>}>
+      <Row label="Wiki memory" hint="On for every project unless its own settings say otherwise." control={<Switch label="Wiki memory" on={settings.enabled} onChange={(enabled) => { setSettings((current) => current && { ...current, enabled }); save('enabled', enabled); }} />} />
+      <Row label="Learn from new documents" hint="New and changed documents add memory notes and update the wiki, with the helper model." control={<Switch label="Learn from new documents" on={settings.fromDocuments} onChange={(fromDocuments) => { setSettings((current) => current && { ...current, fromDocuments }); save('fromDocuments', fromDocuments); }} />} />
+      <Row label="Wiki folder" hint="Where the shared wiki is kept, and project wikis unless set below. An absolute path on the computer running Hydor.">
         <div className="flex gap-2">
-          <input aria-label="Wiki hub folder" value={settings.hubPath} disabled={checking || !!migration} onChange={(e) => { const hubPath = e.target.value; setSettings((current) => current && { ...current, hubPath }); }} onBlur={(e) => { if (e.relatedTarget !== findRef.current) changeHub(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} className="min-w-0 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-fg" />
+          <input aria-label="Wiki folder" translate="no" value={settings.hubPath} disabled={checking || !!migration} onChange={(e) => { const hubPath = e.target.value; setSettings((current) => current && { ...current, hubPath }); }} onBlur={(e) => { if (e.relatedTarget !== findRef.current) changeHub(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} className="min-w-0 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-fg" />
           <button ref={findRef} type="button" disabled={checking || !!migration} onClick={() => void browseHub()} className="shrink-0 rounded-lg border border-line bg-bg-2 px-3 py-2 text-sm text-fg hover:bg-bg-3 disabled:opacity-50">Browse</button>
         </div>
         <Popover anchor={findRef} open={finding} onClose={closeFinder} width={340}>
           <WikiFolderFinder anchor={findRef} onPick={pickHub} />
         </Popover>
-        {backups && <div role="status" className="mt-2 space-y-1 text-[12px] text-fg-3"><div><span>Backup of the previous folder</span>: <span translate="no" className="break-all">{backups.sourceBackup}</span></div>{backups.targetBackup && <div><span>Backup of the new folder</span>: <span translate="no" className="break-all">{backups.targetBackup}</span></div>}</div>}
+        {backups && <div role="status" className="mt-2 space-y-1 text-[12px] text-fg-3"><div>The old folder is kept as a hidden backup beside the new one.</div><div><span>Backup of the previous folder</span>: <span translate="no" className="break-all">{backups.sourceBackup}</span></div>{backups.targetBackup && <div><span>Backup of the replaced folder</span>: <span translate="no" className="break-all">{backups.targetBackup}</span></div>}</div>}
       </Row>
-      <Row label="Project wiki folder" hint="Relative to each project folder; existing bindings take precedence.">
-        <input aria-label="Project wiki folder" value={settings.projectPath} onChange={(e) => { const projectPath = e.target.value; setSettings((current) => current && { ...current, projectPath }); }} onBlur={(e) => save('projectPath', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-fg" />
+      <Row label="Project wikis" hint="Where each project's wiki is kept. In the wiki folder, nothing is written into your project folders.">
+        <Segmented size="sm" value={settings.projectWikis} onChange={(projectWikis) => { setSettings((current) => current && { ...current, projectWikis }); save('projectWikis', projectWikis); }} options={[{ value: 'hub', label: 'In the wiki folder' }, { value: 'folder', label: 'In each project’s folder' }]} />
       </Row>
-      <Row label="Ignore project wikis in Git" hint="Already tracked files remain tracked." control={<Switch label="Ignore project wikis in Git" on={settings.gitIgnore} onChange={(gitIgnore) => { setSettings((current) => current && { ...current, gitIgnore }); save('gitIgnore', gitIgnore); }} />} />
+      {settings.projectWikis === 'folder' && <>
+        <Row label="Folder inside each project" hint="Relative to the project's folder. A project whose AGENTS.md names a wiki folder uses that one.">
+          <input aria-label="Folder inside each project" translate="no" value={settings.projectPath} onChange={(e) => { const projectPath = e.target.value; setSettings((current) => current && { ...current, projectPath }); }} onBlur={(e) => save('projectPath', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-fg" />
+        </Row>
+        <Row label="Leave it out of Git" hint="Adds it to the project's .gitignore, in Git repositories only." control={<Switch label="Leave it out of Git" on={settings.gitIgnore} onChange={(gitIgnore) => { setSettings((current) => current && { ...current, gitIgnore }); save('gitIgnore', gitIgnore); }} />} />
+      </>}
       {migration && <WikiMigration preview={migration.preview} onCancel={cancelMigration} onApply={applyMigration} />}
     </Group>
   );

@@ -1,8 +1,8 @@
 // A space's own page. At the top, in the space's colour: its mark, name and what it is about, New session, and
 // one menu (open its folder in Files, show only its sessions in the sidebar, share it with people, delete it); its
 // tabs under them. Overview: its sessions, what it holds in the Library, who it is shared with (ShareDialog.tsx) and
-// what every session in it gets (its folder, guidelines, documents, skills, assistant and memory), with a group's spaces. Then its Library, its files (SpaceFiles), its
-// knowledge (documents only its sessions search, with the shared ones too unless it leaves them out), its skills
+// what every session in it gets (its folder, guidelines, memory, skills and assistant), with a group's spaces. Then its Library, its files (SpaceFiles), its
+// memory (its notes, its wiki memory, and its documents: those only its sessions search, with the shared ones too unless it leaves them out), its skills
 // (SpaceSkills) and its settings. It shows at once from the spaces the app knows, and fills in what it fetches.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearch } from 'wouter';
@@ -11,7 +11,7 @@ import type { KnowledgeBase } from '@shared/knowledge';
 import type { SessionSummary } from '@shared/types';
 import { isGroup, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, spaceColor, type FoundIn, type Space, type SpaceView } from '@shared/spaces';
 import { AgentIcon } from '../../components/AgentIcon';
-import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
+import { Button, cx, Empty, IconButton, inputCls, MenuItem, MenuSep, Popover, Segmented, Switch, Tabs, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { api, del, enc, patch, post } from '../../lib/api';
 import { tildify, timeAgo } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
@@ -32,9 +32,17 @@ import { openShareDialog } from './ShareHost';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { SpaceWiki } from '../wiki/SpaceWiki';
+import { useSpaceMemory, useWikiSettings, type SpaceMemory } from '../wiki/spaceMemory';
+import { PlacePage } from '../memory/MemoryNotes';
 import { loadSpaces, useSpaces } from './state';
 
-export type SpaceTab = 'overview' | 'library' | 'files' | 'knowledge' | 'wiki' | 'skills' | 'agents' | 'settings';
+export type SpaceTab = 'overview' | 'library' | 'files' | 'memory' | 'skills' | 'agents' | 'settings';
+
+/** The parts of the Memory tab (its address's `part`): notes first. */
+export type MemoryPart = 'notes' | 'wiki' | 'documents';
+
+/** The address of a project's Memory tab, on one of its parts. */
+export const memoryPath = (id: string, part?: MemoryPart) => `/projects/${id}/memory${part && part !== 'notes' ? `?part=${part}` : ''}`;
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
 
@@ -158,8 +166,11 @@ export function SpaceMenu({ s }: { s: Space }) {
   );
 }
 
+/** How much the project remembers: notes, wiki articles and documents (what is loaded so far). */
+const memoryTotal = (m: SpaceMemory, view?: SpaceView) => (m.notes ?? 0) + (m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0) + (view?.docs ?? 0) || undefined;
+
 /** Its mark, name and what it is about over a wash of its colour, New session and its menu, and its tabs. */
-function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
+function Top({ s, view, tab, memory }: { s: Space; view?: SpaceView; tab: SpaceTab; memory: SpaceMemory }) {
   const spaces = useSpaces();
   const home = useApp((x) => x.boot?.home);
   const wide = useMediaQuery('(min-width: 640px)');
@@ -196,8 +207,7 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
             { value: 'overview', label: 'Overview', icon: <LayoutDashboard size={15} /> },
             { value: 'library', label: 'Library', count: wide ? view?.library : undefined, icon: <LibraryBig size={15} /> },
             { value: 'files', label: 'Files', icon: <FolderOpen size={15} /> },
-            { value: 'knowledge', label: 'Knowledge', count: wide ? view?.docs : undefined, icon: <BookOpen size={15} /> },
-            { value: 'wiki', label: 'LLM-Wiki', icon: <BookOpen size={15} /> },
+            { value: 'memory', label: 'Memory', count: wide ? memoryTotal(memory, view) : undefined, icon: <Brain size={15} /> },
             { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined, icon: <Sparkles size={15} /> },
             { value: 'agents', label: 'Agents', icon: <Bot size={15} /> },
             { value: 'settings', label: 'Settings', icon: <Settings size={15} /> },
@@ -214,7 +224,7 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
 const RECENT = 6;
 
 /** Its sessions, what it holds in the Library, and what every session in it gets. */
-function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: string[] }) {
+function OverviewTab({ s, view, keys, memory }: { s: Space; view?: SpaceView; keys?: string[]; memory: SpaceMemory }) {
   const home = useApp((x) => x.boot?.home);
   const byKey = useSessions((x) => x.byKey);
   const spaces = useSpaces();
@@ -302,8 +312,8 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
                 <span className="text-fg-3">Nothing yet: add its guidelines</span>
               )}
             </Fact>
-            <Fact icon={<BookOpen size={16} />} label="Knowledge" onClick={() => to('knowledge')}>
-              {view?.docs ? plural(view.docs, 'document', 'documents') : <span className="text-fg-3">No documents yet</span>}
+            <Fact icon={<Brain size={16} />} label="Memory" onClick={() => to('memory')}>
+              {memorySummary(memory, view) || <span className="text-fg-3">Nothing yet</span>}
               {s.sharedKnowledge === false && <span className="block text-fg-3">Not the shared knowledge</span>}
             </Fact>
             <Fact icon={<Sparkles size={16} />} label="Skills" onClick={() => to('skills')}>
@@ -311,9 +321,6 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
             </Fact>
             <Fact icon={<UserRound size={16} />} label="Starts as" onClick={() => to('settings')}>
               {assistant ? <span translate="no">{assistant}</span> : <span className="text-fg-3">The agent picked on the start page</span>}
-            </Fact>
-            <Fact icon={<Brain size={16} />} label="Memory" onClick={() => go('/settings?s=memory')}>
-              What agents remember about it
             </Fact>
           </div>
         </Card>
@@ -335,6 +342,16 @@ function OverviewTab({ s, view, keys }: { s: Space; view?: SpaceView; keys?: str
       </aside>
     </div>
   );
+}
+
+/** "12 notes · 8 articles · 5 documents": what the project remembers, as far as it is known (articles only while wiki memory is on; none of a kind, none shown). */
+function memorySummary(m: SpaceMemory, view?: SpaceView) {
+  const parts: string[] = [];
+  if (m.notes) parts.push(plural(m.notes, 'note', 'notes'));
+  const articles = m.wiki?.on ? (m.wiki.articles?.length ?? 0) : 0;
+  if (articles) parts.push(plural(articles, 'article', 'articles'));
+  if (view?.docs) parts.push(plural(view.docs, 'document', 'documents'));
+  return parts.join(' · ');
 }
 
 /** Who the project is shared with (ShareDialog.tsx), each with what they did last; nothing while it is shared with no one. */
@@ -360,11 +377,66 @@ function SharedWith({ s }: { s: Space }) {
   );
 }
 
-// ---- Knowledge ----------------------------------------------------------------------------------------------------
+// ---- Memory ------------------------------------------------------------------------------------------------------
+
+/** The Memory tab: the project's notes, its wiki memory and its documents, one part at a time (the address's `part`). */
+function MemoryTab({ s, onSaved, memory }: { s: Space; onSaved: (next: Space) => void; memory: SpaceMemory }) {
+  const asked = new URLSearchParams(useSearch()).get('part');
+  const part: MemoryPart = asked === 'wiki' || asked === 'documents' ? asked : 'notes';
+  const home = useApp((x) => x.boot?.home);
+  const articles = memory.wiki?.on ? memory.wiki.articles?.length : undefined;
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Segmented<MemoryPart>
+          value={part}
+          onChange={(p) => go(memoryPath(s.id, p), true)}
+          options={[
+            { value: 'notes', label: <PartLabel name="Notes" n={memory.notes} /> },
+            { value: 'wiki', label: <PartLabel name="Wiki" n={articles} /> },
+            { value: 'documents', label: <PartLabel name="Documents" n={undefined} /> },
+          ]}
+        />
+        {part === 'notes' && <span className="min-w-0 flex-1 text-[12.5px] text-fg-3">Short facts agents start with in this project.</span>}
+        {part === 'wiki' && <span className="min-w-0 flex-1 text-[12.5px] text-fg-3">Articles agents keep for this project, from its documents and its work.</span>}
+        {part === 'documents' && <span className="min-w-0 flex-1 text-[12.5px] text-fg-3">The files themselves: agents search them and cite what they read.</span>}
+      </div>
+      {part === 'notes' ? (
+        memory.key ? (
+          <PlacePage key={memory.key} place={{ kind: 'repo', key: memory.key }} embedded />
+        ) : (
+          <div className="flex justify-center py-6 text-fg-3">
+            <Throbber size={24} />
+          </div>
+        )
+      ) : part === 'wiki' ? (
+        <SpaceWiki id={s.id} view={memory.wiki} version={memory.version} />
+      ) : (
+        <DocumentsPart s={s} onSaved={onSaved} wikiOn={memory.wiki?.on === true} />
+      )}
+      {part === 'notes' && memory.key && (
+        <p className="text-[12px] text-fg-3">
+          <span>Folder</span>: <span translate="no">{tildify(memory.key, home)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A part's name in the switch, with how many it holds when that is known and not nothing. */
+function PartLabel({ name, n }: { name: string; n?: number }) {
+  return (
+    <>
+      {name}
+      {!!n && <span className="tnum text-fg-3">{n}</span>}
+    </>
+  );
+}
 
 /** Documents only this space's sessions search, and whether they search the shared ones too. */
-function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void }) {
+function DocumentsPart({ s, onSaved, wikiOn }: { s: Space; onSaved: (next: Space) => void; wikiOn: boolean }) {
   const [st, load] = useKnowledge();
+  const wikiSettings = useWikiSettings();
   const spaces = useSpaces();
   const own = st?.bases.filter((b) => b.space === s.id) ?? [];
   const sharedDocs = (st?.bases ?? []).filter((b) => !b.space || (spaces && !spaces.some((x) => x.id === b.space))).reduce((n, b) => n + b.docs, 0);
@@ -398,6 +470,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
   };
   return (
     <div className="space-y-5">
+      {wikiOn && wikiSettings?.fromDocuments && <p className="text-[12.5px] text-fg-3">New and changed documents also update this project’s notes and wiki.</p>}
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2">
           <BookOpen size={16} />
@@ -419,7 +492,7 @@ function KnowledgeTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void
           <div className="text-[13.5px] font-medium">Also the documents of the projects it brings together</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {members.map((m) => (
-              <button key={m.id} type="button" onClick={() => go(`/projects/${m.id}/knowledge`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
+              <button key={m.id} type="button" onClick={() => go(memoryPath(m.id, 'documents'))} className="flex h-7 min-w-0 items-center gap-1.5 rounded-full bg-bg-2 pr-2.5 pl-1.5 text-[12.5px] hover:bg-bg-3">
                 <SpaceMark s={m} size={15} />
                 <span translate="no" className="min-w-0 truncate">
                   {m.name}
@@ -501,7 +574,7 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
 }
 
 /** The space itself: its name, what it is about, its colour, what its agents follow, the assistant they start as, its group. */
-function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void }) {
+function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: Space) => void; onWikiChanged: () => void }) {
   const [form, setForm] = useState<Partial<Space>>(s);
   const [confirm, confirmNode] = useConfirm();
   const assistants = useAssistantsState()?.assistants ?? [];
@@ -512,6 +585,18 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
   const sameMembers = (form.members ?? []).join() === (s.members ?? []).join();
   const dirty = !sameMembers || (['name', 'description', 'instructions', 'assistant', 'color'] as const).some((k) => (form[k] ?? '') !== (s[k] ?? ''));
   const color = form.color ?? s.color;
+  const wikiDefault = useWikiSettings()?.enabled ?? true;
+  const wikiChoice = s.wikiMemory === true ? 'on' : s.wikiMemory === false ? 'off' : 'inherit';
+  /** The project's own Wiki memory switch saves at once, apart from the form: true, false, or null (as in Settings). */
+  const setWiki = async (choice: 'inherit' | 'on' | 'off') => {
+    if (choice === wikiChoice) return;
+    try {
+      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { wikiMemory: choice === 'inherit' ? null : choice === 'on' }));
+      onWikiChanged();
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const save = async () => {
     try {
       onSaved(
@@ -591,6 +676,25 @@ function SettingsTab({ s, onSaved }: { s: Space; onSaved: (next: Space) => void 
             ))}
           </div>
         </Row>
+        <Row title="Wiki memory" sub="Articles agents keep for this project, from its documents and its work.">
+          <Segmented
+            size="sm"
+            value={wikiChoice}
+            onChange={(c) => void setWiki(c)}
+            options={[
+              { value: 'inherit', label: wikiDefault ? 'As in Settings (On)' : 'As in Settings (Off)' },
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+          />
+          <p className="text-[12.5px] leading-snug text-fg-3">
+            Its documents and its work become articles with sources, which agents can read and add to.{' '}
+            <button type="button" onClick={() => go('/settings?s=memory')} className="text-accent hover:underline">
+              Settings → Memory
+            </button>{' '}
+            has the default for every project.
+          </p>
+        </Row>
         <Row title="The projects it brings together" sub="A group: its sessions work with all of them, their files, documents and guidelines.">
           {inGroups.length ? (
             <div className="text-[12.5px] text-fg-3">{tr(`It is in ${inGroups.map((g) => g.name).join(', ')}, so it cannot bring other projects together itself.`)}</div>
@@ -639,6 +743,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   }, [share, !!view]);
   const [data, setData] = useState<{ space: Space; sessions: string[] } | null>(null);
   const [gone, setGone] = useState(false);
+  const memory = useSpaceMemory(id, (data?.space ?? view)?.folder);
   useEffect(() => {
     let live = true;
     api<{ space: Space; sessions: string[] }>(`/api/projects/${enc(id)}`).then(
@@ -679,7 +784,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
   const saved = (next: Space) => setData((d) => ({ space: next, sessions: d?.sessions ?? [] }));
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <Top s={s} view={view} tab={tab} />
+      <Top s={s} view={view} tab={tab} memory={memory} />
       {tab === 'files' ? (
         // The folder scrolls in its own box, so the page keeps its height.
         <div className="min-h-0 flex-1">
@@ -690,16 +795,14 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1120px] px-3 py-5 sm:px-6 sm:py-6">
-            {tab === 'wiki' ? (
-              <SpaceWiki id={s.id} />
-            ) : tab === 'knowledge' ? (
-              <KnowledgeTab s={s} onSaved={saved} />
+            {tab === 'memory' ? (
+              <MemoryTab s={s} onSaved={saved} memory={memory} />
             ) : tab === 'skills' ? (
               <SpaceSkillsTab s={s} />
             ) : tab === 'agents' ? (
               <AgentsBoard space={s} />
             ) : tab === 'settings' ? (
-              <SettingsTab s={s} onSaved={saved} />
+              <SettingsTab s={s} onSaved={saved} onWikiChanged={memory.reload} />
             ) : tab === 'library' ? (
               view ? (
                 <div className="space-y-4">
@@ -714,7 +817,7 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
                 </div>
               ) : null
             ) : (
-              <OverviewTab s={s} view={view} keys={data?.sessions} />
+              <OverviewTab s={s} view={view} keys={data?.sessions} memory={memory} />
             )}
           </div>
         </div>
