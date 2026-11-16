@@ -124,7 +124,7 @@ import {
   type Look,
 } from './ops';
 import type { AskScope, ModelDoc, ModelEditorProps } from '../kinds';
-import { tr } from '../../../i18n/runtime';
+import { tr, trIn } from '../../../i18n/runtime';
 import { Presenter, Slideshow } from './Present';
 import { presentMoreMenu, PresentMoreItems, ShowAs, type ShowHow } from './PresentMore';
 import { choosePicture as chooseFile, uploadPicture as upload } from '../pictures';
@@ -1919,7 +1919,7 @@ export function SlidesEditor({
   const presentButtons = (
     <div className="flex shrink-0 items-center">
       <Button size="sm" variant="primary" icon={<Play size={14} />} onClick={() => setPresent({ from: index, presenter: false })} className={cx(mid && 'rounded-r-none')}>
-        {mid ? 'Present' : ''}
+        {mid ? trIn('slides', 'Present') : ''}
       </Button>
       {mid && (
         <Button ref={anchors.present} size="sm" variant="primary" aria-label="More ways to present" onClick={() => setMenu(menu === 'present' ? null : 'present')} className="rounded-l-none border-l border-accent-fg/25 px-1.5">

@@ -1,10 +1,11 @@
 // The languages the app is shown in. English is the app's own; the others come from a dictionary each
 // (web/src/i18n), and agents are asked to reply in the language picked.
 
-export type Lang = 'en' | 'zh' | 'el';
+export type Lang = 'en' | 'de' | 'zh' | 'el';
 
 export const LANGS: { id: Lang; name: string; english: string }[] = [
   { id: 'en', name: 'English', english: 'English' },
+  { id: 'de', name: 'Deutsch', english: 'German' },
   { id: 'zh', name: '中文（简体）', english: 'Chinese (Simplified)' },
   { id: 'el', name: 'Ελληνικά', english: 'Greek' },
 ];

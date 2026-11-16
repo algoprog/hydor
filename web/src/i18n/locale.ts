@@ -10,7 +10,7 @@ export function currentLang(): Lang {
   return isLang(v) ? v : preferred(navigator.languages ?? [navigator.language]);
 }
 
-const TAGS: Partial<Record<Lang, string>> = { zh: 'zh-CN', el: 'el-GR' };
+const TAGS: Partial<Record<Lang, string>> = { de: 'de-DE', zh: 'zh-CN', el: 'el-GR' };
 
 /** For toLocaleString, Intl.DateTimeFormat and the like; undefined (the browser's) in English. */
 export const LOCALE: string | undefined = (() => {
