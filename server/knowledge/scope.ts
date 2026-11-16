@@ -6,6 +6,7 @@ import type { DB } from '../db.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { baseRows, type BaseRow } from './store.ts';
+import { isWikiBase, wikiBaseVisible } from '../wiki/knowledge/bindings.ts';
 
 /** The space a session works in: its own, else that of the session that started it. */
 export function spaceOfSession(db: DB, extra: SessionExtra): string | null {
@@ -24,6 +25,8 @@ export function basesFor(db: DB, space: string | null): (BaseRow & { own: boolea
   const members = new Map((sp?.members ?? []).filter((id) => spaces.has(id)).map((id) => [id, spaces.get(id)!.name]));
   const out: (BaseRow & { own: boolean; from?: string })[] = [];
   for (const b of baseRows(db)) {
+    if (!wikiBaseVisible(db, b.id)) continue;
+    if (b.space && !spaces.has(b.space) && isWikiBase(db, b.id)) continue;
     if (sp && b.space === sp.id) out.push({ ...b, own: true });
     else if (b.space && members.has(b.space)) out.push({ ...b, own: true, from: members.get(b.space) });
     else if ((!b.space || !spaces.has(b.space)) && sp?.sharedKnowledge !== false) out.push({ ...b, own: false });

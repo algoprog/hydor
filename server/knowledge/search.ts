@@ -8,6 +8,7 @@ import { anyWords } from '../memory/search.ts';
 import { BYTES, queryTable, scale, scoreAt } from '../memory/vectors.ts';
 import { vectorBlock } from './indexer.ts';
 import { baseRows, knowledgeSchema } from './store.ts';
+import { wikiBaseVisible, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 
 export type SearchMode = 'auto' | 'words' | 'meaning' | 'exact';
 
@@ -119,7 +120,7 @@ export interface SearchResult {
 /** The passages about a question in the bases (all of them, or all `within`, when none are named), best first. */
 export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; within?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null }): Promise<SearchResult> {
   knowledgeSchema(db);
-  const all = baseRows(db).filter((b) => !o.within || o.within.includes(b.id));
+  const all = baseRows(db).filter((b) => wikiBaseVisible(db, b.id) && (!o.within || o.within.includes(b.id)));
   const names = new Map(all.map((b) => [b.id, b.name]));
   const bases = o.bases?.length ? all.filter((b) => o.bases!.includes(b.id) || o.bases!.some((n) => n.toLowerCase() === b.name.toLowerCase())).map((b) => b.id) : all.map((b) => b.id);
   const limit = Math.max(1, Math.min(o.limit ?? 8, 50));
@@ -155,7 +156,7 @@ export async function searchKnowledge(db: DB, o: { query: string; bases?: string
   const hits: KnowledgeHit[] = [];
   for (const [id, f] of fused) {
     const r = rows.get(id);
-    if (!r) continue;
+    if (!r || !wikiDocumentVisible(db, r.base, r.path)) continue;
     hits.push({ ref: `kb:${r.id}`, base: r.base, baseName: names.get(r.base) ?? r.base, docId: r.doc, path: r.path, title: r.title, part: r.part ?? undefined, text: excerpt(r.text, query), score: f.rrf, by: f.by });
   }
   // Exact text keeps reading order; the rest goes by rank.
