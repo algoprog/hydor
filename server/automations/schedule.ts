@@ -138,7 +138,7 @@ export function parseCron(expr: string): Cron {
   };
 }
 
-function cronDay(c: Cron, day: { mo: number; d: number; wd: number }): boolean {
+export function cronDay(c: Cron, day: { mo: number; d: number; wd: number }): boolean {
   if (!c.month.has(day.mo)) return false;
   const dom = c.dom.has(day.d);
   const dow = c.dow.has(day.wd);

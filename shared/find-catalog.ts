@@ -186,6 +186,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['plugins', 'Codex', 'codex plugins marketplaces', 'Codex’s own plugins and marketplaces', 'Codex’s plugins'],
   // Agents › Scheduled tasks
   ['tasks', 'New task', 'schedule cron automation task timer webhook recurring', 'Agent work that starts by itself', 'New scheduled task'],
+  ['tasks', 'Week view', 'calendar week month schedules what runs tomorrow when ran last week history timeline agents apps watchers webhooks', 'Everything that runs by itself, on a week: what ran and what runs next', 'Scheduled tasks on a calendar'],
   ['tasks', 'Start from an example', 'task examples templates automation ideas', 'Ready-made scheduled tasks', 'Scheduled task examples'],
   ['tasks', 'Morning brief', 'daily news weather calendar summary', 'A ready-made scheduled task'],
   ['tasks', 'News on a topic', 'news watch topic daily', 'A ready-made scheduled task'],
@@ -328,6 +329,13 @@ const PAGES: [string, string, string, string, string][] = [
   ['published', 'Published', '/library?tab=published', 'published public share link site pages folder', 'Pages and sites anyone with the link can open'],
   ['preview', 'Preview', '/preview', 'dev server localhost web app browser phone tablet screen picture screenshot', 'The web apps running on this computer, to look at from any device'],
   ['agents', 'Agents', '/agents', 'agents assistants presets team helpers subagents child sessions schedules scheduled automations tiers budget researcher writer coder tutor planner analyst results hand back history rows spreadsheet email report versions history undo go back bring back examples checks test try', 'Your agents: what each does, where and when it works, what it thinks with, and whom it asks'],
+  [
+    'schedules',
+    'Schedules',
+    '/agents/schedules',
+    'schedules schedule calendar week month day view timetable what runs tomorrow today when next run what ran last week history failed runs cost scheduled tasks automations agents apps watchers webhooks cron recurring pause',
+    'Everything that runs by itself, on a week: what ran and how it went, what runs next, and each day’s cost',
+  ],
   ['new-agent', 'New agent', '/agents?new=1', 'make create new agent assistant describe draft schedule team helper', 'An agent of your own, drafted from what you say it should do'],
   ['install-agent', 'Install an agent from a file', '/agents?install=1', 'install agent file hydor-agent import share colleague friend another computer download export copy move', 'An agent someone gave you as a file: see what it brings and needs, then install it'],
   ['usage', 'Usage and limits', '/usage', 'usage limits plan quota reset tokens system', 'What you have used of each plan, and when it resets (System → Usage)'],

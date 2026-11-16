@@ -2,8 +2,9 @@
 // often, once, by a cron expression, when a webhook calls, or when a watcher sees a change. Each run
 // starts a new session (or posts into one you pick) with the task's prompt, and the task's history
 // keeps how each run went. Examples start common ones from a short form.
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, ChevronDown, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MailX, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearch } from 'wouter';
+import { CalendarClock, CalendarDays, ChevronDown, Copy, CopyPlus, Eye, FlaskConical, ListChecks, MailX, MoreHorizontal, Pencil, Play, Plus, Trash2, Webhook } from 'lucide-react';
 import { scheduleText, type ScheduledTask, type TaskApp, type TaskDraft, type TaskRun, type TaskSchedule } from '@shared/automations';
 import { hookHelp } from '@shared/engineering';
 import type { AppDef } from '@shared/apps';
@@ -667,6 +668,13 @@ export function TaskEditor({
 export function TasksSettings() {
   const [tasks, setTasks] = useState<ScheduledTask[] | null>(null);
   const [editing, setEditing] = useState<{ task: ScheduledTask | null; draft?: TaskDraft } | null>(null);
+  // ?task=<id> (Schedules' Edit) opens that task's form once its list is here.
+  const asked = new URLSearchParams(useSearch()).get('task');
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    const t = asked && asked !== opened.current ? tasks?.find((x) => x.id === asked) : undefined;
+    if (t) (opened.current = asked, setEditing({ task: t }));
+  }, [asked, tasks]);
   const load = () =>
     api<{ tasks: ScheduledTask[] }>('/api/tasks')
       .then((r) => setTasks(r.tasks))
@@ -679,6 +687,9 @@ export function TasksSettings() {
   return (
     <Stack>
       <SectionActions>
+        <Button size="sm" variant="ghost" icon={<CalendarDays size={14} />} onClick={() => go('/agents/schedules')} title="Everything that runs by itself, on a week: what ran and what runs next">
+          Week view
+        </Button>
         <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => setEditing({ task: null })}>
           New task
         </Button>
