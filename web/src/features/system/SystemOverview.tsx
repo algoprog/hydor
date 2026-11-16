@@ -91,8 +91,9 @@ function Health() {
     ...(disk != null && root ? [{ icon: <HardDrive size={13} />, label: 'Disk', value: disk, sub: `${(root.avail / 2 ** 30).toFixed(0)} GB free` }] : []),
     ...(gpu != null ? [{ icon: <Microchip size={13} />, label: s.gpus.length > 1 ? `Graphics × ${s.gpus.length}` : 'Graphics', value: gpu, sub: s.gpus[0].name.replace('NVIDIA ', '') }] : []),
   ];
+  // Hardware meters use the system vocabulary; Memory here means RAM, not saved agent notes.
   return (
-    <button type="button" onClick={() => go('/system/monitor')} className="block w-full rounded-2xl border border-line bg-panel px-4 py-3.5 text-left transition-colors hover:border-line-2" title="Open Monitor">
+    <button data-i18n="system" type="button" onClick={() => go('/system/monitor')} className="block w-full rounded-2xl border border-line bg-panel px-4 py-3.5 text-left transition-colors hover:border-line-2" title="Open Monitor">
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12.5px] text-fg-3">
         <span className="h-1.5 w-1.5 rounded-full bg-ok" />
         <span translate="no" className="font-medium text-fg">

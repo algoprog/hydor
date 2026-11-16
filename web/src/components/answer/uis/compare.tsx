@@ -2,7 +2,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, CircleX, Coins, Dices, Flag, Info, MessageSquarePlus, Minus, RotateCcw, RotateCw, Shuffle, ThumbsDown, ThumbsUp, TriangleAlert, Trophy, X } from 'lucide-react';
-import { tr } from '../../../i18n/runtime';
+import { tr, trIn } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
 import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
@@ -1452,7 +1452,8 @@ function DrawNames({ options, count, done, title }: { options: PickOption[]; cou
       {done && options.length > 0 && (
         <div className={cx('flex flex-wrap items-center gap-2', slots && 'mt-3')}>
           <Btn primary={!kept} icon={<Shuffle size={14} />} onClick={draw} disabled={!!shuffle}>
-            {kept ? tr('Draw again') : k > 1 ? tr('Draw {0}').replace('{0}', String(k)) : tr('Draw')}
+            {/* A random draw has a different meaning from the drawing tools. */}
+            {kept ? trIn('random', 'Draw again') : k > 1 ? trIn('random', 'Draw {0}').replace('{0}', String(k)) : trIn('random', 'Draw')}
           </Btn>
           {kept && !shuffle && (
             <Btn primary icon={<MessageSquarePlus size={14} />} onClick={() => ask(withTitle(title, tr('Drawn: {0}').replace('{0}', kept.map((i) => options[i].label).join(', '))))}>

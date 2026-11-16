@@ -252,7 +252,8 @@ export function Tips() {
             <p className="mt-1 text-[13px] leading-relaxed text-fg-2">{text.body}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1 border-t border-line bg-bg-1 px-2.5 py-2">
+        {/* Keep every action reachable when translated labels need another row. */}
+        <div data-i18n="tips" className="flex flex-wrap items-center gap-1 border-t border-line bg-bg-1 px-2.5 py-2">
           <Button size="sm" variant="ghost" onClick={skip} title="Stop showing tips, on every device">
             Skip tips
           </Button>

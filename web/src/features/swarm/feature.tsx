@@ -63,7 +63,8 @@ function LeadDock({ s, mode }: { s: SessionSummary; mode: SwarmMode }) {
             </>
           )}
         </span>
-        <button type="button" onClick={() => setOpen(true)} className="shrink-0 font-medium text-accent hover:underline">
+        <button data-i18n="swarm" type="button" onClick={() => setOpen(true)} className="shrink-0 font-medium text-accent hover:underline">
+          {/* This is the agents' shared work overview, not a Library board. */}
           Board
         </button>
       </div>
@@ -86,7 +87,8 @@ function MemberDock({ lead, mode }: { lead: SessionSummary; mode: SwarmMode }) {
           </span>
           <span className="max-sm:hidden">: its posts and report go there</span>
         </span>
-        <button type="button" onClick={() => setOpen(true)} className="shrink-0 font-medium text-accent hover:underline">
+        <button data-i18n="swarm" type="button" onClick={() => setOpen(true)} className="shrink-0 font-medium text-accent hover:underline">
+          {/* This is the agents' shared work overview, not a Library board. */}
           Board
         </button>
         <button type="button" onClick={() => openSession(lead.key)} className="shrink-0 font-medium text-accent hover:underline">

@@ -48,6 +48,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node scripts/test.mjs",
     "i18n:extract": "node scripts/i18n-extract.mjs",
+    "i18n:audit": "node scripts/i18n-audit.mjs",
     "find:vectors": "OUTDIR=dist/dev node scripts/build-server.mjs scripts/find-vectors.ts && DATA_DIR=/tmp/hydor-find-vectors node dist/dev/find-vectors.js",
     "guide:settings": "node scripts/guide-settings.mjs",
     "start": "node dist/server/index.js",

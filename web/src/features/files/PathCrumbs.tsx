@@ -98,7 +98,7 @@ export function PathCrumbs({ path, className, after, compact }: { path: string; 
               …
             </button>
           ) : (
-            <Step dir={s.dir} label={s.label} icon={i === 0 ? top.icon : undefined} bare={i === 0} onDir={() => go(s)} fit={i > 0} />
+            <Step dir={s.dir} label={s.label} appLabel={i === 0} icon={i === 0 ? top.icon : undefined} bare={i === 0} onDir={() => go(s)} fit={i > 0} />
           )}
         </span>
       ))}

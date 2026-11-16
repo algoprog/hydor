@@ -127,10 +127,10 @@ function FileBody({
 
 // The place last shown (a folder, a search…), which the first tab goes back to, and how that tab shows it.
 let lastPlace = '/files';
-let lastHere: { icon: ReactNode; label: string } | null = null;
+let lastHere: { icon: ReactNode; label: string; appLabel: boolean } | null = null;
 
 /** Open files as tabs, after the place they were opened from. */
-function FileTabs({ current, place }: { current: string | null; place: { icon: ReactNode; label: string } }) {
+function FileTabs({ current, place }: { current: string | null; place: { icon: ReactNode; label: string; appLabel: boolean } }) {
   const tabs = useUI((s) => s.tabs).filter((t) => t.kind === 'file');
   const dirty = useFiles((s) => s.dirty);
   if (!tabs.length) return null;
@@ -146,7 +146,8 @@ function FileTabs({ current, place }: { current: string | null; place: { icon: R
     <div className="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-line px-2 [&::-webkit-scrollbar]:hidden">
       <div onClick={() => go(lastPlace)} title="Back to the folder" className={cx(tab, 'px-3', !current ? 'border-line bg-bg text-fg' : 'border-transparent text-fg-3 hover:text-fg-2')}>
         <span className="shrink-0 text-fg-3">{place.icon}</span>
-        <span translate="no" className="min-w-0 truncate">
+        {/* The first tab names an app place or an authored folder, just like the page title. */}
+        <span translate={place.appLabel ? undefined : "no"} className="min-w-0 truncate">
           {place.label}
         </span>
       </div>
@@ -252,12 +253,12 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
   const onFile = (p: string, l?: number) => showInFiles(p, l);
   const shown =
     place === 'search'
-      ? { icon: <Search size={14} />, label: 'Search' }
+      ? { icon: <Search size={14} />, label: 'Search', appLabel: true }
       : place === 'recent'
-        ? { icon: <Clock size={14} />, label: 'Recent files' }
+        ? { icon: <Clock size={14} />, label: 'Recent files', appLabel: true }
         : place === 'trash'
-          ? { icon: <Trash2 size={14} />, label: 'Trash' }
-          : { icon: dir === home ? <House size={14} /> : <Folder size={14} />, label: dir === home ? 'Home folder' : basename(dir) || dir };
+          ? { icon: <Trash2 size={14} />, label: 'Trash', appLabel: true }
+          : { icon: dir === home ? <House size={14} /> : <Folder size={14} />, label: dir === home ? 'Home folder' : basename(dir) || dir, appLabel: dir === home };
   if (!path) lastHere = shown;
   const here = path && lastHere ? lastHere : shown;
 
@@ -294,7 +295,8 @@ export function FilesPage({ path, line, search }: { path: string | null; line?: 
       className="-ml-1 flex max-w-full min-w-0 items-center gap-1 rounded-lg px-1 text-left hover:bg-bg-2 active:bg-bg-2"
       aria-label="Places"
     >
-      <span translate="no" className="truncate">
+      {/* Keep the origin with the cached title so app labels translate even while a file is open. */}
+      <span translate={here.appLabel ? undefined : "no"} className="truncate">
         {here.label}
       </span>
       <ChevronDown size={15} className="shrink-0 text-fg-3" />

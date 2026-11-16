@@ -13,6 +13,7 @@ import { cx, MenuItem, MenuLabel, MenuSep, Picker, Popover, SettingChip, useShee
 import type { StartChange } from '../registry';
 import { useSpaces } from '../spaces/state';
 import { AssistantIcon } from './icons';
+import { assistantTranslate } from './language';
 import { useAssistantsState } from './state';
 
 const AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
@@ -39,7 +40,7 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
     return [a.description || 'Your own agent', also && `Uses ${also}`].filter(Boolean).join(' · ');
   };
   /** Agents the user made keep their own words as they are; the built-in ones are the app's text, translated. */
-  const own = (a: Assistant) => (a.builtin ? undefined : 'no');
+  const own = assistantTranslate;
   const row = (a: Assistant) => {
     const sel = a.id === cur?.id;
     return (
@@ -158,10 +159,13 @@ export function AssistantStartOption({ value, onChange }: { value: SessionExtra;
         open={open}
         onClick={() => setOpen((o) => !o)}
         title={cur ? `${cur.name}\n${cur.description}` : 'Which agent this session starts as'}
+        // The tooltip contains authored content as well as the visible name.
+        translate={cur ? assistantTranslate(cur) : undefined}
         value={
           <span className="inline-flex items-center gap-1.5">
             <AssistantIcon icon={cur?.icon ?? 'sparkles'} size={13} plain className="shrink-0 text-fg-3" />
-            {cur?.name ?? '…'}
+            {/* Keep authored names literal and the built-in English identities intact in German. */}
+            <span translate={cur ? assistantTranslate(cur) : undefined}>{cur?.name ?? '…'}</span>
           </span>
         }
       />
@@ -222,13 +226,15 @@ export function SessionAssistantPicker({ s, label, onConfig }: { s: SessionSumma
         label ? (
           <span className="inline-flex items-center gap-1.5">
             {cur && <AssistantIcon icon={cur.icon} size={13} plain className="shrink-0 text-fg-3" />}
-            {name}
+            {cur ? <span translate={assistantTranslate(cur)}>{name}</span> : name}
           </span>
         ) : (
-          name
+          cur ? <span translate={assistantTranslate(cur)}>{name}</span> : name
         )
       }
       title={cur ? `Agent: ${cur.name}\n${cur.description}` : 'Agent: none. Pick one to shape how the session works from your next message'}
+      // Protect names and descriptions in native title attributes too.
+      translate={cur ? assistantTranslate(cur) : undefined}
       width={360}
     >
       {(close) => (

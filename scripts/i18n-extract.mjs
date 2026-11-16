@@ -302,9 +302,13 @@ function sentences(js) {
 }
 
 const found = new Map();
+const allSources = new Map();
 const add = (s, where, jsx = false) => {
   const t = s.replace(/\s+/g, ' ').trim();
   if (!isText(t, jsx)) return;
+  // A word may have different meanings in different editors; retain every use for review.
+  if (!allSources.has(t)) allSources.set(t, new Set());
+  allSources.get(t).add(where);
   if (!found.has(t)) found.set(t, where);
 };
 
@@ -363,6 +367,30 @@ for (const f of files(path.join(ROOT, 'server'), /\.ts$/)) {
   for (const m of src.matchAll(/new HttpError\(\s*\d+\s*,\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
   if (!/(^|\/)(tools|mcp|cli)\.ts$|^server\/pages\/actions\.ts$/.test(where.split(path.sep).join('/'))) for (const m of src.matchAll(/new Error\(\s*((['"`])(?:(?!\2)[^\\]|\\.)*\2)/g)) for (const s of literals(m[1])) add(s, where);
 }
+// Structured failures also reach the UI without a direct HttpError literal. Restrict extraction to their
+// message statements and the phone-readiness helper, leaving the refresh agent's prompts out of the catalog.
+// The existing literal scanner keeps nested template values and their visible conditional fragments intact.
+for (const f of ['server/phone/index.ts', 'server/pages/board-refresh.ts']) {
+  const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+  const record = (expression) => {
+    const shown = [];
+    for (const s of literals(expression, shown)) add(s, f);
+    for (const s of shown) add(s, f, true);
+  };
+  if (f === 'server/phone/index.ts') {
+    const start = src.indexOf('export function notReadyText(');
+    const end = src.indexOf('export class Phone', start);
+    if (start >= 0 && end > start) record(src.slice(start, end));
+    // A problem call ends its statement on a source line, including calls formatted across several lines.
+    for (const m of src.matchAll(/throw problem\(/g)) {
+      const end = src.indexOf(';\n', m.index);
+      if (end >= 0) record(src.slice(m.index, end));
+    }
+  } else {
+    // These returned failure reasons and notification bodies are displayed by the board UI or push service.
+    for (const line of src.split('\n')) if (/\bfail\(|return \{ error:|^\s*body:/.test(line)) record(line);
+  }
+}
 // Whole files whose strings the pages show: the search providers, the helper model's choices, the agents' list, the
 // sessions' notices (a session finished, needs you, failed) and messages, and the form an image or a video asks first.
 for (const f of ['brave', 'duckduckgo', 'naget', 'searxng', 'service'].map((x) => `server/search/${x}.ts`).concat('server/helper.ts', 'server/agents/acp.ts', 'server/sessions.ts', 'server/images/settings.ts')) {
@@ -410,6 +438,13 @@ const out = Object.fromEntries([...found.entries()].sort((a, b) => a[0].localeCo
 fs.mkdirSync(path.join(ROOT, 'web/src/i18n'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'web/src/i18n/strings.json'), `${JSON.stringify(out, null, 0).replace(/^\{/, '{\n').replace(/","/g, '",\n"').replace(/\}$/, '\n}')}\n`);
 console.log(`${found.size} strings`);
+// Optional review evidence stays outside the shipped catalog and does not alter its format.
+const inventoryFlag = process.argv.indexOf('--inventory');
+if (inventoryFlag !== -1) {
+  const target = process.argv[inventoryFlag + 1];
+  if (!target || target.startsWith('--')) throw new Error('--inventory requires an output path');
+  fs.writeFileSync(target, `${JSON.stringify(Object.fromEntries([...allSources].sort(([a], [b]) => a.localeCompare(b)).map(([key, paths]) => [key, [...paths].sort()])), null, 2)}\n`);
+}
 for (const lang of ['de', 'zh', 'el']) {
   const file = path.join(ROOT, `web/src/i18n/${lang}.json`);
   const have = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
