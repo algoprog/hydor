@@ -58,7 +58,7 @@ import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
 import { KeepAwake, setAwakeMode } from './awake.ts';
-import { loadOrigins, originListed } from './origins.ts';
+import { linkBase, loadOrigins, originListed } from './origins.ts';
 import { Phone, phoneRoutes } from './phone/index.ts';
 import { isAbsPath, trimSep, within } from './platform.ts';
 import { startSettings, updateStartSettings } from './startSettings.ts';
@@ -1416,7 +1416,8 @@ app.post('/api/push/test', async (req) => {
 
 // ---- Use on your phone: the app on the person's own devices through Tailscale Serve (server/phone) ---------------------
 
-phoneRoutes(app, new Phone(db, config.port));
+const phone = new Phone(db, config.port);
+phoneRoutes(app, phone);
 
 // ---- notebooks: Jupyter kernels ------------------------------------------------------------
 
@@ -1932,7 +1933,8 @@ app.get('/guest-api/:token', async (req, reply) => {
 
 // ---- MCP: other agents, and the pages sessions show -------------------------------------------
 
-const publicBase = () => config.allowedOrigins[0] ?? `http://127.0.0.1:${config.port}`;
+// The address links the app hands out start with: ALLOWED_ORIGINS's first, else the Tailscale one it is served at, else this computer's (server/origins.ts).
+const publicBase = () => linkBase(config.allowedOrigins, phone.servedUrl(), config.port);
 
 // ---- the app's capabilities (server/features): search, browser, memory, assistants… ------------------
 

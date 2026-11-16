@@ -12,7 +12,7 @@ import Fastify from 'fastify';
 import { APP_ROOT } from '../config.ts';
 import { openDb, type DB } from '../db.ts';
 import { HttpError } from '../auth.ts';
-import { addOrigin, loadOrigins, originListed, storedOrigins } from '../origins.ts';
+import { addOrigin, linkBase, loadOrigins, originListed, storedOrigins } from '../origins.ts';
 import { ruleFor } from '../guide/api.ts';
 import { Phone, phoneRoutes, type PhoneProblem } from './index.ts';
 import { findTailscale, parseServe, parseVersion, pointsAt, serveProblem, serveSyntax } from './tailscale.ts';
@@ -322,6 +322,35 @@ test('the API: status, serve with its problem, stop', async () => {
   const off = await app.inject({ method: 'POST', url: '/api/phone/stop' });
   assert.equal(off.json().serving, null);
   await app.close();
+});
+
+test('links the app hands out: the served address while it is served, unless ALLOWED_ORIGINS names one, which stays', async () => {
+  const other = { TCP: { '443': { HTTPS: true } }, Web: { [`${HOST}:443`]: { Handlers: { '/': { Proxy: 'http://127.0.0.1:3000' } } } } };
+  const f = fake({});
+  const { db, phone } = phoneWith(f.bin);
+  // As server/index.ts makes them: ALLOWED_ORIGINS's first, else the served address, else this computer's.
+  const base = (allowed: string[]) => linkBase(allowed, phone.servedUrl(), PORT);
+  const LIVE = ['https://dev.naget.com', 'https://other.example.com'];
+  assert.equal(base([]), `http://127.0.0.1:${PORT}`, 'not served: this computer');
+  assert.equal(base(LIVE), 'https://dev.naget.com');
+  await phone.serve();
+  assert.equal(base([]), `https://${HOST}`, 'served, nothing set: the tailnet address');
+  assert.equal(base(LIVE), 'https://dev.naget.com', 'an address set stays the one links use');
+  // Kept over a restart (the record is in the database), without asking Tailscale.
+  assert.equal(new Phone(db, PORT, { bin: () => null }).servedUrl(), `https://${HOST}`);
+  await phone.stop();
+  assert.equal(base([]), `http://127.0.0.1:${PORT}`, 'stopped: back to this computer');
+  assert.equal(base(LIVE), 'https://dev.naget.com');
+  // Served on another port, links say it.
+  f.set({ serve: other });
+  await phone.serve(8443);
+  assert.equal(base([]), `https://${HOST}:8443`);
+  await phone.stop();
+  // Published by hand and taken on (Accept it): links use it too.
+  f.set({ serve: { TCP: { '443': { HTTPS: true } }, Web: { [`${HOST}:443`]: { Handlers: { '/': { Proxy: TARGET } } } } } });
+  assert.equal(base([]), `http://127.0.0.1:${PORT}`, 'not taken on yet');
+  await phone.serve();
+  assert.equal(base([]), `https://${HOST}`);
 });
 
 test('agents: Serve only on a card each time (Full access too), Stop serving on a card', () => {
