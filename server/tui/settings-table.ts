@@ -571,6 +571,35 @@ row('computer', 'Screen Recording', 'action', {
 
 // ---- Capabilities › Memory, Child sessions ------------------------------------------------------------------------------
 row('memory', 'Memory', 'switch', { read: rd('/api/memory', 'enabled'), write: put('/api/memory', (v) => ({ enabled: v })) });
+row('memory', 'Wiki memory', 'switch', {
+  read: rd('/api/wiki/settings', 'enabled'),
+  write: put('/api/wiki/settings', (v) => ({ enabled: v })),
+  note: 'For every project that does not say otherwise in its own Settings tab, and for the shared wiki.',
+});
+row('memory', 'Learn from new documents', 'switch', {
+  read: rd('/api/wiki/settings', 'fromDocuments'),
+  write: put('/api/wiki/settings', (v) => ({ fromDocuments: v })),
+  note: 'New and changed documents add memory notes and update the wiki, with the helper model.',
+});
+row('memory', 'Wiki folder', 'page', { note: 'Changing it may move the wiki’s files, which you review on the page first.' });
+row('memory', 'Project wikis', 'choice', {
+  choices: [
+    { value: 'hub', label: 'In the wiki folder' },
+    { value: 'folder', label: 'In each project’s folder' },
+  ],
+  read: rd('/api/wiki/settings', 'projectWikis'),
+  write: put('/api/wiki/settings', (v) => ({ projectWikis: v })),
+});
+row('memory', 'Folder inside each project', 'text', {
+  read: rd('/api/wiki/settings', 'projectPath'),
+  write: put('/api/wiki/settings', (v) => ({ projectPath: v })),
+  note: 'Relative to each project’s folder; used when project wikis are kept in each project’s folder.',
+});
+row('memory', 'Leave it out of Git', 'switch', {
+  read: rd('/api/wiki/settings', 'gitIgnore'),
+  write: put('/api/wiki/settings', (v) => ({ gitIgnore: v })),
+  note: 'Adds the project’s wiki folder to its .gitignore, in Git repositories only.',
+});
 row('memory', 'Search by meaning', 'switch', {
   read: rd('/api/memory', 'meaning.on'),
   write: put('/api/memory', (v) => ({ meaning: v })),
