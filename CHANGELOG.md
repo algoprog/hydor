@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.69.0 · 16 November 2026
+
+See what happened while you were away, everything that runs by itself on one week, exactly what changed in a
+spreadsheet, and agents you can roll back, check with examples and share as a file.
+
+- **While you were away**: under the message box, one folded line says what needs you, what failed, what finished and
+  what runs next since your last visit. Open it for the rows: answer a question or an approval in place, open a
+  finished session or run, or **Mark all as seen**. It stays as you left it on each device. In a terminal: `hydor away`.
+- **Schedules**: a tab on the Agents page, and **Week view** in **Settings → Scheduled tasks**, show everything that runs
+  by itself on a week: each run coloured by how it went (opening its session), what runs next drawn faintly, tasks that
+  run every few minutes, watchers and webhooks as bands, each day's cost, a month view, and a list of them all with a
+  switch to pause each. On a phone, one day at a time.
+- **What changed in a spreadsheet**: **Tools → Compare with the version before** (or with any version) shows the changes
+  in place: changed cells tinted, rows and columns added or removed, tabs added, removed or renamed, and a list of each
+  change with before → after. Put back one change, or the whole version, kept as a new version. A spreadsheet an agent
+  changed in a session has **See what changed** on its card.
+- **Agents with versions**: every save of one of your agents keeps the version before, with who made it (you, an
+  agent, an install). **More → Versions** compares two and brings one back.
+- **Examples that check an agent**: give an agent a few example messages and what its answer must do. **Try the
+  examples** runs them in throwaway sessions that send nothing, after telling you what it costs, and shows which passed.
+- **Share an agent as a file**: **More → Download as a file** saves it as a `.hydor-agent` file, leaving out your
+  projects, accounts, recipients and keys. **Install** on the Agents page shows what a file brings and needs before
+  anything is saved; its schedules come paused, and Full access becomes Accept edits. In a terminal: `hydor agents
+  export` and `hydor agents install`.
+
 ## 0.68.1 · 16 November 2026
 
 Starter ideas line up on a phone.
