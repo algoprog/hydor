@@ -137,11 +137,15 @@ try {
     // Hashing yields to the event loop between files, so the server keeps answering.
     const { source, target } = pair('yield');
     for (let i = 0; i < 40; i++) fs.writeFileSync(path.join(source, 'wiki', `f${i}.md`), `file ${i}`);
+    // Counted in turns of the event loop rather than in time, so a busy machine does not change the count: a hashing
+    // that held the loop until it finished would leave this at 0.
     let ticks = 0;
-    const timer = setInterval(() => { ticks++; }, 0);
+    let hashing = true;
+    const turn = () => { if (hashing) { ticks++; setImmediate(turn); } };
+    setImmediate(turn);
     await previewWikiMigration(source, target);
-    clearInterval(timer);
-    assert.ok(ticks > 5, `the event loop ran while hashing (${ticks} ticks)`);
+    hashing = false;
+    assert.ok(ticks >= 10, `the event loop ran while hashing (${ticks} turns)`);
   }
   console.log('Wiki migration tests passed');
 } finally {
