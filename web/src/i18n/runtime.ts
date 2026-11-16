@@ -149,5 +149,5 @@ const DICTS: Partial<Record<Lang, () => Promise<Dict>>> = {
   el: () => import('./el.json').then((m) => m.default as Dict),
 };
 
-// Vite discovers optional supplement catalogs at build time.
-const SUPPLEMENTS = import.meta.glob<Dict>('./*.*.json', { import: 'default' });
+// Vite discovers supplement catalogs; Node-based tests do not run its transform.
+const SUPPLEMENTS = import.meta.env?.MODE ? import.meta.glob<Dict>('./*.*.json', { import: 'default' }) : {};
