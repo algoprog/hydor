@@ -3,6 +3,57 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.68.0 · 16 November 2026
+
+Work that starts with an email and ends with something sent: connect your mail with an app password, start a task for
+each new email, record or event, keep what agents would send in an Outbox until you say so, and send an agent's
+results to people. The start page gives you ideas to begin with, sessions say how they ended, answer cards open full
+screen and save as pictures, conversations export, and what you capture on your phone reaches your agents.
+
+- **Email, with an app password**: **Apps → Connected apps → Email** connects Gmail, iCloud, Fastmail, Yahoo, GMX, Zoho,
+  Proton Mail (through its Bridge) and most other mail with your address and an app password. The servers fill in by
+  themselves, with a link to your provider's page on making the password, and no Google Cloud project is needed. Agents
+  can search, read, file, draft and send, and save attachments in their folder. Outlook.com and Microsoft 365 need a
+  Microsoft sign-in, which this does not do yet; the form says so.
+- **Ask first, and the Outbox**: each tool of a connected account is now **On**, **Ask first** or **Off**. Tools that send,
+  post, delete or pay start on Ask first for accounts you connect from now on; accounts you connected before keep their
+  settings, with a one-click offer to switch. A call to such a tool waits in **Inbox → Outbox** as a draft you can
+  change (an email shows To, Cc, Subject and Body): send it, drop it, or send all of a session's at once. It holds for
+  every agent and in every permission mode, Full access included.
+- **Test without sending**: beside a scheduled task's **Test run**, a test that runs it as it would run but keeps every
+  call that would send, post, delete or pay as "would have sent", and makes none of them.
+- **A task for each new email**: **Watch → Email** starts a task when new mail arrives in a folder, from someone or with a
+  subject you choose: one run for each email, with its text and its attachments, never twice for the same one.
+- **A task for anything new in a connected account**: **Watch → A connected app** checks one of an account's tools that
+  only reads (new deals, files, tickets, payments…), without a model, and starts a run for each new item. **Try it**
+  shows what came back and picks out the items. For a calendar, **Before each event** starts a run 15 minutes, 30
+  minutes, an hour or the evening before each event, following events that move and skipping cancelled ones.
+- **Where an agent's results go**: each run can add a row to one Library spreadsheet (a column for each field, so charts
+  of it follow), update the same Library page as a new version instead of making a new page each time, and email the
+  results to the people you name, from your connected mail account. An agent's page now shows its results as a table,
+  a column for each field, kept for a year.
+- **From your phone to your agents**: photos, files and voice messages you send to Hydor in Telegram, Discord or Slack
+  now reach the agent, saved in the session's folder (voice messages turned into words). `/agents` lists your own
+  agents and `/as Bookkeeper` starts a session as one of them; **New sessions as** gives each chat app one. Installed
+  on Android or a computer from Chrome or Edge, the web app appears in the **Share** menu: what you share opens in the
+  start page's message box.
+- **Starter ideas**: under an empty message box, six ways to begin: three example requests that change each day, the
+  two apps you run most, and an example of work that repeats. A tap fills the box; **Hide** puts them away, and
+  **Settings → General → Starter ideas** brings them back. The line under the title now says what you can ask for.
+- **Sessions in plain words**: a session that is not running says how it ended: **Done** (with the files it made or
+  changed), **Stopped** or **Failed**, where all of them said Stopped. A finished turn shows what it cost (at API prices
+  when you are on a plan) where its tokens were; the tokens are still under **Time and cost**. **Today** on the start
+  page counts sessions, file edits and cost.
+- **Answer cards full screen and as pictures**: every answer card has **Full screen**, and **Save as picture** and **Copy
+  as picture** under its **…**. Cards with a map or a Plotly chart inside cannot be saved as pictures yet.
+- **Export a conversation**: the session menu's **Export** saves it as a Markdown file, copies it as Markdown, or makes a
+  Library document of it, with answer cards as tables and text. In a terminal: `hydor sessions export`.
+- **Keep the computer awake**: the desktop apps keep the computer from going to sleep on its own while agents work and
+  from a few minutes before a scheduled task is due until it starts (**Settings → General → Keep the computer awake**).
+  Closing a laptop's lid still puts it to sleep.
+- **Screenshots agents check**: the smaller copy of a screenshot that agents look at to check their work came out
+  garbled with the newer browser; it is right again.
+
 ## 0.67.1 · 15 November 2026
 
 A session you delete leaves the list at once, and stays gone.
