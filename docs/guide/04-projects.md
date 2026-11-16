@@ -311,7 +311,7 @@ An agent can make a link too, with your OK each time: "Share my Thesis project w
 
 Their link opens the project on its own, in the app's look, with nothing else of yours around it:
 
-- At the top, the project's mark, its name and what it is about. On the right, their own name: its menu says what they may do and until when, and who shared it with them, and has **Language** (English, 中文, Ελληνικά) and **Theme** (**Light**, **Dark** or **Like this device**) for their browser.
+- At the top, the project's mark, its name and what it is about. On the right, their own name: its menu says what they may do and until when, and who shared it with them, and has **Language** (English, Deutsch, 中文, Ελληνικά) and **Theme** (**Light**, **Dark** or **Like this device**) for their browser.
 - **Documents**: the project's pages, documents, slides, spreadsheets, LaTeX documents and notebooks, each with its picture. One opens to read as its own address shows it (a LaTeX document typeset into pages, its source a click away), with **Download** for its files: a PDF, a Word document, the LaTeX project and so on. With **Edit documents**, documents, spreadsheets, slides, pages and designs open in their editor instead.
 - **Sessions**: the project's sessions, as a [read-only link](/guide/devices#share-a-session-with-a-read-only-link) shows a session: the conversation, the steps by name, file changes and pages the agent showed, following along while an agent works. Never command output, the agent's thinking or what a step was given. A Confidential session never shows.
 - **Runs**, when the project has experiments: each run's name, how it went and when, its metrics and its settings. Never its command, its folder, its log or the machine it ran on.

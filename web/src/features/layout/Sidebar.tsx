@@ -357,7 +357,7 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
       >
         {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
-        <nav ref={touchDragArea} data-tour="tools" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
+        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
           <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
             {tools.map((t) => (
               <SortableTool key={t.id} t={t} onMenu={onToolMenu} />

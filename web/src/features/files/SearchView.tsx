@@ -216,7 +216,7 @@ export function SearchView({ query, onFile }: { query: SearchQuery; onFile: (pat
   const more = (path: string) => (
     <button
       type="button"
-      aria-label={`More for ${basename(path)}`}
+      aria-label={`More for “${basename(path)}”`}
       onClick={(e) => {
         e.stopPropagation();
         showMenu(path, e.currentTarget);

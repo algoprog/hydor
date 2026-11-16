@@ -553,7 +553,7 @@ function TodoCard({ t, sessionKey }: { t: ToolInfo; sessionKey: string }) {
               {x.status === 'completed' && <Check size={9} strokeWidth={3.5} className={anim[i] ? 'anim-draw' : undefined} />}
               {x.status === 'in_progress' && <span className="anim-pop-in h-1.5 w-1.5 rounded-full bg-busy" />}
             </span>
-            <span className={cx(x.status === 'completed' && (anim[i] ? 'strike-in text-fg-3' : 'text-fg-3 line-through'), x.status === 'in_progress' && 'font-medium')}>{x.text}</span>
+            <span translate="no" className={cx(x.status === 'completed' && (anim[i] ? 'strike-in text-fg-3' : 'text-fg-3 line-through'), x.status === 'in_progress' && 'font-medium')}>{x.text}</span>
           </li>
         ))}
       </ul>

@@ -299,7 +299,7 @@ function BranchRow({
       <Button size="sm" variant="ghost" disabled={!!repo.op} onClick={() => void switchTo(repo, ctx.apply, confirm, { name: b.name })}>
         Switch
       </Button>
-      <IconButton ref={ref} label={`More for ${b.name}`} size="sm" active={open} onClick={() => setOpen((o) => !o)}>
+      <IconButton ref={ref} label={`More for “${b.name}”`} size="sm" active={open} onClick={() => setOpen((o) => !o)}>
         <Ellipsis size={15} />
       </IconButton>
       <Popover anchor={ref} open={open} onClose={close} align="end" width={260} title={b.name}>

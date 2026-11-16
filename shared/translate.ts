@@ -87,8 +87,6 @@ export function translator(dict: Dictionary): (s: string, split?: boolean) => st
     const longest = [...text].sort((a, b) => b.length - a.length)[0]?.trim() ?? '';
     const anyCase = !!longest && k.startsWith(longest) && cased(k[0]);
     const quoted = new Set(parts.flatMap((p, i) => (isValue(p) && /[“"‘«']$/.test(parts[i - 1]) && /^[”"’»']/.test(parts[i + 1] ?? '') ? [num(p)] : [])));
-    // These values are user-defined names and paths, not phrases to translate recursively.
-    if (['More for {0}', 'Find in {0}', 'What is in {0}'].includes(k)) quoted.add(0);
     // A value after a label ("Goal: {0}") holds whatever the label names, however long, and one in quotes a name: never loose.
     const loose = parts.flatMap((p, i) =>
       isValue(p) && !quoted.has(num(p)) && !/[:：]\s*$/.test(parts[i - 1]) && (!endings.has(num(p)) || kept.has(num(p))) && (!/[A-Za-z]/.test(parts[i - 1]) || !/[A-Za-z]/.test(parts[i + 1])) ? [num(p)] : [],

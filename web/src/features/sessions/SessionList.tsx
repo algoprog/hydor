@@ -699,7 +699,7 @@ function PlaceHead({ g, folded, home, onFold, handle, lifted }: { g: SessionGrou
           <IconButton
             ref={more}
             size="sm"
-            label={`More for ${g.label}`}
+            label={`More for “${g.label}”`}
             onClick={(e) => (e.stopPropagation(), setMenu(true))}
             // On hover with a mouse; always on touch screens.
             className={cx('opacity-0 group-hover/head:opacity-100 focus-visible:opacity-100 [@media(pointer:coarse)]:opacity-100', menu && 'opacity-100')}
