@@ -330,17 +330,17 @@ test('links the app hands out: the served address while it is served, unless ALL
   const { db, phone } = phoneWith(f.bin);
   // As server/index.ts makes them: ALLOWED_ORIGINS's first, else the served address, else this computer's.
   const base = (allowed: string[]) => linkBase(allowed, phone.servedUrl(), PORT);
-  const LIVE = ['https://dev.naget.com', 'https://other.example.com'];
+  const LIVE = ['https://hydor.example.com', 'https://other.example.com'];
   assert.equal(base([]), `http://127.0.0.1:${PORT}`, 'not served: this computer');
-  assert.equal(base(LIVE), 'https://dev.naget.com');
+  assert.equal(base(LIVE), 'https://hydor.example.com');
   await phone.serve();
   assert.equal(base([]), `https://${HOST}`, 'served, nothing set: the tailnet address');
-  assert.equal(base(LIVE), 'https://dev.naget.com', 'an address set stays the one links use');
+  assert.equal(base(LIVE), 'https://hydor.example.com', 'an address set stays the one links use');
   // Kept over a restart (the record is in the database), without asking Tailscale.
   assert.equal(new Phone(db, PORT, { bin: () => null }).servedUrl(), `https://${HOST}`);
   await phone.stop();
   assert.equal(base([]), `http://127.0.0.1:${PORT}`, 'stopped: back to this computer');
-  assert.equal(base(LIVE), 'https://dev.naget.com');
+  assert.equal(base(LIVE), 'https://hydor.example.com');
   // Served on another port, links say it.
   f.set({ serve: other });
   await phone.serve(8443);
