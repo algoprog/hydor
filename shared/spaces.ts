@@ -21,6 +21,8 @@ export interface Space {
   assistant?: string;
   /** False: its sessions search only the space's own knowledge, not the shared knowledge too. */
   sharedKnowledge?: boolean;
+  /** Wiki memory for this project: true on, false off; absent: as Settings → Memory → Wiki memory says for projects (shared/wiki.ts). */
+  wikiMemory?: boolean;
   /**
    * The spaces it brings together, by id: a group. Its sessions get theirs too: their documents, instructions,
    * skills and folders. A group brings in plain spaces, not other groups.
