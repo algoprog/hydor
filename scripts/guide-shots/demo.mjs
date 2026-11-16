@@ -664,6 +664,31 @@ export async function seedApi(api, home, now, s) {
   return { spaces: { thesis, garden, taxes, shop: shopSpace } };
 }
 
+/**
+ * While you were away (the start page): how some of Alex's sessions ended, as the app keeps it when a turn ends, and a
+ * few runs of the scheduled tasks there are (which ones depends on the time of day: seedApi skips those due soon).
+ * Sessions no other shot opens, so each picture shows the same; `ended` only, so the sidebar's dots stay as they were.
+ */
+export function awayData(db, s, now) {
+  const end = db.prepare('update app_sessions set ended = ?, ended_at = ?, end_line = ?, end_files = ? where key = ?');
+  if (s.pictures) end.run('done', s.pictures.at, 'Here are the picture and the clip: the yellow tram climbing a sunny street, ready for your trip blog.', JSON.stringify({ made: [s.pictures.pic, s.pictures.clip], n: 2 }), s.pictures.key);
+  end.run('done', s.thesis.at, 'Here is an outline in five parts, with what each needs from your notes.', null, s.thesis.key);
+  end.run('failed', s.search.at, 'API Error: 529 Overloaded. The model is busy: send a message to try again.', null, s.search.key);
+  const task = (name) => db.prepare('select id from tasks where name = ?').get(name)?.id;
+  const run = db.prepare(
+    `insert into task_runs (id, task_id, trigger, started_at, ended_at, status, summary, cost_usd, key) values (?, ?, 'schedule', ?, ?, ?, ?, ?, ?)`,
+  );
+  const runs = [
+    ['Nightly shop tests', 'failed', now - 7 * HOUR, '2 checkout tests fail on main since the discount change', 0.31, null],
+    ['Ridge E5 price watch', 'silent', now - 2 * HOUR, 'Still $1,849 at velora.bike: no drop under $1,700', 0.02, null],
+    ['Morning brief', 'done', s.brief.at, 'Cloudy, 8 °C, rain after 4 pm. Two meetings: design review at 10, dentist at 3.', 0.04, s.brief.key],
+  ];
+  for (const [name, status, at, summary, cost, key] of runs) {
+    const id = task(name);
+    if (id) run.run(crypto.randomBytes(8).toString('hex'), id, at - 3 * MIN, at, status, summary, cost, key);
+  }
+}
+
 // ---- answered to the page ---------------------------------------------------------------------------
 
 /** What the server can't show without a real agent or account: live states, cards, plan limits, the inbox. */
@@ -832,7 +857,18 @@ export function overrides(s, now) {
     { index: 0, name: 'NVIDIA GeForce RTX 4090', memUsed: 21_400, memTotal: 24_564, util: 87 },
     { index: 1, name: 'NVIDIA GeForce RTX 4090', memUsed: 2_100, memTotal: 24_564, util: 4 },
   ];
-  return { live, usage, inbox, models, picks, gpus };
+  /**
+   * While you were away: the server's own answer, with what waits on you from the inbox above (the longest waiting
+   * first; after Mark all as seen, only what came since).
+   */
+  const away = (real) => {
+    const needs = inbox
+      .filter((it) => it.at > real.since)
+      .sort((a, b) => a.at - b.at)
+      .map((it) => ({ id: it.id, group: 'needs', outcome: 'waiting', title: it.title, ...(it.detail ? { line: it.detail.replace(/\s+/g, ' ') } : {}), at: it.at, path: it.path, ...(it.agent ? { agent: it.agent } : {}), ...(it.session ? { session: it.session } : {}), item: it }));
+    return { ...real, rows: [...needs, ...real.rows.filter((r) => r.group !== 'needs')], counts: { ...real.counts, needs: needs.length } };
+  };
+  return { live, usage, inbox, models, picks, gpus, away };
 }
 
 /** The models Claude Code offers, as its own program lists them (the stand-in program lists none). */

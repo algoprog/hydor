@@ -98,6 +98,9 @@ export const SHOTS = [
     id: 'start',
     async take(p, ctx) {
       await ctx.go('/', { settle: 1500 });
+      // While you were away opens by itself (the demo has things waiting on you): folded to its line, as after a click.
+      const away = 'js:document.querySelector(\'section[aria-label="While you were away"] > [role="button"][aria-expanded="true"]\')';
+      if (await p.box(away)) await p.click(away, { wait: 500 });
       await p.click('textarea');
       await p.type('Plan a 4-day trip to Lisbon in May: two adults, mid-range hotels, lots of walking.');
       await p.park();

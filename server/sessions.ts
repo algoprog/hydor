@@ -47,6 +47,8 @@ import { autoPlan, tierNote } from './assistants/auto.ts';
 import { noteModels } from './assistants/tiers.ts';
 import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/tiers.ts';
 import { opensTurn } from './opinion/turns.ts';
+import { filesOf, sessionEnd } from '../shared/ending.ts';
+import { recordEnding } from './away/index.ts';
 import { ancestorsOf, runningBelow, runningChildren } from './children/family.ts';
 
 /** The agent a session key names ("claude:…", "codex:…", "acp:…"). */
@@ -138,6 +140,7 @@ interface Row {
   handoff_to: string | null;
   done_at: number | null;
   seen_at: number | null;
+  ended_at: number | null;
   fork_from: string | null;
   snooze_until: number | null;
   worktree: string | null;
@@ -155,7 +158,7 @@ const SELECT = `
     s.lines_added, s.lines_removed, s.turns, s.tokens_in, s.tokens_out, s.tokens_cached, s.cost_usd, s.gen_ms, s.work_ms, s.bg_tasks, s.parent_key,
     a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
     a.created_by_app, a.model as pref_model, a.effort as pref_effort, a.mode as pref_mode, a.created_at as app_created,
-    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
+    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.ended_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
   from sessions s left join app_sessions a on a.key = s.key`;
 
 const SELECT_APP_ONLY = `
@@ -165,7 +168,7 @@ const SELECT_APP_ONLY = `
     0 as lines_added, 0 as lines_removed, 0 as turns, 0 as tokens_in, 0 as tokens_out, 0 as tokens_cached, null as cost_usd,
     0 as gen_ms, 0 as work_ms, null as bg_tasks, null as parent_key, a.title as app_title, a.cwd as app_cwd, a.agent as app_agent, a.first_prompt as app_first_prompt, a.archived, a.pinned,
     a.created_by_app, a.model as pref_model, a.effort as pref_effort, a.mode as pref_mode, a.created_at as app_created,
-    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
+    a.updated_at as app_updated, a.sort_order, a.handoff_from, a.handoff_to, a.done_at, a.seen_at, a.ended_at, a.fork_from, a.snooze_until, a.worktree, a.pr, a.account, a.acp_agent, a.extra
   from app_sessions a where not exists (select 1 from sessions s where s.key = a.key)`;
 
 /** A non-image attachment: saved under uploads/ and listed by path in the message. */
@@ -450,6 +453,7 @@ export class SessionManager extends EventEmitter {
       forkFrom: r.fork_from ?? undefined,
       doneAt: r.done_at ?? undefined,
       seenAt: r.seen_at ?? undefined,
+      endedAt: r.ended_at ?? undefined,
       snoozedUntil: r.snooze_until && r.snooze_until > Date.now() ? r.snooze_until : undefined,
       worktree: parseJson<WorktreeInfo>(r.worktree),
       pr: parseJson<PullRequestInfo>(r.pr),
@@ -581,6 +585,7 @@ export class SessionManager extends EventEmitter {
         if (ended !== undefined && (st === 'idle' || st === 'error')) {
           const t = { key: s.key, agent: s.agent, cwd: s.cwd, status: st, startedAt: ended, endedAt: now, external: false };
           setTimeout(() => turnEnded(t), 1500);
+          setTimeout(() => this.keepEnding(s.key, s.agent, st, now), 2000);
         }
         continue; // the first sighting is only a baseline
       }
@@ -629,6 +634,8 @@ export class SessionManager extends EventEmitter {
       if ((st === 'idle' || st === 'error') && busy(prev.status)) {
         const t = { key: s.key, agent: s.agent, cwd: s.cwd, status: st, startedAt: prev.turnStart, endedAt: now, external: !!s.external };
         setTimeout(() => turnEnded(t), 1500);
+        // How it ended, for the start page's "While you were away", once its last lines are in too.
+        setTimeout(() => this.keepEnding(s.key, s.agent, st, now, s.live?.error), 2000);
       }
       if (st === 'idle' && busy(prev.status) && now - prev.turnStart >= 10_000) {
         this.db
@@ -658,6 +665,35 @@ export class SessionManager extends EventEmitter {
   private notify(n: NotifyEvent) {
     const out = this.noticeGate ? this.noticeGate(n) : n;
     if (out) this.emit('notify', out);
+  }
+
+  /**
+   * Keeps how a turn that ended at `at` went (server/away): Done, Failed or Stopped as the session's page tells it, from
+   * its timeline (in memory for the sessions the app runs; one running elsewhere may not have it: its status says),
+   * with the start of its last reply, or what went wrong, and the files it made.
+   */
+  private keepEnding(key: string, agent: Agent, st: Phase, at: number, error?: string) {
+    if (!this.exists(key)) return;
+    const items = this.timelines.get(key)?.parser.items ?? [];
+    const end = items.length ? sessionEnd(items) : null;
+    const ended = end?.ended ?? (st === 'error' ? 'failed' : 'done');
+    let line = ended === 'failed' ? undefined : this.lastReply(key);
+    if (ended === 'failed') {
+      for (let i = items.length - 1; i >= 0 && !line; i--) {
+        const it = items[i];
+        if (it.kind === 'system' && it.level === 'error' && !it.peer && it.text.trim()) line = it.text;
+        if (opensTurn(it)) break;
+      }
+      line ??= error;
+    }
+    const files = filesOf(items);
+    try {
+      recordEnding(this.db, key, agent, { ended, at, line, made: files.made, changed: files.changed.length });
+    } catch (e) {
+      console.warn(`[away] could not keep how ${key} ended: ${(e as Error).message}`);
+      return;
+    }
+    this.queueSummary(key);
   }
 
   /** The start of the latest reply, when its timeline is in memory (never loads a transcript for it). */

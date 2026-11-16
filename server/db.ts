@@ -190,6 +190,12 @@ export function openDb(file = paths.db, o: { cacheMb?: number } = {}): DB {
     ['extra', 'text'],
     // The start the page sent that made it, so the same start sent again gets this session (SessionManager.startOnce).
     ['start_id', 'text'],
+    // How its latest turn ended (done, failed, stopped) and when, the start of its last reply and the files it made, for
+    // the start page's "While you were away" (server/away).
+    ['ended', 'text'],
+    ['ended_at', 'integer'],
+    ['end_line', 'text'],
+    ['end_files', 'text'],
   ]) {
     if (appCols.has(col)) continue;
     try {

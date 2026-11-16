@@ -183,6 +183,7 @@ hydor completion install
 | `hydor sessions` | 你最近的会话，每个前面有一个标记：● 工作中、● 需要你处理、✓ 已完成、✗ 出错。它的动词做的是会话菜单所做的事：`search`、`rename`、`archive` 和 `unarchive`、`pin` 和 `unpin`、`read`、`snooze`、`move`（移到某个项目）、`fork`、`goal`、`share`（只读链接）、`changes`（它修改过的文件）、`commands`（它运行过的命令）、`queue`（正在等待的消息，以及 `queue clear` 和 `queue remove`）、`show`、`export`（把对话保存为 Markdown 文件，`-o -` 直接打印出来，`--library` 则在资料库中生成一份文档）、`send`、`stop` 和 `delete`。 |
 | `hydor inbox` | 等你处理的事（批准、问题、智能体要的密钥、待审的技能）：`list`，以及 `show` 查看其中一项和在哪里回答它。 |
 | `hydor outbox` | 等你确认的调用（设为先问我的已连接账户工具）：`list`，`show` 查看其中一项和它的输入，`send`（按原样发送，或用 `--set NAME=value` 修改某个字段）和 `drop`。 |
+| `hydor away` | 自你上次来过之后发生了什么，和开始页的**你不在时**一样：等你处理的事、完成或失败的会话、自动运行的事情及其花费，以及今天接下来要运行的任务。`hydor away seen` 把它们全部标为已看。 |
 
 `hydor show 6f1e2a3b` 与 `hydor sessions show 6f1e2a3b` 相同，`send` 和 `stop` 也是：短的那些仍然保留。
 
@@ -192,6 +193,7 @@ hydor sessions rename 6f1e "Fix the login bug"
 hydor sessions fork 6f1e "try it with a cache instead"
 hydor sessions export 6f1e -o notes.md  # 把对话保存为 Markdown
 hydor inbox
+hydor away                           # 你不在时发生了什么
 ```
 
 ### 你的工作

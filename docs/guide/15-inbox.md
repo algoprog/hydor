@@ -12,6 +12,8 @@ Its header says how many things wait on you ("3 waiting on you"). The newest are
 
 When nothing waits, it says "Nothing is waiting on you".
 
+The start page shows what waits on you too, first in **While you were away** under the message box, with what finished and what ran by itself since your last visit (see [While you were away](/guide/start#while-you-were-away)).
+
 ## What shows in the inbox
 
 Everything an agent is waiting on you for, from every session on this machine, including the sessions that scheduled tasks and apps start, and from your other machines:
