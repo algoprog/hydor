@@ -1,6 +1,6 @@
 # Agents
 
-An agent is who a session works as: its instructions, what it may use, where and when it works, the model tier it thinks with, which other agents it hands work to, and what it may spend in a month. This topic covers the Agents page, the agents that come with the app, making your own by saying what it should do, changing one, where an agent works, its schedules, tiers, agents that hand work to other agents, a monthly budget, starting and switching sessions as an agent, importing Claude Code's agent files, the task folders a session gets when you pick no folder, and having agents clean up after a task.
+An agent is who a session works as: its instructions, what it may use, where and when it works, the model tier it thinks with, which other agents it hands work to, and what it may spend in a month. This topic covers the Agents page, the agents that come with the app, making your own by saying what it should do, changing one, where an agent works, its schedules, tiers, agents that hand work to other agents, a monthly budget, an agent's versions and the examples that check it, starting and switching sessions as an agent, sharing an agent as a file, importing Claude Code's agent files, the task folders a session gets when you pick no folder, and having agents clean up after a task.
 
 ![The Agents page: your agents, each in a card with how it is doing, and the built-in ones under them](images/agents.webp)
 
@@ -30,7 +30,7 @@ An agent is a role a session takes on. Text that every agent should follow in ev
 
 Open **Agents** in the sidebar, or go to [/agents](/agents). On a phone the sidebar is a drawer: open it first. [Settings → Capabilities → Your agents](/settings?s=assistants&find=Your%20agents) has a **Your agents** row that opens this page too (it says how many agents are your own); the rest of that section is about task folders and clean-up, below.
 
-- **New agent**, at the top, makes one (see [Make an agent](#make-an-agent)); **Import** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)).
+- **New agent**, at the top, makes one (see [Make an agent](#make-an-agent)); **Import** brings in Claude Code's agent files (see [Import Claude Code's agent files](#import-claude-codes-agent-files)); **Install** installs an agent from a file someone gave you (see [Share an agent as a file](#share-an-agent-as-a-file)).
 - Your agents show as cards. Each card has the agent's name, its line, how it is doing (**Working**, **Needs you** when one of its sessions waits for your answer, **Budget spent**, or **Idle**), the projects it works in (or **Everywhere**), its tier, when it runs next, how many messages wait in its inbox, and what it spent this month.
 - Chips above the cards show **All**, **Everywhere**, each project that has agents of its own, **On a schedule** and **Needs you**.
 - The agents that come with the app are under **Built in**.
@@ -40,6 +40,8 @@ Click a card for the agent's own page:
 - Its settings in a few sentences, such as "It works everywhere, every weekday at 09:00, and thinks with Quick." Click any underlined words to change them there (see [Change an agent](#change-an-agent)).
 - **Start a session** opens the start page with the agent picked (and its project, when it works in one).
 - **All settings** opens every setting in the editor (see [All settings](#all-settings)). **Duplicate** makes a copy to change; **Delete** removes one of yours.
+- **More** (⋯): **Versions**, for one of yours, lists what it was before each change, to compare and bring back (see [Versions: go back to an earlier one](#versions-go-back-to-an-earlier-one)); **Download as a file** saves it as a file to keep or give (see [Share an agent as a file](#share-an-agent-as-a-file)).
+- **Examples**, for one of yours: messages to try it with and what its answer must do, with **Try the examples** (see [Examples that check it](#examples-that-check-it)).
 - **Schedules** lists the scheduled tasks that run as it, with **Add a schedule**.
 - **Inbox**, for an agent that keeps a conversation of its own: its messages and their answers, a box to send it one, and **Its conversation** (see [An agent with a conversation of its own](#an-agent-with-a-conversation-of-its-own)).
 - **What it handed back**, for an agent with fields or places for its results: a table of its results, one row for each, with where each went (see [What an agent hands back](#what-an-agent-hands-back)).
@@ -231,7 +233,27 @@ On an agent's page, its settings read as sentences: what it does, "It works *eve
 - **What it hands back**: its fields and where each result goes.
 - **Its monthly budget**: dollars a month, or none.
 
-**All settings** has the rest (see [All settings](#all-settings)). Sessions you start from then on use the new version, and so do the sessions with it that are already going, from your next message: Custom reads it before each turn, and Claude Code and Codex start afresh once they are free (the conversation carries on).
+**All settings** has the rest (see [All settings](#all-settings)). Each change is kept as a version, so you can go back (see [Versions: go back to an earlier one](#versions-go-back-to-an-earlier-one)). Sessions you start from then on use the new version, and so do the sessions with it that are already going, from your next message: Custom reads it before each turn, and Claude Code and Codex start afresh once they are free (the conversation carries on).
+
+## Versions: go back to an earlier one
+
+Each save that changes what one of your agents is keeps a version: a change on its page, in **All settings**, from the command line, by an agent you asked (through the app's API), and the draft or file that made it. Open its page, then **More** (⋯) → **Versions**:
+
+- The list shows each version, newest first: **v1**, **v2**…, what changed in a few sentences ("It thinks with Best now (it was Quick). Its monthly budget is $5 now (it was $3).") or what the agent that changed it said it did, who saved it (**You**, **An agent**, **Drafted**, **Installed**, **Imported**) and when; **Now** marks the current one. A version its examples were tried with says how many passed ("Examples: 2 of 3 passed"), so you can see whether a change made it better.
+- Click one to compare it with the one before it, or pick any two in **Compare** … **with** …: what changed between them, in sentences, and its **Instructions** side by side, lines taken out in red and lines put in in green.
+- **Bring it back** makes the picked version the current one again. It is saved as a new version that says "Brought back version 3.", so the one it had stays in the list, to go back to. Agents it handed work to and projects that are gone since are left out.
+
+An agent keeps its latest 50 versions; they go when you delete it. Its examples are not part of a version: bringing an old version back keeps the examples it has now. An agent made before versions were kept gets the way it was as its first version ("Before versions were kept") at its first change.
+
+## Examples that check it
+
+Examples let you check that one of your agents still does its job after you change it, as an app's examples do. Each is a message to try it with and what its answer must do. On the agent's page, under **Examples**:
+
+1. **Add an example**: give it a name if you like, write **The message to try it with** as you would write it to the agent, and add a check for each thing a good answer does. A check is a plain sentence, such as "It names both pull requests" or "It says plainly when it found nothing new", which the helper model reads its answer against; or a rule on what it gave, as an app's check is: `{{reply}} contains Lisbon`, or, for an agent that hands back results, `{{result.count}} > 0` on one of its fields. **Save the example**. An agent has up to 10 examples, each with up to 8 checks.
+2. **Try the examples** (or the flask button beside one, for that one alone) first says what it will do and cost: how many sessions it starts as the agent and on which tier, about what that costs (from what its last tries cost, or what its sessions cost this month; nothing to go on yet before its first try), and what is left of its monthly budget, which the tries count towards. Press **Try them**.
+3. Each example runs in a session of its own, started as the agent on its tier, in an empty folder, kept out of your sessions list. It sends nothing: what it would send through your connected apps is kept as what it would have sent, and what it hands back goes nowhere but the try. When it ends, its checks are read. An agent with fields to hand back also has to hand back a result.
+
+Each example then shows how its last try went: **Passed**, how many checks failed, **Did not finish**, or **Waiting for you** (its session asks you something: open it), with when and what it cost. Click one for its message, each check with what was seen (✓ or ✗), what it handed back, its reply, and **Open its session**. When you change the agent after its examples were last tried, the page says so with **Try them again**. Examples never run by themselves.
 
 ## Where an agent works
 
@@ -379,6 +401,15 @@ On an agent's page:
 
 The search box (Ctrl+K, ⌘K on a Mac) finds agents by name and description too; picking one opens its page.
 
+## Share an agent as a file
+
+One of your agents can travel as one file, to keep or to give to a colleague, who installs it on their Hydor.
+
+- **To download one**: open its page, then **More** (⋯) → **Download as a file**. Built-in agents download too, to install as someone's own. The file (`.hydor-agent`) holds its instructions, what it may use, its tier, program and model, the skills it favors, its permission mode, budget and other settings, the agents it hands work to (by name), what it hands back and the kinds of place its results go, its schedules that run by the clock (as suggestions), and its examples. Nothing of yours goes in it: the projects it works in, the connected accounts it uses, the Library page and spreadsheet its results went to, who its results are emailed to and from which account, and its webhook's address and key are left out, and its schedules that start on a watch, a webhook or a date stay here. The file lists in words what was left out, to set again.
+- **To install one**: on the [Agents page](/agents), press **Install**, then **Choose a file** and pick a `.hydor-agent` file (or drop it there). Before anything is saved, a card shows it: its name and line, **What it brings** (its instructions, what it may use, its tier, what it hands back, its examples, its suggested schedules), **What it needs from you** (what was left out, and the agents it hands work to that you don't have), and **Its instructions** to read. An agent of yours with the same name is not touched: the new one installs beside it as "Name (2)", unless you pick **Replace mine**, which makes yours this one as a new version (the way it was stays in its **Versions**, and your examples stay, after the file's). **Add the schedules it suggests, paused** adds its schedules, turned off until you turn them on. Press **Install**, and its page opens.
+
+Some things change on the way in, and the card says which: an agent that never asked before acting (**Full access**) starts with **Accept edits**, a program not set up here gives way to the one picked on the start page, and a file from a newer Hydor brings what this one knows (update Hydor for the rest). A file that is not an agent's file, or is broken, is refused with what is wrong; an app's file installs on the [Apps page](/guide/apps#share-an-app-as-a-file) instead, and Claude Code's agent files come in with **Import** (below).
+
 ## Import Claude Code's agent files
 
 Claude Code can keep agents of its own as Markdown files in a `.claude/agents` folder: a short header with the agent's name, description, model and tools, and its instructions below. The app turns these files into agents of yours, so every program here can work that way.
@@ -469,4 +500,7 @@ Turn it off and agents leave what they made in place. Either way, agents follow 
 - "What did my Bookkeeper hand back this month, and how much did it add up to?"
 - "Let my Docs keeper keep one conversation of its own, and send it: update the guide for the new Agents page."
 - "Switch my session about the Lisbon trip to the Planner agent."
+- "What changed in my Paper scout this week? Bring back the version from before Monday if its examples did better then."
+- "Give my Weekly report agent two examples, one for a quiet week and one for a busy one, with what a good report must say, and try them."
+- "Download my Bookkeeper agent as a file, and tell me what I'll need to set again on my laptop."
 - "Put new task folders in ~/Documents/Tasks from now on."

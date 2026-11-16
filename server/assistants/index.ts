@@ -8,13 +8,17 @@
 //
 // For other capabilities (apps, automations): listAssistants(), assistantById(id) and assistantStart(id).
 import crypto from 'node:crypto';
+import { agentFileName, type AgentVersion } from '../../shared/agent-files.ts';
 import { agentMode, ASSISTANT_ICONS, assistantExtra, TOOL_KINDS, type AgentDraft, type AgentResults, type Assistant, type AssistantsState, type AssistantSwitch } from '../../shared/assistants.ts';
 import { isTier } from '../../shared/tiers.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { Agent } from '../../shared/types.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
+import { config } from '../config.ts';
+import { connections } from '../connections/apps.ts';
 import type { DB } from '../db.ts';
+import { isInternal } from '../internal.ts';
 import { resolvePath } from '../files.ts';
 import { featureDeps, runTools } from '../features/registry.ts';
 import type { Deps, Feature, SpawnInfo } from '../features/types.ts';
@@ -32,7 +36,10 @@ import { activity, monthSpend } from './rules.ts';
 import { seenModels, setTeam, setTiers, teamOf, tierDefaults, tiersOf } from './tiers.ts';
 import { findAgentFiles, parseAgentFile, readAgentFile } from './importer.ts';
 import { instructionsFor, spawnFor, switchNote, type Target } from './instructions.ts';
-import { allAssistants, cleanAssistant, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf } from './store.ts';
+import { allAssistants, bringBack, cleanAssistant, cleanUpOn, DEFAULT_TASK_ROOT, findAssistant, removeAssistant, saveAssistant, setSettings, taskRoot, toneOf, type SaveHow } from './store.ts';
+import { exportAgent, installAgent, previewInstall } from './agentFile.ts';
+import { exampleTurnEnded, examplesByVersion, examplesState, tryExamples } from './examples.ts';
+import { agentVersion, agentVersions } from './versions.ts';
 import { dayIn, makeTaskFolder } from './taskFolder.ts';
 
 // ---- for other capabilities -----------------------------------------------------------------------------
@@ -227,8 +234,15 @@ function routes(d: Deps) {
     changed();
     return tiersState();
   });
+  // Who saved it, for its versions: an agent through the app's API, the draft that made it, or you.
+  const names = (kind: 'agent' | 'project', id: string) => (kind === 'agent' ? allAssistants(db).find((a) => a.id === id)?.name : allSpaces(db).find((s) => s.id === id)?.name) ?? id;
+  const how = (req: { body?: unknown; headers: Record<string, unknown> }, drafted = false): SaveHow => {
+    const b = body(req);
+    const why = typeof b.why === 'string' ? b.why.slice(0, 600) : undefined;
+    return { by: isInternal(req as never) ? 'agent' : drafted && b.drafted === true ? 'draft' : 'you', why, name: names };
+  };
   app.post('/api/assistants', async (req) => {
-    const a = saveAssistant(db, { ...body(req), id: undefined });
+    const a = saveAssistant(db, { ...body(req), id: undefined }, how(req, true));
     changed();
     return { assistant: a, ...state() };
   });
@@ -238,9 +252,64 @@ function routes(d: Deps) {
     return state();
   });
   app.put('/api/assistants/:id', async (req) => {
-    const a = saveAssistant(db, { ...body(req), id: idOf(req) });
+    const a = saveAssistant(db, { ...body(req), id: idOf(req) }, how(req));
     changed();
     return { assistant: a, ...state() };
+  });
+
+  // Its versions: each save that changed what it is, newest first, with how its examples went with each.
+  const own = (req: { params: unknown }) => {
+    const a = findAssistant(db, idOf(req));
+    if (!a) throw new HttpError(404, 'There is no such agent');
+    return a;
+  };
+  app.get('/api/assistants/:id/versions', async (req): Promise<{ versions: AgentVersion[] }> => {
+    const a = own(req);
+    const tried = examplesByVersion(db, a.id);
+    return { versions: agentVersions(db, a.id).map((v) => (tried.get(v.n) ? { ...v, examples: tried.get(v.n) } : v)) };
+  });
+  app.get('/api/assistants/:id/versions/:n', async (req) => {
+    const v = agentVersion(db, own(req).id, Number((req.params as { n: string }).n));
+    if (!v) throw new HttpError(404, 'There is no such version: only the latest 50 are kept');
+    return { version: v };
+  });
+  // Bring it back: an earlier version becomes the current one, as a new version (its examples stay as they are now).
+  app.post('/api/assistants/:id/versions/:n/restore', async (req) => {
+    const saved = bringBack(db, own(req).id, Number((req.params as { n: string }).n), { ...how(req), projects: new Set(allSpaces(db).map((s) => s.id)) });
+    changed();
+    return { assistant: saved, ...state() };
+  });
+
+  // Its examples: the latest try of each, what a try costs, and whether it changed since they were last tried.
+  app.get('/api/assistants/:id/examples', async (req) => examplesState(d, own(req)));
+  // Try the examples (or those named): each in a throwaway session as the agent. `agent`: the program picked on the start page.
+  app.post('/api/assistants/:id/examples/try', async (req) => {
+    const b = body(req);
+    const only = Array.isArray(b.only) ? b.only.map(String) : typeof b.example === 'string' ? [b.example] : undefined;
+    const use = b.agent === 'claude' || b.agent === 'codex' || b.agent === 'acp' ? { agent: b.agent as Agent, acpAgent: typeof b.acpAgent === 'string' ? b.acpAgent : undefined } : undefined;
+    const runs = await tryExamples(d, own(req), { only, use });
+    return { started: runs, ...examplesState(d, own(req)) };
+  });
+
+  // Download as a file: the agent as a .hydor-agent file, with nothing of yours in it.
+  app.get('/api/assistants/:id/export', async (req, reply) => {
+    const a = own(req);
+    const all = connections(db);
+    const file = exportAgent(db, d.scheduler, a, { connName: (id) => all.find((c) => c.id === id)?.entry?.name ?? id, version: config.version });
+    const name = agentFileName(a);
+    return reply
+      .header('Content-Type', 'application/json; charset=utf-8')
+      .header('Content-Disposition', `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(name)}`)
+      .send(JSON.stringify(file, null, 2));
+  });
+  // Install from a file: what it brings and needs, before anything is saved; then the agent saved.
+  app.post('/api/assistants/install/check', { bodyLimit: 1024 * 1024 }, async (req) => previewInstall(db, body(req).file));
+  app.post('/api/assistants/install', { bodyLimit: 1024 * 1024 }, async (req) => {
+    const b = body(req);
+    const use = b.agent === 'claude' || b.agent === 'codex' || b.agent === 'acp' ? { agent: b.agent as Agent, acpAgent: typeof b.acpAgent === 'string' ? b.acpAgent : undefined } : undefined;
+    const r = installAgent(d, b.file, { replace: b.replace === true, schedules: b.schedules === true, use });
+    changed();
+    return { assistant: r.assistant, schedules: r.schedules, ...state() };
   });
   app.delete('/api/assistants/:id', async (req) => {
     const id = idOf(req);
@@ -269,7 +338,7 @@ function routes(d: Deps) {
     const parsed = parseAgentFile(src, file || String(b.name ?? '').slice(0, 200));
     // Imported again: the same assistant, brought up to date (its icon kept).
     const prev = file ? allAssistants(db).find((a) => !a.builtin && a.source === file) : undefined;
-    const a = saveAssistant(db, prev ? { ...parsed, id: prev.id, icon: prev.icon } : parsed);
+    const a = saveAssistant(db, prev ? { ...parsed, id: prev.id, icon: prev.icon } : parsed, { by: 'import' });
     changed();
     return { assistant: a, ...state() };
   });
@@ -343,6 +412,8 @@ export const assistants: Feature = {
     return instructionsFor(findAssistant(d.db, s.extra.assistant), toneOf(d.db), { agent: 'acp', acpAgent: CONSOLE_ID });
   },
   turnEnd(t, d) {
+    // A try of an example: its checks are read in the background (the helper model takes a while).
+    void exampleTurnEnded(d, t).catch(() => {});
     return inboxTurnEnded(d, t);
   },
   start(d) {

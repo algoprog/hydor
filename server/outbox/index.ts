@@ -117,10 +117,12 @@ const changed = (d: Deps) => d.broadcast({ t: 'feature', id: 'outbox', data: { h
 
 /**
  * Whether the session's work now is a test that sends nothing: its scheduled run (a test run marked dry), the run it
- * was started for, or the app run it belongs to, while that run goes on.
+ * was started for, or the app run it belongs to, while that run goes on; or a try of an agent's example.
  */
 export function isDry(db: DB, key: string): boolean {
   try {
+    // A try of an agent's example (Try the examples) sends nothing, ever.
+    if (sessionExtra(db, key).agentExample) return true;
     const open = openRunIn(db, key);
     if (open) return !!open.dry;
     const extra = sessionExtra(db, key);

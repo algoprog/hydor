@@ -1,11 +1,16 @@
 // `hydor agents`: the Agents page. List (as `hydor agents` always printed), show, new, edit and remove, with the fields
-// the page edits as options (and where results go, --results-to), and results: an agent's history of what it handed
-// back. The API calls them assistants. Built-in agents can be copied (`new --from`), not changed.
+// the page edits as options (and where results go, --results-to), results: an agent's history of what it handed
+// back, and export and install: an agent as a .hydor-agent file, and one installed from such a file (what it brings and
+// needs said first). The API calls them assistants. Built-in agents can be copied (`new --from`), not changed.
+import fs from 'node:fs';
+import path from 'node:path';
+import { agentFileName, type AgentFile, type AgentInstallPreview } from '../../../shared/agent-files.ts';
 import type { AgentResults, Assistant, OutputTarget } from '../../../shared/assistants.ts';
 import { ASSISTANT_ICONS, RESULTS_KEEP } from '../../../shared/assistants.ts';
 import { enc } from '../client.ts';
 import { tierName } from '../lines.ts';
-import { choose, fields, markdown, num, pickOne, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
+import { tildify } from '../term.ts';
+import { choose, fields, flag, markdown, num, pickOne, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
 
 const AGENT_HINT = 'hydor agents lists them';
 const agent = { name: 'agent', kind: 'agent', pick: true } as const;
@@ -216,7 +221,7 @@ const programName = (a: Assistant) => (a.agent === 'acp' ? (a.acpAgent === 'cons
 export const agents: Area = {
   name: 'agents',
   summary: 'Your agents',
-  help: 'An agent is a preset a session starts as (Researcher, Writer…): its instructions, the program and model it suggests, what it may use and how much it may spend. The built-in ones can be copied, not changed. Name one by its name or the start of its id; on a terminal, leave it out to pick from a list. Where its results go is --results-to on new and edit; their fields are set on the page (hydor open agents); hydor agents results shows what it handed back.',
+  help: 'An agent is a preset a session starts as (Researcher, Writer…): its instructions, the program and model it suggests, what it may use and how much it may spend. The built-in ones can be copied, not changed. Name one by its name or the start of its id; on a terminal, leave it out to pick from a list. Where its results go is --results-to on new and edit; their fields are set on the page (hydor open agents); hydor agents results shows what it handed back. hydor agents export saves one as a file, and hydor agents install installs one from a file.',
   group: 'models',
   verbs: [
     {
@@ -377,6 +382,65 @@ export const agents: Area = {
         if (r.more) ctx.out(p.dim(`${r.results.length} of ${r.total}: --limit for more.`));
         const made = [r.made.sheet, r.made.library].filter(Boolean).map((x) => `“${x!.title}”`);
         if (made.length) ctx.out(p.dim(`Its runs go into ${made.join(' and ')} in the Library.`));
+      },
+    },
+    {
+      name: 'export',
+      aliases: ['download'],
+      args: [agent],
+      options: { output: { type: 'string', short: 'o', value: '<file>', desc: 'Where to write it (- prints it; default: its name, here)', kind: 'file' } },
+      summary: 'Save an agent as a file, to keep or to give',
+      help: 'The file (.hydor-agent, JSON) holds its instructions, tools, tier, skills, team (by name), what it hands back, its schedules by the clock as suggestions, and its examples. Nothing of yours goes in it: its projects, connected accounts, Library pages, who its results are emailed to and its webhook’s address and key are left out, and the file says so. Built-in agents export too.',
+      examples: ['hydor agents export bookkeeper', 'hydor agents export bookkeeper -o ~/Desktop/bookkeeper.hydor-agent', 'hydor agents export bookkeeper -o -'],
+      async run(ctx, [given], v) {
+        const found = await findAgent(ctx, given);
+        const file = await ctx.conn.api<AgentFile>('GET', `/api/assistants/${enc(found.id)}/export`);
+        const text = `${JSON.stringify(file, null, 2)}\n`;
+        if (str(v, 'output') === '-') return ctx.out(text.replace(/\n$/, ''));
+        const out = path.resolve(str(v, 'output') ?? agentFileName(found));
+        if (!str(v, 'output') && fs.existsSync(out)) throw new UsageError(`${path.basename(out)} exists already: name the file with -o <file>`);
+        fs.mkdirSync(path.dirname(out), { recursive: true });
+        fs.writeFileSync(out, text);
+        if (ctx.o.json) return ctx.json({ id: found.id, file: out, leftOut: file.leftOut ?? [] });
+        ctx.out(`Saved “${found.name}” as ${tildify(out, ctx.look.home)}.`);
+        if (file.leftOut?.length) ctx.out([ctx.look.p.dim('Left out, to set again where it is installed:'), ...file.leftOut.map((l) => ctx.look.p.dim(`  - ${l}`))]);
+      },
+    },
+    {
+      name: 'install',
+      aliases: ['import-file'],
+      args: [{ name: 'file', kind: 'file' }],
+      options: {
+        replace: { type: 'boolean', desc: 'Replace yours of the same name, as a new version of it' },
+        schedules: { type: 'boolean', desc: 'Add the schedules it suggests, paused' },
+      },
+      summary: 'Install an agent from a .hydor-agent file',
+      help: 'It says first what the file brings and what it needs from you (connected apps, who results are emailed to…), then asks (--yes does not). An agent of yours with the same name is left as it is: the new one installs beside it as “Name (2)”, unless --replace. A mode that never asks starts as Accept edits. Claude Code’s agent files (.md) come in on the Agents page’s Import.',
+      examples: ['hydor agents install bookkeeper.hydor-agent', 'hydor agents install bookkeeper.hydor-agent --replace --schedules -y'],
+      async run(ctx, [file], v) {
+        let text: string;
+        try {
+          text = fs.readFileSync(path.resolve(file), 'utf8');
+        } catch {
+          throw new UsageError(`Cannot read ${file}`);
+        }
+        const p = await ctx.conn.api<AgentInstallPreview>('POST', '/api/assistants/install/check', { file: text });
+        const replace = flag(v, 'replace') && !!p.clash;
+        const { p: paint } = ctx.look;
+        if (!ctx.o.json) {
+          ctx.out([
+            paint.bold(replace ? `${p.clash!.name} (replacing yours)` : p.beside) + (p.agent.description ? paint.dim(` · ${p.agent.description}`) : ''),
+            ...p.brings.map((l) => `  ${l}`),
+            ...(p.needs.length ? ['', paint.bold('It needs from you'), ...p.needs.map((l) => `  - ${l}`)] : []),
+            ...(p.notes.length ? ['', ...p.notes.map((l) => paint.dim(l))] : []),
+            ...(p.clash && !replace ? ['', paint.dim(`You have an agent named “${p.clash.name}”: this installs beside it as “${p.beside}” (--replace replaces yours).`)] : []),
+            ...(p.schedules.length && !flag(v, 'schedules') ? [paint.dim('Its suggested schedules are not added: --schedules adds them, paused.')] : []),
+          ]);
+        }
+        if (!(await ctx.confirm(replace ? `Replace “${p.clash!.name}”?` : `Install “${p.beside}”?`))) return ctx.out('Not installed.');
+        const r = await ctx.conn.api<{ assistant: Assistant; schedules: number }>('POST', '/api/assistants/install', { file: text, replace, schedules: flag(v, 'schedules') });
+        if (ctx.o.json) return ctx.json(r);
+        ctx.out(`${replace ? 'Replaced' : 'Installed'} “${r.assistant.name}” (${r.assistant.id})${r.schedules ? `, with ${r.schedules === 1 ? '1 schedule' : `${r.schedules} schedules`}, paused` : ''}.`);
       },
     },
     {
