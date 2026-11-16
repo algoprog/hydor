@@ -312,51 +312,63 @@ await ok('how a turn ended is kept: a later turn replaces it, and a stopped one 
 await ok('routes: the summary, a visit going on, and Mark all as seen (the sessions in it count as opened)', async () => {
   const app = Fastify();
   const seen: string[] = [];
+  // The routes go by the seeded world's clock (it is NOW; you were last here until LEFT), never the real one.
+  const clock = NOW;
   registerAway(app, {
     ...src,
+    now: () => clock,
     markSeen: (key) => {
       seen.push(key);
-      db.prepare('update app_sessions set seen_at = ? where key = ?').run(Date.now(), key);
+      db.prepare('update app_sessions set seen_at = ? where key = ?').run(clock, key);
     },
   });
   await app.ready();
-  // The real clock now: the seeded world is in the past, so give it a visit that ended an hour ago, before it all.
-  const real = Date.now();
-  const shift = real - NOW;
-  db.prepare('update app_sessions set ended_at = ended_at + ?, done_at = done_at + ?').run(shift, shift);
-  db.prepare('update task_runs set ended_at = ended_at + ?').run(shift);
-  db.prepare('update app_runs set ended_at = ended_at + ?').run(shift);
-  db.prepare('update tasks set next_at = next_at + ?').run(shift);
-  for (const it of inbox) it.at += shift;
-  kvSet(db, 'away.visits', JSON.stringify({ start: LEFT + shift - HOUR, last: LEFT + shift }));
 
-  const g = await app.inject({ method: 'GET', url: `/api/away?until=${real + 12 * HOUR}` });
+  const g = await app.inject({ method: 'GET', url: `/api/away?until=${NOW + 12 * HOUR}` });
   assert.equal(g.statusCode, 200);
   const sum = g.json() as AwaySummary;
-  assert.equal(sum.since, LEFT + shift);
+  assert.equal(sum.now, NOW);
+  assert.equal(sum.since, LEFT);
   assert.ok(sum.rows.some((r: AwayRow) => r.id === 'session:claude:deploy'));
   assert.equal(sum.next[0].name, 'Price watch');
 
   // A visit: the first minute in front starts one; since stays where it was.
   const h = await app.inject({ method: 'POST', url: '/api/away/here' });
   assert.equal(h.statusCode, 200);
-  assert.equal((h.json() as { since: number }).since, LEFT + shift);
-  assert.equal(visitsOf(db).before, LEFT + shift);
+  assert.equal((h.json() as { since: number }).since, LEFT);
+  assert.equal(visitsOf(db).before, LEFT);
 
   // Mark all as seen, up to what the page showed.
   const m = await app.inject({ method: 'POST', url: '/api/away/seen', payload: { at: sum.now } });
   assert.equal(m.statusCode, 200);
   assert.deepEqual(seen.sort(), ['claude:deploy', 'claude:older', 'claude:report']);
+  assert.equal(visitsOf(db).cleared, NOW);
   const after = (await app.inject({ method: 'GET', url: '/api/away' })).json() as AwaySummary;
   assert.deepEqual(after.rows, []);
   assert.equal(awayHasNews(after), false);
   // What waits from now on shows again.
-  inbox.push({ id: 'question:new', kind: 'question', title: 'Which hotel?', at: Date.now() + 1000, path: '/s/claude%3Ay' });
+  inbox.push({ id: 'question:new', kind: 'question', title: 'Which hotel?', at: clock + 1000, path: '/s/claude%3Ay' });
   const later = (await app.inject({ method: 'GET', url: '/api/away' })).json() as AwaySummary;
   assert.deepEqual(
     later.rows.map((r) => r.id),
     ['question:new'],
   );
+  await app.close();
+});
+
+await ok('routes: given no clock, the server clock', async () => {
+  const app = Fastify();
+  const blank = fresh('clock');
+  registerAway(app, { db: blank, inbox: () => [], markSeen: () => {} });
+  await app.ready();
+  const t0 = Date.now();
+  const h = await app.inject({ method: 'POST', url: '/api/away/here' });
+  const t1 = Date.now();
+  assert.equal(h.statusCode, 200);
+  const v = visitsOf(blank);
+  assert.ok(v.last !== undefined && v.last >= t0 && v.last <= t1, 'the visit is heard at the time now');
+  const sum = (await app.inject({ method: 'GET', url: '/api/away' })).json() as AwaySummary;
+  assert.ok(sum.now >= t1 && sum.now <= Date.now());
   await app.close();
 });
 
