@@ -292,6 +292,12 @@ let docId = '';
   b = await book();
   ok(dups.text?.includes('took 1 duplicate row') && ['apples', 'figs', 'kiwi', 'pears'].every((w) => Object.values(b.sheets[0].cells).some((c) => typeof c.v === 'string' && c.v.includes(w))), 'a row that repeats one above it goes, the others stay');
   ok((await act({ id, action: 'remove_duplicates' })).text?.startsWith('No row'), 'none left: said');
+  // What the last action changed, in words (Tools → Compare with the version before): the row that went; nothing saved.
+  const before = (await model<Workbook>(id)).page.version;
+  const cmp = await act({ id, action: 'compare' });
+  ok(/1 row removed/.test(cmp.text ?? '') && /Nothing was saved/.test(cmp.text ?? '') && (await model<Workbook>(id)).page.version === before, `compare: what the version before changed, nothing saved (${(cmp.text ?? cmp.error ?? '').slice(0, 160)})`);
+  ok((await act({ id, action: 'compare', since: 1, until: 1 })).text?.includes('Nothing changed'), 'compare: a version with itself, nothing changed');
+  ok((await act({ id, action: 'compare', since: 99 })).error?.includes('no longer kept'), 'compare: a version not kept, said');
 
   await run('save_sheet', { id, title: 'Stock', update: [{ sheet: 'Stock', cells: { E1: 'Double', E2: '=D2*2' } }] });
   await act({ id, action: 'fill', range: 'E2:E5' });

@@ -370,6 +370,19 @@ function PageView({ id }: { id: string }) {
       toastError(e);
     }
   };
+  // See what changed under an agent's turn (/pages/<id>?compare=<version before>&v=<the turn's version>): a spreadsheet
+  // opens on its Compare, the turn's version on view when a newer one came since. Asked once: the address forgets it.
+  const askCompare = Number(new URLSearchParams(search).get('compare')) || 0;
+  const askVersion = Number(new URLSearchParams(search).get('v')) || 0;
+  const [compareAt, setCompareAt] = useState<{ from: number; v: number } | null>(null);
+  useEffect(() => {
+    if (!data || !askCompare || data.page.kind !== 'sheet') return;
+    const v = askVersion && askVersion !== data.page.version ? askVersion : 0;
+    if (v) void viewVersion(v);
+    setCompareAt({ from: askCompare, v });
+    go(`/pages/${id}`, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.page.id, askCompare]);
   const restore = async () => {
     if (!old) return;
     try {
@@ -566,6 +579,7 @@ function PageView({ id }: { id: string }) {
         startPresent={startPresent}
         live={live}
         commentAi={commentAi}
+        compareWith={compareAt && (compareAt.v ? old?.version === compareAt.v : !old) ? compareAt.from : undefined}
       />
     ) : (
       <Empty icon={<AppWindow size={22} />} title="This app cannot open it">
