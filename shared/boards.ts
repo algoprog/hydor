@@ -5,9 +5,14 @@
 // checks a card passes before it is kept.
 //
 // The board as it is kept (server/pages/boards.ts writes it a card a line, so two versions read as a diff of lines):
-//   { "format": 1, "cards": [BoardCard, …] }   the cards in their order on the board (the first at the top left)
-// A board's title and description are the Library's, as every kind's are (shared/pages.ts PageInfo).
+//   { "format": 1, "cap"?: 5 | null, "cards": [BoardCard, …] }   the cards in their order on the board (the first at the
+//   top left); cap: the board's monthly spending cap for its cards' refreshes (left out: $5; null: off)
+// A board's title and description are the Library's, as every kind's are (shared/pages.ts PageInfo). How cards refresh
+// themselves is in shared/board-refresh.ts.
 import { answerUi, type AnswerUiSpec } from './answer-ui/index.ts';
+import { cleanCap, cleanRefresh, RefreshError, type CardRefresh } from './board-refresh.ts';
+
+export type { CardRefresh } from './board-refresh.ts';
 
 /** A card's size on the board: S, M, L or Wide. */
 export type CardSize = 's' | 'm' | 'l' | 'wide';
@@ -33,12 +38,6 @@ export interface CardSource {
   task?: string;
 }
 
-/**
- * How a card refreshes: kept for a later part of the work (refreshing is not built yet). A card may carry it already;
- * a board keeps it as it is (any small JSON object), with `refreshedAt`, the last time its data was made anew.
- */
-export type CardRefresh = Record<string, unknown>;
-
 export interface BoardCard {
   /** Its id on the board: c and letters and digits. */
   id: string;
@@ -54,14 +53,16 @@ export interface BoardCard {
   /** Who put it there: the user pinning it, or an agent (save_board). */
   by?: 'user' | 'agent';
   from?: CardSource;
-  /** How it refreshes (a later part of the work): carried as it is. */
+  /** How it refreshes itself: the question asked again, when, on which tier (shared/board-refresh.ts). */
   refresh?: CardRefresh;
-  /** When its data was last made anew (a later part of the work). */
+  /** When its data was last made anew (a refresh, or an agent's change of its data). */
   refreshedAt?: number;
 }
 
 export interface Board {
   format: 1;
+  /** The monthly spending cap for its cards' refreshes, in dollars: left out, $5; null, off (shared/board-refresh.ts boardCap). */
+  cap?: number | null;
   cards: BoardCard[];
 }
 
@@ -322,7 +323,13 @@ export function checkCard(input: unknown, o: { strict?: boolean; label?: string;
   if (isObj(input.refresh)) {
     const bytes = new TextEncoder().encode(JSON.stringify(input.refresh)).length;
     if (bytes > BOARD_LIMITS.refresh) throw new CardError(`${label}: its refresh setting is more than ${BOARD_LIMITS.refresh / 1024} KB.`);
-    card.refresh = input.refresh;
+    try {
+      const r = cleanRefresh(input.refresh);
+      if (r) card.refresh = r;
+    } catch (e) {
+      if (e instanceof RefreshError) throw new CardError(`${label}: ${e.message}`);
+      throw e;
+    }
   }
   if (typeof input.refreshedAt === 'number' && Number.isFinite(input.refreshedAt) && input.refreshedAt > 0) card.refreshedAt = Math.round(input.refreshedAt);
   return card;
@@ -350,12 +357,19 @@ export function checkBoard(input: unknown, o: { strict?: boolean } = {}): Board 
     seen.add(card.id);
     return card;
   });
-  return { format: 1, cards };
+  let cap: number | null | undefined;
+  try {
+    cap = cleanCap(b.cap);
+  } catch (e) {
+    if (e instanceof RefreshError) throw new CardError(e.message);
+    throw e;
+  }
+  return { format: 1, ...(cap !== undefined ? { cap } : {}), cards };
 }
 
 /** The board's text as it is kept: a card a line, so two versions read as a diff of lines. */
 export function boardText(b: Board): string {
-  const empty = JSON.stringify({ format: 1, cards: [] });
+  const empty = JSON.stringify({ format: 1, ...(b.cap !== undefined ? { cap: b.cap } : {}), cards: [] });
   if (!b.cards.length) return `${empty}\n`;
   return `${empty.slice(0, -2)}\n${b.cards.map((c) => JSON.stringify(c)).join(',\n')}\n]}\n`;
 }
@@ -369,15 +383,23 @@ export function moveCard(b: Board, from: number, to: number): Board {
   return { ...b, cards };
 }
 
-/** A card's fields changed (its title, its size), by its id. */
-export const changeCard = (b: Board, id: string, change: Partial<Pick<BoardCard, 'title' | 'size'>>): Board => ({
+/** A card's fields changed (its title, its size, how it refreshes: undefined stops it), by its id. */
+export const changeCard = (b: Board, id: string, change: Partial<Pick<BoardCard, 'title' | 'size' | 'refresh'>>): Board => ({
   ...b,
   cards: b.cards.map((c) => {
     if (c.id !== id) return c;
     const next = { ...c, ...change };
     if (!next.title?.trim()) delete next.title;
+    if ('refresh' in change && !change.refresh) delete next.refresh;
     return next;
   }),
 });
+
+/** The board's monthly cap for refreshes changed (a number of dollars; null: off; undefined: back to the default). */
+export const setBoardCap = (b: Board, cap: number | null | undefined): Board => {
+  const next: Board = { ...b, cap };
+  if (cap === undefined) delete next.cap;
+  return next;
+};
 
 export const removeCard = (b: Board, id: string): Board => ({ ...b, cards: b.cards.filter((c) => c.id !== id) });

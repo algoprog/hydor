@@ -281,6 +281,17 @@ async function findTask(ctx: Ctx, given: string | undefined): Promise<ScheduledT
   return choose(ctx, list, given, { id: (t) => t.id, names: (t) => [t.name], what: 'task', hint: TASK_HINT, label: (t) => t.name, detail: (t) => scheduleText(t.schedule) });
 }
 
+/** A board card's refreshes are changed on the board (its card's … → Keep it up to date…), not here. */
+function notBoard(ctx: Ctx, t: ScheduledTask, what: string) {
+  if (t.board) throw new UsageError(`“${t.name}” is a board card’s refresh: ${what} it on the board (${ctx.conn.base}/pages/${t.board.page}?card=${t.board.card}, the card’s … → Keep it up to date…, or Stop refreshing); hydor library refresh ${t.board.page} refreshes it now`);
+}
+
+/** Pauses or turns on a task: a board card's refreshes by their switch alone, any other by saving it so. */
+async function setOn(ctx: Ctx, t: ScheduledTask, on: boolean): Promise<{ task: ScheduledTask }> {
+  if (t.board) return ctx.conn.api<{ task: ScheduledTask }>('POST', `/api/automations/tasks/${enc(t.id)}/enabled`, { on });
+  return ctx.conn.api<{ task: ScheduledTask }>('POST', '/api/tasks', { ...bodyOf(t), enabled: on });
+}
+
 const whenText = (ms?: number) => (ms ? new Date(ms).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
 
 const RUN_MARK = { running: 'busy', done: 'done', partial: 'attention', blocked: 'attention', failed: 'error', error: 'error', silent: 'off' } as const;
@@ -326,12 +337,13 @@ export const tasks: Area = {
           p.bold(t.name),
           ...fields(ctx, [
             ['Id', t.id],
+            ['Refreshes', t.board ? `the card “${t.board.cardTitle}” on the board “${t.board.title}”: change it there (${ctx.conn.base}/pages/${t.board.page}?card=${t.board.card})` : undefined],
             ['When', scheduleText(t.schedule)],
             ['Next', t.enabled && t.nextAt ? whenText(t.nextAt) : undefined],
             ['State', t.enabled ? 'on' : t.pausedReason ? `paused: ${t.pausedReason}` : 'paused'],
             [
               'Runs',
-              t.app ? `the app “${t.appName ?? t.app.id}”` : [t.agent === 'acp' ? (t.acpAgent === 'console' ? 'custom' : t.acpAgent) : t.agent, t.model, t.effort, t.mode].filter(Boolean).join(' · '),
+              t.board ? undefined : t.app ? `the app “${t.appName ?? t.app.id}”` : [t.agent === 'acp' ? (t.acpAgent === 'console' ? 'custom' : t.acpAgent) : t.agent, t.model, t.effort, t.mode].filter(Boolean).join(' · '),
             ],
             ['Folder', t.cwd ? tildify(t.cwd, ctx.look.home) : undefined],
             ['Posts into', t.target],
@@ -344,7 +356,7 @@ export const tasks: Area = {
             ['Came from', t.origin],
           ]),
         ]);
-        if (t.prompt) ctx.out(['', p.bold('Prompt'), ...markdown(ctx, t.prompt)]);
+        if (t.prompt) ctx.out(['', p.bold(t.board ? 'The question it asks again' : 'Prompt'), ...markdown(ctx, t.prompt)]);
       },
     },
     {
@@ -390,6 +402,7 @@ export const tasks: Area = {
       examples: ['hydor tasks edit daily-brief --at 08:30', 'hydor tasks edit daily-brief --model opus --budget 2', 'hydor tasks edit daily-brief "A new prompt"'],
       async run(ctx, [given, ...words], v) {
         const t = await findTask(ctx, given);
+        notBoard(ctx, t, 'change');
         const body = bodyOf(t);
         const schedule = scheduleOf(ctx, v);
         if (schedule) {
@@ -421,7 +434,7 @@ export const tasks: Area = {
       examples: ['hydor tasks pause daily-brief'],
       async run(ctx, [given]) {
         const t = await findTask(ctx, given);
-        const r = await ctx.conn.api<{ task: ScheduledTask }>('POST', '/api/tasks', { ...bodyOf(t), enabled: false });
+        const r = await setOn(ctx, t, false);
         if (ctx.o.json) return ctx.json(r);
         ctx.out(`Paused “${t.name}”.`);
       },
@@ -434,7 +447,7 @@ export const tasks: Area = {
       examples: ['hydor tasks resume daily-brief'],
       async run(ctx, [given]) {
         const t = await findTask(ctx, given);
-        const r = await ctx.conn.api<{ task: ScheduledTask }>('POST', '/api/tasks', { ...bodyOf(t), enabled: true });
+        const r = await setOn(ctx, t, true);
         if (ctx.o.json) return ctx.json(r);
         ctx.out(`“${t.name}” is on${r.task.nextAt ? `: next ${whenText(r.task.nextAt)}` : ''}.`);
       },
@@ -494,6 +507,7 @@ export const tasks: Area = {
       examples: ['hydor tasks remove daily-brief', 'hydor tasks remove daily-brief -y'],
       async run(ctx, [given]) {
         const t = await findTask(ctx, given);
+        notBoard(ctx, t, 'stop');
         if (!(await ctx.confirm(`Remove “${t.name}”?`))) return ctx.out('Not removed.');
         const r = await ctx.conn.api('DELETE', `/api/tasks/${enc(t.id)}`);
         if (ctx.o.json) return ctx.json(r);

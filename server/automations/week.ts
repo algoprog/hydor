@@ -36,12 +36,30 @@ export function dateIn(tz: string, at: number): string {
   return `${w.y}-${String(w.mo).padStart(2, '0')}-${String(w.d).padStart(2, '0')}`;
 }
 
-/** What a task is for, the agent or app it belongs to, and where it is changed. */
+/** What a task is for, the agent, app or board it belongs to, and where it is changed. */
 function itemOf(t: ScheduledTask, agents: Map<string, { name: string; icon?: string }>, tz: string, band: boolean): ScheduleItem {
   const agentId = typeof t.extra?.assistant === 'string' ? t.extra.assistant : undefined;
   const agent = agentId ? agents.get(agentId) : undefined;
   const daily = t.origin?.startsWith('daily:') ? t.origin.slice('daily:'.length) : undefined;
   const appId = t.app?.id ?? daily;
+  // A board card's refreshes: changed on its board (the card's … → Keep it up to date…), which its pencil opens.
+  if (t.board) {
+    return {
+      id: t.id,
+      name: t.name,
+      source: 'board',
+      kind: t.schedule.kind,
+      when: scheduleText(t.schedule, tz),
+      enabled: t.enabled,
+      ...(t.pausedReason ? { pausedReason: t.pausedReason } : {}),
+      ...(t.enabled && t.nextAt ? { nextAt: t.nextAt } : {}),
+      ...(t.recent?.length ? { recent: t.recent } : {}),
+      ...(t.lastStatus ? { lastStatus: t.lastStatus } : {}),
+      board: { id: t.board.page, name: t.board.title, card: t.board.cardTitle },
+      edit: `/pages/${encodeURIComponent(t.board.page)}?card=${encodeURIComponent(t.board.card)}`,
+      band,
+    };
+  }
   const source: ScheduleSource = agent ? 'agent' : appId ? 'app' : 'task';
   const appPage = (id: string) => (id.startsWith('tpl:') ? `/apps/t/${encodeURIComponent(id.slice(4))}` : `/apps/${encodeURIComponent(id)}`);
   // Where it is changed today: an agent's schedules on its page, an app's under its Runs (Update automatically in its

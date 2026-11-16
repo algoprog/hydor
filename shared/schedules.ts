@@ -1,11 +1,11 @@
 // Schedules: one place for everything that runs by itself (scheduled tasks, agents' schedules, apps' schedules,
-// watchers and webhooks, all scheduled tasks underneath), as a week or a month: the runs that happened with how
+// board cards that refresh themselves, watchers and webhooks, all scheduled tasks underneath), as a week or a month: the runs that happened with how
 // each went, and the runs to come (GET /api/automations/week, server/automations/week.ts). Times come with their
 // day and minute in the user's time zone, so a page draws them without any time-zone sums of its own.
 import type { RunStatus, RunTrigger, TaskSchedule } from './automations.ts';
 
-/** What a scheduled task is for: a task of its own, one of an agent's schedules, or an app's. */
-export type ScheduleSource = 'task' | 'agent' | 'app';
+/** What a scheduled task is for: a task of its own, one of an agent's schedules, an app's, or a board card's refreshes. */
+export type ScheduleSource = 'task' | 'agent' | 'app' | 'board';
 
 /** One thing that runs by itself, as the Schedules list shows it. */
 export interface ScheduleItem {
@@ -32,7 +32,9 @@ export interface ScheduleItem {
   agent?: { id: string; name: string; icon?: string };
   /** The app it runs (an app's schedule), and whether it is that app's Update automatically. */
   app?: { id: string; name?: string; daily?: boolean };
-  /** Where it is changed, a page of the app: the agent's page, the app's page, or Settings → Scheduled tasks. */
+  /** The board whose card it refreshes (a board's refreshes), and the card's title. */
+  board?: { id: string; name: string; card: string };
+  /** Where it is changed, a page of the app: the agent's page, the app's page, the board, or Settings → Scheduled tasks. */
   edit: string;
   /**
    * Drawn as one band a day rather than a block a run: it repeats every few minutes (more than eight runs a day), or it

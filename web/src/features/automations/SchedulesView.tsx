@@ -5,7 +5,7 @@
 // schedule, watcher and webhook, with its last result, its next run, a switch to pause it and a link to where it is
 // changed (editing stays where it was). On a phone, one day at a time (arrows, or a swipe) and the list.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type TouchEvent } from 'react';
-import { AppWindow, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Repeat, Webhook } from 'lucide-react';
+import { AppWindow, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, Eye, LayoutDashboard, Pencil, Plus, Repeat, Webhook } from 'lucide-react';
 import { OUTCOME_LABEL, TRIGGER_LABEL, type RunStatus } from '@shared/automations';
 import { addDate, mondayOf, type ScheduleItem, type ScheduleWeek, type WeekBand, type WeekDay, type WeekNext, type WeekRun } from '@shared/schedules';
 import { api, enc, post } from '../../lib/api';
@@ -125,7 +125,7 @@ function tallies(data: ScheduleWeek, shown: (id: string) => boolean): Tally[] {
 
 // ---- what runs by itself -----------------------------------------------------------------------------------------
 
-type Filter = 'all' | 'task' | 'agent' | 'app' | 'watch' | 'webhook' | 'paused';
+type Filter = 'all' | 'task' | 'agent' | 'app' | 'board' | 'watch' | 'webhook' | 'paused';
 const matches = (it: ScheduleItem, f: Filter) => f === 'all' || (f === 'paused' ? !it.enabled : f === 'watch' || f === 'webhook' ? it.kind === f : it.source === f);
 
 function KindIcon({ it, size = 15 }: { it: ScheduleItem; size?: number }) {
@@ -134,6 +134,7 @@ function KindIcon({ it, size = 15 }: { it: ScheduleItem; size?: number }) {
   if (it.band) return <Repeat size={size} />;
   if (it.agent) return <AssistantIcon icon={it.agent.icon ?? 'bot'} size={size - 3} plain />;
   if (it.source === 'app') return <AppWindow size={size} />;
+  if (it.source === 'board') return <LayoutDashboard size={size} />;
   return <CalendarClock size={size} />;
 }
 
@@ -147,12 +148,16 @@ function Source({ it }: { it: ScheduleItem }) {
     <span className="shrink-0 text-fg-3">
       App · <span translate="no">{it.app.name ?? it.name}</span>
     </span>
+  ) : it.board ? (
+    <span className="shrink-0 text-fg-3">
+      Board · <span translate="no">{it.board.name}</span>
+    </span>
   ) : (
     <span className="shrink-0 text-fg-3">Task</span>
   );
 }
 
-const editTitle = (it: ScheduleItem) => (it.agent ? 'Change it on its agent’s page' : it.app ? 'Change it on its app’s page' : 'Change it in Settings → Scheduled tasks');
+const editTitle = (it: ScheduleItem) => (it.agent ? 'Change it on its agent’s page' : it.app ? 'Change it on its app’s page' : it.board ? 'Change it on its board' : 'Change it in Settings → Scheduled tasks');
 
 // ---- what a click opens -----------------------------------------------------------------------------------------
 
@@ -728,6 +733,7 @@ export function SchedulesView() {
     { key: 'task', label: 'Tasks' },
     { key: 'agent', label: 'Agents' },
     { key: 'app', label: 'Apps' },
+    { key: 'board', label: 'Boards' },
     { key: 'watch', label: 'Watchers' },
     { key: 'webhook', label: 'Webhooks' },
     { key: 'paused', label: 'Paused' },
