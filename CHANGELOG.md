@@ -3,6 +3,30 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.72.0 · 16 November 2026
+
+Your agents get switches for the browser and the computer, wiki memory learns from each project's work, and a folder
+linked in a reply opens in its pop-up.
+
+- **Use a browser and Use the computer**: what an agent may use has two more switches. **Use a browser** lets it open
+  websites, click and fill in forms in the app's browser (until now that came with **Use the web**), and **Use the
+  computer** lets it see the screen and use the mouse and keyboard, in the desktop apps with Computer use on (until now
+  every agent could). Claude Code, Codex and Custom all have those tools switched off when they are off, and an agent
+  no longer reads how to use tools it can't. Agents you saved with some switches off keep what they could do: the
+  browser where they had the web, the computer where they could run commands. The same goes for an older version of an
+  agent you bring back, and for an agent file from an earlier Hydor.
+- **Wiki memory learns from the project's work**: about once a day, with **Learn from conversations** on in Settings →
+  Memory, the helper model reads each project's recent conversations (your own words and the agents' replies, never
+  their tools' output; never confidential sessions, sessions with memory off, helpers or scheduled runs) and adds what
+  is worth keeping to the project's wiki: decisions and why, how things work, pitfalls and their fixes. Each
+  conversation is kept as a source, and **Recent updates** on the Memory tab opens the session it came from. The first
+  time it looks back two weeks, so wikis that were still empty fill in soon after this update.
+- **Documents already in a project's knowledge** are read into its wiki too, once, at the same gentle pace as new
+  ones: until now only documents added after 0.71.0 were.
+- **A folder linked in an agent's reply** opens in the pop-up over the conversation, as the Files page shows it,
+  instead of "Could not open the file". Its folders open in place, a file opened from it has an arrow back to the
+  folder, and **Open in Files** goes to the folder there.
+
 ## 0.71.0 · 16 November 2026
 
 Wiki memory: each project keeps a wiki that grows from its documents and its work, beside its notes and documents on
