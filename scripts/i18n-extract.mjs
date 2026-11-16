@@ -400,8 +400,8 @@ for (const d of fs.readdirSync(path.join(ROOT, 'skills'))) {
   const description = fs.existsSync(md) && /^description:\s*(.+)$/m.exec(fs.readFileSync(md, 'utf8'))?.[1];
   if (description) add(description.replace(/^(["'])(.*)\1$/, '$2'), `skills/${d}/SKILL.md`);
 }
-// The guide's topics that are in English only (the API): their titles show among the translated ones.
-for (const f of fs.readdirSync(path.join(ROOT, 'docs/guide')).filter((x) => x.endsWith('.md') && x !== 'README.md' && !fs.existsSync(path.join(ROOT, 'docs/guide/zh', x)))) {
+// Guide titles also need dictionary entries when a language has no translated guide topic yet.
+for (const f of fs.readdirSync(path.join(ROOT, 'docs/guide')).filter((x) => /^\d+-[a-z0-9-]+\.md$/.test(x))) {
   const title = /^# (.+)$/m.exec(fs.readFileSync(path.join(ROOT, 'docs/guide', f), 'utf8'))?.[1];
   if (title) add(title, `docs/guide/${f}`);
 }
@@ -410,9 +410,17 @@ const out = Object.fromEntries([...found.entries()].sort((a, b) => a[0].localeCo
 fs.mkdirSync(path.join(ROOT, 'web/src/i18n'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'web/src/i18n/strings.json'), `${JSON.stringify(out, null, 0).replace(/^\{/, '{\n').replace(/","/g, '",\n"').replace(/\}$/, '\n}')}\n`);
 console.log(`${found.size} strings`);
-for (const lang of ['zh', 'el']) {
+for (const lang of ['de', 'zh', 'el']) {
   const file = path.join(ROOT, `web/src/i18n/${lang}.json`);
   const have = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+  // Supplement catalogs contribute coverage without replacing existing base translations.
+  const supplements = fs.readdirSync(path.dirname(file), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && new RegExp(`^${lang}\\.[a-z0-9_-]+\\.json$`).test(entry.name))
+    .map((entry) => entry.name).sort();
+  for (const name of supplements) {
+    const entries = JSON.parse(fs.readFileSync(path.join(path.dirname(file), name), 'utf8'));
+    for (const [key, value] of Object.entries(entries)) if (!Object.hasOwn(have, key)) have[key] = value;
+  }
   const missing = Object.keys(out).filter((k) => !(k in have)).length;
   console.log(`${lang}: ${Object.keys(out).length - missing} translated, ${missing} to go`);
 }

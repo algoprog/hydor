@@ -613,12 +613,14 @@ export function AgentsPage() {
               <section>
                 <h2 className="mb-2 text-[13px] font-medium text-fg-3">Built in</h2>
                 <div className="flex flex-wrap gap-1.5">
+                  {/* Built-in names and descriptions remain in their original language. */}
                   {builtins.map((a) => (
                     <button
                       key={a.id}
                       type="button"
                       onClick={() => go(`/agents/${enc(a.id)}`)}
                       title={a.description}
+                      translate="no"
                       className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pr-3 pl-1 text-[13px] hover:border-line-2"
                     >
                       <AssistantIcon icon={a.icon} size={12} />

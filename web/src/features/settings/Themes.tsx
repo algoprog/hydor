@@ -216,10 +216,11 @@ function ThemeCard({ theme, picked, showing, onPick, menu }: { theme: AppTheme; 
           {picked && <Check size={13} strokeWidth={2.5} className={showing ? 'shrink-0 text-accent' : 'shrink-0 text-fg-3'} />}
         </span>
       </button>
+      {/* Quoted names remain literal when the surrounding label is translated. */}
       <button
         ref={anchor}
         type="button"
-        aria-label={`More for ${theme.name}`}
+        aria-label={`More for “${theme.name}”`}
         title="More"
         onClick={() => setOpen((o) => !o)}
         className={cx(

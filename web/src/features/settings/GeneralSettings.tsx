@@ -506,8 +506,9 @@ function SessionLimitsSetting() {
           <Throbber className="text-fg-3" />
         ) : (
           <>
+            {/* Distinguish the session RAM limit from the agent memory feature. */}
             <Select
-              label="Memory"
+              label="Memory (RAM)"
               disabled={off}
               value={String(r.limits.memoryMb ?? 0)}
               onChange={(v) => save({ memoryMb: Number(v) || null })}

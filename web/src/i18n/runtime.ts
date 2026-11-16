@@ -1,3 +1,4 @@
+import { combineLanguageCatalogs, isLanguageSupplement } from '../../../shared/language-catalog.ts';
 // The pages in the user's language. The app's own words are translated as they are drawn, from a dictionary
 // per language (npm run i18n:extract lists them in strings.json; zh.json, el.json… hold the translations).
 // Text nodes and a few attributes are changed in place: React keeps its nodes, and when it sets one's text
@@ -125,7 +126,10 @@ export async function startTranslating(lang: Lang) {
   if (lang === 'en' || observer) return;
   const load = LANGS.find((l) => l.id === lang) ? DICTS[lang] : undefined;
   if (!load) return;
-  translate = translator(await load());
+  // Modules may add language-specific entries without replacing the main dictionary.
+  const entries = Object.entries(SUPPLEMENTS).filter(([name]) => isLanguageSupplement(name.slice(2), lang));
+  const supplements = await Promise.all(entries.map(async ([name, loadSupplement]) => [name.slice(2), await loadSupplement()] as [string, Dict]));
+  translate = translator(combineLanguageCatalogs(await load(), supplements));
   document.documentElement.lang = lang;
   walk(document.body);
   observer = new MutationObserver((list) => {
@@ -140,6 +144,10 @@ export async function startTranslating(lang: Lang) {
 
 /** Each language's dictionary, loaded when it is the one in use. */
 const DICTS: Partial<Record<Lang, () => Promise<Dict>>> = {
+  de: () => import('./de.json').then((m) => m.default as Dict),
   zh: () => import('./zh.json').then((m) => m.default as Dict),
   el: () => import('./el.json').then((m) => m.default as Dict),
 };
+
+// Vite discovers optional supplement catalogs at build time.
+const SUPPLEMENTS = import.meta.glob<Dict>('./*.*.json', { import: 'default' });
