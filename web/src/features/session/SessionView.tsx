@@ -23,7 +23,7 @@ import { TaskItem } from './WorkRow';
 import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
-import { FindBar } from './FindBar';
+import { FindBar, showSeq } from './FindBar';
 import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
 import { ConfidentialLock } from '../confidential/feature';
 import { OfflineFrames } from '../pages/frame';
@@ -628,6 +628,15 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [sessionKey]);
+  // A board's card opens the conversation it was pinned from at its reply (`at=<seq>`): that reply, in view.
+  const atAsked = new URLSearchParams(useSearch()).get('at');
+  const atSeq = atAsked && /^\d+$/.test(atAsked) ? Number(atAsked) : null;
+  useEffect(() => {
+    if (atSeq === null || findWords) return;
+    useSessionShow.getState().show(sessionKey, 'conversation');
+    void showSeq(sessionKey, atSeq);
+    go(sessionPath(sessionKey), true);
+  }, [atSeq, sessionKey]);
   // After the reset above, so a session opened from the search box keeps its find bar.
   useEffect(() => {
     if (!findWords) return;

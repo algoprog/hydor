@@ -45,7 +45,7 @@ export interface ExportOptions {
 }
 
 /** The tools that put something with the reply rather than being steps of the work (as the session's page shows them). */
-const WITH_REPLY = new Set(['present_files', 'show_html', 'save_page', 'save_doc', 'save_sheet', 'save_slides', 'save_latex', 'save_notebook', 'save_diagram', 'use_app']);
+const WITH_REPLY = new Set(['present_files', 'show_html', 'save_page', 'save_doc', 'save_sheet', 'save_slides', 'save_latex', 'save_notebook', 'save_diagram', 'save_board', 'use_app']);
 /** The app's own tool's name without its server's prefix (mcp__hydor__present_files → present_files). */
 const bare = (name: string) => /^mcp__(?:hydor|naget-agent|agent-console)__(.+)$/.exec(name)?.[1] ?? name;
 const PICTURE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;

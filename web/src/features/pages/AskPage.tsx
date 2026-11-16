@@ -107,7 +107,7 @@ async function followAsk(key: string, prompt: string, beforeSend: () => Promise<
   }
 }
 
-type AskKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram';
+type AskKind = 'page' | 'slides' | 'doc' | 'sheet' | 'tex' | 'notebook' | 'diagram' | 'board';
 const EXAMPLES: Record<AskKind, string[]> = {
   slides: ['Make the titles shorter and clearer', 'Add a slide with a chart of these numbers', 'Use a darker theme', 'Write speaker notes for every slide', 'Add simple animations to the bullets'],
   page: ['Make it more colourful', 'Add a chart of the numbers', 'Make it easier to use on a phone', 'Fix any mistakes in the words'],
@@ -116,6 +116,7 @@ const EXAMPLES: Record<AskKind, string[]> = {
   tex: ['Fix the errors so it compiles', 'Add a table of the results', 'Make the abstract shorter', 'Number the equations and refer to them in the text', 'Add a bibliography with these sources'],
   notebook: ['Explain what this cell does', 'Fix the error in this cell', 'Add a chart of the results', 'Add a text cell before each section saying what it does', 'Make it run faster'],
   diagram: ['Add a step for checking the payment', 'Colour the shapes by team', 'Lay it out from left to right', 'Turn it into a swimlane diagram by role', 'Add a legend for the colours'],
+  board: ['Bring every card up to date', 'Add a card with this week’s weather', 'Put the charts first, side by side', 'Make the small cards wider', 'Add a card that sums up the others'],
 };
 const WHAT_CHANGES: Record<AskKind, string> = {
   slides: 'Say what to change, and an agent changes the slides. You see each change here as soon as it is saved.',
@@ -125,6 +126,7 @@ const WHAT_CHANGES: Record<AskKind, string> = {
   tex: 'Say what to change, and an agent changes the LaTeX. You see each change here as soon as it is saved.',
   notebook: 'Ask about the notebook, or say what to change, and an agent answers or changes it. You see each change here as soon as it is saved.',
   diagram: 'Say what to change, and an agent changes the diagram. You see each change here as soon as it is saved.',
+  board: 'Say what to add or change, and an agent changes the board’s cards. You see each change here as soon as it is saved.',
 };
 const PLACEHOLDER: Record<AskKind, string> = {
   slides: 'What should change on the slides?',
@@ -134,6 +136,7 @@ const PLACEHOLDER: Record<AskKind, string> = {
   tex: 'What should change in the document?',
   notebook: 'What should change, or what do you want to know?',
   diagram: 'What should change in the diagram?',
+  board: 'What should the board show, or change?',
 };
 
 function Start({ page, scopes, beforeSend }: { page: PageInfo; scopes: AskScope[]; beforeSend: () => Promise<boolean> }) {

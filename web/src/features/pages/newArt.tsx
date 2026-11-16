@@ -587,7 +587,19 @@ export function PictureArt({ w, h, bg, color }: { w: number; h: number; bg: 'whi
   );
 }
 
-export function BlankArt({ kind }: { kind: 'doc' | 'sheet' | 'notebook' | 'diagram' }) {
+export function BlankArt({ kind }: { kind: 'doc' | 'sheet' | 'notebook' | 'diagram' | 'board' }) {
+  if (kind === 'board')
+    return (
+      <div translate="no" aria-hidden className="@container absolute inset-0 bg-bg-1">
+        <div className="grid h-full grid-cols-12" style={{ gap: '2.4cqw', padding: '5cqw' }}>
+          {[6, 3, 3, 4, 4, 4].map((span, i) => (
+            <div key={i} className={cx('border border-dashed border-fg/15 bg-panel', i === 0 && 'border-solid border-accent/50')} style={{ gridColumnEnd: 'span ' + span, borderRadius: '2cqw' }}>
+              {i === 0 && <div className="bg-accent/70" style={{ margin: '3cqw', width: '30%', height: '2.4cqw', borderRadius: '1cqw' }} />}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   if (kind === 'doc')
     return (
       <Paper pad={6} gap={1.8}>

@@ -7,6 +7,7 @@ import { normalizeMath } from './markdown-math';
 import { streamBlocks } from './stream-blocks';
 import { Check, Copy, FileText } from 'lucide-react';
 import { highlight, resolveLang } from '../lib/highlight';
+import type { CardSource } from '@shared/boards';
 import { CITE_RUN, citedReply, citeNumbers, type Cited } from '@shared/citations';
 import { codexCitations, FILE_CITATION } from '@shared/file-citations';
 import { CiteChip, SourcesRow } from './Citations';
@@ -280,6 +281,8 @@ export interface MdInfo {
   cwd?: string;
   /** A confidential session's reply: nothing loads from the web for it (pictures there are links), and its live blocks stay code. */
   offline?: boolean;
+  /** Where the reply is, for an answer card pinned to a board from it: its session and place, or an app's or a task's run. */
+  pinFrom?: CardSource;
 }
 export const MdCtx = createContext<MdInfo>({ src: '', streaming: false, rich: false });
 
@@ -722,6 +725,7 @@ export const Markdown = memo(function Markdown({
   sessionKey,
   cwd,
   offline,
+  pinFrom,
 }: {
   text: string;
   className?: string;
@@ -746,13 +750,15 @@ export const Markdown = memo(function Markdown({
   cwd?: string;
   /** A confidential session's reply: nothing from the web (pictures there are links), live blocks stay code. */
   offline?: boolean;
+  /** Where the reply is, for its answer cards pinned to a board (its session and place, an app's or a task's run). */
+  pinFrom?: CardSource;
 }) {
   const src = useMemo(() => {
     const t = normalizeMath(codexCitations(text), !notebook);
     return streaming ? holdOpenMaths(t) : t;
   }, [text, notebook, streaming]);
   useChemistry(src);
-  const base = useMemo<Omit<MdInfo, 'src'>>(() => ({ streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline }), [streaming, rich, sessionKey, cwd, offline]);
+  const base = useMemo<Omit<MdInfo, 'src'>>(() => ({ streaming: !!streaming, rich: !!rich, sessionKey, cwd, offline, pinFrom }), [streaming, rich, sessionKey, cwd, offline, pinFrom]);
   const info = useMemo<MdInfo>(() => ({ ...base, src }), [base, src]);
   // While it comes, block by block (a document's headings are numbered across the whole of it: it is read whole).
   const blocks = useMemo(() => (streaming && !baseDir && !app ? streamBlocks(src) : null), [src, streaming, baseDir, app]);

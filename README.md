@@ -47,7 +47,8 @@ tier alone, and 67% less than running everything on the strongest model
 ([the numbers](docs/plans/tiers-and-the-team.md)). See [Sessions](docs/guide/02-sessions.md).
 
 **For everything else.** Research with cited sources, a browser you can take over, and a Library where agents write
-documents, slides, spreadsheets, LaTeX and diagrams that you edit as in Word, PowerPoint, Excel and Overleaf. Small
+documents, slides, spreadsheets, LaTeX and diagrams that you edit as in Word, PowerPoint, Excel and Overleaf, and boards
+that keep the answer cards you pin from replies (a chart, this week's numbers, the weather) together. Small
 [apps](docs/guide/10-apps.md) do one job each, from a trip plan to a product comparison. See the
 [Library](docs/guide/11-library.md) and [research](docs/guide/08-research.md).
 

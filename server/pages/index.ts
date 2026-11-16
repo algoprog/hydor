@@ -2,8 +2,8 @@
 // input, so it lives in the agent's transcript); the user's clicks on its choices come back to the
 // message box. save_page keeps one in the Pages library, with versions and storage of its own, and an
 // address of its own for a phone's home screen. save_slides keeps a slide deck there (slides.ts), to edit,
-// present and export; save_doc, save_sheet, save_latex, save_notebook and save_diagram keep documents, spreadsheets, LaTeX
-// documents, Jupyter notebooks and diagrams (docs.ts, sheets.ts, latex.ts, notebooks.ts, diagrams.ts; kinds.ts says what each kind does). export_page makes a file of any of them (a
+// present and export; save_doc, save_sheet, save_latex, save_notebook, save_diagram and save_board keep documents, spreadsheets, LaTeX
+// documents, Jupyter notebooks, diagrams and boards of answer cards (docs.ts, sheets.ts, latex.ts, notebooks.ts, diagrams.ts, boards.ts; kinds.ts says what each kind does). export_page makes a file of any of them (a
 // PDF, a Word document, a PowerPoint deck, an Excel file…) for the agent to hand over. publish_site asks the user to put a folder (a project's build) or a saved page at a
 // link; nothing is published until they confirm on the card.
 //
@@ -23,6 +23,7 @@
 //   POST /api/pages/video-still, POST /api/pages/videos, GET /api/pages/videos/:sha
 //   GET/PUT /api/pages/file (a file of the computer's in an editor: filemodel.ts)
 //   GET/POST /api/pages/:id/notebook (where a notebook of the Library runs: notebooks.ts)
+//   POST /api/boards/pin (an answer card pinned to a board: board-routes.ts)
 //   POST /api/library/uploads, PUT/DELETE /api/library/uploads/:id, POST /api/library/move (files dropped on the Library: uploads.ts)
 //   GET /api/pages/picture?url=, GET /api/pages/fonts.css?f=, GET /api/pages/fonts/*
 //   GET/POST /api/sites, DELETE /api/sites/:id, GET/POST /api/sites/requests/:id
@@ -36,7 +37,7 @@ import { isAbsPath } from '../platform.ts';
 import os from 'node:os';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { PageInfo, PagesEvent, PublishRequest } from '../../shared/pages.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -76,6 +77,8 @@ import { HOW_TO_MAKE, makeInstructions } from './content-types.ts';
 import { agentBook, readBook, SAVE_SHEET_DESCRIPTION, SAVE_SHEET_SCHEMA } from './sheets.ts';
 import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from './slides.ts';
 import { agentDiagram, SAVE_DIAGRAM_DESCRIPTION, SAVE_DIAGRAM_SCHEMA } from './diagrams.ts';
+import { agentBoard, readBoard, SAVE_BOARD_DESCRIPTION, SAVE_BOARD_SCHEMA } from './boards.ts';
+import { boardRoutes } from './board-routes.ts';
 import { myThemeByName } from './my-themes.ts';
 import { withSheetsAndLogo } from './slides-sources.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
@@ -128,6 +131,16 @@ import { DESCRIPTION_WORDS, type LibFolder } from '../../shared/pages.ts';
 export { MAX_PAGE } from './store.ts';
 
 const tell = (d: Deps, data: PagesEvent) => d.broadcast({ t: 'feature', id: 'pages', data });
+
+/**
+ * A picture from the web, through this server, kept a while (GET /api/pages/picture): also what a board shared at a
+ * link shows of its cards' pictures (spaces/portal.ts), once the link has said the address is one of the board's.
+ */
+let webPicture: ((url: string, reply: FastifyReply) => Promise<unknown>) | null = null;
+export function serveWebPicture(url: string, reply: FastifyReply): Promise<unknown> {
+  if (!webPicture) throw new HttpError(503, 'Pictures are not served yet');
+  return webPicture(url, reply);
+}
 
 /**
  * The save tools' libraryFolder: where in the Library what they save goes (folders.ts agentPlace). Not `folder`, which
@@ -334,7 +347,7 @@ const GET_PAGE: RunTool = {
   name: 'get_page',
   annotations: { readOnlyHint: true },
   description:
-    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents, Jupyter notebooks and diagrams (Pages). With no id: each one’s id, title, kind, project and Library folder, version and last change (and its description, when there are few). With query: the ones that fit it best, found by their titles and descriptions, by words and by meaning, each with its description: to find the one the user means among many. With an id: its description, then a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project, a notebook’s cells and outputs or a diagram’s shapes and connectors as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex, save_notebook or save_diagram, or with page_action what its editor does in a click to the whole of it), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
+    'The user’s saved pages, slide decks, documents, spreadsheets, LaTeX documents, Jupyter notebooks, diagrams and boards of answer cards (Pages). With no id: each one’s id, title, kind, project and Library folder, version and last change (and its description, when there are few). With query: the ones that fit it best, found by their titles and descriptions, by words and by meaning, each with its description: to find the one the user means among many. With an id: its description, then a page’s current HTML, the data it stores and the comments on its blocks (to change it, or answer them, with save_page), or a deck’s slides, a document, a spreadsheet, a LaTeX project, a notebook’s cells and outputs, a diagram’s shapes and connectors or a board’s cards as it is kept (to change it with save_slides, save_doc, save_sheet, save_latex, save_notebook, save_diagram or save_board, or with page_action what its editor does in a click to the whole of it), or to answer questions about it. With path instead: a LaTeX file of this computer (as Files opens it in its editor): the comments the user wrote on the words of its project’s files, which the app keeps beside them (answer them with save_latex’s path and comments).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -693,15 +706,47 @@ const SAVE_DIAGRAM: RunTool = {
   },
 };
 
+const SAVE_BOARD: RunTool = {
+  name: 'save_board',
+  description: SAVE_BOARD_DESCRIPTION,
+  inputSchema: withDescription(withProject(withFolder(SAVE_BOARD_SCHEMA))),
+  async run(a, ctx) {
+    const db = ctx.deps.db;
+    let id = changing(db, a, 'board');
+    // A board by its name: the one of that name (the last changed, when there are several), else a new one called so.
+    const name = typeof a.board === 'string' ? a.board.trim() : '';
+    if (!id && name) {
+      const same = listPages(db).filter((p) => p.kind === 'board' && !outOfReach(ctx, p) && p.title.trim().toLowerCase() === name.toLowerCase());
+      if (same[0]) id = same[0].id;
+    }
+    const named = describeOnly(ctx, { ...a, board: undefined, id: id ?? undefined }, 'board');
+    if (named) return named;
+    const title = id ? a.title : given(a.title) ? a.title : name;
+    if (!id && !given(title)) throw new Error('title: a new board needs a name (or give id, or board: a board’s name, to add to one).');
+    const prev = id ? readBoard(pageSource(db, id)!.text) : null;
+    // Its cards came from this conversation (an app's step has none to point at).
+    const { board, said } = agentBoard(prev, a, ctx.step ? undefined : { session: ctx.key });
+    const p = keepModel(ctx, id, 'board', title, board, { project: a.project, folder: a.libraryFolder, description: a.description });
+    const n = board.cards.length;
+    return [
+      `Saved the board "${p.title}" (page ${p.id}, version ${p.version})${said.length ? `: ${said.join('; ')}` : ''}; ${n} card${n === 1 ? '' : 's'} on it. It shows in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user sees the cards drawn as in a reply, sizes and arranges them, and pins more from replies. get_page with its id lists each card's id, to change it.`,
+      ...(!id && name && !given(a.title) ? [`There was no board called “${name}”, so this one was made.`] : []),
+      ...foldNote(p),
+      ...p.describeNote,
+    ].join(' ');
+  },
+};
+
 const EXPORT_PAGE: RunTool = {
   name: 'export_page',
   description: [
-    'Save a page, slide deck, document, spreadsheet, LaTeX document, notebook or diagram of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
+    'Save a page, slide deck, document, spreadsheet, LaTeX document, notebook, diagram or board of the user’s Library as a file, to hand over with present_files: a page as a PDF or a Word document (docx),',
     'a deck as PowerPoint (pptx), a PDF (a slide a page) or its slides as pictures (png: a zip of them, or one slide with slide), a document as Word (docx), OpenDocument (odt), PDF, Markdown (md), EPUB (epub) or plain text (txt), a spreadsheet as Excel (xlsx), CSV (its first sheet) or PDF,',
     'a LaTeX document as its typeset PDF, its main source (tex) or the whole project (zip), a notebook as its .ipynb file (ipynb), a Python script of its cells (py) or a PDF; any of them as a web page (html) that works on its own.',
     'A deck’s web page (html) is one small file that opens in any browser and works offline (its pictures, videos and fonts inside it), but for its 3D parts, embedded web pages and the libraries its custom code loads; its PowerPoint file (pptx) turns what PowerPoint lacks into pictures or PowerPoint’s nearest effects, and says what changed.',
     'A design (a poster, a post, a card: a page of artboards) as pictures exactly its size (png or jpg, scale 1 to 3, twice its size unless asked; a zip of them for several pages, or one page with slide) or a PDF to print, each page its own size on paper.',
     'A diagram as SVG (svg), pictures (png or jpg, twice its size unless scale says; transparent for a see-through png), a draw.io file (drawio) or a PDF (each page its own size); one page with slide (its number), else each page (a zip of them when it has several).',
+    'A board as Markdown (md), a PDF or a web page: each card’s title, then its data as text and tables (the cards themselves draw only in the app).',
     'The file goes in this session’s folder unless you give a path.',
   ].join(' '),
   inputSchema: {
@@ -779,10 +824,10 @@ const PUBLISH_SITE: RunTool = {
  * keep" wrote an HTML file that never reached Pages.
  */
 /** The tools Pages' instructions are about (their guide comes with any of them). */
-export const PAGE_TOOLS = ['show_html', 'save_page', 'save_slides', 'save_doc', 'save_sheet', 'save_latex', 'save_notebook', 'save_diagram', 'get_page', 'page_action', 'export_page', 'how_to_make'];
+export const PAGE_TOOLS = ['show_html', 'save_page', 'save_slides', 'save_doc', 'save_sheet', 'save_latex', 'save_notebook', 'save_diagram', 'save_board', 'get_page', 'page_action', 'export_page', 'how_to_make'];
 
 const INSTRUCTIONS =
-  `Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, and a diagram to keep and change (a flowchart, an org chart, a mind map, an architecture, network, UML or ER diagram) with save_diagram rather than an image or a Mermaid file (a \`\`\`mermaid block stays right for a quick diagram inside a reply), unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in, and its query finds the ones that fit what you look for; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing), and their description says what it is (under ${DESCRIPTION_WORDS} words, given with each new one): the Library shows it, and its search finds things by it. page_action does to a saved one what its editor does in a click to the whole of it (every slide animated, the accessibility check’s fixes, PowerPoint compatible, a theme; suggested changes accepted; a table sorted, duplicates removed, rows and columns put in or taken out with formulas following; a LaTeX project’s files renamed; a notebook’s outputs cleared; a diagram laid out again or restyled; a copy), rather than writing it all out with the save tool. export_page saves one as a file to hand over (PDF, Word, OpenDocument, PowerPoint, Excel, CSV, Markdown, EPUB, plain text, LaTeX, a notebook, a Python script, SVG, PNG or a draw.io file). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget, an org chart, a swimlane diagram), read how to make it well with how_to_make before you make it.`;
+  `Pages: show_html shows a page in the conversation (a report, a dashboard, a table, a mock-up, options to pick from). When the user wants something to keep and come back to (a tracker, a log, a calculator, a checklist, a planner), make it a page and save it with save_page rather than as an HTML file, unless they ask for a file: it goes into their Library, can go on a phone’s home screen, and keeps what it stores with hydor.storage on every device (a file’s localStorage stays in one browser). For slides or a presentation, make a deck with save_slides (they edit, present and export it to PowerPoint or PDF in the Library) rather than a .pptx file; likewise a document to read, edit or print (a letter, a report, a CV) with save_doc rather than a .docx, a spreadsheet (a budget, a tracker of numbers, a table with totals) with save_sheet rather than an .xlsx, anything in LaTeX (a paper, a thesis, maths) with save_latex rather than a .tex file, a Jupyter notebook to read, run and come back to (a lesson, an analysis to show) with save_notebook, and a diagram to keep and change (a flowchart, an org chart, a mind map, an architecture, network, UML or ER diagram) with save_diagram rather than an image or a Mermaid file (a \`\`\`mermaid block stays right for a quick diagram inside a reply), and answer cards they want to keep together and come back to (this week’s numbers, a streak, the weather beside their experiments) on a board with save_board (the same cards as \`\`\`ui blocks, in a grid; they also pin cards from replies themselves), unless they ask for a file made another way or it belongs with a project’s code and data in a folder. get_page lists all of these, to change one, with the Library folder each is in, and its query finds the ones that fit what you look for; the save tools’ libraryFolder puts one in a folder of the Library (by its name or a path, made when missing), and their description says what it is (under ${DESCRIPTION_WORDS} words, given with each new one): the Library shows it, and its search finds things by it. page_action does to a saved one what its editor does in a click to the whole of it (every slide animated, the accessibility check’s fixes, PowerPoint compatible, a theme; suggested changes accepted; a table sorted, duplicates removed, rows and columns put in or taken out with formulas following; a LaTeX project’s files renamed; a notebook’s outputs cleared; a diagram laid out again or restyled; a copy), rather than writing it all out with the save tool. export_page saves one as a file to hand over (PDF, Word, OpenDocument, PowerPoint, Excel, CSV, Markdown, EPUB, plain text, LaTeX, a notebook, a Python script, SVG, PNG or a draw.io file). Pages look like part of this app (its theme, light or dark as the app is) unless the user asks for another look: show_html says how. When the user asks for a known kind of slide, deck, document, section, page part, page or spreadsheet by name (a SWOT slide, a pitch deck, a cover letter, an executive summary, a habit tracker, a pricing table, a budget, an org chart, a swimlane diagram), read how to make it well with how_to_make before you make it.`;
 
 /** The tools that make and change pictures and videos, for the agent beside a deck, a document or a page. */
 const PICTURES =
@@ -807,6 +852,8 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
     tex: 'Read it with get_page (its files, and the errors of its last typesetting), change what they ask (lines are numbered from 1 in each file, as its editor shows them), and save it with save_latex and that id, sending what changes (edits for small changes in a file; what you leave out stays); it is typeset again, and you hear of any errors: fix them. page_action move_files renames or moves files, pictures and folders, every reference to them following.',
     diagram:
       'Read it with get_page (each page’s shapes and connectors in the order drawn, each with its id, kind, words, place and look), change what they ask, and save it with save_diagram and that id: change (by id, only the fields that change), add ({nodes, edges}: new shapes without x, y go beside what they join) and remove (ids) for a few changes, layout to lay a page out again, or the whole diagram for a new one. A message that starts with the shapes they picked (by their ids) is about those. Keep the look the diagram has (its colours, shapes and fonts) for what you add, and keep places the user set. page_action layout lays a page out again and restyle gives shapes one look.',
+    board:
+      'Read it with get_page (its cards in order, each with its id, answer UI, size and data), change what they ask, and save it with save_board and that id: cards to add (each {ui, data, title?, size?}; find_ui gives the data each UI takes, and each card is checked against it), change ([{id, title?, size?, data?}]: a card brought up to date is its new data), remove and order. A card’s data is a copy of what was pinned; to bring one up to date, find what it shows anew (search, read, run) and give its new data in the same shape. Keep the cards, sizes and order they set.',
     notebook:
       'Read it with get_page (its cells in order, numbered from 1, each with its id and what its last run showed), change what they ask ("cell 3" is the third, as the notebook shows them; a message that starts with a cell and its id is about that one), and save the whole notebook with save_notebook and that id, keeping the cells, ids and outputs you do not change. To run code and keep real outputs, export it (export_page, ipynb) into your folder, run it there, and save it back with save_notebook and path. page_action clear_outputs clears outputs. To answer a question about it, read it and answer.',
   };
@@ -815,8 +862,8 @@ function askInstructions(db: Deps['db'], v: unknown): string | null {
     k ? how[p.kind!] : 'Read it with get_page and save the whole changed page with save_page and that id. When they name a part (its words, or its CSS selector), change that part, and the rest only as needed.',
     actionsLine(k ? p.kind! : 'page'),
     // Comments (all but notebooks and diagrams have them): Resolve with AI asks for this, and so may the user in words.
-    p.kind === 'notebook' || p.kind === 'diagram' ? '' : RESOLVE_COMMENTS,
-    p.kind === 'sheet' || p.kind === 'tex' || p.kind === 'notebook' ? '' : PICTURES,
+    p.kind === 'notebook' || p.kind === 'diagram' || p.kind === 'board' ? '' : RESOLVE_COMMENTS,
+    p.kind === 'sheet' || p.kind === 'tex' || p.kind === 'notebook' || p.kind === 'board' ? '' : PICTURES,
     'When they ask, export_page gives its files (PowerPoint, Word, Excel, PDF, a web page…) and publish_site puts it at a link, once they confirm.',
     'What they look at shows your changes as you write them, and updates as soon as you save; keep their own changes, and answer in a sentence or two what you changed. Do not make a new page or a file unless they ask.',
   ]
@@ -869,6 +916,8 @@ function routes(d: Deps) {
     tell(d, { what: 'pages' });
     refreshThumbs(d, [id]);
   };
+  // Answer cards pinned to boards (board-routes.ts).
+  boardRoutes(d, changed);
 
   // ---- the library -------------------------------------------------------------------------------
   app.get('/api/pages', async () => {
@@ -1290,8 +1339,7 @@ function routes(d: Deps) {
     }
     return r;
   };
-  app.get('/api/pages/picture', async (req, reply) => {
-    const url = String((req.query as { url?: string }).url ?? '');
+  webPicture = async (url, reply) => {
     if (!/^https?:\/\//i.test(url) || url.length > 4096) throw new HttpError(400, 'url is an http(s) address');
     let seen = pictures.get(url);
     if (seen && Date.now() - seen.at > (seen.sha ? 6 * 3600_000 : seen.brief ? 15_000 : 10 * 60_000)) seen = undefined;
@@ -1308,7 +1356,8 @@ function routes(d: Deps) {
     }
     if (!a) return reply.code(404).send({ error: seen?.error ?? 'Not a picture' });
     return reply.header('Cache-Control', 'private, max-age=86400').header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox").type(a.mime).send(a.data);
-  });
+  };
+  app.get('/api/pages/picture', async (req, reply) => webPicture!(String((req.query as { url?: string }).url ?? ''), reply));
   /** Google's fonts for decks shown in the app, through this server (the app's pages load no font from elsewhere). */
   app.get('/api/pages/fonts.css', async (req, reply) => {
     const css = await fontsCss(String((req.query as { f?: string }).f ?? ''));
@@ -1406,7 +1455,7 @@ function routes(d: Deps) {
 export const pages: Feature = {
   id: 'pages',
   routes,
-  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, watched(SAVE_DIAGRAM), GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK, HOW_TO_MAKE, pageActionTool({ keep: keepModel, hidden: outOfReach })],
+  tools: () => [SHOW_HTML, SAVE_PAGE, watched(SAVE_SLIDES), watched(SAVE_DOC), watched(SAVE_SHEET), watched(SAVE_LATEX), SAVE_NOTEBOOK, watched(SAVE_DIAGRAM), SAVE_BOARD, GET_PAGE, EXPORT_PAGE, PUBLISH_SITE, LATEX_CHECK, HOW_TO_MAKE, pageActionTool({ keep: keepModel, hidden: outOfReach })],
   spawn: (s, d) => {
     const ask = s.extra?.page ? askInstructions(d.db, s.extra.page) : null;
     // Something asked for from the gallery or Turn it into (`extra.make`): the request in full, the message being short.

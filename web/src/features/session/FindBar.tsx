@@ -52,6 +52,15 @@ async function reveal(key: string, seq: number, q: string) {
   mark(el, q);
 }
 
+/**
+ * A reply shown where it is (a board's card opens the conversation it was pinned from at its reply): once the
+ * conversation has loaded, older pages are loaded until it is there, and it is scrolled into view and flashes.
+ */
+export async function showSeq(key: string, seq: number) {
+  for (let i = 0; i < 100 && !useTimeline.getState().byKey[key]?.items; i++) await new Promise((r) => setTimeout(r, 100));
+  await reveal(key, seq, '');
+}
+
 /** `first`: words to look for at once (from the search box). */
 export function FindBar({ sessionKey, first, onClose }: { sessionKey: string; first?: string; onClose: () => void }) {
   const [q, setQ] = useState(first ?? '');

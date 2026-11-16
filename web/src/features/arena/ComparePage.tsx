@@ -87,7 +87,7 @@ export function ComparePage() {
         actions={
           <Button size="sm" variant="ghost" icon={<Swords size={14} />} onClick={() => go('/arena')}>
             <span className="max-sm:hidden">Which models win</span>
-            <span className="sm:hidden">Board</span>
+            <span className="sm:hidden" data-i18n="arena">Board</span>
           </Button>
         }
       />
