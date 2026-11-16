@@ -87,7 +87,8 @@ with any model, and a strong model can lead cheaper subagents. Each comparison h
 ## What else it does
 
 - **Agents of your own**: say what one should do and it is drafted for you; each works on its own schedules, on a model
-  tier, with a monthly budget, and can hand parts of its work to other agents.
+  tier, with a monthly budget, and can hand parts of its work to other agents. Every change is a version to compare and
+  bring back, examples check it still does its job, and it travels as a file to install on another Hydor.
 - **Work that runs by itself**: scheduled tasks, watchers (a new email, a new deal, file or ticket in a connected app,
   or the half hour before each meeting starts one too), webhooks, and goals an agent keeps working on.
 - **Your email**: connect any mail account with an app password, and agents search, read, sort, draft and send.

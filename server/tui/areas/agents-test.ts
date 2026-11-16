@@ -2,6 +2,9 @@
 // remove (not without a yes, not a built-in one), --json as returned. Against a fake connection (test-kit.ts). Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/tui/areas/agents-test.ts && DATA_DIR=/tmp/hydor-test-agents node dist/dev/agents-test.js
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { ApiError } from '../client.ts';
 import { UsageError } from './kit.ts';
 import { atWidths, fakeConn, run, type Answer } from './test-kit.ts';
@@ -276,6 +279,72 @@ test('list on a narrow terminal: the description goes whole before the name is c
   assert.match(w[100][0], /^Researcher +researcher +Finds and weighs sources +Best$/);
   assert.match(w[40][0], /^Researcher +researcher +Best$/, 'the description went whole');
   assert.match(w[40][2], /^Bookkeeper +bookkeeper-3f9a +Standard$/);
+});
+
+test('export: the file the API gives, written as its name.hydor-agent (not over one there), -o, - prints it; what was left out said', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-agents-cli-'));
+  const cwd = process.cwd();
+  process.chdir(dir);
+  try {
+    const file = { hydor: 'agent', format: 1, agent: { name: 'Bookkeeper', instructions: 'Be exact.' }, leftOut: ['The project it works in: it works everywhere until you pick them again.'] };
+    const r0 = routes({ 'GET /api/assistants/bookkeeper-3f9a/export': file });
+    const r = await run(fakeConn(r0).conn, ['agents', 'export', 'bookkeeper']);
+    assert.match(r.out, /^Saved “Bookkeeper” as .*Bookkeeper\.hydor-agent\.$/m);
+    assert.match(r.out, /Left out, to set again where it is installed:\n {2}- The project it works in/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'Bookkeeper.hydor-agent'), 'utf8')), file);
+    await refused(run(fakeConn(r0).conn, ['agents', 'export', 'bookkeeper']), /^Bookkeeper\.hydor-agent exists already: name the file with -o <file>$/);
+    await run(fakeConn(r0).conn, ['agents', 'export', 'bookkeeper', '-o', 'out/b.json']);
+    assert.ok(fs.existsSync(path.join(dir, 'out', 'b.json')));
+    const printed = await run(fakeConn(r0).conn, ['agents', 'export', 'bookkeeper', '-o', '-']);
+    assert.deepEqual(JSON.parse(printed.out), file);
+  } finally {
+    process.chdir(cwd);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('install: what it brings and needs first, then asks; beside yours unless --replace; --schedules', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-agents-cli-'));
+  const f = path.join(dir, 'b.hydor-agent');
+  fs.writeFileSync(f, '{"hydor":"agent"}');
+  const preview = {
+    agent: { name: 'Bookkeeper', description: 'Keeps my books' },
+    brings: ['Its instructions (2 lines).', 'It may use read files.'],
+    needs: ['Who its results are emailed to, and from which mail account: set them again under What it hands back.'],
+    notes: [],
+    team: [],
+    schedules: [{ name: 'Fridays', schedule: { kind: 'daily', time: '16:00' }, task: 'x' }],
+    examples: [],
+    clash: { id: 'bookkeeper-3f9a', name: 'Bookkeeper' },
+    beside: 'Bookkeeper (2)',
+  };
+  const sent: unknown[] = [];
+  const r0 = routes({
+    'POST /api/assistants/install/check': preview,
+    'POST /api/assistants/install': (b: unknown) => (sent.push(b), { assistant: { id: (b as { replace: boolean }).replace ? 'bookkeeper-3f9a' : 'bookkeeper-77', name: (b as { replace: boolean }).replace ? 'Bookkeeper' : 'Bookkeeper (2)' }, schedules: (b as { schedules: boolean }).schedules ? 1 : 0 }),
+  });
+  const r = await run(fakeConn(r0).conn, ['agents', 'install', f], { confirm: true });
+  assert.deepEqual(r.asked, ['Install “Bookkeeper (2)”?']);
+  assert.match(r.out, /^Bookkeeper \(2\) · Keeps my books$/m);
+  assert.match(r.out, /^ {2}Its instructions \(2 lines\)\.$/m);
+  assert.match(r.out, /It needs from you\n {2}- Who its results are emailed to/);
+  assert.match(r.out, /installs beside it as “Bookkeeper \(2\)” \(--replace replaces yours\)/);
+  assert.match(r.out, /--schedules adds them, paused/);
+  assert.match(r.out, /^Installed “Bookkeeper \(2\)” \(bookkeeper-77\)\.$/m);
+  assert.deepEqual(sent[0], { file: '{"hydor":"agent"}', replace: false, schedules: false });
+  const no = await run(fakeConn(r0).conn, ['agents', 'install', f], { confirm: false });
+  assert.match(no.out, /Not installed\./);
+  assert.equal(sent.length, 1);
+  const rep = await run(fakeConn(r0).conn, ['agents', 'install', f, '--replace', '--schedules', '-y']);
+  assert.match(rep.out, /^Replaced “Bookkeeper” \(bookkeeper-3f9a\), with 1 schedule, paused\.$/m);
+  assert.deepEqual(sent[1], { file: '{"hydor":"agent"}', replace: true, schedules: true });
+  await refused(run(fakeConn(r0).conn, ['agents', 'install', path.join(dir, 'none.hydor-agent'), '-y']), /^Cannot read /);
+  // Nobody to ask and no --yes: it says so.
+  await refused(run(fakeConn(r0).conn, ['agents', 'install', f]), /nobody to ask here, so add -y/);
+  // A broken file: the server's words.
+  const bad = routes({ 'POST /api/assistants/install/check': new ApiError(400, 'This is not a Hydor agent file') });
+  await refused(run(fakeConn(bad).conn, ['agents', 'install', f, '-y']), /^This is not a Hydor agent file$/, ApiError);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 for (const [name, fn] of tests) {

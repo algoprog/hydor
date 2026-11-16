@@ -435,7 +435,7 @@ export async function makeProjectAgent(db: DB, spaceId: string, o: { draft?: (db
       // No helper model to ask, or no answer from it: the template, as with little to go on.
     }
   }
-  const saved = saveAssistant(db, cleanAssistant(a) as Partial<Record<keyof Assistant, unknown>>);
+  const saved = saveAssistant(db, cleanAssistant(a) as Partial<Record<keyof Assistant, unknown>>, { by: 'draft' });
   if (!s.assistant) updateSpace(db, s.id, { assistant: saved.id });
   return { agent: saved, how, kind };
 }

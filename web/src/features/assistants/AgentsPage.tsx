@@ -1,10 +1,12 @@
 // The Agents page (/agents): your agents, each in a few sentences (what it does, where and when it works, what it
 // thinks with, whom it asks, what it may spend) with how it is doing; New agent drafts one from what you say it
-// should do; an agent's own page (/agents/<id>) changes it in place, lists its schedules and recent sessions, and
-// opens All settings (every setting, in the editor).
-import { useEffect, useMemo, useState } from 'react';
+// should do; an agent's own page (/agents/<id>) changes it in place, lists its schedules, examples and recent sessions,
+// opens All settings (every setting, in the editor), and in its menu its Versions and Download as a file; Install
+// installs one from a file.
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearch } from 'wouter';
-import { CalendarClock, Copy, FileUp, MessageSquarePlus, Plus, Settings2, Sparkles, Trash2, X } from 'lucide-react';
+import { CalendarClock, Copy, Download, FileDown, FileUp, History, MessageSquarePlus, MoreHorizontal, Plus, Settings2, Sparkles, Trash2, X } from 'lucide-react';
+import { agentFileName } from '@shared/agent-files';
 import { agentMode, DEFAULT_ASSISTANT, hasOutput, type AgentDraft, type Assistant, type AssistantsState } from '@shared/assistants';
 import type { ScheduledTask, TaskDraft, TaskSchedule } from '@shared/automations';
 import type { SpaceView } from '@shared/spaces';
@@ -13,7 +15,7 @@ import { money, timeAgo, untilText } from '../../lib/format';
 import { go, openSession } from '../../lib/nav';
 import { lastAgent } from '../../lib/start';
 import { toast, toastError, useApp, useSessions } from '../../lib/store';
-import { Badge, Button, cx, inputCls, Throbber, useConfirm } from '../../components/ui';
+import { Badge, Button, cx, IconButton, inputCls, MenuItem, Popover, Throbber, useConfirm } from '../../components/ui';
 import { tr } from '../../i18n/runtime';
 import { PageHeader } from '../layout/PageHeader';
 import { TaskEditor } from '../settings/TasksSettings';
@@ -23,6 +25,9 @@ import { loadActivity, nextRunOf, statusOf, useAgentActivity } from './agentsSta
 import { AssistantIcon } from './icons';
 import { AgentSentences } from './Sentences';
 import { InboxPanel, ResultsPanel } from './AgentPanels';
+import { ExamplesPanel } from './AgentExamples';
+import { VersionsDialog } from './AgentVersions';
+import { InstallAgentDialog } from './InstallAgent';
 import { useAssistants, useAssistantsState } from './state';
 
 const saved = (r: AssistantsState) => useAssistants.getState().set(r);
@@ -146,7 +151,7 @@ function NewAgent({ onClose, onAll, project }: { onClose: () => void; onAll: (d:
     if (!d) return;
     setBusy('make');
     try {
-      const r = await post<AssistantsState & { assistant: Assistant }>('/api/assistants', d.a);
+      const r = await post<AssistantsState & { assistant: Assistant }>('/api/assistants', { ...d.a, drafted: true });
       saved(r);
       const a = r.assistant;
       if (d.schedule) {
@@ -275,6 +280,9 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
   const byKey = useSessions((s) => s.byKey);
   const [confirm, confirmNode] = useConfirm();
   const [task, setTask] = useState<{ task: ScheduledTask | null; draft?: TaskDraft } | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [versions, setVersions] = useState(false);
+  const more = useRef<HTMLButtonElement>(null);
   const a = st?.assistants.find((x) => x.id === id);
   const recent = useMemo(
     () =>
@@ -320,6 +328,16 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
       })
       .catch(toastError);
   const spent = act?.monthUsd ?? 0;
+  // Download as a file: a .hydor-agent, with nothing of yours in it.
+  const download = () => {
+    setMenu(false);
+    const link = document.createElement('a');
+    link.href = `/api/assistants/${enc(a.id)}/export`;
+    link.download = agentFileName(a);
+    document.body.append(link);
+    link.click();
+    link.remove();
+  };
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start gap-3">
@@ -352,6 +370,19 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
               Delete
             </Button>
           )}
+          <IconButton ref={more} label="More" size="sm" active={menu} onClick={() => setMenu((o) => !o)}>
+            <MoreHorizontal size={15} />
+          </IconButton>
+          <Popover anchor={more} open={menu} onClose={() => setMenu(false)} align="end" width={230}>
+            {!a.builtin && (
+              <MenuItem icon={<History size={15} />} onClick={() => (setMenu(false), setVersions(true))}>
+                Versions
+              </MenuItem>
+            )}
+            <MenuItem icon={<Download size={15} />} onClick={download} hint={a.builtin ? 'To install as your own' : undefined}>
+              Download as a file
+            </MenuItem>
+          </Popover>
         </div>
       </div>
 
@@ -371,6 +402,7 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
 
       {a.standing && <InboxPanel a={a} />}
       {hasOutput(a) && <ResultsPanel a={a} />}
+      {!a.builtin && <ExamplesPanel a={a} />}
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-2xl border border-line bg-panel p-4">
           <div className="mb-2 flex items-center gap-2">
@@ -444,6 +476,7 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
         </section>
       </div>
       <TaskEditor open={!!task} task={task?.task ?? null} initial={task?.draft} title={task?.task ? undefined : `A schedule for ${a.name}`} onClose={() => setTask(null)} onSaved={loadActivity} />
+      {!a.builtin && <VersionsDialog a={a} all={st.assistants} open={versions} onClose={() => setVersions(false)} />}
       {confirmNode}
     </div>
   );
@@ -460,9 +493,17 @@ export function AgentsPage() {
   const [edit, setEdit] = useState<Partial<Assistant> | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [importing, setImporting] = useState(false);
+  const [installing, setInstalling] = useState(false);
   const id = path.startsWith('/agents/') ? decodeURIComponent(path.slice('/agents/'.length)) : null;
   const q = new URLSearchParams(search);
   const making = q.get('new') === '1';
+  // The search box's Install an agent from a file.
+  useEffect(() => {
+    if (q.get('install') === '1') {
+      setInstalling(true);
+      go('/agents', true);
+    }
+  }, [search]);
   const forProject = q.get('project') ?? undefined;
   useEffect(() => {
     if (id) setFilter('all');
@@ -503,6 +544,9 @@ export function AgentsPage() {
           <>
             <Button size="sm" variant="ghost" icon={<FileUp size={14} />} onClick={() => setImporting(true)} title="Import Claude Code agent files (.claude/agents)">
               <span className="hidden sm:inline">Import</span>
+            </Button>
+            <Button size="sm" variant="ghost" icon={<FileDown size={14} />} onClick={() => setInstalling(true)} title="Install an agent from a file (.hydor-agent)">
+              <span className="hidden sm:inline">Install</span>
             </Button>
             <Button size="sm" variant="primary" icon={<Plus size={14} />} onClick={() => go('/agents?new=1')}>
               New agent
@@ -574,6 +618,7 @@ export function AgentsPage() {
       </div>
       <EditAssistant value={edit} onClose={() => setEdit(null)} onSaved={(a) => (loadActivity(), !id && go(`/agents/${enc(a.id)}`, true))} />
       <ImportDialog open={importing} onClose={() => setImporting(false)} />
+      <InstallAgentDialog open={installing} onClose={() => setInstalling(false)} />
     </div>
   );
 }
