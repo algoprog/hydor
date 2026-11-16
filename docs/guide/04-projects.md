@@ -1,6 +1,6 @@
 # Projects and knowledge
 
-A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), documents of its own, what agents remember about it, the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
+A project keeps one piece of work together: its sessions, a folder for its files (and other folders of yours it works with), what agents remember about it (notes, a wiki and documents of its own), the guidelines every agent in it follows, skills of its own, the agent its sessions start as, and agents of its own. Shared knowledge holds the documents and folders you add once so that every session can search them and cite the file and page it read. This topic covers making and using projects and groups of projects, giving a project skills of its own, sharing a project with people, and adding, searching and managing the documents agents search.
 
 ![The Projects page: a card for each project, with what it holds and New session](images/projects.webp)
 
@@ -58,7 +58,7 @@ Under the projects, **Folders you work in** lists folders you worked in lately t
 
 A new folder goes in a **Projects** folder where task folders go: "Taxes 2026" gets `~/Hydor/Projects/taxes-2026`, unless you moved task folders elsewhere (see [Move task folders](/guide/agents#move-task-folders)). If that name is taken, it adds `-2`, `-3` and so on. Made from the Projects page, the new project's page opens. Made from the start page, the new project is picked for the session you are about to start.
 
-Two more things are set on the project's **Settings** tab afterwards: the agent its sessions start as, and the projects it brings together. Its documents go on its **Knowledge** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
+Two more things are set on the project's **Settings** tab afterwards: the agent its sessions start as, and the projects it brings together. Its notes, wiki and documents are on its **Memory** tab, its skills on its **Skills** tab, and more folders on its **Files** tab.
 
 ### A project for a folder you already have
 
@@ -113,7 +113,7 @@ Click a project on the Projects page to open it. The top of its page is in the p
 - **Share with people**: invite someone (an advisor, a student) to see the project and comment on its documents at a link of their own (see [Share a project with people](#share-a-project-with-people)).
 - **Delete the project** (see [Delete a project](#delete-a-project)).
 
-Below them are eight tabs: **Overview**, **Library**, **Files**, **Knowledge**, **LLM Wiki**, **Skills**, **Agents** and **Settings**. **Library**, **Knowledge** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
+Below them are seven tabs: **Overview**, **Library**, **Files**, **Memory**, **Skills**, **Agents** and **Settings**. **Library**, **Memory** and **Skills** have a count, except on a phone, where the tabs leave their counts out. On a phone (or in a narrow window), the tabs that do not fit are under **More** at the end of the row: tap it for a menu of them. While one of them is open, its name shows there in place of **More**. Each tab shows at once.
 
 ### Overview
 
@@ -122,7 +122,7 @@ The project at a glance, in cards:
 - **Sessions**: the sessions in the project (started in it, or working in its folder, in Hydor, Claude Code or Codex), the one at work most recently first, each with its agent's icon, its title, what it is doing while it runs (**Working**, **Needs you**, **Ready**; not on a phone) and how long ago it was at work. Click one to open it. With more than six, **All** shows the rest. With none yet, it says that a new one works in the project's folder, with its guidelines, documents and skills, and has **New session**.
 - **In the Library**: what the project holds in the Library, the last changed first (see [Library](#library)). **Open in the Library** shows them there. Files dropped on it are added to the project.
 - **Shared with** (beside them, under them on a phone), once you share the project with someone: each person, with their initials and what they did last ("Commented on “Chapter 3” · 2 h ago", "Not opened yet"). Click one, or **Share**, to see and change who it is shared with (see [Share a project with people](#share-a-project-with-people)).
-- **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Knowledge** (how many documents it has), **Skills** (how many of its own), **Starts as** (its agent) and **Memory** (**What agents remember about it**, which opens [Settings → Memory](/settings?s=memory), where the notes agents kept about the project are listed under its folder).
+- **Every session here** (beside them, under them on a phone): what every session in the project gets. **Folder** (its folder, and how many more it works with: click for the **Files** tab), **Guidelines** (the start of its guidelines: click for **Settings**), **Memory** (what it remembers, in a line: "12 notes · 8 articles · 5 documents", with the articles only while its wiki memory is on; click for the **Memory** tab), **Skills** (how many of its own) and **Starts as** (its agent).
 - **The projects it brings together**, for a group: each of its projects, with how many sessions it has. Click one to open it.
 
 ### Library
@@ -140,13 +140,13 @@ The project's folder, and the other folders it works with, as the [Files page](/
 
 To add files from elsewhere, use **Add to a project** on the Files page, in a file's window or on an agent's file cards: a file is copied into the project's folder, a folder joins those it works with (see [Add files to a project](/guide/files-git#add-files-to-a-project)). Or drop files from your computer on the project's card or its Library: what the Library keeps (documents, spreadsheets, pictures…) goes there, and any other file comes into this folder (see [Add files of yours](/guide/library#add-files-of-yours)).
 
-### Knowledge
+### Memory
 
-The project's own documents, which only its sessions search, and whether they search the shared knowledge too. See [Give a project documents of its own](#give-a-project-documents-of-its-own).
+What the project remembers, in three parts, one at a time under a switch: **Notes**, **Wiki** and **Documents**. Each has its own address (`/projects/<id>/memory`, with `?part=wiki` or `?part=documents`), and the old Knowledge and LLM Wiki tabs' addresses open it.
 
-### LLM Wiki
-
-The **LLM Wiki** tab shows the articles and sources in this project's wiki. Select an article or source to read it; links to other wiki files and the article's listed sources can be opened there. The tab says when the wiki is off or its configured folder is missing. Configure the folder in [Settings → Memory → LLM Wiki](/guide/memory#llm-wiki).
+- **Notes**: the memory notes agents kept about the project, as [Settings → Memory](/settings?s=memory) lists them, with **Add a note** and a search field. They are the short facts every session in the project starts with (see [Memory](/guide/memory)).
+- **Wiki**: the articles and sources of the project's wiki memory, to read, and **Recent updates** from new and changed documents. Agents write it; you read it here (see [Wiki memory](/guide/wiki-memory#a-projects-memory-tab)).
+- **Documents**: the project's own documents, which only its sessions search, and whether they search the shared knowledge too. See [Give a project documents of its own](#give-a-project-documents-of-its-own). New and changed documents also update the project's notes and wiki while Wiki memory and **Learn from new documents** are on (see [Learn from new documents](/guide/wiki-memory#learn-from-new-documents)).
 
 ### Skills
 
@@ -166,11 +166,12 @@ It is named after the project ("Shop engineer"), works only in the project and i
 
 ### Settings
 
-Everything about the project itself, in four parts, each with a line on what it is for:
+Everything about the project itself, in five parts, each with a line on what it is for:
 
 - **The project**: its **Name** (beside its mark, in the colour picked), **What it is about** and **Its colour**.
 - **What every agent in it follows**: its **Agent Guidelines**, as when you made it.
 - **How its sessions start**: under **Its sessions start as**, one choice to tap: **The agent picked on the start page** (the default: the start page keeps the agent you picked in the project, General until you pick another), or one of your agents, built in or your own. A project where you have not picked anything yet then opens on the start page with that agent.
+- **Wiki memory**: whether the project keeps a wiki of articles from its documents and its work: **As in Settings (On)** (or **(Off)**, as the default is now), **On** or **Off**. It saves at once. [Settings → Memory](/settings?s=memory&find=Wiki%20memory) has the default for every project (see [Wiki memory](/guide/wiki-memory#turn-it-on-or-off)).
 - **The projects it brings together**: pick projects here to turn this project into a group (see [Bring projects together in a group](#bring-projects-together-in-a-group)).
 
 Once you change something, a bar says **Unsaved changes**, with **Undo changes** and **Save**; it stays in view while you scroll. At the bottom, **Delete the project** says what stays, with its button.
@@ -268,7 +269,7 @@ A group is a project that brings several projects together, for work that spans 
 
 You can also turn an existing project into a group: on its **Settings** tab, pick projects under **The projects it brings together** and click **Save**. Change a group's projects the same way. Take all of them out and it is a plain project again.
 
-A group's **Knowledge** tab also shows **Also the documents of the projects it brings together**: each of its projects, with how many documents it has. Click one to open that project's Knowledge tab. Its **Skills** tab shows **Also the skills of the projects it brings together** the same way.
+A group's **Memory** tab, under **Documents**, also shows **Also the documents of the projects it brings together**: each of its projects, with how many documents it has. Click one to open that project's documents. Its **Skills** tab shows **Also the skills of the projects it brings together** the same way.
 
 ### Limits
 
@@ -358,7 +359,7 @@ Each link is a long random code that opens one project for one person. A code th
 Agents can search documents you add once: contracts, manuals, notes, papers, a whole folder. They find passages by their words or by what they mean, and cite the file and page they read. Documents are kept in **knowledge bases**: named collections of files you dropped in and folders on this computer.
 
 - **Shared knowledge** ([Projects → Shared knowledge](/knowledge)): every session searches it, in a project too unless the project turns that off.
-- **A project's own knowledge**, on its **Knowledge** tab: only that project's sessions search it, and the sessions of a group that brings the project in.
+- **A project's own knowledge**, on its **Memory** tab, under **Documents**: only that project's sessions search it, and the sessions of a group that brings the project in.
 
 To open the shared knowledge, click the **Shared knowledge** tab on the Projects page, or type "shared knowledge" in the search box (Ctrl+K).
 
@@ -420,7 +421,7 @@ The ⋯ button (**More**) at the top right of a knowledge base opens its menu:
 
 ## Give a project documents of its own
 
-Open the project and go to its **Knowledge** tab.
+Open the project, go to its **Memory** tab and pick **Documents**.
 
 - **Also search the shared knowledge** is a switch, on unless you turn it off. Turn it off and the project's sessions search only the project's own documents (and, in a group, those of its projects). The line under it says how many shared documents there are, with a **Shared knowledge** link.
 - With no documents yet, drop documents or a folder in the box, or choose them: a knowledge base named after the project is made for them. **Start with a folder on this computer instead** makes an empty one, named after the project, to add a folder to.
@@ -450,7 +451,7 @@ An agent searches by words and by meaning together unless it asks for one, and a
 
 Above the knowledge bases, a field says "Try a search, as agents do: a question, or “exact words” in quotes". Type and press Enter. Up to 10 passages come back, each with its file and page, its knowledge base and how it was found: **by words**, **by meaning**, or both, or **by exact** for exact text. Click one to open the file.
 
-On the Shared knowledge tab, it searches what a session outside any project searches. On a project's Knowledge tab, it searches what a session in that project searches.
+On the Shared knowledge tab, it searches what a session outside any project searches. On a project's Documents part (its **Memory** tab), it searches what a session in that project searches.
 
 ## Which sessions search which knowledge
 
