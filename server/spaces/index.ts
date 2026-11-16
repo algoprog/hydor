@@ -19,6 +19,7 @@ import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { docsBySpace, releaseSpace } from '../knowledge/store.ts';
+import { repoRoot } from '../memory/store.ts';
 import { claimSessions } from './found.ts';
 import { hideSuggestion, spaceSuggestions } from './suggest.ts';
 import { clearSpaceSwitches, copyToSpace, releaseSpaceSkills, removeSpaceSkill, restoreSpaceSkill, saveSpaceSkill, setSpaceSwitch, switchSpaceSkillsOff, skillsOf, spaceSkillDoc, spaceSkillsView, spaceSwitches } from '../skillpack/spaceSkills.ts';
@@ -333,7 +334,8 @@ export const spaces: Feature = {
     d.app.get('/api/projects/:id', async (req) => {
       const s = spaceById(d.db, id(req));
       if (!s) throw new HttpError(404, 'No such project');
-      return { space: s, sessions: sessionsIn(d.db, s.id) };
+      // memoryKey: where memory keeps the project's notes (its repository's root, the main one for a worktree, else its folder).
+      return { space: s, sessions: sessionsIn(d.db, s.id), memoryKey: repoRoot(s.folder) ?? s.folder };
     });
     d.app.patch('/api/projects/:id', async (req) => {
       const was = spaceById(d.db, id(req))?.wikiMemory;

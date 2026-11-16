@@ -41,7 +41,7 @@ export interface SpaceMemory {
 }
 
 /** A project's notes and wiki memory, for its page: the tab's count, the Overview's fact, the Memory tab. */
-export function useSpaceMemory(id: string, folder: string | undefined): SpaceMemory {
+export function useSpaceMemory(id: string, folder: string | undefined, memoryKey?: string): SpaceMemory {
   const home = useApp((x) => x.boot?.home);
   useMemoryState();
   const memoryVersion = useMemory((s) => s.version);
@@ -52,6 +52,8 @@ export function useSpaceMemory(id: string, folder: string | undefined): SpaceMem
   // Notes are kept under the repository's root; a folder that is no repository (or the home folder) is its own place.
   useEffect(() => {
     setKey(null);
+    // The server says where memory keeps the project's notes; an older server does not, so ask Git then.
+    if (memoryKey) return void setKey(memoryKey);
     if (!folder) return;
     let live = true;
     api<{ info: { repo?: string } | null }>(`/api/git/repo-info?path=${enc(folder)}`).then(
@@ -61,7 +63,7 @@ export function useSpaceMemory(id: string, folder: string | undefined): SpaceMem
     return () => {
       live = false;
     };
-  }, [folder, home]);
+  }, [folder, home, memoryKey]);
   useEffect(() => {
     setNotes(undefined);
     if (!key) return;

@@ -741,12 +741,12 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
     openShareDialog(view);
     go(tabPath(id, tab), true);
   }, [share, !!view]);
-  const [data, setData] = useState<{ space: Space; sessions: string[] } | null>(null);
+  const [data, setData] = useState<{ space: Space; sessions: string[]; memoryKey?: string } | null>(null);
   const [gone, setGone] = useState(false);
-  const memory = useSpaceMemory(id, (data?.space ?? view)?.folder);
+  const memory = useSpaceMemory(id, (data?.space ?? view)?.folder, data?.memoryKey);
   useEffect(() => {
     let live = true;
-    api<{ space: Space; sessions: string[] }>(`/api/projects/${enc(id)}`).then(
+    api<{ space: Space; sessions: string[]; memoryKey?: string }>(`/api/projects/${enc(id)}`).then(
       (r) => {
         if (!live) return;
         setData(r);
