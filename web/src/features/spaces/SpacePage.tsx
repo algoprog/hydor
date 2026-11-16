@@ -31,9 +31,10 @@ import { activityText, PersonMark, useShares } from './ShareDialog';
 import { openShareDialog } from './ShareHost';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
+import { SpaceWiki } from '../wiki/SpaceWiki';
 import { loadSpaces, useSpaces } from './state';
 
-export type SpaceTab = 'overview' | 'library' | 'files' | 'knowledge' | 'skills' | 'agents' | 'settings';
+export type SpaceTab = 'overview' | 'library' | 'files' | 'knowledge' | 'wiki' | 'skills' | 'agents' | 'settings';
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
 
@@ -196,6 +197,7 @@ function Top({ s, view, tab }: { s: Space; view?: SpaceView; tab: SpaceTab }) {
             { value: 'library', label: 'Library', count: wide ? view?.library : undefined, icon: <LibraryBig size={15} /> },
             { value: 'files', label: 'Files', icon: <FolderOpen size={15} /> },
             { value: 'knowledge', label: 'Knowledge', count: wide ? view?.docs : undefined, icon: <BookOpen size={15} /> },
+            { value: 'wiki', label: 'LLM-Wiki', icon: <BookOpen size={15} /> },
             { value: 'skills', label: 'Skills', count: wide ? view?.skills : undefined, icon: <Sparkles size={15} /> },
             { value: 'agents', label: 'Agents', icon: <Bot size={15} /> },
             { value: 'settings', label: 'Settings', icon: <Settings size={15} /> },
@@ -688,7 +690,9 @@ export function SpacePage({ id, tab }: { id: string; tab: SpaceTab }) {
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1120px] px-3 py-5 sm:px-6 sm:py-6">
-            {tab === 'knowledge' ? (
+            {tab === 'wiki' ? (
+              <SpaceWiki id={s.id} />
+            ) : tab === 'knowledge' ? (
               <KnowledgeTab s={s} onSaved={saved} />
             ) : tab === 'skills' ? (
               <SpaceSkillsTab s={s} />

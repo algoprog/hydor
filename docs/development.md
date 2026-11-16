@@ -203,3 +203,7 @@ the search box's catalog (`shared/find-catalog.ts`, then `npm run find:vectors`)
 fails when the guide no longer matches the app (a link that points nowhere, a Settings section or an API route
 it does not describe, a picture that is missing). The guide's pictures (`docs/guide/images`) come from a demo copy
 of the app with made-up data: `scripts/guide-shots` takes them again when a page they show changes.
+
+## LLM Wiki module
+
+The native LLM Wiki capability and its integration boundaries are described in [LLM Wiki development](llm-wiki-development.md).

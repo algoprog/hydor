@@ -110,15 +110,26 @@ While it is off:
 
 ## Settings → Memory
 
-Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". The **Memory** switch is beside the section's title, and **Learn more** under the title opens this topic. Below it, top to bottom, the page has five groups:
+Everything about memory is in [Settings → Capabilities → Memory](/settings?s=memory): "What agents remember about you, your projects and each session, and when it was written". The **Memory** switch is beside the section's title, and **Learn more** under the title opens this topic. Below it, top to bottom, the page has six groups:
 
 - **Your profile**: what every agent gets about you, with **Edit** and a **⋯** menu (see [Your profile](/guide/memory#your-profile)).
 - **Notes**: every note kept, with **Add a note**, a search field and an index of places (see [Notes](/guide/memory#notes)).
 - **Learning**: **Learn from conversations**, **Tidy up automatically**, and the **Last tidy-up** with **What changed** and **Tidy up now**.
 - **What agents get**: **Search by meaning**, **Notes each agent starts with** and **Profile length**.
+- **LLM Wiki**: wiki folders, Git exclusion and session checkpoints (see [LLM Wiki](#llm-wiki)).
 - **Your data**: **Bring in…** from other assistants, **Export** (Markdown, JSON) and **Clear all…**.
 
 A row's name can have an **(i)** button beside it, which says more about what the row does. On a phone, Settings opens as a list: tap **Memory** to open it on its own page. There the notes take the screen's whole width, and every menu on the page opens as a sheet from the bottom of the screen.
+
+### LLM Wiki
+
+Turn **LLM Wiki** on, enter the **Wiki hub folder** as an absolute path on the computer running Hydor, and choose the **Project wiki folder**, relative to each project. Its default is `.wiki`; an existing project binding takes precedence. Press **Save**. When Hydor runs in a container, the paths must be accessible inside that container. Existing folders are not moved.
+
+**Ignore project wikis in Git** is on by default and can be turned off. It adds the project wiki to `.gitignore` when the project wiki is written. Files already tracked by Git remain tracked. Turning the option off does not remove an existing ignore entry.
+
+With memory and LLM Wiki on, Hydor's Custom agent can record session checkpoints in the hub before and after its own context compaction, as well as periodic event checkpoints. A checkpoint may contain a redacted agent summary or only event metadata; it is not a full transcript. For Claude Code and Codex, Hydor attempts a checkpoint when you start compaction from Hydor. Automatic compaction inside those agents does not have verified hook coverage. If a checkpoint fails, compaction can continue. Turning memory off for the session or globally prevents its wiki session capture and rehydration; existing checkpoints remain.
+
+Ask an agent to preview lessons learned from the session before saving them. The preview writes nothing; saving the selected lessons requires your confirmation. The preview uses indexed session messages, so the most recent messages may not be present yet.
 
 ### Notes
 

@@ -16,6 +16,7 @@ import { NotesGroup, PlacePage, parsePlace, placeClosed } from './MemoryNotes';
 import { AgentsGetGroup, YourDataGroup } from './MemoryOptions';
 import { ProfileGroup } from './MemoryProfile';
 import { useMemoryState } from './state';
+import { WikiSettings } from '../wiki/WikiSettings';
 
 export function MemorySettings() {
   const st = useMemoryState();
@@ -51,6 +52,7 @@ export function MemorySettings() {
             <ProfileGroup />
             <NotesGroup onBringIn={() => setBringing(true)} />
             <LearningGroup />
+            <WikiSettings />
             <AgentsGetGroup />
             <YourDataGroup onBringIn={() => setBringing(true)} />
           </Stack>

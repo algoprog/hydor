@@ -14,6 +14,8 @@ const own = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(location.or
 
 if (own) {
   contextBridge.exposeInMainWorld('hydorDesktop', {
+    /** Choose a local folder through the operating system's dialog. */
+    chooseFolder: (current) => ipcRenderer.invoke('hydor:choose-folder', String(current || '')),
     /** A dropped file's path on this computer, or '' (a file made in the page, or one the system gave no path for). */
     pathOf: (file) => {
       try {
