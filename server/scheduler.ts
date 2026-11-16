@@ -91,6 +91,27 @@ export interface AppRunEnd {
   url: string;
 }
 
+/**
+ * What refreshes a board's cards (server/pages/board-refresh.ts): a card that keeps itself up to date is a scheduled
+ * task of its own (its id `board-<page>-<card>`), whose runs start a session the board module makes and end with the
+ * card's data replaced (or the reason it could not be). Its runs are quiet: no notice for each, one when it pauses.
+ */
+export interface BoardRunner {
+  /** Whether a task is a board card's refresh. */
+  owns(taskId: string): boolean;
+  /** Why a refresh may not start now (the board's monthly cap reached, the card gone), said plainly; null when it may. */
+  blocked(taskId: string, trigger: RunTrigger): string | null;
+  /** Starts a refresh's session (archived, sending nothing): its key. Throws a plain reason when it cannot. */
+  start(o: { task: string; run: string; trigger: RunTrigger; question: string }): Promise<string>;
+  /** A refresh's turn ended: the card's data replaced from the reply, or why not (the run fails, the card keeps its data). */
+  ended(o: { task: string; run: string; key: string; reply: string; ended: 'idle' | 'error'; why: string; costUsd: number; question: string }): Promise<{ status: RunStatus; summary: string; error?: string }>;
+  /** Where a notice about a card's refreshes opens (its board), and what it is called. */
+  noticeOf(taskId: string): { url: string; title: string };
+}
+
+/** How long a board card's refresh may take before it is stopped. */
+const BOARD_RUN_MS = 20 * 60_000;
+
 /** A task's answers for its template, its {{change}} filled in with what its watcher saw. */
 const appInputs = (app: TaskApp, change = '') => Object.fromEntries(Object.entries(app.inputs).map(([k, v]) => [k, v.replace(/\{\{\s*change\s*\}\}/g, change)]));
 
@@ -242,6 +263,8 @@ export class Scheduler extends EventEmitter {
   private starting = new Set<string>();
   /** Runs templates for tasks that do (useApps). */
   private apps?: AppRunner;
+  /** Refreshes board cards (useBoards). */
+  private boards?: BoardRunner;
   /** Watch tasks being checked now. */
   private checking = new Set<string>();
   private finalizing = new Set<string>();
@@ -302,9 +325,18 @@ export class Scheduler extends EventEmitter {
     };
   }
 
-  list(): ScheduledTask[] {
+  /**
+   * The tasks, oldest first. Those that refresh a board's cards are the board's to change (its cards' Keep it up to
+   * date…): only Schedules' week view, which shows everything that runs by itself, asks for them (`boards`).
+   */
+  list(o: { boards?: boolean } = {}): ScheduledTask[] {
     const recent = recentByTask(this.db);
-    return (this.db.prepare('select * from tasks where resume = 0 order by created_at').all() as Row[]).map((r) => this.toTask(r, recent.get(r.id)));
+    return (this.db.prepare('select * from tasks where resume = 0 order by created_at').all() as Row[]).filter((r) => o.boards || !this.isBoard(r.id)).map((r) => this.toTask(r, recent.get(r.id)));
+  }
+
+  /** Whether a task refreshes a board's card. */
+  isBoard(id: string): boolean {
+    return !!this.boards?.owns(id);
   }
 
   private get(id: string): Row {
@@ -355,11 +387,16 @@ export class Scheduler extends EventEmitter {
     };
   }
 
-  /** Creates a task, or updates it when `id` names one. */
-  save(input: Partial<ScheduledTask>, o: { origin?: string } = {}): ScheduledTask {
+  /**
+   * Creates a task, or updates it when `id` names one. `as`: the id a new task takes (a board card's refresh, whose id
+   * says which card it is), or the one it updates when it is there already.
+   */
+  save(input: Partial<ScheduledTask>, o: { origin?: string; as?: string } = {}): ScheduledTask {
     const t = this.normalize(input);
-    const old = input.id ? this.get(input.id) : null;
-    const id = old?.id ?? crypto.randomUUID();
+    // A board's card refreshes from its board's settings, not from the task forms.
+    if (!o.as && ((input.id && this.isBoard(input.id)) || String(input.origin ?? '').startsWith('board:'))) throw new HttpError(400, 'A board card’s refreshes are set on the board: its … menu → Keep it up to date…');
+    const old = input.id ? this.get(input.id) : o.as ? ((this.db.prepare('select * from tasks where id = ? and resume = 0').get(o.as) as Row | undefined) ?? null) : null;
+    const id = old?.id ?? o.as ?? crypto.randomUUID();
     const secret = t.schedule.kind === 'webhook' ? (old?.secret ?? crypto.randomBytes(24).toString('base64url')) : null;
     const enabled = input.enabled !== false;
     const now = Date.now();
@@ -407,7 +444,7 @@ export class Scheduler extends EventEmitter {
   }
 
   setEnabled(id: string, on: boolean): ScheduledTask {
-    return this.save({ ...this.task(id), enabled: on });
+    return this.save({ ...this.task(id), enabled: on }, this.isBoard(id) ? { as: id } : {});
   }
 
   remove(id: string) {
@@ -429,6 +466,57 @@ export class Scheduler extends EventEmitter {
   async runNow(id: string): Promise<string | undefined> {
     const r = this.get(id);
     return (await this.run(r, { trigger: 'manual', input: await this.watchNow(r) })).key;
+  }
+
+  /**
+   * A board card's refresh now (Refresh now, Try again, Refresh all): a run of its scheduled task when it has one, else
+   * of the card that refreshes only when asked (its runs kept under the same id, with no task behind them).
+   */
+  async runBoard(id: string, o: { name: string; question: string; agent: ScheduledTask['agent']; cwd: string }): Promise<{ runId?: string; key?: string }> {
+    if (!this.isBoard(id)) throw new HttpError(400, 'Not a board card’s refresh');
+    const saved = this.db.prepare('select * from tasks where id = ? and resume = 0').get(id) as Row | undefined;
+    const row: Row = saved ?? {
+      id,
+      name: o.name,
+      schedule: JSON.stringify({ kind: 'every', minutes: 60 }),
+      prompt: o.question,
+      agent: o.agent,
+      cwd: o.cwd,
+      model: null,
+      effort: null,
+      mode: null,
+      target: null,
+      enabled: 0,
+      next_at: null,
+      last_at: null,
+      last_status: null,
+      last_key: null,
+      secret: null,
+      resume: 0,
+      created_at: Date.now(),
+      acp_agent: null,
+      extra: null,
+      fail_limit: null,
+      fails: 0,
+      paused_reason: null,
+      notepad: null,
+      watch_state: null,
+      origin: null,
+      app: null,
+    };
+    return this.run(row, { trigger: 'manual', input: o.question });
+  }
+
+  /** A board card's refresh going on now, if one is. */
+  boardRunning(id: string): RunRow | undefined {
+    return this.db.prepare(`select * from task_runs where task_id = ? and status = 'running' order by started_at desc limit 1`).get(id) as RunRow | undefined;
+  }
+
+  /** Board cards' refreshes: their tasks go (a card that stops refreshing, a board deleted); their history stays with `keepRuns`. */
+  removeBoard(id: string, o: { keepRuns?: boolean } = {}) {
+    this.db.prepare('delete from tasks where id = ? and resume = 0').run(id);
+    if (!o.keepRuns) dropRuns(this.db, id);
+    this.emit('changed');
   }
 
   /** Runs a task again with an earlier run's input. */
@@ -644,6 +732,11 @@ export class Scheduler extends EventEmitter {
     this.apps = apps;
   }
 
+  /** Refreshes board cards (the pages feature calls this once it starts). */
+  useBoards(boards: BoardRunner) {
+    this.boards = boards;
+  }
+
   /** A template's name, for what shows a task that runs it. */
   templateName(id: string): string | undefined {
     return this.apps?.name(id);
@@ -802,11 +895,23 @@ export class Scheduler extends EventEmitter {
       const next = schedule.kind === 'watch' ? r.next_at : nextRun(schedule, now, this.tz());
       this.db.prepare('update tasks set last_at = ?, next_at = ?, enabled = ? where id = ?').run(now, next, next || schedule.kind !== 'once' ? r.enabled : 0, r.id);
     }
+    // A board card's refresh: not while its board's cap is reached (on its schedule it waits quietly for the next one;
+    // the board says so, and tells the person once), nor twice at once.
+    const board = !test && this.boards?.owns(r.id) ? this.boards : null;
+    if (board) {
+      const why = this.boardRunning(r.id) ? 'It is being refreshed already.' : board.blocked(r.id, o.trigger);
+      if (why) {
+        this.starting.delete(r.id);
+        if (o.trigger === 'schedule') return {};
+        throw new HttpError(409, why);
+      }
+    }
     // A task that runs a template gives it its answers (kept as the run's input, to run again with).
     const app = parse<TaskApp>(r.app);
     const answers = app ? (o.answers ?? appInputs(app, o.input ?? '')) : undefined;
     const body = answers ? JSON.stringify(answers) : (o.input ?? r.prompt);
-    const dry = test && o.dry === true;
+    // A board's refresh sends nothing, ever: calls that act outside are held as "would have sent".
+    const dry = (test && o.dry === true) || !!board;
     const prompt = `${this.preamble(r, schedule, o.trigger, dry)}\n\n${body}`;
     const taskId = test && !o.saved ? '' : r.id;
     const runId = startRun(this.db, { taskId, trigger: o.trigger, input: body, rerunOf: o.rerunOf, dry });
@@ -815,7 +920,10 @@ export class Scheduler extends EventEmitter {
     let standingKey: string | null = null;
     let error: string | undefined;
     try {
-      if (app && answers) {
+      if (board) {
+        key = await board.start({ task: r.id, run: runId, trigger: o.trigger, question: body });
+        setRun(this.db, runId, { key });
+      } else if (app && answers) {
         if (!this.apps) throw new Error('Apps are not on here');
         // Its run ends when the template's does (appRunEnded); it has no session of its own to watch.
         const started = this.apps.start({ app: app.id, inputs: answers, test });
@@ -951,24 +1059,50 @@ export class Scheduler extends EventEmitter {
         continue;
       }
       const s = this.sessions.summary(run.key);
+      // A board's refresh nobody watches: one that runs on (or waits on someone) past its time stops, and fails.
+      if (this.isBoard(run.task_id) && now - run.started_at > BOARD_RUN_MS && s?.live && s.live.status !== 'idle' && s.live.status !== 'error') {
+        this.finalizing.add(run.id);
+        void this.sessions
+          .interrupt(run.key)
+          .catch(() => {})
+          .finally(() => {
+            this.finalizing.delete(run.id);
+            void this.finalize(run, 'error', Date.now(), `It took longer than ${BOARD_RUN_MS / 60_000} minutes, so it was stopped.`);
+          });
+        continue;
+      }
       if (busy(s?.live?.status)) continue;
       if (run.queued && s?.queue?.some((q) => q.text === run.sent)) continue;
       void this.finalize(run, s?.live?.status === 'error' ? 'error' : 'idle');
     }
   }
 
-  private async finalize(run: RunRow, ended: 'idle' | 'error', at = Date.now()) {
+  private async finalize(run: RunRow, ended: 'idle' | 'error', at = Date.now(), reason?: string) {
     if (this.finalizing.has(run.id)) return;
     this.finalizing.add(run.id);
     try {
       const r = getRun(this.db, run.id);
       if (!r || r.status !== 'running') return;
       const reply = r.key ? await this.replyOf(r.key) : '';
-      const status: RunStatus = r.outcome ?? (ended === 'error' ? 'error' : silentText(reply) ? 'silent' : 'done');
-      const why = ended === 'error' ? (r.key ? this.sessions.summary(r.key)?.live?.error : undefined) || 'It stopped with an error' : '';
-      const summary = r.summary ?? (oneLine(reply) || why || undefined);
+      let status: RunStatus = r.outcome ?? (ended === 'error' ? 'error' : silentText(reply) ? 'silent' : 'done');
+      const why = reason ?? (ended === 'error' ? (r.key ? this.sessions.summary(r.key)?.live?.error : undefined) || 'It stopped with an error' : '');
+      let summary = r.summary ?? (oneLine(reply) || why || undefined);
       const cost = r.key ? Math.max(0, this.costNow(r.key) - r.cost_base) : null;
-      if (!finishRun(this.db, r.id, { status, summary, reply: reply || null, costUsd: cost, at })) return;
+      let error: string | null = null;
+      // A board card's refresh: the card's new data from the reply, or why it could not be (its run fails).
+      if (this.boards?.owns(r.task_id)) {
+        try {
+          const out = await this.boards.ended({ task: r.task_id, run: r.id, key: r.key ?? '', reply, ended: reason ? 'error' : ended, why, costUsd: cost ?? 0, question: r.input ?? '' });
+          status = out.status;
+          summary = out.summary;
+          error = out.error ?? null;
+        } catch (e) {
+          status = 'error';
+          error = (e as Error).message || 'It could not be kept';
+          summary = `Could not update: ${error}`;
+        }
+      }
+      if (!finishRun(this.db, r.id, { status, summary, reply: reply || null, costUsd: cost, at, error })) return;
       if (r.task_id && r.trigger !== 'test') this.counted(r.task_id, status, summary, r.key ?? undefined);
       this.settle(r.id);
       this.emit('changed');
@@ -1011,7 +1145,8 @@ export class Scheduler extends EventEmitter {
       const fails = (r.fails ?? 0) + 1;
       const limit = r.fail_limit ?? DEFAULT_FAIL_LIMIT;
       this.db.prepare('update tasks set fails = ? where id = ?').run(fails, taskId);
-      if (limit > 0 && fails >= limit && r.enabled) this.pause(r, `Paused after ${fails} failed runs in a row. The last: ${summary || 'it stopped with an error'}`, key);
+      if (limit > 0 && fails >= limit && r.enabled)
+        this.pause(r, this.isBoard(taskId) ? `Paused after ${fails} failed refreshes in a row. The last: ${(summary || 'it stopped with an error').replace(/^Could not update: /, '')}` : `Paused after ${fails} failed runs in a row. The last: ${summary || 'it stopped with an error'}`, key);
     } else if (status !== 'blocked' && status !== 'running' && r.fails) this.db.prepare('update tasks set fails = 0 where id = ?').run(taskId);
   }
 
@@ -1023,8 +1158,13 @@ export class Scheduler extends EventEmitter {
 
   // ---- notices -------------------------------------------------------------------------------
 
-  /** A notice about a task itself: on its session when there is one, else in the open pages. */
+  /** A notice about a task itself: on its session when there is one, else in the open pages; a board card's opens its board. */
   private noticeTask(r: Row, key: string | undefined, body: string) {
+    if (this.boards?.owns(r.id)) {
+      const at = this.boards.noticeOf(r.id);
+      this.sessions.emit('notify', { key: `board:${r.id}`, kind: 'failed', title: at.title, body: clip(body, 200), agent: 'claude', at: Date.now(), url: at.url } satisfies NotifyEvent);
+      return;
+    }
     const s = key ? this.sessions.summary(key) : null;
     if (s) this.sessions.emit('notify', { key: s.key, kind: 'failed', title: r.name, body: clip(body, 200), agent: s.agent, at: Date.now() } satisfies NotifyEvent);
     else this.sessions.emit('toast', { level: 'error', text: `${r.name}: ${clip(body, 200)}` });
@@ -1036,8 +1176,11 @@ export class Scheduler extends EventEmitter {
    * conversation leaves its notices as they are (your turns there are not the run's).
    */
   private gate(n: NotifyEvent): NotifyEvent | null {
-    if (n.kind === 'waiting') return n;
     const run = recentRunIn(this.db, n.key, 15_000);
+    // A board card's refresh is quiet, even waiting on someone (nobody watches it: it stops in time): the card shows how
+    // it went, and its schedule's pause says so, once.
+    if (run && this.isBoard(run.task_id)) return null;
+    if (n.kind === 'waiting') return n;
     // Not a run's turn: none here, its notice went out already, or its message still waits behind this turn.
     if (!run || run.notified || run.queued === 1) return n;
     setRun(this.db, run.id, { notified: 1 });
@@ -1053,7 +1196,7 @@ export class Scheduler extends EventEmitter {
   /** A run the session said nothing about (a short turn): its own notice, unless it had nothing to report. */
   private noticeLater(id: string) {
     const r = getRun(this.db, id);
-    if (!r?.key || r.notified || r.status === 'silent' || r.status === 'running') return;
+    if (!r?.key || r.notified || r.status === 'silent' || r.status === 'running' || this.isBoard(r.task_id)) return;
     setRun(this.db, id, { notified: 1 });
     const s = this.sessions.summary(r.key);
     const kind: NotifyEvent['kind'] = r.status === 'failed' || r.status === 'error' ? 'failed' : r.status === 'blocked' ? 'waiting' : 'done';

@@ -1,7 +1,8 @@
 // `hydor library`: the Library page. What agents made and you kept: pages, documents, slides, spreadsheets, diagrams, LaTeX
 // documents, notebooks, boards of answer cards (the pages of the API's /api/pages) and pictures, videos and sounds (/api/media). List and search them,
 // show one (a document as its text, a board as its cards; the rest as what it is), export one to a file in the format its menu offers, open it
-// (the editors are visual, so that prints the address), and remove it.
+// (the editors are visual, so that prints the address), and remove it. Boards' cards that keep themselves up to date: list what
+// refreshes when and what it costs (refreshes), and refresh a card, or a whole board, now (refresh).
 import fs from 'node:fs';
 import path from 'node:path';
 import type { LibFolder, PageInfo } from '../../../shared/pages.ts';
@@ -325,6 +326,69 @@ export const library: Area = {
         if (ctx.o.json) return ctx.json({ id: t.id, file: out, bytes: got.data.length, format: media ? 'original' : format, ...(got.note ? { note: got.note } : {}) });
         ctx.out(`Saved “${t.title}” as ${tildify(out, ctx.look.home)} (${size(got.data.length)}).`);
         if (got.note) ctx.out(ctx.look.p.dim(got.note));
+      },
+    },
+    {
+      name: 'refreshes',
+      args: [{ name: 'board', kind: 'page', optional: true }],
+      summary: 'What on your boards refreshes, and its cost',
+      help: 'Each board card that keeps itself up to date: its board, how often it refreshes, the tier its agent thinks with, about what a refresh costs, when it was last updated, and when it refreshes next (or why it is paused, or how its last refresh failed). Then each board’s monthly cap for refreshes and what they spent this month. Name a board to see only its cards.',
+      examples: ['hydor library refreshes', 'hydor library refreshes Shop', 'hydor library refreshes --json'],
+      async run(ctx, [given]) {
+        const { p } = ctx.look;
+        type Row = { board: string; boardTitle: string; card: string; title: string; when: string; tier: string; perRefreshUsd?: number; refreshedAt?: number; nextAt?: number; running?: boolean; paused?: string; lastError?: string };
+        const r = await ctx.conn.api<{ boards: { id: string; title: string; cap: number | null; spentUsd: number; reached: boolean }[]; cards: Row[] }>('GET', '/api/boards/refreshes');
+        let { boards, cards } = r;
+        if (given) {
+          const { thing: t } = await find(ctx, given);
+          if (t.kind !== 'board') throw new UsageError(`“${t.title}” is not a board`);
+          boards = boards.filter((b) => b.id === t.id);
+          cards = cards.filter((c) => c.board === t.id);
+        }
+        if (ctx.o.json) return ctx.json({ boards, cards });
+        if (!cards.length) return ctx.out(p.dim(given ? 'None of its cards refreshes: on the board, a card’s … menu → Keep it up to date…' : 'No board card refreshes yet: on a board, a card’s … menu → Keep it up to date…'));
+        // When it refreshes next: "in 40m", "in 5h", "in 2d".
+        const soon = (at: number) => {
+          const m = Math.max(1, Math.round((at - Date.now()) / 60_000));
+          return m < 60 ? `in ${m}m` : m < 48 * 60 ? `in ${Math.round(m / 60)}h` : `in ${Math.round(m / 1440)}d`;
+        };
+        const state = (c: Row) => (c.running ? 'refreshing now' : c.paused ? c.paused : c.lastError ? `failed: ${c.lastError}` : c.nextAt ? `next ${soon(c.nextAt)}` : '');
+        const list = table(
+          ctx,
+          cards.map((c) => [p.bold(c.title), p.dim(c.boardTitle), c.when, p.dim(c.tier), c.perRefreshUsd !== undefined ? `~$${c.perRefreshUsd.toFixed(2)}` : p.dim('?'), p.dim(c.refreshedAt ? timeAgo(c.refreshedAt) : 'not yet'), p.dim(state(c))]),
+          { head: ['CARD', 'BOARD', 'WHEN', 'TIER', 'A TIME', 'UPDATED', ''], grow: 0, drop: [6, 3, 5] },
+        );
+        const caps = boards.map((b) => `${b.title}: ${b.cap === null ? 'no cap' : `$${b.spentUsd.toFixed(2)} of its $${b.cap} cap this month${b.reached ? ' (reached: refreshes wait for next month)' : ''}`}`);
+        ctx.out([...list, '', ...caps.map((c) => p.dim(c)), '', p.dim('hydor library refresh <board> [card] refreshes now.')]);
+      },
+    },
+    {
+      name: 'refresh',
+      args: [
+        { name: 'board', kind: 'page', pick: true },
+        { name: 'card', kind: 'text', optional: true },
+      ],
+      summary: 'Refresh a board’s card now, or all of them',
+      help: 'Asks an agent the card’s question again and replaces its data with the answer (on the card’s tier, sending nothing; it counts toward the board’s monthly cap). Name the card by its number (as hydor library show lists them), its id or the start of its title; leave it out to refresh every card of the board that keeps itself up to date. It starts the refresh and returns; the board shows the new data when it is done.',
+      examples: ['hydor library refresh Shop', 'hydor library refresh Shop 2', 'hydor library refresh Shop "Sales this week"'],
+      async run(ctx, [given, which]) {
+        const { thing: t } = await find(ctx, given);
+        if (t.kind !== 'board') throw new UsageError(`“${t.title}” is not a board`);
+        if (!which) {
+          const r = await ctx.conn.api<{ started: number; skipped: string[] }>('POST', `/api/boards/${enc(t.id)}/refresh`, {});
+          if (ctx.o.json) return ctx.json(r);
+          ctx.out(r.started ? `Refreshing ${r.started} card${r.started === 1 ? '' : 's'} of “${t.title}”.` : `No card of “${t.title}” was refreshed.`);
+          for (const s of r.skipped) ctx.out(ctx.look.p.dim(s));
+          return;
+        }
+        const m = await ctx.conn.api<{ model?: { cards?: { id: string; ui: string; title?: string; data?: { title?: unknown } }[] } }>('GET', `/api/pages/${enc(t.id)}`);
+        const cards = (m.model?.cards ?? []).map((c, i) => ({ ...c, n: i + 1, name: c.title || (typeof c.data?.title === 'string' ? c.data.title : '') || c.ui }));
+        const w = which.trim().toLowerCase();
+        const card = /^\d+$/.test(w) ? cards.find((c) => c.n === Number(w)) : (cards.find((c) => c.id === which) ?? cards.find((c) => c.name.toLowerCase() === w) ?? cards.find((c) => c.name.toLowerCase().startsWith(w)));
+        if (!card) throw new UsageError(`“${t.title}” has no card “${which}”: hydor library show ${t.id} lists them`);
+        const r = await ctx.conn.api<{ runId?: string; key?: string }>('POST', `/api/boards/${enc(t.id)}/cards/${enc(card.id)}/refresh`, {});
+        if (ctx.o.json) return ctx.json({ board: t.id, card: card.id, ...r });
+        ctx.out(`Refreshing “${card.name}” on “${t.title}”: the board shows its new data when it is done.`);
       },
     },
     {

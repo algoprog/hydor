@@ -21,6 +21,9 @@ import {
   type BoardCard,
   type CardSize,
 } from '../../shared/boards.ts';
+import { cleanCap, cleanRefresh, everyOf, refreshText, refreshTier, RefreshError, scheduleOf, type CardRefresh, type RefreshEvery } from '../../shared/board-refresh.ts';
+import { isDataRef } from '../../shared/answer-ui/data-ref.ts';
+import { isTier, tierLabel } from '../../shared/tiers.ts';
 import { HttpError } from '../auth.ts';
 
 /** The longest a board may be as text. */
@@ -50,7 +53,11 @@ export function keepBoard(input: unknown, o: { strict?: boolean } = {}): { board
 /** A board as kept (read as it was written: a card whose UI the app no longer has still shows its data). */
 export function readBoard(text: string): Board {
   const b = JSON.parse(text) as Partial<Board>;
-  return { format: 1, cards: Array.isArray(b.cards) ? b.cards.filter(isObj) : [] };
+  let cap: number | null | undefined;
+  try {
+    cap = cleanCap(b.cap);
+  } catch {}
+  return { format: 1, ...(cap !== undefined ? { cap } : {}), cards: Array.isArray(b.cards) ? b.cards.filter(isObj) : [] };
 }
 
 export const freshBoard = (): Board => newBoard();
@@ -161,7 +168,8 @@ export function boardForAgent(text: string): string {
     if (budget <= 0) return;
     const data = JSON.stringify(c.data);
     const from = c.from?.session ? ` · from session ${c.from.session}${c.from.title ? ` (“${c.from.title}”)` : ''}` : c.from?.run ? ` · from app run ${c.from.run}` : '';
-    const refresh = c.refresh ? ` · refresh ${JSON.stringify(c.refresh)}` : '';
+    const r = c.refresh;
+    const refresh = r ? ` · refreshes ${refreshText(r.schedule)} on ${tierLabel(refreshTier(r))}, asking ${JSON.stringify(r.ask.length > 160 ? `${r.ask.slice(0, 159)}…` : r.ask)}${c.refreshedAt ? `, last updated ${new Date(c.refreshedAt).toISOString()}` : ''}` : '';
     const s = `--- card ${i + 1} · id ${c.id} · ${c.ui} · ${SIZE_LABEL[c.size] ?? c.size} · “${cardTitle(c)}” · pinned ${new Date(c.pinnedAt).toISOString()} by ${c.by ?? 'the user'}${from}${refresh}\n${data.length > CUT ? `${data.slice(0, CUT)}… (cut: ${data.length} characters)` : data}`;
     budget -= s.length;
     parts.push(s);
@@ -170,7 +178,7 @@ export function boardForAgent(text: string): string {
   return [
     `A board of answer cards, ${b.cards.length} card${b.cards.length === 1 ? '' : 's'} in their order on it (the first at the top left), each with its id, the answer UI that draws it, its size (S, M, L or Wide) and its data as the \`\`\`ui block held it.`,
     parts.join('\n\n') || '(No cards yet.)',
-    'To change it: save_board with this id: cards to add more (each {ui, data, title?, size?}, checked against its UI as find_ui says), change ([{id, title?, size?, data?}]), remove ([ids]) and order ([ids] in their new order). A card’s data is a copy of what was pinned: to bring it up to date, give its new data in change.',
+    'To change it: save_board with this id: cards to add more (each {ui, data, title?, size?, refresh?}, checked against its UI as find_ui says), change ([{id, title?, size?, data?, refresh?}]), remove ([ids]) and order ([ids] in their new order). A card’s data is a copy of what was pinned: to bring it up to date once, give its new data in change; to keep it up to date, give it refresh (an agent asks its question again on a schedule and its data is replaced). A card whose data has from reads a spreadsheet or a file each time it is shown: it is always current.',
   ].join('\n\n');
 }
 
@@ -184,9 +192,23 @@ export const SAVE_BOARD_DESCRIPTION = [
   'Each card is {ui: an answer UI’s name, data: its data, the JSON object a ```ui block of it holds, title?: its title on the board (its data’s title when left out), size?: s|m|l|wide (S a quarter of the width on a computer, M a third, L a half, Wide all of it; one column on a phone)}.',
   'Call find_ui first for the UIs you use (names or what they show): each card’s data is checked against its UI’s type as find_ui gives it, and a card that does not fit is refused, saying why.',
   'With id: change ([{id, title?, size?, data?}]), remove ([card ids]) and order ([card ids], the new order) change the cards it has; cards adds new ones at the end (or at: their place from 1).',
-  'A card keeps a copy of its data as it was given: to bring one up to date, give its new data in change.',
+  'A card keeps a copy of its data as it was given: to bring one up to date once, give its new data in change.',
+  'To keep a card up to date by itself ("keep this updated every morning"), give it refresh: {ask: the question an agent answers again each time (the user’s request, as it would be asked now; for a card they pinned, left out, their request it came from), every: hour, day, weekdays or week (left out: only when they press Refresh now), at: its time ("07:00", in their time zone), on: the day for week ("monday"), tier: quick (the default), standard, best or max}; refresh: null stops it. Each refresh is an agent’s session on that tier that sends nothing and answers with a new ```ui block of the same UI, which replaces the card’s data (a failed one keeps it; three in a row pause it). It costs money: the result says about what a refresh and a month come to, and each board has a monthly cap for its refreshes ($5 unless the user changes it on the board). Say so when you set one. A card that reads a spreadsheet or a file (its data has from) needs none.',
+  'get_page with a board’s id says, for each card that refreshes, when, on which tier, what it costs, when it was last updated and whether its last refresh failed, and the board’s cap and what its refreshes spent this month: answer questions about them from it.',
   `Give each new board a description (under 100 words): the Library shows it and its search finds the board by it.`,
 ].join(' ');
+
+const REFRESH_SCHEMA = {
+  type: ['object', 'null'],
+  description: 'Keep the card up to date by itself (null: stop). An agent answers ask again and its new ```ui block replaces the card’s data.',
+  properties: {
+    ask: { type: 'string', description: 'The question asked again each time (left out: the card’s own, or the request it was pinned from).' },
+    every: { type: 'string', enum: ['hour', 'day', 'weekdays', 'week', 'off'], description: 'How often: every hour, every day, weekdays, every week; off (or left out): only when the user presses Refresh now.' },
+    at: { type: 'string', description: 'For day, weekdays and week: the time, "07:00", in the user’s time zone (07:00 when left out).' },
+    on: { type: 'string', description: 'For week: the day ("monday").' },
+    tier: { type: 'string', enum: ['quick', 'standard', 'best', 'max'], description: 'The tier the agent thinks with: quick (the default and cheapest) unless the question needs more.' },
+  },
+};
 
 const CARD_SCHEMA = {
   type: 'object',
@@ -195,6 +217,7 @@ const CARD_SCHEMA = {
     data: { type: 'object', description: 'Its data: the JSON object a ```ui block of that UI holds.' },
     title: { type: 'string', description: 'Its title on the board; left out, its data’s title.' },
     size: { type: 'string', enum: CARD_SIZES, description: 's, m, l or wide: a quarter, a third, a half or the whole width on a computer.' },
+    refresh: REFRESH_SCHEMA,
   },
   required: ['ui', 'data'],
 };
@@ -209,8 +232,8 @@ export const SAVE_BOARD_SCHEMA = {
     at: { type: 'number', description: 'With id: where the new cards go, from 1 (at the end when left out).' },
     change: {
       type: 'array',
-      items: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, size: { type: 'string', enum: CARD_SIZES }, data: { type: 'object' } }, required: ['id'] },
-      description: 'With id: cards to change, by their ids (get_page lists them): a new title, size or data.',
+      items: { type: 'object', properties: { id: { type: 'string' }, title: { type: 'string' }, size: { type: 'string', enum: CARD_SIZES }, data: { type: 'object' }, refresh: REFRESH_SCHEMA }, required: ['id'] },
+      description: 'With id: cards to change, by their ids (get_page lists them): a new title, size, data, or how it refreshes (refresh; null stops it).',
     },
     remove: { type: 'array', items: { type: 'string' }, description: 'With id: cards to take off, by their ids.' },
     order: { type: 'array', items: { type: 'string' }, description: 'With id: the cards’ ids in their new order (those left out keep their places after them).' },
@@ -243,6 +266,11 @@ export function agentBoard(prev: Board | null, a: Record<string, unknown>, from:
         if (ch.size !== undefined && !CARD_SIZES.includes(ch.size as CardSize)) throw new CardError(`Card ${c.id}: size is s, m, l or wide.`);
         const next = checkCard({ ...c, ...(ch.title !== undefined ? { title: ch.title } : {}), ...(ch.size !== undefined ? { size: ch.size } : {}), ...(ch.data !== undefined ? { data: ch.data } : {}) }, { strict: ch.data !== undefined, label: `Card ${c.id}` });
         if (ch.data !== undefined) next.refreshedAt = Date.now();
+        if (ch.refresh !== undefined) {
+          const r = agentRefresh(ch.refresh, next, `Card ${c.id}`);
+          if (r) next.refresh = r;
+          else delete next.refresh;
+        }
         board.cards[i] = next;
       }
       said.push(`changed ${a.change.length} card${a.change.length === 1 ? '' : 's'}`);
@@ -262,6 +290,10 @@ export function agentBoard(prev: Board | null, a: Record<string, unknown>, from:
         const card = checkCard(isObj(c) ? { ...c, id: undefined, pinnedAt: undefined, refresh: undefined, refreshedAt: undefined } : c, { strict: true, label: `Card ${i + 1} of cards`, now });
         card.by = 'agent';
         if (from) card.from = from;
+        if (isObj(c) && c.refresh !== undefined && c.refresh !== null) {
+          const r = agentRefresh(c.refresh, card, `Card ${i + 1} of cards`);
+          if (r) card.refresh = r;
+        }
         return card;
       });
       if (board.cards.length + added.length > BOARD_LIMITS.cards)
@@ -278,4 +310,39 @@ export function agentBoard(prev: Board | null, a: Record<string, unknown>, from:
     }
     return { board, said };
   });
+}
+
+// ---- how an agent sets a card's refresh --------------------------------------------------------------------------------
+
+const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/**
+ * A card's refresh as an agent gives it ({ask?, every?, at?, on?, tier?}; null stops it), on top of the one the card has:
+ * its question, the card's own when left out. Throws CardError, said plainly.
+ */
+export function agentRefresh(v: unknown, card: BoardCard, label: string): CardRefresh | undefined {
+  if (v === null || v === false) return undefined;
+  if (!isObj(v)) throw new CardError(`${label}: refresh is {ask?, every?, at?, on?, tier?}, or null to stop it.`);
+  if (isDataRef(card.data)) throw new CardError(`${label} reads its numbers from a spreadsheet or a file each time it is shown: it is always current, so it needs no refresh.`);
+  const cur = card.refresh;
+  const ask = typeof v.ask === 'string' && v.ask.trim() ? v.ask : cur?.ask;
+  if (!ask) throw new CardError(`${label}: refresh needs ask, the question an agent answers again each time (the user’s request, as it would be asked now).`);
+  const every = v.every === undefined ? (cur ? everyOf(cur.schedule) : 'off') : String(v.every).toLowerCase().replace(/^(daily|every ?day)$/, 'day').replace(/^(hourly|every ?hour)$/, 'hour').replace(/^(weekly|every ?week)$/, 'week').replace(/^weekday$/, 'weekdays');
+  if (!['off', 'hour', 'day', 'weekdays', 'week'].includes(every)) throw new CardError(`${label}: refresh’s every is hour, day, weekdays, week or off (not ${JSON.stringify(v.every)}).`);
+  const at = typeof v.at === 'string' && v.at.trim() ? v.at.trim() : cur?.schedule?.kind === 'daily' ? cur.schedule.time : '07:00';
+  if (every !== 'off' && every !== 'hour' && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(at)) throw new CardError(`${label}: refresh’s at is a time written as 07:00 (not ${JSON.stringify(v.at)}).`);
+  let day = cur?.schedule?.kind === 'daily' && cur.schedule.days?.length === 1 ? cur.schedule.days[0] : 1;
+  if (v.on !== undefined) {
+    const n = typeof v.on === 'number' ? v.on : DAYS.findIndex((d) => d.startsWith(String(v.on).trim().toLowerCase().slice(0, 3)));
+    if (!Number.isInteger(n) || n < 0 || n > 6) throw new CardError(`${label}: refresh’s on is a day of the week ("monday").`);
+    day = n;
+  }
+  const tier = v.tier === undefined ? cur?.tier : String(v.tier).toLowerCase();
+  if (tier !== undefined && !isTier(tier)) throw new CardError(`${label}: refresh’s tier is quick, standard, best or max.`);
+  try {
+    return cleanRefresh({ ask, schedule: scheduleOf(every as RefreshEvery, at.padStart(5, '0'), day), tier, costUsd: cur?.costUsd });
+  } catch (e) {
+    if (e instanceof RefreshError) throw new CardError(`${label}: ${e.message}`);
+    throw e;
+  }
 }

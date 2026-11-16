@@ -1,19 +1,23 @@
 // A board of the Library (shared/boards.ts): the answer cards pinned to it, each drawn by the same view as in a reply
 // (CardView), in a grid that lays out by the room it has: twelve columns on a computer, where S, M, L and Wide span 3,
 // 4, 6 and 12 of them; six on a narrower window (S and M half of it); one on a phone. Each card has its title and where it
-// came from above it, and on hover (a tap on a phone) its Size, Full screen and "…": Rename, Move up and down, Save as
-// picture, Open the conversation, Remove. Cards are dragged by their handle to reorder them on a computer.
+// came from above it (or, for a card that keeps itself up to date, when it was updated, what a refresh costs and how often:
+// Refresh.tsx), and on hover (a tap on a phone) its Size, Full screen and "…": Refresh now, Keep it up to date…, Rename,
+// Move up and down, Save as picture, Open the conversation, Remove. A title the card draws as its own heading shows once,
+// in the card. Cards are dragged by their handle to reorder them on a computer. The bar has Refresh all and the board's
+// monthly cap for refreshes; a board whose refreshes reached it says so at the top.
 //
 // Every change is saved at once as a new version (versions on each change, as the Library keeps them): the change is
 // made here at once, then kept in order, one after another; when the board was saved meanwhile (an agent added a card),
 // the change is made again on the newest version and kept on top of it, so nothing either did is lost.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowDown, ArrowUp, Ellipsis, Expand, GripVertical, ImageDown, MessageSquareText, Pencil, Pin, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarClock, CircleSlash, Ellipsis, Expand, GripVertical, ImageDown, MessageSquareText, Pencil, Pin, RefreshCw, Trash2 } from 'lucide-react';
 import { answerUi } from '@shared/answer-ui';
-import { cardTitle, changeCard, newBoard, removeCard, SIZE_LABEL, CARD_SIZES, type Board, type BoardCard, type CardSize } from '@shared/boards';
+import { cardTitle, changeCard, newBoard, removeCard, setBoardCap, SIZE_LABEL, CARD_SIZES, type Board, type BoardCard, type CardSize } from '@shared/boards';
+import type { BoardRefreshState, CardRefresh } from '@shared/board-refresh';
 import type { PageInfo } from '@shared/pages';
 import { CardView } from '../../../components/answer/AnswerUi';
 import { CardFullScreen, cardPicture, picturable, savePicture } from '../../../components/answer/CardTools';
@@ -27,6 +31,7 @@ import { go, sessionPath } from '../../../lib/nav';
 import { toastError, useSessions, useToasts } from '../../../lib/store';
 import { saveBlob } from '../exportFile';
 import type { ModelEditorProps } from '../kinds';
+import { CapBand, CapButton, readsSource, refreshable, refreshBoard, refreshCard, RefreshDialog, RefreshMeta, RefreshProblem, useBoardRefresh } from './Refresh';
 
 /** How many of the grid's columns each size spans: of six on a narrower window, of twelve on a computer (one on a phone). */
 const SPAN: Record<CardSize, string> = {
@@ -54,6 +59,17 @@ function useSource(c: BoardCard): { label: string; open: () => void } | null {
   return null;
 }
 
+/** What a card's refreshes need from its board: what they are doing, and what starts or sets them (none: read only). */
+export interface Refreshes {
+  state: BoardRefreshState | null;
+  /** Refresh now, Try again. */
+  now?: (c: BoardCard) => void;
+  /** Keep it up to date… */
+  settings?: (c: BoardCard) => void;
+  /** Stop refreshing. */
+  stop?: (c: BoardCard) => void;
+}
+
 interface TileProps {
   card: BoardCard;
   pageId: string;
@@ -63,10 +79,34 @@ interface TileProps {
   phone: boolean;
   run: (op: Op) => void;
   onRemove: (c: BoardCard) => void;
+  refreshes?: Refreshes;
+}
+
+const sameWords = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/**
+ * Whether a card draws its title as its own heading (its first heading reads the same): then the board's line above it
+ * shows only when it was pinned or updated, and the controls. Watched as the card draws (a view may come a little later).
+ */
+function useDrawsTitle(el: React.RefObject<HTMLDivElement | null>, title: string): boolean {
+  const [same, setSame] = useState(false);
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (!node) return;
+    const look = () => {
+      const h = node.querySelector('.aui-h3, h1, h2, h3');
+      setSame(!!h && sameWords(h.textContent ?? '', title));
+    };
+    look();
+    const mo = new MutationObserver(look);
+    mo.observe(node, { childList: true, subtree: true, characterData: true });
+    return () => mo.disconnect();
+  }, [el, title]);
+  return same;
 }
 
 /** One card on the board: its title and source above it, its tools on hover, the card itself drawn by its UI's view. */
-function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove }: TileProps) {
+function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove, refreshes }: TileProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: card.id, disabled: readOnly || phone });
   const title = cardTitle(card);
   const size = sizeOf(card);
@@ -79,6 +119,12 @@ function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove }: Til
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(title);
   const [pictures, setPictures] = useState(false);
+  // Its title once: in the card, when the card draws it as its heading.
+  const drawsTitle = useDrawsTitle(el, title);
+  const rs = refreshes?.state?.cards[card.id];
+  const meta = <RefreshMeta card={card} s={rs} state={refreshes?.state ?? null} guest={viaLink} />;
+  const refreshing = !!(card.refresh || rs?.running || rs?.last);
+  const canRefresh = !readOnly && !!refreshes?.now && refreshable(card);
   // What the views read of where they are: a card on a board keeps its own state on this device (ticks, answers).
   const info = useMemo(() => ({ done: true, keep: `board:${pageId}:${card.id}`, cwd: card.from?.cwd, board: pageId }), [pageId, card.id, card.from?.cwd]);
   const look = () => setPictures(picturable(el.current));
@@ -125,7 +171,7 @@ function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove }: Til
             <GripVertical size={14} />
           </button>
         )}
-        <div className="min-w-0 flex-1">
+        <div className={cx('min-w-0 flex-1', drawsTitle && !renaming && 'self-center')}>
           {renaming ? (
             <input
               autoFocus
@@ -141,20 +187,26 @@ function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove }: Til
               translate="no"
               className={cx(inputCls, 'h-7.5 text-[13.5px] font-semibold')}
             />
-          ) : (
+          ) : drawsTitle ? null : (
             <h3 translate="no" className="truncate text-[13.5px] leading-5 font-semibold tracking-tight text-fg" onDoubleClick={readOnly ? undefined : () => (setName(title), setRenaming(true))}>
               {title}
             </h3>
           )}
           <div className="flex min-w-0 items-center gap-1 text-[11.5px] leading-4 text-fg-3">
-            <span className="shrink-0">{`Pinned ${ago(card.pinnedAt)}`}</span>
-            {src && (
+            {refreshing ? (
+              meta
+            ) : (
               <>
-                <span className="shrink-0">·</span>
-                <span className="shrink-0">from</span>
-                <button type="button" onClick={src.open} translate="no" className="min-w-0 truncate text-left underline-offset-2 hover:text-fg-2 hover:underline">
-                  {src.label}
-                </button>
+                <span className="shrink-0">{`Pinned ${ago(card.pinnedAt)}`}</span>
+                {src && (
+                  <>
+                    <span className="shrink-0">·</span>
+                    <span className="shrink-0">from</span>
+                    <button type="button" onClick={src.open} translate="no" className="min-w-0 truncate text-left underline-offset-2 hover:text-fg-2 hover:underline">
+                      {src.label}
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -181,6 +233,7 @@ function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove }: Til
           </IconButton>
         </div>
       </div>
+      {!readOnly && refreshes?.now && <RefreshProblem card={card} s={rs} onTry={() => refreshes.now!(card)} />}
       <div className="md">
         <div ref={el} className={cx('aui relative', isDragging && 'pointer-events-none opacity-80')} data-ui={card.ui} translate="no">
           {drawn}
@@ -194,6 +247,22 @@ function Tile({ card, pageId, first, last, readOnly, phone, run, onRemove }: Til
         ))}
       </Popover>
       <Popover anchor={moreRef} open={menu === 'more'} onClose={() => setMenu(null)} align="end" width={230}>
+        {canRefresh && (
+          <MenuItem icon={<RefreshCw size={14} />} disabled={!!rs?.running} onClick={() => (setMenu(null), card.refresh || card.from?.session || card.from?.task ? refreshes!.now!(card) : refreshes!.settings?.(card))}>
+            {rs?.running ? 'Refreshing…' : 'Refresh now'}
+          </MenuItem>
+        )}
+        {!readOnly && refreshes?.settings && !readsSource(card) && (
+          <MenuItem icon={<CalendarClock size={14} />} onClick={() => (setMenu(null), refreshes.settings!(card))}>
+            Keep it up to date…
+          </MenuItem>
+        )}
+        {!readOnly && refreshes?.stop && card.refresh && (
+          <MenuItem icon={<CircleSlash size={14} />} onClick={() => (setMenu(null), refreshes.stop!(card))}>
+            Stop refreshing
+          </MenuItem>
+        )}
+        {!readOnly && refreshes?.settings && !readsSource(card) && <MenuSep />}
         {!readOnly && (
           <MenuItem icon={<Pencil size={14} />} onClick={() => (setMenu(null), setName(title), setRenaming(true))}>
             Rename
@@ -261,7 +330,7 @@ function EmptyBoard({ readOnly }: { readOnly: boolean }) {
  * The board's cards in their grid. `run` keeps a change (none: read-only, an older version or a shared link's).
  * `gridRef` gives the grid's element, for a picture of the whole board.
  */
-export function BoardGrid({ board, pageId, run, phone, gridRef }: { board: Board; pageId: string; run?: (op: Op) => void; phone: boolean; gridRef?: React.Ref<HTMLDivElement> }) {
+export function BoardGrid({ board, pageId, run, phone, gridRef, refreshes }: { board: Board; pageId: string; run?: (op: Op) => void; phone: boolean; gridRef?: React.Ref<HTMLDivElement>; refreshes?: Refreshes }) {
   const readOnly = !run;
   const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
   const ids = useMemo(() => board.cards.map((c) => c.id), [board.cards]);
@@ -310,7 +379,7 @@ export function BoardGrid({ board, pageId, run, phone, gridRef }: { board: Board
             className="grid grid-cols-1 items-start gap-x-4 gap-y-6 @xl:grid-cols-6 @4xl:grid-cols-12"
           >
             {board.cards.map((c, i) => (
-              <Tile key={c.id} card={c} pageId={pageId} first={i === 0} last={i === board.cards.length - 1} readOnly={readOnly} phone={phone} run={run ?? (() => {})} onRemove={remove} />
+              <Tile key={c.id} card={c} pageId={pageId} first={i === 0} last={i === board.cards.length - 1} readOnly={readOnly} phone={phone} run={run ?? (() => {})} onRemove={remove} refreshes={refreshes} />
             ))}
           </div>
         </div>
@@ -380,12 +449,72 @@ export function BoardEditor({ doc, pageId, layout, readOnly, lead, tail, band }:
     });
   };
 
+  // Cards that keep themselves up to date: what their refreshes are doing, and what starts or sets them (Refresh.tsx).
+  const live = !readOnly && !viaLink;
+  const anyRefresh = board.cards.some((c) => c.refresh);
+  const { state, reload } = useBoardRefresh(pageId, live && board.cards.length > 0);
+  const [setting, setSetting] = useState<string | null>(null);
+  const [capOpen, setCapOpen] = useState(false);
+  const [all, setAll] = useState(false);
+  const settingCard = setting ? board.cards.find((c) => c.id === setting) : undefined;
+  const refreshes = useMemo(
+    () =>
+      live
+        ? {
+            state,
+            now: (c: BoardCard) => void refreshCard(pageId, c.id, reload),
+            settings: (c: BoardCard) => setSetting(c.id),
+            stop: (c: BoardCard) => run((b) => changeCard(b, c.id, { refresh: undefined })),
+          }
+        : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [live, state, pageId, reload],
+  );
+  const saveRefresh = (c: BoardCard, r: CardRefresh, now: boolean) => {
+    setSetting(null);
+    run((b) => changeCard(b, c.id, { refresh: r }));
+    // Refreshed once the setting is kept (its question is the one just written).
+    if (now) void queue.current.then(() => refreshCard(pageId, c.id, reload));
+  };
+  const busy = !!state && Object.values(state.cards).some((c) => c.running);
+  // Opened from Schedules' pencil (?card=…): that card's settings, once.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (asked.current || !live) return;
+    const id = new URLSearchParams(location.search).get('card');
+    if (id && board.cards.some((c) => c.id === id)) {
+      asked.current = true;
+      setSetting(id);
+    }
+  }, [board.cards, live]);
+
   const count = board.cards.length;
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg" data-i18n="board">
       <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">{lead}</div>
         {!phone && count > 0 && <span className="shrink-0 px-1 text-[12px] text-fg-3">{count === 1 ? '1 card' : `${count} cards`}</span>}
+        {live && anyRefresh && (
+          <>
+            <CapButton board={board} state={state} open={capOpen} setOpen={setCapOpen} compact={phone} onCap={(cap) => run((b) => setBoardCap(b, cap))} />
+            {phone ? (
+              <IconButton label="Refresh all" disabled={all} onClick={() => (setAll(true), void refreshBoard(pageId, () => (setAll(false), reload())))}>
+                <RefreshCw size={16} className={cx((all || busy) && 'animate-spin')} />
+              </IconButton>
+            ) : (
+              <button
+                type="button"
+                disabled={all}
+                onClick={() => (setAll(true), void refreshBoard(pageId, () => (setAll(false), reload())))}
+                title={tr('Refresh every card that keeps itself up to date, now')}
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[12.5px] text-fg-2 transition-colors hover:bg-bg-3 hover:text-fg disabled:opacity-60"
+              >
+                <RefreshCw size={14} className={cx((all || busy) && 'animate-spin')} />
+                Refresh all
+              </button>
+            )}
+          </>
+        )}
         {count > 0 && (
           <span onPointerEnter={() => setPicture(picturable(grid.current))} onFocus={() => setPicture(picturable(grid.current))}>
             <IconButton
@@ -400,11 +529,23 @@ export function BoardEditor({ doc, pageId, layout, readOnly, lead, tail, band }:
         {tail}
       </div>
       {band}
+      {live && state && anyRefresh && <CapBand state={state} onRaise={() => setCapOpen(true)} />}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto w-full max-w-[1600px] px-3 pt-4 pb-[max(24px,var(--safe-bottom))] sm:px-6 sm:pt-5">
-          <BoardGrid board={board} pageId={pageId} run={readOnly ? undefined : run} phone={phone} gridRef={grid} />
+          <BoardGrid board={board} pageId={pageId} run={readOnly ? undefined : run} phone={phone} gridRef={grid} refreshes={refreshes} />
         </div>
       </div>
+      {settingCard && (
+        <RefreshDialog
+          card={settingCard}
+          pageId={pageId}
+          board={board}
+          state={state}
+          onClose={() => setSetting(null)}
+          onSave={(r, now) => saveRefresh(settingCard, r, now)}
+          onStop={() => (setSetting(null), run((b) => changeCard(b, settingCard.id, { refresh: undefined })))}
+        />
+      )}
     </div>
   );
 }

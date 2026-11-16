@@ -337,11 +337,31 @@ export function createPage(
     if (kind === 'page') db.prepare('update pages set icon = ? where id = ?').run(iconOf(html), id);
     noteRefs(db, id, 1, sources);
   })();
+  heard(id, kind);
   return pageInfo(db, id)!;
 }
 
 /** How long apart an agent's saves in a row may be to be kept as one version. */
 export const FOLD_MS = 5 * 60_000;
+
+/**
+ * What hears that a page was made, changed or deleted, by any way it was (the editors, an agent's tool, a shared link,
+ * a version brought back, a copy): a board's cards' refreshes are kept in step with it (board-refresh.ts). A listener
+ * that fails does not undo the change.
+ */
+const listeners: ((id: string, kind: 'page' | PageKind | null) => void)[] = [];
+export function onPageChange(fn: (id: string, kind: 'page' | PageKind | null) => void) {
+  listeners.push(fn);
+}
+function heard(id: string, kind: 'page' | PageKind | null) {
+  for (const fn of listeners) {
+    try {
+      fn(id, kind);
+    } catch (e) {
+      console.warn(`[pages] after a change to ${id}: ${(e as Error).message}`);
+    }
+  }
+}
 
 /**
  * A new version of a page: it becomes the current one, and its title the page's. An agent's save in a turn (`turn`: its
@@ -394,6 +414,7 @@ export function addVersion(
     prune(db, id);
   })();
   if (folded !== null) p.onFold?.(folded);
+  heard(id, cur.kind ?? 'page');
   return pageInfo(db, id)!;
 }
 
@@ -414,8 +435,9 @@ export function copyPage(db: DB, id: string): PageInfo {
 }
 
 export function renamePage(db: DB, id: string, title: unknown): PageInfo {
-  mustPage(db, id);
+  const p = mustPage(db, id);
   db.prepare('update pages set title = ?, updated_at = ? where id = ?').run(cleanTitle(title), Date.now(), id);
+  heard(id, p.kind ?? 'page');
   return pageInfo(db, id)!;
 }
 
@@ -438,6 +460,7 @@ export function setPageSpace(db: DB, id: string, space: string | null): PageInfo
 export function deletePage(db: DB, id: string) {
   db.prepare('delete from pages where id = ?').run(id);
   dropRefs(db, id);
+  heard(id, null);
 }
 
 /** Which show_html calls of a session were kept, and as which page. */

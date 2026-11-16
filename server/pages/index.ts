@@ -79,6 +79,9 @@ import { agentDeck, readDeck, SAVE_SLIDES_DESCRIPTION, SAVE_SLIDES_SCHEMA } from
 import { agentDiagram, SAVE_DIAGRAM_DESCRIPTION, SAVE_DIAGRAM_SCHEMA } from './diagrams.ts';
 import { agentBoard, readBoard, SAVE_BOARD_DESCRIPTION, SAVE_BOARD_SCHEMA } from './boards.ts';
 import { boardRoutes } from './board-routes.ts';
+import { refreshLines, sourceQuestion, startRefreshes, tierCosts } from './board-refresh.ts';
+import { aboutUsd, boardCap, refreshText, refreshTier, runsPerMonth } from '../../shared/board-refresh.ts';
+import { cardTitle } from '../../shared/boards.ts';
 import { myThemeByName } from './my-themes.ts';
 import { withSheetsAndLogo } from './slides-sources.ts';
 import { agentFileComments, openFile, openFileComments, saveFile, texFileForAgent } from './filemodel.ts';
@@ -387,7 +390,12 @@ const GET_PAGE: RunTool = {
     const about = p.description ? ` Its description: ${p.description}` : ' It has no description yet.';
     if (k) {
       const by = p.who ? ` It was last changed by ${p.who}, someone the user shared it with: keep their changes.` : p.by === 'edit' || p.by === 'made' ? ` It was last changed by the user in its editor: keep their changes.` : '';
-      return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${about}${by} ${k.forAgent(pageSource(db, id)!.text)}`;
+      // A board says how its cards refresh as well: when, what it costs, how the last went (board-refresh.ts).
+      let refreshes = '';
+      try {
+        if (p.kind === 'board') refreshes = `\n\n${refreshLines(ctx.deps, id).join('\n')}`;
+      } catch {}
+      return `${p.title} (page ${p.id}, version ${p.version} of ${p.versions} kept).${about}${by} ${k.forAgent(pageSource(db, id)!.text)}${refreshes}`;
     }
     const html = (await pageHtml(db, id))!.html;
     const data = storageText(db, id);
@@ -724,12 +732,38 @@ const SAVE_BOARD: RunTool = {
     const title = id ? a.title : given(a.title) ? a.title : name;
     if (!id && !given(title)) throw new Error('title: a new board needs a name (or give id, or board: a board’s name, to add to one).');
     const prev = id ? readBoard(pageSource(db, id)!.text) : null;
+    // A card the user pinned that is to refresh itself, with no question given: the request it was pinned from.
+    if (prev && Array.isArray(a.change)) {
+      for (const ch of a.change) {
+        const r = ch && typeof ch === 'object' ? (ch as Record<string, unknown>).refresh : undefined;
+        if (!r || typeof r !== 'object' || (typeof (r as { ask?: unknown }).ask === 'string' && (r as { ask: string }).ask.trim())) continue;
+        const card = prev.cards.find((c) => c.id === String((ch as { id?: unknown }).id));
+        if (card && !card.refresh) {
+          const q = await sourceQuestion(ctx.deps, card);
+          if (q) (ch as Record<string, unknown>).refresh = { ...(r as object), ask: q };
+        }
+      }
+    }
     // Its cards came from this conversation (an app's step has none to point at).
     const { board, said } = agentBoard(prev, a, ctx.step ? undefined : { session: ctx.key });
     const p = keepModel(ctx, id, 'board', title, board, { project: a.project, folder: a.libraryFolder, description: a.description });
     const n = board.cards.length;
+    // What the refreshes it set come to.
+    const touched = new Set([...(Array.isArray(a.change) ? a.change : []).filter((c) => c && typeof c === 'object' && 'refresh' in c).map((c) => String((c as { id?: unknown }).id))]);
+    const asked = Array.isArray(a.cards) && a.cards.some((c) => c && typeof c === 'object' && (c as { refresh?: unknown }).refresh);
+    const set = board.cards.filter((c) => c.refresh && (touched.has(c.id) || (asked && c.by === 'agent' && !prev?.cards.some((x) => x.id === c.id))));
+    const costs = set.length ? tierCosts(db) : null;
+    const refreshes = set.map((c) => {
+      const r = c.refresh!;
+      const per = costs![refreshTier(r)];
+      const month = r.schedule && per !== null ? `, about ${aboutUsd(per * runsPerMonth(r.schedule))} a month` : '';
+      return `“${cardTitle(c)}” refreshes ${refreshText(r.schedule)} on ${refreshTier(r)}${per !== null ? `, about ${aboutUsd(per)} a refresh${month}` : ''}`;
+    });
+    const cap = boardCap(board);
     return [
       `Saved the board "${p.title}" (page ${p.id}, version ${p.version})${said.length ? `: ${said.join('; ')}` : ''}; ${n} card${n === 1 ? '' : 's'} on it. It shows in the Library (${ctx.deps.publicBase()}/pages/${p.id}), where the user sees the cards drawn as in a reply, sizes and arranges them, and pins more from replies. get_page with its id lists each card's id, to change it.`,
+      ...(refreshes.length ? [`${refreshes.join('; ')}. Its refreshes ${cap === null ? 'have no monthly cap' : `stop for the month at the board’s $${cap} cap`}; tell the user what they cost.`] : []),
+      ...(touched.size && !set.length ? ['The cards it changed no longer refresh.'] : []),
       ...(!id && name && !given(a.title) ? [`There was no board called “${name}”, so this one was made.`] : []),
       ...foldNote(p),
       ...p.describeNote,
@@ -1472,6 +1506,9 @@ export const pages: Feature = {
   },
   start(d) {
     setCaptureDb(d.db);
+    // Board cards that keep themselves up to date: the scheduler runs their refreshes, kept in step with every save of a
+    // board (board-refresh.ts), and once at start-up for changes that went unseen.
+    if (d.scheduler) startRefreshes(d);
     d.sessions.on('toolstream', (key: string, e: ToolStream) => feedDraft(d, key, e));
     // A turn that ended (or an agent that stopped) leaves no page being written, and its saves are done with.
     d.sessions.on('live', (key: string, live: { status?: string } | null) => {

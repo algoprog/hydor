@@ -413,16 +413,16 @@ function updateTask(tz: string): RunTool {
 function listTasks(tz: string): RunTool {
   return {
     name: 'list_tasks',
-    description: 'The user’s scheduled tasks: id, name, when each runs (in their time zone), the next run, how the last one went, and whether it is paused.',
+    description: 'The user’s scheduled tasks: id, name, when each runs (in their time zone), the next run, how the last one went, and whether it is paused. Board cards that keep themselves up to date are among them, marked so: they are changed on their board (save_board), not with update_task.',
     inputSchema: { type: 'object', properties: {} },
     annotations: { readOnlyHint: true },
     async run(_a, ctx) {
       const d = ctx.deps;
-      const tasks = d.scheduler.list();
+      const tasks = d.scheduler.list({ boards: true });
       if (!tasks.length) return 'There are no scheduled tasks yet.';
       const lines = tasks.map((t) =>
         [
-          `- ${t.id} · ${t.name}`,
+          `- ${t.id} · ${t.name}${d.scheduler.isBoard(t.id) ? ' (a board card’s refresh: get_page on its board says more, and save_board changes it)' : ''}`,
           scheduleText(t.schedule, tz),
           t.enabled ? (t.nextAt ? `next ${localText(t.nextAt, tz)}` : 'no run to come') : `paused${t.pausedReason ? ` (${t.pausedReason})` : ''}`,
           t.recent?.[0] ? `last: ${OUTCOME_LABEL[t.recent[0].status].toLowerCase()}, ${localText(t.recent[0].at, tz)}` : 'not run yet',
