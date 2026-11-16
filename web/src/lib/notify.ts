@@ -151,6 +151,14 @@ export async function enablePush(): Promise<PushState> {
   return 'on';
 }
 
+/** Sends a test notice to this device only (Use on your phone's Send a test); how many got it (0 or 1). */
+export async function testThisDevice(): Promise<number> {
+  if (!supported()) return 0;
+  const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+  if (!sub) return 0;
+  return (await post<{ sent: number }>('/api/push/test', { endpoint: sub.endpoint })).sent;
+}
+
 export async function disablePush(): Promise<PushState> {
   if (!supported()) return 'unsupported';
   const reg = await navigator.serviceWorker.ready;

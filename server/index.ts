@@ -58,6 +58,8 @@ import { standAll } from './openForms.ts';
 import { setStartup, startupDefault, startupState } from './startup.ts';
 import { onDesktop, tellDesktop } from './desktop.ts';
 import { KeepAwake, setAwakeMode } from './awake.ts';
+import { linkBase, loadOrigins, originListed } from './origins.ts';
+import { Phone, phoneRoutes } from './phone/index.ts';
 import { isAbsPath, trimSep, within } from './platform.ts';
 import { startSettings, updateStartSettings } from './startSettings.ts';
 import { claudeRetention, setClaudeRetention } from './claudeHistory.ts';
@@ -143,7 +145,9 @@ app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body,
 // Webhook deliveries also come as forms.
 app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) => done(null, Object.fromEntries(new URLSearchParams(String(body ?? '')))));
 
-const allowed = new Set([...config.allowedOrigins, `http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`]);
+// This computer's own addresses; the extra ones (ALLOWED_ORIGINS, and those the app added, such as its Tailscale address) are in server/origins.ts.
+loadOrigins(db);
+const allowed = new Set([`http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`]);
 
 /** The visitor's address, as a proxy on this computer or a private network passes it on (server/auth.ts). */
 function clientIp(req: FastifyRequest): string {
@@ -157,7 +161,7 @@ function isHttps(req: FastifyRequest): boolean {
 function originOk(req: FastifyRequest): boolean {
   const origin = req.headers.origin;
   if (!origin) return false;
-  if (allowed.has(origin)) return true;
+  if (allowed.has(origin) || originListed(origin)) return true;
   // Same host as the request (e.g. reached through another hostname of the tunnel).
   try {
     return new URL(origin).host === req.headers.host;
@@ -1407,7 +1411,16 @@ app.post('/api/push/unsubscribe', async (req) => {
   push.unsubscribe(String(body(req).endpoint ?? ''));
   return { ok: true };
 });
-app.post('/api/push/test', async () => ({ sent: await push.send({ key: '', kind: 'done', title: 'Hydor', body: 'Notifications work on this device.', url: '/', at: Date.now() }) }));
+// A test notice: to every device that gets them, or only to one (its subscription's endpoint), as Use on your phone sends it.
+app.post('/api/push/test', async (req) => {
+  const only = String(body(req).endpoint ?? '') || undefined;
+  return { sent: await push.send({ key: '', kind: 'done', title: 'Hydor', body: 'Notifications work on this device.', url: '/', at: Date.now() }, only) };
+});
+
+// ---- Use on your phone: the app on the person's own devices through Tailscale Serve (server/phone) ---------------------
+
+const phone = new Phone(db, config.port);
+phoneRoutes(app, phone);
 
 // ---- notebooks: Jupyter kernels ------------------------------------------------------------
 
@@ -1923,7 +1936,8 @@ app.get('/guest-api/:token', async (req, reply) => {
 
 // ---- MCP: other agents, and the pages sessions show -------------------------------------------
 
-const publicBase = () => config.allowedOrigins[0] ?? `http://127.0.0.1:${config.port}`;
+// The address links the app hands out start with: ALLOWED_ORIGINS's first, else the Tailscale one it is served at, else this computer's (server/origins.ts).
+const publicBase = () => linkBase(config.allowedOrigins, phone.servedUrl(), config.port);
 
 // ---- the app's capabilities (server/features): search, browser, memory, assistants… ------------------
 
