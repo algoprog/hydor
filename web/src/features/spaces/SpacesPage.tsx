@@ -4,7 +4,7 @@
 // A group brings spaces together: its sessions work with all of them. Picked by name on the start page in place of
 // a folder. Files dropped on a space's card go into its Library (pages/uploads.ts: each made what it is, any other file
 // in its folder); dropped elsewhere on the list, nothing happens.
-import { useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { Boxes, Folder, Layers, LibraryBig, MessagesSquare, Plus, SquarePen, UserPlus, X } from 'lucide-react';
 import type { SpaceView } from '@shared/spaces';
@@ -19,7 +19,7 @@ import { PageHeader } from '../layout/PageHeader';
 import { addToLibrary, dragsFiles, droppedFiles, dropMoves } from '../pages/uploads';
 import { DropHint } from '../pages/UploadTray';
 import { memberNames, NewSpaceDialog, SpaceMark, SpacesTabs, startInSpace, useSpaceSuggestions } from './parts';
-import { SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
+import { memoryPath, SpaceMenu, SpacePage, type SpaceTab } from './SpacePage';
 import { useSpaces } from './state';
 
 const plural = (n: number, one: string, many: string) => tr(`${n} ${n === 1 ? one : many}`);
@@ -295,6 +295,12 @@ function List() {
 
 export function SpacesPage() {
   const [loc] = useLocation();
-  const m = /^\/projects\/([a-z0-9]+)(?:\/(library|files|knowledge|wiki|skills|agents|settings))?$/.exec(loc);
+  const m = /^\/projects\/([a-z0-9]+)(?:\/(library|files|memory|knowledge|wiki|skills|agents|settings))?$/.exec(loc);
+  // The old Knowledge and LLM-Wiki tabs are parts of the Memory tab now: their addresses open it (and are replaced by its own).
+  const old = m?.[2] === 'knowledge' ? 'documents' : m?.[2] === 'wiki' ? 'wiki' : null;
+  useEffect(() => {
+    if (m && old) go(memoryPath(m[1], old), true);
+  }, [m?.[1], old]);
+  if (m && old) return null;
   return m ? <SpacePage id={m[1]} tab={(m[2] as SpaceTab | undefined) ?? 'overview'} /> : <List />;
 }

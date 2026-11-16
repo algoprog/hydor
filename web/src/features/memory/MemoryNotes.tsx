@@ -395,8 +395,11 @@ export function NotesGroup({ onBringIn }: { onBringIn: () => void }) {
   );
 }
 
-/** One place's page: its notes (a search of its own), opened from the index. */
-export function PlacePage({ place }: { place: Place }) {
+/**
+ * One place's page: its notes (a search of its own), opened from the index. `embedded`: inside a project's Memory tab,
+ * with no title or back link of its own: its Add a note button sits over the notes.
+ */
+export function PlacePage({ place, embedded }: { place: Place; embedded?: boolean }) {
   const home = useApp((s) => s.boot?.home);
   const st = useMemoryState();
   const [q, setQ] = useState('');
@@ -465,19 +468,29 @@ export function PlacePage({ place }: { place: Place }) {
 
   return (
     <div className="space-y-5">
-      <SubHeader
-        back="Memory"
-        onBack={closePlace}
-        title={title}
-        hint={hint}
-        actions={
-          canAdd && (
+      {embedded ? (
+        canAdd && (
+          <div className="flex justify-end">
             <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
               Add a note
             </Button>
-          )
-        }
-      />
+          </div>
+        )
+      ) : (
+        <SubHeader
+          back="Memory"
+          onBack={closePlace}
+          title={title}
+          hint={hint}
+          actions={
+            canAdd && (
+              <Button size="sm" variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>
+                Add a note
+              </Button>
+            )
+          }
+        />
+      )}
       <Group>
         {!stale && <SearchRow value={q} onChange={setQ} placeholder="Search these notes" />}
         {entries === null ? (

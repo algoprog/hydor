@@ -1,4 +1,4 @@
-// Knowledge bases on the pages that hold them (Spaces → Shared knowledge, and each space's Knowledge tab): a
+// Knowledge bases on the pages that hold them (Spaces → Shared knowledge, and each space's Memory tab): a
 // drop zone for files and folders (copied into the app), a base's card (its folders on this computer, read
 // where they are and kept up to date, its documents, what could not be read, moving it to a space), and a
 // search the way agents do.

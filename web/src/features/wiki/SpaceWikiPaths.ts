@@ -1,4 +1,13 @@
-// Safe wiki-relative link and frontmatter helpers for the read-only project wiki view.
+// Safe wiki-relative link and frontmatter helpers for the read-only project wiki view, and the view as the pages read it.
+import type { ProjectWikiView } from '../../../../shared/wiki.ts';
+
+/** The view as the server sends it, or an older server's (status disabled / missing), as the view the pages draw. */
+export function normalizeWikiView(raw: unknown): ProjectWikiView {
+  const r = (raw ?? {}) as Omit<Partial<ProjectWikiView>, 'status'> & { status?: string };
+  const status = r.status === 'disabled' ? 'off' : r.status === 'missing' ? 'empty' : r.status === 'off' || r.status === 'empty' || r.status === 'ready' || r.status === 'error' ? r.status : 'error';
+  return { ...r, status, on: typeof r.on === 'boolean' ? r.on : status !== 'off', inherited: r.inherited !== false };
+}
+
 /** Resolve only relative links inside the wiki; external and absolute links keep their normal behavior. */
 export function wikiRelative(from: string, href: string): string | null {
   if (!href || /^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(href)) return null;
