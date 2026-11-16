@@ -84,7 +84,8 @@ import { findIssues, type CleanIssue } from '@shared/sheet-clean';
 import { flashFill } from '@shared/sheet-flash';
 import { htmlText, looksFor, parseHtmlTable, tableText } from '@shared/sheet-html';
 import { allowed, columnValues, CondFormats, filterHidden, listOptions, Merges, Rules } from '@shared/sheet-rules';
-import { post } from '../../../lib/api';
+import { api, post } from '../../../lib/api';
+import { portalToken } from '../../../lib/machine';
 import { toast, toastError } from '../../../lib/store';
 import { tr } from '../../../i18n/runtime';
 import { Button, cx, MenuBack, MenuItem, MenuSep, Popover, SheetsOnPhone, useConfirm } from '../../../components/ui';
@@ -94,7 +95,10 @@ import { isMod } from '../common/keys';
 import { ContextMenu, MenuBar, type MenuEntry } from '../common/menus';
 import { useOwnScroll } from '../live';
 import { ShortcutsDialog, type ShortcutGroup } from '../common/Shortcuts';
-import type { AskScope, ModelEditorProps } from '../kinds';
+import { loadModelVersion, type AskScope, type ModelEditorProps } from '../kinds';
+import type { PageVersion } from '@shared/pages';
+import { VersionsDialog } from '../common/VersionsDialog';
+import { SheetCompare } from './Compare';
 import { Board } from './Board';
 import { ChartLayer, ChartPanel } from './Charts';
 import { CommentsPanel, type SheetCommentAi } from './CommentsPanel';
@@ -263,7 +267,7 @@ function AgentCell({ geo, r, c }: { geo: GridGeo; r: number; c: number }) {
   );
 }
 
-export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live: agent, commentAi }: ModelEditorProps<Workbook>) {
+export function SheetEditor({ doc, pageId, layout, readOnly: readOnlyProp, onSave, lead, tail, band, savedNote, onDirty, onAsk, onScopes, saveNowRef, live: agent, commentAi, compareWith: compareAsk }: ModelEditorProps<Workbook>) {
   const root = useRef<HTMLDivElement>(null);
   const grid = useRef<GridHandle>(null);
   const barRef = useRef<HTMLTextAreaElement>(null);
@@ -572,6 +576,88 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
     aiDirty.current = false;
     setSi((i) => Math.min(i, bookRef.current!.sheets.length - 1));
     setRev((r) => r + 1);
+  };
+
+  // ---- comparing with a version ----------------------------------------------------------------------------------------
+  // What changed since a version (Tools → Compare with the version before or with a version, or See what changed under
+  // an agent's turn): the workbook as it is here compared with it (Compare.tsx), one change put back as a change here
+  // (Undo takes it back), or the whole version put back as a new one, as the Library's Versions does it.
+  const [compare, setCompare] = useState<{ version: number; at?: number; before: Workbook } | null>(null);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const headRef = useRef<HTMLDivElement>(null);
+  const [headH, setHeadH] = useState(48);
+  // The save bar stays in view under it (a change put back is a change here, to save or discard).
+  const saveBarRef = useRef<HTMLDivElement>(null);
+  const [saveH, setSaveH] = useState(0);
+  // A page of the Library (not a file of the computer's), and the version open: `${id}:${version}`, or `${id}:v${n}` for an older one on view.
+  // Not in a shared project's portal: its people reach only what its link gives them.
+  const canCompare = !!pageId && !!doc && !portalToken;
+  const shownVersion = Number(/:v?(\d+)$/.exec(doc?.key ?? '')?.[1]) || 0;
+  const olderOnView = /:v\d+$/.test(doc?.key ?? '');
+  const versionsOf = () => api<{ page: { version: number }; versions: PageVersion[] }>(`/api/pages/${encodeURIComponent(pageId)}`);
+  const compareWithVersion = async (v: number, at?: number) => {
+    setVersionsOpen(false);
+    try {
+      const [old, list] = await Promise.all([loadModelVersion<Workbook>(encodeURIComponent(pageId), v), at ? null : versionsOf().catch(() => null)]);
+      if (editRef.current) commitEdit(null);
+      setHeadH(headRef.current?.offsetHeight ?? 48);
+      setCompare({ version: v, at: at ?? list?.versions.find((x) => x.version === v)?.createdAt, before: old.model });
+    } catch (err) {
+      toastError(err);
+    }
+  };
+  /** The version before the one open (the newest kept before it: an agent's saves in a turn are one version). */
+  const compareBefore = async () => {
+    try {
+      const r = await versionsOf();
+      const cur = shownVersion || r.page.version;
+      const prev = r.versions.filter((v) => v.version < cur).sort((a, b) => b.version - a.version)[0];
+      if (!prev) return void toast(tr('There is no version before this one yet: each save makes one.'));
+      await compareWithVersion(prev.version, prev.createdAt);
+    } catch (err) {
+      toastError(err);
+    }
+  };
+  useLayoutEffect(() => setSaveH(saveBarRef.current?.offsetHeight ?? 0), [dirty, !!compare]);
+  // Opened to show what changed (a conversation's See what changed): once (a version saved or put back later does not
+  // open it again; the Library asks only once the version to compare is the one on view).
+  const compareAsked = useRef(0);
+  useEffect(() => {
+    if (!compareAsk || !doc || !pageId || compareAsked.current === compareAsk) return;
+    compareAsked.current = compareAsk;
+    void compareWithVersion(compareAsk);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareAsk, doc?.key, pageId]);
+  /** The version compared with brought back whole, as a new version (nothing is lost); changes not saved here are dropped first. */
+  const restoreCompared = async () => {
+    if (!compare) return;
+    const v = compare.version;
+    if (
+      !(await confirm({
+        title: tr(`Put back version ${v}?`),
+        body: dirtyRef.current ? tr('Your changes that are not saved yet are dropped, and this version comes back as the latest. The one open now stays among the versions.') : tr('It comes back as the latest version. The one open now stays among the versions.'),
+        confirm: tr('Put it back'),
+        danger: dirtyRef.current,
+      }))
+    )
+      return;
+    try {
+      const r = await post<{ page: { version: number } }>(`/api/pages/${encodeURIComponent(pageId)}/versions/${v}/restore`);
+      if (dirtyRef.current && savedRef.current) {
+        // Dropped, so the version put back comes in as the latest.
+        setEdit(null);
+        bookRef.current = clone(savedRef.current);
+        calcRef.current = computeBook(bookRef.current);
+        hist.current = { past: [], future: [], saved: 0 };
+        aiDirty.current = false;
+        dirtyRef.current = false;
+        setRev((n) => n + 1);
+      }
+      toast(tr(`Version ${v} is back, as version ${r.page.version}`), 'ok');
+      setCompare(null);
+    } catch (err) {
+      toastError(err);
+    }
   };
 
   // ---- the selection --------------------------------------------------------------------------------------------------------
@@ -2695,6 +2781,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
 
   const menuCtx: MenuCtx = {
     readOnly,
+    compare: canCompare ? { before: () => void compareBefore(), pick: () => setVersionsOpen(true) } : undefined,
     style: active?.s,
     nRows,
     nCols,
@@ -2911,7 +2998,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
       {dropping && (
         <div className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-accent bg-accent/10 text-[14px] font-medium text-accent">Drop an Excel, OpenDocument, CSV or TSV file to add its sheets</div>
       )}
-      <div className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
+      <div ref={headRef} className="flex min-h-12 shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <div className="flex min-w-0 shrink items-center gap-1.5">{lead}</div>
           {/* The menus beside the title, where the header has room for them; one button where it hasn't. */}
@@ -3198,7 +3285,7 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
         last={!(dirty && !readOnly)}
       />
       {dirty && !readOnly && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
+        <div ref={saveBarRef} className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 pb-[max(8px,var(--safe-bottom))]">
           <span className="min-w-0 flex-1 text-[12.5px] text-fg-2">
             <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-warn align-middle" />
             Not saved yet{savedNote ? <span className="text-fg-3"> · {savedNote}</span> : null}
@@ -3210,6 +3297,44 @@ export function SheetEditor({ doc, layout, readOnly: readOnlyProp, onSave, lead,
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </div>
+      )}
+      {compare && bookRef.current && (
+        <div
+          ref={(el) => {
+            // The keys go here, not to the grid underneath.
+            if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
+          }}
+          tabIndex={-1}
+          onKeyDown={(e) => e.key === 'Escape' && !e.defaultPrevented && (e.preventDefault(), setCompare(null))}
+          className="absolute inset-x-0 z-40 flex flex-col outline-none"
+          style={{ top: headH, bottom: dirty && !readOnly ? saveH : 0 }}
+        >
+          <SheetCompare
+            before={compare.before}
+            after={bookRef.current}
+            rev={rev}
+            version={compare.version}
+            at={compare.at}
+            upTo={olderOnView ? shownVersion : undefined}
+            dirty={dirty}
+            phone={narrow}
+            startSheet={sheet?.id}
+            onPutBack={readOnly ? undefined : (next) => change({ k: 'book', before: bookRef.current!, after: next })}
+            onRestore={readOnly || !onSave ? undefined : () => void restoreCompared()}
+            onOther={() => setVersionsOpen(true)}
+            onBack={() => setCompare(null)}
+          />
+        </div>
+      )}
+      {canCompare && (
+        <VersionsDialog
+          open={versionsOpen}
+          pageId={pageId}
+          skip={olderOnView ? shownVersion : undefined}
+          hint="Pick a version: the spreadsheet shows what changed since it."
+          onClose={() => setVersionsOpen(false)}
+          onPick={(v) => void compareWithVersion(v.version, v.createdAt)}
+        />
       )}
       <input
         ref={fileRef}

@@ -14,7 +14,9 @@ import { folderPath } from './folders.ts';
 import { compileSummary, compileTex } from './latex.ts';
 import { myThemeByName, myThemes } from './my-themes.ts';
 import { readBook } from './sheets.ts';
-import { createPage, mustPage, pageSource } from './store.ts';
+import { createPage, mustPage, pageSource, versionsOf } from './store.ts';
+import { diffBooks } from '../../shared/sheet-diff.ts';
+import { diffText } from './sheet-compare.ts';
 import { refreshThumbs } from './thumbs.ts';
 import type { PageInfo } from '../../shared/pages.ts';
 import { HTML_ACTIONS } from './page-tools.ts';
@@ -1101,6 +1103,31 @@ const restyleDiagram: Act<Diagram> = (d, a) => {
   return { model: normalizeDiagram(out), said: `${said.join('; ')}.` };
 };
 
+/**
+ * Tools → Compare with the version before (sheets/Compare.tsx, shared/sheet-diff.ts): what changed between two of its
+ * versions, in words. Nothing is saved.
+ */
+const compareVersions: Act<Workbook> = (book, a, x) => {
+  const db = x.ctx.deps.db;
+  const id = x.page.id;
+  const latest = x.page.version;
+  const kept = versionsOf(db, id).map((v) => v.version);
+  const num = (v: unknown, what: string) => {
+    const k = Number(v);
+    if (!Number.isInteger(k) || k < 1) throw new Error(`${what}: a version’s number (get_page or GET /api/pages/${id} lists them).`);
+    if (!kept.includes(k)) throw new Error(`${what}: version ${k} is no longer kept; its versions are ${kept.join(', ')}.`);
+    return k;
+  };
+  const until = a.until === undefined ? latest : num(a.until, 'until');
+  const since = a.since === undefined ? kept.filter((v) => v < until).sort((p, q) => q - p)[0] : num(a.since, 'since');
+  if (!since) return { said: `“${x.page.title}” has no version before version ${until}: nothing to compare.` };
+  const read = (v: number) => readBook(pageSource(db, id, v)!.text);
+  const d = diffBooks(read(since), until === latest ? book : read(until));
+  return {
+    said: `What changed in “${x.page.title}” from version ${since} to version ${until}${until === latest ? ' (the latest)' : ''}, as the editor’s Compare shows it (the user opens it with Tools → Compare with the version before):\n${diffText(d)}\nNothing was saved. To put a whole version back, as a new version: POST /api/pages/${id}/versions/${since}/restore (app_api); one cell or row back: save_sheet with it as it was.`,
+  };
+};
+
 // ---- every kind -------------------------------------------------------------------------------------------------------
 
 const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
@@ -1125,6 +1152,7 @@ const ACTIONS: { [K in PageKind]: Record<string, Act<any>> } = {
     ask_ai: askAi,
     pivot_table: pivotTable,
     goal_seek: goalSeekAct,
+    compare: compareVersions,
   },
   tex: { move_files: moveFiles, tidy_source: tidySource, tidy_bibliography: tidyBibliography },
   notebook: { clear_outputs: clearOutputs },
@@ -1201,6 +1229,7 @@ const DESCRIPTION = [
   '- pivot_table {rows: a column or two (letters or header words), across?: a column, values: [{column, fn: sum|count|average|min|max}], filters?: [{column, hide: [values left out]}], range?, name?}: a new sheet after it summing the table up, as formulas that keep up with it (Data → Pivot table; the user changes it there).',
   '- goal_seek {cell: a formula’s cell, to: the number it is to give, changing: a cell of a number it uses}: the value of that cell that makes the formula give it, put in (Tools → Goal seek).',
   '- ask_ai {again?}: the AI cells (=AI(…)) that wait for an answer asked of the helper model, many at once, their answers kept with the sheet (it costs a little, as any question to it does); again: true asks every AI cell again (Refresh AI cells).',
+  '- compare {since?: a version number (the one before until when left out), until?: a version (the latest when left out)}: what changed between them, as Tools → Compare with the version before shows it: tabs added, removed or renamed, rows and columns added, removed or moved, each cell changed with what it was and is (formula and shown value), and formulas whose results changed; nothing is saved. Use it to tell the user exactly what you changed.',
   'LaTeX documents.',
   '- move_files {moves: [{from, to}]}: rename or move files, pictures and folders ("figures/" to "img/"), every \\input, \\include and \\includegraphics that names them following, their comments and tracked changes along; it is typeset again.',
   '- tidy_source {files?, align?}: Edit → Tidy the source on its .tex files (or those listed): each line indented by the environments, items and groups it is in, and tables’ cells lined up at their & (align: false leaves them); no line’s own text changes.',
@@ -1268,6 +1297,8 @@ const SCHEMA = {
     count: { type: 'number' },
     name: { type: 'string', description: 'rename_sheet, duplicate_sheet: the sheet’s name.' },
     to: { type: ['number', 'string'], description: 'move_sheet: its place from 1; turn_into: slides, doc or page.' },
+    since: { type: 'number', description: 'compare: the older version’s number (the one before until when left out).' },
+    until: { type: 'number', description: 'compare: the newer version’s number (the latest when left out).' },
     moves: { type: 'array', items: { type: 'object' }, description: 'move_files: [{from, to}].' },
     files: { type: 'array', items: { type: 'string' }, description: 'tidy_source: the .tex files (all when left out).' },
     file: { type: 'string', description: 'tidy_bibliography: the .bib file (the first when left out).' },
