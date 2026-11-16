@@ -1,7 +1,8 @@
 // `hydor agents`: the Agents page. List (as `hydor agents` always printed), show, new, edit and remove, with the fields
-// the page edits as options. The API calls them assistants. Built-in agents can be copied (`new --from`), not changed.
-import type { Assistant } from '../../../shared/assistants.ts';
-import { ASSISTANT_ICONS } from '../../../shared/assistants.ts';
+// the page edits as options (and where results go, --results-to), and results: an agent's history of what it handed
+// back. The API calls them assistants. Built-in agents can be copied (`new --from`), not changed.
+import type { AgentResults, Assistant, OutputTarget } from '../../../shared/assistants.ts';
+import { ASSISTANT_ICONS, RESULTS_KEEP } from '../../../shared/assistants.ts';
 import { enc } from '../client.ts';
 import { tierName } from '../lines.ts';
 import { choose, fields, markdown, num, pickOne, str, strs, table, UsageError, type Area, type Ctx, type OptionSpec, type Values } from './kit.ts';
@@ -46,7 +47,70 @@ const FIELD_OPTIONS: Record<string, OptionSpec> = {
   'step-up': { type: 'string', value: 'on|off', desc: 'off: a failed helper is not run again a tier up', values: ['on', 'off'] },
   standing: { type: 'string', value: 'on|off', desc: 'on: it keeps one conversation of its own, with an inbox', values: ['on', 'off'] },
   budget: { type: 'string', value: '<dollars>', desc: 'What its sessions may spend in a month (0: no limit)' },
+  'results-to': {
+    type: 'strings',
+    value: '<place>',
+    desc: 'Where each result goes (again for more; none for none)',
+  },
 };
+
+/**
+ * Where results go, from --results-to: the places named, in their order, each kept as it was where it named the same
+ * (an email's subject and account, a webhook's key); undefined when not given. A spreadsheet by its id or title.
+ */
+async function placesOf(ctx: Ctx, v: Values, was: OutputTarget[] = []): Promise<OutputTarget[] | undefined> {
+  if (v['results-to'] === undefined) return undefined;
+  const out: OutputTarget[] = [];
+  let sheets: { id: string; title: string; kind?: string }[] | null = null;
+  for (const raw of strs(v, 'results-to')) {
+    const given = raw.trim();
+    if (!given || given === 'none') continue;
+    const at = given.indexOf(':');
+    const kind = (at < 0 ? given : given.slice(0, at)).toLowerCase();
+    const rest = at < 0 ? '' : given.slice(at + 1).trim();
+    const old = was.find((t) => t.kind === kind);
+    if (kind === 'library') {
+      if (rest && rest !== 'new' && rest !== 'same') throw new UsageError('--results-to library takes :new for a new page each run (left out: the same page, updated)');
+      out.push(rest === 'new' ? { kind: 'library', each: 'new' } : { kind: 'library', ...(old?.kind === 'library' && old.page ? { page: old.page } : {}) });
+    } else if (kind === 'sheet') {
+      const [name, tab] = rest.split('#').map((x) => x.trim());
+      let page: string | undefined;
+      if (name) {
+        sheets ??= (await ctx.conn.api<{ pages: { id: string; title: string; kind?: string }[] }>('GET', '/api/pages')).pages.filter((p) => p.kind === 'sheet');
+        page = pickOne(sheets, name, { id: (p) => p.id, names: (p) => [p.title], what: 'spreadsheet', hint: 'hydor library lists them' }).id;
+      }
+      out.push({ kind: 'sheet', ...(page ? { page } : {}), ...(tab ? { tab } : {}) });
+    } else if (kind === 'email') {
+      const to = rest
+        .split(/[,;]/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+      if (!to.length) throw new UsageError('--results-to email takes the addresses: email:anna@example.org,sam@example.com');
+      out.push({ kind: 'email', to, ...(old?.kind === 'email' && old.subject ? { subject: old.subject } : {}), ...(old?.kind === 'email' && old.account ? { account: old.account } : {}) });
+    } else if (kind === 'notify' || kind === 'notification') out.push({ kind: 'notify' });
+    else if (kind === 'file') {
+      if (!rest) throw new UsageError('--results-to file takes a path in the folder it works in: file:reports/{date}.md');
+      out.push({ kind: 'file', path: rest });
+    } else if (kind === 'webhook') {
+      if (!rest) throw new UsageError('--results-to webhook takes an https address: webhook:https://hooks.example.com/x');
+      out.push({ kind: 'webhook', url: rest, ...(old?.kind === 'webhook' && old.url === rest && old.secret ? { secret: old.secret } : {}) });
+    } else throw new UsageError(`--results-to takes library, library:new, sheet, sheet:<spreadsheet>, email:<addresses>, notify, file:<path> or webhook:<url> (it was “${given}”)`);
+  }
+  return out;
+}
+
+/** The output with its places changed: none when it is left with neither fields nor places. */
+const withPlaces = (o: Assistant['output'], to: OutputTarget[]) => (o?.fields?.length || to.length ? { ...(o?.fields?.length ? { fields: o.fields } : {}), ...(to.length ? { to } : {}) } : null);
+
+/** A place in a few words, for show. */
+function placeText(t: OutputTarget): string {
+  if (t.kind === 'library') return t.each === 'new' ? 'a new Library page each run' : t.page ? `the Library page ${t.page}, updated` : 'a Library page, updated each run';
+  if (t.kind === 'sheet') return `a row in ${t.page ? `the spreadsheet ${t.page}` : 'a spreadsheet of its own'}${t.tab ? ` (tab ${t.tab})` : ''}`;
+  if (t.kind === 'email') return `an email to ${t.to.join(', ')}${t.account ? ` from ${t.account}` : ''}`;
+  if (t.kind === 'file') return `the file ${t.path}`;
+  if (t.kind === 'webhook') return `a webhook at ${t.url}`;
+  return 'a notification';
+}
 
 const onOff = (v: Values, k: string): boolean | undefined => {
   const s = str(v, k);
@@ -144,6 +208,7 @@ const FIELD_WORDS: Record<string, string> = {
   stepUp: 'step up',
   standing: 'own conversation',
   agent: 'program',
+  output: 'where results go',
 };
 
 const programName = (a: Assistant) => (a.agent === 'acp' ? (a.acpAgent === 'console' ? 'Custom' : a.acpAgent) : a.agent);
@@ -151,7 +216,7 @@ const programName = (a: Assistant) => (a.agent === 'acp' ? (a.acpAgent === 'cons
 export const agents: Area = {
   name: 'agents',
   summary: 'Your agents',
-  help: 'An agent is a preset a session starts as (Researcher, Writer…): its instructions, the program and model it suggests, what it may use and how much it may spend. The built-in ones can be copied, not changed. Name one by its name or the start of its id; on a terminal, leave it out to pick from a list. Its output fields and where results go are set on the page (hydor open agents).',
+  help: 'An agent is a preset a session starts as (Researcher, Writer…): its instructions, the program and model it suggests, what it may use and how much it may spend. The built-in ones can be copied, not changed. Name one by its name or the start of its id; on a terminal, leave it out to pick from a list. Where its results go is --results-to on new and edit; their fields are set on the page (hydor open agents); hydor agents results shows what it handed back.',
   group: 'models',
   verbs: [
     {
@@ -200,6 +265,8 @@ export const agents: Area = {
             ['Handed work by others', found.askable === false ? 'no' : undefined],
             ['Monthly budget', found.budgetUsd ? `$${found.budgetUsd}` : undefined],
             ['Own conversation', found.standing ? 'yes, with an inbox' : undefined],
+            ['Hands back', found.output?.fields?.length ? found.output.fields.map((f) => f.label).join(', ') : found.output?.to?.length ? 'its reply' : undefined],
+            ['Results go to', found.output?.to?.map(placeText).join('\n')],
             ['Imported from', found.source],
           ]),
         ]);
@@ -212,7 +279,7 @@ export const agents: Area = {
       args: [{ name: 'name', kind: 'text', rest: true }],
       options: { ...FIELD_OPTIONS, from: { type: 'string', value: '<agent>', desc: 'Start from a copy of this agent (a built-in one too)', kind: 'agent' } },
       summary: 'Make an agent',
-      help: 'Up to 200 of your own. Instructions: --instructions, --file (- is stdin), or, on a terminal with neither, in your editor. With --from, it starts as a copy of that agent and only what you name differs. Lists (--tools, --projects, --connections, --skills, --can-ask) take commas or the option again. --agent takes claude, codex, custom, or an agent of Settings → More agents; --model only counts with one.',
+      help: 'Up to 200 of your own. Instructions: --instructions, --file (- is stdin), or, on a terminal with neither, in your editor. With --from, it starts as a copy of that agent and only what you name differs. Lists (--tools, --projects, --connections, --skills, --can-ask) take commas or the option again. --results-to takes library (the same page, updated each run), library:new (a new page each run), sheet (a row each run in a spreadsheet of its own), sheet:<spreadsheet>#<tab> (one of yours, by id or title), email:<addresses>, notify, file:<path> or webhook:<url>, once for each place. --agent takes claude, codex, custom, or an agent of Settings → More agents; --model only counts with one.',
       examples: [
         'hydor agents new Bookkeeper --tools read,edit --tier standard',
         'hydor agents new Reviewer --file reviewer.md --mode plan',
@@ -221,6 +288,8 @@ export const agents: Area = {
       async run(ctx, words, v) {
         const from = str(v, 'from') ? pickOne(await listAgents(ctx), str(v, 'from')!, { id: (a) => a.id, names: (a) => [a.name], what: 'agent', hint: AGENT_HINT }) : undefined;
         const changes = await fieldsOf(ctx, v);
+        const to = await placesOf(ctx, v, from?.output?.to);
+        if (to) changes.output = withPlaces(from?.output, to);
         if (str(v, 'file')) changes.instructions = await ctx.readText({ file: str(v, 'file') });
         else if (!Object.keys(changes).length && ctx.interactive && !from) changes.instructions = (await ctx.readText({ current: '' })) ?? '';
         const body: Record<string, unknown> = { ...merged(from ?? {}, changes), name: words.join(' ') };
@@ -236,17 +305,22 @@ export const agents: Area = {
       args: [agent],
       options: { ...FIELD_OPTIONS, name: { type: 'string', value: '<name>', desc: 'Another name (up to 60 characters)' } },
       summary: 'Change an agent’s fields',
-      help: 'Only what you name changes. With nothing named, on a terminal, its instructions open in your editor: saving them unchanged changes nothing. Built-in agents cannot be changed: copy one with hydor agents new --from. Give "" to clear a text or a list (--description "", --projects ""), auto to a tier to make it Automatic, 0 to a budget for no limit; --agent "" keeps the start page’s program.',
+      help: 'Only what you name changes. With nothing named, on a terminal, its instructions open in your editor: saving them unchanged changes nothing. Built-in agents cannot be changed: copy one with hydor agents new --from. Give "" to clear a text or a list (--description "", --projects ""), auto to a tier to make it Automatic, 0 to a budget for no limit; --agent "" keeps the start page’s program. --results-to replaces where results go (none: nowhere but the conversation); see hydor agents new --help for its places.',
       examples: [
         'hydor agents edit bookkeeper --budget 20',
         'hydor agents edit bookkeeper --tools read,web --tier best',
         'hydor agents edit bookkeeper',
         'hydor agents edit bookkeeper --file new-instructions.md',
+        'hydor agents edit bookkeeper --results-to sheet --results-to notify',
+        'hydor agents edit bookkeeper --results-to email:sam@example.com',
+        'hydor agents edit bookkeeper --results-to "sheet:Household budget#2026"',
       ],
       async run(ctx, [given], v) {
         const found = await findAgent(ctx, given);
         if (found.builtin) throw new UsageError(`“${found.name}” is built in and cannot be changed: hydor agents new "My ${found.name}" --from ${found.id} makes a copy to change`);
         const changes = await fieldsOf(ctx, v);
+        const to = await placesOf(ctx, v, found.output?.to);
+        if (to) changes.output = withPlaces(found.output, to);
         if (str(v, 'name') !== undefined) {
           if (!str(v, 'name')!.trim()) throw new UsageError('--name cannot be empty');
           changes.name = str(v, 'name')!.trim();
@@ -268,6 +342,41 @@ export const agents: Area = {
             ),
           ].join(', ')}.`,
         );
+      },
+    },
+    {
+      name: 'results',
+      aliases: ['history'],
+      args: [agent],
+      summary: 'What an agent handed back, and where it went',
+      help: `Each result its hand_back gave, newest first (20 unless --limit says how many, up to 200): when, its fields, and where it went (✓ got there, ✗ did not). It keeps results for a year, up to ${RESULTS_KEEP.count}.`,
+      examples: ['hydor agents results bookkeeper', 'hydor agents results bookkeeper --limit 100', 'hydor agents results bookkeeper --json'],
+      async run(ctx, [given]) {
+        const found = await findAgent(ctx, given);
+        const limit = Math.min(200, ctx.o.limit ?? 20);
+        const r = await ctx.conn.api<AgentResults>('GET', `/api/assistants/${enc(found.id)}/results?limit=${limit}`);
+        if (ctx.o.json) return ctx.json(r);
+        const { p } = ctx.look;
+        if (!r.results.length) return ctx.out(`${found.name} has handed nothing back yet.`);
+        const fields = found.output?.fields?.length ? found.output.fields : [{ id: 'result', label: 'Result', type: 'markdown' as const }];
+        const cell = (x: unknown): string =>
+          x === null || x === undefined ? '' : Array.isArray(x) ? x.map((i) => (i && typeof i === 'object' ? Object.values(i).map(cell).join(' · ') : cell(i))).join('; ') : typeof x === 'boolean' ? (x ? 'yes' : 'no') : typeof x === 'object' ? JSON.stringify(x) : String(x).split('\n').find((l) => l.trim()) ?? '';
+        // In this computer's time.
+        const when = (at: number) => {
+          const d = new Date(at);
+          const p2 = (x: number) => String(x).padStart(2, '0');
+          return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+        };
+        ctx.out(
+          table(
+            ctx,
+            r.results.map((x) => [p.dim(when(x.at)), ...fields.map((f) => cell(x.value?.[f.id])), x.sent.map((s) => `${s.ok ? '✓' : '✗'} ${s.kind}`).join(', ')]),
+            { head: ['When', ...fields.map((f) => f.label), 'Went to'], grow: 1, fixed: [0] },
+          ),
+        );
+        if (r.more) ctx.out(p.dim(`${r.results.length} of ${r.total}: --limit for more.`));
+        const made = [r.made.sheet, r.made.library].filter(Boolean).map((x) => `“${x!.title}”`);
+        if (made.length) ctx.out(p.dim(`Its runs go into ${made.join(' and ')} in the Library.`));
       },
     },
     {

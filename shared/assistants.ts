@@ -68,12 +68,33 @@ export interface Assistant {
 export type OutputTarget =
   /** A file in the folder it works in: "{date}", "{time}" and "{agent}" fill in; .json gets the fields as JSON, anything else Markdown. */
   | { kind: 'file'; path: string }
-  /** A page in the Library, in its project when it works in one. */
-  | { kind: 'library' }
+  /**
+   * A page in the Library, in its project when it works in one: the same page each run, as a new version of it (the
+   * page picked, by id; none: the one its first run made), or a new page each run (`each: 'new'`).
+   */
+  | { kind: 'library'; each?: 'new'; page?: string }
+  /**
+   * A row in a Library spreadsheet each run: when it ran, then one column per field. The spreadsheet picked, by id (none:
+   * the one its first run made, named after the agent), and its tab by name (none: the first; one not there is added).
+   */
+  | { kind: 'sheet'; page?: string; tab?: string }
+  /**
+   * An email to people, from one of your connected mail accounts (by its address; none: the first): the result as a
+   * readable email. "{date}", "{time}" and "{agent}" fill in in the subject.
+   */
+  | { kind: 'email'; to: string[]; subject?: string; account?: string }
   /** A POST of the result as JSON to an address, signed with a key from the vault when one is named. */
   | { kind: 'webhook'; url: string; secret?: string }
   /** A notification, with the result's first line. */
   | { kind: 'notify' };
+
+export type OutputKind = OutputTarget['kind'];
+
+/** The kinds of place, in the order the settings and the history show them. */
+export const OUTPUT_KINDS: OutputKind[] = ['library', 'sheet', 'email', 'notify', 'file', 'webhook'];
+
+/** The subject an email of results gets when none is set. */
+export const DEFAULT_EMAIL_SUBJECT = '{agent} · {date}';
 
 export interface AgentOutput {
   /** The fields it fills in, as an app's answer fields; none: one Markdown field, its result. */
@@ -81,15 +102,48 @@ export interface AgentOutput {
   to?: OutputTarget[];
 }
 
+/** Where one result went: the kind of place, whether it got there, in words, and the Library page it went to. */
+export interface ResultSent {
+  kind: OutputKind;
+  ok: boolean;
+  detail: string;
+  /** The Library page or spreadsheet it went to, by id. */
+  page?: string;
+}
+
 /** One result an agent handed back (hand_back), with where it went. */
 export interface AgentResult {
+  /** Its number in the history, for paging. */
+  id?: number;
   at: number;
   /** The session that handed it back. */
   key: string;
   /** Its first line, for the list. */
   line: string;
   value: Record<string, unknown>;
-  sent: { kind: OutputTarget['kind']; ok: boolean; detail: string }[];
+  sent: ResultSent[];
+}
+
+/**
+ * How much of its history an agent keeps: results up to a year old, and at most this many (whichever comes first). A
+ * daily or weekly agent keeps a whole year, to compare and add up; one that runs every hour keeps about three weeks.
+ */
+export const RESULTS_KEEP = { days: 366, count: 500 };
+
+/** The Library pages an agent's results go to that its first run made (a page updated each run, a spreadsheet), with their titles. */
+export interface ResultPlaces {
+  library?: { id: string; title: string };
+  sheet?: { id: string; title: string };
+}
+
+/** A page of an agent's history (GET /api/assistants/:id/results). */
+export interface AgentResults {
+  results: AgentResult[];
+  /** How many it keeps in all. */
+  total: number;
+  /** There are older ones: ask again with before = the last one's id. */
+  more: boolean;
+  made: ResultPlaces;
 }
 
 /** A message in a standing agent's inbox: who sent it, and its answer once it came. */

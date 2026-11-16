@@ -8,7 +8,7 @@
 //
 // For other capabilities (apps, automations): listAssistants(), assistantById(id) and assistantStart(id).
 import crypto from 'node:crypto';
-import { agentMode, ASSISTANT_ICONS, assistantExtra, TOOL_KINDS, type AgentDraft, type Assistant, type AssistantsState, type AssistantSwitch } from '../../shared/assistants.ts';
+import { agentMode, ASSISTANT_ICONS, assistantExtra, TOOL_KINDS, type AgentDraft, type AgentResults, type Assistant, type AssistantsState, type AssistantSwitch } from '../../shared/assistants.ts';
 import { isTier } from '../../shared/tiers.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { Agent } from '../../shared/types.ts';
@@ -25,7 +25,8 @@ import { helperJson } from '../helper.ts';
 import { validSchedule } from '../scheduler.ts';
 import { allSpaces, updateSpace } from '../spaces/index.ts';
 import { makeProjectAgent } from './projectAgent.ts';
-import { handBackTool, resultsOf } from './output.ts';
+import { handBackTool } from './output.ts';
+import { madePlaces, resultsPage } from './results.ts';
 import { ensureStanding, inboxCounts, inboxOf, inboxTurnEnded, sendToInbox, standingKey, sweepInboxes } from './inbox.ts';
 import { activity, monthSpend } from './rules.ts';
 import { seenModels, setTeam, setTiers, teamOf, tierDefaults, tiersOf } from './tiers.ts';
@@ -195,8 +196,13 @@ function routes(d: Deps) {
     if (!a?.standing) throw new HttpError(400, 'That agent does not keep a conversation of its own');
     return { key: await ensureStanding(d, a) };
   });
-  // The results an agent handed back lately (hand_back), newest first.
-  app.get('/api/assistants/:id/results', async (req) => ({ results: resultsOf(db, idOf(req)) }));
+  // Its history: the results it handed back (hand_back), newest first, a page at a time (before: the last one's id), and
+  // the Library pages its first run made for them.
+  app.get('/api/assistants/:id/results', async (req): Promise<AgentResults> => {
+    const q = req.query as { before?: string; limit?: string };
+    if (!findAssistant(db, idOf(req))) throw new HttpError(404, 'There is no such agent');
+    return { ...resultsPage(db, idOf(req), { before: Number(q.before) || undefined, limit: Number(q.limit) || undefined }), made: madePlaces(db, idOf(req)) };
+  });
   // New agent → Draft it: settings from a description, to change and save.
   app.post('/api/assistants/draft', async (req) => draftAgent(db, String(body(req).text ?? '')));
   // An agent for a project that has none of its own: drafted to fit it, or its kind's template, or the default one.
