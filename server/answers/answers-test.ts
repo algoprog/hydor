@@ -18,7 +18,8 @@ import { FORMATTING } from '../formatting/index.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as store from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
-import { allUiNames, describeUi, findUiTool } from './index.ts';
+import { REF_UIS, refProblems, resolveRef, tableOf, type Cell } from '../../shared/answer-ui/data-ref.ts';
+import { allUiNames, describeUi, findUiTool, REF_HOW } from './index.ts';
 import { dropUiIndex, findUis, uisByWords } from './search.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -272,6 +273,51 @@ test('names beside queries: the UIs named first with their examples, then what t
   assert.match(t2, /## recipe: [\s\S]*## weather: /);
   const onlyBad = await tool.run({ names: ['no-such-ui'], query: 'weather forecast' }, ctx);
   assert.match(typeof onlyBad === 'string' ? onlyBad : onlyBad.text, /## weather: /, 'an unknown name beside a query still finds what the query asks');
+});
+
+/** A source with the headings each UI's reference example names, to draw it from. */
+const REF_SOURCES: Record<string, Cell[][]> = {
+  chart: [['Month', 'Region', 'Revenue'], ['2026-09', 'EU', 1200], ['2026-09', 'US', 2100], ['2026-10', 'EU', 1350]],
+  table: [['Region', 'Total'], ['EU', 40], ['US', 25], ['EU', 10]],
+  stats: [['Month', 'Total', 'Status'], ['2026-09', 120, 'Done'], ['2026-10', 80, 'Open'], ['2026-10', 70, 'Done']],
+  distribution: [['Days', 'Carrier', 'Country'], [2, 'Speedy', 'GR'], [5, 'Slow', 'GR'], [3, 'Speedy', 'CY']],
+  'map-values': [['City', 'Lat', 'Lng', 'Orders'], ['Athens', 37.98, 23.73, 5], ['Athens', 37.98, 23.73, 2], ['Patras', 38.25, 21.73, 3]],
+  ranking: [['Product', 'Quantity', 'Category'], ['Mug', 3, 'Kitchen'], ['Bowl', 5, 'Kitchen'], ['Mug', 4, 'Kitchen']],
+};
+/** What each UI's data must hold once its reference is worked out: the fields its view draws. */
+const REF_DRAWS: Record<string, (d: Record<string, any>) => boolean> = {
+  chart: (d) => Array.isArray(d.x) && d.x.length > 0 && Array.isArray(d.series) && d.series.every((s: any) => typeof s.name === 'string' && s.values.length === d.x.length),
+  table: (d) => Array.isArray(d.columns) && d.columns.every((c: any) => c.key && c.label) && Array.isArray(d.rows) && d.rows.length > 0,
+  stats: (d) => Array.isArray(d.stats) && d.stats.every((s: any) => s.label && typeof s.value === 'number'),
+  distribution: (d) => Array.isArray(d.values) && d.values.every((v: unknown) => typeof v === 'number') && Array.isArray(d.groups),
+  'map-values': (d) => Array.isArray(d.points) && d.points.every((p: any) => p.name && typeof p.lat === 'number' && typeof p.lng === 'number' && typeof p.value === 'number'),
+  ranking: (d) => Array.isArray(d.items) && d.items.every((it: any) => it.name && typeof it.value === 'number'),
+};
+
+test('the UIs that read from a spreadsheet or a file say how, with an example that is checked and draws', async () => {
+  const withRef = ANSWER_UIS.filter((s) => s.ref).map((s) => s.id);
+  assert.deepEqual(new Set(withRef), REF_UIS, 'each UI that takes a reference says so, and only those');
+  for (const s of ANSWER_UIS.filter((x) => x.ref)) {
+    assert.match(s.ref!.shape, /^\{[\s\S]*from: \{ sheet: string, range\?: string \} \| \{ file: string \}[\s\S]*\}$/, `${s.id}: its reference's type names its source`);
+    assert.match(s.ref!.shape, /where\?: string/, `${s.id}: and a filter`);
+    assert.deepEqual(JSON.parse(JSON.stringify(s.ref!.example)), s.ref!.example, `${s.id}: its reference example is plain JSON`);
+    assert.deepEqual(refProblems(s.id, s.ref!.example), [], `${s.id}: its reference example is one the checker takes`);
+    assert.match(s.use, /spreadsheet or a data file/, `${s.id}: its use says it can read one`);
+    const r = resolveRef(s.id, s.ref!.example, tableOf(REF_SOURCES[s.id]), 'Example');
+    assert.ok(!('from' in r.data), `${s.id}: the reference is gone once worked out`);
+    assert.ok(REF_DRAWS[s.id](r.data), `${s.id}: worked out in its own shape, which its view draws (${JSON.stringify(r.data).slice(0, 300)})`);
+    assert.match(describeUi(s), /Or from a spreadsheet or a file[\s\S]*```ui [a-z-]+\n\{"title".*"from":/, `${s.id}: find_ui describes it with an example`);
+  }
+  const tool = findUiTool();
+  const named = await tool.run({ names: ['chart', 'recipe'] }, ctx);
+  const text = typeof named === 'string' ? named : named.text;
+  assert.equal(text.split(REF_HOW).length, 2, 'the rules are said once, after the UIs, when one can read a source');
+  assert.ok(text.indexOf(REF_HOW) > text.indexOf('## recipe:'));
+  const plain = await tool.run({ names: ['recipe'] }, ctx);
+  assert.ok(!(typeof plain === 'string' ? plain : plain.text).includes(REF_HOW), 'and not when none can');
+  assert.match(REF_HOW, /more than a few dozen rows/, 'they say when to use one');
+  assert.match(REF_HOW, /50 MB/);
+  assert.match(FORMATTING, /Library spreadsheet or a data file/, 'every agent hears of them');
 });
 
 test('every agent hears of answer UIs when it starts', () => {

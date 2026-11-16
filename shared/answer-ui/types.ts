@@ -23,4 +23,9 @@ export interface AnswerUiSpec {
   shape: string;
   /** Its data in an example: real-looking content, which the gallery draws. */
   example: Record<string, unknown>;
+  /**
+   * For a UI that can read its numbers from a Library spreadsheet or a data file instead (data-ref.ts REF_UIS): the
+   * fields it then takes in place of its values (`shape`, as above) and an example of them, which find_ui gives with it.
+   */
+  ref?: { shape: string; example: Record<string, unknown> };
 }

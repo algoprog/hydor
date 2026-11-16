@@ -3,6 +3,7 @@
 // what can be kept: tables as tables (a data table, a comparison, a chart's numbers, a decision matrix, a versus card,
 // any list of short records), pictures as pictures, code as code, and the rest as headed lists of label and value.
 // Shared: the pages copy a card with it and the server exports with it.
+import { REF_UIS, refSource } from './data-ref.ts';
 
 type Data = Record<string, unknown>;
 
@@ -274,6 +275,14 @@ export function answerMarkdown(name: string, data: unknown, fallback?: string): 
   const out: string[] = [];
   const title = str(d.title) || str(d.subject) || str(d.location) || fallback || '';
   if (title) out.push(`**${inline(title)}**`);
+  // A card that reads its numbers from a spreadsheet or a file (data-ref.ts) says where: they are read when it is shown.
+  const src = REF_UIS.has(name) ? refSource(d.from) : null;
+  if (src) {
+    const where = src.file ? `the file ${src.file}` : `the spreadsheet “${src.sheet}”${src.range ? ` (${src.range})` : src.tab ? ` (${src.tab})` : ''}`;
+    out.push(...(out.length ? [''] : []), `_Its numbers are read from ${inline(where)} each time it is shown._`);
+    if (str(d.note)) out.push('', str(d.note));
+    return out.join('\n').trim();
+  }
   const own = TABLES[name]?.(d) ?? null;
   const skip = new Set(['ui', 'title', ...(str(d.title) ? [] : str(d.subject) ? ['subject'] : str(d.location) ? ['location'] : []), ...(own ? TABLE_KEYS[name] : [])]);
   if (own) {

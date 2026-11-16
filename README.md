@@ -95,8 +95,8 @@ with any model, and a strong model can lead cheaper subagents. Each comparison h
 - **Your email**: connect any mail account with an app password, and agents search, read, sort, draft and send.
 - **Answers you can use**: replies show maths, diagrams, pictures and more than 140 answer UIs (tables, charts, maps,
   recipes, forecasts, quizzes, practice problems checked as you answer, code you can run) that agents fill in as they
-  answer; each opens full screen and saves as a picture, and a whole conversation exports as Markdown or a Library
-  document.
+  answer; tables and charts can read their numbers straight from a Library spreadsheet or a data file and stay current;
+  each opens full screen and saves as a picture, and a whole conversation exports as Markdown or a Library document.
 - **For researchers and engineers**: a paper radar and a check before you submit, experiments that wait for a free GPU,
   failed CI runs looked into, issues triaged, large changes made by a team of agents.
 - **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.

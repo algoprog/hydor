@@ -177,7 +177,7 @@ export const COMPARE: AnswerUiSpec[] = [
     id: 'ranking',
     title: 'Ranking',
     group: 'compare',
-    use: 'A ranked list with rank numbers, pictures, value bars and how many places each moved since the last ranking.',
+    use: 'A ranked list with rank numbers, pictures, value bars and how many places each moved since the last ranking. It can read its numbers from a spreadsheet or a data file.',
     keywords: 'ranking ranked top 10 list leaderboard league order best most chart positions standings movers places',
     shape: `{
   title?: string
@@ -194,6 +194,20 @@ export const COMPARE: AnswerUiSpec[] = [
   }[]                          // in rank order: the first is number 1
   note?: md                    // what it is based on; since when the changes are counted
 }`,
+    ref: {
+      shape: `{
+  title?: string
+  metric?: string              // the value's label unless set
+  from: { sheet: string, range?: string } | { file: string }
+  items: { name: string, value?: string, detail?: string, image?: string, tag?: string, change?: string }
+                               // the column of each: value "sum(Quantity)" for each name, or a column as it is (an item a row)
+  where?: string
+  sort?: string                // highest value first unless set
+  limit?: number               // how many (10 unless set; 100 at most)
+  unit?: string, prefix?: string, note?: md
+}`,
+      example: { title: 'Best-selling products', from: { file: 'data/orders.csv' }, items: { name: 'Product', value: 'sum(Quantity)', detail: 'first(Category)' }, metric: 'Units sold', limit: 10 },
+    },
     example: {
       title: 'Paris 2024: the medal table',
       metric: 'Gold medals',
