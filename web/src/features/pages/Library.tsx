@@ -66,7 +66,7 @@ import { api, del, enc, patch, post } from '../../lib/api';
 import { ago, bytes } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { toast, toastError } from '../../lib/store';
-import { tr } from '../../i18n/runtime';
+import { tr, trIn } from '../../i18n/runtime';
 import { Button, cx, Empty, IconButton, MenuBack, MenuItem, MenuLabel, MenuSep, Popover, Throbber, useConfirm, useMediaQuery } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 import { downloadMedia, recaption, SoundTile, startSessionWithMedia, Still } from '../media/parts';
@@ -370,7 +370,8 @@ function ItemCard({ it, showSpace, showFolder }: { it: Item; showSpace?: boolean
           <>
             {p.kind === 'slides' ? (
               <MenuItem icon={<Play size={14} />} onClick={() => (close(), go(`/pages/${p.id}?present=1`))}>
-                Present
+                {/* This action presents slides; the same word also names a tense elsewhere. */}
+                {trIn('slides', 'Present')}
               </MenuItem>
             ) : (
               <MenuItem icon={<PenLine size={14} />} onClick={() => (close(), open('edit'))}>

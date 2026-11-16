@@ -49,8 +49,8 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
       >
         <AssistantIcon icon={a.icon} size={15} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13.5px] font-medium text-fg">{a.name}</span>
-          <span className="block truncate text-[12px] text-fg-3">{about(a)}</span>
+          <span translate="no" className="block truncate text-[13.5px] font-medium text-fg">{a.name}</span>
+          <span translate="no" className="block truncate text-[12px] text-fg-3">{about(a)}</span>
         </span>
         {sel && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
       </button>
@@ -70,7 +70,7 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
         className={cx('flex h-9.5 min-w-0 items-center gap-2 rounded-lg pr-2 pl-1.5 text-left transition-colors hover:bg-bg-2', sel && 'bg-bg-2')}
       >
         <AssistantIcon icon={a.icon} size={13} />
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg">{a.name}</span>
+        <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg">{a.name}</span>
         {sel && <Check size={14} className="shrink-0" strokeWidth={2.5} />}
       </button>
     );
@@ -101,7 +101,8 @@ function AssistantMenu({ list, cur, heading, onPick, onSettings }: { list: Assis
               <div className="grid grid-cols-2 gap-0.5">{mine.map(tile)}</div>
             </>
           )}
-          <p className="mx-1.5 mt-1 line-clamp-2 min-h-[calc(2lh+9px)] border-t border-line px-1 pt-2 text-[12px] leading-4 text-fg-3">{shown ? about(shown) : ''}</p>
+          {/* Agent descriptions are authored content and keep their original language. */}
+          <p translate="no" className="mx-1.5 mt-1 line-clamp-2 min-h-[calc(2lh+9px)] border-t border-line px-1 pt-2 text-[12px] leading-4 text-fg-3">{shown ? about(shown) : ''}</p>
         </div>
       )}
       <MenuSep />

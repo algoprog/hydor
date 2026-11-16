@@ -185,6 +185,7 @@ function PlaceRow({
   drop,
   after,
   onUnpin,
+  appLabel,
 }: {
   icon: ReactNode;
   label: string;
@@ -194,6 +195,7 @@ function PlaceRow({
   drop?: string;
   after?: () => void;
   onUnpin?: () => void;
+  appLabel?: boolean;
 }) {
   const d = useDropOn(drop ?? null, after);
   return (
@@ -209,7 +211,8 @@ function PlaceRow({
         className="flex h-8 min-w-0 flex-1 items-center gap-2.5 px-2.5 text-left text-[13.5px] max-md:h-11 max-md:text-[15px]"
       >
         <span className="flex w-4 shrink-0 items-center justify-center text-fg-3">{icon}</span>
-        <span translate="no" className="min-w-0 truncate">
+        {/* App labels are translatable; user-provided folder names stay untouched. */}
+        <span translate={appLabel ? undefined : "no"} className="min-w-0 truncate">
           {label}
         </span>
       </button>
@@ -264,11 +267,11 @@ export function Places({
     <div className="px-2 py-2">
       {onFind && (
         <div ref={findRef}>
-          <PlaceRow icon={<Search size={15} />} label="Go to a folder" onClick={() => findRef.current && onFind(findRef.current)} />
+          <PlaceRow icon={<Search size={15} />} label="Go to a folder" appLabel onClick={() => findRef.current && onFind(findRef.current)} />
         </div>
       )}
-      <PlaceRow icon={<Clock size={15} />} label="Recent files" active={place === 'recent'} onClick={() => onPlace('recent')} />
-      <PlaceRow icon={<House size={15} />} label="Home folder" title={home} active={here(home)} onClick={() => onDir(home)} drop={home} after={after} />
+      <PlaceRow icon={<Clock size={15} />} label="Recent files" appLabel active={place === 'recent'} onClick={() => onPlace('recent')} />
+      <PlaceRow icon={<House size={15} />} label="Home folder" appLabel title={home} active={here(home)} onClick={() => onDir(home)} drop={home} after={after} />
       {others.map((p) => (
         <PlaceRow key={p} icon={<FolderOpen size={15} />} label={basename(p)} title={tildify(p, home)} active={here(p)} onClick={() => onDir(p)} drop={p} after={after} />
       ))}
@@ -305,7 +308,7 @@ export function Places({
               after={after}
             />
           ))}
-          {spaces.length > 8 && <PlaceRow icon={<span className="text-[13px]">…</span>} label="All projects" onClick={() => go('/projects')} />}
+          {spaces.length > 8 && <PlaceRow icon={<span className="text-[13px]">…</span>} label="All projects" appLabel onClick={() => go('/projects')} />}
         </>
       )}
       {lately.length > 0 && (
@@ -317,7 +320,7 @@ export function Places({
         </>
       )}
       <div className="mt-3 border-t border-line pt-2">
-        <PlaceRow icon={<Trash2 size={15} />} label="Trash" active={place === 'trash'} onClick={() => onPlace('trash')} />
+        <PlaceRow icon={<Trash2 size={15} />} label="Trash" appLabel active={place === 'trash'} onClick={() => onPlace('trash')} />
       </div>
     </div>
   );
