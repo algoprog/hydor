@@ -158,6 +158,7 @@ double click.
 | The tabs: Rename, Duplicate, Delete this sheet, Move left, Move right | **page_action `rename_sheet`** (formulas that name it follow), **`duplicate_sheet`, `delete_sheet`, `move_sheet`** |
 | The board's cards moved between lanes; Expand row's fields | save: `update` (the row's cells) |
 | Download: Excel, CSV, PDF | `export_page` (xlsx, csv, pdf) |
+| Tools → Compare with the version before, Compare with a version; a turn's See what changed | **page_action `compare`** {since, until} (in words, nothing saved); Put back the version: `POST …/versions/:v/restore` (a card); Put this back: save `update`, the cell or row as it was |
 
 A person's: zoom, the keyboard shortcuts, Expand row as a view, the cell picked.
 
@@ -296,7 +297,8 @@ saves nothing and says why.
   it): `sort` {by, descending}, `remove_duplicates` {columns}, `fill` {range, direction}, `clear` {range, what},
   `trim_spaces`, `split_text` {range, separator, overwrite}, `summarize` {by, across, values}, `insert_rows` and
   `insert_columns` {at, count}, `delete_rows` {rows}, `delete_columns` {columns}, `rename_sheet` {name},
-  `duplicate_sheet` {name}, `delete_sheet`, `move_sheet` {to}.
+  `duplicate_sheet` {name}, `delete_sheet`, `move_sheet` {to}, `compare` {since, until} (what changed between two
+  versions, in words: it saves nothing).
 - **LaTeX documents**: `move_files` {moves} (typeset again, as save_latex is).
 - **Notebooks**: `clear_outputs` {cells}.
 - **Any kind**: `turn_into` {to: slides, doc or page}, `duplicate` {title}.

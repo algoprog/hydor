@@ -4,71 +4,20 @@
 // change listed beside it (a click goes to it), Restore this version (the Library's restore: it comes back as a new
 // version) and the way back to the document. The versions to compare with are picked from a list of them. Nothing here
 // changes the document; the comparison itself is shared/doc-changes.ts's.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ArrowLeft, History, RotateCcw } from 'lucide-react';
 import { changesOf } from '@shared/doc-changes';
 import { blockHtml, docCss, listInfo, pageMargins, PAPERS, tocEntries, type Doc, type MathDraw } from '@shared/docs';
-import type { PageVersion } from '@shared/pages';
-import { api } from '../../../lib/api';
 import { ago } from '../../../lib/format';
-import { Button, cx, Dialog, Throbber } from '../../../components/ui';
+import { Button, cx } from '../../../components/ui';
 import { ChangeLines } from './Suggestions';
 
 /** What was added and what was taken out, in the colours Word's Compare uses. */
 const ADDED = '#188038';
 const REMOVED = '#c5221f';
 
-const BY: Record<PageVersion['by'], string> = { agent: 'by the agent', user: 'kept by you', restore: 'brought back', edit: 'changed by you', made: 'made by you' };
-
-/** The list of a page's versions, to pick one to compare the document with (the latest, the one open, left out). */
-export function VersionsDialog({ open, pageId, onClose, onPick }: { open: boolean; pageId: string; onClose: () => void; onPick: (v: PageVersion) => void }) {
-  const [list, setList] = useState<PageVersion[] | null>(null);
-  const [latest, setLatest] = useState(0);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!open) return;
-    setList(null);
-    setError('');
-    api<{ page: { version: number }; versions: PageVersion[] }>(`/api/pages/${encodeURIComponent(pageId)}`).then(
-      (r) => {
-        setLatest(r.page.version);
-        setList(r.versions);
-      },
-      (e) => setError((e as Error).message),
-    );
-  }, [open, pageId]);
-  const older = (list ?? []).filter((v) => v.version !== latest);
-  return (
-    <Dialog open={open} onClose={onClose} title="Compare with a version" width={420}>
-      <p className="mb-2 text-[12.5px] text-fg-3">Pick a version: the document shows what changed since it.</p>
-      {!list && !error && (
-        <div className="flex justify-center py-6 text-fg-3">
-          <Throbber />
-        </div>
-      )}
-      {error && <p className="py-2 text-[13px] text-err">{error}</p>}
-      {list && !older.length && <p className="py-4 text-center text-[13px] text-fg-3">There is no older version yet: each save makes one.</p>}
-      {older.length > 0 && (
-        <div className="max-h-[min(52vh,420px)] divide-y divide-line overflow-y-auto rounded-xl border border-line">
-          {older.map((v) => (
-            <button key={v.version} type="button" onClick={() => onPick(v)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-bg-2">
-              <span className="w-9 shrink-0 font-mono text-[12px] text-fg-3">v{v.version}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] text-fg" translate="no">
-                  {v.title}
-                </span>
-                <span className="block truncate text-[11.5px] text-fg-3">
-                  {ago(v.createdAt)} · {BY[v.by] ?? v.by}
-                  {v.steps ? ` · ${v.steps} saves` : ''}
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </Dialog>
-  );
-}
+/** The list of versions to pick one from (shared with the spreadsheet's Compare). */
+export { VersionsDialog } from '../common/VersionsDialog';
 
 /** A document's margins as CSS padding: top, right, bottom, left. */
 const marginsCss = (d: Doc) => {

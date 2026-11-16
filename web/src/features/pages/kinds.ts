@@ -85,4 +85,9 @@ export interface ModelEditorProps<M> {
    * it the document uses that the editor does not hold (pictures, styles, data), for the files tree.
    */
   file?: { folder?: string; main: string; open?: string; comments?: { list: unknown[]; n: number }; dir?: string; uses?: { name: string; kind: TexFileKind; size: number }[] };
+  /**
+   * Open with what changed since this version shown (a conversation's See what changed, /pages/<id>?compare=<version>):
+   * the spreadsheet editor's Compare. Editors without one leave it.
+   */
+  compareWith?: number;
 }

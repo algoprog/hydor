@@ -33,6 +33,8 @@ import {
   Eraser as Broom,
   ChartNoAxesCombined,
   Grid3x3,
+  GitCompareArrows,
+  History,
   Printer,
   Table2,
   Target,
@@ -163,6 +165,8 @@ export interface MenuCtx {
   goalSeek(): void;
   /** Tools → Print and PDF setup. */
   printSetup(): void;
+  /** Compare with the version before, or with a version picked (a spreadsheet of the Library only). */
+  compare?: { before(): void; pick(): void };
   trace(what: 'pre' | 'dep'): void;
   traced: boolean;
   untrace(): void;
@@ -416,6 +420,9 @@ export function sheetMenus(m: MenuCtx): MenuDef[] {
       { label: 'Trace dependents', icon: <ArrowRightFromLine size={14} />, also: 'formulas that use this cell audit', run: () => m.trace('dep') },
       m.traced && { label: 'Remove traces', run: m.untrace },
       !ro && { label: 'Print and PDF setup', icon: <Printer size={14} />, keys: 'Ctrl+P', also: 'page setup orientation landscape portrait fit print area header rows repeat gridlines', run: m.printSetup },
+      m.compare && '-',
+      m.compare && { label: 'Compare with the version before', icon: <GitCompareArrows size={14} />, also: 'what changed diff versions history agent changes undo put back restore', run: m.compare.before },
+      m.compare && { label: 'Compare with a version', icon: <History size={14} />, also: 'diff versions history changes since put back restore', run: m.compare.pick },
       '-',
       { label: 'Keyboard shortcuts', icon: <Keyboard size={14} />, keys: 'Ctrl+/', run: m.shortcuts },
       m.onAsk && '-',

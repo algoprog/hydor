@@ -230,6 +230,7 @@ You can also ask an agent for something to keep from the start: "make me a habit
 
 - the page's title and **Saved in the Library · version 2** (the version this reply saved: when the agent saves the page several times in one reply, the reply has one card, for the last version, and the earlier saves are listed among its steps);
 - **Open**, which opens it in the Library, **Edit** (the pencil) and **Full screen**;
+- for a spreadsheet the reply changed, **See what changed**: what that reply changed, marked in the sheet ([See what changed in a spreadsheet](#see-what-changed-in-a-spreadsheet));
 - the page itself, working, with its data, right in the card.
 
 On a wide screen, while pages show beside the conversation, the card stays small and its page opens beside it.
@@ -823,6 +824,29 @@ The button on a row's number (or Space on a row picked with Shift+Space, or righ
 
 An Excel file you open or save keeps all of this: its filters, conditional formatting, dropdowns (with their chips' colours, and options with commas or quotes, or more of them than Excel holds in a rule, on a hidden sheet of lists), checkboxes and other rules, merged cells, hidden rows and columns, groups, borders, number formats, notes, comments (as Excel's threaded comments), named ranges, links, a whole sheet's protection, the print setup, and charts on their cells (a histogram as a column chart of its bins). The newer functions stay as Excel writes them (Google Sheets' own as Excel's: JOIN as TEXTJOIN, REGEXMATCH as REGEXTEST); AI and SPARKLINE cells, which Excel cannot work out, go as the values they show. An OpenDocument file (.ods) brings its merged cells, notes, validation lists and rules, and the conditional formatting LibreOffice gives it. The workbook's own page and its PDF show them too.
 
+### See what changed in a spreadsheet
+
+When you hand a spreadsheet to an agent ("add last month's figures", "update the budget"), you can see exactly what it changed, and put back what you don't want.
+
+- **From the conversation**: the card of a spreadsheet an agent changed in that reply has **See what changed** (on a phone, its icon; beside the conversation, a line under the card). It opens the spreadsheet with what that reply changed, against the version before it.
+- **In the spreadsheet**: **Tools → Compare with the version before** compares the spreadsheet with its version before; **Tools → Compare with a version** lets you pick any of its versions. An older version opened from **Versions** (the clock) compares the same way, with the version before it.
+
+The sheet then shows the changes in place:
+
+- cells whose value or formula changed are amber; a number format or a look alone (bold, a colour) is blue; formulas that only give another result because what they use changed are faintly amber;
+- rows and columns added are green, and the ones removed show where they were, red and struck through;
+- the tabs under the sheet say which tabs are **new**, **removed** or renamed (**was Notes**), and how many changes each has.
+
+Beside it, the changes are listed tab by tab: each cell with what it was and what it is (for a formula, the formula and what it shows), each row or column added or removed with its first cells, rows moved (by a sort), and the tab's other parts that changed (charts, the filter, merged cells and the like). Click a change to go to its cell, or a tinted cell to find its change in the list; **A formula’s result changed with them** lists the formulas whose results changed. The top says when that version was saved and counts the changes: "10 cells changed on 1 tab · 1 row added · 1 tab removed".
+
+To line the two versions up, rows are matched by a key column when the table has one (a column of names, ids or dates, all filled in and never repeated), or else by what each row holds, and formulas are compared with their references followed through the rows and columns put in or taken out. So a row put in marks only that row, not every row under it. Under each tab's changes, a line says how its rows were lined up.
+
+- **Put back version 2**, at the top, brings that version back whole, as a new version: the one you had stays among the versions, so nothing is lost. If you have changes not saved yet, it asks first, as they are dropped.
+- **Put this back** (the arrow on a change) undoes just that change: a cell as it was (its formula written for where it is now), a row or column added taken out, one removed put back where it was, a tab added taken out, one removed put back, one renamed given its name back. It is a change like any other: **Undo** takes it back, and **Save** in the bar at the bottom keeps it.
+- **Another version** compares with another version; **Back to the spreadsheet** (or Esc) leaves.
+
+An agent can tell you the same: ask "what did you change in my budget?" and it lists the changes as the compare does, cell by cell.
+
 ## LaTeX documents
 
 A LaTeX document is its source (the main file, main.tex, and any others it reads, such as a .bib of references) and its pictures, typeset into pages by LaTeX on the computer the app runs on. You edit the source beside its typeset pages, as in Overleaf, as code or shown as a document, and save the PDF, the .tex file or the whole project.
@@ -1210,7 +1234,7 @@ Every save of a page is a version of its own: the first one (kept or made by you
 
 1. Open the page and click **Versions**.
 2. The list shows each version (`v3`), its title (**The latest** for the current one), when it was made, who made it (**by the agent**, **kept by you**, **changed by you**, **made by you** or **brought back**) and its size.
-3. Click a version to look at it. A band above the page says "An older version, as it was 2 days ago. What it changes here is not kept." The older version works with the page's data, but anything you change in it is thrown away. A document opens with what changed since that version marked in its words and listed beside it ([Compare with a version](#documents)).
+3. Click a version to look at it. A band above the page says "An older version, as it was 2 days ago. What it changes here is not kept." The older version works with the page's data, but anything you change in it is thrown away. A document opens with what changed since that version marked in its words and listed beside it ([Compare with a version](#documents)); in a spreadsheet, **Tools → Compare with the version before** shows what that version changed ([See what changed in a spreadsheet](#see-what-changed-in-a-spreadsheet)).
 4. Click **Bring it back** to make it current, or **Back to the latest** to leave it.
 
 Bringing a version back adds it as a new version on top ("Version 3 is back, as version 6"), so the versions after it stay too. The page's data is not touched.
@@ -1369,6 +1393,7 @@ Agents can read and change what is in your Library for you, with your OK on a ca
 - "Move my packing list into the Trip project."
 - "I changed the headings on the trip page; now add a map under them."
 - "My budget tracker looked better yesterday: bring back the version from before your last change."
+- "What exactly did you change in my 'Household budget' spreadsheet just now? List the cells, then put October's groceries back as they were."
 - "What did I log in my habit tracker this week? Sum it up."
 - "Rename the page 'Untitled checklist' to 'Moving house'."
 - "Find the spreadsheet where I worked out what the Lisbon trip costs."
