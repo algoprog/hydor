@@ -167,6 +167,7 @@ You don’t have to know where an option lives: type what you want in the search
 [Settings → Scheduled tasks](/settings?s=tasks): agent work that starts by itself: on a schedule, once, or when a webhook calls. More in [Scheduled tasks](/guide/tasks).
 
 - [**New task**](/settings?s=tasks&find=New%20task): Agent work that starts by itself.
+- [**Week view**](/settings?s=tasks&find=Week%20view): Everything that runs by itself, on a week: what ran and what runs next.
 - [**Start from an example**](/settings?s=tasks&find=Start%20from%20an%20example): Ready-made scheduled tasks.
 - [**Morning brief**](/settings?s=tasks&find=Morning%20brief): A ready-made scheduled task.
 - [**News on a topic**](/settings?s=tasks&find=News%20on%20a%20topic): A ready-made scheduled task.
