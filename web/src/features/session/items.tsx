@@ -415,13 +415,14 @@ export function ToolLine({ item }: { item: ToolItem }) {
         <span className="flex min-w-0 flex-1 items-baseline gap-2 text-[13px]">
           {label ? (
             <>
-              <span className={cx('max-w-full shrink-0 truncate', busy ? 'shine' : 'text-fg-2')}>{label}</span>
-              <span className="hidden min-w-0 flex-1 truncate font-mono text-[11.5px] text-fg-3 sm:block">{line}</span>
+              {/* The agent's own words for the command (its description) and the command itself are never translated. */}
+              <span translate={t.label ? 'no' : undefined} className={cx('max-w-full shrink-0 truncate', busy ? 'shine' : 'text-fg-2')}>{label}</span>
+              <span translate="no" className="hidden min-w-0 flex-1 truncate font-mono text-[11.5px] text-fg-3 sm:block">{line}</span>
             </>
           ) : (
             <>
               {v && <span className={cx('shrink-0', busy ? 'text-fg' : 'text-fg-3')}>{v}</span>}
-              <span className={cx('min-w-0 truncate', (cmd || t.category === 'search') && 'font-mono text-[12px]', busy ? 'shine' : 'text-fg-2')}>
+              <span translate={cmd ? 'no' : undefined} className={cx('min-w-0 truncate', (cmd || t.category === 'search') && 'font-mono text-[12px]', busy ? 'shine' : 'text-fg-2')}>
                 {(cmd ? line : toolTitle(t, home, cwd)) || t.name}
               </span>
               {t.subtitle && !cmd && <span className="hidden min-w-0 shrink truncate text-[12px] text-fg-3 sm:inline">{t.subtitle}</span>}
