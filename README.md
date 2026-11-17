@@ -251,7 +251,7 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only), with the additional terms in its [NOTICE](NOTICE):
-keep its credit, and mark a changed version as changed. If you share a changed Hydor, or let others use one over a
+mark a changed version as changed, and no rights to the Hydor name or logo. If you share a changed Hydor, or let others use one over a
 network, you share your changes under the same license. For other terms, such as a commercial license, write through
 [algoprog.com](https://algoprog.com); any proceeds go fully into the development of Hydor. Contributions come in under
 the [contributor agreement](CLA.md). Hydor is independent, not affiliated with or endorsed by Anthropic or OpenAI

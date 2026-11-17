@@ -1,7 +1,6 @@
 Hydor
 Copyright 2026 Chris Samarinas and the Hydor contributors
 
-Hydor was created by Chris Samarinas (https://algoprog.com).
 https://github.com/algoprog/hydor · https://hydor.app
 
 Hydor is free software: you can redistribute it and/or modify it under the terms of the GNU Affero
@@ -12,13 +11,9 @@ The license is in the LICENSE file.
 
 Additional terms, under section 7 of the GNU Affero General Public License:
 
-  a) Attribution (section 7(b)). Every copy of Hydor, changed or not, and every work based on it keeps
-     this NOTICE file, and keeps the attribution "Hydor was created by Chris Samarinas
-     (https://algoprog.com)" wherever the work shows its legal notices or the credits of the software it
-     is built on.
-  b) Changed versions (section 7(c)). A changed version is marked as changed from the original, and is
+  a) Changed versions (section 7(c)). A changed version is marked as changed from the original, and is
      not presented as the original Hydor.
-  c) Name and logo (section 7(e)). The license gives no rights to the name Hydor or its logo, beyond
+  b) Name and logo (section 7(e)). The license gives no rights to the name Hydor or its logo, beyond
      saying truthfully where a work comes from.
 
 Hydor is also available under other terms, such as a commercial license, from Chris Samarinas
