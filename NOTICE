@@ -1,8 +1,29 @@
 Hydor
-Copyright 2026 Hydor Devs
+Copyright 2026 Chris Samarinas and the Hydor contributors
 
 Hydor was created by Chris Samarinas (https://algoprog.com).
 https://github.com/algoprog/hydor · https://hydor.app
+
+Hydor is free software: you can redistribute it and/or modify it under the terms of the GNU Affero
+General Public License, version 3 only (AGPL-3.0-only), as published by the Free Software Foundation,
+with the additional terms below. It is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+The license is in the LICENSE file.
+
+Additional terms, under section 7 of the GNU Affero General Public License:
+
+  a) Attribution (section 7(b)). Every copy of Hydor, changed or not, and every work based on it keeps
+     this NOTICE file, and keeps the attribution "Hydor was created by Chris Samarinas
+     (https://algoprog.com)" wherever the work shows its legal notices or the credits of the software it
+     is built on.
+  b) Changed versions (section 7(c)). A changed version is marked as changed from the original, and is
+     not presented as the original Hydor.
+  c) Name and logo (section 7(e)). The license gives no rights to the name Hydor or its logo, beyond
+     saying truthfully where a work comes from.
+
+Hydor is also available under other terms, such as a commercial license, from Chris Samarinas
+(https://algoprog.com). Any proceeds from licensing Hydor under other terms go fully into the
+development of Hydor. Contributions come in under the Hydor Contributor License Agreement (CLA.md).
 
 The handwriting styles for typed signatures (web/src/features/signatures/fonts/) are the
 fonts Dancing Script, Mr Dafoe, Mr De Haviland and Mynerve, unchanged but for WOFF

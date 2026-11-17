@@ -63,7 +63,10 @@ over existing files), and new text is written as the guide is: plain words, for 
 - `npm run typecheck` and `npm test` pass; pull requests run them on GitHub too.
 - Written with an AI's help is fine, as long as you have read every line, run it and stand behind it. Issues and pull
   requests that read as unchecked output (a diagnosis no one confirmed, code no one ran) are closed.
-- Hydor is under the [GNU AGPL-3.0](LICENSE): what you contribute is too.
+- Hydor is under the [GNU AGPL-3.0](LICENSE). Before your first pull request is merged, you sign the
+  [contributor agreement](CLA.md), once, by a comment on the pull request when the bot there asks: you keep the
+  copyright of what you write, and Hydor may also offer it under other terms, such as a commercial license. Any
+  proceeds go fully into the development of Hydor.
 
 ## Conduct and security
 
