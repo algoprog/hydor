@@ -25109,5 +25109,6 @@
 "{0} did not start":"Το {0} δεν ξεκίνησε",
 "Start in a new session":"Έναρξη σε νέα συνεδρία",
 "That session is gone":"Αυτή η συνεδρία δεν υπάρχει πια",
-"The agent stopped before it got your message and could not be started again. Start your message in a new session, or try again.":"Ο πράκτορας σταμάτησε πριν λάβει το μήνυμά σας και δεν μπόρεσε να ξεκινήσει ξανά. Ξεκινήστε το μήνυμά σας σε νέα συνεδρία ή δοκιμάστε ξανά."
+"The agent stopped before it got your message and could not be started again. Start your message in a new session, or try again.":"Ο πράκτορας σταμάτησε πριν λάβει το μήνυμά σας και δεν μπόρεσε να ξεκινήσει ξανά. Ξεκινήστε το μήνυμά σας σε νέα συνεδρία ή δοκιμάστε ξανά.",
+  "It can be built now from what the project already has: {0}.": "Μπορεί να χτιστεί τώρα από όσα έχει ήδη το έργο: {0}."
 }

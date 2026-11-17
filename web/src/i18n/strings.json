@@ -9865,6 +9865,7 @@
 "It becomes the current version, saved as a new one: the version it has now stays in the list, to go back to. Its examples stay as they are.":"web/src/features/assistants/AgentVersions.tsx",
 "It came from a file: add the newer file to update it":"server/plugins/index.ts",
 "It came out over {0} MB, too large for a picture: make it shorter or smaller":"server/mediaedit/video.ts",
+"It can be built now from what the project already has: {0}.":"web/src/features/wiki/WikiActions.tsx",
 "It can run without it":"web/src/features/apps/Needs.tsx",
 "It can use port {0} instead.":"web/src/features/settings/PhoneSettings.tsx",
 "It can’t be put back afterwards.":"web/src/features/files/TrashView.tsx",

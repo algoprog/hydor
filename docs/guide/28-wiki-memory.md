@@ -141,7 +141,7 @@ Agents are told that `index.md` lists the articles by area and that `wiki/areas/
 
 ## Build a wiki from a project's history
 
-A project that existed before wiki memory, or whose wiki is still empty, has a lot the wiki has not read. **Build from history** reads it. While the project's wiki has no article yet, the **⋯** menu beside the buttons on its **Memory** tab → **Wiki** offers **Build from history…** in place of **Rebuild from sources…**. A dialog says what it will read ("38 conversations, 412 commits, 9 documents, 14 notes, README.md, docs/"), about how long it takes (for what matters most, and in all) and what it costs: "It uses your Claude plan", or the price when your helper model has one in the app. Press **Build** to start it.
+A project that existed before wiki memory, or whose wiki is still empty, has a lot the wiki has not read. **Build from history** reads it. While the project's wiki has no article yet, the **⋯** menu beside the buttons on its **Memory** tab → **Wiki** offers **Build from history…** in place of **Rebuild from sources…**. The empty **Wiki** tab shows it too: under the line that says it is empty, what the project has to build it from, with a **Build from history…** button. A dialog says what it will read ("38 conversations, 412 commits, 9 documents, 14 notes, README.md, docs/"), about how long it takes (for what matters most, and in all) and what it costs: "It uses your Claude plan", or the price when your helper model has one in the app. Press **Build** to start it.
 
 What it reads:
 

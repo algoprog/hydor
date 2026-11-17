@@ -23855,5 +23855,6 @@
   "{0} did not start": "{0} wurde nicht gestartet",
   "Start in a new session": "In neuer Sitzung starten",
   "That session is gone": "Diese Sitzung gibt es nicht mehr",
-  "The agent stopped before it got your message and could not be started again. Start your message in a new session, or try again.": "Der Agent wurde beendet, bevor er deine Nachricht bekam, und konnte nicht erneut gestartet werden. Starte deine Nachricht in einer neuen Sitzung oder versuche es noch einmal."
+  "The agent stopped before it got your message and could not be started again. Start your message in a new session, or try again.": "Der Agent wurde beendet, bevor er deine Nachricht bekam, und konnte nicht erneut gestartet werden. Starte deine Nachricht in einer neuen Sitzung oder versuche es noch einmal.",
+  "It can be built now from what the project already has: {0}.": "Es lässt sich jetzt aus dem aufbauen, was das Projekt schon hat: {0}."
 }

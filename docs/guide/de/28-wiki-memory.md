@@ -142,7 +142,7 @@ Agenten erfahren, dass `index.md` die Artikel nach Themenbereichen listet und da
 
 ## Ein Wiki aus dem Verlauf eines Projekts aufbauen
 
-Ein Projekt, das schon vor Wiki-Memory bestand oder dessen Wiki noch leer ist, hat vieles, das sein Wiki nicht gelesen hat. **Aus dem Verlauf aufbauen** liest es. Solange das Wiki des Projekts noch keinen Artikel hat, bietet das Menü **⋯** neben den Buttons im Tab **Memory** → **Wiki** **Aus dem Verlauf aufbauen …** anstelle von **Aus den Quellen neu aufbauen …**. Ein Dialog sagt, was gelesen wird („38 Unterhaltungen, 412 Commits, 9 Dokumente, 14 Notizen, README.md, docs/“), etwa wie lange es dauert (für das Wichtigste und insgesamt) und was es kostet: „Es nutzt deinen Claude-Tarif“ oder der Preis, wenn dein Hilfsmodell in der App einen hat. Mit **Aufbauen** startest du es.
+Ein Projekt, das schon vor Wiki-Memory bestand oder dessen Wiki noch leer ist, hat vieles, das sein Wiki nicht gelesen hat. **Aus dem Verlauf aufbauen** liest es. Solange das Wiki des Projekts noch keinen Artikel hat, bietet das Menü **⋯** neben den Buttons im Tab **Memory** → **Wiki** **Aus dem Verlauf aufbauen …** anstelle von **Aus den Quellen neu aufbauen …**. Auch der leere Tab **Wiki** zeigt es: unter der Zeile, die sagt, dass er leer ist, woraus das Projekt sein Wiki aufbauen kann, mit dem Button **Aus dem Verlauf aufbauen …**. Ein Dialog sagt, was gelesen wird („38 Unterhaltungen, 412 Commits, 9 Dokumente, 14 Notizen, README.md, docs/“), etwa wie lange es dauert (für das Wichtigste und insgesamt) und was es kostet: „Es nutzt deinen Claude-Tarif“ oder der Preis, wenn dein Hilfsmodell in der App einen hat. Mit **Aufbauen** startest du es.
 
 Was gelesen wird:
 

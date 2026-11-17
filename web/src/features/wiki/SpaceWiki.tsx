@@ -13,7 +13,7 @@ import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { wikiDocument, wikiRelative } from './SpaceWikiPaths';
 import { useWikiSettings } from './spaceMemory';
-import { WikiActions } from './WikiActions';
+import { BuildFromHistoryPrompt, WikiActions } from './WikiActions';
 import { WikiJobProgress } from './WikiJobProgress';
 import { useWikiJob } from './wikiJob';
 
@@ -312,6 +312,8 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
         </p>
       )}
       {view && on && view.status !== 'error' && !ready && <p className="text-[13px] text-fg-3">Nothing here yet. Agents add to it as they work, and new documents update it.</p>}
+      {/* An empty wiki that the project's files, notes, conversations, commits or documents can fill now: say so, with the button. */}
+      {view && on && view.status !== 'error' && !ready && <BuildFromHistoryPrompt id={id} job={job} onStarted={refreshJob} />}
       {view && on && view.root && (
         <p className="text-[12px] break-all text-fg-3">
           <span>Folder</span>: <span translate="no">{tildify(view.root, home)}</span>

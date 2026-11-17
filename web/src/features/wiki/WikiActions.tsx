@@ -124,6 +124,28 @@ export function WikiActions({ id, job, refresh, empty }: { id: string; job: Wiki
   );
 }
 
+/**
+ * An empty wiki's way in: when the project has something to build its wiki from, a line saying what, and Build from
+ * history… (the same dialog as the ⋯ menu's). Nothing when there is nothing to read, or while a job runs.
+ */
+export function BuildFromHistoryPrompt({ id, job, onStarted }: { id: string; job: WikiJob | null; onStarted: () => void }) {
+  const [offer, setOffer] = useState<Offer | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    api<Offer>(`/api/projects/${enc(id)}/wiki/build`).then(setOffer, () => setOffer(null));
+  }, [id]);
+  if (!offer?.worth || !offer.empty || job?.state === 'running') return null;
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel px-3 py-2.5 min-[480px]:flex-row min-[480px]:items-center">
+      <p className="min-w-0 flex-1 text-[13px] leading-snug text-fg-2">{tr(`It can be built now from what the project already has: ${readsLine(offer.counts)}.`)}</p>
+      <Button variant="primary" size="sm" className="min-h-11 w-full min-[480px]:min-h-0 min-[480px]:w-auto" onClick={() => setOpen(true)}>
+        Build from history…
+      </Button>
+      {open && <BuildDialog id={id} onClose={() => setOpen(false)} onStarted={onStarted} />}
+    </div>
+  );
+}
+
 /** What a job costs, in words: the Claude plan on Automatic, else the price when the app has one. */
 function costLine(h: { model?: string; label: string; priced: boolean; usd?: number; usdMax?: number }): string {
   if (h.model === 'auto' || (h.model === undefined && h.label === 'Automatic' && !h.priced)) return tr('It uses your Claude plan.');

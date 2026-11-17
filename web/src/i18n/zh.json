@@ -25125,5 +25125,6 @@
 "{0} did not start":"{0} 没有启动",
 "Start in a new session":"在新会话中开始",
 "That session is gone":"这个会话已不存在",
-"The agent stopped before it got your message and could not be started again. Start your message in a new session, or try again.":"智能体在收到你的消息之前就停止了，无法再次启动。请在新会话中开始你的消息，或重试。"
+"The agent stopped before it got your message and could not be started again. Start your message in a new session, or try again.":"智能体在收到你的消息之前就停止了，无法再次启动。请在新会话中开始你的消息，或重试。",
+  "It can be built now from what the project already has: {0}.": "现在就可以用这个项目已有的内容来构建它：{0}。"
 }
