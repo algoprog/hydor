@@ -257,6 +257,19 @@ async function withNotes(key: string, text: string, said: string | null = text, 
   return notes ? `<system-reminder>\n${notes}\n</system-reminder>\n\n${text}` : text;
 }
 
+/**
+ * What a session that moved to another account at a usage limit is told of its own subagents that stopped (at the limit,
+ * or cut off by the move): Claude Code keeps each one's work, and a message to it continues it from there.
+ */
+export function subagentsLine(names: string[]): string {
+  if (!names.length) return '';
+  const quoted = names.map((n) => `"${n}"`);
+  const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}` : quoted[0];
+  return names.length > 1
+    ? ` Your subagents ${list} stopped at that limit and can go on now: send each one a message (SendMessage) to continue it from where it stopped, or start it again if that fails.`
+    : ` Your subagent ${list} stopped at that limit and can go on now: send it a message (SendMessage) to continue it from where it stopped, or start it again if that fails.`;
+}
+
 /** The notes a started agent has for its first message, given once: a command leaves them for the next. */
 function takeFirst(l: Live, text: string): string {
   if (!l.firstNotes || text.trimStart().startsWith('/')) return '';
@@ -592,11 +605,16 @@ export class SessionManager extends EventEmitter {
       const ended = this.endedTurns.get(s.key);
       this.endedTurns.delete(s.key);
       if (!prev || prev.status === st) {
-        // A turn that began and ended between two looks (a quick one, or the first): the capabilities hear of it too.
+        // A turn that began and ended between two looks (a quick one, or the first): the capabilities hear of it too, and
+        // one the plan's usage limit stopped goes on as below. A turn the agent starts by itself on a background task's
+        // notice while its account is at the limit is that quick: the request is refused at once.
         if (ended !== undefined && (st === 'idle' || st === 'error')) {
           const t = { key: s.key, agent: s.agent, cwd: s.cwd, status: st, startedAt: ended, endedAt: now, external: false };
           setTimeout(() => turnEnded(t), 1500);
           setTimeout(() => this.keepEnding(s.key, s.agent, st, now), 2000);
+          const hit = this.limitHits.delete(s.key);
+          if (hit) this.limitEnds.set(s.key, now);
+          this.afterTurn(s, hit, now);
         }
         continue; // the first sighting is only a baseline
       }
@@ -626,19 +644,10 @@ export class SessionManager extends EventEmitter {
       } else if (st === 'error') {
         this.notify({ ...base, kind: 'failed', body: s.live?.error ? s.live.error.slice(0, 200) : 'Stopped with an error' } satisfies NotifyEvent);
       }
-      // A turn that ended because the plan's usage ran out: another account with usage left takes the session
-      // over now, or it continues by itself after the reset, as you asked.
       // Only the turn's own limit error proves interruption: an account can reach 100% as work finishes.
       const hit = this.limitHits.delete(s.key);
       if (hit) this.limitEnds.set(s.key, now);
-      if ((st === 'idle' || st === 'error') && busy(prev.status) && s.agent !== 'acp' && this.onLimited && !this.resumeLookup?.(s.key)) {
-        const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
-        const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
-        if (hit) {
-          if (autoSwitchOn(this.db) && !s.external) this.switchAtLimit(s.key, resetsAt).catch((e) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${(e as Error).message}` }));
-          else if (kvGet(this.db, 'auto_resume') === '1') this.resumeAfterLimit(s.key, resetsAt).catch(() => {});
-        }
-      }
+      if ((st === 'idle' || st === 'error') && busy(prev.status)) this.afterTurn(s, hit, now);
       // A session on API credit goes back to a plan once one has usage again.
       if (st === 'idle' && busy(prev.status) && this.lives.get(s.key)?.apiCredit) this.leaveCredit(s.key).catch(() => {});
       // The capabilities hear of every ended turn (memory notes, spending, automations), once its last lines are in.
@@ -658,6 +667,26 @@ export class SessionManager extends EventEmitter {
         if (!(s.acpAgent === CONSOLE_ID && s.goal?.status === 'active') && !this.helpersAtWork(s)) setTimeout(() => this.notify({ ...base, kind: 'done', body: this.lastReply(s.key) ?? 'Finished' } satisfies NotifyEvent), 1500);
       }
     }
+  }
+
+  /**
+   * A turn of a session run here ended. One the plan's usage limit stopped (`hit`) carries on with another of the agent's
+   * accounts that has usage left (Switch accounts at a limit), or continues by itself after the reset (Resume after
+   * usage limits). Its own subagents that a limit stopped while it went on (a limit of their model alone) carry on with
+   * another account too, once it has ended its turn.
+   */
+  private afterTurn(s: SessionSummary, hit: boolean, now: number) {
+    if (s.agent === 'acp' || !this.onLimited || this.resumeLookup?.(s.key)) return;
+    const switching = autoSwitchOn(this.db) && !s.external;
+    const failed = (e: Error) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${e.message}` });
+    if (!hit) {
+      if (switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
+      return;
+    }
+    const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
+    const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
+    if (switching) this.switchAtLimit(s.key, resetsAt).catch(failed);
+    else if (kvGet(this.db, 'auto_resume') === '1') this.resumeAfterLimit(s.key, resetsAt).catch(() => {});
   }
 
   /**
@@ -1538,20 +1567,79 @@ export class SessionManager extends EventEmitter {
     try {
       const agent = agentOfKey(key) as 'claude' | 'codex';
       const from = this.accountOf(key);
+      // Its own subagents still at work stop at their next request to this account, their work kept: the move waits
+      // for them rather than cut them off mid-step, so each can be continued on the next account.
+      if (await this.subagentsStop(key)) {
+        // Meanwhile you stopped it, or it went on (a turn got through, or it moved already).
+        if (this.userStopped.has(key) || this.accountOf(key) !== from || this.lives.get(key)?.adapter.limitStopped === false) return;
+      }
+      const stopped = this.subagentsToContinue(key);
       const to = await this.freeAccount(agent, from);
       if (!to) {
         if (agent === 'claude' && (await this.toCredit(key))) {
-          await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit and no other account has usage left, so this session now runs on API credit. Continue where you left off.`);
+          await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit and no other account has usage left, so this session now runs on API credit. Continue where you left off.${subagentsLine(stopped)}`);
           return;
         }
         if (kvGet(this.db, 'auto_resume') === '1') await this.resumeAfterLimit(key, resetsAt);
         return;
       }
       if (await this.carryOver(key, from, to.id)) return;
-      await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.`);
+      await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}. Continue where you left off.${subagentsLine(stopped)}`);
     } finally {
       this.switching.delete(key);
     }
+  }
+
+  /**
+   * Its own subagents stopped at a usage limit while the session went on (a limit of their model alone), with Switch
+   * accounts on: once its turn has ended and none of them is still at work, and its account's usage says it is at a
+   * limit, another account with usage left takes the session over, and it is told to continue them there.
+   */
+  private async switchForSubagents(key: string) {
+    if (this.switching.has(key) || this.subagentsAtWork(key) || this.lives.get(key)?.adapter.state.status !== 'idle') return;
+    this.switching.add(key);
+    try {
+      const agent = agentOfKey(key) as 'claude' | 'codex';
+      const from = this.accountOf(key);
+      // A usage that could not be read never moves a session that is getting on with its work.
+      const own = await this.usageOf(agent, from, 60_000);
+      if (!own?.ok || !SessionManager.usedUp(own)) return;
+      const to = await this.freeAccount(agent, from);
+      const stopped = this.subagentsToContinue(key);
+      if (!to || !stopped.length || this.lives.get(key)?.adapter.state.status !== 'idle') return;
+      if (await this.carryOver(key, from, to.id)) return;
+      await this.deliverOrQueue(key, `${this.accountName(agent, from)} reached a usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`);
+    } finally {
+      this.switching.delete(key);
+    }
+  }
+
+  /** Whether a session's own subagents (Claude Code's Agent tool) are at work in the background. */
+  private subagentsAtWork(key: string): boolean {
+    const a = this.lives.get(key)?.adapter;
+    return !!a && !a.exited && [...a.tasks.values()].some((t) => t.status === 'running' && (t.kind ?? '').includes('agent'));
+  }
+
+  /**
+   * At a usage limit, waits for a session's own subagents still at work to stop, as they do at their next request (two
+   * minutes at most), and for the turn its agent starts on each one's notice to end. True when it waited.
+   */
+  private async subagentsStop(key: string, ms = 120_000, every = 2_000): Promise<boolean> {
+    const busy = () => this.subagentsAtWork(key) || ['working', 'starting'].includes(this.lives.get(key)?.adapter.state.status ?? '');
+    if (!busy()) return false;
+    for (const until = Date.now() + ms; busy() && Date.now() < until; ) await new Promise((r) => setTimeout(r, every));
+    return true;
+  }
+
+  /**
+   * A session's own subagents a move to another account lets go on, by what each was doing: those the plan's limit
+   * stopped, and any still at work, which the move cuts off. Each can be continued from where it stopped.
+   */
+  private subagentsToContinue(key: string): string[] {
+    const a = this.lives.get(key)?.adapter;
+    if (!a) return [];
+    const running = [...a.tasks.values()].filter((t) => t.status === 'running' && (t.kind ?? '').includes('agent')).map((t) => t.description);
+    return [...new Set([...a.limitTasks.values(), ...running])];
   }
 
   /** Sessions moving to another account right now. */
@@ -1618,9 +1706,26 @@ export class SessionManager extends EventEmitter {
     const from = this.accountOf(key);
     if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
     const to = await this.freeAccount(agent, from);
-    if (to) return this.carryOver(key, from, to.id);
+    if (to) {
+      const stopped = this.subagentsToContinue(key);
+      const goes = await this.carryOver(key, from, to.id);
+      // Its next message says so: the agent may be waiting for the old account's reset, for itself or its subagents.
+      this.moveNotes.set(key, `${this.accountName(agent, from)} reached its usage limit, so this session now runs on ${this.accountName(agent, to.id)}, which has usage left.${subagentsLine(stopped)}`);
+      return goes;
+    }
     if (agent === 'claude') await this.toCredit(key);
     return false;
+  }
+
+  /** What a session that moved to another account before a message is told with that message. */
+  private moveNotes = new Map<string, string>();
+
+  /** The move's note for the agent, once; a command ("/compact") leaves it for the next message. */
+  private takeMoveNote(key: string, text: string): string {
+    const note = this.moveNotes.get(key);
+    if (!note || text.trimStart().startsWith('/')) return '';
+    this.moveNotes.delete(key);
+    return note;
   }
 
   /**
@@ -2210,7 +2315,8 @@ export class SessionManager extends EventEmitter {
     l.adapter.limitStopped = false;
     this.emit('resumeCancelled', key);
     try {
-      await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text, takeFirst(l, text)), this.saveImages(images));
+      const first = [takeFirst(l, text), this.takeMoveNote(key, text)].filter(Boolean).join('\n\n');
+      await l.adapter.sendMessage(await withNotes(key, withFiles(text, this.saveFiles(files)), text, first), this.saveImages(images));
     } catch (e) {
       // A Custom process started before the update may not know _hydor/message. Keep the user's
       // original message and attachments in the persistent queue, without stopping its running turn.

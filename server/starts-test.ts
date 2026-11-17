@@ -147,7 +147,7 @@ test('a Custom process from before the update queues unsupported follow-ups with
   const m: any = {
     lives: new Map([[key, live]]), live: () => live, isCustom: () => true,
     switchBeforeSend: async () => {}, snapshot: async () => {}, limitHits: new Map(), userStopped: new Set(),
-    emit: () => {}, saveFiles: () => [], saveImages: (v: unknown) => v,
+    takeMoveNote: () => '', emit: () => {}, saveFiles: () => [], saveImages: (v: unknown) => v,
     enqueue: (...args: unknown[]) => queued.push(args), touchApp: () => {},
   };
   await proto.send.call(m, key, '/follow-up', images, files);

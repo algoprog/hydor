@@ -204,6 +204,12 @@ export function claudeModels(init: Json | undefined): ModelOption[] {
   }));
 }
 
+/**
+ * A background subagent's failure that the plan's usage limit caused, as its notice sums it up: 'Agent "…" failed: Agent
+ * terminated early due to an API error: You've hit your 5-hour limit · resets 4:20am (UTC) (error type rate_limit, …)'.
+ */
+const LIMIT_FAILURE = /\b(?:hit|reached) your\b.{0,40}?\blimit\b/i;
+
 /** Readable reasons for a turn that stopped early. */
 const RESULT_ERRORS: Record<string, string> = {
   error_max_turns: 'Stopped: the turn limit was reached',
@@ -400,16 +406,22 @@ export class ClaudeLive extends LiveAdapter {
           startedAt: replay ? undefined : Date.now(),
           toolUseId: m.tool_use_id,
         });
+        this.limitTasks.delete(m.task_id);
         break;
       case 'task_updated': {
         const t = this.tasks.get(m.task_id);
         if (t && m.patch?.status) t.status = m.patch.status === 'killed' ? 'stopped' : m.patch.status;
         if (t && m.patch?.description) t.description = m.patch.description;
+        if (m.patch?.status === 'running') this.limitTasks.delete(m.task_id);
         break;
       }
       case 'task_notification': {
         const t = this.tasks.get(m.task_id);
         if (t) t.status = m.status;
+        // A subagent the plan's usage limit stopped: its work is kept, and a message continues it on an account with usage.
+        if (m.status === 'failed' && LIMIT_FAILURE.test(String(m.summary ?? ''))) {
+          this.limitTasks.set(m.task_id, t?.description ?? /"([^"]+)"/.exec(String(m.summary))?.[1] ?? m.task_id);
+        } else this.limitTasks.delete(m.task_id);
         break;
       }
       case 'background_tasks_changed': {

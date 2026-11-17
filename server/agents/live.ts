@@ -72,6 +72,11 @@ export abstract class LiveAdapter extends EventEmitter {
   lastActivity = Date.now();
   /** The last completed turn actually stopped at a usage limit; undefined until its outcome is known. */
   limitStopped?: boolean;
+  /**
+   * Its own subagents (Claude Code's Agent tool) that the plan's usage limit stopped, by task id, with what each was
+   * doing: their work is kept, and a message to each continues it once an account has usage again.
+   */
+  limitTasks = new Map<string, string>();
   /** Cards the app asks for itself (a connected app's form), beside the agent's own approvals: answered here. */
   private asides = new Map<string, { done: (a: ApprovalAnswer | null) => void; check?: (a: ApprovalAnswer) => string | null }>();
 
