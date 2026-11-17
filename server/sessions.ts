@@ -45,6 +45,8 @@ import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custo
 import { customGoal } from './custom/goal.ts';
 import { titleFor } from './titles.ts';
 import { isConfidential } from '../shared/confidential.ts';
+import { browserHandoffFinish, browserHandoffStart } from './browser/browsing.ts';
+import { carriedBrowserOnly, checkBrowserOnlyHandoff } from './browser/handoff.ts';
 import { carriedExtra, checkHandoff, checkModelSwitch, confidentialStart, confidentialTitle, localModel } from './confidential/index.ts';
 import { agentStart } from './assistants/rules.ts';
 import { autoPlan, tierNote } from './assistants/auto.ts';
@@ -360,6 +362,13 @@ async function endProcess(pid: number) {
   await wait(2000);
 }
 
+
+/** What a fork or an edit of a session keeps of its settings: confidential, and browser-only (server/browser/handoff.ts). */
+function carried(db: DB, key: string): SessionExtra | undefined {
+  const a = carriedExtra(db, key);
+  const b = carriedBrowserOnly(db, key);
+  return a || b ? { ...a, ...b } : undefined;
+}
 export class SessionManager extends EventEmitter {
   lives = new Map<string, Live>();
   private timelines = new Map<string, Timeline>();
@@ -1372,6 +1381,8 @@ export class SessionManager extends EventEmitter {
     const picked = { effort: o.effort };
     // A confidential session (or a child of one): Custom with a local model, memory off (server/confidential).
     o = confidentialStart(this.db, o);
+    // Do this here (a tab of the user's own browsing): only an agent that can be kept to the browser, and a tab that is still there; it works in the browser alone.
+    o = browserHandoffStart(this.db, o);
     // Started as one of your agents: its tier's model when none was picked, and what is left of its monthly budget as its cap.
     o = agentStart(this.db, o);
     // Automatic: Best's model for its program; its own agent may step up to Max when a problem proves too hard for it.
@@ -1428,8 +1439,21 @@ export class SessionManager extends EventEmitter {
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: auto ? undefined : o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
+    // Do this here: the tab moves to the session's browser now, and its first message says the page is open there.
+    let handed = '';
+    if (o.extra?.browserHandoff) {
+      try {
+        handed = await browserHandoffFinish(l.key, cwd, o);
+      } catch (e) {
+        // The tab went between the check and now: a session with no page to work on is of no use.
+        await this.remove(l.key).catch(() => {});
+        throw e;
+      }
+    }
     const here = onThisComputer(o.paths);
-    const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
+    const attached = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
+    // A session given a page of your browsing (Do this here) hears where it is first, even with nothing else to say.
+    const prompt = handed ? (attached ? `${handed}\n\n${attached}` : handed) : attached;
     const images = [...(o.images ?? []), ...here.images];
     if (prompt || images.length) {
       // What the capabilities have to say of the request (an app that does it); not of a conversation handed over.
@@ -1526,8 +1550,8 @@ export class SessionManager extends EventEmitter {
           remember: false,
           account: this.accountOf(key),
           acpAgent: s.acpAgent,
-          // An edit of a confidential session stays confidential.
-          extra: carriedExtra(this.db, key),
+          // An edit of a confidential session stays confidential; one of a browser-only session stays browser-only.
+          extra: carried(this.db, key),
         });
     this.db.prepare('update app_sessions set title = ?, worktree = ? where key = ?').run(s.title, s.worktree ? JSON.stringify(s.worktree) : null, next);
     this.setFlags(key, { archived: true });
@@ -1574,6 +1598,7 @@ export class SessionManager extends EventEmitter {
    */
   async handoff(fromKey: string, o: Omit<CreateOpts, 'cwd' | 'title'>): Promise<string> {
     checkHandoff(this.db, fromKey);
+    checkBrowserOnlyHandoff(this.db, fromKey);
     if (fromKey.startsWith('acp:') || (o.agent === 'acp' && o.acpAgent !== CONSOLE_ID)) throw new HttpError(400, 'Hand-offs go from Claude Code or Codex to the other one or to Custom');
     const from = this.summary(fromKey);
     const cwd = this.sessionCwd(fromKey);
@@ -1607,9 +1632,11 @@ export class SessionManager extends EventEmitter {
     if (this.external.get(key) && !this.lives.has(key)) throw new HttpError(409, 'This session is open in another app; fork it there, or close it there first');
     const prefs = from.prefs ?? {};
     const cfg = { model: prefs.model ?? undefined, effort: prefs.effort ?? undefined, mode: prefs.mode ?? undefined, account: this.accountOf(key) };
-    // A fork of a confidential session stays confidential, on a model on this computer.
-    const extra = carriedExtra(this.db, key);
-    if (extra) cfg.model = localModel(featureDeps(), cfg.model ?? from.model).id;
+    // A fork of a confidential session stays confidential, on a model on this computer; a browser-only one stays
+    // browser-only (without the tab it was given: its browser starts fresh).
+    const secret = carriedExtra(this.db, key);
+    if (secret) cfg.model = localModel(featureDeps(), cfg.model ?? from.model).id;
+    const extra = carried(this.db, key);
     let l: Live;
     if (from.agent === 'claude') {
       if (o.at && !/^[0-9a-f-]{36}$/i.test(o.at)) throw new HttpError(400, 'Bad message id');

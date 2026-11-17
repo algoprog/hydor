@@ -87,12 +87,14 @@ import { exportRoutes } from './session-export.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { makeOf } from '../shared/content-asks.ts';
 import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from './confidential/index.ts';
+import { checkBrowserOnlyChange } from './browser/handoff.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
 import { claimSessions, syncFoundProjects } from './spaces/found.ts';
 import { sidebarPlaces, sidebarTools } from './sidebar/index.ts';
 import { folderOrigins } from './sidebar/origins.ts';
 import { useMachines } from './experiments/remote.ts';
+import { BROWSING_KEY } from '../shared/browser.ts';
 
 ensureDirs();
 ensureProbeDir();
@@ -1794,9 +1796,10 @@ app.register(async (scope) => {
             send(c, { t: 'kernel', id, e: { op: 'gone' } });
           }
         }
-      } else if (m.t !== 'ping' && typeof m.key === 'string' && (m.key.startsWith('preview:') || m.key.startsWith('page:'))) {
-        // A dev server's page streaming to Preview, or a page of the Library open in its editor (an agent's save of it
-        // shows as it comes: server/pages/drafts.ts): their news only, no session behind them.
+      } else if (m.t !== 'ping' && typeof m.key === 'string' && (m.key.startsWith('preview:') || m.key.startsWith('page:') || m.key === BROWSING_KEY || m.key.startsWith('browser-profile:'))) {
+        // A dev server's page streaming to Preview, a page of the Library open in its editor (an agent's save of it
+        // shows as it comes: server/pages/drafts.ts), your own browsing (the Browser page), or a profile's browser you
+        // sign in with: their news only, no session behind them.
         if (m.t === 'sub') c.subs.add(m.key);
         else if (m.t === 'unsub') c.subs.delete(m.key);
       } else if (m.t === 'sub' && m.key === SYSTEM_CHANNEL && !c.subs.has(m.key)) {
@@ -2001,6 +2004,8 @@ app.patch('/api/sessions/:key/extra', async (req) => {
   const patch = (req.body ?? {}) as Record<string, unknown>;
   // Confidential is set when a session starts and stays; memory stays off in one (server/confidential).
   checkExtraChange(db, key, patch);
+  // Browser-only (Do this here) is set when a session starts and stays (server/browser/handoff.ts).
+  checkBrowserOnlyChange(db, key, patch);
   const extra = setSessionExtra(db, key, patch);
   sessions.queueSummary(key);
   return { extra };

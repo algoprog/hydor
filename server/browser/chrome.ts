@@ -8,8 +8,9 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
-import type { ChromeDownload, ChromeInfo } from '../../shared/browser.ts';
+import { DESKTOP_CHROME, type ChromeDownload, type ChromeInfo } from '../../shared/browser.ts';
 import { config } from '../config.ts';
+import { desktopChromium } from '../desktop.ts';
 import { proxyArgs } from './proxy.ts';
 
 export const BROWSER_DIR = path.join(config.dataDir, 'browser');
@@ -136,12 +137,21 @@ function downloadedChromes(): ChromeInfo[] {
 
 let found: { at: number; list: ChromeInfo[] } | null = null;
 
-/** Every Chromium found, the best first: the system's, one downloaded here, Playwright's full one, its headless shell. */
+/** In the desktop app, its own browser: its pages show in the app's window, and you use them as in any browser. */
+function desktopChrome(): ChromeInfo[] {
+  return desktopChromium ? [{ path: DESKTOP_CHROME, source: 'desktop', label: 'The desktop app’s own browser', version: desktopChromium }] : [];
+}
+
+/**
+ * Every Chromium found, the best first: the desktop app's own (in the desktop app), the system's, one downloaded here,
+ * Playwright's full one, its headless shell.
+ */
 export function findChromes(): ChromeInfo[] {
   if (found && Date.now() - found.at < 30_000) return found.list.map((c) => ({ ...c, version: c.version ?? (versionOf(c.path) || undefined) }));
   const pw = playwrightChromes();
-  const list = [...systemChromes(), ...downloadedChromes(), ...pw.filter((c) => !c.shell), ...pw.filter((c) => c.shell)];
+  const list = [...desktopChrome(), ...systemChromes(), ...downloadedChromes(), ...pw.filter((c) => !c.shell), ...pw.filter((c) => c.shell)];
   for (const c of list) {
+    if (c.source === 'desktop') continue;
     readVersion(c.path);
     c.version ??= versionOf(c.path) || undefined;
   }
@@ -185,6 +195,11 @@ interface LaunchOpts {
    * PDF or picture made on a Linux server sets lines wider than the editor shows them on a Mac or Windows (or Word).
    */
   exactText?: boolean;
+  /**
+   * Unpacked extensions to load (your own browsing's, or those you let agents use in a profile). Chromium and Chrome for
+   * Testing load them; Google Chrome itself has stopped taking them this way, and then runs without.
+   */
+  extensions?: string[];
 }
 
 function args(o: LaunchOpts, sandbox: boolean): string[] {
@@ -209,6 +224,13 @@ function args(o: LaunchOpts, sandbox: boolean): string[] {
     '--window-size=1280,800',
     ...(o.proxy ? proxyArgs(o.proxy) : []),
   ];
+  if (o.extensions?.length) {
+    const list = o.extensions.join(',');
+    a.push(`--load-extension=${list}`, `--disable-extensions-except=${list}`);
+    // Chrome 137 to 141 still load them when this is off.
+    const i = a.findIndex((x) => x.startsWith('--disable-features='));
+    a[i] += ',DisableLoadExtensionCommandLineSwitch';
+  }
   if (o.headless || o.shell) a.push('--headless');
   if (o.exactText) a.push('--font-render-hinting=none');
   if (!sandbox) a.push('--no-sandbox');

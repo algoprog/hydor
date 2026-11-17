@@ -38,6 +38,10 @@ const RULES: Rule[] = [
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
   ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],
   ['*', /^\/api\/browser\/sessions\//, 'refuse', 'Use the browser tools (browser_open, browser_act, browser_read) for that.'],
+  // The user's own browsing (the Browser page) is theirs alone: agents get a page of it only when the user hands it to them (Do this here).
+  ['*', /^\/api\/browser\/browsing(\/|$)/, 'refuse', 'That is the user’s own browsing, which agents never use. Use the browser tools for the web; the user can hand you a page with Do this here on the Browser page.'],
+  // An extension runs in the user's own browsing with its sign-ins: adding, removing or switching one is the user's say each time, in every mode.
+  ['W', /^\/api\/browser\/extensions(\/|$)/, 'ask', 'An extension runs in your own browsing, where you are signed in, and can read the sites it asks for.'],
   ['*', /^\/api\/computer\/sessions\//, 'refuse', 'Use the computer tools (computer_screenshot, computer_act) for that.'],
   ['POST', /^\/api\/computer\/permissions\//, 'refuse', 'macOS asks the user for these permissions itself: tell them to press Allow in Settings → Capabilities → Computer use.'],
   ['*', /^\/api\/sessions\/[^/]+\/approvals\//, 'refuse', 'Only the user answers approval cards.'],

@@ -109,8 +109,8 @@ interface DragBits {
 /** A drop ends with a click on the tool under the pointer; that click is ignored. */
 let lastDragEnd = 0;
 
-/** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
-function NavItem({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void }) {
+/** A tool: icon over label, four to a row (five with nine tools: two rows), so the sessions keep the room (on phones and computers alike). */
+function NavItem({ t, drag, floating, onMenu, tight }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void; tight?: boolean }) {
   return (
     <button
       ref={drag?.ref}
@@ -128,18 +128,19 @@ function NavItem({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floa
       )}
     >
       <span className={cx('shrink-0', t.match ? 'text-fg' : 'text-fg-3')}>{t.icon}</span>
-      <span className="max-w-full truncate px-1 leading-none">{t.label}</span>
+      <span className={cx('max-w-full truncate leading-none', tight ? 'px-0.5 text-[11px]' : 'px-1')}>{t.label}</span>
       {t.extra}
     </button>
   );
 }
 
 /** A tool that drags into another place among them, as sessions do in their list. */
-function SortableTool({ t, onMenu }: { t: Tool; onMenu: (e: ReactMouseEvent<HTMLElement>) => void }) {
+function SortableTool({ t, onMenu, tight }: { t: Tool; onMenu: (e: ReactMouseEvent<HTMLElement>) => void; tight?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id });
   return (
     <NavItem
       t={t}
+      tight={tight}
       onMenu={onMenu}
       drag={{ ref: setNodeRef, style: { transform: CSS.Transform.toString(transform), transition }, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLButtonElement>) }, lifted: isDragging }}
     />
@@ -203,6 +204,8 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
     { id: 'help', label: 'Help', icon: <CircleHelp size={17} />, match: loc === '/guide' || loc.startsWith('/guide/'), go: () => nav('/guide') },
   ];
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  // Nine tools or more: five to a row, so they make two rows (not two and a lone one).
+  const wide = tools.length >= 9;
   const dragging = dragId ? tools.find((t) => t.id === dragId) : undefined;
 
   const onToolDrop = ({ active, over }: DragEndEvent) => {
@@ -357,14 +360,14 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
       >
         {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
-        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
+        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className={cx('grid shrink-0 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', wide ? 'grid-cols-5' : 'grid-cols-4')}>
           <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
             {tools.map((t) => (
-              <SortableTool key={t.id} t={t} onMenu={onToolMenu} />
+              <SortableTool key={t.id} t={t} tight={wide} onMenu={onToolMenu} />
             ))}
           </SortableContext>
         </nav>
-        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating /> : null}</DragOverlay>, document.body)}
+        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating tight={wide} /> : null}</DragOverlay>, document.body)}
       </DndContext>
       <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
         <MenuItem

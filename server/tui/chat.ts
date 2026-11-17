@@ -16,13 +16,14 @@ import readline from 'node:readline';
 import { agentMode, type Assistant } from '../../shared/assistants.ts';
 import type { AppField } from '../../shared/apps.ts';
 import { childLabel } from '../../shared/children.ts';
+import type { BrowserView } from '../../shared/browser.ts';
 import type { AgentCatalog, AgentUsage, ApprovalRequest, Question, ServerEvent, SessionSummary, TimelineItem } from '../../shared/types.ts';
 import type { Opts } from './args.ts';
 import { enc, spentOf, type Conn } from './client.ts';
 import { conversationLines, openBrowser, resolveKey, sessionLines, shortKey, statusWord, tierLines, usageLines, whyNoReply } from './commands.ts';
 import { commandItems, contextOf, filterKeep, historyItems, listsFolder, menuRows, rank, windowTop, type Context, type Item, type Ranked } from './complete.ts';
 import { ghostOf, ghostWord, KeyReader, layout, LineEditor, type Key } from './editor.ts';
-import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, choiceLine, INDENT, isDeny, itemLines, LOGO, logo, modelLabel, runningLine, shimmer, stepLines, textLines, tierName, type Look } from './lines.ts';
+import { approvalBody, approvalKeys, approvalLines, approvalNeedsApp, askBody, browserCard, browserCardId, browserCardLines, browserChoiceLine, browserKeys, choiceLine, dialogBody, INDENT, isDeny, itemLines, LOGO, logo, modelLabel, runningLine, shimmer, stepLines, textLines, tierName, type Look } from './lines.ts';
 import { backgroundEnd, busy, historyLines, lastReply, Printer, SessionView } from './session.ts';
 import { Screen, suspend, takeTerminal } from './screen.ts';
 import { setTerminalPref, terminalPrefs, type TerminalPrefs } from './settings-table.ts';
@@ -125,6 +126,8 @@ export class Chat {
   private tiers: TiersState | null = null;
   private ui: Ui = { kind: 'input' };
   private shown = new Set<string>();
+  /** The browser card whose lines are printed (it prints again only after it went away and another came). */
+  private browserShown = '';
   private pending: TimelineItem[] = [];
   private starting = 0;
   private notice: { text: string; until: number } | null = null;
@@ -391,6 +394,15 @@ export class Chat {
       else if (a.form?.fields.length) this.ui = { kind: 'form', a, fi: 0, values: Object.fromEntries(a.form.fields.map((f) => [f.id, f.default ?? ''])) };
       if (this.plain) out.push(...this.cardPrompt());
     }
+    // What the agent's browser waits for (an ask, a page's pop-up question) shows as a card once no approval is ahead of it.
+    const bc = view.overlay.approvals.length ? undefined : browserCard(view.browser);
+    if (!bc) {
+      if (!view.overlay.approvals.length) this.browserShown = '';
+    } else if (this.browserShown !== browserCardId(bc)) {
+      this.browserShown = browserCardId(bc);
+      out.push(...this.printer.aside(browserCardLines(bc, this.look)));
+      if (this.plain) out.push(...this.cardPrompt());
+    }
     // A card answered elsewhere (the web app, or the turn ended) goes away here too.
     if ((this.ui.kind === 'question' || this.ui.kind === 'form') && !view.overlay.approvals.some((a) => a.id === (this.ui as { a: ApprovalRequest }).a.id)) this.ui = { kind: 'input' };
     this.write(out);
@@ -477,7 +489,7 @@ export class Chat {
     if ((view?.summary?.queue?.length ?? 0) > 3) rows.push(`${INDENT}${p.dim(`◦ and ${view!.summary!.queue!.length - 3} more`)}`);
     if (this.working()) {
       const l = view?.live;
-      const waiting = l?.status === 'waiting' || !!view?.overlay.approvals.length;
+      const waiting = l?.status === 'waiting' || !!view?.overlay.approvals.length || !!view?.browserWaiting();
       const word = this.starting ? 'Starting' : waiting ? 'Needs you' : l?.status === 'starting' ? 'Starting' : l?.status === 'stopping' ? 'Stopping' : 'Working';
       const since = l?.turnStartedAt ?? (this.starting || undefined);
       // The spinner shades across the logo's colours, frame by frame, and a brighter band sweeps the word.
@@ -541,6 +553,9 @@ export class Chat {
     if (this.ui.kind === 'question') return 'A number picks · your own words, then Enter · Esc skips';
     if (this.ui.kind === 'form') return 'Your answer, then Enter · Esc declines';
     if (a) return 'A key above answers · or say what to do instead, then Enter';
+    const bc = browserCard(this.view?.browser);
+    if (bc?.kind === 'dialog' && bc.dialog.type === 'prompt') return 'Type the answer, then Enter · y keeps the default · n cancels';
+    if (bc) return 'A key above answers';
     if (this.working()) return this.prefs().enter === 'join' ? 'Enter sends into the running turn · /queue waits for its end' : 'Enter queues it for when the turn ends · /now joins the turn';
     return this.view ? 'Message the agent · /help' : 'What should the agent do? · /help';
   }
@@ -573,14 +588,21 @@ export class Chat {
       return out;
     }
     const a = this.view?.overlay.approvals[0];
-    if (!a || approvalNeedsApp(a)) return [];
+    if (!a) {
+      const bc = browserCard(this.view?.browser);
+      return bc ? [browserChoiceLine(bc, look)] : [];
+    }
+    if (approvalNeedsApp(a)) return [];
     return [choiceLine(a, look)];
   }
 
   /** In plain mode: what to type to answer the card now waiting. */
   private cardPrompt(): string[] {
     const a = this.view?.overlay.approvals[0];
-    if (!a) return [];
+    if (!a) {
+      const bc = browserCard(this.view?.browser);
+      return bc ? [browserChoiceLine(bc, this.look), `${INDENT}  Type a key and Enter${bc.kind === 'dialog' && bc.dialog.type === 'prompt' ? ', or your answer' : ''}.`] : [];
+    }
     if (this.ui.kind === 'question' || this.ui.kind === 'form') return this.cardRows(this.look);
     return [choiceLine(a, this.look), `${INDENT}  Type a key and Enter, or what to do instead.`];
   }
@@ -734,7 +756,14 @@ export class Chat {
       return true;
     }
     const a = this.view?.overlay.approvals[0];
-    if (!a || approvalNeedsApp(a)) return false;
+    if (!a) {
+      const bc = browserCard(this.view?.browser);
+      const key = bc && browserKeys(bc).find((x) => x.key === c.toLowerCase());
+      if (!bc || !key) return false;
+      void this.answerBrowser(bc, key.do);
+      return true;
+    }
+    if (approvalNeedsApp(a)) return false;
     const hit = approvalKeys(a).find((x) => x.key === c.toLowerCase());
     if (!hit) return false;
     void this.answer(a, hit.option.id);
@@ -791,6 +820,9 @@ export class Chat {
       const no = a.options.find(isDeny);
       if (no) return this.answer(a, no.id, t);
     }
+    // Words with a page's prompt waiting: they are its answer.
+    const bc = a ? undefined : browserCard(this.view?.browser);
+    if (bc?.kind === 'dialog' && bc.dialog.type === 'prompt' && t) return this.answerBrowser(bc, 'accept', text);
     if (!t) return;
     this.editor.remember(text);
     keepHistory(this.histFile, text, this.editor.history);
@@ -880,6 +912,35 @@ export class Chat {
     } finally {
       this.busyAsk = false;
       this.render();
+    }
+  }
+
+  /** Answers what the agent's browser waits for: an ask (done or skipped), a pop-up question (OK or Cancel, with the typed text for a prompt), or opens the session in the app to take over there. */
+  private async answerBrowser(c: NonNullable<ReturnType<typeof browserCard>>, what: 'open' | 'done' | 'skipped' | 'accept' | 'dismiss', text?: string) {
+    if (!this.view || this.busyAsk) return;
+    const { p } = this.look;
+    const key = this.view.key;
+    if (what === 'open') {
+      openBrowser(this.conn.url(key));
+      return this.flash(p.dim(`Opened ${this.conn.url(key)}: take over there, or answer here`), 6000);
+    }
+    this.busyAsk = true;
+    try {
+      const res =
+        c.kind === 'ask'
+          ? await this.conn.api<{ view?: BrowserView }>('POST', `/api/browser/sessions/${enc(key)}/asks/${enc(c.ask.id)}`, askBody(what === 'done' ? 'done' : 'skipped'))
+          : await this.conn.api<{ view?: BrowserView }>('POST', `/api/browser/sessions/${enc(key)}/dialog`, dialogBody(c.dialog, what === 'accept', text?.replace(/\n$/, '')));
+      if (res?.view) this.view.browser = res.view;
+      // An ask's answer comes back as its note's one line; a pop-up question has none, so its answer is said here.
+      if (c.kind === 'dialog') {
+        const words = browserKeys(c).find((k) => k.do === what)?.label ?? what;
+        this.write(this.printer.aside([truncate(`${INDENT}${what === 'accept' ? p.green('✓') : p.yellow('✗')} ${p.dim(`${words}${text?.trim() ? `: ${text.trim()}` : ''}`)}`, this.look.width)]));
+      }
+    } catch (e) {
+      this.flash(p.red(`It was not answered: ${(e as Error).message}`));
+    } finally {
+      this.busyAsk = false;
+      this.update();
     }
   }
 

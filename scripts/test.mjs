@@ -23,6 +23,8 @@ const NEEDS = {
   'server/computer/windows-test.ts': 'Windows',
   'server/computer/x11-test.ts': 'an X display',
   'server/desktop-test.ts': 'the desktop app built (desktop/)',
+  // Run by hand or CI with node (not found by the walk below, which takes only .ts): the browser check on the desktop app's own browser.
+  'desktop/scripts/browser-selftest.mjs': 'the desktop app (Electron in desktop/node_modules) and a display (xvfb-run on Linux)',
   'server/mail/live-test.ts': 'a test mail server (GreenMail; see the file)',
 };
 

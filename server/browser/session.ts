@@ -5,16 +5,21 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { BrowserAsk, BrowserDialog, BrowserInput, BrowserNote, BrowserView, ChromeInfo } from '../../shared/browser.ts';
+import os from 'node:os';
+import { BROWSING_KEY, BROWSING_PROFILE, DESKTOP_CHROME, type BrowserAsk, type BrowserDialog, type BrowserInput, type BrowserNote, type BrowserPermissionAsk, type BrowserView, type ChromeInfo } from '../../shared/browser.ts';
 import type { AgentPointer, PointerAct, Way } from '../../shared/pointer.ts';
+import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
 import { addNote, notesOf, updateNote } from '../notes.ts';
 import { Cdp, CdpSession } from './cdp.ts';
 import { BROWSER_DIR, launchChrome, pickChrome, plainUserAgent } from './chrome.ts';
-import { refusal, type Policy } from './guard.ts';
+import { launchDesktop, onDesktopInput, sendExtensions } from './desktopEngine.ts';
+import { extensionsFor, onExtensionsChange } from './extensions.ts';
+import { hostPort, isPrivate, refusal, type Policy } from './guard.ts';
 import { BrowserProxy, contextProxy } from './proxy.ts';
-import { browserSettings, profileDir, profiles, sessionOptions } from './settings.ts';
+import { allow, hostOf } from './confirm.ts';
+import { browserSettings, cleanSites, profileDir, profiles, sessionOptions, setSessionOptions } from './settings.ts';
 import { shownUrl } from './outline.ts';
 import { sleep, Tab, type ElRef, type TabOwner } from './tab.ts';
 import { captureJpeg } from './jpeg.ts';
@@ -40,6 +45,23 @@ const d = () => {
 
 // ---- Chromium processes ------------------------------------------------------------------------------
 
+/** What a browser's process is to the rest: a Chromium the server started, or the desktop app's own (desktopEngine.ts). */
+interface Proc {
+  pid?: number;
+  kill(signal?: NodeJS.Signals | number): boolean;
+  on(event: 'exit', fn: (...args: unknown[]) => void): unknown;
+}
+
+/** The extensions a profile's browser loads: all you turned on in your own browsing; in a profile, those you let agents use. */
+function extensionsOf(profile: string): { id: string; path: string }[] {
+  if (!profile) return [];
+  try {
+    return extensionsFor(d().db, profile === BROWSING_PROFILE ? 'browsing' : 'agents');
+  } catch {
+    return [];
+  }
+}
+
 class Chromium {
   readonly cdp: Cdp;
   ua = '';
@@ -60,9 +82,11 @@ class Chromium {
     readonly profile: string,
     readonly chrome: ChromeInfo,
     readonly dir: string,
-    readonly proc: import('node:child_process').ChildProcess,
+    readonly proc: Proc,
     cdp: Cdp,
     private proxy: BrowserProxy,
+    /** The desktop app's connection to its own browser (desktopEngine.ts), when this is that one. */
+    readonly conn: string | null = null,
   ) {
     this.cdp = cdp;
     cdp.onClose(() => this.gone());
@@ -70,8 +94,10 @@ class Chromium {
   }
 
   static async start(profile: string, chrome: ChromeInfo, headless: boolean): Promise<Chromium> {
-    const dir = profile ? profileDir(profile) : path.join(BROWSER_DIR, 'run', `fresh-${process.pid}`);
-    if (!profile) fs.rmSync(dir, { recursive: true, force: true });
+    // The desktop app's own browser keeps its profiles itself (in its own folder): no folder here.
+    const own = chrome.path === DESKTOP_CHROME;
+    const dir = own ? '' : profile ? profileDir(profile) : path.join(BROWSER_DIR, 'run', `fresh-${process.pid}`);
+    if (!profile && dir) fs.rmSync(dir, { recursive: true, force: true });
     // Everything outside a session's own context goes through the process's proxy: a named profile's
     // sessions (they share its context), and the pages the app opens for itself.
     let self: Chromium | null = null;
@@ -80,9 +106,26 @@ class Chromium {
       policy: () => (self ? self.sharedPolicy() : globalPolicy()),
       refused: (target, why) => self?.sharedRefused(target, why),
     });
+    if (own) {
+      let launched: Awaited<ReturnType<typeof launchDesktop>>;
+      try {
+        launched = await launchDesktop({ profile, proxy: proxy.port, extensions: extensionsOf(profile) });
+      } catch (e) {
+        proxy.close();
+        throw e;
+      }
+      const c = (self = new Chromium(profile, chrome, dir, launched.proc, launched.cdp, proxy, launched.conn));
+      try {
+        await c.init();
+      } catch (e) {
+        c.gone();
+        throw e;
+      }
+      return c;
+    }
     let launched: Awaited<ReturnType<typeof launchChrome>>;
     try {
-      launched = await launchChrome(chrome, { userDataDir: dir, headless, proxy: proxy.port });
+      launched = await launchChrome(chrome, { userDataDir: dir, headless, proxy: proxy.port, extensions: extensionsOf(profile).map((x) => x.path) });
     } catch (e) {
       proxy.close();
       throw e;
@@ -102,6 +145,11 @@ class Chromium {
     return c;
   }
 
+  /** Runs on the desktop app's own browser (its pages can show in the app's window). */
+  get native(): boolean {
+    return this.conn !== null;
+  }
+
   /** The sessions in the process's shared context: a named profile's. */
   private shared(): SessionBrowser[] {
     return [...browsers.values()].filter((b) => b.chromium === this && !b.closed && !b.context);
@@ -109,6 +157,9 @@ class Chromium {
 
   /** The shared context's rules: the app's settings, and the addresses any of its sessions allowed (each page's requests are still held to its own session's). */
   sharedPolicy(): Policy {
+    // Your own browsing goes where you go, this machine and its network too (never to Hydor itself: the proxy refuses
+    // that whatever the rules); a tab you hand an agent is held to its session's rules page by page (handOver).
+    if (this.profile === BROWSING_PROFILE) return { blockPrivate: false, allow: [], block: [], local: [] };
     const g = globalPolicy();
     return { ...g, local: [...new Set(this.shared().flatMap((b) => b.policy().local))] };
   }
@@ -139,13 +190,15 @@ class Chromium {
       const t = sid ? this.sessions.get(sid) : undefined;
       if (t) this.frames.set(p.frameId, t);
     });
-    this.cdp.on('Fetch.requestPaused', (p) => void this.paused(p), '');
+    // The guard's pauses: the whole browser's, and a single tab's (a tab of your own browsing handed to an agent).
+    this.cdp.on('Fetch.requestPaused', (p, sid) => void this.paused(p, sid));
     this.cdp.on('Browser.downloadWillBegin', (p) => this.downloadBegins(p), '');
     this.cdp.on('Browser.downloadProgress', (p) => this.downloadProgress(p), '');
     await this.cdp.send('Target.setDiscoverTargets', { discover: true });
     await this.cdp.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
-    // Every request of every page, frame and worker passes through the guard.
-    await this.cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
+    // Every request of every page, frame and worker passes through the guard; your own browsing's do not (a tab you hand
+    // an agent does, from then on: guardTab).
+    if (this.profile !== BROWSING_PROFILE) await this.cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
     await this.cdp.send('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: STAGING, eventsEnabled: true });
   }
 
@@ -175,8 +228,11 @@ class Chromium {
     return this.serial(async () => {
       this.creating = owner;
       try {
-        // No window size here: a tab in an existing window cannot have one (each tab's page size is set on it).
-        const { targetId } = await this.cdp.send('Target.createTarget', { url: 'about:blank', ...(ctx ? { browserContextId: ctx } : {}) });
+        // No window size here: a tab in an existing window cannot have one (each tab's page size is set on it). In the
+        // desktop app's browser for your own browsing, an agent's tab is told apart (hydorAgent): it is drawn off screen,
+        // so it works whether or not the window shows it; your own tabs are pages the window shows.
+        const agentTab = this.native && this.profile === BROWSING_PROFILE && owner.key !== BROWSING_KEY;
+        const { targetId } = await this.cdp.send('Target.createTarget', { url: 'about:blank', ...(ctx ? { browserContextId: ctx } : {}), ...(agentTab ? { hydorAgent: true } : {}) });
         for (let i = 0; i < 100 && !this.tabs.has(targetId); i++) await sleep(50);
         const t = this.tabs.get(targetId);
         if (!t) throw new Error('The new tab did not open');
@@ -209,7 +265,8 @@ class Chromium {
       return;
     }
     const opener = info.openerId ? this.tabs.get(info.openerId) : undefined;
-    const owner = this.contexts.get(info.browserContextId) ?? (opener ? ownerOf(opener) : undefined) ?? this.creating;
+    // A tab nobody asked for in your own browsing (an extension opened it) is yours.
+    const owner = this.contexts.get(info.browserContextId) ?? (opener ? ownerOf(opener) : undefined) ?? this.creating ?? (this.profile === BROWSING_PROFILE ? browserOf(BROWSING_KEY) : undefined);
     if (!owner || owner.closed) {
       await s.send('Runtime.runIfWaitingForDebugger').catch(() => {});
       return;
@@ -220,7 +277,14 @@ class Chromium {
     this.sessions.set(p.sessionId, tab);
     owner.pendingTabs++;
     // Set up before its page runs: the commands go out first, then it resumes (a popup waits on both).
-    const init = tab.init(owner.viewportFor()).catch((e) => console.error(`[browser] tab setup: ${(e as Error).message}`));
+    // Your own browsing in the desktop app has no page size of its own: the app's window gives each page one.
+    const free = this.native && owner.key === BROWSING_KEY;
+    // A tab (a popup too) that an agent works in, in your browsing's browser, is held to that session's rules from its first request.
+    const guarded = this.profile === BROWSING_PROFILE && owner.key !== BROWSING_KEY;
+    const init = tab
+      .init(owner.viewportFor(), free)
+      .then(() => (guarded ? this.guardTab(tab) : undefined))
+      .catch((e) => console.error(`[browser] tab setup: ${(e as Error).message}`));
     await s.send('Runtime.runIfWaitingForDebugger').catch(() => {});
     await init;
     owner.pendingTabs--;
@@ -248,9 +312,9 @@ class Chromium {
     this.dropTab(t);
   }
 
-  /** The guard: each request goes on, or fails before it leaves. */
-  private async paused(p: any) {
-    const tab = p.frameId ? this.frames.get(p.frameId) : undefined;
+  /** The guard: each request goes on, or fails before it leaves (answered where it was paused: the browser, or a tab). */
+  private async paused(p: any, sid?: string) {
+    const tab = (p.frameId ? this.frames.get(p.frameId) : undefined) ?? (sid ? this.sessions.get(sid) : undefined);
     const policy = tab ? ownerOf(tab).policy() : globalPolicy();
     let why: string | null = null;
     try {
@@ -260,8 +324,24 @@ class Chromium {
     }
     if (why) {
       if (tab) noteBlocked(tab, String(p.request.url), why);
-      await this.cdp.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'BlockedByClient' }).catch(() => {});
-    } else await this.cdp.send('Fetch.continueRequest', { requestId: p.requestId }).catch(() => {});
+      await this.cdp.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'BlockedByClient' }, sid).catch(() => {});
+    } else await this.cdp.send('Fetch.continueRequest', { requestId: p.requestId }, sid).catch(() => {});
+  }
+
+  /** From now on every request of this tab (of your own browsing) passes the guard, held to its owner's rules. */
+  async guardTab(t: Tab) {
+    if (this.profile !== BROWSING_PROFILE) return;
+    t.guarded = true;
+    const on = { patterns: [{ urlPattern: '*', requestStage: 'Request' }] };
+    await t.s.send('Fetch.enable', on);
+    // Frames in processes of their own (other sites' iframes) have their own sessions.
+    for (const f of t.frames.values()) await f.send('Fetch.enable', on).catch(() => {});
+  }
+
+
+  /** The tab with this target id, in this browser. */
+  tabOf(targetId: string): Tab | undefined {
+    return this.tabs.get(targetId);
   }
 
   private downloadBegins(p: any) {
@@ -282,7 +362,7 @@ class Chromium {
       return dl.owner.downloadEnded(dl.name, null);
     }
     try {
-      const dir = path.join(dl.owner.cwd, 'downloads');
+      const dir = dl.owner.downloadDir();
       fs.mkdirSync(dir, { recursive: true });
       const to = freeName(dir, dl.name);
       try {
@@ -343,7 +423,7 @@ class Chromium {
     this.gone();
   }
 
-  private gone() {
+  gone() {
     if (this.closed) return;
     this.closed = true;
     this.cdp.close();
@@ -354,7 +434,7 @@ class Chromium {
     this.proxy.close();
     for (const t of [...this.tabs.values()]) this.dropTab(t);
     if (processes.get(this.profile) === this) processes.delete(this.profile);
-    if (!this.profile) fs.rmSync(this.dir, { recursive: true, force: true });
+    if (!this.profile && this.dir) fs.rmSync(this.dir, { recursive: true, force: true });
     for (const b of [...browsers.values()]) if (b.chromium === this) void b.close('The browser stopped');
   }
 }
@@ -441,8 +521,17 @@ function globalPolicy(): Policy {
 export const profileKey = (id: string) => `browser-profile:${id}`;
 /** …or a dev server's page streaming to Preview, where the browser can't reach the preview port (server/preview.ts). */
 export const previewKey = (port: number) => `preview:${port}`;
-/** Neither has an agent to tell, cards in a conversation, or a session's options. */
-export const outsideSessions = (key: string) => key.startsWith('browser-profile:') || key.startsWith('preview:');
+/** None of these has an agent to tell, cards in a conversation, or a session's options; nor has your own browsing. */
+export const outsideSessions = (key: string) => key === BROWSING_KEY || key.startsWith('browser-profile:') || key.startsWith('preview:');
+
+/** Where your own browsing saves what it downloads: your Downloads folder (your home folder when there is none). */
+export function downloadsFolder(): string {
+  const d = path.join(os.homedir(), 'Downloads');
+  try {
+    if (fs.statSync(d).isDirectory()) return d;
+  } catch {}
+  return os.homedir();
+}
 /** A preview's page reaches its own dev server, by each name of this machine, and nothing else here. */
 const previewLocal = (key: string): string[] => {
   const port = key.startsWith('preview:') ? Number(key.slice('preview:'.length)) : 0;
@@ -458,6 +547,8 @@ export class SessionBrowser implements TabOwner {
   active: Tab | null = null;
   driver: 'agent' | 'user' = 'agent';
   asks: BrowserAsk[] = [];
+  /** What the user allowed pressing on signed-in sites (confirm.ts): the button's words and site, until when. */
+  allowed = new Map<string, number>();
   busy: string | undefined;
   downloads: BrowserView['downloads'] = [];
   refs = new Map<number, ElRef>();
@@ -495,6 +586,16 @@ export class SessionBrowser implements TabOwner {
   get ownBrowser() {
     return outsideSessions(this.key);
   }
+
+  /** Where its downloads go: the session's folder's downloads (your Downloads folder, for your own browsing). */
+  downloadDir(): string {
+    return this.key === BROWSING_KEY ? this.cwd : path.join(this.cwd, 'downloads');
+  }
+
+  /** Where the tabs it was given came from (Do this here): the site it is kept to. */
+  handedFrom: string | undefined;
+  /** A site asks for a permission in your own browsing: yours to answer (browsing.ts keeps the queue). */
+  permission: BrowserPermissionAsk | null = null;
 
   /** The size Preview shows its page at: new tabs open at it too. */
   fit: { w: number; h: number; mobile: boolean; scale: number } | null = null;
@@ -552,7 +653,10 @@ export class SessionBrowser implements TabOwner {
     this.tabs = this.tabs.filter((t) => t !== tab);
     for (const [id, r] of this.refs) if (r.tab === tab) this.refs.delete(id);
     if (this.active === tab) this.setActive(this.tabs[this.tabs.length - 1] ?? null);
-    if (!this.tabs.length && !this.closed) void this.close('Its last tab closed');
+    // Your own browsing is never left without a tab (it is not closed by closing the last one, as an agent's is).
+    if (!this.tabs.length && !this.closed && this.key === BROWSING_KEY) {
+      if (!this.chromium.closed) void this.newTab().catch(() => {});
+    } else if (!this.tabs.length && !this.closed) void this.close('Its last tab closed');
     this.changed();
   }
 
@@ -586,7 +690,16 @@ export class SessionBrowser implements TabOwner {
       open: !this.closed,
       profile: this.profile || undefined,
       profileName: prof?.name,
-      tabs: this.tabs.map((t) => ({ id: t.targetId, title: t.title, url: t.url, active: t === this.active, loading: t.navigating || undefined })),
+      tabs: this.tabs.map((t) => ({
+        id: t.targetId,
+        title: t.title,
+        url: t.url,
+        active: t === this.active,
+        loading: t.navigating || undefined,
+        ...(t.favicon ? { favicon: t.favicon } : {}),
+        ...(t.canGoBack ? { canGoBack: true } : {}),
+        ...(t.canGoForward ? { canGoForward: true } : {}),
+      })),
       driver: this.driver,
       busy: this.busy,
       asks: this.asks,
@@ -594,6 +707,9 @@ export class SessionBrowser implements TabOwner {
       viewport: { w: this.active?.viewport.w ?? DESKTOP.w, h: this.active?.viewport.h ?? DESKTOP.h, mobile: this.active?.viewport.mobile || undefined },
       downloads: this.downloads,
       ...(this.pointer ? { pointer: this.pointer } : {}),
+      engine: this.chromium.native ? 'desktop' : 'chrome',
+      ...(this.handedFrom ? { handedFrom: this.handedFrom } : {}),
+      ...(this.permission ? { permission: this.permission } : {}),
     };
   }
 
@@ -605,6 +721,8 @@ export class SessionBrowser implements TabOwner {
 
   async newTab(): Promise<Tab> {
     const t = await this.chromium.newTab(this, this.context);
+    // The tab is in the list once it is set up (adopt): callers may count on it being there.
+    for (let i = 0; i < 100 && !this.tabs.includes(t) && !t.closed && !this.closed; i++) await sleep(20);
     this.setActive(t);
     return t;
   }
@@ -717,7 +835,9 @@ export class SessionBrowser implements TabOwner {
     if (on) {
       this.driver = 'user';
       const t = await this.tab();
-      if (fit && fit.w > 200 && fit.h > 200) await t.setViewport(Math.round(fit.w), Math.round(fit.h), true, Math.min(3, Math.max(1, fit.scale)));
+      if (t.free) {
+        // The app's window sizes the page.
+      } else if (fit && fit.w > 200 && fit.h > 200) await t.setViewport(Math.round(fit.w), Math.round(fit.h), true, Math.min(3, Math.max(1, fit.scale)));
       else if (t.viewport.mobile) await t.setViewport(DESKTOP.w, DESKTOP.h, false, 1);
       if (this.cast && Date.now() < this.watchUntil) await this.startCast();
     } else {
@@ -778,7 +898,7 @@ export class SessionBrowser implements TabOwner {
     if (!this.ownBrowser) {
       const anchor = await lastItem(this.key);
       addNote(d().db, { key: this.key, kind: 'browser', anchor, data: { ask: a, status: 'waiting' } satisfies BrowserNote });
-      notifyUser(this.key, kind === 'local' ? `Asks to open ${a.text}` : kind === 'payment' ? `Stopped before paying: ${a.text}` : `Needs you in the browser: ${a.text}`);
+      notifyUser(this.key, kind === 'local' ? `Asks to open ${a.text}` : kind === 'payment' ? `Stopped before paying: ${a.text}` : kind === 'confirm' ? `Asks to press “${a.text}”${siteOf(a.url) ? ` on ${siteOf(a.url)}` : ''}` : `Needs you in the browser: ${a.text}`);
     }
     return a;
   }
@@ -803,6 +923,13 @@ export class SessionBrowser implements TabOwner {
       msg = outcome === 'done' ? `I allowed ${a.text} in the browser for this session. Open it again with browser_open.` : `I did not allow ${a.text} in the browser.`;
     } else if (a.kind === 'payment') {
       msg = outcome === 'done' ? `I took care of “${a.text}” in the browser myself. ${page}` : `I did not go ahead with “${a.text}”. ${page}`;
+    } else if (a.kind === 'confirm') {
+      const on = hostOf(a.url);
+      if (outcome === 'done') allow(this.allowed, a.url, a.text);
+      msg =
+        outcome === 'done'
+          ? `I allow you to press “${a.text}”${on ? ` on ${on}` : ''}. Press it now: my OK holds for 2 minutes and for one press. ${page}`
+          : `I do not allow “${a.text}”${on ? ` on ${on}` : ''}. Do not press it, nor anything else that does the same. ${page}`;
     } else msg = outcome === 'done' ? `Done in the browser (${a.text}). ${page}` : `I could not do that in the browser (${a.text}). ${page}`;
     this.turnedAway = false;
     await tellAgent(this.key, msg);
@@ -862,27 +989,111 @@ export const browserOf = (key: string) => {
 };
 export const openBrowsers = () => [...browsers.values()].filter((b) => !b.closed);
 
-/** The session's browser, started when it has none (in the profile its settings name). */
-export async function ensureBrowser(key: string, cwd: string, profile?: string): Promise<SessionBrowser> {
+const starting_ = new Map<string, Promise<SessionBrowser>>();
+
+/**
+ * The session's browser, started when it has none (in the profile its settings name). `empty`: no blank tab of its own
+ * (a tab is about to be given to it). Two calls at once for one key share one start.
+ */
+export function ensureBrowser(key: string, cwd: string, profile?: string, o: { empty?: boolean } = {}): Promise<SessionBrowser> {
+  const going = starting_.get(key);
+  if (going) return going.then(() => ensureBrowser(key, cwd, profile, o));
+  const p = startBrowser(key, cwd, profile, o).finally(() => starting_.delete(key));
+  starting_.set(key, p);
+  return p;
+}
+
+async function startBrowser(key: string, cwd: string, profile: string | undefined, o: { empty?: boolean }): Promise<SessionBrowser> {
   const have = browserOf(key);
   if (have) {
-    have.cwd = cwd;
-    if (!have.tabs.length) await have.newTab();
+    if (key !== BROWSING_KEY) have.cwd = cwd;
+    if (!have.tabs.length && !o.empty) await have.newTab();
     return have;
   }
-  const prof = profile ?? (key.startsWith('browser-profile:') ? key.slice('browser-profile:'.length) : sessionOptions(d().db, key).profile) ?? '';
-  const known = !prof || profiles(d().db).some((p) => p.id === prof);
+  // Your own browsing has its own profile; agents' sessions can have it only as a caller hands it over here (a tab of
+  // yours an agent was given), never through their options, which take only the profiles listed in Settings.
+  const prof = profile ?? (key === BROWSING_KEY ? BROWSING_PROFILE : key.startsWith('browser-profile:') ? key.slice('browser-profile:'.length) : sessionOptions(d().db, key).profile) ?? '';
+  const known = !prof || prof === BROWSING_PROFILE || profiles(d().db).some((p) => p.id === prof);
   const c = await processFor(known ? prof : '');
-  const b = new SessionBrowser(key, cwd, c, known ? prof : '');
+  const b = new SessionBrowser(key, key === BROWSING_KEY ? downloadsFolder() : cwd, c, known ? prof : '');
+  // You drive your own browsing; nobody else does.
+  if (key === BROWSING_KEY) b.driver = 'user';
   browsers.set(key, b);
   try {
     b.context = await c.context(b);
-    await b.newTab();
+    if (!o.empty) await b.newTab();
   } catch (e) {
     await b.close('could not start');
     throw e;
   }
   return b;
+}
+
+/** The site a page is on, as the allowed-sites lists name it ("example.com"); null for a page that is on no website. */
+export function siteOfUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol)) return null;
+    return cleanSites([u.hostname])[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Do this here: a session is given a page of your own browsing. It gets a browser of its own on the same Chromium
+ * (profile 'browsing': signed in as you are, no blank tab) and a tab of its own in it, which opens your tab's address;
+ * your tab stays in your strip, untouched. Every request of the agent's tab passes the guard, and the session is kept
+ * to the page's site (and to its address when that is on this machine). The session must exist (its options are stored
+ * with it).
+ */
+export async function handOver(tabId: string, key: string, cwd: string): Promise<{ browser: SessionBrowser; tab: Tab; site: string; title: string; url: string }> {
+  const from = browserOf(BROWSING_KEY);
+  const mine = from?.tabs.find((t) => t.targetId === tabId);
+  if (!from || !mine || mine.closed) throw new HttpError(404, 'That tab is not open any more');
+  const url = mine.url;
+  const site = siteOfUrl(url);
+  if (!site) throw new HttpError(409, 'Open a page on a website in that tab first: an agent can be given only a tab that shows one');
+  const u = new URL(url);
+  const local = (await isPrivate(u)) ? [hostPort(u)] : [];
+  setSessionOptions(d().db, key, { allow: [site], ...(local.length ? { local } : {}) });
+  const b = await ensureBrowser(key, cwd, BROWSING_PROFILE, { empty: true });
+  if (b.chromium !== from.chromium) throw new HttpError(409, 'The session already has a browser of its own');
+  b.handedFrom = site;
+  b.driver = 'agent';
+  try {
+    // Opened by the session's browser, so it is the agent's tab; the guard is on before it loads anything.
+    const t = await b.newTab();
+    await b.chromium.guardTab(t);
+    const err = await t.navigate(url);
+    if (err) throw new HttpError(502, `Could not open the page for the session: ${err}`);
+    await t.waitLoad(5000);
+    return { browser: b, tab: t, site, title: mine.title, url };
+  } catch (e) {
+    await b.close('the page could not be opened');
+    throw e;
+  }
+}
+
+/**
+ * You take the page back: the agent's tab closes, its address opens as a new tab of your own browsing (in front), and
+ * the agent is told. (The id is the agent's tab.)
+ */
+export async function takeBack(tabId: string): Promise<SessionBrowser> {
+  const home = browserOf(BROWSING_KEY);
+  if (!home) throw new HttpError(404, 'Your browser is not open');
+  const b = openBrowsers().find((x) => x.handedFrom && x.tabs.some((t) => t.targetId === tabId));
+  const t = b?.tabs.find((x) => x.targetId === tabId);
+  if (!b || !t) throw new HttpError(404, 'An agent does not have that tab');
+  const url = t.url;
+  const mine = await home.newTab();
+  if (/^https?:/i.test(url)) await mine.navigate(url).catch(() => null);
+  home.setActive(mine);
+  home.changed();
+  await tellAgent(b.key, 'I took the page back: it is mine again in my own browser, and your tab is closed.');
+  // Its last tab closing closes its browser.
+  await b.closeTab(t);
+  return home;
 }
 
 export async function closeBrowser(key: string, why?: string) {
@@ -894,10 +1105,24 @@ export async function closeAll() {
   for (const c of [...processes.values()]) await c.close();
 }
 
+const viewListeners = new Set<(key: string, view: BrowserView) => void>();
+/** Hears every change of a browser's view (browsing.ts keeps your open tabs from it). Returns how to stop. */
+export function onBrowserView(fn: (key: string, view: BrowserView) => void): () => void {
+  viewListeners.add(fn);
+  return () => viewListeners.delete(fn);
+}
+
 export function emitView(key: string) {
   const b = browsers.get(key);
   const view: BrowserView = b && !b.closed ? b.view() : { key, open: false, tabs: [], driver: 'agent', asks: [], viewport: DESKTOP, downloads: [] };
   d().toSubscribers(key, { t: 'feature', id: 'browser', key, data: { type: 'state', view } });
+  for (const fn of viewListeners) {
+    try {
+      fn(key, view);
+    } catch (e) {
+      console.error(`[browser] view listener: ${(e as Error).message}`);
+    }
+  }
 }
 
 export function viewOf(key: string): BrowserView {
@@ -909,6 +1134,8 @@ export function viewOf(key: string): BrowserView {
 export function sweepIdle() {
   const now = Date.now();
   for (const b of openBrowsers()) {
+    // Your own browsing stays open while the app runs, as a browser's window does.
+    if (b.key === BROWSING_KEY) continue;
     // A preview has nothing to wait for: it closes like any browser nobody looks at.
     const limit = b.key.startsWith('preview:') ? IDLE_MS : b.asks.length || b.driver === 'user' ? ASK_IDLE_MS : IDLE_MS;
     if (now - Math.max(b.lastUse, b.watchUntil) > limit) void b.close('idle');
@@ -960,3 +1187,34 @@ export function killAll() {
     } catch {}
   }
 }
+
+// ---- the desktop app's own browser ----------------------------------------------------------------------------------
+
+/** The browser running on the desktop app's connection `conn`. */
+const byConn = (conn: string) => [...processes.values()].find((c) => c.conn === conn && !c.closed);
+
+/** You clicked or typed in a page the app's window shows: you drive that tab's browser now, and the agent waits. */
+onDesktopInput((conn, target, typed) => {
+  const t = byConn(conn)?.tabOf(target);
+  if (!t) return;
+  const b = ownerOf(t);
+  // What you type stays yours, as when you drive through the live view: the field is noted so the agent never sees it.
+  if (typed) void t.markTyped();
+  if (b.closed || b.driver === 'user' || b.ownBrowser) return;
+  if (b.active !== t) b.setActive(t);
+  void b.takeOver(true).catch(() => {});
+});
+
+/** A site's name for people: the address's host without "www.". */
+function siteOf(url: string | undefined): string {
+  try {
+    return url ? new URL(url).hostname.replace(/^www\./, '') : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Extensions added, removed, turned on or off: the app's browsers that load them load the new set at once. */
+onExtensionsChange(() => {
+  for (const c of processes.values()) if (c.native && c.profile && !c.closed) sendExtensions(c.profile, extensionsOf(c.profile));
+});

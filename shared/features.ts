@@ -34,6 +34,13 @@ export interface SessionExtra {
   auto?: true;
   /** Pages: what it was asked to make from the gallery or Turn it into (shared/content-asks.ts, checked by makeOf), told to its agent in full. */
   make?: MakeExtra;
+  /**
+   * Do this here (the Browser page): the tab of your own browsing, by its id, this session is given as it starts. It
+   * then works in that tab alone, kept to its site, with your sign-ins there, and uses nothing but the browser.
+   */
+  browserHandoff?: { tab: string };
+  /** The session may use the browser and nothing else: no commands, files, other network or other tools. Set when it starts, never removed. */
+  browserOnly?: true;
   /** Any other capability's settings, under its own name. */
   [field: string]: unknown;
 }

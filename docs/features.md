@@ -204,11 +204,42 @@ agents that speak ACP and take MCP servers.
   opens to a card for each page, only those cited, by the numbers the agent gave them, its list of sources no longer
   repeated in the text. When no provider can answer, Claude Code and Codex search with their own web search instead.
   [Search providers](search-providers.md).
-- **A browser**: agents open sites, click, type and read pages, in a Chromium of their own. You watch it live
-  above the message box, the agent's pointer gliding to each place it acts (a ring where it clicks, the field it types
-  into outlined, scrolls and keys beside it, each step's picture marked where it clicked), and take over to log in, solve a check or pay, on a computer or a phone; with a sign-in
+- **A browser**: agents open sites, click, type and read pages, in a browser of their own. In the desktop apps it is
+  the app's own browser (built on Chromium, running inside the app: nothing to install, its pages drawn fast in the
+  window, and working with the window closed); elsewhere it is a Chromium the app starts, seen as a live picture. You
+  watch it live above the message box, the agent's pointer gliding to each place it acts (a ring where it clicks, the
+  field it types into outlined, scrolls and keys beside it, each step's picture marked where it clicked), and take over to log in,
+  solve a check or pay, on a computer or a phone (in the desktop app a click or a key in the page takes over, and the agent waits); with a sign-in
   saved in the vault, the agent signs in itself, typing the password without seeing it, on that site only. Sites
-  on your own network stay off limits unless you allow one.
+  on your own network stay off limits unless you allow one. On a site it is signed in to (a profile that keeps
+  sign-ins, or a page you handed it), an agent stops before a button that sends, posts, publishes, deletes or
+  transfers and asks you to allow it (once, for the same words on that site, for two minutes; the words in English,
+  German, Greek, Chinese, French and Spanish; **Ask before sending on signed-in sites** turns it off), as it always
+  stops before paying. The desktop app's own browser is in Settings → Browser's list and chosen first; with it,
+  **Show a window** and the download of a Chrome are not shown.
+- **Your own browser** (the **Browser** tool in the sidebar): tabs (kept between visits, up to 30), an address bar that
+  opens an address (with or without https://, `localhost:3000`, a file) or searches with your search providers, back,
+  forward, reload and stop, a star and a bookmarks bar (folders, a » menu for a long bar, right-click to edit),
+  find in page (Ctrl/⌘+F, with the number of matches), shortcuts (Ctrl/⌘+T, W, L, R, F, Alt+←, Alt+→), downloads into
+  your Downloads folder, the permissions a site asks for (camera, microphone, location, notifications… with Block and
+  Allow, remembered for the site), a page's pop-up questions, and on a phone a tab list and a menu. In the desktop app its tabs are real pages in
+  the window; elsewhere a live picture of a Chromium you drive. It keeps your sign-ins in a profile of its own that agents
+  can never pick, and it can open addresses on your own network (never Hydor itself).
+- **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. Bring them
+  in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac
+  Arc and Safari, each profile by its name, into one new folder that keeps the browser's own folders; Safari needs Full Disk
+  Access) or from an exported bookmarks file, and export them as a file Chrome, Firefox and Safari import.
+- **Chrome extensions** in your own browser (the desktop app's browser runs them): from the Chrome Web Store by link or
+  id, or the **Add to Hydor** button on a Web Store page, from a folder (loaded where it is), or from the Chrome-based
+  browsers on this computer; toolbar buttons with popups and badges, options pages, a switch to turn one off, **Remove**,
+  and **Also in agents’ browsers** (those that use a profile) off until you turn it on. Electron lacks part of Chrome's extension features, so
+  each extension's row names the parts that may not work (blocking or changing requests, cookies, history, the side
+  panel…). Changing an extension through the API asks you every time.
+- **Hand a page to an agent**: **Ask about this page** starts a session with a copy of the page's text (the agent cannot
+  touch the page); **Do this here** gives Claude Code or Custom one tab of its own at your page, signed in as you on that
+  site, kept to that site, with the browser's tools and nothing else, asking before it sends, posts, deletes or
+  transfers; **Take back** closes the agent's tab and opens the page in yours. **Agents’ tabs** lists the browsers agents
+  have open, to watch, take over or open the conversation.
 - **Memory**: agents save notes about you, the project and the session when you ask or they learn something
   lasting that the files don't say, one fact per note written to be found again, with how it is known (you said so,
   checked, or not checked yet), some only until a date, and a chip under the reply shows
@@ -1543,7 +1574,9 @@ programs shows each program's version and what is out, with Check now, Update no
   **Sending while an agent works** says (`/queue` and `/now` decide for one message); asking the agent to change
   either device setting changes the chat too.
 - Approvals answered with a key (`y`, `n`, a choice's number) or denied with your own words; questions with numbered
-  choices, several picks or your own answer; forms field by field, files by their path. Commands for a new session,
+  choices, several picks or your own answer; forms field by field, files by their path; what an agent's browser waits
+  for (a login, a payment, an address or a button to allow, a page's pop-up question) as a card with keys (`y`/`n`, or
+  `o` to open the session in the app, `d` done, `n` can't). Commands for a new session,
   another session, the model, effort and mode, your agents, subagents, tiers, usage and cost, copying the last reply
   (`/copy`, over SSH and in tmux too) and clearing the screen; `/hydor <command>` runs any of the commands below
   inside the chat, with its own menu; any other `/command` goes to the agent. `hydor -c` carries on the folder's
@@ -1551,7 +1584,7 @@ programs shows each program's version and what is out, with Check now, Update no
 - `hydor run` for scripts: one request, followed until the work is done (subagents' replies, Claude Code's own subagents in
   the background, and the turns they wake included; a dev server left running does not hold it up), the reply on stdout, progress on stderr, `--json` (the reply, cost, tokens, turns, subagents) or
   `--stream-json` (each change as it happens), `--timeout`, and exit codes for done, failed (a usage limit named),
-  bad usage, an answer needed, a time-out and Ctrl+C. A message can be piped in.
+  bad usage, an answer needed (an approval, a question or what the agent's browser waits for), a time-out and Ctrl+C. A message can be piped in.
 - Everything the app does is a command with verbs, grouped in `hydor help`: sessions (search, rename, archive, pin,
   snooze, move, fork, goal, share, changes, commands, the queue, delete; marks show what each is doing), projects and
   their documents, guidelines, agents, memory (notes, forgetting and restoring, your profile), skills, plugins, MCP
@@ -1624,7 +1657,7 @@ programs shows each program's version and what is out, with Check now, Update no
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, System, Settings, Search, Help; Usage is a tab of System) stay in
+- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, Browser, System, Settings, Search, Help; Usage is a tab of System, nine tools in two rows) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
