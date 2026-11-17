@@ -236,15 +236,25 @@ agents that speak ACP and take MCP servers.
   (``- Wiki: `path` ``) names it. Every wiki folder is inside the wiki folder or its project, however it is set. Learn from new documents
   (on unless turned off): when a document is added or changed in knowledge, the helper model reads it (its first 40,000
   characters, one document at a time, after its base has been quiet for half a minute, at most 40 an hour), keeps its text as a
-  source, adds to up to three articles and writes up to two new ones, and, for a project's documents, adds up to three short notes to its
-  memory; a rewrite that would drop a fifth of an article, anything with a secret and an article over 20,000 characters are left out,
-  and each outcome is listed under Recent updates; documents already in a project's knowledge when you update are read once too,
-  at the same pace (the newest 400). Learn from the project's work (about once a day, when memory's Learn from conversations is on,
-  nobody has written for ten minutes, and the last pass was 20 hours ago; the first time it looks back two weeks): the helper reads the
-  project's recent conversations (your own words and each agent's last reply of a turn, never tool output; not confidential
-  sessions, sessions with memory off, child sessions or scheduled runs), at most four a project and twelve a pass, keeps each as a
-  source with the secrets taken out and adds to or starts articles with lasting knowledge only (no memory notes, nothing personal),
-  and an update opens its session. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
+  source, adds to up to three articles and writes up to two new ones, keeping only the important information (key facts,
+  findings, decisions, names and numbers; the detail stays in the document, for search), and, for a project's documents, adds up
+  to three short notes to its memory; a rewrite that would drop a fifth of an article, anything with a secret and an article over
+  20,000 characters are left out, and each outcome is listed under Recent updates; documents already in a project's knowledge are
+  read once too, at the same pace (the newest 400 a project, looked at again every ten minutes). A large data file (CSV, TSV, a
+  spreadsheet or JSON data, over 40,000 characters of text or 256 KB) is analysed with code instead: the helper writes Python that
+  Hydor runs in a sandbox with no network that sees only that file, read-only (up to four runs of a minute each), and only its
+  findings become the source and go into the articles; without such a sandbox (macOS and Windows for now) these files are searched
+  only, and agents in sessions can analyse them with code from their paths. A project with more documents than the most to read
+  into the wiki (Settings, 100 at first, 0 to 100,000; a project's Settings tab can set a number of its own) keeps them all out of
+  its wiki: none is read, no update is listed, agents search them instead, and its Memory tab says so; raise the limit and they are
+  read. Learn from the project's work (about once a day, when memory's Learn from conversations is on, nobody has written for ten
+  minutes, and the last pass was 20 hours ago; the first time it looks back two weeks): the helper reads the project's recent
+  conversations (your own words and each agent's last reply of a turn, never tool output; not confidential sessions, sessions with
+  memory off, child sessions or scheduled runs), at most four a project and twelve a pass. It keeps where it stopped in each
+  session: one it has read is never read again, a session that goes on is read from its new turns only, and one an agent is still
+  working in, or that it had no room for, waits for the next time. It keeps each conversation as a source with the secrets taken
+  out and adds to or starts articles with lasting knowledge only (no memory notes, nothing personal), and an update opens its
+  session. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
   write articles with the hash of what they read, and check its sources and links, only in their own project's wiki (or the shared one),
   never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools. Changing the wiki
   folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). The Custom agent keeps
@@ -262,7 +272,7 @@ agents that speak ACP and take MCP servers.
   holds in the Library and what every session in it gets (its folder, guidelines, memory as a line of notes, articles and documents,
   skills and assistant), a group's projects too, and its Library tab everything it holds there; its Memory tab has its notes, its
   wiki memory and its documents, one part at a time (`?part=wiki`, `?part=documents`; the old Knowledge and LLM Wiki addresses open it); its Settings tab sets its name,
-  colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch (saved at once) and its group, saved from a bar
+  colour, guidelines, the assistant its sessions start as (one tap among them), its Wiki memory switch and the most documents its wiki reads (each saved at once) and its group, saved from a bar
   that shows once something changed. Its Files tab shows its folders; files come in from
   Files, a file's window or an agent's file cards with Add to a project. Its Skills tab lists every skill its
   sessions get, each with a switch for the project alone (On here, Off here; Follow Settings goes back): its own

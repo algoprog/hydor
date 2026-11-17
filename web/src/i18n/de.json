@@ -23401,5 +23401,17 @@
   "Use the computer": "Nutze den Computer",
   "See the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on)": "Den Bildschirm sehen und Maus und Tastatur in jeder App bedienen (in den Desktop-Apps, mit Computer Use an)",
   "use a browser": "einen Browser nutzen",
-  "use the computer": "den Computer nutzen"
+  "use the computer": "den Computer nutzen",
+  "A number of its own": "Eine eigene Zahl",
+  "A project with more documents than this keeps them out of its wiki: agents search them instead": "Ein Projekt mit mehr Dokumenten als dieser Zahl liest sie nicht in sein Wiki: Agenten durchsuchen sie stattdessen",
+  "A project with more documents than this keeps them out of its wiki: agents search them instead.": "Ein Projekt mit mehr Dokumenten als dieser Zahl liest sie nicht in sein Wiki: Agenten durchsuchen sie stattdessen.",
+  "As in Settings ({0})": "Wie in den Einstellungen ({0})",
+  "Most documents to read into its wiki": "Höchstzahl der Dokumente für sein Wiki",
+  "Most documents to read into the wiki": "Höchstzahl der Dokumente für das Wiki",
+  "projects spaces project workspace group sessions files documents knowledge memory notes wiki memory tab guidelines instructions skills folder library overview settings tab most documents to read into its wiki limit": "Projekte Spaces Projekt Arbeitsbereich Gruppe Sitzungen Dateien Dokumente Wissen Memory Notizen Wiki-Memory Tab Richtlinien Anweisungen Skills Ordner Bibliothek Übersicht Einstellungen Tab Höchstzahl Dokumente für sein Wiki Grenze",
+  "The most documents to read into the wiki is a whole number from 0 to {0}": "Die Höchstzahl der Dokumente für das Wiki ist eine ganze Zahl von 0 bis {0}",
+  "This project has {0} documents, more than the {1} its wiki reads: agents search them instead of reading them into the wiki.": "Dieses Projekt hat {0} Dokumente, mehr als die {1}, die sein Wiki liest: Agenten durchsuchen sie, statt sie ins Wiki zu lesen.",
+  "This project has 1 document, more than the {0} its wiki reads: agents search them instead of reading them into the wiki.": "Dieses Projekt hat 1 Dokument, mehr als die {0}, die sein Wiki liest: Agenten durchsuchen es, statt es ins Wiki zu lesen.",
+  "wiki memory documents limit maximum most number count too many large many documents project knowledge read helper model retrieval search instead keep out of the wiki default 100 per project own number": "Wiki-Memory Dokumente Grenze Maximum Höchstzahl Anzahl zu viele große viele Dokumente Projekt Wissen lesen Hilfsmodell Abruf Suche stattdessen nicht ins Wiki Standard 100 pro Projekt eigene Zahl",
+  "wikiDocumentLimit: a whole number from 0 to {0}, or null": "wikiDocumentLimit: eine ganze Zahl von 0 bis {0} oder null"
 }

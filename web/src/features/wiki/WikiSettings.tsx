@@ -7,6 +7,7 @@ import { api, post, put } from '../../lib/api';
 import { machineId } from '../../lib/machine';
 import { toastError } from '../../lib/store';
 import { Group, Row } from '../settings/kit';
+import { DocumentLimit } from './DocumentLimit';
 import { WikiMigration, type WikiMigrationAction, type WikiMigrationConflict, type WikiMigrationPreview } from './WikiMigration';
 import { WikiFolderFinder } from './WikiFolderFinder';
 
@@ -105,6 +106,7 @@ export function WikiSettings() {
     <Group title="Wiki memory" hint="Articles agents keep for each project, from its documents and its work." actions={<a href="/guide/wiki-memory" className="text-[12px] text-accent hover:underline">Learn more</a>}>
       <Row label="Wiki memory" hint="On for every project unless its own settings say otherwise." control={<Switch label="Wiki memory" on={settings.enabled} onChange={(enabled) => { setSettings((current) => current && { ...current, enabled }); save('enabled', enabled); }} />} />
       <Row label="Learn from new documents" hint="New and changed documents add memory notes and update the wiki, with the helper model." control={<Switch label="Learn from new documents" on={settings.fromDocuments} onChange={(fromDocuments) => { setSettings((current) => current && { ...current, fromDocuments }); save('fromDocuments', fromDocuments); }} />} />
+      <Row label="Most documents to read into the wiki" hint="A project with more documents than this keeps them out of its wiki: agents search them instead." control={<DocumentLimit label="Most documents to read into the wiki" value={settings.documentLimit} onCommit={(documentLimit) => { setSettings((current) => current && { ...current, documentLimit }); save('documentLimit', documentLimit); }} />} />
       <Row label="Wiki folder" hint="Where the shared wiki is kept, and project wikis unless set below. An absolute path on the computer running Hydor.">
         <div className="flex gap-2">
           <input aria-label="Wiki folder" translate="no" value={settings.hubPath} disabled={checking || !!migration} onChange={(e) => { const hubPath = e.target.value; setSettings((current) => current && { ...current, hubPath }); }} onBlur={(e) => { if (e.relatedTarget !== findRef.current) changeHub(e.target.value); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} className="min-w-0 w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-fg" />

@@ -3,7 +3,7 @@
 // updates and an open article load again when the server says the wiki changed.
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { FileText } from 'lucide-react';
-import type { ProjectWikiView, WikiItem, WikiUpdate } from '@shared/wiki';
+import type { ProjectWikiView, WikiDocuments, WikiItem, WikiUpdate } from '@shared/wiki';
 import { Markdown } from '../../components/Markdown';
 import { Button, Throbber } from '../../components/ui';
 import { api, enc } from '../../lib/api';
@@ -12,6 +12,7 @@ import { go, openSession } from '../../lib/nav';
 import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { wikiDocument, wikiRelative } from './SpaceWikiPaths';
+import { useWikiSettings } from './spaceMemory';
 
 type WikiFile = { path: string; content: string; sha256: string };
 
@@ -71,13 +72,45 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
   );
 }
 
+/** What new and changed documents and the project's work did lately (at most 20), and how many documents the project holds against the most its wiki reads; they load again when the wiki changes. */
+export function useWikiUpdates(id: string, active: boolean, version: number): { updates: WikiUpdate[]; documents?: WikiDocuments } {
+  const [state, setState] = useState<{ updates: WikiUpdate[]; documents?: WikiDocuments }>({ updates: [] });
+  useEffect(() => {
+    setState({ updates: [] });
+    if (!active) return;
+    let live = true;
+    api<{ updates: WikiUpdate[]; documents?: WikiDocuments }>(`/api/projects/${enc(id)}/wiki/updates`).then(
+      (r) => live && setState({ updates: Array.isArray(r.updates) ? r.updates.slice(0, 20) : [], documents: r.documents }),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [id, active, version]);
+  return state;
+}
+
+/** Said when the project has more documents than its wiki reads: they stay for agents to search. */
+export function DocumentsNote({ documents }: { documents?: WikiDocuments }) {
+  if (!documents?.over) return null;
+  return (
+    <p className="text-[12.5px] leading-snug text-fg-3">
+      {tr(documents.count === 1 ? `This project has 1 document, more than the ${documents.limit} its wiki reads: agents search them instead of reading them into the wiki.` : `This project has ${documents.count} documents, more than the ${documents.limit} its wiki reads: agents search them instead of reading them into the wiki.`)}
+    </p>
+  );
+}
+
+/** The same note on its own (the Documents part), when the project's wiki memory is on. */
+export function DocumentsNoteOf({ id, on, version }: { id: string; on: boolean; version: number }) {
+  return <DocumentsNote documents={useWikiUpdates(id, on, version).documents} />;
+}
+
 export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWikiView | undefined; version: number }) {
   const home = useApp((s) => s.boot?.home);
   const [selected, setSelected] = useState<string | null>(null);
   const [file, setFile] = useState<WikiFile | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [updates, setUpdates] = useState<WikiUpdate[]>([]);
   const shown = useRef<string | null>(null);
   useEffect(() => {
     setSelected(null);
@@ -109,18 +142,8 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
     };
   }, [id, selected, version]);
   const on = view?.on !== false && view?.status !== 'off';
-  useEffect(() => {
-    setUpdates([]);
-    if (!view || !on) return;
-    let active = true;
-    api<{ updates: WikiUpdate[] }>(`/api/projects/${enc(id)}/wiki/updates`).then(
-      (r) => active && setUpdates(Array.isArray(r.updates) ? r.updates.slice(0, 20) : []),
-      () => {},
-    );
-    return () => {
-      active = false;
-    };
-  }, [id, on, !view, version]);
+  const { updates, documents } = useWikiUpdates(id, !!view && on, version);
+  const fromDocuments = useWikiSettings()?.fromDocuments !== false;
   const openLink = (e: MouseEvent<HTMLDivElement>) => {
     const anchor = (e.target as Element).closest('a');
     if (!anchor || !file || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -236,6 +259,7 @@ export function SpaceWiki({ id, view, version }: { id: string; view: ProjectWiki
           </div>
         </>
       )}
+      {view && on && fromDocuments && <DocumentsNote documents={documents} />}
       {view && on && updates.length > 0 && (
         <section>
           <h3 className="mb-2 text-[13px] font-semibold">Recent updates</h3>

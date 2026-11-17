@@ -23,6 +23,8 @@ export interface Space {
   sharedKnowledge?: boolean;
   /** Wiki memory for this project: true on, false off; absent: as Settings → Memory → Wiki memory says for projects (shared/wiki.ts). */
   wikiMemory?: boolean;
+  /** The most documents its knowledge may hold for its wiki to read them (0 to 100000); absent: as Settings → Memory → Wiki memory says. */
+  wikiDocumentLimit?: number;
   /**
    * The spaces it brings together, by id: a group. Its sessions get theirs too: their documents, instructions,
    * skills and folders. A group brings in plain spaces, not other groups.

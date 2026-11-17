@@ -24744,5 +24744,17 @@
 "Use the computer":"Χρήση υπολογιστή",
 "See the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on)":"Βλέπει την οθόνη και χρησιμοποιεί το ποντίκι και το πληκτρολόγιο σε οποιαδήποτε εφαρμογή (στις εφαρμογές υπολογιστή, με τη Χρήση υπολογιστή ενεργή)",
 "use a browser":"χρησιμοποιεί πρόγραμμα περιήγησης",
-"use the computer":"χρησιμοποιεί τον υπολογιστή"
+"use the computer":"χρησιμοποιεί τον υπολογιστή",
+"A number of its own":"Δικός του αριθμός",
+"A project with more documents than this keeps them out of its wiki: agents search them instead":"Ένα έργο με περισσότερα έγγραφα από αυτόν τον αριθμό τα κρατά έξω από το wiki του: οι πράκτορες τα αναζητούν αντί γι' αυτό",
+"A project with more documents than this keeps them out of its wiki: agents search them instead.":"Ένα έργο με περισσότερα έγγραφα από αυτόν τον αριθμό τα κρατά έξω από το wiki του: οι πράκτορες τα αναζητούν αντί γι' αυτό.",
+"As in Settings ({0})":"Όπως στις Ρυθμίσεις ({0})",
+"Most documents to read into its wiki":"Μέγιστος αριθμός εγγράφων που διαβάζονται στο wiki του",
+"Most documents to read into the wiki":"Μέγιστος αριθμός εγγράφων που διαβάζονται στο wiki",
+"projects spaces project workspace group sessions files documents knowledge memory notes wiki memory tab guidelines instructions skills folder library overview settings tab most documents to read into its wiki limit":"έργα χώροι έργο χώρος εργασίας ομάδα συνεδρίες αρχεία έγγραφα γνώσεις μνήμη σημειώσεις καρτέλα μνήμη wiki οδηγίες δεξιότητες φάκελος βιβλιοθήκη επισκόπηση καρτέλα ρυθμίσεις μέγιστος αριθμός εγγράφων που διαβάζονται στο wiki του όριο",
+"The most documents to read into the wiki is a whole number from 0 to {0}":"Ο μέγιστος αριθμός εγγράφων που διαβάζονται στο wiki είναι ακέραιος από 0 έως {0}",
+"This project has {0} documents, more than the {1} its wiki reads: agents search them instead of reading them into the wiki.":"Αυτό το έργο έχει {0} έγγραφα, περισσότερα από τα {1} που διαβάζει το wiki του: οι πράκτορες τα αναζητούν αντί να τα διαβάζουν στο wiki.",
+"This project has 1 document, more than the {0} its wiki reads: agents search them instead of reading them into the wiki.":"Αυτό το έργο έχει 1 έγγραφο, περισσότερα από τα {0} που διαβάζει το wiki του: οι πράκτορες το αναζητούν αντί να το διαβάζουν στο wiki.",
+"wiki memory documents limit maximum most number count too many large many documents project knowledge read helper model retrieval search instead keep out of the wiki default 100 per project own number":"μνήμη wiki έγγραφα όριο μέγιστος αριθμός πλήθος πάρα πολλά μεγάλο πολλά έγγραφα έργο γνώσεις ανάγνωση βοηθητικό μοντέλο ανάκτηση αναζήτηση αντί έξω από το wiki προεπιλογή 100 ανά έργο δικός του αριθμός",
+"wikiDocumentLimit: a whole number from 0 to {0}, or null":"wikiDocumentLimit: ακέραιος από 0 έως {0}, ή null"
 }

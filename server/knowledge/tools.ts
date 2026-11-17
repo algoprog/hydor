@@ -29,8 +29,12 @@ export function knowledgeInstructions(db: DB, space: string | null = null): stri
     `Knowledge bases: the user added their own documents for you to search: ${bases.map((b) => `${b.name} (${b.docs} document${b.docs === 1 ? '' : 's'}${whose(b)})`).join(', ')}.`,
     'When a question may be answered from them, search there first with knowledge_search, before the web or memory, and read more of a document with knowledge_read.',
     'Answer from what the passages say, and cite each one you use as [file, page or part] with its path; say so when they do not answer it.',
+    'A large data file (a CSV, a spreadsheet, JSON data) is better analysed with code than read passage by passage: when you can run commands, load it from its path in a script (Python, with pandas or the csv module).',
   ].join(' ');
 }
+
+/** Data files, whose content is analysed better with code than read as passages. */
+const DATA_FORMATS = new Set(['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'xlsx', 'xls', 'ods']);
 
 const SEARCH: RunTool = {
   name: 'knowledge_search',
@@ -71,6 +75,7 @@ const READ: RunTool = {
   description: [
     'Read more of a document in a knowledge base: the passages around one knowledge_search found (give its ref, like kb:123),',
     'or a document by its path, from its start or from a passage number. Each passage is marked with its number and its page or part.',
+    'A large data file (CSV, spreadsheet, JSON) is better analysed with code from its path, when you can run commands.',
   ].join(' '),
   inputSchema: {
     type: 'object',
@@ -108,6 +113,9 @@ const READ: RunTool = {
     }
     const next = from + rows.length;
     if (next < doc.passages) out += `\n(More from passage ${next + 1}: knowledge_read with path and from: ${next + 1}.)`;
+    // A data file of many passages: its numbers are read better by code than by eye.
+    if (DATA_FORMATS.has(String(doc.format ?? '').toLowerCase()) && doc.passages > count)
+      out += '\n(This is a data file: to count, sum or compare across it, load it from its path with code (Python: pandas or the csv module) instead of reading it passage by passage.)';
     return out.slice(0, MAX_READ + 400);
   },
 };

@@ -13,6 +13,7 @@ import os from 'node:os';
 import { isAbsPath } from '../platform.ts';
 import fs from 'node:fs';
 import path from 'node:path';
+import { MAX_WIKI_DOCUMENTS } from '../../shared/wiki.ts';
 import { isGroup, MAX_FOLDERS, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type FoundIn, type Space, type SpaceView } from '../../shared/spaces.ts';
 import { taskRoot } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
@@ -139,6 +140,9 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
   // Wiki memory for this project: true or false is its own switch, null follows Settings → Memory, absent keeps what it was.
   if (b.wikiMemory !== undefined && b.wikiMemory !== null && typeof b.wikiMemory !== 'boolean') throw new HttpError(400, 'wikiMemory: true, false or null');
   const wikiMemory: boolean | null = b.wikiMemory !== undefined ? (b.wikiMemory as boolean | null) : (prev?.wikiMemory ?? null);
+  // The most documents its wiki reads: a whole number, null follows Settings, absent keeps what it was.
+  if (b.wikiDocumentLimit !== undefined && b.wikiDocumentLimit !== null && (typeof b.wikiDocumentLimit !== 'number' || !Number.isInteger(b.wikiDocumentLimit) || b.wikiDocumentLimit < 0 || b.wikiDocumentLimit > MAX_WIKI_DOCUMENTS)) throw new HttpError(400, `wikiDocumentLimit: a whole number from 0 to ${MAX_WIKI_DOCUMENTS}, or null`);
+  const wikiDocumentLimit: number | null = b.wikiDocumentLimit !== undefined ? (b.wikiDocumentLimit as number | null) : (prev?.wikiDocumentLimit ?? null);
   return {
     name,
     color: color in SPACE_COLORS ? color : 'blue',
@@ -147,6 +151,7 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
     assistant: (b.assistant !== undefined ? clean(b.assistant, 80) : prev?.assistant) || undefined,
     ...(shared ? {} : { sharedKnowledge: false }),
     ...(wikiMemory === null ? {} : { wikiMemory }),
+    ...(wikiDocumentLimit === null ? {} : { wikiDocumentLimit }),
   };
 }
 /**
@@ -190,7 +195,7 @@ export function createSpace(db: DB, b: Record<string, unknown>, own?: { found?: 
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
   if (!prev) throw new HttpError(404, 'No such project');
-  const { sharedKnowledge: _was, wikiMemory: _wm, members: _had, folders: _also, ...kept } = prev;
+  const { sharedKnowledge: _was, wikiMemory: _wm, wikiDocumentLimit: _wl, members: _had, folders: _also, ...kept } = prev;
   const members = membersOf(db, b, prev);
   const folders = foldersOf(b, prev, prev.folder);
   const next: Space = { ...kept, ...fields(b, prev), ...(members ? { members } : {}), ...(folders ? { folders } : {}) };
@@ -338,11 +343,11 @@ export const spaces: Feature = {
       return { space: s, sessions: sessionsIn(d.db, s.id), memoryKey: repoRoot(s.folder) ?? s.folder };
     });
     d.app.patch('/api/projects/:id', async (req) => {
-      const was = spaceById(d.db, id(req))?.wikiMemory;
+      const before = spaceById(d.db, id(req));
       const s = updateSpace(d.db, id(req), body(req));
       changed();
       // The project's wiki memory pages refresh when its switch moves.
-      if (was !== s.wikiMemory) d.broadcast({ t: 'feature', id: 'wiki', data: { space: s.id } });
+      if (before?.wikiMemory !== s.wikiMemory || before?.wikiDocumentLimit !== s.wikiDocumentLimit) d.broadcast({ t: 'feature', id: 'wiki', data: { space: s.id } });
       return s;
     });
     d.app.delete('/api/projects/:id', async (req) => {

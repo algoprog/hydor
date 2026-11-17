@@ -237,6 +237,7 @@
 - [**记忆**](/settings?s=memory&find=Memory)：智能体开始时会带上之前会话记下的内容，并在你要求时保存笔记。
 - [**Wiki 记忆**](/settings?s=memory&find=Wiki%20memory)：智能体为每个项目根据其文档和工作保存的文章：对每个项目都开启，除非项目自己的设置另有规定。
 - [**从新文档中学习**](/settings?s=memory&find=Learn%20from%20new%20documents)：新添加和修改的文档会添加记忆笔记，并用辅助模型更新 wiki。
+- [**Most documents to read into the wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki)：A project with more documents than this keeps them out of its wiki: agents search them instead。
 - [**Wiki 文件夹**](/settings?s=memory&find=Wiki%20folder)：共享 wiki 保存的位置，以及下面没有另行设置时项目 wiki 保存的位置。
 - [**项目 Wiki**](/settings?s=memory&find=Project%20wikis)：每个项目的 wiki 保存在哪里：保存在 wiki 文件夹中，或保存在每个项目的文件夹中。
 - [**每个项目内的文件夹**](/settings?s=memory&find=Folder%20inside%20each%20project)：每个项目在自己的文件夹里的什么位置保存 wiki。

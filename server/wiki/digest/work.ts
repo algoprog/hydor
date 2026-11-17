@@ -4,7 +4,8 @@
 // (digestText): each conversation is kept as a source, its articles are updated or added, the update is listed
 // with the session it came from. No memory notes: memory's own learning from conversations does those. Sessions
 // with memory off, confidential ones, child sessions and scheduled runs are never read (conversationsSince, turnsOf).
-// All its state is in the database (the server restarts often): when it last ran, and where it read up to.
+// All its state is in the database (the server restarts often): when it last ran, and where it stopped in each session
+// (a session read is never read again; when it goes on, only its new turns are).
 import { kvGet, kvSet, type DB } from '../../db.ts';
 import { conversationsSince, turnsOf } from '../../memory/learn.ts';
 import { learnOn, memoryOn } from '../../memory/store.ts';
@@ -14,7 +15,7 @@ import { wikiHash } from '../core.ts';
 import { wikiMemoryOn, wikiSpaceOfSession } from '../roots.ts';
 import { digestText } from './digest.ts';
 import { helperDigestAsk, type DigestAsk } from './plan.ts';
-import { digested } from './store.ts';
+import { digested, dropWorkMarks, setWorkMark, workMark } from './store.ts';
 
 /** Conversations read at most for a project, and in one pass. */
 export const PER_PROJECT = 4;
@@ -25,7 +26,7 @@ export const MIN_CONVO_CHARS = 600;
 /** What one message of the user, and one reply, may take. */
 const USER_CHARS = 1500;
 const REPLY_CHARS = 1000;
-/** The first time (and never further back than this), a pass looks back this far. */
+/** A pass never looks further back than this. */
 export const LOOK_BACK_MS = 14 * 86400_000;
 /** A pass runs when the last was this long ago, and nobody has been working for this long. */
 export const EVERY_MS = 20 * 3600_000;
@@ -34,7 +35,8 @@ export const QUIET_MS = 10 * 60_000;
 export const CHECK_MS = 10 * 60_000;
 export const FIRST_CHECK_MS = 2 * 60_000;
 
-const KV_SINCE = 'wiki.work.since';
+/** A session's read mark is kept this long (a session untouched for so long is not looked at again). */
+const MARK_KEEP_MS = 60 * 86400_000;
 const KV_AT = 'wiki.work.at';
 
 const day = (t: number) => new Date(t).toISOString().slice(0, 10);
@@ -70,41 +72,56 @@ export function wikiWorkDue(db: DB, now = Date.now()): boolean {
 
 let running = false;
 
+export interface WorkOptions {
+  /** Whether an agent is working in the session or waits on the user: it is read in a later pass. */
+  busy?: (key: string) => boolean;
+}
+
 /**
  * One pass over the projects' recent work. Returns how many conversations it read (0 when memory or learning is off,
- * or another pass is running). Errors are logged, never thrown.
+ * or another pass is running). Errors are logged, never thrown. A session is read once: where each stopped is kept
+ * (wiki_work_sessions), and when it goes on only its new turns are read. A session is marked once the helper has
+ * answered; one that was busy, had no room, had too little new or failed is read in a later pass.
  */
-export async function learnWikiFromWork(db: DB, ask: DigestAsk | undefined, now = Date.now(), onUpdate?: (space: string | null) => void): Promise<number> {
+export async function learnWikiFromWork(db: DB, ask: DigestAsk | undefined, now = Date.now(), onUpdate?: (space: string | null) => void, options: WorkOptions = {}): Promise<number> {
   if (running) return 0;
   running = true;
   try {
     if (!memoryOn(db) || !learnOn(db)) return 0;
-    const since = Math.max(Number(kvGet(db, KV_SINCE)) || 0, now - LOOK_BACK_MS);
+    const floor = now - LOOK_BACK_MS;
     const projects = new Map(allSpaces(db).filter((s) => wikiMemoryOn(db, s.id)).map((s) => [s.id, s]));
     let read = 0;
     if (projects.size) {
       // The latest conversations first, at most PER_PROJECT of a project and PER_PASS in all.
       const perProject = new Map<string, number>();
-      const chosen: { key: string; title: string; last: number; space: string; text: string; cut: boolean; hash: string }[] = [];
-      for (const c of conversationsSince(db, since, 400)) {
+      const chosen: { key: string; title: string; last: number; space: string; text: string; cut: boolean; hash: string; upto: number; continued: boolean }[] = [];
+      for (const c of conversationsSince(db, floor, 400)) {
         if (chosen.length >= PER_PASS) break;
         const space = wikiSpaceOfSession(db, c.key, c.cwd);
         if (!space || !projects.has(space) || (perProject.get(space) ?? 0) >= PER_PROJECT) continue;
-        const turns = turnsOf(db, c.key, { since });
+        if (options.busy?.(c.key)) continue;
+        const mark = workMark(db, c.key);
+        const turns = turnsOf(db, c.key, { since: Math.max(mark?.upto ?? 0, floor) });
+        // A turn the agent has not answered yet is read with its reply.
+        while (turns.length && !turns[turns.length - 1].reply) turns.pop();
         if (!turns.length) continue;
+        const upto = turns[turns.length - 1].at;
         const { text, cut } = conversationText(turns);
         const clean = redactSecrets(text);
         if (clean.length < MIN_CONVO_CHARS) continue;
         const hash = wikiHash(clean);
-        if (digested(db, space, hash)) continue;
+        if (digested(db, space, hash)) {
+          setWorkMark(db, c.key, { space, upto, at: now });
+          continue;
+        }
         perProject.set(space, (perProject.get(space) ?? 0) + 1);
-        chosen.push({ key: c.key, title: clip(c.title || 'untitled', 100), last: c.last, space, text: clean, cut, hash });
+        chosen.push({ key: c.key, title: clip(c.title || 'untitled', 100), last: c.last, space, text: clean, cut, hash, upto, continued: !!mark });
       }
       const helper = ask ?? helperDigestAsk(db);
       for (const c of chosen) {
         try {
           read++;
-          await digestText(db, helper, {
+          const done = await digestText(db, helper, {
             space: c.space,
             base: 'sessions',
             title: c.title,
@@ -115,16 +132,18 @@ export async function learnWikiFromWork(db: DB, ask: DigestAsk | undefined, now 
             kind: 'conversation',
             notes: false,
             hash: c.hash,
+            continued: c.continued,
             now: () => now,
             onUpdate,
           });
+          if (done) setWorkMark(db, c.key, { space: c.space, upto: c.upto, at: now });
         } catch (e) {
           console.warn(`[wiki] learning from session ${c.key}: ${(e as Error).message}`);
         }
       }
     }
-    kvSet(db, KV_SINCE, String(now));
     kvSet(db, KV_AT, String(now));
+    dropWorkMarks(db, now - MARK_KEEP_MS);
     return read;
   } catch (e) {
     console.warn(`[wiki] learning from the projects' work: ${(e as Error).message}`);

@@ -31,7 +31,9 @@ import { activityText, PersonMark, useShares } from './ShareDialog';
 import { openShareDialog } from './ShareHost';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
-import { SpaceWiki } from '../wiki/SpaceWiki';
+import { DEFAULT_WIKI_DOCUMENTS } from '@shared/wiki';
+import { DocumentLimit } from '../wiki/DocumentLimit';
+import { DocumentsNoteOf, SpaceWiki } from '../wiki/SpaceWiki';
 import { useSpaceMemory, useWikiSettings, type SpaceMemory } from '../wiki/spaceMemory';
 import { PlacePage } from '../memory/MemoryNotes';
 import { loadSpaces, useSpaces } from './state';
@@ -412,7 +414,7 @@ function MemoryTab({ s, onSaved, memory }: { s: Space; onSaved: (next: Space) =>
       ) : part === 'wiki' ? (
         <SpaceWiki id={s.id} view={memory.wiki} version={memory.version} />
       ) : (
-        <DocumentsPart s={s} onSaved={onSaved} wikiOn={memory.wiki?.on === true} />
+        <DocumentsPart s={s} onSaved={onSaved} wikiOn={memory.wiki?.on === true} version={memory.version} />
       )}
       {part === 'notes' && memory.key && (
         <p className="text-[12px] text-fg-3">
@@ -434,7 +436,7 @@ function PartLabel({ name, n }: { name: string; n?: number }) {
 }
 
 /** Documents only this space's sessions search, and whether they search the shared ones too. */
-function DocumentsPart({ s, onSaved, wikiOn }: { s: Space; onSaved: (next: Space) => void; wikiOn: boolean }) {
+function DocumentsPart({ s, onSaved, wikiOn, version }: { s: Space; onSaved: (next: Space) => void; wikiOn: boolean; version: number }) {
   const [st, load] = useKnowledge();
   const wikiSettings = useWikiSettings();
   const spaces = useSpaces();
@@ -471,6 +473,7 @@ function DocumentsPart({ s, onSaved, wikiOn }: { s: Space; onSaved: (next: Space
   return (
     <div className="space-y-5">
       {wikiOn && wikiSettings?.fromDocuments && <p className="text-[12.5px] text-fg-3">New and changed documents also update this project’s notes and wiki.</p>}
+      {wikiOn && wikiSettings?.fromDocuments && <DocumentsNoteOf id={s.id} on version={version} />}
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-2 text-fg-2">
           <BookOpen size={16} />
@@ -597,6 +600,17 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
       toastError(e);
     }
   };
+  const wikiLimit = useWikiSettings()?.documentLimit ?? DEFAULT_WIKI_DOCUMENTS;
+  const limitChoice = s.wikiDocumentLimit === undefined ? 'inherit' : 'own';
+  /** The most documents its wiki reads saves at once too: a number of its own, or null (as in Settings). */
+  const setLimit = async (limit: number | null) => {
+    try {
+      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { wikiDocumentLimit: limit }));
+      onWikiChanged();
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const save = async () => {
     try {
       onSaved(
@@ -695,6 +709,22 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
             has the default for every project.
           </p>
         </Row>
+        {wikiChoice !== 'off' && (
+          <Row title="Most documents to read into its wiki" sub="A project with more documents than this keeps them out of its wiki: agents search them instead.">
+            <div className="flex flex-wrap items-center gap-2">
+              <Segmented
+                size="sm"
+                value={limitChoice}
+                onChange={(c) => void (c === 'inherit' ? setLimit(null) : setLimit(s.wikiDocumentLimit ?? wikiLimit))}
+                options={[
+                  { value: 'inherit', label: tr(`As in Settings (${wikiLimit})`) },
+                  { value: 'own', label: 'A number of its own' },
+                ]}
+              />
+              {limitChoice === 'own' && <DocumentLimit label="Most documents to read into its wiki" value={s.wikiDocumentLimit ?? wikiLimit} onCommit={(n) => void setLimit(n)} />}
+            </div>
+          </Row>
+        )}
         <Row title="The projects it brings together" sub="A group: its sessions work with all of them, their files, documents and guidelines.">
           {inGroups.length ? (
             <div className="text-[12.5px] text-fg-3">{tr(`It is in ${inGroups.map((g) => g.name).join(', ')}, so it cannot bring other projects together itself.`)}</div>

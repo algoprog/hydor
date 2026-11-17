@@ -237,6 +237,7 @@
 - [**Μνήμη**](/settings?s=memory&find=Memory): Οι πράκτορες ξεκινούν με ό,τι κράτησαν προηγούμενες συνεδρίες και αποθηκεύουν σημειώσεις όταν το ζητάτε.
 - [**Μνήμη wiki**](/settings?s=memory&find=Wiki%20memory): Άρθρα που κρατούν οι πράκτορες για κάθε έργο, από τα έγγραφα και τη δουλειά του: ενεργά για κάθε έργο, εκτός αν οι δικές του ρυθμίσεις λένε άλλο.
 - [**Μάθηση από νέα έγγραφα**](/settings?s=memory&find=Learn%20from%20new%20documents): Τα νέα και αλλαγμένα έγγραφα προσθέτουν σημειώσεις μνήμης και ενημερώνουν το wiki, με το βοηθητικό μοντέλο.
+- [**Most documents to read into the wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki): A project with more documents than this keeps them out of its wiki: agents search them instead.
 - [**Φάκελος Wiki**](/settings?s=memory&find=Wiki%20folder): Πού φυλάσσεται το κοινό wiki, και τα wiki των έργων αν δεν οριστεί αλλιώς παρακάτω.
 - [**Wiki έργων**](/settings?s=memory&find=Project%20wikis): Πού φυλάσσεται το wiki κάθε έργου: στον φάκελο wiki ή στον φάκελο κάθε έργου.
 - [**Φάκελος μέσα σε κάθε έργο**](/settings?s=memory&find=Folder%20inside%20each%20project): Πού μέσα στον φάκελό του κρατά κάθε έργο το wiki του.

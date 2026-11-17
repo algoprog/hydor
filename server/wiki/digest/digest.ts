@@ -14,7 +14,9 @@ import { ingestWikiSource, wikiHash } from '../core.ts';
 import { isWikiBase } from '../knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
+import { analysisAvailable, analyzeDataFile, needsAnalysis } from './analyze.ts';
 import { checkPlan, helperDigestAsk, planPrompt, planSystem, writePrompt, writeSystem, type ArticleLine, type DigestAsk, type TextKind } from './plan.ts';
+import { documentsOverLimit } from './limit.ts';
 import { digested, markDigested, recordUpdate } from './store.ts';
 import { appendLog, bodyOf, cleanLinks, composeArticle, freePath, readOrNull, splitFront, titleOfArticle, writeFile, writeIndex } from './write.ts';
 
@@ -93,6 +95,8 @@ export interface DigestTextInput {
   notes: boolean;
   /** Its hash (wikiHash of the text), marked as read once the helper has answered. */
   hash: string;
+  /** A conversation read before, of which only the newer turns are given. */
+  continued?: boolean;
   now: () => number;
   onUpdate?: (space: string | null) => void;
 }
@@ -100,9 +104,10 @@ export interface DigestTextInput {
 /**
  * Everything after the text is at hand, for a document and a conversation alike: keep it as a source, ask the helper
  * which articles it bears on, write them (never shorter than they were, never with a secret), refresh the index and
- * log, add the notes, mark the text as read and record the update. Never throws: what goes wrong is the update's error.
+ * log, add the notes, mark the text as read and record the update. Never throws: what goes wrong is the update's error. Returns whether the
+ * text was digested (the helper answered, even with nothing to add); false when it could not be kept or the helper failed.
  */
-export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Promise<void> {
+export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Promise<boolean> {
   const { space, text: raw, cut, kind, title, hash, now } = i;
   const project = space ? spaceById(db, space) : null;
   const rec = (articles: string[], notes: number, error?: string) => {
@@ -123,7 +128,7 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     docText = text;
   } catch (e) {
     rec([], 0, `Could not keep the ${kind} as a source: ${(e as Error).message}`);
-    return;
+    return false;
   }
 
   let articles: string[] = [];
@@ -132,7 +137,7 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     const listing = listArticles(root, docText);
     const place = project ? repoRoot(project.folder) : null;
     const noteTitles = place ? entries(db, { scope: 'repo', scopeKey: place, limit: 100 }).map(titleOf) : [];
-    const plan = checkPlan(await ask({ system: planSystem(kind), prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title, text: docText, cut, kind }, articles: listing.lines, more: listing.more, noteTitles }), maxTokens: 2000 }), listing.all);
+    const plan = checkPlan(await ask({ system: planSystem(kind), prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title, text: docText, cut, kind, continued: i.continued }, articles: listing.lines, more: listing.more, noteTitles }), maxTokens: 2000 }), listing.all);
 
     // The articles to write: existing ones with their text, new ones with a free path.
     const targets: { path: string; title: string; current?: string }[] = [];
@@ -153,7 +158,7 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     }
 
     if (targets.length) {
-      const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ document: { title, text: docText, cut, kind }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown }[] };
+      const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ document: { title, text: docText, cut, kind, continued: i.continued }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown }[] };
       const accepted: { target: (typeof targets)[number]; body: string }[] = [];
       for (const a of Array.isArray(answer?.articles) ? answer.articles : []) {
         const target = targets.find((t) => t.path === a.path);
@@ -215,9 +220,11 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     markDigested(db, space, hash, now());
     if (!articles.length && !notes && !problems.length) problems.push('Nothing in it to add to the wiki or to memory');
     rec(articles, notes, problems.length ? problems.join('; ').slice(0, 600) : undefined);
+    return true;
   } catch (e) {
     // The helper failed (not there, a refused answer…): recorded; the document is tried again when it changes.
     rec(articles, notes, `${(e as Error).message}`.slice(0, 300));
+    return false;
   }
 }
 
@@ -324,17 +331,41 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
     const project = space ? spaceById(db, space) : null;
     if (space && !project) return 'skip';
     if (!memoryOn(db) || !fromDocumentsOn(db) || !wikiMemoryOn(db, space)) return 'skip';
+    // Too many documents for its wiki to read (Wiki memory's limit): they stay for agents to search, with no update listed for each.
+    if (documentsOverLimit(db, space).over) return 'skip';
     const doc = docByPath(db, ev.path, [base.id]);
     if (!doc || doc.status !== 'indexed') return 'skip';
     const { text: raw, cut } = documentText(db, doc.id);
     if (!raw.trim()) return 'skip';
     const hash = wikiHash(raw);
     if (digested(db, space, hash)) return 'skip';
+    // A large data file (a big CSV, a spreadsheet, JSON data) reads badly as text: the helper analyses it with code in a
+    // sandbox and only its findings go on to the wiki. Where there is no such sandbox, agents search it only.
+    const data = needsAnalysis({ path: doc.path, format: doc.format, size: doc.size }, cut ? Number.POSITIVE_INFINITY : raw.length);
+    const listed = (error: string) => {
+      recordUpdate(db, { space, base: base.id, document: doc.title, path: doc.path, articles: [], notes: 0, error }, now());
+      o.onUpdate?.(space);
+    };
+    if (data && !analysisAvailable()) {
+      listed('A large data file: agents search it, but it was not analysed for the wiki, as this computer has no sandbox to run code in');
+      return 'done';
+    }
     if (budgetBlocked()) {
       return 'later';
     }
     starts.push(now());
 
+    if (data) {
+      const a = await analyzeDataFile({ file: doc.path, title: doc.title, ask });
+      if (!a.ok) {
+        // Tried again when the file changes.
+        listed(`Could not analyse it with code: ${a.error}`.slice(0, 300));
+        return 'done';
+      }
+      const text = `Findings from analysing the data file ${doc.title} with code (${a.runs} run${a.runs === 1 ? '' : 's'}; the file itself stays in the project's knowledge, for agents to search and analyse):\n\n${a.findings}`;
+      await digestText(db, ask, { space, base: base.id, title: doc.title, path: doc.path, origin: `knowledge:${base.name}/${doc.title} (analysed with code)`, text, cut: false, kind: 'document', notes: true, hash, now, onUpdate: o.onUpdate });
+      return 'done';
+    }
     await digestText(db, ask, { space, base: base.id, title: doc.title, path: doc.path, origin: `knowledge:${base.name}/${doc.title}`, text: raw, cut, kind: 'document', notes: true, hash, now, onUpdate: o.onUpdate });
     return 'done';
   }

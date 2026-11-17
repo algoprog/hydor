@@ -130,7 +130,6 @@ function tops(): string[] {
   return out;
 }
 
-/** Runs a code step's program and reads what it returned; throws with its last lines when it fails. */
 /** A call the program made through ctx: what kind, and with what; its answer goes back to it (a throw: an error it gets). */
 export type CtxCall = (kind: string, args: Record<string, unknown>) => Promise<unknown>;
 
@@ -138,7 +137,8 @@ export type CtxCall = (kind: string, args: Record<string, unknown>) => Promise<u
 const MOST_CALLS = 500;
 const CALL_LINE = 1 << 20;
 
-export async function runCode(o: { language: 'javascript' | 'typescript' | 'python'; code: string; input: Record<string, unknown>; slug: string; requires?: Requires; seconds: number; signal?: AbortSignal; onCall?: CtxCall }): Promise<CodeOut> {
+/** Runs a code step's program and reads what it returned; throws with its last lines when it fails. `files` are absolute paths bound read-only at the same path in the sandbox (those that exist). */
+export async function runCode(o: { language: 'javascript' | 'typescript' | 'python'; code: string; input: Record<string, unknown>; slug: string; requires?: Requires; seconds: number; signal?: AbortSignal; onCall?: CtxCall; files?: string[] }): Promise<CodeOut> {
   // bubblewrap alone: the mounts below are its own (a Mac's Seatbelt or Windows' low integrity don't run code steps).
   const sb = sandboxAvailable();
   const bwrap = sb?.kind === 'bwrap' ? sb.bin : null;
@@ -199,6 +199,8 @@ export async function runCode(o: { language: 'javascript' | 'typescript' | 'pyth
       '--bind',
       work,
       work,
+      // Files the caller lets it read: read-only, at the same path (after /tmp, so one under it shows too).
+      ...(o.files ?? []).filter((f) => path.isAbsolute(f) && fs.existsSync(f)).flatMap((f) => ['--ro-bind', f, f]),
       '--remount-ro',
       '/',
       '--chdir',

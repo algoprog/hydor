@@ -24760,5 +24760,17 @@
 "Use the computer":"使用电脑",
 "See the screen and use the mouse and keyboard in any app (the desktop apps, with Computer use on)":"查看屏幕，并在任何应用中使用鼠标和键盘（桌面应用中，需开启电脑操控）",
 "use a browser":"使用浏览器",
-"use the computer":"使用电脑"
+"use the computer":"使用电脑",
+"A number of its own":"自己的数字",
+"A project with more documents than this keeps them out of its wiki: agents search them instead":"文档多于此数的项目不会把它们读入 wiki：智能体改为搜索它们",
+"A project with more documents than this keeps them out of its wiki: agents search them instead.":"文档多于此数的项目不会把它们读入 wiki：智能体改为搜索它们。",
+"As in Settings ({0})":"与设置一致（{0}）",
+"Most documents to read into its wiki":"最多读入其 wiki 的文档数",
+"Most documents to read into the wiki":"最多读入 wiki 的文档数",
+"projects spaces project workspace group sessions files documents knowledge memory notes wiki memory tab guidelines instructions skills folder library overview settings tab most documents to read into its wiki limit":"项目 空间 工作区 分组 会话 文件 文档 知识 记忆 笔记 wiki 记忆 标签页 准则 指令 技能 文件夹 资料库 概览 设置 标签页 最多 读入 其 wiki 的 文档数 上限",
+"The most documents to read into the wiki is a whole number from 0 to {0}":"最多读入 wiki 的文档数是 0 到 {0} 之间的整数",
+"This project has {0} documents, more than the {1} its wiki reads: agents search them instead of reading them into the wiki.":"此项目有 {0} 份文档，多于其 wiki 读取的 {1} 份：智能体会搜索它们，而不是把它们读入 wiki。",
+"This project has 1 document, more than the {0} its wiki reads: agents search them instead of reading them into the wiki.":"此项目有 1 份文档，多于其 wiki 读取的 {0} 份：智能体会搜索它，而不是把它读入 wiki。",
+"wiki memory documents limit maximum most number count too many large many documents project knowledge read helper model retrieval search instead keep out of the wiki default 100 per project own number":"wiki 记忆 文档 上限 最大 最多 数量 计数 太多 大量 许多 文档 项目 知识库 读取 辅助模型 检索 搜索 改为 不读入 wiki 默认 100 每个项目 自己的数字",
+"wikiDocumentLimit: a whole number from 0 to {0}, or null":"wikiDocumentLimit：0 到 {0} 之间的整数，或 null"
 }

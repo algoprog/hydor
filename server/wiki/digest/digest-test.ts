@@ -8,13 +8,13 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { setSettings } from '../../assistants/store.ts';
-import { openDb } from '../../db.ts';
 import type { Deps } from '../../features/types.ts';
 import { knowledgeEvents, type IndexedDoc } from '../../knowledge/events.ts';
 import { scanSoon } from '../../knowledge/indexer.ts';
-import { addSource, createBase, docsOf } from '../../knowledge/store.ts';
+import { addSource, createBase, docsOf, knowledgeSchema } from '../../knowledge/store.ts';
+import { kvGet, openDb } from '../../db.ts';
 import { entries, repoRoot, setEnabled } from '../../memory/store.ts';
-import { createSpace } from '../../spaces/index.ts';
+import { createSpace, spaceById, updateSpace } from '../../spaces/index.ts';
 import { browseWiki } from '../browse.ts';
 import { checkWiki, readWiki } from '../core.ts';
 import { ensureWikiKnowledge } from '../knowledge/bindings.ts';
@@ -22,7 +22,9 @@ import { wikiRoot } from '../roots.ts';
 import { setWikiSettings, wikiSettings } from '../settings/settings.ts';
 import { createDigest, MAX_DOC_CHARS, type Digest } from './digest.ts';
 import { PLAN_SYSTEM } from './plan.ts';
-import { wikiDigest } from './index.ts';
+import { backfillDocuments, wikiDigest } from './index.ts';
+import { documentsOverLimit } from './limit.ts';
+import { analysisAvailable } from './analyze.ts';
 import { cleanLinks, composeArticle, slugOf, splitFront, writable } from './write.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -355,6 +357,123 @@ test('documents wait for their base to be quiet, and at most so many are read an
   await capped.settled();
   assert.equal(capped.pending(), 0);
   assert.equal(asked.length, n3 + 1, 'the waiting document was read');
+  stop();
+});
+
+test('a project with more documents than its limit: they are not read, quietly; its own number wins; raising it reads them', async () => {
+  const dir = path.join(tmp, 'beta-docs');
+  const folder = path.join(tmp, 'beta');
+  fs.mkdirSync(dir);
+  fs.mkdirSync(folder);
+  const beta = createSpace(db, { name: 'Beta', folder });
+  const bbase = createBase(db, { name: 'Beta docs', space: beta.id });
+  addSource(db, bbase.id, 'folder', dir);
+  const betaUpdates = () => updates(`/api/projects/${beta.id}/wiki/updates`);
+  const documentsOf = async (url: string) => (await app.inject({ method: 'GET', url })).json().documents as { count: number; limit: number; over: boolean };
+  const d = newDigest();
+  plan = { update: [], create: [{ title: 'Beta notes' }], notes: [] };
+  write = () => ({ articles: [{ path: 'wiki/beta-notes.md', content: '# Beta notes\n\nSomething longer than twenty characters.\n' }] });
+  assert.equal(wikiSettings(db).documentLimit, 100, 'the default');
+  setWikiSettings(db, { documentLimit: 2 });
+  for (const n of [1, 2, 3]) fs.writeFileSync(path.join(dir, `beta-${n}.md`), `# Beta ${n}\n\nA document about beta number ${n}, with enough words to be read.\n`);
+  const n0 = asked.length;
+  await scan(bbase.id, (k) => k >= 3);
+  await d.settled();
+  assert.equal(asked.length, n0, 'over the limit: the helper is not asked');
+  assert.deepEqual(await betaUpdates(), [], 'and no update row for each document');
+  assert.deepEqual(documentsOverLimit(db, beta.id), { count: 3, limit: 2, over: true });
+  assert.deepEqual(await documentsOf(`/api/projects/${beta.id}/wiki/updates`), { count: 3, limit: 2, over: true }, 'the route says so');
+  assert.equal((await documentsOf('/api/wiki/updates')).limit, 2, 'the shared wiki uses the global number');
+  // The backfill skips it as well, and does not mark it.
+  const queued: string[] = [];
+  const queue = { enqueue: (e: IndexedDoc) => void queued.push(e.path) };
+  const mine = (e: string[]) => e.filter((p) => p.startsWith(dir));
+  backfillDocuments(db, queue);
+  assert.deepEqual(mine(queued), []);
+  assert.notEqual(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1');
+  // Its own number wins over the global one.
+  assert.equal(updateSpace(db, beta.id, { wikiDocumentLimit: 5 }).wikiDocumentLimit, 5);
+  assert.deepEqual(documentsOverLimit(db, beta.id), { count: 3, limit: 5, over: false });
+  assert.equal(documentsOverLimit(db, null).limit, 2, 'the global number stays for the shared wiki');
+  assert.throws(() => updateSpace(db, beta.id, { wikiDocumentLimit: -1 }), /whole number from 0 to 100000/);
+  assert.throws(() => updateSpace(db, beta.id, { wikiDocumentLimit: 1.5 }), /whole number/);
+  assert.throws(() => updateSpace(db, beta.id, { wikiDocumentLimit: '9' }), /whole number/);
+  assert.equal(updateSpace(db, beta.id, { description: 'else' }).wikiDocumentLimit, 5, 'changing something else keeps it');
+  // Under its limit now: the documents already there are queued once, and read.
+  queued.length = 0;
+  backfillDocuments(db, queue);
+  assert.equal(mine(queued).length, 3);
+  assert.equal(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1');
+  queued.length = 0;
+  backfillDocuments(db, queue);
+  assert.deepEqual(mine(queued), [], 'once');
+  for (const doc of docsOf(db, bbase.id)) d.enqueue({ base: bbase.id, path: doc.path, title: doc.title });
+  await d.settled();
+  assert.ok(asked.length > n0, 'read after the limit was raised');
+  assert.ok((await betaUpdates()).length >= 1);
+  // A wiki's own documents are not counted.
+  knowledgeSchema(db);
+  const own = ensureWikiKnowledge(db, { root: wikiRoot(db, beta.id)!, space: beta.id });
+  db.prepare("insert into kb_docs (base, source, path, title, format, size, mtime, passages, status, indexed_at) values (?, 's', '/w/a.md', 'a.md', 'md', 1, 0, 1, 'indexed', 1)").run(own.base);
+  assert.equal(documentsOverLimit(db, beta.id).count, 3);
+  // Over again: a new document is skipped, quietly, and the mark is dropped so raising the limit reads what was missed.
+  updateSpace(db, beta.id, { wikiDocumentLimit: 3 });
+  fs.writeFileSync(path.join(dir, 'beta-4.md'), '# Beta 4\n\nA fourth document about beta, with enough words to be read.\n');
+  const n1 = asked.length;
+  const rows = (await betaUpdates()).length;
+  await scan(bbase.id, (k) => k >= 4);
+  await d.settled();
+  assert.equal(asked.length, n1);
+  assert.equal((await betaUpdates()).length, rows);
+  queued.length = 0;
+  backfillDocuments(db, queue);
+  assert.notEqual(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1', 'over again: no longer marked');
+  updateSpace(db, beta.id, { wikiDocumentLimit: null });
+  assert.equal('wikiDocumentLimit' in spaceById(db, beta.id)!, false, 'null: as in Settings again');
+  assert.equal(documentsOverLimit(db, beta.id).limit, 2);
+  setWikiSettings(db, { documentLimit: 100 });
+  backfillDocuments(db, queue);
+  assert.equal(mine(queued).length, 4, 'read when the limit allows it');
+  stop();
+});
+
+test('a large data file is analysed with code in the sandbox, and only its findings reach the wiki', async () => {
+  const d = newDigest();
+  const csv = path.join(docs, 'orders.csv');
+  const rows = ['id,customer,amount,country'];
+  for (let i = 0; i < 3000; i++) rows.push(`ORDER-${i},customer-${i % 97},${(i % 50) + 10}.50,${['GR', 'US', 'DE'][i % 3]}`);
+  const findings = 'The file lists 3,000 orders from 97 customers in three countries (GR, US and DE), with amounts from 10.50 to 59.50.';
+  const ran: string[] = [];
+  plan = { update: [], create: [{ title: 'Orders data' }], notes: [] };
+  // The helper: one run of code, then its findings; then the article, from the findings.
+  write = (prompt) => {
+    if (prompt.includes('<document>')) return { articles: [{ path: 'wiki/orders-data.md', content: `# Orders data\n\n${findings}\n` }] };
+    if (!prompt.includes('Run 1:')) return { run: "n = sum(1 for _ in open(input['path'])) - 1\nprint('ROWS', n)" };
+    ran.push(prompt);
+    return { findings };
+  };
+  const n = asked.length;
+  const before = docsOf(db, base.id).length;
+  fs.writeFileSync(csv, `${rows.join('\n')}\n`);
+  await scan(base.id, (k) => k > before);
+  await d.settled();
+  const latest = (await updates()).find((u) => u.path === csv);
+  assert.ok(latest, 'its update is listed');
+  if (analysisAvailable()) {
+    assert.match(ran[0] ?? '', /ROWS 3000/, 'what the code printed reached the helper');
+    const planned = asked.slice(n).find((q) => q.system === PLAN_SYSTEM)!.prompt;
+    assert.match(planned, /Findings from analysing the data file orders\.csv with code/);
+    assert.ok(!planned.includes('ORDER-2999'), 'the rows themselves never reach the plan');
+    const dir = path.join(wikiRoot(db, alpha.id)!, 'raw', 'articles');
+    const sources = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(dir, f), 'utf8'));
+    assert.ok(sources.some((x) => x.includes('3,000 orders from 97 customers')), 'the findings are kept as its source');
+    assert.ok(sources.every((x) => !x.includes('ORDER-2999')), 'the rows are not');
+    assert.deepEqual(latest.articles, ['wiki/orders-data.md']);
+  } else {
+    console.log('   (no sandbox for code here: checking that the file is searched only)');
+    assert.match(latest.error ?? '', /no sandbox to run code in/);
+    assert.equal(asked.length, n, 'no helper call without a sandbox');
+  }
   stop();
 });
 

@@ -14,6 +14,7 @@ function schema(db: DB) {
     );
     create index if not exists wiki_updates_space on wiki_updates (space, id);
     create table if not exists wiki_digested (place text not null, hash text not null, at integer not null, primary key (place, hash));
+    create table if not exists wiki_work_sessions (key text primary key, space text, upto integer not null, at integer not null);
   `);
   ready.add(db);
 }
@@ -59,4 +60,27 @@ export function digested(db: DB, space: string | null, hash: string): boolean {
 export function markDigested(db: DB, space: string | null, hash: string, at = Date.now()) {
   schema(db);
   db.prepare('insert or replace into wiki_digested (place, hash, at) values (?, ?, ?)').run(place(space), hash, at);
+}
+
+/** Where the work pass stopped reading a session: its last turn read (the turn's own time), and when it was read. */
+export interface WorkMark {
+  space: string | null;
+  upto: number;
+  at: number;
+}
+
+export function workMark(db: DB, key: string): WorkMark | undefined {
+  schema(db);
+  return db.prepare('select space, upto, at from wiki_work_sessions where key = ?').get(key) as WorkMark | undefined;
+}
+
+export function setWorkMark(db: DB, key: string, m: WorkMark) {
+  schema(db);
+  db.prepare('insert or replace into wiki_work_sessions (key, space, upto, at) values (?, ?, ?, ?)').run(key, m.space, m.upto, m.at);
+}
+
+/** Forgets the marks of sessions read before `before` (a session that old is not looked at again). */
+export function dropWorkMarks(db: DB, before: number) {
+  schema(db);
+  db.prepare('delete from wiki_work_sessions where at < ?').run(before);
 }
