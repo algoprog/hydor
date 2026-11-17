@@ -3,6 +3,64 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.82.0 · 17 November 2026
+
+A browser of your own in Hydor, to browse with and to hand pages to agents, and in the desktop app the agents' browser
+runs inside the app.
+
+- **The Browser page** (**Browser** in the sidebar): tabs, an address bar that opens addresses and searches with your
+  search providers, back, forward and reload, find in page (Ctrl+F), downloads into your Downloads folder, and sites
+  asking for your camera, microphone, location or notifications (**Site permissions** lists what you allowed or
+  blocked). In the desktop app its pages are real pages in the window; in a browser or on a phone they show as a live
+  picture you drive, as the agents' browser does.
+- **Bookmarks**: a bookmarks bar, a star in the address bar and a bookmarks panel with folders. Bring in your bookmarks
+  from Chrome, Edge, Brave, Chromium, Vivaldi, Opera, Arc, Firefox or Safari on this computer, or from a bookmarks file
+  any browser exports, and export yours.
+- **Chrome extensions**: add one from the Chrome Web Store (paste its link, or press **Add to Hydor** on its page), from
+  a folder, or bring in those installed in your other browsers. Their buttons, popups and badges sit beside the address
+  bar; you can turn each off, and let one run in agents' browsers too. They run in the desktop app's browser, which has
+  most of what extensions use; the panel says which parts of one may not work.
+- **Hand a page to an agent**: **Ask about this page** starts a session with a copy of the page's text, and **Do this
+  here** gives an agent a tab of its own at your page, signed in as you on that site and kept to it, with nothing but
+  the browser (no commands, files or other tools), in Claude Code or Custom. **Take back** gives you the page back, and
+  **Agents' tabs** shows every agent's browser beside yours.
+- **Asking before sending on signed-in sites**: where an agent's browser is signed in (a profile that keeps sign-ins, or
+  a page you handed it), it now stops before a button that sends, posts, publishes, deletes or transfers something and
+  asks you, as it already did before paying (**Settings → Browser → Ask before sending on signed-in sites**).
+- **The agents' browser in the desktop app** now runs inside the app, with no Chrome to install: its pages draw fast in
+  the window and you click into one to use it yourself (the agent waits meanwhile), and it keeps working with the
+  window closed. **Settings → Browser** lists it first; Chrome and Chromium are still there to choose.
+- **The terminal**: `hydor` chat shows what an agent's browser waits for (a login, a payment, an address on this
+  computer, a button to allow, a page's question) and lets you answer it, and `hydor run` stops with needs-answer.
+- **Usage** has its own button in the sidebar again, right after **Browser**, with the bar that shows how much your
+  plans have left; **System** keeps Files, Git, Terminal, Preview, Monitor and Experiments. The sidebar's ten tools sit
+  in two rows of five.
+
+## 0.81.0 · 17 November 2026
+
+Grok Build gets an effort picker, plan usage meters and switching accounts at a limit, like Claude Code and Codex.
+
+- **Effort for Grok Build**: Grok's models take a reasoning effort, each its own levels (Grok 4.6: xhigh, high,
+  medium or low, high to start; Grok 4.5: high, medium or low). The start page's **Options → Effort** offers them as soon as Grok
+  Build is added, even before its first session, because the app asks Grok for its models. A running session changes
+  its effort in its own Effort picker, and app runs take it too. When you switch to a model that does not take the
+  effort you had (xhigh on Grok 4.5), the picker shows that model's default, and that is what it runs with. The same
+  works for any other agent that speaks ACP whose models offer efforts.
+- **Grok's plan usage**: the Usage page's **Limits** tab has a **Grok Build** card for Grok's own sign-in and one for
+  each Grok account you added, with the plan (SuperGrok, SuperGrok Plus or SuperGrok Heavy), **Weekly** usage and when
+  it resets, the credits left and **Pay as you go** spending ("$12.00 of $50.00 this month") when the plan has them.
+  Signed out, the card says to sign in; on a plan run by a team it says the limits are managed by your team. The
+  small usage meter in the sidebar counts Grok too.
+- **Switch accounts at a limit** and **Resume after usage limits** now work for Grok Build: when a Grok account
+  reaches its weekly limit, its credit limit or its pay-as-you-go spending cap, the session moves to another signed-in
+  Grok account with usage left (the least used one) and continues there; with none left it waits for the reset when
+  **Resume after usage limits** is on. A message to a session whose account is out moves it first, a new session
+  starts on an account with usage left, and a short rate limit (a burst of requests) moves nothing. The limit notice
+  above the message box shows for Grok sessions too, and **Switch accounts at a limit** shows in **Settings → Agents →
+  Accounts** as soon as you have added any account, Grok's included.
+- Limit resets (Codex reset credits, Claude reset grants) and API credit at a limit are still for Claude Code and
+  Codex only.
+
 ## 0.80.0 · 17 November 2026
 
 Projects that were around before wiki memory can build it from their own history, and a new session offers to do it first.

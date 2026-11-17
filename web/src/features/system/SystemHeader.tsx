@@ -1,16 +1,16 @@
 // The System section: this computer's files, its Git repositories, terminals, the web apps running on it
-// (Preview), how it is doing (Monitor), what the agents' plans have left (Usage, with Activity and the Arena) and the
-// jobs it runs for you (Experiments), under one tool in the sidebar. Each page keeps its own address (/files, /git,
-// /terminal, /preview, /system/monitor, /usage, /system/experiments); this is the header they share, with a tab each.
+// (Preview), how it is doing (Monitor) and the jobs it runs for you (Experiments), under one tool in the sidebar. Each
+// page keeps its own address (/files, /git, /terminal, /preview, /system/monitor, /system/experiments); this is the
+// header they share, with a tab each. What the agents' plans have left (Usage) has a tool of its own since 0.82.0.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, ChevronDown, FlaskConical, FolderTree, Gauge, GitBranch, LayoutDashboard, MonitorSmartphone, SquareTerminal } from 'lucide-react';
+import { Activity, ChevronDown, FlaskConical, FolderTree, GitBranch, LayoutDashboard, MonitorSmartphone, SquareTerminal } from 'lucide-react';
 import type { TipId } from '@shared/tips';
 import { machineId } from '../../lib/machine';
 import { go } from '../../lib/nav';
 import { cx, Popover, SheetsOnPhone, useIsMobile } from '../../components/ui';
 import { PageHeader } from '../layout/PageHeader';
 
-export type SystemTab = 'overview' | 'files' | 'git' | 'terminal' | 'preview' | 'monitor' | 'usage' | 'experiments';
+export type SystemTab = 'overview' | 'files' | 'git' | 'terminal' | 'preview' | 'monitor' | 'experiments';
 
 /** The page each tab opens; Files opens where you left it. */
 let filesAt = '/files';
@@ -24,7 +24,6 @@ const PATHS: Record<SystemTab, () => string> = {
   terminal: () => '/terminal',
   preview: () => '/preview',
   monitor: () => '/system/monitor',
-  usage: () => '/usage',
   experiments: () => '/system/experiments',
 };
 
@@ -32,7 +31,6 @@ const PATHS: Record<SystemTab, () => string> = {
 export function systemTabOf(loc: string): SystemTab | null {
   if (loc === '/system') return 'overview';
   if (loc === '/system/monitor') return 'monitor';
-  if (loc === '/usage' || loc === '/stats' || loc === '/arena') return 'usage';
   if (loc === '/system/experiments' || loc.startsWith('/system/experiments/')) return 'experiments';
   if (loc === '/files' || loc === '/file' || loc === '/search') return 'files';
   if (loc === '/git') return 'git';
@@ -49,13 +47,12 @@ const TABS: { id: SystemTab; label: string; icon: ReactNode; tip?: TipId }[] = [
   // Dev-server previews open on this server's own preview port: its own machine only.
   ...(machineId ? [] : [{ id: 'preview' as const, label: 'Preview', icon: <MonitorSmartphone size={14} />, tip: 'preview' as const }]),
   { id: 'monitor', label: 'Monitor', icon: <Activity size={14} /> },
-  { id: 'usage', label: 'Usage', icon: <Gauge size={14} />, tip: 'usage' },
   { id: 'experiments', label: 'Experiments', icon: <FlaskConical size={14} /> },
 ];
 
 /**
  * On a phone, the title names the tab you are on and opens all of System's tools in a sheet, a grid of four
- * across (as the drawer's tools): eight tabs never fit across a phone, and those scrolled off its edge were lost.
+ * across (as the drawer's tools): seven tabs never fit across a phone, and those scrolled off its edge were lost.
  */
 function PhoneSwitcher({ tab }: { tab: SystemTab }) {
   const [open, setOpen] = useState(false);

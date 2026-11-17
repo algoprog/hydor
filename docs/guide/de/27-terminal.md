@@ -85,6 +85,24 @@ Eine Frage zeigt ihre Auswahlmöglichkeiten nummeriert: Drücke eine Zahl, um ei
 
 Manche Anfragen brauchen die App: eine nach einer Unterschrift oder einem Key für eine deiner Apps. Das Terminal sagt das und gibt die Adresse der Sitzung in der App an.
 
+### Wenn der Browser des Agenten auf dich wartet
+
+Worauf der Browser eines Agenten wartet, erscheint als Karte in der Unterhaltung, nach einer Freigabe, die davor liegt, in den Worten der App (siehe [Der Browser für Agenten](/guide/web#the-browser-agents-use)). Das Terminal zeigt sie auf Englisch:
+
+- „Needs you in the browser: …“ für eine Anmeldung, eine Prüfung oder alles, bei dem sich der Agent unsicher ist, mit der Adresse der Seite darunter.
+- „Stopped before paying or ordering: …. That is yours to do“.
+- „Wants to open localhost:3000, on this machine or its network“.
+- „Wants to press “Send” on mail.example.com“ für eine Schaltfläche, die auf einer Website, bei der der Browser angemeldet ist, sendet, veröffentlicht, löscht oder überweist (siehe [Schaltflächen, die senden, veröffentlichen oder löschen](/guide/web#buttons-that-send-post-or-delete)); die Karte ergänzt, dass der Agent sie nur drückt, wenn du es erlaubst.
+- Eine Dialogfrage einer Seite: Die Website sagt etwas (oder fragt, ob du sie verlassen willst), mit ihrer Nachricht.
+
+Die Karte zeigt ihre Tasten, und ein Tastendruck beantwortet sie:
+
+- Bei einer Adresse oder einer Schaltfläche: **y** erlaubt sie (eine Adresse für diese Sitzung) und **n** erlaubt sie nicht.
+- Bei einer Anmeldung, einer Prüfung oder einer Zahlung, die nur du auf der Seite erledigen kannst: **o** öffnet die Seite der Sitzung in der App in deinem Browser, damit du dort übernehmen kannst, **d** meldet, dass du fertig bist, und **n** meldet, dass du es nicht kannst (bei einer Zahlung: nicht jetzt).
+- Bei einer Dialogfrage: **y** ist OK (Verlassen bei „Seite verlassen?“) und **n** ist Abbrechen (Bleiben). Eine Warnung hat nur OK. Bei einer Texteingabe tippst du deine Antwort und drückst Enter, oder du drückst **y**, um zu behalten, was sie zeigt, oder **n** zum Abbrechen.
+
+Das Terminal kann die Seite selbst nicht zeigen, also übernimm mit **o**. Ist die Karte beantwortet, schrumpft sie auf eine Zeile: „Done in the browser“, „Skipped“, „Allowed“ oder „Not allowed“.
+
 ### Während der Arbeit
 
 Deine Eingabezeile bleibt deine. Was die Eingabetaste mit einer Nachricht macht, die du sendest, während der Agent arbeitet, bestimmt **Senden, während ein Agent arbeitet** in [Einstellungen → App → Allgemein](/settings?s=general&find=Sending%20while%20an%20agent%20works): **In laufenden Durchlauf senden** (die Voreinstellung, wie in der App) gibt sie in den laufenden Durchlauf, und **Auf Ende warten** reiht sie ein, damit sie beim Ende des Durchlaufs geht (sie erscheint als **queued**). Was auch eingestellt ist, zwei Befehle entscheiden für eine Nachricht:
@@ -147,7 +165,7 @@ Fehlende Werte stammen zuerst aus der letzten Startseitenauswahl und danach aus 
 `hydor run "…"` oder `hydor -p "…"` erstellt eine Sitzung, wartet auf Abschluss, gibt die letzte Antwort aus und beendet sich. Abgeschlossen bedeutet: Der Durchlauf ist beendet, alle Subagenten einschließlich Claude Codes Hintergrundagenten sind fertig und ihre Antworten zugestellt, die Warteschlange ist leer. Ein wartender Hauptagent wird nach Subagentenrückmeldungen fortgesetzt; auch darauf wartet der Befehl. Ein laufender Entwicklungsserver blockiert den Abschluss nicht. Bei `--timeout` oder Strg+C werden Hintergrundsubagenten mitgestoppt. Ohne Nachricht wird Standardeingabe gelesen, etwa `git diff | hydor run "review this change"`.
 
 - In einem Terminal sagen kurze Zeilen am Rand, was passiert (jeder Schritt, Subagenten beim Start und beim Ende); `-q` schaltet sie aus.
-- Freigaben und Fragen unterbrechen den unbeaufsichtigten Lauf. Das Terminal nennt die Anfrage; in App oder `hydor resume` kannst du antworten. Mit `--mode full` oder `-y` fragt der Agent nicht.
+- Freigaben und Fragen unterbrechen den unbeaufsichtigten Lauf. Das Terminal nennt die Anfrage; in App oder `hydor resume` kannst du antworten. Das gilt auch für das, worauf der Browser des Agenten wartet (eine Anmeldung, eine Zahlung, eine Adresse oder eine Schaltfläche zum Erlauben, eine Dialogfrage), und der Lauf sagt es: „The agent’s browser: Wants to press “Delete” on mail.example.com“. Mit `--mode full` oder `-y` fragt der Agent nicht.
 - `--json` erzeugt am Ende ein Objekt mit `key`, `url`, `status`, `reply`, `model`, `costUsd` einschließlich Subagenten, `tokens`, `durationMs`, `turns`, `children` mit `title`, `label`, `tier`, `costUsd`, `status` je Hydor-Subagent und bei Fehlern `error`. `--stream-json` liefert fortlaufende Zeilen für `item`, `live`, `note` und abschließend dasselbe Ergebnisobjekt.
 - `--timeout 300` stoppt nach 300 Sekunden.
 
@@ -317,6 +335,8 @@ Farben sind in einem Terminal an (True Color, wo es sie gibt) und aus, wenn die 
 - „Aktiviere Tab-Vervollständigung für hydor in meiner Shell.“
 - „Erstelle ein Skript, das vorgemerkte Änderungen mit hydor run prüft und den Commit bei gefundenen Fehlern verhindert.“
 - „Was bedeutet Exit-Code 3 bei hydor run?“
+- „Der Browser des Agenten will auf einer Website Senden drücken: Was drücke ich im Terminal?“
+- „Mein hydor run hat angehalten, weil der Browser des Agenten auf eine Anmeldung wartet: Wie mache ich weiter?“
 - „Richte hydor auf meinem Laptop für diesen Hydor-Computer ein.“
 - „Welcher hydor-Befehl listet meine geplanten Aufgaben auf, und wie schalte ich eine davon im Terminal aus?“
 - „Welcher Befehl speichert ein Sitzungsgespräch als Markdown?“

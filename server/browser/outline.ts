@@ -36,6 +36,12 @@ export interface El {
   fileInput?: boolean;
   /** Pressing it would likely pay or place an order. */
   payment?: boolean;
+  /** Pressing it would likely send, post, publish, share, delete or transfer something (the words of its name). */
+  consequential?: boolean;
+  /** The form it is in (its own key, shared by the form's elements), when it is in one. */
+  form?: string;
+  /** It has the keyboard focus. */
+  focused?: boolean;
   /** A <select>, with its options' labels. */
   options?: string[];
 }
@@ -106,6 +112,99 @@ const SENSITIVE_NAME = /passw|card.?num|cc.?num|cvv|cvc|\bcsc\b|security.?code|o
 const CARD = /\bcc-(number|csc|exp)|card.?num|cc.?num|cvv|cvc|\bcsc\b/i;
 const PAY = /\b(pay( now)?|place (my |your |the )?order|buy( it)? now|buy|purchase|complete (my |your |the )?(purchase|order|payment|checkout)|confirm (and pay|payment|purchase|order)|submit (order|payment)|subscribe now|start (my |your )?(subscription|trial)|donate( now)?|book now|rent now|order now)\b/i;
 const PAY_FRAME = /stripe|braintree|adyen|checkout\.com|paypal|squareup|klarna|affirm|afterpay|authorize\.net|worldpay|cybersource/i;
+
+
+// ---- buttons that send, post, delete or transfer ------------------------------------------------------------
+// What a button's name says about pressing it, in English, German, Greek, Chinese, French and Spanish. A name counts
+// when its verb leads it (or ends it, in German), and it is short: "Post", "Delete account", "Konto löschen". Plurals
+// and tenses are other words ("Posts", "12 comments", "Sent", "Deleted items" are not), and so are the ones that
+// only send something to yourself ("Send code", "Resend", "Send me a link") or only close a dialog ("Cancel").
+
+/** A name as the lists keep it: lower case, without accents, hyphens or marks between the words. */
+const fold = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[’`´]/g, "'")
+    .replace(/[^\p{L}\p{N}'\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+const set = (list: string) => new Set(fold(list).split(' ').filter(Boolean));
+
+/** Verbs that lead a name (English, French, Spanish, German, Greek), one word each. */
+const LEAD = set(
+  [
+    'send post publish share reply comment tweet retweet repost delete remove erase discard transfer withdraw unsubscribe submit deactivate',
+    'envoyer envoyez publier publiez partager partagez repondre repondez commenter commentez supprimer supprimez effacer effacez retirer retirez transferer virer poster soumettre desabonner',
+    'enviar envia publicar publica compartir comparte responder responde comentar comenta eliminar elimina borrar borra transferir transfiere retirar suprimir descartar tuitear postear',
+    'senden sende absenden abschicken versenden posten veroffentlichen teilen antworten kommentieren loschen entfernen uberweisen verwerfen abbestellen abheben auszahlen',
+    'αποστολή στείλτε στείλε δημοσίευση δημοσίευσε δημοσιεύστε ανάρτηση αναρτήστε διαγραφή διαγράψτε διαγράψε κατάργηση αφαίρεση αφαιρέστε μεταφορά μεταφέρετε κοινοποίηση κοινοποιήστε απάντηση απαντήστε σχολιάστε ανάληψη υποβολή απόρριψη απεγγραφή',
+  ].join(' '),
+);
+/** German puts the verb last ("Konto löschen", "Nachricht senden"). */
+const LAST = set('senden absenden abschicken versenden posten veroffentlichen teilen antworten kommentieren loschen entfernen uberweisen verwerfen abbestellen abheben auszahlen kundigen');
+/** Names made of more than a verb: cancelling or closing something that is yours, sending money. */
+const PHRASES: RegExp[] = [
+  /^(?:cancel|end) (?:my |your |the )?(?:subscription|membership|plan|order|account|booking|reservation|trial)\b/,
+  /^close (?:my |your |the )?account\b/,
+  /^(?:add|leave|write) (?:a |your )?(?:comment|reply|review)\b/,
+  /^(?:annuler|resilier) (?:mon |ma |l'|la |le )?(?:abonnement|compte|commande|reservation)\b/,
+  /^(?:fermer|supprimer) (?:mon |le |ce )?compte\b/,
+  /^(?:(?:effectuer|faire) un )?virement\b/,
+  /^(?:se )?desabonner\b/,
+  /^(?:cancelar|anular) (?:mi |la |tu |el )?(?:suscripcion|cuenta|pedido|reserva)\b/,
+  /^cerrar (?:mi |la |tu )?cuenta\b/,
+  /^dar(?:se)? de baja\b/,
+  /^(?:abonnement|mitgliedschaft|konto|vertrag) (?:kundigen|schliessen|loschen)\b/,
+  /^ακυρωση (?:της )?συνδρομης|^κλεισιμο λογαριασμου/,
+];
+/** Sending something to yourself, or again, is not sending it to others. */
+const TO_SELF = /\b(?:code|codigo|otp|pin|link|lien|enlace|verification|verificacion|verifier|again|erneut|nouveau|nuevamente|otra vez|reset|test|prueba|essai|copy|copie|copia|kopie|me|mir|moi|myself)\b|resend|^(?:renvoyer|reenviar)|κωδικ|συνδεσμ|ξανα/;
+const SEND_FAMILY = /^(?:send|envoyer|envoyez|enviar|envia|senden|sende|absenden|abschicken|versenden|αποστολη|στειλ)|(?:senden|absenden|abschicken|versenden)$/;
+/** Not the thing itself: clearing a filter, or removing from a view. */
+const HARMLESS = /^remove (?:all )?(?:filters?|tags?|highlights?|formatting)\b/;
+/** Answers to "Are you sure?" and the like: they count when the page is about one of the verbs above. */
+const YES = set('confirm confirmar confirmer bestatigen ok okay yes ja oui si valider proceed επιβεβαιωση ναι');
+/** What a page about a consequential thing says (a dialog asking "Delete this post?"), folded. */
+const ABOUT = /\b(?:delet|remov|erase|discard|transfer|send|post\b|publish|withdraw|unsubscrib|permanently|cannot be undone|can't be undone|supprim|effac|retir|virement|envoy|publi|elimin|borr|enviar|loschen|entfern|uberweis|senden|veroffentl|kundig|dauerhaft)|διαγραφ|μεταφορ|αποστολ|δημοσιευ|μονιμα|删除|转账|发送|发布|永久|无法撤|不可恢复|不能撤销/;
+/** Chinese: verbs inside a short name (no counts, no "done" or "not yet"), and the ones only a whole name settles. */
+const ZH = /发送|发布|发表|删除|移除|清除|转账|汇款|提现|提交|分享|转发|回复|退订|取消订阅|注销|关闭账户|关闭账号|丢弃|放弃/;
+const ZH_NOUNISH = /^(?:发表|提交|发)?评论$/;
+const ZH_TO_SELF = /验证码|链接|测试|给我|重新/;
+
+/** The roles that press something: a button, a link, a menu item, or a clickable thing the page does not name. */
+const PRESSABLE = /^(?:button|link|menuitem|clickable)$/i;
+
+/**
+ * Whether a button, a link or a submit input with this name likely sends, posts, publishes, shares, deletes or
+ * transfers something. `page`: the page's text, which settles a bare "Confirm" or "Yes". Payments are `payment`'s.
+ */
+export function isConsequential(name: string, o: { role?: string; page?: string } = {}): boolean {
+  if (o.role !== undefined && !PRESSABLE.test(o.role)) return false;
+  const raw = name.trim();
+  const about = () => !!o.page && ABOUT.test(fold(o.page));
+  if (!raw || raw.length > 60) return false;
+  if (/[一-鿿]/.test(raw)) {
+    const z = raw.replace(/\s+/g, '');
+    if (z.length > 10 || /\d|^[已未待]/.test(z) || ZH_TO_SELF.test(z)) return false;
+    if (ZH_NOUNISH.test(z)) return true;
+    if (/^(?:确认|确定)$/.test(z)) return about();
+    return ZH.test(z);
+  }
+  let n = fold(raw);
+  const stripped = n.replace(/^(?:please|yes|ja|oui|si|jetzt|ahora|maintenant|ναι) /, '').replace(/^(?:confirm|confirmar|confirmer|bestatigen|επιβεβαιωση) (?:and|y|et|und|και) /, '');
+  if (stripped) n = stripped;
+  const words = n.split(' ').filter(Boolean);
+  if (!words.length || words.length > 6) return false;
+  if (words.length <= 2 && words.every((w) => YES.has(w))) return about();
+  if (HARMLESS.test(n)) return false;
+  if (PHRASES.some((r) => r.test(n))) return true;
+  const verb = LEAD.has(words[0]) ? words[0] : LAST.has(words[words.length - 1]) ? words[words.length - 1] : '';
+  if (!verb) return false;
+  if (SEND_FAMILY.test(n) && TO_SELF.test(n)) return false;
+  return true;
+}
 
 const SECRET_PARAM = /^(pw|pwd|pass|passwd|password|passcode|pin|cvc|cvv|csc|card|cardnumber|card_number|ccnum|cc_number|otp|totp|secret)$/i;
 
@@ -362,6 +461,8 @@ export function buildOutline(o: OutlineIn): Outline {
         el = { id, session: f.session, backendNodeId: N.backendNodeId[labelFor ?? i], role: r, name: clip(name, 80), box: vbox, inView: zone === 'view', tag: tagName, type: stype || undefined };
         if (sensitive) el.sensitive = true;
         if (fileInput) el.fileInput = true;
+        if (myForm) el.form = myForm;
+        if (sax?.props.focused === true) el.focused = true;
         const parts: string[] = [`${o.prev && !o.prev.has(id) ? '*' : ''}[${id}] ${fileInput ? 'file input' : r}`];
         if (el.name) parts.push(quote(el.name));
         // Values: what a field holds, never a password, card, code, or what the user typed themselves.
@@ -462,6 +563,13 @@ export function buildOutline(o: OutlineIn): Outline {
   if (main) walkFrame(main, 0, 0, 0, 0);
   flush();
 
+  // What a page says, for a bare "Confirm" or "Yes" (a dialog asking "Delete this post?").
+  const pageText = lines
+    .filter((l) => l.kind !== 'el')
+    .map((l) => l.text)
+    .join(' ')
+    .slice(0, 8000);
+  for (const p of pending) if (isConsequential(p.el.name, { role: p.el.role, page: pageText })) p.el.consequential = true;
   for (const p of pending) if (PAY.test(p.el.name) || (p.submitLike && ((p.form && cardForms.has(p.form)) || (payFrame && /\b(pay|order|purchase|buy|confirm|complete|place|submit)\b/i.test(p.el.name))))) p.el.payment = true;
 
   // Within the budget: what is on screen first, then elements before the page's text.

@@ -508,6 +508,12 @@ row('browser', 'Keep pages off this machine and its network', 'switch', {
   write: put('/api/browser/settings', (v) => ({ blockPrivate: v })),
 });
 row('browser', 'Screenshots for models that see images', 'switch', { read: rd('/api/browser/settings', 'settings.screenshots'), write: put('/api/browser/settings', (v) => ({ screenshots: v })) });
+row('browser', 'Ask before sending on signed-in sites', 'switch', {
+  read: { endpoint: '/api/browser/settings', pick: (d) => d.settings?.confirmSignedIn !== false },
+  write: put('/api/browser/settings', (v) => ({ confirmSignedIn: v })),
+});
+row('browser', 'Bookmarks', 'page', { note: 'The Browser page’s bookmarks are kept, imported and exported on the page.' });
+row('browser', 'Extensions', 'page', { note: 'Chrome extensions are added and switched on the Browser page.' });
 row('browser', 'Sites', 'list', {
   items: 'allow:<site> (only these) and block:<site> (never these), such as allow:example.com',
   check: (v) => {

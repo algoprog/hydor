@@ -69,6 +69,9 @@ None of these happens until you do the thing in the first column.
 | Turn on speech recognition on the server, "On this machine" | `github.com`, `huggingface.co` | Downloads of whisper.cpp and the model, once. Your voice stays on your computer. |
 | Pick "A service" for speech recognition | The address you give | Your recordings, and the key you gave. |
 | Press the download in the Browser settings | `googlechromelabs.github.io`, `storage.googleapis.com` | A request for Chrome for Testing, once. |
+| Add a Chrome extension from the Chrome Web Store (a link, an id, or **Add to Hydor**) | `clients2.google.com`, and the address it sends the download to | The extension's id, and a request for its file, once for each time you add it. |
+| Type something that is not an address in the Browser page's address bar | The site of the first search provider that is on (`naget.com`, `search.brave.com`, `duckduckgo.com` or your SearXNG address) | Your search words, as the page you open. This is your own browser. |
+| Browse in the Browser page | The sites you open | What any browser sends them. Your own browser keeps its sign-ins in a profile of its own on this computer. |
 | Set up the picture tools on this computer | `huggingface.co`, `pypi.org`, `files.pythonhosted.org` | Downloads of three models and Python packages, once. Your pictures stay on your computer. |
 | Link a Telegram bot | `api.telegram.org` | Your bot's token, and what the chat carries: your messages, the agents' replies, buttons and notices. Hydor asks Telegram for new messages (long polling) while the bot is linked. |
 | Press **Notify this device** | The push service of your browser (Google, Mozilla or Apple) | An encrypted message that a session finished or needs you. The push service cannot read it; it sees that one was sent, its size, and your server's address. |

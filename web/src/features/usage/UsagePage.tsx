@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
 import { AlertTriangle, Coins, TrendingUp } from 'lucide-react';
-import type { AgentAccount, AgentUsage, UsageWindow } from '@shared/types';
+import type { AccountAgent, AgentAccount, AgentUsage, UsageWindow } from '@shared/types';
 import { ago, compact, pct, untilText } from '../../lib/format';
 import { go } from '../../lib/nav';
 import { useApp, useUsage } from '../../lib/store';
-import { AgentIcon, agentName } from '../../components/AgentIcon';
+import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
+import { AgentIcon } from '../../components/AgentIcon';
 import { Columns, Meter, severityColor } from '../../components/charts';
 import { Button, cx, Throbber, Tabs } from '../../components/ui';
-import { SystemHeader } from '../system/SystemHeader';
+import { PageHeader } from '../layout/PageHeader';
 import { StatsBody } from '../stats/StatsPage';
 import { ArenaBoard } from '../arena/ArenaBoard';
 import { LimitBanner, ResetList } from './LimitReset';
@@ -34,19 +35,22 @@ function WindowRow({ w }: { w: UsageWindow }) {
   );
 }
 
-function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | 'codex'; account?: AgentAccount }) {
+/** Dollars as the account's currency writes them. */
+const dollars = (n: number | null | undefined, currency?: string | null) => (n == null ? '–' : n.toLocaleString(LOCALE, { style: 'currency', currency: currency || 'USD' }));
+
+function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent; account?: AgentAccount }) {
+  const grok = agent === 'grok';
   return (
     <section className="min-w-0 rounded-2xl border border-line bg-panel p-4 sm:p-5">
       <header className="mb-3 flex items-center gap-2.5">
         <AgentIcon agent={agent} size={20} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold">
-            {agentName(agent)}
+            {ACCOUNT_AGENT_NAMES[agent]}
             {account && <span className="font-normal text-fg-3"> · {account.name}</span>}
           </div>
           <div className="truncate text-[12px] text-fg-3">
-            {u?.account?.email ?? '—'}
-            {u?.account?.plan && <span> · {u.account.plan}</span>}
+            {[u?.account?.email, u?.account?.plan].filter(Boolean).join(' · ') || '—'}
           </div>
         </div>
         {u && <span className="shrink-0 text-[12px] text-fg-3">{ago(u.fetchedAt)}</span>}
@@ -58,7 +62,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
       ) : !u.ok && !u.windows.length ? (
         <div className="rounded-lg border border-err/30 bg-err/5 px-3 py-2.5 text-[12.5px]">
           <div className="text-err">{u.error ?? 'Usage is unavailable'}</div>
-          <button className="mt-1 text-accent hover:underline" onClick={() => go('/settings')}>
+          <button className="mt-1 text-accent hover:underline" onClick={() => go(grok ? '/settings?s=accounts' : '/settings')}>
             Check the sign-in in Settings
           </button>
         </div>
@@ -70,8 +74,8 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
               <WindowRow key={w.id} w={w} />
             ))}
             {!u.windows.length &&
-              (u.account ? (
-                <div className="py-3 text-[12.5px] text-fg-3">No usage limits reported for this plan.</div>
+              (u.account || grok ? (
+                <div className="py-3 text-[12.5px] text-fg-3">{u.note ?? (grok && (u.credits || u.extra) ? 'No weekly limit reported for this plan.' : 'No usage limits reported for this plan.')}</div>
               ) : (
                 <div className="py-3 text-[12.5px] text-fg-3">
                   Not signed in.{' '}
@@ -85,14 +89,14 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
             <div className="mt-3 rounded-lg bg-bg-1 px-3 py-2 text-[12.5px]">
               <div className="flex items-center gap-2">
                 <TrendingUp size={13} className="text-fg-3" />
-                <span className="font-medium">Extra usage</span>
+                <span className="font-medium">{grok ? 'Pay as you go' : 'Extra usage'}</span>
                 <span className="ml-auto text-fg-3">{u.extra.enabled ? 'On' : 'Off'}</span>
               </div>
               {u.extra.enabled && u.extra.monthlyLimit != null && (
                 <div className="mt-1.5">
                   <Meter percent={u.extra.utilization ?? (u.extra.used && u.extra.monthlyLimit ? (u.extra.used / u.extra.monthlyLimit) * 100 : 0)} />
                   <div className="mt-1 text-[11.5px] text-fg-3">
-                    {u.extra.used ?? 0} of {u.extra.monthlyLimit} {u.extra.currency ?? ''} this month
+                    {grok ? `${dollars(u.extra.used ?? 0, u.extra.currency)} of ${dollars(u.extra.monthlyLimit, u.extra.currency)} this month` : `${u.extra.used ?? 0} of ${u.extra.monthlyLimit} ${u.extra.currency ?? ''} this month`}
                   </div>
                 </div>
               )}
@@ -104,7 +108,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
               <div className="flex items-center gap-1.5 text-[11.5px] text-fg-3">
                 <Coins size={12} /> Credits
               </div>
-              <div className="mt-0.5 text-[17px] font-semibold">{u.credits.unlimited ? 'Unlimited' : u.credits.balance ? compact(Number(u.credits.balance), 1) : '0'}</div>
+              <div className="mt-0.5 text-[17px] font-semibold">{u.credits.unlimited ? 'Unlimited' : u.credits.balance ? (grok ? dollars(Number(u.credits.balance)) : compact(Number(u.credits.balance), 1)) : '0'}</div>
             </div>
           )}
           <ResetList u={u} account={account?.id} />
@@ -144,16 +148,17 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: 'claude' | '
 const SUBS = { limits: 'How much of each plan is left, and when it resets', activity: 'Lines changed, tokens and sessions over time', arena: 'Which models win on your own tasks' };
 
 export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
-  const { claude, codex, accounts: usageByAccount, loading, refresh } = useUsage();
+  const { claude, codex, grok, accounts: usageByAccount, loading, refresh } = useUsage();
   const added = useApp((s) => s.boot?.accounts) ?? [];
   useEffect(() => {
     refresh().catch(() => {});
   }, [refresh]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* A tab of System since 0.37.0 (its place in the sidebar went to Agents); Limits, Activity and the Arena are its own. */}
-      <SystemHeader
-        tab="usage"
+      {/* A tool of its own in the sidebar again since 0.82.0 (a tab of System from 0.37.0); Limits, Activity and the Arena are its own. */}
+      <PageHeader
+        title="Usage"
+        tip="usage"
         sub={SUBS[tab]}
         actions={
           tab === 'limits' && (
@@ -180,8 +185,9 @@ export function UsagePage({ tab }: { tab: 'limits' | 'activity' | 'arena' }) {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Card u={claude} agent="claude" />
               <Card u={codex} agent="codex" />
+              {grok && <Card u={grok} agent="grok" />}
               {added.map((a) => (
-                <Card key={a.id} u={usageByAccount[a.id] ?? null} agent={a.agent === 'codex' ? 'codex' : 'claude'} account={a} />
+                <Card key={a.id} u={usageByAccount[a.id] ?? null} agent={a.agent} account={a} />
               ))}
             </div>
           </div>

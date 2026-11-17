@@ -46,7 +46,7 @@ import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, installUpdateNow, laterUpdate, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { accountById, accountEnv, accountPool, addAccount, addedAccounts, apiCreditOn, autoSwitchOn, hasApiKey, setApiKey, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
-import { dropGrokControl, grokControl, grokFlows } from './agents/grok.ts';
+import { dropGrokControl, grokControl, grokFlows, type GrokControl } from './agents/grok.ts';
 import { ACCOUNT_AGENT_NAMES, isGrok } from '../shared/grok.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
@@ -87,12 +87,14 @@ import { exportRoutes } from './session-export.ts';
 import { isConfidential } from '../shared/confidential.ts';
 import { makeOf } from '../shared/content-asks.ts';
 import { checkExtraChange, confidentialKey, privateHelper, privateNotice } from './confidential/index.ts';
+import { checkBrowserOnlyChange } from './browser/handoff.ts';
 import { localNow, setUserTimezone, userTimezone } from './userPrefs.ts';
 import { codexFolderNames } from './codex-projects.ts';
 import { claimSessions, syncFoundProjects } from './spaces/found.ts';
 import { sidebarPlaces, sidebarTools } from './sidebar/index.ts';
 import { folderOrigins } from './sidebar/origins.ts';
 import { useMachines } from './experiments/remote.ts';
+import { BROWSING_KEY } from '../shared/browser.ts';
 
 ensureDirs();
 ensureProbeDir();
@@ -988,12 +990,23 @@ app.delete('/api/acp-agents/:id', async (req) => {
 let usageAt = 0;
 const extraUsage: Record<string, AgentUsage> = {};
 
+/** Grok Build is set up: its agent is added in Settings → More agents, or an account of it exists. */
+const grokSetUp = () => acpAgents(db).some((a) => isGrok(a)) || addedAccounts(db).some((a) => a.agent === 'grok');
+
+/**
+ * Grok's plan usage costs a process started for a second, so a reading stands for 4 minutes (the page asks every 5, and
+ * Claude and Codex are read every 2) unless the Usage page's Refresh asks for a new one.
+ */
+const grokUsageOf = (c: GrokControl, force: boolean) => (!force && c.lastUsage && Date.now() - c.lastUsage.fetchedAt < 4 * 60_000 ? c.lastUsage : c.usage());
+
 /** Usage of every added account (each through its own control process). */
-async function addedUsage(): Promise<Record<string, AgentUsage>> {
-  // Grok Build's accounts have no usage to read here.
-  const list = addedAccounts(db).filter((a) => a.agent !== 'grok');
+async function addedUsage(force = false): Promise<Record<string, AgentUsage>> {
+  const list = addedAccounts(db);
   const got = await Promise.all(
-    list.map(async (a) => [a.id, a.agent === 'claude' ? await sessions.controlFor('claude', a.id).usage(sessions.liveClaudeUsage(a.id)) : await sessions.controlFor('codex', a.id).usage()] as const),
+    list.map(
+      async (a) =>
+        [a.id, a.agent === 'grok' ? await grokUsageOf(grokControl(db, a.id), force) : a.agent === 'claude' ? await sessions.controlFor('claude', a.id).usage(sessions.liveClaudeUsage(a.id)) : await sessions.controlFor('codex', a.id).usage()] as const,
+    ),
   );
   for (const k of Object.keys(extraUsage)) if (!list.some((a) => a.id === k)) delete extraUsage[k];
   for (const [id, u] of got) extraUsage[id] = u;
@@ -1001,19 +1014,20 @@ async function addedUsage(): Promise<Record<string, AgentUsage>> {
 }
 
 /** Reads every account's usage now, tells the open pages, and keeps sessions waiting out a limit on its reset. */
-async function readUsage() {
+async function readUsage(force = false) {
   usageAt = Date.now();
-  const [c, x, accounts] = await Promise.all([claude.usage(sessions.liveClaudeUsage()), codex.usage(), addedUsage()]);
-  broadcast({ t: 'usage', claude: c, codex: x, accounts });
+  const [c, x, g, accounts] = await Promise.all([claude.usage(sessions.liveClaudeUsage()), codex.usage(), grokSetUp() ? grokUsageOf(grokControl(db), force) : undefined, addedUsage(force)]);
+  broadcast({ t: 'usage', claude: c, codex: x, ...(g ? { grok: g } : {}), accounts });
   scheduler.syncResumes();
-  return { claude: c, codex: x, accounts };
+  return { claude: c, codex: x, ...(g ? { grok: g } : {}), accounts };
 }
 
 app.get('/api/usage', async (req) => {
   const refresh = (req.query as Record<string, string>).refresh === '1';
   const stale = Date.now() - usageAt > 120_000;
-  if (refresh || stale || !claude.lastUsage || !codex.lastUsage) return readUsage();
-  return { claude: claude.lastUsage, codex: codex.lastUsage, accounts: { ...extraUsage } };
+  const g = grokSetUp() ? grokControl(db) : undefined;
+  if (refresh || stale || !claude.lastUsage || !codex.lastUsage || (g && !g.lastUsage)) return readUsage(refresh);
+  return { claude: claude.lastUsage, codex: codex.lastUsage, ...(g?.lastUsage ? { grok: g.lastUsage } : {}), accounts: { ...extraUsage } };
 });
 
 // While a session waits to continue after a usage limit, usage is read now and then, more often as the
@@ -1052,7 +1066,7 @@ app.post('/api/usage/:agent/reset', async (req) => {
 app.get('/api/accounts', async () => {
   const added = addedAccounts(db);
   // Grok Build shows once it is set up: its agent is added in Settings → More agents, or an account of it exists.
-  const grok = acpAgents(db).some((a) => isGrok(a)) || added.some((a) => a.agent === 'grok');
+  const grok = grokSetUp();
   const [c, x, g, extra] = await Promise.all([
     claude.account(),
     codex.account(),
@@ -1782,9 +1796,10 @@ app.register(async (scope) => {
             send(c, { t: 'kernel', id, e: { op: 'gone' } });
           }
         }
-      } else if (m.t !== 'ping' && typeof m.key === 'string' && (m.key.startsWith('preview:') || m.key.startsWith('page:'))) {
-        // A dev server's page streaming to Preview, or a page of the Library open in its editor (an agent's save of it
-        // shows as it comes: server/pages/drafts.ts): their news only, no session behind them.
+      } else if (m.t !== 'ping' && typeof m.key === 'string' && (m.key.startsWith('preview:') || m.key.startsWith('page:') || m.key === BROWSING_KEY || m.key.startsWith('browser-profile:'))) {
+        // A dev server's page streaming to Preview, a page of the Library open in its editor (an agent's save of it
+        // shows as it comes: server/pages/drafts.ts), your own browsing (the Browser page), or a profile's browser you
+        // sign in with: their news only, no session behind them.
         if (m.t === 'sub') c.subs.add(m.key);
         else if (m.t === 'unsub') c.subs.delete(m.key);
       } else if (m.t === 'sub' && m.key === SYSTEM_CHANNEL && !c.subs.has(m.key)) {
@@ -1989,6 +2004,8 @@ app.patch('/api/sessions/:key/extra', async (req) => {
   const patch = (req.body ?? {}) as Record<string, unknown>;
   // Confidential is set when a session starts and stays; memory stays off in one (server/confidential).
   checkExtraChange(db, key, patch);
+  // Browser-only (Do this here) is set when a session starts and stays (server/browser/handoff.ts).
+  checkBrowserOnlyChange(db, key, patch);
   const extra = setSessionExtra(db, key, patch);
   sessions.queueSummary(key);
   return { extra };

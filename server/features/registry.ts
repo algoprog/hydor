@@ -90,10 +90,11 @@ export function runTools(ctx: RunCtx): RunTool[] {
  * featureContext). A guide whose tools are all switched off for it (its agent may not use the browser, say) is left out.
  */
 export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
-  const out: GivenAdditions = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {} };
+  const out: GivenAdditions = { instructions: [], notes: [], mcpServers: {}, env: {}, args: [], skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {}, builtinTools: null };
   if (!deps) return out;
   // A confidential session gets no MCP server but the app's own (server/confidential): connected apps and plugins' servers reach outside.
-  const closed = s.extra?.confidential === true;
+  // Nor does a browser-only one (Do this here, server/browser/handoff.ts): it has the browser and nothing else.
+  const closed = s.extra?.confidential === true || s.extra?.browserOnly === true;
   // The instructions in the capabilities' order, each guide with the tools it is about.
   const texts: { text: string; tools?: string[] }[] = [];
   for (const f of list) {
@@ -109,6 +110,7 @@ export async function spawnAdditions(s: SpawnInfo): Promise<GivenAdditions> {
       out.disallowedTools.push(...(a.disallowedTools ?? []));
       out.allowedTools.push(...(a.allowedTools ?? []));
       out.strictMcp ||= !!a.strictMcp;
+      if (a.builtinTools) out.builtinTools = out.builtinTools ? out.builtinTools.filter((t) => a.builtinTools!.includes(t)) : [...a.builtinTools];
       Object.assign(out.codexConfig, a.codexConfig);
     } catch (e) {
       warn(f, 'spawn', e);

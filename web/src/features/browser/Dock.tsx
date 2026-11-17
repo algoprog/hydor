@@ -2,13 +2,16 @@
 // view to watch (full screen on a phone), taking over to log in or pass a check, and handing back.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, CreditCard, Ellipsis, FileDown, Globe, Hand, Keyboard, Maximize2, Minimize2, RotateCw, Server, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, CreditCard, Ellipsis, FileDown, Globe, Hand, Keyboard, Maximize2, Minimize2, RotateCw, Server, ShieldAlert, X } from 'lucide-react';
 import type { BrowserAsk, BrowserView } from '@shared/browser';
 import type { SessionSummary } from '@shared/types';
 import { Button, cx, IconButton, inputCls, MenuItem, MenuLabel, MenuSep, Popover, useIsMobile } from '../../components/ui';
 import { openFile } from '../../lib/nav';
+import { post } from '../../lib/api';
+import { toastError } from '../../lib/store';
 import { browserCall, hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 import { LiveView, type LiveViewApi } from './LiveView';
+import { nativePages, PageView } from './PageView';
 import { SessionSites, ProfilePicker } from './Options';
 
 /** Opens a session's browser view from elsewhere (a card in the conversation, the session's menu). */
@@ -43,24 +46,28 @@ export function AskLine({ k, ask, phone, onTake }: { k: string; ask: BrowserAsk;
       <>
         Wants to open <span className="font-mono text-[12.5px]">{ask.text}</span>, on this machine or its network
       </>
+    ) : ask.kind === 'confirm' ? (
+      <>
+        {hostOf(ask.url ?? '') ? `Wants to press “${ask.text}” on ${hostOf(ask.url ?? '')}` : `Wants to press “${ask.text}”`}
+      </>
     ) : ask.kind === 'payment' ? (
       <>Stopped before paying or ordering: {ask.text}. That is yours to do.</>
     ) : (
       <>Needs you in the browser: {ask.text}</>
     );
-  const Icon = ask.kind === 'local' ? Server : ask.kind === 'payment' ? CreditCard : Hand;
+  const Icon = ask.kind === 'local' ? Server : ask.kind === 'confirm' ? ShieldAlert : ask.kind === 'payment' ? CreditCard : Hand;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <Icon size={15} className="shrink-0 text-warn" />
       <div className="min-w-[min(100%,220px)] flex-1 text-[13.5px] leading-snug">{head}</div>
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
-        {ask.kind === 'local' ? (
+        {ask.kind === 'local' || ask.kind === 'confirm' ? (
           <>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => run(() => answerAsk(k, ask.id, 'skipped'))}>
               Don’t allow
             </Button>
             <Button size="sm" variant="primary" disabled={busy} onClick={() => run(() => answerAsk(k, ask.id, 'done'))}>
-              Allow for this session
+              {ask.kind === 'confirm' ? 'Allow' : 'Allow for this session'}
             </Button>
           </>
         ) : (
@@ -295,8 +302,8 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
   const fullMenuRef = useRef<HTMLButtonElement>(null);
   const live = useRef<LiveViewApi>(null);
   const asks = view?.asks.length ?? 0;
-  // What needs the page itself (a login, a payment, a dialog) opens the live view; allowing an address does not.
-  const needsPage = view?.asks.filter((a) => a.kind !== 'local').length ?? 0;
+  // What needs the page itself (a login, a payment, a dialog) opens the live view; allowing an address or a button does not.
+  const needsPage = view?.asks.filter((a) => a.kind !== 'local' && a.kind !== 'confirm').length ?? 0;
   const dialog = !!view?.dialog;
 
   // Shown when asked for from a card or the menu; what needs the user opens it on a computer.
@@ -327,7 +334,16 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
   if (!view || (!view.open && !asks)) return null;
   const tab = view.tabs.find((t) => t.active) ?? view.tabs[0];
   const driving = view.driver === 'user';
-  const waiting = view.asks.filter((a) => a.kind !== 'local');
+  const waiting = view.asks.filter((a) => a.kind !== 'local' && a.kind !== 'confirm');
+  const native = nativePages(view);
+  // A tab you handed over: it is yours again, and the session's browser lets go of it.
+  const takeBack = async () => {
+    try {
+      await post(`/api/browser/browsing/tabs/${encodeURIComponent(tab?.id ?? '')}/take-back`, {});
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const status = driving ? 'You are driving: the agent waits' : waiting.length ? 'Waiting for you' : view.busy;
   const take = async () => {
     await takeOver(key, mobile);
@@ -347,11 +363,22 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
       <button className="min-w-0 flex-1 text-left" onClick={() => (inFull ? undefined : mobile ? setFull(true) : setExpanded((x) => !x))}>
         <div className="truncate text-[13.5px] font-medium">{!tab || tab.url === 'about:blank' ? 'Blank page' : tab.title || hostOf(tab.url) || 'Browser'}</div>
         <div className="flex items-center gap-1.5 truncate text-[12px] text-fg-3">
-          {view.profileName && <span className="shrink-0 rounded bg-bg-2 px-1.5 text-[11px]">{view.profileName}</span>}
+          {view.handedFrom ? (
+            <span className="shrink-0 rounded bg-bg-2 px-1.5 text-[11px]">
+              Your tab from <span translate="no">{hostOf(view.handedFrom) || view.handedFrom}</span>
+            </span>
+          ) : (
+            view.profileName && <span className="shrink-0 rounded bg-bg-2 px-1.5 text-[11px]">{view.profileName}</span>
+          )}
           {status ? <span className={cx('truncate', !driving && view.busy && 'shine', (driving || waiting.length > 0) && 'text-warn')}>{status}</span> : <span className="truncate">{hostOf(tab?.url ?? '') || 'Agent’s browser'}</span>}
           {view.tabs.length > 1 && <span className="shrink-0">· {view.tabs.length} tabs</span>}
         </div>
       </button>
+      {view.open && view.handedFrom && tab && (
+        <Button size="sm" variant="ghost" onClick={takeBack} title="Take the tab back into your own browsing">
+          Take back
+        </Button>
+      )}
       {view.open &&
         (driving ? (
           <Button size="sm" variant="primary" onClick={back} title="Give the browser back to the agent">
@@ -403,8 +430,9 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
           {expanded && !full && view.open && (
             <div className="space-y-2 px-3 pb-3">
               <AddressBar k={key} view={view} driving={driving} />
+              {native && !driving && <p className="text-[12px] text-fg-3">Click into the page to use it yourself</p>}
               <div className="relative">
-                <LiveView ref={live} k={key} view={view} driving={driving} maxH="44vh" className="rounded-lg border border-line" />
+                <PageView ref={live} k={key} view={view} driving={driving} maxH="44vh" className="rounded-lg border border-line" />
                 {view.dialog && <DialogCard k={key} view={view} />}
               </div>
             </div>
@@ -430,7 +458,7 @@ export function BrowserDock({ s }: { s: SessionSummary }) {
               {(w, h) => (
                 <>
                   <FitPage k={key} view={view} on={driving && mobile} area={{ w, h }} />
-                  <LiveView ref={live} k={key} view={view} driving={driving} maxH={`${Math.max(120, h - 16)}px`} className="rounded-lg border border-line" />
+                  <PageView ref={live} k={key} view={view} driving={driving} maxH={`${Math.max(120, h - 16)}px`} className="rounded-lg border border-line" />
                   {view.dialog && <DialogCard k={key} view={view} />}
                 </>
               )}

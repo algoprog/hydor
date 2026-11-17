@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { closestCenter, DndContext, DragOverlay, MouseSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Boxes, CircleHelp, Folders, Inbox, ListFilter, MonitorCog, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, WifiOff, X } from 'lucide-react';
+import { Boxes, CircleHelp, Folders, Gauge, Inbox, ListFilter, MonitorCog, PanelLeftClose, RotateCcw, Search, Settings, SquarePen, WifiOff, X } from 'lucide-react';
 import { usualOrder, type SidebarTool } from '@shared/sidebar';
 import { activityOf } from '../../lib/activity';
 import { AreaTouchSensor, MOUSE_DRAG, TOUCH_DRAG, touchDragArea } from '../../lib/dragTouch';
@@ -43,9 +43,9 @@ function leftOf(u: AgentUsage): number {
  * are no paid ones, each counted once (an added account can be the agent's own sign-in too). No subscriptions, no bar.
  */
 function UsageHint() {
-  const { claude, codex, accounts } = useUsage();
+  const { claude, codex, grok, accounts } = useUsage();
   const seen = new Set<string>();
-  const subs = [claude, codex, ...Object.values(accounts)].filter((u): u is AgentUsage => {
+  const subs = [claude, codex, grok, ...Object.values(accounts)].filter((u): u is AgentUsage => {
     if (!u?.ok || !u.windows.some((w) => w.usedPercent != null)) return false;
     const key = u.account?.email ? `${u.agent}:${u.account.email.toLowerCase()}` : null;
     if (key && seen.has(key)) return false;
@@ -58,7 +58,7 @@ function UsageHint() {
   const left = counted.reduce((n, u) => n + leftOf(u), 0) / counted.length;
   const title = [
     `${Math.round(left)}% left across ${counted.length} ${paid.length ? 'paid' : 'free'} subscription${counted.length === 1 ? '' : 's'}`,
-    ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
+    ...counted.map((u) => `${u.agent === 'claude' ? 'Claude' : u.agent === 'grok' ? 'Grok' : 'Codex'}${u.account?.email ? ` (${u.account.email})` : ''}: ${pct(leftOf(u))} left`),
   ].join('\n');
   return (
     <span className="absolute bottom-[7px] left-1/2 h-[3px] w-8 -translate-x-1/2 overflow-hidden rounded-full bg-fg/10" title={title}>
@@ -109,8 +109,8 @@ interface DragBits {
 /** A drop ends with a click on the tool under the pointer; that click is ignored. */
 let lastDragEnd = 0;
 
-/** A tool: icon over label, four to a row, so the sessions keep the room (on phones and computers alike). */
-function NavItem({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void }) {
+/** A tool: icon over label, four to a row (five with nine tools: two rows), so the sessions keep the room (on phones and computers alike). */
+function NavItem({ t, drag, floating, onMenu, tight }: { t: Tool; drag?: DragBits; floating?: boolean; onMenu?: (e: ReactMouseEvent<HTMLElement>) => void; tight?: boolean }) {
   return (
     <button
       ref={drag?.ref}
@@ -128,18 +128,19 @@ function NavItem({ t, drag, floating, onMenu }: { t: Tool; drag?: DragBits; floa
       )}
     >
       <span className={cx('shrink-0', t.match ? 'text-fg' : 'text-fg-3')}>{t.icon}</span>
-      <span className="max-w-full truncate px-1 leading-none">{t.label}</span>
+      <span className={cx('max-w-full truncate leading-none', tight ? 'px-0.5 text-[11px]' : 'px-1')}>{t.label}</span>
       {t.extra}
     </button>
   );
 }
 
 /** A tool that drags into another place among them, as sessions do in their list. */
-function SortableTool({ t, onMenu }: { t: Tool; onMenu: (e: ReactMouseEvent<HTMLElement>) => void }) {
+function SortableTool({ t, onMenu, tight }: { t: Tool; onMenu: (e: ReactMouseEvent<HTMLElement>) => void; tight?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id });
   return (
     <NavItem
       t={t}
+      tight={tight}
       onMenu={onMenu}
       drag={{ ref: setNodeRef, style: { transform: CSS.Transform.toString(transform), transition }, attrs: { ...attributes, ...(listeners as HTMLAttributes<HTMLButtonElement>) }, lifted: isDragging }}
     />
@@ -179,8 +180,10 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
 
   const tools: Tool[] = [
     ...features().flatMap((f) => (f.nav ?? []).map((n): Tool => ({ id: n.id, label: n.label, icon: n.icon, match: n.match ? n.match(loc) : loc === n.path, go: () => nav(n.path) }))),
-    // This computer: its files, Git, terminals, previews, monitor and the plans' usage, each a tab of System (the plans' usage shows on it).
-    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system', extra: <UsageHint /> },
+    // What the agents' plans have used and have left, with a thin bar for it at a glance.
+    { id: 'usage', label: 'Usage', icon: <Gauge size={17} />, match: loc === '/usage' || loc === '/stats' || loc === '/arena', go: () => nav('/usage'), extra: <UsageHint /> },
+    // This computer: its files, Git, terminals, previews and monitor, each a tab of System.
+    { id: 'system', label: 'System', icon: <MonitorCog size={17} />, match: systemTabOf(loc) !== null, go: () => nav('/system'), tour: 'nav-system' },
     {
       id: 'settings',
       label: 'Settings',
@@ -203,6 +206,8 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
     { id: 'help', label: 'Help', icon: <CircleHelp size={17} />, match: loc === '/guide' || loc.startsWith('/guide/'), go: () => nav('/guide') },
   ];
   tools.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+  // Nine tools or more: five to a row, so they make two rows (not two and a lone one).
+  const wide = tools.length >= 9;
   const dragging = dragId ? tools.find((t) => t.id === dragId) : undefined;
 
   const onToolDrop = ({ active, over }: DragEndEvent) => {
@@ -357,14 +362,14 @@ export const Sidebar = memo(function Sidebar({ mobile }: { mobile?: boolean }) {
         accessibility={{ screenReaderInstructions: { draggable: 'Drag a tool to move it. The tools keep the order you set, on every device.' } }}
       >
         {/* Only the tools in the grid: the tour brings them in by their places in it. Touches on them may pick one up (lib/dragTouch). */}
-        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className="grid shrink-0 grid-cols-4 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]">
+        <nav ref={touchDragArea} data-tour="tools" data-i18n="nav" className={cx('grid shrink-0 gap-1 border-t border-line px-2 pt-2 pb-[max(8px,var(--safe-bottom))]', wide ? 'grid-cols-5' : 'grid-cols-4')}>
           <SortableContext items={tools.map((t) => t.id)} strategy={rectSortingStrategy}>
             {tools.map((t) => (
-              <SortableTool key={t.id} t={t} onMenu={onToolMenu} />
+              <SortableTool key={t.id} t={t} tight={wide} onMenu={onToolMenu} />
             ))}
           </SortableContext>
         </nav>
-        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating /> : null}</DragOverlay>, document.body)}
+        {createPortal(<DragOverlay dropAnimation={null}>{dragging ? <NavItem t={dragging} floating tight={wide} /> : null}</DragOverlay>, document.body)}
       </DndContext>
       <Popover anchor={toolMenuAt} open={toolMenu} onClose={() => setToolMenu(false)} width={210}>
         <MenuItem

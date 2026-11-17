@@ -15,13 +15,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as pty from 'node-pty';
 import { WebSocketServer, type WebSocket } from 'ws';
+import type { BrowserAsk, BrowserNote, BrowserView } from '../../shared/browser.ts';
 import type { ChildNote } from '../../shared/children.ts';
 import type { SessionNote } from '../../shared/features.ts';
 import type { ApprovalRequest, LiveOverlay, LiveState, SessionSummary, TimelineItem, ToolInfo, ToolItem } from '../../shared/types.ts';
 import { parseArgv, UsageError } from './args.ts';
 import type { Conn } from './client.ts';
 import { KeyReader, layout, LineEditor } from './editor.ts';
-import { approvalBody, approvalKeys, childReplyLines, foldedLine, itemLines, modelLabel, noteLines, stepLines, turnLines, type Look } from './lines.ts';
+import { approvalBody, approvalKeys, askBody, browserCard, browserCardLines, browserChoiceLine, browserKeys, browserNoteLines, childReplyLines, dialogBody, foldedLine, itemLines, modelLabel, noteLines, stepLines, turnLines, type Look } from './lines.ts';
 import { chunksOf, finishedLength, renderMarkdown } from './markdown.ts';
 import { historyLines, lastReply, Printer, SessionView } from './session.ts';
 import { modeFor } from './start.ts';
@@ -317,6 +318,75 @@ test('the input laid out: rows a column short of the width, the cursor’s row a
   assert.deepEqual(empty.rows, ['› Message the agent']);
 });
 
+const ASK = (kind: BrowserAsk['kind'], text: string, extra: Partial<BrowserAsk> = {}): BrowserAsk => ({ id: `ask-${kind}`, kind, text, at: 0, ...extra });
+const L = look(80);
+const browserView = (o: Partial<BrowserView> = {}): BrowserView => ({ key: 'claude:x', open: true, tabs: [], driver: 'agent', asks: [], viewport: { w: 1280, h: 800 }, downloads: [], ...o });
+
+test('the browser: a waiting ask is a card in the web app’s words, with the keys that answer it', () => {
+  const card = (a: BrowserAsk) => browserCardLines(browserCard(browserView({ asks: [a] }))!, L).join('\n');
+  const keys = (a: BrowserAsk) => browserChoiceLine(browserCard(browserView({ asks: [a] }))!, L);
+  assert.match(card(ASK('ask', 'Sign in to the bank')), /^ {2}! Needs you in the browser: Sign in to the bank/);
+  assert.equal(keys(ASK('ask', 'x')), '    o Open the session in the app  ·  d Done  ·  n Can’t');
+  assert.match(card(ASK('payment', 'Place order')), /Stopped before paying or ordering: Place order\. That is yours to do/);
+  assert.equal(keys(ASK('payment', 'x')), '    o Open the session in the app  ·  d Done  ·  n Not now');
+  assert.match(card(ASK('local', 'localhost:3000')), /Wants to open localhost:3000, on this machine or its network/);
+  assert.equal(keys(ASK('local', 'x')), '    y Allow for this session  ·  n Don’t allow');
+  const confirm = ASK('confirm', 'Send', { url: 'https://mail.example.com/compose' });
+  assert.match(card(confirm), /^ {2}! Wants to press “Send” on mail\.example\.com\n.*signed in there/);
+  assert.equal(keys(confirm), '    y Allow  ·  n Don’t allow');
+  assert.deepEqual(browserKeys({ kind: 'ask', ask: confirm }).map((k) => [k.key, k.do]), [['y', 'done'], ['n', 'skipped']]);
+  assert.deepEqual(browserKeys({ kind: 'ask', ask: ASK('ask', 'x') }).map((k) => [k.key, k.do]), [['o', 'open'], ['d', 'done'], ['n', 'skipped']]);
+  assert.deepEqual(askBody('done'), { outcome: 'done' });
+  assert.equal(browserCard(browserView()), undefined);
+  assert.equal(browserCard(null), undefined);
+  assert.equal(browserCard(browserView({ asks: [ASK('ask', 'a'), ASK('ask', 'b')] }))!.kind === 'ask' && (browserCard(browserView({ asks: [ASK('ask', 'a'), ASK('ask', 'b')] })) as { ask: BrowserAsk }).ask.text, 'a', 'the oldest first');
+});
+
+test('the browser: a page’s pop-up question comes before the asks, y OK and n Cancel, typed words answer a prompt', () => {
+  const dialog = (type: 'alert' | 'confirm' | 'prompt' | 'beforeunload', message = 'Sure?', defaultPrompt?: string) => browserCard(browserView({ asks: [ASK('ask', 'x')], dialog: { type, message, url: 'https://shop.example.com/cart', defaultPrompt } }))!;
+  assert.equal(dialog('confirm').kind, 'dialog');
+  assert.deepEqual(browserCardLines(dialog('confirm'), L), ['  ? shop.example.com says', '      Sure?']);
+  assert.equal(browserChoiceLine(dialog('confirm'), L), '    y OK  ·  n Cancel');
+  assert.equal(browserChoiceLine(dialog('alert'), L), '    y OK');
+  assert.equal(browserChoiceLine(dialog('beforeunload'), L), '    y Leave  ·  n Stay');
+  assert.match(browserCardLines(dialog('beforeunload', ''), L).join('\n'), /asks whether to leave\n.*Leave this page\? Changes may not be saved\./);
+  assert.match(browserCardLines(dialog('prompt', 'Your name?', 'Ann'), L).join('\n'), /Type your answer, then Enter \(y keeps “Ann”\)/);
+  const d = (dialog('prompt', 'q', 'Ann') as { dialog: any }).dialog;
+  assert.deepEqual(dialogBody(d, true, 'Bo'), { accept: true, text: 'Bo' });
+  assert.deepEqual(dialogBody(d, true), { accept: true, text: 'Ann' });
+  assert.deepEqual(dialogBody({ ...d, type: 'confirm' }, false, 'ignored'), { accept: false, text: undefined });
+});
+
+test('the browser: a finished card is one dim line, as the web app’s verdicts', () => {
+  const line = (a: BrowserAsk, status: BrowserNote['status']) => noteLines({ id: 'n', key: 'k', kind: 'browser', at: 0, data: { ask: a, status } satisfies BrowserNote }, L)![0];
+  assert.equal(line(ASK('ask', 'Sign in'), 'done'), '  ✓ Done in the browser: Sign in');
+  assert.equal(line(ASK('ask', 'Sign in'), 'skipped'), '  ✗ Skipped: Sign in');
+  assert.equal(line(ASK('ask', 'Sign in'), 'waiting'), '  ✗ No longer waiting: Sign in');
+  assert.equal(line(ASK('payment', 'Buy'), 'done'), '  ✓ Done in the browser: Pay or order: Buy');
+  assert.equal(line(ASK('local', 'localhost:3000'), 'done'), '  ✓ Allowed: Open localhost:3000');
+  assert.equal(line(ASK('local', 'localhost:3000'), 'skipped'), '  ✗ Not allowed: Open localhost:3000');
+  assert.equal(line(ASK('confirm', 'Send', { url: 'https://mail.example.com/c' }), 'done'), '  ✓ Allowed: Press “Send” on mail.example.com');
+  assert.equal(line(ASK('confirm', 'Send'), 'skipped'), '  ✗ Not allowed: Press “Send”');
+  assert.equal(browserNoteLines({ ask: ASK('ask', 'x'), status: 'done' }, L).length, 1);
+});
+
+test('the browser: a waiting card is held by the printer until it is answered; the view tells what waits', () => {
+  const ask = ASK('ask', 'Solve the captcha');
+  const note = (status: BrowserNote['status']): SessionNote => ({ id: 'bn', key: 'claude:x', kind: 'browser', at: 0, data: { ask, status } satisfies BrowserNote });
+  const pr = new Printer(look(80));
+  const v = viewOf([], {}, [note('waiting')]);
+  v.browser = browserView({ asks: [ask] });
+  assert.deepEqual(pr.take(v).lines, [], 'the card is in the region');
+  assert.equal(v.browserWaiting(), true);
+  v.notes = [note('done')];
+  v.browser = browserView();
+  assert.deepEqual(pr.take(v).lines, ['  ✓ Done in the browser: Solve the captcha']);
+  assert.deepEqual(pr.take(v).lines, [], 'once');
+  assert.equal(v.browserWaiting(), false);
+  v.browser = browserView({ dialog: { type: 'alert', message: 'Hi', url: 'https://a.test/' } });
+  assert.equal(v.browserWaiting(), true);
+});
+
 // ---- the printer --------------------------------------------------------------------------------------------------
 
 /** An item's lines as one string, without colour, 80 columns. */
@@ -417,6 +487,9 @@ interface Fake {
   notes: SessionNote[];
   answers: { id: string; body: any }[];
   waitAnswer?: (b: any) => void;
+  browser?: BrowserView;
+  waitBrowser?: (b: any) => void;
+  browserAnswers: { what: string; body: any }[];
 }
 const fakes = new Map<string, Fake>();
 const calls: { method: string; path: string; body: any }[] = [];
@@ -458,9 +531,29 @@ function newFake(title: string, extra: Record<string, unknown> = {}): Fake {
     overlay: { items: [], patches: {}, approvals: [] },
     notes: [],
     answers: [],
+    browserAnswers: [],
   };
   fakes.set(f.key, f);
   return f;
+}
+/** The session's browser changes: the server tells its subscribers, as it does. */
+function setBrowser(f: Fake, v: Partial<BrowserView>) {
+  f.browser = { key: f.key, open: true, tabs: [], driver: 'agent', asks: [], viewport: { w: 1280, h: 800 }, downloads: [], ...v };
+  toSubs(f.key, { t: 'feature', id: 'browser', key: f.key, data: { type: 'state', view: f.browser } });
+}
+/** An ask the agent's browser waits on until the user answers it (in the terminal, here); its card in the conversation turns into its verdict. */
+async function browserAsk(f: Fake, ask: BrowserAsk) {
+  const note: SessionNote = { id: `bn-${ask.id}`, key: f.key, kind: 'browser', at: Date.now(), data: { ask, status: 'waiting' } satisfies BrowserNote };
+  f.notes.push(note);
+  toSubs(f.key, { t: 'note', key: f.key, note });
+  setBrowser(f, { asks: [ask] });
+  setLive(f, { status: 'working' });
+  const body = await new Promise<any>((r) => (f.waitBrowser = r));
+  f.browserAnswers.push({ what: ask.id, body });
+  setBrowser(f, {});
+  const done: SessionNote = { ...note, data: { ask, status: body.outcome === 'skipped' ? 'skipped' : 'done', endedAt: Date.now() } satisfies BrowserNote };
+  f.notes[f.notes.length - 1] = done;
+  toSubs(f.key, { t: 'note', key: f.key, note: done });
 }
 const turnEnd = (status = 'completed', durationMs = 900): TimelineItem => ({ kind: 'turn', id: `turn:${Math.random()}`, seq: 0, status, durationMs, model: 'claude-opus-5-5' });
 
@@ -538,6 +631,21 @@ async function play(f: Fake, text: string) {
     setLive(f, { status: 'working', pendingApprovals: 0 });
     push(f, { kind: 'tool', id: 'tb', seq: 0, tool: { name: 'Bash', category: 'command', title: 'npm test', status: answer.decision === 'deny' ? 'declined' : 'ok', durationMs: 1600 } });
     await sleep(100);
+  }
+  if (/stuck in the browser/.test(text)) {
+    // An ask nobody answers: `hydor run` stops with "needs an answer".
+    setBrowser(f, { asks: [{ id: 'stuck', kind: 'ask', text: 'Sign in to the bank', at: Date.now() }] });
+    await new Promise(() => {});
+  }
+  if (/use the browser/.test(text)) {
+    await browserAsk(f, { id: 'ask-send', kind: 'confirm', text: 'Send', url: 'https://mail.example.com/compose', at: Date.now() });
+    // A page's pop-up question: a prompt.
+    setBrowser(f, { dialog: { type: 'prompt', message: 'Your name?', defaultPrompt: 'Ann', url: 'https://mail.example.com/' } });
+    const body = await new Promise<any>((r) => (f.waitBrowser = r));
+    f.browserAnswers.push({ what: 'dialog', body });
+    setBrowser(f, {});
+    await browserAsk(f, { id: 'ask-login', kind: 'ask', text: 'Sign in to the bank', at: Date.now() });
+    setLive(f, { status: 'working' });
   }
   if (/drop/.test(text)) {
     // The socket drops; what happens meanwhile comes with the reload after it is back.
@@ -645,6 +753,19 @@ const server = http.createServer((req, res) => {
     if (p === '/api/sessions' && req.method === 'GET') {
       const list = [...fakes.values()].map(summaryOf).reverse();
       return send(200, { sessions: list, total: list.length });
+    }
+    // The browser's routes (server/browser/routes.ts): a session's view, and its answers.
+    const bm = /^\/api\/browser\/sessions\/([^/]+)(\/.*)?$/.exec(p);
+    if (bm) {
+      const bf = fakes.get(decodeURIComponent(bm[1]));
+      if (!bf) return send(404, { error: 'Session not found' });
+      if (!bm[2] && req.method === 'GET') return send(200, { view: bf.browser ?? { key: bf.key, open: false, tabs: [], driver: 'agent', asks: [], viewport: { w: 1280, h: 800 }, downloads: [] }, options: {} });
+      if (/^\/(asks\/.+|dialog)$/.test(bm[2] ?? '') && req.method === 'POST') {
+        bf.waitBrowser?.(body);
+        bf.waitBrowser = undefined;
+        return send(200, { view: bf.browser });
+      }
+      return send(404, { error: 'Not found' });
     }
     if (!f) return send(404, { error: 'Session not found' });
     if (rest === '' && req.method === 'GET') return send(200, { summary: summaryOf(f), live: f.live, overlay: f.overlay });
@@ -783,6 +904,10 @@ test('run: a failed turn exits 1, an approval with nobody to answer 3, a timeout
   assert.equal(asks.code, 3);
   assert.match(asks.err, /It needs an answer: Run npm test/);
   assert.match(asks.err, /hydor resume claude:/);
+  const stuck = await hydor(['run', '--json', 'stuck in the browser']);
+  assert.equal(stuck.code, 3, 'what its browser waits for is an answer too');
+  assert.equal(JSON.parse(stuck.out).status, 'needs-answer');
+  assert.equal(JSON.parse(stuck.out).asks, 'The agent’s browser: Needs you in the browser: Sign in to the bank');
   const slow = await hydor(['run', '--json', '--timeout', '1', 'be slow']);
   assert.equal(slow.code, 124);
   assert.equal(JSON.parse(slow.out).status, 'timeout');
@@ -957,6 +1082,37 @@ for (const cols of [80, 120]) {
     for (const l of s.split('\n')) assert.ok(strWidth(l) <= cols, l);
   });
 }
+
+test('the chat: what the agent’s browser waits for is a card with keys: y allows a button, a typed answer fills a prompt, d says it is done', async () => {
+  const c = await chatIn(100);
+  await c.until(/What should the agent do\?/);
+  c.p.write('use the browser\r');
+  await c.until(/Wants to press “Send” on mail\.example\.com/);
+  await c.until(/y Allow {2}· {2}n Don’t allow/);
+  assert.match(await c.screen(), /Needs you/);
+  c.p.write('y');
+  await c.until(/✓ Allowed: Press “Send” on mail\.example\.com/);
+  await c.until(/mail\.example\.com says/);
+  await c.until(/Type the answer, then Enter/);
+  c.p.write('Bo\r');
+  await c.until(/✓ OK: Bo/);
+  await c.until(/Needs you in the browser: Sign in to the bank/);
+  await c.until(/o Open the session in the app {2}· {2}d Done {2}· {2}n Can’t/);
+  c.p.write('d');
+  await c.until(/✓ Done in the browser: Sign in to the bank/);
+  await c.until(/Hello there\./);
+  const f = [...fakes.values()].filter((x) => x.summary.title.startsWith('use the browser')).at(-1)!;
+  assert.deepEqual(f.browserAnswers, [
+    { what: 'ask-send', body: { outcome: 'done' } },
+    { what: 'dialog', body: { accept: true, text: 'Bo' } },
+    { what: 'ask-login', body: { outcome: 'done' } },
+  ]);
+  const s = await c.screen();
+  assert.equal(s.split('\n').filter((l) => l.includes('Wants to press')).length, 1, 'the card is printed once');
+  c.p.write('\x04');
+  const t0 = Date.now();
+  while (c.exit() === null && Date.now() - t0 < 5000) await sleep(50);
+});
 
 test('the chat: Tab completes, a question and a form answered field by field, Esc stops a turn, a resize while it works', async () => {
   const c = await chatIn(100);

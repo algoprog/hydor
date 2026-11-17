@@ -1,6 +1,32 @@
-// A raw Chrome DevTools Protocol client over one WebSocket: commands and their replies, and events,
-// for the browser itself and for every target attached with flatten (each with a session id).
+// A raw Chrome DevTools Protocol client over one connection: commands and their replies, and events, for the browser
+// itself and for every target attached with flatten (each with a session id). The connection is a WebSocket to a
+// Chromium the server started, or the desktop app's message channel to its own browser (desktopEngine.ts).
 import WebSocket from 'ws';
+
+/** How CDP's messages travel: each one a JSON text, both ways. */
+export interface CdpTransport {
+  send(raw: string): void;
+  onMessage(fn: (raw: string) => void): void;
+  /** Called once, when the connection is gone (either side closed it). */
+  onClose(fn: () => void): void;
+  close(): void;
+}
+
+function socketTransport(ws: WebSocket): CdpTransport {
+  return {
+    send: (raw) => ws.send(raw),
+    onMessage: (fn) => ws.on('message', (raw) => fn(String(raw))),
+    onClose: (fn) => {
+      ws.on('close', fn);
+      ws.on('error', fn);
+    },
+    close: () => {
+      try {
+        ws.close();
+      } catch {}
+    },
+  };
+}
 
 type Handler = (params: any, sessionId?: string) => void;
 
@@ -20,19 +46,23 @@ export class Cdp {
   closed = false;
   private closers = new Set<() => void>();
 
-  private constructor(private ws: WebSocket) {
-    ws.on('message', (raw) => this.receive(String(raw)));
-    ws.on('close', () => this.shut());
-    ws.on('error', () => this.shut());
+  private constructor(private t: CdpTransport) {
+    t.onMessage((raw) => this.receive(raw));
+    t.onClose(() => this.shut());
   }
 
   static connect(url: string, timeoutMs = 15_000): Promise<Cdp> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url, { perMessageDeflate: false, maxPayload: 512 * 1024 * 1024 });
       const t = setTimeout(() => (ws.terminate(), reject(new CdpError('The browser did not answer'))), timeoutMs);
-      ws.once('open', () => (clearTimeout(t), resolve(new Cdp(ws))));
+      ws.once('open', () => (clearTimeout(t), resolve(new Cdp(socketTransport(ws)))));
       ws.once('error', (e) => (clearTimeout(t), reject(e)));
     });
+  }
+
+  /** A client over another way of carrying the messages (the desktop app's channel). */
+  static over(t: CdpTransport): Cdp {
+    return new Cdp(t);
   }
 
   send<T = any>(method: string, params: object = {}, session?: string, timeoutMs = 30_000): Promise<T> {
@@ -44,7 +74,13 @@ export class Cdp {
         reject(new CdpError(`The browser did not finish ${method} in time`));
       }, timeoutMs);
       this.waiting.set(id, { resolve, reject, timer, session });
-      this.ws.send(JSON.stringify(session ? { id, method, params, sessionId: session } : { id, method, params }));
+      try {
+        this.t.send(JSON.stringify(session ? { id, method, params, sessionId: session } : { id, method, params }));
+      } catch (e) {
+        clearTimeout(timer);
+        this.waiting.delete(id);
+        reject(new CdpError(`The browser could not be reached (${(e as Error).message})`));
+      }
     });
   }
 
@@ -75,9 +111,7 @@ export class Cdp {
   }
 
   close() {
-    try {
-      this.ws.close();
-    } catch {}
+    this.t.close();
     this.shut();
   }
 
