@@ -12,6 +12,7 @@ import { BOOKMARK_ROOTS, type BookmarkNode, type BookmarkSource } from '../../sh
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
+import { syncBookmarkVectors } from './meaning.ts';
 
 const KEY = 'browser.bookmarks';
 export const MAX_BOOKMARKS = 20_000;
@@ -58,6 +59,12 @@ function save(db: DB, nodes: BookmarkNode[]): BookmarkNode[] {
     list.forEach((n, i) => (n.pos = i));
   }
   kvSet(db, KEY, JSON.stringify(nodes));
+  // The vectors of bookmarks that are gone or changed go (a changed one is embedded again).
+  try {
+    syncBookmarkVectors(db, nodes);
+  } catch (e) {
+    console.warn(`[browser] bookmark vectors: ${(e as Error).message}`);
+  }
   return nodes;
 }
 

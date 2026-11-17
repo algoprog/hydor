@@ -7,6 +7,7 @@ import { forgetSession } from './ops.ts';
 import { bookmarkRoutes } from './bookmarks.ts';
 import { browsingRoutes } from './browsing.ts';
 import { extensionRoutes } from './extensions.ts';
+import { startBrowserVectors } from './meaning.ts';
 import { browserRoutes } from './routes.ts';
 import { closeBrowser, killAll, openBrowsers, reapStale, setBrowserDeps, sweepIdle } from './session.ts';
 import { browserSettings } from './settings.ts';
@@ -68,6 +69,8 @@ export const browser: Feature = {
       }),
   start(d) {
     setBrowserDeps(d);
+    // Your history, bookmarks and downloads get their vectors in the background, once search by meaning is on.
+    startBrowserVectors(d.db);
     reapStale();
     // Reads the browsers' versions now, for Settings → Browser.
     findChromes();

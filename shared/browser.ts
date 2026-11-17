@@ -345,8 +345,8 @@ export interface ClosedTab {
 
 /** One suggestion under the address bar. */
 export type Suggestion =
-  /** A page: from your history or bookmarks, or what you typed as an address. */
-  | { kind: 'history' | 'bookmark' | 'url'; url: string; title?: string }
+  /** A page: from your history or bookmarks, or what you typed as an address. `meaning`: it was found by what it is about, none of the words typed are in it. */
+  | { kind: 'history' | 'bookmark' | 'url'; url: string; title?: string; meaning?: true }
   /** One of your open tabs: switch to it. */
   | { kind: 'tab'; url: string; title?: string; tab: string }
   /** Words to search with your search engine. */

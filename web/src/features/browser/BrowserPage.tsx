@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { enc, post } from '../../lib/api';
 import { MOD } from '../../lib/format';
-import { go, openFile } from '../../lib/nav';
+import { go } from '../../lib/nav';
 import { Button, cx, Empty, IconButton, Kbd, MenuItem, MenuSep, Popover, Throbber, useIsMobile } from '../../components/ui';
 import { live as socket } from '../../lib/ws';
 import { NavButton } from '../layout/PageHeader';
@@ -65,6 +65,7 @@ import {
   useBookmarks,
   usePrefs,
   desktopBrowser,
+  showDownload,
 } from './browsing';
 import { BrowserSettingsPanel } from './BrowserSettings';
 import { ExtensionButtons, ExtensionsPanel } from './Extensions';
@@ -113,13 +114,6 @@ function PermissionBar({ view }: { view: BrowserView }) {
     </div>
   );
 }
-
-/** A finished download: shown in its folder by the desktop app when it can, else opened as the app opens files. */
-const showDownload = (path: string) => {
-  const b = desktopBrowser();
-  if (!b?.showFile) return openFile(path);
-  void b.showFile(path).then((ok) => ok || openFile(path), () => openFile(path));
-};
 
 /** Files the browser saved lately. */
 function DownloadsPanel({ onClose }: { onClose: () => void }) {

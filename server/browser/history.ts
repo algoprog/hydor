@@ -5,6 +5,8 @@
 // typed, the address to complete it to in place, and what the search engine suggests (a stand-in `fetch` in tests).
 import type { BookmarkNode, BrowserView, BrowsingPrefs, HistoryEntry, SearchEngine, Suggestion, SuggestResult } from '../../shared/browser.ts';
 import type { DB } from '../db.ts';
+import { warmMeaning } from '../memory/embed.ts';
+import { browsingAlike, dropVectors, sweepHistoryVectors } from './meaning.ts';
 
 export const MAX_HISTORY = 20_000;
 const URL_MAX = 2000;
@@ -59,7 +61,8 @@ const wordsOf = (q: string): string[] => q.toLowerCase().split(/\s+/).filter(Boo
 // ---- the table ------------------------------------------------------------------------------------------------
 
 const ready = new WeakSet<DB>();
-function table(db: DB) {
+/** Makes the table when it is not there yet (the first use of a database). */
+export function table(db: DB) {
   if (ready.has(db)) return;
   db.exec(`create table if not exists browser_history (
     id integer primary key autoincrement,
@@ -95,13 +98,18 @@ export function addVisit(db: DB, url: string, title: string, typed = false, now 
     const row = db.prepare(`select ${COLS} from browser_history where url = ?`).get(u) as Row | undefined;
     if (row) {
       const next = t || row.title;
+      // A new title is embedded again.
+      if (next !== row.title) dropVectors(db, 'history', [String(row.id)]);
       db.prepare('update browser_history set at = ?, visits = visits + 1, typed = typed + ?, title = ?, hay = ? where id = ?').run(now, typed ? 1 : 0, next, hayOf(next, u), row.id);
       return { ...row, at: now, visits: row.visits + 1, typed: row.typed + (typed ? 1 : 0), title: next };
     }
     const r = db.prepare('insert into browser_history (url, title, hay, at, visits, typed) values (?, ?, ?, ?, 1, ?)').run(u, t, hayOf(t, u), now, typed ? 1 : 0);
     // The oldest pages go once there are more than the most.
     const n = (db.prepare('select count(*) as n from browser_history').get() as { n: number }).n;
-    if (n > MAX_HISTORY) db.prepare('delete from browser_history where id in (select id from browser_history order by at asc, id asc limit ?)').run(n - MAX_HISTORY);
+    if (n > MAX_HISTORY) {
+      db.prepare('delete from browser_history where id in (select id from browser_history order by at asc, id asc limit ?)').run(n - MAX_HISTORY);
+      sweepHistoryVectors(db);
+    }
     return { id: Number(r.lastInsertRowid), url: u, title: t, at: now, visits: 1, typed: typed ? 1 : 0 };
   });
   return entry(go());
@@ -114,7 +122,10 @@ export function setTitle(db: DB, url: string, title: string) {
   if (!u) return;
   const t = tidyTitle(title, u);
   if (!t) return;
-  db.prepare('update browser_history set title = ?, hay = ? where url = ? and title <> ?').run(t, hayOf(t, u), u, t);
+  const row = db.prepare('select id from browser_history where url = ? and title <> ?').get(u, t) as { id: number } | undefined;
+  if (!row) return;
+  db.prepare('update browser_history set title = ?, hay = ? where id = ?').run(t, hayOf(t, u), row.id);
+  dropVectors(db, 'history', [String(row.id)]);
 }
 
 /** `instr` tests for each word, to put after a `where`: all the words are in the title or the address. */
@@ -139,15 +150,39 @@ export function listHistory(db: DB, o: { q?: string; before?: number; limit?: nu
   return rows.map(entry);
 }
 
+/** Pages by their ids, as listHistory gives them. */
+export function historyByIds(db: DB, ids: number[]): HistoryEntry[] {
+  table(db);
+  const get = db.prepare(`select ${COLS} from browser_history where id = ?`);
+  return ids.flatMap((id) => {
+    const r = get.get(id) as Row | undefined;
+    return r ? [entry(r)] : [];
+  });
+}
+
+/** The pages with all the words (as listHistory), the likeliest first: the most recent 200 by frecency. For the search box. */
+export function searchHistory(db: DB, q: string, now = Date.now()): HistoryEntry[] {
+  table(db);
+  const w = wordTests(wordsOf(q));
+  if (!w.sql) return [];
+  const rows = db.prepare(`select ${COLS} from browser_history where ${w.sql} order by at desc, id desc limit 200`).all(...w.args) as Row[];
+  return rows.map(entry).sort((a, b) => frecency(b, now) - frecency(a, now) || b.at - a.at);
+}
+
 export function removeHistory(db: DB, id: number): boolean {
   table(db);
-  return db.prepare('delete from browser_history where id = ?').run(id).changes > 0;
+  const gone = db.prepare('delete from browser_history where id = ?').run(id).changes > 0;
+  dropVectors(db, 'history', [String(id)]);
+  return gone;
 }
 
 /** Clears the history: everything last visited since that time, or all of it. Returns how many pages went. */
 export function clearHistory(db: DB, since?: number): number {
   table(db);
-  return (since === undefined ? db.prepare('delete from browser_history').run() : db.prepare('delete from browser_history where at >= ?').run(since)).changes;
+  const n = (since === undefined ? db.prepare('delete from browser_history').run() : db.prepare('delete from browser_history where at >= ?').run(since)).changes;
+  // No vector of a page that is cleared stays behind.
+  sweepHistoryVectors(db);
+  return n;
 }
 
 export function historyCount(db: DB): number {
@@ -327,12 +362,41 @@ interface Cand {
   title?: string;
   tab?: string;
   score: number;
+  /** Found by its meaning alone (none of its words are what was typed). */
+  meaning?: boolean;
 }
 const RANK = { tab: 0, bookmark: 1, history: 2 } as const;
 
 /** Bookmarks and open tabs weigh in as pages you chose: a bookmark as eight visits, a tab you have open as four. */
 const BOOKMARK_WEIGHT = 8;
 const TAB_WEIGHT = 4;
+
+/**
+ * Words and meaning, fused by their ranks: a page's score is 1 / (8 + its place among the pages that hold the words) plus
+ * 0.8 / (8 + its place among the pages alike in meaning), a place it is not in adding nothing. A strong word match stays on
+ * top, a page alike in meaning that holds none of the words comes after the matches, and one that is both comes first.
+ */
+const RRF_K = 8;
+const RRF_MEANING = 0.8;
+/** How many pages by meaning are asked for, and how long the model has to answer (the engine may take longer: it is not waited for either). */
+const MEANING_LIMIT = 20;
+const MEANING_WAIT_MS = 250;
+/** Meaning is asked for words: at least this many characters (the engine's own limit is the other end). */
+const MEANING_MIN_CHARS = 3;
+
+/** `p`'s answer, or `fallback` when it is not there after `ms` (measured from `since`). */
+async function within<T>(p: Promise<T>, since: number, ms: number, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), Math.max(0, since + ms - Date.now()));
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([p.catch(() => fallback), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface SuggestInput {
   /** What was typed. */
@@ -374,6 +438,43 @@ function inlineOf(typed: string, cands: Cand[]): string | undefined {
   return typed + best.form.slice(rest.length);
 }
 
+/** The pages alike in meaning put among the ones with the words (see RRF_K): those found by meaning alone come marked. */
+function fuse(db: DB, ranked: Cand[], alike: { kind: string; ref: string; score: number }[], bookmarks: BookmarkNode[], score: (url: string, title: string, weight: number) => number): Cand[] {
+  const byId = new Map(bookmarks.map((b) => [b.id, b]));
+  const get = db.prepare(`select ${COLS} from browser_history where id = ?`);
+  // Each page once, its best similarity: a page that is both a bookmark and in the history counts once.
+  const found = new Map<string, { sim: number; cand: Cand }>();
+  for (const a of alike) {
+    let c: Cand | undefined;
+    if (a.kind === 'history') {
+      const r = get.get(Number(a.ref)) as Row | undefined;
+      if (r) c = { kind: 'history', url: r.url, title: r.title || undefined, score: score(r.url, r.title, 0), meaning: true };
+    } else {
+      const b = byId.get(a.ref);
+      const u = b?.url ? historyUrl(b.url) : null;
+      if (b && u) c = { kind: 'bookmark', url: b.url!, title: b.title || undefined, score: score(u, b.title, BOOKMARK_WEIGHT), meaning: true };
+    }
+    if (!c) continue;
+    const k = keyOf(c.url);
+    const have = found.get(k);
+    if (!have) found.set(k, { sim: a.score, cand: c });
+    else {
+      if (a.score > have.sim) have.sim = a.score;
+      if (RANK[c.kind] < RANK[have.cand.kind]) have.cand = { ...c, title: c.title ?? have.cand.title };
+    }
+  }
+  const order = [...found.entries()].sort((a, b) => b[1].sim - a[1].sim || b[1].cand.score - a[1].cand.score);
+  const fused = new Map<string, { cand: Cand; rrf: number }>();
+  ranked.forEach((c, i) => fused.set(keyOf(c.url), { cand: c, rrf: 1 / (RRF_K + i + 1) }));
+  order.forEach(([k, f], i) => {
+    const add = RRF_MEANING / (RRF_K + i + 1);
+    const have = fused.get(k);
+    if (have) have.rrf += add;
+    else fused.set(k, { cand: f.cand, rrf: add });
+  });
+  return [...fused.values()].sort((a, b) => b.rrf - a.rrf || b.cand.score - a.cand.score || RANK[a.cand.kind] - RANK[b.cand.kind]).map((x) => x.cand);
+}
+
 /** The address bar's suggestions: open tabs, bookmarks and history for the words, what was typed as an address, and the engine's. */
 export async function suggest(db: DB, o: SuggestInput): Promise<SuggestResult> {
   table(db);
@@ -385,7 +486,13 @@ export async function suggest(db: DB, o: SuggestInput): Promise<SuggestResult> {
   const plainQ = base.toLowerCase();
 
   // The engine is asked at once, while the rest is worked out here.
+  const began = Date.now();
   const asked = q && o.prefs.suggest && !o.address && !/^[a-z][a-z0-9+.-]*:/i.test(q) && q.length <= 100 ? engineSuggestions(o.prefs.engine, q, { fetch: o.fetch, signal: o.signal, now }) : Promise.resolve<string[]>([]);
+
+  // Words are searched by meaning too, at the same time (the model on your computer, when search by meaning is on).
+  const wordsTyped = !!q && !o.address && !/^[a-z][a-z0-9+.-]*:/i.test(q) && q.length >= MEANING_MIN_CHARS && q.length <= 100;
+  if (q) warmMeaning(db);
+  const alikeP = wordsTyped ? browsingAlike(db, q, ['history', 'bookmark'], { limit: MEANING_LIMIT, waitMs: MEANING_WAIT_MS }).catch(() => []) : Promise.resolve([]);
 
   // History matching, with its frecency.
   const w = wordTests(words);
@@ -423,11 +530,16 @@ export async function suggest(db: DB, o: SuggestInput): Promise<SuggestResult> {
     if (!have || RANK[c.kind] < RANK[have.kind]) best.set(k, { ...c, score: Math.max(c.score, have?.score ?? 0), title: c.title ?? have?.title });
     else if (c.score > have.score) have.score = c.score;
   }
-  const ranked = [...best.values()].sort((a, b) => b.score - a.score || RANK[a.kind] - RANK[b.kind]);
-  const asItem = (c: Cand): Suggestion => (c.kind === 'tab' ? { kind: 'tab', url: c.url, ...(c.title ? { title: c.title } : {}), tab: c.tab! } : { kind: c.kind, url: c.url, ...(c.title ? { title: c.title } : {}) });
+  let ranked = [...best.values()].sort((a, b) => b.score - a.score || RANK[a.kind] - RANK[b.kind]);
+  const asItem = (c: Cand): Suggestion =>
+    c.kind === 'tab' ? { kind: 'tab', url: c.url, ...(c.title ? { title: c.title } : {}), tab: c.tab! } : { kind: c.kind, url: c.url, ...(c.title ? { title: c.title } : {}), ...(c.meaning ? { meaning: true } : {}) };
 
+  // The address to complete to is by words alone.
   const inline = inlineOf(q, cands);
   const searches = (await asked).slice(0, MAX_SEARCH_SUGGESTIONS);
+  // The model is not waited for beyond a moment, or the engine's own wait.
+  const alike = await within(alikeP, began, MEANING_WAIT_MS, []);
+  if (alike.length) ranked = fuse(db, ranked, alike, o.bookmarks, score);
 
   const items: Suggestion[] = [];
   const room = MAX_SUGGESTIONS - searches.length;

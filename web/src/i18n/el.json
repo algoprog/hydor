@@ -25413,5 +25413,13 @@
 "What you type in the address bar goes to your search engine, as in any browser":"Ό,τι πληκτρολογείτε στη γραμμή διευθύνσεων πηγαίνει στη μηχανή αναζήτησής σας, όπως σε κάθε πρόγραμμα περιήγησης",
 "Your own browser is in the desktop app":"Το δικό σας πρόγραμμα περιήγησης βρίσκεται στην εφαρμογή υπολογιστή",
 "Your own browser is part of the desktop app":"Το δικό σας πρόγραμμα περιήγησης είναι μέρος της εφαρμογής υπολογιστή",
-"your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers clear browsing data history cookies cache desktop app":"δικό σας πρόγραμμα περιήγησης αρχική σελίδα μηχανή αναζήτησης google duckduckgo bing προτάσεις αποκλεισμός διαφημίσεων διαφημίσεις ιχνηλάτες εκκαθάριση δεδομένων περιήγησης ιστορικό cookies κρυφή μνήμη εφαρμογή υπολογιστή"
+"your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers clear browsing data history cookies cache desktop app":"δικό σας πρόγραμμα περιήγησης αρχική σελίδα μηχανή αναζήτησης google duckduckgo bing προτάσεις αποκλεισμός διαφημίσεων διαφημίσεις ιχνηλάτες εκκαθάριση δεδομένων περιήγησης ιστορικό cookies κρυφή μνήμη εφαρμογή υπολογιστή",
+  "Downloaded": "Λήψη",
+  "Last visited": "Τελευταία επίσκεψη",
+  "Nothing to open: the download did not finish": "Δεν υπάρχει κάτι να ανοίξει: η λήψη δεν ολοκληρώθηκε",
+  "Opens the page in a new tab of your browser": "Ανοίγει τη σελίδα σε νέα καρτέλα του προγράμματος περιήγησής σας",
+  "Opens the page it came from, in a new tab of your browser": "Ανοίγει τη σελίδα από την οποία προήλθε, σε νέα καρτέλα του προγράμματος περιήγησής σας",
+  "Shows the file in its folder": "Εμφανίζει το αρχείο στον φάκελό του",
+  "Visits": "Επισκέψεις",
+  "Wiki memory is off for this chat or project": "Η μνήμη wiki είναι ανενεργή για αυτή τη συνομιλία ή αυτό το έργο"
 }

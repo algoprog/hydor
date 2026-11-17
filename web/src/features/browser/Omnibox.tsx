@@ -8,6 +8,7 @@ import { Clock, Globe, Info, Lock, LockOpen, PanelTop, Search, Sparkles, Star } 
 import type { BrowserTab, Suggestion } from '@shared/browser';
 import { cx } from '../../components/ui';
 import { askAgent, desktopBrowser, ENGINE_NAMES, forgetAddress, goTo, shownAddress, suggest, switchTab, useTabState, usePrefs, zoomPercent } from './browsing';
+import { fitRows } from './omniboxFit';
 import { connectionOf, SiteInfo } from './SiteInfo';
 
 /** One row of the list. */
@@ -20,6 +21,8 @@ interface Row {
   /** For a tab: which one. For a search or asking: the words. */
   tab?: string;
   text?: string;
+  /** Found by what it is about, not by the words typed: nothing in it is marked. */
+  meaning?: boolean;
 }
 
 const ROW = 34;
@@ -79,11 +82,11 @@ export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { 
     found.forEach((i, n) => {
       if (i.kind === 'search') out.push({ id: `s${n}`, kind: 'search', title: i.text, text: i.text });
       else if (i.kind === 'tab') out.push({ id: `t${i.tab}`, kind: 'tab', title: i.title || i.url, url: i.url, tab: i.tab });
-      else out.push({ id: `${i.kind[0]}${n}`, kind: i.kind, title: i.title || i.url, url: i.url });
+      else out.push({ id: `${i.kind[0]}${n}`, kind: i.kind, title: i.title || i.url, url: i.url, ...('meaning' in i && i.meaning ? { meaning: true } : {}) });
     });
-    // As many as fit on the screen without scrolling; asking an agent stays last.
+    // As many as fit on the screen without scrolling, some of your pages and some of the engine's among them; asking an agent stays last.
     const fit = Math.max(2, Math.floor(((at?.room ?? 440) - 12) / ROW));
-    return [...out.slice(0, fit - 1), { id: 'ask', kind: 'ask', title: q, text: q }];
+    return [...fitRows(out, fit - 1), { id: 'ask', kind: 'ask', title: q, text: q }];
   }, [q, result, at?.room]);
   const words = useMemo(() => q.split(/\s+/).filter((w) => w.length > 0), [q]);
   const fill = (r: Row) => (r.kind === 'ask' || r.kind === 'search' ? (r.text ?? '') : shownAddress(r.url));
@@ -310,11 +313,11 @@ function RowView({ r, active, words, engine, onHover, onPick }: { r: Row; active
       ) : (
         <>
           <span translate="no" className="min-w-0 shrink truncate">
-            <Marked text={r.title} words={words} />
+            <Marked text={r.title} words={r.meaning ? [] : words} />
           </span>
           {r.url && r.url !== r.title && (
             <span translate="no" className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3">
-              <Marked text={stripScheme(r.url)} words={words} />
+              <Marked text={stripScheme(r.url)} words={r.meaning ? [] : words} />
             </span>
           )}
           {r.kind === 'tab' && <span className="ml-auto shrink-0 text-[12px] text-fg-3">Switch to tab</span>}

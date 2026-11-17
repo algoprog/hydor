@@ -15,7 +15,13 @@ import { FIND_PLACES, findPlaces, matchItem, matchStrength, placeOf, queryAffini
 import { catalogItems, catalogText, OPTIONS, SECTIONS } from '../../shared/find-catalog.ts';
 import type { ScheduledTask } from '../../shared/automations.ts';
 import type { SessionSummary } from '../../shared/types.ts';
+import Fastify from 'fastify';
+import { addBookmark } from '../browser/bookmarks.ts';
+import { addDownload } from '../browser/downloads.ts';
+import { addVisit } from '../browser/history.ts';
+import { fillBrowserVectors } from '../browser/meaning.ts';
 import { APP_ROOT } from '../config.ts';
+import { internalHeaders } from '../internal.ts';
 import { kvSet, openDb } from '../db.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
 import * as store from '../memory/store.ts';
@@ -23,7 +29,7 @@ import * as vec from '../memory/vectors.ts';
 import { searchLibrary } from '../pages/search.ts';
 import { createPage, describePage, initPages } from '../pages/store.ts';
 import { createSpace } from '../spaces/index.ts';
-import { dropLists, findAll, findScope, hashOf, makeWaiting, onEvent, setFindScope, setShippedForTests, shippedVectors } from './index.ts';
+import { dropLists, find, findAll, findScope, hashOf, makeWaiting, onEvent, setFindScope, setShippedForTests, shippedVectors } from './index.ts';
 import { shippedItems } from './sources.ts';
 import { findUsage, noteUsage } from './usage.ts';
 
@@ -301,6 +307,62 @@ test('use lifts what matches: picked for the same words most, then picked at all
   // What was picked for these words counts whole however it matches.
   assert.ok(usageBoost(u, queryAffinity(u, 'memory'), 'sec:memory', undefined, 0.3) > 0.24);
   assert.equal(usageBoost(null, new Map(), 'sec:memory'), 0);
+});
+
+test('your browsing: found by words and by meaning, only when asked for, only where looked in, and never for an agent', async () => {
+  kvSet(db, 'memory.meaning', '1');
+  setEmbedderForTests(async (texts) => texts.map(fake));
+  vec.setCodebookForTests(new Float32Array(vec.DIM * 16).map((_, i) => -0.12 + ((i % 16) * 0.24) / 15));
+  const now = Date.now();
+  addVisit(db, 'https://recipes.example/pasta?utm=1', 'Pasta recipes', false, now - 86_400_000);
+  addVisit(db, 'https://travel.example/lisbon', 'Lisbon notes', false, now - 2 * 86_400_000);
+  addBookmark(db, { title: 'Holiday planner', url: 'https://plan.example/holiday' });
+  addDownload(db, { name: 'Pasta night.pdf', path: '/home/me/Downloads/Pasta night.pdf', url: 'https://recipes.example/pasta.pdf', at: now });
+  addDownload(db, { name: 'Lisbon tickets.pdf', path: '/home/me/Downloads/Lisbon tickets.pdf', url: 'https://travel.example/t.pdf', at: now - 1000 });
+  // By words (before any vector is made).
+  assert.equal((await findAll(d, 'pasta')).browsing, undefined, 'not asked for: not there');
+  const words = (await findAll(d, 'pasta', [], { browsing: true })).browsing!;
+  assert.deepEqual(
+    words.map((b) => [b.kind, b.title]),
+    [
+      ['history', 'Pasta recipes'],
+      ['download', 'Pasta night.pdf'],
+    ],
+  );
+  assert.equal(words[0].url, 'https://recipes.example/pasta?utm=1');
+  assert.equal(words[1].path, '/home/me/Downloads/Pasta night.pdf');
+  assert.equal(words[0].visits, 1);
+  // By meaning: the vectors are made in the background; then what is about the same is found in other words.
+  assert.ok((await fillBrowserVectors(db)) >= 5);
+  const meaning = (await findAll(d, 'vacation', [], { browsing: true })).browsing!;
+  assert.deepEqual(
+    meaning.map((b) => [b.kind, b.title]).sort(),
+    [
+      ['bookmark', 'Holiday planner'],
+      ['download', 'Lisbon tickets.pdf'],
+      ['history', 'Lisbon notes'],
+    ],
+  );
+  // Words and meaning together: the page with the words first.
+  const both = (await findAll(d, 'pasta recipes', [], { browsing: true })).browsing!.filter((b) => b.kind === 'history');
+  assert.equal(both[0].title, 'Pasta recipes');
+  // Where it looks.
+  assert.equal((await findAll(d, 'pasta', ['sessions', 'pages'], { browsing: true })).browsing, undefined, 'the Browser place is not picked');
+  const only = await findAll(d, 'pasta', ['browsing'], { browsing: true });
+  assert.equal(only.browsing!.length, 2);
+  assert.equal(only.sessions.length + only.messages.length + only.notes.length + only.alike.length, 0, 'nothing else is looked in');
+  assert.ok(FIND_PLACES.includes('browsing'));
+  assert.deepEqual(findPlaces('browsing,nope'), ['browsing']);
+  // An agent's own call (app_api) carries the internal header: the route never gives it your browsing, whatever it asks.
+  const app = Fastify();
+  find.routes!({ app, db, sessions: d.sessions, scheduler: d.scheduler, broadcast: () => {} } as unknown as Parameters<NonNullable<typeof find.routes>>[0]);
+  const get = async (url: string, internal: boolean) => (await app.inject({ method: 'GET', url, headers: internal ? internalHeaders() : {} })).json() as { browsing?: unknown[] };
+  assert.equal((await get('/api/find?q=pasta&browsing=1&in=browsing', false)).browsing?.length, 2, 'a person at the box gets it');
+  assert.equal((await get('/api/find?q=pasta&in=browsing', false)).browsing, undefined, 'only when asked for');
+  assert.equal((await get('/api/find?q=pasta&browsing=1&in=browsing', true)).browsing, undefined, 'an agent’s call never does');
+  assert.equal((await get('/api/find?q=pasta&browsing=1', true)).browsing, undefined);
+  assert.ok(!JSON.stringify(await get('/api/find?q=pasta&browsing=1', true)).includes('recipes.example'), 'and none of it is anywhere in the answer');
+  await app.close();
 });
 
 test('places: each address as the search box lists it', () => {

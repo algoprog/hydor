@@ -276,11 +276,12 @@ As you type in the address bar, a list under it offers, with the words you typed
 
 - your open tabs ("Switch to tab": pick one to go to it instead of opening the page again),
 - your bookmarks and the pages of your history that match the words in their titles and addresses, the ones you go to often and lately first (addresses you typed yourself count most),
+- with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, bookmarks and pages of your history that are about what you typed even when their titles and addresses do not hold its words, after the ones that do (they show without bold words). The model that finds them runs on this computer, from a vector made of each page's title and address (without its query string) and kept in the app's database apart from everything else; it goes when the page does,
 - what you typed, as a search ("Search Google") or, when it looks like an address, as that address,
 - the search engine's own suggestions, when [Search suggestions](/guide/web#browser-settings) is on,
 - last, **Ask an agent: “…”**, which starts a session with what you typed as its first message, on the agent and model the start page used last, and takes you to it.
 
-The list shows as many as fit on the screen. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab. The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor, and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
+The list shows as many as fit on the screen, with at least two of your pages and two of the engine's suggestions among them when there are that many. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab. The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor (found by the words you typed, never by meaning), and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
 
 ### Keyboard shortcuts
 
@@ -333,6 +334,8 @@ Press **Ctrl+H**, or **Menu** (⋯) → **History**, or go to [History](/browser
 
 Your history stays on this computer, in the app's own database, and only your own browsing adds to it: web pages and files, the page each tab ends up on, its title as it settles. The last 20,000 pages are kept; the oldest go first. Agents never see it. It is what the address bar's [suggestions](/guide/web#suggestions) draw on.
 
+The files your browser downloads are kept in a list too: each one's name, where it was saved and the address it came from, the last 5,000. **Clear browsing data** with **Browsing history** ticked clears that list as well, for the same time range (the files stay where they were saved), and a page, bookmark or download that goes takes its place in search by meaning with it. The search box (Ctrl+K) finds your history, bookmarks and downloads, by their words and by what they are about, under **Browser** in **Search in** (see [Search everything with Ctrl+K](/guide/start#search-everything-with-ctrlk)). Agents never see any of it.
+
 ### Browser settings
 
 **Menu** (⋯) → **Settings**, or [Settings → Browser → Your own browsing → Browser settings](/settings?s=browser&find=Browser%20settings), or [Browser settings](/browser?panel=settings), opens a panel with:
@@ -341,7 +344,7 @@ Your history stays on this computer, in the app's own database, and only your ow
 - **Search engine**: what the address bar searches with: Google (at first), DuckDuckGo, Bing, Brave, Ecosia, Startpage, or **Custom**, an address of your own with %s where your words go, such as `https://example.com/search?q=%s`.
 - **Search suggestions** (on at first): what you type in the address bar goes to your search engine as you type, as in any browser, so it can suggest searches. Startpage and a custom address give none. Turn it off to keep what you type on this computer; your open tabs, bookmarks and history still show.
 - **Block ads and trackers** (on at first), see below.
-- **Clear browsing data**: tick **Browsing history**, **Cookies and site data** (you are signed out of sites) and **Cached files**, pick a time range (**Last hour**, **Last 24 hours**, **Last 7 days** or **All time**) and press **Clear data**. The time range is for the history alone: cookies, site data and cached files are always cleared for all time.
+- **Clear browsing data**: tick **Browsing history**, **Cookies and site data** (you are signed out of sites) and **Cached files**, pick a time range (**Last hour**, **Last 24 hours**, **Last 7 days** or **All time**) and press **Clear data**. The time range is for the history (and the list of downloads kept with it) alone: cookies, site data and cached files are always cleared for all time.
 
 ### Block ads and trackers
 
@@ -557,7 +560,8 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "Add example.org/reports to my bookmarks bar in a folder called Work."
 - "How do I change my browser's search engine or home page?" (it is **Menu** → **Settings** on the Browser page: yours to change, agents can't)
 - "How do I allow ads on one site in my browser?" (the padlock's **Allow ads on this site**)
-- "How do I clear my browsing history and cookies?" (**Browser settings** → **Clear browsing data**; the time range counts for the history alone)
+- "How do I clear my browsing history and cookies?" (**Browser settings** → **Clear browsing data**; the time range counts for the history, and the list of downloads kept with it, alone)
+- "Why does the address bar suggest a page I visited that has none of the words I typed?" (with search by meaning on, it also offers pages about what you typed)
 - "How do I reopen a tab I closed?" (**Ctrl+Shift+T**, or **Recently closed** in the history)
 - "Does my browser block ads, and where do its lists come from?"
 - "Bring my Chrome and Firefox bookmarks into the Browser page." (or: "Why can't I import my Safari bookmarks?")

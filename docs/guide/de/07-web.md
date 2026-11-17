@@ -276,11 +276,12 @@ Während du in die Adressleiste tippst, bietet eine Liste darunter an, mit den g
 
 - deine geöffneten Tabs („Zum Tab wechseln“: Wähle einen, um zu ihm zu gehen, statt die Seite erneut zu öffnen),
 - deine Lesezeichen und die Seiten deines Verlaufs, die zu den Wörtern in ihren Titeln und Adressen passen, die du oft und zuletzt besucht hast zuerst (Adressen, die du selbst getippt hast, zählen am meisten),
+- bei eingeschaltetem [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning) Lesezeichen und Seiten deines Verlaufs, in denen es um das Getippte geht, auch wenn ihre Titel und Adressen dessen Wörter nicht enthalten, nach denen, die sie enthalten (sie erscheinen ohne fette Wörter). Das Modell, das sie findet, läuft auf diesem Computer, mit einem Vektor aus Titel und Adresse jeder Seite (ohne ihren Query-String), den die App getrennt von allem anderen in ihrer Datenbank aufbewahrt; er verschwindet mit der Seite,
 - das, was du getippt hast, als Suche („Mit Google suchen“) oder, wenn es wie eine Adresse aussieht, als diese Adresse,
 - die eigenen Vorschläge der Suchmaschine, wenn [Suchvorschläge](/guide/web#browser-settings) eingeschaltet ist,
 - zuletzt **Agenten fragen: „…“**, das eine Sitzung mit dem Getippten als erster Nachricht startet, mit dem Agenten und Modell, die die Startseite zuletzt verwendet hat, und dich dorthin bringt.
 
-Die Liste zeigt so viele Einträge, wie auf den Bildschirm passen. Die Pfeiltasten bewegen sich darin, und **Enter** öffnet den markierten (das Getippte, wenn keiner markiert ist); **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet ihn in einem neuen Tab. Die Adressleiste vervollständigt auch an Ort und Stelle: Beginnt etwas, wohin du gegangen bist, mit dem Getippten, steht der Rest markiert hinter deinem Cursor, und **Tab** oder **→** übernimmt ihn. Löschst du das Getippte, wird die Vervollständigung ausgeschaltet. **Umschalt+Entf** bei einem Verlaufsvorschlag vergisst diese Seite, und **Esc** schließt die Liste.
+Die Liste zeigt so viele Einträge, wie auf den Bildschirm passen, darunter mindestens zwei deiner Seiten und zwei Vorschläge der Suchmaschine, soweit es so viele gibt. Die Pfeiltasten bewegen sich darin, und **Enter** öffnet den markierten (das Getippte, wenn keiner markiert ist); **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet ihn in einem neuen Tab. Die Adressleiste vervollständigt auch an Ort und Stelle: Beginnt etwas, wohin du gegangen bist, mit dem Getippten, steht der Rest markiert hinter deinem Cursor (gefunden über die getippten Wörter, nie über die Bedeutung), und **Tab** oder **→** übernimmt ihn. Löschst du das Getippte, wird die Vervollständigung ausgeschaltet. **Umschalt+Entf** bei einem Verlaufsvorschlag vergisst diese Seite, und **Esc** schließt die Liste.
 
 ### Tastenkürzel
 
@@ -333,6 +334,8 @@ Drücke **Strg+H** oder **Menü** (⋯) → **Verlauf** oder gehe zu [Verlauf](/
 
 Dein Verlauf bleibt auf diesem Computer, in der eigenen Datenbank der App, und nur dein eigenes Surfen trägt zu ihm bei: Webseiten und Dateien, die Seite, auf der jeder Tab landet, und sein Titel, sobald er feststeht. Die letzten 20.000 Seiten bleiben erhalten; die ältesten gehen zuerst. Agenten sehen ihn nie. Auf ihn stützen sich die [Vorschläge](/guide/web#suggestions) der Adressleiste.
 
+Die Dateien, die dein Browser herunterlädt, werden ebenfalls in einer Liste gespeichert: jeweils Name, Speicherort und die Adresse, von der sie kam, die letzten 5.000. **Browserdaten löschen** mit angehaktem **Browserverlauf** leert auch diese Liste, für denselben Zeitraum (die Dateien bleiben dort, wo sie gespeichert wurden), und eine Seite, ein Lesezeichen oder ein Download, der verschwindet, nimmt seinen Platz in der Bedeutungssuche mit. Die Suche (Strg+K) findet deinen Verlauf, deine Lesezeichen und Downloads über ihre Wörter und über das, worum es in ihnen geht, unter **Browser** in **Suchen in** (siehe [Alles mit Strg+K durchsuchen](/guide/start#search-everything-with-ctrlk)). Agenten sehen nichts davon.
+
 ### Browser-Einstellungen
 
 **Menü** (⋯) → **Einstellungen** oder [Einstellungen → Browser → Dein eigenes Surfen → Browser-Einstellungen](/settings?s=browser&find=Browser%20settings) oder [Browser-Einstellungen](/browser?panel=settings) öffnet einen Bereich mit:
@@ -341,7 +344,7 @@ Dein Verlauf bleibt auf diesem Computer, in der eigenen Datenbank der App, und n
 - **Suchmaschine**: womit die Adressleiste sucht: Google (zuerst), DuckDuckGo, Bing, Brave, Ecosia, Startpage oder **Custom**, eine eigene Adresse mit %s an der Stelle deiner Suchwörter, etwa `https://example.com/search?q=%s`.
 - **Suchvorschläge** (zuerst eingeschaltet): Was du in die Adressleiste eingibst, geht beim Tippen wie in jedem Browser an deine Suchmaschine, damit sie Suchen vorschlagen kann. Startpage und eine eigene Adresse liefern keine. Schalte es aus, um das Getippte auf diesem Computer zu behalten; deine geöffneten Tabs, Lesezeichen und dein Verlauf erscheinen weiterhin.
 - **Werbung und Tracker blockieren** (zuerst eingeschaltet), siehe unten.
-- **Browserdaten löschen**: Hake **Browserverlauf**, **Cookies und Websitedaten** (du wirst von Websites abgemeldet) und **Zwischengespeicherte Dateien** an, wähle einen Zeitraum (**Letzte Stunde**, **Letzte 24 Stunden**, **Letzte 7 Tage** oder **Gesamter Zeitraum**) und drücke **Daten löschen**. Der Zeitraum gilt nur für den Verlauf: Cookies, Websitedaten und zwischengespeicherte Dateien werden immer für den gesamten Zeitraum gelöscht.
+- **Browserdaten löschen**: Hake **Browserverlauf**, **Cookies und Websitedaten** (du wirst von Websites abgemeldet) und **Zwischengespeicherte Dateien** an, wähle einen Zeitraum (**Letzte Stunde**, **Letzte 24 Stunden**, **Letzte 7 Tage** oder **Gesamter Zeitraum**) und drücke **Daten löschen**. Der Zeitraum gilt nur für den Verlauf (und die dazugehörige Download-Liste): Cookies, Websitedaten und zwischengespeicherte Dateien werden immer für den gesamten Zeitraum gelöscht.
 
 ### Werbung und Tracker blockieren
 
@@ -557,7 +560,8 @@ Stoppen beendet die Aktion und entzieht allen Sitzungen die Freigabe. Für erneu
 - „Setze example.org/reports in einen Ordner namens Arbeit in meiner Lesezeichenleiste.“
 - „Wie ändere ich die Suchmaschine oder die Startseite meines Browsers?“ (Es ist **Menü** → **Einstellungen** auf der Seite Browser: deine Sache, Agenten können es nicht.)
 - „Wie erlaube ich Werbung auf einer Website in meinem Browser?“ (**Werbung auf dieser Website erlauben** am Schloss)
-- „Wie lösche ich meinen Browserverlauf und meine Cookies?“ (**Browser-Einstellungen** → **Browserdaten löschen**; der Zeitraum gilt nur für den Verlauf)
+- „Wie lösche ich meinen Browserverlauf und meine Cookies?“ (**Browser-Einstellungen** → **Browserdaten löschen**; der Zeitraum gilt nur für den Verlauf und die dazugehörige Download-Liste)
+- „Warum schlägt die Adressleiste eine Seite vor, die ich besucht habe und die keines der getippten Wörter enthält?“ (bei eingeschalteter Bedeutungssuche bietet sie auch Seiten an, in denen es um das Getippte geht)
 - „Wie öffne ich einen Tab wieder, den ich geschlossen habe?“ (**Strg+Umschalt+T** oder **Zuletzt geschlossen** im Verlauf)
 - „Blockiert mein Browser Werbung, und woher stammen seine Listen?“
 - „Importiere meine Lesezeichen aus Chrome und Firefox in die Seite Browser.“ (oder: „Warum kann ich meine Safari-Lesezeichen nicht importieren?“)

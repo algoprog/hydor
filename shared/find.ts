@@ -163,6 +163,27 @@ export interface FoundNote {
   meaning?: number;
 }
 
+/**
+ * A page of your own browser's history, a bookmark or a download found by the search box (desktop app, your own browser).
+ * Only the person using the box gets these: they are never part of what agents are given.
+ */
+export interface FoundBrowsing {
+  kind: 'history' | 'bookmark' | 'download';
+  /** The history entry's or the download's number, or the bookmark's id. */
+  id: string;
+  title: string;
+  /** The page's address (a download's: the address it came from, when it has one a page can open). */
+  url?: string;
+  /** A download's file, where it was saved (none when it failed). */
+  path?: string;
+  /** When the page was last visited, the bookmark added or the file downloaded. */
+  at: number;
+  visits?: number;
+  failed?: boolean;
+  /** A bookmark's folders, by name ("Recipes › Soups"). */
+  folder?: string;
+}
+
 export interface FindResponse {
   /** Search by meaning answered this time. */
   meaning: boolean;
@@ -172,16 +193,19 @@ export interface FindResponse {
   sessions: FoundSession[];
   messages: SearchHit[];
   notes: FoundNote[];
+  /** Your own browsing: pages, bookmarks and downloads (asked for with `browsing=1`; never for an agent's call). */
+  browsing?: FoundBrowsing[];
 }
 
 // ---- where it looks -------------------------------------------------------------------------------
 
 /**
  * The places the search box can look in, as its Search in menu lists them: `actions` is the app's own pages
- * and actions (Go to, Actions), `settings` holds the themes too, `guide` is Help. None picked is everywhere.
+ * and actions (Go to, Actions), `settings` holds the themes too, `guide` is Help, `browsing` is your own browser's history,
+ * bookmarks and downloads (desktop app). None picked is everywhere.
  * The places picked are kept for every device (server/find), and go with each search (`/api/find?in=`).
  */
-export const FIND_PLACES = ['sessions', 'messages', 'spaces', 'pages', 'templates', 'files', 'memory', 'tasks', 'assistants', 'skills', 'connections', 'settings', 'actions', 'guide'] as const;
+export const FIND_PLACES = ['sessions', 'messages', 'spaces', 'pages', 'templates', 'files', 'memory', 'tasks', 'assistants', 'skills', 'connections', 'settings', 'actions', 'guide', 'browsing'] as const;
 export type FindPlace = (typeof FIND_PLACES)[number];
 
 /** Places as given (a list, or "a,b" as an address has them), tidied: known ones once, in the menu's order; all of them is everywhere, []. */

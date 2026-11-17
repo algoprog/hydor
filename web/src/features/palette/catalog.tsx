@@ -31,7 +31,7 @@ import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
 import { formatOf, MEDIA_LABELS, pageKind, type Visual } from './visuals';
 
-export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Agents' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images, videos and audio' | 'Themes' | 'Files';
+export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Agents' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images, videos and audio' | 'Themes' | 'Files' | 'History' | 'Bookmarks' | 'Downloads';
 
 export interface Entry extends Findable {
   id: string;
@@ -54,6 +54,8 @@ export interface Entry extends Findable {
   place?: string[];
   /** What people or agents wrote about it (a description), after the facts in the list: never translated. */
   note?: string;
+  /** Its title, where and body are what people or pages wrote (a page's title, a file's name): never translated. */
+  own?: boolean;
   /** What opening it does, in a few words ("Opens Settings → Memory, at this option"). */
   opens?: string;
   /** The place it is in (a setting's section, sec:memory): visiting that counts for it too, half as much. */

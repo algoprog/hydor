@@ -15,6 +15,7 @@ import { addNote, notesOf, updateNote } from '../notes.ts';
 import { Cdp, CdpSession } from './cdp.ts';
 import { BROWSER_DIR, launchChrome, pickChrome, plainUserAgent } from './chrome.ts';
 import { launchDesktop, onDesktopInput, sendExtensions } from './desktopEngine.ts';
+import { addDownload } from './downloads.ts';
 import { extensionsFor, onExtensionsChange } from './extensions.ts';
 import { hostPort, isPrivate, refusal, type Policy } from './guard.ts';
 import { BrowserProxy, contextProxy } from './proxy.ts';
@@ -86,7 +87,7 @@ class Chromium {
   private lock: Promise<unknown> = Promise.resolve();
   private compositor: { ctx: string; s: CdpSession } | null = null;
   private compositorCtx: string | null = null;
-  private downloads = new Map<string, { owner: SessionBrowser; name: string }>();
+  private downloads = new Map<string, { owner: SessionBrowser; name: string; url: string }>();
 
   private constructor(
     readonly profile: string,
@@ -358,7 +359,7 @@ class Chromium {
     const tab = this.frames.get(p.frameId);
     if (!tab) return;
     const name = safeName(String(p.suggestedFilename || 'download'));
-    this.downloads.set(p.guid, { owner: ownerOf(tab), name });
+    this.downloads.set(p.guid, { owner: ownerOf(tab), name, url: String(p.url ?? '') });
     ownerOf(tab).downloadStarted(name);
   }
 
@@ -369,7 +370,7 @@ class Chromium {
     const from = path.join(STAGING, p.guid);
     if (p.state !== 'completed') {
       fs.rmSync(from, { force: true });
-      return dl.owner.downloadEnded(dl.name, null);
+      return dl.owner.downloadEnded(dl.name, null, dl.url);
     }
     try {
       const dir = dl.owner.downloadDir();
@@ -381,10 +382,10 @@ class Chromium {
         fs.copyFileSync(from, to);
         fs.rmSync(from, { force: true });
       }
-      dl.owner.downloadEnded(path.basename(to), to);
+      dl.owner.downloadEnded(path.basename(to), to, dl.url);
     } catch (e) {
       console.error(`[browser] download: ${(e as Error).message}`);
-      dl.owner.downloadEnded(dl.name, null);
+      dl.owner.downloadEnded(dl.name, null, dl.url);
     }
   }
 
@@ -688,7 +689,15 @@ export class SessionBrowser implements TabOwner {
     this.changed();
   }
 
-  downloadEnded(name: string, file: string | null) {
+  downloadEnded(name: string, file: string | null, url = '') {
+    // What your own browsing downloads is kept in a list, for the search box (downloads.ts); an agent's browser keeps none.
+    if (this.key === BROWSING_KEY) {
+      try {
+        addDownload(d().db, { name, path: file, url, failed: !file });
+      } catch (e) {
+        console.error(`[browser] download list: ${(e as Error).message}`);
+      }
+    }
     this.pendingDownloads = Math.max(0, this.pendingDownloads - 1);
     this.finishedDownloads.push({ name, path: file });
     const i = this.downloads.findIndex((x) => !x.done);
