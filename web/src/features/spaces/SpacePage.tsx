@@ -399,9 +399,10 @@ function MemoryTab({ s, onSaved, memory }: { s: Space; onSaved: (next: Space) =>
             { value: 'documents', label: <PartLabel name="Documents" n={undefined} /> },
           ]}
         />
-        {part === 'notes' && <span className="min-w-0 flex-1 text-[12.5px] text-fg-3">Short facts agents start with in this project.</span>}
-        {part === 'wiki' && <span className="min-w-0 flex-1 text-[12.5px] text-fg-3">Articles agents keep for this project, from its documents and its work.</span>}
-        {part === 'documents' && <span className="min-w-0 flex-1 text-[12.5px] text-fg-3">The files themselves: agents search them and cite what they read.</span>}
+        {/* On a narrow screen the explanation takes a row of its own under the switch. */}
+        {part === 'notes' && <span className="min-w-0 basis-full text-[12.5px] text-fg-3 sm:basis-auto sm:flex-1">Short facts agents start with in this project.</span>}
+        {part === 'wiki' && <span className="min-w-0 basis-full text-[12.5px] text-fg-3 sm:basis-auto sm:flex-1">Articles agents keep for this project, from its documents and its work.</span>}
+        {part === 'documents' && <span className="min-w-0 basis-full text-[12.5px] text-fg-3 sm:basis-auto sm:flex-1">The files themselves: agents search them and cite what they read.</span>}
       </div>
       {part === 'notes' ? (
         memory.key ? (

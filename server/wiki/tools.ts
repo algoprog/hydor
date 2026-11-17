@@ -15,8 +15,7 @@ import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts'
 import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { otherProject } from '../memory/across.ts';
 import { wikiSettings } from './settings/settings.ts';
-import { wikiChatEnabled, wikiEnabledForSession } from './access.ts';
-import { sessionExtra } from '../sessionExtra.ts';
+import { wikiEnabledForSession } from './access.ts';
 import { inSession } from '../documents/index.ts';
 import { canRead, extractText } from '../documents/extract.ts';
 import { isSecret } from '../agent/permissions.ts';
@@ -88,7 +87,8 @@ function otherWikiRoot(ctx: RunCtx, wiki: unknown, project: string): { root: str
   const t = otherProject(db, ctx.key, ctx.cwd, project);
   // This project's own wiki: as the tool always worked.
   if (!t) return undefined;
-  if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) throw new Error('Wiki memory is off for this chat');
+  // This project's own switch counts too, as it does for its own wiki: it may have been turned off since the session started.
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   if (!wikiMemoryOn(db, t.id)) throw new Error(`Wiki memory is off for the project “${t.name}”`);
   return { root: wikiRoot(db, t.id, { create: false }), name: t.name };
 }

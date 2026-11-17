@@ -11,10 +11,9 @@ import { excerpt, searchKnowledge } from '../knowledge/search.ts';
 import { chunkById } from '../knowledge/store.ts';
 import { meaningOn, queryVector } from '../memory/embed.ts';
 import { otherProject, scopeFor } from '../memory/across.ts';
-import { sessionExtra } from '../sessionExtra.ts';
 import { activeWikiDocument } from './core.ts';
 import { articleInfo, wikiBase } from './deliver.ts';
-import { wikiChatEnabled } from './access.ts';
+import { wikiEnabledForSession } from './access.ts';
 import { ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiFileActive, wikiKnowledgeSchema } from './knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
@@ -559,7 +558,8 @@ function placesFor(ctx: RunCtx, own: (ctx: RunCtx) => string | null, input: stri
     const places = mine();
     return { places, label: places[0]?.label ?? (space ? 'this project’s wiki' : 'the shared wiki'), notes: [], tag: false };
   }
-  if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) throw new Error('Wiki memory is off for this chat');
+  // This project's own switch counts too, as it does for its own wiki: it may have been turned off since the session started.
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   const notes: string[] = [];
   const add = (places: Place[], t: { id: string; name: string; here: boolean }) => {
     if (!wikiMemoryOn(db, t.id)) {

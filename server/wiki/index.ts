@@ -13,6 +13,7 @@ import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { areasLine } from './areas/tend.ts';
 import { sessionExtra } from '../sessionExtra.ts';
+import { spaceById } from '../spaces/index.ts';
 import { wikiHasArticles } from './has-articles.ts';
 
 /**
@@ -44,7 +45,9 @@ export const wiki: Feature = {
     : [],
   spawn: (s, d) => {
     if (!wikiChatEnabled(d.db, s.extra)) return undefined;
-    const space = wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
+    // A new Codex session has no key yet: the project picked for it on the start page is its project, wherever it works.
+    const picked = !s.key && typeof s.extra.space === 'string' ? spaceById(d.db, s.extra.space) : null;
+    const space = picked?.id ?? wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
     // Wiki knowledge: each wiki that exists is bound as its project's (or the shared) documents and stays bound; off unbinds it.
     for (const sp of space ? [space, null] : [null]) {
       try {

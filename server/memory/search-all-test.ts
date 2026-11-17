@@ -294,6 +294,11 @@ test('wiki_status and wiki_read with project: another project’s wiki, read onl
   updateSpace(db, delta.id, { wikiMemory: null });
   setSessionExtra(db, 'claude:nowiki', { wikiEnabled: false, space: alpha.id });
   await assert.rejects(call(ctxIn('claude:nowiki', alphaDir), 'wiki_read', { project: 'Beta', path: 'wiki/deploys.md' }), /off for this chat/);
+  // This project's own Wiki memory switch counts too, as for its own wiki: turned off while a session runs, another project's wiki is closed to it.
+  updateSpace(db, alpha.id, { wikiMemory: false });
+  await assert.rejects(call(here, 'wiki_read', { project: 'Beta', path: 'wiki/deploys.md' }), /off for this chat or project/);
+  await assert.rejects(call(here, 'wiki_search', { query: 'deploys', project: 'Beta' }), /off for this chat or project/);
+  updateSpace(db, alpha.id, { wikiMemory: null });
   // Nothing that writes takes it.
   for (const name of ['wiki_write', 'wiki_ingest_text', 'wiki_ingest_document']) assert.ok(!('project' in ((tool(here, name).inputSchema as { properties: object }).properties as object)), name);
   for (const name of ['wiki_read', 'wiki_status']) assert.ok('project' in ((tool(here, name).inputSchema as { properties: object }).properties as object), name);
