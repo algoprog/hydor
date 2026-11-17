@@ -576,6 +576,16 @@ row('memory', 'Wiki memory', 'switch', {
   write: put('/api/wiki/settings', (v) => ({ enabled: v })),
   note: 'For every project that does not say otherwise in its own Settings tab, and for the shared wiki.',
 });
+row('memory', 'Wiki memory on by default in chats', 'switch', {
+  read: rd('/api/wiki/settings', 'defaultChatEnabled'),
+  write: put('/api/wiki/settings', (v) => ({ defaultChatEnabled: v })),
+  note: 'Chats use this setting unless you choose otherwise in a chat’s options.',
+});
+row('memory', 'Auto lessons learned by default in chats', 'switch', {
+  read: rd('/api/wiki/settings', 'defaultAutoLessons'),
+  write: put('/api/wiki/settings', (v) => ({ defaultAutoLessons: v })),
+  note: 'Lessons are only suggested: saving one always asks you first.',
+});
 row('memory', 'Learn from new documents', 'switch', {
   read: rd('/api/wiki/settings', 'fromDocuments'),
   write: put('/api/wiki/settings', (v) => ({ fromDocuments: v })),
