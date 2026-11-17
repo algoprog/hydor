@@ -20,7 +20,7 @@ Wie andere Agenten liest Custom `AGENTS.md` oder `CLAUDE.md` des Projekts und be
 
 ## Eine Custom-Sitzung starten
 
-1. Klicke auf der Startseite auf **Agent** und wähle **Custom** mit dem Hinweis „Beliebiges Modell: OpenRouter, Ollama, vLLM“.
+1. Klicke auf der Startseite auf **Agent** und wähle **Benutzerdefiniert** mit dem Hinweis „Beliebiges Modell: OpenRouter, Ollama, vLLM“.
 2. Klicke auf **Modell** und wähle eines deiner Modelle. Ist die Liste leer, füge zuerst ein Modell hinzu: **Agent** → **Modelle für Custom**.
 3. Wähle unter **Optionen** die **Berechtigungen** (siehe [Was Custom ohne Rückfrage tun darf](#choose-what-custom-may-do-without-asking)). Eine Einstellung für den Denkaufwand gibt es bei Custom nicht.
 4. Schreibe die Aufgabe und drücke Enter.
@@ -49,10 +49,10 @@ Jeder Schritt erhält einen verständlichen Namen wie „index.ts lesen“, „R
 
 **Berechtigungen** unter **Optionen** auf der Startseite oder im Menü unter dem Nachrichtenfeld bestimmt den Handlungsspielraum. Umschalt+Tab im Nachrichtenfeld wechselt zum nächsten Modus.
 
-- **Nachfragen**, die Voreinstellung: fragt vor Dateiänderungen und Befehlen. Rein lesende Befehle wie `ls`, `cat` oder `git status` laufen ohne Rückfrage.
+- **Fragen**, die Voreinstellung: fragt vor Dateiänderungen und Befehlen. Rein lesende Befehle wie `ls`, `cat` oder `git status` laufen ohne Rückfrage.
 - **Änderungen akzeptieren**: erlaubt Dateiänderungen im Sitzungsordner. Befehle mit Auswirkungen und Aktionen außerhalb des Ordners benötigen Zustimmung.
 - **Automatisch**: Routinearbeiten laufen direkt, riskantere Schritte prüft eine schnelle Bewertung. Siehe [Auto-Modus](#auto-mode).
-- **Vollzugriff**: Tools und Befehle laufen ohne Freigabefragen und ohne [Befehls-Sandbox](#the-sandbox-for-commands), einschließlich Administratorbefehlen und Änderungen außerhalb des Ordners. Es gelten weiterhin die Rechte deines Computerkontos; fehlende Administratorrechte werden dadurch nicht erteilt. Vertrauliche Sitzungen behalten ihre Netzwerkbeschränkungen.
+- **Voller Zugriff**: Tools und Befehle laufen ohne Freigabefragen und ohne [Befehls-Sandbox](#the-sandbox-for-commands), einschließlich Administratorbefehlen und Änderungen außerhalb des Ordners. Es gelten weiterhin die Rechte deines Computerkontos; fehlende Administratorrechte werden dadurch nicht erteilt. Vertrauliche Sitzungen behalten ihre Netzwerkbeschränkungen.
 - **Planen**: ausschließlich lesen und planen, keine Dateiänderungen oder Befehle. Custom nutzt nur lesende Tools und endet mit einem nummerierten Plan. Zur Umsetzung wechselst du den Modus und beauftragst die Ausführung.
 
 Außer im Vollzugriff benötigen bestimmte Befehle immer deine Zustimmung; siehe [Befehle mit zwingender Rückfrage](#commands-that-always-ask).
@@ -135,9 +135,9 @@ In [vertraulichen Sitzungen](/guide/sessions#keep-a-session-confidential) läuft
 
 Ein Ziel lässt Custom über mehrere Durchläufe weiterarbeiten, bis eine Bedingung erfüllt ist, etwa „npm test ist erfolgreich und die Upload-Seite verarbeitet Dateien mit 2 GB“.
 
-1. Öffne das Sitzungsmenü (⋯) → **Ziel festlegen**.
+1. Öffne das Sitzungsmenü (⋯) → **Ziel setzen**.
 2. Beschreibe, wie „fertig“ aussieht, als Bedingung, die zutrifft, wenn die Arbeit erledigt ist.
-3. Klicke auf **Daran arbeiten** oder drücke Strg+Enter beziehungsweise ⌘Enter auf dem Mac.
+3. Klicke auf **Arbeit am Ziel starten** oder drücke Strg+Enter beziehungsweise ⌘Enter auf dem Mac.
 
 Custom beginnt sofort. Läuft bereits ein Durchlauf, wird das Ziel nach dessen Ende geprüft.
 

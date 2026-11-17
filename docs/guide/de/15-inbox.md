@@ -25,7 +25,7 @@ Hier findest du offene Anfragen aus allen Sitzungen dieses Computers, auch aus g
 - **Angeforderte Keys**, etwa „Fragt nach einem Key: OPENWEATHER_KEY“, einschließlich Begründung.
 - **Skill-Vorschläge** wie „Schlägt einen neuen Skill vor: …“ oder „Schlägt eine Änderung am Skill … vor“, mit dem jeweiligen Anlass.
 - **Eine Sitzung, die woanders auf dich wartet**: „Wartet in VS Code auf dich“ (oder in einem Terminal), für Sitzungen, die außerhalb der App laufen.
-- **Rückfragen einer App**, deren Lauf einen Schritt **Eine Person fragen** erreicht hat.
+- **Rückfragen einer App**, deren Lauf einen Schritt **Person fragen** erreicht hat.
 - **Kommentare zu geteilten Projekten oder Inhalten**, etwa „Maria hat ‚Abschlussarbeit, Kapitel 3‘ kommentiert“, mit dem Text. Der Eintrag bleibt, bis du oder ein Agent antwortet oder der Kommentar als erledigt markiert ist. **Öffnen** führt zum Dokument, Bild, Video oder Audio.
 - **Zurückgehaltene Aufrufe im Postausgang**, etwa ein E-Mail-Versand über ein verbundenes Konto mit der Vorgabe „Vorher fragen“. Diese stehen zuerst unter **Postausgang**.
 
@@ -36,8 +36,8 @@ Jeder Eintrag zeigt, in welcher Sitzung er wartet (mit dem Symbol des Agenten) u
 Freigaben, Fragen und Formulare erscheinen als dieselben Karten wie in der Sitzung. Du kannst sie direkt beantworten, ohne die Unterhaltung zu öffnen. Darüber steht der Sitzungsname als Link. Die oberste Kartenzeile beschreibt Anfrage und Wartezeit.
 
 - **Freigaben** zeigen Befehl, Dateiänderung als Diff oder Tool-Eingaben. Wähle **Erlauben**, eine angebotene dauerhafte Freigabe wie **Alle Änderungen in dieser Sitzung erlauben** oder **Für diese Sitzung erlauben**, oder **Ablehnen**. **Ablehnen…** öffnet zuerst das Feld „Optional: Sag dem Agenten, was er stattdessen tun soll“. Danach bestätigst du mit **Ablehnen**.
-- **Pläne** von Claude Code zeigen den Plan mit **Genehmigen, Änderungen automatisch übernehmen**, **Genehmigen, vor Änderungen fragen** und **Weiter planen**.
-- **Fragen** bieten eine oder gegebenenfalls mehrere Auswahlmöglichkeiten. Unter **Andere Antwort eingeben** kannst du selbst antworten und eine Datei anhängen. Wähle anschließend **Antworten senden** oder **Überspringen**.
+- **Pläne** von Claude Code zeigen den Plan mit **Änderungen genehmigen und automatisch akzeptieren**, **Genehmigen, vor Änderungen fragen** und **Weiter planen**.
+- **Fragen** bieten eine oder gegebenenfalls mehrere Auswahlmöglichkeiten. Unter **Andere – eigene Antwort eingeben** kannst du selbst antworten und eine Datei anhängen. Wähle anschließend **Antworten senden** oder **Überspringen**.
 - **Dienstformulare** zeigen Nachricht und Felder des Dienstes. Fülle sie aus und wähle **Senden**, **Ablehnen** oder **Nicht jetzt**. Ohne auszufüllende Felder steht dort **Erlauben** statt **Senden**. **Öffnen** führt eine angeforderte Seite in einem neuen Tab auf.
 
 Nach der Antwort verschwindet der Eintrag und der Agent arbeitet weiter. Die Optionen erklären [Agentenaktionen erlauben oder ablehnen](/guide/sessions#approve-or-deny-what-the-agent-wants-to-do) und [Fragen beantworten und Pläne freigeben](/guide/sessions#answer-questions-and-approve-plans).
@@ -134,7 +134,7 @@ Auf dem Smartphone:
 1. Öffne die App auf dem Smartphone über HTTPS. [Einstellungen → App → Auf dem Smartphone nutzen](/settings?s=phone) richtet den privaten Zugang über Tailscale ein. Der QR-Code öffnet die App auf dem Smartphone direkt bei den folgenden Einrichtungsschritten; siehe [Mit Tailscale auf dem Smartphone nutzen](/guide/devices#use-it-on-your-phone-with-tailscale).
 2. Füge auf einem iPhone oder iPad die App zuerst zum Home-Bildschirm hinzu (**Teilen** → **Zum Home-Bildschirm hinzufügen**) und öffne sie von dort. Bis dahin sagt die Einstellung das und lässt sich nicht einschalten.
 3. Öffne **Einstellungen → App → Benachrichtigungen** und schalte **Dieses Gerät benachrichtigen** ein. Erlaube Benachrichtigungen, wenn das Handy fragt.
-4. Tippe auf **Test senden** und verlasse die App, um den Eingang zu prüfen.
+4. Tippe auf **Testbenachrichtigung senden** und verlasse die App, um den Eingang zu prüfen.
 
 Sagt die Einstellung, Benachrichtigungen seien „In den Browsereinstellungen für diese Website blockiert“, erlaube sie zuerst in den Einstellungen des Browsers für die Adresse der App und schalte sie dann ein. Sagt sie „Dieser Browser kann hier keine Benachrichtigungen empfangen“, kann der Browser sie unter dieser Adresse nicht annehmen, oft weil die App über einfaches HTTP statt über HTTPS geöffnet wird.
 

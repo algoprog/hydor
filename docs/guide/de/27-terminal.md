@@ -277,7 +277,7 @@ hydor settings set search.providers duckduckgo,naget
 hydor settings run notifications.send-a-test
 ```
 
-Browserspezifische Einstellungen wie Design, Sprache und Benachrichtigungston können hier nicht geändert werden. Die Ausgabe erklärt das und nennt die Seite. Dasselbe gilt für rein grafische Optionen. Die beiden Terminaleinstellungen **Senden während der Agentenarbeit** und **Terminalvorschläge** lassen sich dagegen mit `hydor settings set` ändern.
+Browserspezifische Einstellungen wie Design, Sprache und Benachrichtigungston können hier nicht geändert werden. Die Ausgabe erklärt das und nennt die Seite. Dasselbe gilt für rein grafische Optionen. Die beiden Terminaleinstellungen **Senden, während ein Agent arbeitet** und **Terminalvorschläge** lassen sich dagegen mit `hydor settings set` ändern.
 
 ### Suchen, Hilfe, Öffnen und API
 
@@ -299,7 +299,7 @@ Browserspezifische Einstellungen wie Design, Sprache und Benachrichtigungston k�
 
 ## Hydor eines anderen Computers verwenden
 
-Erstelle dort einen Zugriffstoken unter [Einstellungen → App → Computer](/settings?s=machines&find=Access%20from%20other%20machines) → **Neuer Token** oder mit `hydor access-token "my laptop"`. Verwende anschließend Adresse und Token:
+Erstelle dort einen Zugriffstoken unter [Einstellungen → App → Computer](/settings?s=machines&find=Access%20from%20other%20machines) → **Neues Token** oder mit `hydor access-token "my laptop"`. Verwende anschließend Adresse und Token:
 
 ```bash
 hydor --server https://hydor.example.com --token acm_… sessions

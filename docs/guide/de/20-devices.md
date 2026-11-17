@@ -26,7 +26,7 @@ Auf dem Home-Bildschirm installiert, öffnet sich die App im Vollbild mit ihrem 
 
 Installiert, erscheint Hydor im Teilen-Menü deines Handys oder Computers, wie es eine Messaging-App tut. Teile ein Foto, ein PDF, eine Webseite oder ein paar Zeilen Text aus einer beliebigen anderen App, wähle **Hydor**, und die Startseite öffnet sich mit dem, was du geteilt hast, schon im Nachrichtenfeld: die Wörter und der Link als Text, die Dateien als Anhänge. Schreibe ein Wort dazu, was damit geschehen soll, wähle auf Wunsch den Agenten und sende ab.
 
-- **Android**: funktioniert in Chrome, Edge und anderen Browsern auf Basis von Chromium, sobald die App über das Menü des Browsers installiert ist (**App installieren** oder **Zum Startbildschirm hinzufügen**).
+- **Android**: funktioniert in Chrome, Edge und anderen Browsern auf Basis von Chromium, sobald die App über das Menü des Browsers installiert ist (**App installieren** oder **Zum Home-Bildschirm hinzufügen**).
 - **Computer**: funktioniert in Chrome und Edge nach Installation über die Adressleiste oder **Hydor installieren** im Browsermenü, sofern die Quell-App das systemweite Teilen-Menü verwendet.
 - **iPhone und iPad**: Safari erlaubt Web-Apps keine Empfangsfunktion im Teilen-Menü. Fotos und Dateien kannst du stattdessen über eine Chat-App senden; siehe [Was ein Chat kann](/guide/devices#what-a-chat-can-do). Für Text und Links kannst du einen Kurzbefehl anlegen: im Teilen-Menü anzeigen lassen, Text und URLs akzeptieren, die Eingabe mit **URL codieren** umwandeln und über **URLs öffnen** an deine App-Adresse mit `/?prompt=` anhängen, etwa `https://hydor.example.com/?prompt=` plus codiertem Text. Safari öffnet die Startseite mit dem vorausgefüllten Nachrichtenfeld.
 
@@ -38,9 +38,9 @@ Benachrichtigungen informieren dich bei Abschluss, Fehlern und Rückfragen, auch
 
 1. Öffne auf dem Smartphone [Einstellungen → App → Benachrichtigungen](/settings?s=notifications&find=Notify%20this%20device).
 2. Aktiviere **Dieses Gerät benachrichtigen** und erlaube die Browseranfrage. Jedes Gerät wird separat eingerichtet.
-3. Prüfe den Empfang mit **Test senden**. Die Nachricht erscheint, wenn die App nicht sichtbar ist.
+3. Prüfe den Empfang mit **Testbenachrichtigung senden**. Die Nachricht erscheint, wenn die App nicht sichtbar ist.
 
-Auf dem Smartphone zeigt [Auf dem Smartphone nutzen](/settings?s=phone) unter **Auf diesem Smartphone** nach **Zum Home-Bildschirm** denselben Schalter **Dieses Gerät benachrichtigen**. **Test senden** sendet dort nur an dieses Smartphone.
+Auf dem Smartphone zeigt [Auf dem Smartphone nutzen](/settings?s=phone) unter **Auf diesem Handy** nach **Zum Home-Bildschirm hinzufügen** denselben Schalter **Dieses Gerät benachrichtigen**. **Testbenachrichtigung senden** sendet dort nur an dieses Smartphone.
 
 Auf iPhone und iPad musst du die App zuerst zum Home-Bildschirm hinzufügen und von dort öffnen. Blockierte Website-Mitteilungen erlaubst du zuerst in den Browsereinstellungen. Einfache Ja-Nein-Freigaben bieten direkt in unterstützten Benachrichtigungen **Genehmigen** und **Ablehnen**. Mehr unter [Posteingang und Benachrichtigungen](/guide/inbox).
 
@@ -75,7 +75,7 @@ Ein Kanal wird der Person zugeordnet, die den Code gesendet hat. Dort werden nur
 - **Antworten**: Nach Ende des Durchlaufs kommt die Antwort passend formatiert zurück: mit Telegram-Formatierung, Discord-Markdown in Nachrichten zu 2.000 Zeichen oder Slack-mrkdwn in Blöcken. Lange Antworten umfassen höchstens zehn Nachrichten; der Rest bleibt in der Sitzung. Telegram und Discord zeigen eine Schreibanzeige, Slack eine Sanduhr. **In Hydor öffnen** funktioniert, wenn die App eine Internetadresse hat oder über dein Tailnet bereitgestellt wird; siehe [Mit Tailscale auf dem Smartphone nutzen](/guide/devices#use-it-on-your-phone-with-tailscale).
 - **Was ein Agent fragt**: Eine einfache Ja-Nein-Frage kommt mit Schaltflächen, die sie beantworten; alles Weitere (ein Formular, ein Plan) kommt mit einem Link, um in der App zu antworten.
 - **Befehle**: `/new` erstellt eine Sitzung, mit angehängter Aufgabe startet sie sofort. `/as` und `/agents` wählen eigene Agenten. `/sessions` listet letzte Sitzungen zur Fortsetzung, `/stop` stoppt den Agenten, `/status` nennt Sitzung und Zustand, `/help` zeigt die Befehle. Telegram zeigt ein Befehlsmenü, Discord Slash-Befehle. In Slack folgt alles auf `/hydor`, etwa `/hydor new`; andere Wörter nach `/hydor` gehen als Nachricht an die Sitzung. In Discord und Slack funktionieren auch `!new`, `!as`, `!status` und weitere als normale Nachricht.
-- **Benachrichtigungen**: Bei standardmäßig aktiviertem **Benachrichtigungen aus allen Sitzungen** melden deine Chats Abschluss, Fehler und Rückfragen aller Sitzungen, auch wenn sie nicht dort gestartet wurden.
+- **Benachrichtigungen**: Bei standardmäßig aktiviertem **Mitteilungen von jeder Sitzung** melden deine Chats Abschluss, Fehler und Rückfragen aller Sitzungen, auch wenn sie nicht dort gestartet wurden.
 
 Sticker, Umfragen und Standorte werden nicht weitergegeben. Der Chat bittet stattdessen um Text, Fotos, Dateien oder Sprachnachrichten.
 
@@ -90,8 +90,8 @@ Tailscale ist eine kostenlose App, die deine eigenen Geräte in einem privaten N
 1. Installiere Tailscale auf diesem Computer und melde dich an ([tailscale.com/download](https://tailscale.com/download)). **Tailscale auf diesem Computer** zeigt die Bereitschaft, etwa „Angemeldet. Dieser Computer heißt laptop im Konto you@example.com.“ Bis dahin nennt die Zeile das Problem: nicht installiert, nicht gestartet, nicht angemeldet oder ausgeschaltet. Sie bietet **Tailscale herunterladen** oder den nötigen nächsten Schritt und **Erneut prüfen**.
 2. Wähle [**Auf meinen Geräten bereitstellen**](/settings?s=phone&find=Serve%20it%20on%20my%20devices). Unter **Adresse** erscheint die App-Adresse mit **Kopieren** und **Öffnen**. Die App akzeptiert sie automatisch; du musst keine Datei bearbeiten.
 3. Installiere Tailscale auch auf deinem Smartphone und melde dich mit demselben Konto an.
-4. Scanne mit der Smartphonekamera den QR-Code unter [**Auf dem Smartphone öffnen**](/settings?s=phone&find=Open%20it%20on%20your%20phone) oder gib die Adresse ein. Melde dich mit dem App-Passwort an.
-5. Das Smartphone öffnet **Auf dem Smartphone nutzen** mit dem Bereich **Auf diesem Smartphone**. Wähle zuerst **Zum Home-Bildschirm**: auf dem iPhone in Safari über **Teilen → Zum Home-Bildschirm**, was dort für Benachrichtigungen erforderlich ist; auf Android über **Installieren** oder im Chrome-Menü **App installieren**. Aktiviere anschließend **Dieses Gerät benachrichtigen** und wähle **Test senden**. Der Test geht ausschließlich an dieses Smartphone.
+4. Scanne mit der Smartphonekamera den QR-Code unter [**Auf dem Handy öffnen**](/settings?s=phone&find=Open%20it%20on%20your%20phone) oder gib die Adresse ein. Melde dich mit dem App-Passwort an.
+5. Das Smartphone öffnet **Auf dem Handy nutzen** mit dem Bereich **Auf diesem Handy**. Wähle zuerst **Zum Home-Bildschirm hinzufügen**: auf dem iPhone in Safari über **Teilen → Zum Home-Bildschirm hinzufügen**, was dort für Benachrichtigungen erforderlich ist; auf Android über **Installieren** oder im Chrome-Menü **App installieren**. Aktiviere anschließend **Dieses Gerät benachrichtigen** und wähle **Testbenachrichtigung senden**. Der Test geht ausschließlich an dieses Smartphone.
 
 **Bereitstellung beenden** entfernt die App wieder aus deinem Tailnet. Dabei wird genau rückgängig gemacht, was **Auf meinen Geräten bereitstellen** eingerichtet hat: die bereitgestellte Adresse und ihre Aufnahme in die von Hydor akzeptierten Adressen. Andere Tailscale-Bereitstellungen bleiben erhalten. Hast du Hydor bereits manuell mit Tailscale bereitgestellt, zeigt die Seite „Außerhalb dieser Seite mit Tailscale eingerichtet“. **Bereitstellung beenden** schaltet auch diese Bereitstellung ab.
 
@@ -143,7 +143,7 @@ Das richtest du unter [Einstellungen → App → Computer](/settings?s=machines)
 
 ### Einen Computer hinzufügen
 
-1. Installiere Hydor **auf dem anderen Computer** und erzeuge dort einen Zugriffstoken über [Einstellungen → App → Computer](/settings?s=machines&find=Access%20from%20other%20machines) → **Neuer Token** oder mit `node dist/server/cli.js access-token "my laptop"` im Hydor-Ordner. Kopiere den mit `acm_` beginnenden Token.
+1. Installiere Hydor **auf dem anderen Computer** und erzeuge dort einen Zugriffstoken über [Einstellungen → App → Computer](/settings?s=machines&find=Access%20from%20other%20machines) → **Neues Token** oder mit `node dist/server/cli.js access-token "my laptop"` im Hydor-Ordner. Kopiere den mit `acm_` beginnenden Token.
 2. Öffne **hier** [Einstellungen → App → Computer](/settings?s=machines&find=Add%20a%20machine) und klicke auf **Computer hinzufügen**.
 3. Gib einen **Namen** ein, etwa „GPU-Computer“.
 4. Wähle unter **Verbindung** den Zugriffsweg:
@@ -189,8 +189,8 @@ Wenn die Seite eines anderen Computers nicht angezeigt werden kann, siehst du st
 
 In **Zugriff von anderen Computern**, auf fremden Computerseiten **Zugriff auf …**, erstellst du Zugriffstoken. Ein anderer Hydor-Computer kann damit alles tun, was du hier kannst, einschließlich Befehlsausführung. Erstelle deshalb einen eigenen Token pro zugreifendem Computer.
 
-1. Klicke neben der Gruppenüberschrift auf **Neuer Token**.
-2. Gib unter **Welcher Computer verwendet ihn?** etwa „Mein Laptop“ ein und wähle **Token erstellen**.
+1. Klicke neben der Gruppenüberschrift auf **Neues Token**.
+2. Gib unter **Welcher Computer wird es verwenden?** etwa „Mein Laptop“ ein und wähle **Token erstellen**.
 3. Kopiere den nur jetzt sichtbaren Token in die Computer-Einstellungen des anderen Hydor.
 
 Jeder Token zeigt Erstellungszeit und letzte Verwendung. **Widerrufen** im Menü **⋯** fragt nach und trennt den Zugriff anschließend sofort.
@@ -216,7 +216,7 @@ Befehlsausgaben, Denkprozesse, Bildanhänge selbst und andere App-Inhalte bleibe
 Externe Agenten wie Claude Code auf deinem Laptop, Codex, Cursor oder andere MCP-Clients können über Hydors MCP-Server Sitzungen auf diesem Computer auflisten, lesen, starten und steuern. Jeder benötigt einen unter [Einstellungen → App → Andere Agenten verbinden](/settings?s=connect) erzeugten Token. Damit kann er hier wie du Sitzungen starten und steuern.
 
 1. Klicke neben dem Titel der Gruppe **Token** auf [**Neues Token**](/settings?s=connect&find=New%20token).
-2. Vergib unter **Nach dem Einsatzort benennen** etwa „Claude Code auf meinem Laptop“ und wähle **Token erstellen**.
+2. Vergib unter **Benenne es nach dem Einsatzort** etwa „Claude Code auf meinem Laptop“ und wähle **Token erstellen**.
 3. Kopiere die benötigten Angaben jetzt; sie werden nicht erneut angezeigt:
    - **Token**: der eigentliche Zugangstoken.
    - **Claude Code**: ein Einrichtungsbefehl wie `claude mcp add --transport http hydor <address>/mcp --header "Authorization: Bearer <token>"`.
@@ -246,7 +246,7 @@ Pull-Requests werden über Konten unter [Einstellungen → App → Versionsverwa
 
 1. Klicke neben dem Titel der Gruppe **Konten** auf [**Konto hinzufügen**](/settings?s=scm&find=Add%20an%20account). Ein Dialog öffnet sich.
 2. Wähle **GitHub** oder **Gitea**.
-3. Bei GitHub kannst du eine vorhandene Anmeldung der lokalen GitHub CLI mit **Anmeldung übernehmen** direkt nutzen. Andernfalls füge einen fein abgestuften **Zugriffstoken** mit Pull requests (Lesen und Schreiben), Contents (Lesen) und Commit statuses (Lesen) für deine Repositorys ein. **Erstellen** öffnet GitHub. Eine **Serveradresse** ist nur für GitHub Enterprise nötig.
+3. Bei GitHub kannst du eine vorhandene Anmeldung der lokalen GitHub CLI mit **Diese Anmeldung verwenden** direkt nutzen. Andernfalls füge einen fein abgestuften **Zugriffstoken** mit Pull requests (Lesen und Schreiben), Contents (Lesen) und Commit statuses (Lesen) für deine Repositorys ein. **Erstellen** öffnet GitHub. Eine **Serveradresse** ist nur für GitHub Enterprise nötig.
 4. Für Gitea: die **Serveradresse** (`https://gitea.example.com`) und ein **Zugriffstoken**, das du in Gitea unter Settings → Applications → Generate token erstellst, mit Lese- und Schreibzugriff auf das Repository.
 5. Klicke auf **Hinzufügen**. Die App prüft den Token beim Server und zeigt das Konto anschließend mit Benutzernamen an.
 

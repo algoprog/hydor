@@ -30,9 +30,9 @@ Der Agent liest zunächst den aktuellen Zustand und bittet dich dann auf einer K
 
 Agenten können deine Bibliotheksinhalte mit denselben Funktionen bearbeiten wie du in den Editoren. Sie schreiben Präsentationen, Dokumente, Tabellen, LaTeX-Dokumente, Notebooks und Diagramme. Auch Aktionen für einen gesamten Inhalt lassen sich in einem Schritt ausführen:
 
-- **Präsentationen**: Alle Folien animieren (**Dezent**, **Lebendig** oder **Markant**) oder sämtliche Animationen entfernen, Befunde der **Barrierefreiheitsprüfung** beheben, fehlende Bildbeschreibungen ergänzen, die Präsentation PowerPoint-kompatibel machen oder ins Webformat zurückwandeln, eine mitgelieferte oder eigene Designvorlage anwenden, zwischen Breitbild und Standardformat wechseln, Folien aus einer anderen Präsentation übernehmen und Diagramme aus einer Tabelle aktualisieren.
+- **Folien**: Alle Folien animieren (**Dezent**, **Lebendig** oder **Markant**) oder sämtliche Animationen entfernen, Befunde der **Barrierefreiheitsprüfung** beheben, fehlende Bildbeschreibungen ergänzen, die Präsentation PowerPoint-kompatibel machen oder ins Webformat zurückwandeln, eine mitgelieferte oder eigene Designvorlage anwenden, zwischen Breitbild und Standardformat wechseln, Folien aus einer anderen Präsentation übernehmen und Diagramme aus einer Tabelle aktualisieren.
 - **Dokumente**: Änderungsvorschläge annehmen oder ablehnen, das Seitenlayout ändern sowie Kopfzeilen, Fußzeilen und Seitenzahlen einfügen.
-- **Tabellen**: Tabellen sortieren, doppelte Zeilen entfernen, Zellen nach unten oder rechts ausfüllen, Inhalte löschen, überflüssige Leerzeichen entfernen, Text in Spalten aufteilen, auf einem neuen Tabellenblatt zusammenfassen (wie **Daten → Zusammenfassen nach**), Zeilen und Spalten einfügen oder entfernen sowie Tabellenblätter umbenennen, kopieren, verschieben oder löschen. Formeln werden wie im Editor angepasst.
+- **Tabellen**: Tabellen sortieren, doppelte Zeilen entfernen, Zellen nach unten oder rechts ausfüllen, Inhalte löschen, überflüssige Leerzeichen entfernen, Text in Spalten aufteilen, auf einem neuen Tabellenblatt zusammenfassen (wie **Daten → Zusammenfassen durch**), Zeilen und Spalten einfügen oder entfernen sowie Tabellenblätter umbenennen, kopieren, verschieben oder löschen. Formeln werden wie im Editor angepasst.
 - **LaTeX-Dokumente**: Dateien, Bilder und Ordner umbenennen oder verschieben und ihre Verweise entsprechend anpassen.
 - **Notebooks**: Ausgaben löschen.
 - **Diagramme**: Eine oder alle Seiten neu anordnen, etwa als Flussdiagramm von oben nach unten oder von links nach rechts, als Baum, Mindmap, konzentrische Ringe, Kreis oder Raster. Außerdem Formen einheitlich gestalten, die Schrift vereinheitlichen oder dem Diagramm einen handgezeichneten Stil geben.
@@ -52,7 +52,7 @@ Dabei entsteht jeweils eine neue Version; die vorherige bleibt im Versionsverlau
 Bevor ein Agent etwas ändert, erscheint eine Karte in der Unterhaltung und in deinem [Posteingang](/inbox). Bist du gerade nicht da, erhältst du eine Benachrichtigung. Die Karte zeigt:
 
 - **Die beabsichtigte Änderung** in den Worten des Agenten, zum Beispiel „Projekt ‚Abschlussarbeit‘ erstellen“.
-- **Die betroffenen Werte**, Feld für Feld: den bisherigen und den neuen Wert einer Einstellung („**Ergebnisse**: 10 → 20“) oder die Angaben für einen neuen Eintrag.
+- **Zu ändernde Werte**, Feld für Feld: den bisherigen und den neuen Wert einer Einstellung („**Ergebnisse**: 10 → 20“) oder die Angaben für einen neuen Eintrag.
 - **Den eigentlichen Aufruf** in kleiner Schrift, zum Beispiel `PUT /api/search/settings`. So kannst du unabhängig von der Beschreibung prüfen, was ausgeführt wird.
 
 Du hast folgende Möglichkeiten:
@@ -89,9 +89,9 @@ Einige Aktionen kannst nur du selbst ausführen. Versucht ein Agent es trotzdem,
 Die Berechtigungen einer Sitzung bestimmen, wann eine Karte nachfragt:
 
 - **Plan** und bei Codex **Nur lesen**: Der Agent darf Einstellungen lesen und Fragen beantworten, aber nichts ändern. Er beschreibt die vorgesehenen Änderungen. Eine Ausnahme sind die Einstellungen seiner eigenen Sitzung: Wenn du ihn bittest, den Plan-Modus zu verlassen, das Modell zu wechseln oder gründlicher nachzudenken, fragt er auf einer Karte nach.
-- **Nachfragen**, **Änderungen annehmen**, **Automatisch** und ähnliche Modi: Änderungen benötigen die oben beschriebenen Bestätigungskarten.
-- **Bypass** bei Claude Code und **Vollzugriff** bei Codex: Der Agent führt deine beauftragten Änderungen ohne Bestätigungskarte aus. Braucht er Angaben, erscheint weiterhin ein Formular.
-- **Vollzugriff** bei Custom: Keine Bestätigungskarten, auch bei Aktionen, die sonst immer nachfragen. Für weitere Angaben erscheinen weiterhin Formulare.
+- **Fragen**, **Änderungen akzeptieren**, **Automatisch** und ähnliche Modi: Änderungen benötigen die oben beschriebenen Bestätigungskarten.
+- **Bypass** bei Claude Code und **Voller Zugriff** bei Codex: Der Agent führt deine beauftragten Änderungen ohne Bestätigungskarte aus. Braucht er Angaben, erscheint weiterhin ein Formular.
+- **Voller Zugriff** bei Custom: Keine Bestätigungskarten, auch bei Aktionen, die sonst immer nachfragen. Für weitere Angaben erscheinen weiterhin Formulare.
 
 Unabhängig vom Modus erfordert jede Änderung der Sitzungsberechtigungen oder des Ausgabenlimits eine eigene Bestätigungskarte ohne **Für diese Sitzung erlauben**, etwa „Stelle diese Sitzung auf Bypass um“ oder „Erhöhe das Limit auf 20 $“. Das geht sowohl in der App als auch im Terminal. Im Terminal erscheint dieselbe Karte; mit **y** oder **n** antwortest du.
 

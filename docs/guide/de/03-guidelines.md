@@ -28,7 +28,7 @@ Der Agent erhält alle zutreffenden Ebenen in dieser Reihenfolge. Widersprechen 
 2. Schreibe unter **Für alle Sitzungen**, was jeder Agent über dich und deine Arbeitsweise wissen soll.
 3. Klicke auf **Speichern**.
 
-Unter dem Textfeld bietet **Vorlage wählen…** einige vorbereitete Vorgaben zur Ansprache: **Verständliche Sprache, kurze Antworten, Fachbegriffe erklären**, **Freundlich und ermutigend: Ich bin neu hier** und **Knapp und technisch**. Eine Auswahl ergänzt die Zeile „So sprichst du mit mir: …“. Du kannst sie vor dem Speichern anpassen. **Speichern** wird erst aktiv, wenn du etwas änderst. **Änderungen verwerfen** stellt den zuletzt gespeicherten Stand wieder her.
+Unter dem Textfeld bietet **Vorlage wählen…** einige vorbereitete Vorgaben zur Ansprache: **Verständliche Sprache, kurze Antworten, Fachbegriffe erklären**, **Herzlich und ermutigend: Ich bin neu in diesem Bereich** und **Kurz und technisch**. Eine Auswahl ergänzt die Zeile „So sprichst du mit mir: …“. Du kannst sie vor dem Speichern anpassen. **Speichern** wird erst aktiv, wenn du etwas änderst. **Änderungen verwerfen** stellt den zuletzt gespeicherten Stand wieder her.
 
 Jede Ebene umfasst höchstens 20.000 Zeichen. Halte die Richtlinien möglichst kurz: Jede Sitzung liest den gesamten Text. Wenige klare Sätze sind hilfreicher als mehrere Seiten.
 
@@ -40,7 +40,7 @@ Jedes Projekt kann eigene Richtlinien erhalten: für wen die Arbeit gedacht ist,
 2. Fülle das Feld **Agentenrichtlinien: Vorgaben für alle Agenten im Projekt** aus.
 3. Speichere das Projekt.
 
-Du kannst die Richtlinien auch beim Anlegen eines Projekts schreiben: Öffne im Fenster **Neues Projekt** die **Weiteren Optionen** und fülle **Agentenrichtlinien** aus. Unter **Einstellungen → Agenten → Agentenrichtlinien → Für ein Projekt** findest du alle Projekte mit Richtlinien, jeweils mit deren erster Zeile. Bei vielen Einträgen zeigt **Alle anzeigen** die vollständige Liste. Klicke auf einen Eintrag, um das Projekt zu öffnen.
+Du kannst die Richtlinien auch beim Anlegen eines Projekts schreiben: Öffne im Fenster **Neues Projekt** den Bereich **Weitere Optionen** und fülle **Agentenrichtlinien** aus. Unter **Einstellungen → Agenten → Agentenrichtlinien → Für ein Projekt** findest du alle Projekte mit Richtlinien, jeweils mit deren erster Zeile. Bei vielen Einträgen zeigt **Alle anzeigen** die vollständige Liste. Klicke auf einen Eintrag, um das Projekt zu öffnen.
 
 Sitzungen in einer Gruppe, die mehrere Projekte zusammenfasst, folgen den Richtlinien der Gruppe. Bei der Arbeit an einem enthaltenen Projekt lesen sie zusätzlich dessen Vorgaben.
 

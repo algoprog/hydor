@@ -8,7 +8,7 @@ Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen ech
 
 Alle hier ausgeführten Agenten, darunter Claude Code, Codex, Custom und ACP-Agenten, erhalten drei App-Tools: Websuche, Seitenabruf und die Suche nach Bildern und Videos zu konkreten Dingen. Sie funktionieren modellunabhängig; auch ein kleines lokales Modell kann damit genauso recherchieren wie ein großes.
 
-- Suchanfragen verwenden die Anbieter unter **Einstellungen → Funktionen → Suche** in ihrer Reihenfolge. Der erste aktivierte Anbieter antwortet. Fehlen Key oder Kontingent, ist der Anbieter unerreichbar oder verlangt er eine Bot-Prüfung, wird der nächste versucht. Das Ergebnis nennt dem Agenten den verwendeten Anbieter.
+- Suchanfragen verwenden die Anbieter unter **Einstellungen → Funktionen → Suchen** in ihrer Reihenfolge. Der erste aktivierte Anbieter antwortet. Fehlen Key oder Kontingent, ist der Anbieter unerreichbar oder verlangt er eine Bot-Prüfung, wird der nächste versucht. Das Ergebnis nennt dem Agenten den verwendeten Anbieter.
 - Agenten können bis zu 100 Ergebnisse anfordern und nach Websites einschließlich Ausschlüssen, Zeitraum, Sprache, PDF-Dateien oder offiziellen Startseiten filtern, etwa Personen- oder Unternehmensseiten. Naget Search unterstützt außerdem Kategorien wie Papers, Preprints, biomedizinische Veröffentlichungen, US-Patente, Unternehmensberichte, Nachrichten, Dokumentation und Diskussionen. Unterstützt ein Anbieter einen Filter nicht, erfährt der Agent das.
 - Naget Search kann pro Treffer statt eines gewöhnlichen Auszugs gezielt die zur Frage passenden Sätze liefern. Das dauert länger und wird verwendet, wenn Fakten aus den Seiten benötigt werden. Dafür ist kein Key nötig.
 - Für Listen von Spielen, Filmen, Orten, Gerichten, Produkten oder Teams können Agenten jeweils ein Bild finden: bevorzugt aus dem passenden Wikipedia-Artikel, etwa Cover, Ortsfoto oder Vereinswappen, sonst das Vorschaubild einer zugehörigen Webseite. Auf Wunsch kommt ein YouTube-Video hinzu, dessen Titel das Objekt ausdrücklich nennt, etwa Trailer, Rezept oder Höhepunkte. Ohne eindeutige Zuordnung bleibt der Eintrag ohne Bild oder Video. Apps verwenden diese Inhalte in Antworten; siehe [Apps](/guide/apps).
@@ -20,11 +20,11 @@ Claude Code und Codex besitzen zusätzlich eigene Webtools. Deren zitierte Quell
 
 ## Suchanbieter auswählen
 
-Öffne [Einstellungen → Funktionen → Suche](/settings?s=search). Auf dem Smartphone wählst du in der Einstellungsliste unter Funktionen **Suche**.
+Öffne [Einstellungen → Funktionen → Suche](/settings?s=search). Auf dem Smartphone wählst du in der Einstellungsliste unter Funktionen **Suchen**.
 
 Unter [Anbieter](/settings?s=search&find=Providers) gilt „Von oben nach unten: Der erste aktivierte Anbieter antwortet“. Jede Zeile zeigt:
 
-- den Namen, beim ersten aktivierten Anbieter **Standard** und gegebenenfalls Warnungen wie **Key erforderlich** oder **Adresse deiner Instanz erforderlich**;
+- den Namen, beim ersten aktivierten Anbieter **Standard** und gegebenenfalls Warnungen wie **Key erforderlich** oder **Benötigt die Adresse deiner Instanz**;
 - eine Zeile dazu, was er ist; das (i) neben seinem Namen ergänzt, worauf er eine Suche beschränken kann, etwa „Bis zu 100 Ergebnisse · Kategorien · Zeiträume · Startseiten · die Teile von Seiten, die antworten“;
 - falls vorhanden eine gekürzte Kennzeichnung des gespeicherten Keys wie „sk-ab…12cd“, niemals den vollständigen Wert;
 - den letzten Fehler in Rot mit Zeitangabe;
@@ -36,7 +36,7 @@ Das (i) neben **Anbieter** sagt, dass Agenten das Web durchsuchen und Seiten les
 
 ### Naget Search
 
-[Naget Search](/settings?s=search&find=Naget%20Search) ist der Standardanbieter mit einem eigenen Index für Web, Papers, Patente und Unternehmensberichte. Ohne Key steht ein kostenloses Tageskontingent bereit. Nach der ersten Antwort zeigt die Zeile **Heute noch kostenlos verfügbar**, einen Balken und die nächste Freigabezeit. Ist das Kontingent verbraucht, erscheint ein Hinweis; bis zur Erneuerung antwortet der nächste Anbieter.
+[Naget Search](/settings?s=search&find=Naget%20Search) ist der Standardanbieter mit einem eigenen Index für Web, Papers, Patente und Unternehmensberichte. Ohne Key steht ein kostenloses Tageskontingent bereit. Nach der ersten Antwort zeigt die Zeile **Heute verbleibendes kostenloses Kontingent**, einen Balken und die nächste Freigabezeit. Ist das Kontingent verbraucht, erscheint ein Hinweis; bis zur Erneuerung antwortet der nächste Anbieter.
 
 Ein Key von naget.com ermöglicht mehr Anfragen. Die Anzeige nennt dann **Verbleibende Credits**. Mit Key kann Naget Search auch beim Seitenabruf die zur Frage passenden Sätze auswählen; siehe [Ganze Seiten oder gezielt passende Abschnitte lesen](/guide/web#read-whole-pages-or-only-the-parts-that-answer-a-question). Ohne Key wählt die App Absätze nach Wörtern aus. Passende Sätze direkt in Suchergebnissen sind auch ohne Key möglich. „Naget Search benötigt derzeit einen Key“ bedeutet, dass Anfragen ohne Key gerade abgelehnt werden; bis zur Eingabe übernimmt der nächste Anbieter.
 
@@ -140,7 +140,7 @@ Bei geöffnetem Sitzungsbrowser erscheint direkt über dem Nachrichtenfeld ein B
 Am Computer:
 
 - Eingeklappt zeigt der Bereich links ein kleines Livebild. Klicke darauf, auf den Titel oder auf **Live-Ansicht anzeigen**, um ihn zu öffnen. **Live-Ansicht ausblenden** klappt ihn ein.
-- **Vollbild** zeigt den Browser über der gesamten App, **Vollbild schließen** kehrt zurück.
+- **Vollbild** zeigt den Browser über der gesamten App, **Vollbild beenden** kehrt zurück.
 - **Übernehmen** lässt dich den Browser selbst bedienen (siehe unten), und **Browseroptionen** (⋯) öffnet sein Menü.
 
 Auf dem Smartphone öffnet ein Antippen den Browser im Vollbild; × schließt die Ansicht.
@@ -188,7 +188,7 @@ Vor einem zahlungs- oder bestellauslösenden Knopf hält der Agent an, etwa „V
 ### Andere Rückmeldungen und selbst übernehmen
 
 - **Nicht möglich** meldet dem Agenten, dass du die Bitte nicht erfüllen konntest.
-- Du kannst jederzeit über **Übernehmen** selbst eingreifen, auch ohne Aufforderung. Der Agent wartet. Versucht er währenddessen einen Browserzugriff, erfährt er, dass du steuerst und er bei Rückgabe benachrichtigt wird. **Zurückgeben** gibt die Steuerung frei; ein wartender Agent erhält den aktuellen Seitenstand.
+- Du kannst jederzeit über **Übernehmen** selbst eingreifen, auch ohne Aufforderung. Der Agent wartet. Versucht er währenddessen einen Browserzugriff, erfährt er, dass du steuerst und er bei Rückgabe benachrichtigt wird. **An Agenten zurückgeben** gibt die Steuerung frei; ein wartender Agent erhält den aktuellen Seitenstand.
 
 Die von der App in deinem Namen gesendeten Meldungen erscheinen in der Unterhaltung. Bei einem laufenden Durchlauf warten sie bis zu dessen Ende.
 
@@ -198,7 +198,7 @@ Die von der App in deinem Namen gesendeten Meldungen erscheinen in der Unterhalt
 
 ## Lokale Websites oder Netzwerkadressen für eine Sitzung erlauben
 
-Die standardmäßig aktive Option [Zugriff auf diesen Computer und sein Netzwerk sperren](/settings?s=browser&find=Keep%20pages%20off%20this%20machine%20and%20its%20network) verhindert Seitenzugriffe auf lokale Geräte. Will der Agent etwa einen Entwicklungsserver öffnen, fragt er: „Möchte localhost:3000 auf diesem Computer oder in seinem Netzwerk öffnen“, mit **Nicht erlauben** und **Für diese Sitzung erlauben**. Eine Freigabe gilt für diese Adresse im Sitzungsbrowser; der Agent wird zum erneuten Öffnen aufgefordert.
+Die standardmäßig aktive Option [Zugriff auf diesen Computer und sein Netzwerk sperren](/settings?s=browser&find=Keep%20pages%20off%20this%20machine%20and%20its%20network) verhindert Seitenzugriffe auf lokale Geräte. Will der Agent etwa einen Entwicklungsserver öffnen, fragt er: „Möchte localhost:3000 auf diesem Computer oder in seinem Netzwerk öffnen“, mit **Nicht zulassen** und **Für diese Sitzung erlauben**. Eine Freigabe gilt für diese Adresse im Sitzungsbrowser; der Agent wird zum erneuten Öffnen aufgefordert.
 
 Auch von dir während einer Übernahme eingegebene lokale oder private Adressen werden für die Sitzung freigegeben. Unter **Websites für diese Sitzung** im Browsermenü stehen sie unter „Auf diesem Computer oder im Netzwerk erlaubt“. × widerruft eine Freigabe. Hydor selbst lässt sich im Agentenbrowser nie öffnen.
 
@@ -208,8 +208,8 @@ Auch von dir während einer Übernahme eingegebene lokale oder private Adressen 
 
 - **Tabs**, wenn mehrere offen sind: Wähle den sichtbaren Tab. Öffnet eine Seite einen neuen Tab, arbeitet der Agent dort weiter.
 - **Wird im Sitzungsordner gespeichert**: die neuesten Dateien, die der Browser heruntergeladen hat; wähle eine, um sie zu öffnen.
-- **Profil – Wechsel startet den Browser neu**: **Neu, ohne Anmeldungen** oder eines deiner Profile. Die Auswahl erscheint nach dem ersten angelegten Profil. Ein Wechsel schließt den Browser; beim nächsten Einsatz startet er mit dem neuen Profil.
-- **Websites für diese Sitzung**: **Nur diese Websites**, leer für uneingeschränkte Auswahl, und **Diese Websites nie**, jeweils eine pro Zeile. Sie ergänzen die Listen unter Einstellungen → Browser. **Speichern** übernimmt sie.
+- **Profil; ein Wechsel startet den Browser neu**: **Neues Profil ohne Anmeldungen** oder eines deiner Profile. Die Auswahl erscheint nach dem ersten angelegten Profil. Ein Wechsel schließt den Browser; beim nächsten Einsatz startet er mit dem neuen Profil.
+- **Websites für diese Sitzung**: **Nur diese Seiten**, leer für uneingeschränkte Auswahl, und **Diese Websites ausschließen**, jeweils eine pro Zeile. Sie ergänzen die Listen unter Einstellungen → Browser. **Speichern** übernimmt sie.
 - **Browser schließen**.
 
 ## Den Browser selbst öffnen
@@ -218,7 +218,7 @@ Du kannst den Browser einer Sitzung öffnen, bevor der Agent es tut, etwa um dic
 
 ## Downloads und Uploads
 
-Heruntergeladene Dateien liegen im Unterordner downloads des Sitzungsordners. Der Agent erfährt den Pfad. Das Browsermenü zeigt die neuesten Dateien unter **Im Sitzungsordner gespeichert**.
+Heruntergeladene Dateien liegen im Unterordner downloads des Sitzungsordners. Der Agent erfährt den Pfad. Das Browsermenü zeigt die neuesten Dateien unter **Wird im Sitzungsordner gespeichert**.
 
 Ein Agent kann Dateien nur aus dem Ordner der Sitzung an das Upload-Feld einer Seite anhängen. Soll er eine andere Datei hochladen, kopiere sie zuerst in diesen Ordner (siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git)).
 
@@ -265,8 +265,8 @@ Kann Chromes Sandbox zur Abschirmung von Webseiten auf diesem Computer nicht lau
 
 Unter [Websites](/settings?s=browser&find=Sites) gelten zwei Listen für sämtliche Sitzungsbrowser. Schreibe eine Website pro Zeile, etwa example.com; Unterdomains sind eingeschlossen:
 
-- **Nur diese Websites**: Mit Einträgen dürfen nur diese Websites geöffnet werden; leer bedeutet alle.
-- **Diese Websites nie**: Von diesen Websites wird nichts geladen.
+- **Nur diese Seiten**: Mit Einträgen dürfen nur diese Websites geöffnet werden; leer bedeutet alle.
+- **Diese Websites ausschließen**: Von diesen Websites wird nichts geladen.
 
 Nach Änderungen erscheint **Websites speichern** neben der Überschrift. Auch vollständige Adressen sind erlaubt; die App übernimmt nur den Host, aus „https://www.example.com/page“ wird example.com. Jede Sitzung ergänzt eigene Listen über **Websites für diese Sitzung** im Browsermenü.
 
@@ -291,7 +291,7 @@ In der Desktop-App können Agenten auf einem Mac, unter Windows und unter Linux 
 
 Öffne [Einstellungen → Funktionen → Computer Use](/settings?s=computer) mit „Agenten sehen deinen Bildschirm und bedienen Maus und Tastatur in der Desktop-App“. Aktiviere [**Computer Use**](/settings?s=computer&find=Computer%20use) neben der Überschrift. Je nach System gilt anschließend:
 
-- **Auf einem Mac** erteilst du Hydor die zwei Berechtigungen von macOS. Drücke neben [**Barrierefreiheit**](/settings?s=computer&find=Accessibility), der Berechtigung von macOS zur Nutzung von Maus und Tastatur, auf **Erlauben…**. macOS fragt, ob Hydor diesen Computer steuern darf, und seine Systemeinstellungen öffnen sich bei **Datenschutz & Sicherheit → Bedienungshilfen**: Schalte dort **Hydor** ein. Drücke neben [**Bildschirmaufzeichnung**](/settings?s=computer&find=Screen%20Recording), der Berechtigung von macOS zum Sehen des Bildschirms, auf **Erlauben…** und schalte **Hydor** unter **Bildschirmaufnahme** ein (**Bildschirm- & Systemaudioaufnahme** ab macOS 15). Wenn macOS verlangt, Hydor zu beenden und neu zu öffnen, tu das: Laufende Agenten arbeiten weiter. Eine Berechtigung, die macOS erteilt hat, zeigt **Erlaubt** und bleibt bei Updates der App erhalten. Wenn die Systemeinstellungen **Hydor** als eingeschaltet zeigen, die Einstellungen aber weiter **Erlauben…** sagen, stammt dieser Schalter aus einer früheren Version (vor 0.28.1 brauchte jedes Update die Berechtigungen erneut): Drücke **Erlauben…**, was ihn zurücksetzt, und schalte **Hydor** noch einmal ein.
+- **Auf einem Mac** erteilst du Hydor die zwei Berechtigungen von macOS. Drücke neben [**Barrierefreiheit**](/settings?s=computer&find=Accessibility), der Berechtigung von macOS zur Nutzung von Maus und Tastatur, auf **Erlauben…**. macOS fragt, ob Hydor diesen Computer steuern darf, und seine Systemeinstellungen öffnen sich bei **Datenschutz & Sicherheit → Bedienungshilfen**: Schalte dort **Hydor** ein. Drücke neben [**Bildschirmaufzeichnung**](/settings?s=computer&find=Screen%20Recording), der Berechtigung von macOS zum Sehen des Bildschirms, auf **Erlauben…** und schalte **Hydor** unter **Bildschirmaufzeichnung** ein (**Bildschirm- & Systemaudioaufnahme** ab macOS 15). Wenn macOS verlangt, Hydor zu beenden und neu zu öffnen, tu das: Laufende Agenten arbeiten weiter. Eine Berechtigung, die macOS erteilt hat, zeigt **Erlaubt** und bleibt bei Updates der App erhalten. Wenn die Systemeinstellungen **Hydor** als eingeschaltet zeigen, die Einstellungen aber weiter **Erlauben…** sagen, stammt dieser Schalter aus einer früheren Version (vor 0.28.1 brauchte jedes Update die Berechtigungen erneut): Drücke **Erlauben…**, was ihn zurücksetzt, und schalte **Hydor** noch einmal ein.
 - **Windows**: Keine zusätzliche Freigabe nötig. Programme mit Administratorrechten und der gesperrte Bildschirm sind nicht erreichbar.
 - **Linux**: Erforderlich sind ein X11- beziehungsweise Xorg-Desktop und Python 3, das meist vorhanden ist. Wayland, heute bei vielen GNOME- und KDE-Systemen Standard, erlaubt anderen Apps keinen solchen Bildschirm-, Maus- und Tastaturzugriff. Die Einstellungen erklären das und den Wechsel zu X11. Unter Ubuntu wählst du am Anmeldebildschirm über das Zahnrad **Ubuntu on Xorg**.
 

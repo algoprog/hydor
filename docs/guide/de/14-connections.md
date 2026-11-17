@@ -34,7 +34,7 @@ Die Seite öffnet sich auf **Verbunden**, wenn du etwas verbunden hast, und auf 
 
 Jede Karte zeigt den Namen des Dienstes, was ein Agent damit tun kann und wie er sich verbindet:
 
-- **Browseranmeldung**: Anmeldung beim Dienst im Browser.
+- **Browser-Anmeldung**: Anmeldung beim Dienst im Browser.
 - **API-Key**: einen vom Dienst bereitgestellten Key einfügen.
 - **Keine Anmeldung**: keine Zugangsdaten erforderlich.
 - **Läuft auf diesem Computer**: Hydor startet bei Bedarf ein lokales Programm.
@@ -50,7 +50,7 @@ Beispiele:
 - **Dateien und Design**: Google Drive, Dropbox, Box, Figma, Canva, Miro, Gamma, Cloudinary.
 - **Entwicklertools und Hosting**: GitHub, GitLab, Sentry, CircleCI, Postman, Cloudflare, Vercel, Netlify, Railway, Context7, DeepWiki.
 - **Daten und Analyse**: Airtable, Supabase, Neon, PostgreSQL, MongoDB, SQLite, PostHog, Mixpanel, Amplitude, Datadog.
-- **Geschäftliches**: Stripe, PayPal, Plaid, Square, HubSpot, Intercom, Attio, Klaviyo, Webflow, Wix, WordPress.com.
+- **Geschäft**: Stripe, PayPal, Plaid, Square, HubSpot, Intercom, Attio, Klaviyo, Webflow, Wix, WordPress.com.
 - **Suche und Web**: Exa, Perplexity, Tavily, Brave Search, Firecrawl, Wolfram und ein Playwright-Browser.
 - **KI und Alltag**: Hugging Face, Zapier, AllTrails, Kiwi.com, trivago, Strava.
 - **Auf diesem Computer**: Dateien auf diesem Computer (die Ordner, die du auswählst), Git, Uhrzeit und ein Memory-Graph.
@@ -88,7 +88,7 @@ Manche Dienste lassen dich nur über einen eigenen Anmelde-Client (eine OAuth-Ap
 
 1. Erstelle den Client in den Entwicklereinstellungen des Dienstes.
 2. Gib ihm die Adresse unter **Callback-Adresse für den Dienst** (sie hat eine Schaltfläche zum Kopieren).
-3. Füge **Client-ID** und gegebenenfalls **Client-Geheimnis** ein.
+3. Füge **Client-ID** und gegebenenfalls **Client-Secret** ein.
 4. Klicke auf **Bei … anmelden**.
 
 ### Dienste auf diesem Computer
@@ -99,10 +99,10 @@ Diese starten hier für den Agenten jeder Sitzung ein Programm (mit npx oder uvx
 
 Mit Adresse und App-Passwort können Agenten E-Mails lesen, suchen, ordnen, entwerfen und senden. Unterstützt werden Gmail, iCloud Mail, Fastmail, Yahoo, AOL, GMX, WEB.DE, Zoho, Posteo, mailbox.org, Proton Mail über Bridge und viele Firmen- und Bildungskonten.
 
-1. Öffne den [Marktplatz](/apps/connected?tab=market) und wähle **E-Mail** unter **E-Mail, Chat und Meetings** oder per Suche.
+1. Öffne den [Marktplatz](/apps/connected?tab=market) und wähle **E-Mail** unter **E-Mail, Chat und Besprechungen** oder per Suche.
 2. Gib deine **E-Mail-Adresse** ein. Hydor findet deine Mailserver von selbst. Für einen Anbieter, den es kennt, zeigt es, wie du dort ein App-Passwort erstellst, und **Anleitung zum Erstellen** öffnet die eigene Hilfeseite des Anbieters.
 3. Erstelle ein App-Passwort (siehe unten) und füge es in **App-Passwort** ein.
-4. Gib optional **Deinen Namen** für ausgehende Nachrichten an.
+4. Gib optional **Dein Name** für ausgehende Nachrichten an.
 5. Klicke auf **Verbinden**. Hydor meldet sich zum Lesen und zum Senden an, bevor es etwas speichert. Schlägt das fehl, sagt es, warum: ein falsches Passwort oder ein falscher Benutzername, dass dein Anbieter ein App-Passwort statt deines üblichen will, oder dass ein Server nicht geantwortet hat.
 
 Das App-Passwort liegt verschlüsselt im lokalen Tresor und bleibt für Agenten unsichtbar. Für weitere Konten öffne **E-Mail** erneut und wähle **Weiteres Konto hinzufügen**.
@@ -130,7 +130,7 @@ Outlook.com, Hotmail, Live sowie Microsoft-365-Firmen- und Bildungskonten könne
 
 ### Deine E-Mail-Konten
 
-Unter **Verbunden** listet Email deine Konten nach Adresse. **Testen** prüft ihre Anmeldung. **Konten** öffnet je Konto **Testen**, **Ändern** für App-Passwort, Name oder Server und **Entfernen**. Entfernen löscht nur das gespeicherte App-Passwort, nicht Postfachinhalte. Beim letzten Konto wird Email getrennt; **Verbindung trennen** entfernt alle Konten.
+Unter **Verbunden** listet Email deine Konten nach Adresse. **Testen** prüft ihre Anmeldung. **Konten** öffnet je Konto **Testen**, **Ändern** für App-Passwort, Name oder Server und **Entfernen**. Entfernen löscht nur das gespeicherte App-Passwort, nicht Postfachinhalte. Beim letzten Konto wird Email getrennt; **Trennen** entfernt alle Konten.
 
 ### Was Agenten mit E-Mails tun können
 
@@ -151,7 +151,7 @@ Unter **Verbunden** zeigt jedes Konto seinen Zustand:
 
 - **Funktioniert**, letzten Prüfzeitpunkt, aktivierte Tool-Anzahl wie „12 von 14 Tools aktiv“ und Anzahl mit vorheriger Freigabe.
 - **Noch nicht getestet**.
-- **Erneute Anmeldung erforderlich**, wenn die Anmeldung nicht erneuert werden konnte.
+- **Eine erneute Anmeldung ist erforderlich**, wenn die Anmeldung nicht erneuert werden konnte.
 - **Funktioniert nicht** mit Begründung.
 
 **Testen** verbindet sich mit dem Dienst so, wie es Agenten tun werden, und listet seine Werkzeuge auf. Eine Meldung sagt, dass das Konto funktioniert und wie viele Werkzeuge es hat, oder was schiefgegangen ist: „Der Key wurde abgelehnt“ oder „Die Anmeldung wurde abgelehnt: Verbinde erneut“ (das Konto zeigt dann **Eine erneute Anmeldung ist erforderlich**). Konten werden direkt nach dem Verbinden von selbst getestet.
@@ -181,7 +181,7 @@ Geplante Aufgaben kannst du mit **Ohne Versand testen** ohne externe Aktionen er
 
 ## Ein Konto trennen
 
-Klicke auf **Verbindung trennen**, mobil das Steckersymbol, und bestätige. Die lokal gespeicherte Anmeldung oder der Key wird entfernt und Agenten erhalten keine Tools mehr. Bei Browseranmeldungen widerruft Hydor Tokens zusätzlich beim Dienst, sofern dieser das unterstützt.
+Klicke auf **Trennen**, mobil das Steckersymbol, und bestätige. Die lokal gespeicherte Anmeldung oder der Key wird entfernt und Agenten erhalten keine Tools mehr. Bei Browseranmeldungen widerruft Hydor Tokens zusätzlich beim Dienst, sofern dieser das unterstützt.
 
 ## Konten für eine einzelne Sitzung auswählen
 
@@ -238,7 +238,7 @@ Auch Apps können Wetter-, Karten- oder andere Keys benötigen. Du gibst sie auf
 2. **Name**: 2 bis 64 Großbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben, etwa WEATHER_API_KEY. Eingaben werden entsprechend umgewandelt, „github token“ etwa in GITHUB_TOKEN, und das Feld zeigt das an.
 3. **Wert**: Füge den Key ein. Nur eine Zeile ist erlaubt, außer bei Blöcken mit -----BEGIN wie Zertifikaten oder privaten Keys.
 4. **Erlaubte Hosts**: bis zu 20 durch Kommas getrennte Adressen wie api.example.com. Der Key wird nur über HTTPS an diese Hosts und ihre Subdomains gesendet. Ohne Host ist keine Verwendung möglich.
-5. **Befehle auf diesem Computer dürfen ihn verwenden** ist zunächst aus. Aktiviere es bei Bedarf für Datenbankpasswörter oder Git-Tokens; siehe [Befehle mit Keys](/guide/connections#commands-that-use-a-key).
+5. **Befehle auf diesem Computer dürfen den Key verwenden** ist zunächst aus. Aktiviere es bei Bedarf für Datenbankpasswörter oder Git-Tokens; siehe [Befehle mit Keys](/guide/connections#commands-that-use-a-key).
 6. **Notiz** erklärt den Zweck und ist für Agenten sichtbar.
 7. **Übermittlung** (optional): Standardmäßig steht der Key im Authorization-Header, nach „Bearer “. Du kannst die **Kopfzeile** ändern (etwa X-Api-Key) und was **Vor dem Key** steht (nichts, bei anderen Headern) oder ihn stattdessen **Oder als Abfrageparameter** senden (etwa api_key).
 8. Klicke auf **Speichern**.
@@ -295,7 +295,7 @@ Jedes Geheimnis kommt als eigener Key in den Tresor, benannt nach der Anmeldung 
 
 Manche Aufgaben brauchen ein Passwort oder einen Token in einem Programm auf diesem Computer: mit einem Token zu GitHub pushen, mit seinem Passwort eine Datenbank lesen, ein Skript, das einen Dienst aufruft. Dafür haben Agenten ein Tool, das einen Befehl ausführt, bei dem Keys aus dem Tresor in seiner Umgebung stehen, jeweils unter ihrem eigenen Namen. Was der Befehl ausgibt, kommt mit maskierten Keys zum Agenten zurück.
 
-- Nur Keys mit aktivem **Befehle auf diesem Computer dürfen ihn verwenden** werden übergeben. Das stellst du im Stiftdialog oder bei der Anfrage ein.
+- Nur Keys mit aktivem **Befehle auf diesem Computer dürfen den Key verwenden** werden übergeben. Das stellst du im Stiftdialog oder bei der Anfrage ein.
 - Vor der Ausführung zeigt **Befehl ausführen mit …** die Key-Namen, den Befehl und seinen Zweck. **Erlauben** gilt einmal. **Für diese Sitzung erlauben** erlaubt spätere Befehle derselben Sitzung mit denselben Keys bis zum App-Neustart. **Nicht ausführen** lehnt ab; du kannst eine Alternative nennen.
 - Eine Sitzung mit Vollzugriff führt diese Befehle ohne Nachfrage aus, wie ihre anderen Befehle auch. Im Planmodus läuft keiner.
 - Programme können grundsätzlich alles tun, auch Keys an andere Orte senden. Erlaube deshalb nur verstandene Befehle und nur bei tatsächlich benötigten Keys.
@@ -339,7 +339,7 @@ Klicke auf [Server hinzufügen](/settings?s=mcp&find=Add%20server). Der Dialog *
   - **URL**: die Adresse des Servers, beginnend mit http:// oder https://.
   - **Header** (für Claude Code): eine Zeile „Name: Wert“ pro Header, für Server, die einen API-Key annehmen. Server, die eine Anmeldung im Browser (OAuth) nutzen, brauchen keine: Melde dich nach dem Hinzufügen in der Liste an.
   - **Bearer-Token-Variable** (für Codex, optional): der Name einer Umgebungsvariablen, deren Wert Codex als Bearer-Token sendet.
-- **Wo Claude Code ihn verwendet**, bei alleiniger Claude-Code-Auswahl **Geltungsbereich**:
+- **Wo Claude Code es verwendet**, bei alleiniger Claude-Code-Auswahl **Geltungsbereich**:
   - **Alle Ordner**, der Standard, gilt für alle Sitzungen dieses Computers.
   - **Dieser Ordner** gilt nur im oben gewählten Ordner und liegt in deinen persönlichen Claude-Code-Einstellungen.
   - **Geteilte .mcp.json**: wird in einer .mcp.json-Datei in diesem Ordner gespeichert, damit alle, die im Repository arbeiten, ihn bekommen.

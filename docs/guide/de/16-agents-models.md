@@ -10,8 +10,8 @@ Der Agent ist das Programm, das deine Nachricht liest, Tools wie Dateien, Befehl
 
 - **Claude Code** (Anthropic). Läuft mit deinem Claude-Abo oder rechnet über ein Anthropic-API-Konto ab. Seine Modelle sind die von Anthropic (Opus, Sonnet, Haiku). Es hat eigene Nutzungslimits, die die [Nutzungsseite](/usage) zeigt.
 - **Codex** von OpenAI nutzt dein ChatGPT-Abo und OpenAI-Modelle. Auch seine Limits stehen unter Nutzung. Codex wird mitgeliefert.
-- **Custom** nutzt alle unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichteten Modelle: OpenRouter, lokale Ollama- oder vLLM-Modelle und OpenAI-kompatible Endpunkte. Geeignet für offene, günstigere oder vollständig lokale Modelle. Siehe [Custom, der eigene Agent der App](/guide/custom).
-- **ACP-Agenten** wie Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI und Auggie oder ein eigener Befehl. ACP, das Agent Client Protocol, standardisiert die Verbindung zwischen App und Agentenprogramm. Jeder verwendet seine eigene Anmeldung und Modelle.
+- **Benutzerdefiniert** nutzt alle unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichteten Modelle: OpenRouter, lokale Ollama- oder vLLM-Modelle und OpenAI-kompatible Endpunkte. Geeignet für offene, günstigere oder vollständig lokale Modelle. Siehe [Custom, der eigene Agent der App](/guide/custom).
+- **Agenten mit ACP-Unterstützung** wie Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI und Auggie oder ein eigener Befehl. ACP, das Agent Client Protocol, standardisiert die Verbindung zwischen App und Agentenprogramm. Jeder verwendet seine eigene Anmeldung und Modelle.
 
 Unterstützung in der App:
 
@@ -60,7 +60,7 @@ Auf der Startseite steht **Modell** auf **Automatisch**: Die Sitzung startet auf
 
 Unter **Modellstufen in Sitzungen** stehen zwei standardmäßig aktive Schalter:
 
-- **Mit Subagenten arbeiten** weist den Hauptagenten zu Planung, Delegation an günstigere Stufen und Prüfung an. Ohne vorgegebene Stufe erhalten Subagenten Standard. Deaktiviert arbeiten Agenten grundsätzlich allein, sofern sie nicht selbst anders entscheiden; die Startseite bietet dann kein Automatisch.
+- **Subagenten koordinieren** weist den Hauptagenten zu Planung, Delegation an günstigere Stufen und Prüfung an. Ohne vorgegebene Stufe erhalten Subagenten Standard. Deaktiviert arbeiten Agenten grundsätzlich allein, sofern sie nicht selbst anders entscheiden; die Startseite bietet dann kein Automatisch.
 - **Max für schwierige Probleme** (zu Beginn an): Ein Hauptagent auf Automatisch kann sich selbst auf Max verschieben, wenn sich ein Problem als zu schwer für Am besten erweist. Ausgeschaltet bleiben Sitzungen auf Automatisch auf Am besten.
 
 ## Agentenprogramme werden automatisch installiert
@@ -72,7 +72,7 @@ Unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Agent%20p
 - **Eigene Installation**;
 - **von der App installiert**: Die App hat es in ihrem eigenen Ordner installiert.
 - **Mit der App geliefert**, etwa Codex;
-- **Noch nicht vorhanden: wird bei erster Verwendung installiert**. **Installieren** startet sofort.
+- **Nicht installiert: Wird bei der ersten Nutzung automatisch installiert**. **Installieren** startet sofort.
 
 Bei Updates nennt die Zeile die neue Version. Codex zeigt bei zusätzlicher eigener Installation auch die Terminalversion. Sitzungen verwenden die App-Version, das Terminal deine eigene.
 
@@ -193,7 +193,7 @@ Zum Hinzufügen:
 2. Wenn die App weiß, wie man es installiert (Gemini CLI, OpenCode, Qwen Code, Auggie und die Agenten, die einen ACP-Adapter brauchen), installiert sie es jetzt im Hintergrund. Goose, Kimi CLI und die anderen installierst du selbst, mit dem Befehl oder der Adresse in ihrer Zeile.
 3. Melde dich einmal im eigenen Programm des Agenten an: Öffne das [Terminal](/terminal), führe seinen Befehl aus (zum Beispiel `gemini`) und folge seiner Anmeldung. Wenn du das überspringst, sagt dir eine Sitzung: „Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again.“
 
-Danach erscheint der Agent unter **Ausführen mit** auf der Startseite.
+Danach erscheint der Agent unter **Ausführungsumgebung** auf der Startseite.
 
 Um einen hinzugefügten Agenten zu ändern, klicke auf **Bearbeiten**. Um ihn zu entfernen, öffne sein Menü **⋯**, wähle **Entfernen** und bestätige: Seine Sitzungen bleiben aufgelistet, aber um sie fortzusetzen, muss der Agent erneut eingerichtet werden. Custom ist eingebaut: Seine Zeile sagt „Eingebaut: Modelle von OpenRouter, Ollama und vLLM, in Einstellungen → Modelle“ und hat statt Bearbeiten und Entfernen eine Schaltfläche **Modelle**.
 
@@ -239,7 +239,7 @@ Custom verwendet alle unter [Einstellungen → Agenten → Modelle](/settings?s=
 - **Auf diesem Computer**: was dieser Computer hat, und die Modelle, die hier installiert sind.
 - **Modell von Hugging Face hinzufügen** zum Suchen, Prüfen und Installieren offener Modelle.
 - **OpenRouter**: Hunderte Modelle über einen Key, in drei Gruppen: dein Key, die Modelle, die du hinzugefügt hast, und eine Suche, um weitere hinzuzufügen.
-- **Laufzeitumgebungen und Endpunkte** für Ollama, vLLM, andere OpenAI-kompatible Server und einen Hugging-Face-Token.
+- **Modelllaufzeitumgebungen und Endpunkte** für Ollama, vLLM, andere OpenAI-kompatible Server und einen Hugging-Face-Token.
 
 Fahre im Menü **Modell** von Custom mit der Maus über ein Modell, um zu sehen, wo es läuft und wie viel es auf einmal liest, zum Beispiel „OpenRouter · 128K Kontext“ oder „vLLM, auf diesem Computer · 32K Kontext · startet bei Verwendung“. Die Listen aktualisieren sich jede Minute von selbst.
 
@@ -298,7 +298,7 @@ Bei jedem steht, ob es hier gut oder langsam läuft, wie es laufen würde („vL
 
 ### Suchen und filtern
 
-1. Gib unter **Hugging Face durchsuchen oder org/name einfügen** einen Namen wie `qwen3`, einen vollständigen Modellnamen oder eine huggingface.co-Adresse ein. Vorher erscheinen Vorschläge und **Die meistgeladenen anzeigen**.
+1. Gib unter **Hugging Face durchsuchen oder org/name einfügen** einen Namen wie `qwen3`, einen vollständigen Modellnamen oder eine huggingface.co-Adresse ein. Vorher erscheinen Vorschläge und **Am häufigsten heruntergeladene ansehen**.
 2. Kombiniere Filter:
    - **Läuft hier gut**: nur Modelle, die auf diesem Computer gut laufen würden.
    - **GGUF · Ollama**: Modelle im GGUF-Format, die Ollama ausführt.
@@ -348,7 +348,7 @@ OpenRouter unter openrouter.ai bietet Hunderte Modelle vieler Anbieter über ein
 1. Erstelle einen Key auf openrouter.ai über den Link im Abschnitt.
 2. Klicke in [Einstellungen → Agenten → Modelle](/settings?s=models&find=OpenRouter) in der Zeile **Dein OpenRouter-Key** auf **Key hinzufügen**, füge ihn im Dialog in **Dein OpenRouter-Key: sk-or-…** ein und klicke auf **Speichern**.
 
-Danach steht dort **Mit OpenRouter verbunden** mit Anfang und Ende des Keys. **Key entfernen** im Menü **⋯** löscht ihn. Der vollständige Wert bleibt auf dem Server verborgen.
+Danach steht dort **Verbunden mit OpenRouter** mit Anfang und Ende des Keys. **Key entfernen** im Menü **⋯** löscht ihn. Der vollständige Wert bleibt auf dem Server verborgen.
 
 Auch beim ersten Bedarf ist die Eingabe möglich: Für Bilder, Zeichnungen, Videos oder Ton erscheint in der Unterhaltung eine sichere Karte; siehe [Wenn ein Agent den OpenRouter-Key benötigt](/guide/documents-voice#when-an-agent-needs-the-openrouter-key). KI-Editorwerkzeuge fragen im eigenen Dialog. Beide Wege speichern ihn hier.
 
@@ -362,12 +362,12 @@ Tippe in derselben Gruppe in **OpenRouter durchsuchen: deepseek, qwen, claude…
 
 - **Tool-Aufrufe**: Modelle, die Tools nativ aufrufen, so wie Custom sie am besten nutzt (Beste Übereinstimmung stellt diese zuerst).
 - **Verarbeitet Bilder**;
-- **Reasoning** für Modelle mit zusätzlichem Denkprozess;
+- **Schlussfolgern** für Modelle mit zusätzlichem Denkprozess;
 - **Kostenlos**.
 
 Das Menü rechts ordnet die Ergebnisse: **Beste Übereinstimmung** (solange du nach Namen suchst), **Neueste**, **Günstigstes** oder **Größter Kontext**. Du bekommst bis zu 50 Modelle, zuerst die ersten acht und **Alle anzeigen** für den Rest.
 
-Jeder Treffer nennt Anbieter, Name und Kennzeichnungen: **Aktuellste Version**, **Neu** für die letzten drei Wochen, **Kostenlos**, **Reasoning**, **Bilder** oder **Keine nativen Tools**. Ohne native Tools beschreibt Custom sie in Anweisungen und liest Aufrufe aus Text. Hinzu kommen Kontextgröße wie „128K Kontext“, maximale Antwortlänge wie „16K Ausgabe“, Ein- und Ausgabepreis pro Million Token, Listungsmonat, Kurzbeschreibung und OpenRouter-Kennung.
+Jeder Treffer nennt Anbieter, Name und Kennzeichnungen: **Neueste**, **Neu** für die letzten drei Wochen, **Kostenlos**, **Schlussfolgern**, **Bilder** oder **Keine nativen Tools**. Ohne native Tools beschreibt Custom sie in Anweisungen und liest Aufrufe aus Text. Hinzu kommen Kontextgröße wie „128K Kontext“, maximale Antwortlänge wie „16K Ausgabe“, Ein- und Ausgabepreis pro Million Token, Listungsmonat, Kurzbeschreibung und OpenRouter-Kennung.
 
 ### Modelle zur Auswahl hinzufügen
 
@@ -375,7 +375,7 @@ Klicke bei einem Modell auf **Hinzufügen**. Seine Zeile zeigt dann **Hinzugefü
 
 ## Ollama, vLLM oder andere Endpunkte verbinden
 
-Unter **Laufzeitumgebungen und Endpunkte** in [Einstellungen → Agenten → Modelle](/settings?s=models&find=Runtimes%20and%20endpoints) verbindest du Modellserver.
+Unter **Modelllaufzeitumgebungen und Endpunkte** in [Einstellungen → Agenten → Modelle](/settings?s=models&find=Runtimes%20and%20endpoints) verbindest du Modellserver.
 
 ### Ollama
 

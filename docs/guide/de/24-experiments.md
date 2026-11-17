@@ -12,9 +12,9 @@ Die obere Zeile beschreibt die Warteschlange, etwa „2 laufen · 1 wartet auf e
 
 Darunter stehen deine Läufe, nach Experiment gruppiert. Das Experiment mit dem neuesten Lauf steht zuerst. Jede Zeile zeigt Namen, wichtige Metriken mit ihren zuletzt ausgegebenen Werten, Startzeit, Status und Ausführungsort. Die Statusangaben bedeuten:
 
-- **Eingereiht**: Der Lauf wurde gerade hinzugefügt. **Wartet auf eine GPU**, **Wartet** oder **In der Cluster-Warteschlange**: Der Lauf wäre an der Reihe, aber benötigte Ressourcen sind noch belegt. Beim Darüberfahren erfährst du den Grund.
-- **Wird gestartet**, **Läuft seit 2 Std. 13 Min.**, **Wird gestoppt**.
-- **Abgeschlossen**: mit Exit-Code 0 beendet. Außerdem **Fehlgeschlagen**, **Gestoppt**, **Vorzeitig gestoppt** für den vorzeitigen Abbruch innerhalb eines Sweeps und **Prozess nicht mehr auffindbar**, etwa nach einem Computerneustart.
+- **Eingereiht**: Der Lauf wurde gerade hinzugefügt. **Warten auf eine GPU**, **Wartet** oder **In der Warteschlange des Clusters**: Der Lauf wäre an der Reihe, aber benötigte Ressourcen sind noch belegt. Beim Darüberfahren erfährst du den Grund.
+- **Wird gestartet**, **Läuft seit 2 Std. 13 Min.**, **Anhalten**.
+- **Abgeschlossen**: mit Exit-Code 0 beendet. Außerdem **Fehlgeschlagen**, **Angehalten**, **Vorzeitig gestoppt** für den vorzeitigen Abbruch innerhalb eines Sweeps und **Nicht mehr vorhanden**, etwa nach einem Computerneustart.
 
 **Suchen** rechts oberhalb der Liste öffnet eine Suche nach Name, Experiment oder Befehl sowie Filter nach Status und Ausführungsort. **× N angezeigt** entfernt aktive Filter.
 
@@ -33,9 +33,9 @@ Unter **Weitere Optionen** findest du:
 
 - **Einstellungen**: Zeilen im Format name=value, die mit dem Lauf gespeichert und in Tabellen verglichen werden. Die App erkennt außerdem Parameter im Befehl: `--name value`, `--name=value` und `name=value` hinter dem Programm, wie bei Hydra. `{name}` im Befehl wird durch den jeweiligen Einstellungswert ersetzt.
 - **Seed**: `{seed}` übernimmt den Wert im Befehl; ein vorhandenes `--seed` wird ebenfalls erkannt. **Priorität**: Höhere Werte kommen zuerst. **Zeitlimit (Stunden)**: Danach wird der Lauf gestoppt.
-- **Metrikdatei**: eine Datei mit Metriken als JSON-Zeilen zusätzlich zur Konsolenausgabe. **Bewertungen je Beispiel**: eine Datei mit Einzelbewertungen; siehe [Ergebnistabellen für Papers](#results-tables-for-your-paper).
-- **Benachrichtigungen**: **Bei Abschluss** und **Bei einem Fehler** sind standardmäßig aktiviert. Optional gibt es **Wenn eine Metrik einen Schwellenwert überschreitet**, etwa „val_acc > 0.9“.
-- **Zuständiger Agent**: siehe [Der zuständige Agent](#the-agent-on-call).
+- **Metrikdatei**: eine Datei mit Metriken als JSON-Zeilen zusätzlich zur Konsolenausgabe. **Bewertungen pro Beispiel**: eine Datei mit Einzelbewertungen; siehe [Ergebnistabellen für Papers](#results-tables-for-your-paper).
+- **Benachrichtigungen**: **Bei Abschluss** und **Bei Fehlern** sind standardmäßig aktiviert. Optional gibt es **Wenn eine Metrik einen Schwellenwert überschreitet**, etwa „val_acc > 0.9“.
+- **Überwachung durch einen Agenten**: siehe [Der zuständige Agent](#the-agent-on-call).
 - Bei SLURM-Clustern zusätzlich **Prozessoren**, **Arbeitsspeicher (GB)** und **Partition**.
 
 Anschließend öffnet sich der neue Lauf, damit du seinen Start verfolgen kannst.
@@ -46,7 +46,7 @@ Anschließend öffnet sich der neue Lauf, damit du seinen Start verfolgen kannst
 - Jobs ohne GPU starten sofort, mit begrenzter Parallelität. Die Anzahl legst du unter [Ausführungsorte](#where-runs-go) fest. Der Standard ist ein Viertel der CPU-Threads, mindestens 1 und höchstens 4.
 - Fordert ein Job mehr GPUs an, als vorhanden sind, oder eine GPU auf einem Computer ohne NVIDIA-GPU, schlägt er sofort mit einer Erklärung fehl.
 - Ein Lauf sieht über CUDA_VISIBLE_DEVICES nur seine zugewiesenen GPUs. Ein Lauf ohne GPU sieht keine. Außerdem erhält er HYDOR_RUN als Kennung, HYDOR_RUN_DIR als Laufordner und HYDOR_SEED. PYTHONUNBUFFERED sorgt dafür, dass Python-Ausgaben sofort im Protokoll erscheinen.
-- Läufe bleiben bei Neustarts oder Updates der App in tmux aktiv, ohne tmux als Hintergrundprozesse. Nach dem Neustart findet die App sie wieder, liest zwischenzeitliche Ausgaben und erkennt beendete Prozesse. Ein verschwundener Prozess erhält den Status **Prozess nicht mehr auffindbar**.
+- Läufe bleiben bei Neustarts oder Updates der App in tmux aktiv, ohne tmux als Hintergrundprozesse. Nach dem Neustart findet die App sie wieder, liest zwischenzeitliche Ausgaben und erkennt beendete Prozesse. Ein verschwundener Prozess erhält den Status **Nicht mehr vorhanden**.
 
 ## Was ein Lauf aufzeichnet
 
@@ -59,7 +59,7 @@ Anschließend öffnet sich der neue Lauf, damit du seinen Start verfolgen kannst
 
 Klicke auf einen Lauf. Auf breiten Bildschirmen öffnet er sich neben der Liste, auf schmalen an ihrer Stelle mit einem Zurück-Pfeil.
 
-- Oben stehen Name und Aktionen: **Stoppen** während der Ausführung oder Wartezeit, **Erneut ausführen** zum Öffnen eines vorausgefüllten neuen Laufs und **Mehr** (⋯) mit **Befehl kopieren**, **Ordner in Dateien öffnen** und nach Abschluss **Aufzeichnung löschen**. Das Löschen entfernt Aufzeichnung, Protokoll, Patch und Metriken. Vom Job im Arbeitsordner erzeugte Dateien bleiben erhalten.
+- Oben stehen Name und Aktionen: **Stoppen** während der Ausführung oder Wartezeit, **Erneut ausführen** zum Öffnen eines vorausgefüllten neuen Laufs und **Mehr** (⋯) mit **Befehl kopieren**, **Arbeitsordner in Dateien öffnen** und nach Abschluss **Datensatz löschen**. Das Löschen entfernt Aufzeichnung, Protokoll, Patch und Metriken. Vom Job im Arbeitsordner erzeugte Dateien bleiben erhalten.
 - Darunter siehst du Status und Begründung, Ausführungsort sowie Start- und Endzeit.
 - **Metriken** zeigt jede Metrik über die Schritte hinweg mit letztem und bestem Wert. **Alle N** blendet mehr als vier Metriken ein.
 - **Protokoll** zeigt die Ausgabe, neueste Zeilen unten. **Folgen** hält bei laufenden Jobs die neueste Ausgabe im Blick. Scrollst du nach oben, wird das automatische Nachführen unterbrochen.
@@ -73,10 +73,10 @@ Klicke auf einen Lauf. Auf breiten Bildschirmen öffnet er sich neben der Liste,
 Unter **Weitere Optionen** → **Überwachung durch einen Agenten**:
 
 - **Aus**, die Voreinstellung: Probleme werden weiterhin auf der Laufseite erfasst.
-- **Benachrichtigen**: Du erhältst bei einem Problem eine Benachrichtigung.
-- **Agent untersucht das Problem**: Ein Agent startet eine Sitzung im Arbeitsordner. Er erhält das Ereignis, das Ende des Protokolls, die Laufaufzeichnung und deine Vorgaben unter **Was der Agent tun darf**. Innerhalb dieses Rahmens handelt er und berichtet anschließend kurz über Ursache und Maßnahmen. Die Laufseite verlinkt seine Sitzung.
+- **Benachrichtige mich**: Du erhältst bei einem Problem eine Benachrichtigung.
+- **Durch Agenten prüfen lassen**: Ein Agent startet eine Sitzung im Arbeitsordner. Er erhält das Ereignis, das Ende des Protokolls, die Laufaufzeichnung und deine Vorgaben unter **Was der Agent tun darf**. Innerhalb dieses Rahmens handelt er und berichtet anschließend kurz über Ursache und Maßnahmen. Die Laufseite verlinkt seine Sitzung.
 
-Standardmäßig überwacht er alle folgenden Fälle; du kannst einzelne abwählen: **NaN**, wenn eine Metrik NaN oder unendlich wird oder ein NaN-Verlust im Protokoll erscheint; **Speichermangel** bei CUDA-Fehlern, `OutOfMemoryError` oder Exit-Code 137; **Stillstand** ohne neue Ausgabe seit 30 Minuten oder der von dir gewählten Dauer; **Absturz** bei Exit-Codes ungleich 0 oder einem unerwartet beendeten Prozess; **Divergenz**, wenn der Verlust fünf Messungen in Folge mehr als doppelt so hoch wie sein bisheriger Bestwert ist.
+Standardmäßig überwacht er alle folgenden Fälle; du kannst einzelne abwählen: **NaN**, wenn eine Metrik NaN oder unendlich wird oder ein NaN-Verlust im Protokoll erscheint; **Nicht genügend Speicher** bei CUDA-Fehlern, `OutOfMemoryError` oder Exit-Code 137; **Stillstand** ohne neue Ausgabe seit 30 Minuten oder der von dir gewählten Dauer; **Ein Absturz** bei Exit-Codes ungleich 0 oder einem unerwartet beendeten Prozess; **Divergenz**, wenn der Verlust fünf Messungen in Folge mehr als doppelt so hoch wie sein bisheriger Bestwert ist.
 
 Ohne eigene Vorgaben gilt sinngemäß: „Lies Protokoll und Code. Ist eine Korrektur eindeutig und sicher, starte den Lauf mit experiment_run erneut, wenn möglich vom letzten Checkpoint. Ändere so wenig wie möglich. Lösche niemals Dateien oder Checkpoints. Berichte dem Nutzer anschließend kurz, was passiert ist und was du getan hast.“ Zuständig ist der Agent, der den Lauf gestartet hat. Wurde er manuell gestartet, gelten Agent und Modell, die du zuletzt auf der Startseite gewählt hast. Pro Lauf untersucht nur ein Agent gleichzeitig das Problem. Höchstens drei solche Einsätze werden pro Stunde gestartet; danach erhältst du stattdessen eine Benachrichtigung.
 
@@ -99,7 +99,7 @@ Das Menü (⋯) eines Experiments bietet **Tabelle erstellen** aus abgeschlossen
 - **Spalten**: Wähle die Metriken durch Anklicken. Der Pfeil legt fest, ob größere oder kleinere Werte besser sind.
 - **Zeilen**: **Nach Experiment** oder nach einer Einstellung, die sich zwischen Läufen unterscheidet, etwa **Nach lr**.
 - **Grundlinie**: die Zeile, gegen die die anderen getestet werden (die erste Zeile, wenn du keine auswählst).
-- **Test gegen die Baseline**: **Automatisch wählen** verwendet gepaarte Tests über Beispiele, wenn Einzelbewertungen vorliegen, andernfalls gepaarte Tests über gemeinsame Seeds und sonst einen Welch-t-Test über Seeds. Manuell verfügbar sind **Welch-t-Test über Seeds**, **Gepaarter t-Test nach Seed oder Beispiel**, **Gepaartes Bootstrap über Beispiele** und **Kein Test**.
+- **Mit der Baseline vergleichen**: **Automatisch wählen** verwendet gepaarte Tests über Beispiele, wenn Einzelbewertungen vorliegen, andernfalls gepaarte Tests über gemeinsame Seeds und sonst einen Welch-t-Test über Seeds. Manuell verfügbar sind **Welch-t-Test über Seeds**, **Gepaarter t-Test (nach Seed oder Beispiel)**, **Gepaarter Bootstrap über Beispiele** und **Kein Test**.
 - **Beschriftung**.
 
 Jede Zelle zeigt Mittelwert ± Standardabweichung über die Läufe beziehungsweise Seeds ihrer Zeile. Der beste Wert jeder Spalte wird fett dargestellt. Ein Kreuz (†) kennzeichnet Werte, die nach Holm-Korrektur für mehrere Zeilen bei p < 0,05 besser als die Baseline sind. Beim Darüberfahren erscheinen die p-Werte. Unter der Tabelle stehen verwendeter Test und ausgeschlossene Läufe, etwa noch aktive Läufe oder solche ohne die nötigen Metriken.
@@ -112,7 +112,7 @@ Anschließend kannst du:
 
 Beim Kopieren oder Einfügen wird die Tabelle gespeichert. Im LaTeX steht unmittelbar vor tabular die Zeile `% hydor:table <id>`. Behalte sie bei, damit die Prüfung vor einer Einreichung Werte aus den Läufen neu berechnen und Änderungen erkennen kann. **Ergebnistabellen** im oberen Menü (⋯) listet gespeicherte Tabellen. Du kannst sie erneut kopieren oder einfügen oder mit **Neu berechnen** aus dem aktuellen Stand der Läufe aktualisieren.
 
-Für gepaarte Tests über Beispiele, etwa Suchanfragen oder übersetzte Sätze, schreibt ein Lauf eine Datei mit Einzelbewertungen. Gib sie unter **Bewertungen je Beispiel** an. Diese enthält JSON-Zeilen mit `id`, alternativ `qid`, `query` oder `example`, und einem Zahlenwert je Metrik, etwa `{"id": "q12", "ndcg@10": 0.53}`. Auch Zeilen aus trec_eval -q sind möglich. Wie im Befehl sind `{name}`-Platzhalter erlaubt. Nach Abschluss wird die Datei beim Lauf aufbewahrt.
+Für gepaarte Tests über Beispiele, etwa Suchanfragen oder übersetzte Sätze, schreibt ein Lauf eine Datei mit Einzelbewertungen. Gib sie unter **Bewertungen pro Beispiel** an. Diese enthält JSON-Zeilen mit `id`, alternativ `qid`, `query` oder `example`, und einem Zahlenwert je Metrik, etwa `{"id": "q12", "ndcg@10": 0.53}`. Auch Zeilen aus trec_eval -q sind möglich. Wie im Befehl sind `{name}`-Platzhalter erlaubt. Nach Abschluss wird die Datei beim Lauf aufbewahrt.
 
 ## Sweeps
 
@@ -121,7 +121,7 @@ Ein Sweep führt denselben Befehl mit unterschiedlichen Parameterwerten aus, ein
 1. Setze im Befehl `{name}` an die Stelle jedes Parameterwerts: `python train.py --lr {lr} --batch {batch}`.
 2. Trage unter **Einstellungen und ihre Werte** zum Beispiel `lr` und `0.001, 0.0003, 0.0001` ein. **Einstellung hinzufügen** ergänzt weitere Parameter.
 3. Wähle **Jede Kombination** oder **Eine Zufallsstichprobe** mit **höchstens** N Läufen.
-4. Um wenig aussichtsreiche Läufe früh zu stoppen, wähle unter **Vorzeitig stoppen anhand von** eine Metrik und die gewünschte Richtung. Ein Lauf wird **vorzeitig gestoppt**, wenn sein Wert bei einem Schritt schlechter als der Median der anderen Läufe an diesem Schritt ist und mindestens drei andere Läufe den Schritt erreicht haben.
+4. Um wenig aussichtsreiche Läufe früh zu stoppen, wähle unter **Metrik für vorzeitigen Abbruch** eine Metrik und die gewünschte Richtung. Ein Lauf wird **vorzeitig gestoppt**, wenn sein Wert bei einem Schritt schlechter als der Median der anderen Läufe an diesem Schritt ist und mindestens drei andere Läufe den Schritt erreicht haben.
 5. Benenne das **Experiment** und klicke auf **N Läufe starten**.
 
 Die Läufe erscheinen gemeinsam unter dem Experiment. **Sweep** neben seinem Namen öffnet die Auswertung: Verlauf und bester Lauf nach der gewählten Metrik, wahlweise mit letztem oder bestem Wert. Für jeden Parameter zeigt ein Diagramm einen Punkt pro Lauf; bei weit auseinanderliegenden Werten wie Lernraten verwendet es eine logarithmische Skala. Der beste Lauf ist umrandet. Von dort kannst du **Tabelle erstellen** oder **Die besten 6 vergleichen** wählen.
@@ -140,8 +140,8 @@ Die Läufe erscheinen gemeinsam unter dem Experiment. **Sweep** neben seinem Nam
 
 - **Name** und **SSH-Host**: wie hinter `ssh`, etwa einen Eintrag aus `~/.ssh/config` oder `me@login.cluster.edu`. Der App-Server nutzt seine eigenen SSH-Keys und fragt kein Passwort ab. Dafür muss ein ohne Passwort nutzbarer Key eingerichtet sein, etwa mit `ssh-copy-id`. Der Host-Key des Clusters muss ebenfalls bekannt sein; verbinde dich dazu einmal im Terminal mit `ssh`.
 - **SLURM** oder **SSH ohne Scheduler**.
-- **Ordner für Laufprotokolle auf dem Cluster**, standardmäßig `~/hydor-runs`, sowie bei SLURM **Partition** und **Konto**.
-- **Vorbereitungsbefehle**, die vor jedem Job laufen, etwa `module load cuda/12.1` und `source ~/venvs/ml/bin/activate`.
+- **Entfernter Ordner für Laufprotokolle**, standardmäßig `~/hydor-runs`, sowie bei SLURM **Partition** und **Konto**.
+- **Vorbereitende Befehle**, die vor jedem Job laufen, etwa `module load cuda/12.1` und `source ~/venvs/ml/bin/activate`.
 
 **Prüfen** führt zunächst `ssh host true` aus. Bei SLURM folgt `sinfo` zur Auflistung der Partitionen, bei reinem SSH werden `nvidia-smi` und tmux geprüft. **Hinzufügen** speichert den Cluster. In der Liste gibt es je Cluster **Prüfen** und **Entfernen**.
 

@@ -12,7 +12,7 @@ Mögliche Auslöser:
 
 - **Zu einer Uhrzeit**: an gewählten Wochentagen oder über einen Cron-Ausdruck.
 - **Wiederholt**: alle festgelegten Minuten, mindestens fünf, oder Stunden.
-- **Einmalig**: zu Datum und Uhrzeit.
+- **Einmal**: zu Datum und Uhrzeit.
 - **Überwachen**: Änderungen an Feeds, Webseiten, JSON-Werten, Ordnern oder Befehlsausgaben, neue E-Mails oder neue Einträge in verbundenen Apps wie Deals, Dateien, Tickets und Zahlungen. Auch ein festgelegter Abstand vor Kalenderterminen ist möglich. Die Prüfung arbeitet ohne Modell und verbraucht keine Token; erst eine Änderung startet den Agenten.
 - **Webhook**: Ein Dienst wie GitHub, Gitea, ein Formular oder dein Skript ruft die eigene Adresse der Aufgabe auf.
 
@@ -25,8 +25,8 @@ Du findest Aufgaben unter [Einstellungen → Geplante Aufgaben](/settings?s=task
 - **Neue Aufgabe** für die vollständige manuelle Einrichtung.
 - **Mit einem Beispiel beginnen** für häufige Anwendungsfälle.
 - Einen Agenten bitten, etwa „Erinnere mich Freitag um 9“. Du bestätigst seinen Vorschlag auf einer Karte.
-- **Als Automatisierung einrichten** im Sitzungsmenü erstellt einen Entwurf aus einer erfolgreichen Sitzung.
-- **Zeitplan hinzufügen** unter **Läufe** einer App richtet deren automatische Ausführung ein.
+- **In Automatisierung umwandeln** im Sitzungsmenü erstellt einen Entwurf aus einer erfolgreichen Sitzung.
+- **Zeitplan hinzufügen** unter **Ausführungen** einer App richtet deren automatische Ausführung ein.
 
 Das automatische Fortsetzen nach einem Nutzungslimit ist eine separate Einstellung: [Einstellungen → Allgemein → Nach Nutzungslimits fortsetzen](/settings?s=general&find=Resume%20after%20usage%20limits); siehe [Nutzung, Limits und Kosten](/guide/usage).
 
@@ -84,9 +84,9 @@ Alle Zeiten sind lokal. Auf Smartphones zeigt die Ansicht jeweils einen Tag; **�
 
 Darunter stehen die Auswahlelemente der Startseite:
 
-- **Modell** und **Denkaufwand** verwenden ohne eigene Auswahl die Agentenstandards.
-- **Berechtigungen** bestimmen den Handlungsspielraum. Neue Aufgaben verwenden **Nachfragen** bei Claude Code, **Automatisch** bei Codex und **Automatisch** bei Custom: Routinearbeiten laufen, riskante Aktionen fragen nach. Benötigt ein unbeaufsichtigter Lauf Zustimmung, wartet sie in Sitzung und [Posteingang](/guide/inbox).
-- **Agent**, **Memory**, sofern aktiv, **Ausgabenlimit**, **Schwarm** und **Forschung** gelten für jede neue Laufsitzung wie auf der Startseite; siehe [Sitzungen](/guide/sessions), [Agenten](/guide/agents) und [Memory](/guide/memory). Eine Aufgabe mit einem deiner Agenten erscheint auch in dessen Zeitplänen, nutzt seine Modellstufe und zählt zum Monatsbudget. Fehlerhafte oder mit Fehler gestoppte Läufe werden eine Stufe höher bis Best wiederholt, außer **Bei fehlgeschlagener Prüfung hochstufen** ist deaktiviert. Bei Agenten mit eigener dauerhafter Unterhaltung wird dort weitergeschrieben statt eine neue Sitzung zu starten.
+- **Modell** und **Aufwand** verwenden ohne eigene Auswahl die Agentenstandards.
+- **Berechtigungen** bestimmen den Handlungsspielraum. Neue Aufgaben verwenden **Fragen** bei Claude Code, **Automatisch** bei Codex und **Automatisch** bei Custom: Routinearbeiten laufen, riskante Aktionen fragen nach. Benötigt ein unbeaufsichtigter Lauf Zustimmung, wartet sie in Sitzung und [Posteingang](/guide/inbox).
+- **Agent**, **Memory**, sofern aktiv, **Ausgabenlimit**, **Schwarm** und **Forschung** gelten für jede neue Laufsitzung wie auf der Startseite; siehe [Sitzungen](/guide/sessions), [Agenten](/guide/agents) und [Memory](/guide/memory). Eine Aufgabe mit einem deiner Agenten erscheint auch in dessen Zeitplänen, nutzt seine Modellstufe und zählt zum Monatsbudget. Fehlerhafte oder mit Fehler gestoppte Läufe werden eine Stufe höher bis Best wiederholt, außer **Bei fehlgeschlagener Prüfung auf eine höhere Stufe wechseln** ist deaktiviert. Bei Agenten mit eigener dauerhafter Unterhaltung wird dort weitergeschrieben statt eine neue Sitzung zu starten.
 
 ### Der Prompt
 
@@ -96,7 +96,7 @@ Die erste Nachricht jedes Laufs enthält mehr als deinen Prompt: eine Zeile mit 
 
 ### Wann die Aufgabe läuft
 
-**Wann** bietet **Zu einer Uhrzeit**, **Wiederholt**, **Einmalig**, **Überwachen** und **Webhook**. Für die ersten drei zeigt „Nächste Läufe: …“ bis zu drei Termine in deiner Zeitzone.
+**Wann** bietet **Zu einer Uhrzeit**, **Wiederholt**, **Einmal**, **Überwachen** und **Webhook**. Für die ersten drei zeigt „Nächste Läufe: …“ bis zu drei Termine in deiner Zeitzone.
 
 - **Zu einer Uhrzeit**: eine Tageszeit und die Wochentage (S M T W T F S). Wähle einen Tag, um ihn ein- oder auszuschalten; alle sieben bedeuten jeden Tag, und mindestens einer bleibt immer eingeschaltet.
 - **Cron-Ausdruck…** (unter **Zu einer Uhrzeit**) wandelt die Uhrzeit und die Tage in einen Cron-Ausdruck um, eine gängige Schreibweise für Zeitpläne, den du dann ändern kannst; **Stattdessen eine Tageszeit** geht zurück. Er hat fünf Felder: Minute, Stunde, Tag des Monats, Monat und Wochentag (0 oder 7 ist Sonntag), in deiner Zeitzone. `*/15 9-17 * * 1-5` läuft werktags alle 15 Minuten von 09:00 bis 17:45. Monats- und Tagesnamen (`jan`, `mon`) und die Kürzel `@hourly`, `@daily`, `@weekly`, `@monthly` und `@yearly` funktionieren ebenfalls. Ein Ausdruck, der nicht funktioniert, wird beim Speichern mit dem Grund abgelehnt.
@@ -122,14 +122,14 @@ Eine Überwachung prüft regelmäßig ohne Modell und startet den Agenten nur be
 - **Feed**: die **Adresse** eines RSS- oder Atom-Feeds mit neuen Beiträgen einer Website, eines Blogs oder Code-Hosters. Neue Einträge wecken den Agenten mit Titel, Link, Datum und Zusammenfassung, höchstens 25 gleichzeitig.
 - **Seite**: die **Adresse** einer Webseite, und **Welcher Abschnitt** zählt:
   - **Ganze Seite** berücksichtigt Änderungen am lesbaren Text.
-  - **Nahe einem Text** berücksichtigt Zeilen mit dem Suchtext und jeweils eine Nachbarzeile davor und danach, etwa rund um „Preis“.
+  - **Im Umfeld eines Textes** berücksichtigt Zeilen mit dem Suchtext und jeweils eine Nachbarzeile davor und danach, etwa rund um „Preis“.
   - **Selektor** wählt über einfache CSS-Selektoren einen Bereich: Tag, `#id`, `.class` oder `[attribute=value]`, kombiniert oder verschachtelt wie `main .price`.
 
   Der Lauf bekommt die Zeilen, die dazugekommen sind, und die Zeilen, die weggefallen sind. Die Überwachung liest die Seite so, wie der Server sie erhält, ohne die Skripte der Seite auszuführen. Prüfe deshalb mit **Testen**, ob sie sieht, was du siehst.
 - **JSON**: die **Adresse** einer JSON-Antwort (das Datenformat, das die APIs vieler Dienste liefern), **Wert unter** einem Pfad wie `data.price` oder `data.items[0].price`, und **Agenten starten, wenn der Wert** sich ändert, gleich ist, nicht gleich ist, darüber liegt, darunter liegt oder einen **Wert** enthält. Zahlen werden als Zahlen verglichen. Eine Bedingung weckt den Agenten, wenn sie zu gelten beginnt, nicht bei jeder Prüfung, solange sie gilt.
 - **Ordner**: ein **Ordner** auf diesem Computer und, wenn du magst, **Nur Dateien mit diesem Muster**, ein Muster wie `*.pdf` (`*` steht für beliebigen Text, `?` für ein Zeichen). Neue Dateien wecken den Agenten, mit ihren Namen, Größen und Daten. Versteckte Dateien und Unterordner bleiben unberücksichtigt.
 - **Befehl**: ein **Befehl**, der bei jeder Prüfung mit deiner Shell im Ordner der Aufgabe läuft, höchstens eine Minute lang, und ob der Agent geweckt wird, **Wenn sich die Ausgabe ändert** oder **Bei geändertem Exit-Code** (die Zahl, mit der ein Befehl endet: 0 bedeutet meist, dass er funktioniert hat). Der Lauf bekommt die Ausgabe und das, was sich darin geändert hat.
-- **E-Mail**: neue Nachrichten eines [verbundenen E-Mail-Kontos](/guide/connections#connect-your-email). Wähle **Konto** und **Ordner**, standardmäßig Posteingang, sowie optional **Absender enthält**, **Betreff enthält** oder **Nur ungelesene Nachrichten**. Jede neue E-Mail startet einen eigenen Lauf, maximal zehn pro Prüfung, mit Absender, Empfängern, Datum, Betreff und Text als externen Daten. Anhänge landen unter email-attachments im Aufgabenordner. Bei mehr als zehn neuen Nachrichten starten die neuesten zehn; der erste Lauf nennt die älteren in einer Zusammenfassung. Auch nach Neustarts löst dieselbe E-Mail keinen zweiten Lauf aus.
+- **E-Mail**: neue Nachrichten eines [verbundenen E-Mail-Kontos](/guide/connections#connect-your-email). Wähle **Konto** und **Ordner**, standardmäßig Posteingang, sowie optional **Absender enthält**, **Betreff enthält** oder **Nur noch ungelesene E-Mails**. Jede neue E-Mail startet einen eigenen Lauf, maximal zehn pro Prüfung, mit Absender, Empfängern, Datum, Betreff und Text als externen Daten. Anhänge landen unter email-attachments im Aufgabenordner. Bei mehr als zehn neuen Nachrichten starten die neuesten zehn; der erste Lauf nennt die älteren in einer Zusammenfassung. Auch nach Neustarts löst dieselbe E-Mail keinen zweiten Lauf aus.
 - **Verbundene App**: etwas Neues in einer der Apps, die du verbunden hast (siehe [Verbundene Apps](/guide/connections)), etwa ein neuer Deal oder Kontakt in einem CRM, eine neue Datei in einem Cloud-Laufwerk, ein neues Ticket oder eine neue Zahlung. Wähle das **Konto** und dann das **Werkzeug**, das bei jeder Prüfung aufgerufen wird: Angeboten werden nur Werkzeuge, die nachsehen (auflisten oder suchen), nie eines, das sendet, ändert, löscht oder bezahlt, und nur solche, die für das Konto aktiviert sind. **Ausgangspunkt** bietet fertige Startpunkte, wo die App solche Dinge enthält (**Neue Dateien**, **Neue Kontakte**, **Neue Verkaufschancen**, **Neue Tickets**, **Neue Zahlungen** und weitere): Jeder wählt eines der Werkzeuge des Kontos und füllt dessen Felder aus. Fülle die Felder des Werkzeugs nach Belieben aus; in einem Feld steht `{{now}}` für den Zeitpunkt jeder Prüfung und `{{now+2d}}` für zwei Tage später (auch `{{today}}` und `{{tomorrow}}`). **Ausprobieren** ruft das Werkzeug einmal auf und zeigt, was zurückkam: wo die Einträge in seiner Antwort stehen (**Einträge befinden sich in**), das Feld, an dem man sie unterscheidet (**Eindeutige Kennung**, etwa eine ID oder eine Adresse), die ersten Einträge und die **Vollständige Tool-Antwort** im Ganzen. Wähle dort eine andere Liste oder ein anderes Feld, wenn das gefundene nicht passt. Jeder neue Eintrag startet dann einen eigenen Lauf, höchstens 10 pro Prüfung, mit dem Eintrag als externen Daten; kommen mehr auf einmal, nennt der erste Lauf die anderen in einer Zeile. Ein Eintrag startet nie zwei Läufe, auch nicht nach einem Neustart der App. Bitte das Werkzeug, die neuesten zuerst und genug davon zu liefern, wo seine Felder das erlauben.
   - **Vor jedem Termin**: für einen verbundenen Kalender ein Lauf zu einer festen Zeit vor jedem seiner Termine, statt einen für jeden neuen Eintrag. **Lauf starten** **15 Min.**, **30 Min.** oder **1 Stunde** vor jedem Termin, oder **Am Abend zuvor** **Um** einer Uhrzeit deiner Wahl, und wenn du magst nur für Termine, bei denen der **Titel enthält** einen bestimmten Text, oder **Nur Termine mit weiteren Personen**. Verwende das Werkzeug, das deine Termine auflistet, mit Feldern von `{{now}}` bis `{{now+2d}}` oder so, und wähle nach **Ausprobieren** unter **Startzeit in** das Feld mit dem Beginn jedes Termins. Der Beobachter liest bei jeder Prüfung die anstehenden Termine und noch einmal zum Zeitpunkt jedes Termins. Ein verschobener Termin bekommt seinen Lauf vor der neuen Zeit; ein abgesagter bekommt keinen.
 
@@ -162,7 +162,7 @@ Die Daten werden als externe Inhalte gekennzeichnet. **Jetzt ausführen** sendet
 
 Unter der Adresse stehen:
 
-- **Signaturgeheimnis (optional)**: Trage einen Wert ein oder wähle **Erzeugen** und hinterlege denselben Wert beim Dienst. Aufrufe benötigen dann eine HMAC-SHA256-Signatur des Inhalts, wie sie GitHub, Gitea und andere liefern. Auch GitLabs Token-Header wird unterstützt. Ohne korrekten Nachweis wird der Aufruf abgelehnt.
+- **Signaturgeheimnis (optional)**: Trage einen Wert ein oder wähle **Generieren** und hinterlege denselben Wert beim Dienst. Aufrufe benötigen dann eine HMAC-SHA256-Signatur des Inhalts, wie sie GitHub, Gitea und andere liefern. Auch GitLabs Token-Header wird unterstützt. Ohne korrekten Nachweis wird der Aufruf abgelehnt.
 - **Signatur-Header**: erscheint bei gesetztem Geheimnis. Leer werden Standardheader wie X-Hub-Signature-256, X-Gitea-Signature oder X-Signature-256 verwendet. Alternativ gibst du den eigenen Headernamen an.
 - **Filter (optional)**: **Nur ausführen, wenn** oder **Überspringen, wenn** ein Pfad im Aufruf einem Wert **ist**: `body.action` ist `opened`, `headers.x-github-event` ist `push`, `query.kind` ist `daily`. Ein Pfad ohne `body.`, `headers.` oder `query.` liest den Body. Ein Aufruf, den der Filter ausschließt, wird beantwortet und startet nichts.
 
@@ -179,7 +179,7 @@ Wenn die Adresse bekannt geworden ist oder ein Dienst sie nicht mehr aufrufen so
 
 ## Mit einem Beispiel beginnen
 
-Unter der Liste findest du [**Mit einem Beispiel beginnen**](/settings?s=tasks&find=Start%20from%20an%20example). Zunächst sind vier Einträge sichtbar. **Alle Beispiele anzeigen** und **Weniger Beispiele anzeigen** erweitern oder kürzen die Liste. Die Gruppen heißen **Alltag**, **Überwachen** und **Entwicklung**. Wähle ein Beispiel, fülle das kurze Formular aus, bestimme unter **Ausgeführt von** den Agenten und klicke auf **Aufgabe erstellen**. **Weitere Optionen…** öffnet stattdessen das vorausgefüllte vollständige Formular. Optionale Felder dürfen leer bleiben. Schalter wie **Pull-Requests öffnen** legen fest, was der Agent tun darf.
+Unter der Liste findest du [**Mit einem Beispiel beginnen**](/settings?s=tasks&find=Start%20from%20an%20example). Zunächst sind vier Einträge sichtbar. **Alle Beispiele anzeigen** und **Weniger Beispiele anzeigen** erweitern oder kürzen die Liste. Die Gruppen heißen **Alltag**, **Überwachen** und **Entwicklung**. Wähle ein Beispiel, fülle das kurze Formular aus, bestimme unter **Ausgeführt von** den Agenten und klicke auf **Aufgabe erstellen**. **Weitere Optionen…** öffnet stattdessen das vorausgefüllte vollständige Formular. Optionale Felder dürfen leer bleiben. Schalter wie **Pull-Requests erstellen** legen fest, was der Agent tun darf.
 
 **Alltag**
 
@@ -187,15 +187,15 @@ Unter der Liste findest du [**Mit einem Beispiel beginnen**](/settings?s=tasks&f
 - [**Neuigkeiten zu einem Thema**](/settings?s=tasks&find=News%20on%20a%20topic): tatsächlich neue Informationen mit Quellen zu gewählten Zeiten, zunächst täglich 09:00. Ohne Neuigkeiten bleibt die Aufgabe still.
 - [**Wochenbericht aus einem Ordner**](/settings?s=tasks&find=Weekly%20report%20from%20a%20folder): an einem Wochentag (zunächst freitags um 16:00 Uhr), was sich in den letzten sieben Tagen in einem Ordner oder Repository geändert hat und was unfertig wirkt, mit drei Vorschlägen für die nächste Woche. Sie ändert keine Dateien.
 - [**E-Mail-Zusammenfassung**](/settings?s=tasks&find=Inbox%20digest): neue Nachrichten seit dem letzten Lauf, dringende zuerst. Nur lesend und mit verbundenem E-Mail-Konto; siehe [Verbundene Apps, Keys und Tools](/guide/connections).
-- [**Nach Gewohnheiten fragen**](/settings?s=tasks&find=Habit%20check-in): freundliche Rückfrage zur Gewohnheit, zunächst täglich 20:00. Die Serie erfolgreicher Tage bleibt in den Aufgabennotizen erhalten.
+- [**Gewohnheits-Check-in**](/settings?s=tasks&find=Habit%20check-in): freundliche Rückfrage zur Gewohnheit, zunächst täglich 20:00. Die Serie erfolgreicher Tage bleibt in den Aufgabennotizen erhalten.
 - [**Erinnerung**](/settings?s=tasks&find=Reminder): Hinweis zur gewählten Uhrzeit und an gewählten Tagen, zunächst werktags 09:00. Für einmalige Termine siehe [Erinnerungen](/guide/tasks#reminders).
 
 **Überwachen**
 
-- [**Preis überwachen**](/settings?s=tasks&find=Price%20watch): prüft eine Produktseite alle 60 Minuten, optional nur nahe einem Text wie „Preis“. Meldet Änderungen oder das Erreichen beziehungsweise Unterschreiten deines Zielpreises.
-- [**Seitenänderungen melden**](/settings?s=tasks&find=Page%20change%20alert): prüft alle 30 Minuten eine Seite oder einen Textbereich und bewertet relevante Änderungen. Unwichtiges bleibt still.
+- [**Preisüberwachung**](/settings?s=tasks&find=Price%20watch): prüft eine Produktseite alle 60 Minuten, optional nur nahe einem Text wie „Preis“. Meldet Änderungen oder das Erreichen beziehungsweise Unterschreiten deines Zielpreises.
+- [**Benachrichtigung bei Seitenänderung**](/settings?s=tasks&find=Page%20change%20alert): prüft alle 30 Minuten eine Seite oder einen Textbereich und bewertet relevante Änderungen. Unwichtiges bleibt still.
 - [**Neue Releases**](/settings?s=tasks&find=New%20releases): prüft GitHub-Releases eines Repositorys mit owner/name alle sechs Stunden und nennt Neuerungen und mögliche Inkompatibilitäten.
-- [**Website-Erreichbarkeit prüfen**](/settings?s=tasks&find=Site%20up%20check): prüft alle zehn Minuten. Bei Ausfall untersucht der Agent DNS, Zertifikat, HTTP-Status und Zeitüberschreitungen. Die Rückkehr meldet er kurz.
+- [**Erreichbarkeit der Website prüfen**](/settings?s=tasks&find=Site%20up%20check): prüft alle zehn Minuten. Bei Ausfall untersucht der Agent DNS, Zertifikat, HTTP-Status und Zeitüberschreitungen. Die Rückkehr meldet er kurz.
 - [**Speicherplatzwarnung**](/settings?s=tasks&find=Disk%20space%20alert): prüft ein Laufwerk, zunächst `/`, alle 30 Minuten. Ab standardmäßig 90 % Belegung findet der Agent große Verbraucher und schlägt Bereinigung vor, ohne zu löschen.
 - [**Neue Dateien in einem Ordner**](/settings?s=tasks&find=New%20files%20in%20a%20folder): prüft alle 15 Minuten, optional auf Muster wie `*.pdf`, und führt für neue Dateien die Anweisung unter **Danach** aus oder beschreibt sie kurz.
 

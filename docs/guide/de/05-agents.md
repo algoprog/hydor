@@ -11,9 +11,9 @@ Beim Sitzungsstart wählst du auf der Startseite einen Agenten. Später kannst d
 Ein Agent kann Folgendes festlegen:
 
 - **Anweisungen** für Rolle und Arbeitsweise. Sie gelten während der gesamten Arbeit; deine Unterhaltungsaufträge haben Vorrang.
-- **Arbeitsort**: überall oder nur in ausgewählten Projekten. Siehe [Wo ein Agent arbeitet](#where-an-agent-works).
+- **Arbeitsbereich**: überall oder nur in ausgewählten Projekten. Siehe [Wo ein Agent arbeitet](#where-an-agent-works).
 - **Ausführungszeitpunkt**: wenn du oder ein anderer Agent ihn darum bittest, und nach seinen eigenen Zeitplänen (siehe [Wann ein Agent arbeitet: Zeitpläne](#when-an-agent-works-schedules)).
-- **Modellstufe**: Automatisch oder Quick, Standard, Best beziehungsweise Max mit je Programm einmal zugeordnetem Modell. Siehe [Modellstufen](#what-an-agent-thinks-with-tiers).
+- **Verwendete Modellstufe**: Automatisch oder Quick, Standard, Best beziehungsweise Max mit je Programm einmal zugeordnetem Modell. Siehe [Modellstufen](#what-an-agent-thinks-with-tiers).
 - **Sein Team**: die anderen Agenten, an die er Teile seiner Arbeit weitergeben darf, und ob andere Agenten ihm Arbeit weitergeben dürfen (siehe [Agenten, die Arbeit an andere Agenten weitergeben](#agents-that-hand-work-to-other-agents)).
 - **Ein Monatsbudget**: was seine Sitzungen in einem Monat ausgeben dürfen (siehe [Ein Monatsbudget](#a-monthly-budget)).
 - **Ergebnisübergabe**: die Felder jedes Ergebnisses, geprüft, und wohin jedes geht: eine Seite in der Bibliothek, eine Zeile in einer Tabelle, eine E-Mail an Personen, eine Benachrichtigung, eine Datei, ein Webhook (siehe [Was ein Agent zurückgibt](#what-an-agent-hands-back)).
@@ -33,7 +33,7 @@ Ein Agent ist eine Sitzungsrolle. Allgemeine Vorgaben für alle Agenten, ein Pro
 - **Neuer Agent** erstellt einen; siehe [Einen Agenten erstellen](#make-an-agent). **Importieren** übernimmt Claude-Code-Dateien; siehe [Claude-Code-Agenten importieren](#import-claude-codes-agent-files). **Installieren** liest eine erhaltene Agentendatei; siehe [Agenten als Datei teilen](#share-an-agent-as-a-file).
 - Zwei Tabs unter dem Titel: **Deine Agenten**, diese Seite, und **Zeitpläne**, alles, was von selbst in einer Woche läuft: die Zeitpläne deiner Agenten mit deinen anderen geplanten Aufgaben, die Zeitpläne deiner Apps, Überwachungen und Webhooks, jeder Lauf nach seinem Ergebnis eingefärbt, was als Nächstes läuft, und eine Liste von allen mit einem Schalter, um jeden anzuhalten (siehe [Die Woche ansehen: was lief und was als Nächstes läuft](/guide/tasks#see-the-week-what-ran-and-what-runs-next)).
 - Deine Agenten erscheinen als Karten. Jede Karte zeigt den Namen des Agenten, seine Zeile, wie es ihm geht (**Arbeitet**, **Braucht dich**, wenn eine seiner Sitzungen auf deine Antwort wartet, **Budget aufgebraucht** oder **Inaktiv**), die Projekte, in denen er arbeitet (oder **Überall**), seine Leistungsstufe, wann er als Nächstes läuft, wie viele Nachrichten in seinem Posteingang warten und was er in diesem Monat ausgegeben hat.
-- Filter über den Karten sind **Alle**, **Überall**, Projekte mit eigenen Agenten, **Mit Zeitplan** und **Benötigt dich**.
+- Filter über den Karten sind **Alle**, **Überall**, Projekte mit eigenen Agenten, **Nach einem Zeitplan** und **Braucht dich**.
 - Mitgelieferte Agenten stehen unter **Eingebaut**.
 
 Ein Klick auf eine Karte öffnet die Agentenseite:
@@ -157,7 +157,7 @@ Für eine große Frage, die viele Suchen braucht, siehe tiefgehende Recherche un
 4. Lies die Beschreibung und ändere unterstrichene Teile direkt; siehe [Agenten bearbeiten](#change-an-agent). Bei Zeitplänen steht unter „Jeder geplante Lauf beginnt mit“ die Startnachricht. **Seine Anweisungen** zeigt den vollständigen Text.
 5. **Agent erstellen** meldet „*Name* ist bereit“ und öffnet die Agentenseite. Ein Zeitplan wird als geplante Aufgabe mit diesem Agenten angelegt.
 
-**Alle Einstellungen** öffnet den vollständigen Editor, **Erneut beschreiben** kehrt zum Auftrag zurück. Im Projekt bietet der Tab **Agenten** die Option **Neuer Agent hier** sowie ohne Projektagenten **Agenten für dieses Projekt erstellen** anhand von Beschreibung oder passender Vorlage. Auch neue Projekte können direkt einen erhalten; siehe [Projekte](/guide/projects).
+**Alle Einstellungen** öffnet den vollständigen Editor, **Erneut beschreiben** kehrt zum Auftrag zurück. Im Projekt bietet der Tab **Agenten** die Option **Neuer Agent hier** sowie ohne Projektagenten **Einen für dieses Projekt erstellen** anhand von Beschreibung oder passender Vorlage. Auch neue Projekte können direkt einen erhalten; siehe [Projekte](/guide/projects).
 
 ### Leer beginnen
 
@@ -177,23 +177,23 @@ Der Editor, den **Alle Einstellungen** öffnet, enthält jede Einstellung eines 
   - **Der Ordner auf der Startseite**: Sitzungen arbeiten in dem Ordner, der dort angezeigt wird, wie bei Programmierer. Wähle das für Agenten, die in einem Projekt arbeiten.
 - **Ausführungsumgebung**: das Programm, das er vorschlägt und mit dem er auf der Startseite ausgewählt wird.
   - **Beliebiger Agent** behält standardmäßig deine Startseitenauswahl;
-  - **Claude Code**, **Codex**, **Custom** mit beliebigem Modell oder unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügte Programme;
+  - **Claude Code**, **Codex**, **Benutzerdefiniert** mit beliebigem Modell oder unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügte Programme;
   - Sobald du ein Programm auswählst, erscheint daneben ein Modellmenü mit den Modellen dieses Programms (bei Programmen, die eine Auswahl bieten); lässt du es unberührt, gilt das Standardmodell des Programms. Eine Leistungsstufe darunter bestimmt stattdessen das Modell.
 - **Berechtigungsmodus**:
   - **Wie ausgewählt** (die Standardeinstellung): behält den auf der Startseite gewählten Modus.
-  - **Nachfragen** vor Dateiänderungen und Befehlen;
-  - **Änderungen erlauben** für freie Dateibearbeitung, Rückfragen vor Befehlen;
-  - **Vollzugriff** ohne Rückfragen;
+  - **Fragen** vor Dateiänderungen und Befehlen;
+  - **Änderungen akzeptieren** für freie Dateibearbeitung, Rückfragen vor Befehlen;
+  - **Voller Zugriff** ohne Rückfragen;
   - **Plan** nur zum Lesen und Planen bis zur Freigabe.
 
   Claude Code, Codex und Custom verwenden jeweils passende Modi. Andere Programme wie Gemini CLI oder OpenCode behalten ihre eigenen.
-- **Modellstufe**: **Automatisch**, **Schnell**, **Standard**, **Am besten** oder **Max**. Darunter **Subagenten höchstens auf** mit **Beliebig** oder einer Stufe und standardmäßig **Bei fehlgeschlagener Prüfung hochstufen**. Siehe [Modellstufen](#what-an-agent-thinks-with-tiers).
+- **Modellstufe**: **Automatisch**, **Schnell**, **Standard**, **Am besten** oder **Max**. Darunter **Höchste Modellstufe für die von ihm gestarteten Subagenten** mit **Beliebig** oder einer Stufe und standardmäßig **Bei fehlgeschlagener Prüfung auf eine höhere Stufe wechseln**. Siehe [Modellstufen](#what-an-agent-thinks-with-tiers).
 - **Erlaubte Werkzeuge**: sieben Schalter, bei einem neuen Agenten alle eingeschaltet (siehe unten).
 - **Bevorzugte Skills** mit einzeln eingegebenen Namen; siehe unten.
 - **Verbindungen**, sobald Konten verbunden sind; siehe unten.
 - **Team**: ein Schalter für jeden anderen Agenten, an den er Arbeit übergeben darf, und **Andere Agenten dürfen ihm Arbeit übergeben** (siehe [Agenten, die Arbeit an andere Agenten übergeben](#agents-that-hand-work-to-other-agents)).
 - **Monatsbudget** in Dollar, leer für unbegrenzt. Siehe [Monatsbudget](#a-monthly-budget).
-- **Eigene Unterhaltung** mit **Eine Unterhaltung mit Posteingang beibehalten**. Siehe [Eigene Unterhaltungen](#an-agent-with-a-conversation-of-its-own).
+- **Eine eigene Unterhaltung**: **Führt eine dauerhafte Unterhaltung mit eigenem Posteingang**. Siehe [Eigene Unterhaltungen](#an-agent-with-a-conversation-of-its-own).
 - **Ergebnisübergabe**: die Felder jedes Ergebnisses und wohin jedes geht (siehe [Was ein Agent übergibt](#what-an-agent-hands-back)).
 
 ### Verfügbare Werkzeuge
@@ -292,7 +292,7 @@ Ein Agent, der auf eine Leistungsstufe eingestellt ist, startet mit dem Modell d
 
 [Einstellungen → Agenten → Modelle → Leistungsstufen](/settings?s=models&find=Tiers) sagt, was jede Leistungsstufe bedeutet, in einer Tabelle mit einer Spalte für jedes Programm: bei **Claude Code** ein Modell (zu Beginn Haiku, Sonnet, Opus und das neueste Fable) und ein Aufwand; bei **Codex** ein Modell und ein Aufwand (zu Beginn Luna, Terra, Sol und Astra; bei einem Abo ohne eines davon das nächstliegende, das es anbietet, mit mehr Aufwand für die höhere Stufe, wo sich zwei ein Modell teilen); bei **Benutzerdefiniert** eines deiner benutzerdefinierten Modelle oder keines, wodurch das in der Sitzung gewählte Modell bleibt. Eine Leistungsstufe, die du nicht anfasst, folgt dem neuesten Modell dieser Art ihres Programms. **Zurück zu den Standardeinstellungen** stellt sie wieder her.
 
-**Subagenten höchstens auf** begrenzt delegierte Hydor-Modellstufen. Höhere Anforderungen werden auf die Grenze reduziert; außerdem darf kein Subagent über der Stufe seiner Leitung arbeiten. Ein ausdrücklich genanntes Modell wird wie angegeben verwendet.
+**Höchste Modellstufe für die von ihm gestarteten Subagenten** begrenzt delegierte Hydor-Modellstufen. Höhere Anforderungen werden auf die Grenze reduziert; außerdem darf kein Subagent über der Stufe seiner Leitung arbeiten. Ein ausdrücklich genanntes Modell wird wie angegeben verwendet.
 
 **Bei fehlgeschlagener Prüfung auf eine höhere Stufe wechseln** (eingeschaltet, solange du es nicht ausschaltest): Ein Hydor-Subagent, den der Agent auf einer Leistungsstufe startet und dessen Antwort eine kurze Prüfung nicht besteht (das Hilfsmodell liest seinen Auftrag und seine Antwort) oder der mit einem Fehler stoppt, läuft noch einmal eine Stufe höher, höchstens bis Best und nie über der höchsten Stufe, die der Agent erlaubt. Geprüft wird nur seine Antwort auf den Auftrag: Eine spätere Antwort auf eine Nachricht seiner Leitung oder von dir schickt nie die ganze Aufgabe noch einmal durch. Die Leitung erfährt, dass und warum das geschehen ist, und dem neuen Subagenten wird gesagt, warum der erste nicht genügt hat. Auch ein geplanter Lauf des Agenten, der auf seiner Stufe fehlschlägt, läuft noch einmal eine Stufe höher, bis Best. Eine Leitung kann einen Subagenten auch selbst hochstufen, wenn sie das Ergebnis nicht gut genug findet.
 
@@ -307,7 +307,7 @@ Dabei gilt:
 
 - Integrierte Rollen oder Sitzungen ohne Agenten dürfen alle am Arbeitsort verfügbaren eigenen Agenten beauftragen.
 - Ein Agent von dir darf nur an die Agenten Arbeit übergeben, die sein **Team** aufführt.
-- Bei deaktiviertem **Andere Agenten dürfen Aufgaben übergeben** nimmt ein Agent keine solchen Aufträge an.
+- Bei deaktiviertem **Andere Agenten dürfen ihm Arbeit übergeben** nimmt ein Agent keine solchen Aufträge an.
 - Benannte Agenten bleiben auf ihre Projekte und höchstens die Berechtigungen der beauftragenden Sitzung beschränkt.
 
 In der Unterhaltung erscheint jeder Hydor-Subagent als Karte unter dem Durchgang, der ihn gestartet hat, mit dem Agenten, als der er arbeitet (oder „Hydor-Subagent“), seiner Leistungsstufe, seinem Programm und Modell, was er gerade tut und was er gekostet hat und, wenn er hochgestuft wurde, von welcher Stufe aus und warum; **Öffnen** öffnet seine Unterhaltung. Der Tab **Agenten** eines Projekts zeigt, welche seiner Agenten Arbeit an welche übergeben.
@@ -330,11 +330,11 @@ Ohne Konfiguration liefert der Agent seine Unterhaltungsantwort. Unter **Ergebni
 
 - **Ergebnisfelder**: je Name und Typ wie Text, Langtext, Zahl, Ja/Nein, Datum, Link, Liste oder Tabelle mit Spalten sowie Pflichtstatus. Der Agent füllt sie über `hand_back`. Unpassende Ergebnisse werden mit Korrekturhinweisen zurückgegeben.
 - **Ergebnisziele** zusätzlich zur Unterhaltung:
-  - **Bibliotheksseite**: Standard ist **Dieselbe Seite aktualisieren**. Der erste Lauf erstellt eine nach dem Agenten benannte Seite in seinem Projekt, falls vorhanden. Weitere Läufe speichern neue Versionen; ältere bleiben im Verlauf. Eigene Umbenennungen bleiben erhalten. **Neue Seite pro Lauf** erstellt stattdessen jeweils eine mit Agentenname und Datum. Vor Einführung dieser Auswahl erstellte Agenten behalten dieses Verhalten.
-  - **Tabellenzeile**: Jeder Lauf ergänzt dieselbe Bibliothekstabelle um **Datum** und Felder in konfigurierter Reihenfolge. Zahlen, Daten und Links behalten passende Typen, damit Formeln und Diagramme funktionieren; Listen und Tabellen werden lesbarer Zelltext wie „Milch; Eier“. **Neue Tabelle** erstellt beim ersten Lauf eine nach dem Agenten benannte Tabelle. Alternativ wählst du eine vorhandene samt Blatt; fehlende Blätter werden angelegt. Siehe [Eine Tabellenzeile](#a-row-in-a-spreadsheet).
+  - **Eine Seite in der Bibliothek**: Standard ist **Dieselbe Seite, aktualisiert**. Der erste Lauf erstellt eine nach dem Agenten benannte Seite in seinem Projekt, falls vorhanden. Weitere Läufe speichern neue Versionen; ältere bleiben im Verlauf. Eigene Umbenennungen bleiben erhalten. **Bei jedem Lauf eine neue Seite** erstellt stattdessen jeweils eine mit Agentenname und Datum. Vor Einführung dieser Auswahl erstellte Agenten behalten dieses Verhalten.
+  - **Eine Zeile in einer Tabelle**: Jeder Lauf ergänzt dieselbe Bibliothekstabelle um **Datum** und Felder in konfigurierter Reihenfolge. Zahlen, Daten und Links behalten passende Typen, damit Formeln und Diagramme funktionieren; Listen und Tabellen werden lesbarer Zelltext wie „Milch; Eier“. **Neue Tabelle** erstellt beim ersten Lauf eine nach dem Agenten benannte Tabelle. Alternativ wählst du eine vorhandene samt Blatt; fehlende Blätter werden angelegt. Siehe [Eine Tabellenzeile](#a-row-in-a-spreadsheet).
   - **Eine E-Mail**: das Ergebnis als E-Mail an die Personen, die du nennst (eine Adresse oder mehrere), mit einem Betreff (`{date}`, `{time}` und `{agent}` werden ersetzt; leer gelassen, gelten der Name des Agenten und der Tag), von einem deiner verbundenen Mailkonten (**Von**; das erste, wenn du keines auswählst; siehe [Verbundene Apps, Keys und Werkzeuge](/guide/connections#connect-your-email)). Sie liest sich in jedem Mailprogramm gut, jedes Feld unter seinem Namen, Tabellen als Tabellen. Da du die Personen hier selbst gewählt hast, wird sie gesendet, sobald jedes Ergebnis bereit ist, ohne im Postausgang zu warten.
   - **Benachrichtigung** mit der ersten Ergebniszeile;
-  - **Datei im Arbeitsordner**, etwa `reports/{date}.md`, mit `{date}`, `{time}` und `{agent}`. `.json` schreibt JSON, andere Endungen Markdown. Der Pfad darf den Arbeitsordner nicht verlassen;
+  - **Eine Datei im Arbeitsordner des Agenten**, etwa `reports/{date}.md`, mit `{date}`, `{time}` und `{agent}`. `.json` schreibt JSON, andere Endungen Markdown. Der Pfad darf den Arbeitsordner nicht verlassen;
   - **Webhook** als JSON-POST an eine HTTPS-Adresse, bei angegebenem Tresor-Key signiert und auf dessen erlaubte Hosts begrenzt. Siehe [Verbundene Apps, Keys und Tools](/guide/connections).
 
 Was du in diese Felder eingibst, gilt, sobald du das Feld verlässt oder Enter drückst. Die Einstellungen zeigen die Seite und die Tabelle, die sein erster Lauf erstellt hat, mit einem Link zum Öffnen.
@@ -345,11 +345,11 @@ Die Spalten werden an ihren Überschriften in der ersten Zeile der Tabelle erkan
 
 ### Ergebnisverlauf
 
-**Ergebnisse** auf der Agentenseite zeigt neueste Resultate zuerst, mit Zeitpunkt, Spalten je Feld und **Zugestellt an** mit Symbolen je Ziel. Zustellfehler sind rot; Darüberfahren erklärt den Status, Bibliothekssymbole öffnen den Inhalt. Ein Klick auf die Zeile zeigt das gesamte Ergebnis und **Sitzung öffnen**. Die Tabelle scrollt; **Ältere anzeigen** lädt weitere. Ergebnisse bleiben ein Jahr, höchstens 500 Einträge, also bei täglicher Ausführung ein Jahr, bei stündlicher etwa drei Wochen. Zu lange Felder werden gekennzeichnet und sind an den Zustellzielen vollständig vorhanden. Oberhalb stehen Links zu gefüllter Bibliotheksseite und Tabelle.
+**Ergebnisse** auf der Agentenseite zeigt neueste Resultate zuerst, mit Zeitpunkt, Spalten je Feld und **Übermittelt an** mit Symbolen je Ziel. Zustellfehler sind rot; Darüberfahren erklärt den Status, Bibliothekssymbole öffnen den Inhalt. Ein Klick auf die Zeile zeigt das gesamte Ergebnis und **Sitzung öffnen**. Die Tabelle scrollt; **Ältere anzeigen** lädt weitere. Ergebnisse bleiben ein Jahr, höchstens 500 Einträge, also bei täglicher Ausführung ein Jahr, bei stündlicher etwa drei Wochen. Zu lange Felder werden gekennzeichnet und sind an den Zustellzielen vollständig vorhanden. Oberhalb stehen Links zu gefüllter Bibliotheksseite und Tabelle.
 
 ## Ein Agent mit eigener Unterhaltung
 
-Üblicherweise starten Agenten pro Auftrag eine Sitzung. **Eine Unterhaltung mit Posteingang beibehalten** im vollständigen Editor oder unter Auslösern erstellt stattdessen bei Bedarf einmalig eine dauerhafte Unterhaltung, bei genau einem zugeordneten Projekt in dessen Ordner:
+Üblicherweise starten Agenten pro Auftrag eine Sitzung. **Führt eine dauerhafte Unterhaltung mit eigenem Posteingang** im vollständigen Editor oder unter Auslösern erstellt stattdessen bei Bedarf einmalig eine dauerhafte Unterhaltung, bei genau einem zugeordneten Projekt in dessen Ordner:
 
 - Nachrichten an ihn warten in seinem **Posteingang** und kommen nacheinander in seine Unterhaltung, jede erst, wenn die vorherige ihre Antwort hat: was du von seiner Seite sendest und was andere Agenten ihm übergeben.
 - Seine geplanten Läufe schreiben in dieselbe Unterhaltung und warten, bis ein laufender Durchgang zu Ende ist; jeder erscheint im Verlauf seines Zeitplans, wie jeder Lauf.
@@ -362,12 +362,12 @@ Der **Posteingang** auf der Agentenseite zeigt **Wartet**, **Wird bearbeitet**, 
 ## Eine Sitzung als bestimmter Agent starten
 
 1. Öffne die [Startseite](/). Unter dem Nachrichtenfeld zeigt eine Zeile, wer die Arbeit macht: das Programm, das Modell, der Ordner und der **Agent**-Chip, der den aktuell gewählten Agenten nennt.
-2. Öffne **Agent**. Unter **Starten als** stehen zuerst integrierte Rollen, dann unter **Deine** projektübergreifende und zum gewählten Projekt passende eigene Agenten.
+2. Öffne **Agent**. Unter **Starten als** stehen zuerst integrierte Rollen, dann unter **Eigene** projektübergreifende und zum gewählten Projekt passende eigene Agenten.
    - Am Computer stehen die Namen in einem Raster, zwei pro Zeile. Fahre mit der Maus über einen, um unter dem Raster seine Zeile zu sehen: seine Beschreibung und, wenn er ein Programm vorschlägt, „Verwendet“, gefolgt von diesem Programm und seinem Modell.
    - Auf dem Smartphone öffnet sich das Menü als Blatt vom unteren Bildschirmrand und listet jeden Agenten mit seiner Zeile auf.
 3. Wähle den Agenten, schreibe den Auftrag und drücke Enter oder **Starten**.
 
-**Agenten erstellen oder bearbeiten** unten öffnet die [Agentenseite](/agents). **Sitzung starten** auf einer Agentenseite öffnet die vorausgewählte Startseite.
+**Agenten erstellen oder ändern** unten öffnet die [Agentenseite](/agents). **Sitzung starten** auf einer Agentenseite öffnet die vorausgewählte Startseite.
 
 Die Auswahl bewirkt:
 
@@ -391,7 +391,7 @@ Ab deiner nächsten Nachricht arbeitet die Sitzung als der neue Agent, und die U
 
 - Das Programm erhält die Wechselanweisung mit deiner Nachricht, unsichtbar in der Unterhaltung.
 - **Claude Code und Codex** lesen ihre Anweisungen beim Start. Ist die Sitzung frei, startet ihr Programm deshalb vor deiner Nachricht neu, mit den Anweisungen und Grenzen des neuen Agenten; diese Nachricht dauert dann einen Moment länger. Mitten in einem Durchgang oder während es auf ein Ziel hinarbeitet oder Arbeit im Hintergrund hat, bekommt es die neuen Anweisungen stattdessen mit deiner Nachricht und startet bei einer späteren Nachricht neu, sobald es frei ist.
-- **Custom** liest vor jedem Durchlauf neu. Andere Programme wie Gemini CLI und OpenCode erhalten die Anweisungen mit deiner Nachricht.
+- **Benutzerdefiniert** liest vor jedem Durchlauf neu. Andere Programme wie Gemini CLI und OpenCode erhalten die Anweisungen mit deiner Nachricht.
 - Die verbundenen Konten, die der neue Agent einschaltet, sind in der Sitzung eingeschaltet, anstelle derer des vorherigen; was du selbst für die Sitzung ein- oder ausgeschaltet hast, bleibt. Hat er einen Berechtigungsmodus, wechselt die Sitzung auf den passenden Modus, und auf sein Modell, wenn er das eigene Programm der Sitzung vorschlägt. Das Programm selbst bleibt gleich: Wie du die Unterhaltung in ein anderes verlegst, steht unter [Mit einem anderen Agenten fortsetzen](/guide/sessions#continue-in-another-agent).
 
 Eine Sitzung, die ohne Agent gestartet wurde (in VS Code oder einem Terminal oder bevor es Agenten in der App gab), zeigt dort **Kein Agent**: Wähle einen, um ihr einen zu geben. Auch das Menü der Sitzung (⋯) → **Sitzungseinstellungen** → **Agent** nennt ihn; ein Klick darauf öffnet die Seite des Agenten.
@@ -419,7 +419,7 @@ Manches ändert sich auf dem Weg hinein, und die Karte sagt, was: Ein Agent, der
 Claude Code kann eigene Agenten als Markdown-Dateien in einem Ordner `.claude/agents` führen: ein kurzer Kopf mit Name, Beschreibung, Modell und Tools des Agenten und darunter seine Anweisungen. Die App macht aus diesen Dateien Agenten von dir, sodass jedes Programm hier so arbeiten kann.
 
 1. Öffne die [Agentenseite](/agents) und **Importieren**.
-2. **Claude-Code-Agenten importieren** zeigt persönliche Dateien aus `~/.claude/agents` unter **Deine** sowie `.claude/agents` im auf der [Dateien-Seite](/files) geöffneten Ordner unter **Dieser Ordner**. Öffne für Projektagenten dort zuerst das Projekt.
+2. **Claude-Code-Agenten importieren** zeigt persönliche Dateien aus `~/.claude/agents` unter **Eigene** sowie `.claude/agents` im auf der [Dateien-Seite](/files) geöffneten Ordner unter **Dieser Ordner**. Öffne für Projektagenten dort zuerst das Projekt.
 3. **Importieren** neben einer Datei macht den Agenten auf Agentenseite und Startseite verfügbar.
 4. Für eine Datei an einem anderen Ort klicke auf **Datei auswählen** („Oder eine Agentendatei von diesem Gerät“) und wähle die `.md`-Datei.
 
@@ -429,8 +429,8 @@ Die Datei muss Markdown (`.md`) und höchstens 256 KB groß sein. Das übernimmt
 |---|---|
 | `name` (oder der Dateiname, wenn es keinen gibt) | **Name**: „code-reviewer“ wird zu „Code reviewer“ |
 | `description` | **Eine Zeile dazu**: ihr erster Satz, ohne die Beispiele |
-| `model` | **Ausführen mit**: Claude Code und Modell; „inherit“ behält die Startseitenauswahl |
-| `tools` | **Verfügbare Werkzeuge** nach Gruppen; ohne tools sind alle erlaubt |
+| `model` | **Ausführungsumgebung**: Claude Code und Modell; „inherit“ behält die Startseitenauswahl |
+| `tools` | **Erlaubte Werkzeuge** nach Gruppen; ohne tools sind alle erlaubt |
 | `permissionMode` | **Berechtigungsmodus**: default → Nachfragen, acceptEdits → Änderungen erlauben, bypassPermissions → Vollzugriff, plan → Plan |
 | `skills` | **Bevorzugte Skills** |
 | Text unter den Kopfzeilen | **Anweisungen** |

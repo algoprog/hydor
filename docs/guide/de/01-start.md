@@ -29,7 +29,7 @@ Am Computer kannst du die Seitenleiste zwischen 180 und 560 Pixel breit einstell
 Unter der Suche stehen alle Sitzungen in Gruppen:
 
 - **Aktiv**: Sitzungen mit Aktivität in den letzten fünf Minuten, hier, in VS Code oder einem Terminal, auch bereits abgeschlossene. Nach fünf Minuten ohne Aktivität wechseln sie in ihre normale Gruppe, selbst wenn das Agentenprogramm noch offen ist. Durch Nutzungslimits gestoppte Sitzungen bleiben hier, solange ihre automatische Fortsetzung geplant ist; brichst du diese ab, gilt wieder die Fünf-Minuten-Regel. Laufende Hintergrundagenten, Befehle oder Überwachungen halten eine Sitzung ebenfalls hier, unabhängig von zwischenzeitlicher Stille. Die Einträge behalten ihre Position; per Ziehen änderst du sie.
-- **Angeheftet**: deine angehefteten Sitzungen in frei veränderbarer Reihenfolge. Ziehe eine Sitzung aus einer unteren Gruppe hierher, um sie anzuheften.
+- **Angepinnt**: deine angehefteten Sitzungen in frei veränderbarer Reihenfolge. Ziehe eine Sitzung aus einer unteren Gruppe hierher, um sie anzuheften.
 - **Projekte**: je eine Gruppe für jedes Projekt und für jeden selbst ausgewählten Ordner mit mindestens zwei Sitzungen. Zunächst steht der zuletzt verwendete oben. Ziehe eine Gruppe an ihrer Überschrift an eine andere Position, um eine eigene Reihenfolge festzulegen; auf dem Smartphone hältst du sie vorher kurz gedrückt. Die Reihenfolge gilt geräteübergreifend. Noch nie verschobene Gruppen, etwa neue Projekte, erscheinen zuerst. Jede Gruppe zeigt die fünf neuesten Sitzungen; **12 weitere anzeigen** beziehungsweise die entsprechende Anzahl öffnet den Rest, **Weniger anzeigen** klappt ihn wieder ein.
 - **Heute**, **Gestern**, **Diese Woche**, danach Monate und Jahre: die übrigen Sitzungen nach letzter Aktivität.
 - **Zurückgestellt**: unten bis zum festgelegten Zeitpunkt.
@@ -81,7 +81,7 @@ Unten in der Seitenleiste stehen die App-Werkzeuge mit vier Einträgen pro Zeile
 - **Agenten**: deine und die mitgelieferten Agenten mit Aufgaben, Arbeitsorten, Zeitplänen, Modellen und Zuständigkeiten. Siehe [Agenten](/guide/agents).
 - **System**: dieser Computer mit Tabs für **Übersicht** zu Zustand und aktuellem Inhalt der Werkzeuge, **Dateien** zum Durchsuchen, Öffnen und Bearbeiten, **Git** für Repositorys, Änderungen, Branches und Verlauf, **Terminal** für auch nach einem Seitenwechsel weiterlaufende Shells, **Vorschau** für lokale Entwicklungsserver, nur auf den eigenen Seiten dieses Computers, **Überwachen** mit Live-Anzeigen für Prozessoren, Grafikkarten, Arbeitsspeicher, Datenträger und aktive Programme sowie **Nutzung** mit verbrauchtem Kontingent, Rücksetzzeiten, **Aktivität** und **Arena**. Ein schmaler Balken unter dem Systemsymbol zeigt das übrige Kontingent deiner bezahlten Abos oder, falls du keine hast, deiner kostenlosen Abos. Ist nichts mehr übrig, wird er rot. Siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git) und [Nutzung, Limits und Kosten](/guide/usage).
 - **Einstellungen**: sämtliche App-Einstellungen. Ein Punkt zeigt eine verfügbare neue Version an. Siehe [Alle Einstellungen](/guide/settings).
-- **Suche**: öffnet dieselbe Suche wie Strg+K.
+- **Suchen**: öffnet dieselbe Suche wie Strg+K.
 - **Hilfe**: öffnet diesen Leitfaden, in dem du auch einen Agenten zur App befragen kannst. Hier startet auch die Willkommenstour.
 
 Das ist die Standardreihenfolge. Ziehe ein Werkzeug an eine andere Position; auf dem Smartphone hältst du es vorher kurz gedrückt. Deine Reihenfolge gilt auf allen Geräten und für alle angezeigten Computer. Nach einer Änderung stellt am Computer ein Rechtsklick auf ein Werkzeug und **Standardreihenfolge wiederherstellen** alles zurück.
@@ -90,7 +90,7 @@ Das ist die Standardreihenfolge. Ziehe ein Werkzeug an eine andere Position; auf
 
 **Neue Sitzung** öffnet die Startseite mit „Woran sollen wir arbeiten?“ und „Stelle eine Aufgabe: Recherche, Dokumente, Pläne oder Code.“. Unter dem großen Nachrichtenfeld stehen:
 
-- **Ausführen mit**: das Agentenprogramm, etwa Claude Code, Codex, Custom oder ein hinzugefügter Agent.
+- **Ausführungsumgebung**: das Agentenprogramm, etwa Claude Code, Codex, Custom oder ein hinzugefügter Agent.
 - **Modell**: dessen Modell.
 - **Ordner**: der Arbeitsordner, ein Projekt oder ein neuer Aufgabenordner.
 - **Agent**: die Rolle, etwa Allgemein, Forscher, Schriftsteller, Programmierer, Nachhilfelehrer, Planer, Analyst, App builder oder ein eigener Agent. Siehe [Agenten](/guide/agents).
@@ -98,12 +98,12 @@ Das ist die Standardreihenfolge. Ziehe ein Werkzeug an eine andere Position; auf
 
 Am Computer steht darunter „Enter zum Starten · Umschalt+Enter für eine neue Zeile“. Ist das Abo-Kontingent des Agenten ausgeschöpft, nennt ein Hinweis über dem Feld das Limit und die Rücksetzzeit.
 
-Gab es seit deinem letzten Besuch neue Ereignisse, steht unter dem Feld **Während deiner Abwesenheit** mit einer Zusammenfassung: abgeschlossene Arbeit, Rückfragen, automatische Ausführungen und kommende Aufgaben. Siehe [Während deiner Abwesenheit](#while-you-were-away). Ohne neue Ereignisse entfällt der Bereich.
+Gab es seit deinem letzten Besuch neue Ereignisse, steht unter dem Feld **Während du weg warst** mit einer Zusammenfassung: abgeschlossene Arbeit, Rückfragen, automatische Ausführungen und kommende Aufgaben. Siehe [Während deiner Abwesenheit](#while-you-were-away). Ohne neue Ereignisse entfällt der Bereich.
 
 Bei leerem Feld erscheinen **Einstiegsideen**: drei Beispielaufträge, zwei deiner Apps und eine Automation.
 
 - Ein Klick auf ein Beispiel übernimmt es in das Feld. Passe es an und sende es selbst; vorher wird nichts gesendet. „…“ ergänzt du mit deinem Text. Die Beispiele wechseln täglich und beziehen sich in Codeordnern auf Programmierung.
-- Ein Klick auf eine App öffnet ihr Formular. Angezeigt werden deine beiden meistverwendeten Apps, anfangs **Recherchebericht** und **Reiseplaner**. Siehe [Apps](/guide/apps).
+- Ein Klick auf eine App öffnet ihr Formular. Angezeigt werden deine beiden meistverwendeten Apps, anfangs **Bericht der tiefgehenden Recherche** und **Reiseplaner**. Siehe [Apps](/guide/apps).
 - Die Automation, etwa „Jeden Montag um 8:00 Uhr sende mir …“, übernimmt ihren Text in das Feld. Ergänze und sende ihn; der Agent richtet eine [geplante Aufgabe](/guide/tasks) ein.
 
 Beim Tippen verschwinden die Ideen. **Ausblenden** verbirgt sie dauerhaft auf allen Geräten. Unter [Einstiegsideen](/settings?s=general&find=Starter%20ideas) in Einstellungen → App → Allgemein aktivierst du sie wieder. Auf dem Smartphone stehen sie in einer horizontal scrollbaren Zeile.
@@ -120,10 +120,10 @@ Unter dem Nachrichtenfeld und über den Einstiegsideen siehst du nach deiner Rü
 
 Geöffnet zeigt der Bereich bis zu sechs Einträge, die wichtigsten zuerst. **… weitere anzeigen** öffnet den Rest:
 
-- **Benötigt dich**: Freigaben, Fragen, Formulare, im Postausgang zurückgehaltene Aufrufe und weitere Rückfragen wie im [Posteingang](/guide/inbox). Bei Freigaben, Fragen, Formularen und zurückgehaltenen Aufrufen öffnet **Hier antworten** die passende Posteingangskarte unter dem Eintrag. Andere Einträge führen zum jeweiligen Ort.
+- **Braucht dich**: Freigaben, Fragen, Formulare, im Postausgang zurückgehaltene Aufrufe und weitere Rückfragen wie im [Posteingang](/guide/inbox). Bei Freigaben, Fragen, Formularen und zurückgehaltenen Aufrufen öffnet **Hier antworten** die passende Posteingangskarte unter dem Eintrag. Andere Einträge führen zum jeweiligen Ort.
 - **Abgeschlossen** und **Fehlgeschlagen**: seit dem letzten Besuch beendete und noch nicht erneut geöffnete Sitzungen, jeweils mit dem Anfang der letzten Antwort oder Fehlerbeschreibung und erstellten Dateien. Dateien öffnen sich in Dateien, der Eintrag öffnet die Sitzung.
 - **Automatisch ausgeführt**: Läufe deiner [geplanten Aufgaben](/guide/tasks), Agentenzeitpläne und Apps, die über App-Seite, Link, API oder Chat-App gestartet wurden. Angezeigt werden Ergebnis (**Abgeschlossen**, **Fehlgeschlagen** oder **Nichts Neues**) und Kosten. Ein Klick öffnet die ausführende Sitzung beziehungsweise den App-Lauf.
-- **Heute noch geplant**: unter den Ereignissen die für heute noch anstehenden Aufgaben.
+- **Heute als Nächstes**: unter den Ereignissen die für heute noch anstehenden Aufgaben.
 
 Der Bereich öffnet sich nicht selbst, auch bei Rückfragen. Dein Gerät merkt sich den geöffneten oder geschlossenen Zustand. **Alle als gesehen markieren** leert die Anzeige und markiert Einträge und Sitzungen auf allen Geräten als gesehen beziehungsweise geöffnet; auch ihre Punkte in der Seitenleiste verschwinden. Spätere Ereignisse erscheinen neu. Läufe ohne neue Ergebnisse und kommende Aufgaben lösen die Anzeige allein nicht aus.
 
@@ -135,14 +135,14 @@ Im Terminal listet `hydor away` dieselben Ereignisse auf; `hydor away seen` mark
 
 1. Stelle sicher, dass der Agent einsatzbereit ist. Melde dich für Claude Code oder Codex unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Accounts) im Bereich **Konten** über **Anmelden** beim gewünschten Agenten an. Folge den Schritten: Link öffnen, bestätigen und Code einfügen oder eingeben. Custom benötigt ein Modell aus [Einstellungen → Agenten → Modelle](/settings?s=models). Die Willkommenstour hilft dir beim ersten Mal dabei. Siehe [Agenten, Konten und Modelle](/guide/agents-models).
 2. Klicke oben in der Seitenleiste auf **Neue Sitzung**. Auch beim App-Start erscheint die Startseite.
-3. Wähle unter dem Nachrichtenfeld über **Ausführen mit** das Programm und daneben über **Modell** sein Modell. Zum Einstieg genügt das als „Standard“ markierte Modell.
+3. Wähle unter dem Nachrichtenfeld über **Ausführungsumgebung** das Programm und daneben über **Modell** sein Modell. Zum Einstieg genügt das als „Standard“ markierte Modell.
 4. Wähle unter **Ordner** den Arbeitsort:
    - ein **Projekt**, um in dessen Ordner mit seinen Dokumenten und Richtlinien zu arbeiten;
    - einer der Ordner, die du zuletzt verwendet hast, unter **Ordner**, oder ein anderer: Mit **Durchsuchen** durchsuchst du deine Ordner, oder du gibst den Namen oder Pfad eines Ordners in **Projekt oder Ordner suchen oder Pfad eingeben** ein;
    - **Neuer Aufgabenordner** für einen nach deinem Auftrag benannten Ordner in `~/Hydor`, sofern du den Ort nicht unter [Einstellungen → Funktionen → Deine Agenten](/settings?s=assistants&find=Task%20folders) änderst.
 
    Die meisten Agenten starten ohne eigene Ordnerauswahl in einem neuen Aufgabenordner. Programmierer arbeitet im gewählten Ordner.
-5. Beschreibe deinen Auftrag, stelle eine Frage oder füge eine Fehlermeldung in das Nachrichtenfeld ein. Hänge Dateien über die Büroklammer an oder ziehe sie auf das Feld. Bereits lokal vorhandene Dateien übernimmst du auf der Dateien-Seite über **Sitzung mit dieser Datei starten** im Dateimenü. Siehe [Eine Sitzung mit Dateien starten](/guide/files-git#start-a-session-with-files).
+5. Beschreibe deinen Auftrag, stelle eine Frage oder füge eine Fehlermeldung in das Nachrichtenfeld ein. Hänge Dateien über die Büroklammer an oder ziehe sie auf das Feld. Bereits lokal vorhandene Dateien übernimmst du auf der Dateien-Seite über **Sitzung damit starten** im Dateimenü. Siehe [Eine Sitzung mit Dateien starten](/guide/files-git#start-a-session-with-files).
 6. Drücke Enter oder **Starten**, auf dem Smartphone den runden Pfeil.
 
 Die Sitzung öffnet sich. Du siehst die einzelnen Schritte in verständlicher Form und am Ende die Antwort. Braucht ein Befehl oder eine Dateiänderung eine Freigabe, erscheint eine Karte mit **Erlauben** und **Ablehnen**. Im Nachrichtenfeld unten setzt du die Unterhaltung fort. Deine Startseitenauswahl bleibt geräteübergreifend für die nächste Sitzung gespeichert.
@@ -151,7 +151,7 @@ Weiter geht es mit [Sitzungen](/guide/sessions), wo alle Sitzungsfunktionen besc
 
 ## Alles mit Strg+K durchsuchen
 
-Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight auf dem Mac. Strg+K beziehungsweise ⌘K öffnet sie auf jeder Seite, außer beim Tippen in einem Codeeditor oder Terminal. Auch **Suche** in der Seitenleiste und das Strg+K-Symbol bei **Sitzungen suchen** öffnen sie. Erneutes Strg+K oder Esc schließt sie.
+Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight auf dem Mac. Strg+K beziehungsweise ⌘K öffnet sie auf jeder Seite, außer beim Tippen in einem Codeeditor oder Terminal. Auch **Suchen** in der Seitenleiste und das Strg+K-Symbol bei **Sitzungen suchen** öffnen sie. Erneutes Strg+K oder Esc schließt sie.
 
 ### Was die Suche findet
 
@@ -177,11 +177,11 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 
 ### Die Ergebnisanzeige
 
-- Der **Beste Treffer** steht oben. Danach folgen Kategorien mit bis zu vier Zeilen. „3 weitere in Sitzungen“ zeigt den Rest.
+- **Beste Übereinstimmung** steht oben. Danach folgen Kategorien mit bis zu vier Zeilen. „3 weitere in Sitzungen“ zeigt den Rest.
 - Auf breiten Bildschirmen zeigt eine Vorschau neben der Liste weitere Angaben zum ausgewählten Treffer und seinem Ziel.
 - Mit ↑ und ↓ wechselst du zwischen den Treffern, mit Enter öffnest du einen. Esc leert, was du eingegeben hast, und ein zweites Esc schließt die Suche (ist die Liste **Suchen in** geöffnet, schließt Esc zuerst die Liste).
 - Ohne Eingabe zeigt die Suche **Letzte Sitzungen** und **Vorschläge**: die Orte, die du am häufigsten nutzt (bis sie diese kennt, ein paar nützliche). Sind in **Suchen in** Orte ausgewählt, zeigt sie stattdessen, was diese enthalten.
-- Unten steht **Wörter** oder **Wörter und Bedeutung**. Mit aktiviertem [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning), standardmäßig unter Einstellungen → Funktionen → Memory eingeschaltet, findet die Suche auch sinngleiche Formulierungen und andere Sprachen.
+- Unten steht **Worte** oder **Wörter und Bedeutung**. Mit aktiviertem [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning), standardmäßig unter Einstellungen → Funktionen → Memory eingeschaltet, findet die Suche auch sinngleiche Formulierungen und andere Sprachen.
 
 ### Die Suche lernt deine Nutzung kennen
 
@@ -199,8 +199,8 @@ Damit du Hydor auf deinem Smartphone erreichst, braucht die App eine HTTPS-Adres
 
 Du kannst Hydor wie eine App installieren und im Vollbild öffnen:
 
-- **iPhone oder iPad**: in Safari öffnen, dann Teilen → **Zum Home-Bildschirm**.
-- **Android**: in Chrome öffnen, dann ⋮ → **Zum Startbildschirm hinzufügen** oder **App installieren**.
+- **iPhone oder iPad**: in Safari öffnen, dann Teilen → **Zum Home-Bildschirm hinzufügen**.
+- **Android**: in Chrome öffnen, dann ⋮ → **Zum Home-Bildschirm hinzufügen** oder **App installieren**.
 
 Nach der Installation unter Android sowie mit Chrome oder Edge am Computer erscheint Hydor auch als Teilen-Ziel. Teile ein Foto, eine Datei oder einen Link aus einer anderen App: Die Startseite öffnet sich mit dem Inhalt im Nachrichtenfeld. Siehe [Aus anderen Apps an Hydor teilen](/guide/devices#share-to-hydor-from-other-apps).
 
@@ -222,7 +222,7 @@ Auf dem Smartphone öffnen die Startseitenauswahlen für Programm, Modell, Ordne
 
 - Unter dem Nachrichtenfeld stehen die sechs neuesten Sitzungen unter **Zuletzt**. **Alle Sitzungen** öffnet das Menü.
 - Enter fügt eine neue Zeile ein. Der runde Pfeil startet eine Sitzung oder sendet eine Nachricht. Mit angeschlossener Tastatur senden auch Strg+Enter beziehungsweise ⌘Enter.
-- In der Sitzung zeigt eine Schaltfläche das Modell und bei Abweichungen Denkaufwand und Berechtigungen. Sie öffnet ein Bedienfeld mit **Modell**, **Denkaufwand**, **Berechtigungen**, Kontextauslastung und **Verdichten**.
+- In der Sitzung zeigt eine Schaltfläche das Modell und bei Abweichungen Denkaufwand und Berechtigungen. Sie öffnet ein Bedienfeld mit **Modell**, **Aufwand**, **Berechtigungen**, Kontextauslastung und **Verdichten**.
 - Markiere einen Teil einer Antwort oder deiner Nachricht, um darunter **Zitieren** einzublenden.
 - **Details** öffnet sich nur auf Anforderung über der Unterhaltung.
 - Die Suche füllt den Bildschirm; **Abbrechen** schließt sie.
@@ -264,9 +264,9 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 - **Passende Abschnitte** erscheinen beim Tippen. Ein Klick öffnet sie; auch die übergreifende Suche per Strg+K findet sie.
 - **Enter** oder **Fragen** lässt einen Agenten in einem Bereich neben dem Leitfaden antworten, mit Links zu passenden Stellen. Nach deiner Freigabe auf einer Karte kann er auch Einstellungen ändern oder etwas einrichten. Die Antwort gehört zu einer normalen Sitzung mit dem auf der Startseite zuletzt gewählten Agenten und Modell. Stelle weitere Fragen im Bereich oder öffne die Sitzung über den Pfeil oben auf ihrer eigenen Seite.
 
-**Einen Agenten fragen** oben auf jeder Hilfeseite öffnet denselben Bereich, ebenso „Einen Agenten zur App fragen“ in der Suche. Unter dem Eingabefeld stehen die Themen in Gruppen. Ihre Abschnitte lassen sich einzeln öffnen oder mit **Alle öffnen** gemeinsam anzeigen. Am Ende stehen Beispielaufträge: Ein Klick übernimmt sie in das Agentenfeld, wo du sie anpassen und senden kannst.
+**Agenten fragen** oben auf jeder Hilfeseite öffnet denselben Bereich, ebenso „Einen Agenten zur App fragen“ in der Suche. Unter dem Eingabefeld stehen die Themen in Gruppen. Ihre Abschnitte lassen sich einzeln öffnen oder mit **Alle öffnen** gemeinsam anzeigen. Am Ende stehen Beispielaufträge: Ein Klick übernimmt sie in das Agentenfeld, wo du sie anpassen und senden kannst.
 
-- Die Willkommenstour führt dich durch die App und richtet die gewünschten Agenten ein. Starte sie über **Take a tour** oben in der Hilfe, über [Take a tour](/settings?s=general&find=Take%20the%20tour) unter Einstellungen → App → Allgemein oder mit „Tour“ in der Suche. Erkennt Hydor auf diesem Computer den Ordner eines zuvor verwendeten Agenten wie Claude Code oder Codex, ergänzt die Tour **Schon einen anderen Agenten verwendet?**. Sie nennt die gefundenen Agenten. **Vorhandenes Wissen übernehmen** öffnet [Importieren](/guide/memory#bring-in-from-other-assistants) über der Tour, um Wissen über dich und selbst erstellte Skills zu übernehmen. Ohne solche Ordner entfällt der Schritt. In der Desktop-App folgt außerdem **Auch auf deinem Smartphone nutzen?**: **Einrichten** beendet die Tour bei [Auf dem Smartphone nutzen](/settings?s=phone); **Nicht jetzt** setzt sie fort. Anschließend erklären Hinweise die übrige App beim ersten Besuch des jeweiligen Bereichs. Siehe [Die Tour starten](/guide/app#take-the-tour).
+- Die Willkommenstour führt dich durch die App und richtet die gewünschten Agenten ein. Starte sie über **Take a tour** oben in der Hilfe, über [Take a tour](/settings?s=general&find=Take%20the%20tour) unter Einstellungen → App → Allgemein oder mit „Tour“ in der Suche. Erkennt Hydor auf diesem Computer den Ordner eines zuvor verwendeten Agenten wie Claude Code oder Codex, ergänzt die Tour **Nutzt du bereits einen anderen Agenten?**. Sie nennt die gefundenen Agenten. **Ihr Wissen übernehmen** öffnet [Importieren](/guide/memory#bring-in-from-other-assistants) über der Tour, um Wissen über dich und selbst erstellte Skills zu übernehmen. Ohne solche Ordner entfällt der Schritt. In der Desktop-App folgt außerdem **Auch auf dem Handy nutzen?**: **Einrichten** beendet die Tour bei [Auf dem Smartphone nutzen](/settings?s=phone); **Nicht jetzt** setzt sie fort. Anschließend erklären Hinweise die übrige App beim ersten Besuch des jeweiligen Bereichs. Siehe [Die Tour starten](/guide/app#take-the-tour).
 - **Versionshinweise** unter Einstellungen → App → Allgemein oder in der Suche erklären die Änderungen jeder Version. Nach einem Update erscheint einmal „Was ist neu?“.
 - Auch die Agenten können diesen Leitfaden lesen. Frage in jeder Sitzung „Wie kann ich…?“. Der Agent kann antworten oder die Aufgabe übernehmen. Siehe [Agenten die App bedienen lassen](/guide/ask-agents).
 

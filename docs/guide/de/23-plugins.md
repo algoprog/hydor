@@ -24,10 +24,10 @@ Oben findest du drei Tabs: **Alle Agenten** für die Plugins dieser App, die all
 
 Unter **Alle Agenten** findest du:
 
-- ein Suchfeld und neben der Abschnittsüberschrift die Schaltfläche **Hinzufügen** mit den Optionen **Plugin erstellen**, **Mit einem Agenten erstellen**, **Über einen Link**, **Aus einer ZIP-Datei** und **Aus einem Ordner**;
+- ein Suchfeld und neben der Abschnittsüberschrift die Schaltfläche **Hinzufügen** mit den Optionen **Plugin erstellen**, **Mit einem Agenten erstellen**, **Von einem Link**, **Aus einer ZIP-Datei** und **Aus einem Ordner**;
 - während ein Plugin hinzugefügt oder eingerichtet wird, eine laufend aktualisierte Anzeige der einzelnen Schritte;
 - **Deine Plugins**: hinzugefügte Plugins, jeweils mit Schalter und einem **⋯**-Menü mit **Details** sowie **Bearbeiten** für selbst erstellte oder aus einem Ordner eingebundene Plugins. Das (i) neben der Überschrift erklärt, dass diese Plugins mit allen Agenten funktionieren. Selbst erstellte Plugins sind mit **Von dir erstellt** gekennzeichnet, Plugins aus einem Link, einer Datei oder einem fremden Ordner mit **Von dir hinzugefügt**;
-- **Mitgeliefert**: noch nicht hinzugefügte integrierte Plugins, jeweils mit **Hinzufügen**.
+- **Mitgelieferte Plugins**: noch nicht hinzugefügte integrierte Plugins, jeweils mit **Hinzufügen**.
 
 Jedes Plugin zeigt Namen und Version, seinen Zweck, seinen Inhalt („1 Skill · 1 Tool-Server“) und mögliche Einschränkungen: eine fehlgeschlagene Einrichtung, ein fehlendes Programm oder einen noch nicht gespeicherten Key. Klicke auf den Namen eines Plugins oder auf **⋯ → Details**, um es zu öffnen.
 
@@ -35,7 +35,7 @@ Auch über die Suche (Strg+K, auf dem Mac ⌘K) findest du Plugins im Bereich **
 
 ## Ein mitgeliefertes Plugin hinzufügen
 
-1. Klicke unter **Mitgeliefert** in der Zeile des Plugins auf **Hinzufügen**, oder öffne es und klicke dort auf **Hinzufügen**.
+1. Klicke unter **Mitgelieferte Plugins** in der Zeile des Plugins auf **Hinzufügen**, oder öffne es und klicke dort auf **Hinzufügen**.
 2. Oben auf der Seite siehst du die einzelnen Schritte: Zuerst wird das Plugin hinzugefügt, dann werden seine Pakete und Downloads eingerichtet. Sobald es bereit ist, wird es aktiviert.
 
 Benötigt ein Plugin andere Plugins, werden diese zuerst hinzugefügt. Welche das sind, steht vor dem Hinzufügen auf seiner Detailseite.
@@ -55,15 +55,15 @@ Benötigt ein Plugin andere Plugins, werden diese zuerst hinzugefügt. Welche da
 
 Klicke auf ein Plugin. Sein Fenster zeigt:
 
-- die Herkunft (**Mitgeliefert**, Link, Datei, **Hier erstellt** oder Ordner), Autor, Lizenz und Website;
-- nach dem Hinzufügen seinen Schalter: **Für alle Agenten aktiviert** oder **Aus**;
+- die Herkunft (**Mit der App geliefert**, Link, Datei, **Hier erstellt** oder Ordner), Autor, Lizenz und Website;
+- nach dem Hinzufügen seinen Schalter: **Für jeden Agenten aktiviert** oder **Aus**;
 - seinen Zweck;
-- **Was Agenten erhalten**: Skills mit Einsatzbeschreibung, Tool-Server mit Programm oder Adresse, Anweisungen und die Agenten, denen das Plugin zur Verfügung steht;
+- **Für Agenten bereitgestellte Inhalte**: Skills mit Einsatzbeschreibung, Tool-Server mit Programm oder Adresse, Anweisungen und die Agenten, denen das Plugin zur Verfügung steht;
 - **Voraussetzungen**, jeweils mit Haken oder Kreuz: andere Plugins, Python- und Node-Pakete, Downloads, Programme auf diesem Computer samt Installationshinweisen und Keys, bei fehlenden Keys mit **Hinzufügen**;
 - eigene Dateien, mögliche Probleme im Plugin-Ordner und unter **Über dieses Plugin** seine eigene Beschreibung;
 - bei hinzugefügten Plugins den Plugin-Ordner und den Datenordner.
 
-Ein hinzugefügtes Plugin hat unten ein **⋯**-Menü: **Bearbeiten** für selbst erstellte oder aus einem Ordner eingebundene Plugins, **Neueste Version herunterladen** bei Plugins aus einem Link sowie **Erneut einrichten**, **Als ZIP verpacken**, **Ordner anzeigen** und **Entfernen**.
+Ein hinzugefügtes Plugin hat unten ein **⋯**-Menü: **Bearbeiten** für selbst erstellte oder aus einem Ordner eingebundene Plugins, **Neueste Version herunterladen** bei Plugins aus einem Link sowie **Erneut einrichten**, **In eine ZIP-Datei packen**, **Ordner anzeigen** und **Entfernen**.
 
 ## Voraussetzungen und Einrichtung eines Plugins
 
@@ -88,9 +88,9 @@ Verwende den Schalter in der Plugin-Zeile oder im Detailfenster. Nach dem Deakti
 
 ## Ein Plugin per Link, Datei oder Ordner hinzufügen
 
-1. Klicke auf **Hinzufügen** und dann auf **Über einen Link**, **Aus einer ZIP-Datei** oder **Aus einem Ordner**.
+1. Klicke auf **Hinzufügen** und dann auf **Von einem Link**, **Aus einer ZIP-Datei** oder **Aus einem Ordner**.
 2. Gib die Quelle an:
-   - **Über einen Link**: ein Git-Repository mit einem Plugin, für GitHub als owner/repo oder als Adresse, oder ein Link zum Plugin-Ordner auf GitHub. Unter **Branch oder Unterordner im Repository…** kannst du einen Branch oder Tag und einen Ordner angeben.
+   - **Von einem Link**: ein Git-Repository mit einem Plugin, für GitHub als owner/repo oder als Adresse, oder ein Link zum Plugin-Ordner auf GitHub. Unter **Ein Branch oder ein Ordner im Repository…** kannst du einen Branch oder Tag und einen Ordner angeben.
    - **Aus einer ZIP-Datei**: ein hier oder anderswo als ZIP verpacktes Plugin. Wähle die Datei aus oder ziehe sie in das Feld.
    - **Aus einem Ordner**: ein Ordner auf diesem Computer. Das Plugin wird direkt von dort verwendet. Änderungen im Ordner gelten für neue Sitzungen; das eignet sich besonders während der Entwicklung.
 3. Klicke auf **Ansehen**. Du siehst, was das Plugin bereitstellt und benötigt, welche integrierten Plugins es mitbringt und ob benötigte Plugins noch fehlen. Fehlende Voraussetzungen musst du zuerst hinzufügen.
@@ -103,9 +103,9 @@ Während der Einrichtung siehst du die einzelnen Schritte. Ein Plugin mit dem Na
 1. Klicke auf **Hinzufügen** und dann auf **Plugin erstellen**.
 2. Gib einen **Namen** und den Zweck an und klicke auf **Erstellen**. Das Plugin wird hinzugefügt und aktiviert; der Editor öffnet sich.
 3. Fülle die Tabs aus und klicke auf **Speichern**:
-   - **Über dieses Plugin**: Anzeigename, Version (bei einer neuen veröffentlichten Fassung erhöhen), Zweck, Kategorie und Bild.
-   - **Skills**: **Skill schreiben** mit Name, Kategorie, Einsatzbedingungen und Anweisungen, oder **Eigenen Skill kopieren** aus deiner Skill-Sammlung. Klicke auf einen Skill, um ihn zu bearbeiten.
-   - **Werkzeuge**: **Tool-Server hinzufügen**, entweder **Ein Programm hier** mit Programm, einem Argument pro Zeile und Umgebungsvariablen als NAME=value-Zeilen oder **Eine Adresse** mit MCP-Server-Adresse und Headern. `${PLUGIN_ROOT}` steht für den Plugin-Ordner, `${PLUGIN_DATA}` für den Datenordner. Ein Server-Argument kann zum Beispiel `${PLUGIN_ROOT}/files/server.py` lauten.
+   - **Über**: Anzeigename, Version (bei einer neuen veröffentlichten Fassung erhöhen), Zweck, Kategorie und Bild.
+   - **Skills**: **Skill schreiben** mit Name, Kategorie, Einsatzbedingungen und Anweisungen, oder **Einen deiner eigenen kopieren** aus deiner Skill-Sammlung. Klicke auf einen Skill, um ihn zu bearbeiten.
+   - **Werkzeuge**: **Toolserver hinzufügen**, entweder **Ein lokales Programm** mit Programm, einem Argument pro Zeile und Umgebungsvariablen als NAME=value-Zeilen oder **Eine Adresse** mit MCP-Server-Adresse und Headern. `${PLUGIN_ROOT}` steht für den Plugin-Ordner, `${PLUGIN_DATA}` für den Datenordner. Ein Server-Argument kann zum Beispiel `${PLUGIN_ROOT}/files/server.py` lauten.
    - **Voraussetzungen**: Python-Pakete, Node-Pakete, Programme, Keys, andere Plugins und Downloads, jeweils ein Eintrag pro Zeile.
    - **Dateien**: **Dateien hinzufügen** nimmt Dateien in das Plugin auf, bis zu 50 MB pro Datei und 200 MB insgesamt. Der Papierkorb entfernt eine Datei. Dateien werden sofort hinzugefügt oder entfernt; **Speichern** ist dafür nicht nötig.
    - **Anweisungen**: ergänzende Anweisungen, die jeder Agent bei aktiviertem Plugin erhält.
@@ -119,7 +119,7 @@ Selbst erstellte Plugins liegen im Datenordner der App unter plugins/mine. Zum s
 ## Ein Plugin teilen
 
 - **Als Datei**: Öffne das Plugin und wähle **⋯ → In eine ZIP-Datei packen** (oder **In eine ZIP-Datei packen** in seinem Editor). Jeder kann es mit **Hinzufügen → Aus einer ZIP-Datei** hinzufügen. Seine Einrichtung wird nicht mit verpackt: Sie wird dort, wo es hinzugefügt wird, neu durchgeführt.
-- **Als Link**: Lege den Plugin-Ordner in einem Git-Repository ab, etwa auf GitHub. Andere fügen das Plugin über **Hinzufügen → Über einen Link** hinzu und erhalten neue Versionen über **Neueste Version herunterladen**.
+- **Als Link**: Lege den Plugin-Ordner in einem Git-Repository ab, etwa auf GitHub. Andere fügen das Plugin über **Hinzufügen → Von einem Link** hinzu und erhalten neue Versionen über **Neueste Version herunterladen**.
 
 Auch andere Tools mit Unterstützung für das Format Agent Plugins können seine Skills und Tool-Server verwenden. App-spezifische Angaben wie Voraussetzungen und Anweisungen liegen im Abschnitt `com.naget.agent`, den andere Tools überspringen.
 
@@ -147,9 +147,9 @@ Ein Plugin kann auf bestimmte Agenten beschränkt sein; das steht im Detailfenst
 Claude Code und Codex haben eigene Plugins aus ihren Marktplätzen, die jeweils nur der betreffende Agent verwendet. Beide haben einen Tab auf der Plugin-Seite:
 
 - **Claude Code**: **Installiert**, jeweils mit Schalter und **Deinstallieren**; **Entdecken** zum Durchsuchen der Marktplätze, nach Installationszahl sortiert, mit **Installieren**; **Marktplätze** zum Hinzufügen per owner/repo, Git-Adresse oder Ordner und zum Entfernen.
-- **Codex**: **Zu Codex hinzugefügt**, jeweils mit **Entfernen**; **Weitere finden** zum Durchsuchen der Codex-Marktplätze mit **Hinzufügen**; **Marktplätze** mit Hinzufügen, **Aktualisieren** und Entfernen.
+- **Codex**: **Zu Codex hinzugefügt**, jeweils mit **Entfernen**; **Mehr finden** zum Durchsuchen der Codex-Marktplätze mit **Hinzufügen**; **Marktplätze** mit Hinzufügen, **Aktualisieren** und Entfernen.
 
-Die zugehörigen Skills erscheinen auf der Skill-Seite unter den eigenen Skills des Agenten. Soll ein Claude-Code-Plugin allen Agenten zur Verfügung stehen, füge es unter den Plugins dieser App über **Hinzufügen → Über einen Link** hinzu.
+Die zugehörigen Skills erscheinen auf der Skill-Seite unter den eigenen Skills des Agenten. Soll ein Claude-Code-Plugin allen Agenten zur Verfügung stehen, füge es unter den Plugins dieser App über **Hinzufügen → Von einem Link** hinzu.
 
 ## Plugins und Sicherheit
 

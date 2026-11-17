@@ -33,8 +33,8 @@ Auch eine geplante Aufgabe kann bei jedem Lauf Tiefgehende Recherche starten. Ih
 
 - **Gleichzeitig aktive Forscher** (1 bis 8; anfangs 4): Wie viele Forscher in jeder Runde gleichzeitig suchen, also wie breit jede Runde angelegt ist.
 - **Runden**: 1 bis 5, anfangs 2. Jede Runde verfolgt offene Punkte der vorherigen. Anschließend folgt eine separate Prüfrunde.
-- **Suchen insgesamt**: 10 bis 500 in Zehnerschritten, anfangs 60. Dieses Budget gilt gemeinsam für Leitung und Recherche-Agenten.
-- **Berichtsformat**: **Seite** oder **Word**.
+- **Suchanfragen insgesamt**: 10 bis 500 in Zehnerschritten, anfangs 60. Dieses Budget gilt gemeinsam für Leitung und Recherche-Agenten.
+- **Der Bericht**: **Seite** oder **Word**.
 
 Der Browser merkt sich die Zahlen für deinen nächsten Durchlauf mit Tiefgehende Recherche. Der Modus selbst bleibt nicht aktiv: Neue Sitzungen starten ohne Recherchemodus, da Tiefgehende Recherche ein Mehrfaches einer einzelnen Antwort kostet.
 
@@ -65,7 +65,7 @@ Tiefgehende Recherche führt viele Agenten gleichzeitig aus. Setze vorher im sel
 
 Jeder Agent kann einen abgeschlossenen Teil seiner Arbeit an einen Subagenten übergeben, der ihn gleichzeitig bearbeitet und danach berichtet. Es gibt zwei Arten, und die App sagt dir, welche es ist. Ein **Hydor-Subagent** ist eine eigene Sitzung, die Hydor startet, mit beliebigem Agenten und Modell: Er hat eine Karte in der Unterhaltung, steht in der Seitenleiste unter seiner übergeordneten Sitzung, hat eigene Kosten und seinen eigenen Anteil am Ausgabenlimit, du kannst ihn öffnen und mit ihm sprechen, und seine Antwort kommt als Nachricht bei der übergeordneten Sitzung an. Ein **Claude-Code-Subagent** ist einer, den Claude Code für einen kurzen Teil seiner Arbeit innerhalb der Sitzung ausführt (bei Codex ein „Codex-Subagent“): Er ist eine Zeile in der Leiste über dem Nachrichtenfeld, öffnet sich in einem Bereich mit seinen Schritten, kann gestoppt, aber nicht angesprochen werden, und was er ausgibt, zählt zu den Ausgaben der Sitzung selbst. In der Leiste sagt jede Zeile, welche Art es ist („Hydor-Subagent · Claude Code · Sonnet 5.5“ oder „Claude-Code-Subagent“), und wenn du darauf zeigst, steht dort, wer ihn ausführt ([Subagenten](/guide/sessions#subagents)). Der Rest dieses Abschnitts handelt von Hydor-Subagenten.
 
-Du musst nichts aktivieren. Bitte etwa „Lass drei Subagenten jeweils einen Anbieter recherchieren“ oder „Lass Codex die Tests schreiben, während du die Dokumentation bearbeitest“, oder überlasse die Aufteilung dem Agenten. Der Hauptagent soll selbstständig planen und prüfen und klare Teilaufgaben an günstigere Modellstufen delegieren. Siehe [Modellstufen für unterschiedliche Aufgaben](/guide/agents-models#tiers-a-model-for-each-kind-of-job). Dort lässt sich das mit **Mit Subagenten arbeiten** ausschalten.
+Du musst nichts aktivieren. Bitte etwa „Lass drei Subagenten jeweils einen Anbieter recherchieren“ oder „Lass Codex die Tests schreiben, während du die Dokumentation bearbeitest“, oder überlasse die Aufteilung dem Agenten. Der Hauptagent soll selbstständig planen und prüfen und klare Teilaufgaben an günstigere Modellstufen delegieren. Siehe [Modellstufen für unterschiedliche Aufgaben](/guide/agents-models#tiers-a-model-for-each-kind-of-job). Dort lässt sich das mit **Subagenten koordinieren** ausschalten.
 
 Für jeden Hydor-Subagenten legt der Agent fest:
 
@@ -86,7 +86,7 @@ In der Unterhaltung der übergeordneten Sitzung erscheint die Antwort als eine Z
 
 - Antworten über etwa 4.000 Zeichen werden vom Hilfsmodell zusammengefasst; die Leitung kann weiterhin den Volltext lesen. Siehe [Agenten, Konten und Modelle](/guide/agents-models).
 - Wenn ein Hydor-Subagent mit einem Fehler stoppt oder vor dem Ende gestoppt wird, erfährt die übergeordnete Sitzung auch das.
-- Bei Quick und Standard prüft das Hilfsmodell Auftrag und Antwort kurz. Ist das Ergebnis unzureichend oder schlägt der Agent fehl, wird die Aufgabe eine Stufe höher erneut ausgeführt, höchstens auf Best und nie über die von der Leitung erlaubte Höchststufe. Die Leitung erfährt Grund und Wechsel. Nur die ursprüngliche Auftragsantwort wird so geprüft, nicht spätere Antworten. Eigene Agenten können **Bei fehlgeschlagener Prüfung hochstufen** deaktivieren. Die Leitung kann auch selbst bei unzureichenden Ergebnissen hochstufen.
+- Bei Quick und Standard prüft das Hilfsmodell Auftrag und Antwort kurz. Ist das Ergebnis unzureichend oder schlägt der Agent fehl, wird die Aufgabe eine Stufe höher erneut ausgeführt, höchstens auf Best und nie über die von der Leitung erlaubte Höchststufe. Die Leitung erfährt Grund und Wechsel. Nur die ursprüngliche Auftragsantwort wird so geprüft, nicht spätere Antworten. Eigene Agenten können **Bei fehlgeschlagener Prüfung auf eine höhere Stufe wechseln** deaktivieren. Die Leitung kann auch selbst bei unzureichenden Ergebnissen hochstufen.
 - Die Leitung kann jederzeit Aktivität, Programm, Modell, Kosten und Anfang der neuesten Antwort ihrer Subagenten abrufen und ihnen weitere Aufgaben geben.
 - Antworten aus während eines App-Stopps beendeten Durchläufen werden nach dem Neustart zugestellt.
 
@@ -110,7 +110,7 @@ Ein Subagent mit Freigabeanfrage oder Rückfrage wartet wie jede andere Sitzung 
 
 ### Gleichzeitige Subagenten festlegen
 
-Unter [Einstellungen → Funktionen → Subagenten](/settings?s=children) stellst du **Gleichzeitig pro Sitzung** mit − und + auf 1 bis 12, anfangs 4. Der Eintrag liegt in der Gruppe **Subagenten**; **(i)** erklärt deren Grenzen. [Zur Einstellung](/settings?s=children&find=Working%20at%20once%2C%20per%20session). Das Limit gilt je Sitzung, nicht für die ganze App. Für Tiefgehende Recherche gilt eine eigene Zahl gleichzeitiger Recherche-Agenten, Schwarm die **Schwarm-Größe**.
+Unter [Einstellungen → Funktionen → Subagenten](/settings?s=children) stellst du **Gleichzeitig aktive Subagenten pro Sitzung** mit − und + auf 1 bis 12, anfangs 4. Der Eintrag liegt in der Gruppe **Subagenten**; **(i)** erklärt deren Grenzen. [Zur Einstellung](/settings?s=children&find=Working%20at%20once%2C%20per%20session). Das Limit gilt je Sitzung, nicht für die ganze App. Für Tiefgehende Recherche gilt eine eigene Zahl gleichzeitiger Recherche-Agenten, Schwarm die **Schwarm-Größe**.
 
 ## Ein schwieriges Problem mit einem Schwarm bearbeiten
 
@@ -147,7 +147,7 @@ Ein fertiges Mitglied sendet seinen Bericht an die Leitung. Eine neue Nachricht 
 
 **Board** öffnet das Schwarm-Board (auf einem Smartphone von unten):
 
-- **Mitglieder**: laufende und maximal gleichzeitige Zahl, danach jedes Mitglied mit Aktivität oder „Durchlauf abgeschlossen“, „Gestoppt“ beziehungsweise „Mit Fehler beendet“. Ein Klick öffnet seine Sitzung, **Leitung öffnen** die Hauptsitzung. Vor der Ansatzwahl steht dort, dass noch niemand gestartet wurde.
+- **Mitglieder**: laufende und maximal gleichzeitige Zahl, danach jedes Mitglied mit Aktivität oder „Durchlauf abgeschlossen“, „Gestoppt“ beziehungsweise „Mit Fehler beendet“. Ein Klick öffnet seine Sitzung, **Leitenden Agenten öffnen** die Hauptsitzung. Vor der Ansatzwahl steht dort, dass noch niemand gestartet wurde.
 - **Beiträge**: alles, was gepostet wurde, die neuesten zuerst. Jeder Beitrag zeigt, wer ihn geschrieben hat (die Leitung oder der Titel des Mitglieds), für wen er war, wenn er an ein Mitglied oder an die Leitung ging, seine Art (Fortschritt, Erkenntnis, Frage, Notiz) und wie lange das her ist. Wechsle zwischen **Alle**, **Erkenntnisse** und **Fragen**. Neue Beiträge erscheinen, sobald sie eintreffen.
 
 ### Mitglieder stoppen
@@ -171,8 +171,8 @@ Bei einer Zweitmeinung prüft das Modell eines anderen Anbieters die geänderten
 ### Anfordern
 
 1. Öffne das Menü der Sitzung (⋯) und wähle **Zweitmeinung**.
-2. Wähle unter **Wer prüft?** den Prüfer; die Empfehlung steht oben.
-3. Wähle unter **Welcher Durchlauf?** aus bis zu zwölf zuletzt abgeschlossenen Durchläufen mit Zeitpunkt und Zahl geänderter Dateien. Der neueste ist vorausgewählt.
+2. Wähle unter **Wer prüft es?** den Prüfer; die Empfehlung steht oben.
+3. Wähle unter **Durchlauf auswählen** aus bis zu zwölf zuletzt abgeschlossenen Durchläufen mit Zeitpunkt und Zahl geänderter Dateien. Der neueste ist vorausgewählt.
 4. Klicke auf **Fragen**; die Schaltfläche nennt den Prüfer, etwa **Codex fragen**.
 
 Unter dem Durchlauf erscheint sofort eine Karte, die sich meist innerhalb von ein bis zwei Minuten füllt. Laufende Durchläufe sind erst nach ihrem Ende prüfbar. Auf dem Smartphone öffnet der Dialog von unten.
@@ -181,8 +181,8 @@ Unter dem Durchlauf erscheint sofort eine Karte, die sich meist innerhalb von ei
 
 Es kommen nur Modelle anderer Anbieter infrage, damit kein Anbieter seine eigene Arbeit prüft:
 
-- **Claude-Code-Sitzungen** und andere Sitzungen mit Anthropic-Modell können von **Codex** über dessen Programm oder einem nicht von Anthropic stammenden Custom-Modell geprüft werden.
-- **Codex-Sitzungen** und andere Sitzungen mit OpenAI-Modell können von **Claude**, Sonnet über Claude Code, oder einem Custom-Modell außerhalb von OpenAI geprüft werden.
+- **Claude Code**-Sitzungen und andere Sitzungen mit Anthropic-Modell können von **Codex** über dessen Programm oder einem nicht von Anthropic stammenden Custom-Modell geprüft werden.
+- **Codex**-Sitzungen und andere Sitzungen mit OpenAI-Modell können von **Claude**, Sonnet über Claude Code, oder einem Custom-Modell außerhalb von OpenAI geprüft werden.
 - Andere Sitzungen mit Custom oder weiteren Agenten und Modellen anderer Anbieter können Claude, Codex oder ein Custom-Modell eines jeweils anderen Anbieters verwenden.
 
 Custom bietet deine unter [Einstellungen → Modelle](/settings?s=models) hinzugefügten Modelle an. Die Prüfung liest nur. Claude und Codex dürfen gezielt Dateien im Sitzungsordner öffnen, verändern aber nichts. Zusätzlich zum Durchlauf sehen sie deine erste Sitzungsnachricht und deine Nachricht unmittelbar vor dem Durchlauf. Zu große Änderungen werden nur teilweise übergeben; die Karte weist darauf hin.
@@ -192,7 +192,7 @@ Custom bietet deine unter [Einstellungen → Modelle](/settings?s=models) hinzug
 Die Überschrift der Karte lautet **Zweitmeinung** und der Name des Prüfers, dann:
 
 - Solange er arbeitet: „Arbeit wird geprüft“ und wie lange es schon dauert, mit einer Zeile, die sagt, was der Prüfer gerade liest.
-- nach Abschluss eine Zusammenfassung nach Schweregrad wie „1 kritisch · 2 wichtig“, **Sieht gut aus** mit gegebenenfalls kleineren Hinweisen oder **Kein eindeutiges Urteil**, wenn die Antwort nicht als Prüfergebnis gelesen werden konnte;
+- nach Abschluss eine Zusammenfassung nach Schweregrad wie „1 kritisch · 2 wichtig“, **Sieht gut aus** mit gegebenenfalls kleineren Hinweisen oder **Kein klares Urteil**, wenn die Antwort nicht als Prüfergebnis gelesen werden konnte;
 - bei Fehlschlag **Keine Antwort** mit Grund, etwa fehlendes Prüferprogramm, keine Antwort innerhalb von acht Minuten oder zwischenzeitlicher App-Neustart, und **Erneut versuchen**.
 
 Die Überschrift klappt die Karte auf oder zu. Innen stehen Zusammenfassung und Befunde nach Schweregrad. Jeder Befund nennt:
@@ -201,13 +201,13 @@ Die Überschrift klappt die Karte auf oder zu. Innen stehen Zusammenfassung und 
 - ein kurzer Titel und die Datei und Zeile, um die es geht (klicke darauf, um die Datei dort zu öffnen);
 - Problem, Auswirkungen und Korrekturvorschlag.
 
-Bei schwereren Befunden sind Kleinigkeiten unter **N kleinere Hinweise anzeigen** eingeklappt; **Kleinere Hinweise ausblenden** schließt sie wieder. × entfernt die Karte aus der Ansicht.
+Bei schwereren Befunden sind Kleinigkeiten unter **N kleinere Hinweise anzeigen** eingeklappt; **Kleinere Befunde ausblenden** schließt sie wieder. × entfernt die Karte aus der Ansicht.
 
 ### Hinweise an den Agenten senden
 
 - Das Papierflugzeug **An Agenten senden** neben einem Befund übernimmt ihn als bearbeitbaren Entwurf ins Nachrichtenfeld.
-- **Alle an Agenten senden** übernimmt sämtliche angezeigten Befunde.
-- Während der Agent arbeitet, fügt **Alle einreihen** beziehungsweise **Einreihen** sie der Warteschlange für das Ende des Durchlaufs hinzu.
+- **Alles an den Agenten senden** übernimmt sämtliche angezeigten Befunde.
+- Während der Agent arbeitet, fügt **Alle in die Warteschlange stellen** beziehungsweise **Einreihen** sie der Warteschlange für das Ende des Durchlaufs hinzu.
 
 Die Nachricht nennt Prüfer, Befunde mit Schweregrad und Dateien und bittet den Agenten, jeden Punkt zu prüfen, bestätigte Probleme zu beheben und begründet zu erklären, was er unverändert lässt.
 
@@ -232,7 +232,7 @@ Jedes Modell arbeitet in einer eigenen Sitzung mit demselben Auftrag, Anhängen,
 
 Jede Vergleichssitzung zeigt über dem Nachrichtenfeld **Arena** mit „Derselbe Auftrag ging an weitere Modelle“ und **Antworten vergleichen**. Die Vergleichsseite zeigt oben den Auftrag und pro Modell eine während der Ausgabe wachsende Antwortspalte, am Computer nebeneinander, auf dem Smartphone untereinander.
 
-- **Diese behalten** ist nach der ersten Antwort verfügbar. Die Sitzung gewinnt, andere werden archiviert und bleiben dort weiterhin lesbar. Die Spalten heißen anschließend **Behalten** und **Archiviert**.
+- **Dieses behalten** ist nach der ersten Antwort verfügbar. Die Sitzung gewinnt, andere werden archiviert und bleiben dort weiterhin lesbar. Die Spalten heißen anschließend **Behalten** und **Archiviert**.
 - **Öffnen** führt zur Sitzung eines Modells. Beim behaltenen steht dort **Hier fortsetzen**, um die Unterhaltung mit dem Gewinner fortzusetzen.
 - **Welche Modelle gewinnen** beziehungsweise auf dem Smartphone **Rangliste** öffnet Nutzung → Arena.
 
@@ -275,13 +275,13 @@ Solange eine Sitzung ein Limit hat, zeigt eine Leiste über ihrem Nachrichtenfel
 
 Geprüft wird nach jedem Modellaufruf. Der Durchlauf stoppt nach dem Aufruf, der das Limit erreicht, sodass die Summe leicht darüber liegen kann:
 
-- Der Agent stoppt. Unter dem Durchlauf steht „Am Ausgabenlimit gestoppt“ mit Verbrauch, Limit und **Limit erhöhen…**. Eine Benachrichtigung nennt die Sitzung.
+- Der Agent stoppt. Unter dem Durchlauf steht „Am Ausgabenlimit gestoppt“ mit Verbrauch, Limit und **Limit erhöhen …**. Eine Benachrichtigung nennt die Sitzung.
 - Ihre laufenden Hydor-Subagenten stoppen ebenfalls. Ihr Hinweis sagt, dass die Sitzung, die sie gestartet hat, ihr Ausgabenlimit erreicht hat, mit **Öffnen**, um dorthin zu gehen.
 - Neue Nachrichten warten. Gesendeter Text wird nicht weitergegeben, sondern bleibt mit einem Limit-Hinweis im Feld. Die Warteschlange bleibt angehalten, bis du das Limit erhöhst oder entfernst.
 
 ### Das Limit erhöhen oder entfernen
 
-Wähle **Erhöhen** in der Leiste, **Limit erhöhen…** im Hinweis oder das Sitzungsmenü. Setze ein Limit oberhalb des bisherigen Verbrauchs oder entferne es. Wartende Nachrichten werden anschließend gesendet. Subagenten, die am übergeordneten Limit stoppten, nehmen nach dessen Erhöhung ebenfalls wieder Nachrichten an.
+Wähle **Erhöhen** in der Leiste, **Limit erhöhen …** im Hinweis oder das Sitzungsmenü. Setze ein Limit oberhalb des bisherigen Verbrauchs oder entferne es. Wartende Nachrichten werden anschließend gesendet. Subagenten, die am übergeordneten Limit stoppten, nehmen nach dessen Erhöhung ebenfalls wieder Nachrichten an.
 
 ### Limits für Subagenten
 
@@ -289,8 +289,8 @@ Jeder neue Hydor-Subagent erhält einen gleichen Anteil des verbleibenden überg
 
 ### Limits für geplante Aufgaben und Apps
 
-- **Geplante Aufgaben**: Der Editor unter [Einstellungen → Geplante Aufgaben](/settings?s=tasks), **Neue Aufgabe** oder Aufgabenmenü → **Bearbeiten** enthält das **Ausgabenlimit** wie die Startseite. **Stoppt ab $** unter **Pro Ausführung** setzt dasselbe Limit; leer bedeutet unbegrenzt. Jede neue Ausführungssitzung hält daran an. Fügt eine Ausführung stattdessen eine Nachricht in eine vorhandene Sitzung ein, gilt deren eigenes Limit. Aus einer Unterhaltung erstellte Aufgaben übernehmen deren Einstellungen einschließlich Ausgabenlimit. Siehe [Geplante Aufgaben](/guide/tasks).
-- **Apps**: Unter **Grenzen** gibt es **Maximale Kosten pro Ausführung (US$)**. Siehe [Apps](/guide/apps).
+- **Geplante Aufgaben**: Der Editor unter [Einstellungen → Geplante Aufgaben](/settings?s=tasks), **Neue Aufgabe** oder Aufgabenmenü → **Bearbeiten** enthält das **Ausgabenlimit** wie die Startseite. **Stoppt oberhalb von $** unter **Pro Ausführung** setzt dasselbe Limit; leer bedeutet unbegrenzt. Jede neue Ausführungssitzung hält daran an. Fügt eine Ausführung stattdessen eine Nachricht in eine vorhandene Sitzung ein, gilt deren eigenes Limit. Aus einer Unterhaltung erstellte Aufgaben übernehmen deren Einstellungen einschließlich Ausgabenlimit. Siehe [Geplante Aufgaben](/guide/tasks).
+- **Apps**: Unter **Grenzen** gibt es **Maximale Kosten pro Lauf (US$)**. Siehe [Apps](/guide/apps).
 
 ## Einen Agenten fragen
 

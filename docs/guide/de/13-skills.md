@@ -28,7 +28,7 @@ Jede von der App gestartete Sitzung erhält die Skill-Bibliothek:
 
 - **Claude Code** erhält sie als Plugin namens „hydor“. Die Skills erscheinen deshalb etwa als hydor:research oder hydor:writing.
 - **Codex** erhält einen zusätzlichen Skills-Ordner.
-- **Custom**, der eigene Agent der App, erhält die Skills nach Namen und Gruppen. Er kann außerdem anhand der Aufgabe nach einem Skill suchen. Siehe [Custom](/guide/custom).
+- **Benutzerdefiniert**, der eigene Agent der App, erhält die Skills nach Namen und Gruppen. Er kann außerdem anhand der Aufgabe nach einem Skill suchen. Siehe [Custom](/guide/custom).
 - **Andere Agenten** wie Gemini CLI oder OpenCode erhalten eine Liste mit dem Dateipfad jedes Skills und lesen die passende Datei bei Bedarf.
 
 Außerhalb der App gestartete Sitzungen, etwa im Terminal oder in VS Code, erhalten die Bibliothek nicht. Die App trägt sie nicht in deine Claude-Code- oder Codex-Einstellungen ein.
@@ -55,7 +55,7 @@ Jedes Laden zählt als Verwendung. Bei Bibliotheksskills zeigt die Zeile die Anz
 
 Von oben nach unten findest du:
 
-- Neben dem Titel **Neuer Skill** und das Menü **⋯** mit **Passende Skills vorschlagen**, **Skills anhand von Schlüsselwörtern einbinden**, **Dein Skills-Ordner** zum Öffnen in Dateien, **Weitere Skills über Plugins** für [Einstellungen → Plugins](/settings?s=plugins) und **So erhalten Agenten Skills**.
+- Neben dem Titel **Neuer Skill** und das Menü **⋯** mit **Passende Skills vorschlagen**, **Skills anhand von Schlüsselwörtern einbinden**, **Dein Skills-Ordner** zum Öffnen in Dateien, **Mit Plugins erweitern** für [Einstellungen → Plugins](/settings?s=plugins) und **So erhalten Agenten Skills**.
 - Ausstehende Agentenvorschläge, sofern vorhanden; siehe [Einen Skill-Vorschlag bestätigen, bearbeiten oder verwerfen](#approve-edit-or-dismiss-a-proposed-skill). Das (i) erklärt, dass erst nach deiner Zustimmung gespeichert wird.
 - Ein Suchfeld und die Filter **Alle**, **Eingebaut**, **Deine Skills**, **Von Plugins**, **Claude Code und Codex** und **In Projekten**. Leere Filter werden ausgeblendet.
 - die Skills, in Gruppen nach ihrem Zweck (der Titel jeder Gruppe nennt, wie viele sie enthält, und eine lange Gruppe zeigt ihre ersten acht mit **Alle anzeigen**): **Arbeitsweisen**, **Schreiben**, **Dokumente**, **Recherche und Web**, **Planung und Entscheidungen**, **Daten und Zahlen**, **Design und Bilder**, **Programmierung**, **KI-Modelle** und **Diese App**; dann **Eigene Skills von Claude Code**, **Eigene Skills von Codex** und eine Gruppe für jedes Projekt mit eigenen Skills;
@@ -94,9 +94,9 @@ Klicke auf den Skill-Namen oder eine Anzeige **Skill wird verwendet** in der Unt
 
 Welche Aktionen unten verfügbar sind, hängt vom Skill ab:
 
-- Eingebaut: **Eigene Version erstellen**; siehe [Einen eingebauten Skill ändern](#change-a-built-in-skill).
+- Eingebaut: **Meine eigene Version erstellen**; siehe [Einen eingebauten Skill ändern](#change-a-built-in-skill).
 - Eigener Skill: **Ändern** und **Entfernen**.
-- Plugin-Skill: **Sein Plugin** zum Öffnen des Plugins und **Eigene Version erstellen**.
+- Plugin-Skill: **Sein Plugin** zum Öffnen des Plugins und **Meine eigene Version erstellen**.
 - Eigener Skill von Claude Code oder Codex: **Ändern**, bei nicht löschbaren Skills **Öffnen**, öffnet SKILL.md im Editor. Außerdem gibt es **Löschen**.
 - Projektskill: **Skills des Projekts**.
 
@@ -231,7 +231,7 @@ Ein Skill für alle Agenten wird in deinem Skills-Ordner innerhalb der App-Daten
 
 ## Einen eingebauten Skill ändern
 
-Öffne den Skill und klicke auf **Eigene Version erstellen**. Bearbeite die vorausgefüllten Felder und klicke auf **Speichern**. Deine Version basiert auf einer vollständigen Kopie des eingebauten Skill-Ordners einschließlich Beispielen und Skripten.
+Öffne den Skill und klicke auf **Meine eigene Version erstellen**. Bearbeite die vorausgefüllten Felder und klicke auf **Speichern**. Deine Version basiert auf einer vollständigen Kopie des eingebauten Skill-Ordners einschließlich Beispielen und Skripten.
 
 Danach verwenden Agenten deine Version, auch wenn die App später das eingebaute Original aktualisiert. Unter **Deine Skills** steht „Deine Version eines eingebauten Skills“. Entferne deine Version, um zum Original zurückzukehren; siehe [Einen Skill entfernen und wiederherstellen](#remove-a-skill-and-bring-it-back).
 
@@ -254,7 +254,7 @@ Gespeichert wird erst nach deiner Zustimmung. Bis dahin arbeitet der Agent weite
 
 ### Was die Karte zeigt
 
-Der Vorschlag erscheint während der weiteren Arbeit als Karte in der Unterhaltung, außerhalb der eingeklappten Schritte. Oben steht **Als Skill speichern?**, **Diesen Skill verbessern?** oder **Diesen eingebauten Skill verbessern?**, dazu Name und Status: **Wartet auf dich**, **Gespeichert**, **Verworfen** oder **Ersetzt**.
+Der Vorschlag erscheint während der weiteren Arbeit als Karte in der Unterhaltung, außerhalb der eingeklappten Schritte. Oben steht **Als Skill speichern?**, **Diesen Skill verbessern?** oder **Diesen integrierten Skill verbessern?**, dazu Name und Status: **Wartet auf dich**, **Gespeichert**, **Verworfen** oder **Ersetzt**.
 
 Darunter stehen:
 
@@ -294,7 +294,7 @@ Es wird nichts gespeichert. Der Agent erhält deine Entscheidung mit einer mögl
 Skills werden von Agenten gelesen. Deshalb prüft die App jeden Vorschlag vor der Anzeige:
 
 - **Geheimnisse blockieren den Vorschlag.** Text, der wie ein Passwort, Key oder Token aussieht, etwa ein API-Key, privater Key oder ein Passwort im Klartext oder innerhalb einer Adresse, wird nicht als Karte angezeigt. Der Agent soll den Wert entfernen und stattdessen seinen Aufbewahrungsort nennen.
-- **Auffällige Steuerungsanweisungen werden markiert.** Unter **Prüfe diese Zeilen vor dem Bestätigen** erscheinen Zeilennummer und Text, wenn ein Vorschlag etwa bestehende Anweisungen außer Kraft setzen, die Identität des Agenten ersetzen, Informationen vor dir verbergen oder Zustimmungen umgehen will. Auch das Versenden von Keys oder privaten Dateien, direkt aus dem Internet gestartete Skripte, geänderte Agenteneinstellungen oder Startdateien, weit außerhalb des Projekts gelöschte oder überschriebene Dateien, versteckte HTML-Anweisungen und unsichtbare Zeichen werden hervorgehoben.
+- **Auffällige Steuerungsanweisungen werden markiert.** Unter **Sieh dir diese Zeilen an, bevor du sie genehmigst** erscheinen Zeilennummer und Text, wenn ein Vorschlag etwa bestehende Anweisungen außer Kraft setzen, die Identität des Agenten ersetzen, Informationen vor dir verbergen oder Zustimmungen umgehen will. Auch das Versenden von Keys oder privaten Dateien, direkt aus dem Internet gestartete Skripte, geänderte Agenteneinstellungen oder Startdateien, weit außerhalb des Projekts gelöschte oder überschriebene Dateien, versteckte HTML-Anweisungen und unsichtbare Zeichen werden hervorgehoben.
 
 Bei solchen Warnungen fragt die App erneut: **Trotz dieser Warnungen speichern?** Klicke nur auf **Speichern**, wenn die markierten Anweisungen tatsächlich von den Agenten befolgt werden sollen.
 

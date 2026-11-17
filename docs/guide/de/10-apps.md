@@ -37,7 +37,7 @@ Darunter:
 - **Fertige Apps zum Installieren**: erscheint dort, sobald du eine fertige App deinstalliert hast. Jede Karte zeigt ihre Art, was sie tut und was du von ihr bekommst (die Seiten ihrer Ansicht, etwa beim Reiseplaner **Deine Reise**, **Tag für Tag**, **Im Voraus buchen** und **Budget**), und **Installieren** (siehe [Eine fertige App installieren oder deinstallieren](#install-or-uninstall-a-ready-made-app)).
 - **Bausteine** ist eingeklappt mit Anzahl: kleine Apps als Schritte eigener Abläufe, etwa Seite zusammenfassen, übersetzen, mit Webbelegen antworten, kategorisieren und Fakten extrahieren. Eigene Bausteine stehen dabei; **Schritt hinzufügen** bietet sie im Builder an.
 
-Zustandsmarkierungen sind **Wartet**, **Startet**, **In Arbeit**, **Braucht dich** für Freigaben oder Antworten, **Erledigt**, **Fehlgeschlagen** und **Gestoppt**.
+Zustandsmarkierungen sind **Wartet**, **Wird gestartet**, **In Arbeit**, **Braucht dich** für Freigaben oder Antworten, **Erledigt**, **Fehlgeschlagen** und **Angehalten**.
 
 Ziehe `.hydor-app` oder `.json` irgendwo auf die Seite zum Installieren. Zuerst erscheint eine Beschreibungskarte; siehe [App als Datei teilen](#share-an-app-as-a-file).
 
@@ -200,7 +200,7 @@ Die Statuskarte nennt:
 - **Wartet auf die Ausführung**, **Wird gestartet…** oder **Arbeitet** mit der bisherigen Zeit. Während er arbeitet, siehst du seine letzten Schritte („Web durchsucht“, „Eine Seite gelesen“, „Den Plan aktualisiert“) und den Anfang dessen, was der Agent zuletzt gesagt hat.
 - **Er braucht deine Genehmigung in der Sitzung** oder **Er hat eine Frage an dich in der Sitzung**: Der Agent wartet auf dich. Öffne die Sitzung, um zu antworten; Genehmigungen erscheinen auch [im Posteingang](/inbox).
 - **Erledigt in …** mit Kosten.
-- **Gestoppt** oder **Nicht abgeschlossen** mit Ursache.
+- **Angehalten** oder **Nicht abgeschlossen** mit Ursache.
 
 Darunter kommt das Ergebnis. Eine App mit einer Ansicht zeigt es dort (siehe [Ansicht der App](#its-view)); **Einfache Antwort** in der Statuskarte zeigt es stattdessen als einfache Karte und Tabellen, und **Eigene Ansicht** geht zurück. Ohne Ansicht:
 
@@ -294,7 +294,7 @@ Die Fragen, die jemand vor jedem Lauf beantwortet. **Frage hinzufügen** fügt e
 - Bei **Wahl**: den Optionen, eine pro Zeile (bleibt das Feld leer, bietet sie Ja und Nein an), und **Es können mehrere ausgewählt werden**, womit man mehr als eine abhaken kann (die Antwort hat dann eine Option pro Zeile).
 - **Hilfetext, Beispiel, Standard …** öffnet drei weitere Felder: **Hilfe unter der Frage**, **Eine Beispielantwort** (grau im leeren Feld angezeigt) und **Standardwert**.
 
-Das Menü **⋯** einer Frage hat **Nach oben verschieben**, **Nach unten verschieben** und **Entfernen**. Unter jeder Frage siehst du ihren Platzhalter, zum Beispiel `{{destination}}`: So bezieht sich die Aufgabe auf ihre Antwort, und es ist der Name, den Programme dafür verwenden. Der Platzhalter einer neuen Frage folgt ihrem Wortlaut, bis die Aufgabe ihn verwendet. Eine App kann bis zu 30 Fragen haben.
+Das Menü **⋯** einer Frage hat **Nach oben verschieben**, **Nach unten** und **Entfernen**. Unter jeder Frage siehst du ihren Platzhalter, zum Beispiel `{{destination}}`: So bezieht sich die Aufgabe auf ihre Antwort, und es ist der Name, den Programme dafür verwenden. Der Platzhalter einer neuen Frage folgt ihrem Wortlaut, bis die Aufgabe ihn verwendet. Eine App kann bis zu 30 Fragen haben.
 
 ### Auftrag
 
@@ -312,7 +312,7 @@ Warnungen unter dem Feld sagen dir, wenn ein Platzhalter keine Frage benennt (er
 
 Ergebnisfelder werden vom Agenten ausgefüllt, als Karte oder Tabelle dargestellt und Programmen als JSON zurückgegeben. Ohne Felder gilt die normale Agentenantwort.
 
-**Ergebnisfeld hinzufügen** ergänzt:
+**Antwortfeld hinzufügen** ergänzt:
 
 - Überschrift wie „Empfehlung“;
 - Ihrer Art: **Text**, **Langer Text** (formatierter Text), **Zahl**, **Ja/nein**, **Datum**, **Link**, **Liste**, **Tabelle** oder **Bilder, Videos oder Dateien**.
@@ -320,7 +320,7 @@ Ergebnisfelder werden vom Agenten ausgefüllt, als Karte oder Tabelle dargestell
 - **Beschreibung des Feldinhalts für den Agenten (optional)**: ein Hinweis für den Agenten.
 - Bei einer **Tabelle**: ihre **Spalten**, jeweils mit einem Namen und einem Typ (**Text**, **Zahl**, **Ja/nein**, **Datum**, **Link** oder **Bild**). **Spalte hinzufügen** fügt eine hinzu; eine Tabelle behält mindestens eine Spalte.
 
-Das **⋯**-Menü eines Ergebnisfelds enthält **Nach oben verschieben**, **Nach unten verschieben** und **Entfernen**.
+Das **⋯**-Menü eines Ergebnisfelds enthält **Nach oben verschieben**, **Nach unten** und **Entfernen**.
 
 Ein Feld **Bilder, Videos oder Dateien** (und eine Spalte **Bild**) nimmt auf, was der Agent gefunden oder erstellt hat: eine Adresse im Web oder eine Datei auf diesem Computer (ein Foto in deinem Ordner „Bilder“, ein von ihm gezeichnetes Diagramm, eine Aufnahme), jeweils mit einer Beschreibung. Hydor behält eine Kopie einer Datei auf diesem Computer und eines Bilds im Web (bis zu 15 MB), damit es überall zu sehen ist, wo auch das Ergebnis angezeigt wird; Videos im Web bleiben Links. Die Läufe einer öffentlichen Seite dürfen nur auf das Web verweisen.
 
@@ -351,7 +351,7 @@ Was die Läufe von Hydors eigenen Tools verwenden dürfen: Websuche, den Browser
 ### Grenzen
 
 - **Ausführungen pro Tag (insgesamt)**: die meisten Läufe, die diese App an einem Tag ausführen darf; gezählt werden Läufe aus dem Formular, der API, von anderen Agenten, aus den Zeilen einer CSV-Datei und von der öffentlichen Seite sowie Unterhaltungen auf ihrem Bildschirm, ab Mitternacht. Darüber hinaus wird ein Lauf mit „This app has run … times today, its limit“ abgelehnt. Leer: kein Limit.
-- **Ausgabenlimit pro Lauf in US-Dollar** stoppt beim Erreichen; leer bedeutet kein Limit. Siehe [Nutzung, Limits und Kosten](/guide/usage).
+- **Maximale Kosten pro Lauf (US$)** stoppt beim Erreichen; leer bedeutet kein Limit. Siehe [Nutzung, Limits und Kosten](/guide/usage).
 
 ### Vor dem Speichern testen
 
@@ -488,7 +488,7 @@ Schritttypen:
 - **Wiederholen**: seine Schritte einmal für jedes Element einer Liste (auf Wunsch einige gleichzeitig) oder noch einmal, bis etwas zutrifft.
 - **Zur gleichen Zeit**: Zweige, die nebeneinander laufen; der Ablauf geht weiter, wenn alle zu Ende sind.
 - **App aufrufen**: eine andere deiner Apps, als ein Schritt. Unter den Arten bietet **Schritt hinzufügen** Bausteine an: Apps, die als Schritte anderer Apps gemacht sind, deine eigenen (die mit **Ein Block** markierten, unter den Antwortfeldern einer App, und die, die „Zu einem Block zusammenfassen“ erstellt) und die vorgefertigten (**Seite zusammenfassen**, **Übersetzen**, **Antwort aus dem Internet**, **Nach Kategorien sortieren** und **Fakten herausarbeiten**, jeder beim Einfügen zu deinem eigenen gemacht). Ein Baustein kommt als Aufruf mit seinem auszufüllenden Formular hinein; Fragen, die das eigene Formular der App unter demselben Namen hat, sind schon beantwortet; eine Änderung an einem Baustein ist eine Änderung für jede App, die ihn aufruft.
-- **Daten speichern**: Datensätze hinzufügen, finden, ändern und entfernen.
+- **Daten aufbewahren**: Datensätze hinzufügen, finden, ändern und entfernen.
 - **Person fragen**: Der Lauf wartet auf deine Antwort, Ja oder Nein oder ein kurzes Formular: Eine Benachrichtigung öffnet den Lauf, wo eine Karte danach fragt, und der Posteingang listet sie auf. Er wartet eine Woche, wenn du kein anderes Limit setzt, und schlägt dann fehl. Die Fragen vom Typ **Wahl** in seinem Formular können anbieten, was der Lauf gefunden hat: Schreibe einen Wert eines früheren Schritts allein als Wahl, etwa `{{find.items}}`, und wenn der Schritt fragt, bietet die Karte jedes Element dieser Liste (oder jede Zeile eines Textes) als Wahl an, sodass ein Lauf fragen kann, welche der gefundenen Dinge er genauer ansehen soll. Mit **Es können mehrere ausgewählt werden** hakst du so viele an, wie du magst, und `{{step.field}}` sind die angehakten, eines pro Zeile. Auch andere Wörter in der Frage, ihrem Hilfetext und ihren Wahlmöglichkeiten werden mit Werten gefüllt, und eine Wahl, die am Ende nichts anzubieten hat, wird zu einem einfachen Textfeld.
 - **Code ausführen**: Ein Programm von dir, in JavaScript, TypeScript oder Python, bekommt die Werte, die du ihm gibst, und gibt die Werte des Schritts zurück (unter **Ausgabewerte** benennst du sie, für die Schritte danach). Es läuft in einer Sandbox: kein Netzwerk und keine Dateien dieses Computers außer den Paketen, die die App installiert. Nach außen greift es nur über `ctx`, jeder Aufruf ein Schritt des Laufs: `ctx.model` fragt ein Modell, `ctx.agent` einen Agenten, `ctx.tool` verwendet eines der Tools der App, `ctx.ask` wartet auf deine Antwort, `ctx.data` speichert Datensätze und `ctx.app` startet eine andere App. So kann ein ganzer Ablauf ein einziges Programm sein, mit eigenen Bedingungen und Schleifen; seine Aufrufe erscheinen auf der Seite des Laufs wie Schritte, und wenn der Lauf nach einem Neustart wieder startet, läuft das Programm noch einmal, und die Aufrufe, die es vorher gemacht hat, liefern das, was sie damals geliefert haben, ohne erneut zu laufen. Eine App-Datei mit Code-Schritten sagt das auf ihrer Installationskarte.
 - **Wert berechnen**: ein Wert aus einem anderen, sofort und kostenlos: das erste oder letzte Element einer Liste, die Anzahl, eine Summe, der Durchschnitt, der kleinste oder größte Wert (eines Feldes jedes Elements), ein Feld jedes Elements, die Elemente zu Text verbunden, ohne Wiederholungen, nach einem Feld sortiert, als Zahl oder ein Datum einige Tage später. Er ergibt `{{id.value}}` und erscheint im Graphen als kleine Kapsel.
@@ -531,7 +531,7 @@ Unter **Bearbeiten** einer App zeigt der Tab **Design** ihre Ansicht mit der Ant
 
 - **Agenten um einen Entwurf bitten** (sobald die App gespeichert ist): Eine Sitzung startet als **App builder** mit einer Nachricht dazu, oder, wenn die App neben einer Unterhaltung geöffnet ist, geht die Nachricht an diesen Agenten. Er schreibt die Ansicht, probiert sie mit einem Lauf aus und behebt, was nicht passt.
 - **Mit dem Ergebnis beginnen**: eine Seite mit einem Block für jedes Antwortfeld, von der aus du weiter änderst.
-- **Agenten ändern lassen** bearbeitet eine vorhandene Ansicht.
+- **Agenten um eine Änderung bitten** bearbeitet eine vorhandene Ansicht.
 - **Als Code ändern**: die Ansicht als JSON, ihre Seiten, Elemente (HTML mit Werten wie `{{result.days}}` und CSS) und Ereignisse, wie das API-Thema des Guides sie beschreibt ([Apps: Ansichten](/guide/api#apps-views)); die Vorschau folgt dem, was du tippst.
 - **Ansicht entfernen** stellt nach Speichern einfache Karten wieder her.
 

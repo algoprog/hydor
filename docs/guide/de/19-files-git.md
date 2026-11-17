@@ -24,7 +24,7 @@ Auf Smartphones zeigt der Titel den Bereich, etwa **System / Überwachen**. Tipp
 
 Darunter öffnet jede Werkzeugkarte über Titel oder **Öffnen** den jeweiligen Tab:
 
-- **Dateien**: Suche ab dem Benutzerordner nach Namen und Inhalten, zuletzt geöffnete Dateien sowie **Benutzerordner**, **Zuletzt verwendete Dateien** und **Papierkorb**.
+- **Dateien**: Suche ab dem Benutzerordner nach Namen und Inhalten, zuletzt geöffnete Dateien sowie **Persönlicher Ordner**, **Zuletzt geöffnete Dateien** und **Papierkorb**.
 - **Git**: Repositorys mit Branch und Anzahl geänderter Dateien, zuerst solche mit Änderungen oder ausstehenden Pushes. Ein Klick öffnet das Repository im Git-Tab.
 - **Terminal**: laufende Shells und **Neu**.
 - **Vorschau**: die hier laufenden Web-Apps, jede mit ihrem Port. Klicke auf eine, um sie anzusehen.
@@ -50,11 +50,11 @@ Weitere Zugänge:
 ## Orte
 
 - **Zu einem Ordner wechseln**: nach Namen suchen oder Pfad wie `~/code/shop` eingeben. Projekte und angeheftete Ordner stehen zuerst. Tab oder der Pfeil am Zeilenende zeigt Unterordner.
-- **Zuletzt verwendete Dateien**: in diesem Browser geöffnete Dateien, neueste zuerst, mit Ordner. Nicht mehr vorhandene sind gekennzeichnet; **Nicht mehr vorhandene entfernen** bereinigt die Liste.
-- **Benutzerordner**: dein persönlicher Dateiordner. Ein abweichender Standardordner neuer Sitzungen erscheint darunter.
-- **Angeheftet**: auf allen Geräten gleiche Ordner. Zum Anheften nutze Ordnerkontextmenü oder **⋯ → An Orte anheften**. Zum Lösen zeige darauf und wähle ✕ oder **Aus Orten lösen**.
+- **Zuletzt geöffnete Dateien**: in diesem Browser geöffnete Dateien, neueste zuerst, mit Ordner. Nicht mehr vorhandene sind gekennzeichnet; **Nicht mehr vorhandene Einträge entfernen** bereinigt die Liste.
+- **Persönlicher Ordner**: dein persönlicher Dateiordner. Ein abweichender Standardordner neuer Sitzungen erscheint darunter.
+- **Angepinnt**: auf allen Geräten gleiche Ordner. Zum Anheften nutze Ordnerkontextmenü oder **⋯ → An „Orte“ anheften**. Zum Lösen zeige darauf und wähle ✕ oder **Nicht mehr unter „Orte“ anheften**.
 - **Projekte**: eigene Ordner der Projekte.
-- **Sitzungsordner**: zuletzt von Sitzungen verwendete Ordner.
+- **Bisherige Arbeitsordner der Sitzungen**: zuletzt von Sitzungen verwendete Ordner.
 - **Papierkorb**: gelöschte Inhalte; siehe [Löschen und wiederherstellen](/guide/files-git#delete-and-put-back).
 
 Auf dem Computer kannst du Dateien oder Zeilen auf einen Ordner in den Orten ziehen.
@@ -63,7 +63,7 @@ Auf dem Computer kannst du Dateien oder Zeilen auf einen Ordner in den Orten zie
 
 Die Leiste über dem Ordner enthält von links:
 
-- **Übergeordneten Ordner** als Pfeil nach oben.
+- **Übergeordneter Ordner** als Pfeil nach oben.
 - Pfadschritte: Haus für den Benutzerordner, dann etwa **code › shop**. Außerhalb beginnt der Pfad bei **Computer** (`/`). Klicke auf einen Schritt oder ziehe Zeilen darauf zum Verschieben. Lange Pfade klappen mittlere Schritte unter **…** zusammen. Letzter Schritt oder Pfeil daneben öffnet **Zu einem Ordner wechseln**.
 - **In *dem Ordner* suchen**: grenzt die Liste beim Tippen auf die Namen ein, die enthalten, was du eingibst. Enter oder die Zeile **Alles in … nach „…“ durchsuchen, auch Dateiinhalte** oben in der Liste durchsucht jeden Ordner darunter, Dateinamen und den Inhalt der Dateien (siehe [Dateien suchen](/guide/files-git#search-files)).
 - **Neu** mit **Neuer Ordner**, **Neue Datei**, **Neues Notebook**, **Dateien hochladen** und **Ordner hochladen**.
@@ -100,8 +100,8 @@ Jede Zeile hat ein Menü. Fahre auf die Zeile und klicke an ihrem Ende auf **Meh
 - **Öffnen**.
 - **Bild bearbeiten** beziehungsweise **Video bearbeiten**. **Speichern** im Editor überschreibt die Datei und verschiebt die alte Version in den Papierkorb; **Kopie speichern** erstellt daneben „name (edited)“; siehe [Bilder und Videos bearbeiten](/guide/library#edit-pictures-and-videos).
 - **Sitzung damit starten** für Dateien; siehe [Sitzung mit Dateien starten](/guide/files-git#start-a-session-with-files). Für Ordner: **Neue Sitzung in diesem Ordner** mit vorausgewähltem Arbeitsordner.
-- **Zu Projekt hinzufügen**; siehe [Dateien zu einem Projekt hinzufügen](/guide/files-git#add-files-to-a-project).
-- **An Orte anheften** oder **Aus Orten lösen** für Ordner.
+- **Zu einem Projekt hinzufügen**; siehe [Dateien zu einem Projekt hinzufügen](/guide/files-git#add-files-to-a-project).
+- **An „Orte“ anheften** oder **Nicht mehr unter „Orte“ anheften** für Ordner.
 - **Umbenennen** mit F2, **Duplizieren**, **Verschieben nach** und **Kopieren nach**.
 - **Hier ein Terminal öffnen** (ein Ordner): eine neue Shell in diesem Ordner, auf einem Computer im unteren Bereich, auf einem Smartphone auf der Seite „Terminal“.
 - **Pfad kopieren** als vollständiger Pfad.
@@ -115,7 +115,7 @@ Für gemeinsame Aktionen wählst du mehrere Einträge:
 - Am Computer über das Kästchen am Zeilenanfang beim Darüberzeigen, Strg+Klick beziehungsweise ⌘+Klick zum Ergänzen, Umschalt+Klick für einen Bereich ab der letzten Auswahl oder Strg+A für alle.
 - Auf einem Smartphone halte eine Zeile gedrückt und tippe dann auf die anderen; oder **Mehr** → **Mehrere auswählen**.
 
-Die Leiste zeigt Anzahl, **Sitzung starten**, **Zu Projekt hinzufügen**, **Verschieben nach**, **Löschen** und unter **Weitere (⋯)** zusätzliche Aktionen wie **Kopieren nach**, **Pfade kopieren** und **Als .zip herunterladen**. ✕ oder Esc hebt alles auf.
+Die Leiste zeigt Anzahl, **Sitzung starten**, **Zu einem Projekt hinzufügen**, **Verschieben nach**, **Löschen** und unter **Mehr** (⋯) zusätzliche Aktionen wie **Kopieren nach**, **Pfade kopieren** und **Als .zip herunterladen**. ✕ oder Esc hebt alles auf.
 
 ### Tastatur verwenden
 
@@ -157,12 +157,12 @@ Ein Ordner kann nicht in sich selbst verschoben werden. Vorhandenes wird nicht e
 
 ### Löschen und wiederherstellen
 
-**Löschen** verschiebt eine Datei oder einen Ordner samt Inhalt sofort in den Papierkorb. Die Meldung bietet **Rückgängig**. Erst beim Leeren wird endgültig gelöscht.
+**Löschen** verschiebt eine Datei oder einen Ordner samt Inhalt sofort in den Papierkorb. Die Meldung bietet **Rückgängig machen**. Erst beim Leeren wird endgültig gelöscht.
 
 Der **Papierkorb** unter den Orten listet auf, was du gelöscht hast, das Neueste zuerst: jeweils mit dem Ort, an dem es war, dem Zeitpunkt des Löschens und seiner Größe.
 
 - **Wiederherstellen** bringt den Inhalt an den Ursprungsort zurück. Ist der Name neu belegt, entsteht eine Kopie mit „copy“. Für alte Einträge ohne erfassten Ursprungsort wird ein Zielordner abgefragt.
-- **Weitere (⋯)** bietet **In anderem Ordner wiederherstellen** und **Endgültig löschen**.
+- **Mehr** (⋯) bietet **In einen anderen Ordner verschieben** und **Endgültig löschen**.
 - **Papierkorb leeren** löscht nach Bestätigung alle Einträge endgültig.
 
 Der Papierkorb liegt im App-Datenordner, etwa `~/.hydor/trash`; die Seite nennt den Pfad. Benutzerordner und Wurzelordner `/` können nicht gelöscht werden. Inhalte auf einem anderen Datenträger als der App-Datenordner lassen sich nicht dorthin verschieben; Hydor fragt zuerst nach endgültigem Löschen.
@@ -175,7 +175,7 @@ Dateien werden unverändert heruntergeladen. Ordner oder eine Mehrfachauswahl we
 
 Projekte speichern eigene Dateien im Projektordner und können weitere vorhandene Ordner einbeziehen; siehe [Projekte und Wissen](/guide/projects). So ergänzt du Inhalte:
 
-1. Öffne das Kontextmenü einer Datei oder eines Ordners oder wähle mehrere und dann **Zu Projekt hinzufügen**.
+1. Öffne das Kontextmenü einer Datei oder eines Ordners oder wähle mehrere und dann **Zu einem Projekt hinzufügen**.
 2. Wähle das Projekt oder erstelle mit **Neues Projekt** eines.
 
 Dateien werden in den Projektordner kopiert. Ordner werden nicht kopiert, sondern an ihrem bisherigen Ort eingebunden. Die Meldung nennt das Ergebnis und **Anzeigen** öffnet den Projekttab **Dateien**. Bereits enthaltene Inhalte bleiben unverändert.
@@ -208,7 +208,7 @@ Das Feld **Uploads** unten rechts zeigt den Fortschritt je Datei. **Abbrechen** 
 Bevor etwas gesendet wird, prüft die App, ob es in diesem Ordner Dateien mit denselben Namen gibt. Wenn welche existieren, listet das Feld sie auf („3 sind bereits vorhanden“) mit drei Möglichkeiten:
 
 - **Ersetzen**: vorhandene Dateien überschreiben.
-- **Vorhandene überspringen**: nur neue Dateien hochladen.
+- **Vorhandene Dateien überspringen**: nur neue Dateien hochladen.
 - **Abbrechen**: nichts hochladen.
 
 ## Datei öffnen und bearbeiten
@@ -232,7 +232,7 @@ Auf einem Computer zeigt die Leiste über der Datei ihren Pfad und diese Schaltf
 - **Fragen** für Fragen und Änderungsaufträge; siehe [unten](#ask-an-agent-about-the-file).
 - **Terminal in diesem Ordner**: eine neue Shell im Ordner der Datei.
 - **Herunterladen**.
-- **Weitere (⋯)** mit **Suchen**, **Ersetzen**, **Gehe zu Zeile**, **Zur Auswahl fragen**, **Tastenkürzel**, **Sitzung damit starten**, **Zu Projekt hinzufügen**, **Im Ordner anzeigen** und **Pfad kopieren**.
+- **Mehr** (⋯) mit **Suchen**, **Ersetzen**, **Zu Zeile springen**, **Frage zur Auswahl stellen**, **Tastenkombinationen**, **Sitzung damit starten**, **Zu einem Projekt hinzufügen**, **Im Ordner anzeigen** und **Pfad kopieren**.
 - **Speichern**.
 
 Strg+F beziehungsweise ⌘F öffnet die Suchleiste bei aktivem Textcursor. Ersetzen geht mit Strg+H beziehungsweise ⌘⌥F; Zeilensprung mit Strg+G beziehungsweise ⌘⌥G.
@@ -249,7 +249,7 @@ Auf einem Smartphone zeigt die Leiste **Zurück**, den Namen der Datei über ihr
 
 - Ungespeicherte Änderungen werden zuerst gespeichert.
 - Der Agent startet im Ordner der Datei, weiß, welche Datei du meinst, und ändert diese Datei selbst. Du siehst jede Änderung im Editor, sobald sie geschrieben ist, die geänderten Zeilen kurz eingefärbt, wobei deine Stelle in der Datei erhalten bleibt.
-- Du kannst im Bereich weiter antworten. **Neue Anfrage** beginnt neu, **Als Sitzung öffnen** zeigt die vollständige Sitzung, die auch in deiner Sitzungsliste steht. Mobil klappt **Datei ansehen** den Bereich weg; die untere Leiste holt ihn zurück.
+- Du kannst im Bereich weiter antworten. **Eine neue Anfrage** beginnt neu, **Als Sitzung öffnen** zeigt die vollständige Sitzung, die auch in deiner Sitzungsliste steht. Mobil klappt **Datei ansehen** den Bereich weg; die untere Leiste holt ihn zurück.
 - Der Bereich bleibt beim Tabwechsel offen, mit eigener Unterhaltung je Datei. Dies gilt ebenso für Word, Excel, CSV, LaTeX und Notebooks. Bei Notebooks bleiben Ausgaben anderer Zellen erhalten. Bei PDFs liest der Agent und beantwortet auch ausgewählte Textstellen, Gleichungen oder Abbildungen; siehe [Zu einem PDF-Ausschnitt fragen](#ask-about-a-part-of-a-pdf). Gespeichertes Modell und Berechtigungen bleiben wie beim [Fragen in der Bibliothek](/guide/library#change-it-by-asking-an-agent) unverändert.
 
 ### Änderungen an einer geöffneten Datei
@@ -257,7 +257,7 @@ Auf einem Smartphone zeigt die Leiste **Zurück**, den Namen der Datei über ihr
 Agenten und Terminals ändern Dateien laufend. Der Editor prüft alle paar Sekunden, während eines Agentenlaufs jede Sekunde:
 
 - Ohne eigene ungespeicherte Änderungen übernimmt er den neuen Stand automatisch. Nur geänderte Zeilen werden ersetzt und kurz hervorgehoben, die Leseposition bleibt.
-- Bei eigenen ungespeicherten Änderungen erscheint „Die Datei wurde seit dem Öffnen auf dem Datenträger geändert“. Wähle **Neu laden und meine Änderungen verwerfen** oder **Mit meinen Änderungen überschreiben**.
+- Bei eigenen ungespeicherten Änderungen erscheint „Die Datei wurde seit dem Öffnen auf dem Datenträger geändert“. Wähle **Neu laden (meine Änderungen verwerfen)** oder **Mit meiner Version überschreiben**.
 
 Ein neuerer Dateistand wird beim Speichern nie ohne diese Abfrage überschrieben.
 
@@ -325,9 +325,9 @@ Ein Video öffnet sich im eigenen Player der App, der den Betrachter ausfüllt:
 - **Ein Klick auf eine Seite** setzt dort, was die Werkzeugleiste gerade hält: **Text** (ein Feld zum Tippen, die übliche Einstellung), **Ankreuzen**, **Kreuz** oder **Datum** (das heutige Datum, das du ändern kannst). Klicke auf eine leere Stelle nach der anderen: Jeder Klick beginnt den nächsten Eintrag. So füllst du ein Formular aus, das nur aus gedruckten Linien und Kästchen besteht, oder ein eingescanntes.
 - **Unterschrift** setzt eine gespeicherte oder neu gezeichnete, getippte oder hochgeladene Unterschrift. **Für später speichern** übernimmt neue; siehe [Unterschriften](/guide/library#signatures). Ein Signaturfeld mit **Hier unterschreiben** positioniert sie beim Tippen darin.
 - **Verschieben und skalieren**: Häkchen, Kreuz und Unterschrift ziehen, blaue Ecke zum Skalieren. Textfelder haben einen linken Griff; **A−** und **A+** ändern die Schriftgröße. Papierkorb darüber oder Entf entfernt den Eintrag.
-- **Zoom** per Zwei-Finger-Geste, am Computer Strg+Mausrad oder Strg+= und Strg+−. **Auf Breite einpassen** oder Strg+0 setzt zurück.
+- **Zoom** per Zwei-Finger-Geste, am Computer Strg+Mausrad oder Strg+= und Strg+−. **Auf Seitenbreite einpassen** oder Strg+0 setzt zurück.
 
-**Speichern** erstellt „name (filled).pdf“ daneben und öffnet die Kopie. Der Pfeil bietet **Kopie daneben speichern** und **Datei ersetzen**, wobei die alte Fassung in den [Papierkorb](#delete-and-put-back) wandert. **Schließen** fragt bei Änderungen vor dem Verwerfen.
+**Speichern** erstellt „name (filled).pdf“ daneben und öffnet die Kopie. Der Pfeil bietet **Kopie im selben Ordner speichern** und **Datei ersetzen**, wobei die alte Fassung in den [Papierkorb](#delete-and-put-back) wandert. **Schließen** fragt bei Änderungen vor dem Verwerfen.
 
 Die Felder behalten deine Werte als die eigenen Felder eines Formulars, sodass jeder PDF-Betrachter sie zeigt und sie dort weiter geändert werden können, in Schriften, die deine Wörter enthalten (auch Griechisch und Chinesisch). Was du platziert hast, wird auf die Seiten gezeichnet. Die eigenen Bytes der Datei bleiben, wie sie waren, mit den Änderungen dahinter, also:
 
@@ -350,7 +350,7 @@ Agenten können PDFs ebenfalls ausfüllen und bearbeiten; siehe [Dokumente, Bild
 - **Text markieren**: Wähle ihn mit der Maus aus, oder halte auf dem Smartphone ein Wort gedrückt und ziehe an den Anfassern. Es erscheint eine kleine Leiste: Eine ihrer vier Farben (Gelb, Grün, Blau oder Rosa) markiert die Wörter, **Hinweis** markiert sie und öffnet eine Notiz zum Schreiben, **Fragen** fragt einen Agenten dazu ([weiter unten](#ask-about-a-part-of-a-pdf)), und **Kopieren** kopiert sie, wobei ein am Zeilenende getrenntes Wort wieder zusammengesetzt wird. Eine Auswahl reicht, wie du liest, von einer Spalte eines Papers in die nächste.
 - **Eine Abbildung oder eine Gleichung markieren**: Klicke auf **Bereich auswählen** und ziehe einen Rahmen darum; am Computer hältst du stattdessen Alt gedrückt und ziehst, ohne die Schaltfläche. Für diesen Teil der Seite erscheint dieselbe Leiste, und er wird als Bild davon gespeichert (**Kopieren** kopiert das Bild oder, wo der Browser kein Kopieren von Bildern erlaubt, seinen Text).
 - **Eine Markierung ändern**: Klicke darauf, um ihre Leiste zu öffnen, eine andere Farbe zu wählen, **Notiz bearbeiten**, **Fragen**, **Kopieren** oder sie zu löschen (der Papierkorb oder Entf; **Rückgängig machen** in der Meldung danach holt sie zurück). Wenn du den Zeiger auf einer Markierung ruhen lässt, siehst du ihre Notiz, und ein kleiner Punkt kennzeichnet die, die eine haben. Wenn du dieselben Wörter noch einmal markierst, ändert sich ihre Farbe.
-- **Zoom** per Geste, Strg+Mausrad oder Strg+= und Strg+−; **Auf Breite einpassen** oder Strg+0 setzt zurück. Markierungen bleiben bei jeder Größe an der Textstelle.
+- **Zoom** per Geste, Strg+Mausrad oder Strg+= und Strg+−; **Auf Seitenbreite einpassen** oder Strg+0 setzt zurück. Markierungen bleiben bei jeder Größe an der Textstelle.
 
 Eine Seite, die nur ein Bild ist (ein Scan), hat keine Wörter zum Auswählen: Markiere ihre Teile mit **Bereich auswählen**. Wörter, die an einer Seite nach oben oder unten laufen (eine seitlich gedrehte Seite), lassen sich ebenfalls nicht auswählen. Markierungen, die andere Apps in einem PDF gespeichert haben, erscheinen auf seinen Seiten, aber nicht in **Notizen**.
 
@@ -360,11 +360,11 @@ Eine Seite, die nur ein Bild ist (ein Scan), hat keine Wörter zum Auswählen: M
 
 Markierungen und Notizen werden getrennt nach Dateipfad gespeichert; das PDF bleibt unverändert. Beim Umbenennen oder Verschieben hier ziehen sie mit. Bei externem Verschieben, etwa durch Terminal oder Agenten, findet Hydor sie beim Öffnen anhand des Inhalts wieder. Ändert sich das PDF, etwa nach neuem LaTeX-Satz, werden Textmarkierungen anhand ihrer Wörter auch auf anderen Seiten gesucht. Nicht mehr auffindbare bleiben an der alten Position mit Hinweis.
 
-Unter **Weitere (⋯)** in Notizen stehen:
+Unter **Mehr** (⋯) in Notizen stehen:
 
 - **In einem Projekt speichern**: Deine Markierungen und Notizen kommen als ein Dokument, benannt nach dem Paper („Sparse Retrieval with Learned Term Weights (notes).md“, zum Beispiel), ins [Wissen](/guide/projects#memory) eines Projekts: der Titel des Papers, dann die Wörter jeder Markierung (eine Zeile für einen Bereich) und deine Notiz, Seite für Seite, sodass die Sitzungen des Projekts sie finden, wenn sie seine Dokumente durchsuchen. Das Projekt, in dessen Ordner das PDF liegt, steht zuerst. Das Dokument folgt jeder Änderung, die du an den Notizen machst; **Projektwissen öffnen** zeigt es dort, und **Dort nicht mehr speichern** nimmt es heraus.
-- **Im PDF speichern**: echte PDF-Hervorhebungen mit zugehörigen Kommentaren für andere Anwendungen. **Kopie daneben speichern** erstellt „name (highlighted).pdf“ samt erhaltenen Notizen. **Datei ersetzen** überschreibt mit Sicherung der alten Fassung im [Papierkorb](#delete-and-put-back). Erneutes Speichern ersetzt frühere exportierte Markierungen. Bei untersagten Kommentaren oder entsprechender Zertifizierung bleiben Notizen getrennt gespeichert.
-- **Alle kopieren** als Text.
+- **Im PDF speichern**: echte PDF-Hervorhebungen mit zugehörigen Kommentaren für andere Anwendungen. **Kopie im selben Ordner speichern** erstellt „name (highlighted).pdf“ samt erhaltenen Notizen. **Datei ersetzen** überschreibt mit Sicherung der alten Fassung im [Papierkorb](#delete-and-put-back). Erneutes Speichern ersetzt frühere exportierte Markierungen. Bei untersagten Kommentaren oder entsprechender Zertifizierung bleiben Notizen getrennt gespeichert.
+- **Alles kopieren** als Text.
 
 ### Zu einem PDF-Ausschnitt fragen
 
@@ -414,7 +414,7 @@ Kernel laufen nach Schließen des Notebooks und über App-Neustarts hinweg weite
 
 ### Zellen schreiben und ausführen
 
-Zelltypen sind **Code**, **Text** als Markdown und **Rohtext**. Code wird angeklickt, Text per Doppelklick bearbeitet. Während der Ausführung stehen `[*]` und Dauer, danach die Ausführungsnummer wie `[3]`.
+Zelltypen sind **Code**, **Text** als Markdown und **Roh**. Code wird angeklickt, Text per Doppelklick bearbeitet. Während der Ausführung stehen `[*]` und Dauer, danach die Ausführungsnummer wie `[3]`.
 
 - Zeige auf eine Code-Zelle, und eine Ausführen-Schaltfläche tritt an die Stelle ihrer Nummer („Ausführen (Umschalt+Enter)“: Sie führt die Zelle aus und geht zur nächsten; während die Zelle läuft, unterbricht sie den Kernel). Ihre Werkzeuge erscheinen in der Ecke: **Bearbeiten** (Text-Zellen), der Zelltyp, **Nach oben verschieben**, **Nach unten**, **Zelle darunter hinzufügen**, **Zelle löschen** und **Mehr zu dieser Zelle** (⋯, das Menü der Zelle, weiter unten). Auf dem Smartphone tippst du auf eine Zelle: Ihre Werkzeuge erscheinen darüber, **Ausführen** eingeschlossen.
 - Am Computer zeigt das Zeigen zwischen zwei Zellen **+ Code** und **+ Text**. Dieselben beiden Schaltflächen stehen unter der letzten Zelle.
@@ -460,7 +460,7 @@ Jedes Repository zeigt seinen Namen und Branch sowie kleine Markierungen, wenn e
 - **Merge** oder **Rebase wird ausgeführt**: ein Merge, der bei Dateien mit Konflikten angehalten hat (siehe [Wenn ein Merge bei Konflikten anhält](/guide/files-git#when-a-merge-stops-on-conflicts)).
 - Rechts das Alter des letzten Commits.
 
-**Remotes aller Repositorys abrufen** als Wolke aktualisiert die Remoteinformationen. **Aktualisieren** liest die Liste neu.
+**Remotes aller Repositories abrufen** als Wolke aktualisiert die Remoteinformationen. **Aktualisieren** liest die Liste neu.
 
 Klicke auf ein Repository, um es neben der Liste zu öffnen. Oben stehen: sein Name und Ordner, der Branch, auf dem du bist, eine Zeile dazu, wie es im Vergleich zum Remote steht, **Synchronisieren** und ein ⋯-Menü. Darunter vier Tabs: **Änderungen**, **Verlauf**, **Branches** und **Stashes**. Am Computer öffnet sich das Repository, das du zuletzt benutzt hast, wenn du auf die Seite kommst. In einem kleinen Fenster faltet sich die Liste in den Titel der Seite (klicke auf den Namen des Repositorys, um ein anderes zu wählen); auf dem Smartphone ist die Liste eine eigene Seite, und ein Repository öffnet sich darüber mit einem Zurückpfeil.
 
@@ -468,7 +468,7 @@ Klicke auf ein Repository, um es neben der Liste zu öffnen. Oben stehen: sein N
 
 **Hinzufügen** bietet:
 
-- **Einen Ordner auf diesem Computer hinzufügen**: Tippe den Ordner eines Projekts ein oder wähle ihn und klicke auf **Hinzufügen**. Ein Ordner innerhalb eines Repositorys fügt dieses Repository hinzu. Ein Ordner, den Git noch nicht verwaltet, kann ein eigenes Repository beginnen: **Repository hier initialisieren** (Gits `git init`).
+- **Ordner auf diesem Computer hinzufügen**: Tippe den Ordner eines Projekts ein oder wähle ihn und klicke auf **Hinzufügen**. Ein Ordner innerhalb eines Repositorys fügt dieses Repository hinzu. Ein Ordner, den Git noch nicht verwaltet, kann ein eigenes Repository beginnen: **Repository hier initialisieren** (Gits `git init`).
 - **Von einem Link klonen**: Füge die Adresse eines Repositorys auf GitHub, GitLab oder einem anderen Git-Server ein (`https://…`, `ssh://…` oder `git@host:owner/project`). **Wohin es geht** schlägt einen eigenen Ordner vor (in `~/code`, wenn du einen hast); er darf noch nicht existieren oder muss leer sein. **Klonen** zeigt, wie weit es ist; du kannst den Dialog schließen, und es läuft weiter. Das Repository öffnet sich, wenn es fertig ist.
 
 Einträge bleiben bis **⋯ → Aus Liste entfernen** bestehen; der Ordner wird dabei nicht verändert.
@@ -481,7 +481,7 @@ Das Remote ist der gemeinsame Repositoryort, etwa GitHub. Unter dem Branch steht
 
 Wenn dein Branch und der des Remotes beide weitergegangen sind, ändert Synchronisieren noch nichts und fragt, wie sie zusammengeführt werden sollen:
 
-- **Meine Commits darauf aufbauen** setzt deine Commits nach die des Remotes, als wären sie später entstanden. Das ergibt einen linearen Verlauf, einen Rebase.
+- **Meine Commits per Rebase aufsetzen** setzt deine Commits nach die des Remotes, als wären sie später entstanden. Das ergibt einen linearen Verlauf, einen Rebase.
 - **Zusammenführen** verbindet beide Linien mit einem Merge-Commit; bisherige Commits bleiben unverändert.
 
 Danach sendet Synchronisieren deine Commits hoch. Haben beide Seiten dieselben Zeilen geändert, hält es an, damit du sie klären kannst (siehe [Wenn ein Merge bei Konflikten anhält](/guide/files-git#when-a-merge-stops-on-conflicts)). Berühren deine nicht committeten Änderungen Dateien, die sich im Remote geändert haben, sagt es das: Committe sie zuerst oder lege sie in einem Stash beiseite.
@@ -489,7 +489,7 @@ Danach sendet Synchronisieren deine Commits hoch. Haben beide Seiten dieselben Z
 Das ⋯-Menü bietet einzelne Schritte:
 
 - **Fetch** aktualisiert Remoteinformationen ohne lokale Dateiänderung. **Pull** übernimmt Commits mit derselben Rückfrage bei Abweichungen. **Push** sendet deine Commits.
-- **Terminal hier öffnen**, **In Dateien anzeigen**, **Pfad kopieren**.
+- **Hier ein Terminal öffnen**, **In Dateien anzeigen**, **Pfad kopieren**.
 - **Remotes**: die Remotes des Repositorys und ihre Adressen. Ein Repository ohne eines zeigt **Kein Remote · Hinzufügen**: Füge eine Adresse ein und klicke auf **Remote hinzufügen** (es heißt origin), dann auf **Branch veröffentlichen**.
 - **Tags pushen**, wenn Tags vorhanden sind.
 
@@ -512,7 +512,7 @@ Zum Committen unten:
 
 Nur ausgewählte Dateien gehen ein, auch wenn andernorts weitere gestagt wurden.
 
-**Letzten Commit ändern** erscheint, solange kein Remote ihn enthält. Nach Aktivierung bearbeitest du dessen Nachricht und ergänzt ausgewählte Dateien statt eines neuen Commits. Buttons heißen entsprechend **Ändern** und **Ändern und Push**.
+**Letzten Commit ändern** erscheint, solange kein Remote ihn enthält. Nach Aktivierung bearbeitest du dessen Nachricht und ergänzt ausgewählte Dateien statt eines neuen Commits. Buttons heißen entsprechend **Ändern** und **Ändern und pushen**.
 
 Ist alles committet, steht unter Änderungen **Keine Änderungen zum Committen** und der letzte Commit wird angezeigt: Klicke ihn an, um ihn im Verlauf zu öffnen.
 
@@ -550,7 +550,7 @@ Wenn etwas in einer früheren Version funktioniert hat und jetzt kaputt ist, öf
 - **Funktionierte bei**: ausgewählter Commit möglichst als Tag, sonst jüngster Tag. Beliebige Tags, Branches oder Commits sind möglich; die Auflösung steht darunter.
 - **Fehlerhaft bei**: zunächst `HEAD`.
 - **Was ist kaputt**, in deinen Worten, und **So prüfst du es (optional)**: ein Befehl, der fehlschlägt, solange es kaputt ist.
-- **Ausführen mit**: zuständiger Agent.
+- **Ausgeführt von**: zuständiger Agent.
 
 **Starten** öffnet eine neue Sitzung im eigenen Worktree und lässt deine Kopie unverändert. Der Agent schreibt eine Prüfung, testet beide Endpunkte, sucht mit git bisect den ersten fehlerhaften Commit, erklärt Ursache und mögliche Korrektur. Siehe [Fehlerverursachenden Commit finden](/guide/engineering#find-what-broke-it).
 
@@ -574,8 +574,8 @@ Ein Stash legt deine uncommitteten Änderungen beiseite, damit du an etwas ander
 
 **Stashes** listet sie mit ihrer Nachricht, dem Branch, auf dem sie erstellt wurden, dem Zeitpunkt und der Zahl der Dateien auf. Klicke einen an, um zu sehen, was er enthält, Datei für Datei:
 
-- **Anwenden und entfernen** stellt Änderungen wieder her und löscht den Stash.
-- **Anwenden** stellt sie wieder her und behält den Stash.
+- **Anbringen und entfernen** stellt Änderungen wieder her und löscht den Stash.
+- **Übernehmen** stellt sie wieder her und behält den Stash.
 - Papierkorb löscht nach Rückfrage unwiderruflich.
 
 Wenn die Änderungen mit dem kollidieren, was die Dateien jetzt enthalten, sind die Dateien mit Konflikten unter Änderungen mit **C** markiert: Löse sie wie nach einem Merge und committe.
@@ -641,7 +641,7 @@ Um eines in einem anderen Ordner zu öffnen, starte es von dort: auf der Seite �
 
 ### Terminalbereich
 
-Am Computer öffnet oder schließt `` Ctrl+` ``, auch auf dem Mac, den unteren Terminalbereich auf jeder Seite. Es sind dieselben Terminals wie auf der Terminalseite. Ziehe die Oberkante für die Höhe; **Bereich ausblenden** schließt. Auch die Suchaktion **Terminalbereich ein- oder ausblenden** schaltet ihn. Aus anderen Seiten gestartete Terminals erscheinen dort.
+Am Computer öffnet oder schließt `` Ctrl+` ``, auch auf dem Mac, den unteren Terminalbereich auf jeder Seite. Es sind dieselben Terminals wie auf der Terminalseite. Ziehe die Oberkante für die Höhe; **Panel ausblenden** schließt. Auch die Suchaktion **Terminalbereich ein- oder ausblenden** schaltet ihn. Aus anderen Seiten gestartete Terminals erscheinen dort.
 
 ### Graue Vorschläge
 
@@ -678,7 +678,7 @@ Ein Klick zeigt die App rechts. Am Computer öffnet die erste automatisch, mobil
 
 - **Zurück**, **Vorwärts** und **Neu laden** sowie die Adresszeile mit dem Port und dem Pfad der Seite. Sie folgt den Links, die du in der App anklickst; gib einen anderen Pfad ein und drücke Enter, um dorthin zu gehen.
 - **Computer**, **Tablet**, **Smartphone** für passende Breiten, mobil 390 Pixel, auf den verfügbaren Platz verkleinert.
-- **Weitere (⋯)** mit **In eigenem Tab öffnen**, **Agenten zu diesem Bildschirm fragen**, **Bild speichern** und **Als Bild anzeigen** beziehungsweise **Live anzeigen**. Die Agentenfrage öffnet die Startseite mit Screenshot, App-Ordner und ergänzbarem Anfang „Zu diesem Bildschirm von …“.
+- **Mehr** (⋯) mit **In einem eigenen Tab öffnen**, **Agenten zu dieser Ansicht fragen**, **Als Bild speichern** und **Als Bild anzeigen** beziehungsweise **Live anzeigen**. Die Agentenfrage öffnet die Startseite mit Screenshot, App-Ordner und ergänzbarem Anfang „Zu diesem Bildschirm von …“.
 
 ### Live oder als Bilder
 
@@ -715,7 +715,7 @@ Die Kacheln oben zeigen, mit einem kleinen Diagramm der letzten zwei Minuten:
 - **Arbeitsspeicher** mit belegter und gesamter Größe.
 - **GPU × n** bei NVIDIA-GPUs mit durchschnittlicher Auslastung und Grafikspeicher.
 - **Netzwerk** mit eingehenden und ausgehenden Daten pro Sekunde.
-- **Datenträger-I/O** mit Lese- und Schreibraten.
+- **Festplatten-E/A** mit Lese- und Schreibraten.
 
 Darunter stehen Details:
 

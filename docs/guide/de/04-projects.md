@@ -48,12 +48,12 @@ Unter den Projekten listet **Ordner, in denen du arbeitest** Ordner auf, in dene
    - **Name**: wie du das Projekt nennst, etwa „Steuern 2026“, „Der Garten“ oder „Abschlussarbeit“. Bis zu 60 Zeichen. Es ist das einzige Feld, das du ausfüllen musst. Das Quadrat daneben ist das Zeichen des Projekts, in der Farbe, die es bekommt: Klicke darauf, um eine andere der acht Farben auszuwählen (Bernstein, Blau, Grün, Rosa, Violett, Türkis, Orange, Schiefergrau). Wenn du keine auswählst, bekommen Projekte die Farben der Reihe nach.
    - **Dateien ablegen**: Wähle eine der beiden Möglichkeiten.
      - **In einem neuen Ordner** ist der Standard. Die App erstellt einen nach dem Projekt benannten Ordner.
-     - **In einem vorhandenen Ordner** verwendet einen bestehenden Projekt- oder Dokumentenordner auf diesem Computer unverändert. **Zuletzt verwendet, noch ohne Projekt** bietet passende Ordner direkt an. **Ordner auswählen…** sucht nach Name oder Pfad. Ist der Name noch leer, wird der Ordnername übernommen. **Ändern** wählt einen anderen Ordner.
+     - **In einem Ordner, den ich bereits habe** verwendet einen bestehenden Projekt- oder Dokumentenordner auf diesem Computer unverändert. **Kürzlich verwendet, noch in keinem Projekt** bietet passende Ordner direkt an. **Ordner auswählen …** sucht nach Name oder Pfad. Ist der Name noch leer, wird der Ordnername übernommen. **Ändern** wählt einen anderen Ordner.
 3. Optional öffnet **Weitere Optionen** die übrigen Angaben. Ein Punkt zeigt bereits ausgefüllte Optionen an:
    - **Worum es geht**: bis zu 300 Zeichen Beschreibung unter dem Namen.
    - **Agentenrichtlinien**: Zielgruppe, Arbeitsweise und Besonderheiten für jede Projektsitzung, etwa „Beträge in EUR. Ich bin in Griechenland selbstständig.“ Bis zu 20.000 Zeichen. Siehe [Agentenrichtlinien](/guide/guidelines).
-   - **Weitere verwendete Ordner**: zusätzliche Arbeitsordner, ohne Kopieren der Dateien. **Ordner hinzufügen** erlaubt bis zu zwölf, ✕ entfernt die Zuordnung.
-4. Lasse **Agent für dieses Projekt** aktiviert, um einen Projektagenten erstellen zu lassen; siehe [Agenten](#agents). Alternativ schaltest du es aus.
+   - **Andere Ordner, die es verwendet**: zusätzliche Arbeitsordner, ohne Kopieren der Dateien. **Ordner hinzufügen** erlaubt bis zu zwölf, ✕ entfernt die Zuordnung.
+4. Lasse **Ein Agent dafür** aktiviert, um einen Projektagenten erstellen zu lassen; siehe [Agenten](#agents). Alternativ schaltest du es aus.
 5. Klicke **Projekt erstellen** oder drücke Enter im Namensfeld.
 
 Neue Ordner entstehen unter **Projekte** am Speicherort der Aufgabenordner. „Taxes 2026“ bekommt etwa `~/Hydor/Projects/taxes-2026`, sofern du den Ort nicht geändert hast; siehe [Aufgabenordner verschieben](/guide/agents#move-task-folders). Bei vergebenem Namen folgen `-2`, `-3` und so weiter. Von der Projektseite aus öffnet sich das neue Projekt, von der Startseite aus wird es für die nächste Sitzung ausgewählt.
@@ -72,7 +72,7 @@ Hydor listet die Sitzungen auf, die du außerhalb von Hydor in Claude Code und C
 - **Die eigenen Projekte von Codex**: Die Projekte, die du in der Codex-App führst, einschließlich der Ordner, die sie für deine ChatGPT-Projekte anlegt, werden zu Projekten, sobald eine Sitzung in einem ihrer Ordner gearbeitet hat. Das Projekt übernimmt den Namen, den Codex dafür hat, seinen ersten Ordner als eigenen Ordner des Projekts und seine anderen Ordner als die Ordner, mit denen das Projekt arbeitet.
 - **Was ausgenommen ist**: dein persönlicher Ordner; versteckte Ordner (außer den Ordnern der eigenen Projekte von Codex); temporäre Ordner; die Ordner, die die App für sich selbst anlegt (Aufgabenordner, Läufe von Apps, Worktrees und ihre Daten); Ordner, die du als **Kein Projekt** markiert hast; und Ordner, die ein Projekt schon hat: sein eigener Ordner, einer, mit dem es arbeitet, oder ein Ordner darin.
 - **Zeitpunkt**: nach dem Einlesen vorhandener Sitzungen beim Hydor-Start, danach etwa innerhalb einer Minute nach neuen Sitzungen.
-- **Sein Name**: der Name, den du dem Ordner in der Seitenleiste gegeben hast (**Umbenennen**), sonst der Name des Codex-Projekts, sonst der eigene Name des Ordners. Wenn ein Projekt schon diesen Namen hat, kommt der Name des übergeordneten Ordners davor („client/app“), danach eine Zahl.
+- **Name**: der Name, den du dem Ordner in der Seitenleiste gegeben hast (**Umbenennen**), sonst der Name des Codex-Projekts, sonst der eigene Name des Ordners. Wenn ein Projekt schon diesen Namen hat, kommt der Name des übergeordneten Ordners davor („client/app“), danach eine Zahl.
 - **Auf der Projektseite**: Seine Karte sagt auf ihrem Streifen, wo es gefunden wurde: **Von Claude Code**, **Von Codex** oder **Von Claude Code und Codex**, mit den Zeichen der Programme. Fahre darüber, um „Hydor hat dieses Projekt für einen Ordner erstellt, in dem du mit Claude Code arbeitest“ zu lesen (oder Codex, oder beide). So gefundene Projekte stehen nach den Projekten, die du schon hast, das zuletzt aktive zuerst.
 - **In der Seitenleiste**: Seine Gruppe ist die Gruppe des Projekts, mit seinem Zeichen und Namen und nach dem Namen den Zeichen der Programme. Fahre über den Namen oder öffne das **⋯** der Überschrift, um zu sehen, woher seine Sitzungen kamen (**Außerhalb von Hydor gestartet**), wie bei der Gruppe eines Ordners.
 - **Vollständiges Projekt**: Der Arbeitsordner bleibt unverändert, ohne Verschieben oder Kopieren. Dokumente, Skills, Richtlinien, Agenten, Bibliothek und Freigaben funktionieren wie gewohnt. Du kannst umbenennen, beschreiben und löschen. Claude-Code-Skills aus `.claude/skills` erscheinen weiterhin unter **Skills**; CLAUDE.md und AGENTS.md werden wie bisher gelesen.
@@ -119,7 +119,7 @@ Darunter stehen sieben Tabs: **Übersicht**, **Bibliothek**, **Dateien**, **Memo
 
 Karten zeigen das Projekt auf einen Blick:
 
-- **Sitzungen**: alle zugehörigen Sitzungen, ob hier oder extern im Projektordner gestartet, zuletzt aktive zuerst. Angezeigt werden Agentensymbol, Titel, am Computer Aktivität wie **In Arbeit**, **Benötigt dich** oder **Bereit**, und Zeit seit letzter Aktivität. Ein Klick öffnet die Sitzung; ab mehr als sechs zeigt **Alle** den Rest. Ohne Sitzungen erklärt ein Hinweis die Arbeit mit Projektordner, Richtlinien, Dokumenten und Skills und bietet **Neue Sitzung**.
+- **Sitzungen**: alle zugehörigen Sitzungen, ob hier oder extern im Projektordner gestartet, zuletzt aktive zuerst. Angezeigt werden Agentensymbol, Titel, am Computer Aktivität wie **In Arbeit**, **Braucht dich** oder **Bereit**, und Zeit seit letzter Aktivität. Ein Klick öffnet die Sitzung; ab mehr als sechs zeigt **Alle** den Rest. Ohne Sitzungen erklärt ein Hinweis die Arbeit mit Projektordner, Richtlinien, Dokumenten und Skills und bietet **Neue Sitzung**.
 - **In der Bibliothek**: Projektinhalte, zuletzt geänderte zuerst. Siehe [Bibliothek](#library). **In der Bibliothek öffnen** zeigt sie dort. Auf die Karte gezogene Dateien werden hinzugefügt.
 - **Geteilt mit**, daneben oder auf dem Smartphone darunter: nach erster Freigabe die Personen mit Initialen und letzter Aktivität, etwa „‚Kapitel 3‘ kommentiert · vor 2 Std.“ oder „Noch nicht geöffnet“. Eine Person oder **Teilen** öffnet die Freigabeverwaltung. Siehe [Projektfreigaben](#share-a-project-with-people).
 - **Jede Sitzung hier** (daneben, auf dem Smartphone darunter): was jede Sitzung im Projekt bekommt. **Ordner** (sein Ordner und wie viele weitere es nutzt: Klicke darauf, um zum Tab **Dateien** zu gelangen), **Richtlinien** (der Anfang seiner Richtlinien: Klicke darauf, um zu **Einstellungen** zu gelangen), **Memory** (was es sich merkt, in einer Zeile: „12 Notizen · 8 Artikel · 5 Dokumente“, wobei die Artikel nur erscheinen, solange sein Wiki-Memory an ist; klicke darauf, um zum Tab **Memory** zu gelangen), **Skills** (wie viele eigene es hat) und **Beginnt als** (sein Agent).
@@ -134,7 +134,7 @@ Hier liegen Seiten, Folien, Dokumente, Tabellen und LaTeX-Dokumente aus Projekts
 Der Projektordner und Zusatzordner erscheinen wie auf der [Dateien-Seite](/guide/files-git#browse-a-folder), mit Öffnen, Mehrfachauswahl, Ziehen, Hochladen und Zeilenmenüs. Dateien öffnen sich in einem Fenster über der Seite.
 
 - Über dem Inhalt stehen Schaltflächen je Ordner, der Stamm unter dem Projektnamen, weitere unter ihren Ordnernamen. Ein Klick wechselt den angezeigten Ordner.
-- **Ordner verknüpfen** fügt per Name oder Pfad einen weiteren Arbeitsordner unverändert hinzu, höchstens zwölf. Es wird nichts kopiert.
+- **Ordner hinzufügen** fügt per Name oder Pfad einen weiteren Arbeitsordner unverändert hinzu, höchstens zwölf. Es wird nichts kopiert.
 - ✕ auf dem Chip eines Ordners nimmt ihn aus dem Projekt heraus; der Ordner selbst bleibt, wie er ist. Der Hinweis bietet **Rückgängig machen**.
 - **In Dateien öffnen** öffnet den Ordner auf der Dateien-Seite.
 
@@ -156,7 +156,7 @@ Alle verfügbaren Skills aus Projekt, Bibliothek und den eigenen Beständen von 
 
 Projektspezifische Agenten erscheinen als Team. Jeder zeigt seine Auslöser wie **Auf Anfrage** und Zeitpläne mit nächstem Lauf; darunter sind delegierte Agenten durch Linien verbunden. Ein Klick öffnet daneben Details zu Arbeitsort, Modell, Berechtigungen, Auftraggebern und Monatskosten sowie **Sitzung starten** im Projekt und **Öffnen** für die Agentenseite. Unter dem Board stehen unter **Hier ebenfalls verfügbar, projektübergreifend** die allgemeinen Agenten. **Neuer Agent hier** erstellt einen Projektagenten. Siehe [Agenten](/guide/agents).
 
-Ein Projekt kann bei Erstellung über **Agent für dieses Projekt** oder hier über **Agenten für dieses Projekt erstellen** einen passenden Agenten erhalten:
+Ein Projekt kann bei Erstellung über **Ein Agent dafür** oder hier über **Einen für dieses Projekt erstellen** einen passenden Agenten erhalten:
 
 - Sagt das Projekt genug über sich selbst (worum es geht und welche Richtlinien es hat, oder eine README oder Agentennotizen in seinem Ordner), entwirft das Hilfsmodell einen Agenten, der zu ihm passt, ausgehend von der Vorlage für seine Art.
 - Sagt es wenig, ist der Agent die Vorlage für seine Art, bestimmt nach dem, was sein Ordner enthält, oder nach den Worten, mit denen es beschrieben wurde: ein Entwickler für Software, ein Webentwickler für eine Website, ein ML-Forscher für Experimente mit maschinellem Lernen, ein Analyst für Daten, ein Paper-Autor für ein Paper in LaTeX, ein Forscher für Papers und Berichte zum Lesen, ein Autor für Dokumente, ein Designer für Bilder und Videos oder ein Präsentator für Folien.
@@ -170,7 +170,7 @@ Alles zum Projekt selbst, in fünf Teilen, jeweils mit einer Zeile dazu, wofür 
 
 - **Das Projekt**: **Name** neben dem farbigen Zeichen, **Worum es geht** und **Farbe**. Name, Inhalt und Farbe erscheinen auf Projektkarte, Projektseite und Startseite.
 - **Was jeder Agent darin befolgt**: seine **Agentenrichtlinien**, wie bei der Erstellung.
-- **Wie seine Sitzungen starten**: Unter **Neue Sitzungen starten mit** tippst du eine Auswahl an: **Auf der Startseite ausgewählter Agent** (die Voreinstellung: Die Startseite behält den Agenten, den du im Projekt gewählt hast, Allgemein, bis du einen anderen wählst) oder einen deiner Agenten, ob eingebaut oder selbst erstellt. Ein Projekt, in dem du noch nichts gewählt hast, öffnet sich dann auf der Startseite mit diesem Agenten.
+- **Agent beim Sitzungsstart**: Unter **Neue Sitzungen starten mit** tippst du eine Auswahl an: **Auf der Startseite ausgewählter Agent** (die Voreinstellung: Die Startseite behält den Agenten, den du im Projekt gewählt hast, Allgemein, bis du einen anderen wählst) oder einen deiner Agenten, ob eingebaut oder selbst erstellt. Ein Projekt, in dem du noch nichts gewählt hast, öffnet sich dann auf der Startseite mit diesem Agenten.
 - **Wiki-Memory**: ob das Projekt ein Wiki mit Artikeln aus seinen Dokumenten und seiner Arbeit führt: **Wie in den Einstellungen (ein)** (oder **(aus)**, je nachdem, was gerade die Voreinstellung ist), **Ein** oder **Aus**. Die Auswahl wird sofort gespeichert. [Einstellungen → Memory](/settings?s=memory&find=Wiki%20memory) enthält die Voreinstellung für jedes Projekt (siehe [Wiki-Memory](/guide/wiki-memory#turn-it-on-or-off)). Darunter steht **Höchstzahl der Dokumente für sein Wiki** auf **Wie in den Einstellungen (100)** oder **Eine eigene Zahl**: Ein Projekt mit mehr Dokumenten hält sie aus seinem Wiki heraus, und Agenten durchsuchen sie stattdessen (siehe [Wenn ein Projekt zu viele Dokumente hat](/guide/wiki-memory#when-a-project-has-too-many-documents)).
 - **Die Projekte, die es zusammenbringt**: Wähle hier Projekte aus, um dieses Projekt zu einer Gruppe zu machen (siehe [Projekte in einer Gruppe zusammenbringen](#bring-projects-together-in-a-group)).
 
@@ -188,7 +188,7 @@ Der Tab listet jeden Skill, den die Sitzungen des Projekts bekommen, in Gruppen 
 - **Wann verwenden**: etwa „Beim Zitieren einer Quelle in der Abschlussarbeit“. Diese Beschreibung erhalten alle Projektsitzungen; den Rest lädt der Agent nur bei Bedarf.
 - **Skill**: Arbeitsschritte, Prüfungen und zu vermeidende Fehler in Markdown.
 
-Für eine nur hier geltende Anpassung eines Bibliotheks-Skills öffnest du ihn und wählst **Für dieses Projekt anpassen**. Er wird mit Beispielen und Skripten ins Projekt kopiert und im Editor geöffnet. Die Bibliotheksfassung bleibt für andere Sitzungen unverändert.
+Für eine nur hier geltende Anpassung eines Bibliotheks-Skills öffnest du ihn und wählst **Für dieses Projekt ändern**. Er wird mit Beispielen und Skripten ins Projekt kopiert und im Editor geöffnet. Die Bibliotheksfassung bleibt für andere Sitzungen unverändert.
 
 Ein Skill braucht einen Namen mit 2 bis 64 Zeichen, eine Einsatzbeschreibung mit mindestens zehn Zeichen und eine Anleitung mit mehr als wenigen Wörtern. Insgesamt gelten höchstens 20.000 Zeichen. Erkennbare Passwörter, Keys und Tokens sind nicht erlaubt; beschreibe stattdessen ihren Ablageort.
 
@@ -196,7 +196,7 @@ Ein Skill braucht einen Namen mit 2 bis 64 Zeichen, eine Einsatzbeschreibung mit
 
 Jeder Skill im Tab hat am Ende seiner Zeile einen Schalter: die Skills deiner Bibliothek (eingebaute, eigene und die deiner Plugins), die eigenen des Projekts sowie die eigenen von Claude Code und Codex. Ein Schalter hier gilt nur für die Sitzungen dieses Projekts; die Schalter unter [Einstellungen → Skills](/settings?s=skills) gelten für alle anderen Sitzungen.
 
-- Abweichungen heißen **Hier ein** oder **Hier aus** und lassen sich mit **Hier geändert** filtern. Global deaktivierte Skills zeigen **Aus** und können nur für dieses Projekt aktiviert werden.
+- Abweichungen heißen **Hier aktiviert** oder **Hier deaktiviert** und lassen sich mit **Hier geändert** filtern. Global deaktivierte Skills zeigen **Aus** und können nur für dieses Projekt aktiviert werden.
 - Im Fenster eines Skills, der hier umgeschaltet wurde, steht, was die Einstellungen für alle anderen Sitzungen festlegen, und **Einstellungen übernehmen** kehrt dorthin zurück. Das Gleiche bewirkt es, ihn von Hand zurückzuschalten.
 - Im Menü **⋯** schalten **Alle Skills einschalten** und **Alle Skills ausschalten** nach deiner Bestätigung jeden Skill ein oder aus, den der Tab für dieses Projekt auflistet, und **Standardeinstellungen für alle Skills übernehmen** setzt nach deiner Bestätigung jeden Skill auf das zurück, was die Einstellungen sagen. **Standard-Skill-Einstellungen für alle Projekte ändern** öffnet Einstellungen → Skills. Alles ein- oder auszuschalten betrifft jeden Skill im Tab, auch die, die die Filter ausblenden; später hinzugefügte Skills folgen ihrer üblichen Einstellung, und bereits laufende Sitzungen behalten ihre, bis sie neu starten. Konnten die eigenen Skills von Codex nicht gelesen werden, sagt das die Bestätigung, und sie bleiben, wie sie sind.
 
@@ -204,7 +204,7 @@ Neue Projektsitzungen übernehmen den aktuellen Schaltzustand. Laufende behalten
 
 ### Die projektspezifische Skill-Liste
 
-Jeder eigene Skill des Projekts erscheint als Zeile: sein Name, wann er zu benutzen ist und wie oft Agenten im Projekt (und in Gruppen, die es einbinden) ihn benutzt haben. Ein Skill, der den Namen eines Skills in deiner Skill-Bibliothek trägt, hat das Abzeichen **Ersetzt Bibliotheks-Skill**: Die Sitzungen des Projekts bekommen ihn anstelle des Skills aus der Bibliothek.
+Jeder eigene Skill des Projekts erscheint als Zeile: sein Name, wann er zu benutzen ist und wie oft Agenten im Projekt (und in Gruppen, die es einbinden) ihn benutzt haben. Ein Skill, der den Namen eines Skills in deiner Skill-Bibliothek trägt, hat das Abzeichen **Ersetzt den Skill aus der Bibliothek**: Die Sitzungen des Projekts bekommen ihn anstelle des Skills aus der Bibliothek.
 
 - Klicke ihn an, um den Skill und seinen **Verlauf** der Änderungen zu lesen. **Veränderung** unten in diesem Fenster bearbeitet seinen Namen, wann er zu benutzen ist und seinen Text: Ein neuer Name behält seine übrigen Dateien, seinen Verlauf und seinen Schalter.
 - **Entfernen** im selben Fenster fragt nach. Danach entfällt der Skill oder die gleichnamige Bibliotheksfassung gilt wieder. Entfernte Skills stehen unter der Liste als **Entfernt:** und lassen sich per Klick wiederherstellen.
@@ -262,7 +262,7 @@ Eine Gruppe ist ein Projekt, das mehrere andere für übergreifende Arbeit bünd
 ### Eine Gruppe erstellen
 
 1. Klicke auf der [Projektseite](/projects) auf **Projekte gruppieren**. Die Karte erscheint ab zwei gewöhnlichen Projekten.
-2. Gib unter **Neue Projektgruppe** einen **Namen** ein, etwa „Arbeit“ oder „Alles zur Abschlussarbeit“.
+2. Gib unter **Neue Gruppe von Projekten** einen **Namen** ein, etwa „Arbeit“ oder „Alles zur Abschlussarbeit“.
 3. Tippe unter **Die Projekte, die es zusammenbringt** jedes Projekt an, das aufgenommen werden soll; tippe es noch einmal an, um es wieder herauszunehmen. Wähle mindestens eines aus.
 4. Fülle optional **Worum es geht** und die **Agentenrichtlinien** aus und wähle eine Farbe.
 5. Klicke auf **Gruppe erstellen**. Wie ein Projekt bekommt sie einen eigenen Ordner für das, was darin entsteht, und ihre Seite öffnet sich.
@@ -312,7 +312,7 @@ Auch Agenten können nach jeweiliger Freigabe Links erstellen: „Teile mein Pro
 
 Ihr Link öffnet das Projekt für sich allein, im Design der App, ohne etwas anderes von dir drumherum:
 
-- Oben stehen Zeichen, Name und Beschreibung. Rechts nennt das Menü unter dem eigenen Namen Rechte, Ablauf und freigebende Person und bietet **Sprache** mit Deutsch, Englisch, Chinesisch und Griechisch sowie **Design** mit **Hell**, **Dunkel** oder **Wie dieses Gerät** für diesen Browser.
+- Oben stehen Zeichen, Name und Beschreibung. Rechts nennt das Menü unter dem eigenen Namen Rechte, Ablauf und freigebende Person und bietet **Sprache** mit Deutsch, Englisch, Chinesisch und Griechisch sowie **Design** mit **Hell**, **Dunkel** oder **Geräteeinstellung übernehmen** für diesen Browser.
 - **Dokumente**: die Seiten, Dokumente, Folien, Tabellen, LaTeX-Dokumente und Notebooks des Projekts, jeweils mit ihrem Bild. Eines öffnet sich zum Lesen so, wie es seine eigene Adresse zeigt (ein LaTeX-Dokument als gesetzte Seiten, sein Quelltext einen Klick entfernt), mit **Herunterladen** für seine Dateien: ein PDF, ein Word-Dokument, das LaTeX-Projekt und so weiter. Mit **Dokumente bearbeiten** öffnen sich Dokumente, Tabellen, Folien, Seiten und Designs stattdessen in ihrem Editor.
 - **Sitzungen**: die Sitzungen des Projekts, so wie ein [Link zum Lesen](/guide/devices#share-a-session-with-a-read-only-link) eine Sitzung zeigt: die Unterhaltung, die Schritte mit ihren Namen, Dateiänderungen und Seiten, die der Agent gezeigt hat, und man liest live mit, während ein Agent arbeitet. Nie die Ausgabe von Befehlen, das Denken des Agenten oder das, was ein Schritt bekommen hat. Eine vertrauliche Sitzung wird nie angezeigt.
 - **Ausführungen**, wenn das Projekt Experimente hat: Name jedes Laufs, wie er verlaufen ist und wann, seine Metriken und seine Einstellungen. Nie sein Befehl, sein Ordner, sein Log oder der Computer, auf dem er lief.
@@ -322,7 +322,7 @@ Die Seite aktualisiert sich von selbst, jede Minute, solange sie offen ist. Agen
 
 ### Kommentare unter eigenem Namen
 
-**Kommentare** neben einem Dokument, LaTeX, Folien, Tabellen oder einer Seite, auf dem Smartphone darüber, zeigt Kommentare und Antworten mit Urheber. Eigene erscheinen als **Du**, Agenten als **Agent**, deine unter deinem Freigabenamen. Diesen nennt **Deine Kommentare erscheinen als** unten im Freigabedialog, zunächst „Eigentümer“; **Ändern** passt ihn an.
+**Kommentare** neben einem Dokument, LaTeX, Folien, Tabellen oder einer Seite, auf dem Smartphone darüber, zeigt Kommentare und Antworten mit Urheber. Eigene erscheinen als **Du**, Agenten als **Agent**, deine unter deinem Freigabenamen. Diesen nennt **Deine Kommentare erscheinen für sie unter dem Namen** unten im Freigabedialog, zunächst „Eigentümer“; **Ändern** passt ihn an.
 
 Zum Kommentieren klicken sie auf **Kommentar hinzufügen** und fügen dann die Worte ein, um die es geht, aus dem Dokument kopiert, oder lassen sie weg, um das ganze Dokument zu kommentieren; bei Folien wählen sie die Folie, bei einer Tabelle das Blatt und die Zelle (etwa B4). Sie können jeden Kommentar beantworten und erledigen oder wieder öffnen, aber nur ihre eigenen ändern oder löschen. Mit **Dokumente bearbeiten** kommentieren sie im Editor selbst, so wie du.
 
@@ -339,7 +339,7 @@ Mit **Dokumente bearbeiten** gespeicherte Änderungen erstellen eine neue Versio
 Im Dialog zum Teilen listet **Geteilt mit** jede Person auf, mit dem, was sie tun darf, bis wann und was sie zuletzt getan hat. Ihr Menü **Mehr** (⋯) bietet:
 
 - **Ansehen und kommentieren** oder **Dokumente bearbeiten**, wirksam ab der nächsten Aktion;
-- **Eine Woche ab jetzt**, **Einen Monat ab jetzt** oder **Bis zur Deaktivierung**;
+- **Ab jetzt eine Woche lang**, **Ab jetzt einen Monat lang** oder **Bis zur Deaktivierung**;
 - **Neuen Link erstellen**: deaktiviert den alten sofort. Sende den neuen Link. Identität und Kommentare bleiben erhalten;
 - **Freigabe beenden**: deaktiviert den Link sofort, erhält aber Beiträge unter dem Namen.
 
@@ -371,7 +371,7 @@ Jede Wissensdatenbank hat ein eigenes Ablagefeld und **Ordner auf diesem Compute
 
 ### Dateien ablegen oder auswählen
 
-Ziehe Dokumente oder Ordner auf das Feld „Dokumente oder Ordner hier ablegen“, oder nutze **Dateien auswählen** beziehungsweise **Ordner**. Dateien werden in den App-Datenordner kopiert und sofort eingelesen. Spätere Änderungen der Originale werden deshalb nicht übernommen. Ein kleiner Bereich zeigt den Upload. Bei gleichen Dateinamen fragt er nach **Ersetzen**, **Vorhandene überspringen** oder **Abbrechen**.
+Ziehe Dokumente oder Ordner auf das Feld „Dokumente oder Ordner hier ablegen“, oder nutze **Dateien auswählen** beziehungsweise **Ordner**. Dateien werden in den App-Datenordner kopiert und sofort eingelesen. Spätere Änderungen der Originale werden deshalb nicht übernommen. Ein kleiner Bereich zeigt den Upload. Bei gleichen Dateinamen fragt er nach **Ersetzen**, **Vorhandene Dateien überspringen** oder **Abbrechen**.
 
 Uploads kommen vom gerade verwendeten Gerät. Auf dem Smartphone öffnet **Dateien auswählen** dessen Dateiauswahl; ganze Ordner lassen sich nur am Computer auswählen.
 
@@ -380,7 +380,7 @@ Uploads kommen vom gerade verwendeten Gerät. Auf dem Smartphone öffnet **Datei
 1. Wähle bei der Wissensdatenbank **Ordner auf diesem Computer hinzufügen**.
 2. Tippe im Menü, das sich öffnet („Einen Ordner einlesen und aktuell halten“), den Namen eines Ordners ein, um ihn unter den zuletzt verwendeten Ordnern und denen in deinem Benutzerordner zu finden, oder gib seinen Pfad ein, etwa `~/Documents/Manuals`. Wähle ihn aus.
 
-Der Ordner bleibt an seinem Ort, ohne Kopie. Seine Schaltfläche steht an der Datenbank. Eine Minute nach App-Start und danach stündlich werden neue und geänderte Dateien eingelesen und entfernte aus dem Bestand genommen. Nach einem Start werden auch zuvor nicht lesbare Dokumente erneut versucht, die eine neuere Version vielleicht unterstützt. **Jetzt neu einlesen** im Menü startet sofort.
+Der Ordner bleibt an seinem Ort, ohne Kopie. Seine Schaltfläche steht an der Datenbank. Eine Minute nach App-Start und danach stündlich werden neue und geänderte Dateien eingelesen und entfernte aus dem Bestand genommen. Nach einem Start werden auch zuvor nicht lesbare Dokumente erneut versucht, die eine neuere Version vielleicht unterstützt. **Jetzt noch einmal lesen** im Menü startet sofort.
 
 „Dieser Computer“ ist der Hydor-Server und muss nicht das Gerät vor dir sein.
 
@@ -401,12 +401,12 @@ Jede Datenbank erscheint als Karte. Unter dem Namen stehen Dokument- und Passage
 
 Ist die semantische Suche aktiv, aber noch nicht bereit, erklärt ein Hinweis über den Datenbanken den Grund. Bis dahin suchen Agenten nach Wörtern:
 
-- **Semantische Suche wird auf diesem Computer eingerichtet**, mit aktuellem Schritt wie PyTorch-Installation, einmalig beim ersten Mal;
-- **Semantische Suche startet** beim Laden und erstmaligen Herunterladen des Modells;
-- **Semantische Suche wartet auf Arbeitsspeicher** mit verfügbarem und benötigtem Speicher. Alle paar Minuten wird erneut versucht; das Schließen anderer Programme kann helfen;
+- **Bedeutungssuche wird auf diesem Computer eingerichtet**, mit aktuellem Schritt wie PyTorch-Installation, einmalig beim ersten Mal;
+- **Bedeutungssuche wird gestartet** beim Laden und erstmaligen Herunterladen des Modells;
+- **Bedeutungssuche wartet auf freien Arbeitsspeicher** mit verfügbarem und benötigtem Speicher. Alle paar Minuten wird erneut versucht; das Schließen anderer Programme kann helfen;
 - **Semantische Suche angehalten** mit Grund. Nach Korrektur, etwa Python-Installation, nutze **Erneut versuchen** oder [Einstellungen → Memory](/settings?s=memory&find=Search%20by%20meaning).
 
-- **Dokumente anzeigen** listet Name oder Pfad, Passagenzahl und Größe. **Kein Text** kennzeichnet leere Textbestände, **Nicht lesbar** einen Fehler mit Erklärung beim Darüberfahren. Ein Klick öffnet das Dokument, **Dokumente ausblenden** schließt die Liste.
+- **Dokumente anzeigen** listet Name oder Pfad, Passagenzahl und Größe. **Kein Text** kennzeichnet leere Textbestände, **konnte nicht gelesen werden** einen Fehler mit Erklärung beim Darüberfahren. Ein Klick öffnet das Dokument, **Dokumente ausblenden** schließt die Liste.
 - Konnten einige Dokumente nicht gelesen werden, sagt eine rote Zeile, wie viele, mit den ersten paar und dem Grund für jedes.
 - Hochgeladene Dateien entfernst du über × am Zeilenende, am Computer beim Darüberfahren sichtbar. Gelöscht wird die Datenbankkopie. Dateien eingebundener Ordner haben kein ×; entferne sie im Originalordner oder beende dessen Einbindung.
 
@@ -442,7 +442,7 @@ In der Unterhaltung erscheint eine Suche als Schritt: **Deine Dokumente durchsuc
 Drei Sucharten stehen bereit:
 
 - **Nach Wörtern** für Passagen mit den Suchwörtern, beste Treffer zuerst, immer verfügbar.
-- **Nach Bedeutung** für sinngleiche Inhalte, auch anders formuliert oder anderssprachig. Dafür muss **Nach Bedeutung suchen** unter [Einstellungen → Memory](/settings?s=memory&find=Search%20by%20meaning) aktiv sein, standardmäßig eingeschaltet. Das Modell läuft lokal und bereitet alle Datenbanken im Hintergrund vor. Siehe [Memory](/guide/memory#search-by-meaning). Ohne Aktivierung nennen Wissen-Tabs die passende Einstellung; Agenten verwenden Wortsuche.
+- **Nach Bedeutung** für sinngleiche Inhalte, auch anders formuliert oder anderssprachig. Dafür muss **Bedeutungssuche** unter [Einstellungen → Memory](/settings?s=memory&find=Search%20by%20meaning) aktiv sein, standardmäßig eingeschaltet. Das Modell läuft lokal und bereitet alle Datenbanken im Hintergrund vor. Siehe [Memory](/guide/memory#search-by-meaning). Ohne Aktivierung nennen Wissen-Tabs die passende Einstellung; Agenten verwenden Wortsuche.
 - **Exakter Text** für Ausdrücke in Anführungszeichen wie „Kündigungsfrist“ oder reguläre Ausdrücke zwischen Schrägstrichen wie `/INV-\d+/`. Wie grep eignet sich das für Namen, Nummern und Codes; Ergebnisse folgen der Dokumentreihenfolge.
 
 Ohne ausdrückliche Einschränkung kombiniert der Agent Wort- und Bedeutungssuche. Anführungszeichen oder Schrägstriche lösen exakte Suche aus. Standardmäßig erhält er acht Passagen, auf Wunsch bis zu 25, und kann einzelne Datenbanken nach Namen auswählen.

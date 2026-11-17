@@ -19,9 +19,9 @@ Der Modus wird pro Browser gespeichert. Smartphone und Computer können deshalb 
 Unter der Überschrift, im Kasten der Gruppe, erscheinen die Designs als kleine Bilder der App in ihren Farben, in zwei Reihen: **Dunkel** und **Hell**. Vier sind in der App enthalten:
 
 - **Hydor Dark**: schwarzer Sitzungshintergrund, kühle blauschwarze Flächen und ein bläulich violetter Akzent. Das voreingestellte dunkle Design.
-- **Midnight**: schwarzer Hintergrund, warme fast schwarze Flächen und Goldakzente.
+- **Mitternacht**: schwarzer Hintergrund, warme fast schwarze Flächen und Goldakzente.
 - **Hydor Light**: warmer gebrochen weißer Hintergrund mit dunklem Goldakzent. Das voreingestellte helle Design.
-- **Sage**: kühles graugrünes Papier mit dunklem petrolfarbenem Akzent.
+- **Salbei**: kühles graugrünes Papier mit dunklem petrolfarbenem Akzent.
 
 Klicke auf ein Design, um es zu verwenden. Es wird zum Design für seinen Modus, und der Modus wechselt dorthin (außer der Modus ist **System**: dann wird es angezeigt, sobald dein Gerät in diesem Modus ist). Jeder Modus behält seine eigene Auswahl, du kannst also nachts Midnight und tagsüber Sage haben. Ist **System** an, steht in den Reihen, welches gerade aktiv ist. Auch wenn du den Namen eines Designs in das Suchfeld tippst, findest du es, und wenn du es auswählst, wechselst du dorthin.
 
@@ -87,7 +87,7 @@ Agenten werden gebeten, in deiner gewählten Sprache zu antworten, sofern du kei
 
 ## Enter während der Agentenarbeit festlegen
 
-Unter **Sitzungen** bestimmt [**Senden während der Agentenarbeit**](/settings?s=general&find=Sending%20while%20an%20agent%20works), was eine Nachricht während eines laufenden Durchlaufs bewirkt:
+Unter **Sitzungen** bestimmt [**Senden, während ein Agent arbeitet**](/settings?s=general&find=Sending%20while%20an%20agent%20works), was eine Nachricht während eines laufenden Durchlaufs bewirkt:
 
 - **In laufenden Durchlauf senden** (anfangs eingestellt): Enter fügt deine Nachricht dem laufenden Durchlauf hinzu, sodass der Agent sie sofort berücksichtigt. Strg+Enter (⌘Enter auf dem Mac) wartet stattdessen, bis der Durchlauf zu Ende ist.
 - **Auf Ende warten**: Enter stellt deine Nachricht in die Warteschlange, und sie wird gesendet, wenn der Durchlauf zu Ende ist. Strg+Enter (⌘Enter auf dem Mac) fügt sie stattdessen dem laufenden Durchlauf hinzu.
@@ -100,11 +100,11 @@ Unter **Terminals** zeigt [**Terminalvorschläge**](/settings?s=general&find=Ter
 
 ## Sitzungen nach Nutzungslimits fortsetzen
 
-[**Nach Nutzungslimits fortsetzen**](/settings?s=general&find=Resume%20after%20usage%20limits) ist zunächst aus. Aktiviert setzt es eine wegen ausgeschöpften Kontingents gestoppte Sitzung eine Minute nach Zurücksetzung automatisch fort. Die App speichert dies serverseitig, sodass es ohne offenen Browser funktioniert. Mehr unter [Nutzung, Limits und Kosten](/guide/usage).
+[**Nach dem Zurücksetzen von Nutzungslimits fortsetzen**](/settings?s=general&find=Resume%20after%20usage%20limits) ist zunächst aus. Aktiviert setzt es eine wegen ausgeschöpften Kontingents gestoppte Sitzung eine Minute nach Zurücksetzung automatisch fort. Die App speichert dies serverseitig, sodass es ohne offenen Browser funktioniert. Mehr unter [Nutzung, Limits und Kosten](/guide/usage).
 
 ## Inaktive Sitzungen löschen
 
-Die App bewahrt Sitzungen unabhängig vom Agentenprogramm auf; siehe [Jede Sitzung bleibt erhalten](/guide/usage#every-session-is-kept). Nach langer Inaktivität kann sie sie automatisch löschen. [**Inaktive Sitzungen löschen**](/settings?s=general&find=Delete%20inactive%20sessions) ist standardmäßig an und entfernt nach **einem Jahr** täglich höchstens einige hundert Sitzungen.
+Die App bewahrt Sitzungen unabhängig vom Agentenprogramm auf; siehe [Jede Sitzung bleibt erhalten](/guide/usage#every-session-is-kept). Nach langer Inaktivität kann sie sie automatisch löschen. [**Inaktive Sitzungen löschen**](/settings?s=general&find=Delete%20inactive%20sessions) ist standardmäßig an und entfernt nach **1 Jahr** täglich höchstens einige hundert Sitzungen.
 
 - Wähle im Menü neben dem Schalter in seiner Zeile, wie lange eine Sitzung inaktiv bleiben darf: **Nach 3 Monaten**, **Nach 6 Monaten**, **Nach 1 Jahr**, **Nach 2 Jahren** oder **Nach 5 Jahren**.
 - Deaktiviere den Schalter für unbegrenzte Aufbewahrung.
@@ -210,7 +210,7 @@ Nach der Tour zeigen dir Tipps den Rest der App, wenn du darauf stößt. Wenn ei
 Die App verwendet ein gemeinsames, bei der Installation festgelegtes Passwort. Öffne [Einstellungen → App → Passwort](/settings?s=security&find=Change%20password) und wähle in **Passwort ändern** die Aktion **Ändern…**:
 
 1. Gib dein **Aktuelles Passwort** ein.
-2. Tippe das **Neue Passwort** (mindestens 10 Zeichen) und **Neues Passwort wiederholen** ein.
+2. Tippe unter **Neues Passwort** das Passwort (mindestens 10 Zeichen) und unter **Neues Passwort wiederholen** dasselbe noch einmal ein.
 3. Klicke auf **Passwort ändern**. Die Schaltfläche wird erst mit aktuellem Passwort und ausreichender Länge aktiv.
 
 Alle anderen Browser werden abgemeldet, auch Smartphones und andere Computer. Dieser Browser bleibt angemeldet. Bei falschem aktuellem Passwort oder unterschiedlicher Wiederholung wird nichts geändert und die App erklärt den Grund.

@@ -30,9 +30,9 @@ Jede Zeile zeigt den verbrauchten Anteil mit einem Balken, den verbleibenden Ant
 Je nach Tarif siehst du außerdem:
 
 - **Zusätzliche Nutzung** bei Claude: ob kostenpflichtige Nutzung über das Abo hinaus aktiviert ist und wie viel des monatlichen Zusatzbudgets verbraucht wurde.
-- **Guthaben** bei Codex: deinen Guthabenstand oder „Unbegrenzt“.
+- **Credits** bei Codex: deinen Guthabenstand oder „Unbegrenzt“.
 - **Limit-Resets**: aktuell verfügbare Resets; siehe [Einen Limit-Reset verwenden](#use-a-limit-reset).
-- **Nutzung nach Anwendung in dieser Woche** bei Claude: wie sich die Nutzung auf die verschiedenen Claude-Anwendungen verteilt.
+- **Diese Woche nach Nutzungsbereich** bei Claude: wie sich die Nutzung auf die verschiedenen Claude-Anwendungen verteilt.
 - **Token pro Tag** bei Codex: die letzten 30 Tage und der Gesamtverbrauch seit Beginn. Ein Token ist ein Wortteil; Modelle messen damit gelesenen und erzeugten Text.
 
 Bei Problemen erscheint ein entsprechender Hinweis:
@@ -52,7 +52,7 @@ Ist das Kontingent eines Abos aufgebraucht, endet der laufende Agentendurchlauf.
 
 Der Hinweis bietet folgende Möglichkeiten:
 
-- **Nach Zurücksetzung fortsetzen**: Ist **Nach Nutzungslimits fortsetzen** noch deaktiviert, kannst du damit die einzelne Sitzung automatisch weiterlaufen lassen. Eine Minute nach der Zurücksetzung erhält sie die Nachricht „Mach dort weiter, wo du aufgehört hast.“ Anschließend erscheint „Diese Sitzung wird nach der Zurücksetzung automatisch fortgesetzt“ mit **Abbrechen**.
+- **Beim Zurücksetzen fortsetzen**: Ist **Nach dem Zurücksetzen von Nutzungslimits fortsetzen** noch deaktiviert, kannst du damit die einzelne Sitzung automatisch weiterlaufen lassen. Eine Minute nach der Zurücksetzung erhält sie die Nachricht „Mach dort weiter, wo du aufgehört hast.“ Anschließend erscheint „Diese Sitzung wird nach der Zurücksetzung automatisch fortgesetzt“ mit **Abbrechen**.
 - **Reset verwenden**: verfügbar, wenn das Konto einen jetzt nutzbaren Limit-Reset hat, etwa „2 Resets verfügbar“.
 
 Ist das Limit bereits aufgehoben, die automatische Fortsetzung aber noch ausstehend, zeigt der Hinweis „Wird automatisch fortgesetzt in …“ mit **Abbrechen**.
@@ -68,7 +68,7 @@ So funktioniert das Timing, mit dem Schalter oder mit **Beim Zurücksetzen forts
 - Fortgesetzt wird nur ein Durchgang, den das Limit wirklich gestoppt hat, nicht einer, der gerade fertig wurde, als die Nutzung des Abos 100 % erreichte. Eine geplante Fortsetzung entfällt, wenn die Sitzung ohne sie weitergeht: Du sendest eine Nachricht oder drückst **Stoppen**, oder ein Durchgang läuft normal durch. Ein Durchgang, den der Agent während des Wartens von selbst startet (wenn eine eigene Hintergrundaufgabe oder ein eigener Subagent am selben Limit stoppt), lässt sie nicht entfallen. Eine Sitzung, die du mit **Stoppen** angehalten hast, wird nie von selbst fortgesetzt, auch wenn der Fehler des Limits zuerst kam, bis du ihr eine Nachricht sendest.
 - **Abbrechen** im Hinweis hebt die geplante Fortsetzung auf.
 
-Bei mehreren Konten setzt [**Bei einem Limit das Konto wechseln**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) die Sitzung sofort mit einem anderen Konto fort. Gewartet wird erst, wenn alle Konten ausgeschöpft sind; siehe [Agenten, Konten und Modelle](/guide/agents-models#use-all-your-accounts-switch-at-a-limit). Für Claude Code kann [**Bei einem Limit API-Guthaben verwenden**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) stattdessen den gespeicherten Anthropic-API-Key zur Abrechnung nutzen; siehe [API-Guthaben verwenden, wenn alle Konten ausgeschöpft sind](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit).
+Bei mehreren Konten setzt [**Bei erreichtem Limit das Konto wechseln**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) die Sitzung sofort mit einem anderen Konto fort. Gewartet wird erst, wenn alle Konten ausgeschöpft sind; siehe [Agenten, Konten und Modelle](/guide/agents-models#use-all-your-accounts-switch-at-a-limit). Für Claude Code kann [**Bei erreichtem Limit API-Guthaben verwenden**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) stattdessen den gespeicherten Anthropic-API-Key zur Abrechnung nutzen; siehe [API-Guthaben verwenden, wenn alle Konten ausgeschöpft sind](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit).
 
 ## Einen Limit-Reset verwenden
 
@@ -76,7 +76,7 @@ Manche Abos geben dir Limit-Resets: Reset-Guthaben bei Codex und Reset-Gutschrif
 
 Jede Karte listet sie unter **Limit-Resets** auf, mit der Anzahl, die du hast. Jeder Reset zeigt seinen Namen (und wie viele Verwendungen er noch hat), „Läuft ab in …“ (in Warnfarbe, wenn es weniger als einen Tag dauert) oder „Läuft nicht ab“ und Hinweise wie „Nutzbar, sobald du ein Limit erreichst“ oder „Noch nicht nutzbar“. Ein Reset, den ein anderes Limit zurückhält, sagt, welches, und wann es endet: „Gesperrt, solange dein Wochenlimit aufgebraucht ist (nutzbar in …)“. Manche Claude-Resets setzen nur einen Teil deines Kontingents zurück, sodass du sie nicht verwenden kannst, solange dein Wochenlimit aufgebraucht ist; nutzbar werden sie, sobald es zurückgesetzt wird. Gibt es keine: „Im Moment gibt es keine Limit-Resets“, mit dem Zeitpunkt des nächsten, wenn das Abo ihn nennt. Die App prüft die Resets eines Claude-Kontos etwa alle zehn Minuten, da Anthropic häufigere Abfragen ablehnt, und zeigt dazwischen die zuletzt gelesene Liste, auch nach einem Neustart der App. Ein Reset kann deshalb einige Minuten brauchen, bis er als nutzbar erscheint. Einer, den du verwendest, verschwindet sofort aus der Liste.
 
-1. Klicke neben einem Reset auf **Verwenden** oder im Limithinweis auf **Reset verwenden**. Dort wird der erste aktuell nutzbare Reset gewählt.
+1. Klicke neben einem Reset auf **Benutzen** oder im Limithinweis auf **Reset verwenden**. Dort wird der erste aktuell nutzbare Reset gewählt.
 2. Lies die Bestätigung: Dort stehen der verwendete Reset, dessen Ablaufdatum und der verbleibende Bestand. Ist kein Limit erreicht, erscheint eine entsprechende Warnung.
 3. Klicke auf **Reset verwenden**.
 
@@ -91,7 +91,7 @@ Der Tab **Aktivität** (`/stats`) erfasst die Arbeit der Agenten aus den Sitzung
 Oben wählst du:
 
 - **Täglich** für die letzten 30 Tage, **Wöchentlich** für 26 Wochen, **Monatlich** für zwölf Monate oder seit Beginn deiner Historie und **Jährlich** nach Kalenderjahr. Die Seite merkt sich deine Auswahl.
-- **Alle** oder einen Agenten: **Claude**, **Codex**, **Custom** und weitere hier bereits aktive Agenten wie Gemini CLI oder OpenCode.
+- **Alle** oder einen Agenten: **Claude**, **Codex**, **Benutzerdefiniert** und weitere hier bereits aktive Agenten wie Gemini CLI oder OpenCode.
 - Ein Modell, wenn du es weiter unten unter **Nach Modell** ausgewählt hast. Die Seite zeigt dann nur dessen Werte. Mit dem **✕** an seiner Markierung wechselst du zurück zu allen Modellen.
 - **Diagramme** oder **Tabelle**.
 
@@ -99,7 +99,7 @@ Daneben stehen Zeitraum und Zeitzone. Tage, Wochen und Monate richten sich nach 
 
 Die Kacheln zeigen die Summen für den gewählten Zeitraum:
 
-- **Hinzugefügte Zeilen** und **Entfernte Zeilen**;
+- **Zeilen hinzugefügt** und **Zeilen entfernt**;
 - **Eingabetoken**, also neu eingelesene und aus dem Cache gelesene Token, und **Ausgabetoken**, also erzeugten Text;
 - **Ausgabegeschwindigkeit** in Token pro Sekunde während der Texterzeugung;
 - **API-Kosten (geschätzt)** für dieselbe Tokenmenge bei API-Abrechnung;
@@ -112,7 +112,7 @@ Der kleine Pfeil auf einer Kachel vergleicht den Wert mit dem unmittelbar vorher
 Darunter findest du in beiden Ansichten:
 
 - **Nach Agent**: jeder Agent mit Namen (Claude Code, Codex, Custom, Gemini CLI und die anderen, die etwas getan haben), mit Sitzungen, Prompts, Zeilen, Eingabe und Ausgabe.
-- **Aktivste Projekte**: die Ordner mit den meisten geänderten Zeilen.
+- **Top-Projekte**: die Ordner mit den meisten geänderten Zeilen.
 - **Nach Modell**: Sitzungen, Prompts, Eingabetoken, Eingabetoken aus dem Cache, Ausgabetoken und API-Kosten je Modell. Das gilt auch für Custom-Modelle von OpenRouter, Ollama oder vLLM. Klicke auf ein Modell, um die gesamte Seite darauf einzugrenzen. Bei unbekanntem Preis erscheint **Preis festlegen**. Beim Darüberfahren siehst du den Preis pro Million Token und seine Quelle: „eigener Preis“ oder „öffentliche Preistabelle“.
 
 Auf Smartphones stehen zwei Kacheln nebeneinander; einige Tabellenspalten werden ausgeblendet.
@@ -138,7 +138,7 @@ Ausgabenlimits verwenden dieselben Preise. Meldet ein Agent tatsächliche Kosten
 1. Klicke im Tab **Aktivität** oberhalb von **Nach Modell** auf **Modellpreise** oder bei einem Modell auf **Preis festlegen**.
 2. Der Dialog **Modellpreise** listet die Modelle in der Ansicht und alle, für die du schon einen Preis festgelegt hast. Jedes hat **Eingabe**, **Aus dem Cache** und **Ausgabe**, in Dollar pro Million Tokens. Leere Felder verwenden den Preis aus der öffentlichen Tabelle, der grau angezeigt wird.
 3. Trage deine Preise ein. Eingabe und Ausgabe sind erforderlich. Der Cache-Preis ist optional; ohne Angabe gilt der Eingabepreis.
-4. Für ein nicht aufgeführtes Modell trägst du dessen ID unter **Weitere Modell-ID** ein und klickst auf **Hinzufügen**.
+4. Für ein nicht aufgeführtes Modell trägst du dessen ID unter **Eine andere Modell-ID** ein und klickst auf **Hinzufügen**.
 5. Klicke auf **Preise speichern**.
 
 Das Papierkorbsymbol **Preis aus der Tabelle verwenden** entfernt deinen eigenen Preis. Soll ein lokales Modell als kostenlos zählen, setze Ein- und Ausgabepreis auf 0.
@@ -158,7 +158,7 @@ Ein Ausgabenlimit stoppt die Sitzung, sobald der festgelegte Betrag erreicht ist
 - Für eine neue Sitzung: Wähle auf der Startseite **Optionen** → **Ausgabenlimit**. Wähle $1, $5, $10 oder $25 oder gib einen Betrag ein und klicke auf **Set**. **Keine Obergrenze** hebt es auf.
 - Für eine laufende Sitzung: das Menü der Sitzung (⋯) → **Sitzungseinstellungen** → **Ausgabenlimit**. Der Dialog zeigt, was sie bisher ausgegeben hat. Gib ein Limit ein (ab $0.01) und klicke auf **Limit festlegen** oder **Veränderung**; **Limit entfernen** hebt es auf.
 
-Bei aktivem Limit steht über dem Nachrichtenfeld etwa „$1.20 von $5.00“ mit **Ändern**. Nach dem Modellaufruf, der das Limit erreicht, stoppt der Agent. Unter dem Durchlauf erscheint „Am Ausgabenlimit gestoppt“. Neue Nachrichten warten, bis du das Limit mit **Limit erhöhen…** anhebst oder entfernst. Mehr dazu unter [Sitzungen](/guide/sessions).
+Bei aktivem Limit steht über dem Nachrichtenfeld etwa „$1.20 von $5.00“ mit **Ändern**. Nach dem Modellaufruf, der das Limit erreicht, stoppt der Agent. Unter dem Durchlauf erscheint „Am Ausgabenlimit gestoppt“. Neue Nachrichten warten, bis du das Limit mit **Limit erhöhen …** anhebst oder entfernst. Mehr dazu unter [Sitzungen](/guide/sessions).
 
 ## Der Tab Arena
 
