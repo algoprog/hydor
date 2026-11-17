@@ -2,7 +2,7 @@
 // the agent does in it (one action at a time): read it as an outline, look at it, click, type, scroll.
 import type { BrowserDialog } from '../../shared/browser.ts';
 import { CdpError, CdpSession } from './cdp.ts';
-import { captureJpeg } from './jpeg.ts';
+import { captureJpeg, jpegWidth } from './jpeg.ts';
 import { keyEvents, parseKey } from './keys.ts';
 import { buildOutline, SNAPSHOT_STYLES, type AxInfo, type El, type FrameSnap, type Outline } from './outline.ts';
 
@@ -94,6 +94,12 @@ export class Tab {
   private screencast: ((frame: { data: string; w: number; h: number }) => void) | null = null;
   private castOpts: { maxWidth: number; maxHeight: number } | null = null;
   private lastFrameAt = 0;
+  /** Pictures of the page and changes of its size, one at a time (inTurn). */
+  private viewTurn: Promise<unknown> = Promise.resolve();
+  /** Pictures being taken smaller than the page, while the live view streams (and a moment after each): see frame(). */
+  private shrinking = 0;
+  /** How wide the stream's frames are when no such picture is being taken. */
+  private castWidth = 0;
 
   constructor(
     public owner: TabOwner,
@@ -247,8 +253,11 @@ export class Tab {
 
   async setViewport(w: number, h: number, mobile: boolean, scale: number) {
     this.viewport = { w, h, mobile, scale };
-    await this.s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: scale, mobile, screenWidth: w, screenHeight: h });
-    await this.s.send('Emulation.setTouchEmulationEnabled', { enabled: mobile, maxTouchPoints: mobile ? 5 : 0 }).catch(() => {});
+    // After a picture being taken (inTurn): its end would put the size back as it was.
+    await this.inTurn(async () => {
+      await this.s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: scale, mobile, screenWidth: w, screenHeight: h });
+      await this.s.send('Emulation.setTouchEmulationEnabled', { enabled: mobile, maxTouchPoints: mobile ? 5 : 0 }).catch(() => {});
+    });
   }
 
   /** Runs one action at a time in this tab. */
@@ -442,21 +451,44 @@ export class Tab {
     return null;
   }
 
+  /**
+   * Pictures of the page and changes of its size, one at a time. Chromium takes a picture smaller than the page by
+   * making the view that small for it, then gives the view back the size it found: a second picture taken meanwhile
+   * found the first one's small size and gave that back, and the live view's frames stayed that small from then on
+   * (the page itself laid out as before), however large the view asked for. A change of size made meanwhile would be
+   * undone the same way.
+   */
+  private inTurn<T>(fn: () => Promise<T>): Promise<T> {
+    const p = this.viewTurn.then(fn, fn);
+    this.viewTurn = p.catch(() => {});
+    return p;
+  }
+
   /** A screenshot of what is on screen (JPEG, base64), at most `width` × `height` pixels when given. */
-  async screenshot(o: { quality?: number; width?: number; height?: number; format?: 'jpeg' | 'png' } = {}): Promise<string> {
-    let clip: object | undefined;
-    if (o.width) {
-      // Clip coordinates are the document's: the visible part is where the page is scrolled to.
-      const m = await this.s.send('Page.getLayoutMetrics');
-      const v = m.cssVisualViewport ?? m.visualViewport;
-      const dsf = this.viewport.scale || 1;
-      const scale = Math.min(1, o.width / (v.clientWidth * dsf), o.height ? o.height / (v.clientHeight * dsf) : 1);
-      clip = { x: v.pageX, y: v.pageY, width: v.clientWidth, height: v.clientHeight, scale };
-    }
-    // A JPEG made the way every decoder reads it (jpeg.ts): the full Chromium's own reach models garbled.
-    if (o.format !== 'png') return captureJpeg(this.s, { ...(clip ? { clip } : {}), captureBeyondViewport: false }, o.quality ?? 70, 20_000);
-    const r = await this.s.send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip } : {}), captureBeyondViewport: false }, 20_000);
-    return r.data;
+  screenshot(o: { quality?: number; width?: number; height?: number; format?: 'jpeg' | 'png' } = {}): Promise<string> {
+    return this.inTurn(async () => {
+      let clip: { x: number; y: number; width: number; height: number; scale: number } | undefined;
+      if (o.width) {
+        // Clip coordinates are the document's: the visible part is where the page is scrolled to.
+        const m = await this.s.send('Page.getLayoutMetrics');
+        const v = m.cssVisualViewport ?? m.visualViewport;
+        const dsf = this.viewport.scale || 1;
+        const scale = Math.min(1, o.width / (v.clientWidth * dsf), o.height ? o.height / (v.clientHeight * dsf) : 1);
+        clip = { x: v.pageX, y: v.pageY, width: v.clientWidth, height: v.clientHeight, scale };
+      }
+      // While the view is made smaller for the picture, the stream sends a frame that small (frame() leaves it out).
+      const shrunk = !!clip && clip.scale < 1 && !!this.screencast;
+      if (shrunk) this.shrinking++;
+      try {
+        // A JPEG made the way every decoder reads it (jpeg.ts): the full Chromium's own reach models garbled.
+        if (o.format !== 'png') return await captureJpeg(this.s, { ...(clip ? { clip } : {}), captureBeyondViewport: false }, o.quality ?? 70, 20_000);
+        const r = await this.s.send('Page.captureScreenshot', { format: 'png', ...(clip ? { clip } : {}), captureBeyondViewport: false }, 20_000);
+        return r.data as string;
+      } finally {
+        // Its frame can come a moment after the picture.
+        if (shrunk) setTimeout(() => this.shrinking--, 300);
+      }
+    });
   }
 
   /** In an isolated world, so the page's own scripts cannot see or change what this does. */
@@ -847,9 +879,16 @@ export class Tab {
 
   // ---- the live view -------------------------------------------------------------------------------
 
+  /**
+   * The page's frames, at most `maxWidth` × `maxHeight`, to `onFrame`. A stream that is running stops first: started
+   * again, Chromium keeps a running screencast's size, so a view opened larger (the folded panel's small picture
+   * opened up, full screen) went on getting the small picture's frames, stretched and blurred.
+   */
   async startCast(onFrame: (f: { data: string; w: number; h: number }) => void, o: { maxWidth: number; maxHeight: number }) {
+    if (this.screencast) await this.s.send('Page.stopScreencast').catch(() => {});
     this.screencast = onFrame;
     this.castOpts = o;
+    this.castWidth = 0;
     await this.s.send('Page.startScreencast', { format: 'jpeg', quality: 55, maxWidth: Math.round(o.maxWidth), maxHeight: Math.round(o.maxHeight), everyNthFrame: 1 });
   }
 
@@ -867,6 +906,11 @@ export class Tab {
   private frame(p: any) {
     const ack = () => this.s.send('Page.screencastFrameAck', { sessionId: p.sessionId }).catch(() => {});
     if (!this.screencast) return void ack();
+    // A frame from a smaller picture being taken (a step's, say): the live view would show it stretched and blurred
+    // until the page next changes.
+    const width = jpegWidth(p.data);
+    if (this.shrinking && width && width < this.castWidth) return void ack();
+    if (!this.shrinking && width) this.castWidth = width;
     const m = p.metadata ?? {};
     this.screencast({ data: p.data, w: m.deviceWidth ?? this.viewport.w, h: m.deviceHeight ?? this.viewport.h });
     // At most about eight frames a second: the next one is asked for a little later.

@@ -71,6 +71,13 @@ export async function captureJpeg(s: CdpSession, params: Record<string, unknown>
   }
 }
 
+/** A JPEG's width in pixels, from its frame header (base64: only its start is read), or 0 when that is not there. */
+export function jpegWidth(b64: string): number {
+  const b = Buffer.from(b64.slice(0, 8192), 'base64');
+  for (let i = 2; i + 9 < b.length && b[i] === 0xff; i += 2 + b.readUInt16BE(i + 2)) if (b[i + 1] >= 0xc0 && b[i + 1] <= 0xc3) return b.readUInt16BE(i + 7);
+  return 0;
+}
+
 /**
  * A JPEG's frame and scans, for the tests: the ids of the frame's components, and those of each scan. Every decoder
  * reads one scan of all three components; Chromium's own have three scans, numbered from 0 ([[0], [1], [2]]).

@@ -17,6 +17,7 @@ import type { AgentPointer } from '../../shared/pointer.ts';
 import type { Deps, RunCtx } from '../features/types.ts';
 import { openDb } from '../db.ts';
 import { registerFeatures } from '../features/registry.ts';
+import { jpegWidth } from './jpeg.ts';
 import { act, askUser, open, read, tabs, upload, type OpCtx } from './ops.ts';
 import { browserOf, closeAll, GLIDE_MS, setBrowserDeps } from './session.ts';
 import { setSessionOptions, setBrowserSettings } from './settings.ts';
@@ -418,6 +419,45 @@ async function main() {
     r = await read(ctx, 'state', {});
     assert.match(r.text, /textbox "Name" \(filled by the user, value hidden/);
     assert.doesNotMatch(r.text, /my secret name/);
+  });
+
+  /** Types into the form's Email field (the page changes; the agent's step takes its small picture), then the widths of the live view's frames meanwhile. */
+  const frameWidths = async (text: string) => {
+    const email = idOf((await read(ctx, 'state', {})).text, /textbox "Email"/);
+    events.length = 0;
+    await act(ctx, [{ action: 'type', id: email, text }], false);
+    await new Promise((x) => setTimeout(x, 800));
+    return events.filter((e) => e.type === 'frame').map((e) => jpegWidth((e as unknown as { data: string }).data));
+  };
+
+  // Before any other view asks (the largest view asked for sets the size, and an ask lasts 45 seconds).
+  await check('a view opened larger gets frames as large as it asks: the stream starts again at its size', async () => {
+    const b = browserOf(KEY)!;
+    // The folded panel's small picture starts the stream...
+    await b.watch(160, 100, 'folded');
+    await new Promise((x) => setTimeout(x, 600));
+    const small = await frameWidths('small@example.com');
+    assert.ok(small.length > 0 && small.every((w) => w > 0 && w <= 160), `the small picture's frames: ${small.join(', ')} pixels wide`);
+    // ...then the panel opens up: its frames come at its size, not the small picture's stretched.
+    await b.watch(800, 500, 'opened');
+    await new Promise((x) => setTimeout(x, 800));
+    const large = await frameWidths('large@example.com');
+    assert.ok(large.length > 0 && large.every((w) => w >= 2 * Math.max(...small)), `the opened view's frames: ${large.join(', ')} pixels wide`);
+  });
+
+  await check('pictures of the page taken at the same time leave the live view’s frames as large as they were', async () => {
+    const t = browserOf(KEY)!.active!;
+    const before = await frameWidths('before@example.com');
+    // Chromium makes the view smaller for each: taken together, the view stayed small (and the stream with it).
+    await Promise.all([t.screenshot({ quality: 60, width: 160, height: 100 }), t.screenshot({ quality: 55, width: 360 }), t.screenshot({ quality: 60, width: 160, height: 100 })]);
+    const after = await frameWidths('after@example.com');
+    assert.ok(before.length > 0 && after.length > 0 && after.every((w) => w === Math.max(...before)), `before: ${before.join(', ')}; after: ${after.join(', ')} pixels wide`);
+  });
+
+  await check('the small pictures of the agent’s steps never show in the live view', async () => {
+    const seen: number[] = [];
+    for (let i = 0; i < 6; i++) seen.push(...(await frameWidths(`step${i}@example.com`)));
+    assert.ok(seen.length > 0 && seen.every((w) => w === seen[0]), `frames ${seen.join(', ')} pixels wide`);
   });
 
   await check('the live view streams frames while watched', async () => {
