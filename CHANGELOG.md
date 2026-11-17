@@ -3,6 +3,31 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.81.0 · 17 November 2026
+
+Grok Build gets an effort picker, plan usage meters and switching accounts at a limit, like Claude Code and Codex.
+
+- **Effort for Grok Build**: Grok's models take a reasoning effort, each its own levels (Grok 4.6: xhigh, high,
+  medium or low, high to start; Grok 4.5: high, medium or low). The start page's **Options → Effort** offers them as soon as Grok
+  Build is added, even before its first session, because the app asks Grok for its models. A running session changes
+  its effort in its own Effort picker, and app runs take it too. When you switch to a model that does not take the
+  effort you had (xhigh on Grok 4.5), the picker shows that model's default, and that is what it runs with. The same
+  works for any other agent that speaks ACP whose models offer efforts.
+- **Grok's plan usage**: the Usage page's **Limits** tab has a **Grok Build** card for Grok's own sign-in and one for
+  each Grok account you added, with the plan (SuperGrok, SuperGrok Plus or SuperGrok Heavy), **Weekly** usage and when
+  it resets, the credits left and **Pay as you go** spending ("$12.00 of $50.00 this month") when the plan has them.
+  Signed out, the card says to sign in; on a plan run by a team it says the limits are managed by your team. The
+  small usage meter in the sidebar counts Grok too.
+- **Switch accounts at a limit** and **Resume after usage limits** now work for Grok Build: when a Grok account
+  reaches its weekly limit, its credit limit or its pay-as-you-go spending cap, the session moves to another signed-in
+  Grok account with usage left (the least used one) and continues there; with none left it waits for the reset when
+  **Resume after usage limits** is on. A message to a session whose account is out moves it first, a new session
+  starts on an account with usage left, and a short rate limit (a burst of requests) moves nothing. The limit notice
+  above the message box shows for Grok sessions too, and **Switch accounts at a limit** shows in **Settings → Agents →
+  Accounts** as soon as you have added any account, Grok's included.
+- Limit resets (Codex reset credits, Claude reset grants) and API credit at a limit are still for Claude Code and
+  Codex only.
+
 ## 0.80.0 · 17 November 2026
 
 Projects that were around before wiki memory can build it from their own history, and a new session offers to do it first.
