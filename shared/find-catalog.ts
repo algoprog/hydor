@@ -235,6 +235,8 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   // Capabilities › Memory
   ['memory', 'Memory', 'remember notes recall forget', 'Agents start with what earlier sessions kept, and save notes when you ask'],
   ['memory', 'Wiki memory', 'wiki articles knowledge llm wiki karpathy markdown sources project wiki shared wiki on off default each project', 'Articles agents keep for each project, from its documents and its work: on for every project unless its own settings say otherwise'],
+  ['memory', 'Wiki memory on by default in chats', 'wiki memory chat default switch each chat on off conversation use the wiki', 'Chats use this setting unless you choose otherwise'],
+  ['memory', 'Auto lessons learned by default in chats', 'wiki memory lessons learned suggestions automatic chat default switch conversation suggest lessons keep dismiss', 'Chats use this setting unless you choose otherwise'],
   ['memory', 'Learn from new documents', 'wiki memory digest documents knowledge new changed added files notes articles helper model update learn read', 'New and changed documents add memory notes and update the wiki, with the helper model'],
   ['memory', 'Most documents to read into the wiki', 'wiki memory documents limit maximum most number count too many large many documents project knowledge read helper model retrieval search instead keep out of the wiki default 100 per project own number', 'A project with more documents than this keeps them out of its wiki: agents search them instead'],
   ['memory', 'Wiki folder', 'wiki memory hub folder shared wiki path where kept move migrate backup browse location directory', 'Where the shared wiki is kept, and project wikis unless set below'],
