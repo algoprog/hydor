@@ -7,7 +7,40 @@ import type { DB } from '../../db.ts';
  * The helper, asked for JSON (an injectable function: the tests stub it, as memory's tidy-up does). `strong`: a rare
  * question that needs the stronger model (the wiki's reorganising pass): Sonnet when the helper is Automatic.
  */
-export type DigestAsk = (q: { system: string; prompt: string; maxTokens?: number; strong?: boolean }) => Promise<unknown>;
+export type DigestAsk = (q: { system: string; prompt: string; maxTokens?: number; strong?: boolean; signal?: AbortSignal }) => Promise<unknown>;
+
+/** The error a call ends with when its job was stopped. */
+export class StoppedError extends Error {
+  constructor() {
+    super('Stopped');
+    this.name = 'StoppedError';
+  }
+}
+
+/** The helper with a job's signal on every call: none is made after it is aborted, and one in flight ends with it. */
+export const withSignal =
+  (ask: DigestAsk, signal?: AbortSignal): DigestAsk =>
+  async (q) => {
+    if (!signal) return ask(q);
+    if (signal.aborted) throw new StoppedError();
+    let onAbort!: () => void;
+    // Whatever the helper does with the signal, the call ends the moment the job is stopped.
+    const stopped = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new StoppedError());
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      const call = ask({ ...q, signal: q.signal ? AbortSignal.any([q.signal, signal]) : signal });
+      call.catch(() => {});
+      return await Promise.race([call, stopped]);
+    } catch (e) {
+      if (signal.aborted) throw new StoppedError();
+      throw e;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+      stopped.catch(() => {});
+    }
+  };
 
 export const helperDigestAsk =
   (db: DB): DigestAsk =>

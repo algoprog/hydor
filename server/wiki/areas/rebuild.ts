@@ -1,35 +1,41 @@
 // Rebuilding a wiki from its sources. raw/ holds what the wiki was built from (documents' text, conversations,
 // commit messages, notes moved from memory, all kept redacted); a rebuild archives the wiki as it is (its articles,
 // index, log and structure, into .history/rebuilds/<time>/, the ARCHIVES_KEPT latest kept; raw/ and output/ never
-// move), reads every source again through the digest's plan and write path (oldest first, one at a time, at most
-// REBUILD_PER_HOUR an hour, no source kept twice), then organises the areas, writes the hubs, does the queued folds,
-// and makes every old path that is gone a redirect to the new article that matches it best (else to index.md), so
-// notes and links that name old paths still lead somewhere. An archive can be put back (restore). Memory notes are
-// never touched. A rebuild a restart cut short goes on where it stopped (jobs.ts).
+// move), then reads, through the digest's plan and write path, a few sources at once (run.ts: the helper's workers, no
+// source kept twice): the project's files, made fresh; the kept sources oldest first, except commit messages, which are read
+// fresh from the repository, all of them; the documents and conversations the wiki never read, and the project's memory
+// notes, made fresh (sources.ts); then each article of the earlier wiki that no new one covers. After them it organises
+// the areas, writes the hubs, does the queued folds and merges, and makes every old path that is gone a redirect to the
+// new article that matches it best (else to index.md), so notes and links that name old paths still lead somewhere. An
+// archive can be put back (restore), also after a rebuild was stopped. Memory notes are never touched. A rebuild a restart
+// cut short goes on where it stopped, and one a person stopped goes on when they say so (jobs.ts).
 import fs from 'node:fs';
 import path from 'node:path';
 import { HttpError } from '../../auth.ts';
 import type { DB } from '../../db.ts';
-import { helperCost } from '../../helper.ts';
+import { helperCost, helperParallel } from '../../helper.ts';
 import { searchKnowledge } from '../../knowledge/search.ts';
 import { spaceById } from '../../spaces/index.ts';
 import { archiveWiki, dropArchive, redirectOf, restoreWiki, wikiArchives, wikiHash } from '../core.ts';
 import { browseWiki } from '../browse.ts';
 import { wikiBase } from '../deliver.ts';
-import { MAX_DOC_CHARS, digestText } from '../digest/digest.ts';
-import type { DigestAsk, TextKind } from '../digest/plan.ts';
+import { MAX_DOC_CHARS } from '../digest/digest.ts';
 import { changeUpdate, recordUpdate } from '../digest/store.ts';
 import { appendLines, frontValue, listOf, readOrNull, splitFront, summaryOf, titleOfArticle, writeFile, writeIndex } from '../digest/write.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { areaArticles } from './articles.ts';
-import { claimJob, jobRunning, jobState, releaseJob, saveJob, type JobState } from './jobs.ts';
-import { runMerges } from './merge.ts';
+import { claimJob, finishJob, jobRunning, jobState, jobSignal, releaseJob, saveJob, wikiJobChanged, type JobState } from './jobs.ts';
+import { jobProgress, type JobProgress } from './progress.ts';
 import { redirectStub } from './redirects.ts';
 import { hasAreas, isHubPath, loadRegistry } from './registry.ts';
-import { reorganiseWiki, reorganising } from './reorganise.ts';
-import { refreshHubs } from './tend.ts';
+import { reorganising } from './reorganise.ts';
+import { commitsAllRead, hubsPhase, jobOptions, organisePhase, readSources, stoppedNow, type JobOptions } from './run.ts';
+import { averageSeconds, BUILD_PER_HOUR, gatherHistory, historyCounts, noteTexts, readArchived, readSource, titleAndKind, type Cat, type RebuildSource } from './sources.ts';
+import { markCommitsRead } from '../digest/commits.ts';
 
-/** Sources a rebuild reads an hour at most, and the archives of earlier wikis kept. */
+export { readSource, titleAndKind, type RebuildSource };
+
+/** The archives of earlier wikis kept. */
 
 /**
  * Drops the archives beyond those kept: the latest few, and always the oldest, the wiki as it was before its first
@@ -41,7 +47,8 @@ function pruneArchives(root: string, made: string): void {
   for (const a of all) if (!keep.has(a.name)) dropArchive(root, a.name);
 }
 
-export const REBUILD_PER_HOUR = 60;
+/** Sources a rebuild starts in an hour at most: only a guard (the workers set its pace). */
+export const REBUILD_PER_HOUR = BUILD_PER_HOUR;
 export const ARCHIVES_KEPT = 3;
 
 const day = (t: number) => new Date(t).toISOString().slice(0, 10);
@@ -52,50 +59,21 @@ const nameOf = (at: string) => (/T\d\d:\d\d/.test(at) ? at.replace(/[:.]/g, '-')
 
 // ---- the sources ----------------------------------------------------------------------------------------------
 
-export interface RebuildSource {
-  /** raw/… (a kept source), or wiki/… (an article that cites no source, read from the archive). */
-  path: string;
-  title: string;
-  origin: string;
-  kind: TextKind;
-  text: string;
-}
-
-/** What a source note says it came from, as a title the helper reads, and how to read it (a conversation or a document). */
-function titleAndKind(origin: string, fallback: string): { title: string; kind: TextKind } {
-  const clip = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 120) || fallback;
-  if (origin.startsWith('session:')) return { title: clip(origin.slice(8).split(' · ')[0]), kind: 'conversation' };
-  if (origin.startsWith('commits:')) return { title: clip(`Commits ${origin.slice(8).split(' · ').slice(1).join(' · ')}`), kind: 'conversation' };
-  if (origin.startsWith('knowledge:')) return { title: clip(origin.slice(10).replace(/^[^/]*\//, '')), kind: 'document' };
-  if (origin.startsWith('memory notes')) return { title: 'Notes from memory', kind: 'document' };
-  if (origin.startsWith('file:')) return { title: clip(path.posix.basename(origin.slice(5).split('#')[0])), kind: 'document' };
-  return { title: clip(origin), kind: 'document' };
-}
-
-/** A kept source as the digest reads it: its text (without the note's front matter), where it came from, its title. */
-export function readSource(root: string, rel: string): RebuildSource | null {
-  const cur = readOrNull(root, rel);
-  if (!cur) return null;
-  const f = splitFront(cur.content);
-  const origin = frontValue(f, 'source') ?? rel;
-  const text = f.body.trim();
-  if (!text) return null;
-  const { title, kind } = titleAndKind(origin, path.posix.basename(rel, '.md'));
-  return { path: rel, title, origin, kind, text: text.slice(0, MAX_DOC_CHARS) };
-}
-
 /**
- * The sources a rebuild reads, oldest first: every source note in raw/ (by the day it was kept, then its file's time,
- * then its path), then each article that cites none of them (an agent wrote it from nothing kept), so a rebuild
- * never drops what has no source.
+ * The kept sources a rebuild reads, oldest first: every source note in raw/ (by the day it was kept, then its file's time, then
+ * its path), then each article that cites none of them (an agent wrote it from nothing kept), so a rebuild never drops what has
+ * no source. `skip`: origins that are read fresh instead (a rebuild makes the project's files and notes again, and reads all its
+ * commits from the repository: their kept sources are left out, but only when the fresh ones exist).
  */
-export function rebuildSources(root: string): { path: string; chars: number }[] {
+export function rebuildSources(root: string, o: { skip?: string[] } = {}): { path: string; chars: number }[] {
   const notes: { path: string; day: string; mtime: number; chars: number }[] = [];
   for (const s of browseWiki(root).sources) {
     const cur = readOrNull(root, s.path);
     if (!cur) continue;
     const f = splitFront(cur.content);
-    if (!frontValue(f, 'source')) continue;
+    const origin = frontValue(f, 'source');
+    if (!origin) continue;
+    if (o.skip?.some((p) => origin.startsWith(p))) continue;
     let mtime = 0;
     try {
       mtime = fs.statSync(path.join(root, ...s.path.split('/'))).mtimeMs;
@@ -112,41 +90,74 @@ export function rebuildSources(root: string): { path: string; chars: number }[] 
   return [...notes.map((n) => ({ path: n.path, chars: n.chars })), ...loose];
 }
 
-// ---- the estimate ---------------------------------------------------------------------------------------------
+// ---- the estimate ---------------------------------------------------------------------------------------------------------
 
 export interface RebuildEstimate {
+  /** All it reads: the kept sources, and the history sources below. */
   sources: number;
+  /** What it reads besides the kept sources: the project's files (0 or 1 source), its memory notes, the commits (and the sources they make), documents and sessions the wiki never read. */
+  reads: { kept: number; files: string[]; notes: number; commits: number; commitSources: number; documents: number; sessions: number };
   /** Helper calls, about: two a source, the organisation (the proposal and the fit check), one a hub. */
   calls: number;
   /** The most it may take: two more for each article of the wiki now, when no new article holds what it said and it is read again. */
   callsMax: number;
   /** What the helper reads of the sources, in characters. */
   chars: number;
+  /** About how long it takes, with the helper's workers at once. */
+  minutes: number;
+  workers: number;
   helper: { model: string; label: string; priced: boolean; usd?: number; usdMax?: number; note?: string };
   /** The wiki's articles now, and the archives there are. */
   articles: number;
   archives: { at: string; articles: number }[];
 }
 
-export function rebuildEstimate(db: DB, root: string): RebuildEstimate {
-  const sources = rebuildSources(root);
-  const chars = sources.reduce((n, s) => n + s.chars, 0);
+/** What a rebuild skips among the kept sources because it reads them fresh: the origins' beginnings. */
+function freshOrigins(c: { files: boolean; notes: boolean; commits: boolean }): string[] {
+  return [...(c.files ? ['files:'] : []), ...(c.notes ? ['notes:'] : []), ...(c.commits ? ['commits:'] : [])];
+}
+
+/** Each source's size as the helper reads it, roughly, for what has no text yet: a conversation, a document, a batch of commits, the files. */
+const CHARS = { s: 6_000, d: 8_000, c: 12_000, f: 20_000 };
+
+export async function rebuildEstimate(db: DB, root: string, space: string | null = null): Promise<RebuildEstimate> {
+  const project = space ? spaceById(db, space) : null;
+  const history = project ? await historyCounts(db, project, { exactDocuments: true }) : { files: [], anyFiles: false, notes: 0, commits: 0, documents: 0, sessions: 0 };
+  const noteSources = project ? noteTexts(db, project).length : 0;
+  const commitSources = Math.ceil(history.commits / 50);
+  const sources = rebuildSources(root, { skip: freshOrigins({ files: history.anyFiles, notes: noteSources > 0, commits: history.commits > 0 }) });
   const articles = areaArticles(root).length;
-  const expected = Math.max(articles, sources.length);
+  const fresh = (history.anyFiles ? 1 : 0) + noteSources + commitSources + history.documents + history.sessions;
+  const total = sources.length + fresh;
+  const chars = sources.reduce((n, s) => n + s.chars, 0) + (history.anyFiles ? CHARS.f : 0) + noteSources * 10_000 + commitSources * CHARS.c + history.documents * CHARS.d + history.sessions * CHARS.s;
+  const expected = Math.max(articles, total);
   const r = loadRegistry(root);
   const hubs = hasAreas(r) ? Math.max(1, r.areas.length - 1) : Math.max(1, Math.round(expected / 5));
   const fit = Math.ceil(expected / 20);
-  const calls = 2 * sources.length + 1 + fit + hubs;
+  const calls = 2 * total + 1 + fit + hubs;
   // About four characters a token: each source is read twice (the plan, the writing) with the prompts, the article list
   // and the articles it changes; the organisation reads every article's line; a hub its articles' beginnings.
-  const tokensIn = Math.round((2 * chars + sources.length * 14_000 + expected * 600 + 3_000 + hubs * 5_000) / 4);
-  const tokensOut = Math.round((sources.length * 5_000 + expected * 120 + hubs * 1_200) / 4);
+  const tokensIn = Math.round((2 * chars + total * 14_000 + expected * 600 + 3_000 + hubs * 5_000) / 4);
+  const tokensOut = Math.round((total * 5_000 + expected * 120 + hubs * 1_200) / 4);
   const cost = helperCost(db, { tokensIn, tokensOut });
   // Each article read again (no new one holds it) costs about what a source of its size does.
   const articleChars = areaArticles(root).reduce((n, a) => n + Math.min(MAX_DOC_CHARS, a.body.length), 0);
   const most = helperCost(db, { tokensIn: tokensIn + Math.round((2 * articleChars + articles * 14_000) / 4), tokensOut: tokensOut + Math.round((articles * 5_000) / 4) });
   const helper = cost.model === 'auto' ? { ...cost, note: 'Automatic uses your Claude account’s usage: Claude Haiku, and Sonnet for the areas' } : { ...cost, ...(most.usd != null ? { usdMax: most.usd } : {}) };
-  return { sources: sources.length, calls, callsMax: calls + 2 * articles, chars, helper, articles, archives: archivesOf(root) };
+  const workers = helperParallel(db);
+  const minutes = Math.max(1, Math.ceil((total * averageSeconds(db)) / workers / 60 + (averageSeconds(db) * (3 + hubs)) / 60));
+  return {
+    sources: total,
+    reads: { kept: sources.length, files: history.files, notes: history.notes, commits: history.commits, commitSources, documents: history.documents, sessions: history.sessions },
+    calls,
+    callsMax: calls + 2 * articles,
+    chars,
+    minutes,
+    workers,
+    helper,
+    articles,
+    archives: archivesOf(root),
+  };
 }
 
 /** The archives of earlier wikis, newest first: when each was archived, and how many articles it held. */
@@ -333,18 +344,7 @@ export async function redirectOldPaths(db: DB | null, space: string | null, root
 
 // ---- running it ---------------------------------------------------------------------------------------------------
 
-export interface RebuildOptions {
-  /** The helper (Haiku on Automatic) and the stronger one for the areas (Sonnet). */
-  ask: DigestAsk;
-  strong: DigestAsk;
-  onUpdate?: (space: string | null) => void;
-  /** Sources an hour at most (REBUILD_PER_HOUR), and how long a failed source waits before it is tried again. */
-  perHour?: number;
-  retryMs?: number;
-  now?: () => number;
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export type RebuildOptions = Partial<JobOptions>;
 
 /** The wiki of a place, or why there is none to rebuild. */
 function rootOf(db: DB, space: string | null): string {
@@ -355,118 +355,112 @@ function rootOf(db: DB, space: string | null): string {
   return root;
 }
 
-export const estimateRebuild = (db: DB, space: string | null): RebuildEstimate => rebuildEstimate(db, rootOf(db, space));
+export const estimateRebuild = (db: DB, space: string | null): Promise<RebuildEstimate> => rebuildEstimate(db, rootOf(db, space), space);
 
 /**
  * Starts a rebuild: archives the wiki now (so a failure here says so at once), then reads its sources in the
  * background. 409 while the wiki does something else at a person's request.
  */
-export async function startRebuild(db: DB, space: string | null, o: RebuildOptions): Promise<{ started: true; sources: number; archive: string }> {
+export async function startRebuild(db: DB, space: string | null, options: RebuildOptions = {}): Promise<{ started: true; sources: number; archive: string }> {
+  const o = jobOptions(db, options);
   const root = rootOf(db, space);
-  if (!claimJob(space)) throw new HttpError(409, 'The wiki is busy with a rebuild, an update or a reorganisation: try again when it is done');
+  if (!claimJob(space)) throw new HttpError(409, 'The wiki is busy with a build, a rebuild, an update or a reorganisation: try again when it is done');
   try {
     if (reorganising()) throw new HttpError(409, 'A reorganisation is running: try again in a few minutes');
     const now = (o.now ?? Date.now)();
-    const sources = rebuildSources(root);
-    if (!sources.length) throw new HttpError(409, 'The wiki has no sources to rebuild from');
+    // What is read again fresh: the project's files and notes, and every commit (what the wiki never read besides: documents and conversations).
+    const project = space ? spaceById(db, space) : null;
+    const history = project ? await gatherHistory(db, project, root, { order: 'rebuild', now }) : null;
+    const skip = history ? freshOrigins({ files: history.byCat.f.length > 0, notes: history.byCat.n.length > 0, commits: history.byCat.c.length > 0 }) : [];
+    const kept = rebuildSources(root, { skip }).map((s) => s.path);
+    const by = history?.byCat;
+    const list: { id: string; cat: Cat }[] = [...(by?.f ?? []), ...kept.map((id) => ({ id, cat: 'k' as const })), ...(by?.c ?? []), ...(by?.d ?? []), ...(by?.s ?? []), ...(by?.n ?? [])];
+    if (!list.length) throw new HttpError(409, 'The wiki has no sources to rebuild from');
     const name = archiveName(now);
     await archiveWiki(root, name);
     // The latest few archives are kept, and the oldest (the wiki before its first rebuild); the one just made never goes.
     pruneArchives(root, name);
-    const updateId = recordUpdate(db, { space, base: 'rebuild', document: `Rebuilding: 0 of ${sources.length} sources`, path: `rebuild:${new Date(now).toISOString()}`, articles: [], notes: 0 }, now);
-    const job: JobState = { kind: 'rebuild', state: 'running', phase: 'sources', done: 0, total: sources.length, startedAt: now, archive: name, sources: sources.map((s) => s.path), failed: [], did: [], updateId, starts: [] };
+    const updateId = recordUpdate(db, { space, base: 'rebuild', document: `Rebuilding: 0 of ${list.length} sources`, path: `rebuild:${new Date(now).toISOString()}`, articles: [], notes: 0 }, now);
+    const job: JobState = {
+      kind: 'rebuild',
+      state: 'running',
+      phase: 'sources',
+      done: 0,
+      total: list.length,
+      startedAt: now,
+      archive: name,
+      sources: list.map((x) => x.id),
+      cats: list.map((x) => x.cat).join(''),
+      finished: [],
+      failed: [],
+      did: [],
+      updateId,
+      starts: [],
+      ...(history ? { head: history.head ?? undefined, counts: { commits: history.counts.commits, sessions: history.byCat.s.length, documents: history.byCat.d.length, notes: history.counts.notes } } : {}),
+    };
     saveJob(db, space, job);
     o.onUpdate?.(space);
     void runRebuild(db, space, root, job, o);
-    return { started: true, sources: sources.length, archive: archiveTime(name) };
+    return { started: true, sources: list.length, archive: archiveTime(name) };
   } catch (e) {
     releaseJob(space);
     throw e;
   }
 }
 
-/** Goes on with a rebuild (from where it stopped, after a restart). Never throws; the job slot is released at the end. */
-export async function runRebuild(db: DB, space: string | null, root: string, job: JobState, o: RebuildOptions): Promise<void> {
+/** Goes on with a rebuild (from where it stopped, after a restart or a stop). Never throws; the job slot is released at the end. */
+export async function runRebuild(db: DB, space: string | null, root: string, job: JobState, options: RebuildOptions = {}): Promise<void> {
+  const o = jobOptions(db, options);
   const now = o.now ?? Date.now;
-  const perHour = o.perHour ?? REBUILD_PER_HOUR;
   const save = () => saveJob(db, space, job);
   const row = (document: string, articles?: string[], error?: string | null) => {
     if (job.updateId) changeUpdate(db, job.updateId, { document, articles, error }, now());
     o.onUpdate?.(space);
   };
-  const written = new Set<string>();
+  let written = new Set<string>();
   const archiveDir = path.join(root, '.history', 'rebuilds', job.archive ?? '');
+  // The job ends here in one of three ways: done, failed (what went wrong is in job.error), or stopped by a person.
+  const stopped = () => {
+    Object.assign(job, { state: 'stopped', endedAt: now(), current: [] });
+    save();
+    row(`Rebuild stopped at ${job.done} of ${job.total} sources`, [...written].slice(0, 50));
+  };
   try {
-    const sources = job.sources ?? [];
-    const readFrom = async (from: number) => {
-      for (let i = from; i < sources.length; i++) {
-        // At most perHour sources started in any hour.
-        for (;;) {
-          job.starts = (job.starts ?? []).filter((t) => t > now() - 3600_000);
-          if (job.starts.length < perHour) break;
-          await sleep(Math.max(1000, job.starts[0] + 3600_000 - now() + 1000));
-        }
-        job.starts.push(now());
-        const rel = sources[i];
-        const src = rel.startsWith('raw/') ? readSource(root, rel) : readArchived(archiveDir, rel);
-        let ok = !src;
-        for (let attempt = 0; src && !ok && attempt < 2; attempt++) {
-          if (attempt) await sleep(o.retryMs ?? 60_000);
-          ok = await digestText(db, o.ask, {
-            space,
-            base: 'rebuild',
-            title: src.title,
-            path: `rebuild:${rel}`,
-            origin: src.origin,
-            text: src.text,
-            cut: false,
-            kind: src.kind,
-            notes: false,
-            hash: wikiHash(src.text),
-            now,
-            source: rel.startsWith('raw/') ? rel : null,
-            quiet: true,
-            report: (r) => r.articles.forEach((p) => written.add(p)),
-          });
-        }
-        if (!ok) job.failed = [...(job.failed ?? []), rel];
-        job.done = i + 1;
-        save();
-        row(`Rebuilding: ${job.done} of ${job.total} sources`, [...written].slice(0, 50));
-      }
-    };
+    job.state = 'running';
+    delete job.error;
+    delete job.endedAt;
     if (job.phase === 'sources') {
-      await readFrom(job.done);
+      const read = async () => readSources(db, space, root, job, { ...o, base: 'rebuild', archiveDir, progress: (w) => ((written = new Set([...written, ...w])), row(`Rebuilding: ${job.done} of ${job.total} sources`, [...written].slice(0, 50))) });
+      if ((await read()) === 'stopped') return stopped();
       if (job.carried == null) {
         // What the earlier wiki said that no new article holds (the helper keeps a little of each source, and may have
         // left a topic out): those articles, from the archive, are read as sources too.
+        const sources = job.sources ?? [];
         const extra = uncovered(root, archiveDir, new Set(sources));
         job.carried = extra.length;
-        sources.push(...extra);
-        job.sources = sources;
-        job.total = sources.length;
+        job.sources = [...sources, ...extra];
+        job.cats = `${job.cats ?? ''}${'k'.repeat(extra.length)}`;
+        job.total = job.sources.length;
         save();
-        if (extra.length) await readFrom(job.done);
+        if (extra.length && (await read()) === 'stopped') return stopped();
       }
       const failed = job.failed?.length ?? 0;
-      if (sources.length && failed > sources.length / 2) throw new Error(`The helper could not read ${failed} of ${sources.length} sources: restore the previous wiki, or rebuild again later`);
+      const total = job.sources?.length ?? 0;
+      if (total && failed > total / 2) throw new Error(`The helper could not read ${failed} of ${total} sources: restore the previous wiki, or rebuild again later`);
       job.phase = 'organise';
       save();
     }
     if (job.phase === 'organise') {
       row('Rebuilding: organising the areas', [...written].slice(0, 50));
-      // One reorganisation at a time in the app: wait for another wiki's to end.
-      for (let i = 0; i < 60 && reorganising(); i++) await sleep(5_000);
-      const r = await reorganiseWiki(root, { db, space, propose: o.strong, check: o.ask, project: space ? (() => { const p = spaceById(db, space); return p ? { name: p.name, description: p.description } : null; })() : null, now: now(), onUpdate: o.onUpdate });
-      job.did = [...(job.did ?? []), r.ran ? r.summary! : `Areas not organised: ${r.error}`];
+      await organisePhase(db, space, root, job, o);
+      if (stoppedNow(space)) return stopped();
       job.phase = 'hubs';
       save();
     }
     if (job.phase === 'hubs') {
       row('Rebuilding: writing the hubs', [...written].slice(0, 50));
-      const hubs = await refreshHubs(db, o.ask, [root], { max: Infinity, now: now() });
-      const merged = (await runMerges(root, o.ask, { db, space, now: now(), onUpdate: o.onUpdate })).filter((m) => m.ok).length;
-      job.did = [...(job.did ?? []), `Wrote ${hubs} hub${hubs === 1 ? '' : 's'}${merged ? `; did ${merged} queued merge${merged === 1 ? '' : 's'}` : ''}`];
+      await hubsPhase(db, space, root, job, o);
+      if (stoppedNow(space)) return stopped();
       job.phase = 'redirects';
       save();
     }
@@ -484,30 +478,19 @@ export async function runRebuild(db: DB, space: string | null, root: string, job
     const carried = job.carried ? ` and ${job.carried} earlier article${job.carried === 1 ? '' : 's'} no new one covered` : '';
     const summary = `Rebuilt from ${kept} source${kept === 1 ? '' : 's'}${carried}: ${articles.length} article${articles.length === 1 ? '' : 's'}${areas ? ` in ${areas} area${areas === 1 ? '' : 's'}` : ''}${failed ? `; ${failed} source${failed === 1 ? '' : 's'} could not be read` : ''}`;
     await appendLines(root, [`- ${day(now())} · rebuilt from ${kept} sources${carried}: ${articles.length} articles (the earlier wiki is archived)`]).catch(() => {});
-    Object.assign(job, { state: 'done', endedAt: now(), phase: undefined, did: [summary, ...(job.did ?? [])] });
+    // The commits are read to the repository's HEAD: the daily pass goes on from there.
+    if (space && job.head && commitsAllRead(job)) markCommitsRead(db, space, job.head, now());
+    Object.assign(job, { state: 'done', endedAt: now(), phase: undefined, current: [], did: [summary, ...(job.did ?? [])] });
     save();
     row(summary, articles.map((a) => a.path).slice(0, 50), failed ? `Could not read: ${job.failed!.join(', ')}`.slice(0, 600) : null);
   } catch (e) {
-    Object.assign(job, { state: 'failed', endedAt: now(), error: (e as Error).message.slice(0, 400) });
+    if (stoppedNow(space) && !job.error) return stopped();
+    Object.assign(job, { state: 'failed', endedAt: now(), error: job.error ?? (e as Error).message.slice(0, 400), current: [] });
     save();
     row(`Rebuild stopped after ${job.done} of ${job.total} sources`, [...written].slice(0, 50), job.error);
   } finally {
-    releaseJob(space);
+    finishJob(space, job.state);
     o.onUpdate?.(space);
-  }
-}
-
-/** An article that cited no source, read from the archive as its own source (never kept in raw/). */
-function readArchived(archiveDir: string, rel: string): RebuildSource | null {
-  try {
-    const content = fs.readFileSync(path.join(archiveDir, ...rel.split('/')), 'utf8');
-    if (redirectOf(content) != null) return null;
-    const body = splitFront(content).body.trim();
-    if (!body) return null;
-    const title = titleOfArticle(content, path.posix.basename(rel, '.md'));
-    return { path: rel, title, origin: `wiki article ${rel} of the earlier wiki`, kind: 'document', text: body.slice(0, MAX_DOC_CHARS) };
-  } catch {
-    return null;
   }
 }
 
@@ -517,7 +500,8 @@ function readArchived(archiveDir: string, rel: string): RebuildSource | null {
  * Puts an archived wiki back: what is there now is archived first (the latest ARCHIVES_KEPT kept). Refused while the
  * wiki rebuilds, updates or reorganises.
  */
-export async function restoreArchive(db: DB, space: string | null, at: string, o: { onUpdate?: (space: string | null) => void; now?: number } = {}): Promise<{ restored: string; archived: string; articles: number }> {
+export async function restoreArchive(db: DB, space: string | null, at: string, options: { onUpdate?: (space: string | null) => void; now?: number } = {}): Promise<{ restored: string; archived: string; articles: number }> {
+  const o = { ...options, onUpdate: options.onUpdate ?? wikiJobChanged };
   const root = rootOf(db, space);
   const name = nameOf(String(at ?? ''));
   if (!wikiArchives(root).some((a) => a.name === name)) throw new HttpError(404, 'No such archive of this wiki');
@@ -539,8 +523,23 @@ export async function restoreArchive(db: DB, space: string | null, at: string, o
   }
 }
 
-/** GET …/wiki/rebuild: what the wiki is doing at a person's request (or did last), and its archives. */
-export function wikiJobStatus(db: DB, space: string | null): { state: 'idle' | 'running' | 'done' | 'failed'; kind?: string; phase?: string; done: number; total: number; startedAt?: number; endedAt?: number; error?: string; parts?: string[]; did?: string[]; archives: { at: string; articles: number }[] } {
+export interface JobStatus {
+  state: 'idle' | 'running' | 'done' | 'failed' | 'stopped';
+  kind?: string;
+  phase?: string;
+  done: number;
+  total: number;
+  startedAt?: number;
+  endedAt?: number;
+  error?: string;
+  parts?: string[];
+  did?: string[];
+  progress?: JobProgress;
+  archives: { at: string; articles: number }[];
+}
+
+/** GET …/wiki/rebuild: what the wiki is doing at a person's request (or did last), its progress, and its archives. */
+export function wikiJobStatus(db: DB, space: string | null): JobStatus {
   if (space && !spaceById(db, space)) throw new HttpError(404, 'No such project');
   let root: string | null = null;
   try {
@@ -553,6 +552,7 @@ export function wikiJobStatus(db: DB, space: string | null): { state: 'idle' | '
   if (!job) return { state: 'idle', done: 0, total: 0, archives };
   // A job the database says runs that no part of this process runs was cut short (it is taken up at the start).
   const state = job.state === 'running' && !jobRunning(space) ? 'failed' : job.state;
+  const progress = jobProgress(db, space, job, state);
   return {
     state,
     kind: job.kind,
@@ -564,6 +564,7 @@ export function wikiJobStatus(db: DB, space: string | null): { state: 'idle' | '
     ...(job.error || state !== job.state ? { error: job.error ?? 'It stopped when the app restarted' } : {}),
     ...(job.parts ? { parts: job.parts } : {}),
     ...(job.did?.length ? { did: job.did } : {}),
+    ...(progress ? { progress } : {}),
     archives,
   };
 }

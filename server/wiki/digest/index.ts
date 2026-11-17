@@ -26,7 +26,10 @@ import { CHECK_MS, FIRST_CHECK_MS, learnWikiFromQuiet, learnWikiFromWork, nobody
 import { areasHelper, reorganiseNow, tendAreas } from '../areas/tend.ts';
 import { estimateRebuild, restoreArchive, startRebuild, wikiJobStatus } from '../areas/rebuild.ts';
 import { startUpdate, updateParts } from '../areas/update.ts';
+import { buildOffer, startBuild } from '../areas/build.ts';
+import { continueWikiJob, stopWikiJob } from '../areas/control.ts';
 import { resumeWikiJobs } from '../areas/resume.ts';
+import { setWikiJobBroadcast } from '../areas/jobs.ts';
 import { setDigestQueue } from './queue.ts';
 
 let digest: Digest | null = null;
@@ -95,6 +98,7 @@ export const wikiDigest: Feature = {
       return { updates: updatesOf(d.db, id), documents: documentsOverLimit(d.db, id) };
     });
     const changed = (space: string | null) => d.broadcast({ t: 'feature', id: 'wiki', data: { space } });
+    setWikiJobBroadcast(changed);
     /** Reorganise the shared wiki's areas now, whatever the triggers say (one at a time). */
     d.app.post('/api/wiki/reorganise', async () => reorganiseNow(d.db, null, { onUpdate: changed }));
     /** The same for a project's wiki. */
@@ -121,6 +125,20 @@ export const wikiDigest: Feature = {
       if (body.confirm !== true) return estimateRebuild(d.db, space);
       return startRebuild(d.db, space, helpers());
     };
+    /** Build from history: what a project's empty wiki would read (GET, and POST without confirm), or start it. Projects only. */
+    const build = async (req: { params: unknown; body: unknown }) => {
+      const space = place(req);
+      if (!space) throw new HttpError(404, 'Only a project can be built from its history');
+      const body = (req.body ?? {}) as { confirm?: unknown; exclude?: unknown };
+      if (body.confirm !== true) {
+        const offer = await buildOffer(d.db, space);
+        if (!offer) throw new HttpError(409, 'Memory, or wiki memory for this project, is off');
+        return offer;
+      }
+      return startBuild(d.db, space, { ...helpers(), ...(typeof body.exclude === 'string' ? { exclude: body.exclude } : {}) });
+    };
+    const stop = async (req: { params: unknown }) => stopWikiJob(d.db, place(req));
+    const goOn = async (req: { params: unknown }) => continueWikiJob(d.db, place(req), helpers());
     const status = async (req: { params: unknown }) => wikiJobStatus(d.db, place(req));
     const restore = async (req: { params: unknown; body: unknown }) => {
       const at = (req.body as { at?: unknown } | undefined)?.at;
@@ -134,12 +152,19 @@ export const wikiDigest: Feature = {
     d.app.get('/api/projects/:id/wiki/rebuild', status);
     d.app.post('/api/wiki/rebuild/restore', restore);
     d.app.post('/api/projects/:id/wiki/rebuild/restore', restore);
+    d.app.get('/api/projects/:id/wiki/build', build);
+    d.app.post('/api/projects/:id/wiki/build', build);
+    d.app.post('/api/wiki/stop', stop);
+    d.app.post('/api/projects/:id/wiki/stop', stop);
+    d.app.post('/api/wiki/continue', goOn);
+    d.app.post('/api/projects/:id/wiki/continue', goOn);
     d.app.post('/api/wiki/update', update);
     d.app.post('/api/projects/:id/wiki/update', update);
   },
   start(d) {
     digest?.dispose();
     const onUpdate = (space: string | null) => d.broadcast({ t: 'feature', id: 'wiki', data: { space } });
+    setWikiJobBroadcast(onUpdate);
     const mine = (digest = createDigest(d.db, { onUpdate }));
     setDigestQueue(mine);
     // A rebuild the last stop cut short goes on where it stopped; an update or a reorganisation is not taken up again.

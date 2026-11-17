@@ -87,6 +87,18 @@ export function helperCost(db: DB, t: { tokensIn: number; tokensOut: number }): 
   return typeof usd === 'number' && Number.isFinite(usd) ? { model: id, label: m.label, priced: true, usd: Math.round(usd * 100) / 100 } : { model: id, label: m.label, priced: false };
 }
 
+/**
+ * How many helper calls a long job (a wiki's build or rebuild) may have in flight at once: 3 on Automatic (each is a
+ * Claude Code or Codex program), 4 for a model over an API, 1 for a model on this computer or the local network.
+ */
+export function helperParallel(db: DB): number {
+  const id = helperModelId(db);
+  if (id === 'auto') return 3;
+  const m = customModels().find((x) => x.id === id);
+  if (!m || m.local || m.provider === 'ollama' || m.provider === 'vllm') return 1;
+  return 4;
+}
+
 /** Whether the helper (or the given model) can look at images. */
 export function helperSees(db: DB, model?: string): boolean {
   const id = model ?? helperModelId(db);

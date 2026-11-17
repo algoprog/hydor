@@ -12,8 +12,14 @@ import { userLang } from '../language/index.ts';
 import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { areasLine } from './areas/tend.ts';
+import { sessionExtra } from '../sessionExtra.ts';
+import { wikiHasArticles } from './has-articles.ts';
 
-/** What every agent is told while wiki memory is on: that it is there and how to look in it. */
+/**
+ * What every agent is told while wiki memory is on and the wiki has an article: that it is there and how to look in it. A project
+ * whose wiki is empty says nothing of it (an agent would look for what is not there), unless the session waits for a build of it
+ * (extra.memoryBuild), which will have something in it by the time its agent gets the first message.
+ */
 const LOOK =
   'Wiki memory is on: this project keeps articles (wiki/…) with their sources (raw/…), made from its documents and its work, beside memory notes (recall, remember: short facts) and documents (knowledge_search, knowledge_read: the files themselves). Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, which lists the articles by area (wiki/areas/<area>.md is an area’s hub: what it covers, its key facts and its articles), or wiki_search (words and meaning, exact text or a pattern; each result says its article, section and lines, which wiki_read opens with section or lines). Cite the articles you use.';
 
@@ -56,16 +62,17 @@ export const wiki: Feature = {
     const write = `Write new wiki articles, source notes, lessons, plans and execution records in ${language}, unless the user requests another language. Preserve original sources and established document language.`;
     // The wiki's areas, in one line that changes only when they do (not for a model of a small context).
     let areas: string | null = null;
-    if (!s.lean) {
-      try {
-        const root = wikiRoot(d.db, space);
-        areas = root ? areasLine(root) : null;
-      } catch {
-        /* a wiki that cannot be read gives no line */
-      }
+    // A session that waits for its project's memory to be built (extra.memoryBuild, set while it is created and cleared when its first message goes) is told too.
+    let has = s.extra?.memoryBuild === true || (!!s.key && sessionExtra(d.db, s.key).memoryBuild === true);
+    try {
+      const root = wikiRoot(d.db, space);
+      has ||= wikiHasArticles(root);
+      if (!s.lean && root) areas = areasLine(root);
+    } catch {
+      /* a wiki that cannot be read gives no line */
     }
     return {
-      instructions: [LOOK, ...(areas ? [areas] : [])],
+      instructions: [...(has ? [LOOK] : []), ...(areas ? [areas] : [])],
       guides: [
         { tools: KEEP_TOOLS, text: `${KEEP} ${write}` },
         { tools: CHECK_TOOLS, text: CHECK },

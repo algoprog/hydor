@@ -300,11 +300,18 @@ agents that speak ACP and take MCP servers.
   later, two a day, under the revision rules, the merged one left as a redirect that `wiki_read` follows. Agents get a line naming
   the areas, and article lines say the area; an agent can be asked to reorganise now (`POST /api/projects/:id/wiki/reorganise`).
   The Wiki part's ⋯ menu: **Update now** (the waiting documents, unread conversations and new commits read at once; up to ten
-  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Rebuild from
-  sources…** (an estimate of sources, helper calls and cost first; the wiki archived, the last three kept and the first one always, then every source in
-  `raw/` read again, at most 60 an hour, then the earlier articles no new one covers, the areas and hubs made anew, and old article paths redirected to the new articles;
-  sources, plans and memory notes untouched; it goes on after a restart) and **Restore the previous wiki…**; a line says what
-  it is doing, one at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`).
+  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Build from history…**
+  while the wiki is empty (it reads what the project has that the wiki never read: its files, memory notes, up to 300 conversations
+  by signal, the newest 1,200 commit messages and its unread documents, what matters most first so an agent can start early, then the
+  areas, hubs and merges; `/api/projects/:id/wiki/build`), **Rebuild from sources…** (an estimate of what it reads, minutes, helper
+  calls and cost first; the wiki archived, the last three kept and the first one always, then the files and the kept sources in
+  `raw/` read again, commit messages fresh from the repository, the documents and conversations never read, the earlier articles no
+  new one covers, the areas and hubs made anew, and old article paths redirected to the new articles; sources, plans and memory notes
+  untouched; it goes on after a restart) and **Restore the previous wiki…**. A build or rebuild reads several sources at once
+  (three on Automatic, four over an API, one on a local model) and goes as fast as they do; a panel shows its steps, what it reads now
+  and the time left, with **Stop** (what was written stays), **Continue** and **Try again** (`…/wiki/stop`, `…/wiki/continue`); one
+  job at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`). Agents are told of a wiki only
+  once it has an article.
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works

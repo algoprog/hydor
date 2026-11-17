@@ -26,6 +26,7 @@ import { backfillDocuments } from './index.ts';
 import { documentsToRead } from './limit.ts';
 import { OVERVIEW_MIN_FOLDER, OVERVIEW_PER_HOUR, OVERVIEW_SYSTEM, OVERVIEW_TITLES, unreadFolders, writeOverviews } from './overviews.ts';
 import { PLAN_SYSTEM, PLAN_SYSTEM_CONVERSATION } from './plan.ts';
+import { claimJob, releaseJob } from '../areas/jobs.ts';
 import { readsInDay } from './reads.ts';
 import { conversationSignal, CORRECTION } from './signal.ts';
 import { updatesOf, workMark } from './store.ts';
@@ -419,6 +420,35 @@ test('commits: at most 60 commits and 12,000 characters; a failing helper is tri
   setLearnOn(db, true);
   assert.ok((await digestCommitsDue(db, ask, now + 400 * HOUR)) >= 1, 'read once learning is on again');
   assert.equal(prompts(asks, PLAN_SYSTEM_CONVERSATION).filter((q) => q.includes('Another decision')).length, 1, 'asked about once');
+});
+
+test('the background passes skip a project while a job runs on its wiki: the commits, the work pass, the quiet pass and the document queue', async () => {
+  const p = mk('Busy job');
+  git(p.folder, 'init', '-q');
+  commit(p.folder, 'A decision made while a job runs\n\nWhy: it must wait.');
+  session('busy-job', p.folder, { title: 'busy-job', last: Date.now() - 3 * HOUR });
+  const b = createBase(db, { name: 'Busy docs', space: p.space.id }).id;
+  doc(b, addSource(db, b, 'folder', p.folder).id, `${p.folder}/busy.md`, { text: 'A busy document with enough words to be read by the wiki, about nothing in particular.' });
+  assert.ok(claimJob(p.space.id));
+  const before = asked.length;
+  await digestCommitsDue(db, ask, Date.now() + 500 * HOUR);
+  const others = await learnWikiFromWork(db, ask, Date.now());
+  assert.equal(workMark(db, 'busy-job'), undefined, `the daily pass reads none of its conversations (it read ${others} of others)`);
+  await learnWikiFromQuiet(db, ask, Date.now());
+  assert.equal(workMark(db, 'busy-job'), undefined);
+  const d = createDigest(db, { ask, quietMs: 0, unref: false });
+  d.enqueue({ base: b, path: `${p.folder}/busy.md`, title: 'busy.md' });
+  await d.settled();
+  assert.equal(d.pending(), 1, 'the document waits in the queue');
+  assert.ok(asked.slice(before).every((q) => !/while a job runs|busy-job|busy document/i.test(q.prompt)), 'nothing of the project was read');
+  releaseJob(p.space.id);
+  // When the job has ended the same queue reads it, and the passes read the project again.
+  await d.readNow(() => true);
+  assert.equal(d.pending(), 0);
+  assert.ok(asked.slice(before).some((q) => /busy document/i.test(q.prompt)));
+  await learnWikiFromWork(db, ask, Date.now());
+  assert.ok(workMark(db, 'busy-job'), 'read once the job is over');
+  d.dispose();
 });
 
 test('the quiet pass is gated as the daily pass: nothing with Learn from conversations off', async () => {
