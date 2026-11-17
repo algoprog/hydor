@@ -3,6 +3,25 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.73.0 · 17 November 2026
+
+Wiki memory reads each conversation once and keeps only what matters from documents. A project with too many documents
+leaves them to search, and large data files are analysed with code.
+
+- **Each conversation is read once**: learning from a project's work keeps where it stopped in each session. A session it
+  has read is never read again; when it goes on, only its new turns are read, and the helper is told they continue what it
+  read before. A session an agent is still working in, or one there was no room for that day, waits for the next time
+  instead of being missed.
+- **Only what matters from documents**: the wiki keeps a document's key facts, findings, decisions, names and numbers,
+  and leaves the detail in the document, where agents search it.
+- **Most documents to read into the wiki**: a new setting in Settings → Memory → Wiki memory (100 at first), and a
+  number of its own on a project's Settings tab. A project with more documents than that keeps them all out of its wiki:
+  agents search them instead, and its Memory tab says so. Raise the limit and they are read.
+- **Large data files analysed with code**: a big CSV or TSV file, a spreadsheet or JSON data is no longer read as text.
+  The helper writes short Python programs that Hydor runs in a sandbox with no network, which sees only that file, and
+  only its findings go into the wiki. This works on Linux with bubblewrap; on macOS and Windows such files are searched
+  only for now. Agents in sessions are also told to analyse a large data file with code from its path.
+
 ## 0.72.0 · 16 November 2026
 
 Your agents get switches for the browser and the computer, wiki memory learns from each project's work, and a folder
