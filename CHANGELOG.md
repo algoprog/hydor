@@ -3,6 +3,33 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.74.0 · 17 November 2026
+
+Plans and lesson suggestions in Wiki memory, Wiki memory switches for each chat, the whole guide in German, and all of a
+project's skills turned on as well as off. With thanks again to wirrockendigital, whose contributions brought these.
+
+- **Plans in Wiki memory**: **Adopt a plan** on a project's Memory tab (Wiki) starts a session that asks you for the
+  plan, shows what the project has already and a preview, and keeps it in the project's wiki once you agree on a card.
+  A plan changes only that way: each revision is shown first, and the plan as it was is kept. Agreeing to a plan does not
+  let an agent start on it. **Plans and evidence** lists them, with what was done for each.
+- **Wiki memory for each chat**: a chat's options have **Wiki memory** and **Auto lessons learned** switches, and
+  **Settings → Memory** has their defaults (**Wiki memory on by default in chats**: on; **Auto lessons learned by default
+  in chats**: off). An agent changing them always asks you first.
+- **Lesson suggestions**: with Auto lessons learned on, the helper model may suggest a lesson for the project's wiki
+  after a turn; only you keep or dismiss it.
+- **A checkpoint before a long conversation is compacted**: Claude Code and Codex sessions keep one in Wiki memory first
+  (the helper reads the last messages, which can add a few seconds). A session started before Wiki memory was turned on
+  gets it after a restart.
+- **The guide in German**: every topic, when the app is in German. German now says one thing one way throughout, and the
+  built-in agents have German names (Forscher, Programmierer…).
+- **A project's skills**: **Turn on all skills** beside **Turn off all skills** in its Skills tab's **⋯** menu, both
+  asking first; the menu's other items now read **Follow default settings for all skills** and **Change default skill
+  settings for all projects**.
+- **Your own messages**: **Copy message** sits under each message you send, with **Edit from here** and the time.
+- **Fixes**: in Chinese and Greek, the phone setup's messages and the board's monthly cap notice are translated; a
+  picker's label is translated even when it shows one of your own agents; a message with only files shows its files and
+  nothing empty to copy.
+
 ## 0.73.0 · 17 November 2026
 
 Wiki memory reads each conversation once and keeps only what matters from documents. A project with too many documents
