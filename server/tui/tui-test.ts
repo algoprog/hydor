@@ -1461,6 +1461,13 @@ test('the chat: Enter while the agent works joins the turn (as set) or queues it
   await device({ enter: 'queue', terminalSuggestions: false, theme: 'dark' });
   await c.until(/Enter now waits for the turn to end · Grey suggestions are off/);
   assert.deepEqual(JSON.parse(fs.readFileSync(terminalFile, 'utf8')), { enter: 'queue', suggestions: false });
+  // Wait for the joined turn to end and for the current prompt to reflect the idle state.
+  await waitFor(() => f.live?.status === 'idle');
+  const idleAt = Date.now();
+  while (!/› Message the agent · \/help/.test((await c.screen()).split('\n').slice(-5).join('\n'))) {
+    assert.ok(Date.now() - idleAt < 6000, 'the current prompt did not return to idle');
+    await sleep(50);
+  }
   // With Enter queuing, the placeholder says so, Enter queues, and /now still joins.
   c.p.write('be slow a third time\r');
   await c.until(/Working · \d+ s/);

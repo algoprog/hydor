@@ -273,6 +273,8 @@ async function realBrowser() {
       await call('POST', '/api/browser/browsing/go', { text: `${base}/mail` });
       await until('the inbox', () => b.active?.title === 'Inbox');
       await until('back possible', () => b.active!.canGoBack === true);
+      // The favicon is read asynchronously after the navigation history becomes available.
+      await until('the favicon', () => b.active?.favicon === `${base}/icon.png`);
       const v = (await call('GET', '/api/browser/sessions/browsing')).view;
       const tab = v.tabs.find((t: { active: boolean }) => t.active);
       assert.equal(tab.canGoBack, true);
