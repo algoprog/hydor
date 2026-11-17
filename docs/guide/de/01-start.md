@@ -178,7 +178,9 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 ### Die Ergebnisanzeige
 
 - **Beste Übereinstimmung** steht oben. Danach folgen Kategorien mit bis zu vier Zeilen. „3 weitere in Sitzungen“ zeigt den Rest.
-- Auf breiten Bildschirmen zeigt eine Vorschau neben der Liste weitere Angaben zum ausgewählten Treffer und seinem Ziel.
+- Bilder, Videos, Töne, die Seiten der Bibliothek und Dateien erscheinen mit Vorschaubild und ihren Angaben: was es ist (ein Bild, ein Video, ein Dokument, Folien, eine Tabelle, ein PNG-Bild …), Größe oder Länge, Projekt und Ordner und wann es zuletzt geändert wurde. Bei einer Seite folgt ihre Beschreibung.
+- Auf breiten Bildschirmen zeigt eine Vorschau neben der Liste weitere Angaben zum ausgewählten Treffer und seinem Ziel. Ein Bild oder eine Seite erscheint dort größer (ein Klick öffnet es), und ein Video oder ein Ton spielt direkt dort.
+- Auf dem Smartphone füllen die Treffer den Bildschirm, ohne Vorschau: Jede Zeile sagt genug, um die Treffer auseinanderzuhalten, und ist groß genug zum Antippen.
 - Mit ↑ und ↓ wechselst du zwischen den Treffern, mit Enter öffnest du einen. Esc leert, was du eingegeben hast, und ein zweites Esc schließt die Suche (ist die Liste **Suchen in** geöffnet, schließt Esc zuerst die Liste).
 - Ohne Eingabe zeigt die Suche **Letzte Sitzungen** und **Vorschläge**: die Orte, die du am häufigsten nutzt (bis sie diese kennt, ein paar nützliche). Sind in **Suchen in** Orte ausgewählt, zeigt sie stattdessen, was diese enthalten.
 - Unten steht **Worte** oder **Wörter und Bedeutung**. Mit aktiviertem [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning), standardmäßig unter Einstellungen → Funktionen → Memory eingeschaltet, findet die Suche auch sinngleiche Formulierungen und andere Sprachen.

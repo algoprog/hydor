@@ -23694,5 +23694,15 @@
   "Memory is off for this session: nothing was read or saved.": "Memory ist für diese Sitzung ausgeschaltet: Es wurde nichts gelesen oder gespeichert.",
   "memoryShared: true or false": "memoryShared: true oder false",
   "query is empty": "query ist leer",
-  "Searchable from other projects": "Für andere Projekte durchsuchbar"
+  "Searchable from other projects": "Für andere Projekte durchsuchbar",
+  "board cards dashboard": "Board Karten Dashboard",
+  "diagram flowchart chart": "Diagramm Flussdiagramm Grafik",
+  "document doc word report letter": "Dokument Doc Word Bericht Brief",
+  "latex tex paper": "LaTeX TeX Paper",
+  "notebook jupyter ipynb": "Notebook Jupyter ipynb",
+  "page html": "Seite HTML",
+  "published": "veröffentlicht",
+  "slides deck presentation powerpoint": "Folien Foliensatz Präsentation PowerPoint",
+  "spreadsheet sheet excel table": "Tabelle Tabellenblatt Excel Arbeitsmappe",
+  "{0} library{1}": "{0} Bibliothek{1}"
 }

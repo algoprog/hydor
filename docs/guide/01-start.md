@@ -178,7 +178,9 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 ### How the results show
 
 - The **Best match** comes first. Then each kind has its own group of up to four rows; "3 more in Sessions" shows the rest.
-- On a wide screen, a preview beside the list says more about the result you are on, and where opening it goes.
+- Pictures, videos, sounds, the Library's pages and files show with a thumbnail and their details: what each one is (a picture, a video, a document, slides, a spreadsheet, a PNG image…), its size or length, the project and folder it is in, and when it last changed. A page's description follows.
+- On a wide screen, a preview beside the list says more about the result you are on, and where opening it goes. A picture or a page shows larger there (click it to open it), and a video or a sound plays right there.
+- On a phone the results fill the screen, without the preview: each row says enough to tell the results apart, and is big enough to tap.
 - ↑ and ↓ move, Enter opens. Esc clears what you typed, and a second Esc closes the box (with the **Search in** list open, Esc closes the list first).
 - With nothing typed, it lists **Recent sessions** and **Suggestions**: the places you use most (a few useful ones until it knows). With places picked in **Search in**, it lists what they hold instead.
 - The bottom line says **Words** or **Words and meaning**. With [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on (it is, unless you turn it off in Settings → Capabilities → Memory), results also match what you mean in other words, and in other languages.

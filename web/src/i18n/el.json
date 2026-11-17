@@ -24948,5 +24948,15 @@
 "Memory is off for this session: nothing was read or saved.":"Η μνήμη είναι απενεργοποιημένη για αυτή τη συνεδρία: δεν διαβάστηκε ούτε αποθηκεύτηκε τίποτα.",
 "memoryShared: true or false":"memoryShared: true ή false",
 "query is empty":"το query είναι κενό",
-"Searchable from other projects":"Αναζητήσιμο από άλλα έργα"
+"Searchable from other projects":"Αναζητήσιμο από άλλα έργα",
+"board cards dashboard":"πίνακας κάρτες ταμπλό",
+"diagram flowchart chart":"διάγραμμα διάγραμμα ροής γράφημα",
+"document doc word report letter":"έγγραφο Word αναφορά επιστολή",
+"latex tex paper":"LaTeX TeX άρθρο",
+"notebook jupyter ipynb":"σημειωματάριο Jupyter ipynb",
+"page html":"σελίδα HTML",
+"published":"δημοσιευμένο",
+"slides deck presentation powerpoint":"διαφάνειες παρουσίαση PowerPoint",
+"spreadsheet sheet excel table":"υπολογιστικό φύλλο Excel πίνακας",
+"{0} library{1}":"{0} βιβλιοθήκη{1}"
 }

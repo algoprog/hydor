@@ -3,6 +3,21 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.77.0 · 17 November 2026
+
+Richer search results: pictures, videos, sounds, the Library's pages and files show in the search box with thumbnails
+and their details, on a computer and on a phone.
+
+- **Thumbnails in the search box**: pictures, videos (with a play mark), sounds (their shape), the Library's pages,
+  documents, slides and spreadsheets, and picture files show a small picture beside their name, so you can tell them
+  apart at a glance.
+- **Details under each name**: what it is (a picture, a video, a document, slides, a PNG image…), its size or length,
+  the project and folder it is in, and when it last changed; a page's description follows.
+- **A larger preview**: on a wide screen the preview beside the list shows the picture or page larger and plays a
+  video or a sound right there, with its kind, size, length, the model that made it, its project and folder.
+- **Easier on a phone**: the rows are taller and easy to tap, and each says enough without the preview.
+- **Find things by their kind**: typing "slides", "spreadsheet" or "document" finds your decks, sheets and documents.
+
 ## 0.76.0 · 17 November 2026
 
 Memory across projects: agents can search your other projects' notes, wiki and documents, and past conversations of

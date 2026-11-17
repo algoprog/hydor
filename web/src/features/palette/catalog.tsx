@@ -4,19 +4,19 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, AppWindow, ArrowRight, AudioLines, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
 import type { ScheduledTask } from '@shared/automations';
 import type { ConnectionView } from '@shared/connections';
-import type { MediaItem } from '@shared/media';
-import type { PageInfo } from '@shared/pages';
+import { clipLength, type MediaItem } from '@shared/media';
+import type { LibFolder, PageInfo } from '@shared/pages';
 import type { SkillLibrary } from '@shared/skillpack';
 import type { PluginList } from '@shared/plugins';
 import { isGroup, type SpaceView } from '@shared/spaces';
 import { api } from '../../lib/api';
-import { timeAgo } from '../../lib/format';
+import { bytes, timeAgo } from '../../lib/format';
 import { go, goApp } from '../../lib/nav';
 import { useUI } from '../../lib/store';
 import { allThemes, applyTheme, pickTheme } from '../../lib/theme';
@@ -28,6 +28,7 @@ import { startTour } from '../tour/Tour';
 import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
+import { formatOf, MEDIA_LABELS, pageKind, type Visual } from './visuals';
 
 export type Group = 'Settings' | 'Go to' | 'Actions' | 'Guide' | 'Sessions' | 'In messages' | 'Memory' | 'Projects' | 'Apps' | 'Scheduled tasks' | 'Agents' | 'Skills' | 'Plugins' | 'Connections' | 'Pages' | 'Images, videos and audio' | 'Themes' | 'Files';
 
@@ -44,12 +45,32 @@ export interface Entry extends Findable {
   /** For the preview: more about it, and a few facts. */
   body?: string;
   facts?: [string, string][];
+  /** A picture to show it by: a thumbnail in the list, larger in the preview. */
+  visual?: Visual;
+  /** Short facts under its title in the list, in order ("Picture", "1920 × 1080"). */
+  meta?: string[];
+  /** Where it is kept, by the names people gave (its project and folder; a file's folder): after the facts, never translated. */
+  place?: string[];
+  /** What people or agents wrote about it (a description), after the facts in the list: never translated. */
+  note?: string;
   /** What opening it does, in a few words ("Opens Settings → Memory, at this option"). */
   opens?: string;
   /** The place it is in (a setting's section, sec:memory): visiting that counts for it too, half as much. */
   within?: string;
   run: () => void;
 }
+
+/** Words a page of each kind is found by. */
+const PAGE_WORDS: Record<NonNullable<PageInfo['kind']> | 'page', string> = {
+  page: 'page html',
+  slides: 'slides deck presentation powerpoint',
+  doc: 'document doc word report letter',
+  sheet: 'spreadsheet sheet excel table',
+  tex: 'latex tex paper',
+  notebook: 'notebook jupyter ipynb',
+  diagram: 'diagram flowchart chart',
+  board: 'board cards dashboard',
+};
 
 const settingsAt = (s: string, find?: string) => `/settings?s=${encodeURIComponent(s)}${find ? `&find=${encodeURIComponent(find)}` : ''}`;
 
@@ -138,7 +159,7 @@ export async function liveEntries(): Promise<Entry[]> {
     get<{ tasks: ScheduledTask[] }>('/api/tasks'),
     get<{ assistants?: { id: string; name: string; description?: string }[] }>('/api/assistants'),
     get<SkillLibrary>('/api/skillpack'),
-    get<{ pages: PageInfo[] }>('/api/pages'),
+    get<{ pages: PageInfo[]; folders?: LibFolder[] }>('/api/pages'),
     get<{ connections: ConnectionView[] }>('/api/connections'),
     get<{ spaces: SpaceView[] }>('/api/projects'),
     get<{ items: MediaItem[] }>('/api/media'),
@@ -200,20 +221,48 @@ export async function liveEntries(): Promise<Entry[]> {
       within: 'sec:plugins',
       run: () => go(`/settings?s=plugins&plugin=${encodeURIComponent(p.name)}`),
     });
-  for (const p of pages?.pages ?? [])
+  // Where a page or a picture is kept: its project and its folder, by name.
+  const spaceName = new Map((spaces?.spaces ?? []).map((s) => [s.id, s.name]));
+  const folderName = new Map((pages?.folders ?? []).map((f) => [f.id, f.name]));
+  const placeOf = (x: { space?: string; folder?: string }) => ({ project: (x.space && spaceName.get(x.space)) || '', folder: (x.folder && folderName.get(x.folder)) || '' });
+  for (const p of pages?.pages ?? []) {
+    const kind = pageKind(p);
+    const { project, folder } = placeOf(p);
+    const place = [project, folder].filter(Boolean);
     out.push({
       id: `page:${p.id}`,
       group: 'Pages',
-      icon: <AppWindow size={15} />,
+      icon: kind.icon(15),
+      mark: kind.icon(20),
       title: p.title,
-      keywords: 'page published',
+      keywords: `${PAGE_WORDS[p.kind ?? 'page'] ?? 'page'} library${p.published ? ' published' : ''}`,
       text: p.description,
-      where: 'Library',
+      where: ['Library', ...place].join(' › '),
+      hint: timeAgo(p.updatedAt),
+      meta: [kind.label],
+      place,
+      note: p.description,
+      visual: { type: 'page', page: p },
       body: p.description || `Version ${p.version}`,
+      facts: [
+        ['Kind', kind.label],
+        ['Project', project],
+        ['Folder', folder],
+        ['Changed', timeAgo(p.updatedAt)],
+        ['Versions', p.versions > 1 ? String(p.versions) : ''],
+      ],
       opens: 'Opens the page',
       run: () => go(`/pages/${encodeURIComponent(p.id)}`),
     });
-  for (const m of media?.items ?? [])
+  }
+  for (const m of media?.items ?? []) {
+    const { project, folder } = placeOf(m);
+    const place = [project, folder].filter(Boolean);
+    const label = MEDIA_LABELS[m.kind] ?? MEDIA_LABELS.image;
+    const format = formatOf(m.mime);
+    const dims = m.width && m.height ? `${m.width} × ${m.height}` : '';
+    const length = clipLength(m.duration);
+    const meta = m.kind === 'video' ? [label, length, dims] : m.kind === 'audio' ? [label, length, bytes(m.bytes)] : [label, dims, bytes(m.bytes)];
     out.push({
       id: `media:${m.id}`,
       group: 'Images, videos and audio',
@@ -221,11 +270,25 @@ export async function liveEntries(): Promise<Entry[]> {
       title: m.title,
       keywords: `${m.kind === 'video' ? 'video clip' : m.kind === 'audio' ? 'audio sound music song voice recording' : 'image picture'} library`,
       text: [m.description, m.prompt].filter(Boolean).join(' '),
-      where: 'Library › Media',
+      where: ['Library', ...place].join(' › '),
+      hint: timeAgo(m.updatedAt),
+      meta: meta.filter(Boolean),
+      place,
+      visual: { type: 'media', item: m },
       body: m.description,
+      facts: [
+        ['Kind', format ? `${label} · ${format}` : label],
+        ['Size', dims ? `${dims} · ${bytes(m.bytes)}` : bytes(m.bytes)],
+        ['Length', length],
+        ['Made with', m.model ? (m.model.split('/').pop() ?? '') : ''],
+        ['Project', project],
+        ['Folder', folder],
+        ['Changed', timeAgo(m.updatedAt)],
+      ],
       opens: m.kind === 'video' ? 'Opens the video' : m.kind === 'audio' ? 'Opens the sound' : 'Opens the image',
       run: () => go(`/media/${encodeURIComponent(m.id)}`),
     });
+  }
   for (const c of conns?.connections ?? [])
     out.push({
       id: `conn:${c.id}`,

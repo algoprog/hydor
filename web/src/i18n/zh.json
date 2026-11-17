@@ -24964,5 +24964,15 @@
 "Memory is off for this session: nothing was read or saved.":"此会话的记忆已关闭：没有读取或保存任何内容。",
 "memoryShared: true or false":"memoryShared：true 或 false",
 "query is empty":"query 为空",
-"Searchable from other projects":"可从其他项目搜索"
+"Searchable from other projects":"可从其他项目搜索",
+"board cards dashboard":"看板 卡片 仪表板",
+"diagram flowchart chart":"图表 流程图 示意图",
+"document doc word report letter":"文档 Word 报告 信件",
+"latex tex paper":"LaTeX TeX 论文",
+"notebook jupyter ipynb":"笔记本 Jupyter ipynb",
+"page html":"页面 HTML",
+"published":"已发布",
+"slides deck presentation powerpoint":"幻灯片 演示文稿 PowerPoint",
+"spreadsheet sheet excel table":"电子表格 工作表 Excel 表格",
+"{0} library{1}":"{0} 资料库{1}"
 }

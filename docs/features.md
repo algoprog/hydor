@@ -1587,7 +1587,10 @@ programs shows each program's version and what is out, with Check now, Update no
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,
   every setting, sessions and what was said in them, memory notes, projects, apps, scheduled tasks, assistants,
-  skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Opening a result goes where it is: a setting opens its
+  skills, plugins, the Library's pages, images and videos, connections, themes and files, as you type. Pictures,
+  videos, sounds, the Library's pages and files show with a thumbnail and their details (what each is, size or
+  length, project and folder, when it changed, a page's description); on a wide screen the preview shows a picture or
+  a page larger and plays a video or a sound in place, and on a phone the rows are big enough to tap. Opening a result goes where it is: a setting opens its
   page and points at it, a message opens its session at the words. With search by meaning on (Settings →
   Memory; on unless you turn it off) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the

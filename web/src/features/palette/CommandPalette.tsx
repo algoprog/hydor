@@ -12,18 +12,21 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type React
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { ArrowRight, BookOpen, Bot, Boxes, Brain, Cable, CalendarClock, Check, ChevronDown, Compass, CornerDownLeft, FileText, LayoutGrid, Layers, Library, LibraryBig, ListFilter, MessageSquareText, MessagesSquare, Search, Settings, Sparkles, X } from 'lucide-react';
+import { kindLabel } from '@shared/documents';
 import { FIND_PLACES, matchItem, matchStrength, queryAffinity, queryWords, usageBoost, type FindPlace, type FindResponse, type FindUsage } from '@shared/find';
 import type { SessionSummary } from '@shared/types';
 import { api } from '../../lib/api';
-import { MOD, markRuns, timeAgo } from '../../lib/format';
+import { MOD, basename, bytes, dirname, markRuns, tildify, timeAgo } from '../../lib/format';
 import { go, openFile, sessionPath } from '../../lib/nav';
 import { useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Kbd, MenuLabel, MenuSep, Popover, SheetsOnPhone, Throbber, useIsMobile, useMediaQuery, useSheets } from '../../components/ui';
+import { FileIcon } from '../documents/fileTypes';
 import { folderName } from '../sessions/SessionList';
 import { liveEntries, staticEntries, type Entry, type Group } from './catalog';
 import { loadScope, setScope, useFindScope } from './scope';
 import { loadUsage, notePick, useFindUsage } from './usage';
+import { BigVisual, hasBigVisual, Thumb } from './visuals';
 
 export const usePalette = create<{ open: boolean }>(() => ({ open: false }));
 export const openPalette = () => usePalette.setState({ open: true });
@@ -155,7 +158,7 @@ interface Found {
   groups: { group: Group; hits: Hit[] }[];
 }
 
-function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindResponse | null, files: string[], usage: FindUsage | null, places: FindPlace[], home?: string): Found {
+function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindResponse | null, files: string[], fileInfo: Record<string, { size: number; mtime: number }>, usage: FindUsage | null, places: FindPlace[], home?: string): Found {
   const words = queryWords(q);
   const affinity = queryAffinity(usage, q);
   // Only the places picked (the server looked only there too).
@@ -213,13 +216,35 @@ function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindR
       score: rrf(i),
     });
   });
-  files.forEach((p, i) =>
+  files.forEach((p, i) => {
+    const info = fileInfo[p];
+    const folder = tildify(dirname(p), home);
+    const kind = kindLabel(p);
     add({
-      entry: { id: `f:${p}`, group: 'Files', icon: <FileText size={15} />, title: p.split('/').pop() || p, where: p, opens: 'Opens the file', run: () => openFile(p) },
+      entry: {
+        id: `f:${p}`,
+        group: 'Files',
+        icon: <FileIcon path={p} size={16} />,
+        mark: <FileIcon path={p} size={40} />,
+        title: basename(p),
+        where: folder,
+        hint: info ? timeAgo(info.mtime) : undefined,
+        meta: [kind, ...(info ? [bytes(info.size)] : [])],
+        place: [folder],
+        visual: { type: 'file', path: p, size: info?.size },
+        facts: [
+          ['Kind', kind],
+          ['Size', info ? bytes(info.size) : ''],
+          ['Changed', info ? timeAgo(info.mtime) : ''],
+          ['Folder', folder],
+        ],
+        opens: 'Opens the file',
+        run: () => openFile(p),
+      },
       score: rrf(i),
-      marks: matchItem({ title: p.split('/').pop() || p }, words, q).marks,
-    }),
-  );
+      marks: matchItem({ title: basename(p) }, words, q).marks,
+    });
+  });
   // What was picked for this query before shows at once, even before it matches by words or meaning.
   const byKey = new Map(sessions.map((s) => [`s:${s.key}`, s]));
   for (const [id, a] of affinity) {
@@ -298,6 +323,7 @@ export function CommandPalette() {
   const [live, setLive] = useState<Entry[]>([]);
   const [server, setServer] = useState<FindResponse | null>(null);
   const [files, setFiles] = useState<string[]>([]);
+  const [fileInfo, setFileInfo] = useState<Record<string, { size: number; mtime: number }>>({});
   const [busy, setBusy] = useState(false);
   const [more, setMore] = useState<Set<Group>>(new Set());
   const usage = useFindUsage((s) => s.usage);
@@ -329,6 +355,7 @@ export function CommandPalette() {
     setSel(0);
     setServer(null);
     setFiles([]);
+    setFileInfo({});
     setMore(new Set());
     setPicking(false);
     let alive = true;
@@ -346,6 +373,7 @@ export function CommandPalette() {
     if (!open || !term) {
       setServer(null);
       setFiles([]);
+      setFileInfo({});
       setBusy(false);
       return;
     }
@@ -361,8 +389,16 @@ export function CommandPalette() {
       ]).then(([r, f]) => {
         if (ctl.signal.aborted) return;
         setServer(r);
-        setFiles((f?.files ?? []).slice(0, 5));
+        const found = (f?.files ?? []).slice(0, 5);
+        setFiles(found);
         setBusy(false);
+        // The files show at once; their sizes and times join them when they arrive.
+        void Promise.all(found.map((p) => api<{ exists: boolean; size?: number; mtime?: number; dir?: boolean }>(`/api/fs/stat?path=${encodeURIComponent(p)}`, { signal: ctl.signal }).then((st) => [p, st] as const).catch(() => null))).then((all) => {
+          if (ctl.signal.aborted) return;
+          const info: Record<string, { size: number; mtime: number }> = {};
+          for (const x of all) if (x?.[1].exists && x[1].size != null && x[1].mtime != null) info[x[0]] = { size: x[1].size, mtime: x[1].mtime };
+          setFileInfo(info);
+        });
       });
     }, 140);
     return () => {
@@ -374,8 +410,8 @@ export function CommandPalette() {
   const found = useMemo<Found>(() => {
     if (!open) return { top: null, groups: [] };
     const list = Object.values(sessions);
-    return q.trim() ? rank(q, entries, list, server, files, usage, places, home) : start(list, entries, usage, places, home);
-  }, [open, q, entries, sessions, server, files, usage, places, home]);
+    return q.trim() ? rank(q, entries, list, server, files, fileInfo, usage, places, home) : start(list, entries, usage, places, home);
+  }, [open, q, entries, sessions, server, files, fileInfo, usage, places, home]);
 
   // The rows, in order, for the keys: the best match, then each group's (and its "more"). With nothing typed a
   // group lists everything, or with several places picked, a few of each.
@@ -417,6 +453,8 @@ export function CommandPalette() {
       <div
         role="dialog"
         aria-label="Search"
+        // Escape from inside the preview (its video player) closes the box too; the field handles its own.
+        onKeyDown={(e) => e.key === 'Escape' && !e.defaultPrevented && !picking && close()}
         className={cx(
           'flex flex-col overflow-hidden bg-elevated shadow-lg',
           mobile ? 'h-full w-full pt-[var(--safe-top)]' : cx('h-fit max-h-[72vh] w-full rounded-2xl border border-line', wide ? 'max-w-[860px]' : 'max-w-[640px]'),
@@ -493,26 +531,48 @@ export function CommandPalette() {
                 <div key={r.kind === 'hit' ? `${r.group ?? 'top'}:${r.hit.entry.id}` : `more:${r.group}`}>
                   {head && <div className="px-2.5 pt-2.5 pb-1 text-[11.5px] font-medium tracking-wide text-fg-3">{head}</div>}
                   {r.kind === 'hit' ? (
-                    <button
-                      id={`find-${i}`}
-                      role="option"
-                      aria-selected={i === sel}
-                      data-i={i}
-                      onMouseMove={() => sel !== i && setSel(i)}
-                      onClick={() => pick(i)}
-                      className={cx('flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors', !r.group ? 'h-12' : 'h-9', i === sel ? 'bg-accent-soft text-fg' : 'text-fg-2')}
-                    >
-                      <span className={cx('flex shrink-0 items-center justify-center rounded-md', !r.group ? 'h-8 w-8 bg-bg-2 text-fg-2' : 'w-4 text-fg-3')}>{r.hit.entry.icon}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className={cx('block truncate', !r.group ? 'text-[14.5px] font-medium text-fg' : 'text-[13.5px]')}>{r.hit.label ?? marked(r.hit.entry.title, r.hit.marks)}</span>
-                        {!r.group && (r.hit.sub ?? r.hit.entry.where) && <span className="block truncate text-[12px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
-                      </span>
-                      {r.group && (r.hit.sub ?? r.hit.entry.where) && <span className="max-w-[38%] shrink-0 truncate text-[11.5px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
-                      {r.hit.entry.hint && !(r.group && (r.hit.sub ?? r.hit.entry.where)) && <span className="shrink-0 text-[11.5px] text-fg-3">{r.hit.entry.hint}</span>}
-                      {i === sel && <CornerDownLeft size={12} className="shrink-0 text-fg-3" />}
-                    </button>
+                    r.hit.entry.visual ? (
+                      <button
+                        id={`find-${i}`}
+                        role="option"
+                        aria-selected={i === sel}
+                        data-i={i}
+                        onMouseMove={() => sel !== i && setSel(i)}
+                        onClick={() => pick(i)}
+                        className={cx('flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors', !r.group ? 'min-h-[68px]' : 'min-h-14', i === sel ? 'bg-accent-soft text-fg' : 'text-fg-2')}
+                      >
+                        <Thumb v={r.hit.entry.visual} size={!r.group ? 56 : 44} />
+                        <span className="min-w-0 flex-1">
+                          <span translate="no" className={cx('block truncate font-medium text-fg', !r.group ? 'text-[14.5px]' : 'text-[13.5px]')}>
+                            {r.hit.label ?? marked(r.hit.entry.title, r.hit.marks)}
+                          </span>
+                          <MetaLine e={r.hit.entry} />
+                        </span>
+                        {r.hit.entry.hint && <span className="shrink-0 text-[11.5px] text-fg-3">{r.hit.entry.hint}</span>}
+                        {i === sel && <CornerDownLeft size={12} className="shrink-0 text-fg-3 max-sm:hidden" />}
+                      </button>
+                    ) : (
+                      <button
+                        id={`find-${i}`}
+                        role="option"
+                        aria-selected={i === sel}
+                        data-i={i}
+                        onMouseMove={() => sel !== i && setSel(i)}
+                        onClick={() => pick(i)}
+                        className={cx('flex w-full items-center gap-2.5 rounded-lg px-2.5 text-left transition-colors', !r.group ? 'h-12' : 'h-9 max-sm:h-11', i === sel ? 'bg-accent-soft text-fg' : 'text-fg-2')}
+                      >
+                        <span className={cx('flex shrink-0 items-center justify-center rounded-md', !r.group ? 'h-8 w-8 bg-bg-2 text-fg-2' : 'w-4 text-fg-3')}>{r.hit.entry.icon}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className={cx('block truncate', !r.group ? 'text-[14.5px] font-medium text-fg' : 'text-[13.5px]')}>{r.hit.label ?? marked(r.hit.entry.title, r.hit.marks)}</span>
+                          {!r.group && (r.hit.sub ?? r.hit.entry.where) && <span className="block truncate text-[12px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
+                        </span>
+                        {r.group && (r.hit.sub ?? r.hit.entry.where) && <span className="max-w-[38%] shrink-0 truncate text-[11.5px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
+                        {r.hit.entry.hint && !(r.group && (r.hit.sub ?? r.hit.entry.where)) && <span className="shrink-0 text-[11.5px] text-fg-3">{r.hit.entry.hint}</span>}
+                        {i === sel && <CornerDownLeft size={12} className="shrink-0 text-fg-3" />}
+                      </button>
+                    )
                   ) : (
-                    <button id={`find-${i}`} data-i={i} onMouseMove={() => sel !== i && setSel(i)} onClick={() => pick(i)} className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[12.5px]', i === sel ? 'bg-accent-soft text-fg' : 'text-fg-3')}>
+                    <button id={`find-${i}`} data-i={i} onMouseMove={() => sel !== i && setSel(i)} onClick={() => pick(i)} className={cx('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[12.5px] max-sm:h-10', i === sel ? 'bg-accent-soft text-fg' : 'text-fg-3')}>
                       <ChevronDown size={13} className="w-4 shrink-0" />
                       {r.n} more in {r.group}
                     </button>
@@ -521,7 +581,7 @@ export function CommandPalette() {
               );
             })}
           </div>
-          {wide && <Preview hit={current} q={q} />}
+          {wide && <Preview hit={current} q={q} onOpen={() => pick(sel)} />}
         </div>
         {!mobile && (
           <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-[11.5px] text-fg-3">
@@ -644,20 +704,64 @@ function PlaceRow({ icon, label, on, onClick }: { icon: ReactNode; label: string
   );
 }
 
+/** Facts whose values are names people gave or paths (a project, a folder, a model): never translated. */
+const OWN_FACTS = new Set(['Folder', 'Project', 'Made with']);
+
+/** Parts side by side with a mark between them, each its own text (translated alone, or not at all). */
+const joinParts = (parts: ReactNode[], mark: string) =>
+  parts.map((p, k) => (
+    <Fragment key={k}>
+      {k > 0 && <span aria-hidden="true">{mark}</span>}
+      {p}
+    </Fragment>
+  ));
+
+/** A result's line of facts under its title: the app's words (translated), then where it is kept and its description, as people wrote them. */
+function MetaLine({ e }: { e: Entry }) {
+  const parts: ReactNode[] = [
+    ...(e.meta ?? []).map((m) => <span>{m}</span>),
+    ...(e.place ?? []).map((p) => <span translate="no">{p}</span>),
+    ...(e.note ? [<span translate="no" className="opacity-80">{e.note}</span>] : []),
+  ];
+  return parts.length ? <span className="mt-0.5 block truncate text-[12px] text-fg-3">{joinParts(parts, ' · ')}</span> : null;
+}
+
+/** Where a picture, a page or a file is: the Library, then its project and folder (a file: its folder), as people named them. */
+function WhereLine({ e }: { e: Entry }) {
+  const parts: ReactNode[] = [...(e.visual?.type === 'file' ? [] : [<span>Library</span>]), ...(e.place ?? []).map((p) => <span translate="no">{p}</span>)];
+  return parts.length ? <div className="mt-0.5 text-[12px] break-words text-fg-3">{joinParts(parts, ' › ')}</div> : null;
+}
+
 /** More about the one picked: where it is, what it says, and where opening it goes. */
-function Preview({ hit, q }: { hit: Hit | null; q: string }) {
+function Preview({ hit, q, onOpen }: { hit: Hit | null; q: string; onOpen: () => void }) {
   if (!hit) return <div className="hidden w-[45%] items-center justify-center p-6 text-center text-[13px] text-fg-3 md:flex">{q.trim() ? '' : 'Settings, sessions, apps, notes and files, all in one place'}</div>;
   const e = hit.entry;
   const facts = (e.facts ?? []).filter(([, v]) => v);
+  const big = e.visual && hasBigVisual(e.visual) ? <BigVisual v={e.visual} title={e.title} onOpen={onOpen} /> : null;
   return (
-    <div className="flex w-[45%] min-w-0 flex-col gap-3 overflow-y-auto p-5">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bg-2 text-fg-2 [&_svg]:h-5 [&_svg]:w-5">{e.mark ?? e.icon}</span>
-        <div className="min-w-0 pt-0.5">
-          <div className="text-[15px] leading-snug font-medium break-words text-fg">{e.group === 'In messages' ? hit.sub : e.title}</div>
-          {e.where && <div className="mt-0.5 text-[12px] break-words text-fg-3">{e.where}</div>}
+    // Its parts keep their height and the preview scrolls (a picture above a long description would squeeze it to a line).
+    <div className="flex w-[45%] min-w-0 flex-col gap-3 overflow-y-auto p-5 [&>*]:shrink-0">
+      {big ? (
+        <>
+          {big}
+          <div className="min-w-0">
+            <div translate="no" className="text-[15px] leading-snug font-medium break-words text-fg">
+              {e.title}
+            </div>
+            <WhereLine e={e} />
+          </div>
+        </>
+      ) : (
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bg-2 text-fg-2 [&_svg]:h-5 [&_svg]:w-5">{e.mark ?? e.icon}</span>
+          <div className="min-w-0 pt-0.5">
+            <div translate={e.visual ? 'no' : undefined} className="text-[15px] leading-snug font-medium break-words text-fg">
+              {e.group === 'In messages' ? hit.sub : e.title}
+            </div>
+            {e.visual ? <WhereLine e={e} /> : e.where && <div className="mt-0.5 text-[12px] break-words text-fg-3">{e.where}</div>}
+          </div>
         </div>
-      </div>
+      )}
       {e.group === 'In messages' ? (
         <div className="rounded-xl bg-bg-2 px-3 py-2.5 text-[13px] leading-relaxed text-fg-2">{hit.label}</div>
       ) : (
@@ -668,7 +772,9 @@ function Preview({ hit, q }: { hit: Hit | null; q: string }) {
           {facts.map(([k, v]) => (
             <div key={k} className="contents">
               <dt className="text-fg-3">{k}</dt>
-              <dd className="min-w-0 truncate text-fg-2">{v}</dd>
+              <dd translate={OWN_FACTS.has(k) ? 'no' : undefined} className="min-w-0 truncate text-fg-2">
+                {v}
+              </dd>
             </div>
           ))}
         </dl>
