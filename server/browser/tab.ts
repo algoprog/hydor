@@ -8,6 +8,16 @@ import { buildOutline, SNAPSHOT_STYLES, type AxInfo, type El, type FrameSnap, ty
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** A page address's origin ('' when it has none: about:blank, a file). */
+export const originOf = (url: string): string => {
+  try {
+    const u = new URL(url);
+    return /^https?:$/.test(u.protocol) ? u.origin : '';
+  } catch {
+    return '';
+  }
+};
+
 /** What a tab needs from the browser of its session. */
 export interface TabOwner {
   /** A new element number, never used before in this session. */
@@ -62,6 +72,18 @@ export class Tab {
   blocked: { url: string; why: string }[] = [];
   fileChooser: { backendNodeId: number; multiple: boolean } | null = null;
   viewport = { w: 1280, h: 800, mobile: false, scale: 1 };
+  /**
+   * Your own browsing on the desktop app's engine: the page has no fixed size (the app's window gives it one, as in any
+   * browser), so `viewport` is read from the page's layout rather than set.
+   */
+  free = false;
+  /** The page's icon (an address, or a data: URL), and whether its history goes back or forward: for the tab strip. */
+  favicon: string | undefined;
+  canGoBack = false;
+  canGoForward = false;
+  /** Every request of this tab passes the guard (a tab of your own browsing handed to an agent). */
+  guarded = false;
+  private navTimer: NodeJS.Timeout | null = null;
   private inflight = new Map<string, number>();
   private quietSince = Date.now();
   private queue: Promise<unknown> = Promise.resolve();
@@ -74,14 +96,15 @@ export class Tab {
   private lastFrameAt = 0;
 
   constructor(
-    readonly owner: TabOwner,
+    public owner: TabOwner,
     readonly targetId: string,
     readonly s: CdpSession,
     private userAgent: string,
   ) {}
 
   /** Sets the tab up before its page runs (it waits for this, attached on start). */
-  async init(viewport: { w: number; h: number; mobile?: boolean; scale?: number }) {
+  async init(viewport: { w: number; h: number; mobile?: boolean; scale?: number }, free = false) {
+    this.free = free;
     const on = (m: string, fn: (p: any) => void) => this.offs.push(this.s.on(m, fn));
     on('Page.frameStartedLoading', (p) => {
       if (p.frameId === this.targetId) {
@@ -95,14 +118,19 @@ export class Tab {
     on('Page.loadEventFired', () => this.loaded());
     on('Page.frameNavigated', (p) => {
       if (p.frame.parentId) return;
+      const before = this.url;
       this.url = p.frame.url + (p.frame.urlFragment ?? '');
       if (p.frame.loaderId !== this.loaderId) this.newDocument(p.frame.loaderId);
+      // Another site has another icon: the old one goes at once, the new one comes when the page has loaded.
+      if (originOf(before) !== originOf(this.url)) this.favicon = undefined;
       this.owner.changed();
+      this.refreshNav();
     });
     on('Page.navigatedWithinDocument', (p) => {
       if (p.frameId !== this.targetId) return;
       this.url = p.url;
       this.owner.changed();
+      this.refreshNav();
     });
     on('Page.javascriptDialogOpening', (p) => {
       this.dialog = { type: p.type, message: String(p.message ?? '').slice(0, 2000), defaultPrompt: p.defaultPrompt, url: p.url };
@@ -135,6 +163,8 @@ export class Tab {
       const sid = p.sessionId as string;
       const child = new CdpSession(this.s.cdp, sid);
       if (p.targetInfo.type === 'iframe') this.frames.set(p.targetInfo.targetId, child);
+      // A frame in another process of a guarded tab is held to the same rules.
+      if (this.guarded) child.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] }).catch(() => {});
       child.send('Runtime.runIfWaitingForDebugger').catch(() => {});
     });
     on('Target.detachedFromTarget', (p) => {
@@ -147,9 +177,70 @@ export class Tab {
       this.s.send('Page.setLifecycleEventsEnabled', { enabled: true }),
       this.s.send('Page.setInterceptFileChooserDialog', { enabled: true }).catch(() => {}),
       this.s.send('Emulation.setUserAgentOverride', { userAgent: this.userAgent }),
-      this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }),
-      this.setViewport(viewport.w, viewport.h, viewport.mobile ?? false, viewport.scale ?? 1),
+      // A guarded tab's frames in other processes wait until their guard is on (the handler above resumes them).
+      this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: this.guarded, flatten: true }),
+      free ? Promise.resolve() : this.setViewport(viewport.w, viewport.h, viewport.mobile ?? false, viewport.scale ?? 1),
     ]);
+  }
+
+  /** Where the tab belongs from now on (a tab handed to an agent, or taken back): its element numbers were the old owner's. */
+  reown(owner: TabOwner) {
+    this.owner.forget(this, this.ids.values());
+    this.ids.clear();
+    this.prev = null;
+    this.fileChooser = null;
+    this.owner = owner;
+    owner.changed();
+  }
+
+  /** Reads back and forward (the page's history) and its icon, a little after a navigation (several come together). */
+  refreshNav() {
+    if (this.navTimer || this.closed) return;
+    this.navTimer = setTimeout(() => {
+      this.navTimer = null;
+      void this.readNav();
+    }, 150);
+    this.navTimer.unref?.();
+  }
+
+  private async readNav() {
+    if (this.closed) return;
+    let changed = false;
+    try {
+      const h = await this.s.send('Page.getNavigationHistory', {}, 5000);
+      const back = h.currentIndex > 0;
+      const forward = h.currentIndex < h.entries.length - 1;
+      if (back !== this.canGoBack || forward !== this.canGoForward) changed = true;
+      this.canGoBack = back;
+      this.canGoForward = forward;
+    } catch {}
+    if (!this.navigating && /^(https?|file):/.test(this.url)) {
+      try {
+        const r = await this.s.send(
+          'Runtime.evaluate',
+          { expression: `(() => { const l = document.querySelector('link[rel~="icon"]'); return l && l.href ? l.href : ''; })()`, returnByValue: true },
+          5000,
+        );
+        let icon = typeof r.result?.value === 'string' ? r.result.value : '';
+        if (!icon && /^https?:/.test(this.url)) icon = `${originOf(this.url)}/favicon.ico`;
+        if (icon.length > 2000) icon = '';
+        if ((icon || undefined) !== this.favicon) {
+          this.favicon = icon || undefined;
+          changed = true;
+        }
+      } catch {}
+    }
+    if (this.free) {
+      try {
+        const m = await this.s.send('Page.getLayoutMetrics', {}, 5000);
+        const v = m.cssVisualViewport ?? m.visualViewport;
+        if (v?.clientWidth && (Math.round(v.clientWidth) !== this.viewport.w || Math.round(v.clientHeight) !== this.viewport.h)) {
+          this.viewport = { ...this.viewport, w: Math.round(v.clientWidth), h: Math.round(v.clientHeight) };
+          changed = true;
+        }
+      } catch {}
+    }
+    if (changed) this.owner.changed();
   }
 
   async setViewport(w: number, h: number, mobile: boolean, scale: number) {
@@ -168,6 +259,7 @@ export class Tab {
   close() {
     if (this.closed) return;
     this.closed = true;
+    if (this.navTimer) clearTimeout(this.navTimer);
     for (const f of this.offs) f();
     this.offs = [];
     for (const w of this.loadWaiters) w();
@@ -191,6 +283,7 @@ export class Tab {
     this.loadedAt = Date.now();
     for (const w of this.loadWaiters) w();
     this.owner.changed();
+    this.refreshNav();
     // The title as the page set it (the target's own may still be its address).
     this.s
       .send('Runtime.evaluate', { expression: 'document.title', returnByValue: true })
@@ -501,6 +594,10 @@ export class Tab {
       const m = await this.s.send('Page.getLayoutMetrics', {}, 5000);
       const v = m.cssVisualViewport ?? m.visualViewport;
       const k = v?.scale > 0 ? v.scale : 1;
+      if (this.free && v?.clientWidth) {
+        this.viewport = { ...this.viewport, w: Math.round(v.clientWidth), h: Math.round(v.clientHeight) };
+        return { w: v.clientWidth, h: v.clientHeight };
+      }
       return { w: Math.max(v?.clientWidth || 0, this.viewport.w / k), h: Math.max(v?.clientHeight || 0, this.viewport.h / k) };
     } catch {
       return { w: this.viewport.w, h: this.viewport.h };
@@ -680,6 +777,13 @@ export class Tab {
     }
     if (!r.loaderId) this.navigating = false;
     return null;
+  }
+
+  /** Stops a page that is still loading. */
+  async stop() {
+    await this.s.send('Page.stopLoading', {}).catch(() => {});
+    this.navigating = false;
+    this.owner.changed();
   }
 
   async reload() {

@@ -671,12 +671,14 @@ export interface UsageWindow {
 }
 
 export interface AgentUsage {
-  agent: Agent;
+  agent: AccountAgent;
   ok: boolean;
   error?: string;
   fetchedAt: number;
   account?: { email?: string; plan?: string; org?: string };
   windows: UsageWindow[];
+  /** A plain line for when there are no windows to draw (Grok Build: "Usage limits are managed by your team."). */
+  note?: string;
   credits?: { balance?: string; unlimited?: boolean; hasCredits?: boolean } | null;
   /** Limit resets the account holds: Codex reset credits, Claude reset grants. */
   resetCredits?: { available: number; items: LimitReset[]; nextAvailableAt?: number; cooldownUntil?: number } | null;
@@ -891,7 +893,7 @@ export type ServerEvent =
   | { t: 'sessions'; upsert: SessionSummary[]; remove?: string[] }
   | { t: 'items'; key: string; items: TimelineItem[]; total: number; reset?: boolean }
   | { t: 'live'; key: string; live: LiveState | null; overlay: LiveOverlay }
-  | { t: 'usage'; claude?: AgentUsage; codex?: AgentUsage; accounts?: Record<string, AgentUsage> }
+  | { t: 'usage'; claude?: AgentUsage; codex?: AgentUsage; grok?: AgentUsage; accounts?: Record<string, AgentUsage> }
   | { t: 'accounts'; accounts: AgentAccount[] }
   | { t: 'acpAgents'; agents: AcpAgentDef[] }
   | { t: 'login'; flow: LoginFlow }

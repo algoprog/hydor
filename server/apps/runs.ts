@@ -420,7 +420,8 @@ async function launch(r: RunRecord, o: Pick<StartInput, 'app' | 'slug' | 'recipe
       cwd,
       prompt,
       model: o.public ? o.public.model : recipe.model,
-      effort: o.public || agent === 'acp' ? undefined : recipe.effort,
+      // An ACP agent without efforts (Custom) ignores one; Grok Build takes it.
+      effort: o.public ? undefined : recipe.effort,
       // Public runs ask before anything Custom's rules would ask about; with no shell or files there is nothing to ask.
       mode: o.public ? 'ask' : modeFor(agent, acpAgent, recipe.mode),
       title: `${recipe.name}${line ? ` · ${line}` : ''}`,

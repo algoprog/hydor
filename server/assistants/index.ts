@@ -41,6 +41,7 @@ import { exportAgent, installAgent, previewInstall } from './agentFile.ts';
 import { exampleTurnEnded, examplesByVersion, examplesState, sweepExampleFolders, tryExamples } from './examples.ts';
 import { agentVersion, agentVersions } from './versions.ts';
 import { dayIn, makeTaskFolder } from './taskFolder.ts';
+import { browserOnlyKinds } from '../browser/handoff.ts';
 
 // ---- for other capabilities -----------------------------------------------------------------------------
 
@@ -358,7 +359,8 @@ function routes(d: Deps) {
     const runId = runOf((req.params as { token: string }).token);
     const live = runId ? d.sessions.liveByRun(runId) : null;
     if (!live) return reply.code(403).send({ error: 'Not a running agent' });
-    return { tools: findAssistant(db, sessionExtra(db, live.key).assistant)?.tools ?? null };
+    // A browser-only session (Do this here) gets the browser and nothing else, whatever assistant it started as.
+    return { tools: browserOnlyKinds(db, live.key) ?? findAssistant(db, sessionExtra(db, live.key).assistant)?.tools ?? null };
   });
 }
 

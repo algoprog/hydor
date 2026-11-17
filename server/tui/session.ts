@@ -4,6 +4,7 @@
 // and then). The Printer turns it into lines printed once and never changed: an item is printed when it is final (a
 // streaming text's finished chunks as they finish); what is still under way is left for the redrawn region.
 import { EventEmitter } from 'node:events';
+import type { BrowserNote, BrowserView } from '../../shared/browser.ts';
 import { childReplyOf, type ChildNote } from '../../shared/children.ts';
 import type { SessionNote } from '../../shared/features.ts';
 import type { BackgroundTask, LiveOverlay, LiveState, ServerEvent, SessionSummary, TimelineItem, TimelinePage, ToolItem, TurnItem } from '../../shared/types.ts';
@@ -49,6 +50,9 @@ function savedCopy(items: TimelineItem[], o: TimelineItem): TimelineItem | undef
   }
 }
 
+/** How long a look at the browser's view waits after the last one (its news comes as events). */
+const BROWSER_LOOK_MS = 4000;
+
 /** A subagent as its lead knows it: its card, its summary, and how many of its turns have reported back. */
 export interface Helper {
   key: string;
@@ -74,6 +78,9 @@ export class SessionView extends EventEmitter {
   summary: SessionSummary | null = null;
   notes: SessionNote[] = [];
   helpers = new Map<string, Helper>();
+  /** The session's browser (what it waits for: asks and a page's pop-up question); null while there is none or the server has no browser. */
+  browser: BrowserView | null = null;
+  private browserAt = 0;
   loaded = false;
   /** Turns that ended since following began (the agent went from working to not). */
   turnsEnded = 0;
@@ -123,6 +130,7 @@ export class SessionView extends EventEmitter {
           this.conn.api<{ notes: SessionNote[] }>('GET', `/api/sessions/${enc(this.key)}/notes`).catch(() => ({ notes: [] as SessionNote[] })),
         ]);
         this.setLive(one.live, one.overlay ?? EMPTY_OVERLAY);
+        await this.loadBrowser();
         if (one.summary) this.summary = one.summary;
         this.items = page.items;
         this.start = page.start;
@@ -144,8 +152,20 @@ export class SessionView extends EventEmitter {
     const one = await this.conn.api<{ summary: SessionSummary | null; live: LiveState | null; overlay: LiveOverlay }>('GET', `/api/sessions/${enc(this.key)}`);
     if (one.summary) this.summary = one.summary;
     this.setLive(one.live, one.overlay ?? EMPTY_OVERLAY);
+    // The browser's news comes as events; a look now and then (every few seconds at most) catches what was missed.
+    if (Date.now() - this.browserAt >= BROWSER_LOOK_MS) await this.loadBrowser();
     await this.refreshHelpers();
     this.emit('change');
+  }
+
+  /** The browser's view as the server has it now; null when the server has no browser for it. */
+  private async loadBrowser() {
+    this.browserAt = Date.now();
+    try {
+      this.browser = (await this.conn.api<{ view: BrowserView | null }>('GET', `/api/browser/sessions/${enc(this.key)}`)).view ?? null;
+    } catch {
+      this.browser = null;
+    }
   }
 
   private async refreshHelpers() {
@@ -224,6 +244,15 @@ export class SessionView extends EventEmitter {
       return;
     }
     if (!('key' in e) || e.key !== this.key) return;
+    if (e.t === 'feature') {
+      const d = e.data as { type?: string; view?: BrowserView } | undefined;
+      if (e.id === 'browser' && d?.type === 'state' && d.view) {
+        this.browser = d.view;
+        this.browserAt = Date.now();
+        this.emit('change');
+      }
+      return;
+    }
     if (!this.loaded && (e.t === 'items' || e.t === 'note')) {
       this.early.push(e);
       return;
@@ -284,6 +313,11 @@ export class SessionView extends EventEmitter {
   /** A subagent waiting for you (an approval or a question in its own session). */
   helperWaiting(): Helper | undefined {
     return [...this.helpers.values()].find((h) => h.summary?.live?.status === 'waiting' || (h.summary?.live?.pendingApprovals ?? 0) > 0);
+  }
+
+  /** Whether the agent's browser waits for you (an ask, or a page's pop-up question). */
+  browserWaiting(): boolean {
+    return !!this.browser && (this.browser.asks.length > 0 || !!this.browser.dialog);
   }
 
   /** Messages waiting in its queue (not held after a stop). */
@@ -461,6 +495,8 @@ export class Printer {
     // Notes first: they come as they happen.
     for (const n of view.notes) {
       if (this.notesSeen.has(n.id)) continue;
+      // A browser card that waits shows as a card in the region; its one line comes when it is answered (its note changes then).
+      if (n.kind === 'browser' && (n.data as BrowserNote)?.status === 'waiting') continue;
       this.notesSeen.add(n.id);
       if (n.kind === 'child') this.turnHelpers.push((n.data as ChildNote).child);
       const lines = noteLines(n, this.look);

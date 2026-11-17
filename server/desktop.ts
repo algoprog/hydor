@@ -64,6 +64,9 @@ function read(): Desktop | null {
 
 export const desktop = read();
 
+/** The desktop app has a browser of its own that the server may drive (its Chromium's version), or null. */
+export const desktopChromium: string | null = desktop && process.env.HYDOR_DESKTOP_BROWSER ? process.env.HYDOR_DESKTOP_BROWSER : null;
+
 /** The system's name, as the app's words say it. */
 export const SYSTEM_NAME: Record<DesktopPlatform, string> = { mac: 'Mac', windows: 'Windows', linux: 'Linux' };
 
@@ -84,7 +87,13 @@ export type DesktopAsk =
   /** Let go of Esc (the agent is about to press it), and answer once it has; { type: 'esc' } takes it back. */
   | { what: 'esc'; on: false }
   /** The main display as a JPEG at most `max` pixels on its longer side, the glow hidden meanwhile (Linux). */
-  | { what: 'screenshot'; max: number; quality: number };
+  | { what: 'screenshot'; max: number; quality: number }
+  /**
+   * A browser of the app's own for one profile ('' a fresh one, a profile's id, or 'browsing': yours), answering CDP
+   * on connection `conn` (messages of type 'cdp'), every connection of its pages through the server's proxy on `proxy`,
+   * with these extensions loaded (unpacked folders). Answers { product, userAgent } once it is ready.
+   */
+  | { what: 'browser-launch'; conn: string; profile: string; proxy: number; extensions: { id: string; path: string }[] };
 
 /** Messages to the desktop app. */
 export type ToDesktop =
@@ -122,10 +131,32 @@ export type ToDesktop =
    * as the server starts (server/awake.ts). `why` is for the app's log. The app lets go when the server exits.
    */
   | { type: 'awake'; on: boolean; why: string }
-  | ({ type: 'ask'; id: string } & DesktopAsk);
+  | ({ type: 'ask'; id: string } & DesktopAsk)
+  /** A CDP message (JSON) for the app's browser on connection `conn` (desktop/browser.cjs). */
+  | { type: 'cdp'; conn: string; data: string }
+  /** That browser is no longer needed: its pages close. */
+  | { type: 'browser-close'; conn: string }
+  /** The extensions a profile's browser loads now (after one was added, removed, turned on or off). */
+  | { type: 'browser-extensions'; profile: string; extensions: { id: string; path: string }[] }
+  /** Your answer to a site's permission request in your own browsing (`browser-permission`): allow or block it. */
+  | { type: 'browser-permission-answer'; conn: string; id: string; allow: boolean };
 
-/** Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, Esc, ⌘⇧Esc), quit (Windows), and answers. */
-export type FromDesktop = { type: 'update-now' } | { type: 'computer-stop' } | { type: 'quit' } | { type: 'reply'; id: string; ok: boolean; error?: string; [k: string]: unknown };
+/**
+ * Messages from the app: Restart to Update (its menu, the notification), Stop (its menu, Esc, ⌘⇧Esc), quit (Windows),
+ * answers; and from its browser: CDP's answers and events on a connection, that a connection's browser is gone, and
+ * that you used an agent's page the window shows (a click, or keys: `typed`, so what you typed stays hidden from the
+ * agent): you drive that tab from then on.
+ */
+export type FromDesktop =
+  | { type: 'update-now' }
+  | { type: 'computer-stop' }
+  | { type: 'quit' }
+  | { type: 'reply'; id: string; ok: boolean; error?: string; [k: string]: unknown }
+  | { type: 'cdp'; conn: string; data: string }
+  | { type: 'browser-gone'; conn: string; why?: string }
+  | { type: 'browser-input'; conn: string; target: string; typed?: boolean }
+  /** A page of your own browsing asks for a permission (camera, microphone, location…): the app waits for `browser-permission-answer`. */
+  | { type: 'browser-permission'; conn: string; target: string; id: string; permission: string; origin: string; media?: string[] };
 
 export function tellDesktop(m: ToDesktop): boolean {
   if (!desktop || !process.send || !process.connected) return false;

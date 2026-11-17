@@ -4,12 +4,24 @@
 import type { Feature } from '../features/types.ts';
 import { findChromes, pickChrome } from './chrome.ts';
 import { forgetSession } from './ops.ts';
+import { bookmarkRoutes } from './bookmarks.ts';
+import { browsingRoutes } from './browsing.ts';
+import { extensionRoutes } from './extensions.ts';
 import { browserRoutes } from './routes.ts';
 import { closeBrowser, killAll, openBrowsers, reapStale, setBrowserDeps, sweepIdle } from './session.ts';
 import { browserSettings } from './settings.ts';
 import { dropSteps, pruneSteps } from './steps.ts';
 import { BROWSER_INSTRUCTIONS, browserTools } from './tools.ts';
 import type { DB } from '../db.ts';
+
+/** A site's name for people: the address's host without "www.". */
+function hostOf(url: string | undefined): string {
+  try {
+    return url ? new URL(url).hostname.replace(/^www\./, '') : '';
+  } catch {
+    return '';
+  }
+}
 
 /** On, and a Chromium to run. */
 const usable = (db: DB) => {
@@ -22,6 +34,10 @@ export const browser: Feature = {
   routes(d) {
     setBrowserDeps(d);
     browserRoutes(d);
+    // Your own browsing's bookmarks and extensions (the Browser page).
+    bookmarkRoutes(d);
+    extensionRoutes(d);
+    browsingRoutes(d);
   },
   tools: (ctx) => (usable(ctx.deps.db) ? browserTools(ctx) : []),
   spawn: (_s, d) => (usable(d.db) ? { guides: [{ tools: ['browser_open', 'browser_act', 'browser_read', 'browser_tabs', 'browser_upload', 'browser_ask_user'], text: BROWSER_INSTRUCTIONS }] } : undefined),
@@ -34,7 +50,14 @@ export const browser: Feature = {
         return b.asks.map((a) => ({
           id: `browser:${b.key}:${a.id}`,
           kind: 'browser' as const,
-          title: a.kind === 'local' ? `Wants to open ${a.text}, on this machine or its network` : a.kind === 'payment' ? `Stopped before paying or ordering: ${a.text}` : `Needs you in the browser: ${a.text}`,
+          title:
+            a.kind === 'local'
+              ? `Wants to open ${a.text}, on this machine or its network`
+              : a.kind === 'payment'
+                ? `Stopped before paying or ordering: ${a.text}`
+                : a.kind === 'confirm'
+                  ? `Wants to press “${a.text}”${hostOf(a.url) ? ` on ${hostOf(a.url)}` : ''}`
+                  : `Needs you in the browser: ${a.text}`,
           detail: a.title ?? a.url,
           key: b.key,
           session: s?.title,

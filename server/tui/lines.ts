@@ -2,6 +2,7 @@
 // steps (one line each, from the step's title or its label, with what matters of its result), thoughts, notices, the
 // end of a turn, subagents (Hydor's child sessions) starting and finishing, tier notes, and approval cards with their choices.
 // The words follow the web app's (web/src/features/session: items.tsx, outline.ts, Timeline.tsx).
+import type { BrowserAsk, BrowserDialog, BrowserNote, BrowserView } from '../../shared/browser.ts';
 import type { BudgetNote } from '../../shared/budget.ts';
 import { childLabel, childReplyOf, type ChildNote } from '../../shared/children.ts';
 import type { SessionNote } from '../../shared/features.ts';
@@ -338,7 +339,122 @@ export function noteLines(n: SessionNote, look: Look): string[] | null {
     const whose = b.parent ? `its lead’s spending cap (${b.parent.title})` : 'its spending cap';
     return [truncate(`${INDENT}${p.yellow('■')} Stopped at ${whose}: ${money(b.spentUsd)} of ${money(b.capUsd)}`, look.width)];
   }
+  if (n.kind === 'browser') {
+    const b = n.data as BrowserNote;
+    return b?.ask ? browserNoteLines(b, look) : null;
+  }
   return null;
+}
+
+// ---- the browser ------------------------------------------------------------------------------------------
+
+/** The site an address is on (host and port), or '' when it is none. */
+function siteOf(url?: string): string {
+  try {
+    return url ? new URL(url).host : '';
+  } catch {
+    return '';
+  }
+}
+
+/** What an ask is about, as a word for a finished line: "Open localhost:3000", "Pay or order: Buy now", "Press “Send” on mail.example.com". */
+function askWhat(a: BrowserAsk): string {
+  const site = siteOf(a.url);
+  if (a.kind === 'local') return `Open ${a.text}`;
+  if (a.kind === 'payment') return `Pay or order: ${a.text}`;
+  if (a.kind === 'confirm') return `Press “${a.text}”${site ? ` on ${site}` : ''}`;
+  return a.text;
+}
+
+/** A browser card that is over, as one dim line: "Done in the browser: Sign in to the bank", "Not allowed: Open localhost:3000". */
+export function browserNoteLines(b: BrowserNote, look: Look): string[] {
+  const { p } = look;
+  const a = b.ask;
+  const done = b.status === 'done';
+  const allow = a.kind === 'local' || a.kind === 'confirm';
+  const verdict = allow ? (done ? 'Allowed' : 'Not allowed') : b.status === 'waiting' ? 'No longer waiting' : done ? 'Done in the browser' : 'Skipped';
+  return [truncate(`${INDENT}${done ? p.green('✓') : p.yellow('✗')} ${p.dim(`${verdict}: ${askWhat(a)}`)}`, look.width)];
+}
+
+/** What waits for you in an agent's browser: one of its asks, or a page's pop-up question (which blocks the page, so it comes first). */
+export type BrowserCard = { kind: 'ask'; ask: BrowserAsk } | { kind: 'dialog'; dialog: BrowserDialog };
+
+/** The card to show now (the pop-up question, else the oldest ask), or undefined when nothing waits. */
+export function browserCard(v: Pick<BrowserView, 'asks' | 'dialog'> | null | undefined): BrowserCard | undefined {
+  if (!v) return;
+  if (v.dialog) return { kind: 'dialog', dialog: v.dialog };
+  if (v.asks[0]) return { kind: 'ask', ask: v.asks[0] };
+}
+
+/** A card's identity, to show it once. */
+export const browserCardId = (c: BrowserCard) => (c.kind === 'ask' ? c.ask.id : `dialog:${c.dialog.type}:${c.dialog.url}:${c.dialog.message}`);
+
+/** What a key does with a browser card: `open` takes you to the session in the app, `yes` and `no` answer it. */
+export interface BrowserKey {
+  key: 'y' | 'n' | 'd' | 'o';
+  do: 'open' | 'done' | 'skipped' | 'accept' | 'dismiss';
+  label: string;
+}
+
+/** The single keys that answer a browser card, as the web app's buttons do: y allow and n don't for an address or a button, o d n for what only you can do, y and n for a pop-up question. */
+export function browserKeys(c: BrowserCard): BrowserKey[] {
+  if (c.kind === 'dialog') {
+    const leave = c.dialog.type === 'beforeunload';
+    const out: BrowserKey[] = [{ key: 'y', do: 'accept', label: leave ? 'Leave' : 'OK' }];
+    if (c.dialog.type !== 'alert') out.push({ key: 'n', do: 'dismiss', label: leave ? 'Stay' : 'Cancel' });
+    return out;
+  }
+  const k = c.ask.kind;
+  if (k === 'local') return [{ key: 'y', do: 'done', label: 'Allow for this session' }, { key: 'n', do: 'skipped', label: 'Don’t allow' }];
+  if (k === 'confirm') return [{ key: 'y', do: 'done', label: 'Allow' }, { key: 'n', do: 'skipped', label: 'Don’t allow' }];
+  return [
+    { key: 'o', do: 'open', label: 'Open the session in the app' },
+    { key: 'd', do: 'done', label: 'Done' },
+    { key: 'n', do: 'skipped', label: k === 'payment' ? 'Not now' : 'Can’t' },
+  ];
+}
+
+/** The body of the answer to an ask (POST /api/browser/sessions/:key/asks/:id): allow and done are `done`, the rest `skipped`. */
+export const askBody = (outcome: 'done' | 'skipped') => ({ outcome });
+
+/** The body of the answer to a pop-up question (POST /api/browser/sessions/:key/dialog): the text is for a prompt only. */
+export const dialogBody = (d: BrowserDialog, accept: boolean, text?: string) => ({ accept, text: d.type === 'prompt' ? (text ?? d.defaultPrompt ?? '') : undefined });
+
+/** What a browser card says, as plain words (the card's first line, and what `hydor run` reports it waits for). */
+export function browserWords(c: BrowserCard): string {
+  if (c.kind === 'dialog') return `${siteOf(c.dialog.url) || 'The page'} ${c.dialog.type === 'beforeunload' ? 'asks whether to leave' : 'says'}${c.dialog.message ? `: ${c.dialog.message.replace(/\s+/g, ' ').trim()}` : ''}`;
+  const a = c.ask;
+  const site = siteOf(a.url);
+  if (a.kind === 'local') return `Wants to open ${a.text}, on this machine or its network`;
+  if (a.kind === 'confirm') return `Wants to press “${a.text}”${site ? ` on ${site}` : ''}`;
+  if (a.kind === 'payment') return `Stopped before paying or ordering: ${a.text}. That is yours to do`;
+  return `Needs you in the browser: ${a.text}`;
+}
+
+/** A browser card as lines, in the web app's words: what it waits for, then (for a pop-up question) what the page says. */
+export function browserCardLines(c: BrowserCard, look: Look): string[] {
+  const { p, width } = look;
+  if (c.kind === 'dialog') {
+    const d = c.dialog;
+    const site = siteOf(d.url) || 'The page';
+    const out = wrap(p.bold(`${site} ${d.type === 'beforeunload' ? 'asks whether to leave' : 'says'}`), width, { first: `${INDENT}${p.yellow('?')} `, indent: `${INDENT}  ` });
+    const msg = d.message || (d.type === 'beforeunload' ? 'Leave this page? Changes may not be saved.' : '');
+    if (msg) for (const l of msg.split('\n').slice(0, 12)) out.push(...wrap(l, width, { first: `${INDENT}    `, indent: `${INDENT}    ` }));
+    if (d.type === 'prompt') out.push(`${INDENT}  ${p.dim(`Type your answer, then Enter${d.defaultPrompt ? ` (y keeps “${d.defaultPrompt}”)` : ''}`)}`);
+    return out;
+  }
+  const a = c.ask;
+  const words = browserWords(c);
+  const out = wrap(p.bold(words), width, { first: `${INDENT}${p.yellow('!')} `, indent: `${INDENT}  ` });
+  if (a.kind === 'confirm') out.push(`${INDENT}  ${p.dim('It is signed in there: it presses it only if you allow it')}`);
+  if ((a.kind === 'ask' || a.kind === 'payment') && a.url) out.push(truncate(`${INDENT}  ${p.dim(a.url)}`, width));
+  return out;
+}
+
+/** The choices of a browser card, one line: "o Open the session in the app · d Done · n Can’t". */
+export function browserChoiceLine(c: BrowserCard, look: Look): string {
+  const { p } = look;
+  return truncate(`${INDENT}  ${browserKeys(c).map((k) => `${p.accent(p.bold(k.key))} ${k.label}`).join(p.dim('  ·  '))}`, look.width);
 }
 
 // ---- approvals --------------------------------------------------------------------------------------------

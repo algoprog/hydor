@@ -4,8 +4,9 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
+import type { AccountAgent, Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec, precompactCopy } from './agents/claude.ts';
+import { grokControl } from './agents/grok.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
 import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
@@ -16,7 +17,7 @@ import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
 import { answersText, dropForm, standingForm, standingForms } from './openForms.ts';
 import { formContent } from '../shared/forms.ts';
-import { isGrok } from '../shared/grok.ts';
+import { ACCOUNT_AGENT_NAMES, accountAgentOf, isGrok } from '../shared/grok.ts';
 import { agentBaseEnv } from './env.ts';
 import { ExternalWatcher } from './external.ts';
 import { keptOfTranscript, type Indexer } from './indexer/index.ts';
@@ -44,6 +45,8 @@ import { customTurnBefore, prepareCustomFork, restoreCustomFiles } from './custo
 import { customGoal } from './custom/goal.ts';
 import { titleFor } from './titles.ts';
 import { isConfidential } from '../shared/confidential.ts';
+import { browserHandoffFinish, browserHandoffStart } from './browser/browsing.ts';
+import { carriedBrowserOnly, checkBrowserOnlyHandoff } from './browser/handoff.ts';
 import { carriedExtra, checkHandoff, checkModelSwitch, confidentialStart, confidentialTitle, localModel } from './confidential/index.ts';
 import { agentStart } from './assistants/rules.ts';
 import { autoPlan, tierNote } from './assistants/auto.ts';
@@ -359,6 +362,13 @@ async function endProcess(pid: number) {
   await wait(2000);
 }
 
+
+/** What a fork or an edit of a session keeps of its settings: confidential, and browser-only (server/browser/handoff.ts). */
+function carried(db: DB, key: string): SessionExtra | undefined {
+  const a = carriedExtra(db, key);
+  const b = carriedBrowserOnly(db, key);
+  return a || b ? { ...a, ...b } : undefined;
+}
 export class SessionManager extends EventEmitter {
   lives = new Map<string, Live>();
   private timelines = new Map<string, Timeline>();
@@ -771,7 +781,8 @@ export class SessionManager extends EventEmitter {
    * another account too, once it has ended its turn. How a stopped one carries on is kept for afterLimit.
    */
   private afterTurn(s: SessionSummary, hit: boolean, now: number) {
-    if (s.agent === 'acp' || !this.onLimited) return;
+    const agent = this.accountAgentOf(s.key, s.agent);
+    if (!agent || !this.onLimited) return;
     // A resume is set already: it continues then.
     const resumes = this.resumeLookup?.(s.key);
     if (resumes) {
@@ -781,19 +792,24 @@ export class SessionManager extends EventEmitter {
     const switching = autoSwitchOn(this.db) && !s.external;
     const failed = (e: Error) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${e.message}` });
     if (!hit) {
-      if (switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
+      if (agent !== 'grok' && switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
       return;
     }
-    const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
-    const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
-    const after: Promise<LimitAfter | null | void> = switching
-      ? this.switchAtLimit(s.key, resetsAt).catch((e: Error) => {
-          failed(e);
-          return null;
-        })
-      : kvGet(this.db, 'auto_resume') === '1'
-        ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null)
-        : Promise.resolve(null);
+    const carry = () => {
+      const lim = this.lastUsageOf(agent, s.account)?.limited;
+      const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
+      return switching
+        ? this.switchAtLimit(s.key, resetsAt).catch((e: Error) => {
+            failed(e);
+            return null;
+          })
+        : kvGet(this.db, 'auto_resume') === '1'
+          ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null)
+          : Promise.resolve(null);
+    };
+    // Grok Build's limit hit says nothing of when it lifts: its usage is read afresh first (see the limithit handler).
+    const read = agent === 'grok' ? this.limitReads.get(s.key) : undefined;
+    const after: Promise<LimitAfter | null | void> = read ? read.then(carry, carry) : carry();
     this.limitAfter.set(s.key, { at: now, after: after.then((a) => a ?? null) });
   }
 
@@ -1101,6 +1117,16 @@ export class SessionManager extends EventEmitter {
     // A turn you stopped yourself is not one the limit interrupted, even when the limit's error came first.
     adapter.on('limithit', () => {
       if (!this.userStopped.has(key)) this.limitHits.add(key);
+      // Grok Build's account has no rate-limit event: its usage is read now, so the limit and its reset are known.
+      if (adapter.agent === 'acp' && this.isGrokSession(key)) {
+        const read = this.usageOf('grok', this.lives.get(key)?.account, 0)
+          .then(() => undefined)
+          .catch(() => undefined)
+          .finally(() => {
+            if (this.limitReads.get(key) === read) this.limitReads.delete(key);
+          });
+        this.limitReads.set(key, read);
+      }
     });
     // A tool call's input as the model writes it: Pages draws a page while it is being written.
     adapter.on('toolstream', (e: unknown) => this.emit('toolstream', key, e));
@@ -1254,7 +1280,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An ACP agent (Gemini CLI, OpenCode…): its own command, driven over the Agent Client Protocol. */
-  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
+  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
     // Grok Build is the one ACP agent with accounts: an added one is its own GROK_HOME (sign-in and sessions), and the
@@ -1273,7 +1299,7 @@ export class SessionManager extends EventEmitter {
     if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
     const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model });
     Object.assign(env, add.env, acpEnvFor(def.command, env));
-    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, account, pageServer: pageServerUrl(runId), add };
+    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, effort: opts.effort, account, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });
     const adapter = new AcpLive(runner, o);
@@ -1355,6 +1381,8 @@ export class SessionManager extends EventEmitter {
     const picked = { effort: o.effort };
     // A confidential session (or a child of one): Custom with a local model, memory off (server/confidential).
     o = confidentialStart(this.db, o);
+    // Do this here (a tab of the user's own browsing): only an agent that can be kept to the browser, and a tab that is still there; it works in the browser alone.
+    o = browserHandoffStart(this.db, o);
     // Started as one of your agents: its tier's model when none was picked, and what is left of its monthly budget as its cap.
     o = agentStart(this.db, o);
     // Automatic: Best's model for its program; its own agent may step up to Max when a problem proves too hard for it.
@@ -1387,10 +1415,11 @@ export class SessionManager extends EventEmitter {
     // Only Grok Build has accounts among the ACP agents.
     if (o.agent === 'acp' && !isGrok(acpAgent(this.db, o.acpAgent))) account = undefined;
     // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
-    if (o.agent !== 'acp' && autoSwitchOn(this.db)) {
-      const lim = this.controlFor(o.agent, account).lastUsage?.limited;
+    const acctAgent = accountAgentOf(o.agent, o.agent === 'acp' ? acpAgent(this.db, o.acpAgent) : null);
+    if (acctAgent && autoSwitchOn(this.db)) {
+      const lim = this.lastUsageOf(acctAgent, account)?.limited;
       if (lim?.resetsAt && lim.resetsAt > Date.now()) {
-        const free = await this.freeAccount(o.agent, account);
+        const free = await this.freeAccount(acctAgent, account);
         if (free) account = free.id;
       }
     }
@@ -1410,8 +1439,21 @@ export class SessionManager extends EventEmitter {
     if (o.remember !== false && o.agent !== 'acp') this.savePrefs(o.agent, { model: auto ? undefined : o.model, effort: auto ? picked.effort : o.effort, mode, account: o.account ?? '' });
     if (o.title?.trim()) await l.adapter.rename(o.title.trim());
     if (titling) void titling.then((t) => (t ? this.autoTitle(l.key, t) : undefined));
+    // Do this here: the tab moves to the session's browser now, and its first message says the page is open there.
+    let handed = '';
+    if (o.extra?.browserHandoff) {
+      try {
+        handed = await browserHandoffFinish(l.key, cwd, o);
+      } catch (e) {
+        // The tab went between the check and now: a session with no page to work on is of no use.
+        await this.remove(l.key).catch(() => {});
+        throw e;
+      }
+    }
     const here = onThisComputer(o.paths);
-    const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
+    const attached = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
+    // A session given a page of your browsing (Do this here) hears where it is first, even with nothing else to say.
+    const prompt = handed ? (attached ? `${handed}\n\n${attached}` : handed) : attached;
     const images = [...(o.images ?? []), ...here.images];
     if (prompt || images.length) {
       // What the capabilities have to say of the request (an app that does it); not of a conversation handed over.
@@ -1508,8 +1550,8 @@ export class SessionManager extends EventEmitter {
           remember: false,
           account: this.accountOf(key),
           acpAgent: s.acpAgent,
-          // An edit of a confidential session stays confidential.
-          extra: carriedExtra(this.db, key),
+          // An edit of a confidential session stays confidential; one of a browser-only session stays browser-only.
+          extra: carried(this.db, key),
         });
     this.db.prepare('update app_sessions set title = ?, worktree = ? where key = ?').run(s.title, s.worktree ? JSON.stringify(s.worktree) : null, next);
     this.setFlags(key, { archived: true });
@@ -1556,6 +1598,7 @@ export class SessionManager extends EventEmitter {
    */
   async handoff(fromKey: string, o: Omit<CreateOpts, 'cwd' | 'title'>): Promise<string> {
     checkHandoff(this.db, fromKey);
+    checkBrowserOnlyHandoff(this.db, fromKey);
     if (fromKey.startsWith('acp:') || (o.agent === 'acp' && o.acpAgent !== CONSOLE_ID)) throw new HttpError(400, 'Hand-offs go from Claude Code or Codex to the other one or to Custom');
     const from = this.summary(fromKey);
     const cwd = this.sessionCwd(fromKey);
@@ -1589,9 +1632,11 @@ export class SessionManager extends EventEmitter {
     if (this.external.get(key) && !this.lives.has(key)) throw new HttpError(409, 'This session is open in another app; fork it there, or close it there first');
     const prefs = from.prefs ?? {};
     const cfg = { model: prefs.model ?? undefined, effort: prefs.effort ?? undefined, mode: prefs.mode ?? undefined, account: this.accountOf(key) };
-    // A fork of a confidential session stays confidential, on a model on this computer.
-    const extra = carriedExtra(this.db, key);
-    if (extra) cfg.model = localModel(featureDeps(), cfg.model ?? from.model).id;
+    // A fork of a confidential session stays confidential, on a model on this computer; a browser-only one stays
+    // browser-only (without the tab it was given: its browser starts fresh).
+    const secret = carriedExtra(this.db, key);
+    if (secret) cfg.model = localModel(featureDeps(), cfg.model ?? from.model).id;
+    const extra = carried(this.db, key);
     let l: Live;
     if (from.agent === 'claude') {
       if (o.at && !/^[0-9a-f-]{36}$/i.test(o.at)) throw new HttpError(400, 'Bad message id');
@@ -1641,10 +1686,10 @@ export class SessionManager extends EventEmitter {
    * account is not at a limit; undefined when that is not known (not read yet, or no plan limits).
    */
   limitLiftsAt(key: string): number | null | undefined {
-    const agent = agentOfKey(key);
-    if (agent === 'acp') return undefined;
+    const agent = this.accountAgentOf(key);
+    if (!agent) return undefined;
     const lifts = (account?: string) => {
-      const u = this.controlFor(agent, account).lastUsage;
+      const u = this.lastUsageOf(agent, account);
       if (!u?.ok) return undefined;
       return u.limited ? (u.limited.resetsAt ?? undefined) : null;
     };
@@ -1658,14 +1703,14 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An account's usage as it last said, read again when that is older than `fresh` ms. */
-  private async usageOf(agent: 'claude' | 'codex', account: string | undefined, fresh = 120_000): Promise<AgentUsage | undefined> {
-    const ctl = this.controlFor(agent, account);
-    const last = ctl.lastUsage;
+  private async usageOf(agent: AccountAgent, account: string | undefined, fresh = 120_000): Promise<AgentUsage | undefined> {
+    const last = this.lastUsageOf(agent, account);
     if (last && Date.now() - last.fetchedAt <= fresh) return last;
     // One read at a time per account.
     const id = `${agent}:${account ?? ''}`;
     let read = this.usageReads.get(id);
     if (!read) {
+      const ctl = agent === 'grok' ? grokControl(this.db, account) : this.controlFor(agent, account);
       read = (ctl instanceof ClaudeControl ? ctl.usage(this.liveClaudeUsage(account)) : ctl.usage())
         .then((u) => {
           this.emit('usage', account ? { accounts: { [account]: u } } : { [agent]: u });
@@ -1679,11 +1724,24 @@ export class SessionManager extends EventEmitter {
   }
 
   private usageReads = new Map<string, Promise<AgentUsage | undefined>>();
+  /** Grok Build sessions whose plan-limit hit is being followed by a fresh usage reading (afterTurn waits for it). */
+  private limitReads = new Map<string, Promise<void>>();
+
+  /** Whose accounts a session runs as: Claude Code's, Codex's, Grok Build's (an ACP session of it), or none. */
+  private accountAgentOf(key: string, agent: Agent = agentOfKey(key)): AccountAgent | null {
+    if (agent === 'claude' || agent === 'codex') return agent;
+    return this.isGrokSession(key) ? 'grok' : null;
+  }
+
+  /** An account's usage as it last said, without reading it again. */
+  private lastUsageOf(agent: AccountAgent, account: string | null | undefined): AgentUsage | null {
+    return (agent === 'grok' ? grokControl(this.db, account) : this.controlFor(agent, account)).lastUsage;
+  }
 
   private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
 
   /** Another signed-in account of the agent with usage left, the least used first; null when there is none. */
-  private async freeAccount(agent: 'claude' | 'codex', except: string | undefined): Promise<{ id: string | undefined } | null> {
+  private async freeAccount(agent: AccountAgent, except: string | undefined): Promise<{ id: string | undefined } | null> {
     let best: { id: string | undefined; used: number } | null = null;
     for (const id of accountPool(this.db, agent)) {
       if (id === except) continue;
@@ -1696,10 +1754,11 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An account as people know it: an added one's name, the CLI's own by its email. */
-  private accountName(agent: 'claude' | 'codex', account: string | undefined): string {
+  private accountName(agent: AccountAgent, account: string | undefined): string {
     if (account) return accountById(this.db, account)?.name ?? 'another account';
-    const email = this.controlFor(agent).lastUsage?.account?.email;
-    return email ? `${email}` : `your main ${agent === 'claude' ? 'Claude' : 'Codex'} account`;
+    // Grok Build's usage has no email: its sign-in check kept it.
+    const email = agent === 'grok' ? grokControl(this.db).email : this.controlFor(agent).lastUsage?.account?.email;
+    return email ? `${email}` : `your main ${ACCOUNT_AGENT_NAMES[agent].split(' ')[0]} account`;
   }
 
   /**
@@ -1711,11 +1770,12 @@ export class SessionManager extends EventEmitter {
     if (this.switching.has(key)) return null;
     this.switching.add(key);
     try {
-      const agent = agentOfKey(key) as 'claude' | 'codex';
+      const agent = this.accountAgentOf(key);
+      if (!agent) return null;
       const from = this.accountOf(key);
       // Its own subagents still at work stop at their next request to this account, their work kept: the move waits
-      // for them rather than cut them off mid-step, so each can be continued on the next account.
-      if (await this.subagentsStop(key)) {
+      // for them rather than cut them off mid-step, so each can be continued on the next account (not Grok Build's).
+      if (agent !== 'grok' && (await this.subagentsStop(key))) {
         // Meanwhile you stopped it, or it went on (it moved already, or a turn got through).
         if (this.userStopped.has(key)) return null;
         const moved = this.accountOf(key);
@@ -1748,7 +1808,8 @@ export class SessionManager extends EventEmitter {
     if (this.switching.has(key) || this.subagentsAtWork(key) || this.lives.get(key)?.adapter.state.status !== 'idle') return;
     this.switching.add(key);
     try {
-      const agent = agentOfKey(key) as 'claude' | 'codex';
+      const agent = this.accountAgentOf(key);
+      if (!agent || agent === 'grok') return;
       const from = this.accountOf(key);
       // A usage that could not be read never moves a session that is getting on with its work.
       const own = await this.usageOf(agent, from, 60_000);
@@ -1786,7 +1847,7 @@ export class SessionManager extends EventEmitter {
    */
   private subagentsToContinue(key: string): string[] {
     const a = this.lives.get(key)?.adapter;
-    if (!a) return [];
+    if (!a || a.agent === 'acp') return [];
     const running = [...a.tasks.values()].filter((t) => t.status === 'running' && (t.kind ?? '').includes('agent')).map((t) => t.description);
     return [...new Set([...a.limitTasks.values(), ...running])];
   }
@@ -1815,8 +1876,8 @@ export class SessionManager extends EventEmitter {
    * it carries on; null when it stays stopped (you stopped it, or when the limit lifts is not known).
    */
   private async resumeAfterLimit(key: string, resetsAt: number | undefined): Promise<LimitAfter | null> {
-    const agent = agentOfKey(key);
-    if (agent === 'acp') return null;
+    const agent = this.accountAgentOf(key);
+    if (!agent) return null;
     if (!resetsAt) {
       const u = await this.usageOf(agent, this.accountOf(key), 0);
       const r = u?.limited?.resetsAt ?? Math.max(0, ...(u?.windows ?? []).filter((w) => (w.usedPercent ?? 0) >= 100).map((w) => w.resetsAt ?? 0));
@@ -1838,11 +1899,11 @@ export class SessionManager extends EventEmitter {
    * another account with usage left takes it first, so the message is not turned away.
    */
   private async switchBeforeSend(key: string) {
-    const agent = agentOfKey(key);
-    if (agent === 'acp' || !autoSwitchOn(this.db) || this.switching.has(key) || this.external.get(key)) return;
+    const agent = this.accountAgentOf(key);
+    if (!agent || !autoSwitchOn(this.db) || this.switching.has(key) || this.external.get(key)) return;
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') return;
-    if (!this.controlFor(agent, this.accountOf(key)).lastUsage?.limited) return;
+    if (!this.lastUsageOf(agent, this.accountOf(key))?.limited) return;
     this.switching.add(key);
     try {
       await this.beforeResume(key);
@@ -1856,8 +1917,8 @@ export class SessionManager extends EventEmitter {
    * the limit and another is not, it moves there. True when a goal it carried over already continues it.
    */
   async beforeResume(key: string): Promise<boolean> {
-    const agent = agentOfKey(key);
-    if (agent === 'acp' || !autoSwitchOn(this.db)) return false;
+    const agent = this.accountAgentOf(key);
+    if (!agent || !autoSwitchOn(this.db)) return false;
     const from = this.accountOf(key);
     if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
     const to = await this.freeAccount(agent, from);
@@ -1938,7 +1999,8 @@ export class SessionManager extends EventEmitter {
 
   /** Moves the session to the account, says so, and brings a Codex goal along. True when that goal continues it by itself. */
   private async carryOver(key: string, from: string | undefined, to: string | undefined): Promise<boolean> {
-    const agent = agentOfKey(key) as 'claude' | 'codex';
+    const agent = this.accountAgentOf(key);
+    if (!agent) return false;
     const s = this.summary(key);
     // Codex keeps a thread's goal in its account's own folder: it is set again on the new one.
     const goal = agent === 'codex' ? s?.goal : undefined;
@@ -2097,7 +2159,7 @@ export class SessionManager extends EventEmitter {
     const account = this.accountOf(key);
     if (agent === 'acp') {
       const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
-      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, mode: cfg.mode ?? prefs.mode ?? undefined, account, acpAgent: r?.acp_agent ?? undefined, prompt });
+      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, effort, mode: cfg.mode ?? prefs.mode ?? undefined, account, acpAgent: r?.acp_agent ?? undefined, prompt });
     } else await this.spawn(agent, cwd, agent === 'claude' ? { sessionId: id, resume: hasTranscript, model, effort, mode, account, prompt } : { threadId: id, model, effort, mode, account, prompt });
     this.db
       .prepare(
@@ -3091,6 +3153,11 @@ export class SessionManager extends EventEmitter {
     if (agent === 'acp' && acpId === CONSOLE_ID && this.consoleOffers) return this.consoleOffers();
     if (agent === 'acp') {
       const o = this.acpOffers.get(acpId ?? '');
+      // Grok Build says its models and their efforts before any session: its agent is asked briefly.
+      if (!o?.models.length && isGrok(acpAgents(this.db).find((a) => a.id === acpId))) {
+        const models = await grokControl(this.db).models().catch(() => []);
+        return { models, modes: o?.modes ?? [], defaultMode: '' };
+      }
       return { models: o?.models ?? [], modes: o?.modes ?? [], defaultMode: '' };
     }
     if (agent === 'claude') {

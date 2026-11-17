@@ -17,7 +17,7 @@ module.exports = {
   productName: 'Hydor',
   copyright: 'Copyright © Hydor Devs',
   directories: { output: 'dist', buildResources: 'resources' },
-  files: ['main.cjs', 'glow.cjs', 'notices.cjs', 'badge.cjs', 'cli-link.cjs', 'awake.cjs', 'preload.cjs', 'package.json'],
+  files: ['main.cjs', 'glow.cjs', 'notices.cjs', 'badge.cjs', 'cli-link.cjs', 'awake.cjs', 'browser.cjs', 'preload.cjs', 'extensions.cjs', 'extension-preload.cjs', 'package.json'],
   extraResources: [
     // build/ as a whole, not build/server: electron-builder always leaves out a node_modules at the top of
     // a folder it copies, and the server's packages are in server/node_modules.
@@ -39,7 +39,8 @@ module.exports = {
     entitlementsInherit: 'resources/entitlements.plist',
     notarize: signed && !!process.env.APPLE_TEAM_ID,
     extendInfo: {
-      NSMicrophoneUsageDescription: 'Hydor uses the microphone when you talk to it.',
+      NSMicrophoneUsageDescription: 'Hydor uses the microphone when you talk to it, or when a site in your own browsing asks for it and you allow it.',
+      NSCameraUsageDescription: 'Hydor uses the camera when a site in your own browsing asks for it and you allow it.',
       LSMultipleInstancesProhibited: true,
     },
   },
