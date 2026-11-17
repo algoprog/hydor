@@ -539,6 +539,10 @@ function Outline({
     [],
   );
   const [all, setAll] = useState(false);
+  // What you open shows at once: the parts there when the outline opens, and those Show earlier parts brings back. Only
+  // a part that comes while it is open rises in.
+  const there = useRef<Set<string> | null>(null);
+  there.current ??= new Set(parts.map((p) => p.id));
   const keep = live ? PARTS_LIVE : PARTS_DONE;
   const from = useRef<number | null>(null);
   if (from.current === null) from.current = Math.max(0, parts.length - keep);
@@ -556,7 +560,13 @@ function Outline({
   return (
     <div className="mt-1 pl-2">
       {hidden > 0 && (
-        <button onClick={() => setAll(true)} className="-ml-1 rounded-md px-1 py-1 text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2">
+        <button
+          onClick={() => {
+            for (const p of parts) there.current!.add(p.id);
+            setAll(true);
+          }}
+          className="-ml-1 rounded-md px-1 py-1 text-[12.5px] text-fg-3 transition-colors hover:bg-bg-2 hover:text-fg-2"
+        >
           {`Show ${hidden} earlier parts`}
         </button>
       )}
@@ -572,7 +582,7 @@ function Outline({
                 'relative',
                 // The outline's line, from this part's mark to the next one's.
                 !isLast && 'after:absolute after:top-4 after:-bottom-4 after:left-[7.5px] after:w-px after:bg-line',
-                fresh(p.id) && 'anim-in',
+                fresh(p.id) && !there.current!.has(p.id) && 'anim-in',
               )}
             >
               {isLast && live && !replying ? (
@@ -861,6 +871,7 @@ const SegmentView = memo(function SegmentView({
   };
   const lastRun = runs.length - 1;
   const replying = replyItems.some((a) => a.kind === 'assistant' && a.streaming);
+  let works = 0;
 
   return (
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
@@ -885,7 +896,9 @@ const SegmentView = memo(function SegmentView({
           const isLast = k === lastRun;
           return (
             <WorkRun
-              key={`work:${r.id}`}
+              // By its place among the turn's stretches of work, not its first step: the agent at work, shown before a step
+              // comes, turns into that step's stretch in place (drawn afresh, its line rose in again: a blink).
+              key={`work:${works++}`}
               id={r.id}
               items={r.items}
               live={isLast ? live : null}
@@ -906,7 +919,7 @@ const SegmentView = memo(function SegmentView({
           );
         }),
         ...seg.attention.map((q) => (
-          <div key={`ask:${q.id}`} className="anim-in">
+          <div key={`ask:${q.id}`} className={cx(fresh(q.id) && 'anim-in')}>
             {q.kind === 'tool' && <ToolRow item={q} sessionKey={sessionKey} />}
           </div>
         )),
@@ -1257,10 +1270,18 @@ export function Timeline({
 
   // Only what arrives after the first load animates in; opening a session does not replay it all.
   const known = useRef<Set<string> | null>(null);
+  // Where the transcript began at the last render.
+  const knownStart = useRef(0);
   useEffect(() => {
     known.current = null;
   }, [sessionKey]);
   if (!known.current && tl && !tl.loading && tl.items.length) known.current = new Set(tl.items.map((i) => i.id));
+  // Nor do earlier messages loaded as the reader scrolls up (or with Show earlier messages, or by the find bar): they were
+  // there all along, and rising in one by one they flashed above the reader.
+  if (known.current && tl) {
+    if (tl.start < knownStart.current) for (const it of tl.items.slice(0, knownStart.current - tl.start)) known.current.add(it.id);
+    knownStart.current = tl.start;
+  }
   // Nor does a message the transcript now has under another id: its copy was on screen already.
   for (const o of overlay?.items ?? []) {
     const copy = known.current && savedCopy(tl?.items ?? [], o);
