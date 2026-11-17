@@ -3,6 +3,58 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.80.0 · 17 November 2026
+
+Projects that were around before wiki memory can build it from their own history, and a new session offers to do it first.
+
+- **Build from history**: a project's wiki memory can now be built from everything the project already has: its files
+  (the folder's layout, README, AGENTS.md and docs), its memory notes, every conversation, the whole commit history and
+  its documents in Knowledge. What matters most is read first, the rest follows in the background, and the articles
+  are organised into areas at the end. While a project's wiki is new (fewer than 10 articles, never built),
+  **Memory → Wiki** says what the project has to build it from, with a **Build from history…** button.
+- **A new session asks first**: when you start a session in a project whose wiki is new but has something to build
+  from, a card under your first message asks whether to build its memory first (recommended for large or ongoing
+  projects). The agent gets your message once the most important part is read, usually a few minutes later, and the
+  rest goes on in the background. **Start now** stops waiting, **Start without memory** asks again after a week, and
+  **Don't ask for this project** stops asking. What you send meanwhile waits in the queue and goes after the first
+  message. It works the same on a phone.
+- **Progress you can stop**: while a build, rebuild or update runs, **Memory → Wiki** shows its steps, what it is
+  reading and about how long is left, with **Stop** and later **Continue**. What it wrote stays.
+- **Rebuild reads everything**: **Rebuild from sources** now also reads the project's files, the conversations and
+  documents the wiki never read, and the whole commit history, not only what the wiki kept.
+- **Faster**: a build or rebuild reads several sources at once (three with the Automatic helper, four with a model over
+  an API), and two of them never overwrite the same article.
+- **Less noise for agents**: agents hear of a project's wiki only once it has an article, or while their session waits
+  for its build.
+- The **Memory** tab's count no longer counts the wiki's own sources as documents.
+
+## 0.79.0 · 17 November 2026
+
+Grok Build, xAI's coding agent, runs in Hydor, with your Grok subscription.
+
+- **Grok Build as an agent**: add it in **Settings → Agents → More agents**, beside Gemini CLI, OpenCode and the others,
+  with one click. The app installs it the first time it is needed, or uses the one you already have, and keeps it up to
+  date with the other agent programs. Its sessions use the app's own tools and approval cards, and Grok's models.
+- **Sign in with a Grok subscription**: once it is added, **Settings → Agents → Accounts** lists **Grok Build** beside
+  Claude Code and Codex. **Sign in** gives you a link and a one-time code: open the link on any device, sign in with your
+  Grok account and confirm the code, and the page notices when you are done. A session started while signed out says so
+  and where to sign in. An xAI API key in `XAI_API_KEY` works too.
+- **More than one Grok account**: **Add an account** offers Grok Build beside Claude Code and Codex. Each account keeps
+  its own sign-in and its own Grok history; your Grok settings, rules, skills and plugins are shared. Pick the account
+  for a new session under **Options → Account** on the start page, and move a session to another one with its
+  **Account** chip. Usage meters and switching accounts at a limit are still for Claude Code and Codex only.
+- A session whose agent can no longer reopen it (any agent that speaks ACP) now starts afresh, with a note, instead of
+  failing.
+
+## 0.78.1 · 17 November 2026
+
+Translations leave technical words alone.
+
+- In the app's languages, a word placed inside a sentence (a search mode, a file or field name, a project's folder, a
+  parameter) stays as it is when it looks technical, or is written in small letters where the app's own label of that
+  name has a capital: "hybrid", a wiki search mode, no longer comes out in Chinese as another screen's "hybrid working".
+  The app's own labels, times and lists of days are translated in their sentences as before.
+
 ## 0.78.0 · 17 November 2026
 
 A wiki that organises itself: articles grouped in areas with hub pages, a structure that changes as the project does,

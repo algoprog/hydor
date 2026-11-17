@@ -2,14 +2,18 @@
 // (Settings → Accounts). Another moves its history there, and its agent starts there with the next message.
 import { useMemo } from 'react';
 import type { SessionSummary } from '@shared/types';
+import { accountAgentOf } from '@shared/grok';
 import { enc, post } from '../../lib/api';
 import { toast, toastError, useApp } from '../../lib/store';
 import { AccountPicker } from '../home/AccountPicker';
 
 export function SessionAccount({ s }: { s: SessionSummary }) {
   const all = useApp((x) => x.boot?.accounts);
-  const accounts = useMemo(() => (all ?? []).filter((a) => a.agent === s.agent), [all, s.agent]);
-  if (!accounts.length || (s.agent !== 'claude' && s.agent !== 'codex')) return null;
+  const acp = useApp((x) => (s.agent === 'acp' ? x.boot?.acpAgents?.find((a) => a.id === s.acpAgent) : undefined));
+  // Claude Code, Codex and Grok Build (an ACP agent) have accounts; the other ACP agents none.
+  const agent = accountAgentOf(s.agent, acp);
+  const accounts = useMemo(() => (all ?? []).filter((a) => a.agent === agent), [all, agent]);
+  if (!agent || !accounts.length) return null;
   const move = (id: string) => {
     if (id === (s.account ?? '')) return;
     const name = accounts.find((a) => a.id === id)?.name ?? 'your sign-in';
@@ -17,5 +21,5 @@ export function SessionAccount({ s }: { s: SessionSummary }) {
       .then(() => toast(`This session runs as ${name} from your next message`))
       .catch(toastError);
   };
-  return <AccountPicker agent={s.agent} accounts={accounts} value={s.account ?? ''} onChange={move} />;
+  return <AccountPicker agent={agent} accounts={accounts} value={s.account ?? ''} onChange={move} />;
 }

@@ -40,6 +40,9 @@ function manager() {
     loadQueues: () => {},
     dropQueued: () => {},
     queueSummary: () => {},
+    // The sessions waiting on a project's memory question (none here).
+    gates: new Map(),
+    saveGates: () => {},
     emit: (...args: Emitted) => {
       emitted.push(args);
       return true;

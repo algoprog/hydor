@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Works with</b> Claude Code · Codex · Gemini CLI · OpenCode · Qwen Code · Goose · Kimi CLI · Auggie · OpenRouter · Ollama · vLLM · llama.cpp</sub>
+  <sub><b>Works with</b> Claude Code · Codex · Gemini CLI · OpenCode · Qwen Code · Goose · Kimi CLI · Auggie · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp</sub>
 </p>
 
 <p align="center">
@@ -64,7 +64,7 @@
     <td width="50%" valign="top">
       <img src="docs/media/readme-agents.webp" alt="A session in Hydor: each step in plain words, an edit with its diff, and a command waiting for approval" />
       <p><b><a href="docs/guide/16-agents-models.md">Every agent, one app</a></b><br />
-      Claude Code and Codex on the plans you already pay for, six more agents, or Hydor's own agent with any model. Every step in plain words, every change as a diff.</p>
+      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model. Every step in plain words, every change as a diff.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-phone.webp" alt="The same session on a phone, waiting for approval to run the tests" />
@@ -165,9 +165,11 @@ On a Mac, the app puts the command on your PATH by itself.
 
 **Coming from another agent**
 
-- **Run it inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie run as agents of Hydor, beside
-  Claude Code, Codex and its own agent, and sessions you start in VS Code or a terminal show up too
-  ([agents and models](docs/guide/16-agents-models.md)).
+- **Run it inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and Grok Build run as agents of
+  Hydor, beside Claude Code, Codex and its own agent, and sessions you start in VS Code or a terminal show up too
+  ([agents and models](docs/guide/16-agents-models.md)). Sign in to Claude Code, Codex and Grok Build with your
+  subscriptions, and add more than one account of each, a work and a personal one say
+  ([accounts](docs/guide/16-agents-models.md#sign-claude-code-codex-and-grok-build-in)).
 - **Bring in what it knows**: **Settings → Memory → Bring in** takes the memory and skills you made in other agents,
   and what ChatGPT, Claude, Claude Code and Codex know about you. You pick what comes over ([memory](docs/guide/06-memory.md)).
 - **Your projects come along**: the folders you work in with Claude Code and Codex become Hydor projects, with their
@@ -179,6 +181,7 @@ On a Mac, the app puts the command on your PATH by itself.
   project) and your documents, in one memory. Control project contracts, plan editing and execution tracking in settings,
   projects and chats; review contract suggestions before saving. Agents can look through your projects, and a project can keep
   itself to itself.
+- A project's existing history (files, notes, conversations, commits, documents) can build its wiki in minutes, with progress and Stop.
 - About once a day, what each project's conversations settled goes into its wiki, and after a hard task an agent can
   propose its method as a skill. Read, edit and delete all of it ([memory](docs/guide/06-memory.md),
   [wiki memory](docs/guide/28-wiki-memory.md), [how memory works](docs/memory.md)).

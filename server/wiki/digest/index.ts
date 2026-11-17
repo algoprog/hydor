@@ -1,12 +1,13 @@
 // Wiki memory from documents and from a project's work (server/wiki/digest): new and changed documents in knowledge
 // add memory notes and update the wiki (listening to knowledge's 'indexed' event; the documents already there when
-// this came are read once too; a project with more documents than its limit reads the pinned, the most used and the
-// newest, and has an overview article for each folder of the rest, overviews.ts), and about once a day, and when a session
+// this came are read too, every check queuing those its wiki has not read yet, up to 100 waiting a place; a project with
+// more documents than its limit reads the pinned, the most used and the newest, and has an overview article for each
+// folder of the rest, overviews.ts), and about once a day, and when a session
 // has gone quiet, the project's recent conversations update it (work.ts), as do its commit messages once a day
 // (commits.ts). Lists what it did for the project page. The same check keeps the wikis' areas (../areas): new articles
 // placed, the reorganising pass when it is due, folds and merges, hubs written again; and a route asks for a pass now.
 import { HttpError } from '../../auth.ts';
-import { kvGet, kvSet, type DB } from '../../db.ts';
+import type { DB } from '../../db.ts';
 import type { Feature } from '../../features/types.ts';
 import { knowledgeEvents, type IndexedDoc } from '../../knowledge/events.ts';
 import { knowledgeSchema } from '../../knowledge/store.ts';
@@ -14,10 +15,9 @@ import { memoryOn } from '../../memory/store.ts';
 import { spaceById } from '../../spaces/index.ts';
 import { wikiMemoryOn } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
-import { createHash } from 'node:crypto';
 import { digestCommitsDue } from './commits.ts';
 import { createDigest, type Digest } from './digest.ts';
-import { documentBases, documentsOverLimit, documentsToRead, docKey } from './limit.ts';
+import { documentBases, documentsOverLimit, docKey, unreadDocuments } from './limit.ts';
 import { writeOverviews } from './overviews.ts';
 import { helperDigestAsk } from './plan.ts';
 import { updatesOf } from './store.ts';
@@ -26,61 +26,49 @@ import { CHECK_MS, FIRST_CHECK_MS, learnWikiFromQuiet, learnWikiFromWork, nobody
 import { areasHelper, reorganiseNow, tendAreas } from '../areas/tend.ts';
 import { estimateRebuild, restoreArchive, startRebuild, wikiJobStatus } from '../areas/rebuild.ts';
 import { startUpdate, updateParts } from '../areas/update.ts';
+import { buildOffer, startBuild } from '../areas/build.ts';
+import { continueWikiJob, stopWikiJob } from '../areas/control.ts';
 import { resumeWikiJobs } from '../areas/resume.ts';
+import { setWikiJobBroadcast } from '../areas/jobs.ts';
 import { setDigestQueue } from './queue.ts';
 
 let digest: Digest | null = null;
 let timers: NodeJS.Timeout[] = [];
 
-/** The most documents queued at once for a place when it first qualifies. */
-export const BACKFILL_MAX = 400;
-/** Marks a place whose documents were queued (the project's id, or "shared"): per place, so one that qualifies later is queued then. */
-const markKey = (space: string | null) => `wiki.digest.backfilled.${space ?? 'shared'}`;
-/** For a place over its limit: the documents of its read set that were queued (short hashes), so only a document that joins the set later is queued. */
-const pickedKey = (space: string | null) => `wiki.digest.picked.${space ?? 'shared'}`;
-const shortHash = (base: string, path: string) => createHash('sha1').update(docKey(base, path)).digest('hex').slice(0, 12);
+/** The most documents waiting at once for a place: the next ones are queued as these are read. */
+export const WAITING_PER_PLACE = 100;
 
 /**
- * Queues the documents already indexed in a place's knowledge bases (not a wiki's own), the newest first, at most
- * BACKFILL_MAX, for the same digest as new ones: it skips texts it has read and keeps to its hourly budget. A place is
- * queued once, when it first qualifies: memory and "Learn from new documents" on, and wiki memory on for it. One with
- * more documents than its limit (Wiki memory's "Most documents to read into the wiki") queues the documents its wiki
- * reads (the pinned, the most used and the newest), first; each check queues those that joined that set since (a document
- * pinned or used a lot), and it loses its mark, so documents added while it was over are read when it is under again.
- * A place that does not qualify yet is not marked, so it is queued when it does (a switch turned on). Returns how many it queued.
+ * Queues the documents a place's wiki should read and has not read yet (those in knowledge, not a wiki's own), in the
+ * order its wiki reads them, up to WAITING_PER_PLACE waiting for a place, for the same digest as new ones: it skips
+ * texts it has read and keeps to its hourly budget. Nothing is marked as queued: what was read (or tried too often) is
+ * in the database (store.ts), what waits is in the queue, so a restart, a limit raised later or a switch turned on
+ * later loses nothing, and every check queues the next ones as the waiting ones are read. A place qualifies when memory
+ * and "Learn from new documents" are on and wiki memory is on for it. One with more documents than its limit (Wiki
+ * memory's "Most documents to read into the wiki") queues the documents its wiki reads (the pinned, the most used and
+ * the newest). Returns how many it queued.
  */
-export function backfillDocuments(db: DB, queue: Pick<Digest, 'enqueue'>): number {
+export function backfillDocuments(db: DB, queue: Pick<Digest, 'enqueue' | 'waiting'>, o: { now?: number; perPlace?: number } = {}): number {
   if (!memoryOn(db) || !wikiSettings(db).fromDocuments) return 0;
   knowledgeSchema(db);
+  const now = o.now ?? Date.now();
+  const perPlace = o.perPlace ?? WAITING_PER_PLACE;
   const places = (db.prepare('select distinct space from kb_bases').all() as { space: string | null }[]).map((r) => r.space);
   if (!places.includes(null)) places.push(null);
-  const found: (IndexedDoc & { indexed_at: number; id: number })[] = [];
-  const picked: IndexedDoc[] = [];
+  let queued = 0;
   for (const space of places) {
     if (space && !spaceById(db, space)) continue;
     if (!wikiMemoryOn(db, space)) continue;
-    const reads = documentsToRead(db, space);
-    if (reads) {
-      if (kvGet(db, markKey(space)) === '1') kvSet(db, markKey(space), '');
-      const now = reads.slice(0, BACKFILL_MAX);
-      const queued = new Set<string>(JSON.parse(kvGet(db, pickedKey(space)) || '[]'));
-      for (const r of now) if (!queued.has(shortHash(r.base, r.path))) picked.push({ base: r.base, path: r.path, title: r.title });
-      kvSet(db, pickedKey(space), JSON.stringify(now.map((r) => shortHash(r.base, r.path))));
-      continue;
-    }
-    if (kvGet(db, pickedKey(space))) kvSet(db, pickedKey(space), '');
-    if (kvGet(db, markKey(space)) === '1') continue;
-    const bases = documentBases(db, space);
-    if (bases.length) {
-      const rows = db.prepare(`select id, base, path, title, indexed_at from kb_docs where status = 'indexed' and base in (${bases.map(() => '?').join(',')}) order by indexed_at desc, id desc limit ${BACKFILL_MAX}`).all(...bases) as typeof found;
-      found.push(...rows);
-    }
-    kvSet(db, markKey(space), '1');
+    const bases = new Set(documentBases(db, space));
+    const waiting = queue.waiting().filter((w) => bases.has(w.base));
+    const room = perPlace - waiting.length;
+    if (room <= 0) continue;
+    const here = new Set(waiting.map((w) => docKey(w.base, w.path)));
+    const next = unreadDocuments(db, space, { max: room + waiting.length, now }).filter((r) => !here.has(docKey(r.base, r.path))).slice(0, room);
+    for (const r of next) queue.enqueue({ base: r.base, path: r.path, title: r.title });
+    queued += next.length;
   }
-  // The newest first, across the places that qualified.
-  found.sort((a, b) => b.indexed_at - a.indexed_at || b.id - a.id);
-  for (const r of [...picked, ...found]) queue.enqueue({ base: r.base, path: r.path, title: r.title });
-  return picked.length + found.length;
+  return queued;
 }
 
 export const wikiDigest: Feature = {
@@ -95,6 +83,7 @@ export const wikiDigest: Feature = {
       return { updates: updatesOf(d.db, id), documents: documentsOverLimit(d.db, id) };
     });
     const changed = (space: string | null) => d.broadcast({ t: 'feature', id: 'wiki', data: { space } });
+    setWikiJobBroadcast(changed);
     /** Reorganise the shared wiki's areas now, whatever the triggers say (one at a time). */
     d.app.post('/api/wiki/reorganise', async () => reorganiseNow(d.db, null, { onUpdate: changed }));
     /** The same for a project's wiki. */
@@ -121,6 +110,20 @@ export const wikiDigest: Feature = {
       if (body.confirm !== true) return estimateRebuild(d.db, space);
       return startRebuild(d.db, space, helpers());
     };
+    /** Build from history: what a project's empty wiki would read (GET, and POST without confirm), or start it. Projects only. */
+    const build = async (req: { params: unknown; body: unknown }) => {
+      const space = place(req);
+      if (!space) throw new HttpError(404, 'Only a project can be built from its history');
+      const body = (req.body ?? {}) as { confirm?: unknown; exclude?: unknown };
+      if (body.confirm !== true) {
+        const offer = await buildOffer(d.db, space);
+        if (!offer) throw new HttpError(409, 'Memory, or wiki memory for this project, is off');
+        return offer;
+      }
+      return startBuild(d.db, space, { ...helpers(), ...(typeof body.exclude === 'string' ? { exclude: body.exclude } : {}) });
+    };
+    const stop = async (req: { params: unknown }) => stopWikiJob(d.db, place(req));
+    const goOn = async (req: { params: unknown }) => continueWikiJob(d.db, place(req), helpers());
     const status = async (req: { params: unknown }) => wikiJobStatus(d.db, place(req));
     const restore = async (req: { params: unknown; body: unknown }) => {
       const at = (req.body as { at?: unknown } | undefined)?.at;
@@ -134,20 +137,29 @@ export const wikiDigest: Feature = {
     d.app.get('/api/projects/:id/wiki/rebuild', status);
     d.app.post('/api/wiki/rebuild/restore', restore);
     d.app.post('/api/projects/:id/wiki/rebuild/restore', restore);
+    d.app.get('/api/projects/:id/wiki/build', build);
+    d.app.post('/api/projects/:id/wiki/build', build);
+    d.app.post('/api/wiki/stop', stop);
+    d.app.post('/api/projects/:id/wiki/stop', stop);
+    d.app.post('/api/wiki/continue', goOn);
+    d.app.post('/api/projects/:id/wiki/continue', goOn);
     d.app.post('/api/wiki/update', update);
     d.app.post('/api/projects/:id/wiki/update', update);
   },
   start(d) {
     digest?.dispose();
     const onUpdate = (space: string | null) => d.broadcast({ t: 'feature', id: 'wiki', data: { space } });
+    setWikiJobBroadcast(onUpdate);
     const mine = (digest = createDigest(d.db, { onUpdate }));
     setDigestQueue(mine);
     // A rebuild the last stop cut short goes on where it stopped; an update or a reorganisation is not taken up again.
     resumeWikiJobs(d.db, { onUpdate, busy: (key) => ['working', 'waiting', 'starting'].includes(d.sessions.summary(key)?.live?.status ?? '') });
     knowledgeEvents.on('indexed', (doc: IndexedDoc) => mine.enqueue(doc));
     startWikiDrift(d.db, onUpdate);
-    // The documents already there: each place once, when it qualifies; looked at again with every check, so a limit
-    // raised or a switch turned on later reads that place's documents then.
+    // The documents already there, which the last run did not finish reading (what was read is in the database, not
+    // in a mark: an older version's marks go): every check queues what a place's wiki should read and has not read,
+    // up to 100 waiting a place, so a restart, a raised limit or a switch turned on later loses nothing.
+    d.db.prepare("delete from kv where k like 'wiki.digest.backfilled.%' or k like 'wiki.digest.picked.%'").run();
     const backfill = () => {
       try {
         backfillDocuments(d.db, mine);

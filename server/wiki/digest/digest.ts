@@ -24,8 +24,10 @@ import { checkPlan, helperDigestAsk, planPrompt, planSystem, writePrompt, writeS
 import { gitHead, resolvePaths } from './anchors.ts';
 import { SPLIT_AT, splitArticle } from './split.ts';
 import { wikiReads } from './limit.ts';
-import { digested, markDigested, recordUpdate } from './store.ts';
-import { appendLog, appendRevisions, areasOfArticle, bodyOf, cleanLinks, clipLine, freePath, judgeRewrite, parseRemoved, readOrNull, splitFront, storeArticle, summaryOf, SUMMARY_MAX, titleOfArticle, writeIndex, type Stored } from './write.ts';
+import { digested, markDigested, markDocRead, recordUpdate } from './store.ts';
+import { claimPath, releasePaths, withArticleLocks } from './lock.ts';
+import { jobRunning } from '../areas/jobs.ts';
+import { appendLog, appendRevisions, areasOfArticle, bodyOf, cleanLinks, clipLine, judgeRewrite, parseRemoved, readOrNull, splitFront, storeArticle, summaryOf, SUMMARY_MAX, titleOfArticle, writeIndex, type Stored } from './write.ts';
 import { hasAreas, isHubPath, loadRegistry, OTHER, placedIn } from '../areas/registry.ts';
 import type { Removed } from './history.ts';
 
@@ -210,106 +212,132 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     const repo = place && head ? { root: place, head } : null;
     const written: { path: string; title: string }[] = [];
 
-    // The articles to write: existing ones with their text (a long one is split first), new ones with a free path.
-    const targets: { path: string; title: string; current?: string; area?: string }[] = [];
-    for (const p of plan.update) {
-      const cur = readOrNull(root, p);
-      // A review could have turned an article into a contract while the model was planning.
-      if (!cur || contractDocument(p, cur.content)) continue;
-      const title0 = titleOfArticle(cur.content, listing.titles.get(p) ?? p);
-      if (splitFront(cur.content).body.length > SPLIT_AT) {
-        const s = await splitArticle(root, ask, { path: p, title: title0, current: cur.content, incoming: { title, text: docText, kind }, taken: new Set(listing.all), source: title, now: at, repo });
-        if (s.ok) {
-          // The article is a hub now; the new text goes to the part it belongs in.
-          for (const w of s.done.written) {
-            written.push(w);
-            listing.all.add(w.path);
-            listing.titles.set(w.path, w.title);
+    // Sources that bear on the same article, read at once, take turns on it: each writes against the article as the one
+    // before left it, never over it (lock.ts). The articles a new text bears on are known from the plan.
+    const claimedNew: string[] = [];
+    const sameTitle = plan.create.map((c) => [...listing.titles].find(([, t]) => t.trim().toLowerCase() === c.title.trim().toLowerCase())?.[0]).filter((x): x is string => !!x);
+    try {
+      await withArticleLocks(root, [...plan.update, ...sameTitle], async () => {
+        // The articles to write: existing ones with their text (a long one is split first), new ones with a free path.
+        const targets: { path: string; title: string; current?: string; area?: string }[] = [];
+        for (const p of plan.update) {
+          const cur = readOrNull(root, p);
+          // A review could have turned an article into a contract while the helper was planning.
+          if (!cur || contractDocument(p, cur.content)) continue;
+          const title0 = titleOfArticle(cur.content, listing.titles.get(p) ?? p);
+          if (splitFront(cur.content).body.length > SPLIT_AT) {
+            const s = await splitArticle(root, ask, { path: p, title: title0, current: cur.content, incoming: { title, text: docText, kind }, taken: new Set(listing.all), source: title, now: at, repo });
+            if (s.ok) {
+              // The article is a hub now; the new text goes to the part it belongs in.
+              for (const w of s.done.written) {
+                written.push(w);
+                listing.all.add(w.path);
+                listing.titles.set(w.path, w.title);
+              }
+              targets.push(s.done.target);
+              continue;
+            }
+            problems.push(`${p}: could not split it (${s.error})`);
           }
-          targets.push(s.done.target);
-          continue;
-        }
-        problems.push(`${p}: could not split it (${s.error})`);
-      }
-      if (cur.content.length > MAX_ARTICLE_CHARS) {
-        problems.push(`${p} is too long to rewrite: left as it was`);
-        continue;
-      }
-      targets.push({ path: p, title: title0, current: cur.content });
-    }
-    const taken = new Set<string>([...listing.all, ...targets.map((t) => t.path)]);
-    for (const c of plan.create) {
-      // A "new" article whose title an article has already is that article: updated, never made twice ("Title" and "Title 2").
-      const same = [...listing.titles].find(([p, t]) => t.trim().toLowerCase() === c.title.trim().toLowerCase() && !targets.some((x) => x.path === p))?.[0];
-      const cur = same ? readOrNull(root, same) : null;
-      if (same && cur && splitFront(cur.content).body.length <= SPLIT_AT && cur.content.length <= MAX_ARTICLE_CHARS) {
-        targets.push({ path: same, title: titleOfArticle(cur.content, c.title), current: cur.content });
-        continue;
-      }
-      const p = freePath(root, c.title, taken);
-      taken.add(p);
-      targets.push({ path: p, title: c.title, ...(c.area ? { area: c.area } : {}) });
-    }
-
-    if (targets.length) {
-      const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ today: new Date(at).toISOString().slice(0, 10), document: { title, text: docText, cut, kind, continued: i.continued }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown; summary?: unknown; removed?: unknown }[] };
-      const accepted: { target: (typeof targets)[number]; body: string; summary?: string; removed: { items: Removed[]; valid: boolean } }[] = [];
-      for (const a of Array.isArray(answer?.articles) ? answer.articles : []) {
-        const target = targets.find((t) => t.path === a.path);
-        if (!target || accepted.some((x) => x.target === target) || typeof a.content !== 'string') continue;
-        const body = bodyOf(a.content);
-        if (body.length < 20) continue;
-        if (secretIn(body)) {
-          problems.push(`${target.path}: left out, it held a secret`);
-          continue;
-        }
-        // A shorter rewrite is accepted only with a list of what it replaced, each with its reason.
-        const removed = parseRemoved(a.removed);
-        if (target.current != null) {
-          const j = judgeRewrite(splitFront(target.current).body, body, removed);
-          if (!j.ok) {
-            problems.push(`${target.path}: left as it was, ${j.reason}`);
+          if (cur.content.length > MAX_ARTICLE_CHARS) {
+            problems.push(`${p} is too long to rewrite: left as it was`);
             continue;
           }
+          targets.push({ path: p, title: title0, current: cur.content });
         }
-        accepted.push({ target, body, summary: typeof a.summary === 'string' && a.summary.trim() ? clipLine(a.summary, SUMMARY_MAX) : undefined, removed });
-      }
-      // A link may go to an article, the source, the index and the log, not to anything else.
-      const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), ...(sourcePath ? [sourcePath] : []), 'index.md', 'log.md']);
-      const revised: { path: string; title: string; replaced: number }[] = [];
-      const plain: { path: string; title: string }[] = [];
-      for (const { target, body, summary, removed } of accepted) {
-        try {
-          const text = cleanLinks(body, target.path, known);
-          // The article is written against what the file holds now: another writer may have changed it since it was read.
-          const stored: Stored = await storeArticle(root, { path: target.path, title: target.title, body: text, source: sourcePath || undefined, now: at, summary, anchors: repo ? await resolvePaths(repo.root, text) : undefined, commit: head, removed, why: title, areas: target.area ? [target.area] : undefined });
-          if (stored.status === 'refused' && stored.reason !== 'changed meanwhile') problems.push(`${target.path}: left as it was, ${stored.reason}`);
-          else if (stored.status !== 'written') problems.push(`${target.path}: changed meanwhile, left as it is now`);
-          else {
-            const entry = { path: target.path, title: titleOfArticle(readOrNull(root, target.path)?.content ?? '', target.title) };
-            if (stored.replaced) revised.push({ ...entry, replaced: stored.replaced });
-            else plain.push(entry);
-            if (!written.some((w) => w.path === target.path)) written.push(entry);
+        const taken = new Set<string>([...listing.all, ...targets.map((t) => t.path)]);
+        for (const c of plan.create) {
+          // A "new" article whose title an article has already is that article: updated, never made twice ("Title" and "Title 2").
+          const same = [...listing.titles].find(([p, t]) => t.trim().toLowerCase() === c.title.trim().toLowerCase() && !targets.some((x) => x.path === p))?.[0];
+          const cur = same ? readOrNull(root, same) : null;
+          // A same-title article may have become a contract while the helper was planning.
+          if (same && cur && contractDocument(same, cur.content)) continue;
+          if (same && cur && splitFront(cur.content).body.length <= SPLIT_AT && cur.content.length <= MAX_ARTICLE_CHARS) {
+            targets.push({ path: same, title: titleOfArticle(cur.content, c.title), current: cur.content });
+            continue;
           }
-        } catch (e) {
-          problems.push(`${target.path}: ${(e as Error).message}`);
+          const p = claimPath(root, c.title, taken);
+          claimedNew.push(p);
+          taken.add(p);
+          targets.push({ path: p, title: c.title, ...(c.area ? { area: c.area } : {}) });
         }
-      }
-      if (written.length) {
-        try {
-          await writeIndex(root);
-          if (plain.length) await appendLog(root, { document: title, articles: plain, now: at });
-          if (revised.length) await appendRevisions(root, { source: title, now: at, revised });
-        } catch (e) {
-          problems.push(`index or log: ${(e as Error).message}`);
+
+        // Recheck after awaited planning and splitting before exposing paths or text to the writing helper.
+        for (const p of listing.titles.keys()) {
+          const current = readOrNull(root, p);
+          if (!current || contractDocument(p, current.content)) {
+            listing.titles.delete(p);
+            listing.all.delete(p);
+          }
         }
-      }
-    } else if (written.length) {
-      try {
-        await writeIndex(root);
-      } catch (e) {
-        problems.push(`index: ${(e as Error).message}`);
-      }
+        for (let i = targets.length - 1; i >= 0; i--) {
+          const current = readOrNull(root, targets[i].path);
+          if (current && contractDocument(targets[i].path, current.content)) targets.splice(i, 1);
+        }
+
+        if (targets.length) {
+          const answer = (await ask({ system: writeSystem(kind), prompt: writePrompt({ today: new Date(at).toISOString().slice(0, 10), document: { title, text: docText, cut, kind, continued: i.continued }, targets, others: [...listing.titles].filter(([p]) => !targets.some((t) => t.path === p)).slice(0, 60).map(([path, title]) => ({ path, title })) }), maxTokens: 8000 })) as { articles?: { path?: unknown; content?: unknown; summary?: unknown; removed?: unknown }[] };
+          const accepted: { target: (typeof targets)[number]; body: string; summary?: string; removed: { items: Removed[]; valid: boolean } }[] = [];
+          for (const a of Array.isArray(answer?.articles) ? answer.articles : []) {
+            const target = targets.find((t) => t.path === a.path);
+            if (!target || accepted.some((x) => x.target === target) || typeof a.content !== 'string') continue;
+            const body = bodyOf(a.content);
+            if (body.length < 20) continue;
+            if (secretIn(body)) {
+              problems.push(`${target.path}: left out, it held a secret`);
+              continue;
+            }
+            // A shorter rewrite is accepted only with a list of what it replaced, each with its reason.
+            const removed = parseRemoved(a.removed);
+            if (target.current != null) {
+              const j = judgeRewrite(splitFront(target.current).body, body, removed);
+              if (!j.ok) {
+                problems.push(`${target.path}: left as it was, ${j.reason}`);
+                continue;
+              }
+            }
+            accepted.push({ target, body, summary: typeof a.summary === 'string' && a.summary.trim() ? clipLine(a.summary, SUMMARY_MAX) : undefined, removed });
+          }
+          // A link may go to an article, the source, the index and the log, not to anything else.
+          const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), ...(sourcePath ? [sourcePath] : []), 'index.md', 'log.md']);
+          const revised: { path: string; title: string; replaced: number }[] = [];
+          const plain: { path: string; title: string }[] = [];
+          for (const { target, body, summary, removed } of accepted) {
+            try {
+              const text = cleanLinks(body, target.path, known);
+              // The article is written against what the file holds now: another writer may have changed it since it was read.
+              const stored: Stored = await storeArticle(root, { path: target.path, title: target.title, body: text, source: sourcePath || undefined, now: at, summary, anchors: repo ? await resolvePaths(repo.root, text) : undefined, commit: head, removed, why: title, areas: target.area ? [target.area] : undefined });
+              if (stored.status === 'refused' && stored.reason !== 'changed meanwhile') problems.push(`${target.path}: left as it was, ${stored.reason}`);
+              else if (stored.status !== 'written') problems.push(`${target.path}: changed meanwhile, left as it is now`);
+              else {
+                const entry = { path: target.path, title: titleOfArticle(readOrNull(root, target.path)?.content ?? '', target.title) };
+                if (stored.replaced) revised.push({ ...entry, replaced: stored.replaced });
+                else plain.push(entry);
+                if (!written.some((w) => w.path === target.path)) written.push(entry);
+              }
+            } catch (e) {
+              problems.push(`${target.path}: ${(e as Error).message}`);
+            }
+          }
+          if (written.length) {
+            try {
+              await writeIndex(root);
+              if (plain.length) await appendLog(root, { document: title, articles: plain, now: at });
+              if (revised.length) await appendRevisions(root, { source: title, now: at, revised });
+            } catch (e) {
+              problems.push(`index or log: ${(e as Error).message}`);
+            }
+          }
+        } else if (written.length) {
+          try {
+            await writeIndex(root);
+          } catch (e) {
+            problems.push(`index: ${(e as Error).message}`);
+          }
+        }
+      });
+    } finally {
+      releasePaths(root, claimedNew);
     }
     articles = written.map((w) => w.path);
 
@@ -337,6 +365,91 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
   }
 }
 
+/** A document of knowledge as it is read into a wiki: where it is, its text (as far as the helper reads) and its hash. */
+export interface DocumentRead {
+  space: string | null;
+  base: { id: string; name: string };
+  /** `version`: its `indexed_at`, which grows when it changes. */
+  doc: { id: number; path: string; title: string; format: string; size: number; version: number };
+  raw: string;
+  cut: boolean;
+  hash: string;
+  /** A large data file: analysed with code, only the findings go to the wiki. */
+  data: boolean;
+}
+
+/**
+ * The document a wiki would read now, or null when it would not: it is not there or not indexed, a wiki's own folder, memory
+ * or wiki memory off, Learn from new documents off, the project's limit leaves it out (`limit: false` skips that check), it has no
+ * text, or its text was read already (the same hash). `handled` hears of a document left out for those last two reasons:
+ * there is nothing left to read at this version of it.
+ */
+export function documentToRead(db: DB, ev: IndexedDoc, o: { limit?: boolean; handled?: (d: { base: string; path: string; version: number }) => void } = {}): DocumentRead | null {
+  let base;
+  try {
+    base = baseRow(db, ev.base);
+  } catch {
+    return null;
+  }
+  // A wiki's own folder is a knowledge base too: it must not digest itself.
+  if (isWikiBase(db, base.id)) return null;
+  const space = base.space;
+  const project = space ? spaceById(db, space) : null;
+  if (space && !project) return null;
+  if (!memoryOn(db) || !fromDocumentsOn(db) || !wikiMemoryOn(db, space)) return null;
+  // More documents than its wiki reads (Wiki memory's limit): it reads the pinned, the most used and the newest; the rest stay for agents to search, with no update listed for each.
+  if (o.limit !== false && !wikiReads(db, space, base.id, ev.path)) return null;
+  const doc = docByPath(db, ev.path, [base.id]);
+  if (!doc || doc.status !== 'indexed') return null;
+  const { text: raw, cut } = documentText(db, doc.id);
+  const nothingLeft = () => {
+    o.handled?.({ base: base.id, path: doc.path, version: doc.indexed_at });
+    return null;
+  };
+  if (!raw.trim()) return nothingLeft();
+  const hash = wikiHash(raw);
+  if (digested(db, space, hash)) return nothingLeft();
+  // A large data file (a big CSV, a spreadsheet, JSON data) reads badly as text: the helper analyses it with code in a
+  // sandbox and only its findings go on to the wiki. Where there is no such sandbox, agents search it only.
+  const data = needsAnalysis({ path: doc.path, format: doc.format, size: doc.size }, cut ? Number.POSITIVE_INFINITY : raw.length);
+  return { space, base: { id: base.id, name: base.name }, doc: { id: doc.id, path: doc.path, title: doc.title, format: doc.format, size: doc.size, version: doc.indexed_at }, raw, cut, hash, data };
+}
+
+/**
+ * Reads a document into its wiki (the document queue's way, and a build's): a data file is analysed with code first. Returns
+ * whether it was read ('skipped': nothing to read it with, as a data file on a computer with no sandbox; false: the helper failed).
+ * A build or rebuild keeps one update row for all its documents (`quiet`) and hears what each did in `report`.
+ */
+export async function digestDocument(
+  db: DB,
+  ask: DigestAsk,
+  r: DocumentRead,
+  o: { now: () => number; onUpdate?: (space: string | null) => void; quiet?: boolean; report?: DigestTextInput['report']; source?: string | null },
+): Promise<boolean | 'skipped'> {
+  const { space, base, doc, raw, cut, hash } = r;
+  const listed = (error: string) => {
+    if (o.quiet) return;
+    recordUpdate(db, { space, base: base.id, document: doc.title, path: doc.path, articles: [], notes: 0, error }, o.now());
+    o.onUpdate?.(space);
+  };
+  const common = { space, base: base.id, title: doc.title, path: doc.path, cut: false, kind: 'document' as const, notes: !o.quiet, hash, now: o.now, onUpdate: o.onUpdate, quiet: o.quiet, report: o.report };
+  if (r.data) {
+    if (!analysisAvailable()) {
+      listed('A large data file: agents search it, but it was not analysed for the wiki, as this computer has no sandbox to run code in');
+      return 'skipped';
+    }
+    const a = await analyzeDataFile({ file: doc.path, title: doc.title, ask });
+    if (!a.ok) {
+      // Tried again when the file changes.
+      listed(`Could not analyse it with code: ${a.error}`.slice(0, 300));
+      return false;
+    }
+    const text = `Findings from analysing the data file ${doc.title} with code (${a.runs} run${a.runs === 1 ? '' : 's'}; the file itself stays in the project's knowledge, for agents to search and analyse):\n\n${a.findings}`;
+    return digestText(db, ask, { ...common, origin: `knowledge:${base.name}/${doc.title} (analysed with code)`, text });
+  }
+  return digestText(db, ask, { ...common, origin: `knowledge:${base.name}/${doc.title}`, text: raw, cut });
+}
+
 export interface DigestOptions {
   /** The helper (default: the helper model of Settings → Models). */
   ask?: DigestAsk;
@@ -356,6 +469,8 @@ export interface Digest {
   enqueue(doc: IndexedDoc): void;
   /** How many documents wait. */
   pending(): number;
+  /** The documents that wait, in order, and the one being read now, if any. */
+  waiting(): IndexedDoc[];
   /**
    * Reads now the waiting documents `match` picks, without waiting for their base to be quiet (the hour's budget
    * still holds): how many were read when none of them waits any more or the budget stops them.
@@ -367,7 +482,10 @@ export interface Digest {
   dispose(): void;
 }
 
-type Outcome = 'done' | 'skip' | 'later';
+/** 'later': the hour's budget is spent; 'busy': a build, rebuild or update runs on the project's wiki (it reads the documents itself): tried again after a while. */
+type Outcome = 'done' | 'skip' | 'later' | 'busy';
+/** How long a document waits when a job runs on its project's wiki. */
+const BUSY_HOLD_MS = 60_000;
 
 export function createDigest(db: DB, o: DigestOptions = {}): Digest {
   const ask = o.ask ?? helperDigestAsk(db);
@@ -375,20 +493,24 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
   const perHour = o.perHour ?? 40;
   const now = o.now ?? Date.now;
   /** Waiting documents in the order they came, one per document. */
-  const waiting: { ev: IndexedDoc; at: number }[] = [];
+  const waiting: { ev: IndexedDoc; at: number; hold?: number }[] = [];
   const lastAt = new Map<string, number>();
   const starts: number[] = [];
+  /** The waiting documents an Update now asked to read: read although the project's wiki has a job running (its own). */
+  const forced = new Set<IndexedDoc>();
+  /** The document being read now. */
+  let current: IndexedDoc | null = null;
   let timer: NodeJS.Timeout | undefined;
   let running = false;
   let watchers: (() => void)[] = [];
 
-  const readyIndex = () => waiting.findIndex((w) => now() - (lastAt.get(w.ev.base) ?? 0) >= quietMs);
+  const readyIndex = () => waiting.findIndex((w) => now() - (lastAt.get(w.ev.base) ?? 0) >= quietMs && now() >= (w.hold ?? 0));
   const budgetBlocked = () => {
     while (starts.length && starts[0] <= now() - 3600_000) starts.shift();
     return starts.length >= perHour;
   };
   const check = () => {
-    const idle = !running && (!waiting.length || (readyIndex() >= 0 && budgetBlocked()));
+    const idle = !running && (!waiting.length || (readyIndex() >= 0 && budgetBlocked()) || (readyIndex() < 0 && waiting.every((w) => (w.hold ?? 0) > now())));
     if (idle) {
       const w = watchers;
       watchers = [];
@@ -399,7 +521,7 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
     clearTimeout(timer);
     timer = undefined;
     if (running || !waiting.length) return;
-    let at = Math.min(...waiting.map((w) => (lastAt.get(w.ev.base) ?? 0) + quietMs));
+    let at = Math.min(...waiting.map((w) => Math.max((lastAt.get(w.ev.base) ?? 0) + quietMs, w.hold ?? 0)));
     if (at <= now() && budgetBlocked()) at = starts[0] + 3600_000 + 1000;
     timer = setTimeout(() => void run(), Math.max(0, at - now()));
     if (o.unref !== false) timer.unref?.();
@@ -415,15 +537,21 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
         const item = waiting[i];
         waiting.splice(i, 1);
         let outcome: Outcome = 'skip';
+        current = item.ev;
         try {
           outcome = await digestOne(item.ev);
         } catch (e) {
           console.warn(`[wiki] digest of ${item.ev.path}: ${(e as Error).message}`);
+        } finally {
+          current = null;
         }
         if (outcome === 'later') {
           waiting.splice(i, 0, item);
           break;
         }
+        forced.delete(item.ev);
+        // A job on the project's wiki reads its documents itself: this one waits a while (then the queue looks again).
+        if (outcome === 'busy') waiting.splice(i, 0, { ...item, hold: now() + BUSY_HOLD_MS });
       }
     } finally {
       running = false;
@@ -433,55 +561,34 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
   }
 
   async function digestOne(ev: IndexedDoc): Promise<Outcome> {
-    let base;
-    try {
-      base = baseRow(db, ev.base);
-    } catch {
-      return 'skip';
-    }
-    // A wiki's own folder is a knowledge base too: it must not digest itself.
-    if (isWikiBase(db, base.id)) return 'skip';
-    const space = base.space;
-    const project = space ? spaceById(db, space) : null;
-    if (space && !project) return 'skip';
-    if (!memoryOn(db) || !fromDocumentsOn(db) || !wikiMemoryOn(db, space)) return 'skip';
-    // More documents than its wiki reads (Wiki memory's limit): it reads the pinned, the most used and the newest; the rest stay for agents to search, with no update listed for each.
-    if (!wikiReads(db, space, base.id, ev.path)) return 'skip';
-    const doc = docByPath(db, ev.path, [base.id]);
-    if (!doc || doc.status !== 'indexed') return 'skip';
-    const { text: raw, cut } = documentText(db, doc.id);
-    if (!raw.trim()) return 'skip';
-    const hash = wikiHash(raw);
-    if (digested(db, space, hash)) return 'skip';
-    // A large data file (a big CSV, a spreadsheet, JSON data) reads badly as text: the helper analyses it with code in a
-    // sandbox and only its findings go on to the wiki. Where there is no such sandbox, agents search it only.
-    const data = needsAnalysis({ path: doc.path, format: doc.format, size: doc.size }, cut ? Number.POSITIVE_INFINITY : raw.length);
+    // One with nothing left to read at this version (no text, or a text read already) is recorded, so the checks pass it by.
+    const r = documentToRead(db, ev, { handled: (d) => markDocRead(db, { ...d, ok: true }, now()) });
+    if (!r) return 'skip';
+    // A job a person started on the project's wiki reads its documents itself (Update now asks for its own through readNow).
+    if (jobRunning(r.space) && !forced.has(ev)) return 'busy';
+    const mark = (ok: boolean) => markDocRead(db, { base: r.base.id, path: r.doc.path, version: r.doc.version, ok }, now());
     const listed = (error: string) => {
-      recordUpdate(db, { space, base: base.id, document: doc.title, path: doc.path, articles: [], notes: 0, error }, now());
-      o.onUpdate?.(space);
+      recordUpdate(db, { space: r.space, base: r.base.id, document: r.doc.title, path: r.doc.path, articles: [], notes: 0, error }, now());
+      o.onUpdate?.(r.space);
     };
-    if (data && !analysisAvailable()) {
+    if (r.data && !analysisAvailable()) {
       listed('A large data file: agents search it, but it was not analysed for the wiki, as this computer has no sandbox to run code in');
+      mark(true);
       return 'done';
     }
     if (budgetBlocked()) {
       return 'later';
     }
     starts.push(now());
-
-    if (data) {
-      const a = await analyzeDataFile({ file: doc.path, title: doc.title, ask });
-      if (!a.ok) {
-        // Tried again when the file changes.
-        listed(`Could not analyse it with code: ${a.error}`.slice(0, 300));
-        return 'done';
-      }
-      const text = `Findings from analysing the data file ${doc.title} with code (${a.runs} run${a.runs === 1 ? '' : 's'}; the file itself stays in the project's knowledge, for agents to search and analyse):\n\n${a.findings}`;
-      await digestText(db, ask, { space, base: base.id, title: doc.title, path: doc.path, origin: `knowledge:${base.name}/${doc.title} (analysed with code)`, text, cut: false, kind: 'document', notes: true, hash, now, onUpdate: o.onUpdate });
+    // From here the hourly budget is spent: a document read (or with nothing to read it with) is recorded as read, a failure
+    // as a try, tried again an hour later, up to READ_TRIES times for this version of the document.
+    try {
+      mark((await digestDocument(db, ask, r, { now, onUpdate: o.onUpdate })) !== false);
       return 'done';
+    } catch (e) {
+      mark(false);
+      throw e;
     }
-    await digestText(db, ask, { space, base: base.id, title: doc.title, path: doc.path, origin: `knowledge:${base.name}/${doc.title}`, text: raw, cut, kind: 'document', notes: true, hash, now, onUpdate: o.onUpdate });
-    return 'done';
   }
 
   return {
@@ -493,10 +600,15 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
       schedule();
     },
     pending: () => waiting.length,
+    waiting: () => [...(current ? [current] : []), ...waiting.map((w) => w.ev)],
     async readNow(match) {
       const mine = waiting.filter((w) => match(w.ev));
       if (!mine.length) return 0;
-      for (const w of mine) lastAt.set(w.ev.base, now() - quietMs);
+      for (const w of mine) {
+        lastAt.set(w.ev.base, now() - quietMs);
+        w.hold = 0;
+        forced.add(w.ev);
+      }
       const before = waiting.length;
       if (!running) void run();
       await new Promise<void>((resolve) => {

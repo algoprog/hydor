@@ -66,7 +66,7 @@ function StatusPill({ s, end }: { s: SessionSummary; end: SessionEnd | null | un
   let dot = end?.ended === 'done' ? 'bg-ok/70' : end?.ended === 'failed' ? 'bg-err' : 'bg-fg-3/60';
   if (a) {
     const where = a.kind === 'external' ? ` in ${a.client}` : '';
-    if (isBusy(a)) [label, tone, dot] = [a.status === 'starting' ? 'Starting' : `Working${where}`, 'text-busy', 'bg-busy'];
+    if (isBusy(a)) [label, tone, dot] = [a.memory ? 'Building memory' : a.status === 'starting' ? 'Starting' : `Working${where}`, 'text-busy', 'bg-busy'];
     else if (a.status === 'waiting') [label, tone, dot] = [`Needs you${where}`, 'text-warn', 'bg-warn'];
     else if (a.status === 'stopping') [label, tone, dot] = ['Stopping', 'text-fg-3', 'bg-fg-3'];
     else if (inBackground(a)) [label, tone, dot] = [backgroundLine(a), 'text-busy', 'bg-busy'];
@@ -113,7 +113,8 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
           <span className="hidden sm:inline">Continue here</span>
         </Button>
       );
-  } else if (working) {
+  } else if (working && !s.live?.memory) {
+    // Waiting on the memory question or its build, the card has the controls (Start now, Stop building).
     action = (
       <Button size="sm" variant="secondary" icon={<Square size={11} fill="currentColor" strokeWidth={0} />} onClick={() => post(`/api/sessions/${enc(s.key)}/interrupt`).catch(toastError)} title="Stop the current turn (Esc)">
         <span className="hidden sm:inline">Stop</span>

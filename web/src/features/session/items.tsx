@@ -842,7 +842,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   // Your own messages in sessions this app can drive (not ones only open elsewhere).
   const canEdit = useSessions((x) => {
     const s = sessionKey ? x.byKey[sessionKey] : undefined;
-    return !!s && !s.external && (s.agent !== 'acp' || s.acpAgent === 'console') && !item.meta && !item.peer;
+    return !!s && !s.external && (s.agent !== 'acp' || s.acpAgent === 'console') && !item.meta && !item.peer && !item.id.startsWith('held:');
   });
   const [showContext, setShowContext] = useState(false);
   const parsed = useMemo(() => {
@@ -942,6 +942,12 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
             {/* Copy the displayed message text without attachment or editor metadata. */}
             {text && <CopyButton text={text} label="Copy message" className="h-8 w-8" />}
             {item.meta === 'queued' && <span>sent while working ·</span>}
+            {item.meta === 'held' && (
+              <>
+                <span>Sent to the agent when the memory is ready</span>
+                <span>·</span>
+              </>
+            )}
             {canEdit && (
               <>
                 <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded px-1 transition-colors hover:text-fg" title="Go back to just before this message and send something else">

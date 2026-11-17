@@ -45,7 +45,7 @@ export function LiveHead({ agent, name, live }: { agent: Agent; name?: string; l
     <>
       <WorkingIcon agent={agent} name={name} size={15} spinning={!waiting} className={waiting ? 'breathe' : undefined} />
       <span className={cx('font-medium', waiting ? 'text-warn' : 'text-busy')}>
-        {waiting ? 'Waiting for you' : live.status === 'starting' ? 'Starting' : 'Working'}
+        {waiting ? 'Waiting for you' : live.memory ? 'Building memory' : live.status === 'starting' ? 'Starting' : 'Working'}
         {live.where ? ` in ${live.where}` : ''}
       </span>
       <WorkTime since={live.since} before={live.worked} className="text-fg-3" />
@@ -492,6 +492,8 @@ export interface LiveInfo {
   worked?: number;
   where?: string;
   note?: string;
+  /** The agent waits for its project's memory to be built (its first message has not gone). */
+  memory?: boolean;
 }
 
 /** How many of a turn's parts show, its latest, before "Show N earlier parts": fewer while it runs. */
@@ -1184,7 +1186,7 @@ export function Timeline({
     ? null
     : ext
       ? { status: ext.status, since: ext.since, worked, where: ext.client, note: ext.detail === 'input needed' ? undefined : ext.detail }
-      : { status: live!.status, since: live!.turnStartedAt, worked };
+      : { status: live!.status, since: live!.turnStartedAt, worked, memory: live!.memory === 'building' };
 
   // The documents the finished turns made: one look at the session's folder for all of them, made again when another turn
   // finishes (never while one runs). Each turn picks its own from it (TurnDocs.tsx).
