@@ -91,16 +91,24 @@ test('over its limit a project reads the pinned, then the most used, then the ne
   countUses(db, [{ base: b.id, path: `${dir}/d9.md` }]);
   countUses(db, [{ base: b.id, path: `${dir}/d9.md` }]);
   countUses(db, [{ base: b.id, path: `${dir}/d8.md` }]);
+  // A stand-in queue: what waits stays until the test reads it.
   const queued: string[] = [];
-  const queue = { enqueue: (e: { path: string }) => void queued.push(path.basename(e.path, '.md')) };
+  const waits: { base: string; path: string; title: string }[] = [];
+  const queue = {
+    enqueue: (e: { base: string; path: string; title: string }) => {
+      queued.push(path.basename(e.path, '.md'));
+      if (!waits.some((w) => w.base === e.base && w.path === e.path)) waits.push(e);
+    },
+    waiting: () => [...waits],
+  };
   backfillDocuments(db, queue);
   const mine = () => queued.filter((q) => /^d\d+$/.test(q));
-  assert.deepEqual(mine(), ['d11', 'd9', 'd8', 'd0'], 'pinned, most used, then the newest');
-  assert.notEqual(kvGet(db, `wiki.digest.backfilled.${p.space.id}`), '1');
+  assert.deepEqual(mine(), ['d11', 'd9', 'd8', 'd0'], 'pinned, most used, then the newest, in read order');
+  assert.equal(kvGet(db, `wiki.digest.backfilled.${p.space.id}`), undefined, 'no mark is kept');
   queued.length = 0;
   backfillDocuments(db, queue);
-  assert.deepEqual(mine(), [], 'each is queued once');
-  // A document that joins the read set (a pin) is queued by the next check; one that falls out is not touched.
+  assert.deepEqual(mine(), [], 'each waits once');
+  // A document that joins the read set (a pin) is queued by the next check; one that falls out is not touched (d0 still waits).
   setWikiPin(db, b.id, `${dir}/d5.md`, true, Date.now() + 10);
   backfillDocuments(db, queue);
   assert.deepEqual(mine(), ['d5']);

@@ -61,10 +61,10 @@ Das unter [Einstellungen → Modelle](/settings?s=models) gewählte Hilfsmodell 
 - Die Artikel behalten nur das Wichtige: wofür das Dokument da ist, seine zentralen Fakten, Ergebnisse, Entscheidungen, Namen und Zahlen. Einzelheiten, Beispiele und Tabellen Zeile für Zeile bleiben im Dokument, das Agenten durchsuchen.
 - Artikel können überarbeitet werden, nicht nur ergänzt (siehe [Überarbeitungen und lange Artikel](#revisions-and-long-articles)). Alles, was ein Geheimnis enthält, wird weggelassen. Die Notizen sind kurz und neu und wiederholen keine, die das Projekt schon hat.
 - Ein Dokument mit demselben Text wird nicht zweimal gelesen. Eine Änderung am Dokument löst erneutes Lesen aus.
-- Dokumente, die schon im Wissen eines Projekts liegen, werden ebenfalls einmal gelesen, im selben Tempo (die neuesten zuerst, bis zu 400 pro Projekt, wobei das gemeinsame Wissen wie ein Projekt zählt). Das Wiki eines bestehenden Projekts füllt sich also über einige Stunden. Ein Projekt wird alle zehn Minuten erneut angesehen; ein Projekt, das noch nicht bereit war (sein Wiki-Memory war aus, zum Beispiel), wird gelesen, sobald es bereit ist. Ein Projekt mit mehr Dokumenten als seiner Höchstzahl liest die, die es auswählt (siehe unten).
+- Dokumente, die schon im Wissen eines Projekts (oder im gemeinsamen Wissen) liegen, werden ebenfalls gelesen, im selben Tempo, sodass sich das Wiki eines bestehenden Projekts über einige Stunden füllt. Alle zehn Minuten sucht Hydor nach Dokumenten, die ein Wiki lesen sollte und noch nicht gelesen hat, und reiht bis zu 100 davon gleichzeitig für jedes Projekt ein. So geht nichts verloren, wenn die App neu startet, wenn du eine Höchstzahl erhöhst oder wenn du Wiki-Memory später einschaltest: Das Lesen geht dort weiter, wo es aufgehört hat. Ein Projekt mit mehr Dokumenten als seiner Höchstzahl liest die, die es auswählt (siehe unten).
 - Der Ordner des Wiki-Memory ist selbst eine Wissensdatenbank, verarbeitet sich aber nie selbst.
 
-Ist das Hilfsmodell nicht erreichbar oder findet es nichts, was sich zu ergänzen lohnt, geht nichts verloren: Die Aktualisierung wird mit dem Grund aufgeführt, und das Dokument wird erneut versucht, wenn es sich ändert.
+Ist das Hilfsmodell nicht erreichbar, geht nichts verloren: Die Aktualisierung wird mit dem Grund aufgeführt, und das Dokument wird eine Stunde später erneut versucht, bis zu dreimal, und erneut, sobald es sich ändert. Findet das Hilfsmodell nichts, was sich zu ergänzen lohnt, sagt die Aktualisierung das.
 
 ### Überarbeitungen und lange Artikel
 

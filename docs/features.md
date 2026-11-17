@@ -260,7 +260,8 @@ agents that speak ACP and take MCP servers.
   statement it removes (a rewrite keeps at least half, and the earlier text is kept as a snapshot, the 20 newest of each article), an
   article over 12,000 characters is first split into a hub and parts, anything with a secret is left out, and each outcome is
   listed under Recent updates; documents already in a project's knowledge are
-  read once too, at the same pace (the newest 400 a project, looked at again every ten minutes). A large data file (CSV, TSV, a
+  read too, at the same pace (each project is checked every ten minutes for documents its wiki has not read yet, so a restart or a
+  raised limit loses none; a document the helper could not read is tried again an hour later, up to three times, and when it changes). A large data file (CSV, TSV, a
   spreadsheet or JSON data, over 40,000 characters of text or 256 KB) is analysed with code instead: the helper writes Python that
   Hydor runs in a sandbox with no network that sees only that file, read-only (up to four runs of a minute each), and only its
   findings become the source and go into the articles; without such a sandbox (macOS and Windows for now) these files are searched

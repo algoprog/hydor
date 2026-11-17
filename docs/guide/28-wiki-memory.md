@@ -61,10 +61,10 @@ The helper model (set in [Settings → Models](/settings?s=models)) does the rea
 - The articles keep only what matters: what the document is for, its key facts, findings, decisions, names and numbers. Detail, examples and tables row by row stay in the document, which agents search.
 - Articles can be revised, not only added to (see [Revisions and long articles](#revisions-and-long-articles)). Anything that holds a secret is left out. The notes are short, new, and never repeat one the project has.
 - A document with the same text is not read twice. A change to a document reads it again.
-- Documents already in a project's knowledge are read too, once, at the same pace (the newest first, up to 400 a project, the shared knowledge counting as one), so an existing project's wiki fills in over a few hours. A project is looked at again every ten minutes, so one that was not ready (its wiki memory was off, say) is read once it is. A project with more documents than its limit reads those it picks (see below).
+- Documents already in a project's knowledge (or in the shared knowledge) are read too, at the same pace, so an existing project's wiki fills in over a few hours. Every ten minutes Hydor looks for documents a wiki should read and hasn't read yet, and lines up to 100 of them at a time for each project. So nothing is lost when the app restarts, when you raise a limit or when you turn wiki memory on later: the reading goes on where it stopped. A project with more documents than its limit reads those it picks (see below).
 - Wiki memory's own folder is a knowledge base too, but never digests itself.
 
-If the helper cannot be reached or finds nothing worth adding, nothing is lost: the update is listed with the reason, and the document is tried again when it changes.
+If the helper cannot be reached, nothing is lost: the update is listed with the reason, and the document is tried again an hour later, up to three times, and again whenever it changes. If the helper finds nothing worth adding, the update says so.
 
 ### Revisions and long articles
 

@@ -24,7 +24,7 @@ import { checkPlan, helperDigestAsk, planPrompt, planSystem, writePrompt, writeS
 import { gitHead, resolvePaths } from './anchors.ts';
 import { SPLIT_AT, splitArticle } from './split.ts';
 import { wikiReads } from './limit.ts';
-import { digested, markDigested, recordUpdate } from './store.ts';
+import { digested, markDigested, markDocRead, recordUpdate } from './store.ts';
 import { claimPath, releasePaths, withArticleLocks } from './lock.ts';
 import { jobRunning } from '../areas/jobs.ts';
 import { appendLog, appendRevisions, areasOfArticle, bodyOf, cleanLinks, clipLine, judgeRewrite, parseRemoved, readOrNull, splitFront, storeArticle, summaryOf, SUMMARY_MAX, titleOfArticle, writeIndex, type Stored } from './write.ts';
@@ -348,7 +348,8 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
 export interface DocumentRead {
   space: string | null;
   base: { id: string; name: string };
-  doc: { id: number; path: string; title: string; format: string; size: number };
+  /** `version`: its `indexed_at`, which grows when it changes. */
+  doc: { id: number; path: string; title: string; format: string; size: number; version: number };
   raw: string;
   cut: boolean;
   hash: string;
@@ -359,9 +360,10 @@ export interface DocumentRead {
 /**
  * The document a wiki would read now, or null when it would not: it is not there or not indexed, a wiki's own folder, memory
  * or wiki memory off, Learn from new documents off, the project's limit leaves it out (`limit: false` skips that check), it has no
- * text, or its text was read already (the same hash).
+ * text, or its text was read already (the same hash). `handled` hears of a document left out for those last two reasons:
+ * there is nothing left to read at this version of it.
  */
-export function documentToRead(db: DB, ev: IndexedDoc, o: { limit?: boolean } = {}): DocumentRead | null {
+export function documentToRead(db: DB, ev: IndexedDoc, o: { limit?: boolean; handled?: (d: { base: string; path: string; version: number }) => void } = {}): DocumentRead | null {
   let base;
   try {
     base = baseRow(db, ev.base);
@@ -379,13 +381,17 @@ export function documentToRead(db: DB, ev: IndexedDoc, o: { limit?: boolean } = 
   const doc = docByPath(db, ev.path, [base.id]);
   if (!doc || doc.status !== 'indexed') return null;
   const { text: raw, cut } = documentText(db, doc.id);
-  if (!raw.trim()) return null;
+  const nothingLeft = () => {
+    o.handled?.({ base: base.id, path: doc.path, version: doc.indexed_at });
+    return null;
+  };
+  if (!raw.trim()) return nothingLeft();
   const hash = wikiHash(raw);
-  if (digested(db, space, hash)) return null;
+  if (digested(db, space, hash)) return nothingLeft();
   // A large data file (a big CSV, a spreadsheet, JSON data) reads badly as text: the helper analyses it with code in a
   // sandbox and only its findings go on to the wiki. Where there is no such sandbox, agents search it only.
   const data = needsAnalysis({ path: doc.path, format: doc.format, size: doc.size }, cut ? Number.POSITIVE_INFINITY : raw.length);
-  return { space, base: { id: base.id, name: base.name }, doc: { id: doc.id, path: doc.path, title: doc.title, format: doc.format, size: doc.size }, raw, cut, hash, data };
+  return { space, base: { id: base.id, name: base.name }, doc: { id: doc.id, path: doc.path, title: doc.title, format: doc.format, size: doc.size, version: doc.indexed_at }, raw, cut, hash, data };
 }
 
 /**
@@ -442,6 +448,8 @@ export interface Digest {
   enqueue(doc: IndexedDoc): void;
   /** How many documents wait. */
   pending(): number;
+  /** The documents that wait, in order, and the one being read now, if any. */
+  waiting(): IndexedDoc[];
   /**
    * Reads now the waiting documents `match` picks, without waiting for their base to be quiet (the hour's budget
    * still holds): how many were read when none of them waits any more or the budget stops them.
@@ -469,6 +477,8 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
   const starts: number[] = [];
   /** The waiting documents an Update now asked to read: read although the project's wiki has a job running (its own). */
   const forced = new Set<IndexedDoc>();
+  /** The document being read now. */
+  let current: IndexedDoc | null = null;
   let timer: NodeJS.Timeout | undefined;
   let running = false;
   let watchers: (() => void)[] = [];
@@ -506,10 +516,13 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
         const item = waiting[i];
         waiting.splice(i, 1);
         let outcome: Outcome = 'skip';
+        current = item.ev;
         try {
           outcome = await digestOne(item.ev);
         } catch (e) {
           console.warn(`[wiki] digest of ${item.ev.path}: ${(e as Error).message}`);
+        } finally {
+          current = null;
         }
         if (outcome === 'later') {
           waiting.splice(i, 0, item);
@@ -527,24 +540,34 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
   }
 
   async function digestOne(ev: IndexedDoc): Promise<Outcome> {
-    const r = documentToRead(db, ev);
+    // One with nothing left to read at this version (no text, or a text read already) is recorded, so the checks pass it by.
+    const r = documentToRead(db, ev, { handled: (d) => markDocRead(db, { ...d, ok: true }, now()) });
     if (!r) return 'skip';
     // A job a person started on the project's wiki reads its documents itself (Update now asks for its own through readNow).
     if (jobRunning(r.space) && !forced.has(ev)) return 'busy';
+    const mark = (ok: boolean) => markDocRead(db, { base: r.base.id, path: r.doc.path, version: r.doc.version, ok }, now());
     const listed = (error: string) => {
       recordUpdate(db, { space: r.space, base: r.base.id, document: r.doc.title, path: r.doc.path, articles: [], notes: 0, error }, now());
       o.onUpdate?.(r.space);
     };
     if (r.data && !analysisAvailable()) {
       listed('A large data file: agents search it, but it was not analysed for the wiki, as this computer has no sandbox to run code in');
+      mark(true);
       return 'done';
     }
     if (budgetBlocked()) {
       return 'later';
     }
     starts.push(now());
-    await digestDocument(db, ask, r, { now, onUpdate: o.onUpdate });
-    return 'done';
+    // From here the hourly budget is spent: a document read (or with nothing to read it with) is recorded as read, a failure
+    // as a try, tried again an hour later, up to READ_TRIES times for this version of the document.
+    try {
+      mark((await digestDocument(db, ask, r, { now, onUpdate: o.onUpdate })) !== false);
+      return 'done';
+    } catch (e) {
+      mark(false);
+      throw e;
+    }
   }
 
   return {
@@ -556,6 +579,7 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
       schedule();
     },
     pending: () => waiting.length,
+    waiting: () => [...(current ? [current] : []), ...waiting.map((w) => w.ev)],
     async readNow(match) {
       const mine = waiting.filter((w) => match(w.ev));
       if (!mine.length) return 0;
