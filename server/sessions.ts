@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec, precompactCopy } from './agents/claude.ts';
+import { grokControl } from './agents/grok.ts';
 import { RpcError } from './agents/rpc.ts';
 import { CodexLive, codexEnv, CODEX_MODES, codexSpec } from './agents/codex.ts';
 import { ClaudeControl, claudeUsage, CodexControl, mergeCodexSnapshot } from './agents/control.ts';
@@ -1254,7 +1255,7 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An ACP agent (Gemini CLI, OpenCode…): its own command, driven over the Agent Client Protocol. */
-  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
+  private async spawnAcp(cwd: string, opts: { sessionId?: string; resume?: boolean; model?: string; effort?: string; mode?: string; account?: string; acpAgent?: string; extra?: SessionExtra; prompt?: string }): Promise<Live> {
     const def = acpAgent(this.db, opts.acpAgent);
     const env = { ...agentBaseEnv(), ...(def.env ?? {}) };
     // Grok Build is the one ACP agent with accounts: an added one is its own GROK_HOME (sign-in and sessions), and the
@@ -1273,7 +1274,7 @@ export class SessionManager extends EventEmitter {
     if (def.id === CONSOLE_ID) env.HYDOR_RUNTIME = `http://127.0.0.1:${config.port}/agent/run/${runToken(runId)}`;
     const add = await spawnAdditions({ agent: 'acp', acpAgent: def.id, key: `acp:${id}`, cwd, runId, resume: !!opts.resume, extra: opts.extra ?? sessionExtra(this.db, `acp:${id}`), prompt: opts.prompt, model: opts.model });
     Object.assign(env, add.env, acpEnvFor(def.command, env));
-    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, account, pageServer: pageServerUrl(runId), add };
+    const o = { cwd, id, def, acpSession: opts.resume ? acpSessionOf(transcript) : undefined, transcript, mode: opts.mode, model: opts.model, effort: opts.effort, account, pageServer: pageServerUrl(runId), add };
     const meta: RunMeta = { runId, agent: 'acp', key: `acp:${id}`, createdAt: Date.now(), cwd, opts: o };
     const runner = await Runner.start(meta, { cmd, args: def.args, cwd, env });
     const adapter = new AcpLive(runner, o);
@@ -2097,7 +2098,7 @@ export class SessionManager extends EventEmitter {
     const account = this.accountOf(key);
     if (agent === 'acp') {
       const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
-      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, mode: cfg.mode ?? prefs.mode ?? undefined, account, acpAgent: r?.acp_agent ?? undefined, prompt });
+      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, effort, mode: cfg.mode ?? prefs.mode ?? undefined, account, acpAgent: r?.acp_agent ?? undefined, prompt });
     } else await this.spawn(agent, cwd, agent === 'claude' ? { sessionId: id, resume: hasTranscript, model, effort, mode, account, prompt } : { threadId: id, model, effort, mode, account, prompt });
     this.db
       .prepare(
@@ -3091,6 +3092,11 @@ export class SessionManager extends EventEmitter {
     if (agent === 'acp' && acpId === CONSOLE_ID && this.consoleOffers) return this.consoleOffers();
     if (agent === 'acp') {
       const o = this.acpOffers.get(acpId ?? '');
+      // Grok Build says its models and their efforts before any session: its agent is asked briefly.
+      if (!o?.models.length && isGrok(acpAgents(this.db).find((a) => a.id === acpId))) {
+        const models = await grokControl(this.db).models().catch(() => []);
+        return { models, modes: o?.modes ?? [], defaultMode: '' };
+      }
       return { models: o?.models ?? [], modes: o?.modes ?? [], defaultMode: '' };
     }
     if (agent === 'claude') {

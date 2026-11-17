@@ -2,7 +2,7 @@
 // says of the sign-in. Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/agents/grok-test.ts && DATA_DIR=/tmp/hydor-test-grok node dist/dev/grok-test.js
 import assert from 'node:assert/strict';
-import { grokLoginPrompt, grokSignedIn } from './grok.ts';
+import { grokBilling, grokLoginPrompt, grokSignedIn, grokUsage } from './grok.ts';
 
 const LOGIN = `To sign in, open this URL in your browser:
 
@@ -52,5 +52,56 @@ assert.deepEqual(grokSignedIn('You are logged in with\n'), null, 'no detail: not
 assert.equal(grokSignedIn('Default model: grok-4.6\n'), null, 'neither said');
 assert.equal(grokSignedIn(''), null);
 assert.equal(grokSignedIn('\n  \n'), null);
+
+// Plan usage. These answers are MADE UP (nobody has read a signed-in `_x.ai/billing` answer yet); they are plausible shapes
+// the mapping must cope with, so that it can be made exact once a real one is seen.
+const T = (iso: string) => Date.parse(iso);
+
+// 1. Nested, snake case, money in cents, a billing cycle beside the usage, pay as you go.
+const a = grokUsage({
+  billing_config: { tier: 'SUPER_GROK_PLUS', credit_balance_cents: 1250, pay_as_you_go: { enabled: true, spending_cap_cents: 5000, used_cents: 1200 }, auto_topup: { enabled: false, threshold_cents: 500, amount_cents: 2000, max_per_month: 3 } },
+  cycle: { start: '2026-11-10T00:00:00Z', end: '2026-11-17T00:00:00Z' },
+  usage: { used_cents: 300, limit_cents: 1000, last_updated: '2026-11-12T10:00:00Z' },
+});
+assert.equal(a.agent, 'grok');
+assert.equal(a.ok, true);
+assert.equal(a.account?.plan, 'SuperGrok Plus');
+assert.equal(a.windows.length, 1);
+assert.deepEqual(a.windows[0], { id: 'weekly', label: 'Weekly', usedPercent: 30, resetsAt: T('2026-11-17T00:00:00Z'), windowMinutes: 10080 });
+assert.deepEqual(a.credits, { balance: '12.5', hasCredits: true });
+assert.deepEqual(a.extra, { enabled: true, monthlyLimit: 50, used: 12, utilization: 24, currency: 'USD' });
+assert.equal(a.limited, undefined);
+
+// 2. Flat, camel case, a percentage and epoch seconds, dollars as strings, a limit reached.
+const b = grokUsage({ plan: 'SuperGrok Heavy', weeklyUsagePercent: 100, weeklyResetsAt: 1763337600, creditsBalance: '0.00', payAsYouGoEnabled: false });
+assert.equal(b.account?.plan, 'SuperGrok Heavy');
+assert.deepEqual(b.windows, [{ id: 'weekly', label: 'Weekly', usedPercent: 100, resetsAt: 1763337600_000, windowMinutes: 10080 }]);
+assert.deepEqual(b.credits, { balance: '0', hasCredits: false });
+assert.deepEqual(b.extra, { enabled: false, monthlyLimit: null, used: null, utilization: null, currency: 'USD' });
+assert.deepEqual(b.limited, { label: 'Weekly limit', resetsAt: 1763337600_000 });
+
+// 3. Wrapped numbers and protobuf timestamps, a period of seven days, a ratio, and a plan run by a team.
+const c = grokUsage({
+  subscription: { name: 'SuperGrok' },
+  period_usage: { period: { start: { seconds: '1762732800' }, end: { seconds: '1763337600' } }, used: { val: '3' }, limit: { val: '40' } },
+  managed_by_team: true,
+});
+assert.equal(c.account?.plan, 'SuperGrok');
+assert.deepEqual(c.windows, [{ id: 'weekly', label: 'Weekly', usedPercent: 7.5, resetsAt: 1763337600_000, windowMinutes: 10080 }]);
+assert.equal(c.note, 'Usage limits are managed by your team.');
+assert.equal(grokUsage({ usage: { utilization: 0.42, period_end: '2026-12-01T00:00:00Z', period_start: '2026-11-01T00:00:00Z' } }).windows[0].usedPercent, 42);
+assert.equal(grokUsage({ usage: { utilization: 0.42, period_end: '2026-12-01T00:00:00Z', period_start: '2026-11-01T00:00:00Z' } }).windows[0].label, 'Monthly');
+
+// A flag that says the credit limit was reached, with no window at all; and nothing to read.
+assert.deepEqual(grokUsage({ credits: { balance: 0 }, credit_limit_reached: true }).limited, { label: 'Credit limit', resetsAt: null });
+const none = grokUsage({});
+assert.deepEqual([none.ok, none.windows, none.credits, none.extra, none.limited, none.account], [true, [], undefined, undefined, undefined, undefined]);
+
+// What the agent answers signed out, and the other errors.
+const out = grokBilling({ error: { code: -32000, message: 'Authentication required', data: 'Authentication required to fetch billing data' } });
+assert.deepEqual(out, { error: "Sign in to see Grok's plan usage.", keep: false });
+assert.deepEqual(grokBilling({ error: { code: -32601, message: 'Method not found' } }), { error: 'This version of Grok Build does not report plan usage. Update it in Settings → Agents.', keep: false });
+assert.deepEqual(grokBilling({ error: { code: -32603, message: 'Internal error' } }), { error: 'Grok Build could not read the plan usage: Internal error', keep: true });
+assert.equal('usage' in grokBilling({ result: { plan: 'SuperGrok', usage: { used: 1, limit: 4 } } }), true);
 
 console.log('grok-test: all passed');

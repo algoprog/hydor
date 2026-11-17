@@ -238,7 +238,7 @@ export function LimitBanner({ agent, account, className, session }: { agent: Age
 
 /** The resets an account holds, each usable from here. */
 export function ResetList({ u, account }: { u: AgentUsage; account?: string }) {
-  const reset = useLimitReset(u.agent, account);
+  const reset = useLimitReset(u.agent === 'grok' ? 'acp' : u.agent, account);
   const rc = u.resetCredits;
   if (!rc) return null;
   return (

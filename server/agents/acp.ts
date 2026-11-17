@@ -208,6 +208,8 @@ export interface AcpOpts {
   transcript: string;
   mode?: string;
   model?: string;
+  /** The reasoning effort to set, when the agent takes one (Grok Build). */
+  effort?: string;
   /** This app's MCP address for the session (show_html), for agents that take HTTP MCP servers. */
   pageServer?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
@@ -234,6 +236,8 @@ export class AcpLive extends LiveAdapter {
   /** What the agent offers, for the pickers. */
   modes: { id: string; name: string; description?: string }[] = [];
   models: ModelOption[] = [];
+  /** The agent's thought-level option (Grok Build's `reasoning_effort`), when it has one: the values it takes and the one set. */
+  private thought: { id: string; options: string[]; current?: string } | null = null;
 
   constructor(
     runner: Runner,
@@ -336,6 +340,8 @@ export class AcpLive extends LiveAdapter {
     }
     if (this.o.mode && this.modes.some((m) => m.id === this.o.mode)) await this.setMode(this.o.mode).catch(() => {});
     if (this.o.model && this.models.some((m) => m.value === this.o.model)) await this.setModel(this.o.model).catch(() => {});
+    // The effort too, when the agent takes it for the model now set (it is skipped when the model does not take it).
+    if (this.o.effort && this.takesEffort(this.o.effort)) await this.setEffort(this.o.effort).catch(() => {});
     this.state.status = 'idle';
     this.changed();
   }
@@ -389,10 +395,37 @@ export class AcpLive extends LiveAdapter {
       this.modes = r!.modes.availableModes.map((m: Json) => ({ id: String(m.id), name: String(m.name ?? m.id), description: m.description ?? undefined }));
       if (r!.modes.currentModeId) this.state.mode = String(r!.modes.currentModeId);
     }
+    this.thought = thoughtOption(r?.configOptions);
     if (Array.isArray(r?.models?.availableModels)) {
-      this.models = r!.models.availableModels.map((m: Json) => ({ value: String(m.modelId), label: String(m.name ?? m.modelId), description: m.description ?? undefined, efforts: [] }));
+      this.models = acpModelOptions(r!.models, this.thought);
       if (r!.models.currentModelId) this.state.model = String(r!.models.currentModelId);
     }
+    if (this.thought?.current) this.state.effort = this.thought.current;
+  }
+
+  /** The agent's own change to its options (after a model switch, say): the thought level, and the efforts the current model takes. */
+  private optionsChanged(configOptions: unknown) {
+    const thought = thoughtOption(configOptions);
+    if (!thought) return;
+    const was = this.thought?.options ?? [];
+    this.thought = thought;
+    if (thought.current) this.state.effort = thought.current;
+    // A model that takes the session's thought levels (it has no list of its own) takes the new ones; Grok Build's own lists stay.
+    this.models = this.models.map((m) => (m.value === this.state.model && (!m.efforts.length || m.efforts.join() === was.join()) ? { ...m, efforts: thought.options } : m));
+    this.changed();
+  }
+
+  /** Whether the current model takes this effort. */
+  private takesEffort(effort: string) {
+    if (!this.thought) return false;
+    const m = this.models.find((x) => x.value === this.state.model);
+    return m ? m.efforts.includes(effort) : this.thought.options.includes(effort);
+  }
+
+  private async setEffort(effort: string) {
+    if (!this.thought) throw new Error('This agent has no effort to set');
+    await this.rpc.call('session/set_config_option', { sessionId: this.acpSession, configId: this.thought.id, value: effort }, 15_000);
+    this.state.effort = effort;
   }
 
   private onLine(line: string, replay: boolean) {
@@ -424,6 +457,7 @@ export class AcpLive extends LiveAdapter {
         this.state.mode = String(u.currentModeId);
         this.changed();
       }
+      if (u.sessionUpdate === 'config_option_update') this.optionsChanged(u.configOptions);
       return;
     }
     // The answer to a prompt sent before the server restarted (its call is gone): the turn ended.
@@ -624,6 +658,8 @@ export class AcpLive extends LiveAdapter {
   async configure(cfg: LiveConfig): Promise<void> {
     if (cfg.mode) await this.setMode(cfg.mode).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
     if (cfg.model) await this.setModel(cfg.model).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
+    // A new model that does not take the effort set keeps the agent's own choice (its update says which).
+    if (cfg.effort) await this.setEffort(cfg.effort).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
     this.changed();
   }
 

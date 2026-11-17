@@ -7,7 +7,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
-import type { AccountStatus, LoginFlow, ModelOption } from '../../shared/types.ts';
+import type { AccountStatus, AgentUsage, LoginFlow, ModelOption, UsageWindow } from '../../shared/types.ts';
 import { accountEnv } from '../accounts.ts';
 import { ensureCommand } from '../clients.ts';
 import { config, paths } from '../config.ts';
@@ -63,6 +63,201 @@ function grokEnv(extra: Record<string, string>): Record<string, string> {
 }
 
 type Flow = LoginFlow & { proc?: ChildProcess; buf?: string };
+
+// ---- plan usage: Grok's `_x.ai/billing` answer -----------------------------------------------------------------------
+// The answer's exact shape is not known yet (it was written before anyone could read a signed-in one; the first read logs its
+// keys: "[grok] billing shape"). So `grokUsage` looks for things by what their keys are called, anywhere in the answer, and
+// when the real shape is seen, this is the one place to make exact.
+
+const norm = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** A number from a number, a numeric string, or a wrapper such as `{ val: "1250" }`. */
+function numOf(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') return /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? Number(v) : null;
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    for (const k of ['val', 'value', 'amount', 'cents', 'units', 'usd']) if (k in v) return numOf((v as Json)[k]);
+  }
+  return null;
+}
+
+/** Money in dollars: a key that says cents is divided by 100, any other is taken as dollars. */
+const dollarsOf = (v: unknown, key: string): number | null => {
+  const n = numOf(v);
+  return n == null ? null : Math.round((/cents?$/.test(key) ? n / 100 : n) * 100) / 100;
+};
+
+/** A time in ms: epoch seconds or ms, an ISO date, or a `{ seconds, nanos }` timestamp. */
+function msOf(v: unknown): number | null {
+  if (typeof v === 'number') return v > 1e12 ? v : v > 1e8 ? v * 1000 : null;
+  if (typeof v === 'string') {
+    if (/^\d+$/.test(v)) return msOf(Number(v));
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? null : t;
+  }
+  if (v && typeof v === 'object' && 'seconds' in v) return msOf(numOf((v as Json).seconds));
+  return null;
+}
+
+const PAYG = /(payg|payasyougo|ondemand|overage|spendingcap|spendcap|spendinglimit|usagebased)/;
+const PERCENT = /(percent|pct|utili[sz]ation|ratio|fraction)/;
+const USED = /^(used|spent|consumed|usage|currentusage|usedamount|usedcredits|totalused|amountused|usedcents|usedusd)$/;
+const LIMIT = /(limit|cap|allowance|quota|included|budget|max)/;
+const END = /(^end$|(periodend|cycleend|endsat|endat|endtime|enddate|resetsat|resetat|resettime|nextreset\w*|renewsat|renewal\w*|expiresat)$)/;
+const START = /(^start$|(periodstart|cyclestart|startsat|startat|starttime|startdate)$)/;
+/** Objects that hold a period's start and end beside the usage (a billing cycle). */
+const CYCLE = /(cycle|period|reset|renew|week|month)/;
+
+/** The plan's name as people say it: Grok's tier codes (SUPER_GROK_HEAVY…) or names, tidied. */
+function planName(v: string): string {
+  const t = v.replace(/^(subscription[_ ]?tier|tier|plan)[_ ]?/i, '').trim();
+  if (/heavy/i.test(t)) return 'SuperGrok Heavy';
+  if (/super[_ ]?grok[_ ]?plus|grok[_ ]?plus/i.test(t)) return 'SuperGrok Plus';
+  if (/super[_ ]?grok/i.test(t)) return 'SuperGrok';
+  return /^[A-Z0-9_]+$/.test(t) ? t.toLowerCase().replace(/(^|_)(\w)/g, (_m, a, c) => (a ? ' ' : '') + c.toUpperCase()) : t;
+}
+
+/**
+ * Grok Build's plan usage from its `_x.ai/billing` answer, whatever its shape (see above). Looks for:
+ * - a window: an object with a percentage (a key with percent, pct, utilization, ratio or fraction), or a used amount with a
+ *   limit (or what is left), outside anything about pay as you go; its reset is the nearest period end (end, resetsAt,
+ *   nextReset…) in it or around it, its length the period start to that end, and it is "Weekly" (10080 minutes) or "Monthly"
+ *   or "Daily" by a word in its keys or by that length, else just "Usage";
+ * - credits as a balance key; pay as you go as keys under a payg, pay-as-you-go, on-demand, overage or spending-cap name
+ *   (enabled, a cap or limit, used), in dollars (a key ending in cents is divided by 100);
+ * - the plan as a plan, tier or subscription key (SuperGrok, SuperGrok Plus, SuperGrok Heavy);
+ * - a limit reached: a window at 100%, a true "limit reached" or "exhausted" key, or a status saying so;
+ * - a plan run by a team: a true "managed by team" key, as `note`.
+ */
+export function grokUsage(raw: Json): AgentUsage {
+  type Node = { path: string[]; obj: Json; chain: Json[] };
+  const nodes: Node[] = [];
+  const leaves: { path: string; key: string; value: unknown; parent: string }[] = [];
+  const walk = (v: unknown, path: string[], chain: Json[]) => {
+    if (path.length > 7) return;
+    if (Array.isArray(v)) return v.slice(0, 20).forEach((x, i) => walk(x, [...path, String(i)], chain));
+    if (!v || typeof v !== 'object') return;
+    const obj = v as Json;
+    const here = [...chain, obj];
+    nodes.push({ path, obj, chain: here });
+    for (const [k, x] of Object.entries(obj)) {
+      if (!x || typeof x !== 'object' || numOf(x) != null) leaves.push({ path: [...path, k].map(norm).join('.'), key: norm(k), value: x, parent: norm(path[path.length - 1] ?? '') });
+      walk(x, [...path, k], here);
+    }
+  };
+  walk(raw, [], []);
+
+  // The nearest time under a key pattern: in the object itself, then in each one around it, and in the cycle or period
+  // objects beside the usage in each.
+  const near = (chain: Json[], re: RegExp): number | null => {
+    const within = (o: Json) => {
+      for (const [k, x] of Object.entries(o)) {
+        const t = re.test(norm(k)) ? msOf(x) : null;
+        if (t != null) return t;
+      }
+      return null;
+    };
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const t = within(chain[i]);
+      if (t != null) return t;
+      for (const [k, x] of Object.entries(chain[i])) {
+        if (x && typeof x === 'object' && !Array.isArray(x) && CYCLE.test(norm(k))) {
+          const c = within(x as Json);
+          if (c != null) return c;
+        }
+      }
+    }
+    return null;
+  };
+
+  const windows: UsageWindow[] = [];
+  for (const { path, obj, chain } of nodes) {
+    const keys = Object.keys(obj).map(norm);
+    if (PAYG.test(path.map(norm).join('.'))) continue;
+    const entries = Object.entries(obj)
+      .map(([k, x]) => ({ k: norm(k), x }))
+      .filter((e) => !PAYG.test(e.k));
+    const find = (re: RegExp, skip?: RegExp) => entries.find((e) => re.test(e.k) && !(skip && skip.test(e.k)) && numOf(e.x) != null);
+    const pc = find(PERCENT);
+    const used = find(USED);
+    const limit = find(LIMIT, USED);
+    const left = find(/^(remaining|left|available)\w*$/);
+    let usedPercent: number | null = null;
+    if (pc) {
+      const n = numOf(pc.x)!;
+      usedPercent = /(ratio|fraction)/.test(pc.k) || (/utili[sz]ation/.test(pc.k) && n <= 1 && !Number.isInteger(n)) ? n * 100 : n;
+    } else if (limit && numOf(limit.x)! > 0) {
+      const l = numOf(limit.x)!;
+      const u = used ? numOf(used.x) : left ? l - numOf(left.x)! : null;
+      if (u != null) usedPercent = (u / l) * 100;
+    }
+    if (usedPercent == null) continue;
+    const resetsAt = near(chain, END);
+    const startsAt = near(chain, START);
+    const days = resetsAt && startsAt ? (resetsAt - startsAt) / 86_400_000 : null;
+    const text = path.map(norm).join('.') + keys.join('.');
+    const kind = /week/.test(text) ? 'weekly' : /month/.test(text) ? 'monthly' : /dail|day/.test(text) ? 'daily' : days == null ? '' : days >= 6 && days <= 8 ? 'weekly' : days >= 27 && days <= 32 ? 'monthly' : days >= 0.9 && days <= 1.1 ? 'daily' : '';
+    const [id, label, windowMinutes] = kind === 'weekly' ? ['weekly', 'Weekly', 10080] : kind === 'monthly' ? ['monthly', 'Monthly', days ? Math.round(days * 1440) : null] : kind === 'daily' ? ['daily', 'Daily', 1440] : ['usage', 'Usage', days ? Math.round(days * 1440) : null];
+    if (windows.some((w) => w.id === id)) continue;
+    windows.push({ id: id as string, label: label as string, usedPercent: Math.max(0, Math.round(usedPercent * 10) / 10), resetsAt, windowMinutes: windowMinutes as number | null });
+  }
+
+  const under = (l: { path: string }) => PAYG.test(l.path);
+  // Credits: a balance, not one of pay as you go's.
+  const bal = leaves.find((l) => /^(credits?|creditbalance|creditsbalance|balance|availablecredits?|remainingcredits?|prepaidbalance)(cents|usd)?$/.test(l.key) && !under(l) && dollarsOf(l.value, l.key) != null);
+  const balance = bal ? dollarsOf(bal.value, bal.key)! : null;
+  const credits = balance != null ? { balance: String(balance), hasCredits: balance > 0 } : leaves.some((l) => /^unlimited/.test(l.key) && l.value === true) ? { unlimited: true } : null;
+
+  // Pay as you go: its on/off, its cap and what it has used.
+  const pay = leaves.filter(under);
+  const on = pay.find((l) => typeof l.value === 'boolean' && /(enabled|active|on|payg|payasyougo|ondemand|overage)$/.test(l.key));
+  const cap = pay.find((l) => LIMIT.test(l.key) && !USED.test(l.key) && dollarsOf(l.value, l.key) != null);
+  const spent = pay.find((l) => /(used|spent|usage|current)/.test(l.key) && !LIMIT.test(l.key) && dollarsOf(l.value, l.key) != null);
+  const monthlyLimit = cap ? dollarsOf(cap.value, cap.key) : null;
+  const paid = spent ? dollarsOf(spent.value, spent.key) : null;
+  const extra = on || cap ? { enabled: on ? on.value === true : true, monthlyLimit, used: paid, utilization: monthlyLimit && paid != null ? (paid / monthlyLimit) * 100 : null, currency: 'USD' } : null;
+
+  const planLeaf = leaves.find((l) => typeof l.value === 'string' && l.value && (/^(plan|planname|plantype|plantier|tier|tiername|subscription\w*)$/.test(l.key) || (/^(plan|tier|subscription\w*)$/.test(l.parent) && /^(name|displayname|title|type|id)$/.test(l.key))));
+  const plan = planLeaf ? planName(planLeaf.value as string) : undefined;
+
+  // A limit reached: a full window, or the answer says so.
+  const flagged = leaves.find((l) => l.value === true && /(limitreached|reachedlimit|limithit|hitlimit|limitexceeded|exceeded|exhausted|overlimit|capreached|outofcredits)/.test(l.path));
+  const said = leaves.find((l) => typeof l.value === 'string' && /^(status|state|reason|limitstate|usagestate)$/.test(l.key) && /(limit.?reached|exceeded|exhausted|capped|limit.?hit)/i.test(l.value as string));
+  const full = windows.filter((w) => (w.usedPercent ?? 0) >= 100).sort((a, b) => (b.resetsAt ?? 0) - (a.resetsAt ?? 0))[0];
+  let limited: AgentUsage['limited'] = null;
+  if (full) limited = { label: `${full.label} limit`, resetsAt: full.resetsAt ?? null };
+  else if (flagged || said) {
+    const t = flagged?.path ?? String(said?.value).toLowerCase();
+    const w = windows.find((x) => x.id === 'weekly') ?? windows[0];
+    limited = { label: /week/.test(t) ? 'Weekly limit' : /credit/.test(t) ? 'Credit limit' : /(spend|cap|payg)/.test(t) ? 'Spending cap' : w ? `${w.label} limit` : 'Plan limit', resetsAt: w?.resetsAt ?? null };
+  }
+  const team = leaves.some((l) => l.value === true && /(managedbyteam|teammanaged|managedbyorg|limitsmanaged|managedbyadmin|isteamplan|teamplan)/.test(l.path));
+
+  const u: AgentUsage = { agent: 'grok', ok: true, fetchedAt: Date.now(), windows };
+  if (plan) u.account = { plan };
+  if (credits) u.credits = credits;
+  if (extra) u.extra = extra;
+  if (limited) u.limited = limited;
+  if (team) u.note = 'Usage limits are managed by your team.';
+  return u;
+}
+
+/** What Grok's agent said to `_x.ai/billing`: the usage, or why there is none (`keep`: the last numbers still stand). */
+export function grokBilling(a: GrokAnswer | undefined): { usage: AgentUsage } | { error: string; keep: boolean } {
+  const e = a?.error;
+  if (!e) return { usage: grokUsage(a?.result ?? {}) };
+  if (e.code === -32000 || /authentication|sign.?in|log.?in/i.test(`${e.message} ${e.data ?? ''}`)) return { error: "Sign in to see Grok's plan usage.", keep: false };
+  if (e.code === -32601) return { error: 'This version of Grok Build does not report plan usage. Update it in Settings → Agents.', keep: false };
+  return { error: `Grok Build could not read the plan usage: ${e.message}`, keep: true };
+}
+
+/** The keys and kinds of values in an answer, never the values: what the log shows of the billing answer. */
+function shapeOf(v: unknown, depth = 0): unknown {
+  if (Array.isArray(v)) return depth > 6 ? 'array' : v.length ? [`${v.length}×`, shapeOf(v[0], depth + 1)] : [];
+  if (v && typeof v === 'object') return depth > 6 ? 'object' : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shapeOf(x, depth + 1)]));
+  return v === null ? 'null' : typeof v;
+}
+let shapeLogged = false;
 
 /** A call's answer from Grok Build's agent: its result, or its error (an error is an answer too). */
 export type GrokAnswer = { result?: Json; error?: { code?: number; message: string; data?: unknown } };
@@ -140,6 +335,40 @@ export class GrokControl extends EventEmitter {
   }
   flows = new Map<string, Flow>();
   private modelsKept?: { at: number; models: ModelOption[] };
+  /** The last reading of the plan's usage (also one that failed), and the last that worked. */
+  lastUsage: AgentUsage | null = null;
+  private lastGood: AgentUsage | null = null;
+  private reading?: Promise<AgentUsage>;
+
+  /**
+   * The plan's usage, as Grok's agent answers `_x.ai/billing` (it starts for a second: do not call it often). Signed out or
+   * not installed is an answer in plain words, not a throw; a read that fails for another reason keeps the last numbers.
+   */
+  usage(): Promise<AgentUsage> {
+    return (this.reading ??= this.readUsage().finally(() => (this.reading = undefined)));
+  }
+
+  private async readUsage(): Promise<AgentUsage> {
+    const fetchedAt = Date.now();
+    const fail = (error: string, keep = false): AgentUsage => {
+      const u: AgentUsage = keep && this.lastGood ? { ...this.lastGood, ok: false, error, fetchedAt } : { agent: 'grok', ok: false, error, fetchedAt, windows: [] };
+      if (!keep) this.lastGood = null;
+      return (this.lastUsage = u);
+    };
+    try {
+      const a = (await grokAsk(this.extraEnv, [{ method: '_x.ai/billing', params: {} }])).results[0];
+      const b = grokBilling(a);
+      if ('error' in b) return fail(b.error, b.keep);
+      if (!shapeLogged) {
+        shapeLogged = true;
+        console.warn('[grok] billing shape', JSON.stringify(shapeOf(a?.result ?? {})));
+      }
+      return (this.lastUsage = this.lastGood = { ...b.usage, fetchedAt });
+    } catch (e) {
+      const m = (e as Error).message;
+      return fail(/not installed/i.test(m) ? 'Grok Build is not installed yet: it installs itself the first time you sign in or start a session.' : `Grok Build could not read the plan usage: ${m}`, !/not installed/i.test(m));
+    }
+  }
 
   /**
    * Grok Build's models for this account, each with the efforts it takes, as its agent lists them (before any session:
@@ -217,6 +446,7 @@ export class GrokControl extends EventEmitter {
       this.emit('flow', flow);
       if (ok) {
         this.modelsKept = undefined;
+        this.lastUsage = this.lastGood = null;
         this.emit('account');
       }
     };
@@ -252,6 +482,7 @@ export class GrokControl extends EventEmitter {
       await new Promise<void>((resolve) => execProgram(bin, ['logout'], { env, cwd: paths.probe, timeout: 20_000 }, () => resolve()));
     }
     this.modelsKept = undefined;
+    this.lastUsage = this.lastGood = null;
     this.emit('account');
   }
 }
