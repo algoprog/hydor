@@ -117,8 +117,8 @@ export interface SearchResult {
   meaning: boolean;
 }
 
-/** The passages about a question in the bases (all of them, or all `within`, when none are named), best first. */
-export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; within?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null }): Promise<SearchResult> {
+/** The passages about a question in the bases (all of them, or all `within`, when none are named), best first; `keep` leaves out those of paths it refuses before the best are taken. */
+export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; within?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null; keep?: (path: string) => boolean }): Promise<SearchResult> {
   knowledgeSchema(db);
   const all = baseRows(db).filter((b) => wikiBaseVisible(db, b.id) && (!o.within || o.within.includes(b.id)));
   const names = new Map(all.map((b) => [b.id, b.name]));
@@ -156,7 +156,7 @@ export async function searchKnowledge(db: DB, o: { query: string; bases?: string
   const hits: KnowledgeHit[] = [];
   for (const [id, f] of fused) {
     const r = rows.get(id);
-    if (!r || !wikiDocumentVisible(db, r.base, r.path)) continue;
+    if (!r || !wikiDocumentVisible(db, r.base, r.path) || (o.keep && !o.keep(r.path))) continue;
     hits.push({ ref: `kb:${r.id}`, base: r.base, baseName: names.get(r.base) ?? r.base, docId: r.doc, path: r.path, title: r.title, part: r.part ?? undefined, text: excerpt(r.text, query), score: f.rrf, by: f.by });
   }
   // Exact text keeps reading order; the rest goes by rank.

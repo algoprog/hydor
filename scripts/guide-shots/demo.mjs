@@ -504,15 +504,76 @@ export async function seedApi(api, home, now, s) {
     'wiki/public-libraries-in-small-towns.md': ['Public libraries in small towns', ['raw/articles/library-survey-2024.md', 'raw/articles/maple-falls-interview.md'], 'Small towns keep one branch open for fewer hours than a city library, and most depend on a few volunteers.\n\n## What the survey found\n\n- 62% of the towns surveyed have a single branch.\n- The median branch is open 28 hours a week.\n- Programs for children and for older readers are the most used.\n\nSee also [Survey methods](survey-methods.md) and [Interviews with librarians](interviews-with-librarians.md).'],
     'wiki/survey-methods.md': ['Survey methods', ['raw/articles/library-survey-2024.md'], 'The 2024 survey went to 214 town libraries by mail and e-mail, with a response rate of 41%.\n\nQuestions covered opening hours, staff, volunteers, budget and programs. Answers are the librarians’ own reports, not audited figures.'],
     'wiki/interviews-with-librarians.md': ['Interviews with librarians', ['raw/articles/maple-falls-interview.md'], 'Six librarians were interviewed between January and March.\n\n- Funding is the first worry in every interview.\n- Volunteers run the weekend hours in four of the six towns.\n- The library is the only public place with free internet in two towns.\n\nLinked to [Public libraries in small towns](public-libraries-in-small-towns.md).'],
+    'wiki/children-and-family-programs.md': ['Children and family programs', ['raw/articles/library-survey-2024.md'], 'Story time and summer reading are the programs towns keep longest.\n\n- 78% of the libraries run a weekly story time.\n- Summer reading draws the most new card holders.'],
+    'wiki/internet-access-and-digital-help.md': ['Internet access and digital help', ['raw/articles/maple-falls-interview.md'], 'Free Wi-Fi and help with online forms bring in people who never borrow books.\n\n- Job applications and benefit forms are the most common requests.'],
+    'wiki/opening-hours-and-staffing.md': ['Opening hours and staffing', ['raw/articles/library-survey-2024.md'], 'The median branch is open 28 hours a week, with 1.5 paid staff.\n\n- Saturday hours depend on volunteers.'],
+    'wiki/funding-sources.md': ['Funding sources', ['raw/articles/library-survey-2024.md'], 'Town budgets pay 71% of running costs on average; the rest comes from state aid, grants and Friends groups.'],
+    'wiki/volunteers-and-friends-groups.md': ['Volunteers and Friends groups', ['raw/articles/maple-falls-interview.md'], 'Friends groups raise money with book sales and run weekend hours.\n\n- Four of the six towns interviewed rely on them for Saturdays.'],
+    'wiki/library-boards-and-town-budgets.md': ['Library boards and town budgets', ['raw/articles/maple-falls-interview.md'], 'A library board of five to seven residents brings the budget to town meeting each spring.'],
+    'wiki/sampling-and-response-rates.md': ['Sampling and response rates', ['raw/articles/library-survey-2024.md'], 'All 214 town libraries under 10,000 residents were invited; 88 answered (41%).'],
+    'wiki/coding-the-interviews.md': ['Coding the interviews', ['raw/articles/maple-falls-interview.md'], 'Interviews were coded in two rounds: open codes first, then five themes agreed with the advisor.'],
+    'wiki/thesis-timeline-and-defense.md': ['Thesis timeline and defense', [], 'Chapters 1 to 3 are drafted; the defense is in March.'],
     'raw/articles/library-survey-2024.md': ['Library survey 2024', [], 'Survey of 214 town libraries: results by question, with the questionnaire.'],
     'raw/articles/maple-falls-interview.md': ['Maple Falls librarian interview', [], 'Interview, 41 minutes, with the head librarian of Maple Falls.'],
   };
+  // Its areas (wiki/areas/, server/wiki/areas): the articles grouped by topic, each area's hub, the registry Hydor keeps.
+  const areas = [
+    ['library-use', 'Library use and services', 'Who uses small-town libraries, for what, and when they are open', ['wiki/public-libraries-in-small-towns.md', 'wiki/children-and-family-programs.md', 'wiki/internet-access-and-digital-help.md', 'wiki/opening-hours-and-staffing.md']],
+    ['funding', 'Funding and governance', 'Where the money comes from and who decides how it is spent', ['wiki/funding-sources.md', 'wiki/volunteers-and-friends-groups.md', 'wiki/library-boards-and-town-budgets.md']],
+    ['research-methods', 'Research methods', 'How the survey and the interviews were done and analysed', ['wiki/survey-methods.md', 'wiki/sampling-and-response-rates.md', 'wiki/interviews-with-librarians.md', 'wiki/coding-the-interviews.md']],
+  ];
+  const areaOf = (rel) => areas.find((a) => a[3].includes(rel))?.[0] ?? (rel.startsWith('wiki/') ? 'other' : null);
   for (const [rel, [title, sources, body]] of Object.entries(wikiFiles)) {
     const file = path.join(wikiDir, rel);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const front = ['---', `title: ${JSON.stringify(title)}`, ...(sources.length ? ['sources:', ...sources.map((x) => `  - ${x}`)] : []), 'updated: 2026-11-10', '---'];
+    const area = areaOf(rel);
+    const front = ['---', `title: ${JSON.stringify(title)}`, ...(area ? [`summary: ${JSON.stringify(body.split('\n')[0].slice(0, 150))}`, `areas: [${area}]`] : []), ...(sources.length ? ['sources:', ...sources.map((x) => `  - ${x}`)] : []), 'updated: 2026-11-10', '---'];
     fs.writeFileSync(file, `${front.join('\n')}\n\n# ${title}\n\n${body}\n`);
   }
+  const facts = {
+    'library-use': [['62% of the towns surveyed have a single branch.', 'public-libraries-in-small-towns'], ['The median branch is open 28 hours a week, with 1.5 paid staff.', 'opening-hours-and-staffing'], ['78% of the libraries run a weekly story time.', 'children-and-family-programs'], ['Job applications and benefit forms are the most common requests.', 'internet-access-and-digital-help']],
+    funding: [['Town budgets pay 71% of running costs on average.', 'funding-sources'], ['Four of the six towns interviewed rely on Friends groups for Saturdays.', 'volunteers-and-friends-groups'], ['A library board brings the budget to town meeting each spring.', 'library-boards-and-town-budgets']],
+    'research-methods': [['The 2024 survey went to 214 town libraries, with a response rate of 41%.', 'survey-methods'], ['Six librarians were interviewed between January and March.', 'interviews-with-librarians'], ['Interviews were coded in two rounds, then five themes agreed with the advisor.', 'coding-the-interviews']],
+  };
+  const overviews = {
+    'library-use': 'What small-town libraries offer and who comes: one branch open part of the week, programs for children and older readers, and free internet with help for online forms.',
+    funding: 'How small-town libraries are paid for and run: mostly from the town budget, with state aid, grants and Friends groups, under a board of residents.',
+    'research-methods': 'How the thesis gathered its evidence: a mail and e-mail survey of 214 town libraries, and six interviews with librarians, coded in two rounds.',
+  };
+  const titleOf = (rel) => wikiFiles[rel][0];
+  for (const [id, name, about, members] of areas) {
+    const hub = [
+      '---',
+      'kind: hub',
+      `area: ${id}`,
+      `title: ${JSON.stringify(name)}`,
+      `summary: ${JSON.stringify(about)}`,
+      'members:',
+      ...members.map((m) => `  - ${m} 2026-11-10 00000000`),
+      'updated: 2026-11-10',
+      '---',
+      '',
+      `# ${name}`,
+      '',
+      overviews[id],
+      '',
+      '## Key facts',
+      '',
+      ...facts[id].map(([t, a]) => `- ${t} ([${titleOf(`wiki/${a}.md`)}](../${a}.md))`),
+      '',
+      '## Articles',
+      '',
+      ...members.map((m) => `- [${titleOf(m)}](../${m.slice(5)}) — ${wikiFiles[m][2].split('\n')[0].slice(0, 150)}`),
+    ];
+    fs.mkdirSync(path.join(wikiDir, 'wiki', 'areas'), { recursive: true });
+    fs.writeFileSync(path.join(wikiDir, 'wiki', 'areas', `${id}.md`), `${hub.join('\n')}\n`);
+  }
+  const at = new Date().toISOString();
+  fs.mkdirSync(path.join(wikiDir, '.structure'), { recursive: true });
+  fs.writeFileSync(
+    path.join(wikiDir, '.structure', 'areas.json'),
+    JSON.stringify({ version: 1, updatedAt: at, lastReorganisedAt: at, articlesAtReorganise: {}, sizesAtReorganise: { other: 1 }, areas: [...areas.map(([id, name, about]) => ({ id, name, about, parent: null, aliases: [], createdAt: at, updatedAt: at })), { id: 'other', name: 'Other', about: 'Not yet placed in an area', parent: null, aliases: [], createdAt: at, updatedAt: at }], history: [], queue: [], merged: [] }, null, 2),
+  );
   await api('PUT', '/api/memory/profile', {
     text: [
       'Alex: self-employed graphic designer in Portland, Maine; files taxes in Greece, amounts in EUR.',
@@ -724,6 +785,8 @@ export function wikiData(db, spaces, now) {
     ['Budget tables 2019–2024', 'budget-tables.xlsx', now - 26 * HOUR, [], 0, 'Nothing in it to add to the wiki or to memory'],
     ['Interview notes: Maple Falls', 'interviews/maple-falls.docx', now - 3 * HOUR, ['wiki/interviews-with-librarians.md'], 1, null],
     ['Library survey 2024', 'library-survey-2024.pdf', now - 40 * MIN, ['wiki/public-libraries-in-small-towns.md', 'wiki/survey-methods.md'], 2, null],
+    // The wiki's areas (server/wiki/areas): a reorganisation listed as Areas, with what it moved.
+    ['Split Library use into Library use and services and Funding and governance; moved 3 articles', `areas:${new Date(now - 20 * MIN).toISOString().slice(0, 10)}`, now - 20 * MIN, ['wiki/funding-sources.md', 'wiki/volunteers-and-friends-groups.md', 'wiki/library-boards-and-town-budgets.md'], 0, null],
   ];
   for (const [document, file, at, articles, notes, error] of rows) add.run(spaces.thesis, 'demo', document, file, at, JSON.stringify(articles), notes, error);
 }

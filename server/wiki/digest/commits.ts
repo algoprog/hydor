@@ -98,6 +98,49 @@ export async function readCommits(folder: string, o: { sha?: string; since: numb
 
 let running = false;
 
+/** Reads one project's commits since the last time (or the first FIRST_DAYS days); whether the helper read any. Never throws. */
+async function commitsOf(db: DB, ask: DigestAsk | undefined, space: { id: string; name: string; folder: string }, now: number, onUpdate?: (space: string | null) => void): Promise<boolean> {
+  const last = Number(kvGet(db, kvAt(space.id))) || 0;
+  try {
+    const c = await readCommits(space.folder, { sha: kvGet(db, kvSha(space.id)) || undefined, since: last || now - FIRST_DAYS * 86400_000 });
+    kvSet(db, kvAt(space.id), String(now));
+    if (!c) return false;
+    const hash = wikiHash(c.text);
+    let read = false;
+    if (!digested(db, space.id, hash)) {
+      const title = `Commits ${c.from}–${c.to}`;
+      const ok = await digestText(db, ask ?? helperDigestAsk(db), { space: space.id, base: 'commits', title, path: `commits:${c.head.slice(0, 12)}`, origin: `commits:${space.name} · ${c.from}–${c.to}`, text: c.text, cut: false, kind: 'conversation', notes: false, hash, now: () => now, onUpdate });
+      if (!ok) {
+        // The helper failed: tried again in about an hour, from the same commits.
+        kvSet(db, kvAt(space.id), String(now - COMMITS_EVERY_MS + 3600_000));
+        return false;
+      }
+      read = true;
+    }
+    kvSet(db, kvSha(space.id), c.head);
+    return read;
+  } catch (e) {
+    console.warn(`[wiki] commits of ${space.name}: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+/**
+ * One project's new commits now, whatever the time since the last read (Update now): whether there were any to read.
+ * Memory, Learn from conversations and the project's wiki memory must be on, as for the daily read.
+ */
+export async function digestCommitsNow(db: DB, ask: DigestAsk | undefined, spaceId: string, now = Date.now(), onUpdate?: (space: string | null) => void): Promise<boolean> {
+  if (running || !memoryOn(db) || !learnOn(db) || !wikiMemoryOn(db, spaceId)) return false;
+  const space = allSpaces(db).find((s) => s.id === spaceId);
+  if (!space) return false;
+  running = true;
+  try {
+    return await commitsOf(db, ask, space, now, onUpdate);
+  } finally {
+    running = false;
+  }
+}
+
 /**
  * Reads the commits of every project whose turn it is: memory on, wiki memory on for it, a Git repository for a folder,
  * the last time at least COMMITS_EVERY_MS ago. Returns how many projects it read commits for. Never throws.
@@ -113,25 +156,7 @@ export async function digestCommitsDue(db: DB, ask: DigestAsk | undefined, now =
       if (!wikiMemoryOn(db, space.id)) continue;
       const last = Number(kvGet(db, kvAt(space.id))) || 0;
       if (now - last < COMMITS_EVERY_MS) continue;
-      try {
-        const c = await readCommits(space.folder, { sha: kvGet(db, kvSha(space.id)) || undefined, since: last || now - FIRST_DAYS * 86400_000 });
-        kvSet(db, kvAt(space.id), String(now));
-        if (!c) continue;
-        const hash = wikiHash(c.text);
-        if (!digested(db, space.id, hash)) {
-          const title = `Commits ${c.from}–${c.to}`;
-          const ok = await digestText(db, ask ?? helperDigestAsk(db), { space: space.id, base: 'commits', title, path: `commits:${c.head.slice(0, 12)}`, origin: `commits:${space.name} · ${c.from}–${c.to}`, text: c.text, cut: false, kind: 'conversation', notes: false, hash, now: () => now, onUpdate });
-          if (!ok) {
-            // The helper failed: tried again in about an hour, from the same commits.
-            kvSet(db, kvAt(space.id), String(now - COMMITS_EVERY_MS + 3600_000));
-            continue;
-          }
-          read++;
-        }
-        kvSet(db, kvSha(space.id), c.head);
-      } catch (e) {
-        console.warn(`[wiki] commits of ${space.name}: ${(e as Error).message}`);
-      }
+      if (await commitsOf(db, ask, space, now, onUpdate)) read++;
     }
     return read;
   } catch (e) {

@@ -3,7 +3,8 @@
 // this came are read once too; a project with more documents than its limit reads the pinned, the most used and the
 // newest, and has an overview article for each folder of the rest, overviews.ts), and about once a day, and when a session
 // has gone quiet, the project's recent conversations update it (work.ts), as do its commit messages once a day
-// (commits.ts). Lists what it did for the project page.
+// (commits.ts). Lists what it did for the project page. The same check keeps the wikis' areas (../areas): new articles
+// placed, the reorganising pass when it is due, folds and merges, hubs written again; and a route asks for a pass now.
 import { HttpError } from '../../auth.ts';
 import { kvGet, kvSet, type DB } from '../../db.ts';
 import type { Feature } from '../../features/types.ts';
@@ -21,7 +22,12 @@ import { writeOverviews } from './overviews.ts';
 import { helperDigestAsk } from './plan.ts';
 import { updatesOf } from './store.ts';
 import { startWikiDrift } from './drift.ts';
-import { CHECK_MS, FIRST_CHECK_MS, learnWikiFromQuiet, learnWikiFromWork, wikiWorkDue } from './work.ts';
+import { CHECK_MS, FIRST_CHECK_MS, learnWikiFromQuiet, learnWikiFromWork, nobodyWriting, wikiWorkDue } from './work.ts';
+import { areasHelper, reorganiseNow, tendAreas } from '../areas/tend.ts';
+import { estimateRebuild, restoreArchive, startRebuild, wikiJobStatus } from '../areas/rebuild.ts';
+import { startUpdate, updateParts } from '../areas/update.ts';
+import { resumeWikiJobs } from '../areas/resume.ts';
+import { setDigestQueue } from './queue.ts';
 
 let digest: Digest | null = null;
 let timers: NodeJS.Timeout[] = [];
@@ -88,11 +94,56 @@ export const wikiDigest: Feature = {
       if (!spaceById(d.db, id)) throw new HttpError(404, 'No such project');
       return { updates: updatesOf(d.db, id), documents: documentsOverLimit(d.db, id) };
     });
+    const changed = (space: string | null) => d.broadcast({ t: 'feature', id: 'wiki', data: { space } });
+    /** Reorganise the shared wiki's areas now, whatever the triggers say (one at a time). */
+    d.app.post('/api/wiki/reorganise', async () => reorganiseNow(d.db, null, { onUpdate: changed }));
+    /** The same for a project's wiki. */
+    d.app.post('/api/projects/:id/wiki/reorganise', async (req) => {
+      const id = String((req.params as { id: string }).id);
+      if (!spaceById(d.db, id)) throw new HttpError(404, 'No such project');
+      return reorganiseNow(d.db, id, { onUpdate: changed });
+    });
+    // Rebuild a wiki from its sources (an estimate first, then { confirm: true }), its status, putting an archive back, and Update now.
+    const helpers = () => {
+      const ask = areasHelper(d.db);
+      return { ask, strong: ((q) => ask({ ...q, strong: true })) as typeof ask, onUpdate: changed };
+    };
+    const busy = (key: string) => ['working', 'waiting', 'starting'].includes(d.sessions?.summary(key)?.live?.status ?? '');
+    const place = (req: { params: unknown }): string | null => {
+      const id = (req.params as { id?: string }).id;
+      if (id === undefined) return null;
+      if (!spaceById(d.db, String(id))) throw new HttpError(404, 'No such project');
+      return String(id);
+    };
+    const rebuild = async (req: { params: unknown; body: unknown }) => {
+      const space = place(req);
+      const body = (req.body ?? {}) as { confirm?: unknown };
+      if (body.confirm !== true) return estimateRebuild(d.db, space);
+      return startRebuild(d.db, space, helpers());
+    };
+    const status = async (req: { params: unknown }) => wikiJobStatus(d.db, place(req));
+    const restore = async (req: { params: unknown; body: unknown }) => {
+      const at = (req.body as { at?: unknown } | undefined)?.at;
+      if (typeof at !== 'string' || !at) throw new HttpError(400, 'at: the time of the archive to restore (GET …/wiki/rebuild lists them)');
+      return restoreArchive(d.db, place(req), at, { onUpdate: changed });
+    };
+    const update = async (req: { params: unknown; body: unknown }) => startUpdate(d.db, place(req), updateParts((req.body as { parts?: unknown } | undefined)?.parts), { ...helpers(), busy });
+    d.app.post('/api/wiki/rebuild', rebuild);
+    d.app.post('/api/projects/:id/wiki/rebuild', rebuild);
+    d.app.get('/api/wiki/rebuild', status);
+    d.app.get('/api/projects/:id/wiki/rebuild', status);
+    d.app.post('/api/wiki/rebuild/restore', restore);
+    d.app.post('/api/projects/:id/wiki/rebuild/restore', restore);
+    d.app.post('/api/wiki/update', update);
+    d.app.post('/api/projects/:id/wiki/update', update);
   },
   start(d) {
     digest?.dispose();
     const onUpdate = (space: string | null) => d.broadcast({ t: 'feature', id: 'wiki', data: { space } });
     const mine = (digest = createDigest(d.db, { onUpdate }));
+    setDigestQueue(mine);
+    // A rebuild the last stop cut short goes on where it stopped; an update or a reorganisation is not taken up again.
+    resumeWikiJobs(d.db, { onUpdate, busy: (key) => ['working', 'waiting', 'starting'].includes(d.sessions.summary(key)?.live?.status ?? '') });
     knowledgeEvents.on('indexed', (doc: IndexedDoc) => mine.enqueue(doc));
     startWikiDrift(d.db, onUpdate);
     // The documents already there: each place once, when it qualifies; looked at again with every check, so a limit
@@ -126,6 +177,8 @@ export const wikiDigest: Feature = {
         else await guarded('learning from quiet sessions', () => learnWikiFromQuiet(d.db, undefined, Date.now(), onUpdate, { busy }));
         await guarded('reading commits', () => digestCommitsDue(d.db, undefined, Date.now(), onUpdate));
         await guarded('writing overviews', () => writeOverviews(d.db, helperDigestAsk(d.db), Date.now(), onUpdate));
+        // The wikis' areas: placing new articles, the reorganising pass when it is due (only while nobody is writing to an agent), merges, hubs.
+        await guarded('keeping wiki areas', () => tendAreas(d.db, { now: Date.now(), onUpdate, quiet: nobodyWriting(d.db) }));
       })();
     };
     const first = setTimeout(check, FIRST_CHECK_MS);

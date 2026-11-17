@@ -19,6 +19,11 @@ export interface HelperAsk {
   images?: { data: string; mimeType: string }[];
   /** A model other than the chosen helper, by Custom's model id. */
   model?: string;
+  /**
+   * A rare question that needs a stronger model than the everyday helper (a wiki's reorganising pass): on Automatic,
+   * Claude Sonnet instead of Haiku. A helper model the user picked is used as it is.
+   */
+  strong?: boolean;
   maxTokens?: number;
   timeoutMs?: number;
   /** Stops the call (on "auto", its program ends). */
@@ -66,6 +71,22 @@ export function localHelper(db: DB): string | null {
   return id !== 'auto' && customModels().find((m) => m.id === id)?.local ? id : null;
 }
 
+/**
+ * What a number of helper tokens would cost, for an estimate shown before a long job (a wiki's rebuild): the helper's
+ * name, and its price from the app's model prices when it has one ($0 on this computer). Automatic has none: it uses
+ * the Claude account's usage.
+ */
+export function helperCost(db: DB, t: { tokensIn: number; tokensOut: number }): { model: string; label: string; priced: boolean; usd?: number } {
+  const id = helperModelId(db);
+  if (id === 'auto') return { model: 'auto', label: 'Automatic', priced: false };
+  const m = customModels().find((x) => x.id === id);
+  if (!m) return { model: id, label: id, priced: false };
+  if (m.provider === 'ollama' || m.provider === 'vllm') return { model: id, label: m.label, priced: true, usd: 0 };
+  const tokens = { tokensIn: t.tokensIn, tokensCached: 0, tokensOut: t.tokensOut };
+  const usd = costOf(db, m.id, tokens) ?? costOf(db, m.model, tokens);
+  return typeof usd === 'number' && Number.isFinite(usd) ? { model: id, label: m.label, priced: true, usd: Math.round(usd * 100) / 100 } : { model: id, label: m.label, priced: false };
+}
+
 /** Whether the helper (or the given model) can look at images. */
 export function helperSees(db: DB, model?: string): boolean {
   const id = model ?? helperModelId(db);
@@ -83,7 +104,7 @@ export async function helper(db: DB, q: HelperAsk): Promise<string> {
   if (id === 'auto') {
     if (q.images?.length) throw new HttpError(400, 'The helper model cannot see images: pick one that does in Settings → Models');
     try {
-      return await oneShot({ system: q.system, prompt: q.prompt, timeoutMs: timeout, signal: q.signal });
+      return await oneShot({ system: q.system, prompt: q.prompt, timeoutMs: timeout, signal: q.signal, ...(q.strong ? { model: 'sonnet' as const } : {}) });
     } catch (e) {
       // Neither CLI answered: another helper model needs neither.
       if (e instanceof HttpError && e.status === 502 && !q.signal?.aborted) throw new HttpError(502, `${e.message} Settings → Models → Helper model can use another model.`);

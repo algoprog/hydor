@@ -3,6 +3,27 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.78.0 · 17 November 2026
+
+A wiki that organises itself: articles grouped in areas with hub pages, a structure that changes as the project does,
+rebuild and update on demand, and a flexible search for agents down to the section.
+
+- **Areas and hubs**: a project's wiki now groups its articles in areas (at most two levels), each with a hub page: what
+  the area covers, its key facts (each from the article it names) and its articles. The index lists them by area, the
+  Memory tab's Wiki groups them, and agents get the list of areas in one line. A new article is placed as it is
+  written; an article that fits no area waits in **Other**.
+- **It keeps itself in order**: hubs are rewritten when their articles change; articles named after an event ("…
+  rebuild in 0.34.0") are folded into topic articles and near-duplicates merged, with the earlier text kept and the old
+  path leading to the new one; and the areas themselves change over time (split, merged or renamed when the wiki grows),
+  a little at a time and at most weekly, the old names still understood. **Recent updates** shows each change.
+- **Update now, rebuild, restore**: a **⋯** menu on the project's Memory tab → Wiki can update the wiki at once (read
+  what waits, bring articles up to date, reorganise the areas), rebuild it from the sources it keeps (an estimate of
+  the helper calls and cost first; the current wiki archived, and the one before the first rebuild always kept), or put
+  an earlier wiki back. Agents can do the same when you ask them.
+- **Search the wiki any way**: agents get wiki_search, by words and meaning, exact text or a pattern, over areas,
+  articles or sections, in an area, under a path, among the sources or plans, or in other projects; and wiki_read can
+  open just one section, or some lines.
+
 ## 0.77.0 · 17 November 2026
 
 Richer search results: pictures, videos, sounds, the Library's pages and files show in the search box with thumbnails

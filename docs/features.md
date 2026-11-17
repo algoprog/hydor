@@ -274,7 +274,7 @@ agents that speak ACP and take MCP servers.
   out and adds to or starts articles with lasting knowledge only (no memory notes, nothing personal), and an update opens its
   session. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
   write articles with the hash of what they read, and check its sources and links, only in their own project's wiki (or the shared one),
-  never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools. Changing the wiki
+  never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools, and with `wiki_search` (words and meaning, words, exact text or a pattern; areas, articles or sections; one area or path; the articles, the sources or the plans; this project, another or all: each result with its article, section and lines), and `wiki_read` can read one section by its heading or a range of lines, numbered. Changing the wiki
   folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). Checkpoints: before and after an automatic
   compaction Claude Code, Codex and the Custom agent save one checkpoint of the session in the wiki folder (a resumed Claude Code or Codex
   session is given it once, and Custom's is cut to its model's context), with the secrets taken out (for
@@ -290,6 +290,21 @@ agents that speak ACP and take MCP servers.
   the plan's identity and work item numbers kept; each change shows the exact text and waits for your OK, which never authorizes carrying the plan out. Nothing else
   can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
   write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates.
+  Areas: from ten articles a wiki's articles are grouped into areas, lasting topics (`areas:` in each article's front matter, the
+  areas themselves in a hidden `.structure/areas.json`; no file moves), each with a hub kept by Hydor (`wiki/areas/<area>.md`: an
+  overview, up to six key facts each checked against the article it cites, and the area's articles in reading order); `index.md`
+  and the Memory tab list the articles by area, Other last. New articles are placed as they are written; now and then (the first
+  ten articles, an area past twelve, Other filling up again, a quarter of the wiki new; at most once a week) a stronger model proposes
+  the areas again (Sonnet on Automatic), a quick check overrules misplacements, and the code keeps every article placed, areas of two
+  or more, two levels at most and a third of the articles moved at most per pass. Event articles and duplicates it finds are merged
+  later, two a day, under the revision rules, the merged one left as a redirect that `wiki_read` follows. Agents get a line naming
+  the areas, and article lines say the area; an agent can be asked to reorganise now (`POST /api/projects/:id/wiki/reorganise`).
+  The Wiki part's ⋯ menu: **Update now** (the waiting documents, unread conversations and new commits read at once; up to ten
+  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Rebuild from
+  sources…** (an estimate of sources, helper calls and cost first; the wiki archived, the last three kept and the first one always, then every source in
+  `raw/` read again, at most 60 an hour, then the earlier articles no new one covers, the areas and hubs made anew, and old article paths redirected to the new articles;
+  sources, plans and memory notes untouched; it goes on after a restart) and **Restore the previous wiki…**; a line says what
+  it is doing, one at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`).
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works

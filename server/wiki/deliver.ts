@@ -13,6 +13,7 @@ import { searchKnowledge } from '../knowledge/search.ts';
 import { words } from '../memory/store.ts';
 import { BYTES, queryTable, scale, scoreAt } from '../memory/vectors.ts';
 import { activeWikiDocument } from './core.ts';
+import { areaNameOf, areaNames } from './areas/registry.ts';
 import { wikiKnowledgeSchema } from './knowledge/bindings.ts';
 import { wikiChatEnabled } from './access.ts';
 import { claimsToBePlan, PLANS_AREA } from './plans/area.ts';
@@ -92,8 +93,11 @@ function firstLine(body: string): string {
   return '';
 }
 
-/** What one article says of itself: title, summary (front matter, else its first line) and the files that changed since (it may be out of date). */
-export function articleInfo(file: string, rel: string, fallback: string): { title: string; summary: string; stale: string[] } | null {
+/**
+ * What one article says of itself: title, summary (front matter, else its first line), the files that changed since (it
+ * may be out of date) and the areas it is in (a hub: its own).
+ */
+export function articleInfo(file: string, rel: string, fallback: string): { title: string; summary: string; stale: string[]; areas: string[] } | null {
   let text: string;
   try {
     const st = fs.lstatSync(file);
@@ -114,16 +118,18 @@ export function articleInfo(file: string, rel: string, fallback: string): { titl
   const title = cut(one(fields.title).replace(/\s+/g, ' ').trim() || fallback || path.posix.basename(rel, '.md'), 80);
   const summary = cut((one(fields.summary) || firstLine(body)).replace(/\s+/g, ' ').trim(), SUMMARY_CHARS);
   const stale = (Array.isArray(fields.stale) ? fields.stale : one(fields.stale).split(',')).map((x) => x.trim()).filter(Boolean);
-  return { title, summary, stale };
+  const areas = fields.kind === 'hub' && typeof fields.area === 'string' ? [fields.area] : (Array.isArray(fields.areas) ? fields.areas : one(fields.areas).split(',')).map((x) => x.trim()).filter(Boolean);
+  return { title, summary, stale, areas };
 }
 
 /** What a line says of one article: title, summary (front matter, else its first line), and whether it may be out of date. */
-function articleLine(file: string, rel: string, fallback: string): { line: string; said: string } | null {
+function articleLine(file: string, rel: string, fallback: string, names: Map<string, string> | null): { line: string; said: string } | null {
   const a = articleInfo(file, rel, fallback);
   if (!a) return null;
   const { title, summary, stale } = a;
   const changed = stale.length ? ` [may be out of date: ${stale.slice(0, 2).join(', ')}${stale.length > 2 ? ` and ${stale.length - 2} more` : ''} changed]` : '';
-  return { line: `- ${title}${summary ? ` — ${summary}` : ''} (${rel})${changed}`, said: `${title} ${summary}` };
+  const area = areaNameOf(names, a.areas);
+  return { line: `- ${title}${summary ? ` — ${summary}` : ''} (${area ? `${area} · ` : ''}${rel})${changed}`, said: `${title} ${summary}` };
 }
 
 /** The best meaning similarity of each of these passages (by chunk id) to the request. */
@@ -165,11 +171,12 @@ export async function wikiLines(db: DB, o: { space: string | null; query: string
   if (!articles.size) return [];
   const sims = vector ? similarities(db, b.base, vector, new Set([...articles.values()].flatMap((a) => a.chunks))) : null;
   const asked = new Set(words(o.query).filter((w) => w.length >= 4));
+  const names = areaNames(b.root);
   const out: WikiLine[] = [];
   for (const [rel, a] of articles) {
     if (out.length >= o.limit) break;
     if (sims && Math.max(...a.chunks.map((c) => sims.get(c) ?? 0)) < WIKI_MIN) continue;
-    const l = articleLine(a.file, rel, a.title);
+    const l = articleLine(a.file, rel, a.title, names);
     if (!l) continue;
     if (!sims && words(l.said).filter((w) => asked.has(w)).length < 2) continue;
     out.push({ path: rel, text: l.line });

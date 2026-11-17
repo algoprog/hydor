@@ -71,12 +71,17 @@ export function conversationText(turns: { user: string; reply: string }[], max =
   return { text: [lines[0].slice(0, max), ...(cut ? ['(turns in between are left out)'] : []), ...tail].join('\n\n'), cut };
 }
 
+/** Whether nobody has written to an agent (no conversation turn) for QUIET_MS. */
+export function nobodyWriting(db: DB, now = Date.now()): boolean {
+  const newest = (db.prepare('select max(ts) as ts from chunk_text').get() as { ts: number | null } | undefined)?.ts ?? 0;
+  return now - newest >= QUIET_MS;
+}
+
 /** Whether a pass is due: the last was long enough ago, and no conversation turn was written in the last few minutes. */
 export function wikiWorkDue(db: DB, now = Date.now()): boolean {
   const last = Number(kvGet(db, KV_AT)) || 0;
   if (now - last < EVERY_MS) return false;
-  const newest = (db.prepare('select max(ts) as ts from chunk_text').get() as { ts: number | null } | undefined)?.ts ?? 0;
-  return now - newest >= QUIET_MS;
+  return nobodyWriting(db, now);
 }
 
 let running = false;
@@ -84,6 +89,8 @@ let running = false;
 export interface WorkOptions {
   /** Whether an agent is working in the session or waits on the user: it is read in a later pass. */
   busy?: (key: string) => boolean;
+  /** One project alone, now (Update now): its caps and exclusions kept, the daily pass's time left as it is. */
+  only?: string;
 }
 
 interface Chosen {
@@ -194,8 +201,10 @@ export async function learnWikiFromWork(db: DB, ask: DigestAsk | undefined, now 
   try {
     if (!memoryOn(db) || !learnOn(db)) return 0;
     const projects = projectsWithWiki(db);
+    if (options.only) for (const p of [...projects]) if (p !== options.only) projects.delete(p);
     let read = 0;
     if (projects.size) read = await readChosen(db, ask, choose(db, { now, floor: now - LOOK_BACK_MS, projects, busy: options.busy, quiet: false, perProject: PER_PROJECT, total: PER_PASS }), now, onUpdate);
+    if (options.only) return read;
     kvSet(db, KV_AT, String(now));
     dropWorkMarks(db, now - MARK_KEEP_MS);
     dropReads(db, now - 2 * 86400_000);

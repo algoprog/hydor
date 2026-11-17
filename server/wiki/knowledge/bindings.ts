@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { DB } from '../../db.ts';
 import { hubDir, wikiMemoryOn } from '../roots.ts';
-import { activeWikiDocument } from '../core.ts';
+import { activeWikiDocument, redirectOf } from '../core.ts';
 import { knowledgeSchema } from '../../knowledge/store.ts';
 
 interface Binding { base: string; source: string; root: string; space: string | null; active: number }
@@ -67,7 +67,11 @@ export function wikiFileActive(root: string, file: string): boolean {
       }
     }
     if (!fs.statSync(file).isFile()) return false;
-    if (/\.md$/i.test(file) && !activeWikiDocument(fs.readFileSync(file, 'utf8'))) return false;
+    if (/\.md$/i.test(file)) {
+      const text = fs.readFileSync(file, 'utf8');
+      // A redirect stub (an article folded into another) is read through, never listed or searched.
+      if (!activeWikiDocument(text) || redirectOf(text) != null) return false;
+    }
     // A registry can archive a topic without changing that topic's own files.
     if (parts[0] === 'topics' && parts.length > 2) {
       const registryPath = path.join(root, 'wikis.json');

@@ -43,6 +43,14 @@ export function recordUpdate(db: DB, u: NewUpdate, at = Date.now()): number {
   })();
 }
 
+/** Changes a recorded update in place (a rebuild keeps one row with its progress). */
+export function changeUpdate(db: DB, id: number, u: { document?: string; articles?: string[]; error?: string | null }, at?: number) {
+  schema(db);
+  const cur = db.prepare('select document, articles, error, at from wiki_updates where id = ?').get(id) as { document: string; articles: string; error: string | null; at: number } | undefined;
+  if (!cur) return;
+  db.prepare('update wiki_updates set document = ?, articles = ?, error = ?, at = ? where id = ?').run(u.document ?? cur.document, u.articles ? JSON.stringify(u.articles) : cur.articles, u.error === undefined ? cur.error : u.error, at ?? cur.at, id);
+}
+
 /** A place's updates (null: the shared wiki's), newest first. */
 export function updatesOf(db: DB, space: string | null, limit = SHOW_UPDATES): WikiUpdate[] {
   schema(db);

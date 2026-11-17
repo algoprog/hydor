@@ -1,8 +1,9 @@
 // Writing what the helper chose into a wiki: articles with their sources in the frontmatter (the code writes the
 // frontmatter, the model only the body), `index.md` and `log.md`. Only paths wiki/**/*.md, index.md and log.md.
 import path from 'node:path';
-import { applyWikiChanges, readWiki, wikiHash } from '../core.ts';
+import { applyWikiChanges, readWiki, redirectOf, wikiHash } from '../core.ts';
 import { browseWiki } from '../browse.ts';
+import { areaOrder, hasAreas, hubPath, isHubPath, loadRegistry, memberPath, placedIn } from '../areas/registry.ts';
 import { snapshotArticle, type Removed } from './history.ts';
 
 /** A path as this feature writes one: no segment starting with a dot, under wiki/ and ending .md, or index.md or log.md. */
@@ -130,7 +131,10 @@ export function summaryOf(content: string): string {
 /** A path as the front matter lists it: plain characters only. */
 const listable = (p: string) => /^[\w@.+\-/]+$/.test(p) && !p.includes('..');
 
-const KEYS_OWNED = ['title', 'summary', 'sources', 'anchors', 'commit', 'stale', 'updated'];
+const KEYS_OWNED = ['title', 'summary', 'areas', 'sources', 'anchors', 'commit', 'stale', 'updated'];
+
+/** An area id as front matter lists it. */
+const areaId = (id: string) => /^[a-z0-9][a-z0-9-]{0,47}$/.test(id);
 
 export interface Compose {
   title: string;
@@ -145,6 +149,8 @@ export interface Compose {
   anchors?: string[];
   /** The repository's commit the article was written against; kept as it was when not given. */
   commit?: string | null;
+  /** The ids of the areas it is in (wiki/areas); kept as they were when not given. */
+  areas?: string[];
 }
 
 /**
@@ -161,10 +167,12 @@ export function composeArticle(old: string | null, body: string, o: Compose): st
   const summary = o.summary != null ? clipLine(plainLine(o.summary), SUMMARY_MAX) : frontValue(f, 'summary');
   const anchors = (o.anchors ?? (old ? listOf(f, 'anchors') : [])).filter(listable);
   const commit = o.commit || frontValue(f, 'commit');
+  const areas = [...new Set(o.areas ?? areaList(f))].filter(areaId).slice(0, 2);
   const front = [
     '---',
     `title: ${titleLine}`,
     ...(summary ? [`summary: ${JSON.stringify(summary)}`] : []),
+    ...(areas.length ? [`areas: [${areas.join(', ')}]`] : []),
     ...(sources.length ? ['sources:', ...sources.map((s) => `  - ${s}`)] : []),
     ...(anchors.length ? ['anchors:', ...anchors.map((a) => `  - ${a}`)] : []),
     ...(commit ? [`commit: ${commit}`] : []),
@@ -173,6 +181,42 @@ export function composeArticle(old: string | null, body: string, o: Compose): st
     '---',
   ];
   return `${front.join('\n')}\n\n${body.trim()}\n`;
+}
+
+/**
+ * The article with its `areas:` set to `ids` (none: removed), the body and every other key untouched; an article with
+ * no front matter gets one holding only its areas.
+ */
+export function withAreas(text: string, ids: string[]): string {
+  const list = [...new Set(ids)].filter(areaId).slice(0, 2);
+  const line = list.length ? [`areas: [${list.join(', ')}]`] : [];
+  const m = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+  if (!m) return list.length ? `---\n${line.join('\n')}\n---\n\n${text.replace(/^\s+/, '')}` : text;
+  const f = splitFront(text);
+  const at = f.keys.findIndex((k) => k.key === 'areas');
+  const keys = f.keys.map((k) => k.lines);
+  if (at >= 0) keys.splice(at, 1, line);
+  else {
+    // After the summary (or the title), where the code writes it.
+    const after = Math.max(f.keys.findIndex((k) => k.key === 'summary'), f.keys.findIndex((k) => k.key === 'title'));
+    keys.splice(after + 1, 0, line);
+  }
+  return `---\n${keys.flat().join('\n')}\n---\n${text.slice(m[0].length)}`;
+}
+
+/** The ids a front matter lists under `areas:`: a list (`[a, b]` or one a line), or one id or several with commas. */
+function areaList(f: Front): string[] {
+  const listed = listOf(f, 'areas');
+  if (listed.length) return listed;
+  return (frontValue(f, 'areas') ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+}
+
+/** The ids an article's front matter lists under `areas:`. */
+export const areasOfArticle = (text: string): string[] => areaList(splitFront(text));
+
+/** The `## ` and `### ` headings of a body, as plain text. */
+export function headingsOf(body: string, max = 12): string[] {
+  return [...body.matchAll(/^#{2,3}\s+(.+?)\s*#*\s*$/gm)].map((m) => m[1].replace(/[*_`]/g, '').trim()).filter(Boolean).slice(0, max);
 }
 
 /** The article with its `stale:` set to `paths` (none: removed), the body and every other key untouched. */
@@ -242,16 +286,48 @@ export async function writeFile(root: string, rel: string, make: (current: strin
 
 const START = '<!-- articles:start -->';
 const END = '<!-- articles:end -->';
+/** A wiki with fewer articles than this keeps its index a flat list, areas or not. */
+export const GROUP_FROM = 10;
 
-/** `index.md`: every article with its title, link and summary, in a block the code owns (what else is in the file stays). */
+/** One line of the index: the article's title, link and summary. */
+function indexLine(root: string, a: { path: string; title: string }, content?: string): string {
+  const summary = plainLine(summaryOf(content ?? readOrNull(root, a.path)?.content ?? '')).replace(/[\r\n]+/g, ' ');
+  return `- [${a.title.replace(/[\[\]]/g, '')}](${encodeURI(a.path)})${summary ? ` — ${summary}` : ''}`;
+}
+
+/**
+ * The index's block: every article (not hubs, not redirects) with its title, link and summary. Grouped by area once
+ * the wiki has areas and at least GROUP_FROM articles: a heading for each area (linking its hub when it has one), what
+ * it holds, then its articles, in its hub's reading order; an article in two areas is under both; Other last.
+ */
+export function indexBlock(root: string): string {
+  const articles = browseWiki(root).articles.filter((a) => !isHubPath(a.path));
+  const registry = loadRegistry(root);
+  if (!hasAreas(registry) || articles.length < GROUP_FROM) return articles.map((a) => indexLine(root, a)).join('\n') || '(no articles yet)';
+  const texts = new Map(articles.map((a) => [a.path, readOrNull(root, a.path)?.content ?? '']));
+  const members = new Map<string, { path: string; title: string }[]>();
+  for (const a of articles) for (const id of placedIn(areasOfArticle(texts.get(a.path)!), registry)) members.set(id, [...(members.get(id) ?? []), a]);
+  const out: string[] = [];
+  for (const { area, depth } of areaOrder(registry)) {
+    const own = members.get(area.id) ?? [];
+    const subs = registry.areas.filter((x) => x.parent === area.id && (members.get(x.id)?.length ?? 0) > 0);
+    if (!own.length && !subs.length) continue;
+    const hub = readOrNull(root, hubPath(area.id));
+    // The hub's reading order (its members), then the rest by title.
+    const order = hub ? listOf(splitFront(hub.content), 'members').map(memberPath) : [];
+    const rank = (p: string) => (order.includes(p) ? order.indexOf(p) : order.length);
+    own.sort((x, y) => rank(x.path) - rank(y.path) || x.title.localeCompare(y.title));
+    const name = area.name.replace(/[\[\]\r\n]/g, '');
+    const heading = hub && redirectOf(hub.content) == null ? `[${name}](${encodeURI(hubPath(area.id))})` : name;
+    out.push(`${depth ? '###' : '##'} ${heading}`, '', ...(area.about ? [plainLine(area.about), ''] : []), ...own.map((a) => indexLine(root, a, texts.get(a.path))), '');
+  }
+  return out.join('\n').trim();
+}
+
+/** `index.md`: every article with its title, link and summary, grouped by area when the wiki has them, in a block the code owns (what else is in the file stays). */
 export async function writeIndex(root: string): Promise<void> {
   await writeFile(root, 'index.md', (cur) => {
-    const articles = browseWiki(root).articles;
-    const lines = articles.map((a) => {
-      const summary = plainLine(summaryOf(readOrNull(root, a.path)?.content ?? '')).replace(/[\r\n]+/g, ' ');
-      return `- [${a.title.replace(/[\[\]]/g, '')}](${encodeURI(a.path)})${summary ? ` — ${summary}` : ''}`;
-    });
-    const block = `${START}\n${lines.join('\n') || '(no articles yet)'}\n${END}`;
+    const block = `${START}\n${indexBlock(root)}\n${END}`;
     if (cur == null) return `# Wiki index\n\nEvery article, by title.\n\n${block}\n`;
     const a = cur.indexOf(START);
     const b = cur.indexOf(END);
@@ -269,7 +345,7 @@ export async function appendLog(root: string, o: { document: string; articles: {
 }
 
 /** Lines added to `log.md` as they are (each already a whole `- date · …` line). */
-async function appendLines(root: string, lines: string[]): Promise<void> {
+export async function appendLines(root: string, lines: string[]): Promise<void> {
   if (!lines.length) return;
   await writeFile(root, 'log.md', (cur) => (cur == null ? `# Log\n\n${lines.join('\n')}\n` : `${cur.replace(/\s*$/, '')}\n${lines.join('\n')}\n`));
 }
@@ -352,6 +428,8 @@ export interface StoreArticle {
   /** Only write over exactly this file text (a split: the article was read and split as it was). */
   expect?: string;
   carry?: string[];
+  /** The areas it is in (a new article placed by the digest; a merge's union); kept as they were when not given. */
+  areas?: string[];
 }
 
 export interface Stored {
@@ -385,7 +463,7 @@ export async function storeArticle(root: string, a: StoreArticle): Promise<Store
         }
       }
     }
-    const next = composeArticle(cur, a.body, { title: a.title, source: a.source, carry: a.carry, now: a.now, summary: a.summary, anchors: a.anchors, commit: a.commit });
+    const next = composeArticle(cur, a.body, { title: a.title, source: a.source, carry: a.carry, now: a.now, summary: a.summary, anchors: a.anchors, commit: a.commit, areas: a.areas });
     if (cur == null) {
       result = { status: 'written', replaced: 0 };
       return next;

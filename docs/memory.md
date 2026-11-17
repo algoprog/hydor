@@ -161,6 +161,12 @@ An article over 12,000 characters is **split** before it is updated: the helper 
 
 Each article records the files it names and the commit it was written against. Once a day, for a project in a Git repository, Hydor compares them with what changed since. An article whose files changed is marked **stale**, with no model involved, and the helper revises up to five stale articles a day from the article and the change, under the rules above. Agents see a stale article's line with "may be out of date" until it has been revised.
 
+### Areas and hubs
+
+A wiki that keeps growing needs a shape, or its index becomes too long to read. From ten articles, its articles are grouped into **areas**, lasting topics of the project, each with a **hub** (`wiki/areas/<area>.md`): what the area covers, up to six key facts, each linked to the article it comes from and checked against it, and its articles in reading order. `index.md` lists the articles by area, and an agent is told the areas in one line, so it can read one hub instead of the whole index. Files never move: an article says its areas in its front matter.
+
+New articles are placed as they are written. Now and then, and never more than once a week, a stronger model looks at the areas again and may split, merge or rename them; a quick check by the helper overrules an article it put in the wrong place, and Hydor keeps to the rules: every article placed (else **Other**), areas of at least two articles, and at most a third of the articles moved in one pass. An article about an event whose content belongs in a topic article, or a duplicate, is merged into it later, two a day, under the rules of any revision; the article merged away stays as a **redirect**, so links and notes that point at it keep working. See [Areas and hubs](guide/28-wiki-memory.md#areas-and-hubs) in the guide.
+
 ### Big document sets
 
 Reading a thousand papers with the helper model would take days. A project's wiki reads **at most a limit** of its documents: **Most documents to read into the wiki** in **Settings → Memory → Wiki memory**, 100 at first, or a number of its own on the project's **Settings** tab. Over it, the wiki reads the **pinned** ones first, then those agents **used most** (found with a document search or read), then the newest. The rest stay searchable.

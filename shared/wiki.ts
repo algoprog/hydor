@@ -48,6 +48,21 @@ export interface WikiItem {
   title: string;
 }
 
+/** An area of a wiki: a group of articles about one lasting topic, with its hub (what it covers, its key facts, its articles). */
+export interface WikiArea {
+  /** Stable: made once from its first name. */
+  id: string;
+  name: string;
+  /** What belongs in it, in a line. */
+  about: string;
+  /** The area it is a sub-area of (two levels at most). */
+  parent: string | null;
+  /** Its hub's path (wiki/areas/<id>.md), when it has one. */
+  hub?: string;
+  /** Its articles' paths, in its hub's reading order. */
+  articles: string[];
+}
+
 /** GET /api/projects/:id/wiki: a project's wiki memory. */
 export interface ProjectWikiView {
   /** off: wiki memory is off for the project; empty: on, nothing in it yet; ready: articles or sources to show. */
@@ -61,6 +76,11 @@ export interface ProjectWikiView {
   sources?: WikiItem[];
   /** Active project plans (output/projects/, changed only by the plan tools) and execution evidence (output/evidence/). */
   plans?: WikiItem[];
+  /**
+   * While the wiki has areas: each area with its articles (an article in two is in both), top-level areas in order,
+   * each followed by its sub-areas, Other last. `articles` then leaves the hubs out (each area links its own).
+   */
+  areas?: WikiArea[];
   truncated?: boolean;
   error?: string;
 }
@@ -69,7 +89,11 @@ export interface ProjectWikiView {
 export interface WikiUpdate {
   id: number;
   at: number;
-  /** The document's title and path, as knowledge has them; for a conversation, the session's title and `session:<session key>`. */
+  /**
+   * The document's title and path, as knowledge has them; for a conversation, the session's title and `session:<session key>`;
+   * a reorganisation of the areas: what changed ("Split X into Y and Z; moved 6 articles") and `areas:<date>`; a merge:
+   * "A into B" and `merge:<B's path>`.
+   */
   document: string;
   path: string;
   /** The wiki articles it created or changed, by path. */

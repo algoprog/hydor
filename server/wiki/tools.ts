@@ -6,7 +6,11 @@ import type { RunCtx, RunTool } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { guardWikiFolder } from './settings/gitignore.ts';
 import { claimsToBePlan, EVIDENCE_AREA, inEvidenceArea, inPlansArea, PLANS_AREA } from './plans/area.ts';
-import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, wikiHash } from './core.ts';
+import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, redirectOf, wikiHash } from './core.ts';
+import { readWikiPart } from './sections.ts';
+import { wikiSearchTool } from './search-tool.ts';
+import { isHubPath } from './areas/registry.ts';
+import { areasOfArticle, withAreas, writeIndex } from './digest/write.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts';
 import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { otherProject } from '../memory/across.ts';
@@ -156,16 +160,27 @@ export function wikiTools(): RunTool[] {
     },
     {
       name: 'wiki_read',
-      description: 'Read one active article, source, project plan or execution evidence (wiki/…, raw/…, output/projects/…, output/evidence/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable. With `project` it reads that other project’s wiki (read only).',
+      description: 'Read one active article, source, project plan or execution evidence (wiki/…, raw/…, output/projects/…, output/evidence/…, index.md, log.md) with its exact SHA-256. index.md lists the articles by area; wiki/areas/<area>.md is an area’s hub (what it covers, its key facts, its articles). With `section` (a heading’s text or its slug) it reads just that section, its subsections included; with `lines` ("40-80", or "40") just those lines; both come numbered, as wiki_search says where a result is. An article merged into another, or gone when the wiki was rebuilt, is followed to where it went (redirectedFrom says so). Hidden folders, retired documents and links out of the wiki are not readable. With `project` it reads that other project’s wiki (read only).',
       annotations: { readOnlyHint: true },
-      inputSchema: { type: 'object', properties: { path: { type: 'string' }, wiki: wikiArg, project: projectArg }, required: ['path'] },
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          section: { type: 'string', description: 'Optional: read only the section with this heading (its text or slug, case aside; "Methods › Data" for a subsection), with its subsections.' },
+          lines: { type: 'string', description: 'Optional: read only these lines, "40-80" or "40" (numbered).' },
+          wiki: wikiArg,
+          project: projectArg,
+        },
+        required: ['path'],
+      },
       async run(a, ctx) {
         const other = otherWikiRoot(ctx, a.wiki, String(a.project ?? ''));
         const root = other ? other.root : wikiReadTarget(ctx, a.wiki);
         if (!root) return JSON.stringify({ empty: true, note: EMPTY });
-        return JSON.stringify(readWiki(root, String(a.path ?? '')));
+        return JSON.stringify(readWikiPart(root, String(a.path ?? ''), { section: a.section, lines: a.lines }));
       },
     },
+    wikiSearchTool((ctx) => wikiReadTarget(ctx)),
     {
       name: 'wiki_ingest_text',
       description: 'Keep a text source (and where it came from) in the wiki, exactly as given, as a source to write articles from. The text and the origin must hold no passwords, keys or tokens. The same text and origin are kept once; another origin gets its own note. Then write or update the articles that use it, with wiki_write.',
@@ -212,7 +227,7 @@ export function wikiTools(): RunTool[] {
     },
     {
       name: 'wiki_write',
-      description: 'Write one article (wiki/…), execution evidence (output/evidence/<plan>/<name>.md: what was done, deployed or accepted, with evidence or blockers), index.md or log.md after reading it with wiki_read and giving its exact SHA-256, or null for a new file. Plans (output/projects/…) cannot be written here at all: they have their own tools (wiki_plan_preview and wiki_plan_adopt, wiki_plan_revision_preview and wiki_plan_revise). Raw sources and hidden files cannot be written here. On a conflict read again; never overwrite blindly.',
+      description: 'Write one article (wiki/…; not the areas’ hubs in wiki/areas/, which Hydor keeps from their articles), execution evidence (output/evidence/<plan>/<name>.md: what was done, deployed or accepted, with evidence or blockers), index.md or log.md after reading it with wiki_read and giving its exact SHA-256, or null for a new file. Plans (output/projects/…) cannot be written here at all: they have their own tools (wiki_plan_preview and wiki_plan_adopt, wiki_plan_revision_preview and wiki_plan_revise). Raw sources and hidden files cannot be written here. On a conflict read again; never overwrite blindly.',
       inputSchema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, expectedSha256: { type: ['string', 'null'] }, wiki: wikiArg }, required: ['path', 'content', 'expectedSha256'] },
       async run(a, ctx) {
         if (typeof a.path !== 'string' || typeof a.content !== 'string' || !(a.expectedSha256 === null || (typeof a.expectedSha256 === 'string' && /^[a-f0-9]{64}$/.test(a.expectedSha256)))) throw new Error('Give path, content, and the exact expected SHA-256 or null');
@@ -222,12 +237,31 @@ export function wikiTools(): RunTool[] {
         // file is called, whatever its header says, no generic write creates or changes anything there.
         if (inPlansArea(a.path)) throw new Error(`Plans (${PLANS_AREA}/) are adopted with wiki_plan_preview and wiki_plan_adopt and changed with wiki_plan_revision_preview and wiki_plan_revise, which show the exact text, ask the user and keep earlier revisions. wiki_write cannot write there. Record what was done, deployed or accepted in ${EVIDENCE_AREA}/<plan>/<name>.md.`);
         if (inEvidenceArea(a.path) && claimsToBePlan(a.content)) throw new Error(`A plan is not written in ${EVIDENCE_AREA}/: use the plan tools`);
+        // Hubs are kept from their articles; an article merged into another is a redirect that stays one.
+        if (isHubPath(a.path)) throw new Error('Hubs are kept by Hydor from their articles: change the articles instead');
         const root = wikiTarget(ctx, a.wiki);
+        const article = /^wiki\/.+\.md$/i.test(a.path);
+        let content = a.content;
+        if (article) {
+          let cur: { content: string; sha256: string } | null = null;
+          try {
+            cur = readWiki(root, a.path);
+          } catch {
+            /* a new article */
+          }
+          const to = cur && redirectOf(cur.content);
+          if (to) throw new Error(`${a.path} was merged into ${to}: read and write ${to} instead`);
+          // An article keeps the areas it was in when the new text names none (the wiki's upkeep places a new one).
+          const had = cur && cur.sha256 === a.expectedSha256 ? areasOfArticle(cur.content) : [];
+          if (had.length && !areasOfArticle(content).length) content = withAreas(content, had);
+        }
         const guard = await guardProject(ctx, root);
         if (wikiReadTarget(ctx, a.wiki) !== root) throw new Error('Wiki target changed; review the preview again');
-        const result = applyWikiChanges(root, [{ path: a.path, content: a.content, expectedSha256: a.expectedSha256 }]);
+        const result = applyWikiChanges(root, [{ path: a.path, content, expectedSha256: a.expectedSha256 }]);
+        // The index lists every article (by area): it follows each article written.
+        if (article) await writeIndex(root).catch((e) => console.warn(`[wiki] index: ${(e as Error).message}`));
         wrote(ctx, root);
-        return JSON.stringify({ ...result, gitIgnore: guard });
+        return JSON.stringify({ ...result, sha256: wikiHash(Buffer.from(content)), gitIgnore: guard });
       },
     },
     {

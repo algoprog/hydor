@@ -45,7 +45,9 @@ export function checkSplit(raw: unknown, o: { path: string; oldBody: string; tak
   const parts = Array.isArray(r.parts) ? r.parts : [];
   if (parts.length < SPLIT_PARTS.min || parts.length > SPLIT_PARTS.max) return { ok: false, error: `it gave ${parts.length} parts, not ${SPLIT_PARTS.min} to ${SPLIT_PARTS.max}` };
   if (typeof r.hub?.content !== 'string' || bodyOf(r.hub.content).length < 20) return { ok: false, error: 'it gave no hub page' };
-  const dir = `wiki/${slugOf(path.posix.basename(o.path, '.md'))}`;
+  // wiki/areas/ holds the areas' hubs alone: an article called "Areas" keeps its parts beside it under another name.
+  const slug = slugOf(path.posix.basename(o.path, '.md'));
+  const dir = `wiki/${slug === 'areas' ? 'areas-parts' : slug}`;
   const taken = new Set(o.taken);
   const made: SplitPart[] = [];
   for (const p of parts as { title?: unknown; summary?: unknown; content?: unknown }[]) {
@@ -126,6 +128,8 @@ export async function splitArticle(
   const { hub, parts, target } = checked.plan;
   const known = new Set<string>([...o.taken, o.path, ...parts.map((p) => p.path), 'index.md', 'log.md']);
   const sources = listOf(front, 'sources');
+  // The parts are in the areas the article was in.
+  const areas = listOf(front, 'areas');
   const head = o.repo?.head ?? null;
   const anchorsOf = (text: string) => (o.repo && head ? resolvePaths(o.repo.root, text) : Promise.resolve(undefined));
   // The text as it is now is kept first: whatever happens next, it can be got back.
@@ -134,7 +138,7 @@ export async function splitArticle(
     // The parts first, so that a failure part way leaves copies of the text, never a hole in it.
     for (const p of parts) {
       const body = cleanLinks(p.body, p.path, known);
-      const stored = await storeArticle(root, { path: p.path, title: p.title, body, now: o.now, summary: p.summary || undefined, anchors: await anchorsOf(body), commit: head, carry: sources });
+      const stored = await storeArticle(root, { path: p.path, title: p.title, body, now: o.now, summary: p.summary || undefined, anchors: await anchorsOf(body), commit: head, carry: sources, areas: areas.length ? areas : undefined });
       if (stored.status !== 'written') return { ok: false, error: `${p.path}: ${stored.reason ?? 'not written'}` };
     }
     // The hub over the article, only if it is still what was split; every part linked from it.

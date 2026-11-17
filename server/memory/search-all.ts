@@ -17,6 +17,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { articleInfo, wikiBase } from '../wiki/deliver.ts';
 import { wikiChatEnabled } from '../wiki/access.ts';
 import { isWikiBase } from '../wiki/knowledge/bindings.ts';
+import { areaNameOf, areaNames } from '../wiki/areas/registry.ts';
 import { wikiMemoryOn } from '../wiki/roots.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { projectOfSession, scopeFor, type Scope } from './across.ts';
@@ -103,7 +104,7 @@ async function notes(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: nu
 async function wiki(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: number, vector: Float32Array | null): Promise<string[]> {
   // Wiki memory is off for the chat (every confidential one), or not at all.
   if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) return [];
-  const rows: { project: string; rel: string; title: string; summary: string; stale: string[]; score: number }[] = [];
+  const rows: { project: string; rel: string; title: string; summary: string; stale: string[]; area: string | null; score: number }[] = [];
   for (const t of scope.chosen) {
     if (!wikiMemoryOn(db, t.id)) continue;
     const b = wikiBase(db, t.id);
@@ -115,6 +116,7 @@ async function wiki(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: num
       continue;
     }
     const seen = new Set<string>();
+    const names = areaNames(b.root);
     for (const h of hits) {
       // Articles only: not sources (raw/), plans and evidence (output/), the index or the log.
       const rel = path.relative(b.root, h.path).split(path.sep).join('/');
@@ -122,13 +124,13 @@ async function wiki(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: num
       if (!rel.startsWith('wiki/') || !rel.toLowerCase().endsWith('.md') || name === 'index.md' || name === 'log.md' || rel.split('/').some((p) => p.startsWith('.')) || seen.has(rel)) continue;
       seen.add(rel);
       const a = articleInfo(h.path, rel, h.title);
-      if (a) rows.push({ project: t.name, rel, ...a, score: h.score });
+      if (a) rows.push({ project: t.name, rel, title: a.title, summary: a.summary, stale: a.stale, area: areaNameOf(names, a.areas), score: h.score });
     }
   }
   return rows
     .sort((x, y) => y.score - x.score)
     .slice(0, limit)
-    .map((r) => `- ${r.title}${r.summary ? ` — ${r.summary}` : ''} (${r.project} · ${r.rel})${r.stale.length ? ' [may be out of date]' : ''}`);
+    .map((r) => `- ${r.title}${r.summary ? ` — ${r.summary}` : ''} (${r.project} · ${r.area ? `${r.area} · ` : ''}${r.rel})${r.stale.length ? ' [may be out of date]' : ''}`);
 }
 
 async function documents(db: DB, ctx: RunCtx, scope: Scope, query: string, limit: number, vector: Float32Array | null): Promise<string[]> {

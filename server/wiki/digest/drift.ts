@@ -54,8 +54,12 @@ export interface DriftOptions {
   ask?: DigestAsk;
   now?: () => number;
   onUpdate?: (space: string | null) => void;
-  /** Check every project now, whatever its last check (a test). */
+  /** Check every project now, whatever its last check (a test, Update now). */
   force?: boolean;
+  /** One project alone (Update now). */
+  only?: string;
+  /** Stale articles revised at most (default REVISE_PER_DAY). */
+  revise?: number;
 }
 
 /** One project's wiki: mark the stale articles, then revise a few. */
@@ -98,7 +102,7 @@ async function checkOne(db: DB, space: string, o: Required<Pick<DriftOptions, 'n
   const problems: string[] = [];
   const written: string[] = [];
   const source = `code changes since ${stale[0].commit.slice(0, 7)}`;
-  for (const s of stale.slice(0, REVISE_PER_DAY)) {
+  for (const s of stale.slice(0, o.revise ?? REVISE_PER_DAY)) {
     tried[s.path] = now;
     try {
       const cur = readOrNull(root, s.path);
@@ -186,6 +190,7 @@ export async function checkWikiDrift(db: DB, o: DriftOptions = {}): Promise<Drif
   if (!memoryOn(db)) return total;
   for (const space of allSpaces(db)) {
     try {
+      if (o.only && space.id !== o.only) continue;
       if (!wikiMemoryOn(db, space.id)) continue;
       const key = `wiki.drift.checked.${space.id}`;
       if (!o.force && now() - Number(kvGet(db, key) || 0) < DRIFT_EVERY_MS) continue;

@@ -16,6 +16,17 @@ export function activeWikiDocument(text: string): boolean {
   return !m || !/^document_status\s*:\s*["']?(?:archived|superseded|retired)["']?\s*(?:#.*)?$/im.test(m[1]);
 }
 
+/**
+ * Where an article that was folded or merged into another now lives: its front matter's `redirect:` (a wiki/… article
+ * or index.md), or null for any other document. A redirect is a stub: its earlier text is in the wiki's history.
+ */
+export function redirectOf(text: string): string | null {
+  const m = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+  const v = m && /^redirect\s*:[ \t]*["']?([^"'\r\n#]+?)["']?[ \t]*$/im.exec(m[1])?.[1];
+  if (!v) return null;
+  return v === 'index.md' || /^wiki\/(?:[^/\0\\.][^/\0\\]*\/)*[^/\0\\.][^/\0\\]*\.md$/.test(v) ? v : null;
+}
+
 /** Reject symlinks in the path components we control, including the final file. */
 function noSymlinks(root: string, target: string): void {
   const rel = path.relative(root, target);
@@ -115,6 +126,169 @@ export function applyWikiChanges(root: string, changes: WikiChange[], o: { plans
   // The path is judged before the lock is taken, so a refused path never waits on (or leaves) a lock.
   filePath(root, changes[0].path, true);
   return locked(root, () => { applyOne(root, changes[0]); return { paths: [changes[0].path] }; });
+}
+
+/** The wiki's own state (the areas registry), in a hidden folder the wiki tools never reach. */
+const STRUCTURE = '.structure';
+const STATE_NAME = /^[a-z][a-z0-9-]{0,40}\.json$/;
+
+/** A hidden state file's text, or null while there is none. */
+export function readWikiState(root: string, name: string): string | null {
+  if (!STATE_NAME.test(name)) throw new Error('Invalid wiki state name');
+  const file = path.join(root, STRUCTURE, name);
+  try {
+    if (fs.lstatSync(path.join(root, STRUCTURE)).isSymbolicLink() || fs.lstatSync(file).isSymbolicLink()) return null;
+    return readText(file);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Replaces a hidden state file atomically under the wiki's write lock, when it still holds `expected` (null: none
+ * yet); false when it changed meanwhile (another writer got there first: read it again). A busy lock is waited for.
+ */
+export async function writeWikiState(root: string, name: string, content: string, expected: string | null): Promise<boolean> {
+  if (!STATE_NAME.test(name)) throw new Error('Invalid wiki state name');
+  if (Buffer.byteLength(content) > MAX_BYTES) throw new Error('Wiki state is too large');
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return locked(root, () => {
+        const dir = path.join(root, STRUCTURE);
+        try {
+          fs.mkdirSync(dir, { mode: 0o700 });
+        } catch (e) {
+          if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+        }
+        if (fs.lstatSync(dir).isSymbolicLink() || !fs.statSync(dir).isDirectory()) throw new Error('Unsafe wiki state folder');
+        const file = path.join(dir, name);
+        if (fs.existsSync(file) && fs.lstatSync(file).isSymbolicLink()) throw new Error('Unsafe wiki state file');
+        const now = fs.existsSync(file) ? readText(file) : null;
+        if (now !== expected) return false;
+        const temp = path.join(dir, `.hydor-${crypto.randomUUID()}.tmp`);
+        try {
+          fs.writeFileSync(temp, content, { mode: 0o600, flag: 'wx' });
+          fs.renameSync(temp, file);
+        } finally {
+          if (fs.existsSync(temp)) fs.unlinkSync(temp);
+        }
+        return true;
+      });
+    } catch (e) {
+      if (attempt >= 20 || !/locked by another writer/.test((e as Error).message)) throw e;
+      await new Promise((r) => setTimeout(r, 100 + attempt * 50));
+    }
+  }
+}
+
+/** What a rebuild archives and a restore puts back: the articles, the index, the log and the structure; never raw/ (the sources) or output/ (plans and evidence). */
+export const REBUILT = ['wiki', 'index.md', 'log.md', STRUCTURE];
+const ARCHIVE_NAME = /^\d{4}-\d\d-\d\dT[\d-]+Z$/;
+
+/** A real folder inside the wiki (made when missing), never through a symbolic link. */
+function realDir(root: string, parts: string[]): string {
+  let current = root;
+  for (const part of parts) {
+    current = path.join(current, part);
+    try {
+      fs.mkdirSync(current, { mode: 0o700 });
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    }
+    if (fs.lstatSync(current).isSymbolicLink() || !fs.statSync(current).isDirectory()) throw new Error('Unsafe wiki archive folder');
+  }
+  return current;
+}
+
+/** Retries an operation while another writer holds the wiki's lock. */
+async function whileLocked<T>(f: () => T): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return f();
+    } catch (e) {
+      if (attempt >= 40 || !/locked by another writer/.test((e as Error).message)) throw e;
+      await new Promise((r) => setTimeout(r, 100 + attempt * 50));
+    }
+  }
+}
+
+/** The folder of the archives of earlier wikis (hidden: the wiki tools never reach it). */
+const archivesDir = (root: string) => path.join(root, '.history', 'rebuilds');
+
+/** The wiki's archives (`.history/rebuilds/<name>/`), oldest first. */
+export function wikiArchives(root: string): { name: string; dir: string }[] {
+  const dir = archivesDir(root);
+  try {
+    if (fs.lstatSync(path.join(root, '.history')).isSymbolicLink() || fs.lstatSync(dir).isSymbolicLink()) return [];
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && ARCHIVE_NAME.test(e.name))
+      .map((e) => ({ name: e.name, dir: path.join(dir, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+/** Moves what exists of REBUILT into a new archive `name`, under the wiki's lock: what it moved. */
+function moveOut(root: string, name: string): string[] {
+  if (!ARCHIVE_NAME.test(name)) throw new Error('Invalid wiki archive name');
+  const dest = realDir(root, ['.history', 'rebuilds', name]);
+  if (fs.readdirSync(dest).length) throw new Error('That wiki archive exists already');
+  const moved: string[] = [];
+  for (const entry of REBUILT) {
+    const from = path.join(root, entry);
+    let st: fs.Stats;
+    try {
+      st = fs.lstatSync(from);
+    } catch {
+      continue;
+    }
+    if (st.isSymbolicLink()) throw new Error(`Wiki path is a symbolic link: ${entry}`);
+    fs.renameSync(from, path.join(dest, entry));
+    moved.push(entry);
+  }
+  return moved;
+}
+
+/**
+ * Archives the wiki (its articles, index, log and structure) as `.history/rebuilds/<name>/`, leaving its sources and
+ * plans: a rebuild starts from an empty wiki beside them. What it moved.
+ */
+export function archiveWiki(root: string, name: string): Promise<string[]> {
+  return whileLocked(() => locked(root, () => moveOut(root, name)));
+}
+
+/**
+ * Puts an archived wiki back: what is there now is archived first as `keepAs`, then the archive's parts move back and
+ * its folder goes. Under the wiki's lock, so no writer sees half of either.
+ */
+export function restoreWiki(root: string, name: string, keepAs: string): Promise<void> {
+  if (!ARCHIVE_NAME.test(name)) throw new Error('Invalid wiki archive name');
+  return whileLocked(() =>
+    locked(root, () => {
+      const from = path.join(archivesDir(root), name);
+      if (!wikiArchives(root).some((a) => a.name === name)) throw new Error('No such wiki archive');
+      moveOut(root, keepAs);
+      for (const entry of REBUILT) {
+        const src = path.join(from, entry);
+        try {
+          if (fs.lstatSync(src).isSymbolicLink()) continue;
+        } catch {
+          continue;
+        }
+        fs.renameSync(src, path.join(root, entry));
+      }
+      fs.rmSync(from, { recursive: true, force: true });
+    }),
+  );
+}
+
+/** Deletes an archive (the oldest beyond the ones kept). */
+export function dropArchive(root: string, name: string): void {
+  if (!ARCHIVE_NAME.test(name)) throw new Error('Invalid wiki archive name');
+  const a = wikiArchives(root).find((x) => x.name === name);
+  if (a) fs.rmSync(a.dir, { recursive: true, force: true });
 }
 
 /** Coordinate protected plan snapshots with the same cooperative lock as ordinary wiki writes. Only the plan revision workflow calls this: it may write plans. */
@@ -227,6 +401,8 @@ export function ingestWikiDocument(root: string, bytes: Buffer, extension: strin
 export function checkWiki(root: string): { checked: number; issues: { path: string; detail: string }[]; truncated: boolean } {
   const issues: { path: string; detail: string }[] = [];
   const documents = new Map<string, { markdown: string[]; wiki: string[] }>();
+  const stubs = new Set<string>();
+  const hubs = new Set<string>();
   let checked = 0;
   let linkCount = 0;
   let truncated = false;
@@ -248,8 +424,19 @@ export function checkWiki(root: string): { checked: number; issues: { path: stri
       try { content = readText(file); } catch { issues.push({ path: relative, detail: 'Unreadable or invalid UTF-8' }); continue; }
       if (!activeWikiDocument(content)) continue;
       checked++;
+      // A redirect (an article folded or merged into another) is a stub: it needs only its target, not links to it.
+      const redirect = redirectOf(content);
+      if (redirect != null || /^---\s*\r?\n[\s\S]*?^redirect\s*:/m.test(content.slice(0, 2000))) {
+        stubs.add(relative);
+        if (!redirect) issues.push({ path: relative, detail: 'Redirect without a valid target' });
+        else {
+          try { filePath(root, redirect); } catch { issues.push({ path: relative, detail: `Redirect to a missing article: ${redirect}` }); }
+        }
+      }
       // Check simple YAML source lists used by compiled articles; report unsupported list syntax explicitly.
       const front = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(content)?.[1];
+      // An area's hub is kept by Hydor and reached from the index: it needs no links to it.
+      if (relative.startsWith('wiki/areas/') && front && /^kind:\s*hub\s*$/m.test(front)) hubs.add(relative);
       const sourceBlock = front && /^sources:\s*(?:\r?\n((?:[ \t]+-[^\r\n]*(?:\r?\n|$))+)|\[([^\]]*)\])/m.exec(front);
       const sourceValues = sourceBlock ? (sourceBlock[1] ? [...sourceBlock[1].matchAll(/^\s*-\s*(.+?)\s*$/gm)].map((m) => m[1]) : sourceBlock[2].split(',')) : [];
       for (const raw of sourceValues) {
@@ -282,7 +469,7 @@ export function checkWiki(root: string): { checked: number; issues: { path: stri
   };
   visit(root);
   // An article is an active non-index Markdown file under the wiki's article tree.
-  const articles = new Set([...documents.keys()].filter((p) => p.startsWith('wiki/') && !/(?:^|\/)_(?:index)\.md$/i.test(p)));
+  const articles = new Set([...documents.keys()].filter((p) => p.startsWith('wiki/') && !/(?:^|\/)_(?:index)\.md$/i.test(p) && !stubs.has(p)));
   const byName = new Map<string, string[]>();
   for (const document of documents.keys()) {
     const name = path.posix.basename(document).replace(/\.md$/i, '').toLowerCase();
@@ -321,7 +508,7 @@ export function checkWiki(root: string): { checked: number; issues: { path: stri
   }
   // Do not declare partial scans complete or draw global graph conclusions from them.
   if (!truncated) for (const article of articles) {
-    if (!referenced.has(article)) issues.push({ path: article, detail: 'Article has no incoming non-index links' });
+    if (!referenced.has(article) && !hubs.has(article)) issues.push({ path: article, detail: 'Article has no incoming non-index links' });
     const index = path.posix.join(path.posix.dirname(article), '_index.md');
     if (documents.has(index) && !indexed.get(index)?.has(article)) issues.push({ path: index, detail: `Article missing from index: ${article}` });
   }

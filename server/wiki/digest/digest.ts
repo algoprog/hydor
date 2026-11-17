@@ -25,7 +25,8 @@ import { gitHead, resolvePaths } from './anchors.ts';
 import { SPLIT_AT, splitArticle } from './split.ts';
 import { wikiReads } from './limit.ts';
 import { digested, markDigested, recordUpdate } from './store.ts';
-import { appendLog, appendRevisions, bodyOf, cleanLinks, clipLine, freePath, judgeRewrite, parseRemoved, readOrNull, splitFront, storeArticle, summaryOf, SUMMARY_MAX, titleOfArticle, writeIndex, type Stored } from './write.ts';
+import { appendLog, appendRevisions, areasOfArticle, bodyOf, cleanLinks, clipLine, freePath, judgeRewrite, parseRemoved, readOrNull, splitFront, storeArticle, summaryOf, SUMMARY_MAX, titleOfArticle, writeIndex, type Stored } from './write.ts';
+import { hasAreas, isHubPath, loadRegistry, OTHER, placedIn } from '../areas/registry.ts';
 import type { Removed } from './history.ts';
 
 /** The most of a document the helper reads. */
@@ -99,7 +100,10 @@ async function byMeaning(db: DB, root: string, space: string | null, doc: { titl
  * path, title and summary (or first line). The full set stays for checking the paths it names.
  */
 export async function listArticles(db: DB, root: string, space: string | null, doc: { title: string; text: string }): Promise<{ lines: ArticleLine[]; all: Set<string>; more: number; titles: Map<string, string> }> {
-  const all = browseWiki(root).articles;
+  // Hubs are kept from their articles, never written by the digest; redirects are not listed at all.
+  const all = browseWiki(root).articles.filter((a) => !isHubPath(a.path));
+  const registry = loadRegistry(root);
+  const names = hasAreas(registry) ? new Map(registry.areas.map((a) => [a.id, a.name])) : null;
   const hay = doc.text.toLowerCase();
   const scored = all
     .map((a) => ({ a, score: (a.title.toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) ?? []).filter((w) => hay.includes(w)).length }))
@@ -111,7 +115,10 @@ export async function listArticles(db: DB, root: string, space: string | null, d
   join((await byMeaning(db, root, space, doc)).filter((p) => known.has(p)));
   const order = new Map(scored.map((s, i) => [s.a.path, i]));
   const shown = [...all].sort((x, y) => (fused.get(y.path) ?? 0) - (fused.get(x.path) ?? 0) || order.get(x.path)! - order.get(y.path)!).slice(0, LIST_ARTICLES);
-  const lines = shown.map((a) => ({ path: a.path, title: a.title, first: oneLine(summaryOf(readOrNull(root, a.path)?.content ?? '')) }));
+  const lines = shown.map((a) => {
+    const content = readOrNull(root, a.path)?.content ?? '';
+    return { path: a.path, title: a.title, first: oneLine(summaryOf(content)), ...(names ? { areas: placedIn(areasOfArticle(content), registry).map((id) => names.get(id) ?? id).join(', ') } : {}) };
+  });
   return { lines, all: known, more: Math.max(0, all.length - shown.length), titles: new Map(all.map((a) => [a.path, a.title])) };
 }
 
@@ -137,6 +144,11 @@ export interface DigestTextInput {
   continued?: boolean;
   now: () => number;
   onUpdate?: (space: string | null) => void;
+  /** A source the wiki keeps already (a rebuild reads its sources again): the articles cite it, nothing is kept a second time. Null: none to keep or cite. */
+  source?: string | null;
+  /** No update of its own (a rebuild keeps one row for all its sources): `report` hears what it did instead. */
+  quiet?: boolean;
+  report?: (r: { articles: string[]; notes: number; error?: string }) => void;
 }
 
 /**
@@ -149,6 +161,8 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
   const { space, text: raw, cut, kind, title, hash, now } = i;
   const project = space ? spaceById(db, space) : null;
   const rec = (articles: string[], notes: number, error?: string) => {
+    i.report?.({ articles, notes, error });
+    if (i.quiet) return;
     recordUpdate(db, { space, base: i.base, document: i.title, path: i.path, articles, notes, error }, now());
     i.onUpdate?.(space);
   };
@@ -164,7 +178,7 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     // What is kept and what the helper reads has no secret in it.
     const text = redactSecrets(cut ? `${raw}\n\n… (cut here: ${kind === 'conversation' ? 'only its first request and its latest turns were read' : `only the first ${MAX_DOC_CHARS.toLocaleString('en-US')} characters of the document were read`})` : raw);
     const origin = oneLine(i.origin).slice(0, 500);
-    sourcePath = ingestWikiSource(root, text, origin).path;
+    sourcePath = i.source !== undefined ? (i.source ?? '') : ingestWikiSource(root, text, origin).path;
     docText = text;
   } catch (e) {
     rec([], 0, `Could not keep the ${kind} as a source: ${(e as Error).message}`);
@@ -177,7 +191,14 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     const listing = await listArticles(db, root, space, { title, text: docText });
     const place = project ? repoRoot(project.folder) : null;
     const noteTitles = place ? entries(db, { scope: 'repo', scopeKey: place, limit: 100 }).map(titleOf) : [];
-    const plan = checkPlan(await ask({ system: planSystem(kind), prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title, text: docText, cut, kind, continued: i.continued }, articles: listing.lines, more: listing.more, noteTitles }), maxTokens: 2000 }), listing.all);
+    // The wiki's areas, while it has them: each new article is placed in one in the same call.
+    const registry = loadRegistry(root);
+    const areas = hasAreas(registry) ? registry.areas.filter((a) => a.id !== OTHER).map((a) => ({ id: a.id, name: a.name, about: a.about })) : undefined;
+    const plan = checkPlan(
+      await ask({ system: planSystem(kind), prompt: planPrompt({ project: project ? { name: project.name, description: project.description } : null, document: { title, text: docText, cut, kind, continued: i.continued }, articles: listing.lines, more: listing.more, noteTitles, areas }), maxTokens: 2000 }),
+      listing.all,
+      areas ? new Set([...areas.map((a) => a.id), OTHER]) : undefined,
+    );
     const at = now();
     // The project's repository, for the paths an article names and the commit it was written against (none outside git).
     const head = place ? await gitHead(place) : null;
@@ -185,7 +206,7 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     const written: { path: string; title: string }[] = [];
 
     // The articles to write: existing ones with their text (a long one is split first), new ones with a free path.
-    const targets: { path: string; title: string; current?: string }[] = [];
+    const targets: { path: string; title: string; current?: string; area?: string }[] = [];
     for (const p of plan.update) {
       const cur = readOrNull(root, p);
       if (!cur) continue;
@@ -212,9 +233,16 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     }
     const taken = new Set<string>([...listing.all, ...targets.map((t) => t.path)]);
     for (const c of plan.create) {
+      // A "new" article whose title an article has already is that article: updated, never made twice ("Title" and "Title 2").
+      const same = [...listing.titles].find(([p, t]) => t.trim().toLowerCase() === c.title.trim().toLowerCase() && !targets.some((x) => x.path === p))?.[0];
+      const cur = same ? readOrNull(root, same) : null;
+      if (same && cur && splitFront(cur.content).body.length <= SPLIT_AT && cur.content.length <= MAX_ARTICLE_CHARS) {
+        targets.push({ path: same, title: titleOfArticle(cur.content, c.title), current: cur.content });
+        continue;
+      }
       const p = freePath(root, c.title, taken);
       taken.add(p);
-      targets.push({ path: p, title: c.title });
+      targets.push({ path: p, title: c.title, ...(c.area ? { area: c.area } : {}) });
     }
 
     if (targets.length) {
@@ -241,14 +269,14 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
         accepted.push({ target, body, summary: typeof a.summary === 'string' && a.summary.trim() ? clipLine(a.summary, SUMMARY_MAX) : undefined, removed });
       }
       // A link may go to an article, the source, the index and the log, not to anything else.
-      const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), sourcePath, 'index.md', 'log.md']);
+      const known = new Set<string>([...listing.all, ...accepted.map((x) => x.target.path), ...(sourcePath ? [sourcePath] : []), 'index.md', 'log.md']);
       const revised: { path: string; title: string; replaced: number }[] = [];
       const plain: { path: string; title: string }[] = [];
       for (const { target, body, summary, removed } of accepted) {
         try {
           const text = cleanLinks(body, target.path, known);
           // The article is written against what the file holds now: another writer may have changed it since it was read.
-          const stored: Stored = await storeArticle(root, { path: target.path, title: target.title, body: text, source: sourcePath, now: at, summary, anchors: repo ? await resolvePaths(repo.root, text) : undefined, commit: head, removed, why: title });
+          const stored: Stored = await storeArticle(root, { path: target.path, title: target.title, body: text, source: sourcePath || undefined, now: at, summary, anchors: repo ? await resolvePaths(repo.root, text) : undefined, commit: head, removed, why: title, areas: target.area ? [target.area] : undefined });
           if (stored.status === 'refused' && stored.reason !== 'changed meanwhile') problems.push(`${target.path}: left as it was, ${stored.reason}`);
           else if (stored.status !== 'written') problems.push(`${target.path}: changed meanwhile, left as it is now`);
           else {
@@ -322,6 +350,11 @@ export interface Digest {
   enqueue(doc: IndexedDoc): void;
   /** How many documents wait. */
   pending(): number;
+  /**
+   * Reads now the waiting documents `match` picks, without waiting for their base to be quiet (the hour's budget
+   * still holds): how many were read when none of them waits any more or the budget stops them.
+   */
+  readNow(match: (doc: IndexedDoc) => boolean): Promise<number>;
   /** Resolves when nothing is running and nothing waits that could run now (waiting for the hour's budget does not count). */
   settled(): Promise<void>;
   /** Stops the timers. */
@@ -454,6 +487,18 @@ export function createDigest(db: DB, o: DigestOptions = {}): Digest {
       schedule();
     },
     pending: () => waiting.length,
+    async readNow(match) {
+      const mine = waiting.filter((w) => match(w.ev));
+      if (!mine.length) return 0;
+      for (const w of mine) lastAt.set(w.ev.base, now() - quietMs);
+      const before = waiting.length;
+      if (!running) void run();
+      await new Promise<void>((resolve) => {
+        watchers.push(resolve);
+        check();
+      });
+      return Math.max(0, before - waiting.length);
+    },
     settled: () =>
       new Promise<void>((resolve) => {
         watchers.push(resolve);

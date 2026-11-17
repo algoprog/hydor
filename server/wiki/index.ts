@@ -11,10 +11,11 @@ import { LANGS } from '../../shared/i18n.ts';
 import { userLang } from '../language/index.ts';
 import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
+import { areasLine } from './areas/tend.ts';
 
 /** What every agent is told while wiki memory is on: that it is there and how to look in it. */
 const LOOK =
-  'Wiki memory is on: this project keeps articles (wiki/…) with their sources (raw/…), made from its documents and its work, beside memory notes (recall, remember: short facts) and documents (knowledge_search, knowledge_read: the files themselves). Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, then the articles it names. Cite the articles you use.';
+  'Wiki memory is on: this project keeps articles (wiki/…) with their sources (raw/…), made from its documents and its work, beside memory notes (recall, remember: short facts) and documents (knowledge_search, knowledge_read: the files themselves). Look in the wiki when a question may be answered by what the project has kept: wiki_read index.md, which lists the articles by area (wiki/areas/<area>.md is an area’s hub: what it covers, its key facts and its articles), or wiki_search (words and meaning, exact text or a pattern; each result says its article, section and lines, which wiki_read opens with section or lines). Cite the articles you use.';
 
 /**
  * How to use its tools, as guides: every agent gets them with its instructions, and Custom only while one of their
@@ -53,8 +54,18 @@ export const wiki: Feature = {
     // Custom's own agent asks the app for compaction checkpoints only when this is set.
     const language = LANGS.find((item) => item.id === userLang(d.db))!.english;
     const write = `Write new wiki articles, source notes, lessons, plans and execution records in ${language}, unless the user requests another language. Preserve original sources and established document language.`;
+    // The wiki's areas, in one line that changes only when they do (not for a model of a small context).
+    let areas: string | null = null;
+    if (!s.lean) {
+      try {
+        const root = wikiRoot(d.db, space);
+        areas = root ? areasLine(root) : null;
+      } catch {
+        /* a wiki that cannot be read gives no line */
+      }
+    }
     return {
-      instructions: [LOOK],
+      instructions: [LOOK, ...(areas ? [areas] : [])],
       guides: [
         { tools: KEEP_TOOLS, text: `${KEEP} ${write}` },
         { tools: CHECK_TOOLS, text: CHECK },

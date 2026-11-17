@@ -2,8 +2,8 @@
 // documents and the project's work (a session an update came from opens) did to the project's memory lately. It comes from the project's view (spaceMemory.ts); the list of recent
 // updates and an open article load again when the server says the wiki changed.
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { FileText } from 'lucide-react';
-import type { ProjectWikiView, WikiDocuments, WikiItem, WikiUpdate } from '@shared/wiki';
+import { ChevronRight, FileText, Layers } from 'lucide-react';
+import type { ProjectWikiView, WikiArea, WikiDocuments, WikiItem, WikiUpdate } from '@shared/wiki';
 import { Markdown } from '../../components/Markdown';
 import { Button, Throbber } from '../../components/ui';
 import { api, enc } from '../../lib/api';
@@ -13,6 +13,7 @@ import { useApp } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { wikiDocument, wikiRelative } from './SpaceWikiPaths';
 import { useWikiSettings } from './spaceMemory';
+import { useWikiJob, WikiActions, WikiProgress } from './WikiActions';
 
 type WikiFile = { path: string; content: string; sha256: string };
 
@@ -26,6 +27,11 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
   /** The articles brought up to date after the project's code changed (their anchored files), and a folder's overview. */
   const code = u.path.startsWith('code:');
   const overview = u.path.startsWith('overview:');
+  /** A reorganisation of the wiki's areas, and a fold or merge of articles. */
+  const areas = u.path.startsWith('areas:');
+  const merged = u.path.startsWith('merge:');
+  /** A rebuild from the wiki's sources (one row with its progress), or an earlier wiki put back. */
+  const rebuild = u.path.startsWith('rebuild:') || u.path.startsWith('restore:');
   const first = u.articles.slice(0, FEW);
   const more = u.articles.length - first.length;
   return (
@@ -51,6 +57,18 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
           <span className="min-w-0 flex-1 truncate text-[13.5px]">
             <span className="text-fg-3">Overview</span>:{' '}
             <span translate="no">{u.document.replace(/^Overview: /, '')}</span>
+          </span>
+        ) : areas ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]" title={u.document}>
+            <span className="text-fg-3">Areas</span>: <span translate="no">{u.document}</span>
+          </span>
+        ) : merged ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]" title={u.document}>
+            <span className="text-fg-3">Merged</span>: <span translate="no">{u.document}</span>
+          </span>
+        ) : rebuild ? (
+          <span className="min-w-0 flex-1 truncate text-[13.5px]" title={u.document}>
+            <span className="text-fg-3">Rebuild</span>: <span translate="no">{u.document}</span>
           </span>
         ) : (
           <span translate="no" className="min-w-0 flex-1 truncate text-[13.5px]" title={u.path}>
@@ -87,6 +105,81 @@ function UpdateRow({ u, onOpen }: { u: WikiUpdate; onOpen: (path: string) => voi
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * The articles grouped by area: each area a heading that opens its hub (when it has one), what it holds, then its
+ * articles; collapsible, sub-areas under their parent, Other last. An article in two areas is under both.
+ */
+function AreaGroups({ areas, articles, selected, onOpen }: { areas: WikiArea[]; articles: WikiItem[]; selected: string | null; onOpen: (path: string) => void }) {
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const titles = new Map(articles.map((a) => [a.path, a.title]));
+  const toggle = (id: string) =>
+    setClosed((c) => {
+      const n = new Set(c);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <section>
+      <h3 className="mb-2 text-[12px] font-semibold text-fg-3">Articles</h3>
+      <div className="space-y-2">
+        {areas.map((area) => {
+          const open = !closed.has(area.id) && !(area.parent && closed.has(area.parent));
+          if (area.parent && closed.has(area.parent)) return null;
+          return (
+            <div key={area.id} className={area.parent ? 'ml-3 border-l border-line pl-2' : ''}>
+              <div className="flex min-w-0 items-center gap-1">
+                <button type="button" onClick={() => toggle(area.id)} aria-expanded={open} aria-label={area.name} className="shrink-0 rounded p-0.5 text-fg-3 hover:bg-bg-2">
+                  <ChevronRight size={14} className={`transition-transform ${open ? 'rotate-90' : ''}`} />
+                </button>
+                {area.hub ? (
+                  <button type="button" onClick={() => onOpen(area.hub!)} title={area.hub} className={`flex min-w-0 items-center gap-1.5 rounded px-1 text-left text-[13px] font-semibold hover:text-accent ${selected === area.hub ? 'text-accent' : ''}`}>
+                    <Layers size={13} className="shrink-0" />
+                    <span translate="no" className="min-w-0 break-words">
+                      {area.name}
+                    </span>
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => toggle(area.id)} className="min-w-0 px-1 text-left text-[13px] font-semibold">
+                    <span translate="no" className="break-words">
+                      {area.name}
+                    </span>
+                  </button>
+                )}
+                <span className="shrink-0 text-[12px] text-fg-3">{area.articles.length}</span>
+              </div>
+              {open && (
+                <>
+                  {area.about && (
+                    <p translate="no" className="mt-0.5 mb-1 ml-6 text-[12px] leading-snug text-fg-3">
+                      {area.about}
+                    </p>
+                  )}
+                  <div className="ml-3 space-y-0.5">
+                    {area.articles.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => onOpen(p)}
+                        className={`flex w-full min-w-0 items-start gap-2 rounded-lg px-3 py-1.5 text-left text-[13px] hover:bg-bg-2 ${selected === p ? 'bg-bg-2 font-semibold' : ''}`}
+                      >
+                        <FileText size={15} className="mt-0.5 shrink-0" />
+                        <span translate="no" className="min-w-0 break-words" title={p}>
+                          {titles.get(p) || p}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -163,6 +256,7 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
   }, [id, selected, version]);
   const on = view?.on !== false && view?.status !== 'off';
   const { updates, documents } = useWikiUpdates(id, !!view && on, version);
+  const [job, refreshJob] = useWikiJob(id, !!view && on, version);
   const fromDocuments = useWikiSettings()?.fromDocuments !== false;
   const openLink = (e: MouseEvent<HTMLDivElement>) => {
     const anchor = (e.target as Element).closest('a');
@@ -221,13 +315,18 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
           <span>Folder</span>: <span translate="no">{tildify(view.root, home)}</span>
         </p>
       )}
-      {view && on && onStart && <div className="flex flex-wrap gap-2">
+      {view && on && (onStart || view.root) && <div className="flex flex-wrap items-center gap-2">
+        {onStart && <>
         {/* Each action opens an editable draft in the existing project chat flow. */}
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me add a source to this project's wiki. First ask me for the document or URL; do not add anything until I choose the source."))}>Add a source</Button>
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Check this project's wiki for missing sources, broken links, orphaned articles and inconsistent indexes. Show the findings without changing files."))}>Check the wiki</Button>
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me capture lessons learned for this project's wiki. First ask me for the work or session context. Preview the lessons without writing anything; save selected lessons only after my explicit approval."))}>Suggest lessons learned</Button>
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me adopt a plan into this project's wiki. First ask me for the plan, then show existing plans and a preview. Save only after my approval; start implementation only on my separate instruction."))}>Adopt a plan</Button>
+        </>}
+        {/* Update now, Rebuild from sources…, Restore the previous wiki… */}
+        {view.root && <WikiActions id={id} job={job} refresh={refreshJob} />}
       </div>}
+      {view && on && <WikiProgress job={job} />}
       {error && (
         <div role="alert" translate="no" className="rounded-xl border border-line bg-panel p-4 text-[13px]">
           {error}
@@ -238,7 +337,7 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
           {view.truncated && <p className="text-[12px] text-fg-3">The list is limited; some files are not shown.</p>}
           <div className="grid gap-4 md:grid-cols-[minmax(180px,260px)_minmax(0,1fr)]">
             <aside className="max-h-72 space-y-4 overflow-auto rounded-xl border border-line bg-panel p-3 md:max-h-[70vh]">
-              {list(view.articles ?? [], 'articles')}
+              {view.areas?.length ? <AreaGroups areas={view.areas} articles={view.articles ?? []} selected={selected} onOpen={setSelected} /> : list(view.articles ?? [], 'articles')}
               {list(view.sources ?? [], 'sources')}
               {list(view.plans ?? [], 'plans')}
             </aside>

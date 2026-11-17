@@ -41,7 +41,9 @@ try {
   await invoke('wiki_write', { path: 'wiki/concepts/sky.md', content: article, expectedSha256: null });
   const read = await invoke('wiki_read', { path: 'wiki/concepts/sky.md' });
   assert.equal(read.content, article);
-  assert.ok((await invoke('wiki_check', {})).issues.some((issue: { detail: string }) => /no incoming/i.test(issue.detail)), 'the check reports an orphaned article');
+  // The index follows every article written, so the new article is listed there and not an orphan (check-test.ts covers orphans).
+  assert.match((await invoke('wiki_read', { path: 'index.md' })).content, /\]\(wiki\/concepts\/sky\.md\)/, 'the index lists the article just written');
+  assert.ok(!(await invoke('wiki_check', {})).issues.some((issue: { path: string; detail: string }) => issue.path === 'wiki/concepts/sky.md' && /no incoming/i.test(issue.detail)));
   await assert.rejects(invoke('wiki_write', { path: 'raw/notes/lesson.md', content: 'private', expectedSha256: null }), /lessons workflow/);
   await assert.rejects(invoke('wiki_write', { path: read.path, content: 'stale', expectedSha256: '0'.repeat(64) }), /conflict/);
   // Secrets are not kept: not in pasted text, not in an origin.
