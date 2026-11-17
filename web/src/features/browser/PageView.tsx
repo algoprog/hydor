@@ -153,6 +153,8 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
   refused.current = onRefused;
   const wasDriving = useRef(driving);
   const shown = useRef(false);
+  // What hides the page once its picture is drawn in its place (Still calls it), while a picture is going in.
+  const drawn = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const bridge = desktopBrowser();
@@ -170,7 +172,9 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
     let wait = 0;
 
     // The page goes away for a while: a picture of it as it is first (the page is still there while it is made, a few
-    // milliseconds), then it is hidden. A change of mind meanwhile (the box shows again) drops both.
+    // milliseconds), laid in its place under it, and the page is hidden only once the picture is drawn there. Hidden
+    // as soon as the picture came, the place would show empty for the frames a big picture takes to decode (a flash
+    // under a menu). A change of mind meanwhile (the box shows again) drops it all.
     const takeAway = () => {
       if (taking) return;
       const mine = ++gen; // a show still on its way is forgotten (its answer is ignored) and hidden with the rest
@@ -184,10 +188,23 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       }
       taking = true;
       const done = (src: string | null) => {
-        taking = false;
-        if (gone || mine !== gen) return;
-        void bridge.hide(target).catch(() => {});
-        out = true;
+        if (gone || mine !== gen) {
+          taking = false;
+          return;
+        }
+        let late = 0;
+        const leave = () => {
+          if (drawn.current !== leave) return;
+          drawn.current = null;
+          window.clearTimeout(late);
+          taking = false;
+          if (gone || mine !== gen) return;
+          void bridge.hide(target).catch(() => {});
+          out = true;
+        };
+        drawn.current = leave;
+        // A picture that is slow to draw does not keep the page over a menu for long.
+        late = window.setTimeout(leave, 300);
         setStill(src);
         setAway(true);
       };
@@ -320,7 +337,9 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       document.removeEventListener('visibilitychange', kick);
       document.removeEventListener('pointerdown', kick, true);
       for (const ev of ['transitionrun', 'transitionend', 'animationstart', 'animationend']) document.removeEventListener(ev, moved, true);
-      if (at || shown.current) void bridge.hide(target).catch(() => {});
+      // Shown, or still up while its picture is made or drawn: hidden with the place it had.
+      if (at || shown.current || taking) void bridge.hide(target).catch(() => {});
+      drawn.current = null;
       shown.current = false;
     };
     // The box's shape (the page's proportions, the cap) moves it without any of the above: the observers see that too.
@@ -344,15 +363,31 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       className={cx('relative overflow-hidden bg-bg-2', scale && 'mx-auto', driving && !plain && 'ring-2 ring-accent', className)}
       style={scale ? { aspectRatio: ratio, width: maxH ? `min(100%, calc(${maxH} * ${ratio}))` : undefined } : undefined}
     >
-      {away && <Still src={still} view={view} target={target} small={small} />}
+      {away && <Still src={still} view={view} target={target} small={small} onDrawn={() => drawn.current?.()} />}
     </div>
   );
 }
 
-/** The picture of a tab from just before its native page was taken away (or its title, quietly, when there is none) where the page was. */
-function Still({ src, view, target, small }: { src: string | null; view: BrowserView; target: string; small?: boolean }) {
+/**
+ * The picture of a tab from just before its native page was taken away (or its title, quietly, when there is none) where
+ * the page was. `onDrawn`: once it is on the screen (decoded, and a frame painted with it), so the page over it may go.
+ */
+function Still({ src, view, target, small, onDrawn }: { src: string | null; view: BrowserView; target: string; small?: boolean; onDrawn: () => void }) {
   const tab = view.tabs.find((t) => t.id === target);
-  if (src) return <img src={src} alt="The browser’s page" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-left-top" />;
+  const img = useRef<HTMLImageElement>(null);
+  const ready = useRef(onDrawn);
+  ready.current = onDrawn;
+  useEffect(() => {
+    let live = true;
+    // The second frame from now is painted with it (the first one's callbacks run before it is painted).
+    const after = () => void requestAnimationFrame(() => requestAnimationFrame(() => live && ready.current()));
+    if (src && img.current) img.current.decode().then(after, after);
+    else after();
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  if (src) return <img ref={img} src={src} alt="The browser’s page" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-left-top" />;
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center text-fg-3">
       <Globe size={small ? 16 : 22} />
