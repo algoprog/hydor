@@ -3,6 +3,15 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.78.1 · 17 November 2026
+
+Translations leave technical words alone.
+
+- In the app's languages, a word placed inside a sentence (a search mode, a file or field name, a project's folder, a
+  parameter) stays as it is when it looks technical, or is written in small letters where the app's own label of that
+  name has a capital: "hybrid", a wiki search mode, no longer comes out in Chinese as another screen's "hybrid working".
+  The app's own labels, times and lists of days are translated in their sentences as before.
+
 ## 0.78.0 · 17 November 2026
 
 A wiki that organises itself: articles grouped in areas with hub pages, a structure that changes as the project does,
