@@ -381,7 +381,7 @@ export class ClaudeLive extends LiveAdapter {
         this.onControlResponse(m.response ?? {});
         break;
       case 'control_request':
-        this.onControlRequest(m);
+        this.onControlRequest(m, replay);
         break;
       case 'control_cancel_request':
         if (this.approvals.delete(m.request_id)) this.setWorking();
@@ -403,6 +403,8 @@ export class ClaudeLive extends LiveAdapter {
         break;
       case 'user':
         if (!m.parent_tool_use_id) this.onUser(m);
+        // A subagent's step ran (or was refused): an approval it asked for is settled, read again after a restart too.
+        else this.settle(m.message?.content);
         break;
       case 'result':
         this.onResult(m, replay);
@@ -435,13 +437,26 @@ export class ClaudeLive extends LiveAdapter {
     else p.resolve(payload);
   }
 
-  private onControlRequest(m: Json) {
+  private onControlRequest(m: Json, replay = false) {
     const r = m.request ?? {};
     const id = String(m.request_id);
     if (r.subtype === 'can_use_tool') {
+      // Bypass never asks, yet Claude Code asks about a few steps in every mode (a removal whose target it cannot work
+      // out, a command whose check did not finish…): the app allows them, as the user chose. Questions and plans still show.
+      if (!replay && this.bypasses(r)) {
+        this.runner.writeLine({ type: 'control_response', response: { subtype: 'success', request_id: id, response: { behavior: 'allow', updatedInput: r.input ?? {} } } });
+        return;
+      }
       this.raw.set(id, r);
       this.approvals.set(id, buildApproval(id, r));
       this.state.status = 'waiting';
+      // Read again after a restart, it may have been answered before: the lines after it say so (its step's result, a
+      // cancel, the turn's end), and they are all read at once. One still open after them is answered then.
+      if (replay && this.bypasses(r)) {
+        setImmediate(() => {
+          if (this.approvals.has(id) && this.bypasses(r)) this.answer(id, { decision: 'allow' }).catch(() => {});
+        });
+      }
       return;
     }
     if (r.subtype === 'request_user_dialog') return; // never declared, never answered
@@ -449,6 +464,27 @@ export class ClaudeLive extends LiveAdapter {
       type: 'control_response',
       response: { subtype: 'error', request_id: id, error: `${r.subtype} is not supported by this client` },
     });
+  }
+
+  /** In Bypass the app answers a permission request itself: all but a question for the user or a plan to approve. */
+  private bypasses(r: Json): boolean {
+    return this.state.mode === 'bypassPermissions' && !ASKS_USER.has(String(r.tool_name));
+  }
+
+  /** The steps among these results ran (or were refused): an approval any of them waited on is settled. */
+  private settle(content: unknown) {
+    if (!Array.isArray(content)) return;
+    let settled = false;
+    for (const b of content) {
+      if (b?.type !== 'tool_result') continue;
+      for (const [id, a] of this.approvals) {
+        if (a.itemId !== b.tool_use_id) continue;
+        this.approvals.delete(id);
+        this.raw.delete(id);
+        settled = true;
+      }
+    }
+    if (settled && this.state.status === 'waiting') this.setWorking();
   }
 
   /** `replay`: re-read after a restart, so a task did not start now: the session's transcript tells when (SessionManager.dateTasks). */
@@ -907,6 +943,9 @@ export class ClaudeLive extends LiveAdapter {
     this.dropWaiting();
   }
 }
+
+/** Tools that ask the user something rather than for leave: shown in every mode (their cards: buildApproval). */
+const ASKS_USER = new Set(['AskUserQuestion', 'ExitPlanMode']);
 
 function buildApproval(id: string, r: Json): ApprovalRequest {
   const tool = String(r.tool_name ?? 'tool');
