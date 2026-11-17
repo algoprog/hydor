@@ -5,6 +5,7 @@ import { Check, CheckCircle2, ChevronLeft, ChevronRight, CircleCheck, CircleX, C
 import { tr, trIn } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { useWidth } from '../charts';
+import { dotsAndCorners, placeLabels, quadrantOf, wrapName } from '../quadrant-layout';
 import { arr, Btn, Card, Chip, fmtNum, Head, isObj, LinkOut, Md, Meter, num, Pic, Ring, Section, Seg, seriesColor, Stars, str, textOf, TONE, TONE_FILL, toneOf, useAsk, useKept, usePicsOk, withUnit, words, yes, type AnswerUiView, type Data, type Tone } from '../kit';
 
 /** A colour mixed into the panel's (or another): a tinted background or border that reads in both themes. */
@@ -700,112 +701,156 @@ interface QItem {
   y: number;
   note: string;
 }
-interface Box {
-  x0: number;
-  x1: number;
-  y0: number;
-  y1: number;
+interface QPick {
+  i: number;
+  from: 'dot' | 'row';
 }
-const overlaps = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
-const shortName = (s: string) => (s.length > 26 ? `${s.slice(0, 25)}…` : s);
 
-/** Where each point's name goes: beside it, on the side and at the height that keeps it clear of the others. */
-function placeLabels(items: QItem[], sx: (v: number) => number, sy: (v: number) => number, plot: Box, taken: Box[]) {
-  const boxes = [...taken, ...items.map((it) => ({ x0: sx(it.x) - 7, x1: sx(it.x) + 7, y0: sy(it.y) - 7, y1: sy(it.y) + 7 }))];
-  return items.map((it) => {
-    const px = sx(it.x);
-    const py = sy(it.y);
-    const w = shortName(it.name).length * 6.4 + 2;
-    const tries: { anchor: 'start' | 'end'; x: number; y: number }[] = [
-      { anchor: 'start', x: px + 10, y: py },
-      { anchor: 'end', x: px - 10, y: py },
-      { anchor: 'start', x: px + 8, y: py - 14 },
-      { anchor: 'start', x: px + 8, y: py + 14 },
-      { anchor: 'end', x: px - 8, y: py - 14 },
-      { anchor: 'end', x: px - 8, y: py + 14 },
-    ];
-    const order = px + 10 + w > plot.x1 ? [1, 4, 5, 0, 2, 3] : [0, 1, 2, 3, 4, 5];
-    let best = tries[order[0]];
-    for (const k of order) {
-      const t = tries[k];
-      const x0 = t.anchor === 'start' ? t.x : t.x - w;
-      const box = { x0, x1: x0 + w, y0: t.y - 7, y1: t.y + 7 };
-      if (box.x0 < plot.x0 + 2 || box.x1 > plot.x1 - 2 || box.y0 < plot.y0 || box.y1 > plot.y1) continue;
-      if (boxes.some((b) => overlaps(b, box))) continue;
-      best = t;
-      break;
-    }
-    const x0 = best.anchor === 'start' ? best.x : best.x - w;
-    boxes.push({ x0, x1: x0 + w, y0: best.y - 7, y1: best.y + 7 });
-    return best;
-  });
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+const measured = new Map<string, number>();
+/** How wide a text is in the page's font (the canvas measures it; a guess without one). */
+function measureText(text: string, size: number, weight: number, family: string) {
+  const font = `${weight} ${size}px ${family}`;
+  const key = `${font}|${text}`;
+  const hit = measured.get(key);
+  if (hit !== undefined) return hit;
+  if (measureCtx === undefined) measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  let w = text.length * size * 0.56;
+  if (measureCtx) {
+    measureCtx.font = font;
+    w = measureCtx.measureText(text).width;
+  }
+  if (measured.size > 2000) measured.clear();
+  measured.set(key, w);
+  return w;
 }
 
 function Quadrant({ data }: { data: Data }) {
   const [ref, width] = useWidth<HTMLDivElement>();
-  const [hover, setHover] = useState<number | null>(null);
+  const [over, setOver] = useState<QPick | null>(null);
+  const [pinned, setPinned] = useState<QPick | null>(null);
+  const [fonts, setFonts] = useState(false);
+  // The app's font may arrive after the first draw: measure again then.
+  useEffect(() => {
+    let live = true;
+    document.fonts?.ready.then(() => live && setFonts(true));
+    return () => {
+      live = false;
+    };
+  }, []);
   const xa = isObj(data.x) ? data.x : { label: str(data.x_label ?? data.x) };
   const ya = isObj(data.y) ? data.y : { label: str(data.y_label ?? data.y) };
-  const names = (Array.isArray(data.quadrants) ? data.quadrants : []).slice(0, 4).map((q: unknown) => textOf(q, 'name', 'label', 'title'));
-  const items: QItem[] = arr(data.items ?? data.points)
-    .filter(isObj)
-    .map((it) => ({ name: textOf(it, 'name', 'label', 'title'), x: num(it.x), y: num(it.y), note: str(it.note ?? it.detail) }))
-    .filter((it): it is QItem => it.x !== null && it.y !== null)
-    .map((it) => ({ ...it, x: clamp(it.x, 0, 100), y: clamp(it.y, 0, 100) }));
+  const { names, items } = useMemo(() => {
+    const names: string[] = (Array.isArray(data.quadrants) ? data.quadrants : []).slice(0, 4).map((q: unknown) => textOf(q, 'name', 'label', 'title'));
+    const items: QItem[] = arr(data.items ?? data.points)
+      .filter(isObj)
+      .map((it) => ({ name: textOf(it, 'name', 'label', 'title'), x: num(it.x), y: num(it.y), note: str(it.note ?? it.detail) }))
+      .filter((it): it is QItem => it.x !== null && it.y !== null)
+      .map((it) => ({ ...it, x: clamp(it.x, 0, 100), y: clamp(it.y, 0, 100) }));
+    return { names, items };
+  }, [data]);
   const padL = 24;
   const padR = 4;
   const padT = 4;
   const padB = 34;
   const plotW = Math.max(60, width - padL - padR);
-  const plotH = Math.round(clamp(plotW * 0.7, 220, 420));
+  const plotH = Math.round(clamp(plotW * 0.72, 240, 420));
   const H = padT + plotH + padB;
   const sx = (v: number) => padL + (v / 100) * plotW;
   const sy = (v: number) => padT + plotH - (v / 100) * plotH;
   const plot = { x0: padL, x1: padL + plotW, y0: padT, y1: padT + plotH };
-  // The quadrants' names sit in their outer corners: points' names keep clear of them.
-  const corner = (k: number) => {
-    const right = k % 2 === 1;
-    const bottom = k >= 2;
-    const w = (names[k] ?? '').length * 6.6 + 4;
-    const x = right ? plot.x1 - 8 : plot.x0 + 8;
-    const y = bottom ? plot.y1 - 9 : plot.y0 + 15;
-    return { x, y, anchor: right ? ('end' as const) : ('start' as const), box: { x0: right ? x - w : x, x1: right ? x : x + w, y0: y - 10, y1: y + 4 } };
-  };
-  const corners = [0, 1, 2, 3].map(corner);
-  const labels = width > 0 ? placeLabels(items, sx, sy, plot, corners.filter((_, k) => names[k]).map((c) => c.box)) : [];
-  const h = hover !== null ? items[hover] : null;
+  // Every name shows in full beside its point when all of them fit cleanly; else the points are numbered and a key lists them.
+  const layout = useMemo(() => {
+    if (width <= 0) return null;
+    const family = (ref.current && getComputedStyle(ref.current).fontFamily) || 'sans-serif';
+    const pointW = (s: string) => measureText(s, 11.5, 400, family);
+    const cornerW = (s: string) => measureText(s.toUpperCase(), 11, 600, family) + 0.025 * 11 * s.length;
+    const box = { x0: padL, x1: padL + plotW, y0: padT, y1: padT + plotH };
+    const raw = items.map((it) => ({ x: padL + (it.x / 100) * plotW, y: padT + plotH - (it.y / 100) * plotH }));
+    const { dots: dots6, corners: corners6 } = dotsAndCorners(raw, names, 6, box, cornerW);
+    const lines = items.map((it) => wrapName(it.name, Math.min(190, plotW * 0.42), pointW));
+    if (lines.every((l) => l !== null)) {
+      const placed = placeLabels(
+        dots6.map((d, i) => ({ x: d.x, y: d.y, lines: lines[i]!, w: Math.max(...lines[i]!.map(pointW)) + 4 })),
+        6,
+        box,
+        corners6.flatMap((c) => (c ? [c.box] : [])),
+      );
+      if (placed) return { numbered: false as const, r: 6, dots: dots6, corners: corners6, labels: placed, order: items.map((_, i) => i) };
+    }
+    const { dots: dots9, corners: corners9 } = dotsAndCorners(raw, names, 9, box, cornerW);
+    // With quadrant names the key follows the quadrants; without, the order given.
+    const byQuadrant = names.some(Boolean);
+    const order = items.map((_, i) => i).sort((a, b) => (byQuadrant ? quadrantOf(items[a].x, items[a].y) - quadrantOf(items[b].x, items[b].y) : 0) || a - b);
+    return { numbered: true as const, r: 9, dots: dots9, corners: corners9, labels: null, order };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- laid out again only when the width, the points, the names or the font change
+  }, [width, items, names, fonts]);
+  const numberOf: number[] = [];
+  layout?.order.forEach((i, k) => (numberOf[i] = k + 1));
+  const lit = over ?? pinned;
+  const h = lit ? items[lit.i] : null;
+  const litDot = lit && layout ? layout.dots[lit.i] : null;
+  const numbered = !!layout?.numbered;
+  const pointer = (i: number, from: QPick['from']) => ({
+    onPointerEnter: (e: React.PointerEvent) => e.pointerType === 'mouse' && setOver({ i, from }),
+    onPointerLeave: () => setOver((o) => (o && o.i === i && o.from === from ? null : o)),
+    onClick: () => setPinned((p) => (p && p.i === i && p.from === from ? null : { i, from })),
+  });
   const xLabel = str(xa.label);
   const yLabel = str(ya.label);
+  const row = (i: number) => (
+    <li key={i} {...pointer(i, 'row')} className={cx('flex min-w-0 cursor-pointer gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors', lit?.i === i && 'bg-accent-soft')}>
+      <span className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold tabular-nums" style={{ background: seriesColor(0), color: 'var(--panel)' }}>
+        {numberOf[i]}
+      </span>
+      <div className="min-w-0">
+        <div className="font-medium text-fg">{items[i].name}</div>
+        {items[i].note && <div className="text-[12.5px] leading-snug text-fg-3">{items[i].note}</div>}
+      </div>
+    </li>
+  );
   return (
     <Card>
       <Head title={data.title} />
       <div ref={ref} className="relative">
-        {width > 0 && (
+        {width > 0 && layout && (
           <svg width={width} height={H} className="block overflow-visible" role="img" aria-label={items.map((it) => it.name).join(', ')}>
             <rect x={plot.x0} y={plot.y0} width={plotW} height={plotH} rx={10} fill="none" stroke="var(--line)" />
             <path d={`M${plot.x0 + 10},${plot.y0}H${sx(50)}V${sy(50)}H${plot.x0}V${plot.y0 + 10}Q${plot.x0},${plot.y0} ${plot.x0 + 10},${plot.y0}Z`} fill="var(--bg-2)" opacity={0.55} />
             <path d={`M${sx(50)},${sy(50)}H${plot.x1}V${plot.y1 - 10}Q${plot.x1},${plot.y1} ${plot.x1 - 10},${plot.y1}H${sx(50)}Z`} fill="var(--bg-2)" opacity={0.55} />
             <line x1={sx(50)} x2={sx(50)} y1={plot.y0} y2={plot.y1} stroke="var(--viz-axis)" shapeRendering="crispEdges" />
             <line x1={plot.x0} x2={plot.x1} y1={sy(50)} y2={sy(50)} stroke="var(--viz-axis)" shapeRendering="crispEdges" />
-            {corners.map((c, k) =>
-              names[k] ? (
+            {layout.corners.map((c, k) =>
+              c ? (
                 <text key={k} x={c.x} y={c.y} textAnchor={c.anchor} className="fill-fg-3 text-[11px] font-semibold tracking-wide uppercase">
                   {names[k]}
                 </text>
               ) : null,
             )}
-            {items.map((it, i) => (
-              <circle key={i} cx={sx(it.x)} cy={sy(it.y)} r={hover === i ? 7.5 : 6} fill={seriesColor(0)} stroke="var(--panel)" strokeWidth={2} />
+            {items.map((_, i) => (
+              <circle key={i} cx={layout.dots[i].x} cy={layout.dots[i].y} r={lit?.i === i ? layout.r + 1.5 : layout.r} fill={seriesColor(0)} stroke="var(--panel)" strokeWidth={2} opacity={numbered && lit && lit.i !== i ? 0.5 : 1} />
             ))}
-            {items.map((it, i) =>
-              labels[i] ? (
-                <text key={i} x={labels[i].x} y={labels[i].y} dy="0.35em" textAnchor={labels[i].anchor} className={cx('pointer-events-none text-[11.5px]', hover === i ? 'fill-fg font-semibold' : 'fill-fg-2')}>
-                  {shortName(it.name)}
-                </text>
-              ) : null,
-            )}
-            {items.map((it, i) => (
-              <circle key={i} cx={sx(it.x)} cy={sy(it.y)} r={14} fill="transparent" className="cursor-default" onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover((x) => (x === i ? null : x))} onClick={() => setHover((x) => (x === i ? null : i))} />
+            {layout.labels
+              ? items.map((_, i) => {
+                  const l = layout.labels![i];
+                  if (!l) return null;
+                  return (
+                    <text key={i} x={l.x} textAnchor={l.anchor} className={cx('pointer-events-none text-[11.5px]', lit?.i === i ? 'fill-fg font-semibold' : 'fill-fg-2')}>
+                      {l.lines.map((line, k) => (
+                        <tspan key={k} x={l.x} y={l.box.y0 + 13.5 / 2 + k * 13.5} dy="0.35em">
+                          {line}
+                        </tspan>
+                      ))}
+                    </text>
+                  );
+                })
+              : items.map((_, i) => (
+                  <text key={i} x={layout.dots[i].x} y={layout.dots[i].y} dy="0.35em" textAnchor="middle" fill="var(--panel)" opacity={lit && lit.i !== i ? 0.5 : 1} className="pointer-events-none text-[10.5px] font-bold tabular-nums">
+                    {numberOf[i]}
+                  </text>
+                ))}
+            {items.map((_, i) => (
+              <circle key={i} cx={layout.dots[i].x} cy={layout.dots[i].y} r={14} fill="transparent" className="cursor-default" {...pointer(i, 'dot')} />
             ))}
             {/* The axes: what each measures, and the words at its ends. */}
             {str(xa.low) && (
@@ -840,13 +885,30 @@ function Quadrant({ data }: { data: Data }) {
             )}
           </svg>
         )}
-        {h && (h.note || h.name.length > 26) && (
-          <div className="pointer-events-none absolute z-10 max-w-[240px] rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-[12px] shadow-pop" style={{ left: clamp(sx(h.x) + 12, 4, Math.max(4, width - 244)), top: sy(h.y) > H / 2 ? sy(h.y) - 64 : sy(h.y) + 14 }}>
+        {h && litDot && lit?.from === 'dot' && (h.note || numbered) && (
+          <div className="pointer-events-none absolute z-10 max-w-[240px] rounded-lg border border-line bg-elevated px-2.5 py-1.5 text-[12px] shadow-pop" style={{ left: clamp(litDot.x + 12, 4, Math.max(4, width - 244)), top: litDot.y > H / 2 ? litDot.y - 12 : litDot.y + 14, transform: litDot.y > H / 2 ? 'translateY(-100%)' : undefined }}>
             <div className="font-semibold text-fg">{h.name}</div>
             {h.note && <div className="mt-0.5 leading-snug text-fg-2">{h.note}</div>}
           </div>
         )}
       </div>
+      {layout?.numbered &&
+        (names.some(Boolean) ? (
+          <div className="mt-3 grid gap-x-6 gap-y-3 @xl:grid-cols-2">
+            {[0, 1, 2, 3].map((k) => {
+              const rows = layout.order.filter((i) => quadrantOf(items[i].x, items[i].y) === k);
+              if (!rows.length) return null;
+              return (
+                <div key={k}>
+                  {names[k] && <div className="mb-1 px-2 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">{names[k]}</div>}
+                  <ol className="m-0 list-none p-0">{rows.map(row)}</ol>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <ol className="m-0 mt-3 grid list-none gap-x-6 p-0 @xl:grid-cols-2">{layout.order.map(row)}</ol>
+        ))}
     </Card>
   );
 }

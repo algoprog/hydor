@@ -301,7 +301,7 @@ export const COMPARE: AnswerUiSpec[] = [
   x: { label: string, low?: string, high?: string }   // the axis across: its name and the words at each end
   y: { label: string, low?: string, high?: string }   // the axis up
   quadrants?: [string, string, string, string]        // their names: top left, top right, bottom left, bottom right
-  items: { name: string, x: number, y: number, note?: string }[]   // x and y from 0 to 100
+  items: { name: string, x: number, y: number, note?: string }[]   // x and y from 0 to 100; a name of a few words, the detail in its note
 }`,
     example: {
       title: 'Ideas for the shop’s next quarter',

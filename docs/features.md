@@ -1228,7 +1228,7 @@ programs shows each program's version and what is out, with Check now, Update no
   cards, fact checks that weigh each claim's evidence with a tally of verdicts that filters them, follow-up buttons at
   the end of an answer that send the next question when tapped), comparing and deciding (comparison tables with the best values marked, pros and cons, a decision matrix whose
   weights re-rank the options, choices that go to the message box, picks, rankings, scorecards, head-to-heads, 2×2
-  quadrants, SWOT, troubleshooters and wizards that ask one question at a time, a wheel, dice or coin that picks for
+  quadrants (named points, or numbered ones with a key below when the names would not fit), SWOT, troubleshooters and wizards that ask one question at a time, a wheel, dice or coin that picks for
   you, Venn diagrams), shopping (products, product grids, spec sheets, price history, homes to buy or rent), places and travel (places on a map,
   one place, day-by-day itineraries with maps, directions, flights, stays, weather, world clocks, currency, departure
   boards, a route's elevation profile), food and
