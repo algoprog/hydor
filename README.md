@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Works with</b> Claude Code · Codex · Gemini CLI · OpenCode · Qwen Code · Goose · Kimi CLI · Auggie · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp</sub>
+  <sub><b>Works with:</b> Claude Code · Codex · Gemini CLI · Kimi CLI · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp <b>and more</b></sub>
 </p>
 
 <p align="center">
@@ -64,7 +64,7 @@
     <td width="50%" valign="top">
       <img src="docs/media/readme-agents.webp" alt="A session in Hydor: each step in plain words, an edit with its diff, and a command waiting for approval" />
       <p><b><a href="docs/guide/16-agents-models.md">Every agent, one app</a></b><br />
-      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model. Every step in plain words, every change as a diff.</p>
+      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model including on-device.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-phone.webp" alt="The same session on a phone, waiting for approval to run the tests" />
