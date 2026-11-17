@@ -257,9 +257,20 @@ agents that speak ACP and take MCP servers.
   session. Agents get tools to read it, keep a text or a document (up to 20 MiB) as a source,
   write articles with the hash of what they read, and check its sources and links, only in their own project's wiki (or the shared one),
   never in hidden folders, and not at all in Confidential sessions. Wiki articles are searched with the knowledge tools. Changing the wiki
-  folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). The Custom agent keeps
-  one checkpoint per session when it compacts, and agents preview and, with your OK, save lessons learned. A project's Memory tab shows
-  its wiki read-only, with the updates.
+  folder when it has files opens a review (keep, combine or replace, with a hidden backup of each original folder). Checkpoints: before and after an automatic
+  compaction Claude Code, Codex and the Custom agent save one checkpoint of the session in the wiki folder, with the secrets taken out (for
+  Claude Code and Codex, the last messages go to the helper model first, up to about 14 seconds, for its summary);
+  Hydor registers a hook in Claude Code and Codex for it, unless hooks or plugins of yours might already capture compactions, and
+  trusts only its own Codex hook (found once per Codex version). Each chat has two switches in its options, **Wiki memory** and **Auto
+  lessons learned** (their defaults are in Settings → Memory → Wiki memory; an agent changing either asks you on a card): with the
+  second, after a turn the helper suggests lessons from the latest exchange as a card in the chat, which you keep (the exact text
+  and its place are fixed by a hash) or dismiss, and no agent can do either for you; agents can also preview and, with your OK, save
+  lessons learned. Plans: an agent adopts a plan you give it or choose (`wiki_plan_preview`, then `wiki_plan_adopt`) as
+  `output/projects/<name>/plan.md` in the project's wiki, with an execution register (separate states for implementation, deployment
+  and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as a protected snapshot,
+  the plan's identity and work item numbers kept; each change shows the exact text and waits for your OK, which never authorizes carrying the plan out. Nothing else
+  can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
+  write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates.
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works

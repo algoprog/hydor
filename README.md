@@ -78,8 +78,10 @@ your machine. See [keep a session confidential](docs/guide/02-sessions.md#keep-a
 Memory is one system for every agent, in three parts: notes (short facts, found by meaning and checked against your
 conversations each day), **Wiki memory** (linked articles with their sources that agents keep for each project, on by
 default) and your documents. A new or changed document adds notes and updates the wiki (a project with more documents than a limit you set keeps them out of its wiki, and agents search them), and about once a day the
-helper adds what each project's recent conversations settled to its wiki. Each project's **Memory** tab
-shows all three. After a hard task an agent can propose its method as a skill. Nothing is kept until you approve it, and you can read, edit and
+helper adds what each project's recent conversations settled to its wiki. Chats can suggest lessons too (a card you keep or dismiss),
+and a chat's own switches turn Wiki memory and those suggestions on or off. An agent can adopt a plan into a project's wiki and revise it,
+each change with your OK and every earlier revision kept; before an automatic compaction Claude Code and Codex save a checkpoint of the chat.
+Each project's **Memory** tab shows all three. After a hard task an agent can propose its method as a skill. Nothing is kept until you approve it, and you can read, edit and
 delete all of it ([memory](docs/guide/06-memory.md), [wiki memory](docs/guide/28-wiki-memory.md), [skills](docs/guide/13-skills.md)).
 
 ## How it compares
