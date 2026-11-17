@@ -34,6 +34,7 @@ Für das Lernen aus Dokumenten, das Lernen aus der Arbeit eines Projekts und fü
 
 Klappe in den Chat-Optionen **Wiki-Memory** auf, um **Automatische Lessons Learned**, **Wiki-Verträge**, **Automatische Vertragsvorschläge**, **Wiki-Pläne** und **Umsetzungskontrolle** für diesen Chat zu wählen. Die Projektstandards stehen in den Einstellungen; jedes Projekt kann eigene Werte festlegen. Ist eine Funktion im Projekt aus, ist ihr Chat-Schalter nicht verfügbar. Automatische Vertragsvorschläge benötigen Wiki-Verträge und Memory; erst wenn du den genauen Inhalt übernimmst, wird aus einem Vorschlag ein Vertrag.
 
+Die Skill-Bibliothek enthält `wiki-memory`, `wiki-planning` und `wiki-contracts` für diese Abläufe. Skills beschreiben wiederverwendbare Methoden; das Wiki bewahrt Projektinformationen und Quellen auf. Die Skills erteilen keine Berechtigungen und setzen Projekt- oder Chat-Einstellungen nicht außer Kraft.
 
 ## Wo Wikis gespeichert werden
 

@@ -34,6 +34,7 @@ Learning from documents, learning from a project's work and session checkpoints 
 
 In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki contracts**, **Auto contract suggestions**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable. Automatic contract suggestions need Wiki contracts and Memory; a suggestion becomes a contract only when you accept its exact content.
 
+The Skill library includes `wiki-memory`, `wiki-planning` and `wiki-contracts` for these workflows. Skills describe reusable methods; the wiki keeps project information and sources. The skills do not grant permissions or override project and chat settings.
 
 ## Where wikis are kept
 
