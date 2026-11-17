@@ -9,6 +9,7 @@ import { memoryOn, repoRoot } from '../../memory/store.ts';
 import { redactSecrets, secretIn } from '../../memory/secrets.ts';
 import { allSpaces } from '../../spaces/index.ts';
 import { browseWiki } from '../browse.ts';
+import { contractDocument } from '../core.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { gitHead } from './anchors.ts';
 import { DRIFT_SYSTEM, driftPrompt, helperDigestAsk, type DigestAsk } from './plan.ts';
@@ -78,7 +79,8 @@ async function checkOne(db: DB, space: string, o: Required<Pick<DriftOptions, 'n
   const stale: { path: string; title: string; commit: string; paths: string[] }[] = [];
   for (const a of browseWiki(root).articles) {
     const cur = readOrNull(root, a.path);
-    if (!cur) continue;
+    // Reviewed contracts are not inputs or targets for automatic drift maintenance.
+    if (!cur || contractDocument(a.path, cur.content)) continue;
     const t = trackingOf(cur.content);
     if (!t.anchors.length || !t.commit) continue;
     if (!changes.has(t.commit)) changes.set(t.commit, t.commit === head ? [] : await changedSince(repo, t.commit));
@@ -106,9 +108,12 @@ async function checkOne(db: DB, space: string, o: Required<Pick<DriftOptions, 'n
     tried[s.path] = now;
     try {
       const cur = readOrNull(root, s.path);
-      if (!cur) continue;
+      if (!cur || contractDocument(s.path, cur.content)) continue;
       const diff = await git(repo, ['diff', '--no-color', '-U2', s.commit, 'HEAD', '--', ...s.paths.slice(0, 5)]);
       if (!diff?.trim()) continue;
+      // A review may have changed or promoted the article while git was running.
+      const current = readOrNull(root, s.path);
+      if (!current || current.content !== cur.content || contractDocument(s.path, current.content)) continue;
       const answer = (await ask({ system: DRIFT_SYSTEM, prompt: driftPrompt({ path: s.path, title: s.title, text: cur.content, paths: s.paths, diff: redactSecrets(diff).slice(0, DIFF_CHARS), today: day(now), commit: s.commit }), maxTokens: 8000 })) as { status?: unknown; content?: unknown; summary?: unknown; removed?: unknown };
       if (answer?.status === 'keep') {
         // Still true: written against today's commit, so it is not looked at again until something else changes.

@@ -1,13 +1,18 @@
 // Automatic wiki upkeep must never expose, rewrite, split or merge reviewed contracts.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { kvSet, openDb } from '../../db.ts';
 import { areaArticles } from '../areas/articles.ts';
 import { mergeOne } from '../areas/merge.ts';
+import { createSpace } from '../../spaces/index.ts';
+import { wikiRoot } from '../roots.ts';
 import { setWikiSettings } from '../settings/settings.ts';
+import { forgetFileLists } from './anchors.ts';
 import { digestText, listArticles } from './digest.ts';
+import { checkWikiDrift } from './drift.ts';
 import { PLAN_SYSTEM } from './plan.ts';
 import { splitArticle } from './split.ts';
 import { storeArticle, writeIndex } from './write.ts';
@@ -81,6 +86,36 @@ try {
   assert.equal(writing, true);
   assert.equal(fs.readFileSync(ordinary, 'utf8'), promoted, 'the reviewed contract is never rewritten');
   assert.equal(fs.existsSync(path.join(root, '.history')), false, 'no automatic contract snapshot is made');
+
+  // Drift checks neither modify reviewed contracts nor send them to the helper.
+  const project = path.join(root, 'drift-project');
+  fs.mkdirSync(project);
+  const git = (...args: string[]) => execFileSync('git', ['-C', project, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
+  git('init', '-q');
+  fs.writeFileSync(path.join(project, 'tracked.txt'), 'before\n');
+  git('add', 'tracked.txt'); git('commit', '-q', '-m', 'before');
+  const head = git('rev-parse', 'HEAD');
+  const space = createSpace(db, { name: 'Drift contract safety', folder: project });
+  const driftRoot = wikiRoot(db, space.id, { create: true })!;
+  const article = (title: string, contract = false) => `---\ntitle: ${title}\n${contract ? 'document_kind: contract\n' : ''}anchors:\n  - tracked.txt\ncommit: ${head}\n---\n\n# ${title}\n\nSynthetic article for drift testing.\n`;
+  const driftFiles = { 'a-ordinary.md': article('Ordinary'), 'b-promoted.md': article('Promoted'), 'c-contract.md': article('Existing contract', true) };
+  for (const [name, text] of Object.entries(driftFiles)) fs.writeFileSync(path.join(driftRoot, 'wiki', name), text);
+  fs.writeFileSync(path.join(project, 'tracked.txt'), 'after\n');
+  git('add', 'tracked.txt'); git('commit', '-q', '-m', 'after');
+  forgetFileLists();
+  const driftPrompts: string[] = [];
+  const promotedPath = path.join(driftRoot, 'wiki/b-promoted.md');
+  const promotedDrift = article('Promoted', true);
+  await checkWikiDrift(db, { only: space.id, force: true, ask: async ({ prompt }) => {
+    driftPrompts.push(prompt);
+    // Another review may promote a later article while the first helper call is in progress.
+    fs.writeFileSync(promotedPath, promotedDrift);
+    return { status: 'keep' };
+  } });
+  assert.equal(driftPrompts.length, 1, 'only the ordinary article reaches the helper');
+  assert.ok(driftPrompts.every((prompt) => !prompt.includes('Existing contract') && !prompt.includes('Promoted')));
+  assert.equal(fs.readFileSync(path.join(driftRoot, 'wiki/c-contract.md'), 'utf8'), driftFiles['c-contract.md']);
+  assert.equal(fs.readFileSync(promotedPath, 'utf8'), promotedDrift);
 } finally {
   db.close();
   fs.rmSync(root, { recursive: true, force: true });
