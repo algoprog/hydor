@@ -160,9 +160,14 @@ function finish(read: Record<string, string>): Record<string, string> {
   }
   // Set in the app's own settings (~/.config/hydor.env) rather than your shell's.
   if (!env.CLAUDE_CODE_TMPDIR && process.env.CLAUDE_CODE_TMPDIR) env.CLAUDE_CODE_TMPDIR = process.env.CLAUDE_CODE_TMPDIR;
+  // Grok Build's home, likewise (its default account's sign-in and sessions: server/accounts.ts grokHome).
+  if (!env.GROK_HOME && process.env.GROK_HOME) env.GROK_HOME = process.env.GROK_HOME;
   claudeTemp(env);
   const local = path.join(user.homedir, '.local/bin');
   if (!(env.PATH ?? '').split(':').includes(local)) env.PATH = `${local}:${env.PATH ?? '/usr/bin:/bin'}`;
+  // Grok Build's own installer puts its program in ~/.grok/bin: after the user's entries, before the app's own folder.
+  const grok = path.join(user.homedir, '.grok/bin');
+  if (fs.existsSync(grok) && !(env.PATH ?? '').split(':').includes(grok)) env.PATH = `${env.PATH}:${grok}`;
   // Agents' programs the app installed itself (server/clients.ts), after the user's own.
   env.PATH = `${env.PATH}:${path.join(config.dataDir, 'clients/node_modules/.bin')}`;
   const runtime = `/run/user/${user.uid}`;
@@ -209,14 +214,16 @@ export function claudeTemp(env: Record<string, string>) {
 /**
  * Windows: a program there gets your whole environment as it is, so this process's own is the agents', with the same
  * names left out; then ~/.local/bin first (where Claude Code installs itself), the agents' programs the app installed
- * itself, and Git's tools (for bash and the commands agents run) last.
+ * itself, and Git's tools (for bash and the commands agents run) last. Grok Build's own folder (~/.grok/bin) comes before the app's.
  */
 function windowsEnv(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v != null && !dropped(k)) env[k] = v;
   const have = new Set(pathDirs(env).map((d) => d.toLowerCase()));
   const before = [path.join(os.homedir(), '.local', 'bin')].filter((d) => !have.has(d.toLowerCase()));
-  const after = [path.join(config.dataDir, 'clients', 'node_modules', '.bin')];
+  // Grok Build's own installer puts its program in %USERPROFILE%\.grok\bin.
+  const grok = path.join(os.homedir(), '.grok', 'bin');
+  const after = [...(!have.has(grok.toLowerCase()) && fs.existsSync(grok) ? [grok] : []), path.join(config.dataDir, 'clients', 'node_modules', '.bin')];
   const bash = bashPath();
   if (bash) {
     // …\Git\bin\bash.exe: the commands are in …\Git\usr\bin (and git in …\Git\cmd).

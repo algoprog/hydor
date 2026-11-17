@@ -116,7 +116,7 @@ test('add makes the account, and with --no-sign-in stops there', async () => {
   const t = await run(conn, ['accounts', 'add', 'codex', 'Lab', 'box', '--no-sign-in']);
   assert.deepEqual(calls.at(-1), { method: 'POST', path: '/api/agent-accounts', body: { agent: 'codex', name: 'Lab box' } });
   assert.match(t.out, /Added “Lab box” \(acc3\) for Codex\.\nIt is not signed in yet: hydor accounts sign-in acc3/);
-  await assert.rejects(run(conn, ['accounts', 'add', 'gemini', 'x']), (e) => e instanceof UsageError && /claude or codex/.test((e as Error).message));
+  await assert.rejects(run(conn, ['accounts', 'add', 'gemini', 'x']), (e) => e instanceof UsageError && /claude, codex or grok/.test((e as Error).message));
   await assert.rejects(run(conn, ['accounts', 'add', 'claude']), (e) => e instanceof UsageError && /Say the name/.test((e as Error).message));
 });
 
@@ -155,6 +155,35 @@ test('sign-in for an added Codex account, device code: noticed on the event sock
   assert.match(t.out, /2\. Enter this code there: ABCD-EFGH/);
   assert.match(t.out, /Personal is signed in\./);
   assert.deepEqual(calls.find((c) => c.method === 'POST')!.body, { method: 'device' });
+});
+
+test('Grok Build: listed once the API sends it; its sign-in shows the link and the code, with nothing to paste; use keeps its picks under acp:grok', async () => {
+  const grok = { agent: 'grok', loggedIn: true, email: 'me@x.example', detail: 'SuperGrok (me@x.example)' };
+  const withGrok = {
+    ...accountsAnswer,
+    grok,
+    extra: [...accountsAnswer.extra, { id: 'acc4', agent: 'grok', name: 'Work', status: { agent: 'grok', loggedIn: false } }],
+  };
+  const { conn, calls } = fakeConn({
+    'GET /api/accounts': withGrok,
+    'GET /api/bootstrap': { start: { runs: { 'acp:grok': { account: 'acc4' } } } },
+    'POST /api/accounts/grok/login?account=acc4': { id: 'fl4', agent: 'grok', method: 'device', state: 'waiting', url: 'https://accounts.x.ai/oauth2/device?user_code=S6NR-VBPF', code: 'S6NR-VBPF' },
+    'PUT /api/start': { ok: true },
+  });
+  const t = await run(conn, ['accounts']);
+  assert.match(t.out, /·\s+Grok Build\s+its own sign-in\s+Grok Build\s+me@x\.example/);
+  assert.match(t.out, /●\s+Work\s+acc4\s+Grok Build\s+not signed in/);
+  // Without it in the answer, no Grok Build row.
+  assert.doesNotMatch((await run(fakeConn(routes).conn, ['accounts'])).out, /Grok Build/);
+  assert.match((await run(conn, ['accounts', 'show', 'grok'])).out, /^API key +not used by Grok Build$/m);
+  const ev = withEvents(conn);
+  setTimeout(() => ev.push({ id: 'fl4', agent: 'grok', method: 'device', state: 'done' }), 15);
+  const s = await run(conn, ['accounts', 'sign-in', 'grok:work']);
+  assert.match(s.out, /sign in to “Work”:\n\s+https:\/\/accounts\.x\.ai\/oauth2\/device\?user_code=S6NR-VBPF/);
+  assert.match(s.out, /2\. Enter this code there: S6NR-VBPF/);
+  assert.equal(s.typed.length, 0, 'nothing is asked for');
+  await run(conn, ['accounts', 'use', 'grok:work', '-y']);
+  assert.deepEqual(calls.filter((c) => c.method === 'PUT').at(-1)!.body, { runs: { 'acp:grok': { account: 'acc4' } } });
 });
 
 test('sign-in with Codex’s browser method asks for the address; failing or backing out cancels the flow', async () => {

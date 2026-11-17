@@ -14,9 +14,15 @@ function schema(db: DB) {
     );
     create index if not exists wiki_updates_space on wiki_updates (space, id);
     create table if not exists wiki_digested (place text not null, hash text not null, at integer not null, primary key (place, hash));
+    create table if not exists wiki_doc_reads (base text not null, path text not null, version integer not null, ok integer not null, tries integer not null, at integer not null, primary key (base, path));
     create table if not exists wiki_work_sessions (key text primary key, space text, upto integer not null, at integer not null);
   `);
   ready.add(db);
+}
+
+/** Makes sure the tables exist (for a query that reads them before anything was recorded). */
+export function ensureDigestSchema(db: DB) {
+  schema(db);
 }
 
 /** Updates kept for each place. */
@@ -91,4 +97,20 @@ export function setWorkMark(db: DB, key: string, m: WorkMark) {
 export function dropWorkMarks(db: DB, before: number) {
   schema(db);
   db.prepare('delete from wiki_work_sessions where at < ?').run(before);
+}
+
+/** Tries a document gets at one version of it before it is left alone (until it changes). */
+export const READ_TRIES = 3;
+/** How long after a failed try the document is tried again. */
+export const RETRY_AFTER_MS = 3_600_000;
+
+/**
+ * Records what the digest did with a document at a version of it (its `kb_docs.indexed_at`): read (or nothing to read),
+ * or a try that failed, counted per version so a changed document starts again.
+ */
+export function markDocRead(db: DB, d: { base: string; path: string; version: number; ok: boolean }, at = Date.now()) {
+  schema(db);
+  const cur = db.prepare('select version, ok, tries from wiki_doc_reads where base = ? and path = ?').get(d.base, d.path) as { version: number; ok: number; tries: number } | undefined;
+  const tries = d.ok ? 0 : cur && !cur.ok && cur.version === d.version ? cur.tries + 1 : 1;
+  db.prepare('insert or replace into wiki_doc_reads (base, path, version, ok, tries, at) values (?, ?, ?, ?, ?, ?)').run(d.base, d.path, d.version, d.ok ? 1 : 0, tries, at);
 }
