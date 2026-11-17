@@ -46,6 +46,8 @@ import { MODES as CONSOLE_MODES } from './agent/prompt.ts';
 import { createGuestLink, guestItem, guestLinks, openGuestLink, revokeGuestLink } from './guests.ts';
 import { checkUpdates, installUpdateNow, laterUpdate, noteUserMessage, setAutoUpdate, startUpdate, updateState, watchUpdates } from './updates.ts';
 import { accountById, accountEnv, accountPool, addAccount, addedAccounts, apiCreditOn, autoSwitchOn, hasApiKey, setApiKey, removeAccount as removeAgentAccount, renameAccount, syncRoots } from './accounts.ts';
+import { dropGrokControl, grokControl, grokFlows } from './agents/grok.ts';
+import { ACCOUNT_AGENT_NAMES, isGrok } from '../shared/grok.ts';
 import { ACP_PRESETS, acpAgents, CONSOLE_ID, findCommand, removeAcpAgent, saveAcpAgent } from './agents/acp.ts';
 import { devServerShot, listDevServers, livePreview, PREVIEW_ORIGIN, PREVIEW_PORT, previewToken, startPreviewServer } from './preview.ts';
 import { Kernels } from './notebook/kernels.ts';
@@ -418,6 +420,8 @@ app.post('/api/sessions', async (req) => {
     extra: others ? { ...extra, arena: undefined } : extra,
     // A question asked on Help (or from a page in Pages, or a file in Files) leaves the agent's remembered model, effort and permissions as they were.
     remember: extra?.help || extra?.page || extra?.file ? false : undefined,
+    // The start page says a person started it (nothing else does): in a project with no wiki memory it may ask to build it first.
+    askMemory: b.askMemory === true && !others,
   };
   // The page's own id for this press of Start: sent again (its answer lost on the way), it makes no second session.
   const startId = typeof b.startId === 'string' && START_ID.test(b.startId) ? b.startId : undefined;
@@ -760,22 +764,23 @@ app.post('/api/sessions/:key/approvals/:id', async (req) => {
   const b = (req.body ?? {}) as any;
   // An app's long answers (meeting notes pasted into its card) take up to 60,000 characters, as its own form does.
   const form = b.form && typeof b.form === 'object' ? Object.fromEntries(Object.entries(b.form as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '').slice(0, 60_000)])) : undefined;
-  await sessions.answer(K(req), decodeURIComponent((req.params as { id: string }).id), { decision: String(b.decision ?? ''), message: b.message, answers: b.answers, form });
-  return { ok: true };
+  const done = await sessions.answer(K(req), decodeURIComponent((req.params as { id: string }).id), { decision: String(b.decision ?? ''), message: b.message, answers: b.answers, form });
+  // The card of a session that could not start again answers with the new session that has its first message.
+  return { ok: true, ...(done?.key ? { key: done.key } : {}) };
 });
 app.post('/api/sessions/:key/config', async (req) => {
   const b = (req.body ?? {}) as any;
   await sessions.configure(K(req), { model: b.model, effort: b.effort, mode: b.mode });
   return { ok: true };
 });
-// The account a Claude Code or Codex session runs as ('' or none: the CLI's own sign-in): its history moves there,
+// The account a Claude Code, Codex or Grok Build session runs as ('' or none: the CLI's own sign-in): its history moves there,
 // and its agent starts there with the next message.
 app.post('/api/sessions/:key/account', async (req) => {
   const id = String((req.body as { account?: unknown } | undefined)?.account ?? '');
   const key = K(req);
-  const agent = key.startsWith('codex:') ? 'codex' : key.startsWith('claude:') ? 'claude' : null;
-  if (!agent) throw new HttpError(400, 'Only a Claude Code or Codex session runs as an account');
-  if (id && accountById(db, id)?.agent !== agent) throw new HttpError(404, `No such ${agent === 'claude' ? 'Claude Code' : 'Codex'} account`);
+  const agent = key.startsWith('codex:') ? 'codex' : key.startsWith('claude:') ? 'claude' : sessions.isGrokSession(key) ? 'grok' : null;
+  if (!agent) throw new HttpError(400, 'Only a Claude Code, Codex or Grok Build session runs as an account');
+  if (id && accountById(db, id)?.agent !== agent) throw new HttpError(404, `No such ${ACCOUNT_AGENT_NAMES[agent]} account`);
   await sessions.moveToAccount(key, id || undefined);
   return { ok: true };
 });
@@ -985,7 +990,8 @@ const extraUsage: Record<string, AgentUsage> = {};
 
 /** Usage of every added account (each through its own control process). */
 async function addedUsage(): Promise<Record<string, AgentUsage>> {
-  const list = addedAccounts(db);
+  // Grok Build's accounts have no usage to read here.
+  const list = addedAccounts(db).filter((a) => a.agent !== 'grok');
   const got = await Promise.all(
     list.map(async (a) => [a.id, a.agent === 'claude' ? await sessions.controlFor('claude', a.id).usage(sessions.liveClaudeUsage(a.id)) : await sessions.controlFor('codex', a.id).usage()] as const),
   );
@@ -1044,15 +1050,19 @@ app.post('/api/usage/:agent/reset', async (req) => {
 });
 
 app.get('/api/accounts', async () => {
-  const [c, x, extra] = await Promise.all([
+  const added = addedAccounts(db);
+  // Grok Build shows once it is set up: its agent is added in Settings → More agents, or an account of it exists.
+  const grok = acpAgents(db).some((a) => isGrok(a)) || added.some((a) => a.agent === 'grok');
+  const [c, x, g, extra] = await Promise.all([
     claude.account(),
     codex.account(),
-    Promise.all(addedAccounts(db).map(async (a) => ({ ...a, status: await sessions.controlFor(a.agent, a.id).account() }))),
+    grok ? grokControl(db).account() : undefined,
+    Promise.all(added.map(async (a) => ({ ...a, status: await (a.agent === 'grok' ? grokControl(db, a.id) : sessions.controlFor(a.agent, a.id)).account() }))),
   ]);
   // Which Claude accounts have an API key for API credit ("main": the CLI's own sign-in).
   const apiKeys: Record<string, boolean> = { main: hasApiKey(db, undefined) };
   for (const a of extra) if (a.agent === 'claude') apiKeys[a.id] = hasApiKey(db, a.id);
-  return { claude: c, codex: x, extra, apiKeys };
+  return { claude: c, codex: x, ...(g ? { grok: g } : {}), extra, apiKeys };
 });
 
 /** A Claude account's Anthropic API key, the API credit its sessions use when every account is at its limit (Settings → Accounts). */
@@ -1092,6 +1102,7 @@ app.delete('/api/agent-accounts/:id', async (req) => {
   const id = (req.params as { id: string }).id;
   if ([...sessions.lives.values()].some((l) => l.account === id)) throw new HttpError(409, 'Sessions are running as this account: stop them first');
   sessions.dropControl(id);
+  dropGrokControl(id);
   sessions.forgetAccount(id);
   removeAgentAccount(db, id, (req.query as Record<string, string>).wipe === '1');
   delete extraUsage[id];
@@ -1103,16 +1114,25 @@ function broadcastAccounts() {
   broadcast({ t: 'accounts', accounts: addedAccounts(db) });
 }
 
+/** The sign-in calls of an agent's accounts: Claude Code, Codex and Grok Build have them; any other agent is unknown. */
+const loginAgent = (agent: string): 'claude' | 'codex' | 'grok' => {
+  if (agent !== 'claude' && agent !== 'codex' && agent !== 'grok') throw new HttpError(404, 'Unknown agent');
+  return agent;
+};
+
 app.post('/api/accounts/:agent/login', async (req) => {
-  const agent = (req.params as { agent: string }).agent;
+  const agent = loginAgent((req.params as { agent: string }).agent);
   const method = String((req.body as any)?.method ?? '');
   const account = acctOf(req);
+  if (agent === 'grok') return publicFlow(await grokControl(db, account).startLogin());
   const flow = agent === 'claude' ? await sessions.controlFor('claude', account).startLogin(method === 'console' ? 'console' : 'claudeai') : await sessions.controlFor('codex', account).startLogin(method === 'browser' ? 'browser' : 'device');
   return publicFlow(flow);
 });
 
 app.post('/api/accounts/:agent/login/:flow', async (req) => {
-  const { agent, flow } = req.params as { agent: string; flow: string };
+  const { agent: a, flow } = req.params as { agent: string; flow: string };
+  const agent = loginAgent(a);
+  if (agent === 'grok') throw new HttpError(400, 'Grok Build’s sign-in needs nothing pasted: confirm the code in your browser');
   const b = (req.body ?? {}) as { code?: string; url?: string };
   const account = acctOf(req);
   const f = agent === 'claude' ? sessions.controlFor('claude', account).submitCode(flow, String(b.code ?? '')) : await sessions.controlFor('codex', account).submitRedirect(flow, String(b.url ?? ''));
@@ -1120,17 +1140,20 @@ app.post('/api/accounts/:agent/login/:flow', async (req) => {
 });
 
 app.delete('/api/accounts/:agent/login/:flow', async (req) => {
-  const { agent, flow } = req.params as { agent: string; flow: string };
+  const { agent: a, flow } = req.params as { agent: string; flow: string };
+  const agent = loginAgent(a);
   const account = acctOf(req);
-  if (agent === 'claude') sessions.controlFor('claude', account).cancelLogin(flow);
+  if (agent === 'grok') grokControl(db, account).cancelLogin(flow);
+  else if (agent === 'claude') sessions.controlFor('claude', account).cancelLogin(flow);
   else await sessions.controlFor('codex', account).cancelLogin(flow);
   return { ok: true };
 });
 
 app.post('/api/accounts/:agent/logout', async (req) => {
-  const agent = (req.params as { agent: string }).agent;
+  const agent = loginAgent((req.params as { agent: string }).agent);
   const account = acctOf(req);
-  if (agent === 'claude') await sessions.controlFor('claude', account).logout();
+  if (agent === 'grok') await grokControl(db, account).logout();
+  else if (agent === 'claude') await sessions.controlFor('claude', account).logout();
   else await sessions.controlFor('codex', account).logout();
   return { ok: true };
 });
@@ -1670,6 +1693,7 @@ const onFlow = (f: LoginFlow) => {
 claude.on('flow', onFlow);
 codex.on('flow', onFlow);
 sessions.on('flow', onFlow);
+grokFlows.on('flow', onFlow);
 // Projects found in Claude Code and Codex (server/spaces/found.ts): a session that works in a project's folder joins it as the
 // indexer reads it, and the folders those programs work in become projects once the first pass is over, then as they change.
 const foundSync = () => {

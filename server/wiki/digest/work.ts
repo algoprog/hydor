@@ -15,6 +15,8 @@ import { redactSecrets } from '../../memory/secrets.ts';
 import { allSpaces } from '../../spaces/index.ts';
 import { wikiHash } from '../core.ts';
 import { wikiMemoryOn, wikiSpaceOfSession } from '../roots.ts';
+import { jobRunning } from '../areas/jobs.ts';
+import { runPool } from '../areas/pool.ts';
 import { digestText } from './digest.ts';
 import { helperDigestAsk, type DigestAsk } from './plan.ts';
 import { dropReads, logRead, readsInDay } from './reads.ts';
@@ -91,9 +93,12 @@ export interface WorkOptions {
   busy?: (key: string) => boolean;
   /** One project alone, now (Update now): its caps and exclusions kept, the daily pass's time left as it is. */
   only?: string;
+  /** How many conversations are read at once (Update now uses its helpers' pool; the passes read one at a time), and the signal that stops it. */
+  workers?: number;
+  signal?: AbortSignal;
 }
 
-interface Chosen {
+export interface Chosen {
   key: string;
   title: string;
   last: number;
@@ -103,6 +108,37 @@ interface Chosen {
   hash: string;
   upto: number;
   continued: boolean;
+}
+
+/** A session the work pass may read: not read to its last turn yet. */
+export interface Candidate {
+  key: string;
+  title: string;
+  last: number;
+  space: string;
+  /** Turns after this are new (where the last read stopped, or the floor). */
+  since: number;
+  mark?: ReturnType<typeof workMark>;
+  score: number;
+}
+
+/**
+ * A session as the helper reads it, exactly as every pass does: the turns after `since` (a turn the agent has not answered
+ * yet waits), the conversation's first request and latest turns, secrets cut out, at least MIN_CONVO_CHARS. `read`: its text was
+ * read before (the same hash): it is marked read up to its last turn. Null when there is nothing new worth reading.
+ */
+export function prepareSession(db: DB, c: Pick<Candidate, 'key' | 'title' | 'last' | 'space' | 'since' | 'mark'>, now: number): { chosen: Chosen } | { read: number } | null {
+  const turns = turnsOf(db, c.key, { since: c.since });
+  // A turn the agent has not answered yet is read with its reply.
+  while (turns.length && !turns[turns.length - 1].reply) turns.pop();
+  if (!turns.length) return null;
+  const upto = turns[turns.length - 1].at;
+  const { text, cut } = conversationText(turns);
+  const clean = redactSecrets(text);
+  if (clean.length < MIN_CONVO_CHARS) return null;
+  const hash = wikiHash(clean);
+  if (digested(db, c.space, hash)) return { read: upto };
+  return { chosen: { key: c.key, title: clip(c.title || 'untitled', 100), last: c.last, space: c.space, text: clean, cut, hash, upto, continued: !!c.mark } };
 }
 
 /**
@@ -118,7 +154,7 @@ function choose(db: DB, o: { now: number; floor: number; projects: Set<string>; 
     return room.get(space)!;
   };
   // Cheap first: SQL and the indexed text only, for every conversation of a project that has room.
-  const candidates: { key: string; title: string; last: number; space: string; since: number; mark?: ReturnType<typeof workMark>; score: number }[] = [];
+  const candidates: Candidate[] = [];
   for (const c of conversationsSince(db, o.floor, 400)) {
     const space = wikiSpaceOfSession(db, c.key, c.cwd);
     if (!space || !o.projects.has(space) || roomOf(space) <= 0) continue;
@@ -135,57 +171,76 @@ function choose(db: DB, o: { now: number; floor: number; projects: Set<string>; 
   for (const c of candidates) {
     if (chosen.length >= o.total) break;
     if ((taken.get(c.space) ?? 0) >= roomOf(c.space)) continue;
-    const turns = turnsOf(db, c.key, { since: c.since });
-    // A turn the agent has not answered yet is read with its reply.
-    while (turns.length && !turns[turns.length - 1].reply) turns.pop();
-    if (!turns.length) continue;
-    const upto = turns[turns.length - 1].at;
-    const { text, cut } = conversationText(turns);
-    const clean = redactSecrets(text);
-    if (clean.length < MIN_CONVO_CHARS) continue;
-    const hash = wikiHash(clean);
-    if (digested(db, c.space, hash)) {
-      setWorkMark(db, c.key, { space: c.space, upto, at: o.now });
+    const p = prepareSession(db, c, o.now);
+    if (!p) continue;
+    if ('read' in p) {
+      setWorkMark(db, c.key, { space: c.space, upto: p.read, at: o.now });
       continue;
     }
     taken.set(c.space, (taken.get(c.space) ?? 0) + 1);
-    chosen.push({ key: c.key, title: clip(c.title || 'untitled', 100), last: c.last, space: c.space, text: clean, cut, hash, upto, continued: !!c.mark });
+    chosen.push(p.chosen);
   }
   return chosen;
 }
 
-/** Gives the chosen conversations to the helper, one at a time: each is marked read once the helper has answered. */
-async function readChosen(db: DB, ask: DigestAsk | undefined, chosen: Chosen[], now: number, onUpdate?: (space: string | null) => void): Promise<number> {
+/** What reading one conversation may be told besides the usual: the signal of a stopped job, and the quiet row of a build. */
+export interface ReadOne {
+  onUpdate?: (space: string | null) => void;
+  /** A build or rebuild keeps one update row for all its sources: `report` hears what each did instead. */
+  quiet?: boolean;
+  report?: (r: { articles: string[]; notes: number; error?: string }) => void;
+  /** Counts toward the project's reads of the day (the passes' cap); a build does not. */
+  log?: boolean;
+  source?: string | null;
+}
+
+/** Gives one chosen conversation to the helper; it is marked read once the helper has answered. Whether it was read. */
+export async function readSession(db: DB, helper: DigestAsk, c: Chosen, now: number, o: ReadOne = {}): Promise<boolean> {
+  if (o.log !== false) logRead(db, c.space, c.key, now);
+  const done = await digestText(db, helper, {
+    space: c.space,
+    base: 'sessions',
+    title: c.title,
+    path: `session:${c.key}`,
+    origin: `session:${c.title} · ${day(c.last)}`,
+    text: c.text,
+    cut: c.cut,
+    kind: 'conversation',
+    notes: false,
+    hash: c.hash,
+    continued: c.continued,
+    now: () => now,
+    onUpdate: o.onUpdate,
+    quiet: o.quiet,
+    report: o.report,
+    ...(o.source !== undefined ? { source: o.source } : {}),
+  });
+  if (done) setWorkMark(db, c.key, { space: c.space, upto: c.upto, at: now });
+  return done;
+}
+
+/** Gives the chosen conversations to the helper, one at a time (the passes), or `workers` at a time (Update now). */
+async function readChosen(db: DB, ask: DigestAsk | undefined, chosen: Chosen[], now: number, onUpdate?: (space: string | null) => void, workers = 1, signal?: AbortSignal): Promise<number> {
   const helper = ask ?? helperDigestAsk(db);
   let read = 0;
-  for (const c of chosen) {
-    try {
-      read++;
-      logRead(db, c.space, c.key, now);
-      const done = await digestText(db, helper, {
-        space: c.space,
-        base: 'sessions',
-        title: c.title,
-        path: `session:${c.key}`,
-        origin: `session:${c.title} · ${day(c.last)}`,
-        text: c.text,
-        cut: c.cut,
-        kind: 'conversation',
-        notes: false,
-        hash: c.hash,
-        continued: c.continued,
-        now: () => now,
-        onUpdate,
-      });
-      if (done) setWorkMark(db, c.key, { space: c.space, upto: c.upto, at: now });
-    } catch (e) {
-      console.warn(`[wiki] learning from session ${c.key}: ${(e as Error).message}`);
-    }
-  }
+  await runPool(
+    chosen,
+    workers,
+    async (c) => {
+      try {
+        read++;
+        await readSession(db, helper, c, now, { onUpdate });
+      } catch (e) {
+        console.warn(`[wiki] learning from session ${c.key}: ${(e as Error).message}`);
+      }
+    },
+    { signal },
+  );
   return read;
 }
 
-const projectsWithWiki = (db: DB) => new Set(allSpaces(db).filter((s) => wikiMemoryOn(db, s.id)).map((s) => s.id));
+/** The projects the passes read: wiki memory on, and no build, rebuild or update running on its wiki (it reads what the pass would). */
+const projectsWithWiki = (db: DB, o: { busy?: boolean } = {}) => new Set(allSpaces(db).filter((s) => wikiMemoryOn(db, s.id) && !(o.busy !== false && jobRunning(s.id))).map((s) => s.id));
 
 /**
  * One pass over the projects' recent work. Returns how many conversations it read (0 when memory or learning is off,
@@ -200,10 +255,11 @@ export async function learnWikiFromWork(db: DB, ask: DigestAsk | undefined, now 
   running = true;
   try {
     if (!memoryOn(db) || !learnOn(db)) return 0;
-    const projects = projectsWithWiki(db);
+    // Update now is a job on its project's wiki itself: it reads that project, the passes leave a project with a job running.
+    const projects = projectsWithWiki(db, { busy: !options.only });
     if (options.only) for (const p of [...projects]) if (p !== options.only) projects.delete(p);
     let read = 0;
-    if (projects.size) read = await readChosen(db, ask, choose(db, { now, floor: now - LOOK_BACK_MS, projects, busy: options.busy, quiet: false, perProject: PER_PROJECT, total: PER_PASS }), now, onUpdate);
+    if (projects.size) read = await readChosen(db, ask, choose(db, { now, floor: now - LOOK_BACK_MS, projects, busy: options.busy, quiet: false, perProject: PER_PROJECT, total: PER_PASS }), now, onUpdate, options.workers, options.signal);
     if (options.only) return read;
     kvSet(db, KV_AT, String(now));
     dropWorkMarks(db, now - MARK_KEEP_MS);

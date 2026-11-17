@@ -8,6 +8,7 @@ import { usd } from '@shared/budget';
 import { arenaOf } from '@shared/arena';
 import { isConfidential } from '@shared/confidential';
 import { placeKey } from '@shared/start';
+import { accountAgentOf } from '@shared/grok';
 import { AUTO_MODEL, tierProgram } from '@shared/tiers';
 import { api } from '../../lib/api';
 import { activityOf } from '../../lib/activity';
@@ -222,7 +223,10 @@ function StartComposer({
   const [worktree, setWorktree] = useState(!!src.worktree);
   // Accounts added for this agent (Settings → Accounts); '' is the CLI's own sign-in.
   const allAccounts = useApp((s) => s.boot?.accounts);
-  const accounts = useMemo(() => (allAccounts ?? []).filter((a) => a.agent === agent), [allAccounts, agent]);
+  // Grok Build, an ACP agent, has them too; the other ACP agents have none.
+  const acpDef = agent === 'acp' ? acpList?.find((a) => a.id === acpId) : undefined;
+  const accountAgent = accountAgentOf(agent, acpDef);
+  const accounts = useMemo(() => (allAccounts ?? []).filter((a) => a.agent === accountAgent), [allAccounts, accountAgent]);
   const [account, setAccount] = useState('');
   const key = agentKey(agent, acpId);
   // Picks that land after the agent changes (an assistant's model and mode) belong to the new one.
@@ -410,6 +414,8 @@ function StartComposer({
       account: acct,
       worktree: !task && !!repo && worktree,
       ...(Object.keys(extra).length ? { extra } : {}),
+      // A person starting it: in a project with no wiki memory, the session may first ask to build it.
+      askMemory: true,
       ...attachmentPayload(atts),
     };
     const inTask = task;
@@ -717,7 +723,7 @@ function StartComposer({
                 <MoreOptions changed={changed} title={optionsTitle}>
                   <EffortPicker label="Effort" agent={agent} acp={acpId ?? undefined} model={effortModel} value={effort} onChange={(v) => (touch(), setEffort(v), keepRun({ effort: v }))} />
                   <ModePicker label="Permissions" agent={agent} acp={acpId ?? undefined} value={mode} onChange={(v) => (touch(), setMode(v), keepRun({ mode: v }))} />
-                  {accounts.length > 0 && agent !== 'acp' && <AccountPicker agent={agent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
+                  {accounts.length > 0 && accountAgent && <AccountPicker agent={accountAgent} accounts={accounts} value={acct ?? ''} onChange={(id) => (setAccount(id), keepRun({ account: id }))} />}
                   <FeatureStartOptions part="rest" value={extra} cwd={cwd} onChange={onExtra} />
                 </MoreOptions>
               </span>

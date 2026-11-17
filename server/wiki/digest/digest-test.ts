@@ -12,18 +12,19 @@ import { setSettings } from '../../assistants/store.ts';
 import type { Deps } from '../../features/types.ts';
 import { knowledgeEvents, type IndexedDoc } from '../../knowledge/events.ts';
 import { scanSoon } from '../../knowledge/indexer.ts';
-import { addSource, createBase, docsOf, knowledgeSchema } from '../../knowledge/store.ts';
+import { addSource, createBase, docsOf, knowledgeSchema, saveDoc } from '../../knowledge/store.ts';
 import { kvGet, openDb } from '../../db.ts';
 import { entries, repoRoot, setEnabled } from '../../memory/store.ts';
 import { createSpace, spaceById, updateSpace } from '../../spaces/index.ts';
 import { browseWiki } from '../browse.ts';
-import { checkWiki, readWiki } from '../core.ts';
+import { checkWiki, readWiki, wikiHash } from '../core.ts';
 import { ensureWikiKnowledge } from '../knowledge/bindings.ts';
 import { wikiRoot } from '../roots.ts';
 import { setWikiSettings, wikiSettings } from '../settings/settings.ts';
 import { createDigest, MAX_DOC_CHARS, type Digest } from './digest.ts';
 import { PLAN_SYSTEM } from './plan.ts';
-import { backfillDocuments, wikiDigest } from './index.ts';
+import { backfillDocuments, WAITING_PER_PLACE, wikiDigest } from './index.ts';
+import { markDigested, READ_TRIES, RETRY_AFTER_MS } from './store.ts';
 import { documentsOverLimit } from './limit.ts';
 import { analysisAvailable } from './analyze.ts';
 import { cleanLinks, composeArticle, slugOf, splitFront, writable } from './write.ts';
@@ -52,10 +53,26 @@ const asked: { system: string; prompt: string }[] = [];
 let plan: unknown = { update: [], create: [], notes: [] };
 let write: (prompt: string) => unknown = () => ({ articles: [] });
 let fail = false;
+/** While set, the helper waits for it before it answers. */
+let hold: Promise<void> | null = null;
 const ask = async (q: { system: string; prompt: string }) => {
   asked.push(q);
+  if (hold) await hold;
   if (fail) throw new Error('The helper model is not there');
   return q.system === PLAN_SYSTEM ? plan : write(q.prompt);
+};
+
+/** A stand-in queue for the backfill: what it was given, and what waits (a fresh one is a restarted server). */
+const stubQueue = (queued: string[] = [], o: { onQueue?: (e: IndexedDoc) => void } = {}) => {
+  const waits: IndexedDoc[] = [];
+  return {
+    enqueue: (e: IndexedDoc) => {
+      queued.push(e.path);
+      if (!waits.some((w) => w.base === e.base && w.path === e.path)) waits.push(e);
+      o.onQueue?.(e);
+    },
+    waiting: () => [...waits],
+  };
 };
 
 const listeners: (() => void)[] = [];
@@ -417,16 +434,13 @@ test('a project with more documents than its limit: it reads the newest of them,
   assert.deepEqual(documentsOverLimit(db, beta.id), { count: 3, limit: 2, over: true });
   assert.deepEqual(await documentsOf(`/api/projects/${beta.id}/wiki/updates`), { count: 3, limit: 2, over: true }, 'the route says so');
   assert.equal((await documentsOf('/api/wiki/updates')).limit, 2, 'the shared wiki uses the global number');
-  // The backfill queues the ones it picks, newest first, and does not mark the place.
+  // The documents it picked were read, so a check (after a restart, say) has none to queue; no mark is kept.
   const queued: string[] = [];
-  const queue = { enqueue: (e: IndexedDoc) => void queued.push(e.path) };
+  const queue = stubQueue(queued);
   const mine = (e: string[]) => e.filter((p) => p.startsWith(dir));
   backfillDocuments(db, queue);
-  assert.deepEqual(mine(queued).map((p) => path.basename(p)), ['beta-3.md', 'beta-2.md']);
-  assert.notEqual(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1');
-  queued.length = 0;
-  backfillDocuments(db, queue);
-  assert.deepEqual(mine(queued), [], 'each picked document is queued once');
+  assert.deepEqual(mine(queued), [], 'what was read is not queued again');
+  assert.equal(kvGet(db, `wiki.digest.backfilled.${beta.id}`), undefined);
   // Its own number wins over the global one.
   assert.equal(updateSpace(db, beta.id, { wikiDocumentLimit: 5 }).wikiDocumentLimit, 5);
   assert.deepEqual(documentsOverLimit(db, beta.id), { count: 3, limit: 5, over: false });
@@ -435,16 +449,18 @@ test('a project with more documents than its limit: it reads the newest of them,
   assert.throws(() => updateSpace(db, beta.id, { wikiDocumentLimit: 1.5 }), /whole number/);
   assert.throws(() => updateSpace(db, beta.id, { wikiDocumentLimit: '9' }), /whole number/);
   assert.equal(updateSpace(db, beta.id, { description: 'else' }).wikiDocumentLimit, 5, 'changing something else keeps it');
-  // Under its limit now: the documents already there are queued once, and read.
+  // Under its limit now: the document it left out is queued (the 2 it read are not), and read.
   queued.length = 0;
   backfillDocuments(db, queue);
-  assert.equal(mine(queued).length, 3);
-  assert.equal(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1');
+  assert.deepEqual(mine(queued).map((p) => path.basename(p)), ['beta-1.md']);
   queued.length = 0;
   backfillDocuments(db, queue);
-  assert.deepEqual(mine(queued), [], 'once');
-  for (const doc of docsOf(db, bbase.id)) d.enqueue({ base: bbase.id, path: doc.path, title: doc.title });
+  assert.deepEqual(mine(queued), [], 'it waits: not queued twice');
+  for (const e of queue.waiting()) d.enqueue(e);
   await d.settled();
+  queued.length = 0;
+  backfillDocuments(db, stubQueue(queued));
+  assert.deepEqual(mine(queued), [], 'read: nothing left to queue');
   assert.ok(asked.length > n0, 'read after the limit was raised');
   assert.ok((await betaUpdates()).length >= 1);
   // A wiki's own documents are not counted.
@@ -452,7 +468,7 @@ test('a project with more documents than its limit: it reads the newest of them,
   const own = ensureWikiKnowledge(db, { root: wikiRoot(db, beta.id)!, space: beta.id });
   db.prepare("insert into kb_docs (base, source, path, title, format, size, mtime, passages, status, indexed_at) values (?, 's', '/w/a.md', 'a.md', 'md', 1, 0, 1, 'indexed', 1)").run(own.base);
   assert.equal(documentsOverLimit(db, beta.id).count, 3);
-  // Over again: a new document is among the newest, so it is read; the mark is dropped so raising the limit reads what was missed.
+  // Over again: a new document is among the newest, so it is read.
   updateSpace(db, beta.id, { wikiDocumentLimit: 3 });
   fs.writeFileSync(path.join(dir, 'beta-4.md'), '# Beta 4\n\nA fourth document about beta, with enough words to be read.\n');
   const rows = (await betaUpdates()).length;
@@ -460,15 +476,15 @@ test('a project with more documents than its limit: it reads the newest of them,
   await d.settled();
   assert.equal((await betaUpdates()).length, rows + 1, 'the new document is read');
   queued.length = 0;
-  backfillDocuments(db, queue);
-  assert.notEqual(kvGet(db, `wiki.digest.backfilled.${beta.id}`), '1', 'over again: no longer marked');
+  backfillDocuments(db, stubQueue(queued));
+  assert.deepEqual(mine(queued), [], 'over again: the 3 it picks are read');
   queued.length = 0;
   updateSpace(db, beta.id, { wikiDocumentLimit: null });
   assert.equal('wikiDocumentLimit' in spaceById(db, beta.id)!, false, 'null: as in Settings again');
   assert.equal(documentsOverLimit(db, beta.id).limit, 2);
   setWikiSettings(db, { documentLimit: 100 });
-  backfillDocuments(db, queue);
-  assert.equal(mine(queued).length, 4, 'read when the limit allows it');
+  backfillDocuments(db, stubQueue(queued));
+  assert.deepEqual(mine(queued), [], 'all 4 are read by now: nothing to queue');
   stop();
 });
 
@@ -509,6 +525,193 @@ test('a large data file is analysed with code in the sandbox, and only its findi
     assert.match(latest.error ?? '', /no sandbox to run code in/);
     assert.equal(asked.length, n, 'no helper call without a sandbox');
   }
+  stop();
+});
+
+// ---- the documents already there: what each check queues, and what a restart or a failure leaves ---------------------
+
+/** A project with `count` documents saved straight into its knowledge (document i is older the smaller i is), none read yet. */
+function projectWith(name: string, count: number, o: { limit?: number } = {}) {
+  const folder = path.join(tmp, name.toLowerCase());
+  fs.mkdirSync(folder, { recursive: true });
+  const space = createSpace(db, { name, folder, ...(o.limit !== undefined ? { wikiDocumentLimit: o.limit } : {}) });
+  const b = createBase(db, { name: `${name} docs`, space: space.id });
+  knowledgeSchema(db);
+  const paths: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const file = path.join(folder, `doc-${i}.md`);
+    paths.push(file);
+    saveDoc(db, { base: b.id, source: 's', path: file, title: `doc-${i}.md`, format: 'md', size: 100, mtime: 1_600_000_000_000 + i * 1000, status: 'indexed', chunks: [{ text: `# ${name} ${i}\n\nThe ${name} document number ${i}, with enough words to be read by the helper.` }] });
+  }
+  return { space: space.id, base: b.id, paths, names: (e: string[]) => e.filter((p) => paths.includes(p)).map((p) => path.basename(p, '.md')) };
+}
+/** The digest as the backfill's queue, for the documents `paths` only (other tests' documents may be unread too); `seen` hears every document it is given. */
+const scoped = (d: Digest, paths: string[], seen: string[]) => ({
+  enqueue: (e: IndexedDoc) => {
+    seen.push(e.path);
+    if (paths.includes(e.path)) d.enqueue(e);
+  },
+  waiting: () => d.waiting(),
+});
+const readRow = (b: string, file: string) => db.prepare('select version, ok, tries, at from wiki_doc_reads where base = ? and path = ?').get(b, file) as { version: number; ok: number; tries: number; at: number } | undefined;
+const versionOf = (b: string, file: string) => (db.prepare('select indexed_at from kb_docs where base = ? and path = ?').get(b, file) as { indexed_at: number }).indexed_at;
+
+test('after a restart the documents not read yet are queued again; once read, none', async () => {
+  const g = projectWith('Gamma', 3);
+  plan = { update: [], create: [], notes: [] };
+  // Queued, but the server stopped before it read them.
+  const first = newDigest({ quietMs: 1e9 });
+  const q1: string[] = [];
+  backfillDocuments(db, scoped(first, g.paths, q1));
+  assert.deepEqual(g.names(q1), ['doc-2', 'doc-1', 'doc-0'], 'newest first');
+  assert.equal(kvGet(db, `wiki.digest.backfilled.${g.space}`), undefined, 'no mark says they were queued');
+  stop();
+  // A fresh queue: the same documents come again.
+  const q2: string[] = [];
+  const second = newDigest();
+  backfillDocuments(db, scoped(second, g.paths, q2));
+  assert.deepEqual(g.names(q2), ['doc-2', 'doc-1', 'doc-0'], 'queued again after the restart');
+  await second.settled();
+  for (const f of g.paths) assert.equal(readRow(g.base, f)?.ok, 1, 'read, and recorded as read');
+  const q3: string[] = [];
+  backfillDocuments(db, stubQueue(q3));
+  assert.deepEqual(g.names(q3), [], 'once read: none');
+  stop();
+});
+
+test('up to the limit and beyond the room: documents in the read set are queued as the waiting ones are read, those outside never', async () => {
+  const h = projectWith('Delta', 7, { limit: 5 });
+  plan = { update: [], create: [], notes: [] };
+  const d = newDigest();
+  const queuedHere: string[] = [];
+  const queue = scoped(d, h.paths, queuedHere);
+  const check = () => {
+    queuedHere.length = 0;
+    backfillDocuments(db, queue, { perPlace: 2 });
+    return g(queuedHere);
+  };
+  const g = (e: string[]) => h.names(e);
+  assert.deepEqual(check(), ['doc-6', 'doc-5']);
+  assert.deepEqual(check(), [], 'two wait: no room');
+  await d.settled();
+  assert.deepEqual(check(), ['doc-4', 'doc-3']);
+  await d.settled();
+  assert.deepEqual(check(), ['doc-2']);
+  await d.settled();
+  assert.deepEqual(check(), [], 'the 5 of the read set are read');
+  assert.deepEqual((await updates(`/api/projects/${h.space}/wiki/updates`)).map((u) => path.basename(u.path)).sort(), ['doc-2.md', 'doc-3.md', 'doc-4.md', 'doc-5.md', 'doc-6.md']);
+  for (const f of [h.paths[0], h.paths[1]]) assert.equal(readRow(h.base, f), undefined, 'the two outside are never handled');
+  stop();
+});
+
+test('a limit above the old ceiling reaches the documents already there', async () => {
+  const n = WAITING_PER_PLACE + 20;
+  const h = projectWith('Epsilon', n, { limit: 100_000 });
+  const q: string[] = [];
+  const queue = stubQueue(q);
+  backfillDocuments(db, queue);
+  const mineQ = () => q.filter((p) => h.paths.includes(p));
+  assert.equal(mineQ().length, WAITING_PER_PLACE, 'a place has at most this many waiting');
+  assert.equal(path.basename(mineQ()[0], '.md'), `doc-${n - 1}`);
+  // Read in a restarted queue's sense: what waits goes, the next ones come.
+  for (const e of queue.waiting().filter((w) => h.paths.includes(w.path))) db.prepare('insert or replace into wiki_doc_reads (base, path, version, ok, tries, at) values (?, ?, ?, 1, 0, 0)').run(e.base, e.path, versionOf(e.base, e.path));
+  q.length = 0;
+  backfillDocuments(db, stubQueue(q));
+  assert.equal(mineQ().length, 20, 'the rest, beyond the 100');
+});
+
+test('a helper that fails: a failed try, tried again an hour later, up to 3 times for a version; a changed document starts again', async () => {
+  const h = projectWith('Zeta', 1);
+  const file = h.paths[0];
+  plan = { update: [], create: [], notes: [] };
+  let clock = Date.now();
+  const d = newDigest({ now: () => clock });
+  const check = (at: number) => {
+    const q: string[] = [];
+    backfillDocuments(db, scoped(d, h.paths, q), { now: at });
+    return q.filter((p) => p === file).length;
+  };
+  fail = true;
+  try {
+    assert.equal(check(clock), 1);
+    await d.settled();
+    assert.deepEqual({ ok: readRow(h.base, file)?.ok, tries: readRow(h.base, file)?.tries, version: readRow(h.base, file)?.version }, { ok: 0, tries: 1, version: versionOf(h.base, file) });
+    assert.match((await updates(`/api/projects/${h.space}/wiki/updates`))[0].error ?? '', /helper model is not there/, 'the error is listed, too');
+    const tried = clock;
+    assert.equal(check(tried + RETRY_AFTER_MS - 1000), 0, 'not before an hour has passed');
+    assert.equal(check(tried + RETRY_AFTER_MS), 1, 'an hour after');
+    for (let k = 2; k <= READ_TRIES; k++) {
+      clock += RETRY_AFTER_MS;
+      await d.settled();
+      assert.equal(readRow(h.base, file)?.tries, k, `try ${k}`);
+      if (k < READ_TRIES) assert.equal(check(clock + RETRY_AFTER_MS), 1);
+    }
+    clock += RETRY_AFTER_MS * 5;
+    assert.equal(check(clock), 0, `after ${READ_TRIES} failed tries: left alone`);
+    // The document changed: its version grows, it is tried again.
+    db.prepare('update kb_docs set indexed_at = indexed_at + 10 where base = ? and path = ?').run(h.base, file);
+    assert.equal(check(clock), 1, 'changed: queued again');
+    await d.settled();
+    assert.equal(readRow(h.base, file)?.tries, 1, 'its tries start again');
+  } finally {
+    fail = false;
+  }
+  clock += RETRY_AFTER_MS;
+  assert.equal(check(clock), 1, 'the helper is back');
+  await d.settled();
+  assert.equal(readRow(h.base, file)?.ok, 1);
+  assert.equal(check(clock + RETRY_AFTER_MS * 10), 0, 'read');
+  stop();
+});
+
+test('a text read before is recorded as handled without asking the helper, and not queued again', async () => {
+  const h = projectWith('Eta', 1);
+  const file = h.paths[0];
+  const text = (db.prepare('select c.text as text from kb_chunks c join kb_docs d on d.id = c.doc where d.base = ?').get(h.base) as { text: string }).text;
+  markDigested(db, h.space, wikiHash(text));
+  const d = newDigest();
+  const n = asked.length;
+  const q: string[] = [];
+  backfillDocuments(db, scoped(d, h.paths, q));
+  assert.ok(q.includes(file));
+  await d.settled();
+  assert.equal(asked.length, n, 'no helper call');
+  const row = readRow(h.base, file);
+  assert.deepEqual({ ok: row?.ok, tries: row?.tries, version: row?.version }, { ok: 1, tries: 0, version: versionOf(h.base, file) });
+  const again: string[] = [];
+  backfillDocuments(db, stubQueue(again));
+  assert.ok(!again.includes(file), 'not queued again');
+  stop();
+});
+
+test('a document already waiting is not queued twice, and the one being read counts as waiting', async () => {
+  const h = projectWith('Theta', 2);
+  plan = { update: [], create: [], notes: [] };
+  const idle = newDigest({ quietMs: 1e9 });
+  const q: string[] = [];
+  const queue = scoped(idle, h.paths, q);
+  backfillDocuments(db, queue);
+  assert.equal(q.filter((p) => h.paths.includes(p)).length, 2);
+  q.length = 0;
+  backfillDocuments(db, queue);
+  assert.deepEqual(q.filter((p) => h.paths.includes(p)), [], 'both wait');
+  assert.deepEqual(idle.waiting().filter((w) => w.base === h.base).map((w) => path.basename(w.path)), ['doc-1.md', 'doc-0.md'], 'in the order they came (read order)');
+  stop();
+  // One being read, not yet answered by the helper.
+  const busy = newDigest();
+  let release = () => {};
+  hold = new Promise<void>((r) => (release = r));
+  const n = asked.length;
+  busy.enqueue({ base: h.base, path: h.paths[1], title: 'doc-1.md' });
+  for (let i = 0; i < 100 && asked.length === n; i++) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(busy.pending(), 0, 'it is not waiting in the list');
+  assert.deepEqual(busy.waiting().map((w) => w.path), [h.paths[1]], 'but it is in waiting()');
+  q.length = 0;
+  backfillDocuments(db, scoped(busy, h.paths, q));
+  assert.deepEqual(q.filter((p) => h.paths.includes(p)), [h.paths[0]], 'only the other one is queued');
+  hold = null;
+  release();
+  await busy.settled();
   stop();
 });
 

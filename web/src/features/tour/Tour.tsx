@@ -12,7 +12,7 @@ import { createPortal } from 'react-dom';
 import { useLocation } from 'wouter';
 import { create } from 'zustand';
 import { ArrowRight, Bell, Blocks, Check, CircleHelp, Cloud, Cpu, Import, LayoutGrid, ListChecks, MessageSquareText, MessagesSquare, Plus, ShieldCheck, SlidersHorizontal, Smartphone, X } from 'lucide-react';
-import type { AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
+import type { AccountAgent, AccountStatus, AcpAgentDef, Agent, ClientInfo, ModelsState } from '@shared/types';
 import { api, post } from '../../lib/api';
 import { go } from '../../lib/nav';
 import { saveStart, startSettings } from '../../lib/start';
@@ -83,7 +83,7 @@ interface TourState {
   /** Fading out. */
   closing: boolean;
   i: number;
-  signIn: Agent | null;
+  signIn: AccountAgent | null;
   accountsRev: number;
   uses: Use[];
   /** The uses came from the person (saved or picked), not from what is set up already. */

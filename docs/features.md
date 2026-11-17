@@ -32,6 +32,12 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   app what came of the start once it can: the session opens if it started, and one press of Start never makes two
   sessions (after a minute out of reach, the page says so, with Try again). Pages, tabs, menus and dialogs open at
   once, with no fade.
+- A session you start in a project whose wiki memory is empty (but that has conversations, commits, documents, notes
+  or a README to build one from) first asks, in a card under your message, whether to build the memory: **Build memory,
+  then start** holds your message while the most important part is written (the session says Building memory, the card
+  shows the progress, with Start now and Stop building) and sends it when that is read; **Start without memory** starts
+  now and does not ask that project for a week; **Don't ask for this project** never asks again. What you send meanwhile
+  goes after your first message, and the waiting survives a restart.
 - Starter ideas under the start page's empty message box ("Ask for anything: research, documents, plans, code."):
   three example requests that change each day (everyday work, research, documents, and code in a code folder), two
   of your apps (the ones you run most, else Deep research report and Trip planner) and an automation ("Every Monday
@@ -92,13 +98,21 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   network (bubblewrap on Linux, Seatbelt on a Mac), or ask each time where that can't be done (Windows, some containers); its title, notices and memory send nothing out; a
   lock and a calm tint show it. Enforced on the server, not only in the page.
 - More agents: besides Claude Code and Codex, any agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode,
-  Qwen Code, Goose, Kimi CLI, Auggie, or a command of your own). Their approvals become approval cards you can answer
+  Qwen Code, Goose, Kimi CLI, Auggie, Grok Build, or a command of your own). Their approvals become approval cards you can answer
   from a phone, and the app's guidelines, memory notes and skills reach them with the first message; the app's tools
   reach every one that takes MCP servers (through a small bridge when it takes only commands). The app installs the
   ones it can get with npm by itself (with an ACP adapter when the agent needs one, without install scripts); the
   others show their own install command.
-- Several accounts per agent: sign in more than one Claude or Codex account and pick one per session; each
-  shows its own usage and limits, and an added Claude account trusts the folders the main sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
+- Grok Build, xAI's coding agent, is one click in More agents (the app installs it from npm when first needed, or uses
+  yours, also xAI's own installer's `~/.grok/bin`) and runs over ACP with the app's tools, approval cards and Grok's
+  models. Sign in with a Grok subscription under Settings → Accounts: a link and a one-time code to confirm on any
+  device, no pasting; an `XAI_API_KEY` works instead. A session started while signed out stops and says where to sign
+  in. A session whose ACP agent can no longer reopen it starts afresh, with a note, instead of failing.
+- Several accounts per agent: sign in more than one Claude Code, Codex or Grok Build account and pick one per session
+  (Grok accounts each keep their own sign-in and Grok history, and share the CLI's config, rules, skills, plugins and
+  MCP sign-ins; a Grok session's Account chip moves it to another from the next message, its history with it); each
+  shows its own usage and limits (Claude Code and Codex only: Grok has no usage meters, no switching at a limit and no
+  API credit yet), and an added Claude account trusts the folders the main sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
   account runs out of usage moves, with its history, to another account with usage left and carries on (a Claude Code
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
   rather than an error), and the app's own quick
@@ -254,7 +268,8 @@ agents that speak ACP and take MCP servers.
   statement it removes (a rewrite keeps at least half, and the earlier text is kept as a snapshot, the 20 newest of each article), an
   article over 12,000 characters is first split into a hub and parts, anything with a secret is left out, and each outcome is
   listed under Recent updates; documents already in a project's knowledge are
-  read once too, at the same pace (the newest 400 a project, looked at again every ten minutes). A large data file (CSV, TSV, a
+  read too, at the same pace (each project is checked every ten minutes for documents its wiki has not read yet, so a restart or a
+  raised limit loses none; a document the helper could not read is tried again an hour later, up to three times, and when it changes). A large data file (CSV, TSV, a
   spreadsheet or JSON data, over 40,000 characters of text or 256 KB) is analysed with code instead: the helper writes Python that
   Hydor runs in a sandbox with no network that sees only that file, read-only (up to four runs of a minute each), and only its
   findings become the source and go into the articles; without such a sandbox (macOS and Windows for now) these files are searched
@@ -303,11 +318,18 @@ agents that speak ACP and take MCP servers.
   later, two a day, under the revision rules, the merged one left as a redirect that `wiki_read` follows. Agents get a line naming
   the areas, and article lines say the area; an agent can be asked to reorganise now (`POST /api/projects/:id/wiki/reorganise`).
   The Wiki part's ⋯ menu: **Update now** (the waiting documents, unread conversations and new commits read at once; up to ten
-  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Rebuild from
-  sources…** (an estimate of sources, helper calls and cost first; the wiki archived, the last three kept and the first one always, then every source in
-  `raw/` read again, at most 60 an hour, then the earlier articles no new one covers, the areas and hubs made anew, and old article paths redirected to the new articles;
-  sources, plans and memory notes untouched; it goes on after a restart) and **Restore the previous wiki…**; a line says what
-  it is doing, one at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`).
+  out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Build from history…**
+  while the wiki is new (fewer than 10 articles, no build from history run yet) (it reads what the project has that the wiki never read: its files, memory notes, up to 300 conversations
+  by signal, the newest 1,200 commit messages and its unread documents, what matters most first so an agent can start early, then the
+  areas, hubs and merges; `/api/projects/:id/wiki/build`), **Rebuild from sources…** (an estimate of what it reads, minutes, helper
+  calls and cost first; the wiki archived, the last three kept and the first one always, then the files and the kept sources in
+  `raw/` read again, commit messages fresh from the repository, the documents and conversations never read, the earlier articles no
+  new one covers, the areas and hubs made anew, and old article paths redirected to the new articles; sources, plans and memory notes
+  untouched; it goes on after a restart) and **Restore the previous wiki…**. A build or rebuild reads several sources at once
+  (three on Automatic, four over an API, one on a local model) and goes as fast as they do; a panel shows its steps, what it reads now
+  and the time left, with **Stop** (what was written stays), **Continue** and **Try again** (`…/wiki/stop`, `…/wiki/continue`); one
+  job at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`). Agents are told of a wiki only
+  once it has an article.
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a
   folder (its own folder is listed only as the project, and starts sessions in it however it was picked): its sessions work in its own folder (a new one, or one you have) and any other folders of yours it works
@@ -1223,10 +1245,10 @@ the memory it needs, about how fast, and the disk it takes. Installed models sho
 with one click. Models without native tool calls are told about the tools in their own format, or in the
 prompt, and their calls are read from what they write.
 
-The agents' own programs install by themselves when first needed (Claude Code, Gemini CLI, OpenCode…,
+The agents' own programs install by themselves when first needed (Claude Code, Gemini CLI, OpenCode, Grok Build…,
 with npm into the app's folder), and stay up to date: once a day each is brought to its newest version, the
 app's copies with npm and your own installs with their own updater (`claude update`, `codex update`,
-`opencode upgrade`, or npm for `npm install -g` ones), Claude Code on its own release line (stable or latest). A
+`opencode upgrade`, `grok update`, or npm for `npm install -g` ones), Claude Code on its own release line (stable or latest). A
 new version is kept only once it starts and answers the way the sessions use it (no sign-in or usage needed),
 within a minute of the computer being awake or two more on a second start; one that does not is undone, and the
 sessions keep running the version before. Settings → Accounts → Agent

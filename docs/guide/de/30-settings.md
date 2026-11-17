@@ -100,21 +100,21 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 ### Konten
 
-[Einstellungen → Konten](/settings?s=accounts): Die Claude Code- und Codex-Anmeldungen, die jede Sitzung verwendet. Mehr dazu unter [Agenten, Konten und Modelle](/guide/agents-models).
+[Einstellungen → Konten](/settings?s=accounts): Die Claude Code-, Codex- und Grok Build-Anmeldungen, die jede Sitzung verwendet. Mehr dazu unter [Agenten, Konten und Modelle](/guide/agents-models).
 
-- [**Konten**](/settings?s=accounts&find=Accounts): Die Claude-Code- und Codex-Anmeldungen für Sitzungen sowie weitere, die du hinzufügst.
+- [**Konten**](/settings?s=accounts&find=Accounts): Die Claude-Code-, Codex- und Grok-Build-Anmeldungen für Sitzungen sowie weitere, die du hinzufügst.
 - [**Bei erreichtem Limit das Konto wechseln**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): Eine Sitzung, deren Nutzung erschöpft ist, wird mit einem anderen Konto fortgesetzt.
 - [**Bei erreichtem Limit API-Guthaben verwenden**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): Wenn jedes Claude Code-Konto sein Limit erreicht hat, werden die Sitzungen weiterhin über einen Anthropic-API-Key abgerechnet.
-- [**Agentenprogramme**](/settings?s=accounts&find=Agent%20programs): Welche Agentenprogramme installiert sind, und die anderen installieren.
+- [**Agentenprogramme**](/settings?s=accounts&find=Agent%20programs): Welche Agentenprogramme, darunter Grok Build, installiert sind, und die anderen installieren.
 - [**Automatisch aktualisieren**](/settings?s=accounts&find=Update%20automatically): Hält Claude Code, Codex und die anderen Agentenprogramme auf der neuesten Version.
 
 ### Weitere Agenten
 
-[Einstellungen → Weitere Agenten](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose und weitere Agenten mit ACP-Unterstützung. Mehr dazu unter [Agenten, Konten und Modelle](/guide/agents-models).
+[Einstellungen → Weitere Agenten](/settings?s=agents): Gemini CLI, Grok Build, OpenCode, Goose und weitere Agenten mit ACP-Unterstützung. Mehr dazu unter [Agenten, Konten und Modelle](/guide/agents-models).
 
 - [**Deine Agenten**](/settings?s=agents&find=Your%20agents): Agenten, die neben Claude Code und Codex angezeigt werden.
 - [**Eigenen Agenten hinzufügen**](/settings?s=agents&find=Add%20your%20own): Jeder Agent mit ACP-Unterstützung, über seinen Befehl.
-- [**Agenten mit ACP-Unterstützung**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code und Goose, bereit zum Hinzufügen.
+- [**Agenten mit ACP-Unterstützung**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose und Grok Build, bereit zum Hinzufügen.
 
 ### Modelle
 

@@ -18,7 +18,7 @@ import { runMerges } from './merge.ts';
 import { redirectHub } from './redirects.ts';
 import { hasAreas, hubPath, loadRegistry, logEvent, memberPath, OTHER, placedIn, updateRegistry, type Registry } from './registry.ts';
 import { reorganiseDue, reorganiseWiki, reorganising, type ReorganiseResult } from './reorganise.ts';
-import { claimJob, jobRunning, releaseJob, saveJob, type JobState } from './jobs.ts';
+import { claimJob, jobRunning, releaseJob, saveJob, wikiJobChanged, type JobState } from './jobs.ts';
 
 /** Articles one placement call places. */
 export const PLACE_BATCH = 20;
@@ -263,7 +263,8 @@ async function tendAll(db: DB, o: TendOptions, out: Awaited<ReturnType<typeof te
  * A pass now, for the route: whatever the triggers say, one at a time. Throws an HttpError a person can read when it
  * cannot run; the hubs it makes stale are written afterwards, in the background, within the hour's budget.
  */
-export async function reorganiseNow(db: DB, space: string | null, o: { ask?: DigestAsk; strong?: DigestAsk; onUpdate?: (space: string | null) => void } = {}): Promise<ReorganiseResult> {
+export async function reorganiseNow(db: DB, space: string | null, options: { ask?: DigestAsk; strong?: DigestAsk; onUpdate?: (space: string | null) => void } = {}): Promise<ReorganiseResult> {
+  const o = { ...options, onUpdate: options.onUpdate ?? wikiJobChanged };
   if (!memoryOn(db)) throw new HttpError(409, 'Memory is off in Settings → Memory');
   if (!wikiMemoryOn(db, space)) throw new HttpError(409, space ? 'Wiki memory is off for this project' : 'The shared wiki is off in Settings → Memory → Wiki memory');
   const root = wikiRoot(db, space);

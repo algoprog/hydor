@@ -70,7 +70,7 @@ export function ActivityText({ s, className }: { s: SessionSummary; className?: 
     const since = a.kind === 'external' ? s.external?.since : s.live?.turnStartedAt;
     return (
       <span className={cx('flex min-w-0 items-center gap-1 text-busy', className)}>
-        <span className="truncate">{a.status === 'starting' ? 'Starting' : `Working${where}`}</span>
+        <span className="truncate">{a.memory ? 'Building memory' : a.status === 'starting' ? 'Starting' : `Working${where}`}</span>
         <WorkTime since={since} before={s.stats?.workMs} />
       </span>
     );

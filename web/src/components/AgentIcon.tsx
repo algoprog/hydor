@@ -13,8 +13,24 @@ function CustomMark({ size, className, working }: { size: number; className?: st
   );
 }
 
-/** Small agent marks: a starburst for Claude Code, a knot for Codex; `spinning` turns it slowly while it works. */
-export function AgentIcon({ agent, size = 16, className, spinning, name }: { agent: Agent; size?: number; className?: string; spinning?: boolean; name?: string }) {
+/** Grok Build, xAI's agent: a ring with a slash through it, drawn like the other marks. */
+function GrokMark({ size, className, spinning }: { size: number; className?: string; spinning?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={cx('shrink-0 text-info', spinning && 'spin-gentle', className)} aria-label="Grok Build" role="img">
+      <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.6 5.6A8.2 8.2 0 1 0 20.2 12" />
+        <path d="M8.6 15.4 20.4 3.6" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Small agent marks: a starburst for Claude Code, a knot for Codex, a ring and slash for Grok Build ('grok' for its
+ * accounts; its ACP agent by name), a letter on a tile for other ACP agents; `spinning` turns it slowly while it works.
+ */
+export function AgentIcon({ agent, size = 16, className, spinning, name }: { agent: Agent | 'grok'; size?: number; className?: string; spinning?: boolean; name?: string }) {
+  if (agent === 'grok' || (agent === 'acp' && name && /^grok\b/i.test(name.trim()))) return <GrokMark size={size} className={className} spinning={spinning} />;
   // Custom was once called Console.
   if (agent === 'acp' && (name === 'Custom' || name === 'Console')) return <CustomMark size={size} className={className} working={spinning} />;
   if (agent === 'acp') {

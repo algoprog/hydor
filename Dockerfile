@@ -14,7 +14,7 @@ FROM ${NODE_IMAGE}
 ARG CLAUDE_CODE_VERSION=2.1.308
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="Hydor" \
-      org.opencontainers.image.description="A self-hosted agent harness for Claude Code, Codex and any model" \
+      org.opencontainers.image.description="The everything app for AI agents: Claude Code, Codex or any model, unified memory." \
       org.opencontainers.image.source="https://github.com/algoprog/hydor" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${VERSION}"

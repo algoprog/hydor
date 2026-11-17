@@ -32,6 +32,8 @@ export const PACKAGES: Record<string, { pkg: string; name: string; update?: stri
   claude: { pkg: '@anthropic-ai/claude-code', name: 'Claude Code', update: ['update'] },
   codex: { pkg: '@openai/codex', name: 'Codex', update: ['update'] },
   gemini: { pkg: '@google/gemini-cli', name: 'Gemini CLI' },
+  // Its postinstall unpacks the native program, so its install scripts run. Its own installer puts it in ~/.grok/bin.
+  grok: { pkg: '@xai-official/grok', name: 'Grok Build', update: ['update'] },
   opencode: { pkg: 'opencode-ai', name: 'OpenCode', update: ['upgrade'] },
   qwen: { pkg: '@qwen-code/qwen-code', name: 'Qwen Code' },
   auggie: { pkg: '@augmentcode/auggie', name: 'Auggie' },
@@ -187,9 +189,11 @@ export async function ensureCommand(cmd: string): Promise<string | null> {
 
 /**
  * Extra environment for an ACP agent's program: the Pi adapter starts `pi`, which is the app's own copy when none is on the
- * PATH (PI_ACP_PI_COMMAND).
+ * PATH (PI_ACP_PI_COMMAND); Grok Build gets its own updater turned off.
  */
 export function acpEnvFor(cmd: string, env: Record<string, string>): Record<string, string> {
+  // The app updates Grok Build itself (Settings → Agents), so its own auto-updater stays off unless you turned it on.
+  if (/(^|[\\/])grok(\.exe|\.cmd)?$/i.test(cmd.trim())) return env.GROK_DISABLE_AUTOUPDATER ? {} : { GROK_DISABLE_AUTOUPDATER: '1' };
   if (cmd !== 'pi-acp' || env.PI_ACP_PI_COMMAND) return {};
   const pi = onPath('pi') ? null : managedBin('pi');
   return pi ? { PI_ACP_PI_COMMAND: pi } : {};
