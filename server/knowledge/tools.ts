@@ -21,8 +21,8 @@ export function filled(db: DB, bases: (BaseRow & { own?: boolean; from?: string 
 }
 
 /** What a session in `space` (or in none) is told of the bases it searches. */
-export function knowledgeInstructions(db: DB, space: string | null = null): string | null {
-  const bases = filled(db, basesFor(db, space));
+export function knowledgeInstructions(db: DB, space: string | null = null, includeWiki = true): string | null {
+  const bases = filled(db, basesFor(db, space, includeWiki));
   if (!bases.length) return null;
   const whose = (b: { own: boolean; from?: string }) => (space ? (b.from ? `, from the ${b.from} project` : b.own ? ', this project’s own' : ', shared') : '');
   return [

@@ -14,6 +14,7 @@ import { ingestWikiSource, wikiHash } from '../core.ts';
 import { isWikiBase } from '../knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
+import { guardWikiFolder } from '../settings/gitignore.ts';
 import { analysisAvailable, analyzeDataFile, needsAnalysis } from './analyze.ts';
 import { checkPlan, helperDigestAsk, planPrompt, planSystem, writePrompt, writeSystem, type ArticleLine, type DigestAsk, type TextKind } from './plan.ts';
 import { documentsOverLimit } from './limit.ts';
@@ -121,6 +122,8 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
   try {
     root = wikiRoot(db, space, { create: true });
     if (!root) throw new Error('The wiki folder is not available');
+    // Protect a project-local wiki before the first automatic write (only when Settings ask for it).
+    await guardWikiFolder(db, space, root);
     // What is kept and what the helper reads has no secret in it.
     const text = redactSecrets(cut ? `${raw}\n\n… (cut here: ${kind === 'conversation' ? 'only its first request and its latest turns were read' : `only the first ${MAX_DOC_CHARS.toLocaleString('en-US')} characters of the document were read`})` : raw);
     const origin = oneLine(i.origin).slice(0, 500);

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import Fastify from 'fastify';
 import { setSettings } from '../../assistants/store.ts';
 import type { Deps } from '../../features/types.ts';
@@ -73,6 +74,7 @@ const stop = () => listeners.splice(0).forEach((f) => f());
 const project = path.join(tmp, 'alpha');
 const docs = path.join(tmp, 'alpha-docs');
 fs.mkdirSync(project);
+execFileSync('git', ['init', '-q', project]);
 fs.mkdirSync(docs);
 const alpha = createSpace(db, { name: 'Alpha', description: 'The travel booking tool', folder: project });
 const base = createBase(db, { name: 'Alpha docs', space: alpha.id });
@@ -132,8 +134,9 @@ test('a new project document: source, article, index, log, notes, an update, a b
   assert.match(asked[0].prompt, /Project: Alpha — The travel booking tool/);
   assert.match(asked[0].prompt, /<document>[\s\S]*Flights over 500 euros/);
   const root = wikiRoot(db, alpha.id)!;
-  // A project's wiki is a folder of its own in the hub's projects/ (named after the project: the core chooses the name).
-  assert.equal(path.dirname(root), fs.realpathSync(path.join(hub, 'projects')));
+  // The default project wiki is protected in Git before the digest creates source files.
+  assert.equal(root, path.join(project, '.wiki'));
+  assert.match(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), /^\/\.wiki\/$/m);
   const article = readWiki(root, 'wiki/travel-policy.md').content;
   assert.match(article, /^---\ntitle: "Travel policy"\nsources:\n {2}- raw\/articles\/source-[0-9a-f]{64}-[0-9a-f]{64}\.md\nupdated: \d{4}-\d\d-\d\d\n---\n\n# Travel policy/);
   assert.match(article, /See the other and \[index\]\(\.\.\/index\.md\)/);
@@ -152,6 +155,26 @@ test('a new project document: source, article, index, log, notes, an update, a b
   assert.equal((await app.inject({ method: 'GET', url: '/api/projects/spnone/wiki/updates' })).statusCode, 404);
   assert.deepEqual(await updates('/api/wiki/updates'), []);
   stop();
+});
+
+test('the document digest respects an explicit gitignore opt-out', async () => {
+  const folder = path.join(tmp, 'no-ignore');
+  const dir = path.join(tmp, 'no-ignore-docs');
+  fs.mkdirSync(folder); fs.mkdirSync(dir);
+  execFileSync('git', ['init', '-q', folder]);
+  const space = createSpace(db, { name: 'No ignore', folder });
+  const knowledge = createBase(db, { name: 'No ignore docs', space: space.id });
+  addSource(db, knowledge.id, 'folder', dir);
+  setWikiSettings(db, { gitIgnore: false });
+  const d = newDigest();
+  try {
+    plan = { update: [], create: [], notes: [] };
+    fs.writeFileSync(path.join(dir, 'note.md'), '# Note\n\nA synthetic source about projects.\n');
+    await scan(knowledge.id, (count) => count === 1);
+    await d.settled();
+    assert.ok(fs.existsSync(path.join(folder, '.wiki', 'raw', 'articles')));
+    assert.equal(fs.existsSync(path.join(folder, '.gitignore')), false);
+  } finally { setWikiSettings(db, { gitIgnore: true }); stop(); }
 });
 
 test('the same text again: nothing', async () => {

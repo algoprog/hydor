@@ -7,6 +7,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { baseRows, type BaseRow } from './store.ts';
 import { isWikiBase, wikiBaseVisible } from '../wiki/knowledge/bindings.ts';
+import { wikiChatEnabled } from '../wiki/access.ts';
 
 /** The space a session works in: its own, else that of the session that started it. */
 export function spaceOfSession(db: DB, extra: SessionExtra): string | null {
@@ -19,12 +20,13 @@ export function spaceOfSession(db: DB, extra: SessionExtra): string | null {
  * The bases a session in `space` (null: in none) searches: `own` the space's (`from`: the space a group brought
  * in, by name), the others shared. A base whose space is gone counts as shared.
  */
-export function basesFor(db: DB, space: string | null): (BaseRow & { own: boolean; from?: string })[] {
+export function basesFor(db: DB, space: string | null, includeWiki = true): (BaseRow & { own: boolean; from?: string })[] {
   const spaces = new Map(allSpaces(db).map((s) => [s.id, s]));
   const sp = space ? spaces.get(space) : undefined;
   const members = new Map((sp?.members ?? []).filter((id) => spaces.has(id)).map((id) => [id, spaces.get(id)!.name]));
   const out: (BaseRow & { own: boolean; from?: string })[] = [];
   for (const b of baseRows(db)) {
+    if (!includeWiki && isWikiBase(db, b.id)) continue;
     if (!wikiBaseVisible(db, b.id)) continue;
     if (b.space && !spaces.has(b.space) && isWikiBase(db, b.id)) continue;
     if (sp && b.space === sp.id) out.push({ ...b, own: true });
@@ -35,4 +37,7 @@ export function basesFor(db: DB, space: string | null): (BaseRow & { own: boolea
 }
 
 /** The bases the session of a tool call searches. */
-export const basesOfSession = (db: DB, key: string) => basesFor(db, spaceOfSession(db, sessionExtra(db, key)));
+export const basesOfSession = (db: DB, key: string) => {
+  const extra = sessionExtra(db, key);
+  return basesFor(db, spaceOfSession(db, extra), wikiChatEnabled(db, extra));
+};

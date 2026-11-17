@@ -7,14 +7,16 @@ import { execFileSync } from 'node:child_process';
 import { kvGet, kvSet, openDb } from '../../db.ts';
 import { taskRoot } from '../../assistants/store.ts';
 import { createSpace } from '../../spaces/index.ts';
-import { guardWikiFolder, ignoreProjectWiki } from './gitignore.ts';
+import { guardUnregisteredWikiFolder, guardWikiFolder, ignoreProjectWiki } from './gitignore.ts';
 import { setWikiSettings, wikiSettings } from './settings.ts';
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-settings-'));
 const dbPath = path.join(temp, 'app.db');
 let db = openDb(dbPath);
 try {
-  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: true, documentLimit: 100, hubPath: path.join(taskRoot(db), '.wiki'), projectWikis: 'hub', projectPath: '.wiki', gitIgnore: false }, 'on by default; in the hub; .gitignore left alone');
+  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: true, documentLimit: 100, hubPath: path.join(taskRoot(db), '.wiki'), projectWikis: 'hub', projectPath: '.wiki', gitIgnore: false, defaultChatEnabled: true, defaultAutoLessons: false }, 'on by default; project wikis in the hub; .gitignore left alone');
+  setWikiSettings(db, { defaultChatEnabled: false, defaultAutoLessons: true });
+  assert.deepEqual([wikiSettings(db).projectWikis, wikiSettings(db).gitIgnore, wikiSettings(db).defaultChatEnabled, wikiSettings(db).defaultAutoLessons], ['hub', false, false, true], 'explicit preferences override defaults; the project settings stay');
   setWikiSettings(db, { enabled: false });
   assert.equal(wikiSettings(db).enabled, false);
   setWikiSettings(db, { enabled: true });
@@ -42,7 +44,7 @@ try {
   setWikiSettings(db, { documentLimit: 100 });
   db.close();
   db = openDb(dbPath);
-  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: false, documentLimit: 100, hubPath: temp, projectWikis: 'folder', projectPath: 'notes/wiki', gitIgnore: false });
+  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: false, documentLimit: 100, hubPath: temp, projectWikis: 'folder', projectPath: 'notes/wiki', gitIgnore: false, defaultChatEnabled: false, defaultAutoLessons: true });
   const project = path.join(temp, 'project');
   const hubFolder = path.join(temp, 'hub');
   fs.mkdirSync(path.join(project, '.wiki'), { recursive: true });
@@ -63,14 +65,14 @@ try {
   fs.mkdirSync(path.join(plain, '.wiki'), { recursive: true });
   assert.deepEqual(await ignoreProjectWiki(plain, path.join(plain, '.wiki'), true), { changed: false, tracked: false });
   assert.equal(fs.existsSync(path.join(plain, '.gitignore')), false);
-  // The settings decide: only folder wikis, only with the switch on, only inside the project.
+  // The settings decide: project-local wikis, only with the switch on, even for explicit bindings in hub mode.
   const space = createSpace(db, { name: 'Plain', folder: plain });
   const repo = createSpace(db, { name: 'Repo', folder: project });
   setWikiSettings(db, { projectWikis: 'hub', gitIgnore: true });
-  assert.equal(await guardWikiFolder(db, repo.id, path.join(project, '.wiki')), undefined, 'hub wikis never touch the project');
+  assert.equal((await guardWikiFolder(db, repo.id, path.join(project, '.wiki')))?.changed, false, 'a local binding remains protected in hub mode');
   setWikiSettings(db, { projectWikis: 'folder', gitIgnore: false });
   fs.writeFileSync(path.join(project, '.gitignore'), 'other\n');
-  assert.equal(await guardWikiFolder(db, repo.id, path.join(project, '.wiki')), undefined, 'off by default');
+  assert.equal(await guardWikiFolder(db, repo.id, path.join(project, '.wiki')), undefined, 'explicitly switched off');
   assert.equal(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), 'other\n');
   setWikiSettings(db, { gitIgnore: true });
   assert.equal(await guardWikiFolder(db, space.id, path.join(plain, '.wiki')).then((r) => r?.changed), false);
@@ -79,6 +81,11 @@ try {
   assert.equal((await guardWikiFolder(db, repo.id, path.join(project, '.wiki')))?.changed, true);
   assert.equal(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), 'other\n/.wiki/\n');
   assert.equal((await guardWikiFolder(db, repo.id, path.join(project, '.wiki')))?.changed, false, 'already there: no change');
+  fs.writeFileSync(path.join(project, '.gitignore'), 'other\n');
+  assert.equal((await guardUnregisteredWikiFolder(db, project, path.join(project, '.wiki')))?.changed, true, 'an unregistered project wiki is protected');
+  assert.equal(await guardUnregisteredWikiFolder(db, project, temp), undefined, 'an external shared wiki is never added');
+  setWikiSettings(db, { gitIgnore: false });
+  assert.equal(await guardUnregisteredWikiFolder(db, project, path.join(project, '.wiki')), undefined, 'the unregistered guard respects opt-out');
   assert.equal(await guardWikiFolder(db, null, hubFolder), undefined);
   console.log('Wiki settings and Git ignore tests passed');
 } finally {

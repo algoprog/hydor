@@ -19,13 +19,20 @@ export function titleOf(content: string): string {
 }
 
 /** List active Markdown articles and source notes, without opening hidden or linked directories. */
-export function browseWiki(root: string): { articles: WikiEntry[]; sources: WikiEntry[]; truncated: boolean } {
+export function browseWiki(root: string): { articles: WikiEntry[]; sources: WikiEntry[]; plans: WikiEntry[]; truncated: boolean } {
   const articles: WikiEntry[] = [];
   const sources: WikiEntry[] = [];
+  const plans: WikiEntry[] = [];
   let visited = 0;
   let truncated = false;
   const visit = (relative: string, out: WikiEntry[]) => {
     const dir = path.join(root, relative);
+    // Never enter a nested content area through a symlinked ancestor.
+    let ancestor = root;
+    for (const part of relative.split('/')) {
+      ancestor = path.join(ancestor, part);
+      if (!fs.existsSync(ancestor) || fs.lstatSync(ancestor).isSymbolicLink()) return;
+    }
     if (!fs.existsSync(dir) || fs.lstatSync(dir).isSymbolicLink() || !fs.statSync(dir).isDirectory()) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (++visited > 5000) { truncated = true; return; }
@@ -45,5 +52,6 @@ export function browseWiki(root: string): { articles: WikiEntry[]; sources: Wiki
   };
   visit('wiki', articles);
   visit('raw', sources);
-  return { articles, sources, truncated };
+  visit('output/projects', plans);
+  return { articles, sources, plans, truncated };
 }

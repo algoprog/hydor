@@ -7,6 +7,13 @@ import { fillForm } from '../../guide/form.ts';
 import { applyWikiChanges } from '../core.ts';
 import { refreshWikiKnowledge } from '../knowledge/index.ts';
 import { lessonContext, previewLessons } from './lessons.ts';
+import { isLang } from '../../../shared/i18n.ts';
+import { userLang, wordsForLang } from '../../language/index.ts';
+
+/** A requested supported language takes precedence over Hydor's current language. */
+function lessonWords(ctx: RunCtx, requested: unknown): (text: string) => string {
+  return wordsForLang(isLang(requested) ? requested : userLang(ctx.deps.db));
+}
 
 /** Restrict session evidence to sessions whose memory is enabled and not confidential. */
 function current(ctx: RunCtx): TimelineItem[] {
@@ -30,21 +37,21 @@ export function lessonsTools(resolveTarget: (ctx: RunCtx) => string, guardProjec
       name: 'wiki_lessons_preview',
       description: 'Preview evidenced lessons from wiki_lessons_context. Provide each candidate title, lesson, evidence, uncertainty and sourceIds. Include only real corrections, tested fixes or useful discoveries; do not invent outcomes. This dry run writes nothing. Separately obtain user authorization for the exact selection before applying it via the wiki write workflow.',
       annotations: { readOnlyHint: true },
-      inputSchema: { type: 'object', properties: { candidates: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, lesson: { type: 'string' }, evidence: { type: 'string' }, uncertainty: { type: 'string' }, sourceIds: { type: 'array', items: { type: 'string' } } }, required: ['title', 'lesson', 'evidence', 'sourceIds'] } } }, required: ['candidates'] },
+      inputSchema: { type: 'object', properties: { language: { type: 'string', description: 'Optional explicit supported language for the reviewed entry.' }, candidates: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, lesson: { type: 'string' }, evidence: { type: 'string' }, uncertainty: { type: 'string' }, sourceIds: { type: 'array', items: { type: 'string' } } }, required: ['title', 'lesson', 'evidence', 'sourceIds'] } } }, required: ['candidates'] },
       async run(args, ctx) {
         const items = current(ctx);
         const target = resolveTarget(ctx);
-        const result = previewLessons({ session: ctx.key, target, items, candidates: args.candidates });
-        return JSON.stringify({ ...result, expectedSha256: null, authorization: 'Preview only. A separate user-authorized wiki write is required.' });
+        const result = previewLessons({ session: ctx.key, target, items, candidates: args.candidates, translate: lessonWords(ctx, args.language) });
+        return JSON.stringify({ ...result, language: isLang(args.language) ? args.language : userLang(ctx.deps.db), expectedSha256: null, authorization: 'Preview only. A separate user-authorized wiki write is required.' });
       },
     },
     {
       name: 'wiki_lessons_save',
       description: 'Ask the user to approve the exact previously previewed selected lessons, then save only that content to the resolved active wiki. Supply the candidates and the sha256 from wiki_lessons_preview. This always opens a user approval card.',
-      inputSchema: { type: 'object', properties: { candidates: { type: 'array', items: { type: 'object' } }, sha256: { type: 'string' } }, required: ['candidates', 'sha256'] },
+      inputSchema: { type: 'object', properties: { language: { type: 'string', description: 'The language returned by the preview.' }, candidates: { type: 'array', items: { type: 'object' } }, sha256: { type: 'string' } }, required: ['candidates', 'sha256'] },
       async run(args, ctx) {
         const target = resolveTarget(ctx);
-        const result = previewLessons({ session: ctx.key, target, items: current(ctx), candidates: args.candidates });
+        const result = previewLessons({ session: ctx.key, target, items: current(ctx), candidates: args.candidates, translate: lessonWords(ctx, args.language) });
         if (!result.lessons.length || result.sha256 !== args.sha256) throw new Error('Preview changed or is empty; preview the selected lessons again');
         // The card displays the exact bytes and target that the user can approve; an agent boolean is not approval.
         const decision = await fillForm(ctx, { title: 'Save lessons learned', message: `Wiki: ${target}\nFile: ${result.path}\n\n${result.content}`, submit: 'Save', schema: { properties: { confirmed: { type: 'boolean', title: 'Save this exact content' } }, required: ['confirmed'] } });

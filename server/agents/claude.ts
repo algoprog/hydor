@@ -3,6 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import type { ApprovalRequest, ModelOption, TimelineItem, ToolItem } from '../../shared/types.ts';
 import { config } from '../config.ts';
 import { describeClaudeTool, questionsFrom } from '../history/claude.ts';
@@ -11,7 +12,8 @@ import type { Runner, RunSpec } from '../runner/client.ts';
 import { approvalTitleFor, LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
 import { splitHandoff } from '../handoff.ts';
 import type { GivenAdditions } from '../features/types.ts';
-import { PAGE_SERVER } from '../mcp.ts';
+import { PAGE_SERVER, runOf } from '../mcp.ts';
+import { wikiHookToken } from '../wiki/session/hook-auth.ts';
 import { JsonFields } from '../pages/drafts.ts';
 
 type Json = Record<string, any>;
@@ -110,6 +112,26 @@ export function precompactCopy(transcript: string, at: string, dir: string): str
 /** How long a call to the app's own tools (and the capabilities' servers) may take: ten minutes, as for Codex. */
 const TOOL_TIMEOUT_MS = 600_000;
 
+/** Do not register a second compaction hook when existing settings or plugins may already capture it. */
+export function claudeWikiHooksMayOverlap(o: ClaudeOpts, env: Record<string, string>): boolean {
+  if (o.add?.args?.some((arg) => /^(?:--plugin-dir|--plugin-url|--settings)(?:=|$)/.test(arg))) return true;
+  const base = env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  const files = [path.join(base, 'settings.json'), path.join(o.cwd, '.claude', 'settings.json'), path.join(o.cwd, '.claude', 'settings.local.json')];
+  for (const file of files) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const settings = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (settings.disableAllHooks || settings.allowManagedHooksOnly) return true;
+      if (Object.values(settings.enabledPlugins ?? {}).some((enabled) => enabled === true)) return true;
+      if (['PreCompact', 'PostCompact'].some((name) => Array.isArray(settings.hooks?.[name]) && settings.hooks[name].length > 0)) return true;
+    } catch { return true; }
+  }
+  return false;
+}
+
+// A synchronous command hook sends only bounded fields; its bearer is inherited at runtime, never written in settings.
+const WIKI_HOOK_SCRIPT = `let b='';process.stdin.setEncoding('utf8');process.stdin.on('data',x=>{if(b.length<1048576)b+=x});process.stdin.on('end',async()=>{try{const v=JSON.parse(b);if(v.trigger!=='auto'||!['PreCompact','PostCompact'].includes(v.hook_event_name))return;const body={session_id:v.session_id,hook_event_name:v.hook_event_name,trigger:v.trigger,...(typeof v.compact_summary==='string'?{compact_summary:v.compact_summary.slice(0,12000)}:{})};await fetch(process.argv[1],{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+process.env.HYDOR_WIKI_HOOK_TOKEN},body:JSON.stringify(body),signal:AbortSignal.timeout(18000)})}catch{}});`;
+
 export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec {
   const args = [
     '--output-format',
@@ -129,6 +151,16 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   if (o.model) args.push('--model', o.model);
   if (o.effort) args.push('--effort', o.effort);
   if (o.mode) args.push('--permission-mode', o.mode);
+  // Auto-only avoids duplicating Hydor's existing manual compaction checkpoint.
+  if (env.HYDOR_WIKI_AUTO_HOOKS === '1' && o.pageServer && !claudeWikiHooksMayOverlap(o, env)) {
+    const token = new URL(o.pageServer).pathname.split('/').pop() ?? '';
+    const runId = runOf(token);
+    if (runId) {
+      env = { ...env, HYDOR_WIKI_HOOK_TOKEN: wikiHookToken(runId) };
+      const hook = { type: 'command', command: process.execPath, args: ['-e', WIKI_HOOK_SCRIPT, `http://127.0.0.1:${config.port}/agent/claude/wiki-event`], timeout: 20 };
+      args.push('--settings', JSON.stringify({ hooks: { PreCompact: [{ matcher: 'auto', hooks: [hook] }], PostCompact: [{ matcher: 'auto', hooks: [hook] }] } }));
+    }
+  }
   // The app's own server (and the capabilities' servers) join the user's MCP servers. The app's tools
   // need no approval here: those that need the user's say ask in the conversation themselves.
   // Their tools may take minutes (a video model at work, a form waiting for the user): over HTTP, Claude Code

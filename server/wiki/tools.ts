@@ -4,15 +4,23 @@ import os from 'node:os';
 import path from 'node:path';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
-import { guardWikiFolder } from './settings/gitignore.ts';
+import { guardUnregisteredWikiFolder, guardWikiFolder } from './settings/gitignore.ts';
 import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, wikiHash } from './core.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts';
-import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
+import { namedWikiRoot, unregisteredWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { wikiSettings } from './settings/settings.ts';
+import { wikiEnabledForSession } from './access.ts';
 import { inSession } from '../documents/index.ts';
 import { canRead, extractText } from '../documents/extract.ts';
 import { isSecret } from '../agent/permissions.ts';
 import { redactSecrets, secretIn } from '../memory/secrets.ts';
+import { userLang, wordsForLang } from '../language/index.ts';
+import { isLang } from '../../shared/i18n.ts';
+
+/** Use the existing language catalog, with an explicit supported language taking precedence. */
+function sourceWords(ctx: RunCtx, requested: unknown): (text: string) => string {
+  return wordsForLang(isLang(requested) ? requested : userLang(ctx.deps.db));
+}
 
 /** Read a bounded regular source without following symlinks or reading known secret paths. */
 function documentBytes(file: string): Buffer {
@@ -52,7 +60,13 @@ function resolveTarget(ctx: RunCtx, name: string | undefined, create: boolean): 
   const db = ctx.deps.db;
   const space = wikiSpaceOfSession(db, ctx.key, ctx.cwd);
   if (!wikiMemoryOn(db, space)) throw new Error(OFF);
-  if (!name) return wikiRoot(db, space, { create });
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat');
+  if (!name) {
+    // An existing local binding remains authoritative even before this folder is registered as a project.
+    const bound = !space ? unregisteredWikiRoot(db, ctx.cwd) : undefined;
+    if (bound !== undefined) return bound;
+    return wikiRoot(db, space, { create });
+  }
   if (!wikiMemoryOn(db, null)) throw new Error('The shared wiki is off in Settings → Memory → Wiki memory');
   if (name === 'hub') return wikiRoot(db, null, { create });
   return namedWikiRoot(db, name);
@@ -68,6 +82,15 @@ export function wikiTarget(ctx: RunCtx, name?: string): string {
 /** A wiki to read: null while nothing has been written to it. */
 export function wikiReadTarget(ctx: RunCtx, name?: string): string | null {
   return resolveTarget(ctx, name, false);
+}
+
+/** Plan adoption requires the session's existing project wiki and never falls back to the shared hub. */
+export function projectWikiTarget(ctx: RunCtx): string {
+  const space = wikiSpaceOfSession(ctx.deps.db, ctx.key, ctx.cwd);
+  if (!space && !unregisteredWikiRoot(ctx.deps.db, ctx.cwd)) throw new Error('This session has no bound project wiki');
+  const root = wikiReadTarget(ctx);
+  if (!root) throw new Error('This session has no bound project wiki');
+  return root;
 }
 
 /** After a write: the project's (or the shared) wiki is its knowledge, searched again, and the pages refresh. */
@@ -90,7 +113,12 @@ function wrote(ctx: RunCtx, root: string): void {
 /** Add the project's wiki folder to its .gitignore, only where Settings allow it (folder wikis, Git repositories). */
 export async function guardProject(ctx: RunCtx, root: string): Promise<{ changed: boolean; tracked: boolean } | undefined> {
   const db = ctx.deps.db;
-  return guardWikiFolder(db, wikiSpaceOfSession(db, ctx.key, ctx.cwd), root);
+  const space = wikiSpaceOfSession(db, ctx.key, ctx.cwd);
+  const bound = !space ? unregisteredWikiRoot(db, ctx.cwd) : undefined;
+  const guarded = !space && bound === root ? await guardUnregisteredWikiFolder(db, ctx.cwd, root) : await guardWikiFolder(db, space, root);
+  // A session switch can change while the Git guard waits for filesystem work.
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat');
+  return guarded;
 }
 
 /** Agent tools deliberately resolve roots server-side rather than accepting arbitrary filesystem roots. */
@@ -109,7 +137,7 @@ export function wikiTools(): RunTool[] {
     },
     {
       name: 'wiki_read',
-      description: 'Read one article or source of the wiki (wiki/…, raw/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable.',
+      description: 'Read one active article, source or project plan (wiki/…, raw/…, output/projects/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable.',
       annotations: { readOnlyHint: true },
       inputSchema: { type: 'object', properties: { path: { type: 'string' }, wiki: wikiArg }, required: ['path'] },
       async run(a, ctx) {
@@ -121,11 +149,13 @@ export function wikiTools(): RunTool[] {
     {
       name: 'wiki_ingest_text',
       description: 'Keep a text source (and where it came from) in the wiki, exactly as given, as a source to write articles from. The text and the origin must hold no passwords, keys or tokens. The same text and origin are kept once; another origin gets its own note. Then write or update the articles that use it, with wiki_write.',
-      inputSchema: { type: 'object', properties: { content: { type: 'string' }, origin: { type: 'string' }, wiki: wikiArg }, required: ['content', 'origin'] },
+      inputSchema: { type: 'object', properties: { content: { type: 'string' }, origin: { type: 'string' }, wiki: wikiArg, language: { type: 'string', description: 'Optional explicit supported language for generated metadata.' } }, required: ['content', 'origin'] },
       async run(a, ctx) {
         const root = wikiTarget(ctx, a.wiki);
         const guard = await guardProject(ctx, root);
-        const result = ingestWikiSource(root, String(a.content ?? ''), String(a.origin ?? ''));
+        // A concurrent settings change must not redirect a write after its target was resolved.
+        if (wikiReadTarget(ctx, a.wiki) !== root) throw new Error('Wiki target changed; review the preview again');
+        const result = ingestWikiSource(root, String(a.content ?? ''), String(a.origin ?? ''), sourceWords(ctx, a.language));
         wrote(ctx, root);
         return JSON.stringify({ ...result, gitIgnore: guard, note: 'Update the relevant articles and the index, and record this in log.md, with wiki_write. If existing is true, skip recompiling unless needed.' });
       },
@@ -133,7 +163,7 @@ export function wikiTools(): RunTool[] {
     {
       name: 'wiki_ingest_document',
       description: 'Keep a document file (PDF, Word and others Hydor reads) in the wiki as a source: its exact bytes, and its text as a Markdown note to write articles from. Not for files with secrets, links or over 20 MiB. Returns the note’s path and any limit of the text extraction.',
-      inputSchema: { type: 'object', properties: { path: { type: 'string' }, origin: { type: 'string' }, wiki: wikiArg }, required: ['path'] },
+      inputSchema: { type: 'object', properties: { path: { type: 'string' }, origin: { type: 'string' }, wiki: wikiArg, language: { type: 'string', description: 'Optional explicit supported language for generated metadata.' } }, required: ['path'] },
       async run(a, ctx) {
         const root = wikiTarget(ctx, a.wiki);
         const file = inSession(ctx.cwd, String(a.path ?? ''));
@@ -153,7 +183,8 @@ export function wikiTools(): RunTool[] {
           if (!extracted) throw new Error('Document could not be read');
           if (secretIn(extracted.text) || (extracted.note && secretIn(extracted.note))) throw new Error('The extracted document may contain credentials; review it before ingestion');
           const guard = await guardProject(ctx, root);
-          const result = ingestWikiDocument(root, bytes, ext, origin, extracted);
+          if (wikiReadTarget(ctx, a.wiki) !== root) throw new Error('Wiki target changed; review the preview again');
+          const result = ingestWikiDocument(root, bytes, ext, origin, extracted, sourceWords(ctx, a.language));
           wrote(ctx, root);
           return JSON.stringify({ ...result, gitIgnore: guard, format: extracted.format, extractionNote: extracted.note, note: 'Original bytes are unchanged; the Markdown source note is extracted text and may be incomplete.' });
         } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
@@ -161,14 +192,25 @@ export function wikiTools(): RunTool[] {
     },
     {
       name: 'wiki_write',
-      description: 'Write one article (wiki/…/*.md), index.md or log.md of the wiki, after reading it with wiki_read: give the SHA-256 of the version you read, or null for a new file. Nothing else can be written (not sources in raw/, not hidden or settings files). On a conflict read again; never overwrite blindly. Cite the sources an article is kept from in its frontmatter and link related articles.',
+      description: 'Write one article, project evidence document, index.md or log.md after reading it with wiki_read and giving its exact SHA-256, or null for a new file. Existing plans use the revision workflow. Raw sources and hidden files cannot be written here. On a conflict read again; never overwrite blindly.',
       inputSchema: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, expectedSha256: { type: ['string', 'null'] }, wiki: wikiArg }, required: ['path', 'content', 'expectedSha256'] },
       async run(a, ctx) {
         if (typeof a.path !== 'string' || typeof a.content !== 'string' || !(a.expectedSha256 === null || (typeof a.expectedSha256 === 'string' && /^[a-f0-9]{64}$/.test(a.expectedSha256)))) throw new Error('Give path, content, and the exact expected SHA-256 or null');
         // Raw inputs and lesson captures have dedicated workflows, never a generic write shortcut.
         if (a.path.split(/[\\/]/)[0].toLowerCase() === 'raw') throw new Error('Use the source or lessons workflow to create raw material');
         const root = wikiTarget(ctx, a.wiki);
+        if (a.expectedSha256 === null && /^output\/projects\//i.test(a.path)) {
+          const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(a.content)?.[1] ?? '';
+          if (/(?:^|[-_])(?:plan|planung|umsetzungsplan)\.md$/i.test(path.posix.basename(a.path)) || /^["']?document_kind["']?\s*:\s*["']?plan["']?\s*(?:#.*)?$/im.test(frontmatter)) throw new Error('Use the plan adoption workflow for new plans');
+        }
+        if (a.expectedSha256 !== null && /^output\/projects\//i.test(a.path)) {
+          const existing = readWiki(root, a.path);
+          // Existing identified plans must preserve their revision history.
+          const frontmatter = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(existing.content)?.[1] ?? '';
+          if (/(?:^|[-_])(?:plan|planung|umsetzungsplan)\.md$/i.test(path.posix.basename(a.path)) || /^["']?document_kind["']?\s*:\s*["']?plan["']?\s*(?:#.*)?$/im.test(frontmatter)) throw new Error('Use the plan revision workflow for existing plans');
+        }
         const guard = await guardProject(ctx, root);
+        if (wikiReadTarget(ctx, a.wiki) !== root) throw new Error('Wiki target changed; review the preview again');
         const result = applyWikiChanges(root, [{ path: a.path, content: a.content, expectedSha256: a.expectedSha256 }]);
         wrote(ctx, root);
         return JSON.stringify({ ...result, gitIgnore: guard });

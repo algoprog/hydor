@@ -25,6 +25,11 @@ try {
   fs.writeFileSync(path.join(projectA, 'AGENTS.md'), '- Wiki: `knowledge/custom/_index.md`\n');
   fs.writeFileSync(path.join(wikiA, 'wiki', 'concepts', 'sky.md'), '---\ntitle: Sky\nsources:\n  - raw/articles/source.md\n---\n# Sky\n[Source](../../raw/articles/source.md)\n');
   fs.writeFileSync(path.join(wikiA, 'raw', 'articles', 'source.md'), '---\ntitle: Source\n---\nBlue sky evidence.\n');
+  // Plans and their evidence use the existing project wiki and remain visible without archive contents.
+  fs.mkdirSync(path.join(wikiA, 'output', 'projects', 'delivery'), { recursive: true });
+  fs.writeFileSync(path.join(wikiA, 'output', 'projects', 'delivery', 'plan.md'), '# Delivery plan\nWP-01: Review.\n');
+  fs.mkdirSync(path.join(wikiA, 'output', 'projects', '.archive'));
+  fs.writeFileSync(path.join(wikiA, 'output', 'projects', '.archive', 'old.md'), 'old plan');
   fs.mkdirSync(path.join(wikiA, 'wiki', '.archive'));
   fs.mkdirSync(path.join(wikiA, 'wiki', '.history'));
   fs.writeFileSync(path.join(wikiA, 'wiki', '.archive', 'old.md'), 'archive payload');
@@ -37,7 +42,7 @@ try {
   const b = createSpace(db, { name: 'Project B', folder: projectB });
   const c = createSpace(db, { name: 'Project C', folder: projectC });
   const deps = { app, db } as unknown as Deps;
-  setWikiSettings(db, { hubPath: path.join(temp, 'hub') });
+  setWikiSettings(db, { hubPath: path.join(temp, 'hub'), projectWikis: 'hub' });
   const wikiB = wikiRoot(db, b.id, { create: true })!;
   fs.mkdirSync(path.join(wikiB, 'wiki', 'concepts'), { recursive: true });
   fs.writeFileSync(path.join(wikiB, 'wiki', 'concepts', 'sky.md'), '---\ntitle: Bob\'s sky guide\n---\n# Other project private content\n');
@@ -71,6 +76,7 @@ try {
   assert.equal(bodyA.root, fs.realpathSync(wikiA));
   assert.deepEqual(bodyA.articles.map((entry: { path: string }) => entry.path), ['wiki/concepts/sky.md']);
   assert.deepEqual(bodyA.sources.map((entry: { path: string }) => entry.path), ['raw/articles/source.md']);
+  assert.deepEqual(bodyA.plans.map((entry: { path: string }) => entry.path), ['output/projects/delivery/plan.md']);
   assert.deepEqual(bodyB.articles, [{ path: 'wiki/concepts/sky.md', title: "Bob's sky guide" }], 'a title keeps its apostrophe');
   assert.equal(bodyB.root, wikiB);
   assert.equal(bodyA.on, true);
@@ -78,6 +84,8 @@ try {
   assert.equal(article.statusCode, 200);
   assert.match(article.json().content, /\[Source\]\(\.\.\/\.\.\/raw\/articles\/source\.md\)/);
   assert.match((await file(a.id, 'raw/articles/source.md')).json().content, /Blue sky evidence/);
+  assert.match((await file(a.id, 'output/projects/delivery/plan.md')).json().content, /Delivery plan/);
+  assert.equal((await file(a.id, 'output/projects/.archive/old.md')).statusCode, 404);
   assert.match((await file(b.id, 'wiki/concepts/sky.md')).json().content, /Other project private content/);
   assert.equal((await file(b.id, 'raw/articles/source.md')).statusCode, 404);
   for (const bad of ['../outside.md', 'wiki/../../../outside.md', 'wiki/.archive/old.md', 'wiki/.history/old.md', 'wiki/retired.md', 'wiki/link.md', 'wiki/../raw/articles/source.md', '/etc/passwd']) {
