@@ -3,6 +3,33 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.83.0 · 17 November 2026
+
+Your own browser grows into one you can use every day, in the desktop app: a smart address bar, Google as the home
+page, an ad blocker, history and the rest, and it is faster and smoother.
+
+- **In the desktop app**: the Browser page is now part of the desktop app, where its pages are real pages. The web app
+  and phones have no Browser button any more (the pages came there as pictures and lagged); the agents' browser in
+  sessions works everywhere as before.
+- **Faster and smoother**: your own tabs connect directly rather than through the app, the app no longer follows every
+  request your pages make, the page stays in view as a picture under menus, popovers and the address bar's suggestions
+  instead of going blank, it follows the window as you resize it, and the outline around the page is gone.
+- **A smart address bar**: as you type, your open tabs, bookmarks and the pages you visit most and most lately, the
+  address completed in place, your search engine's suggestions, and **Ask an agent** to start a session with what you
+  typed.
+- **Home page and search engine**: a Home button; new tabs and a first start open your home page, Google unless you
+  change it. The address bar searches with Google, DuckDuckGo, Bing, Brave, Ecosia, Startpage or a search page of your
+  own, with suggestions you can turn off (**Browser settings** in the ⋯ menu).
+- **Ads and trackers blocked**, on unless you turn it off (Ghostery's lists, downloaded only while it is on and
+  refreshed weekly): the padlock says how many were blocked on a page, and allows ads on a site.
+- **History** with search and **Recently closed** (Ctrl+Shift+T reopens a tab), and **Clear browsing data** (history
+  for a time range; cookies, site data and cached files).
+- **What a browser does**: a right-click menu on pages (open a link in a new tab or your default browser, copy, save
+  images, search for or ask an agent about the selection, spelling suggestions, inspect), zoom (Ctrl with + − 0, or
+  with the wheel), print, full-screen video, find with a match count, muting a tab that plays sound, a padlock with the
+  site's permissions, **Open in your default browser**, and more shortcuts (Ctrl+Tab, Ctrl+1…9, Ctrl+D, Ctrl+H,
+  Ctrl+J, Ctrl+P). A page's file field opens the system's own file picker.
+
 ## 0.82.0 · 17 November 2026
 
 A browser of your own in Hydor, to browse with and to hand pages to agents, and in the desktop app the agents' browser
