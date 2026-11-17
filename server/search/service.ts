@@ -4,6 +4,7 @@
 import type { NagetCredits, SearchEvent, SearchProviderView, SearchSettingsView, SearchTestResult } from '../../shared/search.ts';
 import { FALLBACK_TAXONOMY, fetchTaxonomy, nagetBase, type Taxonomy } from './naget.ts';
 import { PROVIDERS } from './providers.ts';
+import { QueryReader, type ReaderAsk } from './reader.ts';
 import { missing, Searcher, type Configured } from './run.ts';
 import { SearchError, type ProviderCtx, type SearchProvider, type SearchQuery } from './types.ts';
 
@@ -55,12 +56,14 @@ export class SearchService {
   private stored: Stored;
   private taxonomy: Taxonomy = FALLBACK_TAXONOMY;
 
-  constructor(o: { kv: KV; emit?: (e: SearchEvent) => void; fetch?: typeof fetch; providers?: SearchProvider[] }) {
+  constructor(o: { kv: KV; emit?: (e: SearchEvent) => void; fetch?: typeof fetch; providers?: SearchProvider[]; ask?: ReaderAsk; parallel?: () => number }) {
     this.kv = o.kv;
     this.emit = o.emit ?? (() => {});
     this.fetch = o.fetch ?? fetch;
     this.providers = o.providers ?? PROVIDERS;
-    this.searcher = new Searcher({ fetch: this.fetch, credits: (c) => this.noteCredits(c) });
+    // With a helper model to ask, Naget Search gets the filters a query's words state, read before the search.
+    const reader = o.ask ? new QueryReader({ ask: o.ask, taxonomy: () => this.taxonomy, parallel: o.parallel }) : undefined;
+    this.searcher = new Searcher({ fetch: this.fetch, credits: (c) => this.noteCredits(c), read: reader ? (q, signal) => reader.read(q, signal) : undefined });
     this.stored = this.load();
     try {
       const t = JSON.parse(this.kv.get('search.taxonomy') ?? 'null') as Taxonomy | null;

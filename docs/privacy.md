@@ -54,7 +54,8 @@ These need nothing from you and are on from the first start, except where noted.
 **Small jobs by the helper model.** By default the helper model is Automatic: Claude Haiku through Claude Code
 (or Codex if Claude is not signed in), with your own sign-in. It names new sessions from your first message, and,
 with memory on (it is on by default), writes memory notes, tidies them and learns from your conversations; it
-also checks steps in Auto mode, drafts agents and reads pages for one question. Those go to Anthropic or OpenAI
+also checks steps in Auto mode, drafts agents, reads pages for one question and, before a Naget Search, reads the
+filters the words of a web search state (a site, dates, a kind of page). Those go to Anthropic or OpenAI
 the way a session does, so they carry words of yours.
 
 ## Only when you turn something on or use it

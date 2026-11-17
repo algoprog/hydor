@@ -14,9 +14,10 @@ import { ArgError, filtersText, pageArgs, searchArgs } from '../args.ts';
 import { brave } from '../brave.ts';
 import { duckduckgo, parseDuckDuckGo } from '../duckduckgo.ts';
 import { articleMatch, asksOf, coverage, findMedia, nameWords, ownBadge, showsIt, youtubeId, type MediaDeps } from '../media.ts';
-import { fetchTaxonomy, naget, nagetRequest, readCredits } from '../naget.ts';
+import { FALLBACK_TAXONOMY, fetchTaxonomy, naget, nagetRequest, readCredits, type Taxonomy } from '../naget.ts';
 import { nearest, parts, readPage, type ReadDeps } from '../page.ts';
 import { fallbackNote, NoProvider, Searcher, type Configured } from '../run.ts';
+import { QueryReader, readAnswer, readingPrompt, wantsReading } from '../reader.ts';
 import { searxng } from '../searxng.ts';
 import { SearchService } from '../service.ts';
 import { searchTools } from '../tools.ts';
@@ -90,14 +91,14 @@ describe('Naget Search', () => {
     assert.equal(header(calls[0], 'authorization'), 'Bearer sk-test');
   });
 
-  it('turns filters into a scope, and lets Naget read the query only when the agent gave none', () => {
+  it('turns filters into a scope, and never asks Naget to read the query', () => {
     assert.deepEqual(
       nagetRequest(Q({ text: 'x', k: 250, sites: ['arxiv.org'], excludeSites: ['reddit.com'], from: '2024-01-01', to: '2024-12-31', languages: ['de'], fileTypes: ['pdf'], homepagesOnly: true })),
       { query: 'x', k: 100, web_index: { include_domains: ['arxiv.org'], exclude_domains: ['reddit.com'], start_date: '2024-01-01', end_date: '2024-12-31', homepages_only: true, languages: ['de'], file_types: ['pdf'] } },
     );
-    assert.equal(nagetRequest(Q({ text: 'climate reports from last month' })).parse_query, true);
-    assert.equal(nagetRequest(Q({ text: 'climate reports from last month', categories: ['news'] })).parse_query, undefined);
-    assert.equal(nagetRequest(Q({ text: 'transformer architecture' })).parse_query, undefined);
+    for (const q of [Q({ text: 'climate reports from last month' }), Q({ text: 'climate reports from last month', categories: ['news'] }), Q({ text: 'transformer architecture' })]) {
+      assert.equal('parse_query' in nagetRequest(q), false, 'the words are read by the app, not by Naget');
+    }
     assert.equal(nagetRequest(Q({ fileTypes: ['html', 'pdf'] })).web_index, undefined, 'both file types are no filter');
   });
 
@@ -838,5 +839,333 @@ describe('the sources a reply cites', () => {
     const p = htmlMarkdown('<html><head><title>T</title><meta property="og:image" content="/img/share.jpg?w=1&amp;h=2"></head><body><p>Hello there, this is the page.</p></body></html>', 'https://site.example/a/b');
     assert.equal(p.image, 'https://site.example/img/share.jpg?w=1&h=2');
     assert.equal(htmlMarkdown('<html><head><meta name="twitter:image" content="data:image/png;base64,AAAA"></head><body>x</body></html>', 'https://s.example/').image, undefined);
+  });
+});
+
+// ---- reading the filters a query's words state -------------------------------------------------------
+
+const withLanguages: Taxonomy = { ...FALLBACK_TAXONOMY, languages: [{ id: 'en', label: 'English' }, { id: 'de', label: 'German' }] };
+/** What the helper answers: the JSON with everything empty, but for what a test sets. */
+const answer = (o: Record<string, unknown> = {}) => JSON.stringify({ query: '', include_domains: [], exclude_domains: [], start_date: null, end_date: null, homepages_only: false, languages: [], file_types: [], categories: [], ...o });
+/** A reader whose helper answers from a function, and remembers what it was asked. */
+function reader(ask: (n: number) => Promise<string> | string, o: Partial<ConstructorParameters<typeof QueryReader>[0]> = {}) {
+  const asked: { system: string; prompt: string; signal: AbortSignal; timeoutMs: number }[] = [];
+  const r = new QueryReader({
+    ask: async (q) => {
+      asked.push(q);
+      return ask(asked.length - 1);
+    },
+    taxonomy: () => FALLBACK_TAXONOMY,
+    ...o,
+  });
+  return { r, asked };
+}
+
+describe('reading a search’s words', () => {
+  const words = ['climate reports from last month', 'papers on retrieval augmented generation', 'nasa.gov climate reports', 'PDF annual reports of Tesla', 'official website of Hydor', 'news in German about the election', 'arXiv preprints on diffusion'];
+
+  it('reads only when the agent set no filter and the words have a cue', () => {
+    for (const text of words) assert.equal(wantsReading(Q({ text }), FALLBACK_TAXONOMY), true, text);
+    for (const text of ['transformer architecture', 'how next.js routing works', 'see README.md and index.ts', 'it may work']) assert.equal(wantsReading(Q({ text }), FALLBACK_TAXONOMY), false, text);
+    const set: Partial<SearchQuery>[] = [{ languages: ['en'] }, { sites: ['nasa.gov'] }, { excludeSites: ['x.com'] }, { categories: ['news'] }, { from: '2024-01-01' }, { to: '2024-12-31' }, { fileTypes: ['pdf'] }, { homepagesOnly: true }];
+    for (const o of set) for (const text of words) assert.equal(wantsReading(Q({ text, ...o }), FALLBACK_TAXONOMY), false, `${text} with ${JSON.stringify(o)}`);
+    assert.equal(wantsReading(Q({ text: 'transformer architecture', k: 50, snippets: 'filtered' }), FALLBACK_TAXONOMY), false, 'k and snippets are no filters');
+    assert.equal(wantsReading(Q({ text: 'Semantic Scholar graph api' }), FALLBACK_TAXONOMY), true, 'a collection by its label');
+    assert.equal(wantsReading(Q({ text: 'semantic-scholar api' }), FALLBACK_TAXONOMY), true, 'a collection by its id');
+    assert.equal(wantsReading(Q({ text: 'arxiv diffusion' }), { ...FALLBACK_TAXONOMY, categories: [] }), true, 'arXiv is also a site name');
+  });
+
+  it('puts the question to the helper with today’s local date and the categories', () => {
+    const p = readingPrompt('papers by Jane $& Doe {today}', FALLBACK_TAXONOMY, new Date(2026, 10, 17, 23, 30));
+    assert.equal(p.system, 'You read web search queries for a search engine and answer with JSON only.');
+    assert.match(p.prompt, /^Read a web search query: separate the words to search for from the search filters the query states\.\n\nToday is 2026-11-17 \(Tuesday\)\.\n\nCategories that are collections, the curated sources \(each holds one kind of record\):\n- arxiv \(arXiv\): preprints\n/);
+    assert.match(p.prompt, /\n- europepmc \(Europe PMC\)\n/, 'no description, no colon');
+    assert.match(p.prompt, /page types, each a kind of page wherever it was found: crawled web pages and the collections its description names:\n- academic \(Scholarly papers\): all the scholarly collections/);
+    assert.ok(p.prompt.includes('\n\nQuery: papers by Jane $& Doe {today}\n\nRespond with ONLY this JSON:\n{"query": ""'));
+    const long = readingPrompt('x', { ...FALLBACK_TAXONOMY, categories: [{ id: 'a', label: 'A', group: 'page_type', description: `${'word '.repeat(60)}\n end` }] }, new Date());
+    const line = long.prompt.split('\n').find((l) => l.startsWith('- a (A): '))!;
+    assert.ok(line.endsWith('word...') && line.length <= '- a (A): '.length + 203, line);
+  });
+
+  it('keeps only what is valid in the helper’s answer', () => {
+    const t = FALLBACK_TAXONOMY;
+    const words = 'climate reports on NASA.gov from October, not x.com';
+    const read = (o: Record<string, unknown>, tx = t) => readAnswer(answer(o), words, tx);
+    assert.deepEqual(read({ query: ' climate   reports ', categories: ['news', 'cooking'], include_domains: ['https://www.NASA.gov/x', 'not a host!'], exclude_domains: ['nasa.gov', 'x.com'], start_date: '2026-10', end_date: '2026-10-31', homepages_only: true }), {
+      text: 'climate reports',
+      sites: ['nasa.gov'],
+      excludeSites: ['x.com'],
+      categories: ['news'],
+      from: '2026-10-01',
+      to: '2026-10-31',
+      languages: [],
+      fileTypes: [],
+      homepagesOnly: true,
+    });
+    assert.deepEqual(read({ categories: ['cooking'] }), null, 'an unknown category is dropped, and nothing is left');
+    assert.deepEqual(read({ include_domains: ['a b c'], categories: ['news'] })?.sites, []);
+    assert.equal(read({ start_date: 'last month', categories: ['news'] })?.from, undefined, 'a bad date is dropped');
+    assert.equal(read({ start_date: '2026-02-30', end_date: '2026-03-01', categories: ['news'] })?.to, '2026-03-01');
+    const reversed = read({ start_date: '2026-05-01', end_date: '2026-01-01', categories: ['news'] })!;
+    assert.deepEqual([reversed.from, reversed.to], [undefined, undefined], 'start after end drops both');
+    assert.deepEqual(read({ languages: ['DE', 'fr', 'deu', 'german', 5] }, withLanguages)?.languages, ['de'], 'a language the taxonomy does not list is dropped');
+    assert.deepEqual(read({ languages: ['fr', 'xx'] })?.languages, ['fr', 'xx'], 'any code goes when the taxonomy lists none');
+    assert.deepEqual(read({ file_types: ['pdf'] })?.fileTypes, ['pdf']);
+    assert.equal(read({ file_types: ['pdf', 'html'], categories: ['news'] })?.fileTypes.length, 0, 'both file types are none');
+    assert.equal(read({ file_types: ['docx'], categories: ['news'] })?.fileTypes.length, 0);
+    assert.equal(read({ query: '', categories: ['news'] })?.text, words, 'an empty query is the original words');
+    assert.equal(read({ query: 'é'.repeat(1100), categories: ['news'] })?.text, words, 'over 2048 bytes');
+    assert.equal(read({ query: 'effects of global warming', categories: ['news'] })?.text, words, 'rewritten words are searched as written');
+    assert.equal(read({ query: 'Climate Report', categories: ['news'] })?.text, 'Climate Report', 'the query’s own words, in any case or number');
+    assert.equal(readAnswer(answer({ query: 'US11694034B2', categories: ['uspto'] }), 'US 11,694,034 B2 patent', t)?.text, 'US11694034B2', 'a number written as one word');
+    assert.equal(read({ homepages_only: 'true', categories: ['news'] })?.homepagesOnly, false, 'only true is true');
+    assert.equal(read({ query: 'something else' }), null, 'no filter stated');
+    assert.equal(readAnswer('I could not say', 'x', t), null);
+    assert.equal(readAnswer('[1, 2]', 'x', t), null);
+    assert.equal(readAnswer('', 'x', t), null);
+    assert.equal(readAnswer(`Sure:\n\`\`\`json\n${answer({ categories: ['news'], query: 'q' })}\n\`\`\``, 'x', t)?.text, 'q', 'the first object in the answer');
+  });
+
+  it('merges a reading into the query, keeping k and snippets', async () => {
+    const { r, asked } = reader(() => answer({ query: 'climate reports', categories: ['news'], start_date: '2026-10-01', end_date: '2026-10-31' }));
+    const out = await r.read(Q({ text: 'climate reports from last month', k: 7, snippets: 'filtered' }));
+    assert.deepEqual(out, Q({ text: 'climate reports', k: 7, snippets: 'filtered', categories: ['news'], from: '2026-10-01', to: '2026-10-31' }));
+    assert.equal(asked.length, 1);
+    assert.equal(asked[0].timeoutMs, 8000);
+    assert.match(asked[0].prompt, /Query: climate reports from last month/);
+  });
+
+  it('does not ask without a cue, and asks once for a repeated query (also when it states nothing)', async () => {
+    const { r, asked } = reader((n) => (n === 0 ? answer({ categories: ['news'], query: 'x' }) : answer()));
+    assert.equal(await r.read(Q({ text: 'transformer architecture' })), null);
+    assert.equal(asked.length, 0);
+    const a = await r.read(Q({ text: 'news today' }));
+    const b = await r.read(Q({ text: 'news today', k: 3 }));
+    assert.deepEqual([a?.k, b?.k, asked.length], [20, 3, 1]);
+    assert.equal(await r.read(Q({ text: 'the latest numpy' })), null);
+    assert.equal(await r.read(Q({ text: 'the latest numpy' })), null);
+    assert.equal(asked.length, 2, 'a query that states nothing is remembered too');
+  });
+
+  it('keeps no more than parallel asks in flight, and does not wait for the rest', async () => {
+    let release!: (s: string) => void;
+    const { r, asked } = reader(() => new Promise<string>((res) => (release = res)), { parallel: () => 1 });
+    const first = r.read(Q({ text: 'news today' }));
+    assert.equal(await r.read(Q({ text: 'news yesterday' })), null);
+    assert.equal(asked.length, 1);
+    release(answer({ categories: ['news'], query: 'x' }));
+    assert.equal((await first)?.text, 'x');
+    const second = r.read(Q({ text: 'news yesterday' }));
+    await new Promise((done) => setImmediate(done));
+    assert.equal(asked.length, 2, 'a free place is used again');
+    release(answer());
+    assert.equal(await second, null);
+  });
+
+  it('rests for ten minutes after two failures in a row, and a usable answer starts the count again', async () => {
+    let t = Date.parse('2026-11-17T12:00:00');
+    const plan = ['not json', new Error('boom'), answer({ categories: ['news'], query: 'x' }), 'no', answer({ categories: ['news'], query: 'y' })];
+    const { r, asked } = reader((n) => {
+      const a = plan[n];
+      if (a instanceof Error) throw a;
+      return a;
+    }, { now: () => t });
+    const q = Q({ text: 'news today' });
+    assert.equal(await r.read(q), null);
+    assert.equal(await r.read(q), null);
+    assert.equal(asked.length, 2);
+    t += 9 * 60_000;
+    assert.equal(await r.read(q), null);
+    assert.equal(asked.length, 2, 'still resting');
+    t += 2 * 60_000;
+    assert.equal((await r.read(q))?.text, 'x');
+    assert.equal(asked.length, 3);
+    // x is remembered; another query fails once, which is not yet a rest.
+    assert.equal(await r.read(Q({ text: 'news yesterday' })), null);
+    assert.equal((await r.read(Q({ text: 'news tonight' })))?.text, 'y');
+    assert.equal(asked.length, 5);
+  });
+
+  it('gives up on a slow helper at the time limit, even when it ignores the signal, and a caller’s abort is no failure', async () => {
+    const { r, asked } = reader(() => new Promise<string>(() => {}), { timeoutMs: 40 });
+    const at = Date.now();
+    assert.equal(await r.read(Q({ text: 'news today' })), null);
+    assert.ok(Date.now() - at < 1000, 'held the search for no more than the limit');
+    assert.equal(asked[0].signal.aborted, true, 'the helper was told to stop');
+    const c = reader(() => new Promise<string>(() => {}), { timeoutMs: 5000 });
+    const ctl = new AbortController();
+    const p = c.r.read(Q({ text: 'news today' }), ctl.signal);
+    ctl.abort();
+    assert.equal(await p, null);
+    assert.equal(await c.r.read(Q({ text: 'news today' }), AbortSignal.abort()), null);
+    // Not counted: asking goes on after two of them.
+    const q2 = c.r.read(Q({ text: 'news again' }), AbortSignal.timeout(20));
+    assert.equal(await q2, null);
+    const q3 = c.r.read(Q({ text: 'news once more' }), AbortSignal.timeout(20));
+    assert.equal(await q3, null);
+    assert.equal(await c.r.read(Q({ text: 'news a fourth time' }), AbortSignal.timeout(20)), null);
+    assert.equal(c.asked.length, 4);
+  });
+
+  it('remembers at most 500 readings', async () => {
+    const { r, asked } = reader(() => answer({ categories: ['news'], query: 'x' }));
+    for (let i = 0; i <= 500; i++) await r.read(Q({ text: `news ${i}` }));
+    assert.equal(asked.length, 501);
+    await r.read(Q({ text: 'news 500' }));
+    assert.equal(asked.length, 501);
+    await r.read(Q({ text: 'news 0' }));
+    assert.equal(asked.length, 502, 'the oldest was dropped');
+  });
+});
+
+describe('Naget Search with filters read from the words', () => {
+  const read = Q({ text: 'climate reports', categories: ['news'], from: '2026-10-01', to: '2026-10-31' });
+  const asked = Q({ text: 'climate reports from last month', k: 5 });
+
+  it('searches the read words with the read filters and says what it searched', async () => {
+    const { f, calls } = fake(() => json(200, { data: [{ url: 'https://a.example/', title: 'A', snippet: 's' }] }));
+    const seen: SearchQuery[] = [];
+    const r = await naget.search(asked, ctx(f, { read: async (q) => (seen.push(q), { ...q, ...read, k: 5 }) }));
+    assert.equal(calls.length, 1);
+    assert.deepEqual(body(calls[0]), { query: 'climate reports', k: 5, web_index: { categories: ['news'], start_date: '2026-10-01', end_date: '2026-10-31' } });
+    assert.equal(r.searched?.text, 'climate reports');
+    assert.equal(r.results.length, 1);
+    assert.deepEqual(seen, [asked]);
+  });
+
+  it('searches the words as written when there is no reading, or it fails', async () => {
+    for (const rd of [async () => null, async () => Promise.reject(new Error('helper down'))]) {
+      const { f, calls } = fake(() => json(200, { data: [] }));
+      const r = await naget.search(asked, ctx(f, { read: rd }));
+      assert.deepEqual(body(calls[0]), { query: 'climate reports from last month', k: 5 });
+      assert.equal(r.searched, undefined);
+    }
+  });
+
+  it('searches again as written when Naget refuses what was read, and passes other errors on', async () => {
+    const { f, calls } = fake((_c, n) => (n === 0 ? json(400, { error: { code: 'invalid_request', message: 'bad category' } }) : json(200, { data: [{ url: 'https://a.example/', title: 'A', snippet: 's' }] })));
+    const r = await naget.search(asked, ctx(f, { read: async (q) => ({ ...q, ...read }) }));
+    assert.equal(calls.length, 2);
+    assert.equal(body(calls[0]).query, 'climate reports');
+    assert.deepEqual(body(calls[1]), { query: 'climate reports from last month', k: 5 });
+    assert.equal(r.searched, undefined);
+    assert.equal(r.results.length, 1);
+    const down = fake(() => json(503, { error: {} }));
+    await rejects(naget.search(asked, ctx(down.f, { read: async (q) => ({ ...q, ...read }) })), 'unavailable');
+    assert.equal(down.calls.length, 1);
+  });
+
+  it('searches again as written when the read filters find nothing', async () => {
+    const { f, calls } = fake((_c, n) => json(200, { data: n === 0 ? [] : [{ url: 'https://a.example/', title: 'A', snippet: 's' }] }));
+    const r = await naget.search(asked, ctx(f, { read: async (q) => ({ ...q, ...read }) }));
+    assert.equal(calls.length, 2);
+    assert.deepEqual(body(calls[0]).web_index, { categories: ['news'], start_date: '2026-10-01', end_date: '2026-10-31' });
+    assert.deepEqual(body(calls[1]), { query: 'climate reports from last month', k: 5 });
+    assert.equal(r.searched, undefined, 'what answered is the search as written');
+    assert.equal(r.results.length, 1);
+  });
+});
+
+describe('the searcher and reading', () => {
+  it('gives providers the reader only when asked to, and keeps both answers apart', async () => {
+    const seen: boolean[] = [];
+    const p: SearchProvider = {
+      ...stub('r'),
+      async search(q: SearchQuery, c: ProviderCtx) {
+        seen.push(!!c.read);
+        const read = c.read ? await c.read(q) : null;
+        return { results: [], searched: read ?? undefined };
+      },
+    };
+    const reads: [string, boolean][] = [];
+    const s = new Searcher({ read: async (q, signal) => (reads.push([q.text, !!signal]), { ...q, text: 'read words', categories: ['news'] }) });
+    const plain = await s.search(Q(), [on(p)]);
+    const withRead = await s.search(Q(), [on(p)], { read: true, signal: new AbortController().signal });
+    assert.deepEqual(seen, [false, true]);
+    assert.equal(plain.searched, undefined);
+    assert.equal(withRead.searched?.text, 'read words');
+    assert.deepEqual(reads, [['solid state battery', true]], 'bound to the search’s signal');
+    await s.search(Q(), [on(p)]);
+    await s.search(Q(), [on(p)], { read: true });
+    assert.deepEqual(seen, [false, true], 'each is answered from memory');
+    // Without a reader, nothing is given even when asked.
+    const bare: boolean[] = [];
+    await new Searcher().search(Q(), [on({ ...stub('b'), async search() { bare.push(true); return { results: [] }; } })], { read: true });
+    assert.deepEqual(bare, [true]);
+  });
+
+  it('Settings’ test asks without reading', async () => {
+    let got: ProviderCtx | undefined;
+    const p: SearchProvider = { ...stub('t'), async search(_q: SearchQuery, c: ProviderCtx) { got = c; return { results: [] }; } };
+    await new Searcher({ read: async () => null }).ask(on(p), Q());
+    assert.equal(got?.read, undefined);
+  });
+});
+
+describe('web_search with filters read from its words', () => {
+  const found = { data: [{ url: 'https://nasa.gov/a', title: 'Climate', snippet: 'Report' }] };
+  const nagetFetch = () => fake((c) => (c.url.startsWith('https://naget.com/') ? json(200, found) : json(404, {})));
+  const helperSays = (o: Record<string, unknown>) => answer({ query: 'climate reports', include_domains: ['nasa.gov'], start_date: '2026-10-01', end_date: '2026-10-31', ...o });
+
+  it('shows the filters it read, says what it searched, and sends them to Naget', async () => {
+    const { f, calls } = nagetFetch();
+    const prompts: string[] = [];
+    const svc = new SearchService({ kv: memory(), fetch: f, ask: async (q) => (prompts.push(q.prompt), helperSays({})) });
+    const [web] = searchTools(svc);
+    const out = (await web.run({ query: 'climate reports on nasa.gov from last month' }, run())) as string;
+    const p = parseSearch(out)!;
+    assert.equal(p.query, 'climate reports on nasa.gov from last month');
+    assert.equal(p.filters, 'sites nasa.gov; from 2026-10-01 to 2026-10-31');
+    assert.deepEqual(p.notes, ['Naget Search read these filters from the query’s words and searched "climate reports"; to search another way, set filters yourself (the words are then searched as written).']);
+    assert.deepEqual(body(calls[0]), { query: 'climate reports', k: 20, web_index: { include_domains: ['nasa.gov'], start_date: '2026-10-01', end_date: '2026-10-31' } });
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /- uspto \(US patents\)/, 'the taxonomy in use');
+  });
+
+  it('notes the filters alone when the words stay as they were', async () => {
+    const { f } = nagetFetch();
+    const svc = new SearchService({ kv: memory(), fetch: f, ask: async () => answer({ query: 'papers on diffusion', categories: ['academic'] }) });
+    const out = (await searchTools(svc)[0].run({ query: 'papers on diffusion' }, run())) as string;
+    assert.deepEqual(parseSearch(out)!.notes, ['Naget Search read these filters from the query’s words; to search another way, set filters yourself (the words are then searched as written).']);
+    assert.equal(parseSearch(out)!.filters, 'categories academic');
+  });
+
+  it('does not ask when a filter is set, when the words state nothing, or without a helper', async () => {
+    const { f, calls } = nagetFetch();
+    let asks = 0;
+    const svc = new SearchService({ kv: memory(), fetch: f, ask: async () => (asks++, helperSays({})) });
+    const [web] = searchTools(svc);
+    const out = (await web.run({ query: 'climate reports from last month', languages: ['en'] }, run())) as string;
+    assert.equal(parseSearch(out)!.notes.length, 0);
+    assert.deepEqual(body(calls[0]), { query: 'climate reports from last month', k: 20, web_index: { languages: ['en'] } });
+    await web.run({ query: 'transformer architecture' }, run());
+    assert.equal(asks, 0);
+    // No helper to ask: the words are searched as written.
+    const plain = nagetFetch();
+    const bare = (await searchTools(new SearchService({ kv: memory(), fetch: plain.f }))[0].run({ query: 'climate reports from last month' }, run())) as string;
+    assert.equal(parseSearch(bare)!.notes.length, 0);
+    assert.equal(parseSearch(bare)!.filters, undefined);
+    assert.deepEqual(body(plain.calls[0]), { query: 'climate reports from last month', k: 20 });
+  });
+
+  it('searches as written when the helper fails, and find_media never reads', async () => {
+    const { f, calls } = nagetFetch();
+    let asks = 0;
+    const svc = new SearchService({ kv: memory(), fetch: f, ask: async () => (asks++, Promise.reject(new Error('helper down'))) });
+    const [web] = searchTools(svc);
+    const out = (await web.run({ query: 'climate reports from last month' }, run())) as string;
+    assert.equal(parseSearch(out)!.hits.length, 1);
+    assert.deepEqual(body(calls[0]), { query: 'climate reports from last month', k: 20 });
+    assert.equal(asks, 1);
+    await svc.searcher.search(Q({ text: 'news today' }), svc.configured());
+    assert.equal(asks, 1, 'a search without read is not read');
+  });
+
+  it('tells agents that Naget Search reads the words', () => {
+    const svc = new SearchService({ kv: memory(), fetch: fake(() => json(500, {})).f });
+    const d = searchTools(svc)[0].description;
+    assert.match(d, /- Categories \(Naget Search keeps to them\)[^\n]*\n- Naget Search reads the filters a search states in its words when you set none/);
+    svc.update({ provider: { id: 'naget', enabled: false } });
+    assert.doesNotMatch(searchTools(svc)[0].description, /reads the filters/);
   });
 });

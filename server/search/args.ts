@@ -72,7 +72,8 @@ export function day(v: unknown, what: string, end: boolean): string | undefined 
   return `${m[1]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-const LANGUAGES: Record<string, string> = {
+/** Language names as people write them, and their ISO 639-1 codes. */
+export const LANGUAGES: Record<string, string> = {
   english: 'en', german: 'de', deutsch: 'de', french: 'fr', spanish: 'es', italian: 'it', portuguese: 'pt', dutch: 'nl', polish: 'pl', russian: 'ru', ukrainian: 'uk', greek: 'el',
   turkish: 'tr', arabic: 'ar', hebrew: 'he', hindi: 'hi', chinese: 'zh', japanese: 'ja', korean: 'ko', swedish: 'sv', norwegian: 'no', danish: 'da', finnish: 'fi', czech: 'cs',
 };

@@ -54,12 +54,16 @@ export interface ProviderCtx {
   fetch: typeof fetch;
   /** Naget Search reports what is left of its allowance. */
   credits?(c: NagetCredits): void;
+  /** Naget Search: the query with the filters its words state, read by the helper model; null to search it as written. */
+  read?: (q: SearchQuery) => Promise<SearchQuery | null>;
 }
 
 export interface ProviderAnswer {
   results: SearchResult[];
   /** The asked-for filters it could not keep to, in words ("categories", "exact dates"). */
   ignored?: string[];
+  /** The query as the provider searched it, when it read filters from its words. */
+  searched?: SearchQuery;
 }
 
 export interface SearchProvider {

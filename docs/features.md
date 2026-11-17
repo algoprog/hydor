@@ -196,7 +196,11 @@ agents that speak ACP and take MCP servers.
   columns, the sheet tabs' menu; move a LaTeX document's files, tidy its source and its bibliography; clear a notebook's outputs; duplicate and turn into.
   The agent beside a page (Ask) is told its kind's actions and gets the ids of what was picked.
 - **The web**: search with Naget Search (its own index of the web, papers, patents and filings; free daily
-  searches without a key) or SearXNG, Brave Search and DuckDuckGo, by category, site or date, up to 100 results;
+  searches without a key) or SearXNG, Brave Search and DuckDuckGo, by category, site or date, up to 100 results (when
+  an agent sets no filter but the words of a Naget Search state some, such as "papers on retrieval augmented
+  generation since 2024", the helper model reads them first, within about 8 seconds and for a few searches at a time,
+  and the search's filter tags and a note naming the words searched show it; a search whose read filters find
+  nothing, and the other providers, search as written);
   read whole pages, or only the parts that answer a question; find a picture and a video of each of a list of things
   (find_media: a Wikipedia article's lead picture, else what the pages about it show when shared, and a YouTube
   video whose title names it). Each search shows its results, and each reply the sources it cites: a chip with the

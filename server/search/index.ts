@@ -5,6 +5,7 @@ import type { SearchTestResult } from '../../shared/search.ts';
 import { HttpError } from '../auth.ts';
 import { kvGet, kvSet } from '../db.ts';
 import type { Feature } from '../features/types.ts';
+import { helper, helperParallel } from '../helper.ts';
 import { iconRoutes } from '../web/icons.ts';
 import { SearchService, type SettingsPatch } from './service.ts';
 import { INSTRUCTIONS, searchTools } from './tools.ts';
@@ -14,7 +15,14 @@ let svc: SearchService | null = null;
 export const search: Feature = {
   id: 'search',
   routes(d) {
-    const s = (svc = new SearchService({ kv: { get: (k) => kvGet(d.db, k), set: (k, v) => kvSet(d.db, k, v) }, emit: (data) => d.broadcast({ t: 'feature', id: 'search', data }) }));
+    const s = (svc = new SearchService({
+      kv: { get: (k) => kvGet(d.db, k), set: (k, v) => kvSet(d.db, k, v) },
+      emit: (data) => d.broadcast({ t: 'feature', id: 'search', data }),
+      // The helper model reads the filters a search's words state (search/reader.ts). Its answer is about 150
+      // tokens; the room above that is for a helper that reasons first, which the reader's time limit still bounds.
+      ask: (q) => helper(d.db, { system: q.system, prompt: q.prompt, timeoutMs: q.timeoutMs, signal: q.signal, maxTokens: 1000 }),
+      parallel: () => helperParallel(d.db),
+    }));
     d.app.get('/api/search/settings', async () => s.view());
     d.app.put('/api/search/settings', async (req) => {
       try {

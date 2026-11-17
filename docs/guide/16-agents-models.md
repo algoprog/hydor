@@ -282,6 +282,7 @@ The helper model does small jobs beside your sessions, outside any conversation:
 - checking steps in Custom's Auto mode, and checking a Custom goal after each turn;
 - tidying up memory about once a day, learning from the conversations since, and titling notes for the index agents start with;
 - answering one question about a web page the browser has open;
+- reading the filters (sites, dates, kinds of pages, languages) that the words of a web search state, before Naget Search searches (see [How agents search the web](/guide/web#how-agents-search-the-web));
 - describing pictures for a Custom model that can't see them;
 - summing up a long reply from a Hydor subagent;
 - drafting an app or a scheduled task from a session;

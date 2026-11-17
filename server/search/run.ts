@@ -28,6 +28,8 @@ export interface SearchOutcome {
   ignored: string[];
   /** The providers before it that could not answer. */
   failed: Attempt[];
+  /** The query as the provider searched it, when it read filters from its words. */
+  searched?: SearchQuery;
 }
 
 /** Why a provider did not answer, without its name in front ("needs a key for now…"). */
@@ -61,8 +63,11 @@ export class Searcher {
   readonly lastError = new Map<string, { at: number; kind: string; message: string }>();
   private cache = new Map<string, { at: number; out: SearchOutcome }>();
 
-  constructor(o: { fetch?: typeof fetch; credits?: (c: NagetCredits) => void; now?: () => number } = {}) {
+  private reader?: (q: SearchQuery, signal?: AbortSignal) => Promise<SearchQuery | null>;
+
+  constructor(o: { fetch?: typeof fetch; credits?: (c: NagetCredits) => void; now?: () => number; read?: (q: SearchQuery, signal?: AbortSignal) => Promise<SearchQuery | null> } = {}) {
     this.fetch = o.fetch ?? fetch;
+    this.reader = o.read;
     this.onCredits = o.credits;
     this.now = o.now ?? Date.now;
   }
@@ -93,14 +98,17 @@ export class Searcher {
   }
 
   /** One provider, as set up, without falling back (Settings' Test button, and each step below). */
-  async ask(c: Configured, q: SearchQuery, signal?: AbortSignal): Promise<{ results: SearchResult[]; ignored: string[] }> {
-    const a = await c.provider.search(q, { key: c.key, url: c.url, signal: signal ?? new AbortController().signal, fetch: this.fetch, credits: this.onCredits });
-    return { results: a.results.slice(0, q.k), ignored: a.ignored ?? [] };
+  async ask(c: Configured, q: SearchQuery, signal?: AbortSignal, read?: (q: SearchQuery) => Promise<SearchQuery | null>): Promise<{ results: SearchResult[]; ignored: string[]; searched?: SearchQuery }> {
+    const a = await c.provider.search(q, { key: c.key, url: c.url, signal: signal ?? new AbortController().signal, fetch: this.fetch, credits: this.onCredits, read });
+    return { results: a.results.slice(0, q.k), ignored: a.ignored ?? [], searched: a.searched };
   }
 
-  async search(q: SearchQuery, list: Configured[], o: { prefer?: string; signal?: AbortSignal } = {}): Promise<SearchOutcome> {
+  /** `read`: let a provider that reads filters from the query's words (Naget Search) do so; the agent's web_search asks for it. */
+  async search(q: SearchQuery, list: Configured[], o: { prefer?: string; signal?: AbortSignal; read?: boolean } = {}): Promise<SearchOutcome> {
     const order = this.order(list, o.prefer);
-    const key = JSON.stringify([q, order.map((c) => c.provider.id)]);
+    const key = JSON.stringify([q, order.map((c) => c.provider.id), !!o.read]);
+    const reader = this.reader;
+    const read = o.read && reader ? (x: SearchQuery) => reader(x, o.signal) : undefined;
     const hit = this.cache.get(key);
     if (hit && this.now() - hit.at < CACHE_MS) return hit.out;
     const failed: Attempt[] = [];
@@ -117,10 +125,10 @@ export class Searcher {
         continue;
       }
       try {
-        const a = await this.ask(c, q, o.signal);
+        const a = await this.ask(c, q, o.signal, read);
         this.resting.delete(p.id);
         this.lastError.delete(p.id);
-        const out: SearchOutcome = { provider: p, results: a.results, ignored: a.ignored, failed };
+        const out: SearchOutcome = { provider: p, results: a.results, ignored: a.ignored, failed, searched: a.searched };
         this.cache.set(key, { at: this.now(), out });
         if (this.cache.size > 50) this.cache.delete(this.cache.keys().next().value!);
         return out;

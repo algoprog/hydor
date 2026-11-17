@@ -283,6 +283,7 @@ Das Hilfsmodell bearbeitet kleine Aufgaben außerhalb von Unterhaltungen:
 - Schritte im Auto-Modus von Custom prüfen und ein Custom-Ziel nach jedem Durchlauf prüfen;
 - das Memory etwa einmal am Tag aufräumen, aus den Unterhaltungen seitdem lernen und Notizen für den Index betiteln, mit dem Agenten starten;
 - eine Frage zu einer Webseite beantworten, die der Browser geöffnet hat;
+- die Filter (Websites, Zeiträume, Seitenarten, Sprachen) herauslesen, die die Wörter einer Websuche nennen, bevor Naget Search sucht (siehe [Wie Agenten im Web suchen](/guide/web#how-agents-search-the-web));
 - Bilder für Custom-Modelle ohne Bildverarbeitung beschreiben;
 - lange Antworten von Hydor-Subagenten zusammenfassen;
 - Apps oder geplante Aufgaben aus Sitzungen entwerfen;

@@ -62,9 +62,6 @@ async function call(ctx: ProviderCtx, path: string, body: unknown | null, timeou
   throw new SearchError('unavailable', `Naget Search answered ${res.status}${message ? `: ${message}` : ''}`, Date.now() + 30_000);
 }
 
-/** Words that state dates, a language, PDFs or home pages: Naget's own reading of the query helps then. */
-const STATES = /\b(19|20)\d{2}\b|\b(today|yesterday|recent(ly)?|latest|newest|since|before|after)\b|\b(this|last|past) (day|week|month|year)\b|\bpdfs?\b|\bhome ?pages?\b|\bofficial (web ?)?sites?\b|\bin (english|german|french|spanish|italian|portuguese|dutch|polish|russian|chinese|japanese|korean|arabic|hindi|turkish)\b/i;
-
 function scope(q: SearchQuery): Record<string, unknown> {
   const s: Record<string, unknown> = {};
   if (q.categories.length) s.categories = q.categories;
@@ -78,13 +75,14 @@ function scope(q: SearchQuery): Record<string, unknown> {
   return s;
 }
 
-/** The request body for POST /v1/web-index/search. */
+/**
+ * The request body for POST /v1/web-index/search. Naget no longer reads the filters a query's words state
+ * (parse_query is never sent): the app's helper model does, before the search (reader.ts).
+ */
 export function nagetRequest(q: SearchQuery): Record<string, unknown> {
   const web_index = scope(q);
   const body: Record<string, unknown> = { query: q.text, k: Math.max(1, Math.min(100, q.k)) };
   if (Object.keys(web_index).length) body.web_index = web_index;
-  // Without filters of its own, let Naget read the ones the words state ("… from last year", "PDF reports on …").
-  else if (STATES.test(q.text)) body.parse_query = true;
   if (q.snippets === 'filtered') body.result_fields = ['filtered_snippet'];
   return body;
 }
@@ -117,9 +115,21 @@ export const naget: SearchProvider = {
   enabledByDefault: true,
   async search(q, ctx) {
     // Reading each page for filtered snippets takes a while.
-    const data = await call(ctx, '/v1/web-index/search', nagetRequest(q), q.snippets === 'filtered' ? 120_000 : 45_000);
-    const rows: unknown[] = Array.isArray(data?.data) ? data.data : [];
-    return { results: rows.map(nagetResult).filter((r): r is SearchResult => !!r) };
+    const timeout = q.snippets === 'filtered' ? 120_000 : 45_000;
+    const results = (data: any) => (Array.isArray(data?.data) ? (data.data as unknown[]) : []).map(nagetResult).filter((r): r is SearchResult => !!r);
+    const read = ctx.read ? await ctx.read(q).catch(() => null) : null;
+    if (read) {
+      try {
+        const found = results(await call(ctx, '/v1/web-index/search', nagetRequest(read), timeout));
+        // Filters read from the words can rule everything out ("PDF annual reports" as SEC filings, which are not
+        // PDFs): then the words as written answer instead.
+        if (found.length) return { results: found, searched: read };
+      } catch (e) {
+        // Naget refused the filters that were read: search the words as written instead.
+        if (!(e instanceof SearchError && e.kind === 'invalid')) throw e;
+      }
+    }
+    return { results: results(await call(ctx, '/v1/web-index/search', nagetRequest(q), timeout)) };
   },
 };
 

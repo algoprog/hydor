@@ -13,7 +13,7 @@ its budget; other agents tell the user what to fix in Settings → Search.
 
 | Provider | Key | What it keeps a search to |
 | --- | --- | --- |
-| Naget Search (the default) | none needed: a free daily allowance; a key from naget.com gives more | categories (papers, patents, filings, news, docs…), sites, dates, languages, PDFs, home pages, and the sentences of each page that answer the query |
+| Naget Search (the default) | none needed: a free daily allowance; a key from naget.com gives more | categories (papers, patents, filings, news, docs…), sites, dates, languages, PDFs, home pages, and the sentences of each page that answer the query; when the agent sets no filter but the query's words state some, the app's helper model reads them first (`server/search/reader.ts`) and Naget Search searches the remaining words with them |
 | SearXNG | none: your instance's address | sites, rough dates (the past day, week, month, year), a language, PDFs |
 | Brave Search | needed (there is a free plan) | sites, dates, a language, PDFs |
 | DuckDuckGo | none | sites, rough dates, PDFs; a last resort, about 10 results a page |
@@ -82,7 +82,14 @@ What a provider gets and gives:
   `YYYY-MM-DD`; ISO language codes; file types (`html`, `pdf`); home pages only; and which snippets.
   `withOperators(q)` writes sites and PDFs back as operators, for engines that take them in the query.
 - **Its settings** (`ProviderCtx`): the key and address from Settings, a signal to stop, and `fetch`
-  (the tests pass their own).
+  (the tests pass their own). An optional `read?(q)` returns the query with the filters its words state
+  (`null`: search it as written); it is given only to Naget Search's `search`, for `web_search`, and is
+  implemented in `server/search/reader.ts` (the helper model, a few reads at a time, about 8 seconds, resting
+  10 minutes after two failures in a row). A query the agent already gave a filter is never read, and when
+  the filters read find nothing (or Naget refuses them), Naget Search searches the query as written instead.
+- **Its answer** (`ProviderAnswer`): the results, the filters it `ignored`, and optionally `searched`: the
+  query as the provider searched it, set when it read filters from the words. The tool shows those as the
+  search's filter tags, with a note naming the words searched.
 - **Results** (`SearchResult`): title, address and snippet; a date, category, file type and language
   when it knows them. The tool numbers them for the agent to cite and marks them as outside data, so a
   provider never adds instructions of its own.
