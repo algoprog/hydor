@@ -2,12 +2,13 @@
 // bits a number, on levels fitted once per dimension to texts in the model's nine languages (codebook.ts,
 // made by scripts/memory-embeddings): 384 bytes a note at 4 bits. A query stays in full precision, and its
 // score against a note is the sum, over the note's bytes, of a table made once per query: a scan reads
-// each note's bytes once and adds them up. Each place's vectors are kept in memory within a budget (about
-// a 64th of the computer's memory, at most 512 MB); a place bigger than that is read from the database
+// each note's bytes once and adds them up. The vectors live in the database; each place's are also kept in
+// memory while the budget all search indexes share allows (ram.ts: it follows the computer's memory and how
+// much is free now); a place that does not fit, or any while memory is short, is read from the database
 // each time it is scanned, so millions of notes never have to fit in memory.
-import os from 'node:os';
 import type { DB } from '../db.ts';
 import { CODEBOOK } from './codebook.ts';
+import { keep, release, searchBudget, used, type Kept } from './ram.ts';
 import { memorySchema, onEntriesChanged, placeKey, placeSql, type Place } from './store.ts';
 
 export const MODEL = CODEBOOK.model;
@@ -107,24 +108,22 @@ interface Block {
   /** End dates (0: none), to leave out what expired since it was read. */
   expires: Float64Array;
   n: number;
-  at: number;
+  /** Its place in the memory all search indexes share (ram.ts). */
+  kept: Kept;
 }
 
-/** Memory for the vectors kept: a 64th of the computer's, between 32 and 512 MB. */
-let budget = Math.min(512, Math.max(32, Math.round(os.totalmem() / 64 / 2 ** 20))) * 2 ** 20;
 const blocks = new WeakMap<DB, Map<string, Block>>();
-let held = 0;
-
-export function setVectorBudget(bytes: number) {
-  budget = bytes;
-}
+/** How many vectors each place has, while they do not change: a place too big to keep is not counted again at every search. */
+const counts = new WeakMap<DB, Map<string, number>>();
 
 function forget(db: DB, place?: Place) {
+  const c = counts.get(db);
+  if (c) place ? c.delete(placeKey(place)) : c.clear();
   const m = blocks.get(db);
   if (!m) return;
   for (const [k, b] of m)
     if (!place || k === placeKey(place)) {
-      held -= b.codes.byteLength;
+      release(b.kept);
       m.delete(k);
     }
 }
@@ -133,34 +132,43 @@ onEntriesChanged(forget);
 const blockSql = `select e.id as id, coalesce(e.expires_at, 0) as expires, v.code as code from memory_vectors v join memory_entries e on e.id = v.entry
   where e.scope = ? and e.scope_key = ? and e.status = 'active' and v.model = ?`;
 
-/** A place's vectors from memory, read when needed; null when they would take more than the budget. */
+/** A place's vectors from memory, read when needed; null when they do not fit the budget now (they are then read as scanned). */
 function block(db: DB, p: Place): Block | null {
   let m = blocks.get(db);
   if (!m) blocks.set(db, (m = new Map()));
   const k = placeKey(p);
   const have = m.get(k);
   if (have) {
-    have.at = Date.now();
+    used(have.kept);
     return have;
   }
-  const n = (db.prepare(`select count(*) as n from (${blockSql})`).get(p.scope, p.scopeKey, VECTOR_MODEL) as { n: number }).n;
-  if (n * BYTES > budget) return null;
-  const b: Block = { ids: new Int32Array(n), codes: new Uint8Array(n * BYTES), scales: new Float64Array(n), expires: new Float64Array(n), n: 0, at: Date.now() };
-  for (const r of db.prepare(blockSql).iterate(p.scope, p.scopeKey, VECTOR_MODEL) as Iterable<{ id: number; expires: number; code: Buffer }>) {
-    if (b.n >= n || r.code.length !== BYTES) continue;
-    b.ids[b.n] = r.id;
-    b.expires[b.n] = r.expires;
-    b.codes.set(r.code, b.n * BYTES);
-    b.scales[b.n] = scale(b.codes, b.n * BYTES);
-    b.n++;
+  if (searchBudget() < BYTES) return null;
+  let c = counts.get(db);
+  if (!c) counts.set(db, (c = new Map()));
+  let n = c.get(k);
+  if (n === undefined) {
+    n = (db.prepare(`select count(*) as n from (${blockSql})`).get(p.scope, p.scopeKey, VECTOR_MODEL) as { n: number }).n;
+    c.set(k, n);
   }
-  // The least recently used places make room.
-  held += b.codes.byteLength;
-  const all = [...m.entries()].sort((x, y) => x[1].at - y[1].at);
-  while (held > budget && all.length) {
-    const [ok, ob] = all.shift()!;
-    held -= ob.codes.byteLength;
-    m.delete(ok);
+  let b: Block;
+  // Room first, before anything is allocated; the least recently used places make way.
+  const kept = keep(n * (BYTES + 4 + 8 + 8), () => {
+    if (m.get(k) === b) m.delete(k);
+  });
+  if (!kept) return null;
+  b = { ids: new Int32Array(n), codes: new Uint8Array(n * BYTES), scales: new Float64Array(n), expires: new Float64Array(n), n: 0, kept };
+  try {
+    for (const r of db.prepare(blockSql).iterate(p.scope, p.scopeKey, VECTOR_MODEL) as Iterable<{ id: number; expires: number; code: Buffer }>) {
+      if (b.n >= n || r.code.length !== BYTES) continue;
+      b.ids[b.n] = r.id;
+      b.expires[b.n] = r.expires;
+      b.codes.set(r.code, b.n * BYTES);
+      b.scales[b.n] = scale(b.codes, b.n * BYTES);
+      b.n++;
+    }
+  } catch (e) {
+    release(kept);
+    throw e;
   }
   m.set(k, b);
   return b;

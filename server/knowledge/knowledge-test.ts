@@ -12,6 +12,7 @@ import { setSettings } from '../assistants/store.ts';
 import { openDb, kvSet } from '../db.ts';
 import type { RunCtx } from '../features/types.ts';
 import { setEmbedderForTests } from '../memory/embed.ts';
+import { setRamForTests } from '../memory/ram.ts';
 import { words } from '../memory/store.ts';
 import * as vec from '../memory/vectors.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
@@ -167,6 +168,16 @@ test('by meaning: in other words, once the passages have vectors; words and mean
   const both = await searchKnowledge(db, { query: 'how soon will my refund come' });
   assert.equal(both.hits[0].title, 'expenses.txt');
   assert.ok(both.hits[0].by.includes('meaning'));
+  // With no memory to keep them in (short of it), the vectors are read from the database as they are scanned: the same hits.
+  const hitsOf = (x: typeof r) => x.hits.map((h) => [h.ref, h.score]);
+  setRamForTests({ budget: 2 ** 30 });
+  const kept = await searchKnowledge(db, { query: 'vacation carry over', mode: 'meaning' });
+  setRamForTests({ budget: 0 });
+  const disk = await searchKnowledge(db, { query: 'vacation carry over', mode: 'meaning' });
+  setRamForTests(null);
+  assert.ok(kept.hits.length > 0);
+  assert.deepEqual(hitsOf(disk), hitsOf(kept), 'read from disk, the same hits');
+  assert.deepEqual(hitsOf(kept), hitsOf(r));
 });
 
 test('the tools: passages with what to cite, more of a document around one, and what is in the bases', async () => {

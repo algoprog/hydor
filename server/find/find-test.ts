@@ -23,7 +23,7 @@ import * as vec from '../memory/vectors.ts';
 import { searchLibrary } from '../pages/search.ts';
 import { createPage, describePage, initPages } from '../pages/store.ts';
 import { createSpace } from '../spaces/index.ts';
-import { dropLists, findAll, findScope, hashOf, makeWaiting, onEvent, setFindScope, setShippedForTests, shippedVectors } from './index.ts';
+import { codesHeld, dropLists, findAll, findScope, hashOf, makeWaiting, onEvent, setFindScope, setShippedForTests, shippedVectors, vectorOfText } from './index.ts';
 import { shippedItems } from './sources.ts';
 import { findUsage, noteUsage } from './usage.ts';
 
@@ -206,6 +206,21 @@ test('with search by meaning: what ships found in other words; sessions and task
   const s = await findAll(d, 'holiday plans');
   assert.equal(s.sessions[0]?.key, 'claude:lisbon');
   assert.ok((s.sessions[0].meaning ?? 0) > 0.35);
+  // Memory holds only the vectors of what the lists hold: a vector made earlier is read back from the table when the lists are read
+  // again, and a row for a text no list holds stays on disk (still found by a point lookup, for the apps' and pages' search).
+  const orphan = 'A text that no list holds';
+  db.prepare('insert or replace into find_vectors (hash, model, code) values (?, ?, ?)').run(hashOf(orphan), vec.VECTOR_MODEL, Buffer.from(vec.quantize(fake(orphan))));
+  dropLists();
+  assert.equal(codesHeld(), 0);
+  const again = await findAll(d, 'holiday plans');
+  assert.equal(again.sessions[0]?.key, 'claude:lisbon', 'its vector comes back from find_vectors');
+  assert.ok(codesHeld() > 0);
+  const total = (db.prepare('select count(*) as n from find_vectors').get() as { n: number }).n;
+  assert.ok(codesHeld() < total, `the table has more (${total}) than memory holds (${codesHeld()})`);
+  assert.deepEqual(vectorOfText(db, orphan), vec.quantize(fake(orphan)), 'a point lookup finds it');
+  const held = codesHeld();
+  vectorOfText(db, orphan);
+  assert.equal(codesHeld(), held, 'and does not keep it');
   // A scheduled task made: the same.
   tasks.push({ id: 'k1', name: 'Weekly groceries', prompt: 'Order the shopping list every Friday.' } as ScheduledTask);
   onEvent({ t: 'tasks' } as never, d);

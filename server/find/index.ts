@@ -4,7 +4,8 @@
 // tasks, assistants, skills, pages and connected apps (sources.ts). Their vectors come from two places. What ships
 // with the app has them in shipped-vectors.json, made ahead of time (npm run find:vectors), so no one computes
 // them. What people make gets its vector the moment it is made or changed, as the pages are told (event, below),
-// and keeps it in find_vectors by the hash of its text, 4 bits a number like memory's notes. A search can look in
+// and keeps it in find_vectors by the hash of its text, 4 bits a number like memory's notes. Memory holds only the
+// vectors of what exists now (what the lists below hold); the table keeps the rest, on disk. A search can look in
 // some places only (the box's Search in, kept here for every device: scope). What you pick from the box and the
 // places you visit are kept too (usage.ts), and lift what matches.
 import crypto from 'node:crypto';
@@ -57,24 +58,49 @@ export const setShippedForTests = (m: Map<string, Uint8Array>) => {
 };
 
 const ready = new WeakSet<DB>();
-let made: Map<string, Uint8Array> | null = null;
-/** The vectors made here, read once into memory (a few thousand short texts: a megabyte or two). */
-function madeHere(db: DB): Map<string, Uint8Array> {
-  if (!ready.has(db)) {
-    db.exec('create table if not exists find_vectors (hash text primary key, model text not null, code blob not null)');
-    ready.add(db);
-  }
-  if (made) return made;
-  made = new Map();
-  for (const r of db.prepare('select hash, code from find_vectors where model = ?').iterate(VECTOR_MODEL) as Iterable<{ hash: string; code: Buffer }>)
-    if (r.code.length === BYTES) made.set(r.hash, new Uint8Array(r.code));
-  return made;
+function table(db: DB) {
+  if (ready.has(db)) return;
+  db.exec('create table if not exists find_vectors (hash text primary key, model text not null, code blob not null)');
+  ready.add(db);
 }
 
-const vectorOf = (db: DB, hash: string) => shippedVectors().get(hash) ?? madeHere(db).get(hash);
+/** The vectors made here of what the lists hold now (the table keeps others, on disk). */
+const codes = new Map<string, Uint8Array>();
 
-/** A text's vector, shipped or made here (undefined until it is made): what agents' app search (apps/search.ts) reads. */
-export const vectorOfText = (db: DB, text: string): Uint8Array | undefined => vectorOf(db, hashOf(text));
+/** Reads the vectors of these items from the table, those not shipped nor in memory already. */
+function loadCodes(db: DB, items: { hash: string }[]) {
+  table(db);
+  const sh = shippedVectors();
+  const need = [...new Set(items.map((it) => it.hash))].filter((h) => !sh.has(h) && !codes.has(h));
+  for (let i = 0; i < need.length; i += 500) {
+    const part = need.slice(i, i + 500);
+    for (const r of db.prepare(`select hash, code from find_vectors where model = ? and hash in (${part.map(() => '?').join(',')})`).all(VECTOR_MODEL, ...part) as { hash: string; code: Buffer }[])
+      if (r.code.length === BYTES) codes.set(r.hash, new Uint8Array(r.code));
+  }
+}
+
+/** Lets go of the vectors of what no list holds any more. */
+function prune() {
+  const live = new Set<string>();
+  for (const l of lists.values()) for (const it of l) live.add(it.hash);
+  for (const h of codes.keys()) if (!live.has(h)) codes.delete(h);
+}
+
+const vectorOf = (hash: string) => shippedVectors().get(hash) ?? codes.get(hash);
+
+const lookups = new WeakMap<DB, { get(...args: unknown[]): unknown }>();
+
+/** A text's vector, shipped or made here (undefined until it is made): what agents' app search (apps/search.ts) reads. Its items may not be listed yet, so the table is asked, and the answer not kept. */
+export const vectorOfText = (db: DB, text: string): Uint8Array | undefined => {
+  const hash = hashOf(text);
+  const have = vectorOf(hash);
+  if (have) return have;
+  table(db);
+  let q = lookups.get(db);
+  if (!q) lookups.set(db, (q = db.prepare('select code from find_vectors where hash = ? and model = ?')));
+  const r = q.get(hash, VECTOR_MODEL) as { code: Buffer } | undefined;
+  return r && r.code.length === BYTES ? new Uint8Array(r.code) : undefined;
+};
 
 /** Texts still without a vector, made in order in the background. */
 const waiting = new Map<string, string>();
@@ -82,7 +108,7 @@ let making: Promise<void> | null = null;
 
 function want(d: D, items: (Item & { hash: string })[]) {
   if (!meaningOn(d.db)) return;
-  for (const it of items) if (!vectorOf(d.db, it.hash)) waiting.set(it.hash, it.text);
+  for (const it of items) if (!vectorOf(it.hash)) waiting.set(it.hash, it.text);
   if (waiting.size && !making) making = make(d.db).finally(() => (making = null));
 }
 
@@ -97,12 +123,13 @@ async function make(db: DB) {
         { wait: true, timeoutMs: 180_000 },
       );
       if (!vecs) break;
+      table(db);
       const put = db.prepare('insert or replace into find_vectors (hash, model, code) values (?, ?, ?)');
       db.transaction(() =>
         batch.forEach(([h], i) => {
           const code = quantize(vecs[i]);
           put.run(h, VECTOR_MODEL, Buffer.from(code));
-          madeHere(db).set(h, code);
+          codes.set(h, code);
           waiting.delete(h);
         }),
       )();
@@ -134,6 +161,8 @@ function listOf(d: D, kind: Kind) {
       l = [];
     }
     lists.set(kind, l);
+    loadCodes(d.db, l);
+    prune();
     want(d, l);
   }
   return l;
@@ -166,6 +195,8 @@ export function onEvent(e: ServerEvent, d: D) {
     const fresh = hashed(e.upsert.filter((s) => !s.archived).map(sessionItem));
     const ids = new Set(fresh.map((x) => x.id));
     lists.set('sessions', [...fresh, ...l.filter((x) => !ids.has(x.id) && !gone.has(x.id))].slice(0, MAX_SESSIONS));
+    loadCodes(d.db, fresh);
+    prune();
     want(d, fresh);
   } else if (e.t === 'tasks') soon(d, 'tasks');
   else if (e.t === 'feature') {
@@ -187,7 +218,7 @@ function alike(db: DB, items: (Item & { hash: string })[], q: Float32Array, limi
   const t = queryTable(q);
   const out: { id: string; score: number }[] = [];
   for (const it of items) {
-    const c = vectorOf(db, it.hash);
+    const c = vectorOf(it.hash);
     if (!c) continue;
     const s = scoreAt(t, c, 0) * scale(c, 0);
     if (s >= MIN_SIMILARITY) out.push({ id: it.id, score: s });
@@ -239,7 +270,13 @@ export async function findAll(d: D, query: string, places: FindPlace[] = []): Pr
 }
 
 /** For tests: forget the lists read (the next search reads them again). */
-export const dropLists = () => lists.clear();
+export const dropLists = () => {
+  lists.clear();
+  codes.clear();
+};
+
+/** For tests: how many vectors made here are held in memory. */
+export const codesHeld = () => codes.size;
 
 // ---- where the search box looks ---------------------------------------------------------------------
 

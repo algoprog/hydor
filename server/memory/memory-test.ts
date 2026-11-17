@@ -31,6 +31,7 @@ import { applyTidy, endOfDay, mergedBasis, nearGroups, PLACE_SHARE, tidy, tidyDu
 import { LEARN_SYSTEM, missingPaths, ownWords } from './learn.ts';
 import { fillTranscripts, transcriptCounts } from './transcripts.ts';
 import { memoryTools } from './tools.ts';
+import { setRamForTests } from './ram.ts';
 import * as vec from './vectors.ts';
 import { defaultInterests, rankByInterest, RANK_BY_INTEREST, tokens } from './interest.ts';
 import { createSpace } from '../spaces/index.ts';
@@ -257,10 +258,10 @@ test('4-bit vectors: 384 bytes, a scan scores what the stored vector says, strea
   assert.deepEqual(vec.vectorCounts(db), { embedded: 4, total: 4 });
   const near = vec.nearest(db, [G], q, { k: 2 });
   assert.deepEqual(new Set(near.map((h) => h.id)), new Set([ids[0], ids[3]]), 'by meaning: short = brief, answers = replies');
-  vec.setVectorBudget(100);
+  setRamForTests({ budget: 100 });
   vec.dropVectorCache(db);
   const streamed = vec.nearest(db, [G], q, { k: 2 });
-  vec.setVectorBudget(64 * 2 ** 20);
+  setRamForTests(null);
   assert.deepEqual(streamed, near, 'a place too big to keep gives the same answer');
   store.updateEntry(db, ids[1], 'The user eats no meat.', { source: 'user' });
   assert.deepEqual(vec.missingVectors(db, 10).map((m) => m.id), [ids[1]], 'a changed text needs a new vector');

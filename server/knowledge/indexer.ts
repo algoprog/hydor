@@ -8,7 +8,8 @@ import { TEXT_EXTS } from '../../shared/knowledge.ts';
 import type { DB } from '../db.ts';
 import { canRead, extractText } from '../documents/extract.ts';
 import { embed, meaningHeld, meaningOn } from '../memory/embed.ts';
-import { quantize, VECTOR_MODEL } from '../memory/vectors.ts';
+import { keep, release, searchBudget, used, type Kept } from '../memory/ram.ts';
+import { BYTES, quantize, VECTOR_MODEL } from '../memory/vectors.ts';
 import { htmlMarkdown } from '../web/fetch.ts';
 import { baseRow, baseRows, docsOf, dropDoc, knowledgeSchema, saveDoc, sourcesOf } from './store.ts';
 import { wikiFileActive, wikiSourceRoot } from '../wiki/knowledge/bindings.ts';
@@ -325,20 +326,88 @@ export async function fillVectors(db: DB): Promise<number> {
   return made;
 }
 
-/** Each base's vectors as the search scans them, read once and kept until passages change. */
-let blocks: Map<string, { ids: Int32Array; codes: Uint8Array }> | null = null;
-export const dropVectorBlocks = () => (blocks = null);
+// ---- each base's vectors, as the search scans them -----------------------------------------------------
 
-export function vectorBlock(db: DB, base: string): { ids: Int32Array; codes: Uint8Array } {
-  blocks ??= new Map();
+interface Block {
+  db: DB;
+  ids: Int32Array;
+  codes: Uint8Array;
+  n: number;
+  /** Its place in the memory all search indexes share (ram.ts). */
+  kept: Kept;
+}
+
+/** Bases' vectors kept in memory while the shared budget allows, until passages change; the rest are read from the database as scanned. */
+const blocks = new Map<string, Block>();
+/** How many vectors each base of each database has, until passages change: a base too big to keep is not counted at every search. */
+let counts = new WeakMap<DB, Map<string, number>>();
+
+export function dropVectorBlocks() {
+  for (const b of blocks.values()) release(b.kept);
+  blocks.clear();
+  counts = new WeakMap();
+}
+
+const BASE_VECTORS = 'from kb_vectors v join kb_chunks c on c.id = v.chunk join kb_docs d on d.id = c.doc where d.base = ? and v.model = ?';
+
+/** A base's vectors from memory, read when needed; null when they do not fit the budget now. */
+function vectorBlock(db: DB, base: string): Block | null {
   const have = blocks.get(base);
-  if (have) return have;
-  const rows = db
-    .prepare('select v.chunk as id, v.code as code from kb_vectors v join kb_chunks c on c.id = v.chunk join kb_docs d on d.id = c.doc where d.base = ? and v.model = ?')
-    .all(base, VECTOR_MODEL) as { id: number; code: Buffer }[];
-  const width = rows[0]?.code.length ?? 0;
-  const b = { ids: Int32Array.from(rows.map((r) => r.id)), codes: new Uint8Array(rows.length * width) };
-  rows.forEach((r, i) => b.codes.set(r.code, i * width));
+  if (have && have.db === db) {
+    used(have.kept);
+    return have;
+  }
+  if (have) {
+    release(have.kept);
+    blocks.delete(base);
+  }
+  if (searchBudget() < BYTES) return null;
+  let known = counts.get(db);
+  if (!known) counts.set(db, (known = new Map()));
+  let count = known.get(base);
+  if (count === undefined) {
+    count = (db.prepare(`select count(*) as n ${BASE_VECTORS} and length(v.code) = ?`).get(base, VECTOR_MODEL, BYTES) as { n: number }).n;
+    known.set(base, count);
+  }
+  let b: Block;
+  const kept = keep(count * (BYTES + 4), () => {
+    if (blocks.get(base) === b) blocks.delete(base);
+  });
+  if (!kept) return null;
+  b = { db, ids: new Int32Array(count), codes: new Uint8Array(count * BYTES), n: 0, kept };
+  try {
+    for (const r of db.prepare(`select v.chunk as id, v.code as code ${BASE_VECTORS}`).iterate(base, VECTOR_MODEL) as Iterable<{ id: number; code: Buffer }>) {
+      if (b.n >= count || r.code.length !== BYTES) continue;
+      b.ids[b.n] = r.id;
+      b.codes.set(r.code, b.n * BYTES);
+      b.n++;
+    }
+  } catch (e) {
+    release(kept);
+    throw e;
+  }
   blocks.set(base, b);
   return b;
+}
+
+/** Each of a base's vectors, from memory when it is kept, else read from the database as it goes: `codes` at `off` is one's BYTES. */
+export function scanVectors(db: DB, base: string, each: (id: number, codes: Uint8Array, off: number) => void) {
+  const b = vectorBlock(db, base);
+  if (b) {
+    for (let i = 0, off = 0; i < b.n; i++, off += BYTES) each(b.ids[i], b.codes, off);
+    return;
+  }
+  for (const r of db.prepare(`select v.chunk as id, v.code as code ${BASE_VECTORS}`).iterate(base, VECTOR_MODEL) as Iterable<{ id: number; code: Buffer }>) if (r.code.length === BYTES) each(r.id, r.code, 0);
+}
+
+/** The vectors of just these passages (those that have one), read by id. */
+export function chunkVectors(db: DB, ids: Iterable<number>): Map<number, Uint8Array> {
+  const out = new Map<number, Uint8Array>();
+  const all = [...ids];
+  for (let i = 0; i < all.length; i += 500) {
+    const part = all.slice(i, i + 500);
+    const rows = db.prepare(`select chunk, code from kb_vectors where model = ? and length(code) = ? and chunk in (${part.map(() => '?').join(',')})`).all(VECTOR_MODEL, BYTES, ...part) as { chunk: number; code: Buffer }[];
+    for (const r of rows) out.set(r.chunk, r.code);
+  }
+  return out;
 }

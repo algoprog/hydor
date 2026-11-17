@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import { paths } from './config.ts';
+import { totalMemory } from './memory/ram.ts';
 
 export type DB = Database.Database;
 
@@ -142,8 +143,9 @@ export function openDb(file = paths.db, o: { cacheMb?: number } = {}): DB {
   db.pragma('busy_timeout = 10000');
   db.pragma('foreign_keys = ON');
   // Pages kept by SQLite itself, 64 MB for the server (2 MB by default): on a computer short of memory the system drops
-  // the files it read first, so the pages read most stay here rather than coming back from disk on each request.
-  db.pragma(`cache_size = ${-1024 * (o.cacheMb ?? 64)}`);
+  // the files it read first, so the pages read most stay here rather than coming back from disk on each request. On a
+  // computer or container with less than 4 GB it is a 64th of its memory, at least 16 MB.
+  db.pragma(`cache_size = ${-1024 * (o.cacheMb ?? Math.max(16, Math.min(64, Math.round(totalMemory() / 64 / 2 ** 20))))}`);
   db.exec(SCHEMA);
   // Columns added since the table was first created.
   const cols = new Set((db.prepare('pragma table_info(sessions)').all() as { name: string }[]).map((c) => c.name));

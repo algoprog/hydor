@@ -319,6 +319,11 @@ agents that speak ACP and take MCP servers.
   background), and search notes, wiki articles, documents and past conversations at once, in a project or in all of them (a
   project can keep itself out with **Searchable from other projects** on its Settings tab; what other projects keep is only read).
   [How memory works](memory.md) describes what agents are given and when, and how memory stays current; [Memory internals](memory-internals.md) is for people changing it.
+- **Search by meaning stays light on memory**: the vectors live in the database on disk, and the ones used most are also
+  held in memory, in one budget that notes and knowledge bases share: at most a 64th of the computer's memory (or of a
+  container's limit), never over 512 MB or an eighth of what is free. When memory runs short nothing is held, it is let
+  go within half a minute, and searches read from disk a little slower; the least recently used goes first. Past
+  conversations and apps' records are always read from disk, and the search box keeps only what exists now.
 - **Wiki memory** (formerly the LLM Wiki; Settings → Memory → Wiki memory): linked Markdown articles that agents keep for each
   project, and one shared wiki, from its documents and its work, each with its sources (`wiki/` articles, `raw/` sources,
   `index.md`, `log.md`). On for every project unless turned off: Settings has the default (it decides the shared wiki too) and

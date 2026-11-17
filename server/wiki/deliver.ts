@@ -8,10 +8,10 @@ import path from 'node:path';
 import { isConfidential } from '../../shared/confidential.ts';
 import type { SessionExtra } from '../../shared/features.ts';
 import type { DB } from '../db.ts';
-import { vectorBlock } from '../knowledge/indexer.ts';
+import { chunkVectors } from '../knowledge/indexer.ts';
 import { searchKnowledge } from '../knowledge/search.ts';
 import { words } from '../memory/store.ts';
-import { BYTES, queryTable, scale, scoreAt } from '../memory/vectors.ts';
+import { queryTable, scale, scoreAt } from '../memory/vectors.ts';
 import { activeWikiDocument } from './core.ts';
 import { areaNameOf, areaNames } from './areas/registry.ts';
 import { wikiKnowledgeSchema } from './knowledge/bindings.ts';
@@ -133,11 +133,10 @@ function articleLine(file: string, rel: string, fallback: string, names: Map<str
 }
 
 /** The best meaning similarity of each of these passages (by chunk id) to the request. */
-function similarities(db: DB, base: string, vector: Float32Array, chunks: Set<number>): Map<number, number> {
+function similarities(db: DB, vector: Float32Array, chunks: Set<number>): Map<number, number> {
   const out = new Map<number, number>();
-  const b = vectorBlock(db, base);
   const t = queryTable(vector);
-  for (let i = 0, off = 0; i < b.ids.length; i++, off += BYTES) if (chunks.has(b.ids[i])) out.set(b.ids[i], scoreAt(t, b.codes, off) * scale(b.codes, off));
+  for (const [id, code] of chunkVectors(db, chunks)) out.set(id, scoreAt(t, code, 0) * scale(code, 0));
   return out;
 }
 
@@ -169,7 +168,7 @@ export async function wikiLines(db: DB, o: { space: string | null; query: string
     articles.set(rel, a);
   }
   if (!articles.size) return [];
-  const sims = vector ? similarities(db, b.base, vector, new Set([...articles.values()].flatMap((a) => a.chunks))) : null;
+  const sims = vector ? similarities(db, vector, new Set([...articles.values()].flatMap((a) => a.chunks))) : null;
   const asked = new Set(words(o.query).filter((w) => w.length >= 4));
   const names = areaNames(b.root);
   const out: WikiLine[] = [];

@@ -8,7 +8,7 @@ import type { KnowledgeHit } from '../../shared/knowledge.ts';
 import { isGroup } from '../../shared/spaces.ts';
 import type { DB } from '../db.ts';
 import type { RunCtx, RunTool } from '../features/types.ts';
-import { vectorBlock } from '../knowledge/indexer.ts';
+import { chunkVectors } from '../knowledge/indexer.ts';
 import { basesFor } from '../knowledge/scope.ts';
 import { countUses } from '../knowledge/marks.ts';
 import { searchKnowledge } from '../knowledge/search.ts';
@@ -25,7 +25,7 @@ import { meaningOn, queryVector } from './embed.ts';
 import { findNotes } from './search.ts';
 import { findSessions } from './session-search.ts';
 import { markHit, memoryOn, repoRoot, sessionMemoryOn, words, type Place } from './store.ts';
-import { BYTES, queryTable, scale, scoreAt } from './vectors.ts';
+import { queryTable, scale, scoreAt } from './vectors.ts';
 
 export const KINDS = ['notes', 'wiki', 'documents', 'sessions'] as const;
 type Kind = (typeof KINDS)[number];
@@ -44,12 +44,11 @@ const one = (t: string, n: number) => {
   return x.length > n ? `${x.slice(0, n - 1).trimEnd()}…` : x;
 };
 
-/** The best meaning similarity of each passage (by chunk id) of a base to the question. */
-function similarities(db: DB, base: string, vector: Float32Array, chunks: Set<number>): Map<number, number> {
+/** The meaning similarity of each of these passages (by chunk id) to the question, from their vectors alone. */
+function similarities(db: DB, vector: Float32Array, chunks: Set<number>): Map<number, number> {
   const out = new Map<number, number>();
-  const b = vectorBlock(db, base);
   const t = queryTable(vector);
-  for (let i = 0, off = 0; i < b.ids.length; i++, off += BYTES) if (chunks.has(b.ids[i])) out.set(b.ids[i], scoreAt(t, b.codes, off) * scale(b.codes, off));
+  for (const [id, code] of chunkVectors(db, chunks)) out.set(id, scoreAt(t, code, 0) * scale(code, 0));
   return out;
 }
 
@@ -62,7 +61,7 @@ function bearing(db: DB, hits: KnowledgeHit[], query: string, vector: Float32Arr
   if (!hits.length) return [];
   const asked = words(query);
   const sim = new Map<number, number>();
-  if (vector) for (const base of new Set(hits.map((h) => h.base))) for (const [id, s] of similarities(db, base, vector, new Set(hits.filter((h) => h.base === base).map((h) => Number(h.ref.replace(/^kb:/, '')))))) sim.set(id, s);
+  if (vector) for (const [id, s] of similarities(db, vector, new Set(hits.map((h) => Number(h.ref.replace(/^kb:/, '')))))) sim.set(id, s);
   return hits.filter((h) => {
     if (h.by.includes('exact')) return true;
     if (!vector) return h.by.includes('words');

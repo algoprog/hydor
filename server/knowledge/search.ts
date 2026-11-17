@@ -5,8 +5,8 @@ import type { KnowledgeHit } from '../../shared/knowledge.ts';
 import type { DB } from '../db.ts';
 import { queryVector } from '../memory/embed.ts';
 import { anyWords } from '../memory/search.ts';
-import { BYTES, queryTable, scale, scoreAt } from '../memory/vectors.ts';
-import { vectorBlock } from './indexer.ts';
+import { queryTable, scale, scoreAt } from '../memory/vectors.ts';
+import { scanVectors } from './indexer.ts';
 import { baseRows, knowledgeSchema } from './store.ts';
 import { wikiBaseVisible, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 
@@ -64,14 +64,13 @@ function byMeaning(db: DB, bases: string[], q: Float32Array, limit: number): { i
   const t = queryTable(q);
   const best: { id: number; score: number }[] = [];
   for (const base of bases) {
-    const b = vectorBlock(db, base);
-    for (let i = 0, off = 0; i < b.ids.length; i++, off += BYTES) {
-      const s = scoreAt(t, b.codes, off) * scale(b.codes, off);
-      if (s < MIN_SIMILARITY || (best.length >= limit && s <= best[best.length - 1].score)) continue;
-      best.push({ id: b.ids[i], score: s });
+    scanVectors(db, base, (id, codes, off) => {
+      const s = scoreAt(t, codes, off) * scale(codes, off);
+      if (s < MIN_SIMILARITY || (best.length >= limit && s <= best[best.length - 1].score)) return;
+      best.push({ id, score: s });
       best.sort((x, y) => y.score - x.score);
       if (best.length > limit) best.pop();
-    }
+    });
   }
   return best;
 }
