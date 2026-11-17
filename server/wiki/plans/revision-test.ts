@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import type { ApprovalAnswer } from '../../agents/live.ts';
 import { openDb } from '../../db.ts';
 import type { RunCtx } from '../../features/types.ts';
@@ -83,7 +82,7 @@ try {
   assert.throws(() => applyRevision(root, second, next.sha256));
   assert.deepEqual(fs.readFileSync(file), beforeCollision);
   assert.throws(() => previewRevision(root, { ...second, path: 'output/projects/.archive/old/plan.md' }), /active project plan/);
-  // A failed final replacement leaves the original intact and retains the protected snapshot for inspection.
+  // A failed final replacement leaves the original intact and leaves no snapshot behind, so the plan can be revised again.
   const failureFile = path.join(root, 'output/projects/sample/failure-plan.md');
   const failureOriginal = '# Original plan\n';
   fs.writeFileSync(failureFile, failureOriginal);
@@ -91,13 +90,56 @@ try {
   const failurePreview = previewRevision(root, failureArgs);
   const rename = fs.renameSync;
   try {
-    fs.renameSync = (() => { throw new Error('simulated replacement failure'); }) as typeof fs.renameSync;
+    fs.renameSync = ((from: fs.PathLike, to: fs.PathLike) => { if (String(to) === failureFile) throw new Error('simulated replacement failure'); return rename(from, to); }) as typeof fs.renameSync;
     assert.throws(() => applyRevision(root, failureArgs, failurePreview.sha256), /simulated replacement failure/);
   } finally { fs.renameSync = rename; }
   assert.equal(fs.readFileSync(failureFile, 'utf8'), failureOriginal);
-  assert.equal(fs.readFileSync(path.join(root, failurePreview.snapshot, 'document.md'), 'utf8'), failureOriginal);
+  assert.equal(fs.existsSync(path.join(root, failurePreview.snapshot)), false, 'no snapshot of a plan that was not replaced');
+  assert.deepEqual(fs.readdirSync(path.join(root, 'output/projects/.archive')).filter((name) => name.startsWith('.tmp-')), [], 'no half-made folder');
   assert.equal(fs.existsSync(path.join(root, '.hydor-wiki-write.lock')), false);
   assert.equal(fs.existsSync(path.join(root, 'output/projects/.archive/.revision.lock')), false);
+  assert.equal(applyRevision(root, failureArgs, failurePreview.sha256).revision, 2, 'and the same revision goes through afterwards');
+  assert.equal(fs.readFileSync(path.join(root, failurePreview.snapshot, 'document.md'), 'utf8'), failureOriginal);
+  // A failure while the snapshot is built (here: it cannot be written) leaves nothing either.
+  const buildFile = path.join(root, 'output/projects/sample/build-plan.md');
+  fs.writeFileSync(buildFile, '# Build plan\n');
+  const buildArgs = { ...args, path: 'output/projects/sample/build-plan.md', expectedSha256: wikiHash('# Build plan\n'), content: '# Build plan changed\n' };
+  const buildPreview = previewRevision(root, buildArgs);
+  const writeFile = fs.writeFileSync;
+  try {
+    fs.writeFileSync = ((file: fs.PathOrFileDescriptor, ...rest: unknown[]) => { if (String(file).endsWith('record.json')) throw new Error('simulated disk full'); return (writeFile as (...a: unknown[]) => void)(file, ...rest); }) as typeof fs.writeFileSync;
+    assert.throws(() => applyRevision(root, buildArgs, buildPreview.sha256), /disk full/);
+  } finally { fs.writeFileSync = writeFile; }
+  assert.equal(fs.existsSync(path.join(root, buildPreview.snapshot)), false);
+  assert.deepEqual(fs.readdirSync(path.join(root, 'output/projects/.archive')).filter((name) => name.startsWith('.tmp-')), [], 'the temporary folder is removed');
+  // A snapshot left by an interrupted run (its plan never replaced) is cleared; one of anything else is history and blocks.
+  const leftover = path.join(root, buildPreview.snapshot);
+  fs.mkdirSync(leftover);
+  fs.writeFileSync(path.join(leftover, 'document.md'), '# Build plan\n');
+  fs.writeFileSync(path.join(leftover, 'record.json'), JSON.stringify({ sha256: wikiHash('# Build plan\n') }));
+  fs.chmodSync(path.join(leftover, 'document.md'), 0o444);
+  assert.equal(applyRevision(root, buildArgs, buildPreview.sha256).revision, 2, 'a leftover snapshot of the same bytes does not block');
+  fs.writeFileSync(path.join(root, 'output/projects/sample/history-plan.md'), '# History\n');
+  const historyArgs = { ...args, path: 'output/projects/sample/history-plan.md', expectedSha256: wikiHash('# History\n'), content: '# History changed\n' };
+  const historyPreview = previewRevision(root, historyArgs);
+  fs.mkdirSync(path.join(root, historyPreview.snapshot));
+  fs.writeFileSync(path.join(root, historyPreview.snapshot, 'record.json'), JSON.stringify({ sha256: wikiHash('# Something else\n') }));
+  assert.throws(() => applyRevision(root, historyArgs, historyPreview.sha256), /already exists/);
+  fs.rmSync(path.join(root, historyPreview.snapshot), { recursive: true });
+  // A stale lock (old, or left by a process that is gone) is cleared; a fresh one from a live process is respected.
+  const lockFile = path.join(root, 'output/projects/.archive/.revision.lock');
+  fs.writeFileSync(lockFile, `${process.pid}\n${Date.now()}\n`);
+  assert.throws(() => applyRevision(root, historyArgs, historyPreview.sha256), /locked/, 'a live holder keeps it');
+  fs.writeFileSync(lockFile, 'other writer');
+  const old = new Date(Date.now() - 20 * 60_000);
+  fs.utimesSync(lockFile, old, old);
+  assert.equal(applyRevision(root, historyArgs, historyPreview.sha256).revision, 2, 'a lock older than a few minutes is stale');
+  assert.equal(fs.existsSync(lockFile), false);
+  fs.writeFileSync(path.join(root, 'output/projects/sample/dead-plan.md'), '# Dead\n');
+  const deadArgs = { ...args, path: 'output/projects/sample/dead-plan.md', expectedSha256: wikiHash('# Dead\n'), content: '# Dead changed\n' };
+  const deadPreview = previewRevision(root, deadArgs);
+  fs.writeFileSync(lockFile, '2147483646\n' + Date.now() + '\n');
+  assert.equal(applyRevision(root, deadArgs, deadPreview.sha256).revision, 2, 'a lock whose process is gone is stale');
   // CRLF frontmatter must retain the stable identity and exact original snapshot bytes.
   const crlf = '---\r\ndocument_id: "PLAN-CRLF"\r\ndocument_kind: plan\r\nrevision: 2\r\n---\r\n# Plan\r\n';
   const crlfPath = 'output/projects/sample/crlf.md';
@@ -118,15 +160,14 @@ try {
   const open = fs.openSync;
   try {
     fs.openSync = ((file: fs.PathLike, flags: string | number, mode?: fs.Mode) => {
-      if (String(file) === weakDocument && typeof flags === 'number' && (flags & fs.constants.O_APPEND)) return open(file, 'r');
+      if (String(file).includes('.tmp-revision-') && String(file).endsWith('document.md') && typeof flags === 'number' && (flags & fs.constants.O_APPEND)) return open(file, 'r');
       return open(file, flags, mode);
     }) as typeof fs.openSync;
     assert.throws(() => applyRevision(root, weakArgs, weakPreview.sha256), /cannot be protected/);
   } finally {
     fs.openSync = open;
-    // Clear only a flag that this isolated test may have set on its own temporary snapshot.
-    if (process.platform === 'darwin' && fs.existsSync(weakDocument)) spawnSync('/usr/bin/chflags', ['nouchg', weakDocument]);
   }
+  assert.equal(fs.existsSync(path.dirname(weakDocument)), false, 'a snapshot that cannot be protected is removed');
   assert.equal(fs.readFileSync(path.join(root, weakPath), 'utf8'), weakOriginal);
   const generic = wikiTools().find((tool) => tool.name === 'wiki_write')!;
   await assert.rejects(() => generic.run({ path: args.path, content: '# Bypass', expectedSha256: second.expectedSha256 }, ctx), /wiki_plan_revise/);

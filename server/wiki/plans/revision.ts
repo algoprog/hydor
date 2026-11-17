@@ -137,6 +137,68 @@ function protect(file: string): 'readonly_permissions' | 'immutable_flag' {
   throw new Error('Revision snapshot cannot be protected');
 }
 
+/** A lock older than this is abandoned (a revision takes well under a minute). */
+const STALE_LOCK_MS = 5 * 60_000;
+
+/** Is a process with this id still running here? Unknown counts as running. */
+function alive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
+}
+
+/** Take the revision lock, clearing one that is stale (older than a few minutes, or left by a process that is gone). */
+function takeLock(lock: string): number {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const fd = fs.openSync(lock, 'wx', 0o600);
+      fs.writeSync(fd, `${process.pid}\n${Date.now()}\n`);
+      return fd;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if (attempt > 0 || !staleLock(lock)) throw new Error('Wiki revision is locked by another writer');
+      try { fs.unlinkSync(lock); } catch { /* Someone else cleared it: try once more. */ }
+    }
+  }
+}
+
+function staleLock(lock: string): boolean {
+  try {
+    const st = fs.lstatSync(lock);
+    if (!st.isFile()) return false;
+    if (Date.now() - st.mtimeMs > STALE_LOCK_MS) return true;
+    const pid = Number(/^(\d+)\n/.exec(fs.readFileSync(lock, 'utf8'))?.[1]);
+    return Number.isInteger(pid) && pid > 0 && pid !== process.pid && !alive(pid);
+  } catch { return false; }
+}
+
+/** Remove a snapshot folder, including files the protection made read-only (or immutable on macOS). */
+function removeSnapshot(dir: string): void {
+  try {
+    if (process.platform === 'darwin') spawnSync('/usr/bin/chflags', ['-R', 'nouchg', dir], { stdio: 'ignore' });
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch { /* Best effort: the next attempt clears what is left, see clearLeftovers. */ }
+}
+
+/**
+ * What a failed or interrupted revision can leave: a half-built temporary folder, or a finished snapshot of a plan
+ * that was never replaced (its record names the very bytes the plan still has). Both are removed, so that a plan never
+ * becomes impossible to revise; a snapshot of anything else is history and is never touched.
+ */
+function clearLeftovers(archive: string, finalDir: string, currentSha: string): void {
+  for (const entry of fs.readdirSync(archive, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith('.tmp-revision-')) continue;
+    const dir = path.join(archive, entry.name);
+    try { if (Date.now() - fs.lstatSync(dir).mtimeMs > STALE_LOCK_MS) removeSnapshot(dir); } catch { /* Gone already. */ }
+  }
+  let st: fs.Stats;
+  try { st = fs.lstatSync(finalDir); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
+  if (!st.isDirectory()) return;
+  try {
+    const record = JSON.parse(fs.readFileSync(path.join(finalDir, 'record.json'), 'utf8')) as { sha256?: string };
+    const copy = wikiHash(fs.readFileSync(path.join(finalDir, 'document.md')));
+    if (record.sha256 === currentSha && copy === currentSha) removeSnapshot(finalDir);
+  } catch { /* Not a leftover we can recognise: it stays, and the revision is refused below. */ }
+}
+
 /** Save exact original bytes under both shared locks, then atomically replace the active file. */
 export function applyRevision(root: string, input: RevisionInput, expectedPreview: string): { path: string; sha256: string; revision: number; snapshot: string; protection: string } {
   return withWikiWriteLock(root, (apply) => {
@@ -144,20 +206,21 @@ export function applyRevision(root: string, input: RevisionInput, expectedPrevie
     if (previewRevision(root, input).sha256 !== expectedPreview) throw new Error('Plan preview changed; review it again');
     const archive = archiveDir(root);
     const lock = path.join(archive, '.revision.lock');
-    let fd: number;
-    try { fd = fs.openSync(lock, 'wx', 0o600); } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('Wiki revision is locked by another writer');
-      throw error;
-    }
+    const fd = takeLock(lock);
+    let temporary: string | undefined;
+    let placed: string | undefined;
     try {
       const preview = previewRevision(root, input);
       if (preview.sha256 !== expectedPreview) throw new Error('Plan preview changed; review it again');
       const snapshot = path.join(root, preview.snapshot);
-      // mkdir must fail on any existing entry; existing snapshots are never read or reused.
-      fs.mkdirSync(snapshot, { mode: 0o700 });
+      clearLeftovers(archive, snapshot, preview.originalSha256);
+      // An existing snapshot is history: it is never read, reused or replaced.
+      if (fs.existsSync(snapshot)) throw new Error('A snapshot of this revision already exists');
       const original = fs.readFileSync(path.join(root, preview.path));
       if (wikiHash(original) !== preview.originalSha256) throw new Error('Plan changed; read it again');
-      const doc = path.join(snapshot, 'document.md'), why = path.join(snapshot, 'WHY.md'), recordPath = path.join(snapshot, 'record.json');
+      // Build the whole snapshot out of sight, protect it, verify it, and only then give it its name.
+      temporary = fs.mkdtempSync(path.join(archive, '.tmp-revision-'));
+      const doc = path.join(temporary, 'document.md'), why = path.join(temporary, 'WHY.md'), recordPath = path.join(temporary, 'record.json');
       fs.writeFileSync(doc, original, { flag: 'wx', mode: 0o600 });
       fs.writeFileSync(why, `# Historical revision ${preview.revision}\n\nPreserve the replaced state of ${preview.documentId}; not active project context.\n`, { flag: 'wx', mode: 0o600 });
       const docProtection = protect(doc), whyProtection = protect(why);
@@ -166,9 +229,19 @@ export function applyRevision(root: string, input: RevisionInput, expectedPrevie
       fs.writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
       if (protect(recordPath) !== docProtection) throw new Error('Revision snapshot protection differs between files');
       if (wikiHash(fs.readFileSync(doc)) !== preview.originalSha256) throw new Error('Revision snapshot verification failed');
+      fs.renameSync(temporary, snapshot);
+      placed = snapshot;
+      temporary = undefined;
       // applyOne rechecks the source hash immediately before its atomic rename.
       apply({ path: preview.path, content: preview.content, expectedSha256: preview.originalSha256 });
+      placed = undefined;
       return { path: preview.path, sha256: wikiHash(preview.content), revision: preview.revision + 1, snapshot: preview.snapshot, protection: docProtection };
-    } finally { fs.closeSync(fd); fs.unlinkSync(lock); }
+    } finally {
+      // Whatever went wrong, no half-made or unused snapshot stays to block the next attempt.
+      if (temporary) removeSnapshot(temporary);
+      if (placed) removeSnapshot(placed);
+      fs.closeSync(fd);
+      try { fs.unlinkSync(lock); } catch { /* Already cleared. */ }
+    }
   });
 }
