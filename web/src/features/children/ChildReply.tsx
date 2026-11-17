@@ -1,8 +1,9 @@
 // A child session's reply in its parent's conversation (the message that woke the parent), as one line:
 // whose it is and how it begins. It opens to what the child wrote, or the summary of a long reply, with a
-// way into the child. One that was stopped or failed says so instead.
+// way into the child. One that was stopped or failed says so instead, and one a usage limit stopped that carries on
+// (with another account, on API credit, or once the limit lifts) says how: its reply comes later, in a line of its own.
 import { useMemo, useState } from 'react';
-import { ChevronRight, CircleAlert, CircleStop, Reply } from 'lucide-react';
+import { ChevronRight, CircleAlert, CircleStop, RefreshCw, Reply } from 'lucide-react';
 import type { ChildReply } from '@shared/children';
 import type { UserItem } from '@shared/types';
 import { ReplyMarkdown } from '../../components/Markdown';
@@ -30,13 +31,14 @@ export function ChildReplyLabel({ reply }: { reply: ChildReply }) {
   const title = useSessions((x) => x.byKey[reply.key]?.title) || reply.title;
   const name = <span className="font-medium text-fg">{title}</span>;
   if (reply.ended === 'replied') return <>Reply from {name}</>;
+  if (reply.ended === 'continues') return <>{name} carries on after a usage limit</>;
   return reply.ended === 'stopped' ? <>{name} was stopped</> : <>{name} stopped with an error</>;
 }
 
 export function ChildReplyRow({ item, reply }: { item: UserItem; reply: ChildReply }) {
   const [open, setOpen] = useState(false);
   const head = useMemo(() => firstLine(reply.why ?? reply.text), [reply]);
-  const Icon = reply.ended === 'replied' ? Reply : reply.ended === 'stopped' ? CircleStop : CircleAlert;
+  const Icon = reply.ended === 'replied' ? Reply : reply.ended === 'stopped' ? CircleStop : reply.ended === 'continues' ? RefreshCw : CircleAlert;
   return (
     <div className="tl-item">
       <button
@@ -44,7 +46,7 @@ export function ChildReplyRow({ item, reply }: { item: UserItem; reply: ChildRep
         aria-expanded={open}
         className={cx('group flex min-h-8 w-full items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-bg-2', open && 'bg-bg-2')}
       >
-        <Icon size={14} className={cx('shrink-0', reply.ended === 'replied' ? 'text-accent' : reply.ended === 'stopped' ? 'text-warn' : 'text-err')} />
+        <Icon size={14} className={cx('shrink-0', reply.ended === 'replied' ? 'text-accent' : reply.ended === 'stopped' ? 'text-warn' : reply.ended === 'continues' ? 'text-fg-3' : 'text-err')} />
         {/* On a phone the line has room for its name only. */}
         <span className="max-w-[60%] shrink-0 truncate text-[13px] text-fg-2 max-sm:max-w-none max-sm:min-w-0 max-sm:flex-1 max-sm:shrink">
           <ChildReplyLabel reply={reply} />
@@ -59,7 +61,16 @@ export function ChildReplyRow({ item, reply }: { item: UserItem; reply: ChildRep
         <div className="mt-1 mb-2 ml-[15px] border-l border-accent/30 pl-4">
           {reply.summaryOf ? <div className="mb-1.5 text-[12px] text-fg-3">A summary of a long reply</div> : null}
           {reply.why && reply.text && <div className="mb-1.5 text-[12.5px] text-fg-3">{reply.why}</div>}
-          {reply.text ? <ReplyMarkdown text={reply.text} breaks className="!text-[13.5px] !leading-relaxed !text-fg-2" /> : <div className="text-[13px] text-fg-3">{reply.why ?? 'It wrote no reply.'}</div>}
+          {reply.ended === 'continues' ? (
+            <div className="text-[13px] text-fg-3">
+              {reply.why && <div translate="no">{reply.why}</div>}
+              <div>Its reply comes here when it finishes.</div>
+            </div>
+          ) : reply.text ? (
+            <ReplyMarkdown text={reply.text} breaks className="!text-[13.5px] !leading-relaxed !text-fg-2" />
+          ) : (
+            <div className="text-[13px] text-fg-3">{reply.why ?? 'It wrote no reply.'}</div>
+          )}
           <button type="button" onClick={() => openSession(reply.key)} className="mt-2 inline-flex items-center gap-0.5 text-[12.5px] font-medium text-accent hover:underline">
             {reply.summaryOf ? 'Read the whole reply' : 'Open its session'}
             <ChevronRight size={13} />

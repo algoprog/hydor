@@ -20,14 +20,14 @@ import type { Deps, RunCtx, RunTool } from '../features/types.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { notesOf } from '../notes.ts';
 import { setPriceOverrides } from '../prices.ts';
-import type { CreateOpts } from '../sessions.ts';
+import type { CreateOpts, LimitAfter } from '../sessions.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
 import { saveAssistant } from '../assistants/store.ts';
 import { setTeam, setTiers } from '../assistants/tiers.ts';
 import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
-import { catchUp, CHILD_INSTRUCTIONS, children, findModel, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
+import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
 import { ancestorsOf, childKeys, parentOf, runningBelow, runningChildren } from './family.ts';
 import { childMode } from './modes.ts';
 
@@ -140,6 +140,11 @@ class Sessions extends EventEmitter {
   limited = new Set<string>();
   stoppedAtLimit(key: string) {
     return this.limited.has(key);
+  }
+  /** How each session a usage limit stopped carries on, once the move is settled (null: it stays stopped). */
+  afters = new Map<string, Promise<LimitAfter | null>>();
+  afterLimit(key: string) {
+    return this.afters.get(key);
   }
   /** A session moved to a tier's model (its own step up). */
   moved: { key: string; tier: string; pick: { model?: string; effort?: string }; why: { event: string; why?: string } }[] = [];
@@ -324,6 +329,27 @@ test('stopped, failed, or no reply: the parent hears how it ended', () => {
   const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
   assert.equal(resultMessage({ ...base, turn: t({ status: 'interrupted', reply: 'half' }), stopped: 'its spending cap was reached' }), '[The Hydor subagent "T" (acp:x, Custom · M) was stopped before it finished: its spending cap was reached. What it wrote is below.]\n\nhalf');
   assert.equal(resultMessage({ ...base, turn: t({ status: 'failed' }), error: 'model not found' }), '[The Hydor subagent "T" (acp:x, Custom · M) stopped with an error: model not found]\n(It wrote no reply. child_sessions shows how it stands; the user can open it at L.)');
+});
+
+test('a usage limit stopped it and it carries on: the parent hears how, not an error', () => {
+  const base = { key: 'acp:x', title: 'T', label: 'Custom · M', link: 'L' };
+  const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
+  const hit = { ...base, turn: t({ status: 'failed', reply: 'You’ve hit your limit' }), error: 'You’ve hit your limit · resets 9am (UTC)' };
+  const head = '[The Hydor subagent "T" (acp:x, Custom · M) reached a usage limit and carries on';
+  const tail = '\n(Its reply comes when it finishes, so there is no need to start its work again. child_sessions shows how it stands; the user can open it at L.)';
+  const now = Date.UTC(2026, 10, 17, 3, 0);
+  assert.equal(resultMessage({ ...hit, after: { goes: 'account', to: 'Work 2' } }), `${head} with Work 2, an account with usage left.]${tail}`);
+  assert.equal(resultMessage({ ...hit, after: { goes: 'credit' } }), `${head} with API credit, as every account is at its limit.]${tail}`);
+  assert.equal(resultMessage({ ...hit, after: { goes: 'resume', at: Date.UTC(2026, 10, 17, 9, 1) } }, now), `${head} by itself when the limit lifts, at 09:01 UTC on 17 November (in about 6 hours).]${tail}`);
+  assert.equal(resultMessage({ ...hit, after: { goes: 'on' } }), `${head}.]${tail}`);
+  // Read back in the parent's conversation: how it carries on, and nothing it wrote (its reply comes in a message of its own).
+  const who = { title: 'T', key: 'acp:x', label: 'Custom · M' };
+  assert.deepEqual(childReplyOf(resultMessage({ ...hit, after: { goes: 'account', to: 'Work (personal)' } })), { ...who, ended: 'continues', why: 'with Work (personal), an account with usage left', text: '' });
+  assert.deepEqual(childReplyOf(resultMessage({ ...hit, after: { goes: 'on' } })), { ...who, ended: 'continues', text: '' });
+  // When the limit lifts: the time in UTC, and how long from now in minutes, hours or days.
+  assert.equal(liftsAt(now + 25 * 60_000, now), 'at 03:25 UTC on 17 November (in about 25 minutes)');
+  assert.equal(liftsAt(now + 60 * 60_000, now), 'at 04:00 UTC on 17 November (in about 1 hour)');
+  assert.equal(liftsAt(now + 3 * 86_400_000, now), 'at 03:00 UTC on 20 November (in about 3 days)');
 });
 
 test('the parent’s conversation reads each kind of reply back as it was sent', () => {
@@ -765,6 +791,44 @@ test('a helper its plan’s usage limit stopped is not run again a tier up: anot
   const m = sessions.created.length;
   await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
   assert.equal(sessions.created.length, m);
+});
+
+test('a helper the limit stopped that carries on: its lead hears so once the move is settled; one that stays stopped, an error', async () => {
+  const k = leadKey('s8');
+  await call(k, 'start_child_session', { brief: 'Write the migration.', tier: 'standard', title: 'Migration' });
+  const a = newest();
+  sessions.limited.add(a);
+  finish(a, '', 'failed');
+  let settle!: (v: LimitAfter | null) => void;
+  sessions.afters.set(a, new Promise((r) => (settle = r)));
+  const n = sessions.delivered.length;
+  const m = sessions.created.length;
+  const report = reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(sessions.delivered.length, n, 'nothing until the move is settled');
+  settle({ goes: 'account', to: 'Work 2' });
+  await report;
+  assert.equal(sessions.delivered.length, n + 1);
+  assert.match(sessions.delivered.at(-1)!.text, /^\[The Hydor subagent "Migration" \(claude:child\d+, [^)]+\) reached a usage limit and carries on with Work 2, an account with usage left\.\]\n\(Its reply comes when it finishes/);
+  assert.equal(sessions.created.length, m, 'not run again a tier up');
+  // Its reply, once it finishes on the other account, comes as any other.
+  sessions.limited.delete(a);
+  sessions.afters.delete(a);
+  finish(a, 'Migration written.');
+  await reportTurn(deps, { key: a, startedAt: Date.now() - 1000, external: false });
+  assert.match(sessions.delivered.at(-1)!.text, /^\[Reply from the Hydor subagent "Migration" [^\n]*\]\n\nMigration written\.$/);
+  // No account, credit or resume to carry it on: the error, as before, and still no step up.
+  await call(k, 'start_child_session', { brief: 'Write the migration again.', tier: 'standard', title: 'Migration 2' });
+  const b = newest();
+  sessions.limited.add(b);
+  finish(b, '', 'failed');
+  sessions.afters.set(b, Promise.resolve(null));
+  const m2 = sessions.created.length;
+  await reportTurn(deps, { key: b, startedAt: Date.now() - 1000, external: false });
+  assert.match(sessions.delivered.at(-1)!.text, /^\[The Hydor subagent "Migration 2" [^\n]* stopped with an error: /);
+  assert.equal(sessions.created.length, m2);
+  sessions.limited.delete(b);
+  sessions.afters.delete(b);
 });
 
 test('step_up_child: the lead runs a finished helper’s brief again one tier up, saying why', async () => {

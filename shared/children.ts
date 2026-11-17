@@ -59,8 +59,9 @@ export interface ChildReply {
   key: string;
   /** "Claude Code · claude-opus-5-5". */
   label: string;
-  ended: 'replied' | 'stopped' | 'failed';
-  /** Why it was stopped, or its error. */
+  /** continues: a usage limit stopped its turn, and it carries on (with another account, on API credit, or once the limit lifts). */
+  ended: 'replied' | 'stopped' | 'failed' | 'continues';
+  /** Why it was stopped, its error, or how it carries on ("with Work 2, an account with usage left"). */
   why?: string;
   /** The reply's length when `text` is the helper model's summary of it. */
   summaryOf?: number;
@@ -71,6 +72,7 @@ export interface ChildReply {
 const REPLIED = /^\[Reply from the (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*)\)\]$/;
 const STOPPED = /^\[The (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*?)\) was stopped before it finished(?:: (.*?))?\.(?: What it wrote is below\.)?\]$/;
 const FAILED = /^\[The (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*?)\) stopped with an error: (.*)\]$/;
+const CONTINUES = /^\[The (?:Hydor subagent|child session) "(.*)" \(([^\s,()]+), (.*?)\) reached a usage limit and carries on(?: (.*?))?\.\]$/;
 const SUMMARY = /^Its reply is long \(([\d,]+) characters\), so here is a summary\./;
 
 /** A message that is a child's reply, read back; null for any other message. */
@@ -84,6 +86,8 @@ export function childReplyOf(message: string): ChildReply | null {
   if ((m = REPLIED.exec(head))) who = { title: m[1], key: m[2], label: m[3], ended: 'replied' };
   else if ((m = STOPPED.exec(head))) who = { title: m[1], key: m[2], label: m[3], ended: 'stopped', ...(m[4] ? { why: m[4] } : {}) };
   else if ((m = FAILED.exec(head))) who = { title: m[1], key: m[2], label: m[3], ended: 'failed', why: m[4] };
+  // What follows is for the agent alone: its reply comes later, in a message of its own.
+  else if ((m = CONTINUES.exec(head))) return { title: m[1], key: m[2], label: m[3], ended: 'continues', ...(m[4] ? { why: m[4] } : {}), text: '' };
   else return null;
   if (rest.startsWith('(It wrote no reply.')) return { ...who, text: '' };
   const s = SUMMARY.exec(rest);

@@ -59,6 +59,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     switching: new Set<string>(),
     userStopped: new Set<string>(),
     moveNotes: new Map<string, string>(),
+    limitAfter: new Map(),
     onLimited: () => {},
     resumeLookup: undefined as undefined | ((k: string) => number | undefined),
     external: { get: () => null },
@@ -94,6 +95,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     resumeAfterLimit: async () => {},
   };
   m.afterTurn = proto.afterTurn.bind(m);
+  m.afterLimit = proto.afterLimit.bind(m);
   m.switchAtLimit = proto.switchAtLimit.bind(m);
   m.switchForSubagents = proto.switchForSubagents.bind(m);
   m.subagentsAtWork = proto.subagentsAtWork.bind(m);
@@ -107,9 +109,10 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     calls,
     setFrom: (a: string | undefined) => (from = a),
     watchStatus: proto.watchStatus.bind(m) as (list: unknown[]) => void,
-    switchAtLimit: proto.switchAtLimit.bind(m) as (key: string, resetsAt: number | undefined) => Promise<void>,
-    switchForSubagents: proto.switchForSubagents.bind(m) as (key: string) => Promise<void>,
+    switchAtLimit: proto.switchAtLimit.bind(m) as (key: string, resetsAt: number | undefined) => Promise<unknown>,
+    switchForSubagents: proto.switchForSubagents.bind(m) as (key: string) => Promise<unknown>,
     beforeResume: proto.beforeResume.bind(m) as (key: string) => Promise<boolean>,
+    resumeAfterLimit: proto.resumeAfterLimit.bind(m) as (key: string, resetsAt: number | undefined) => Promise<unknown>,
     takeMoveNote: m.takeMoveNote as (key: string, text: string) => string,
   };
 }
@@ -302,6 +305,223 @@ test('switchAtLimit also waits while the turn the agent starts on a notice is wo
   await t.switchAtLimit(KEY, undefined);
   assert.ok(Date.now() - started >= 90, 'it waited');
   assert.equal(t.calls.carryOver.length, 1);
+});
+
+// ---- switchAtLimit: how the session carries on -----------------------------------------
+
+/** Makes switchAtLimit wait for a subagent at work, which `during` changes after 100 ms. */
+function waitsFor(t: ReturnType<typeof manager>, during: (done: () => void) => void) {
+  const task = agentTask('A');
+  t.adapter.tasks.set('t1', task);
+  setTimeout(() => during(() => (task.status = 'stopped')), 100);
+}
+
+test('switchAtLimit says it moved to the other account', async () => {
+  const t = manager();
+  assert.deepEqual(await t.switchAtLimit(KEY, undefined), { goes: 'account', to: 'Account b' });
+});
+
+test('switchAtLimit says it moved to API credit when no account has usage left and credit is on', async () => {
+  const t = manager({ free: null });
+  t.m.toCredit = async () => true;
+  assert.deepEqual(await t.switchAtLimit(KEY, undefined), { goes: 'credit' });
+  assert.equal(t.calls.delivered.length, 1);
+  assert.ok(t.calls.delivered[0].includes('API credit'), t.calls.delivered[0]);
+});
+
+test('switchAtLimit with no account free and Resume after usage limits on says what the resume says', async () => {
+  const t = manager({ free: null });
+  const resume = { goes: 'resume', at: 123 };
+  const asked: unknown[][] = [];
+  t.m.resumeAfterLimit = async (...a: unknown[]) => (asked.push(a), resume);
+  kvSet(db, 'auto_resume', '1');
+  try {
+    assert.deepEqual(await t.switchAtLimit(KEY, 99), resume);
+    assert.deepEqual(asked, [[KEY, 99]]);
+  } finally {
+    kvSet(db, 'auto_resume', '0');
+  }
+});
+
+test('switchAtLimit with no account free and Resume after usage limits off says nothing carries on', async () => {
+  const t = manager({ free: null });
+  kvSet(db, 'auto_resume', '0');
+  assert.equal(await t.switchAtLimit(KEY, undefined), null);
+  assert.equal(t.calls.delivered.length, 0);
+});
+
+test('switchAtLimit says nothing carries on when, while it waited, you stopped the session', async () => {
+  const t = manager();
+  waitsFor(t, (done) => (t.m.userStopped.add(KEY), done()));
+  assert.equal(await t.switchAtLimit(KEY, undefined), null);
+});
+
+test('switchAtLimit says where the session went when, while it waited, it moved to another account', async () => {
+  const t = manager();
+  waitsFor(t, (done) => (t.setFrom('c'), done()));
+  assert.deepEqual(await t.switchAtLimit(KEY, undefined), { goes: 'account', to: 'Account c' });
+  assert.equal(t.calls.carryOver.length, 0);
+});
+
+test('switchAtLimit says it went on when, while it waited, a turn got through', async () => {
+  const t = manager();
+  waitsFor(t, (done) => ((t.adapter.limitStopped = false), done()));
+  assert.deepEqual(await t.switchAtLimit(KEY, undefined), { goes: 'on' });
+  assert.equal(t.calls.carryOver.length, 0);
+});
+
+test('switchAtLimit says nothing carries on when another move is already under way', async () => {
+  const t = manager();
+  t.m.switching.add(KEY);
+  assert.equal(await t.switchAtLimit(KEY, undefined), null);
+  assert.equal(t.calls.carryOver.length, 0);
+});
+
+// ---- resumeAfterLimit -------------------------------------------------------------------
+
+/** The real resumeAfterLimit, with the time the limit lifts and the scheduling stood in for. */
+function resuming(lifts: number | null | undefined, opts: { usage?: unknown } = {}) {
+  const t = manager({ usage: opts.usage });
+  const scheduled: [string, number][] = [];
+  t.m.limitLiftsAt = () => lifts;
+  t.m.onLimited = (key: string, at: number) => scheduled.push([key, at]);
+  t.m.resumeLookup = (key: string) => scheduled.find((s) => s[0] === key)?.[1];
+  return { ...t, scheduled };
+}
+
+test('resumeAfterLimit schedules the resume a minute after the limit lifts and says when', async () => {
+  const lifts = Date.now() + 3_600_000;
+  const t = resuming(lifts);
+  assert.deepEqual(await t.resumeAfterLimit(KEY, undefined), { goes: 'resume', at: lifts + 60_000 });
+  assert.deepEqual(t.scheduled, [[KEY, lifts + 60_000]]);
+});
+
+test('resumeAfterLimit schedules nothing again when a resume is set, and says when it is', async () => {
+  const t = resuming(Date.now() + 3_600_000);
+  t.m.resumeLookup = () => 456;
+  assert.deepEqual(await t.resumeAfterLimit(KEY, undefined), { goes: 'resume', at: 456 });
+  assert.equal(t.scheduled.length, 0);
+});
+
+test('resumeAfterLimit schedules nothing for a session you stopped', async () => {
+  const t = resuming(Date.now() + 3_600_000);
+  t.m.userStopped.add(KEY);
+  assert.equal(await t.resumeAfterLimit(KEY, undefined), null);
+  assert.equal(t.scheduled.length, 0);
+});
+
+test('resumeAfterLimit says it went on, and schedules nothing, when a turn got through', async () => {
+  const t = resuming(Date.now() + 3_600_000);
+  t.adapter.limitStopped = false;
+  assert.deepEqual(await t.resumeAfterLimit(KEY, undefined), { goes: 'on' });
+  assert.equal(t.scheduled.length, 0);
+});
+
+test('resumeAfterLimit says nothing carries on when no time is known for the limit to lift', async () => {
+  const t = resuming(null);
+  assert.equal(await t.resumeAfterLimit(KEY, undefined), null);
+  assert.equal(t.scheduled.length, 0);
+  assert.equal(t.calls.usageOf.length, 1, 'it looked at the usage');
+});
+
+test('resumeAfterLimit does nothing for an acp session', async () => {
+  const t = resuming(Date.now() + 3_600_000);
+  assert.equal(await t.resumeAfterLimit('acp:00000000-0000-0000-0000-000000000001', undefined), null);
+  assert.equal(t.scheduled.length, 0);
+});
+
+// ---- afterTurn -> afterLimit ----------------------------------------------------------------
+
+test('afterLimit tells how the move at the limit went, once it is settled', async () => {
+  const t = manager();
+  t.m.switchAtLimit = async () => ({ goes: 'account', to: 'Account b' });
+  t.m.limitHits.add(KEY);
+  quickTurn(t);
+  assert.deepEqual(await t.m.afterLimit(KEY, 0), { goes: 'account', to: 'Account b' });
+});
+
+test('afterLimit knows nothing of a turn that ended before the time asked about', async () => {
+  const t = manager();
+  t.m.switchAtLimit = async () => ({ goes: 'account', to: 'Account b' });
+  t.m.limitHits.add(KEY);
+  quickTurn(t);
+  assert.equal(t.m.afterLimit(KEY, Date.now() + 60_000), undefined);
+});
+
+test('afterLimit with a resume already set says when it resumes, and moves nothing', async () => {
+  const t = manager();
+  recording(t);
+  t.m.resumeLookup = () => 456;
+  t.m.limitHits.add(KEY);
+  quickTurn(t);
+  assert.deepEqual(await t.m.afterLimit(KEY, 0), { goes: 'resume', at: 456 });
+  assert.equal(t.calls.switchAtLimit.length, 0);
+});
+
+test('afterLimit knows nothing of a turn the limit did not stop', () => {
+  const t = manager();
+  recording(t);
+  quickTurn(t);
+  assert.equal(t.m.afterLimit(KEY, 0), undefined);
+});
+
+test('afterLimit says nothing carries on with Switch accounts and Resume after usage limits off', async () => {
+  kvSet(db, 'auto_switch', '0');
+  kvSet(db, 'auto_resume', '0');
+  try {
+    const t = manager();
+    recording(t);
+    t.m.limitHits.add(KEY);
+    quickTurn(t);
+    assert.equal(await t.m.afterLimit(KEY, 0), null);
+    assert.equal(t.calls.switchAtLimit.length, 0);
+  } finally {
+    kvSet(db, 'auto_switch', '1');
+  }
+});
+
+test('afterLimit with Switch accounts off and Resume after usage limits on says what the resume says', async () => {
+  kvSet(db, 'auto_switch', '0');
+  kvSet(db, 'auto_resume', '1');
+  try {
+    const t = manager();
+    t.m.resumeAfterLimit = async () => ({ goes: 'resume', at: 789 });
+    t.m.limitHits.add(KEY);
+    quickTurn(t);
+    assert.deepEqual(await t.m.afterLimit(KEY, 0), { goes: 'resume', at: 789 });
+  } finally {
+    kvSet(db, 'auto_switch', '1');
+    kvSet(db, 'auto_resume', '0');
+  }
+});
+
+test('afterLimit turns a move with no answer into nothing carries on', async () => {
+  const t = manager();
+  t.m.switchAtLimit = async () => undefined;
+  t.m.limitHits.add(KEY);
+  quickTurn(t);
+  assert.equal(await t.m.afterLimit(KEY, 0), null);
+});
+
+test('afterLimit knows nothing for an acp session', () => {
+  const t = manager();
+  recording(t);
+  t.m.limitHits.add(KEY);
+  quickTurn(t, { agent: 'acp' });
+  assert.equal(t.m.afterLimit(KEY, 0), undefined);
+});
+
+test('afterLimit says nothing carries on when the move fails, and the failure is toasted once', async () => {
+  const t = manager();
+  t.m.switchAtLimit = () => Promise.reject(new Error('no luck'));
+  t.m.limitHits.add(KEY);
+  quickTurn(t);
+  const after = await t.m.afterLimit(KEY, 0);
+  assert.equal(t.calls.toasts.length, 1);
+  const toast = t.calls.toasts[0] as { level: string; text: string };
+  assert.equal(toast.level, 'error');
+  assert.ok(toast.text.includes('no luck'), toast.text);
+  assert.equal(after, null);
 });
 
 // ---- switchForSubagents ---------------------------------------------------------------

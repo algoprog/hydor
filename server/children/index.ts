@@ -18,6 +18,7 @@ import { confidentialKey, confidentialRun, privateHelper } from '../confidential
 import { kvGet, kvSet, type DB } from '../db.ts';
 import { parseExtra, sessionExtra, setSessionExtra } from '../sessionExtra.ts';
 import type { Deps, Feature, RunCtx, RunTool, TurnInfo } from '../features/types.ts';
+import type { LimitAfter } from '../sessions.ts';
 import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
@@ -479,9 +480,16 @@ const MESSAGE: RunTool = {
 
 // ---- results flow back ---------------------------------------------------------------------------
 
-/** What the parent is told when a child's turn ends; `summary` stands in for a long reply. */
-export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string }): string {
+/**
+ * What the parent is told when a child's turn ends; `summary` stands in for a long reply. A turn its plan's usage limit
+ * stopped, after which the child carries on (`after`: with another account, on API credit, or once the limit lifts),
+ * says so instead of an error: its reply comes when it finishes, so the parent neither starts the work again nor waits
+ * for nothing.
+ */
+export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string; after?: LimitAfter }, now = Date.now()): string {
   const who = `Hydor subagent "${o.title}" (${o.key}, ${o.label})`;
+  if (o.after)
+    return `[The ${who} reached a usage limit and carries on${goesOn(o.after, now)}.]\n(Its reply comes when it finishes, so there is no need to start its work again. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
   const reply = o.turn.reply.trim();
   const head =
     o.turn.status === 'interrupted'
@@ -492,6 +500,45 @@ export function resultMessage(o: { key: string; title: string; label: string; li
   if (!reply) return `${head}\n(It wrote no reply. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
   if (o.summary) return `${head}\nIts reply is long (${reply.length.toLocaleString('en-US')} characters), so here is a summary. child_sessions with key "${o.key}" gives the whole of it; the user can open it at ${o.link}.\n\n${o.summary.trim()}`;
   return `${head}\n\n${reply}`;
+}
+
+/** How a child that reached a usage limit carries on, to follow "carries on". */
+function goesOn(a: LimitAfter, now: number): string {
+  if (a.goes === 'account') return ` with ${a.to}, an account with usage left`;
+  if (a.goes === 'credit') return ' with API credit, as every account is at its limit';
+  if (a.goes === 'resume') return ` by itself when the limit lifts, ${liftsAt(a.at, now)}`;
+  return '';
+}
+
+/** When a limit lifts, for an agent to pass on: "at 09:00 UTC on 18 November (in about 6 hours)". */
+export function liftsAt(at: number, now = Date.now()): string {
+  const d = new Date(at);
+  const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const mins = Math.max(1, Math.round((at - now) / 60_000));
+  const hours = Math.round(mins / 60);
+  const away = mins < 60 ? `${mins} minute${mins === 1 ? '' : 's'}` : mins < 36 * 60 ? `${hours} hour${hours === 1 ? '' : 's'}` : `${Math.round(mins / 1440)} days`;
+  return `at ${d.toISOString().slice(11, 16)} UTC on ${day} (in about ${away})`;
+}
+
+/** How long a report waits to learn how a child its plan's usage limit stopped carries on. */
+const LIMIT_WAIT = 5 * 60_000;
+
+/**
+ * How a child whose turn (begun at `since`) its plan's usage limit stopped carries on, once the session manager has
+ * settled it (a move may first wait up to two minutes for the child's own subagents); null when it stays stopped, when
+ * no limit stopped the turn, or when that takes too long.
+ */
+async function limitAfter(d: Deps, key: string, since: number, wait = LIMIT_WAIT): Promise<LimitAfter | null> {
+  const after = d.sessions.afterLimit?.(key, since);
+  if (!after) return null;
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([after, new Promise<null>((r) => (timer = setTimeout(() => r(null), wait)))]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -585,14 +632,19 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
   if (reported.has(id) || reportedTurn(d, t.key) === turn.prompt.id) return;
   reported.add(id);
   if (reported.size > 2000) reported.delete(reported.values().next().value!);
-  // Kept with the child, so a restart neither repeats it nor loses it (catchUp).
+  // A turn its plan's usage limit stopped: first, how the child carries on is settled (with another account, on API
+  // credit, or once the limit lifts), and the parent hears that instead of an error. One that stays stopped is
+  // reported as any other turn.
+  const after = await limitAfter(d, t.key, t.startedAt);
+  // Kept with the child, so a restart neither repeats it nor loses it (catchUp): only now, so a restart while it was
+  // settled still reports it.
   setSessionExtra(d.db, t.key, { reported: turn.prompt.id });
   // A swarm member its lead or the user stopped: nobody needs the turn that was cut short.
   if (turn.status === 'interrupted' && sessionExtra(d.db, t.key).swarmStopped) return;
   // A child stopped with its parent (Stop all): the stop was the parent's own doing, so it is not told of it.
   if (turn.status === 'interrupted' && markedSince(d, t.key, 'stoppedWithParent', t.startedAt)) return;
   // A child on a tier whose turn did not pass a check runs again one tier up (never above its lead's highest).
-  const up = await stepUpCheck(d, t.key, turn, t.startedAt);
+  const up = after ? null : await stepUpCheck(d, t.key, turn, t.startedAt);
   if (up) {
     try {
       await tellParent(d, parent, t.startedAt, await stepUpChild(d, parent, t.key, up.next, up.why));
@@ -614,7 +666,8 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
     // An error the agent got past (it still replied) is not how the turn ended.
     error: turn.status === 'failed' || (turn.error && !turn.reply) ? (turn.error ?? s?.live?.error ?? 'it failed') : undefined,
     stopped: cap ? 'its spending cap was reached' : undefined,
-    summary: turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply, t.key) : undefined,
+    summary: !after && turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply, t.key) : undefined,
+    after: after ?? undefined,
   });
   await tellParent(d, parent, t.startedAt, msg);
 }
