@@ -13,8 +13,9 @@ import { endBoot } from '../../lib/boot';
 import { machineId, machinePath } from '../../lib/machine';
 import { useMachines } from '../../lib/machines';
 import { useApp } from '../../lib/store';
-import { cannotUpdate, UPDATE_PHASE } from '../../lib/updates';
+import { beforeRewrite, cannotUpdate, UPDATE_PHASE } from '../../lib/updates';
 import { Button, Throbber } from '../../components/ui';
+import { BeforeRewrite } from './BeforeRewrite';
 
 const KEY = () => `wa.oldMachine.${machineId}`;
 
@@ -114,6 +115,8 @@ export function MachineOld({ version, own, error, onOpen }: { version: string; o
   // A desktop app that cannot replace itself where it is says why, and is updated there.
   const stuck = update && update.kind === 'app' && !update.canRestart ? cannotUpdate(update) : '';
   const running = update?.running;
+  // Its last update (this one, or one before, by itself too) could not fast-forward past Hydor's rewritten history.
+  const rewrite = !updating && !!update?.last && !update.last.ok && beforeRewrite(version, update.last.error);
   return (
     <div className="flex h-full min-h-0 flex-1 items-center justify-center overflow-y-auto bg-bg p-4">
       <div className="w-full max-w-md rounded-2xl border border-line bg-panel p-6">
@@ -131,6 +134,7 @@ export function MachineOld({ version, own, error, onOpen }: { version: string; o
         )}
         {stuck && <p className="mt-2 text-[13px] leading-relaxed text-warn">{stuck}</p>}
         {problem && <p className="mt-2 text-[13px] leading-relaxed text-warn">{problem}</p>}
+        {rewrite && <BeforeRewrite name={name} />}
         {updating && (
           <p className="mt-3 flex items-center gap-2 text-[13px] text-fg-2">
             <Throbber className="shrink-0 text-fg-3" />

@@ -1695,7 +1695,9 @@ programs shows each program's version and what is out, with Check now, Update no
 - Several machines: add other machines running Hydor, over SSH or by address, and switch between
   them from the sidebar. Notices from all of them reach you wherever you are. Another machine's pages open in this
   app's version, so opening one with an older Hydor first offers to update it from here (or to open it anyway), and a
-  page that fails to draw says so, with Reload, instead of an empty window.
+  page that fails to draw says so, with Reload, instead of an empty window. A copy from git or Docker older than 0.78.0,
+  which can't update itself past Hydor's rewritten history, gets the command to run on it once; newer copies with no
+  commits of their own move to a rewritten history by themselves when they update.
 - One password guards the app, and a browser stays signed in for 30 days. Wrong passwords are counted by the
   address they come from: after three in an hour the sign-in page also shows a picture of characters to type,
   drawn by the app itself (no outside service), and after ten that address can't sign in for an hour. Ten from

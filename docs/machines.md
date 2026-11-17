@@ -21,4 +21,6 @@ it when that machine no longer needs it. Dev-server previews work on the machine
 
 Keep the machines on the same Hydor version. The app you open shows another machine's pages in its own version, so a
 machine with an older Hydor can lack what some of its pages need. Opening one offers to update it from there (as its own
-Settings → General Update now does, with agents there carrying on), or to open it anyway.
+Settings → General Update now does, with agents there carrying on), or to open it anyway. A copy from git or Docker
+older than 0.78.0 can't update itself past Hydor's rewritten history ("Not possible to fast-forward, aborting."): the
+page then gives the command to run on that machine once ([install.md](install.md) has the other ways).

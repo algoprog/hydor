@@ -1,5 +1,6 @@
 // Newer versions, for a copy installed from git: once a day it fetches its upstream and counts the
-// commits this checkout is behind. "Update now" in Settings pulls, builds and restarts the server;
+// commits this checkout is behind. "Update now" in Settings pulls (moving to upstream's history when it was rewritten
+// and this copy has nothing of its own: upstream.ts), builds and restarts the server;
 // a copy that comes back by itself when the server exits (the installer's systemd service, the
 // Docker image's restart loop: both leave the agents running) also updates itself, after 5 hours
 // without a message from you and at most once a day. Agents may be at work meanwhile.
@@ -33,8 +34,11 @@ import { desktop, onDesktop, SYSTEM_NAME, tellDesktop } from './desktop.ts';
 import { agentBaseEnv } from './env.ts';
 import { git } from './git.ts';
 import { appWords } from './language/index.ts';
+import { commitsBehind, followRewrite, type Git } from './upstream.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+/** git in the app's own folder (a rewritten upstream lists all its commits: more time than the usual 15 s). */
+const rootGit: Git = (args) => git(ROOT, args, 60_000);
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
 /** No message from you for this long before an update installs itself. */
@@ -117,8 +121,8 @@ export async function checkUpdates(): Promise<UpdateState | null> {
   const up = await git(ROOT, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
   if (!up.ok) return null;
   const fetched = await git(ROOT, ['fetch', '--quiet'], 60_000);
-  const [count, subject] = await Promise.all([git(ROOT, ['rev-list', '--count', 'HEAD..@{u}']), git(ROOT, ['log', '-1', '--format=%s', '@{u}'])]);
-  check = { behind: Number(count.out.trim()) || 0, latest: subject.out.trim() || undefined, checkedAt: Date.now(), error: fetched.ok ? undefined : fetchError(fetched.err) };
+  const [behind, subject] = await Promise.all([commitsBehind(rootGit), git(ROOT, ['log', '-1', '--format=%s', '@{u}'])]);
+  check = { behind, latest: subject.out.trim() || undefined, checkedAt: Date.now(), error: fetched.ok ? undefined : fetchError(fetched.err) };
   emit();
   return updateState();
 }
@@ -224,7 +228,11 @@ async function update(db: DB, auto: boolean) {
     const head = async () => (await git(ROOT, ['rev-parse', '--short', 'HEAD'])).out.trim();
     const from = await head();
     const pull = await git(ROOT, ['pull', '--ff-only'], 180_000);
-    if (!pull.ok) return done({ ok: false, from, error: fetchError(pull.err) });
+    if (!pull.ok) {
+      // Upstream's history was rewritten under this copy (Hydor's was with 0.78.0): one with nothing of its own moves to it.
+      const moved = await followRewrite(rootGit);
+      if (!moved.moved) return done({ ok: false, from, error: moved.error ?? fetchError(pull.err) });
+    }
     const to = await head();
     if (to === from) {
       await checkUpdates().catch(() => {});

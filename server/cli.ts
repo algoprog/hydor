@@ -164,7 +164,17 @@ if (cmd === 'set-password') {
     process.exit(1);
   }
   const before = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).toString().trim();
-  run('git', ['pull', '--ff-only']);
+  console.log('$ git pull --ff-only');
+  if (spawnSync('git', ['pull', '--ff-only'], { cwd: ROOT, stdio: 'inherit' }).status !== 0) {
+    // Upstream's history was rewritten under this copy (Hydor's was with 0.78.0): one with nothing of its own moves to it.
+    const { followRewrite, gitIn } = await import('./upstream.ts');
+    const moved = await followRewrite(gitIn(ROOT));
+    if (!moved.moved) {
+      console.error(moved.error ?? 'git pull failed.');
+      process.exit(1);
+    }
+    console.log('Its history was rewritten upstream: moved this copy to it.');
+  }
   const after = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).toString().trim();
   if (before === after) {
     console.log('Already up to date.');

@@ -164,6 +164,16 @@ Neue Updates markieren **Einstellungen** in der Seitenleiste mit einem Punkt. Oh
 
 Andere Geräte bemerken neuere Serverversionen und bieten **Neu laden** mit „Hydor wurde aktualisiert“. Bei Darstellungsfehlern zeigt die Seite Fehler und **Neu laden** statt eines leeren Fensters. Die Seitenleiste bleibt verfügbar; Seitenwechsel versuchen es erneut.
 
+### Eine ältere Kopie von Hand aktualisieren
+
+Hydors Verlauf auf GitHub wurde in Version 0.78.0 neu geschrieben, und eine Kopie, die vorher über Git oder Docker installiert wurde, kann sich nicht selbst darüber hinweg aktualisieren: **Jetzt aktualisieren** bricht mit „Not possible to fast-forward, aborting.“ ab, ebenso das Aktualisieren dieses Computers aus der App eines anderen Computers (siehe [Mehrere Computer in einer App nutzen](/guide/devices#use-other-machines-from-one-app)), dessen Seite dann sagt, was zu tun ist. Aktualisiere sie einmal auf dem Computer selbst, so wie sie installiert wurde; danach aktualisiert sie sich wieder von selbst.
+
+- **Mit dem Installer**: Führe ihn dort noch einmal aus. Er stellt die Kopie auf den neuen Verlauf um (Dateien, die du darin geändert hast, bleiben erhalten), baut sie und startet den Dienst neu; laufende Agenten arbeiten weiter: `curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | bash`. Wenn du sie in einem Ordner deiner Wahl installiert hast, gib diesen Ordner an: `curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | HYDOR_DIR=/that/folder bash`.
+- **In Docker**: Hole das neue Image und starte den Container damit neu, im Ordner mit deiner `compose.yaml`: `docker compose pull && docker compose up -d` (oder `docker pull algoprog/hydor` und starte es so, wie du es bisher getan hast). Was die App speichert, liegt in ihrem Volume, es geht also nichts verloren. Wenn du das Image selbst baust, aktualisiere zuerst deinen Klon wie im nächsten Punkt und führe dann `docker compose up -d --build` aus.
+- **Aus einem eigenen Git-Klon**: Führe in dessen Ordner `git fetch && git reset --keep @{u} && npm ci && npm run build` aus und starte die App dann neu. `git reset --keep` behält die Dateien, die du geändert hast, und hält an, bevor es eine überschreiben würde. Wenn du eigene Commits gemacht hast, setze sie stattdessen mit `git rebase --onto` auf den neuen Verlauf um.
+
+Neuere Kopien kommen mit einem neu geschriebenen Verlauf selbst zurecht: Wenn die Kopie keine eigenen Commits hat, stellt **Jetzt aktualisieren** sie auf den neuen Verlauf um und behält die Dateien, die du geändert hast; wenn sie welche hat, sagt es das und lässt sie unverändert.
+
 ### Updates der Desktop-Apps
 
 Desktop-Apps verwenden veröffentlichte Releases. Bei aktivem [**Automatisch aktualisieren**](/settings?s=general&find=Update%20automatically) laden sie neue Versionen sofort und prüfen deren Übereinstimmung mit dem Release-Build, ohne auf deine Abwesenheit zu warten. Danach siehst du:

@@ -164,6 +164,16 @@ When a newer version is out, a dot shows on **Settings** in the sidebar. A copy 
 
 Other pages open on your devices notice when the app has a newer version than they run, and offer **Reload** ("Hydor was updated"). A page that fails to draw shows "This page stopped working", what went wrong and **Reload**, instead of an empty window; the sidebar stays, and moving to another page tries again.
 
+### Update an older copy by hand
+
+Hydor's history on GitHub was rewritten in version 0.78.0, and a copy installed from git or Docker before then can't update itself past it: **Update now** stops with "Not possible to fast-forward, aborting.", and so does updating that machine from another machine's app (see [Use other machines from one app](/guide/devices#use-other-machines-from-one-app)), whose page then says what to do. Update it once on that machine itself, in the way it was installed; from then on it updates by itself again.
+
+- **With the installer**: run it again there. It moves the copy to the new history (files you changed in it stay), builds it and restarts the service, and running agents carry on: `curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | bash`. If you installed it in a folder of your own choosing, give that folder: `curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | HYDOR_DIR=/that/folder bash`.
+- **In Docker**: get the new image and start the container again from it, in the folder with your `compose.yaml`: `docker compose pull && docker compose up -d` (or `docker pull algoprog/hydor` and run it as you did before). What the app keeps is in its volume, so nothing is lost. If you build the image yourself, first update your clone as in the next point, then `docker compose up -d --build`.
+- **From a git clone of your own**: in its folder, `git fetch && git reset --keep @{u} && npm ci && npm run build`, then start the app again. `git reset --keep` keeps the files you changed and stops before it would overwrite one. If you made commits of your own, move them onto the new history with `git rebase --onto` instead.
+
+Newer copies handle a rewritten history by themselves: when the copy has no commits of its own, **Update now** moves it to the new history, keeping the files you changed; when it has some, it says so and leaves them as they are.
+
 ### Updates in the desktop apps
 
 The desktop apps (Mac, Windows and Linux) go by released versions instead. With [**Update automatically**](/settings?s=general&find=Update%20automatically) on, it downloads a new version as soon as it is out and checks that it is the build the release names, without waiting for you to be away. Then it tells you, in two places:

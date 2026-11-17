@@ -339,6 +339,23 @@ node dist/server/cli.js update   # pull, build, restart the service; running age
 The Docker container updates the copy of the app inside it. Rebuilding the image (`docker compose up -d
 --build`) starts again from your clone of the repository, so `git pull` before you do.
 
+Hydor's history on GitHub was rewritten in version 0.78.0. A copy installed from git or Docker before then can't
+update itself past it (its update stops with "Not possible to fast-forward, aborting."), so update it once by hand,
+in the way it was installed; from then on it updates by itself again:
+
+```bash
+# Installed with the installer: run it again (add HYDOR_DIR=/that/folder before bash for a folder of your own)
+curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | bash
+# Docker: the new image, in the folder with your compose.yaml (what the app keeps is in its volume)
+docker compose pull && docker compose up -d
+# A git clone of your own, in its folder; then start the app again
+git fetch && git reset --keep @{u} && npm ci && npm run build
+```
+
+`git reset --keep` keeps the files you changed and stops before it would overwrite one; commits of your own need
+`git rebase --onto` instead. Newer copies handle a rewritten history by themselves: Update now (and
+`node dist/server/cli.js update`) moves a copy with no commits of its own to the new history.
+
 The agents' programs keep up to date as well, however the app runs: once a day Claude Code, Codex, Gemini CLI
 and the others are brought to their newest version, the app's own copies with npm and yours with their own
 updater (`claude update`, `codex update`…), and a new version that does not work the way the sessions use it is

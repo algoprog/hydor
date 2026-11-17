@@ -44,7 +44,23 @@ if [ -z "$dir" ]; then
   fi
   if [ -d "$dir/.git" ]; then
     say "Updating $dir"
-    git -C "$dir" pull --ff-only
+    if ! git -C "$dir" pull --ff-only; then
+      # When upstream's history was rewritten (Hydor's was with 0.78.0: every commit again under a new id, with the same
+      # dates), a copy whose last commit is there under its new id (with the same times along its last 20 commits) has
+      # nothing of its own: it moves to it, keeping files changed in it (and stopping before it would overwrite one), as
+      # the app's own updater does (server/upstream.ts). Anything else stops here.
+      mine="$(git -C "$dir" log --first-parent -n 20 --format='%at %ct' HEAD)"
+      twin=""
+      if ! git -C "$dir" merge-base --is-ancestor HEAD '@{u}' 2>/dev/null; then
+        while read -r id when; do
+          [ "$when" = "${mine%%$'\n'*}" ] || continue
+          if [ "$(git -C "$dir" log --first-parent -n "$(($(wc -l <<<"$mine")))" --format='%at %ct' "$id")" = "$mine" ]; then twin="$id"; break; fi
+        done < <(git -C "$dir" log --format='%H %at %ct' '@{u}' 2>/dev/null || true)
+      fi
+      [ -n "$twin" ] || die "Could not update $dir (git says why above). A copy with commits of your own needs them moved onto the new version first (git rebase)."
+      say "Its history was rewritten upstream: moving $dir to it"
+      git -C "$dir" reset --keep '@{u}' || die "Files changed in $dir would be overwritten (above): commit them or set them aside (git stash), then run this again."
+    fi
   else
     say "Cloning into $dir"
     git clone --depth 1 "${HYDOR_REPO:-${NAGET_AGENT_REPO:-${AGENT_CONSOLE_REPO:-https://github.com/algoprog/hydor.git}}}" "$dir"

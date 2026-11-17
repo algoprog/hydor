@@ -164,6 +164,16 @@
 
 你的设备上打开的其他页面会发现应用的版本比它们正在运行的更新，并提供**重新加载**（“Hydor 已更新”）。如果某个页面无法绘制出来，你会看到“此页面已停止工作”、出了什么问题以及**重新加载**，而不是一个空白窗口；侧边栏会保留，转到另一个页面会再试一次。
 
+### 手动更新旧版本的副本
+
+Hydor 在 GitHub 上的历史在 0.78.0 版本中被重写了，在那之前从 git 或 Docker 安装的副本无法自己更新越过这一点：**立即更新**会以“Not possible to fast-forward, aborting.”停止，从另一台机器的应用里更新这台机器时也一样（见[在一个应用里使用其他机器](/guide/devices#use-other-machines-from-one-app)），那时它的页面会说明该怎么做。请在那台机器本身上，按它当初的安装方式更新一次；此后它又会自己更新了。
+
+- **用安装程序安装的**：在那里再运行一次安装程序。它会把副本迁移到新的历史上（你在其中改过的文件会保留），构建它并重启服务，正在运行的智能体会继续工作：`curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | bash`。如果你把它装在自己选的文件夹里，请指明那个文件夹：`curl -fsSL https://raw.githubusercontent.com/algoprog/hydor/main/install.sh | HYDOR_DIR=/that/folder bash`。
+- **在 Docker 中**：获取新镜像，并用它重新启动容器，在放有你的 `compose.yaml` 的文件夹里运行：`docker compose pull && docker compose up -d`（或者 `docker pull algoprog/hydor`，然后像之前那样运行它）。应用保存的内容都在它的卷里，所以不会丢失任何东西。如果镜像是你自己构建的，先按下一条的方式更新你的克隆，再运行 `docker compose up -d --build`。
+- **用你自己的 git 克隆**：在它的文件夹里运行 `git fetch && git reset --keep @{u} && npm ci && npm run build`，然后重新启动应用。`git reset --keep` 会保留你改过的文件，并在要覆盖其中某个文件之前停下。如果你自己做过提交，请改用 `git rebase --onto` 把它们移到新的历史上。
+
+较新的副本会自己处理被重写的历史：副本没有自己的提交时，**立即更新**会把它迁移到新的历史上，并保留你改过的文件；有提交时，它会这样告诉你，并保持这些提交不动。
+
 ### 桌面应用的更新
 
 桌面应用（Mac、Windows 和 Linux）则按发布的版本更新。开启[**自动更新**](/settings?s=general&find=Update%20automatically)时，新版本一发布它就会下载，并核对它正是发布中注明的那个版本，不必等你离开。然后它会在两个地方告诉你：

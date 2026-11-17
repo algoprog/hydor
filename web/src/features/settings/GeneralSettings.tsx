@@ -12,7 +12,10 @@ import { Button, cx, Throbber, Segmented, Switch } from '../../components/ui';
 import { currentLang, setLang } from '../../i18n';
 import { LOCALE } from '../../i18n/locale';
 import { restartToUpdate, updateLater } from '../../components/UpdateNotice';
-import { cannotUpdate, UPDATE_PHASE as PHASE } from '../../lib/updates';
+import { beforeRewrite, cannotUpdate, UPDATE_PHASE as PHASE } from '../../lib/updates';
+import { machineId } from '../../lib/machine';
+import { useMachines } from '../../lib/machines';
+import { BeforeRewrite } from '../machines/BeforeRewrite';
 import { followUpPref, type FollowUp } from '../session/Composer';
 import { startTour } from '../tour/Tour';
 import { setTipsOn, useTips } from '../tips/state';
@@ -106,6 +109,7 @@ function LanguageSelect() {
  */
 function VersionRow() {
   const version = useApp((s) => s.boot?.version);
+  const name = useMachines((s) => s.list.find((m) => m.id === machineId)?.name);
   const update = useApp((s) => s.boot?.update);
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState(false);
@@ -250,6 +254,7 @@ function VersionRow() {
                   : `Updated${last.auto ? ' by itself' : ''} ${ago(last.at)}${last.from && last.to ? ` (${last.from} → ${last.to})` : ''}${last.needsRestart ? ': restart the server to use it' : ''}`}
             </p>
           )}
+          {last && !last.ok && beforeRewrite(version, last.error) && <BeforeRewrite name={name ?? 'that machine'} className="space-y-1.5 pt-1 text-fg-2" />}
         </div>
       )}
     </Row>
