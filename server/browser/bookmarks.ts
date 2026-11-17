@@ -588,45 +588,157 @@ export async function bookmarkSources(): Promise<BookmarkSource[]> {
 
 // ---- bookmarks files (the Netscape format) ------------------------------------------------------------
 
+/** Most a tag (a quoted value in it too) may run to; a file's own icons are the longest part of a tag. */
+const MAX_TAG = 256 * 1024;
+/** Most bytes the tokenizer may spend on tags that never close, in all: the work stays linear in the file. */
+const MAX_WASTE = 64 * 1024 * 1024;
+
+/** `name=value` pairs of a tag's text (quotes in it are balanced), names in lower case, in one pass. */
+function tagAttrs(s: string): Record<string, string> {
+  const a: Record<string, string> = {};
+  const n = s.length;
+  const word = (c: number) => (c >= 48 && c <= 58) || (c >= 65 && c <= 90) || c === 95 || (c >= 97 && c <= 122) || c === 45;
+  const space = (c: number) => c === 32 || (c >= 9 && c <= 13) || c === 160 || c === 0xfeff;
+  let i = 0;
+  while (i < n) {
+    const c = s.charCodeAt(i);
+    if (!((c >= 65 && c <= 90) || c === 95 || (c >= 97 && c <= 122))) {
+      // A quoted stretch without a name before it is skipped whole.
+      if (c === 34 || c === 39) {
+        const e = s.indexOf(s[i], i + 1);
+        i = e < 0 ? n : e + 1;
+      } else i++;
+      continue;
+    }
+    let j = i + 1;
+    while (j < n && word(s.charCodeAt(j))) j++;
+    const name = s.slice(i, j).toLowerCase();
+    i = j;
+    while (i < n && space(s.charCodeAt(i))) i++;
+    if (s[i] !== '=') continue;
+    i++;
+    while (i < n && space(s.charCodeAt(i))) i++;
+    if (i >= n) break;
+    const q = s[i];
+    let v: string;
+    if (q === '"' || q === "'") {
+      const e = s.indexOf(q, i + 1);
+      v = s.slice(i + 1, e < 0 ? n : e);
+      i = e < 0 ? n : e + 1;
+    } else {
+      let e = i;
+      while (e < n && !space(s.charCodeAt(e)) && s[e] !== '"' && s[e] !== "'") e++;
+      v = s.slice(i, e);
+      i = Math.max(e, i + 1);
+    }
+    a[name] = decode(v);
+  }
+  return a;
+}
+
+interface Tok {
+  /** "/" for a closing tag. */
+  close: string;
+  /** The tag's name, empty for a stray "<". */
+  name: string;
+  attrs: string;
+  /** Text between tags. */
+  text?: string;
+}
+
+/**
+ * The tags and the text of an HTML file, in one pass: `<`, a name, attributes (quoted values may hold ">"), `>`. A tag
+ * that never closes (or runs past MAX_TAG) is a stray "<" and the text goes on after it.
+ */
+function* htmlTokens(html: string): Generator<Tok> {
+  const n = html.length;
+  let waste = 0;
+  let i = 0;
+  while (i < n) {
+    if (html.charCodeAt(i) !== 60) {
+      let e = html.indexOf('<', i);
+      if (e < 0) e = n;
+      yield { close: '', name: '', attrs: '', text: html.slice(i, e) };
+      i = e;
+      continue;
+    }
+    let j = i + 1;
+    const slash = html[j] === '/';
+    if (slash) j++;
+    const c0 = html.charCodeAt(j);
+    let ok = (c0 >= 65 && c0 <= 90) || (c0 >= 97 && c0 <= 122);
+    const nameFrom = j;
+    if (ok) {
+      while (j < n) {
+        const c = html.charCodeAt(j);
+        if (!((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122))) break;
+        j++;
+      }
+    }
+    const nameTo = j;
+    const attrsFrom = j;
+    const limit = Math.min(n, i + MAX_TAG);
+    let end = -1;
+    if (ok && waste < MAX_WASTE) {
+      for (; j < limit; j++) {
+        const c = html.charCodeAt(j);
+        if (c === 62) {
+          end = j;
+          break;
+        }
+        if (c === 34 || c === 39) {
+          // A quoted value runs to its closing quote, and nothing inside it ends the tag.
+          let k = j + 1;
+          while (k < limit && html.charCodeAt(k) !== c) k++;
+          if (k >= limit) break;
+          j = k;
+        }
+      }
+      if (end < 0) waste += j - i;
+    } else ok = false;
+    if (end < 0) {
+      yield { close: '', name: '', attrs: '' };
+      i++;
+      continue;
+    }
+    yield { close: slash ? '/' : '', name: html.slice(nameFrom, nameTo), attrs: html.slice(attrsFrom, end) };
+    i = end + 1;
+  }
+}
+
 /** Reads a bookmarks file any browser exports, leniently: tags in any case, closing tags missing, entities. */
 export function parseNetscape(html: string): Imp[] {
   const root: Imp = { title: '', children: [] };
   const stack: Imp[] = [root];
   let pending: Imp | null = null;
   let into: { node: Imp; text: string } | null = null;
-  const attrs = (s: string) => {
-    const a: Record<string, string> = {};
-    for (const m of s.matchAll(/([A-Za-z_][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) a[m[1].toLowerCase()] = decode(m[2] ?? m[3] ?? m[4] ?? '');
-    return a;
-  };
   const date = (v?: string) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? (n > 1e11 ? n : n * 1000) : undefined;
   };
-  const re = /<(\/?)([A-Za-z][A-Za-z0-9]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>|([^<]+)|</g;
   // A title ends at its closing tag, or where the next list item or list starts when that tag is missing.
   const finish = () => {
     if (into) into.node.title = decode(into.text).replace(/\s+/g, ' ').trim();
     into = null;
   };
-  for (let m: RegExpExecArray | null; (m = re.exec(html)); ) {
-    if (m[4] !== undefined) {
-      if (into) into.text += m[4];
+  for (const m of htmlTokens(html)) {
+    if (m.text !== undefined) {
+      if (into) into.text += m.text;
       continue;
     }
-    if (!m[2]) continue;
-    const tag = m[2].toLowerCase();
-    if (into && !['b', 'i', 'u', 'em', 'strong', 'span', 'img', 'font', 'br'].includes(tag) && !(m[1] && (tag === 'a' || tag === 'h3'))) finish();
+    if (!m.name) continue;
+    const tag = m.name.toLowerCase();
+    if (into && !['b', 'i', 'u', 'em', 'strong', 'span', 'img', 'font', 'br'].includes(tag) && !(m.close && (tag === 'a' || tag === 'h3'))) finish();
     const top = stack[stack.length - 1];
-    if (!m[1]) {
+    if (!m.close) {
       if (tag === 'h3') {
-        const a = attrs(m[3]);
+        const a = tagAttrs(m.attrs);
         const f: Imp = { title: '', children: [], added: date(a.add_date), bar: a.personal_toolbar_folder === 'true' };
         (top.children ??= []).push(f);
         pending = f;
         into = { node: f, text: '' };
       } else if (tag === 'a') {
-        const a = attrs(m[3]);
+        const a = tagAttrs(m.attrs);
         const l: Imp = { title: '', url: a.href ?? '', added: date(a.add_date) };
         (top.children ??= []).push(l);
         pending = null;

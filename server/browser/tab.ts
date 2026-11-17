@@ -177,7 +177,8 @@ export class Tab {
       this.s.send('Page.setLifecycleEventsEnabled', { enabled: true }),
       this.s.send('Page.setInterceptFileChooserDialog', { enabled: true }).catch(() => {}),
       this.s.send('Emulation.setUserAgentOverride', { userAgent: this.userAgent }),
-      this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }),
+      // A guarded tab's frames in other processes wait until their guard is on (the handler above resumes them).
+      this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: this.guarded, flatten: true }),
       free ? Promise.resolve() : this.setViewport(viewport.w, viewport.h, viewport.mobile ?? false, viewport.scale ?? 1),
     ]);
   }

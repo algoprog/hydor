@@ -281,10 +281,9 @@ class Chromium {
     const free = this.native && owner.key === BROWSING_KEY;
     // A tab (a popup too) that an agent works in, in your browsing's browser, is held to that session's rules from its first request.
     const guarded = this.profile === BROWSING_PROFILE && owner.key !== BROWSING_KEY;
-    const init = tab
-      .init(owner.viewportFor(), free)
-      .then(() => (guarded ? this.guardTab(tab) : undefined))
-      .catch((e) => console.error(`[browser] tab setup: ${(e as Error).message}`));
+    // The guard goes on before anything else, and before the page runs: its first request is held to the rules too.
+    if (guarded) await this.guardTab(tab).catch((e) => console.error(`[browser] tab guard: ${(e as Error).message}`));
+    const init = tab.init(owner.viewportFor(), free).catch((e) => console.error(`[browser] tab setup: ${(e as Error).message}`));
     await s.send('Runtime.runIfWaitingForDebugger').catch(() => {});
     await init;
     owner.pendingTabs--;
@@ -1012,8 +1011,13 @@ async function startBrowser(key: string, cwd: string, profile: string | undefine
   }
   // Your own browsing has its own profile; agents' sessions can have it only as a caller hands it over here (a tab of
   // yours an agent was given), never through their options, which take only the profiles listed in Settings.
-  const prof = profile ?? (key === BROWSING_KEY ? BROWSING_PROFILE : key.startsWith('browser-profile:') ? key.slice('browser-profile:'.length) : sessionOptions(d().db, key).profile) ?? '';
-  const known = !prof || prof === BROWSING_PROFILE || profiles(d().db).some((p) => p.id === prof);
+  const asked = profile ?? (key === BROWSING_KEY ? BROWSING_PROFILE : key.startsWith('browser-profile:') ? key.slice('browser-profile:'.length) : sessionOptions(d().db, key).profile) ?? '';
+  // A session's settings can be written through the API (an agent can change its own), so your browsing's profile counts
+  // only when the caller names it itself: your own browser, or a page you handed an agent (handOver). Asked any other
+  // way, the session gets a fresh browser.
+  const yours = asked === BROWSING_PROFILE && (key === BROWSING_KEY || profile === BROWSING_PROFILE);
+  const prof = asked === BROWSING_PROFILE && !yours ? '' : asked;
+  const known = !prof || yours || profiles(d().db).some((p) => p.id === prof);
   const c = await processFor(known ? prof : '');
   const b = new SessionBrowser(key, key === BROWSING_KEY ? downloadsFolder() : cwd, c, known ? prof : '');
   // You drive your own browsing; nobody else does.

@@ -225,22 +225,38 @@ function createExtensions({ log, mainWindow, openTab, badge }) {
 
   /** A copy of the extension whose worker first runs the stand-ins (see the top of this file), in the app's data folder. */
   function shimmed(ses, id, src, manifest) {
+    const bg = manifest.background;
+    // The worker's place comes from the manifest: inside the extension, or no stand-ins (they would be written elsewhere).
+    const given = String(bg.service_worker).replace(/\\/g, '/').replace(/^\/+/, '');
+    const workerRel = path.posix.normalize(given);
+    if (!given || /^[A-Za-z]:/.test(given) || given.split('/').includes('..') || workerRel === '..' || workerRel.startsWith('../') || path.posix.isAbsolute(workerRel) || workerRel.endsWith('/'))
+      throw new Error(`its service worker path ${JSON.stringify(String(bg.service_worker).slice(0, 200))} is not inside the extension`);
     const dir = shimDir(ses, id);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.cpSync(src, dir, { recursive: true, filter: (from) => !SKIP_COPY.has(path.basename(from)) });
-    const bg = manifest.background;
-    const workerRel = String(bg.service_worker).replace(/^\/+/, '');
-    const workerDir = path.posix.dirname(workerRel.replace(/\\/g, '/'));
-    const into = (name) => path.join(dir, workerDir, name);
-    fs.writeFileSync(into(STANDINS_FILE), `(${standIns.toString()})(${workerSend.toString()}, 'worker');\n`);
+    const workerDir = path.posix.dirname(workerRel);
+    const real = fs.realpathSync(dir);
+    // Every file the stand-ins add stays inside the copy: not through a link, and not by its name.
+    const put = (rel, data) => {
+      const file = path.resolve(dir, rel);
+      if (file !== dir && !file.startsWith(dir + path.sep)) throw new Error(`${rel} is outside the extension`);
+      const parent = fs.realpathSync(path.dirname(file));
+      if (parent !== real && !parent.startsWith(real + path.sep)) throw new Error(`${rel} is outside the extension`);
+      try {
+        if (fs.lstatSync(file).isSymbolicLink()) fs.unlinkSync(file);
+      } catch {}
+      fs.writeFileSync(file, data);
+    };
+    const into = (name) => path.join(workerDir, name);
+    put(into(STANDINS_FILE), `(${standIns.toString()})(${workerSend.toString()}, 'worker');\n`);
     const orig = path.posix.basename(workerRel);
-    fs.writeFileSync(
+    put(
       into(LOADER_FILE),
       bg.type === 'module' ? `import './${STANDINS_FILE}';\nimport './${orig}';\n` : `importScripts('${STANDINS_FILE}', ${JSON.stringify(orig)});\n`,
     );
-    fs.writeFileSync(path.join(dir, RELAY_FILE), '<!doctype html><meta charset="utf-8"><title></title>\n');
+    put(RELAY_FILE, '<!doctype html><meta charset="utf-8"><title></title>\n');
     const changed = { ...manifest, background: { ...bg, service_worker: path.posix.join(workerDir, LOADER_FILE) } };
-    fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(changed));
+    put('manifest.json', JSON.stringify(changed));
     return dir;
   }
 

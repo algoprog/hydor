@@ -24069,5 +24069,7 @@
   "The browsers agents have open now: watch one, take it over, or take back a page you handed it": "Die Browser, die Agenten gerade offen haben: schau einem zu, übernimm ihn oder hol eine Seite zurück, die du übergeben hast",
   "Your bookmarks: folders, the bookmarks bar, importing from the other browsers on this computer or a file, and exporting": "Deine Lesezeichen: Ordner, die Lesezeichenleiste, Import aus den anderen Browsern auf diesem Computer oder aus einer Datei, und Export",
   "your own browsing bookmarks browser page favourites": "eigenes surfen lesezeichen browser-seite favoriten",
-  "your own browsing chrome extensions add-ons browser page desktop app": "eigenes surfen chrome erweiterungen add-ons browser-seite desktop-app"
+  "your own browsing chrome extensions add-ons browser page desktop app": "eigenes surfen chrome erweiterungen add-ons browser-seite desktop-app",
+  "A link in the zip file is not allowed: {0}": "Eine Verknüpfung in der ZIP-Datei ist nicht erlaubt: {0}",
+  "The zip file unpacks to more than {0}": "Die ZIP-Datei wird entpackt größer als {0}"
 }

@@ -26,14 +26,15 @@ export interface DesktopBrowserBridge {
   hide(target?: string): Promise<void>;
   focus(target: string): Promise<void>;
   popup(extensionId: string, rect: PageRect): Promise<boolean>;
-  onBadge(fn: (b: { extension: string; text: string; color?: string; title?: string }) => void): (() => void) | void;
+  /** An extension's badge or title changed; the function it returns stops listening (for this call only). */
+  onBadge(fn: (b: { extension: string; text: string; color?: string; title?: string }) => void): () => void;
   /** An agent's tab (drawn off screen): its frames (JPEG, the page's size in CSS pixels) and cursor, until the function it resolves to is called. Null when it is not one of this app's. */
   watch(target: string, onFrame: (f: PageFrame) => void, onCursor?: (cursor: string) => void): Promise<null | (() => void)>;
   /** Your clicks, wheel, keys and text, as real input on that tab. */
   input(target: string, events: BrowserInput[]): Promise<boolean>;
   edit(target: string, op: PageEdit): Promise<void>;
-  /** A shortcut pressed in one of your own native pages (they take keys themselves). */
-  onKey(fn: (k: { key: string; ctrl: boolean; meta: boolean; alt: boolean; shift: boolean }) => void): (() => void) | void;
+  /** A shortcut pressed in one of your own native pages (they take keys themselves); the function it returns stops listening (for this call only). */
+  onKey(fn: (k: { key: string; ctrl: boolean; meta: boolean; alt: boolean; shift: boolean }) => void): () => void;
   /** Shows a downloaded file in the system's file manager. */
   showFile(path: string): Promise<boolean>;
 }

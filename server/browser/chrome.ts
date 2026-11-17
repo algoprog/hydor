@@ -357,7 +357,19 @@ export async function downloadChrome(tell: (d: ChromeDownload) => void): Promise
 }
 
 /** Unpacks a zip file (stored or deflated entries, with their Unix modes and links) into `dest`. */
-export async function unzip(file: string, dest: string): Promise<void> {
+export async function unzip(file: string, dest: string, o: { links?: boolean; maxBytes?: number } = {}): Promise<void> {
+  const links = o.links !== false;
+  const maxBytes = o.maxBytes ?? Infinity;
+  let total = 0;
+  const tooBig = () => new Error(`The zip file unpacks to more than ${maxBytes >= 1024 * 1024 ? `${Math.round(maxBytes / 1024 / 1024)} MB` : `${maxBytes} bytes`}`);
+  /** Passes an entry's bytes on, counting them: past the cap for the whole zip file it fails (a zip bomb). */
+  async function* counted(src: AsyncIterable<Buffer>): AsyncGenerator<Buffer> {
+    for await (const c of src) {
+      total += c.length;
+      if (total > maxBytes) throw tooBig();
+      yield c;
+    }
+  }
   const fd = fs.openSync(file, 'r');
   try {
     const size = fs.fstatSync(fd).size;
@@ -382,6 +394,7 @@ export async function unzip(file: string, dest: string): Promise<void> {
       const nameLen = cd.readUInt16LE(p + 28);
       const extraLen = cd.readUInt16LE(p + 30);
       const commentLen = cd.readUInt16LE(p + 32);
+      const rawSize = cd.readUInt32LE(p + 24);
       const ext = cd.readUInt32LE(p + 38);
       const local = cd.readUInt32LE(p + 42);
       const name = cd.toString('utf8', p + 46, p + 46 + nameLen);
@@ -389,6 +402,8 @@ export async function unzip(file: string, dest: string): Promise<void> {
       const out = path.resolve(root, name);
       if (out !== root && !out.startsWith(root + path.sep)) throw new Error(`Unsafe path in zip: ${name}`);
       const mode = (ext >>> 16) & 0xffff;
+      if (!name.endsWith('/') && total + rawSize > maxBytes) throw tooBig();
+      if (!links && (mode & 0o170000) === 0o120000) throw new Error(`A link in the zip file is not allowed: ${name}`);
       if (name.endsWith('/')) {
         fs.mkdirSync(out, { recursive: true });
         continue;
@@ -398,13 +413,13 @@ export async function unzip(file: string, dest: string): Promise<void> {
       fs.readSync(fd, lh, 0, 30, local);
       const start = local + 30 + lh.readUInt16LE(26) + lh.readUInt16LE(28);
       if (method !== 0 && method !== 8) throw new Error(`Unsupported zip compression in ${name}`);
-      const read = (): NodeJS.ReadableStream => {
+      const read = (): AsyncGenerator<Buffer> => {
         const raw = compSize ? fs.createReadStream(file, { start, end: start + compSize - 1 }) : Readable.from([]);
-        return method === 8 ? raw.pipe(zlib.createInflateRaw()) : raw;
+        return counted((method === 8 ? raw.pipe(zlib.createInflateRaw()) : raw) as AsyncIterable<Buffer>);
       };
       if ((mode & 0o170000) === 0o120000) {
         const chunks: Buffer[] = [];
-        for await (const c of read() as AsyncIterable<Buffer>) chunks.push(c);
+        for await (const c of read()) chunks.push(c);
         const target = Buffer.concat(chunks).toString('utf8');
         const resolved = path.resolve(path.dirname(out), target);
         if (!resolved.startsWith(root + path.sep)) throw new Error(`Unsafe link in zip: ${name}`);

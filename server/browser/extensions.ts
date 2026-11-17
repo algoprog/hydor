@@ -379,7 +379,8 @@ export function installCrxFile(db: DB, file: string, id: string): Promise<Browse
       await pipeline(fs.createReadStream(file, { start: crx.zipStart }), fs.createWriteStream(zip, { mode: 0o600 }));
       const out = path.join(part, 'files');
       try {
-        await unzip(zip, out);
+        // An extension has no business with links, and 500 MB is more than any of them unpacks to.
+        await unzip(zip, out, { links: false, maxBytes: 500 * 1024 * 1024 });
       } catch (e) {
         throw new HttpError(400, `The extension file could not be unpacked: ${(e as Error).message}`);
       }
@@ -716,6 +717,15 @@ export function extensionRoutes(d: Deps) {
     try {
       file = describe(e.dir).iconFile;
     } catch {}
+    if (!file) throw new HttpError(404, 'That extension has no icon');
+    // The file as it really is on disk: a link inside the extension must not lead out of it.
+    try {
+      const root = fs.realpathSync(e.dir);
+      file = fs.realpathSync(file);
+      if (file !== root && !file.startsWith(root + path.sep)) file = undefined;
+    } catch {
+      file = undefined;
+    }
     if (!file) throw new HttpError(404, 'That extension has no icon');
     const type = MIME[path.extname(file).toLowerCase()];
     if (!type) throw new HttpError(404, 'That extension has no icon');

@@ -984,22 +984,46 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
       w.stop = () => {
         clearTimeout(w.timer);
         clearTimeout(w.late);
+        unbindSender(t, sender);
       };
       t.watchers.set(sender.id, w);
-      // The page that watches going away (closed, or loading another page) ends it.
-      const gone = () => stopWatching(t, sender.id);
-      sender.once('destroyed', gone);
-      sender.on('did-start-navigation', function nav(d) {
-        if (d.isMainFrame && !d.isSameDocument) {
-          sender.off('did-start-navigation', nav);
-          gone();
-        }
-      });
+      bindSender(t, sender);
       if (!t.wc.isDestroyed()) t.wc.setFrameRate(WATCH_FPS);
     }
     // One at once, and the page keeps painting only when something changes: ask for one more now.
     if (!t.frame && !t.wc.isDestroyed()) t.wc.invalidate();
     return true;
+  }
+
+  /**
+   * The page that watches going away (closed, or loading another page) ends all its watching. One pair of listeners for
+   * each such page however many tabs it watches, and they come off when its last watch stops.
+   */
+  const senders = new Map();
+  function bindSender(t, sender) {
+    let s = senders.get(sender.id);
+    if (!s) {
+      s = { sender, tabs: new Set(), gone: null, nav: null };
+      s.gone = () => {
+        for (const x of [...s.tabs]) stopWatching(x, sender.id);
+      };
+      s.nav = (d) => {
+        if (d.isMainFrame && !d.isSameDocument) s.gone();
+      };
+      sender.on('destroyed', s.gone);
+      sender.on('did-start-navigation', s.nav);
+      senders.set(sender.id, s);
+    }
+    s.tabs.add(t);
+  }
+  function unbindSender(t, sender) {
+    const s = senders.get(sender.id);
+    if (!s) return;
+    s.tabs.delete(t);
+    if (s.tabs.size) return;
+    senders.delete(sender.id);
+    sender.removeListener('destroyed', s.gone);
+    sender.removeListener('did-start-navigation', s.nav);
   }
 
   function stopWatching(t, senderId) {

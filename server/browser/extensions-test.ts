@@ -13,6 +13,7 @@ import zlib from 'node:zlib';
 import Fastify from 'fastify';
 import { HttpError } from '../auth.ts';
 import { openDb, kvGet } from '../db.ts';
+import { unzip } from './chrome.ts';
 import type { Deps } from '../features/types.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -195,6 +196,25 @@ test('a CRX3 unpacks with its own id kept: the key is written into the manifest'
   assert.ok(!fs.existsSync(path.join(one.path, '.crx.zip')));
   await call('DELETE', `/api/browser/extensions/${id1}`);
   assert.ok(!fs.existsSync(path.join(ex.EXTENSIONS_DIR, id1)));
+});
+
+test('unzip: links are refused without links, and the total size is capped', async () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'unzip-'));
+  const zip = makeZip({ 'manifest.json': '{}', 'sneaky': 'icon.png' });
+  // Mark the second entry as a symbolic link, as a zip made on Linux does.
+  const link = Buffer.from(zip);
+  for (let i = 0, seen = 0; i < link.length - 4; i++)
+    if (link.readUInt32LE(i) === 0x02014b50 && ++seen === 2) link.writeUInt32LE(((0o120777 << 16) | 0) >>> 0, i + 38);
+  const f = path.join(dir, 'link.zip');
+  fs.writeFileSync(f, link);
+  await assert.rejects(unzip(f, path.join(dir, 'a'), { links: false }), /link/);
+  await unzip(f, path.join(dir, 'b'));
+  assert.ok(fs.lstatSync(path.join(dir, 'b', 'sneaky')).isSymbolicLink(), 'by default a link is made, as for Chrome downloads');
+  const big = path.join(dir, 'big.zip');
+  fs.writeFileSync(big, makeZip({ 'a.txt': 'x'.repeat(3000), 'b.txt': 'y'.repeat(3000) }));
+  await assert.rejects(unzip(big, path.join(dir, 'c'), { maxBytes: 5000 }), /more than/);
+  await unzip(big, path.join(dir, 'd'), { maxBytes: 6000 });
+  assert.equal(fs.readFileSync(path.join(dir, 'd', 'b.txt'), 'utf8').length, 3000);
 });
 
 test('a CRX for another id, a damaged one and a non-CRX are refused', async () => {

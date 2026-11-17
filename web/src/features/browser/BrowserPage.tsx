@@ -332,7 +332,7 @@ export function BrowserPage() {
     const off = desktopBrowser()?.onKey((k) => void run({ key: k.key, mod: (k.ctrl || k.meta) && !k.alt, alt: k.alt, shift: k.shift, ctrl: k.ctrl, meta: k.meta }, false, true));
     return () => {
       window.removeEventListener('keydown', onKey);
-      if (typeof off === 'function') off();
+      off?.();
     };
   }, []);
 

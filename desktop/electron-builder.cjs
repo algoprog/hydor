@@ -39,7 +39,8 @@ module.exports = {
     entitlementsInherit: 'resources/entitlements.plist',
     notarize: signed && !!process.env.APPLE_TEAM_ID,
     extendInfo: {
-      NSMicrophoneUsageDescription: 'Hydor uses the microphone when you talk to it.',
+      NSMicrophoneUsageDescription: 'Hydor uses the microphone when you talk to it, or when a site in your own browsing asks for it and you allow it.',
+      NSCameraUsageDescription: 'Hydor uses the camera when a site in your own browsing asks for it and you allow it.',
       LSMultipleInstancesProhibited: true,
     },
   },

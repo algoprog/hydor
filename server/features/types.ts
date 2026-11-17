@@ -120,6 +120,11 @@ export interface SpawnAdditions {
   allowedTools?: string[];
   /** Claude Code: only the MCP servers the app gives it (--strict-mcp-config), none of the user's own. */
   strictMcp?: boolean;
+  /**
+   * Claude Code: only these of its built-in tools (--tools; [] for none), so one a later version adds stays off too. When
+   * several capabilities say, only the tools all of them name.
+   */
+  builtinTools?: string[] | null;
   /** Codex: more settings for its thread ({ web_search: "disabled" }). */
   codexConfig?: Record<string, unknown>;
 }

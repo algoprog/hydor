@@ -357,6 +357,27 @@ test('export and parse agree on an empty list too', () => {
   assert.deepEqual(parseNetscape(exportNetscape([])), []);
 });
 
+test('pathological files parse in linear time: unclosed quotes and tags, long names, many strays', () => {
+  const inputs: Record<string, string> = {
+    'unclosed attribute': '<a x='.repeat(400_000),
+    'unclosed quote': '<a x="'.repeat(350_000),
+    'unclosed single quote': "<a href='x ".repeat(180_000),
+    'long name': `<a ${'x'.repeat(2_000_000)}`,
+    'long word closed': `<a ${'x'.repeat(250_000)}>t</a>`,
+    'strays': '<'.repeat(2_000_000),
+    'angle then quote': '<a "'.repeat(500_000),
+  };
+  for (const [what, html] of Object.entries(inputs)) {
+    const t0 = Date.now();
+    parseNetscape(html);
+    assert.ok(Date.now() - t0 < 1000, `${what}: ${Date.now() - t0} ms`);
+  }
+  // What is around the trouble still reads.
+  const items = parseNetscape(`<DL><DT><A HREF="https://ok.example/" ADD_DATE="1" ICON="data:image/png;base64,${'A'.repeat(100_000)}">Fine</A>${'<a x='.repeat(1000)}<DT><A HREF='https://two.example/'>Two</A></DL>`);
+  assert.ok(items.some((i) => i.url === 'https://ok.example/' && i.title === 'Fine'));
+  assert.ok(items.some((i) => i.url === 'https://two.example/'));
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
   try {

@@ -25325,5 +25325,7 @@
 "The browsers agents have open now: watch one, take it over, or take back a page you handed it":"Τα προγράμματα περιήγησης που έχουν ανοιχτά οι πράκτορες: παρακολουθήστε ένα, αναλάβετε τον έλεγχό του ή ανακτήστε μια σελίδα που του δώσατε",
 "Your bookmarks: folders, the bookmarks bar, importing from the other browsers on this computer or a file, and exporting":"Οι σελιδοδείκτες σας: φάκελοι, η γραμμή σελιδοδεικτών, εισαγωγή από τα άλλα προγράμματα περιήγησης σε αυτόν τον υπολογιστή ή από αρχείο, και εξαγωγή",
 "your own browsing bookmarks browser page favourites":"δική σας περιήγηση σελιδοδείκτες σελίδα προγράμματος περιήγησης αγαπημένα",
-"your own browsing chrome extensions add-ons browser page desktop app":"δική σας περιήγηση επεκτάσεις chrome πρόσθετα σελίδα προγράμματος περιήγησης εφαρμογή υπολογιστή"
+"your own browsing chrome extensions add-ons browser page desktop app":"δική σας περιήγηση επεκτάσεις chrome πρόσθετα σελίδα προγράμματος περιήγησης εφαρμογή υπολογιστή",
+"A link in the zip file is not allowed: {0}":"Δεν επιτρέπεται σύνδεσμος μέσα στο αρχείο zip: {0}",
+"The zip file unpacks to more than {0}":"Το αρχείο zip αποσυμπιέζεται σε περισσότερα από {0}"
 }

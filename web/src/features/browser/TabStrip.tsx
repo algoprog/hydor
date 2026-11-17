@@ -5,12 +5,26 @@ import type { BrowserTab, BrowserView } from '@shared/browser';
 import { cx, IconButton, Popover, Throbber } from '../../components/ui';
 import { closeTab, newTab, switchTab, tabName } from './browsing';
 
-/** A page's icon, or a globe while it has none (or it did not load). */
+/** The site a tab is on (as the app's site icon route takes it), or '' for a page with no host to ask about. */
+function hostOfTab(url: string): string {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * A page's site icon (from the app's own icon route: the page's own icon address is not one the app's pages may load),
+ * or a globe while it has none (or it did not load).
+ */
 export function Favicon({ tab, size = 14 }: { tab: BrowserTab; size?: number }) {
   const [bad, setBad] = useState<string>();
+  const host = hostOfTab(tab.url);
   if (tab.loading) return <Throbber size={size} className="shrink-0" />;
-  if (!tab.favicon || bad === tab.favicon) return <Globe size={size} className="shrink-0 text-fg-3" />;
-  return <img src={tab.favicon} alt="" width={size} height={size} className="shrink-0 rounded-[3px]" onError={() => setBad(tab.favicon)} />;
+  if (!host || bad === host) return <Globe size={size} className="shrink-0 text-fg-3" />;
+  return <img src={`/api/site-icon/${encodeURIComponent(host)}`} alt="" width={size} height={size} className="shrink-0 rounded-[3px]" onError={() => setBad(host)} />;
 }
 
 export function TabStrip({ view }: { view: BrowserView }) {

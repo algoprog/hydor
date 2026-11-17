@@ -384,7 +384,7 @@ function busyLabel(s: ActStep, e?: El): string {
   return busyWords(s.action, n, { direction: s.direction, keys: s.keys });
 }
 
-interface StepResult {
+export interface StepResult {
   line: string;
   failed?: boolean;
   stop?: string;
@@ -485,25 +485,7 @@ async function doStep(b: SessionBrowser, t: Tab, s: ActStep, e: El | undefined, 
     case 'keys': {
       const keys = String(s.keys ?? s.text ?? '').trim();
       if (!keys) return { line: 'keys needs the keys to press, like "Enter" or "Control+A".', failed: true };
-      const said: string[] = [];
-      for (const k of keys.split(/\s+(?=\S)/).slice(0, 20)) {
-        if (/^enter$/i.test(k)) {
-          const before = said.length ? `Pressed ${said.join(', ')}.` : undefined;
-          const pay = paymentOnPage(b);
-          if (pay) return payment(b, t, pay, before);
-          const sends = pressedByEnter(b);
-          if (sends) {
-            const wait = await confirmFirst(b, t, sends, ctx, before);
-            if (wait) return wait;
-          }
-        }
-        if (parseKey(k)) await b.pointAt(t, { act: 'key', keys: k });
-        const r = await t.key(k);
-        if (r === 'unknown') return { line: `Unknown key ${quote(k)} (use names like Enter, Tab, Escape, ArrowDown, PageDown, Control+A).`, failed: true };
-        said.push(k);
-        if (r === 'dialog') return { line: `Pressed ${said.join(', ')}.`, stop: dialogNote(t)! };
-      }
-      return { line: `Pressed ${said.join(', ')}.` };
+      return pressKeys(b, t, keys, ctx);
     }
     case 'back': {
       const ok = await t.back();
@@ -604,11 +586,55 @@ export function consequentialOnPage(b: SessionBrowser, field?: El): El | undefin
   return field?.form ? here.find((e) => e.form === field.form) : here[0];
 }
 
-/** What a bare Enter would press: the focused button itself, or a sending button of the focused field's form. */
-function pressedByEnter(b: SessionBrowser): El | undefined {
-  const focus = [...(known.get(b.key)?.values() ?? [])].find((e) => e.focused && b.refs.get(e.id)?.tab === b.active);
-  if (!focus) return undefined;
-  return focus.consequential ? focus : consequentialOnPage(b, focus);
+/** Enter (any name for it, with any modifiers: Ctrl+Enter and Meta+Enter send in mail and chat apps) or Space. */
+export function gatedKey(spec: string): 'enter' | 'space' | null {
+  const k = parseKey(spec);
+  if (!k) return null;
+  return k.def.code === 'Enter' ? 'enter' : k.def.code === 'Space' ? 'space' : null;
+}
+
+/**
+ * What the key would press, given the element that has focus now (from a fresh outline). Enter: a payment button in
+ * view, the focused button itself, or a sending button of the focused field's form. Space presses only what has focus
+ * (in a text field it just types a space).
+ */
+export function pressedByKey(b: SessionBrowser, key: 'enter' | 'space', focus?: El): { pay?: El; sends?: El } {
+  if (key === 'space') return { pay: focus?.payment ? focus : undefined, sends: focus?.consequential ? focus : undefined };
+  const pay = paymentOnPage(b) ?? (focus?.payment ? focus : undefined);
+  if (!focus) return { pay };
+  return { pay, sends: focus.consequential ? focus : consequentialOnPage(b, focus) };
+}
+
+/** Presses keys one at a time ("Tab Tab Enter"), reading the focus afresh before each Enter or Space. */
+export async function pressKeys(b: SessionBrowser, t: Tab, keys: string, ctx: OpCtx): Promise<StepResult> {
+  const said: string[] = [];
+  for (const k of keys.split(/\s+(?=\S)/).slice(0, 20)) {
+    const gated = gatedKey(k);
+    if (gated && !t.dialog) {
+      const before = said.length ? `Pressed ${said.join(', ')}.` : undefined;
+      let focus: El | undefined;
+      try {
+        const snap = await t.snapshot(ctx.budget);
+        remember(b.key, snap.outline.els);
+        focus = snap.outline.els.find((e) => e.focused && b.refs.get(e.id)?.tab === b.active);
+      } catch {
+        // The page could not be read: fall back on the last outline.
+        focus = [...(known.get(b.key)?.values() ?? [])].find((e) => e.focused && b.refs.get(e.id)?.tab === b.active);
+      }
+      const { pay, sends } = pressedByKey(b, gated, focus);
+      if (pay) return payment(b, t, pay, before);
+      if (sends) {
+        const wait = await confirmFirst(b, t, sends, ctx, before);
+        if (wait) return wait;
+      }
+    }
+    if (parseKey(k)) await b.pointAt(t, { act: 'key', keys: k });
+    const r = await t.key(k);
+    if (r === 'unknown') return { line: `Unknown key ${quote(k)} (use names like Enter, Tab, Escape, ArrowDown, PageDown, Control+A).`, failed: true };
+    said.push(k);
+    if (r === 'dialog') return { line: `Pressed ${said.join(', ')}.`, stop: dialogNote(t)! };
+  }
+  return { line: `Pressed ${said.join(', ')}.` };
 }
 
 /**

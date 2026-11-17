@@ -10,7 +10,7 @@ import path from 'node:path';
 import type { BrowserAsk } from '../../shared/browser.ts';
 import { openDb } from '../db.ts';
 import { allow, ALLOW_MS, hostOf, useAllowance } from './confirm.ts';
-import { confirmFirst, consequentialOnPage, forgetSession, remember, type OpCtx } from './ops.ts';
+import { confirmFirst, consequentialOnPage, forgetSession, gatedKey, pressKeys, remember, type OpCtx } from './ops.ts';
 import { isConsequential, type El } from './outline.ts';
 import type { SessionBrowser } from './session.ts';
 import { browserSettings, setBrowserSettings } from './settings.ts';
@@ -179,6 +179,104 @@ test('Enter in a field presses a sending button of its own form, or in no form a
   assert.equal(consequentialOnPage(b, search), undefined, 'a search box in its own form');
   assert.equal(consequentialOnPage(b, compose)?.id, 3);
   assert.equal(consequentialOnPage(b, chat)?.id, 3, 'a field in no form: a chat sends on Enter');
+  forgetSession('k');
+});
+
+// ---- keys ------------------------------------------------------------------------------------------------------
+
+test('Enter under any name or modifier, and Space, are the keys that press; others are not', () => {
+  for (const k of ['Enter', 'enter', 'Return', 'Control+Enter', 'Meta+Enter', 'Cmd+Return', 'Shift+Enter', 'Alt+Enter']) assert.equal(gatedKey(k), 'enter', k);
+  for (const k of ['Space', 'space', 'Shift+Space']) assert.equal(gatedKey(k), 'space', k);
+  for (const k of ['Tab', 'Escape', 'ArrowDown', 'a', 'Control+A', 'Delete', 'Nonsense']) assert.equal(gatedKey(k), null, k);
+});
+
+/**
+ * A page with a compose form (a box and a Send button, then a Cancel button) and a Pay button elsewhere, where the focus
+ * moves with Tab through `order`: the outline is made afresh on every look, as on a page.
+ */
+function page(profile = 'p1', withPay = false) {
+  const { b, t } = fake(profile);
+  const tab = t as unknown as Record<string, unknown>;
+  b.refs = new Map([1, 2, 3, 4].map((id) => [id, { tab }])) as never;
+  b.active = tab as never;
+  forgetSession('k');
+  const order = [1, 2, 3, 4];
+  let at = -1;
+  const pressed: string[] = [];
+  const els = (): El[] =>
+    [
+      el({ id: 1, name: 'Message', role: 'textbox', tag: 'textarea', form: 'f:compose' }),
+      el({ id: 2, name: 'Send', consequential: true, form: 'f:compose' }),
+      el({ id: 3, name: 'Cancel', form: 'f:compose' }),
+      el({ id: 4, name: 'Pay now', payment: withPay || undefined, form: 'f:other' }),
+    ].map((e) => ({ ...e, focused: order[at] === e.id }));
+  Object.assign(tab, {
+    dialog: null,
+    snapshot: async () => ({ outline: { els: els() } }),
+    key: async (spec: string) => {
+      if (/^tab$/i.test(spec)) at = Math.min(order.length - 1, at + 1);
+      pressed.push(spec);
+      return 'ok';
+    },
+  });
+  Object.assign(b, { pointAt: async () => {}, refs: b.refs });
+  return { b, t: t as unknown as Tab, pressed, focus: (id: number) => (at = order.indexOf(id)) };
+}
+
+for (const key of ['Enter', 'Return', 'Control+Enter', 'Meta+Enter', 'Space']) {
+  test(`${key} on a focused Send button asks first and does not press it`, async () => {
+    const p = page();
+    p.focus(2);
+    const r = await pressKeys(p.b, p.t, key, ctx());
+    assert.match(r.line, /Did not press \[2\] “Send”/);
+    assert.match(r.stop!, /End your turn/);
+    assert.deepEqual(p.pressed, []);
+    assert.equal(p.b.asks.length, 1);
+    forgetSession('k');
+  });
+}
+
+test('Ctrl+Enter or Meta+Enter in the message box asks, since its form sends', async () => {
+  for (const key of ['Control+Enter', 'Meta+Enter', 'Return']) {
+    const p = page();
+    p.focus(1);
+    const r = await pressKeys(p.b, p.t, key, ctx());
+    assert.match(r.line, /Did not press \[2\]/, key);
+    assert.deepEqual(p.pressed, [], key);
+  }
+  forgetSession('k');
+});
+
+test('Space in the message box types a space; a plain page with no sending button lets Enter through', async () => {
+  const p = page();
+  p.focus(1);
+  assert.match((await pressKeys(p.b, p.t, 'Space', ctx())).line, /^Pressed Space\./);
+  const plain = page('p1');
+  Object.assign(plain.t, { snapshot: async () => ({ outline: { els: [el({ id: 1, name: 'Search', role: 'searchbox', tag: 'input', form: 'f:search', focused: true })] } }) });
+  assert.match((await pressKeys(plain.b, plain.t, 'Enter', ctx())).line, /^Pressed Enter\./);
+  forgetSession('k');
+});
+
+test('"Tab Tab Enter" looks at the focus afresh before the Enter: it lands on Send and stops', async () => {
+  const p = page();
+  // The outline known before the keys (nothing focused on Send): it must not be reused.
+  remember('k', [el({ id: 3, name: 'Cancel', focused: true, form: 'f:compose' })]);
+  const r = await pressKeys(p.b, p.t, 'Tab Tab Enter', ctx());
+  assert.deepEqual(p.pressed, ['Tab', 'Tab'], 'the two Tabs went, the Enter did not');
+  assert.match(r.line, /^Pressed Tab, Tab\. Did not press \[2\] “Send”/);
+  forgetSession('k');
+});
+
+test('a payment button in view stops Enter and Return; a fresh browser (no profile) presses Send', async () => {
+  const p = page('p1', true);
+  p.focus(1);
+  const r = await pressKeys(p.b, p.t, 'Return', ctx());
+  assert.deepEqual(p.pressed, []);
+  assert.ok(p.b.asks.some((a) => a.kind === 'payment'));
+  const f = page('');
+  f.focus(2);
+  assert.match((await pressKeys(f.b, f.t, 'Control+Enter', ctx())).line, /^Pressed Control\+Enter\./);
+  assert.ok(r.stop);
   forgetSession('k');
 });
 

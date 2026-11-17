@@ -17,6 +17,13 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const own = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(location.origin);
 
+/** Listens to a channel for one caller; the function it returns removes exactly that listener. */
+function listen(channel, fn) {
+  const h = (_e, v) => fn(v);
+  ipcRenderer.on(channel, h);
+  return () => void ipcRenderer.removeListener(channel, h);
+}
+
 /** Who watches which agent's tab in this page: one message listener for all, and the main process hears of the first and the last. */
 const watchers = new Map();
 if (own) {
@@ -100,9 +107,9 @@ if (own) {
       /** An extension's toolbar popup, opened under this place. */
       popup: (extensionId, rect) => ipcRenderer.invoke('hydor:browser-popup', { extension: String(extensionId), rect: rectOf(rect) }),
       /** An extension's badge or title changed. */
-      onBadge: (fn) => void ipcRenderer.on('hydor:browser-badge', (_e, b) => fn(b)),
+      onBadge: (fn) => listen('hydor:browser-badge', fn),
       /** The shortcuts your own tabs keep from their pages (Ctrl or ⌘ with T, W, L, R, F; F5; Alt with the arrows). */
-      onKey: (fn) => void ipcRenderer.on('hydor:browser-key', (_e, k) => fn(k)),
+      onKey: (fn) => listen('hydor:browser-key', fn),
       /** Shows a downloaded file in the system's file manager (a file in your home folder). */
       showFile: (path) => ipcRenderer.invoke('hydor:browser-show-file', String(path)),
     },

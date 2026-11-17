@@ -666,7 +666,17 @@ try {
 } catch (e) {
   if (!(e && e.code === 'MODULE_NOT_FOUND' && /extensions\.cjs/.test(String(e.message)))) browserLog('extensions did not start', String((e && e.stack) || e));
 }
-browser = createBrowser({ log: browserLog, toServer, mainWindow: () => win, fromOwnPage, ext: extensions });
+// The browser's pages are this computer's own: a page of another machine the window shows (/m/<id>/…, its tabs are that
+// machine's) gets nothing of them, as it gets no folder chooser.
+const fromThisMachine = (e) => {
+  if (!fromOwnPage(e)) return false;
+  try {
+    return !/^\/m\//.test(new URL(e.senderFrame.url).pathname);
+  } catch {
+    return false;
+  }
+};
+browser = createBrowser({ log: browserLog, toServer, mainWindow: () => win, fromOwnPage: fromThisMachine, ext: extensions });
 browser.registerIpc();
 // A forwarded machine's folders belong to its server, not this desktop computer.
 ipcMain.handle('hydor:choose-folder', async (e, current) => {

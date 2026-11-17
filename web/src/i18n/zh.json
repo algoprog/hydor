@@ -25341,5 +25341,7 @@
 "The browsers agents have open now: watch one, take it over, or take back a page you handed it":"智能体现在打开的浏览器：观看、接管，或收回你交给它的页面",
 "Your bookmarks: folders, the bookmarks bar, importing from the other browsers on this computer or a file, and exporting":"你的书签：文件夹、书签栏、从这台电脑上的其他浏览器或文件导入，以及导出",
 "your own browsing bookmarks browser page favourites":"你自己的浏览 书签 浏览器页面 收藏夹",
-"your own browsing chrome extensions add-ons browser page desktop app":"你自己的浏览 chrome 扩展程序 附加组件 浏览器页面 桌面应用"
+"your own browsing chrome extensions add-ons browser page desktop app":"你自己的浏览 chrome 扩展程序 附加组件 浏览器页面 桌面应用",
+"A link in the zip file is not allowed: {0}":"ZIP 文件中不允许包含链接：{0}",
+"The zip file unpacks to more than {0}":"这个 ZIP 文件解压后超过 {0}"
 }

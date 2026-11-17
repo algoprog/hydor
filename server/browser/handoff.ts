@@ -87,7 +87,7 @@ const isCustom = (s: Pick<SpawnInfo, 'agent' | 'acpAgent'>) => s.agent === 'acp'
 /** What a starting agent gets in a browser-only session (undefined: nothing, as for Custom, which reads `context`). */
 export function browserOnlySpawn(s: Pick<SpawnInfo, 'agent' | 'acpAgent'>): SpawnAdditions | undefined {
   if (isCustom(s)) return undefined;
-  if (s.agent === 'claude') return { instructions: [BROWSER_ONLY_INSTRUCTIONS], disallowedTools: CLAUDE_OFF, strictMcp: true };
+  if (s.agent === 'claude') return { instructions: [BROWSER_ONLY_INSTRUCTIONS], disallowedTools: CLAUDE_OFF, builtinTools: [], strictMcp: true };
   if (s.agent === 'codex') return { instructions: [BROWSER_ONLY_INSTRUCTIONS], codexConfig: CODEX_OFF };
   return { instructions: [BROWSER_ONLY_INSTRUCTIONS] };
 }
