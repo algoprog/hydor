@@ -90,7 +90,7 @@ export function FilePeek() {
     <>
       {file &&
         createPortal(
-          <div className="scrim fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && close()}>
+          <div className="scrim holds fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" onPointerDown={(e) => e.target === e.currentTarget && close()}>
             <div
               role="dialog"
               aria-modal
