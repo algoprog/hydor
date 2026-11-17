@@ -20,7 +20,7 @@ Unter dem Nachrichtenfeld findest du **Ausführungsumgebung**, **Modell**, **Ord
 
 - **Claude Code**: der Agent von Anthropic, nutzbar mit einem Claude-Abo oder API-Key.
 - **Codex**: der Agent von OpenAI, nutzbar mit einem ChatGPT-Abo oder API-Key.
-- **Benutzerdefiniert**: der eigene Agent der App für beliebige Modelle von OpenRouter, Ollama oder vLLM. Siehe [Custom, der eigene Agent der App](/guide/custom).
+- **Custom**: der eigene Agent der App für beliebige Modelle von OpenRouter, Ollama oder vLLM. Siehe [Custom, der eigene Agent der App](/guide/custom).
 - Weitere hinzugefügte ACP-Agenten wie Gemini CLI, OpenCode, Qwen Code oder Goose, jeweils mit ihrem Startbefehl unter dem Namen.
 
 Unten öffnet **Modelle für Custom** die [Einstellungen → Modelle](/settings?s=models). **Agenten hinzufügen oder verwalten** öffnet [Einstellungen → Weitere Agenten](/settings?s=agents). Siehe [Agenten, Konten und Modelle](/guide/agents-models).
@@ -60,7 +60,7 @@ Unter **Optionen** stehen die übrigen Einstellungen. Die Schaltfläche zeigt �
 - **Aufwand**: wie intensiv das Modell nachdenkt. **Standard** verwendet die Modelleinstellung. Je nach Modell gibt es **Niedrig** für schnelle, einfache Überlegungen, **Mittel** für eine ausgewogene Verarbeitung, **Hoch**, **Xhigh** für besonders gründliches Nachdenken und **Max** für den höchsten Denkaufwand. Manche Modelle bieten außerdem **Minimal**, **Keine** oder **Ultra**. Bei Custom, anderen ACP-Agenten und Modellen ohne solche Stufen wird die Auswahl nicht angeboten.
 - **Berechtigungen**: was der Agent ohne Rückfrage tun darf. Jedes Agentenprogramm hat eigene Modi; siehe [Bedeutung der Berechtigungsmodi](#what-each-permissions-mode-means). Umschalt+Tab im Nachrichtenfeld wechselt zum nächsten Modus.
 - **Konto**: erscheint, sobald du unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Accounts) ein weiteres Konto für Claude Code oder Codex hinzugefügt hast. **Deine Anmeldung** ist das eigene Konto des Agentenprogramms. Wähle ein anderes Konto, um die Sitzung damit auszuführen. **Konten verwalten** öffnet die Einstellungen.
-- **Vertraulich**: ein Schalter mit Schloss und dem Hinweis „Nur Modelle auf diesem Computer oder im privaten Netzwerk“ Er eignet sich etwa für die Begutachtung einer Arbeit, Patientendaten oder Kundencode. **Ausführungsumgebung** wechselt zu **Benutzerdefiniert**, **Modell** zum besten dafür verfügbaren Modell auf diesem Computer oder im privaten Netzwerk. Siehe [Eine Sitzung vertraulich halten](#keep-a-session-confidential).
+- **Vertraulich**: ein Schalter mit Schloss und dem Hinweis „Nur Modelle auf diesem Computer oder im privaten Netzwerk“ Er eignet sich etwa für die Begutachtung einer Arbeit, Patientendaten oder Kundencode. **Ausführungsumgebung** wechselt zu **Custom**, **Modell** zum besten dafür verfügbaren Modell auf diesem Computer oder im privaten Netzwerk. Siehe [Eine Sitzung vertraulich halten](#keep-a-session-confidential).
 - **Memory**: erscheint, wenn Memory in den Einstellungen aktiviert ist. **Ein** verwendet und ergänzt gespeichertes Wissen; **Für diese Sitzung deaktiviert** startet ohne diese Informationen und speichert nichts aus der Sitzung. Siehe [Memory](/guide/memory).
 - **Ausgabenlimit**: die maximalen Kosten der Sitzung zu API-Preisen. Gib einen Betrag ein und klicke auf **Festlegen**, oder wähle 1, 5, 10 oder 25 $. **Kein Limit** entfernt die Grenze. Am Limit hält die Sitzung an, bis du es erhöhst. Siehe [Nutzung, Limits und Kosten](/guide/usage).
 - **Schwarm**: **Aus** oder **Schwarm**. Ein leitender Agent zerlegt den Auftrag in unterschiedliche Ansätze und startet dafür jeweils einen Agenten. **Schwarm-Größe** unter [Einstellungen → Funktionen → Subagenten](/settings?s=children&find=Swarm%20size) begrenzt die gleichzeitig arbeitenden Mitglieder. Sie teilen Ergebnisse auf einem Board und schreiben einander Nachrichten. Das ist für schwierige Probleme gedacht und kostet ein Mehrfaches einer einzelnen Sitzung. Alternativ gibt es **Kampagne** („Eine große Änderung in Teilaufgaben, jeweils in einem Worktree“): Die Leitung zerlegt die Änderung, Mitglieder setzen ihre Teile auf eigenen Branches mit Tests um, anschließend führt die Leitung sie zusammen. Der Ordner muss in einem Git-Repository liegen; siehe [Kampagnen](/guide/engineering#campaigns-a-big-change-in-many-parts).
@@ -93,7 +93,7 @@ Schwarm, Kampagnen und Tiefgehende Recherche leiten Hydor-Subagenten. Deshalb la
 
 In Docker kann die eigene Sandbox von Codex nicht starten. Deshalb ist dort **Voller Zugriff** der Standard; das Menü erklärt den Grund.
 
-**Benutzerdefiniert**
+**Custom**
 
 | Modus | Was der Agent darf |
 | --- | --- |
@@ -112,7 +112,7 @@ Außerhalb von Vollzugriff fragt Custom vor riskanten Befehlen nach. In den Modi
 Manche Inhalte dürfen nicht an öffentliche KI-Dienste übermittelt werden: eine zur Begutachtung zugesandte Paper, deren Weitergabe an Online-KI die meisten Konferenzen und Fachzeitschriften untersagen, Patienten- oder Kundenunterlagen oder vertraglich geschützter Unternehmenscode. Eine vertrauliche Sitzung verwendet nur Modelle auf diesem Computer oder im privaten Netzwerk und schränkt Funktionen für externe Dienste ein. Bei einem Modell im privaten Netzwerk werden die Inhalte an dessen Server übertragen; der Modus garantiert deshalb keine Verarbeitung ausschließlich auf diesem Computer.
 
 1. Öffne auf der Startseite **Optionen** und aktiviere **Vertraulich** („Nur Modelle auf diesem Computer oder im privaten Netzwerk“). Die Schaltfläche zeigt anschließend „Vertraulich“.
-2. **Ausführungsumgebung** wechselt zu **Benutzerdefiniert**, **Modell** zum besten dafür verfügbaren Modell auf diesem Computer oder im privaten Netzwerk. Solange der Modus aktiv ist, stehen nur entsprechende Programme und Modelle zur Auswahl. Ist kein geeignetes Modell verfügbar, weist die App darauf hin. Unter [Einstellungen → Agenten → Modelle](/settings?s=models) installierst du für diesen Computer vorgeschlagene Modelle mit einem Klick.
+2. **Ausführungsumgebung** wechselt zu **Custom**, **Modell** zum besten dafür verfügbaren Modell auf diesem Computer oder im privaten Netzwerk. Solange der Modus aktiv ist, stehen nur entsprechende Programme und Modelle zur Auswahl. Ist kein geeignetes Modell verfügbar, weist die App darauf hin. Unter [Einstellungen → Agenten → Modelle](/settings?s=models) installierst du für diesen Computer vorgeschlagene Modelle mit einem Klick.
 3. Schreibe deinen Auftrag, hänge die Arbeit an oder wähle ihren Ordner und drücke Enter. Zum Beispiel: „Begutachte die angehängte Einreichung für NeurIPS: Zusammenfassung, Stärken, Schwächen, Fragen an die Autoren und eine Bewertung.“
 
 Als lokale Modelle gelten hier laufende Ollama- und vLLM-Modelle sowie Endpunkte auf diesem Computer oder in deinem privaten Netzwerk: `localhost`, `127.0.0.1`, `::1`, `10.…`, `192.168.…`, `172.16.…` bis `172.31.…` oder Namen mit der Endung `.local`. Siehe [Ollama, vLLM oder einen anderen Endpunkt verbinden](/guide/agents-models#connect-ollama-vllm-or-another-endpoint). Ollama-Cloudmodelle mit „cloud“ am Namensende laufen auf ollama.com und zählen nicht dazu. Die Startseite behält den vertraulichen Modus für weitere Sitzungen bei, bis du ihn ausschaltest.
@@ -243,7 +243,7 @@ Die Schaltflächen hängen vom Agenten ab:
 
 - **Claude Code**: **Erlauben**, **Ablehnen** und oft eine Regel wie „Bash npm test immer erlauben“ oder „Alle Änderungen in dieser Sitzung erlauben“.
 - **Codex**: **Erlauben**, **Für diese Sitzung erlauben**, **Diesen Befehl immer erlauben**, **Ablehnen**, **Ablehnen und stoppen**; bei Dateiänderungen **Änderungen in dieser Sitzung erlauben**, bei erweiterten Berechtigungen **Für diesen Durchlauf erlauben** und **Für diese Sitzung erlauben**.
-- **Benutzerdefiniert**: **Erlauben**, **Immer erlauben** mit dem genauen Geltungsbereich sowie **Ablehnen**. Die dauerhafte Freigabe gilt nur für den genehmigten Befehl, damit sich keine weiteren Befehle anhängen lassen.
+- **Custom**: **Erlauben**, **Immer erlauben** mit dem genauen Geltungsbereich sowie **Ablehnen**. Die dauerhafte Freigabe gilt nur für den genehmigten Befehl, damit sich keine weiteren Befehle anhängen lassen.
 - Andere Agenten zeigen ihre eigenen Auswahlmöglichkeiten.
 
 **Ablehnen** öffnet zunächst ein Feld mit „Optional: Sag dem Agenten, was er stattdessen tun soll“. Ein zweiter Klick auf **Ablehnen** sendet die Entscheidung mit oder ohne Hinweis. Custom antwortet bei **Ablehnen** sofort, Codex bei **Ablehnen und stoppen** ebenfalls.
@@ -339,7 +339,7 @@ Ein Ziel hält den Agenten über mehrere Durchläufe hinweg an der Arbeit, bis e
 
 - **Claude Code** arbeitet weiter; nach jedem Durchlauf prüft eine kurze Kontrolle, ob das Ziel erreicht ist.
 - **Codex** arbeitet weiter, bis es das Ziel als erreicht bewertet.
-- **Benutzerdefiniert** arbeitet weiter; nach jedem Durchlauf prüft das Hilfsmodell die Belege und nennt den nächsten Schritt. Bei ausbleibendem Fortschritt pausiert das Ziel. Die maximale Rundenzahl legst du unter [Einstellungen → Custom → Ziele → Runden bis zur Zielpause](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) fest.
+- **Custom** arbeitet weiter; nach jedem Durchlauf prüft das Hilfsmodell die Belege und nennt den nächsten Schritt. Bei ausbleibendem Fortschritt pausiert das Ziel. Die maximale Rundenzahl legst du unter [Einstellungen → Custom → Ziele → Runden bis zur Zielpause](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) fest.
 
 Solange ein Ziel besteht, zeigt eine Leiste über dem Nachrichtenfeld Ziel und Status: in Bearbeitung, pausiert, ohne Fortschritt mit benötigter Hilfe oder an einem Nutzungs- beziehungsweise Tokenlimit gestoppt. Außerdem siehst du Zahl der Prüfungen, Zeit- und Tokenverbrauch und die Begründung der letzten Prüfung. **Pausieren** und **Fortsetzen** funktionieren bei Codex und Custom; **Entfernen** beendet die Arbeit am Ziel. Ein Zielsymbol in der Seitenleiste markiert Sitzungen mit Ziel.
 

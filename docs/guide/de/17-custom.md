@@ -20,7 +20,7 @@ Wie andere Agenten liest Custom `AGENTS.md` oder `CLAUDE.md` des Projekts und be
 
 ## Eine Custom-Sitzung starten
 
-1. Klicke auf der Startseite auf **Agent** und wähle **Benutzerdefiniert** mit dem Hinweis „Beliebiges Modell: OpenRouter, Ollama, vLLM“.
+1. Klicke auf der Startseite auf **Agent** und wähle **Custom** mit dem Hinweis „Beliebiges Modell: OpenRouter, Ollama, vLLM“.
 2. Klicke auf **Modell** und wähle eines deiner Modelle. Ist die Liste leer, füge zuerst ein Modell hinzu: **Agent** → **Modelle für Custom**.
 3. Wähle unter **Optionen** die **Berechtigungen** (siehe [Was Custom ohne Rückfrage tun darf](#choose-what-custom-may-do-without-asking)). Eine Einstellung für den Denkaufwand gibt es bei Custom nicht.
 4. Schreibe die Aufgabe und drücke Enter.

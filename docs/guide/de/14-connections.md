@@ -8,7 +8,7 @@ Verbinde E-Mail, Notion, GitHub, Stripe, lokale Ordner und andere Dienste einmal
 
 Agenten können mehr, wenn du ihnen Werkzeuge gibst. Dafür gibt es drei Stellen:
 
-- **Verbundene Apps** ([Apps → Verbundene Apps](/apps/connected)): Dienste aus einem Marktplatz, einmal für alle Agenten verbunden: Claude Code, Codex, Benutzerdefiniert und die Agenten, die ACP sprechen, und die Apps, die sie ausführen. Jedes verbundene Konto gibt den Agenten seine Werkzeuge.
+- **Verbundene Apps** ([Apps → Verbundene Apps](/apps/connected)): Dienste aus einem Marktplatz, einmal für alle Agenten verbunden: Claude Code, Codex, Custom und die Agenten, die ACP sprechen, und die Apps, die sie ausführen. Jedes verbundene Konto gibt den Agenten seine Werkzeuge.
 - **Tresor** im Tab **Keys** derselben Seite: API-Keys, Tokens und Anmeldepasswörter. Ein API-Key erlaubt Programmen, einen Dienst über dein Konto zu verwenden. Agenten nutzen diese Daten für Aufrufe, Webseitenanmeldungen und Programme, sehen die Werte aber nicht.
 - **MCP-Server und Plugins** unter [Einstellungen → MCP-Server](/settings?s=mcp) und [Einstellungen → Plugins](/settings?s=plugins): selbst eingerichtete Tool-Server in den eigenen Einstellungen von Claude Code und Codex sowie Plugins mit Skills und Tools für alle Agenten; siehe [Plugins](/guide/plugins).
 
@@ -167,7 +167,7 @@ Ein Tool mit **Vorher fragen** wird niemals sofort ausgeführt. Hydor hält den 
 
 - Neu verbundene Konten setzen nach außen wirkende Tools standardmäßig auf **Vorher fragen**, andere auf **Aktiviert**. Unter **Werkzeuge** kannst du das ändern.
 - Frühere Konten behalten ihre Einstellungen, damit bestehende Abläufe funktionieren. Eine Aktion wie **Bei 3 Tools für Senden, Veröffentlichen, Löschen oder Bezahlen vorher fragen** stellt alle entsprechenden Tools gemeinsam um. Sie erscheint, solange solche Tools ohne ausdrückliche Auswahl aktiviert sind.
-- „Vorher fragen“ ist deine eigene Einstellung für das Konto, es gilt also in jeder Sitzung und jedem Berechtigungsmodus, auch bei **Voller Zugriff**. Agenten können es nicht ändern, ohne dich auf einer Karte zu fragen, und können einen zurückgehaltenen Aufruf nicht selbst senden. Wo ein Agent auch vor der Nutzung des Werkzeugs fragen würde (die eigene Karte von Claude Code oder Benutzerdefiniert), tut er es nicht: Du sagst einmal Ja, im Postausgang.
+- „Vorher fragen“ ist deine eigene Einstellung für das Konto, es gilt also in jeder Sitzung und jedem Berechtigungsmodus, auch bei **Voller Zugriff**. Agenten können es nicht ändern, ohne dich auf einer Karte zu fragen, und können einen zurückgehaltenen Aufruf nicht selbst senden. Wo ein Agent auch vor der Nutzung des Werkzeugs fragen würde (die eigene Karte von Claude Code oder Custom), tut er es nicht: Du sagst einmal Ja, im Postausgang.
 - Ob ein Werkzeug nach außen wirkt, wird an seinem Namen, seiner Beschreibung und den Hinweisen beurteilt, die sein Dienst gibt (etwa „liest nur“ oder „löscht“). Sieh dir die Markierungen an und stelle jedes andere Werkzeug selbst auf „Vorher fragen“.
 
 Geplante Aufgaben kannst du mit **Ohne Versand testen** ohne externe Aktionen erproben; siehe [Geplante Aufgaben](/guide/tasks#try-a-task-with-a-test-run).

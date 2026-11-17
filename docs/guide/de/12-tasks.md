@@ -77,7 +77,7 @@ Alle Zeiten sind lokal. Auf Smartphones zeigt die Ansicht jeweils einen Tag; **�
 ### Name, Agent und Ordner
 
 - **Name** (das Feld mit „Name, z. B. Morgendliche CI-Zusammenfassung“): wie die Aufgabe in der Liste, in Benachrichtigungen und in den Titeln der Sitzungen ihrer Läufe erscheint („Morgenüberblick · 3. Nov., 07:30“). Bis zu 120 Zeichen.
-- Der Agent-Chip: wer sie ausführt. Claude Code, Codex, Benutzerdefiniert oder ein anderer Agent, den du hinzugefügt hast (siehe [Agenten, Konten und Modelle](/guide/agents-models)). Wenn du einen anderen Agenten wählst, werden Modell und Aufwand zurückgesetzt und die üblichen Berechtigungen dieses Agenten gesetzt.
+- Der Agent-Chip: wer sie ausführt. Claude Code, Codex, Custom oder ein anderer Agent, den du hinzugefügt hast (siehe [Agenten, Konten und Modelle](/guide/agents-models)). Wenn du einen anderen Agenten wählst, werden Modell und Aufwand zurückgesetzt und die üblichen Berechtigungen dieses Agenten gesetzt.
 - Der Ordner-Chip: der Ordner, in dem jeder Lauf arbeitet. Gib einen Pfad ein oder wähle einen, und wähle dann **Diesen Ordner verwenden**. Der Ordner muss existieren.
 
 ### Modell, Denkaufwand, Berechtigungen und weitere Optionen

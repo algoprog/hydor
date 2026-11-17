@@ -91,7 +91,7 @@ Der Tab **Aktivität** (`/stats`) erfasst die Arbeit der Agenten aus den Sitzung
 Oben wählst du:
 
 - **Täglich** für die letzten 30 Tage, **Wöchentlich** für 26 Wochen, **Monatlich** für zwölf Monate oder seit Beginn deiner Historie und **Jährlich** nach Kalenderjahr. Die Seite merkt sich deine Auswahl.
-- **Alle** oder einen Agenten: **Claude**, **Codex**, **Benutzerdefiniert** und weitere hier bereits aktive Agenten wie Gemini CLI oder OpenCode.
+- **Alle** oder einen Agenten: **Claude**, **Codex**, **Custom** und weitere hier bereits aktive Agenten wie Gemini CLI oder OpenCode.
 - Ein Modell, wenn du es weiter unten unter **Nach Modell** ausgewählt hast. Die Seite zeigt dann nur dessen Werte. Mit dem **✕** an seiner Markierung wechselst du zurück zu allen Modellen.
 - **Diagramme** oder **Tabelle**.
 

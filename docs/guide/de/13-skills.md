@@ -28,7 +28,7 @@ Jede von der App gestartete Sitzung erhält die Skill-Bibliothek:
 
 - **Claude Code** erhält sie als Plugin namens „hydor“. Die Skills erscheinen deshalb etwa als hydor:research oder hydor:writing.
 - **Codex** erhält einen zusätzlichen Skills-Ordner.
-- **Benutzerdefiniert**, der eigene Agent der App, erhält die Skills nach Namen und Gruppen. Er kann außerdem anhand der Aufgabe nach einem Skill suchen. Siehe [Custom](/guide/custom).
+- **Custom**, der eigene Agent der App, erhält die Skills nach Namen und Gruppen. Er kann außerdem anhand der Aufgabe nach einem Skill suchen. Siehe [Custom](/guide/custom).
 - **Andere Agenten** wie Gemini CLI oder OpenCode erhalten eine Liste mit dem Dateipfad jedes Skills und lesen die passende Datei bei Bedarf.
 
 Außerhalb der App gestartete Sitzungen, etwa im Terminal oder in VS Code, erhalten die Bibliothek nicht. Die App trägt sie nicht in deine Claude-Code- oder Codex-Einstellungen ein.

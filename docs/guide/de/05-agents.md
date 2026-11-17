@@ -177,7 +177,7 @@ Der Editor, den **Alle Einstellungen** öffnet, enthält jede Einstellung eines 
   - **Der Ordner auf der Startseite**: Sitzungen arbeiten in dem Ordner, der dort angezeigt wird, wie bei Programmierer. Wähle das für Agenten, die in einem Projekt arbeiten.
 - **Ausführungsumgebung**: das Programm, das er vorschlägt und mit dem er auf der Startseite ausgewählt wird.
   - **Beliebiger Agent** behält standardmäßig deine Startseitenauswahl;
-  - **Claude Code**, **Codex**, **Benutzerdefiniert** mit beliebigem Modell oder unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügte Programme;
+  - **Claude Code**, **Codex**, **Custom** mit beliebigem Modell oder unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügte Programme;
   - Sobald du ein Programm auswählst, erscheint daneben ein Modellmenü mit den Modellen dieses Programms (bei Programmen, die eine Auswahl bieten); lässt du es unberührt, gilt das Standardmodell des Programms. Eine Leistungsstufe darunter bestimmt stattdessen das Modell.
 - **Berechtigungsmodus**:
   - **Wie ausgewählt** (die Standardeinstellung): behält den auf der Startseite gewählten Modus.
@@ -210,9 +210,9 @@ Die fünf Schalter umfassen:
 
 Die Wirkung ausgeschalteter Gruppen hängt vom Programm ab:
 
-- Bei **Claude Code und Benutzerdefiniert** sind diese Werkzeuge ausgeschaltet. Ist **Andere Werkzeuge** aus, bekommt Claude Code nur die eigenen Werkzeuge der App und deine verbundenen Konten, keinen der MCP-Server, die du selbst eingerichtet hast.
+- Bei **Claude Code und Custom** sind diese Werkzeuge ausgeschaltet. Ist **Andere Werkzeuge** aus, bekommt Claude Code nur die eigenen Werkzeuge der App und deine verbundenen Konten, keinen der MCP-Server, die du selbst eingerichtet hast.
 - **Codex** wird angewiesen, sie nicht zu verwenden. Ist **Web verwenden** aus, ist auch seine eigene Websuche ausgeschaltet. Ist **Befehle ausführen** aus, aber **Dateien lesen** an, wird Codex angewiesen, seine Shell nur zum Lesen und Durchsuchen von Dateien zu nutzen, da er Dateien über die Shell liest.
-- **Claude Code, Codex und Benutzerdefiniert** haben außerdem die Werkzeuge für Browser und Computer ausgeschaltet, wenn **Nutze einen Browser** oder **Nutze den Computer** aus ist.
+- **Claude Code, Codex und Custom** haben außerdem die Werkzeuge für Browser und Computer ausgeschaltet, wenn **Nutze einen Browser** oder **Nutze den Computer** aus ist.
 - **Andere Agenten** erhalten entsprechende Nutzungsverbote als Anweisung.
 
 Die eigenen Werkzeuge der App (Seiten, Memory und dergleichen) bleiben an, außer denen, die unter einen Schalter fallen, den du ausgeschaltet hast: Ist **Web verwenden** aus, entfallen auch die Websuche und das Lesen von Seiten der App; ist **Nutze einen Browser** aus, entfällt ihr Browser; ist **Nutze den Computer** aus, entfallen ihre Werkzeuge für Bildschirm, Maus und Tastatur; ist **Dateien lesen** aus, entfällt ihr Dokumentenleser. Verbundene Konten sind keine „anderen Werkzeuge“: Darüber entscheiden die **Verbindungen** weiter unten. Braucht eine Aufgabe etwas, das der Agent nicht verwenden kann, soll er das sagen, statt sich anders zu behelfen.
@@ -290,7 +290,7 @@ Modellstufen wählen nach Aufgabentyp statt Modellname:
 
 Ein Agent, der auf eine Leistungsstufe eingestellt ist, startet mit dem Modell dieser Stufe für das Programm, auf dem er läuft, außer wenn für die Sitzung ein Modell gewählt wurde; ist er auf **Automatisch** eingestellt (die Standardeinstellung), verwendet er das Modell, das dort gewählt wurde, wo er startet: auf der Startseite, in der geplanten Aufgabe oder beim Agenten, der ihm Arbeit übergibt. Auf der Startseite kann diese Wahl selbst **Automatisch** sein: Best, mit Wechsel zu Max, wenn sich das Problem als zu schwer erweist (siehe [Leistungsstufen: ein Modell für jede Art von Aufgabe](/guide/agents-models#tiers-a-model-for-each-kind-of-job)).
 
-[Einstellungen → Agenten → Modelle → Leistungsstufen](/settings?s=models&find=Tiers) sagt, was jede Leistungsstufe bedeutet, in einer Tabelle mit einer Spalte für jedes Programm: bei **Claude Code** ein Modell (zu Beginn Haiku, Sonnet, Opus und das neueste Fable) und ein Aufwand; bei **Codex** ein Modell und ein Aufwand (zu Beginn Luna, Terra, Sol und Astra; bei einem Abo ohne eines davon das nächstliegende, das es anbietet, mit mehr Aufwand für die höhere Stufe, wo sich zwei ein Modell teilen); bei **Benutzerdefiniert** eines deiner benutzerdefinierten Modelle oder keines, wodurch das in der Sitzung gewählte Modell bleibt. Eine Leistungsstufe, die du nicht anfasst, folgt dem neuesten Modell dieser Art ihres Programms. **Zurück zu den Standardeinstellungen** stellt sie wieder her.
+[Einstellungen → Agenten → Modelle → Leistungsstufen](/settings?s=models&find=Tiers) sagt, was jede Leistungsstufe bedeutet, in einer Tabelle mit einer Spalte für jedes Programm: bei **Claude Code** ein Modell (zu Beginn Haiku, Sonnet, Opus und das neueste Fable) und ein Aufwand; bei **Codex** ein Modell und ein Aufwand (zu Beginn Luna, Terra, Sol und Astra; bei einem Abo ohne eines davon das nächstliegende, das es anbietet, mit mehr Aufwand für die höhere Stufe, wo sich zwei ein Modell teilen); bei **Custom** eines deiner benutzerdefinierten Modelle oder keines, wodurch das in der Sitzung gewählte Modell bleibt. Eine Leistungsstufe, die du nicht anfasst, folgt dem neuesten Modell dieser Art ihres Programms. **Zurück zu den Standardeinstellungen** stellt sie wieder her.
 
 **Höchste Modellstufe für die von ihm gestarteten Subagenten** begrenzt delegierte Hydor-Modellstufen. Höhere Anforderungen werden auf die Grenze reduziert; außerdem darf kein Subagent über der Stufe seiner Leitung arbeiten. Ein ausdrücklich genanntes Modell wird wie angegeben verwendet.
 
@@ -391,7 +391,7 @@ Ab deiner nächsten Nachricht arbeitet die Sitzung als der neue Agent, und die U
 
 - Das Programm erhält die Wechselanweisung mit deiner Nachricht, unsichtbar in der Unterhaltung.
 - **Claude Code und Codex** lesen ihre Anweisungen beim Start. Ist die Sitzung frei, startet ihr Programm deshalb vor deiner Nachricht neu, mit den Anweisungen und Grenzen des neuen Agenten; diese Nachricht dauert dann einen Moment länger. Mitten in einem Durchgang oder während es auf ein Ziel hinarbeitet oder Arbeit im Hintergrund hat, bekommt es die neuen Anweisungen stattdessen mit deiner Nachricht und startet bei einer späteren Nachricht neu, sobald es frei ist.
-- **Benutzerdefiniert** liest vor jedem Durchlauf neu. Andere Programme wie Gemini CLI und OpenCode erhalten die Anweisungen mit deiner Nachricht.
+- **Custom** liest vor jedem Durchlauf neu. Andere Programme wie Gemini CLI und OpenCode erhalten die Anweisungen mit deiner Nachricht.
 - Die verbundenen Konten, die der neue Agent einschaltet, sind in der Sitzung eingeschaltet, anstelle derer des vorherigen; was du selbst für die Sitzung ein- oder ausgeschaltet hast, bleibt. Hat er einen Berechtigungsmodus, wechselt die Sitzung auf den passenden Modus, und auf sein Modell, wenn er das eigene Programm der Sitzung vorschlägt. Das Programm selbst bleibt gleich: Wie du die Unterhaltung in ein anderes verlegst, steht unter [Mit einem anderen Agenten fortsetzen](/guide/sessions#continue-in-another-agent).
 
 Eine Sitzung, die ohne Agent gestartet wurde (in VS Code oder einem Terminal oder bevor es Agenten in der App gab), zeigt dort **Kein Agent**: Wähle einen, um ihr einen zu geben. Auch das Menü der Sitzung (⋯) → **Sitzungseinstellungen** → **Agent** nennt ihn; ein Klick darauf öffnet die Seite des Agenten.

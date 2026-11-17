@@ -144,9 +144,9 @@ Eine Frage kann eine Hilfezeile darunter haben, eine Beispielantwort im Feld und
 
 Bei einer vorgefertigten App zeigt **Veränderung** neben der Zeile unter dem Formular die Auswahlfelder (und **Fertig** klappt sie wieder ein):
 
-- Das Programm: Claude Code, Codex, Benutzerdefiniert (Hydors eigener Agent für beliebige Modelle) oder ein anderer Agent, den du hinzugefügt hast.
+- Das Programm: Claude Code, Codex, Custom (Hydors eigener Agent für beliebige Modelle) oder ein anderer Agent, den du hinzugefügt hast.
 - **Modell**: die Modelle des Agenten.
-- **Aufwand**: wie gründlich das Modell nachdenkt, bei Modellen, die Stufen anbieten (nicht bei Benutzerdefiniert und den anderen hinzugefügten Agenten).
+- **Aufwand**: wie gründlich das Modell nachdenkt, bei Modellen, die Stufen anbieten (nicht bei Custom und den anderen hinzugefügten Agenten).
 - **Modus**: was der Agent tun darf, ohne dich zu fragen. Er beginnt bei **Automatisch**, weil bei einem Lauf niemand zuschaut. Ein Modus, der vor jedem Schritt fragt, lässt den Lauf auf dich warten.
 
 Dieser Browser merkt die Auswahl für die nächste vorgefertigte App.
@@ -166,7 +166,7 @@ Manche Apps arbeiten mit einem Dienst, der einen Key will: einen API-Key oder ei
 
 Ein Lauf ohne einen Key, den er braucht, startet nicht: In seinem Formular wirst du danach gefragt („Für die Ausführung erforderlich“); über die API, einen Zeitplan oder Zeilen einer CSV-Datei wird der Lauf abgelehnt und sagt, welchen Key du hinzufügen musst (auf ihrer Seite oder unter **Apps → Verbundene Apps → Keys** unter diesem Namen). Wenn ein Key, den du gespeichert hast, noch nicht an eine Website gehen darf, an die die App ihn sendet, sagt das seine Zeile, mit **Erlauben**.
 
-Manche Apps nutzen ein Modell über OpenRouter (zum Beispiel eines, das Bilder zeichnet). Sie fragen auf dieselbe Weise nach deinem **OpenRouter-API-Key**, mit **Abrufen**: Er wird unter [Einstellungen → Modelle](/settings?s=models) gespeichert statt im Tresor, auch für deine anderen Apps und Benutzerdefiniert, und das Modell wird deinen Modellen von selbst hinzugefügt, wenn die App zum ersten Mal läuft. Ein Modell, das auf Ollama, vLLM oder einem Endpunkt läuft, richtest du von Hand unter Einstellungen → Modelle ein: Bis dahin wird ein Lauf abgelehnt und sagt, welches Modell und wie.
+Manche Apps nutzen ein Modell über OpenRouter (zum Beispiel eines, das Bilder zeichnet). Sie fragen auf dieselbe Weise nach deinem **OpenRouter-API-Key**, mit **Abrufen**: Er wird unter [Einstellungen → Modelle](/settings?s=models) gespeichert statt im Tresor, auch für deine anderen Apps und Custom, und das Modell wird deinen Modellen von selbst hinzugefügt, wenn die App zum ersten Mal läuft. Ein Modell, das auf Ollama, vLLM oder einem Endpunkt läuft, richtest du von Hand unter Einstellungen → Modelle ein: Bis dahin wird ein Lauf abgelehnt und sagt, welches Modell und wie.
 
 ### Arbeitsort eines Laufs
 
@@ -413,16 +413,16 @@ Eine öffentliche Seite lässt jeden, der den Link hat, das Formular ausfüllen 
 
 Öffentliche Läufe nutzen immer Custom. Richte dafür zuerst ein Modell unter [Einstellungen → Agenten → Modelle](/settings?s=models) ein.
 
-1. Schalte den Schalter ein. Der Zustand wechselt von **Geschlossen** zu **Offen für jeden mit dem Link**, und das erste Modell von Benutzerdefiniert wird dafür gewählt (ändere es weiter unten).
+1. Schalte den Schalter ein. Der Zustand wechselt von **Geschlossen** zu **Offen für jeden mit dem Link**, und das erste Modell von Custom wird dafür gewählt (ändere es weiter unten).
 2. Kopiere den Link (Hydors Adresse, gefolgt von `/a/` und der Adresse der App) oder wähle **Öffnen**.
 3. Stelle den Rest ein:
-   - **Modell (eines von Benutzerdefiniert)**: das Modell, das öffentliche Läufe verwenden.
+   - **Modell (eines von Custom)**: das Modell, das öffentliche Läufe verwenden.
    - **Im Web suchen und lesen**: zunächst eingeschaltet. Ausgeschaltet antwortet der Agent aus dem, was er weiß.
    - **Läufe pro Besucher und Stunde** (zunächst 5), **Öffentliche Läufe pro Tag** (50) und **Maximale Ausgaben pro Tag** (2 $). Eine Zeile zeigt die öffentlichen Läufe und Ausgaben von heute.
 
 Was Besucher bekommen: den Namen, das Symbol, die Beschreibung und das Formular der App, ihren Lauf, während er läuft, und ihre eigenen früheren Läufe (die letzten 10, an einem Cookie in ihrem Browser erkannt). Sie sehen nie die Aufgabe, die Einstellungen, die Läufe anderer Leute, die Sitzung oder die Kosten, und Fehler erreichen sie in allgemeinen Worten. Dateien, die sie anhängen, dürfen bis zu 3 MB groß sein, und ihre Antworten werden kürzer gehalten als deine. Die Fußzeile der Seite erinnert sie daran, dass Antworten falsch sein können.
 
-Was öffentliche Läufe können: Benutzerdefiniert mit dem gewählten Modell, ohne Befehle und ohne Dateien, mit ausgeschaltetem Memory und ausgeschalteten Verbindungen, in einem Wegwerf-Ordner, der gelöscht wird, wenn der Lauf endet. Sie können nur die Ergebnisfelder abliefern und, wenn du es erlaubst, im Web suchen und öffentliche Seiten lesen. Eine angehängte Datei erreicht den Agenten als ihr Text. Die Ausgaben jedes Laufs sind durch das begrenzt, was vom Budget des Tages übrig ist.
+Was öffentliche Läufe können: Custom mit dem gewählten Modell, ohne Befehle und ohne Dateien, mit ausgeschaltetem Memory und ausgeschalteten Verbindungen, in einem Wegwerf-Ordner, der gelöscht wird, wenn der Lauf endet. Sie können nur die Ergebnisfelder abliefern und, wenn du es erlaubst, im Web suchen und öffentliche Seiten lesen. Eine angehängte Datei erreicht den Agenten als ihr Text. Die Ausgaben jedes Laufs sind durch das begrenzt, was vom Budget des Tages übrig ist.
 
 Damit es ruhig bleibt: Höchstens 3 öffentliche Läufe einer App laufen gleichzeitig (8 über alle Apps), ein Besucher wartet, bis sein letzter Lauf beendet ist, bevor er einen weiteren startet, und eine Adresse bekommt über alle Seiten höchstens 60 Läufe pro Stunde. Öffentliche Läufe zählen zum Tageslimit der App, und sie nehmen keine Nachfragen an. Schalte den Schalter aus, um die Seite zu schließen; Besucher sehen dann „Diese Seite ist nicht öffentlich freigegeben“.
 
@@ -457,7 +457,7 @@ Eine App kann von selbst laufen: zu einer Uhrzeit, in regelmäßigen Abständen,
 
 ## Kosten eines Laufs
 
-Die Kosten jedes Laufs erscheinen auf seiner Seite, sobald er endet, und in der Liste **Ausführungen**. Es ist der Betrag, den der Agent meldet, oder seine Nutzung zu API-Preisen bewertet (bei Benutzerdefiniert geschätzt aus dem, was er gelesen und geschrieben hat); Modelle, die auf diesem Computer laufen, kosten 0 $.
+Die Kosten jedes Laufs erscheinen auf seiner Seite, sobald er endet, und in der Liste **Ausführungen**. Es ist der Betrag, den der Agent meldet, oder seine Nutzung zu API-Preisen bewertet (bei Custom geschätzt aus dem, was er gelesen und geschrieben hat); Modelle, die auf diesem Computer laufen, kosten 0 $.
 
 Bevor du eine CSV-Datei ausführst, schätzt Hydor den ganzen Stapel: „About $… for … rows“, aus den mittleren Kosten der letzten abgeschlossenen Läufe der App (bis zu 30). Bei einem Limit pro Lauf kommt hinzu, was die Zeilen höchstens ausgeben könnten. Wenn die App noch nie einen Lauf abgeschlossen hat, steht dort „Führe die App einmal aus, um die Kosten eines Laufs zu sehen.“
 

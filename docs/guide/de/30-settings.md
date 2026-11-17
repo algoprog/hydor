@@ -304,9 +304,9 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 - [**Ohne Rückfrage ausführen**](/settings?s=apps&find=Run%20without%20asking): Apps, die Agenten ohne vorherige Rückfrage für dich ausführen. Entferne eine App, damit wieder gefragt wird.
 
-### Benutzerdefiniert
+### Custom
 
-[Einstellungen → Benutzerdefiniert](/settings?s=custom): Auto-Modus, Befehls-Sandbox und Laufzeit von Zielen. Mehr dazu unter [Custom, der eigene Agent der App](/guide/custom).
+[Einstellungen → Custom](/settings?s=custom): Auto-Modus, Befehls-Sandbox und Laufzeit von Zielen. Mehr dazu unter [Custom, der eigene Agent der App](/guide/custom).
 
 - [**Auto-Modus**](/settings?s=custom&find=Auto%20mode): Custom genehmigt sichere Schritte selbstständig.
 - [**Sandbox für Befehle**](/settings?s=custom&find=Sandbox%20for%20commands): Befehle im Auto-Modus laufen in einer Sandbox; bei Vollzugriff laufen sie ohne Sandbox.
