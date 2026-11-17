@@ -25134,5 +25134,12 @@
   "Built memory from history": "Η μνήμη δημιουργήθηκε από το ιστορικό",
   "Rebuilt the wiki": "Το wiki αναδημιουργήθηκε",
   "Updated the wiki": "Το wiki ενημερώθηκε",
-  "It already has articles or was built from history: use Update now or Rebuild": "Έχει ήδη άρθρα ή έχει δημιουργηθεί από το ιστορικό: χρησιμοποίησε «Ενημέρωση τώρα» ή «Αναδημιουργία»"
+  "It already has articles or was built from history: use Update now or Rebuild": "Έχει ήδη άρθρα ή έχει δημιουργηθεί από το ιστορικό: χρησιμοποίησε «Ενημέρωση τώρα» ή «Αναδημιουργία»",
+"{0} of {1} this month":"{0} από {1} αυτόν τον μήνα",
+"Grok":"Grok",
+"Grok Build did not answer in time":"Το Grok Build δεν απάντησε εγκαίρως",
+"Grok Build is not installed":"Το Grok Build δεν είναι εγκατεστημένο",
+"Grok Build stopped before it answered":"Το Grok Build σταμάτησε πριν απαντήσει",
+"No weekly limit reported for this plan.":"Δεν αναφέρεται εβδομαδιαίο όριο για αυτό το πρόγραμμα.",
+"This agent has no effort to set":"Αυτός ο πράκτορας δεν έχει ένταση συλλογισμού για ρύθμιση"
 }

@@ -25150,5 +25150,12 @@
   "Built memory from history": "已根据历史记录构建记忆",
   "Rebuilt the wiki": "已重建 wiki",
   "Updated the wiki": "已更新 wiki",
-  "It already has articles or was built from history: use Update now or Rebuild": "已有文章,或已根据历史记录构建过:请使用“立即更新”或“重建”"
+  "It already has articles or was built from history: use Update now or Rebuild": "已有文章,或已根据历史记录构建过:请使用“立即更新”或“重建”",
+"{0} of {1} this month":"本月 {0} / {1}",
+"Grok":"Grok",
+"Grok Build did not answer in time":"Grok Build 未能及时响应",
+"Grok Build is not installed":"Grok Build 未安装",
+"Grok Build stopped before it answered":"Grok Build 在响应前停止了",
+"No weekly limit reported for this plan.":"此套餐未报告每周限额。",
+"This agent has no effort to set":"此智能体没有可设置的推理强度"
 }

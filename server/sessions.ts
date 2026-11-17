@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
+import type { AccountAgent, Agent, AgentCatalog, AgentUsage, BackgroundTask, ExternalState, LiveOverlay, LiveState, NotifyEvent, PullRequestInfo, QueuedMessage, SessionPrefs, SessionSummary, TimelineItem, WorktreeInfo } from '../shared/types.ts';
 import { ClaudeLive, CLAUDE_MODES, claudeSpec, precompactCopy } from './agents/claude.ts';
 import { grokControl } from './agents/grok.ts';
 import { RpcError } from './agents/rpc.ts';
@@ -17,7 +17,7 @@ import type { DB } from './db.ts';
 import { kvGet, kvSet } from './db.ts';
 import { answersText, dropForm, standingForm, standingForms } from './openForms.ts';
 import { formContent } from '../shared/forms.ts';
-import { isGrok } from '../shared/grok.ts';
+import { ACCOUNT_AGENT_NAMES, accountAgentOf, isGrok } from '../shared/grok.ts';
 import { agentBaseEnv } from './env.ts';
 import { ExternalWatcher } from './external.ts';
 import { keptOfTranscript, type Indexer } from './indexer/index.ts';
@@ -772,7 +772,8 @@ export class SessionManager extends EventEmitter {
    * another account too, once it has ended its turn. How a stopped one carries on is kept for afterLimit.
    */
   private afterTurn(s: SessionSummary, hit: boolean, now: number) {
-    if (s.agent === 'acp' || !this.onLimited) return;
+    const agent = this.accountAgentOf(s.key, s.agent);
+    if (!agent || !this.onLimited) return;
     // A resume is set already: it continues then.
     const resumes = this.resumeLookup?.(s.key);
     if (resumes) {
@@ -782,19 +783,24 @@ export class SessionManager extends EventEmitter {
     const switching = autoSwitchOn(this.db) && !s.external;
     const failed = (e: Error) => this.emit('toast', { level: 'error', text: `${s.title}: could not switch accounts: ${e.message}` });
     if (!hit) {
-      if (switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
+      if (agent !== 'grok' && switching && this.lives.get(s.key)?.adapter.limitTasks.size) this.switchForSubagents(s.key).catch(failed);
       return;
     }
-    const lim = this.controlFor(s.agent, s.account).lastUsage?.limited;
-    const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
-    const after: Promise<LimitAfter | null | void> = switching
-      ? this.switchAtLimit(s.key, resetsAt).catch((e: Error) => {
-          failed(e);
-          return null;
-        })
-      : kvGet(this.db, 'auto_resume') === '1'
-        ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null)
-        : Promise.resolve(null);
+    const carry = () => {
+      const lim = this.lastUsageOf(agent, s.account)?.limited;
+      const resetsAt = lim?.resetsAt && lim.resetsAt > now ? lim.resetsAt : undefined;
+      return switching
+        ? this.switchAtLimit(s.key, resetsAt).catch((e: Error) => {
+            failed(e);
+            return null;
+          })
+        : kvGet(this.db, 'auto_resume') === '1'
+          ? this.resumeAfterLimit(s.key, resetsAt).catch(() => null)
+          : Promise.resolve(null);
+    };
+    // Grok Build's limit hit says nothing of when it lifts: its usage is read afresh first (see the limithit handler).
+    const read = agent === 'grok' ? this.limitReads.get(s.key) : undefined;
+    const after: Promise<LimitAfter | null | void> = read ? read.then(carry, carry) : carry();
     this.limitAfter.set(s.key, { at: now, after: after.then((a) => a ?? null) });
   }
 
@@ -1102,6 +1108,16 @@ export class SessionManager extends EventEmitter {
     // A turn you stopped yourself is not one the limit interrupted, even when the limit's error came first.
     adapter.on('limithit', () => {
       if (!this.userStopped.has(key)) this.limitHits.add(key);
+      // Grok Build's account has no rate-limit event: its usage is read now, so the limit and its reset are known.
+      if (adapter.agent === 'acp' && this.isGrokSession(key)) {
+        const read = this.usageOf('grok', this.lives.get(key)?.account, 0)
+          .then(() => undefined)
+          .catch(() => undefined)
+          .finally(() => {
+            if (this.limitReads.get(key) === read) this.limitReads.delete(key);
+          });
+        this.limitReads.set(key, read);
+      }
     });
     // A tool call's input as the model writes it: Pages draws a page while it is being written.
     adapter.on('toolstream', (e: unknown) => this.emit('toolstream', key, e));
@@ -1388,10 +1404,11 @@ export class SessionManager extends EventEmitter {
     // Only Grok Build has accounts among the ACP agents.
     if (o.agent === 'acp' && !isGrok(acpAgent(this.db, o.acpAgent))) account = undefined;
     // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
-    if (o.agent !== 'acp' && autoSwitchOn(this.db)) {
-      const lim = this.controlFor(o.agent, account).lastUsage?.limited;
+    const acctAgent = accountAgentOf(o.agent, o.agent === 'acp' ? acpAgent(this.db, o.acpAgent) : null);
+    if (acctAgent && autoSwitchOn(this.db)) {
+      const lim = this.lastUsageOf(acctAgent, account)?.limited;
       if (lim?.resetsAt && lim.resetsAt > Date.now()) {
-        const free = await this.freeAccount(o.agent, account);
+        const free = await this.freeAccount(acctAgent, account);
         if (free) account = free.id;
       }
     }
@@ -1642,10 +1659,10 @@ export class SessionManager extends EventEmitter {
    * account is not at a limit; undefined when that is not known (not read yet, or no plan limits).
    */
   limitLiftsAt(key: string): number | null | undefined {
-    const agent = agentOfKey(key);
-    if (agent === 'acp') return undefined;
+    const agent = this.accountAgentOf(key);
+    if (!agent) return undefined;
     const lifts = (account?: string) => {
-      const u = this.controlFor(agent, account).lastUsage;
+      const u = this.lastUsageOf(agent, account);
       if (!u?.ok) return undefined;
       return u.limited ? (u.limited.resetsAt ?? undefined) : null;
     };
@@ -1659,14 +1676,14 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An account's usage as it last said, read again when that is older than `fresh` ms. */
-  private async usageOf(agent: 'claude' | 'codex', account: string | undefined, fresh = 120_000): Promise<AgentUsage | undefined> {
-    const ctl = this.controlFor(agent, account);
-    const last = ctl.lastUsage;
+  private async usageOf(agent: AccountAgent, account: string | undefined, fresh = 120_000): Promise<AgentUsage | undefined> {
+    const last = this.lastUsageOf(agent, account);
     if (last && Date.now() - last.fetchedAt <= fresh) return last;
     // One read at a time per account.
     const id = `${agent}:${account ?? ''}`;
     let read = this.usageReads.get(id);
     if (!read) {
+      const ctl = agent === 'grok' ? grokControl(this.db, account) : this.controlFor(agent, account);
       read = (ctl instanceof ClaudeControl ? ctl.usage(this.liveClaudeUsage(account)) : ctl.usage())
         .then((u) => {
           this.emit('usage', account ? { accounts: { [account]: u } } : { [agent]: u });
@@ -1680,11 +1697,24 @@ export class SessionManager extends EventEmitter {
   }
 
   private usageReads = new Map<string, Promise<AgentUsage | undefined>>();
+  /** Grok Build sessions whose plan-limit hit is being followed by a fresh usage reading (afterTurn waits for it). */
+  private limitReads = new Map<string, Promise<void>>();
+
+  /** Whose accounts a session runs as: Claude Code's, Codex's, Grok Build's (an ACP session of it), or none. */
+  private accountAgentOf(key: string, agent: Agent = agentOfKey(key)): AccountAgent | null {
+    if (agent === 'claude' || agent === 'codex') return agent;
+    return this.isGrokSession(key) ? 'grok' : null;
+  }
+
+  /** An account's usage as it last said, without reading it again. */
+  private lastUsageOf(agent: AccountAgent, account: string | null | undefined): AgentUsage | null {
+    return (agent === 'grok' ? grokControl(this.db, account) : this.controlFor(agent, account)).lastUsage;
+  }
 
   private static usedUp = (u: AgentUsage | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
 
   /** Another signed-in account of the agent with usage left, the least used first; null when there is none. */
-  private async freeAccount(agent: 'claude' | 'codex', except: string | undefined): Promise<{ id: string | undefined } | null> {
+  private async freeAccount(agent: AccountAgent, except: string | undefined): Promise<{ id: string | undefined } | null> {
     let best: { id: string | undefined; used: number } | null = null;
     for (const id of accountPool(this.db, agent)) {
       if (id === except) continue;
@@ -1697,10 +1727,11 @@ export class SessionManager extends EventEmitter {
   }
 
   /** An account as people know it: an added one's name, the CLI's own by its email. */
-  private accountName(agent: 'claude' | 'codex', account: string | undefined): string {
+  private accountName(agent: AccountAgent, account: string | undefined): string {
     if (account) return accountById(this.db, account)?.name ?? 'another account';
-    const email = this.controlFor(agent).lastUsage?.account?.email;
-    return email ? `${email}` : `your main ${agent === 'claude' ? 'Claude' : 'Codex'} account`;
+    // Grok Build's usage has no email: its sign-in check kept it.
+    const email = agent === 'grok' ? grokControl(this.db).email : this.controlFor(agent).lastUsage?.account?.email;
+    return email ? `${email}` : `your main ${ACCOUNT_AGENT_NAMES[agent].split(' ')[0]} account`;
   }
 
   /**
@@ -1712,11 +1743,12 @@ export class SessionManager extends EventEmitter {
     if (this.switching.has(key)) return null;
     this.switching.add(key);
     try {
-      const agent = agentOfKey(key) as 'claude' | 'codex';
+      const agent = this.accountAgentOf(key);
+      if (!agent) return null;
       const from = this.accountOf(key);
       // Its own subagents still at work stop at their next request to this account, their work kept: the move waits
-      // for them rather than cut them off mid-step, so each can be continued on the next account.
-      if (await this.subagentsStop(key)) {
+      // for them rather than cut them off mid-step, so each can be continued on the next account (not Grok Build's).
+      if (agent !== 'grok' && (await this.subagentsStop(key))) {
         // Meanwhile you stopped it, or it went on (it moved already, or a turn got through).
         if (this.userStopped.has(key)) return null;
         const moved = this.accountOf(key);
@@ -1749,7 +1781,8 @@ export class SessionManager extends EventEmitter {
     if (this.switching.has(key) || this.subagentsAtWork(key) || this.lives.get(key)?.adapter.state.status !== 'idle') return;
     this.switching.add(key);
     try {
-      const agent = agentOfKey(key) as 'claude' | 'codex';
+      const agent = this.accountAgentOf(key);
+      if (!agent || agent === 'grok') return;
       const from = this.accountOf(key);
       // A usage that could not be read never moves a session that is getting on with its work.
       const own = await this.usageOf(agent, from, 60_000);
@@ -1787,7 +1820,7 @@ export class SessionManager extends EventEmitter {
    */
   private subagentsToContinue(key: string): string[] {
     const a = this.lives.get(key)?.adapter;
-    if (!a) return [];
+    if (!a || a.agent === 'acp') return [];
     const running = [...a.tasks.values()].filter((t) => t.status === 'running' && (t.kind ?? '').includes('agent')).map((t) => t.description);
     return [...new Set([...a.limitTasks.values(), ...running])];
   }
@@ -1816,8 +1849,8 @@ export class SessionManager extends EventEmitter {
    * it carries on; null when it stays stopped (you stopped it, or when the limit lifts is not known).
    */
   private async resumeAfterLimit(key: string, resetsAt: number | undefined): Promise<LimitAfter | null> {
-    const agent = agentOfKey(key);
-    if (agent === 'acp') return null;
+    const agent = this.accountAgentOf(key);
+    if (!agent) return null;
     if (!resetsAt) {
       const u = await this.usageOf(agent, this.accountOf(key), 0);
       const r = u?.limited?.resetsAt ?? Math.max(0, ...(u?.windows ?? []).filter((w) => (w.usedPercent ?? 0) >= 100).map((w) => w.resetsAt ?? 0));
@@ -1839,11 +1872,11 @@ export class SessionManager extends EventEmitter {
    * another account with usage left takes it first, so the message is not turned away.
    */
   private async switchBeforeSend(key: string) {
-    const agent = agentOfKey(key);
-    if (agent === 'acp' || !autoSwitchOn(this.db) || this.switching.has(key) || this.external.get(key)) return;
+    const agent = this.accountAgentOf(key);
+    if (!agent || !autoSwitchOn(this.db) || this.switching.has(key) || this.external.get(key)) return;
     const st = this.lives.get(key)?.adapter.state.status;
     if (st === 'working' || st === 'waiting' || st === 'starting') return;
-    if (!this.controlFor(agent, this.accountOf(key)).lastUsage?.limited) return;
+    if (!this.lastUsageOf(agent, this.accountOf(key))?.limited) return;
     this.switching.add(key);
     try {
       await this.beforeResume(key);
@@ -1857,8 +1890,8 @@ export class SessionManager extends EventEmitter {
    * the limit and another is not, it moves there. True when a goal it carried over already continues it.
    */
   async beforeResume(key: string): Promise<boolean> {
-    const agent = agentOfKey(key);
-    if (agent === 'acp' || !autoSwitchOn(this.db)) return false;
+    const agent = this.accountAgentOf(key);
+    if (!agent || !autoSwitchOn(this.db)) return false;
     const from = this.accountOf(key);
     if (!SessionManager.usedUp(await this.usageOf(agent, from, 60_000))) return false;
     const to = await this.freeAccount(agent, from);
@@ -1939,7 +1972,8 @@ export class SessionManager extends EventEmitter {
 
   /** Moves the session to the account, says so, and brings a Codex goal along. True when that goal continues it by itself. */
   private async carryOver(key: string, from: string | undefined, to: string | undefined): Promise<boolean> {
-    const agent = agentOfKey(key) as 'claude' | 'codex';
+    const agent = this.accountAgentOf(key);
+    if (!agent) return false;
     const s = this.summary(key);
     // Codex keeps a thread's goal in its account's own folder: it is set again on the new one.
     const goal = agent === 'codex' ? s?.goal : undefined;

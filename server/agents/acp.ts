@@ -20,7 +20,7 @@ import { PAGE_SERVER } from '../mcp.ts';
 import { acpBriefing, acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
-import { RpcPeer } from './rpc.ts';
+import { RpcPeer, RpcError } from './rpc.ts';
 import { which, WIN } from '../platform.ts';
 
 type Json = Record<string, any>;
@@ -216,6 +216,30 @@ export interface AcpOpts {
   add?: GivenAdditions;
 }
 
+/**
+ * Whether a Grok Build turn stopped on the plan's usage limit (not a short throttle). Its error kinds `usage_limit_reached` and
+ * `usage_pool_exhausted` and its sentences ("You hit your weekly limit.", "You've hit the credit limit for your plan.", "run out of
+ * credits", HTTP 402) say so; `rate_limited`, `global_rate_limit` and `concurrency_limit` are throttles that pass by themselves.
+ */
+const PLAN_KINDS = /usage_limit_reached|usage_pool_exhausted/i;
+const PLAN_SENTENCE = /\bhit (?:your|the) (?:(?:weekly|daily|monthly|hourly|session|free|usage|credit|spending|plan)\s+)*(?:limit|cap)\b|\brun out of credits\b|\bstatus (?:code )?:?\s*402\b/i;
+/** A turn's whole answer that is only that sentence (a short text, at most a few plain words before it). */
+const PLAN_ANSWER = /^[\w' ]{0,20}?(?:\bhit (?:your|the) (?:(?:weekly|daily|monthly|hourly|session|free|usage|credit|spending|plan)\s+)*(?:limit|cap)\b|\brun out of credits\b)/i;
+
+export function planLimitHit(turn: { error?: string; code?: number; data?: unknown; text?: string; tools?: number }): boolean {
+  if (turn.error != null) {
+    let data = '';
+    try {
+      data = turn.data == null ? '' : JSON.stringify(turn.data).slice(0, 2000);
+    } catch {}
+    const said = `${turn.error} ${data}`;
+    return turn.code === 402 || PLAN_KINDS.test(said) || PLAN_SENTENCE.test(said);
+  }
+  // No error: the agent's own words, when they are all it said in the turn.
+  const text = (turn.text ?? '').trim();
+  return !turn.tools && text.length > 0 && text.length <= 160 && PLAN_ANSWER.test(text);
+}
+
 export class AcpLive extends LiveAdapter {
   readonly agent = 'acp' as const;
   rpc: RpcPeer;
@@ -230,6 +254,8 @@ export class AcpLive extends LiveAdapter {
   /** The running totals the agent last reported (for its ACP session), to tell what each model call used. */
   private usage?: { of: string; in: number; out: number; cached: number; usd?: number };
   private calls = 0;
+  /** What the turn running now has said and done, to tell a plan limit that stopped it (Grok Build). */
+  private turn = { text: '', tools: 0 };
   /** Lines the agent printed in this run so far; each transcript entry notes how many were handled. */
   private ln = 0;
   private caught: { handled: number; answered: Set<string> } | null = null;
@@ -452,6 +478,10 @@ export class AcpLive extends LiveAdapter {
       const u = m.params?.update;
       if (!u || this.loading) return;
       if (u.sessionUpdate === 'usage_update') this.callFrom(u);
+      if (this.prompting) {
+        if (u.sessionUpdate === 'agent_message_chunk' && typeof u.content?.text === 'string') this.turn.text = (this.turn.text + u.content.text).slice(-2000);
+        else if (u.sessionUpdate === 'tool_call' || u.sessionUpdate === 'tool_call_update') this.turn.tools++;
+      }
       this.record({ t: 'update', u });
       if (u.sessionUpdate === 'current_mode_update' && u.currentModeId) {
         this.state.mode = String(u.currentModeId);
@@ -592,6 +622,8 @@ export class AcpLive extends LiveAdapter {
     }
     this.record({ t: 'prompt', id, text, images: images.length || undefined });
     this.prompting = true;
+    this.limitStopped = false;
+    this.turn = { text: '', tools: 0 };
     this.state.status = 'working';
     this.state.turnStartedAt = Date.now();
     this.state.error = undefined;
@@ -601,10 +633,10 @@ export class AcpLive extends LiveAdapter {
       // Custom keeps the prompt's id with the turn: forks and "Edit from here" cut its conversation by it.
       .call('session/prompt', { sessionId: this.acpSession, prompt, ...(this.o.def.id === CONSOLE_ID ? { _meta: { promptId: id } } : {}) }, 7 * 24 * 3600_000)
       .then((r) => this.turnEnded({ stopReason: r?.stopReason ?? 'end_turn' }))
-      .catch((e) => this.turnEnded({ error: (e as Error).message }));
+      .catch((e) => this.turnEnded({ error: (e as Error).message }, e instanceof RpcError ? { code: e.code, data: e.data } : undefined));
   }
 
-  private turnEnded(r: { stopReason?: string; error?: string }) {
+  private turnEnded(r: { stopReason?: string; error?: string }, why?: { code?: number; data?: unknown }) {
     if (!this.prompting) return;
     this.prompting = false;
     // Requests the agent left open end with the turn.
@@ -618,6 +650,11 @@ export class AcpLive extends LiveAdapter {
       if (r.error) this.state.error = r.error;
     }
     this.changed();
+    // A Grok Build turn the plan's usage limit stopped: said before its result, as the other agents do.
+    if (isGrok(this.o.def) && planLimitHit({ error: r.error, ...why, text: this.turn.text, tools: this.turn.tools })) {
+      this.limitStopped = true;
+      this.emit('limithit');
+    }
     this.emit('result');
   }
 

@@ -107,13 +107,17 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   yours, also xAI's own installer's `~/.grok/bin`) and runs over ACP with the app's tools, approval cards and Grok's
   models. Sign in with a Grok subscription under Settings → Accounts: a link and a one-time code to confirm on any
   device, no pasting; an `XAI_API_KEY` works instead. A session started while signed out stops and says where to sign
-  in. A session whose ACP agent can no longer reopen it starts afresh, with a note, instead of failing.
+  in. A session whose ACP agent can no longer reopen it starts afresh, with a note, instead of failing. Its models take
+  a reasoning effort (xhigh, high, medium or low as each model takes them; Grok 4.5 has no xhigh), offered on the start
+  page as soon as Grok Build is added, changed in a running session and taken by app runs; a model that does not take
+  the effort you had shows its own default. Any ACP agent whose models offer efforts gets the same picker.
 - Several accounts per agent: sign in more than one Claude Code, Codex or Grok Build account and pick one per session
   (Grok accounts each keep their own sign-in and Grok history, and share the CLI's config, rules, skills, plugins and
   MCP sign-ins; a Grok session's Account chip moves it to another from the next message, its history with it); each
-  shows its own usage and limits (Claude Code and Codex only: Grok has no usage meters, no switching at a limit and no
-  API credit yet), and an added Claude account trusts the folders the main sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
-  account runs out of usage moves, with its history, to another account with usage left and carries on (a Claude Code
+  shows its own usage and limits (Grok Build's too: its plan, weekly usage, credits and pay as you go, from Grok's own
+  billing; no limit resets or API credit for Grok yet), and an added Claude account trusts the folders the main
+  sign-in trusts. With **Switch accounts at a limit** (on by default), the app uses them all: a session whose
+  account runs out of usage (for Grok, its weekly limit, credit limit or pay-as-you-go cap, not a short rate limit) moves, with its history, to another account with usage left and carries on (a Claude Code
   session's subagents that the limit stopped go on there too, and a Hydor subagent's lead hears that it carries on
   rather than an error), and the app's own quick
   questions (the helper model, apps' model steps) go to the next signed-in account too.
@@ -1494,7 +1498,7 @@ programs shows each program's version and what is out, with Check now, Update no
   Sessions stopped by a usage limit can continue by themselves when it resets (quietly, with a line saying
   whose limit it hit, all your accounts of that agent or one by name, which one and when, while Resume after
   usage limits is on); one you stopped yourself never does.
-- Usage: how much of each plan's limits you have used and when they reset, what the same work would cost
+- Usage: how much of each plan's limits (Claude Code, Codex and Grok Build, each account) you have used and when they reset, what the same work would cost
   through the API, and activity over time, for every agent or one (Custom and the ACP agents by name) and every
   model or one.
 - Every session is kept, whatever the agent's own program does: Claude Code is told to keep its conversations,

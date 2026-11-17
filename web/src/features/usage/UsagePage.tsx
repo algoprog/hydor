@@ -50,8 +50,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent
             {account && <span className="font-normal text-fg-3"> · {account.name}</span>}
           </div>
           <div className="truncate text-[12px] text-fg-3">
-            {u?.account?.email ?? '—'}
-            {u?.account?.plan && <span> · {u.account.plan}</span>}
+            {[u?.account?.email, u?.account?.plan].filter(Boolean).join(' · ') || '—'}
           </div>
         </div>
         {u && <span className="shrink-0 text-[12px] text-fg-3">{ago(u.fetchedAt)}</span>}
@@ -69,18 +68,7 @@ function Card({ u, agent, account }: { u: AgentUsage | null; agent: AccountAgent
         </div>
       ) : (
         <>
-          {grok ? (
-            u.limited && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg border border-err/30 bg-err/5 px-3 py-2 text-[12.5px] text-err" role="status">
-                <AlertTriangle size={13} className="shrink-0" />
-                <span className="min-w-0 flex-1">
-                  {u.limited.label} reached{u.limited.resetsAt ? `, resets ${untilText(u.limited.resetsAt)}` : ''}
-                </span>
-              </div>
-            )
-          ) : (
-            <LimitBanner agent={agent} account={account?.id} className="mb-2" />
-          )}
+          <LimitBanner agent={agent} account={account?.id} className="mb-2" />
           <div className="divide-y divide-line">
             {u.windows.map((w) => (
               <WindowRow key={w.id} w={w} />

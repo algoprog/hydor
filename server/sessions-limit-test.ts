@@ -5,11 +5,12 @@
 // too; and what it tells the agent names them.
 // Build and run with a scratch data folder:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/sessions-limit-test.ts
-//   DATA_DIR=/tmp/hydor-test-limit CLAUDE_CONFIG_DIR=/tmp/hydor-test-limit/claude CODEX_HOME=/tmp/hydor-test-limit/codex node dist/dev/sessions-limit-test.js
+//   DATA_DIR=/tmp/hydor-test-limit CLAUDE_CONFIG_DIR=/tmp/hydor-test-limit/claude CODEX_HOME=/tmp/hydor-test-limit/codex GROK_HOME=/tmp/hydor-test-limit/grok node dist/dev/sessions-limit-test.js
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { addAccount, removeAccount } from './accounts.ts';
 import { kvSet, openDb } from './db.ts';
 import { SessionManager, subagentsLine } from './sessions.ts';
 
@@ -60,6 +61,7 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     userStopped: new Set<string>(),
     moveNotes: new Map<string, string>(),
     limitAfter: new Map(),
+    limitReads: new Map(),
     onLimited: () => {},
     resumeLookup: undefined as undefined | ((k: string) => number | undefined),
     external: { get: () => null },
@@ -95,6 +97,9 @@ function manager(opts: { adapter?: ReturnType<typeof fakeAdapter>; free?: { id: 
     toCredit: async () => false,
     resumeAfterLimit: async () => {},
   };
+  m.accountAgentOf = proto.accountAgentOf.bind(m);
+  m.isGrokSession = proto.isGrokSession.bind(m);
+  m.lastUsageOf = proto.lastUsageOf.bind(m);
   m.afterTurn = proto.afterTurn.bind(m);
   m.finishedNotice = proto.finishedNotice.bind(m);
   m.releaseHeld = proto.releaseHeld.bind(m);
@@ -687,6 +692,113 @@ test('beforeResume leaves no note when it does not move', async () => {
   assert.equal(await t.beforeResume(KEY), false);
   assert.equal(t.calls.carryOver.length, 0);
   assert.equal(t.takeMoveNote(KEY, 'hi'), '');
+});
+
+// ---- Grok Build sessions ---------------------------------------------------------------
+
+const GROK_KEY = 'acp:00000000-0000-0000-0000-000000000002';
+const grokUsage = (limited: boolean, used = 10) => ({ agent: 'grok', ok: true, fetchedAt: Date.now(), windows: [{ id: 'w', label: 'Weekly', usedPercent: used, resetsAt: null }], limited: limited ? { label: 'Weekly limit', resetsAt: Date.now() + 3600_000 } : null });
+
+/** A manager whose Grok session (an ACP session of Grok Build) is the one in `lives`, with its real account helpers. */
+function grokManager(opts: Parameters<typeof manager>[0] = {}) {
+  const t = manager(opts);
+  t.m.lives.set(GROK_KEY, { adapter: { ...t.adapter, agent: 'acp' } });
+  t.m.isGrokSession = (key: string) => key === GROK_KEY;
+  t.m.accountAgentOf = proto.accountAgentOf.bind(t.m);
+  return t;
+}
+const grokSummary = (status: string, extra: Record<string, unknown> = {}) => ({ ...summary(status), key: GROK_KEY, agent: 'acp', acpAgent: 'grok', ...extra });
+
+test('freeAccount for Grok Build picks the added account with usage left, the least used first', async () => {
+  const a = addAccount(db, 'grok', 'Work');
+  const b = addAccount(db, 'grok', 'Personal');
+  const c = addAccount(db, 'grok', 'Spare');
+  try {
+    const reads = new Map<string | undefined, ReturnType<typeof grokUsage> | undefined>([
+      [undefined, grokUsage(true)],
+      [a.id, grokUsage(true)],
+      [b.id, grokUsage(false, 60)],
+      [c.id, grokUsage(false, 20)],
+    ]);
+    const asked: unknown[][] = [];
+    const m: any = { db, usageOf: async (agent: string, id: string | undefined) => (asked.push([agent, id]), reads.get(id)) };
+    const free = (except: string | undefined) => proto.freeAccount.call(m, 'grok', except) as Promise<{ id: string | undefined } | null>;
+    assert.equal((await free(undefined))?.id, c.id, 'the main account and Work are at their limit; Spare is the least used');
+    assert.ok(asked.every((x) => x[0] === 'grok'));
+    assert.equal((await free(c.id))?.id, b.id);
+    // The one the session runs as is never picked, and an unreadable account is skipped.
+    reads.set(b.id, { ...grokUsage(false), ok: false });
+    reads.set(c.id, grokUsage(true));
+    assert.equal(await free(a.id), null);
+    reads.set(undefined, grokUsage(false, 5));
+    const main = await free(a.id);
+    assert.ok(main && main.id === undefined, 'the main account takes it when it has usage left');
+    // Claude Code's pool is its own.
+    assert.equal(await proto.freeAccount.call(Object.assign(m, { usageOf: async () => grokUsage(false) }), 'claude', undefined), null);
+  } finally {
+    for (const x of [a, b, c]) removeAccount(db, x.id, true);
+  }
+});
+
+test('a Grok session the limit stopped moves to another account, told in the same words, with no subagent or credit steps', async () => {
+  const t = grokManager({ free: { id: 'b' } });
+  t.adapter.limitTasks.set('t1', 'A');
+  t.adapter.tasks.set('t1', agentTask('A'));
+  t.m.limitHits.add(GROK_KEY);
+  t.m.statuses.set(GROK_KEY, { status: 'working', turnStart: Date.now() });
+  t.m.switchAtLimit = proto.switchAtLimit.bind(t.m);
+  t.m.lastUsageOf = proto.lastUsageOf.bind(t.m);
+  t.m.lastUsageOf = () => grokUsage(true);
+  t.watchStatus([grokSummary('idle')]);
+  const after = t.m.limitAfter.get(GROK_KEY);
+  assert.ok(after, 'the turn is followed');
+  assert.deepEqual(await after.after, { goes: 'account', to: 'Account b' });
+  assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.delivered, ['Account a reached its usage limit, so this session now runs on Account b. Continue where you left off.']);
+});
+
+test('a Grok session waits for the usage reading its limit hit started, to know when the limit lifts', async () => {
+  const t = grokManager({ free: null });
+  kvSet(db, 'auto_resume', '1');
+  try {
+    let resets: number | undefined;
+    t.m.resumeAfterLimit = async (_key: string, at: number | undefined) => ((resets = at), { goes: 'resume', at: (at ?? 0) + 60_000 });
+    let last: unknown = null;
+    t.m.lastUsageOf = () => last;
+    t.m.limitReads.set(GROK_KEY, new Promise<void>((r) => setTimeout(() => ((last = grokUsage(true)), r()), 30)));
+    t.m.limitHits.add(GROK_KEY);
+    t.m.statuses.set(GROK_KEY, { status: 'working', turnStart: Date.now() });
+    t.watchStatus([grokSummary('idle')]);
+    const done = await t.m.limitAfter.get(GROK_KEY).after;
+    assert.ok(resets && resets > Date.now(), 'the reset time from the fresh reading');
+    assert.equal((done as { goes: string }).goes, 'resume');
+  } finally {
+    kvSet(db, 'auto_resume', '0');
+  }
+});
+
+test('an ACP session of another agent, and a Grok turn with no hit, move nothing', async () => {
+  const other = grokManager();
+  other.m.isGrokSession = () => false;
+  other.m.limitHits.add(GROK_KEY);
+  other.m.statuses.set(GROK_KEY, { status: 'working', turnStart: Date.now() });
+  other.watchStatus([grokSummary('idle')]);
+  assert.equal(other.m.limitAfter.get(GROK_KEY), undefined);
+  const t = grokManager();
+  recording(t);
+  t.adapter.limitTasks.set('t1', 'A');
+  t.m.statuses.set(GROK_KEY, { status: 'working', turnStart: Date.now() });
+  t.watchStatus([grokSummary('idle')]);
+  assert.equal(t.calls.switchAtLimit.length + t.calls.switchForSubagents.length, 0, 'subagent moves are Claude Code’s');
+});
+
+test('beforeResume for a Grok session moves it to the account with usage left, with the note for its next message', async () => {
+  const t = grokManager({ free: { id: 'b' }, usage: grokUsage(true) });
+  t.m.beforeResume = proto.beforeResume.bind(t.m);
+  assert.equal(await t.m.beforeResume(GROK_KEY), false);
+  assert.deepEqual(t.calls.carryOver, [[GROK_KEY, 'a', 'b']]);
+  assert.deepEqual(t.calls.usageOf, [['grok', 'a', 60_000]]);
+  assert.equal(t.takeMoveNote(GROK_KEY, 'hi'), 'Account a reached its usage limit, so this session now runs on Account b, which has usage left.');
 });
 
 // ---- subagentsLine --------------------------------------------------------------------

@@ -3,6 +3,7 @@ import type { AppTheme } from '@shared/themes';
 import type { FolderOrigin } from '@shared/sidebar';
 import type { TeamSettings, TierMap } from '@shared/tiers';
 import type {
+  AccountAgent,
   AcpAgentDef,
   Agent,
   AgentAccount,
@@ -359,9 +360,9 @@ export const useAppSettings = create<{
 export const usedUp = (u: AgentUsage | null | undefined) => !u?.ok || !!u.limited || u.windows.some((w) => (w.usedPercent ?? 0) >= 100);
 
 /** The usage of the account a session runs as (an added one, or the agent's own sign-in). */
-export function usageOf(agent: Agent, account?: string): AgentUsage | null {
+export function usageOf(agent: AccountAgent, account?: string): AgentUsage | null {
   const u = useUsage.getState();
-  return account ? (u.accounts[account] ?? null) : agent === 'claude' ? u.claude : u.codex;
+  return account ? (u.accounts[account] ?? null) : u[agent];
 }
 
 export const useLogins = create<{ flows: Record<string, LoginFlow>; put: (f: LoginFlow) => void }>((set) => ({

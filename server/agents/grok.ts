@@ -339,6 +339,8 @@ export class GrokControl extends EventEmitter {
   lastUsage: AgentUsage | null = null;
   private lastGood: AgentUsage | null = null;
   private reading?: Promise<AgentUsage>;
+  /** The email this account was last seen signed in as (account()), to name it in notes. */
+  email?: string;
 
   /**
    * The plan's usage, as Grok's agent answers `_x.ai/billing` (it starts for a second: do not call it often). Signed out or
@@ -363,7 +365,10 @@ export class GrokControl extends EventEmitter {
         shapeLogged = true;
         console.warn('[grok] billing shape', JSON.stringify(shapeOf(a?.result ?? {})));
       }
-      return (this.lastUsage = this.lastGood = { ...b.usage, fetchedAt });
+      // The billing does not say who is signed in: the quick sign-in check gives the email for the card, once.
+      if (this.email === undefined) await this.account().catch(() => undefined);
+      const account = { ...b.usage.account, ...(this.email && !b.usage.account?.email ? { email: this.email } : {}) };
+      return (this.lastUsage = this.lastGood = { ...b.usage, ...(Object.keys(account).length ? { account } : {}), fetchedAt });
     } catch (e) {
       const m = (e as Error).message;
       return fail(/not installed/i.test(m) ? 'Grok Build is not installed yet: it installs itself the first time you sign in or start a session.' : `Grok Build could not read the plan usage: ${m}`, !/not installed/i.test(m));
@@ -393,6 +398,7 @@ export class GrokControl extends EventEmitter {
       execProgram(bin, ['models'], { env, cwd: paths.probe, timeout: 20_000, maxBuffer: 4 << 20 }, (err, stdout, stderr) => resolve({ out: `${stdout}\n${stderr}`, err: err ?? undefined }));
     });
     const s = grokSignedIn(r.out);
+    if (s) this.email = s.loggedIn ? s.email : undefined;
     if (s) return { agent: 'grok', loggedIn: s.loggedIn, email: s.email, method: s.loggedIn ? 'Grok' : undefined, detail: s.detail };
     return {
       agent: 'grok',

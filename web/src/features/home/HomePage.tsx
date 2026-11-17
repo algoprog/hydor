@@ -578,7 +578,7 @@ function StartComposer({
   return (
     <div>
       <NewSpaceDialog open={newSpace} onClose={() => setNewSpace(false)} onMade={pickSpace} />
-      <LimitBanner agent={agent} account={acct} className="mb-3" />
+      {accountAgent && <LimitBanner agent={accountAgent} account={acct} className="mb-3" />}
       <div
         data-tour="composer"
         className={cx(

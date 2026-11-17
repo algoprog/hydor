@@ -1,12 +1,12 @@
 # Nutzung, Limits und Kosten
 
-Claude Code und Codex nutzen Abonnements mit Nutzungslimits. Gleichzeitig lässt sich jedem Modellaufruf ein API-Preis zuordnen. Hier erfährst du, wo du deinen Verbrauch und die nächste Zurücksetzung siehst, was beim Erreichen eines Limits passiert, wie Sitzungen danach automatisch weiterlaufen und wie die App Aktivität und geschätzte Kosten erfasst. Eigene Modellpreise kannst du ebenfalls hinterlegen.
+Claude Code, Codex und Grok Build nutzen Abonnements mit Nutzungslimits. Gleichzeitig lässt sich jedem Modellaufruf ein API-Preis zuordnen. Hier erfährst du, wo du deinen Verbrauch und die nächste Zurücksetzung siehst, was beim Erreichen eines Limits passiert, wie Sitzungen danach automatisch weiterlaufen und wie die App Aktivität und geschätzte Kosten erfasst. Eigene Modellpreise kannst du ebenfalls hinterlegen.
 
 ![Nutzung: Verbrauch der einzelnen Abonnements und Zeitpunkt ihrer Zurücksetzung](images/usage.webp)
 
 ## Die Nutzungsseite öffnen
 
-Öffne **System** in der Seitenleiste und dann den Tab **Nutzung**. Auf dem Smartphone öffnest du zuerst die Seitenleiste. Ein schmaler Balken unter dem System-Symbol zeigt die verbleibende Nutzung aller bezahlten Claude-Code- und Codex-Abonnements. Für jedes Abo zählt dabei das am weitesten ausgeschöpfte Limit. Hast du ausschließlich kostenlose Abos, zeigt der Balken diese; ohne Abos entfällt er. Sind alle Kontingente aufgebraucht, wird er rot. Beim Darüberfahren siehst du die verbleibende Nutzung je Abo.
+Öffne **System** in der Seitenleiste und dann den Tab **Nutzung**. Auf dem Smartphone öffnest du zuerst die Seitenleiste. Ein schmaler Balken unter dem System-Symbol zeigt die verbleibende Nutzung aller bezahlten Claude-Code-, Codex- und Grok-Build-Abonnements. Für jedes Abo zählt dabei das am weitesten ausgeschöpfte Limit. Hast du ausschließlich kostenlose Abos, zeigt der Balken diese; ohne Abos entfällt er. Sind alle Kontingente aufgebraucht, wird er rot. Beim Darüberfahren siehst du die verbleibende Nutzung je Abo.
 
 Die [Nutzungsseite](/usage) hat drei Tabs:
 
@@ -14,37 +14,40 @@ Die [Nutzungsseite](/usage) hat drei Tabs:
 - **Aktivität** (`/stats`): geänderte Zeilen, Token und Sitzungen im Zeitverlauf.
 - **Arena** (`/arena`): welche Modelle bei deinen eigenen Aufgaben gewinnen.
 
-Die App aktualisiert den Verbrauch beim Öffnen der Seite und danach alle fünf Minuten, solange sie geöffnet ist. Im Tab Limits liest **Aktualisieren** die Werte sofort erneut ein.
+Die App aktualisiert den Verbrauch beim Öffnen der Seite und danach alle fünf Minuten, solange sie geöffnet ist. Im Tab Limits liest **Aktualisieren** die Werte sofort erneut ein. Die Nutzung von Grok Build liest die App im Abstand einiger Minuten von dessen Agenten, und **Aktualisieren** liest sie ebenfalls sofort.
 
 ## Die Limits eines Abos verstehen
 
-Der Tab **Grenzen** zeigt Karten für Claude Code, Codex und jedes Konto, das du unter [Einstellungen → Agenten → Konten](/settings?s=accounts) hinzugefügt hast. Auf breiten Bildschirmen stehen zwei Karten nebeneinander, auf Smartphones untereinander.
+Der Tab **Grenzen** zeigt Karten für Claude Code, Codex, Grok Build (sobald du es unter [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents) hinzugefügt hast) und jedes Konto, das du unter [Einstellungen → Agenten → Konten](/settings?s=accounts) hinzugefügt hast. Auf breiten Bildschirmen stehen zwei Karten nebeneinander, auf Smartphones untereinander.
 
 Jede Karte zeigt E-Mail-Adresse und Tarif des Kontos, das Alter der angezeigten Werte und eine Zeile pro Limit. Ein Limit begrenzt die Nutzung innerhalb eines Zeitfensters:
 
 - Claude Code: **Aktuelle Sitzung (5 Std.)**, **Wöchentlich · alle Modelle** und modellspezifische Wochenlimits wie **Wöchentlich · nur Sonnet**.
 - Codex: **5-Stunden-Fenster**, **Wöchentlich** oder andere Zeitfenster. Bei mehreren Limits beginnt jede Zeile mit deren Bezeichnung.
+- Grok Build: **Wöchentlich**, mit dem Zeitpunkt der Zurücksetzung. Die Karte nennt außerdem den Tarif (SuperGrok, SuperGrok Plus oder SuperGrok Heavy). Die eigene Anmeldung von Grok hat eine Karte, und jedes Grok-Konto, das du hinzugefügt hast, ebenfalls.
 
 Jede Zeile zeigt den verbrauchten Anteil mit einem Balken, den verbleibenden Anteil und die nächste Zurücksetzung, etwa „wird in 2 Std. 15 Min. zurückgesetzt“. Beim Darüberfahren erscheint der genaue Zeitpunkt. Ab 90 % Verbrauch wird ein Warnsymbol angezeigt.
 
 Je nach Tarif siehst du außerdem:
 
 - **Zusätzliche Nutzung** bei Claude: ob kostenpflichtige Nutzung über das Abo hinaus aktiviert ist und wie viel des monatlichen Zusatzbudgets verbraucht wurde.
-- **Credits** bei Codex: deinen Guthabenstand oder „Unbegrenzt“.
+- **Credits** bei Codex und Grok Build: deinen Guthabenstand oder „Unbegrenzt“.
+- **Nach Verbrauch bezahlen** bei Grok Build: wenn der Tarif es hat, was du diesen Monat damit ausgegeben hast, gemessen an seinem Limit („12,00 $ von 50,00 $ in diesem Monat“).
 - **Limit-Resets**: aktuell verfügbare Resets; siehe [Einen Limit-Reset verwenden](#use-a-limit-reset).
 - **Diese Woche nach Nutzungsbereich** bei Claude: wie sich die Nutzung auf die verschiedenen Claude-Anwendungen verteilt.
 - **Token pro Tag** bei Codex: die letzten 30 Tage und der Gesamtverbrauch seit Beginn. Ein Token ist ein Wortteil; Modelle messen damit gelesenen und erzeugten Text.
 
 Bei Problemen erscheint ein entsprechender Hinweis:
 
-- „Nicht angemeldet“ mit **In den Einstellungen anmelden**;
+- „Nicht angemeldet“ mit **In den Einstellungen anmelden** (bei Grok Build: „Melde dich an, um die Nutzung des Grok-Tarifs zu sehen.“);
+- bei einem Tarif, den ein Team verwaltet, sagt die Karte von Grok Build „Nutzungslimits werden von deinem Team verwaltet.“, weil es keine eigenen Limits zu zeigen gibt;
 - „Für diesen Tarif wurden keine Nutzungslimits gemeldet“;
 - eine Fehlermeldung mit **Anmeldung in den Einstellungen prüfen**;
 - „Zuletzt bekannte Werte: …“, wenn die letzte Abfrage fehlgeschlagen ist.
 
 ## Was beim Erreichen eines Limits passiert
 
-Ist das Kontingent eines Abos aufgebraucht, endet der laufende Agentendurchlauf. Ein Hinweis nennt das Konto, das betroffene Limit und den Zeitpunkt der Zurücksetzung. Bei einem einzelnen Konto heißt es beispielsweise „Du hast das Nutzungslimit von Claude Code erreicht“, entsprechend auch für Codex. Sind alle Konten eines Agenten ausgeschöpft, erscheint „Alle deine Claude-Code-Konten haben ihr Nutzungslimit erreicht“. Hat ein anderes Konto noch Kontingent, wird das betroffene Konto namentlich genannt, etwa „Arbeit hat sein Nutzungslimit erreicht“.
+Ist das Kontingent eines Abos aufgebraucht, endet der laufende Agentendurchlauf. Bei Grok Build heißt das: sein Wochenlimit, sein Credit-Limit oder sein Ausgabenlimit bei „Nach Verbrauch bezahlen“; ein kurzes Ratenlimit (eine Welle von Anfragen) zählt nicht und vergeht von selbst. Ein Hinweis nennt das Konto, das betroffene Limit und den Zeitpunkt der Zurücksetzung. Bei einem einzelnen Konto heißt es beispielsweise „Du hast das Nutzungslimit von Claude Code erreicht“, entsprechend auch für Codex und Grok Build. Sind alle Konten eines Agenten ausgeschöpft, erscheint „Alle deine Claude-Code-Konten haben ihr Nutzungslimit erreicht“. Hat ein anderes Konto noch Kontingent, wird das betroffene Konto namentlich genannt, etwa „Arbeit hat sein Nutzungslimit erreicht“.
 
 - auf der Startseite über dem Nachrichtenfeld, passend zum ausgewählten Agenten und Konto;
 - in der Sitzung über dem Nachrichtenfeld;
@@ -68,11 +71,11 @@ So funktioniert das Timing, mit dem Schalter oder mit **Beim Zurücksetzen forts
 - Fortgesetzt wird nur ein Durchgang, den das Limit wirklich gestoppt hat, nicht einer, der gerade fertig wurde, als die Nutzung des Abos 100 % erreichte. Eine geplante Fortsetzung entfällt, wenn die Sitzung ohne sie weitergeht: Du sendest eine Nachricht oder drückst **Stoppen**, oder ein Durchgang läuft normal durch. Ein Durchgang, den der Agent während des Wartens von selbst startet (wenn eine eigene Hintergrundaufgabe oder ein eigener Subagent am selben Limit stoppt), lässt sie nicht entfallen. Eine Sitzung, die du mit **Stoppen** angehalten hast, wird nie von selbst fortgesetzt, auch wenn der Fehler des Limits zuerst kam, bis du ihr eine Nachricht sendest.
 - **Abbrechen** im Hinweis hebt die geplante Fortsetzung auf.
 
-Bei mehreren Konten setzt [**Bei erreichtem Limit das Konto wechseln**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) die Sitzung sofort mit einem anderen Konto fort. Gewartet wird erst, wenn alle Konten ausgeschöpft sind; siehe [Agenten, Konten und Modelle](/guide/agents-models#use-all-your-accounts-switch-at-a-limit). Für Claude Code kann [**Bei erreichtem Limit API-Guthaben verwenden**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) stattdessen den gespeicherten Anthropic-API-Key zur Abrechnung nutzen; siehe [API-Guthaben verwenden, wenn alle Konten ausgeschöpft sind](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit).
+Bei mehreren Konten eines Agenten (Claude Code, Codex oder Grok Build) setzt [**Bei erreichtem Limit das Konto wechseln**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) die Sitzung sofort mit einem anderen Konto fort. Gewartet wird erst, wenn alle Konten ausgeschöpft sind; siehe [Agenten, Konten und Modelle](/guide/agents-models#use-all-your-accounts-switch-at-a-limit). Für Claude Code kann [**Bei erreichtem Limit API-Guthaben verwenden**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) stattdessen den gespeicherten Anthropic-API-Key zur Abrechnung nutzen; siehe [API-Guthaben verwenden, wenn alle Konten ausgeschöpft sind](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit).
 
 ## Einen Limit-Reset verwenden
 
-Manche Abos geben dir Limit-Resets: Reset-Guthaben bei Codex und Reset-Gutschriften bei Claude. Wenn du einen verwendest, werden die Nutzungslimits des Abos sofort zurückgesetzt, statt dass du auf ihr Zurücksetzen wartest.
+Manche Abos geben dir Limit-Resets: Reset-Guthaben bei Codex und Reset-Gutschriften bei Claude (Grok Build hat keine). Wenn du einen verwendest, werden die Nutzungslimits des Abos sofort zurückgesetzt, statt dass du auf ihr Zurücksetzen wartest.
 
 Jede Karte listet sie unter **Limit-Resets** auf, mit der Anzahl, die du hast. Jeder Reset zeigt seinen Namen (und wie viele Verwendungen er noch hat), „Läuft ab in …“ (in Warnfarbe, wenn es weniger als einen Tag dauert) oder „Läuft nicht ab“ und Hinweise wie „Nutzbar, sobald du ein Limit erreichst“ oder „Noch nicht nutzbar“. Ein Reset, den ein anderes Limit zurückhält, sagt, welches, und wann es endet: „Gesperrt, solange dein Wochenlimit aufgebraucht ist (nutzbar in …)“. Manche Claude-Resets setzen nur einen Teil deines Kontingents zurück, sodass du sie nicht verwenden kannst, solange dein Wochenlimit aufgebraucht ist; nutzbar werden sie, sobald es zurückgesetzt wird. Gibt es keine: „Im Moment gibt es keine Limit-Resets“, mit dem Zeitpunkt des nächsten, wenn das Abo ihn nennt. Die App prüft die Resets eines Claude-Kontos etwa alle zehn Minuten, da Anthropic häufigere Abfragen ablehnt, und zeigt dazwischen die zuletzt gelesene Liste, auch nach einem Neustart der App. Ein Reset kann deshalb einige Minuten brauchen, bis er als nutzbar erscheint. Einer, den du verwendest, verschwindet sofort aus der Liste.
 
@@ -171,6 +174,7 @@ Es gibt keinen Knopf zum Leeren der Aktivitätsdaten. Löschst du eine Sitzung s
 ## Frag einen Agenten
 
 - „Wie viel meines Claude-Kontingents ist diese Woche noch übrig und wann wird es zurückgesetzt?“
+- „Wie viel von meinem Grok-Abo ist diese Woche noch übrig?“
 - „Aktiviere die automatische Fortsetzung nach Nutzungslimits.“
 - „Setze meine Sitzung ‚Refactor auth‘ fort, sobald das Codex-Limit zurückgesetzt ist.“
 - „Was hätte die Arbeit des letzten Monats zu API-Preisen je Modell gekostet?“

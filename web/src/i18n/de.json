@@ -23880,5 +23880,12 @@
   "Built memory from history": "Memory wurde aus dem Verlauf aufgebaut",
   "Rebuilt the wiki": "Das Wiki wurde neu aufgebaut",
   "Updated the wiki": "Das Wiki wurde aktualisiert",
-  "It already has articles or was built from history: use Update now or Rebuild": "Es hat schon Artikel oder wurde aus dem Verlauf aufgebaut: nutze „Jetzt aktualisieren“ oder „Neu aufbauen“"
+  "It already has articles or was built from history: use Update now or Rebuild": "Es hat schon Artikel oder wurde aus dem Verlauf aufgebaut: nutze „Jetzt aktualisieren“ oder „Neu aufbauen“",
+  "{0} of {1} this month": "{0} von {1} in diesem Monat",
+  "Grok": "Grok",
+  "Grok Build did not answer in time": "Grok Build hat nicht rechtzeitig geantwortet",
+  "Grok Build is not installed": "Grok Build ist nicht installiert",
+  "Grok Build stopped before it answered": "Grok Build wurde beendet, bevor es geantwortet hat",
+  "No weekly limit reported for this plan.": "Für diesen Tarif wird kein wöchentliches Limit gemeldet.",
+  "This agent has no effort to set": "Dieser Agent hat keinen Aufwand zum Einstellen"
 }
