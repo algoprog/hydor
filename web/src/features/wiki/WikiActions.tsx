@@ -30,10 +30,10 @@ const when = (at: string) => new Date(at).toLocaleString(LOCALE, { dateStyle: 'm
 function readsLine(c: { sessions: number; commits: number; documents: number; notes: number; files: string[] }): string {
   const n = (k: number, one: string, many: string) => (k === 1 ? one : many);
   return [
-    c.sessions ? n(c.sessions, tr('1 conversation'), tr(`${c.sessions} conversations`)) : '',
-    c.commits ? n(c.commits, tr('1 commit'), tr(`${c.commits} commits`)) : '',
-    c.documents ? n(c.documents, tr('1 document'), tr(`${c.documents} documents`)) : '',
-    c.notes ? n(c.notes, tr('1 note'), tr(`${c.notes} notes`)) : '',
+    c.sessions ? n(c.sessions, tr('1 conversation'), tr(`${c.sessions.toLocaleString(LOCALE)} conversations`)) : '',
+    c.commits ? n(c.commits, tr('1 commit'), tr(`${c.commits.toLocaleString(LOCALE)} commits`)) : '',
+    c.documents ? n(c.documents, tr('1 document'), tr(`${c.documents.toLocaleString(LOCALE)} documents`)) : '',
+    c.notes ? n(c.notes, tr('1 note'), tr(`${c.notes.toLocaleString(LOCALE)} notes`)) : '',
     c.files.length ? c.files.join(', ') : '',
   ]
     .filter(Boolean)

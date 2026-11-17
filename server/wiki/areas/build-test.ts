@@ -40,7 +40,7 @@ import { runPool } from './pool.ts';
 import { startRebuild, wikiJobStatus } from './rebuild.ts';
 import { FIT_SYSTEM, PROPOSE_SYSTEM } from './reorganise.ts';
 import { resumeWikiJobs } from './resume.ts';
-import { BUILD_ESSENTIAL_SESSIONS, docSummary, gatherHistory, treeLines, unreadDocuments, unreadSessions } from './sources.ts';
+import { AVG_KEY, BUILD_ESSENTIAL_SESSIONS, docSummary, gatherHistory, treeLines, unreadDocuments, unreadSessions } from './sources.ts';
 import { setAreasHelper } from './tend.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
@@ -301,6 +301,8 @@ test('the offer counts the sources as the build makes them: the exact commit bat
   git(p.folder, 'add', '.');
   for (let i = 0; i < 160; i++) commit(p.folder, `Change ${i}\n\n${'Because of reasons and more reasons. '.repeat(25)}`);
   for (let i = 0; i < 4; i++) session(`claude:cnt${i}`, p.folder, { last: NOW - i * 3600_000 });
+  // No measure yet (the builds of the tests above timed their instant fake helper).
+  kvSet(db, AVG_KEY, '');
   const o = (await buildOffer(db, p.space.id))!;
   const h = await gatherHistory(db, p.space, rootOf(p.space.id), { order: 'build', now: NOW });
   const batches = h.sources.filter((s) => s.cat === 'c').length;

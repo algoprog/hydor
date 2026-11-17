@@ -113,7 +113,8 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
           <span className="hidden sm:inline">Continue here</span>
         </Button>
       );
-  } else if (working) {
+  } else if (working && !s.live?.memory) {
+    // Waiting on the memory question or its build, the card has the controls (Start now, Stop building).
     action = (
       <Button size="sm" variant="secondary" icon={<Square size={11} fill="currentColor" strokeWidth={0} />} onClick={() => post(`/api/sessions/${enc(s.key)}/interrupt`).catch(toastError)} title="Stop the current turn (Esc)">
         <span className="hidden sm:inline">Stop</span>

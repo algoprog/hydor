@@ -14,7 +14,7 @@ import { runMerges } from './merge.ts';
 import { runPool } from './pool.ts';
 import { reorganiseWiki, reorganising } from './reorganise.ts';
 import { areasHelper, refreshHubs } from './tend.ts';
-import { AVG_KEY, BUILD_PER_HOUR, prepareSource, type ReadContext } from './sources.ts';
+import { AVG_KEY, BUILD_PER_HOUR, DEFAULT_SECONDS, prepareSource, type ReadContext } from './sources.ts';
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve) => {
@@ -57,7 +57,9 @@ export function recordSeconds(db: DB, seconds: number): void {
   } catch {
     avg = 0;
   }
-  kvSet(db, AVG_KEY, JSON.stringify({ avg: avg > 0 ? Math.round((avg * 0.8 + seconds * 0.2) * 10) / 10 : Math.round(seconds * 10) / 10 }));
+  // From the default, not from the first source alone (a project's files read in seconds; a batch of commits takes a minute).
+  const from = avg > 0 ? avg : DEFAULT_SECONDS;
+  kvSet(db, AVG_KEY, JSON.stringify({ avg: Math.round((from * 0.8 + seconds * 0.2) * 10) / 10 }));
 }
 
 /** What a build or a rebuild is given: the helper (Haiku on Automatic) and the stronger one for the areas (Sonnet), and how it goes. */
