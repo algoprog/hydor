@@ -239,6 +239,7 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Auto lessons learned by default in chats', 'wiki memory lessons learned suggestions automatic chat default switch conversation suggest lessons keep dismiss', 'Chats use this setting unless you choose otherwise'],
   // Wiki feature defaults can be overridden by each project.
   ['memory', 'Wiki contracts', 'wiki project contracts approved requirements provenance', 'Default for projects unless they choose otherwise'],
+  ['memory', 'Auto contract suggestions', 'wiki contracts helper model automatic proposals', 'Default for projects unless they choose otherwise'],
   ['memory', 'Wiki plans', 'wiki project plans adoption revision', 'Default for projects unless they choose otherwise'],
   ['memory', 'Execution tracking', 'wiki plan execution evidence progress status', 'Default for projects unless they choose otherwise'],
   ['memory', 'Auto lessons learned', 'wiki automatic lessons suggestions project default', 'Default for projects unless they choose otherwise'],

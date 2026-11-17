@@ -176,7 +176,8 @@ On a Mac, the app puts the command on your PATH by itself.
 **Memory that learns, with your OK**
 
 - Notes (short facts, found by meaning), **Wiki memory** (linked articles with their sources that agents keep for each
-  project) and your documents, in one memory. Agents can look through all your projects, and a project can keep
+  project) and your documents, in one memory. Control project contracts, plan editing and execution tracking in settings,
+  projects and chats; review contract suggestions before saving. Agents can look through your projects, and a project can keep
   itself to itself.
 - About once a day, what each project's conversations settled goes into its wiki, and after a hard task an agent can
   propose its method as a skill. Read, edit and delete all of it ([memory](docs/guide/06-memory.md),

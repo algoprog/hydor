@@ -31,8 +31,8 @@ With wiki memory off for a project, its Memory tab says "Wiki memory is off for 
 In chat options, **Wiki memory** and **Auto lessons learned** apply to that chat. Their defaults are in **Settings → Memory → Wiki memory**. Automatic lesson suggestions also need Memory; saving a reviewed suggestion needs your confirmation. A native agent started before Wiki memory was turned on needs a restart to register its checkpoint hook.
 
 Learning from documents, learning from a project's work and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
-In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki contracts**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable.
 
+In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki contracts**, **Auto contract suggestions**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable. Automatic contract suggestions need Wiki contracts and Memory; a suggestion becomes a contract only when you accept its exact content.
 
 ## Where wikis are kept
 
@@ -190,6 +190,8 @@ Rebuild and restore stop when the current wiki or the selected archive contains 
 Ask an agent to preview a project contract from your text or an existing wiki page. The preview shows its content, scope, origin, destination and existing articles to help you check for overlap. Review the exact text and confirm to save it; rejecting it saves nothing. A source page remains unchanged. Relative Markdown links in a copied source keep pointing to the same wiki pages. If a link cannot be safely carried over, rewrite it before trying again.
 
 To change a contract, ask the agent for a revision. Review the previous and proposed text and the reason, then confirm. Hydor preserves the previous revision in a protected snapshot and asks you to review again if the source, destination or relevant existing contracts changed. Approving a contract or revision does not start implementation.
+
+With **Auto contract suggestions** on, the configured helper can suggest a new contract or a revision based on a project conversation. A card shows the proposal and its source; review it and choose whether to save or dismiss it. An agent cannot make that choice for you. Suggestions require Wiki contracts and Memory, and are not generated in Confidential chats. If the source or settings change before saving, review the proposal again.
 
 ## Checkpoints and lessons learned
 

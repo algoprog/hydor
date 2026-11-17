@@ -14,6 +14,7 @@ import { useSpaces } from '../spaces/state';
 import type { WebFeature } from '../registry';
 import { wikiChatOptions, wikiFeatureChange, type WikiChatDefaults } from './chatOptions';
 import { AutoLessonsNote } from './AutoLessonsNote';
+import { AutoContractNote } from './AutoContractNote';
 
 /** Load fresh defaults when the options open and refresh when wiki settings change. */
 function useWikiChatDefaults(): WikiChatDefaults | null {
@@ -51,7 +52,7 @@ function WikiChatOptions({ value, onChange, session = false, sessionKey, cwd }: 
   const project = resolved?.space ? spaces?.find((space) => space.id === resolved.space) : undefined;
   const loaded = !!spaces && !!resolved && (!resolved.space || !!project);
   const state = wikiChatOptions(settings, value, !!memory?.enabled, loaded ? project?.wikiMemory : false, project?.wikiFeatures);
-  const projectDisabled = !!project && !!settings && (!(project.wikiMemory ?? settings.enabled) || WIKI_FEATURES.filter((key) => key !== 'autoContracts').some((key) => !(project.wikiFeatures?.[key] ?? settings.featureDefaults?.[key] ?? true)));
+  const projectDisabled = !!project && !!settings && (!(project.wikiMemory ?? settings.enabled) || WIKI_FEATURES.some((key) => !(project.wikiFeatures?.[key] ?? settings.featureDefaults?.[key] ?? true)));
   return (
     <>
       <div className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 py-1.5 max-sm:min-h-11">
@@ -62,7 +63,7 @@ function WikiChatOptions({ value, onChange, session = false, sessionKey, cwd }: 
       {session && state.wiki && <p className="px-2.5 pb-1 text-[11.5px] leading-snug text-fg-3">If Wiki memory was turned on after the agent started, restart the agent to enable automatic checkpoints.</p>}
       {expanded && <div className="ml-6 border-l border-line pl-2">
         {projectDisabled && <p className="px-2.5 pb-1 text-[11.5px] text-fg-3">Some options are unavailable in this project.{' '}<button type="button" onClick={() => go(`/projects/${project!.id}/settings`)} className="text-accent hover:underline">Open its Settings</button></p>}
-        {WIKI_FEATURES.filter((key) => key !== 'autoContracts').map((key: WikiFeature) => <div key={key} className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 py-1.5 max-sm:min-h-11" title={!state.features.available[key] ? 'Unavailable because a project, Wiki memory or Memory setting is off' : undefined}>
+        {WIKI_FEATURES.map((key: WikiFeature) => <div key={key} className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 py-1.5 max-sm:min-h-11" title={!state.features.available[key] ? 'Unavailable because a project, Wiki memory or Memory setting is off' : undefined}>
           <span className="min-w-0 flex-1 text-[13.5px] text-fg-2 max-sm:text-[14.5px]">{WIKI_FEATURE_LABELS[key]}</span>
           <Switch on={state.features.enabled[key]} disabled={!state.features.available[key]} label={WIKI_FEATURE_LABELS[key]} onChange={(on) => onChange(wikiFeatureChange(value, key, on, session))} />
         </div>)}
@@ -76,4 +77,4 @@ function SessionOptions({ s }: { s: SessionSummary }) {
   return <WikiChatOptions session sessionKey={s.key} cwd={s.cwd} value={s.extra ?? {}} onChange={(change) => { void patch(`/api/sessions/${enc(s.key)}/extra`, change).catch(toastError); }} />;
 }
 
-export const wikiChatFeature: WebFeature = { id: 'wiki-chat', noteViews: { 'wiki-lessons': AutoLessonsNote }, StartOptions: WikiChatOptions, SessionOptions };
+export const wikiChatFeature: WebFeature = { id: 'wiki-chat', noteViews: { 'wiki-lessons': AutoLessonsNote, 'wiki-contracts': AutoContractNote }, StartOptions: WikiChatOptions, SessionOptions };

@@ -31,8 +31,8 @@ Ist Wiki-Memory für ein Projekt ausgeschaltet, steht im Tab Memory „Wiki-Memo
 In den Chat-Optionen gelten **Wiki-Memory** und **Automatische Lessons Learned** für den jeweiligen Chat. Ihre Standards stehen unter **Einstellungen → Memory → Wiki-Memory**. Automatische Vorschläge für Lessons Learned brauchen außerdem Memory; das Speichern eines geprüften Vorschlags erfordert deine Bestätigung. Ein nativer Agent, der vor dem Einschalten von Wiki-Memory gestartet wurde, muss neu gestartet werden, damit er seinen Checkpoint-Hook registriert.
 
 Für das Lernen aus Dokumenten, das Lernen aus der Arbeit eines Projekts und für Sitzungs-Checkpoints muss außerdem [Memory selbst eingeschaltet sein](/guide/memory#turn-memory-off-for-all-sessions): Bei ausgeschaltetem Memory ergänzen neue Dokumente nichts, und es werden keine Checkpoints gespeichert.
-Klappe in den Chat-Optionen **Wiki-Memory** auf, um **Automatische Lessons Learned**, **Wiki-Verträge**, **Wiki-Pläne** und **Umsetzungskontrolle** für diesen Chat zu wählen. Die Projektstandards stehen in den Einstellungen; jedes Projekt kann eigene Werte festlegen. Ist eine Funktion im Projekt aus, ist ihr Chat-Schalter nicht verfügbar.
 
+Klappe in den Chat-Optionen **Wiki-Memory** auf, um **Automatische Lessons Learned**, **Wiki-Verträge**, **Automatische Vertragsvorschläge**, **Wiki-Pläne** und **Umsetzungskontrolle** für diesen Chat zu wählen. Die Projektstandards stehen in den Einstellungen; jedes Projekt kann eigene Werte festlegen. Ist eine Funktion im Projekt aus, ist ihr Chat-Schalter nicht verfügbar. Automatische Vertragsvorschläge benötigen Wiki-Verträge und Memory; erst wenn du den genauen Inhalt übernimmst, wird aus einem Vorschlag ein Vertrag.
 
 ## Wo Wikis gespeichert werden
 
@@ -191,6 +191,8 @@ Neuaufbau und Wiederherstellung werden gestoppt, wenn das aktuelle Wiki oder das
 Bitte einen Agenten, einen Projektvertrag aus deinem Text oder einer vorhandenen Wiki-Seite vorzuschlagen. Die Vorschau zeigt Inhalt, Geltungsbereich, Herkunft, Ziel und vorhandene Artikel, damit du Überschneidungen prüfen kannst. Prüfe den genauen Text und bestätige ihn zum Speichern; beim Ablehnen wird nichts gespeichert. Eine übernommene Quellseite bleibt unverändert. Relative Markdown-Verweise in der Kopie zeigen weiterhin auf dieselben Wiki-Seiten. Lässt sich ein Verweis nicht sicher übernehmen, passe ihn vor einem erneuten Versuch an.
 
 Für eine Änderung bittest du den Agenten um eine Revision. Prüfe den bisherigen und den vorgeschlagenen Text sowie den Grund und bestätige anschließend. Hydor bewahrt die vorherige Fassung in einem geschützten Snapshot auf. Ändern sich Quelle, Ziel oder relevante bestehende Verträge, musst du erneut prüfen. Die Bestätigung eines Vertrags oder einer Revision startet keine Umsetzung.
+
+Ist **Automatische Vertragsvorschläge** eingeschaltet, kann das eingestellte Hilfsmodell aus einer Projektunterhaltung einen neuen Vertrag oder eine Änderung vorschlagen. Eine Karte zeigt den Vorschlag und seine Herkunft; du prüfst ihn und entscheidest, ob du ihn speicherst oder verwirfst. Ein Agent kann diese Entscheidung nicht für dich treffen. Die Vorschläge benötigen Wiki-Verträge und Memory und entstehen nicht in vertraulichen Chats. Ändern sich Quelle oder Einstellungen vor dem Speichern, prüfe den Vorschlag erneut.
 
 ## Checkpoints und Lessons Learned
 

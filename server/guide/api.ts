@@ -51,6 +51,8 @@ const RULES: Rule[] = [
   ['W', /^\/api\/(skillpack\/proposals|automations\/proposals|sites\/requests|connections\/requests)\//, 'refuse', 'Only the user decides on these cards.'],
   // A lesson suggestion the app made from a chat is kept in the wiki, or dismissed, by the user alone; an agent proposes lessons with its own tools, which ask.
   ['W', /^\/api\/wiki-lessons\//, 'refuse', 'Only the user keeps or dismisses a lesson suggestion, on its card in the chat.'],
+  // Contract suggestion decisions belong to the user, not the agent.
+  ['W', /^\/api\/wiki-contracts\//, 'refuse', 'Only the user keeps or dismisses a contract suggestion, on its card in the chat.'],
   ['W', /^\/api\/(access-tokens|mcp\/tokens)$/, 'refuse', 'Tokens are made by the user in Settings, so their value never passes through an agent. Tell them where: Settings → App → Machines (access from other machines) or Connect other agents.'],
   ['POST', /^\/api\/apps\/[^/]+\/keys$/, 'refuse', 'An app’s API keys are made by the user, on its Share tab.'],
   ['POST|PATCH', /^\/api\/connections\/secrets/, 'refuse', 'A key’s value never passes through an agent: ask for it with request_secret, and the user enters it in a card.'],

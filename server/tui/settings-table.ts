@@ -588,6 +588,7 @@ row('memory', 'Auto lessons learned by default in chats', 'switch', {
 });
 // These project defaults follow the same settings endpoint as the web interface.
 row('memory', 'Wiki contracts', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.contracts'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { contracts: v } })) });
+row('memory', 'Auto contract suggestions', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.autoContracts'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { autoContracts: v } })) });
 row('memory', 'Wiki plans', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.plans'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { plans: v } })) });
 row('memory', 'Execution tracking', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.execution'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { execution: v } })) });
 row('memory', 'Auto lessons learned', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.autoLessons'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { autoLessons: v } })) });

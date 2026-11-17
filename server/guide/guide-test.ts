@@ -283,6 +283,8 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     ['POST', '/api/wiki-lessons/n1/save'],
     ['POST', '/api/wiki-lessons/n1/dismiss'],
     // Contract decisions are user-only; scoped wiki and knowledge tools enforce chat controls.
+    ['POST', '/api/wiki-contracts/n1/save'],
+    ['POST', '/api/wiki-contracts/n1/dismiss'],
     ['GET', '/api/projects/sp1/wiki'],
     ['GET', '/api/projects/sp1/wiki/file'],
     ['GET', '/api/projects/sp1/wiki/updates'],

@@ -707,9 +707,9 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
             ))}
           </div>
         </Row>
-        {WIKI_FEATURES.filter((key) => key !== 'autoContracts').map((key) => <Row key={key} title={WIKI_FEATURE_LABELS[key]} sub="Choose this project's setting or follow Settings.">
+        {WIKI_FEATURES.map((key) => <Row key={key} title={WIKI_FEATURE_LABELS[key]} sub="Choose this project's setting or follow Settings.">
           {!(s.wikiMemory ?? wikiDefault) && <p className="text-fg-3">Turn on Wiki memory for this project first.</p>}
-          <Segmented size="sm" disabled={!(s.wikiMemory ?? wikiDefault)} value={s.wikiFeatures?.[key] === undefined ? 'inherit' : s.wikiFeatures[key] ? 'on' : 'off'} onChange={(choice) => void setWikiFeature(key, choice)} options={[
+          <Segmented size="sm" disabled={!(s.wikiMemory ?? wikiDefault) || (key === 'autoContracts' && (s.wikiFeatures?.contracts ?? wikiFeaturesDefault?.contracts ?? true) === false)} value={s.wikiFeatures?.[key] === undefined ? 'inherit' : s.wikiFeatures[key] ? 'on' : 'off'} onChange={(choice) => void setWikiFeature(key, choice)} options={[
             { value: 'inherit', label: wikiFeaturesDefault?.[key] === false ? 'As in Settings (Off)' : 'As in Settings (On)' },
             { value: 'on', label: 'On' }, { value: 'off', label: 'Off' },
           ]} />
