@@ -9,15 +9,13 @@
 
 <p align="center">
   Claude Code and Codex on the plans you already pay for, or any model, local ones too, with unified memory. They
-  code, research, write and run your routine work on your own computer, answer with charts, maps and apps, and check
+  code, research, write and run your routine work on your own computer, answer with dynamic UIs and apps, and check
   with you on your phone.
 </p>
 
 <p align="center">
   <sub><b>Works with</b> Claude Code · Codex · Gemini CLI · OpenCode · Qwen Code · Goose · Kimi CLI · Auggie · OpenRouter · Ollama · vLLM · llama.cpp</sub>
 </p>
-
-<p align="center"><a href="https://hydor.app"><b>hydor.app</b></a> · free and open source</p>
 
 <p align="center">
   <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Apple_silicon-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Apple silicon)" /></a>
@@ -32,7 +30,7 @@
 <p align="center">
   <a href="https://github.com/algoprog/hydor/releases/latest"><img src="https://img.shields.io/docker/v/algoprog/hydor?sort=semver&label=latest&color=0a7ea4" alt="Latest release" /></a>
   <a href="https://hub.docker.com/r/algoprog/hydor"><img src="https://img.shields.io/docker/pulls/algoprog/hydor?color=0a7ea4" alt="Docker pulls" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/algoprog/hydor?color=0a7ea4" alt="License" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-0a7ea4" alt="License: AGPL-3.0" /></a>
 </p>
 
 <p align="center">
@@ -83,7 +81,7 @@
     <td width="50%" valign="top">
       <img src="docs/media/readme-answers.webp" alt="The Trip planner app's answer: four days in Lisbon on a map, day by day" />
       <p><b><a href="docs/guide/10-apps.md">Answers you can use</a></b><br />
-      140+ live UIs (charts, maps, tables, quizzes, code you can run) and 37 ready-made apps that open their answer in a view of their own.</p>
+      140+ dynamic UIs (charts, maps, tables, quizzes, code you can run) and 37 ready-made apps that open their answer in a view of their own.</p>
     </td>
   </tr>
   <tr>
