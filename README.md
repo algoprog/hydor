@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Works with</b> Claude Code · Codex · Gemini CLI · OpenCode · Qwen Code · Goose · Kimi CLI · Auggie · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp</sub>
+  <sub><b>Works with:</b> Claude Code · Codex · Gemini CLI · Kimi CLI · Grok Build · OpenRouter · Ollama · vLLM · llama.cpp <b>and more</b></sub>
 </p>
 
 <p align="center">
@@ -64,7 +64,7 @@
     <td width="50%" valign="top">
       <img src="docs/media/readme-agents.webp" alt="A session in Hydor: each step in plain words, an edit with its diff, and a command waiting for approval" />
       <p><b><a href="docs/guide/16-agents-models.md">Every agent, one app</a></b><br />
-      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model. Every step in plain words, every change as a diff.</p>
+      Claude Code and Codex on the plans you already pay for, seven more agents, or Hydor's own agent with any model including on-device.</p>
     </td>
     <td width="50%" valign="top">
       <img src="docs/media/readme-phone.webp" alt="The same session on a phone, waiting for approval to run the tests" />
@@ -245,7 +245,7 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 - [Remote access](docs/remote-access.md): your phone and other devices, over HTTPS (Tailscale in a few clicks)
 - [Several machines](docs/machines.md): agents on other machines, from one place
 - [How it works](docs/how-it-works.md): architecture and security
-- [How memory works](docs/memory.md): what agents are given and when, how notes and the wiki stay current, and what you control
+- [How memory works](docs/memory.md): what agents are given, how notes and the wiki stay current, and what you control
 - [Memory internals](docs/memory-internals.md): the tables, search and picking, delivery for each agent, the budgets and what runs when
 - [Privacy](docs/privacy.md): what leaves your computer, host by host: no telemetry, and how to turn each connection off
 - [Compared with other agents](docs/compare/README.md), with sources

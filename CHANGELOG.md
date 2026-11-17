@@ -30,6 +30,24 @@ page, an ad blocker, history and the rest, and it is faster and smoother.
   site's permissions, **Open in your default browser**, and more shortcuts (Ctrl+Tab, Ctrl+1…9, Ctrl+D, Ctrl+H,
   Ctrl+J, Ctrl+P). A page's file field opens the system's own file picker.
 
+## 0.82.1 · 17 November 2026
+
+Copies installed from git or Docker before 0.78.0 can update again, and Bypass no longer stops for approvals.
+
+- **Updating an older copy**: Hydor's history on GitHub was rewritten in 0.78.0, and a copy installed from git or
+  Docker before then stopped updating with "Not possible to fast-forward, aborting." Update it once on its machine (run
+  the installer again, pull the new Docker image, or follow the guide's Update an older copy by hand); from then on it
+  updates by itself again. When you update such a machine from another machine's app, its page and its Settings →
+  General now say why the update failed and give the command to run there.
+- **Updates follow a rewritten history**: if the history a copy updates from is rewritten again, Update now, `hydor
+  update` and the installer move a copy with no commits of its own to it, keeping the files you changed; a copy with
+  commits of its own is left as it is, and the update says what to do. The number of updates out counts only the new
+  ones.
+- **Bypass never asks**: Claude Code still asks about a few steps in every mode, Bypass included (a removal whose
+  target it can't work out, such as `rm -rf "$X"/*`, or a command whose safety check didn't finish), and the app
+  showed each as an approval card. In Bypass the app now allows them itself, at once, also after a restart; a question
+  for you and a plan to approve still show, and a subagent's result now settles the approval its step asked for.
+
 ## 0.82.0 · 17 November 2026
 
 A browser of your own in Hydor, to browse with and to hand pages to agents, and in the desktop app the agents' browser
