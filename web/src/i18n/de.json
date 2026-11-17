@@ -23799,6 +23799,7 @@
   "Turn on Wiki memory for this project first.": "Schalte zuerst Wiki-Memory für dieses Projekt ein.",
   "Unavailable because a project, Wiki memory or Memory setting is off": "Nicht verfügbar, weil eine Projekt-, Wiki-Memory- oder Memory-Einstellung ausgeschaltet ist",
   "Wiki contracts": "Wiki-Verträge",
+  "Contract inventory is incomplete": "Der Vertragsbestand ist unvollständig",
   "Wiki contracts are off for this chat": "Wiki-Verträge sind für diesen Chat ausgeschaltet",
   "Wiki feature defaults must be on or off": "Wiki-Funktionsstandards müssen ein- oder ausgeschaltet sein",
   "Wiki plans": "Wiki-Pläne",
