@@ -62,6 +62,7 @@ export const CONFIDENTIAL_TOOLS = new Set([
   'knowledge_list',
   'recall',
   'search_sessions',
+  'memory_search',
   'read_session',
   // Hydor subagents (child sessions), confidential too.
   'start_child_session',

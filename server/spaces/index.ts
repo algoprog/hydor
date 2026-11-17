@@ -143,6 +143,9 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
   // The most documents its wiki reads: a whole number, null follows Settings, absent keeps what it was.
   if (b.wikiDocumentLimit !== undefined && b.wikiDocumentLimit !== null && (typeof b.wikiDocumentLimit !== 'number' || !Number.isInteger(b.wikiDocumentLimit) || b.wikiDocumentLimit < 0 || b.wikiDocumentLimit > MAX_WIKI_DOCUMENTS)) throw new HttpError(400, `wikiDocumentLimit: a whole number from 0 to ${MAX_WIKI_DOCUMENTS}, or null`);
   const wikiDocumentLimit: number | null = b.wikiDocumentLimit !== undefined ? (b.wikiDocumentLimit as number | null) : (prev?.wikiDocumentLimit ?? null);
+  // Searchable from other projects: true (the default, left unwritten) or false; absent keeps what it was.
+  if (b.memoryShared !== undefined && typeof b.memoryShared !== 'boolean') throw new HttpError(400, 'memoryShared: true or false');
+  const memoryShared = b.memoryShared !== undefined ? b.memoryShared !== false : prev?.memoryShared !== false;
   return {
     name,
     color: color in SPACE_COLORS ? color : 'blue',
@@ -152,6 +155,7 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
     ...(shared ? {} : { sharedKnowledge: false }),
     ...(wikiMemory === null ? {} : { wikiMemory }),
     ...(wikiDocumentLimit === null ? {} : { wikiDocumentLimit }),
+    ...(memoryShared ? {} : { memoryShared: false }),
   };
 }
 /**
@@ -195,7 +199,7 @@ export function createSpace(db: DB, b: Record<string, unknown>, own?: { found?: 
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
   if (!prev) throw new HttpError(404, 'No such project');
-  const { sharedKnowledge: _was, wikiMemory: _wm, wikiDocumentLimit: _wl, members: _had, folders: _also, ...kept } = prev;
+  const { sharedKnowledge: _was, wikiMemory: _wm, wikiDocumentLimit: _wl, memoryShared: _ms, members: _had, folders: _also, ...kept } = prev;
   const members = membersOf(db, b, prev);
   const folders = foldersOf(b, prev, prev.folder);
   const next: Space = { ...kept, ...fields(b, prev), ...(members ? { members } : {}), ...(folders ? { folders } : {}) };

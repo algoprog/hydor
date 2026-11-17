@@ -9,8 +9,10 @@ import { claimsToBePlan, EVIDENCE_AREA, inEvidenceArea, inPlansArea, PLANS_AREA 
 import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, wikiHash } from './core.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts';
 import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
+import { otherProject } from '../memory/across.ts';
 import { wikiSettings } from './settings/settings.ts';
-import { wikiEnabledForSession } from './access.ts';
+import { wikiChatEnabled, wikiEnabledForSession } from './access.ts';
+import { sessionExtra } from '../sessionExtra.ts';
 import { inSession } from '../documents/index.ts';
 import { canRead, extractText } from '../documents/extract.ts';
 import { isSecret } from '../agent/permissions.ts';
@@ -70,6 +72,23 @@ function resolveTarget(ctx: RunCtx, name: string | undefined, create: boolean): 
   return namedWikiRoot(db, name);
 }
 
+/**
+ * Another project's wiki, to read only: by its name, when it does not keep itself to itself and has wiki memory on
+ * (for it and for this chat). Null while nothing has been written to it. The tools that write never take it.
+ */
+function otherWikiRoot(ctx: RunCtx, wiki: unknown, project: string): { root: string | null; name: string } | undefined {
+  if (!project.trim()) return undefined;
+  if (confidentialRun(ctx)) throw new Error('Wiki memory is unavailable in confidential sessions');
+  if (wiki) throw new Error('Give project or wiki, not both');
+  const db = ctx.deps.db;
+  const t = otherProject(db, ctx.key, ctx.cwd, project);
+  // This project's own wiki: as the tool always worked.
+  if (!t) return undefined;
+  if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) throw new Error('Wiki memory is off for this chat');
+  if (!wikiMemoryOn(db, t.id)) throw new Error(`Wiki memory is off for the project “${t.name}”`);
+  return { root: wikiRoot(db, t.id, { create: false }), name: t.name };
+}
+
 /** A wiki to write in: made when it is the first time. */
 export function wikiTarget(ctx: RunCtx, name?: string): string {
   const root = resolveTarget(ctx, name, true);
@@ -121,24 +140,28 @@ export async function guardProject(ctx: RunCtx, root: string): Promise<{ changed
 /** Agent tools deliberately resolve roots server-side rather than accepting arbitrary filesystem roots. */
 export function wikiTools(): RunTool[] {
   const wikiArg = { type: 'string', description: 'Optional: "hub" (the shared wiki) or the name of a wiki registered in it. Leave out for this project’s wiki.' };
+  const projectArg = { type: 'string', description: 'Optional: another project’s wiki, by that project’s name (memory_search says which project a result is from). Read only: a project that keeps itself to itself, or has wiki memory off, is refused.' };
   return [
     {
       name: 'wiki_status',
-      description: 'Where this project’s wiki memory is (its folder) and whether anything is kept in it yet. Wiki memory is the project’s articles with their sources, kept from its documents and its work; memory notes (recall, remember) and documents (knowledge_search) are the other parts of memory.',
+      description: 'Where this project’s wiki memory is (its folder) and whether anything is kept in it yet. Wiki memory is the project’s articles with their sources, kept from its documents and its work; memory notes (recall, remember) and documents (knowledge_search) are the other parts of memory. With `project` it says where another project’s wiki is (read only).',
       annotations: { readOnlyHint: true },
-      inputSchema: { type: 'object', properties: { wiki: wikiArg } },
+      inputSchema: { type: 'object', properties: { wiki: wikiArg, project: projectArg } },
       async run(a, ctx) {
+        const other = otherWikiRoot(ctx, a.wiki, String(a.project ?? ''));
+        if (other) return JSON.stringify({ project: other.name, root: other.root, empty: other.root === null, readOnly: true });
         const root = wikiReadTarget(ctx, a.wiki);
         return JSON.stringify({ root, empty: root === null, settings: wikiSettings(ctx.deps.db) });
       },
     },
     {
       name: 'wiki_read',
-      description: 'Read one active article, source, project plan or execution evidence (wiki/…, raw/…, output/projects/…, output/evidence/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable.',
+      description: 'Read one active article, source, project plan or execution evidence (wiki/…, raw/…, output/projects/…, output/evidence/…, index.md, log.md) with its exact SHA-256. Hidden folders, retired documents and links out of the wiki are not readable. With `project` it reads that other project’s wiki (read only).',
       annotations: { readOnlyHint: true },
-      inputSchema: { type: 'object', properties: { path: { type: 'string' }, wiki: wikiArg }, required: ['path'] },
+      inputSchema: { type: 'object', properties: { path: { type: 'string' }, wiki: wikiArg, project: projectArg }, required: ['path'] },
       async run(a, ctx) {
-        const root = wikiReadTarget(ctx, a.wiki);
+        const other = otherWikiRoot(ctx, a.wiki, String(a.project ?? ''));
+        const root = other ? other.root : wikiReadTarget(ctx, a.wiki);
         if (!root) return JSON.stringify({ empty: true, note: EMPTY });
         return JSON.stringify(readWiki(root, String(a.path ?? '')));
       },

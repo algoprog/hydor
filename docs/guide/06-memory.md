@@ -97,7 +97,7 @@ An agent is not handed all of memory. It starts with a short explanation of memo
 
 Memory counts two things for each note, and shows both in the note (see [Open a note](/guide/memory#open-a-note)). **Given to agents** is how often agents got the note without asking: at the start, with a message, or on a file. **Needed by agents** is how often they used it: looked it up, cited it by its number (#123), or worked with the file or command it is about after they were given it. Being given a note is not being needed: only what an agent did with it says that. The notes no agent has needed for months are offered to you to keep or delete (see [Notes no agent needed lately](/guide/memory#notes-no-agent-needed-lately)). Which notes come first another time weighs only what agents looked up themselves.
 
-Agents also get tools for memory: save a note (in a place, with how it is known and an end date if it has one), correct a note, forget one, look notes up by words and meaning (including the notes a topic stands for), update your profile, and search and read past conversations (see [Search earlier sessions](/guide/memory#search-earlier-sessions)). A note found with a lookup counts as needed too.
+Agents also get tools for memory: save a note (in a place, with how it is known and an end date if it has one), correct a note, forget one, look notes up by words and meaning (including the notes a topic stands for), update your profile, search and read past conversations (see [Search earlier sessions](/guide/memory#search-earlier-sessions)), and search notes, wiki articles, documents and past conversations at once, in a project or in all of them (see [Search beyond one project](/guide/memory#search-beyond-one-project)). A note found with a lookup counts as needed too.
 
 ## Turn memory off for one session
 
@@ -337,6 +337,22 @@ Besides notes, agents can look through your past conversations, with any agent. 
 
 Sessions with memory off are left out of this search and can't be read from another session. These tools exist only while memory is on for the session the agent works in.
 
+By default the search covers the sessions of every project. Ask an agent to keep to one ("only in this project", or "only in Shop") and its search takes a project: **this** (this project's sessions), **all** (every project, the default) or a project's name. When a search goes beyond the project the agent works in, each result names the project it is from.
+
+## Search beyond one project
+
+Sometimes what an agent needs was kept or done in another project: "How did we set up deploys in my Shop project?" For that, agents have one search that looks through everything memory keeps at once: notes, wiki articles, documents and past conversations. It looks in the project the agent works in, in all your projects, or in one project by its name (its name on the Projects page, the name of its folder, or the name of its repository). It never looks unless the agent asks: nothing from your other projects is added to what an agent is given at the start or with a message.
+
+Each result says where it is from and how to open it: an article opens with the wiki tool, a document with the knowledge tool, each told which project it is in, and a past conversation with its key. What other projects keep is only ever read: an agent never changes another project's notes, wiki, documents or conversations from here.
+
+Left out of the search, always:
+
+- The conversation the agent is in, and sessions with memory off.
+- A project that keeps itself to itself. Each project has a switch, **Searchable from other projects**, on its **Settings** tab (see [Settings](/guide/projects#settings)): on, agents in your other projects can find and read its notes, wiki, documents and conversations when they look; off, they can't, and the project's own agents can still look into your other projects. Asking for such a project by name says it keeps itself to itself.
+- The wiki of a project that has wiki memory off (see [Wiki memory](/guide/wiki-memory)).
+
+A session outside any project searches all projects when it does not say which. Notes about you are searched once, whichever projects are searched.
+
 You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a Mac). It finds sessions by title, messages that hold your words, and memory notes, under **Memory**. Opening a note "Opens Settings → Memory, at this note".
 
 ## Ask an agent
@@ -353,6 +369,9 @@ You can search past sessions yourself with the search box (Ctrl+K, or ⌘K on a 
 - "That note about the build command is about the Hydor project, not about me: move it there."
 - "Start every session with fewer notes: only the 5 that bear on what I ask."
 - "Turn wiki memory off for the Taxes 2026 project and keep it on for the rest."
+- "Search all my projects for how we set up the release workflow."
+- "How did we handle deploys in my Shop project? Look in its wiki and its conversations."
+- "Which of my past conversations in this project mention the invoice template? Leave the other projects out."
 - "Which notes has no agent needed for months? Delete the ones about the old website."
 - "The note about my trip to Lisbon is only true until 12 May: give it that end date."
 - "Which notes about this project are not checked yet? Check them against the code."

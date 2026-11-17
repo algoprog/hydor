@@ -42,7 +42,7 @@ export function wikiDeliverySpace(db: DB, o: { key?: string; cwd?: string; extra
 }
 
 /** The knowledge base indexing a project's wiki, and the wiki's folder, while it is bound. */
-function wikiBase(db: DB, space: string): { base: string; root: string } | null {
+export function wikiBase(db: DB, space: string): { base: string; root: string } | null {
   wikiKnowledgeSchema(db);
   return (db.prepare('select base, root from kb_wiki_bindings where space = ? and active = 1').get(space) as { base: string; root: string } | undefined) ?? null;
 }
@@ -92,8 +92,8 @@ function firstLine(body: string): string {
   return '';
 }
 
-/** What a line says of one article: title, summary (front matter, else its first line), and whether it may be out of date. */
-function articleLine(file: string, rel: string, fallback: string): { line: string; said: string } | null {
+/** What one article says of itself: title, summary (front matter, else its first line) and the files that changed since (it may be out of date). */
+export function articleInfo(file: string, rel: string, fallback: string): { title: string; summary: string; stale: string[] } | null {
   let text: string;
   try {
     const st = fs.lstatSync(file);
@@ -114,6 +114,14 @@ function articleLine(file: string, rel: string, fallback: string): { line: strin
   const title = cut(one(fields.title).replace(/\s+/g, ' ').trim() || fallback || path.posix.basename(rel, '.md'), 80);
   const summary = cut((one(fields.summary) || firstLine(body)).replace(/\s+/g, ' ').trim(), SUMMARY_CHARS);
   const stale = (Array.isArray(fields.stale) ? fields.stale : one(fields.stale).split(',')).map((x) => x.trim()).filter(Boolean);
+  return { title, summary, stale };
+}
+
+/** What a line says of one article: title, summary (front matter, else its first line), and whether it may be out of date. */
+function articleLine(file: string, rel: string, fallback: string): { line: string; said: string } | null {
+  const a = articleInfo(file, rel, fallback);
+  if (!a) return null;
+  const { title, summary, stale } = a;
   const changed = stale.length ? ` [may be out of date: ${stale.slice(0, 2).join(', ')}${stale.length > 2 ? ` and ${stale.length - 2} more` : ''} changed]` : '';
   return { line: `- ${title}${summary ? ` — ${summary}` : ''} (${rel})${changed}`, said: `${title} ${summary}` };
 }

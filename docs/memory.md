@@ -69,6 +69,10 @@ Everything given is background. The agent is told that notes may be out of date,
 
 Memory counts two things for each note. **Given**: how often an agent got it without asking. **Needed**: how often an agent then looked it up, cited it by its number, or worked on the file it is anchored to or on a command or name the note writes in backticks. The note's dialog shows both (**Given to agents** and **Needed by agents**), and the notes no agent has needed for four months are offered to you to keep or delete. Being given a note at the start no longer counts as needed, and notes from before this was counted keep the date they were last given or looked up.
 
+### Looking beyond one project
+
+Nothing from your other projects is given to an agent unasked. When an agent needs to, it can search: it has one search over notes, wiki articles, documents and past conversations, in its own project (the default), in all your projects, or in one project by name, and its search of past conversations can keep to one project too. A project's wiki and its own documents can then be read by naming the project. All of it is read only. Never found: the conversation the agent is in, sessions with memory off, the wiki of a project with wiki memory off, and everything in a project that keeps itself to itself (**Searchable from other projects**, off, on its Settings tab; its own sessions still look into the others). Results say which project they are from and how to open them.
+
 ## How notes are written
 
 Agents save a note in two cases: when you ask ("Remember that the staging server is only up on weekdays"), or when they learn something lasting that a later session could not find out by itself, such as a decision and why, or a pitfall. You can also write notes yourself under **Add a note** in **Settings → Memory**, and the helper writes some when it tidies up.

@@ -27,6 +27,8 @@ const COMMON = new Set(
 );
 
 export interface Project {
+  /** The project's id (the space). */
+  id: string;
   /** What it is called, and the names a note may use for it. */
   name: string;
   names: string[];
@@ -121,7 +123,7 @@ export function projects(db: DB): Project[] {
     const profile = entries(db, { scope: 'repo', scopeKey: root, kinds: ['profile'], limit: 1 })[0];
     const all = [s.name, path.basename(s.folder), path.basename(root), ...cachedNames(root), leadingName(profile?.text)];
     const names = [...new Set(all.map((n) => n.trim().toLowerCase()).filter((n) => n.length >= 4 && !COMMON.has(n)))];
-    if (names.length) out.push({ name: s.name, names, place, about: firstLine(profile?.text) || firstLine(s.description) });
+    if (names.length) out.push({ id: s.id, name: s.name, names, place, about: firstLine(profile?.text) || firstLine(s.description) });
   }
   return out;
 }

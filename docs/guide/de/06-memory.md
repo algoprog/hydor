@@ -97,7 +97,7 @@ Ein Agent bekommt nicht das ganze Memory auf einmal. Er startet mit einer kurzen
 
 Memory zählt für jede Notiz zwei Dinge und zeigt beide in der Notiz (siehe [Eine Notiz öffnen](/guide/memory#open-a-note)). **An Agenten übergeben** besagt, wie oft Agenten die Notiz ungefragt erhalten haben: zu Beginn, mit einer Nachricht oder bei einer Datei. **Von Agenten verwendet** besagt, wie oft sie sie genutzt haben: nachgeschlagen, mit ihrer Nummer (#123) zitiert oder mit der Datei oder dem Befehl gearbeitet, um den es geht, nachdem sie sie erhalten hatten. Eine Notiz übergeben zu bekommen heißt nicht, sie zu benötigen: Nur was ein Agent damit getan hat, besagt das. Die Notizen, die seit Monaten kein Agent benötigt hat, werden dir zum Behalten oder Löschen angeboten (siehe [Notizen, die länger kein Agent benötigt hat](/guide/memory#notes-no-agent-needed-lately)). Welche Notizen beim nächsten Mal zuerst kommen, berücksichtigt nur, was Agenten selbst nachgeschlagen haben.
 
-Agenten erhalten außerdem Tools zum Speichern mit Bereich, Herkunft und Enddatum, zum Korrigieren und Vergessen, zum Nachschlagen nach Wörtern und Bedeutung einschließlich der Einzelnotizen eines Themas, zum Aktualisieren deines Profils und zum Durchsuchen und Lesen früherer Unterhaltungen. Siehe [Frühere Sitzungen durchsuchen](/guide/memory#search-earlier-sessions). Auch aktiv nachgeschlagene Notizen zählen als benötigt.
+Agenten erhalten außerdem Tools zum Speichern mit Bereich, Herkunft und Enddatum, zum Korrigieren und Vergessen, zum Nachschlagen nach Wörtern und Bedeutung einschließlich der Einzelnotizen eines Themas, zum Aktualisieren deines Profils, zum Durchsuchen und Lesen früherer Unterhaltungen (siehe [Frühere Sitzungen durchsuchen](/guide/memory#search-earlier-sessions)) und zum Durchsuchen von Notizen, Wiki-Artikeln, Dokumenten und früheren Unterhaltungen auf einmal, in einem Projekt oder in allen (siehe [Über ein Projekt hinaus suchen](/guide/memory#search-beyond-one-project)). Auch aktiv nachgeschlagene Notizen zählen als benötigt.
 
 ## Memory für eine Sitzung ausschalten
 
@@ -337,6 +337,22 @@ Agenten können neben Notizen auch frühere Unterhaltungen mit beliebigen Agente
 
 Sitzungen ohne Memory sind von der Suche ausgeschlossen und lassen sich aus anderen Sitzungen nicht lesen. Diese Tools stehen nur bei aktiviertem Memory in der aktuellen Sitzung zur Verfügung.
 
+Standardmäßig umfasst die Suche die Sitzungen aller Projekte. Bitte einen Agenten, bei einem zu bleiben („nur in diesem Projekt“ oder „nur in Shop“), dann nimmt seine Suche ein Projekt: **this** (die Sitzungen dieses Projekts), **all** (alle Projekte, die Voreinstellung) oder den Namen eines Projekts. Geht eine Suche über das Projekt hinaus, in dem der Agent arbeitet, nennt jedes Ergebnis das Projekt, aus dem es stammt.
+
+## Über ein Projekt hinaus suchen
+
+Manchmal wurde das, was ein Agent braucht, in einem anderen Projekt gespeichert oder erledigt: „Wie haben wir Deploys in meinem Shop-Projekt eingerichtet?“ Dafür haben Agenten eine einzige Suche, die alles durchsucht, was Memory aufbewahrt: Notizen, Wiki-Artikel, Dokumente und frühere Unterhaltungen. Sie sucht im Projekt, in dem der Agent arbeitet, in allen deinen Projekten oder in einem Projekt anhand seines Namens (sein Name auf der Seite „Projekte“, der Name seines Ordners oder der Name seines Repositorys). Sie sucht nie von selbst, sondern nur, wenn der Agent danach fragt: Nichts aus deinen anderen Projekten wird dem hinzugefügt, was ein Agent zu Beginn oder mit einer Nachricht erhält.
+
+Jedes Ergebnis nennt, woher es stammt und wie man es öffnet: Ein Artikel öffnet sich mit dem Wiki-Tool, ein Dokument mit dem Wissens-Tool, jeweils mit Angabe des Projekts, in dem es liegt, und eine frühere Unterhaltung mit ihrem Schlüssel. Was andere Projekte aufbewahren, wird nur gelesen: Ein Agent ändert von hier aus nie die Notizen, das Wiki, die Dokumente oder die Unterhaltungen eines anderen Projekts.
+
+Immer von der Suche ausgeschlossen:
+
+- Die Unterhaltung, in der der Agent selbst arbeitet, und Sitzungen ohne Memory.
+- Ein Projekt, das sich für sich hält. Jedes Projekt hat auf seinem Tab **Einstellungen** einen Schalter **Für andere Projekte durchsuchbar** (siehe [Einstellungen](/guide/projects#settings)): Ist er an, können Agenten in deinen anderen Projekten seine Notizen, sein Wiki, seine Dokumente und seine Unterhaltungen finden und lesen, wenn sie danach suchen; ist er aus, können sie das nicht, und die Agenten des Projekts selbst können weiterhin in deine anderen Projekte schauen. Fragt ein Agent nach einem solchen Projekt mit Namen, erfährt er, dass es sich für sich hält.
+- Das Wiki eines Projekts, bei dem Wiki-Memory ausgeschaltet ist (siehe [Wiki-Memory](/guide/wiki-memory)).
+
+Eine Sitzung außerhalb jedes Projekts durchsucht alle Projekte, wenn sie nichts anderes sagt. Notizen über dich werden nur einmal durchsucht, egal in welchen Projekten gesucht wird.
+
 Du kannst selbst mit Strg+K beziehungsweise ⌘K frühere Sitzungen nach Titeln und Nachrichtentext sowie unter **Memory** Notizen finden. Ein Notiztreffer öffnet Einstellungen → Memory direkt bei der Notiz.
 
 ## Einen Agenten fragen
@@ -360,3 +376,6 @@ Du kannst selbst mit Strg+K beziehungsweise ⌘K frühere Sitzungen nach Titeln 
 - „Importiere, was Claude Code und Codex über mich wissen, und zeige mir die Vorschläge vor dem Hinzufügen.“
 - „Ich habe vorher einen anderen Agenten verwendet. Übernimm sein Wissen über mich und meine eigenen Skills und zeige mir zuerst die Liste.“
 - „Schalte Wiki-Memory nur für das Projekt Taxes 2026 aus und lasse es für die übrigen Projekte eingeschaltet.“
+- „Durchsuche alle meine Projekte danach, wie wir den Release-Workflow eingerichtet haben.“
+- „Wie sind wir in meinem Shop-Projekt mit Deploys umgegangen? Schau in sein Wiki und seine Unterhaltungen.“
+- „Welche meiner früheren Unterhaltungen in diesem Projekt erwähnen die Rechnungsvorlage? Lass die anderen Projekte weg.“

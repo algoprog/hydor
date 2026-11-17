@@ -23,6 +23,11 @@ export interface Space {
   sharedKnowledge?: boolean;
   /** Wiki memory for this project: true on, false off; absent: as Settings → Memory → Wiki memory says for projects (shared/wiki.ts). */
   wikiMemory?: boolean;
+  /**
+   * Whether agents in the user's other projects may search and read this project's notes, wiki, documents and
+   * conversations (read only, only when they look for them). Absent or true: they may; false: they may not.
+   */
+  memoryShared?: boolean;
   /** The most documents its knowledge may hold for its wiki to read them (0 to 100000); absent: as Settings → Memory → Wiki memory says. */
   wikiDocumentLimit?: number;
   /**

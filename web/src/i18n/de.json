@@ -23688,5 +23688,11 @@
   "With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all": "Bei mehr Dokumenten als hier liest das Wiki eines Projekts die angehefteten, die am häufigsten genutzten und die neuesten ein: Agenten durchsuchen alle",
   "With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all.": "Bei mehr Dokumenten als hier liest das Wiki eines Projekts die angehefteten, die am häufigsten genutzten und die neuesten ein: Agenten durchsuchen alle.",
   "Your subagent {0} stopped at that limit and can go on now: send it a message (SendMessage) to continue it from where it stopped, or start it again if that fails.": "Dein Subagent {0} ist an diesem Limit stehen geblieben und kann jetzt weitermachen: Sende ihm eine Nachricht (SendMessage), um ihn dort fortzusetzen, wo er aufgehört hat, oder starte ihn neu, falls das nicht klappt.",
-  "Your subagents {0} stopped at that limit and can go on now: send each one a message (SendMessage) to continue it from where it stopped, or start it again if that fails.": "Deine Subagenten {0} sind an diesem Limit stehen geblieben und können jetzt weitermachen: Sende jedem eine Nachricht (SendMessage), um ihn dort fortzusetzen, wo er aufgehört hat, oder starte ihn neu, falls das nicht klappt."
+  "Your subagents {0} stopped at that limit and can go on now: send each one a message (SendMessage) to continue it from where it stopped, or start it again if that fails.": "Deine Subagenten {0} sind an diesem Limit stehen geblieben und können jetzt weitermachen: Sende jedem eine Nachricht (SendMessage), um ihn dort fortzusetzen, wo er aufgehört hat, oder starte ihn neu, falls das nicht klappt.",
+  "“{0}” could mean {1}": "„{0}“ könnte {1} bedeuten",
+  "Agents in your other projects can find and read this project’s notes, wiki, documents and conversations when they look for them. They never change them.": "Agenten in deinen anderen Projekten können die Notizen, das Wiki, die Dokumente und die Unterhaltungen dieses Projekts finden und lesen, wenn sie danach suchen. Sie ändern sie nie.",
+  "Memory is off for this session: nothing was read or saved.": "Memory ist für diese Sitzung ausgeschaltet: Es wurde nichts gelesen oder gespeichert.",
+  "memoryShared: true or false": "memoryShared: true oder false",
+  "query is empty": "query ist leer",
+  "Searchable from other projects": "Für andere Projekte durchsuchbar"
 }

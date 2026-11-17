@@ -39,13 +39,13 @@ const AREAS = 8;
 const HEAD = [
   '# Memory from earlier sessions',
   'Hydor keeps notes from this user’s past sessions, shared by every agent here. Below: those that bear most on this request, and an index of the rest by title; recall finds any of them, by words and by meaning. Use them as background: they may be out of date, a note marked unchecked is an agent’s conclusion no one has confirmed, and what the user says now always comes first. Do not mention them unless they help.',
-  'Memory is for what a later session could not find out by itself: what the user wants or has told you, decisions and why, pitfalls, rules learned the hard way and how you know them. Save such a thing with remember when the user asks or when you learn it: one fact per note, said so that a search in other words finds it, and not what the project’s files or history already record. What every agent should always know about the user goes in their profile instead (update_user_profile). forget removes a note by its number; search_sessions and read_session look through past conversations. Never save secrets.',
+  'Memory is for what a later session could not find out by itself: what the user wants or has told you, decisions and why, pitfalls, rules learned the hard way and how you know them. Save such a thing with remember when the user asks or when you learn it: one fact per note, said so that a search in other words finds it, and not what the project’s files or history already record. What every agent should always know about the user goes in their profile instead (update_user_profile). forget removes a note by its number; search_sessions and read_session look through past conversations. memory_search looks through notes, wiki articles, documents and past conversations at once, here or in your other projects. Never save secrets.',
 ].join('\n');
 
 /** For a model of a small context (memClass lean or tiny): the same, in few words. */
 const LEAN_HEAD = [
   '# Memory from earlier sessions',
-  'Notes Hydor kept from this user’s past sessions: background that may be out of date; what the user says now comes first. recall finds more; remember saves a lasting fact (one a note, never secrets); forget removes one by its number.',
+  'Notes Hydor kept from this user’s past sessions: background that may be out of date; what the user says now comes first. recall finds more; remember saves a lasting fact (one a note, never secrets); forget removes one by its number. memory_search looks through notes, wiki, documents and past conversations at once, here or in other projects.',
 ].join('\n');
 
 /**
@@ -64,13 +64,13 @@ const REQUEST_HEAD = 'From memory (see Memory from earlier sessions in your inst
 /** For a confidential session, which reads memory and saves nothing to it (server/confidential). */
 const READ_ONLY_HEAD = [
   '# Memory from earlier sessions',
-  'Hydor keeps notes from this user’s past sessions. Below: those that bear most on this request, and an index of the rest by title; recall finds any of them, and search_sessions and read_session look through past conversations. Use them as background: they may be out of date, a note marked unchecked is an agent’s conclusion no one has confirmed, and what the user says now always comes first. Do not mention them unless they help.',
+  'Hydor keeps notes from this user’s past sessions. Below: those that bear most on this request, and an index of the rest by title; recall finds any of them, and search_sessions and read_session look through past conversations. memory_search looks through notes, wiki articles, documents and past conversations at once, here or in your other projects. Use them as background: they may be out of date, a note marked unchecked is an agent’s conclusion no one has confirmed, and what the user says now always comes first. Do not mention them unless they help.',
   'This session is confidential, so nothing from it is saved to memory: you can’t add or change notes or the user’s profile here.',
 ].join('\n');
 
 const LEAN_READ_ONLY_HEAD = [
   '# Memory from earlier sessions',
-  'Notes Hydor kept from this user’s past sessions: background that may be out of date; what the user says now comes first. recall finds more. This session is confidential: nothing from it is saved to memory.',
+  'Notes Hydor kept from this user’s past sessions: background that may be out of date; what the user says now comes first. recall finds more; memory_search looks through notes, wiki, documents and past conversations at once, here or in other projects. This session is confidential: nothing from it is saved to memory.',
 ].join('\n');
 
 /** An index entry: its title, and a topic's size. */

@@ -236,7 +236,8 @@ agents that speak ACP and take MCP servers.
   name, description and source, as the preview: the ones you pick are copied, with their files, into your own skills.
   Keys and sign-in files are never copied, a skill's folder is capped (200 files, 512 KB each, 2 MB in all), and a
   skill whose name your skills have already is left out with a note. MCP servers are not brought over. Agents can also look up earlier sessions, by words and by meaning (each message you wrote gets a vector in the
-  background).
+  background), and search notes, wiki articles, documents and past conversations at once, in a project or in all of them (a
+  project can keep itself out with **Searchable from other projects** on its Settings tab; what other projects keep is only read).
   [How memory works](memory.md) describes what agents are given and when, and how memory stays current; [Memory internals](memory-internals.md) is for people changing it.
 - **Wiki memory** (formerly the LLM Wiki; Settings → Memory → Wiki memory): linked Markdown articles that agents keep for each
   project, and one shared wiki, from its documents and its work, each with its sources (`wiki/` articles, `raw/` sources,

@@ -24958,5 +24958,11 @@
 "With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all":"文档多于此数时，项目的 wiki 会读取其中置顶的、最常用的和最新的：智能体会搜索全部文档",
 "With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all.":"文档多于此数时，项目的 wiki 会读取其中置顶的、最常用的和最新的：智能体会搜索全部文档。",
 "Your subagent {0} stopped at that limit and can go on now: send it a message (SendMessage) to continue it from where it stopped, or start it again if that fails.":"你的子智能体 {0} 在该限额处停了下来，现在可以继续：给它发一条消息（SendMessage），让它从停下的地方接着做；如果失败，就重新启动它。",
-"Your subagents {0} stopped at that limit and can go on now: send each one a message (SendMessage) to continue it from where it stopped, or start it again if that fails.":"你的子智能体 {0} 在该限额处停了下来，现在可以继续：给每个子智能体发一条消息（SendMessage），让它从停下的地方接着做；如果失败，就重新启动它们。"
+"Your subagents {0} stopped at that limit and can go on now: send each one a message (SendMessage) to continue it from where it stopped, or start it again if that fails.":"你的子智能体 {0} 在该限额处停了下来，现在可以继续：给每个子智能体发一条消息（SendMessage），让它从停下的地方接着做；如果失败，就重新启动它们。",
+"“{0}” could mean {1}":"“{0}”可能指{1}",
+"Agents in your other projects can find and read this project’s notes, wiki, documents and conversations when they look for them. They never change them.":"你其他项目里的智能体在查找时，可以找到并读取这个项目的笔记、wiki、文档和对话，但绝不会更改它们。",
+"Memory is off for this session: nothing was read or saved.":"此会话的记忆已关闭：没有读取或保存任何内容。",
+"memoryShared: true or false":"memoryShared：true 或 false",
+"query is empty":"query 为空",
+"Searchable from other projects":"可从其他项目搜索"
 }

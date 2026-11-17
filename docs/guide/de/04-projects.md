@@ -166,12 +166,13 @@ Der Agent heißt passend zum Projekt, etwa „Shop-Entwickler“, und arbeitet n
 
 ### Einstellungen
 
-Alles zum Projekt selbst, in fünf Teilen, jeweils mit einer Zeile dazu, wofür er da ist:
+Alles zum Projekt selbst, in sechs Teilen, jeweils mit einer Zeile dazu, wofür er da ist:
 
 - **Das Projekt**: **Name** neben dem farbigen Zeichen, **Worum es geht** und **Farbe**. Name, Inhalt und Farbe erscheinen auf Projektkarte, Projektseite und Startseite.
 - **Was jeder Agent darin befolgt**: seine **Agentenrichtlinien**, wie bei der Erstellung.
 - **Agent beim Sitzungsstart**: Unter **Neue Sitzungen starten mit** tippst du eine Auswahl an: **Auf der Startseite ausgewählter Agent** (die Voreinstellung: Die Startseite behält den Agenten, den du im Projekt gewählt hast, Allgemein, bis du einen anderen wählst) oder einen deiner Agenten, ob eingebaut oder selbst erstellt. Ein Projekt, in dem du noch nichts gewählt hast, öffnet sich dann auf der Startseite mit diesem Agenten.
 - **Wiki-Memory**: ob das Projekt ein Wiki mit Artikeln aus seinen Dokumenten und seiner Arbeit führt: **Wie in den Einstellungen (ein)** (oder **(aus)**, je nachdem, was gerade die Voreinstellung ist), **Ein** oder **Aus**. Die Auswahl wird sofort gespeichert. [Einstellungen → Memory](/settings?s=memory&find=Wiki%20memory) enthält die Voreinstellung für jedes Projekt (siehe [Wiki-Memory](/guide/wiki-memory#turn-it-on-or-off)). Darunter steht **Höchstzahl der Dokumente für sein Wiki** auf **Wie in den Einstellungen (100)** oder **Eine eigene Zahl**: Hat ein Projekt mehr Dokumente, liest sein Wiki nur so viele ein (die angehefteten, die am häufigsten genutzten und die neuesten), und Agenten durchsuchen alle (siehe [Wenn ein Projekt zu viele Dokumente hat](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Für andere Projekte durchsuchbar**: ein Schalter, standardmäßig an, der für ein Projekt angezeigt wird, nicht für eine Gruppe. Ist er an, können Agenten in deinen anderen Projekten die Notizen, das Wiki, die Dokumente und die Unterhaltungen dieses Projekts finden und lesen, wenn sie danach suchen (sie ändern sie nie); ist er aus, hält das Projekt sich für sich, und sie können das nicht. Die eigenen Sitzungen des Projekts sind davon nicht betroffen und können weiterhin in deine anderen Projekte schauen. Die Auswahl wird sofort gespeichert (siehe [Über ein Projekt hinaus suchen](/guide/memory#search-beyond-one-project)).
 - **Die Projekte, die es zusammenbringt**: Wähle hier Projekte aus, um dieses Projekt zu einer Gruppe zu machen (siehe [Projekte in einer Gruppe zusammenbringen](#bring-projects-together-in-a-group)).
 
 Nach Änderungen erscheint eine beim Scrollen sichtbare Leiste **Ungespeicherte Änderungen** mit **Änderungen verwerfen** und **Speichern**. Unten erklärt **Projekt löschen**, was erhalten bleibt.
@@ -478,6 +479,7 @@ Wissenstools liefern nie unzugängliche Projektdokumente, auch nicht bei direkte
 - „Kopiere den Schreib-Skill ins Projekt Garten und passe ihn für verständliche Kindersprache an.“
 - „Aktiviere im Shop-Projekt docker und deaktiviere dort Claude Codes deploy-Skill, nur für dieses Projekt.“
 - „Füge ~/Documents/Manuals zum gemeinsamen Wissen hinzu.“
+- „Mach mein Projekt Steuern 2026 privat: Andere Projekte sollen es nicht durchsuchen können.“
 - „Verschiebe die Wissensdatenbank Verträge nach Steuern 2026 und schalte dort die Suche im gemeinsamen Wissen aus.“
 - „Welche Wissensdatenbanken habe ich, und welche Dokumente waren nicht lesbar?“
 - „Teile mein Projekt Thesis einen Monat lang mit Maria, damit sie kommentieren kann, und mit Nikos, damit er die Dokumente bearbeiten kann.“

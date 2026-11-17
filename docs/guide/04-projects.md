@@ -166,12 +166,13 @@ It is named after the project ("Shop engineer"), works only in the project and i
 
 ### Settings
 
-Everything about the project itself, in five parts, each with a line on what it is for:
+Everything about the project itself, in six parts, each with a line on what it is for:
 
 - **The project**: its **Name** (beside its mark, in the colour picked), **What it is about** and **Its colour**.
 - **What every agent in it follows**: its **Agent Guidelines**, as when you made it.
 - **How its sessions start**: under **Its sessions start as**, one choice to tap: **The agent picked on the start page** (the default: the start page keeps the agent you picked in the project, General until you pick another), or one of your agents, built in or your own. A project where you have not picked anything yet then opens on the start page with that agent.
 - **Wiki memory**: whether the project keeps a wiki of articles from its documents and its work: **As in Settings (On)** (or **(Off)**, as the default is now), **On** or **Off**. It saves at once. [Settings → Memory](/settings?s=memory&find=Wiki%20memory) has the default for every project (see [Wiki memory](/guide/wiki-memory#turn-it-on-or-off)). Under it, **Most documents to read into its wiki** is **As in Settings (100)** or **A number of its own**: a project with more documents than that has its wiki read only that many (the pinned, the most used and the newest), and agents search all of them (see [When a project has too many documents](/guide/wiki-memory#when-a-project-has-too-many-documents)).
+- **Searchable from other projects**: a switch, on by default, and shown for a project, not for a group. On, agents in your other projects can find and read this project's notes, wiki, documents and conversations when they look for them (they never change them); off, the project keeps itself to itself, and they can't. Its own sessions are not affected and can still look into your other projects. It saves at once (see [Search beyond one project](/guide/memory#search-beyond-one-project)).
 - **The projects it brings together**: pick projects here to turn this project into a group (see [Bring projects together in a group](#bring-projects-together-in-a-group)).
 
 Once you change something, a bar says **Unsaved changes**, with **Undo changes** and **Save**; it stays in view while you scroll. At the bottom, **Delete the project** says what stays, with its button.
@@ -478,6 +479,7 @@ The knowledge tools never bring up another project's documents, not even when an
 - "Copy the writing skill into my Garden project, and change it there to use plain words for children."
 - "In my Shop website project, turn the docker skill on and Claude Code's deploy skill off, for that project only."
 - "Add the folder ~/Documents/Manuals to my shared knowledge."
+- "Make my Taxes 2026 project private: other projects should not be able to search it."
 - "Move the Contracts knowledge base into the Taxes 2026 project, and stop that project from searching the shared knowledge."
 - "Which knowledge bases do I have, and which documents couldn't be read?"
 - "Share my Thesis project with Maria so she can comment, for a month, and with Nikos so he can edit the documents."

@@ -611,6 +611,14 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
       toastError(e);
     }
   };
+  /** "Searchable from other projects" saves at once, apart from the form (absent means on). */
+  const setMemoryShared = async (on: boolean) => {
+    try {
+      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { memoryShared: on }));
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const save = async () => {
     try {
       onSaved(
@@ -723,6 +731,11 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
               />
               {limitChoice === 'own' && <DocumentLimit label="Most documents to read into its wiki" value={s.wikiDocumentLimit ?? wikiLimit} onCommit={(n) => void setLimit(n)} />}
             </div>
+          </Row>
+        )}
+        {!isGroup(s) && (
+          <Row title="Searchable from other projects" sub="Agents in your other projects can find and read this project’s notes, wiki, documents and conversations when they look for them. They never change them.">
+            <Switch on={s.memoryShared !== false} label="Searchable from other projects" onChange={(v) => void setMemoryShared(v)} />
           </Row>
         )}
         <Row title="The projects it brings together" sub="A group: its sessions work with all of them, their files, documents and guidelines.">

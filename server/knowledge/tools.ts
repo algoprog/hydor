@@ -7,9 +7,10 @@ import type { RunTool } from '../features/types.ts';
 import { meaningOn } from '../memory/embed.ts';
 import { basesFor, basesOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
-import { baseRow, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
+import { baseRow, baseRows, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
 import { isWikiBase, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 import { countUses } from './marks.ts';
+import { otherProject } from '../memory/across.ts';
 
 const MAX_READ = 14_000;
 const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Projects: shared knowledge for every session, or a project’s own).';
@@ -78,6 +79,7 @@ const READ: RunTool = {
   description: [
     'Read more of a document in a knowledge base: the passages around one knowledge_search found (give its ref, like kb:123),',
     'or a document by its path, from its start or from a passage number. Each passage is marked with its number and its page or part.',
+    'With `project` it reads a document of another project’s own knowledge (read only), by the ref memory_search gave.',
     'A large data file (CSV, spreadsheet, JSON) is better analysed with code from its path, when you can run commands.',
   ].join(' '),
   inputSchema: {
@@ -87,12 +89,15 @@ const READ: RunTool = {
       path: { type: 'string', description: 'A document by its path, to read from the start (or from `from`).' },
       from: { type: 'number', description: 'The passage number to start at (1 is the first).' },
       count: { type: 'number', description: 'How many passages (default 6, at most 30).' },
+      project: { type: 'string', description: 'Another project’s own documents, by that project’s name (memory_search gives the ref and says which project): read only; a project that keeps itself to itself is refused.' },
     },
   },
   annotations: { readOnlyHint: true },
   async run(a, ctx) {
     const db = ctx.deps.db;
-    const within = basesOfSession(db, ctx.key).map((b) => b.id);
+    // Another project's own documents (not its wiki: wiki_read with project), when it is open to this session.
+    const other = otherProject(db, ctx.key, ctx.cwd, a.project);
+    const within = (other ? baseRows(db).filter((b) => b.space === other.id && !isWikiBase(db, b.id)) : basesOfSession(db, ctx.key)).map((b) => b.id);
     let doc: ReturnType<typeof docById>;
     let from = Math.max(0, (Number(a.from) || 1) - 1);
     const count = Math.max(1, Math.min(Number(a.count) || 6, 30));
@@ -103,9 +108,10 @@ const READ: RunTool = {
       if (!a.from) from = Math.max(0, c.seq - 1);
     } else if (a.path) doc = docByPath(db, String(a.path), within);
     else throw new Error('Give a ref (from knowledge_search) or a path');
-    if (!doc || !within.includes(doc.base) || !wikiDocumentVisible(db, doc.base, doc.path)) throw new Error('That document is not in a knowledge base this session searches');
+    if (!doc || !within.includes(doc.base) || !wikiDocumentVisible(db, doc.base, doc.path)) throw new Error(other ? `That document is not in the own documents of the project “${other.name}” (memory_search gives refs; a wiki article is opened with wiki_read and project)` : 'That document is not in a knowledge base this session searches');
     const rows = chunksOf(db, doc.id, from, count);
-    if (!isWikiBase(db, doc.base)) countUses(db, [doc]);
+    // Reading another project's documents leaves its marks as they are.
+    if (!other && !isWikiBase(db, doc.base)) countUses(db, [doc]);
     if (!rows.length) return `${doc.title} has ${doc.passages} passages; there is nothing from passage ${from + 1}.`;
     let out = `${doc.title} (${doc.path}), passages ${from + 1}–${from + rows.length} of ${doc.passages}:\n`;
     let part: string | null = null;

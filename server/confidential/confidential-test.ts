@@ -317,11 +317,11 @@ const ALL_TOOLS = [
   'app_try', 'app_screen', 'app_data', 'app_run', 'app_api', 'schedule_task', 'update_task', 'remember', 'forget', 'update_user_profile', 'skill_save', 'skill_patch', 'swarm_post', 'swarm_read',
   'swarm_stop', 'ui_screenshot', 'experiment_run', 'experiment_sweep', 'a_tool_added_next_year',
   'read_document', 'present_files', 'show_html', 'save_page', 'get_page', 'save_doc', 'save_sheet', 'save_slides', 'save_latex', 'save_notebook', 'export_page', 'knowledge_search', 'knowledge_read',
-  'knowledge_list', 'recall', 'search_sessions', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user', 'list_tasks', 'experiment_list',
+  'knowledge_list', 'recall', 'search_sessions', 'memory_search', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user', 'list_tasks', 'experiment_list',
   'find_ui',
 ];
 const OFF = ['export_page', 'web_search', 'read_page', 'find_media', 'browser_open', 'browser_act', 'computer_screenshot', 'http_request', 'run_with_secrets', 'request_secret', 'list_connections', 'generate_image', 'generate_video', 'generate_audio', 'publish_site', 'use_app', 'app_save', 'app_api', 'schedule_task', 'update_task', 'remember', 'forget', 'update_user_profile', 'skill_save', 'skill_patch', 'ui_screenshot', 'experiment_run', 'experiment_sweep', 'a_tool_added_next_year'];
-const KEPT = ['read_document', 'present_files', 'show_html', 'save_page', 'get_page', 'save_doc', 'save_latex', 'knowledge_search', 'recall', 'search_sessions', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user', 'find_ui'];
+const KEPT = ['read_document', 'present_files', 'show_html', 'save_page', 'get_page', 'save_doc', 'save_latex', 'knowledge_search', 'recall', 'search_sessions', 'memory_search', 'read_session', 'start_child_session', 'child_sessions', 'message_child', 'app_guide', 'ask_form', 'notify_user', 'find_ui'];
 
 test('tools: a confidential session keeps those that work here and loses the rest, new ones too', () => {
   const ctx = ctxOf(SECRET);
@@ -443,11 +443,11 @@ test('memory: read, never written', () => {
   kvSet(db, 'memory.enabled', '1');
   assert.deepEqual(
     memoryTools(ctxOf(SECRET)).map((t) => t.name),
-    ['recall', 'search_sessions', 'read_session'],
+    ['recall', 'search_sessions', 'memory_search', 'read_session'],
   );
   assert.deepEqual(
     memoryTools(ctxOf(PLAIN)).map((t) => t.name),
-    ['remember', 'forget', 'recall', 'search_sessions', 'read_session'],
+    ['remember', 'forget', 'recall', 'search_sessions', 'memory_search', 'read_session'],
   );
   kvSet(db, 'memory.enabled', '0');
   assert.deepEqual(memoryTools(ctxOf(SECRET)), [], 'nothing when memory is off for all');

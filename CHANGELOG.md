@@ -3,6 +3,22 @@
 What changed in each version of Hydor (called Naget Agent until 0.20), newest first. The app shows these in Settings → General →
 Release notes, and says what is new after it updates.
 
+## 0.76.0 · 17 November 2026
+
+Memory across projects: agents can search your other projects' notes, wiki and documents, and past conversations of
+this project or all of them, when they need to; a project can keep itself to itself.
+
+- **Search all of memory**: a new tool, memory_search, lets an agent look through memory notes, wiki articles,
+  documents and past conversations at once, in its own project, in all your projects, or in one by its name ("how did
+  we set up releases in the other project?"). Other projects' memory is only ever read, and only when an agent asks:
+  nothing more is given unasked.
+- **Past conversations of this project or all**: search_sessions can keep to this project, or search one project or
+  all of them, and says which project each conversation is from.
+- **Other projects' wikis and documents**: an agent can open an article of another project's wiki, or one of its
+  documents, to read it; writing stays with each project's own agents.
+- **Searchable from other projects**: a switch on a project's Settings tab, on unless you turn it off, keeps that
+  project's notes, wiki, documents and conversations out of reach of your other projects' agents.
+
 ## 0.75.0 · 17 November 2026
 
 Memory that keeps up with big projects: agents get what bears on each message and on each file they open, notes and
