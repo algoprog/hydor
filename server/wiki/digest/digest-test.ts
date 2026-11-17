@@ -134,9 +134,9 @@ test('a new project document: source, article, index, log, notes, an update, a b
   assert.match(asked[0].prompt, /Project: Alpha — The travel booking tool/);
   assert.match(asked[0].prompt, /<document>[\s\S]*Flights over 500 euros/);
   const root = wikiRoot(db, alpha.id)!;
-  // The default project wiki is protected in Git before the digest creates source files.
-  assert.equal(root, path.join(project, '.wiki'));
-  assert.match(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), /^\/\.wiki\/$/m);
+  // A project's wiki is a folder of its own in the hub's projects/ (named after the project: the core chooses the name).
+  assert.equal(path.dirname(root), fs.realpathSync(path.join(hub, 'projects')));
+  assert.equal(fs.existsSync(path.join(project, '.gitignore')), false, 'nothing is added to the project: its wiki is in the hub');
   const article = readWiki(root, 'wiki/travel-policy.md').content;
   assert.match(article, /^---\ntitle: "Travel policy"\nsources:\n {2}- raw\/articles\/source-[0-9a-f]{64}-[0-9a-f]{64}\.md\nupdated: \d{4}-\d\d-\d\d\n---\n\n# Travel policy/);
   assert.match(article, /See the other and \[index\]\(\.\.\/index\.md\)/);
@@ -157,24 +157,31 @@ test('a new project document: source, article, index, log, notes, an update, a b
   stop();
 });
 
-test('the document digest respects an explicit gitignore opt-out', async () => {
-  const folder = path.join(tmp, 'no-ignore');
-  const dir = path.join(tmp, 'no-ignore-docs');
-  fs.mkdirSync(folder); fs.mkdirSync(dir);
-  execFileSync('git', ['init', '-q', folder]);
-  const space = createSpace(db, { name: 'No ignore', folder });
-  const knowledge = createBase(db, { name: 'No ignore docs', space: space.id });
-  addSource(db, knowledge.id, 'folder', dir);
-  setWikiSettings(db, { gitIgnore: false });
-  const d = newDigest();
-  try {
-    plan = { update: [], create: [], notes: [] };
-    fs.writeFileSync(path.join(dir, 'note.md'), '# Note\n\nA synthetic source about projects.\n');
-    await scan(knowledge.id, (count) => count === 1);
-    await d.settled();
-    assert.ok(fs.existsSync(path.join(folder, '.wiki', 'raw', 'articles')));
-    assert.equal(fs.existsSync(path.join(folder, '.gitignore')), false);
-  } finally { setWikiSettings(db, { gitIgnore: true }); stop(); }
+test('the document digest leaves .gitignore alone unless Settings ask, and then only for a wiki in the project’s folder', async () => {
+  const cases: [string, Partial<Parameters<typeof setWikiSettings>[1]>, boolean, boolean][] = [
+    ['hub', { projectWikis: 'hub', gitIgnore: true }, false, false],
+    ['off', { projectWikis: 'folder', gitIgnore: false }, true, false],
+    ['on', { projectWikis: 'folder', gitIgnore: true }, true, true],
+  ];
+  for (const [name, settings, inFolder, ignored] of cases) {
+    const folder = path.join(tmp, `ignore-${name}`);
+    const dir = path.join(tmp, `ignore-${name}-docs`);
+    fs.mkdirSync(folder); fs.mkdirSync(dir);
+    execFileSync('git', ['init', '-q', folder]);
+    const space = createSpace(db, { name: `Ignore ${name}`, folder });
+    const knowledge = createBase(db, { name: `Ignore ${name} docs`, space: space.id });
+    addSource(db, knowledge.id, 'folder', dir);
+    setWikiSettings(db, settings);
+    const d = newDigest();
+    try {
+      plan = { update: [], create: [], notes: [] };
+      fs.writeFileSync(path.join(dir, 'note.md'), '# Note\n\nA synthetic source about projects.\n');
+      await scan(knowledge.id, (count) => count === 1);
+      await d.settled();
+      assert.equal(fs.existsSync(path.join(folder, '.wiki', 'raw', 'articles')), inFolder, `${name}: where the wiki is`);
+      assert.equal(fs.existsSync(path.join(folder, '.gitignore')) && /^\/\.wiki\/$/m.test(fs.readFileSync(path.join(folder, '.gitignore'), 'utf8')), ignored, `${name}: .gitignore`);
+    } finally { setWikiSettings(db, { projectWikis: 'hub', gitIgnore: false }); stop(); }
+  }
 });
 
 test('the same text again: nothing', async () => {
