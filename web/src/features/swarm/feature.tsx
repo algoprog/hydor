@@ -12,7 +12,7 @@ import type { SessionExtra } from '@shared/features';
 import { partsTally, swarmMode, type SwarmMode } from '@shared/swarm';
 import type { SessionSummary } from '@shared/types';
 import { Dialog, MenuItem, MenuSep, OptionRow, Popover, SettingChip } from '../../components/ui';
-import { activityOf, isBusy } from '../../lib/activity';
+import { activityOf, isWorking } from '../../lib/activity';
 import { enc, patch } from '../../lib/api';
 import { go, openSession } from '../../lib/nav';
 import { toast, toastError, useSessions } from '../../lib/store';
@@ -43,7 +43,8 @@ function LeadDock({ s, mode }: { s: SessionSummary; mode: SwarmMode }) {
   const members = useMembers(s.key);
   const posts = useBoards((x) => x.byKey[s.key]?.posts.length);
   useEffect(() => loadBoard(s.key), [s.key]);
-  const working = members.filter((m) => isBusy(activityOf(m))).length;
+  // A member whose turn is over while its background tasks or subagents still run is working, not done.
+  const working = members.filter((m) => isWorking(activityOf(m))).length;
   const done = members.length - working;
   return (
     <>

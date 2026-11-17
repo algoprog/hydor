@@ -46,7 +46,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   header). Open, up to six rows, most important first:
   what waits on you (approvals, questions, forms and calls held in the Outbox answered right there with the Inbox's
   own cards), sessions that finished Done or Failed and that you have not opened since (the start of the last reply or
-  the error, and the files made, each opening in Files), runs of scheduled tasks, agents' schedules and apps with how
+  the error, and the files made, each opening in Files; one whose subagents or background tasks still run waits until they end), runs of scheduled tasks, agents' schedules and apps with how
   they went (done, failed, nothing new) and their cost, and what runs next today. It stays folded until you open it,
   and as you left it on each device; Mark all as seen clears it and marks its sessions as opened on every device. Your last visit is kept on
   the server for every device: the end of the last time the app was open, in front and in use for a minute or more
@@ -68,7 +68,7 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   doing right now: Active lists all sessions with activity in the last five minutes, including finished ones,
   and moves them back to their usual group after five quiet minutes. Sessions awaiting automatic resume
   after a usage limit stay in Active until that scheduled resume is cleared, and so do sessions whose background
-  agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages). Pinned comes next, then Projects: a group for each project and each folder you picked
+  agents, commands or monitors, or Hydor subagents, are still running, until those end (a session whose subagents still run shows as working, with no Done marker, and takes messages; so does one whose Hydor subagent's own background tasks or subagents still run). Pinned comes next, then Projects: a group for each project and each folder you picked
   (task folders, the home folder and temporary ones go by day), foldable (so are the Active and Projects headings themselves,
   kept on each computer), a line per session, with a pen to
   start a new session there, and dragged by their headings into the order you like, the same on every device;

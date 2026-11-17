@@ -1951,6 +1951,7 @@ registerAway(app, {
   db,
   inbox: () => [...sessions.inbox(), ...inboxItems()],
   acpName: (id) => acpAgents(db).find((a) => a.id === id)?.name,
+  atWork: (key) => sessions.atWork(key),
   markSeen: (key) => sessions.markSeen(key),
 });
 

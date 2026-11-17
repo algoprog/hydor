@@ -10,7 +10,7 @@ import type { SessionSummary } from '@shared/types';
 import { create } from 'zustand';
 import { isConfidential } from '@shared/confidential';
 import { Button, Dialog, MenuItem, OptionRow, Popover, Segmented, SettingChip } from '../../components/ui';
-import { activityOf, isBusy } from '../../lib/activity';
+import { activityOf, isBusy, isWorking } from '../../lib/activity';
 import { api, enc, patch } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { go, openFile, openSession } from '../../lib/nav';
@@ -62,7 +62,8 @@ function LeadDock({ s, r }: { s: SessionSummary; r: ResearchSettings }) {
   useFeatureEvent('research', (e) => e.key === s.key && setSt(e.data as ResearchState));
   // A count, not a list: a selector that makes a new array on every call never settles, and React gives up (a blank page).
   const keys = st?.researchers ?? [];
-  const working = useSessions((x) => keys.filter((k) => isBusy(activityOf(x.byKey[k]))).length);
+  // A researcher still at work in the background (tasks or subagents of its own) counts as at work.
+  const working = useSessions((x) => keys.filter((k) => isWorking(activityOf(x.byKey[k]))).length);
   const report = useReport(s, r);
   const leading = isBusy(activityOf(s));
   const rounds = st?.rounds ?? 0;

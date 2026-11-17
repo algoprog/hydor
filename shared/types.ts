@@ -355,8 +355,8 @@ export interface SessionSummary {
   stats: SessionStats;
   live?: LiveState | null;
   /**
-   * How many of its child sessions are running (starting, working or waiting for you, or kept working by helpers of their own).
-   * Set even when the session's own process has stopped between turns: it is not done while they run.
+   * How many of its child sessions are running (starting, working or waiting for you, or kept working by background tasks
+   * or helpers of their own). Set even when the session's own process has stopped between turns: it is not done while they run.
    */
   helpers?: number;
   archived?: boolean;

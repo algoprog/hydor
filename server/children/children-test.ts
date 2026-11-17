@@ -28,7 +28,7 @@ import { costWords, teamInstructions } from './team.ts';
 import { inboxOf, inboxTurnEnded, pump, standingKey } from '../assistants/inbox.ts';
 import { sessionExtra } from '../sessionExtra.ts';
 import { catchUp, CHILD_INSTRUCTIONS, children, findModel, liftsAt, LONG_REPLY, reportTurn, resultMessage } from './index.ts';
-import { ancestorsOf, childKeys, parentOf, runningBelow, runningChildren } from './family.ts';
+import { ancestorsOf, childKeys, parentOf, runningBelow, runningChildren, stillRunning, workStatus } from './family.ts';
 import { childMode } from './modes.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/') || process.env.PRICES_URL !== '') {
@@ -913,6 +913,52 @@ test('running helpers: a child kept working by running children of its own count
   assert.deepEqual(running([['claude:g1', 'working'], ['claude:g2', 'working']]), { 'claude:g1': ['claude:g2'], 'claude:g0': ['claude:g1'] });
   // Nothing below running: nothing above counts.
   assert.deepEqual(running([['claude:g0', 'working']]), {});
+});
+
+test('running helpers: a child between turns whose background tasks still run is at work; ended tasks or an ended process are not', () => {
+  setSessionExtra(db, 'claude:bw', {});
+  for (const c of ['c1', 'c2', 'c3', 'c4']) setSessionExtra(db, `claude:bw-${c}`, { parent: 'claude:bw' });
+  const task = (kind: string, status: string) => ({ id: `${kind}-${status}`, description: 'x', kind, status });
+  const live = (status: LiveState['status'], tasks: ReturnType<typeof task>[]) => ({ status, backgroundTasks: tasks });
+  assert.equal(workStatus(live('idle', [task('local_bash', 'running')])), 'working');
+  assert.equal(workStatus(live('idle', [task('local_agent', 'running')])), 'working');
+  assert.equal(workStatus(live('idle', [task('local_bash', 'completed')])), 'idle');
+  assert.equal(workStatus(live('idle', [])), 'idle');
+  // A process that ended or failed keeps no task running, whatever its last list said.
+  assert.equal(workStatus(live('exited', [task('local_agent', 'running')])), 'exited');
+  assert.equal(workStatus(live('error', [task('local_bash', 'running')])), 'error');
+  assert.equal(workStatus(live('waiting', [])), 'waiting');
+  const statuses: [string, string][] = [
+    ['claude:bw-c1', workStatus(live('idle', [task('local_bash', 'running')]))],
+    ['claude:bw-c2', workStatus(live('idle', [task('local_agent', 'completed')]))],
+    ['claude:bw-c3', workStatus(live('exited', [task('local_agent', 'running')]))],
+    ['claude:bw-c4', workStatus(live('idle', [task('monitor', 'running')]))],
+  ];
+  assert.deepEqual(running(statuses), { 'claude:bw': ['claude:bw-c1', 'claude:bw-c4'] });
+});
+
+test('what a session still has at work, in words for its parent agent', () => {
+  const task = (kind: string, status = 'running') => ({ id: Math.random().toString(36), description: 'x', kind, status });
+  const s = (status: LiveState['status'], tasks: ReturnType<typeof task>[], helpers?: number) => ({ live: { status, startedAt: 0, pendingApprovals: 0, backgroundTasks: tasks }, helpers });
+  assert.equal(stillRunning(s('idle', [])), '');
+  assert.equal(stillRunning(s('idle', [task('local_bash', 'completed')])), '');
+  assert.equal(stillRunning(s('idle', [task('local_bash')])), '1 background task it started is still running');
+  assert.equal(stillRunning(s('idle', [task('local_agent'), task('local_agent'), task('local_bash')])), '2 subagents and 1 background task it started are still running');
+  // Hydor subagents count as subagents, also when its own process has stopped between turns.
+  assert.equal(stillRunning({ live: null, helpers: 1 }), '1 subagent it started is still running');
+  assert.equal(stillRunning(s('idle', [task('local_agent')], 1)), '2 subagents it started are still running');
+  assert.equal(stillRunning(s('exited', [task('local_bash')])), '');
+});
+
+test('a reply from a Hydor subagent that is still at work says so', () => {
+  const base = { key: 'acp:x', title: 'T', label: 'Custom · M', link: 'L' };
+  const t = (o: Partial<{ reply: string; status: string }>) => ({ items: [], files: [], commands: [], last: end(), reply: '', ...o });
+  const still = '1 background task it started is still running';
+  assert.equal(
+    resultMessage({ ...base, turn: t({ status: 'completed', reply: 'Started the build.' }), still }),
+    '[Reply from the Hydor subagent "T" (acp:x, Custom · M)]\n(It is still working: 1 background task it started is still running; it goes on afterwards, and its next reply comes to you too.)\n\nStarted the build.',
+  );
+  assert.equal(resultMessage({ ...base, turn: t({ status: 'completed', reply: 'Done.' }) }), '[Reply from the Hydor subagent "T" (acp:x, Custom · M)]\n\nDone.');
 });
 
 test('running helpers: a loop in who started whom ends, and a session is never its own helper', () => {

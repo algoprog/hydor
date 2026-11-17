@@ -44,7 +44,9 @@ function statusKind(s: SessionSummary): 'needs' | 'starting' | 'working' | 'stop
   if (l?.status === 'working') return 'working';
   if (l?.status === 'stopping') return 'stopping';
   if (l?.status === 'error') return 'error';
-  if (s.external && s.external.status !== 'idle') return 'outside';
+  // Between turns, but background tasks or subagents it started still run: it is not finished.
+  if ((l?.status === 'idle' && l.backgroundTasks?.some((t) => t.status === 'running')) || (s.helpers ?? 0) > 0) return 'working';
+  if (s.external && (s.external.status !== 'idle' || s.external.backgroundTasks?.length)) return 'outside';
   if (s.doneAt && (!s.seenAt || s.seenAt < s.doneAt)) return 'finished';
   return '';
 }

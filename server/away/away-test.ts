@@ -307,6 +307,14 @@ await ok('how a turn ended is kept: a later turn replaces it, and a stopped one 
   assert.equal(again.fileCount, undefined);
 });
 
+await ok('a session still at work (background tasks or subagents it started still run) is not listed as finished until its work ends', () => {
+  const busy = new Set(['claude:report']);
+  const atWork = (key: string) => busy.has(key);
+  assert.equal(awaySummary({ ...src, atWork }, { now: NOW }).rows.some((r) => r.id === 'session:claude:report'), false);
+  busy.clear();
+  assert.equal(awaySummary({ ...src, atWork }, { now: NOW }).rows.some((r) => r.id === 'session:claude:report'), true);
+});
+
 // ---- the routes ----------------------------------------------------------------------------------------------------
 
 await ok('routes: the summary, a visit going on, and Mark all as seen (the sessions in it count as opened)', async () => {

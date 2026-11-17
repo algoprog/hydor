@@ -49,7 +49,7 @@ import { AUTO_MODEL, type Tier, type TierNote, type TierPick } from '../shared/t
 import { opensTurn } from './opinion/turns.ts';
 import { filesOf, sessionEnd } from '../shared/ending.ts';
 import { recordEnding } from './away/index.ts';
-import { ancestorsOf, runningBelow, runningChildren } from './children/family.ts';
+import { ancestorsOf, isRunningStatus, runningBelow, runningChildren, workStatus } from './children/family.ts';
 import { hubDir, wikiMemoryOn, wikiSpaceOfSession } from './wiki/roots.ts';
 import { sessionMemoryOn } from './memory/store.ts';
 import { sessionCaptureEnabled } from './wiki/session/store.ts';
@@ -430,9 +430,12 @@ export class SessionManager extends EventEmitter {
 
   // ---- listing ---------------------------------------------------------------
 
-  /** Each session's running child sessions (server/children/family.ts): worked out once for a whole list. */
+  /**
+   * Each session's running child sessions (server/children/family.ts): worked out once for a whole list. A child between
+   * turns whose background tasks still run counts: it is not finished.
+   */
   private runningHelpers(): Map<string, Set<string>> {
-    return runningChildren(this.db, [...this.lives].map(([k, l]) => [k, l.adapter.state.status]));
+    return runningChildren(this.db, [...this.lives].map(([k, l]) => [k, workStatus(l.adapter.state)]));
   }
 
   private rowToSummary(r: Row, helpers: Map<string, Set<string>> = this.runningHelpers()): SessionSummary {
@@ -563,6 +566,20 @@ export class SessionManager extends EventEmitter {
   summary(key: string): SessionSummary | null {
     const r = this.row(key);
     return r ? this.rowToSummary(r) : null;
+  }
+
+  /**
+   * Whether a session is at work now, here or in VS Code or a terminal: its turn is going or waits for you, or, between
+   * turns, background tasks or Hydor subagents it started still run. It has not finished until they end.
+   */
+  atWork(key: string): boolean {
+    const l = this.lives.get(key);
+    if (l && isRunningStatus(workStatus(l.adapter.state))) return true;
+    if (this.runningHelpers().get(key)?.size) return true;
+    if (l) return false;
+    const r = this.row(key);
+    const ext = r ? this.externalState(r) : null;
+    return !!ext && (ext.status !== 'idle' || !!ext.backgroundTasks?.length);
   }
 
   queueSummary(key: string) {
@@ -724,7 +741,8 @@ export class SessionManager extends EventEmitter {
 
   /**
    * Whether a session that ended its turn still has helpers at work: its agent's own in the background (Claude Code's
-   * Agent tool), or child sessions it started. It is woken as each ends, so it has not finished.
+   * Agent tool), or child sessions it started that are still at work (in a turn, or with background tasks of their own).
+   * It is woken as each ends, so it has not finished.
    */
   private helpersAtWork(s: SessionSummary): boolean {
     // Its own helpers alone ("local_agent"): a command left running in the background (a dev server) may never end.

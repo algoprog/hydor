@@ -23,7 +23,7 @@ import { helper, helperJson } from '../helper.ts';
 import { AGENT_FILE } from '../models/config.ts';
 import { addNote } from '../notes.ts';
 import { lastTurn, opensTurn, type Turn } from '../opinion/turns.ts';
-import { childKeys, parentOf } from './family.ts';
+import { childKeys, parentOf, stillRunning } from './family.ts';
 import { childMode, modeFamily, modeLevel } from './modes.ts';
 import { roleOf } from '../swarm/roles.ts';
 import { agentMode, assistantExtra, inScope, mayAsk, type Assistant } from '../../shared/assistants.ts';
@@ -421,6 +421,9 @@ function statusOf(s: SessionSummary | null): string {
   if (st === 'working' || st === 'starting') return 'working';
   if (st === 'waiting') return 'waiting for the user (an approval or a question)';
   if (st === 'error' || s.live?.error) return `stopped with an error${s.live?.error ? `: ${firstLine(s.live.error, 160)}` : ''}`;
+  // Between turns with background tasks or subagents of its own still running: not finished, their end wakes it.
+  const still = stillRunning(s);
+  if (still) return `still working: its turn ended, but ${still}`;
   return st === 'idle' ? 'finished its turn' : 'not running';
 }
 
@@ -484,9 +487,10 @@ const MESSAGE: RunTool = {
  * What the parent is told when a child's turn ends; `summary` stands in for a long reply. A turn its plan's usage limit
  * stopped, after which the child carries on (`after`: with another account, on API credit, or once the limit lifts),
  * says so instead of an error: its reply comes when it finishes, so the parent neither starts the work again nor waits
- * for nothing.
+ * for nothing. `still`: what it started that still runs ("1 background task it started is still running"), so the
+ * parent knows it is not finished.
  */
-export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string; after?: LimitAfter }, now = Date.now()): string {
+export function resultMessage(o: { key: string; title: string; label: string; link: string; turn: Turn; error?: string; stopped?: string; summary?: string; after?: LimitAfter; still?: string }, now = Date.now()): string {
   const who = `Hydor subagent "${o.title}" (${o.key}, ${o.label})`;
   if (o.after)
     return `[The ${who} reached a usage limit and carries on${goesOn(o.after, now)}.]\n(Its reply comes when it finishes, so there is no need to start its work again. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
@@ -497,9 +501,10 @@ export function resultMessage(o: { key: string; title: string; label: string; li
       : o.error
         ? `[The ${who} stopped with an error: ${firstLine(o.error, 300)}]`
         : `[Reply from the ${who}]`;
-  if (!reply) return `${head}\n(It wrote no reply. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
-  if (o.summary) return `${head}\nIts reply is long (${reply.length.toLocaleString('en-US')} characters), so here is a summary. child_sessions with key "${o.key}" gives the whole of it; the user can open it at ${o.link}.\n\n${o.summary.trim()}`;
-  return `${head}\n\n${reply}`;
+  const more = o.still ? `\n(It is still working: ${o.still}; it goes on afterwards, and its next reply comes to you too.)` : '';
+  if (!reply) return `${head}${more}\n(It wrote no reply. child_sessions shows how it stands; the user can open it at ${o.link}.)`;
+  if (o.summary) return `${head}${more}\nIts reply is long (${reply.length.toLocaleString('en-US')} characters), so here is a summary. child_sessions with key "${o.key}" gives the whole of it; the user can open it at ${o.link}.\n\n${o.summary.trim()}`;
+  return `${head}${more}\n\n${reply}`;
 }
 
 /** How a child that reached a usage limit carries on, to follow "carries on". */
@@ -668,6 +673,7 @@ export async function reportTurn(d: Deps, t: Pick<TurnInfo, 'key' | 'startedAt' 
     stopped: cap ? 'its spending cap was reached' : undefined,
     summary: !after && turn.reply.length > LONG_REPLY ? await summarize(d, turn.reply, t.key) : undefined,
     after: after ?? undefined,
+    still: (s && stillRunning(s)) || undefined,
   });
   await tellParent(d, parent, t.startedAt, msg);
 }

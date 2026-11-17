@@ -9,7 +9,8 @@
 //   needs you         the Inbox as it is now (approvals, questions, forms, calls held in the Outbox…)
 //   finished          sessions whose last turn ended Done or Failed since then and that you have not opened since:
 //                     how each ended, the start of its last reply and the files it made are kept when its turn ends
-//                     (recordEnding, from server/sessions.ts)
+//                     (recordEnding, from server/sessions.ts); not one still at work (a turn again, or background tasks
+//                     or subagents it started still running), which is listed once its work ends
 //   ran by itself     scheduled tasks' and your agents' runs (task_runs), and apps' runs started from outside a
 //                     session (app_runs: the Apps page, the API, a public page, a chat app), each with how it went and
 //                     its cost; their sessions are not counted again among the finished ones
@@ -114,6 +115,8 @@ export interface AwaySources {
   inbox: () => InboxItem[];
   /** Another agent's name (Settings → More agents), by its id. */
   acpName?: (id: string) => string | undefined;
+  /** Whether a session is still at work (a turn, or background tasks or subagents it started): not finished yet. */
+  atWork?: (key: string) => boolean;
 }
 
 const enc = encodeURIComponent;
@@ -150,10 +153,10 @@ const has = (db: DB, table: string) => !!db.prepare(`select 1 from sqlite_master
  * Sessions that ended Done or Failed in (since, until] and that you have not opened since: not archived, not a helper
  * of another session, and not a run's (a task's or an app's run tells of it instead).
  */
-function finishedRows(db: DB, since: number, until: number): FinishedRow[] {
+function finishedRows(db: DB, since: number, until: number, atWork?: (key: string) => boolean): FinishedRow[] {
   const runs = has(db, 'task_runs') ? 'and not exists (select 1 from task_runs r where r.key = a.key and (r.ended_at is null or r.ended_at > @since))' : '';
   const apps = has(db, 'app_runs') ? 'and not exists (select 1 from app_runs x where x.key = a.key)' : '';
-  return db
+  const rows = db
     .prepare(
       `select a.key, coalesce(s.agent, a.agent) as agent, a.ended, coalesce(a.ended_at, a.done_at) as at, a.end_line, a.end_files,
          a.title as app_title, a.first_prompt as app_first, a.acp_agent, s.title, s.first_prompt
@@ -166,6 +169,9 @@ function finishedRows(db: DB, since: number, until: number): FinishedRow[] {
        order by at desc limit ${MOST}`,
     )
     .all({ since, until }) as FinishedRow[];
+  // A session whose turn ended while background tasks or subagents it started still run is not finished: it is listed
+  // when its work ends.
+  return atWork ? rows.filter((r) => !atWork(r.key)) : rows;
 }
 
 /** Everything since `since`, ready to show. `until`: the end of the day for what runs next (the page's own midnight). */
@@ -197,7 +203,7 @@ export function awaySummary(src: AwaySources, o: { now?: number; until?: number 
   }
 
   // Finished sessions.
-  for (const r of finishedRows(db, since, now)) {
+  for (const r of finishedRows(db, since, now, src.atWork)) {
     const files = parse<{ made?: string[]; n?: number }>(r.end_files);
     const title = r.app_title || r.title || r.first_prompt || r.app_first || 'New session';
     rows.push({
@@ -354,7 +360,7 @@ export function registerAway(app: FastifyInstance, deps: AwayDeps) {
     const upto = Number.isFinite(at) && at > 0 ? Math.min(at, now) : now;
     const v = visitsOf(deps.db);
     const since = sinceOf(v, now);
-    for (const r of finishedRows(deps.db, since, upto)) deps.markSeen(r.key);
+    for (const r of finishedRows(deps.db, since, upto, deps.atWork)) deps.markSeen(r.key);
     kvSet(deps.db, KEY, JSON.stringify({ ...v, cleared: Math.max(v.cleared ?? 0, upto) }));
     return { ok: true };
   });

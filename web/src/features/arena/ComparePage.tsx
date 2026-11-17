@@ -8,7 +8,7 @@ import type { TimelineItem } from '@shared/types';
 import { AgentIcon } from '../../components/AgentIcon';
 import { ReplyMarkdown } from '../../components/Markdown';
 import { Badge, Button, cx, Throbber } from '../../components/ui';
-import { activityOf, isBusy } from '../../lib/activity';
+import { activityOf, isBusy, isWorking } from '../../lib/activity';
 import { api, enc, post } from '../../lib/api';
 import { useFeatureEvent } from '../../lib/featureEvents';
 import { go, openSession } from '../../lib/nav';
@@ -40,13 +40,15 @@ function Column({ e, m, onKeep }: { e: ArenaEntry; m: ArenaMatch; onKeep: () => 
   }, [e.key]);
   const reply = lastReply(items);
   const busy = isBusy(activityOf(s));
+  // Its turn is over, but background tasks or subagents it started still run: still working.
+  const working = isWorking(activityOf(s));
   const kept = m.winner === e.key;
   return (
     <section className={cx('flex min-h-0 min-w-0 flex-col rounded-xl border bg-panel', kept ? 'border-accent/60' : 'border-line')}>
       <header className="flex items-center gap-2 border-b border-line px-3 py-2">
         <AgentIcon agent={e.agent} size={15} name={e.acpAgent === 'console' ? 'Custom' : s?.acpName} spinning={busy} />
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name(e)}</span>
-        {kept ? <Badge tone="ok">Kept</Badge> : m.winner ? <Badge>Archived</Badge> : busy ? <span className="text-[11.5px] text-fg-3">working…</span> : null}
+        {kept ? <Badge tone="ok">Kept</Badge> : m.winner ? <Badge>Archived</Badge> : working ? <span className="text-[11.5px] text-fg-3">working…</span> : null}
       </header>
       <div className="min-h-[160px] flex-1 overflow-y-auto px-3 py-2 md:max-h-[calc(100dvh-230px)]">
         {reply ? <ReplyMarkdown text={reply} /> : <div className="flex h-24 items-center justify-center text-fg-3">{busy || !items ? <Throbber size={20} /> : 'No answer yet'}</div>}

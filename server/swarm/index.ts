@@ -10,7 +10,7 @@
 import { CAMPAIGN_KINDS, campaignParts, partNamed, partsTally, SWARM_KINDS, swarmMode, type CampaignPart, type SwarmBoard, type SwarmKind, type SwarmMode, type SwarmPost } from '../../shared/swarm.ts';
 import type { SessionSummary } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
-import { childKeys } from '../children/family.ts';
+import { childKeys, stillRunning } from '../children/family.ts';
 import { swarmSize } from '../children/index.ts';
 import type { DB } from '../db.ts';
 import type { Deps, Feature, RunCtx, RunTool } from '../features/types.ts';
@@ -147,7 +147,8 @@ function statusOf(d: Deps, key: string): string {
   if (st === 'working' || st === 'starting') return 'working';
   if (st === 'waiting') return 'waiting for the user';
   if (st === 'error' || s.live?.error) return 'stopped with an error';
-  return 'finished its turn';
+  const still = stillRunning(s);
+  return still ? `still working: its turn ended, but ${still}` : 'finished its turn';
 }
 
 /** A post as a line in what an agent reads. */
