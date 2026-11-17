@@ -137,6 +137,7 @@ The **Wiki memory** group has the settings for the articles agents keep for each
 - **Learn from new documents**: on at first. New and changed documents add memory notes (a project's own only) and update the wiki, with the helper model.
 - **Wiki folder**: where the shared wiki is kept, and project wikis unless set below: an absolute path on the computer running Hydor, with **Browse**. Changing it when it has files opens a review to keep, combine or move them (see [Move the wiki folder](/guide/wiki-memory#move-the-wiki-folder)).
 - **Project wikis**: **In the wiki folder** (at first: nothing is written into your project folders) or **In each project’s folder**. With the second, **Folder inside each project** says where, and **Leave it out of Git** keeps it out of the project's repository.
+- **Wiki memory on by default in chats** and **Auto lessons learned by default in chats**: what a new chat starts with. Wiki memory is on in chats at first and automatic lesson suggestions are off; a chat's own options can differ (see [Turn it on or off](/guide/wiki-memory#turn-it-on-or-off)).
 
 Memory itself must be on for new documents to add anything, and for session checkpoints: with memory turned off for a session or all of them, no checkpoints are saved and existing ones stay (see [Checkpoints and lessons learned](/guide/wiki-memory#checkpoints-and-lessons-learned)).
 
