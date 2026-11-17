@@ -39,7 +39,7 @@ try {
   // A project's skill switches pass a --settings of their own: Claude Code keeps one, so the app's hooks join it.
   fs.rmSync(path.join(config, 'settings.json'));
   const switches = ['--settings', JSON.stringify({ skillOverrides: { 'pdf-tools': 'off' } })];
-  const given = (args: string[]) => ({ instructions: [], notes: [], mcpServers: {}, env: {}, args, skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {} });
+  const given = (args: string[]) => ({ instructions: [], notes: [], mcpServers: {}, env: {}, args, skillRoots: [], disallowedTools: [], allowedTools: [], strictMcp: false, codexConfig: {}, builtinTools: null });
   const both = claudeSpec({ ...opts, add: given(switches) }, { ...env, HYDOR_MEMORY_HOOKS: '1' });
   assert.equal(both.args.filter((a) => a === '--settings').length, 1, 'one --settings');
   const merged = JSON.parse(both.args[both.args.indexOf('--settings') + 1]);

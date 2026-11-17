@@ -347,8 +347,8 @@ export const connections: Feature = {
   routes,
   tools: sessionTools,
   spawn(s, d) {
-    // A confidential session reaches no connected app (server/confidential).
-    if (s.extra.confidential) return undefined;
+    // A confidential session reaches no connected app (server/confidential), nor does a browser-only one (Do this here).
+    if (s.extra.confidential || s.extra.browserOnly) return undefined;
     const apps = activeFor(d.db, s.extra);
     const mcpServers: Record<string, McpServerSpec> = {};
     for (const c of apps) {

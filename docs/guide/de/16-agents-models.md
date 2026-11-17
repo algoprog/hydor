@@ -17,10 +17,10 @@ Unterstützung in der App:
 
 - Ziele (der Agent arbeitet weiter, bis eine Bedingung erfüllt ist) und Verzweigungen (eine Kopie der Sitzung ab einer früheren Antwort): Claude Code, Codex und Custom. Nicht die anderen ACP-Agenten.
 - **Fortsetzen in…** (die Unterhaltung an einen anderen Agenten übergeben): von Claude Code oder Codex aus an den jeweils anderen oder an Custom.
-- Aufwand (wie intensiv das Modell nachdenkt): Claude Code und Codex, bei Modellen, die ihn anbieten.
+- Aufwand (wie intensiv das Modell nachdenkt): Claude Code, Codex und Grok Build sowie jeder andere ACP-Agent, dessen Modelle ihn anbieten.
 - Denkaufwand: Claude Code und Codex bei geeigneten Modellen.
-- Mehrere Konten: Claude Code, Codex und Grok Build.
-- Abolimits und Limit-Resets: Claude Code und Codex. (Grok Build hat hier noch keine Nutzungsanzeigen.)
+- Mehrere Konten, Abolimits und der Kontowechsel bei einem Limit: Claude Code, Codex und Grok Build.
+- Limit-Resets und API-Guthaben bei einem Limit: nur Claude Code und Codex.
 
 ## Agent und Modell für eine neue Sitzung wählen
 
@@ -28,11 +28,11 @@ Unter dem Nachrichtenfeld der Startseite (`/`) bestimmst du, wer arbeitet.
 
 1. Klicke auf **Ausführungsumgebung**. Die Liste zeigt **Claude Code** („Anthropic · Claude-Abo oder API-Key“), **Codex** („OpenAI · ChatGPT-Abo oder API-Key“), **Custom** („Beliebiges Modell: OpenRouter, Ollama, vLLM“) und jeden Agenten, den du unter Einstellungen → Weitere Agenten hinzugefügt hast („ACP-Agent · “ und sein Befehl). Ganz unten öffnet **Modelle für Custom** Einstellungen → Modelle, und **Agenten hinzufügen oder verwalten** öffnet Einstellungen → Weitere Agenten.
 2. Klicke auf **Modell** und wähle eines. **Automatisch**, ganz oben und zu Beginn gewählt, lässt die Leistungsstufen entscheiden: Am besten und Max, wenn sich das Problem als zu schwer erweist (siehe [Modellstufen nach Aufgabenart](#tiers-a-model-for-each-kind-of-job)). Darunter zeigt die Liste nur die eigenen Modelle dieses Agenten. Der Standard des Agenten ist mit „Standard“ markiert. Ältere Versionen eines Modells warten hinter einer Zeile wie „2 ältere Modelle“; klicke darauf, um sie zu sehen. Bei mehr als acht Modellen steht oben ein Feld **Modelle suchen**: Tippe ein paar Buchstaben und drücke Enter, um den ersten Treffer zu übernehmen. Wenn der Agent nicht so gestartet ist, wie die App es für seine Modelle verlangt hat, sagt das Menü es mit den eigenen Worten des Agenten zum Grund, und **Erneut versuchen** fragt noch einmal.
-3. Unter **Optionen** findest du **Aufwand** (bei Agenten und Modellen, die ihn haben: Standard, Niedrig, Mittel, Hoch und so weiter) und **Berechtigungen** (was der Agent tun darf, ohne dich zu fragen). Umschalt+Tab im Nachrichtenfeld wechselt ebenfalls die Berechtigungen.
+3. Unter **Optionen** findest du **Aufwand** (bei Agenten und Modellen, die ihn haben: Standard, Niedrig, Mittel, Hoch und so weiter; zu Grok Build siehe [Aufwand bei Grok Build](#effort-for-grok-build)) und **Berechtigungen** (was der Agent tun darf, ohne dich zu fragen). Umschalt+Tab im Nachrichtenfeld wechselt ebenfalls die Berechtigungen.
 
 Die Startseite merkt sich, was du für jeden Ort, an dem du arbeitest, gewählt hast (jedes Projekt, jeden Ordner und **Neuer Aufgabenordner**), auf jedem Gerät: Modell, Aufwand und Berechtigungen jedes Programms kehren dort so zurück, wie du sie verlassen hast (siehe [Was die Startseite speichert](/guide/sessions#what-the-start-page-remembers)).
 
-Ein anderer ACP-Agent als Custom zeigt seine Auswahl für **Modell** und **Berechtigungen** erst nach seiner ersten Sitzung: Sie listet, was der Agent bei seinem letzten Lauf angeboten hat.
+Ein anderer ACP-Agent als Custom zeigt seine Auswahl für **Modell** und **Berechtigungen** erst nach seiner ersten Sitzung: Sie listet, was der Agent bei seinem letzten Lauf angeboten hat. Grok Build ist die Ausnahme: Seine Modelle mit den Aufwandsstufen, die jedes anbietet, erscheinen schon nach dem Hinzufügen, weil die App Grok danach fragt.
 
 Ist **Optionen** → **Vertraulich** eingeschaltet, ist **Ausführungsumgebung** auf **Custom**, und **Modell** listet nur die Modelle auf diesem Computer oder in deinem privaten Netzwerk, die besten davon zuerst gewählt: siehe [Eine Sitzung vertraulich halten](/guide/sessions#keep-a-session-confidential).
 
@@ -49,7 +49,20 @@ Nach einem Modellwechsel gilt:
 - Custom wechselt ab dem nächsten Schritt, auch im laufenden Durchlauf.
 - Andere ACP-Agenten wechseln, sofern sie die Modellauswahl unterstützen.
 
+Mit dem **Aufwand** der Sitzung ist es genauso: Wähle einen, und der laufende Agent nutzt ihn ab dem nächsten Durchlauf. Bietet das Modell, zu dem du wechselst, den bisherigen Aufwand nicht an, zeigt die Auswahl den Standard dieses Modells, und das Modell läuft damit.
+
 Die Liste enthält nur Modelle des Sitzungsagenten, bei vertraulichen Sitzungen nur lokale oder private. Zum Agentenwechsel wähle im Sitzungsmenü (⋯) **In Codex fortsetzen**, **In Claude Code fortsetzen** oder **In Custom fortsetzen**. Diese Optionen bestehen aus Claude-Code- und Codex-Sitzungen; Custom erscheint bei vorhandenem Modell. Die nächste Nachricht startet eine neue Sitzung im selben Ordner mit der bisherigen Unterhaltung. Gestoppte Sitzungen verwenden beim Fortsetzen ihr letztes Modell, sofern du vorher kein anderes wählst.
+
+## Aufwand bei Grok Build
+
+Die Modelle von Grok nehmen einen Denkaufwand an, dieselbe Wahl, die dir Claude Code und Codex bieten:
+
+- Grok 4.6 (und neuere Modelle, die dieselben anbieten): **xhigh**, **high**, **medium** oder **low**. **High** ist der Standard.
+- Grok 4.5: **high**, **medium** oder **low**.
+
+Wähle auf der Startseite unter **Ausführungsumgebung** **Grok Build** und dann **Optionen** → **Aufwand**: Dort stehen die Aufwandsstufen des gewählten Modells, dazu **Standard**. Sie erscheinen schon, sobald Grok Build hinzugefügt ist, auch vor der ersten Sitzung. Eine laufende Grok-Build-Sitzung ändert ihren Aufwand in ihrer eigenen **Aufwand**-Auswahl (dem Chip unter dem Nachrichtenfeld), und auch ein Lauf einer [App](/guide/apps) nimmt einen an. Wechselst du in einer Sitzung zu einem Modell, das den bisherigen Aufwand nicht anbietet (xhigh bei Grok 4.5), zeigt die Auswahl den Standard dieses Modells, und das Modell läuft damit.
+
+Das gibt es nicht nur für Grok: Jeder andere ACP-Agent, dessen Modelle Aufwandsstufen anbieten, bekommt dieselbe **Aufwand**-Auswahl.
 
 ## Modellstufen nach Aufgabenart
 
@@ -146,7 +159,7 @@ Jedes hinzugefügte Konto hat eine eigene Zeile unter der eigenen Anmeldung des 
 - **Abmelden** unterbricht die Arbeitsfähigkeit seiner Sitzungen bis zur erneuten Anmeldung.
 - **Entfernen** nimmt das Konto aus der App. Seine Sitzungen verschwinden aus der Liste, aber ihr Verlauf bleibt auf dem Datenträger, es sei denn, du setzt zusätzlich das Häkchen bei **Auch die Anmeldung und den Verlauf seiner Sitzungen löschen**. Ein Konto kannst du nicht entfernen, solange Sitzungen mit ihm laufen: Beende sie zuerst.
 
-Die [Nutzungsseite](/usage) zeigt pro hinzugefügtem Claude-Code- oder Codex-Konto eine eigene Karte mit Limits. Grok Build hat noch keine Nutzungsanzeigen.
+Die [Nutzungsseite](/usage) zeigt pro hinzugefügtem Claude-Code-, Codex- oder Grok-Build-Konto eine eigene Karte mit Limits.
 
 ## Das Konto einer Sitzung wählen
 
@@ -156,22 +169,24 @@ Hat der gewählte Agent zusätzliche Konten (bei Grok Build, sobald du eines hin
 - Zusätzliche Konten stehen mit ihrem Namen in der Liste.
 - **Konten verwalten** öffnet die Kontoeinstellungen.
 
-Die Startseite merkt sich deine Wahl für diesen Agenten, an jedem Ort gleich. Eine Sitzung, die mit einem hinzugefügten Konto läuft, zeigt oben in der Sitzung den Namen dieses Kontos mit einem Personensymbol. Wenn dieses Konto ein Nutzungslimit erreicht, betrifft der Limit-Hinweis über dem Nachrichtenfeld dieses Konto. Das Konto wird beim Start der Sitzung festgelegt. Es ändert sich nur von selbst, wenn **Bei erreichtem Limit das Konto wechseln** (siehe unten, nur Claude Code und Codex) eingeschaltet ist.
+Die Startseite merkt sich deine Wahl für diesen Agenten, an jedem Ort gleich. Eine Sitzung, die mit einem hinzugefügten Konto läuft, zeigt oben in der Sitzung den Namen dieses Kontos mit einem Personensymbol. Wenn dieses Konto ein Nutzungslimit erreicht, betrifft der Limit-Hinweis über dem Nachrichtenfeld dieses Konto. Das Konto wird beim Start der Sitzung festgelegt. Es ändert sich nur von selbst, wenn **Bei erreichtem Limit das Konto wechseln** (siehe unten) eingeschaltet ist.
 
 Um eine Sitzung selbst zu einem anderen Konto zu verschieben, klicke auf den **Konto**-Chip der Sitzung und wähle eines. Das geht bei Claude-Code-, Codex- und Grok-Build-Sitzungen und gilt ab deiner nächsten Nachricht. Der Grok-Verlauf einer Grok-Build-Sitzung zieht mit um; kann Grok sie unter dem anderen Konto nicht wieder öffnen, beginnt sie dort neu, mit einem Hinweis.
 
 ## Alle Konten nutzen: bei Limits wechseln
 
-Mit zwei oder mehr Konten für denselben Agenten kann die App alle nutzen: Wenn bei einem die Nutzung aufgebraucht ist, arbeitet deine Arbeit mit einem anderen weiter. Öffne [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) und suche **Bei erreichtem Limit das Konto wechseln** in der Gruppe **Nutzungslimit erreicht** unter **Konten**. Sie erscheint, sobald du ein Konto hinzugefügt hast (ihr (i) sagt, dass die Sitzung zu einem anderen Konto dieses Agenten mit verbleibender Nutzung wechselt und weiterläuft, wenn die Nutzung des Kontos einer Sitzung aufgebraucht ist, und dass neue Sitzungen ein Konto an seinem Limit überspringen). Sie ist von Anfang an eingeschaltet (schalte sie dort aus, wenn du das Konto lieber selbst wählst) und funktioniert auch, wenn kein Browser offen ist.
+Mit zwei oder mehr Konten für denselben Agenten kann die App alle nutzen: Wenn bei einem die Nutzung aufgebraucht ist, arbeitet deine Arbeit mit einem anderen weiter. Öffne [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) und suche **Bei erreichtem Limit das Konto wechseln** in der Gruppe **Nutzungslimit erreicht** unter **Konten**. Sie erscheint, sobald du irgendein Konto hinzugefügt hast, auch eines für Grok Build (ihr (i) sagt, dass die Sitzung zu einem anderen Konto dieses Agenten mit verbleibender Nutzung wechselt und weiterläuft, wenn die Nutzung des Kontos einer Sitzung aufgebraucht ist, und dass neue Sitzungen ein Konto an seinem Limit überspringen). Sie ist von Anfang an eingeschaltet (schalte sie dort aus, wenn du das Konto lieber selbst wählst) und funktioniert auch, wenn kein Browser offen ist.
 
 - Wenn ein Durchlauf stoppt, weil das Konto der Sitzung sein Nutzungslimit erreicht hat, wählt die App ein anderes angemeldetes Konto desselben Agenten, das noch Nutzung übrig hat (das am wenigsten genutzte), verschiebt die Sitzung mit ihrem gesamten Verlauf dorthin und sendet „… hat sein Nutzungslimit erreicht, deshalb läuft diese Sitzung jetzt auf …. Mach dort weiter, wo du aufgehört hast.“ Ein Hinweis oben in der App sagt, zu welchem Konto die Sitzung gewechselt ist.
 - Die Subagenten, die eine Claude-Code-Sitzung im Hintergrund ausführt, laufen ebenfalls weiter. Die, die beim Erreichen des Limits noch arbeiten, halten beim nächsten Schritt an, und ihre Arbeit bleibt erhalten. Die App wartet auf sie (höchstens zwei Minuten), bevor sie die Sitzung verschiebt. Die Nachricht nennt sie dann, und der Agent führt jeden dort fort, wo er angehalten hat. Wenn nur die Subagenten an ein Limit stoßen (eines nur für ihr Modell), wechselt die Sitzung, sobald ihr Durchlauf beendet ist und keiner von ihnen mehr arbeitet.
 - Hydor-Subagenten (die Sitzungen, die ein Agent startet, um einen Teil seiner Arbeit zu erledigen) sind eigene Sitzungen, daher wird jede von selbst verschoben, wenn ein Limit ihren Durchlauf stoppt. Der Agent, der sie gestartet hat, erfährt, dass sie weiterläuft und nicht, dass sie fehlgeschlagen ist, und bekommt ihre Antwort, wenn sie fertig ist.
-- Deine Hauptanmeldung und jedes hinzugefügte Konto zählen alle. Claude-Code-Konten lösen Claude-Code-Konten ab, Codex-Konten Codex-Konten. Grok-Build-Konten wechseln noch nicht bei einem Limit.
+- Deine Hauptanmeldung und jedes hinzugefügte Konto zählen alle. Claude-Code-Konten lösen Claude-Code-Konten ab, Codex-Konten Codex-Konten, Grok-Build-Konten Grok-Build-Konten.
+- Ein Grok-Build-Konto ist am Limit, wenn es sein Wochenlimit, sein Credit-Limit oder sein Ausgabenlimit bei „Nach Verbrauch bezahlen“ erreicht. Die Sitzung wechselt dann zu einem anderen angemeldeten Grok-Konto mit verbleibender Nutzung (dem am wenigsten genutzten) und läuft mit „… hat sein Nutzungslimit erreicht, deshalb läuft diese Sitzung jetzt auf …“ weiter. Ein kurzes Ratenlimit (eine Welle von Anfragen) verschiebt nichts: Es vergeht von selbst. Der Limit-Hinweis über dem Nachrichtenfeld erscheint auch bei Grok-Sitzungen.
 - Codex-Ziele wechseln mit und laufen weiter.
-- Wenn jedes Konto sein Limit erreicht hat, wechselt nichts (es sei denn, **Bei erreichtem Limit API-Guthaben verwenden** ist eingeschaltet, siehe unten). Ist **Nach dem Zurücksetzen von Nutzungslimits fortsetzen** eingeschaltet, läuft die Sitzung weiter, sobald das erste Konto zurückgesetzt wird, und zwar mit diesem Konto. Mehr dazu unter [Nutzung, Limits und Kosten](/guide/usage#continue-sessions-automatically-after-a-limit).
+- Wenn jedes Konto sein Limit erreicht hat, wechselt nichts (es sei denn, **Bei erreichtem Limit API-Guthaben verwenden** ist eingeschaltet, siehe unten, bei Claude Code). Ist **Nach dem Zurücksetzen von Nutzungslimits fortsetzen** eingeschaltet, läuft die Sitzung weiter, sobald das erste Konto zurückgesetzt wird, und zwar mit diesem Konto. Das gilt auch für Grok-Build-Sitzungen. Mehr dazu unter [Nutzung, Limits und Kosten](/guide/usage#continue-sessions-automatically-after-a-limit).
 - Eine neue Sitzung, die mit einem Konto an seinem Limit gestartet wird, startet stattdessen mit einem Konto, das noch Nutzung übrig hat. Und eine Nachricht, die du an eine Sitzung sendest, deren Konto am Limit ist, verschiebt die Sitzung zuerst, damit die Nachricht nicht abgewiesen wird. Mit deiner Nachricht erfährt der Agent, dass er jetzt auf einem Konto mit verbleibender Nutzung läuft, sodass er nicht auf das Zurücksetzen des alten Kontos wartet, und welche seiner Subagenten weitermachen können.
 - In VS Code oder Terminals geöffnete Sitzungen bleiben auf ihrem Konto.
+- Limit-Resets (Codex-Reset-Guthaben, Claude-Reset-Gutschriften) und API-Guthaben gibt es weiterhin nur für Claude Code und Codex.
 - Die kleinen eigenen Fragen der App an Claude Code oder Codex (das Hilfsmodell auf **Automatisch**, schnelle Modellschritte einer App, Pull-Request-Beschreibungen, Befehlsvorschläge) gehen auf dieselbe Weise an dein nächstes angemeldetes Konto, wenn eines am Limit oder abgemeldet ist.
 
 ## API-Guthaben nutzen, wenn alle Konten ausgeschöpft sind
@@ -425,6 +440,9 @@ Ein [Hugging-Face-Token](/settings?s=models&find=Hugging%20Face%20token) erlaubt
 - „Füge OpenCode hinzu.“
 - „Füge Grok Build hinzu und melde es mit meinem Grok-Abo an.“
 - „Füge ein zweites Grok-Konto für die Arbeit hinzu und starte meine nächste Sitzung damit.“
+- „Starte meine nächste Grok-Sitzung mit xhigh-Aufwand.“
+- „Wie viel von meinem Grok-Abo ist diese Woche noch übrig?“
+- „Nutze alle meine Grok-Konten: Wenn eines sein Limit erreicht, mach mit einem anderen weiter.“
 - „Füge Gemini CLI und Goose hinzu und sage mir, was ich noch selbst installieren muss.“
 - „Finde ein bildfähiges Hugging-Face-Modell, das hier gut läuft. Prüfe und installiere die passende Größe.“
 - „Füge das neueste DeepSeek-Modell von OpenRouter hinzu.“ Voraussetzung ist dein OpenRouter-Key.

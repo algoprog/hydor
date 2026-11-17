@@ -17,9 +17,9 @@ What each can do in the app:
 
 - Goals (the agent keeps working until a condition holds) and forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
 - **Continue in…** (hand the conversation to another agent): from Claude Code or Codex, to the other one or to Custom.
-- Effort (how hard the model thinks): Claude Code and Codex, for models that offer it.
-- More than one account: Claude Code, Codex and Grok Build.
-- Plan usage limits and limit resets: Claude Code and Codex. (Grok Build has no usage meters here yet.)
+- Effort (how hard the model thinks): Claude Code, Codex and Grok Build, and any other ACP agent whose models offer it.
+- More than one account, plan usage limits and switching accounts at a limit: Claude Code, Codex and Grok Build.
+- Limit resets and API credit at a limit: Claude Code and Codex only.
 
 ## Pick the agent and model for a new session
 
@@ -27,11 +27,11 @@ On the start page (`/`), the row under the message box says who does the work.
 
 1. Click **Runs on**. The list shows **Claude Code** ("Anthropic · Claude plan or API key"), **Codex** ("OpenAI · ChatGPT plan or API key"), **Custom** ("Any model: OpenRouter, Ollama, vLLM") and every agent you added in Settings → More agents ("ACP agent · " and its command). At the bottom, **Models for Custom** opens Settings → Models, and **Add or manage agents** opens Settings → More agents.
 2. Click **Model** and pick one. **Automatic**, at the top and picked to start with, lets the tiers choose: Best, and Max if the problem proves too hard (see [Tiers: a model for each kind of job](#tiers-a-model-for-each-kind-of-job)). Under it the list shows only that agent's own models. The agent's default is marked "default". Older versions of a model wait behind a line such as "2 older models"; click it to see them. When there are more than eight models, a **Search models** box sits at the top: type a few letters and press Enter to take the first match. When the agent did not start as the app asked for its models, the menu says so, with the agent's own words on why, and **Try again** asks again.
-3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
+3. Under **Options** you find **Effort** (for agents and models that have it: Default, Low, Medium, High and so on; for Grok Build, see [Effort for Grok Build](#effort-for-grok-build)) and **Permissions** (what the agent may do without asking you). Shift+Tab in the message box switches permissions too.
 
 The start page remembers what you picked for each place you work in (each project, each folder and **New task folder**), on every device: each program's model, effort and permissions come back there as you left them (see [What the start page remembers](/guide/sessions#what-the-start-page-remembers)).
 
-An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran.
+An ACP agent other than Custom shows its **Model** and **Permissions** choices only after its first session: they list what the agent offered when it last ran. Grok Build is the exception: its models, with the efforts each takes, show as soon as it is added, because the app asks Grok for them.
 
 With **Options** → **Confidential** on, **Runs on** is **Custom** and **Model** lists only the models on this computer or your private network, the best of them picked first: see [Keep a session confidential](/guide/sessions#keep-a-session-confidential).
 
@@ -48,7 +48,20 @@ Pick another model and the session carries on with it:
 - Custom uses it from its next step, even in the middle of a turn.
 - Another ACP agent switches if it offers a choice of models.
 
+The session's **Effort** works the same way. Pick one and the running agent uses it from its next turn on. If the model you switch to does not take the effort you had, the picker shows that model's default, and the model runs with that.
+
 The model menu only lists the session's own agent's models; a confidential session's, only those on this computer or your private network. To move a conversation to another agent, use the session's menu (⋯) → **Continue in Codex**, **Continue in Claude Code** or **Continue in Custom Agent** (from Claude Code and Codex sessions; Custom appears once it has a model). Your next message then starts a new session of that agent in the same folder, with the conversation so far. A stopped session picks up again on the model it last used, unless you pick another one before you send.
+
+## Effort for Grok Build
+
+Grok's models take a reasoning effort, the same choice Claude Code and Codex give you:
+
+- Grok 4.6 (and newer models that offer the same): **xhigh**, **high**, **medium** or **low**. **High** is the default.
+- Grok 4.5: **high**, **medium** or **low**.
+
+On the start page, pick **Grok Build** under **Runs on**, then **Options** → **Effort**: it lists the efforts of the model you picked, with **Default**. They show as soon as Grok Build is added, even before its first session. A running Grok Build session changes its effort in its own **Effort** picker (the chip under the message box), and an [app](/guide/apps) run takes one too. When you switch a session to a model that does not take the effort you had (xhigh on Grok 4.5), the picker shows that model's default, and that is what the model runs with.
+
+It is not only for Grok: any other agent that speaks ACP and whose models offer efforts gets the same **Effort** choice.
 
 ## Tiers: a model for each kind of job
 
@@ -145,7 +158,7 @@ Each added account has its own row, under the agent's own sign-in, with **Sign i
 - **Sign out** stops the sessions that run as this account from working until it signs in again.
 - **Remove** takes the account out of the app. Its sessions leave the list, but their history stays on disk, unless you also tick **Also delete its sign-in and the history of its sessions**. You can't remove an account while sessions are running as it: stop them first.
 
-The [Usage page](/usage) shows a card for every added Claude Code or Codex account, with its own limits. Grok Build has no usage meters yet.
+The [Usage page](/usage) shows a card for every added Claude Code, Codex or Grok Build account, with its own limits.
 
 ## Pick the account a session runs as
 
@@ -155,22 +168,24 @@ When the agent you picked has added accounts (for Grok Build, once you added one
 - Each added account is listed by name.
 - **Manage accounts** opens Settings → Agents → Accounts.
 
-The start page remembers your choice for that agent, the same in every place. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below, Claude Code and Codex only).
+The start page remembers your choice for that agent, the same in every place. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below).
 
 To move a session to another account yourself, click the session's own **Account** chip and pick one. This works for Claude Code, Codex and Grok Build sessions, and takes effect from your next message. A Grok Build session's Grok history moves with it; if Grok can't reopen it under the other account, it starts afresh there, with a note.
 
 ## Use all your accounts: switch at a limit
 
-With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and find **Switch accounts at a limit**, in the **At a usage limit** group under **Accounts**, which shows once you have added an account (its (i) says that when a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on, and that new sessions skip an account at its limit). It is on from the start (turn it off there if you would rather pick the account yourself), and it works while no browser is open.
+With two or more accounts for the same agent, the app can use them all: when one runs out of usage, your work carries on with another. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) and find **Switch accounts at a limit**, in the **At a usage limit** group under **Accounts**, which shows as soon as you have added any account, Grok Build's included (its (i) says that when a session's account runs out of usage, the session moves to another of that agent's accounts with usage left and carries on, and that new sessions skip an account at its limit). It is on from the start (turn it off there if you would rather pick the account yourself), and it works while no browser is open.
 
 - When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A note at the top of the app says which account it moved to.
 - The subagents a Claude Code session runs in the background carry on too. Those still working when the limit hits stop at their next step with their work kept, and the app waits for them (two minutes at most) before it moves the session. The message then names them, and the agent continues each one where it stopped. If only the subagents hit a limit (one for their model alone), the session moves once its turn has ended and none of them is still working.
 - Hydor subagents (the sessions an agent starts to do part of its work) are sessions of their own, so each one moves by itself when a limit stops its turn. The agent that started it hears that it carries on, not that it failed, and gets its reply when it finishes.
-- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex. Grok Build accounts don't switch at a limit yet.
+- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex, Grok Build from Grok Build.
+- A Grok Build account is at its limit when it reaches its weekly limit, its credit limit or its pay-as-you-go spending cap. The session then moves to another signed-in Grok account with usage left (the least used one) and continues with "… reached its usage limit, so this session now runs on …". A short rate limit (a burst of requests) moves nothing: it passes by itself. The limit notice above the message box shows for Grok sessions too.
 - A Codex goal moves with the session and keeps going.
-- When every account is at its limit, nothing moves (unless **Use API credit at a limit** is on, below). With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
+- When every account is at its limit, nothing moves (unless **Use API credit at a limit** is on, below, for Claude Code). With **Resume after usage limits** on, the session continues when the first account resets, on that account. This holds for Grok Build sessions too. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
 - A new session started on an account that is at its limit starts on one with usage left instead, and a message you send to a session whose account is at its limit moves the session first, so the message isn't turned away. With your message, the agent learns that it now runs on an account with usage left, so it doesn't wait for the old account's reset, and which of its subagents can go on.
 - Sessions open in VS Code or a terminal stay on their account.
+- Limit resets (Codex reset credits, Claude reset grants) and API credit are still for Claude Code and Codex only.
 - The app's own quick questions to Claude Code or Codex (the helper model on **Automatic**, an app's quick model steps, pull-request descriptions, command suggestions) go to your next signed-in account the same way when one is at its limit, or signed out.
 
 ## Use API credit when every account is at its limit
@@ -424,6 +439,9 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Add OpenCode to my agents."
 - "Add Grok Build to my agents and sign it in with my Grok subscription."
 - "Add a second Grok account for work, and start my next session on it."
+- "Start my next Grok session on xhigh effort."
+- "How much of my Grok plan is left this week?"
+- "Use all my Grok accounts: when one hits its limit, carry on with another."
 - "Add Gemini CLI and Goose to my agents, and tell me what I still have to install."
 - "Find a model on Hugging Face that runs well on this computer and sees images, check it, and install the best size."
 - "Add the newest DeepSeek model from OpenRouter to my models." (once your OpenRouter key is set)

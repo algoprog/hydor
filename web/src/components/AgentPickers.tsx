@@ -299,11 +299,14 @@ export function EffortPicker({
   label?: string;
 }) {
   const c = useCatalog(agent, acp);
-  if (agent === 'acp') return null;
+  // An ACP agent offers efforts only when it says so (Grok Build); until its catalog is here, nothing shows.
+  if (agent === 'acp' && !c) return null;
   const m = findModel(c, model);
   const levels = m?.efforts ?? [];
   if (c && !levels.length) return null;
-  const shown = value ? cap(value) : label ? (m?.defaultEffort ? cap(m.defaultEffort) : 'Default') : 'Effort';
+  // An effort the model does not take (one kept from another model) shows as the model's default, which is what it runs with.
+  const taken = value && (!levels.length || levels.includes(value)) ? value : null;
+  const shown = taken ? cap(taken) : label ? (m?.defaultEffort ? cap(m.defaultEffort) : 'Default') : 'Effort';
   return (
     <Picker icon={<Gauge size={label ? 14 : 13} className="shrink-0" />} label={label} value={shown} title="Reasoning effort: how hard the model thinks" disabled={disabled} width={230}>
       {(close) => (
@@ -311,7 +314,7 @@ export function EffortPicker({
           <OptionRow
             label="Default"
             hint={m?.defaultEffort ? `Model default (${m.defaultEffort})` : 'Use the configured default'}
-            selected={!value}
+            selected={!taken}
             onClick={() => {
               onChange(null);
               close();

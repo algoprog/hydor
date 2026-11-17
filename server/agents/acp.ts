@@ -20,7 +20,7 @@ import { PAGE_SERVER } from '../mcp.ts';
 import { acpBriefing, acpText } from '../history/acp.ts';
 import type { Runner } from '../runner/client.ts';
 import { LiveAdapter, type ApprovalAnswer, type ImageInput, type LiveConfig, type ModelCall } from './live.ts';
-import { RpcPeer } from './rpc.ts';
+import { RpcPeer, RpcError } from './rpc.ts';
 import { which, WIN } from '../platform.ts';
 
 type Json = Record<string, any>;
@@ -54,6 +54,44 @@ const SIGN_IN: Record<string, string> = { pi: 'pi (then /login)', hermes: 'herme
  * browser (Grok Build's saved sign-in, then its xAI API key when XAI_API_KEY is set for it). Others are never chosen.
  */
 const HEADLESS_AUTH = ['cached_token', 'xai.api_key'];
+
+// ---- models and their efforts ---------------------------------------------------------------------
+
+/** The session's thought-level option (ACP config options, category `thought_level`): its id, the values it takes, the one set. */
+export function thoughtOption(configOptions: unknown): { id: string; options: string[]; current?: string } | null {
+  if (!Array.isArray(configOptions)) return null;
+  const o = configOptions.find((c: Json) => c?.category === 'thought_level' || c?.id === 'reasoning_effort');
+  if (!o || !Array.isArray(o.options)) return null;
+  // Options may come in groups ({ group, options }).
+  const flat: Json[] = o.options.flatMap((x: Json) => (Array.isArray(x?.options) ? x.options : [x]));
+  const options = flat.map((x) => String(x?.value ?? x?.id ?? '')).filter(Boolean);
+  return options.length ? { id: String(o.id), options, current: o.currentValue != null ? String(o.currentValue) : undefined } : null;
+}
+
+/**
+ * The models an ACP agent offers (a session's `models`, or Grok Build's `_meta.modelState`), each with the reasoning efforts
+ * it takes: the model's own list (Grok Build sends one per model in `_meta.reasoningEfforts`), else the session's
+ * thought-level option, which applies to every model.
+ */
+export function acpModelOptions(state: Json | null | undefined, thought?: { options: string[]; current?: string } | null): ModelOption[] {
+  const list: Json[] = Array.isArray(state?.availableModels) ? state!.availableModels : [];
+  return list
+    .filter((m) => m?.modelId != null)
+    .map((m) => {
+      const own: Json[] = Array.isArray(m._meta?.reasoningEfforts) ? m._meta.reasoningEfforts : [];
+      const efforts = own.length ? own.map((e) => String(e?.value ?? e?.id ?? '')).filter(Boolean) : (thought?.options ?? []);
+      const marked = own.find((e) => e?.default);
+      const def = String((own.length ? (marked?.value ?? marked?.id ?? m._meta?.reasoningEffort) : thought?.current) ?? '');
+      return {
+        value: String(m.modelId),
+        label: String(m.name ?? m.modelId),
+        description: m.description ?? undefined,
+        efforts,
+        defaultEffort: def && efforts.includes(def) ? def : undefined,
+        isDefault: state?.currentModelId != null && String(state.currentModelId) === String(m.modelId) ? true : undefined,
+      };
+    });
+}
 
 // ---- the list of agents ---------------------------------------------------------------------------
 
@@ -170,10 +208,36 @@ export interface AcpOpts {
   transcript: string;
   mode?: string;
   model?: string;
+  /** The reasoning effort to set, when the agent takes one (Grok Build). */
+  effort?: string;
   /** This app's MCP address for the session (show_html), for agents that take HTTP MCP servers. */
   pageServer?: string;
   /** What the app's capabilities add: instructions, MCP servers (server/features). */
   add?: GivenAdditions;
+}
+
+/**
+ * Whether a Grok Build turn stopped on the plan's usage limit (not a short throttle). Its error kinds `usage_limit_reached` and
+ * `usage_pool_exhausted` and its sentences ("You hit your weekly limit.", "You've hit the credit limit for your plan.", "run out of
+ * credits", HTTP 402) say so; `rate_limited`, `global_rate_limit` and `concurrency_limit` are throttles that pass by themselves.
+ */
+const PLAN_KINDS = /usage_limit_reached|usage_pool_exhausted/i;
+const PLAN_SENTENCE = /\bhit (?:your|the) (?:(?:weekly|daily|monthly|hourly|session|free|usage|credit|spending|plan)\s+)*(?:limit|cap)\b|\brun out of credits\b|\bstatus (?:code )?:?\s*402\b/i;
+/** A turn's whole answer that is only that sentence (a short text, at most a few plain words before it). */
+const PLAN_ANSWER = /^[\w' ]{0,20}?(?:\bhit (?:your|the) (?:(?:weekly|daily|monthly|hourly|session|free|usage|credit|spending|plan)\s+)*(?:limit|cap)\b|\brun out of credits\b)/i;
+
+export function planLimitHit(turn: { error?: string; code?: number; data?: unknown; text?: string; tools?: number }): boolean {
+  if (turn.error != null) {
+    let data = '';
+    try {
+      data = turn.data == null ? '' : JSON.stringify(turn.data).slice(0, 2000);
+    } catch {}
+    const said = `${turn.error} ${data}`;
+    return turn.code === 402 || PLAN_KINDS.test(said) || PLAN_SENTENCE.test(said);
+  }
+  // No error: the agent's own words, when they are all it said in the turn.
+  const text = (turn.text ?? '').trim();
+  return !turn.tools && text.length > 0 && text.length <= 160 && PLAN_ANSWER.test(text);
 }
 
 export class AcpLive extends LiveAdapter {
@@ -190,12 +254,16 @@ export class AcpLive extends LiveAdapter {
   /** The running totals the agent last reported (for its ACP session), to tell what each model call used. */
   private usage?: { of: string; in: number; out: number; cached: number; usd?: number };
   private calls = 0;
+  /** What the turn running now has said and done, to tell a plan limit that stopped it (Grok Build). */
+  private turn = { text: '', tools: 0 };
   /** Lines the agent printed in this run so far; each transcript entry notes how many were handled. */
   private ln = 0;
   private caught: { handled: number; answered: Set<string> } | null = null;
   /** What the agent offers, for the pickers. */
   modes: { id: string; name: string; description?: string }[] = [];
   models: ModelOption[] = [];
+  /** The agent's thought-level option (Grok Build's `reasoning_effort`), when it has one: the values it takes and the one set. */
+  private thought: { id: string; options: string[]; current?: string } | null = null;
 
   constructor(
     runner: Runner,
@@ -298,6 +366,8 @@ export class AcpLive extends LiveAdapter {
     }
     if (this.o.mode && this.modes.some((m) => m.id === this.o.mode)) await this.setMode(this.o.mode).catch(() => {});
     if (this.o.model && this.models.some((m) => m.value === this.o.model)) await this.setModel(this.o.model).catch(() => {});
+    // The effort too, when the agent takes it for the model now set (it is skipped when the model does not take it).
+    if (this.o.effort && this.takesEffort(this.o.effort)) await this.setEffort(this.o.effort).catch(() => {});
     this.state.status = 'idle';
     this.changed();
   }
@@ -351,10 +421,37 @@ export class AcpLive extends LiveAdapter {
       this.modes = r!.modes.availableModes.map((m: Json) => ({ id: String(m.id), name: String(m.name ?? m.id), description: m.description ?? undefined }));
       if (r!.modes.currentModeId) this.state.mode = String(r!.modes.currentModeId);
     }
+    this.thought = thoughtOption(r?.configOptions);
     if (Array.isArray(r?.models?.availableModels)) {
-      this.models = r!.models.availableModels.map((m: Json) => ({ value: String(m.modelId), label: String(m.name ?? m.modelId), description: m.description ?? undefined, efforts: [] }));
+      this.models = acpModelOptions(r!.models, this.thought);
       if (r!.models.currentModelId) this.state.model = String(r!.models.currentModelId);
     }
+    if (this.thought?.current) this.state.effort = this.thought.current;
+  }
+
+  /** The agent's own change to its options (after a model switch, say): the thought level, and the efforts the current model takes. */
+  private optionsChanged(configOptions: unknown) {
+    const thought = thoughtOption(configOptions);
+    if (!thought) return;
+    const was = this.thought?.options ?? [];
+    this.thought = thought;
+    if (thought.current) this.state.effort = thought.current;
+    // A model that takes the session's thought levels (it has no list of its own) takes the new ones; Grok Build's own lists stay.
+    this.models = this.models.map((m) => (m.value === this.state.model && (!m.efforts.length || m.efforts.join() === was.join()) ? { ...m, efforts: thought.options } : m));
+    this.changed();
+  }
+
+  /** Whether the current model takes this effort. */
+  private takesEffort(effort: string) {
+    if (!this.thought) return false;
+    const m = this.models.find((x) => x.value === this.state.model);
+    return m ? m.efforts.includes(effort) : this.thought.options.includes(effort);
+  }
+
+  private async setEffort(effort: string) {
+    if (!this.thought) throw new Error('This agent has no effort to set');
+    await this.rpc.call('session/set_config_option', { sessionId: this.acpSession, configId: this.thought.id, value: effort }, 15_000);
+    this.state.effort = effort;
   }
 
   private onLine(line: string, replay: boolean) {
@@ -381,11 +478,16 @@ export class AcpLive extends LiveAdapter {
       const u = m.params?.update;
       if (!u || this.loading) return;
       if (u.sessionUpdate === 'usage_update') this.callFrom(u);
+      if (this.prompting) {
+        if (u.sessionUpdate === 'agent_message_chunk' && typeof u.content?.text === 'string') this.turn.text = (this.turn.text + u.content.text).slice(-2000);
+        else if (u.sessionUpdate === 'tool_call' || u.sessionUpdate === 'tool_call_update') this.turn.tools++;
+      }
       this.record({ t: 'update', u });
       if (u.sessionUpdate === 'current_mode_update' && u.currentModeId) {
         this.state.mode = String(u.currentModeId);
         this.changed();
       }
+      if (u.sessionUpdate === 'config_option_update') this.optionsChanged(u.configOptions);
       return;
     }
     // The answer to a prompt sent before the server restarted (its call is gone): the turn ended.
@@ -520,6 +622,8 @@ export class AcpLive extends LiveAdapter {
     }
     this.record({ t: 'prompt', id, text, images: images.length || undefined });
     this.prompting = true;
+    this.limitStopped = false;
+    this.turn = { text: '', tools: 0 };
     this.state.status = 'working';
     this.state.turnStartedAt = Date.now();
     this.state.error = undefined;
@@ -529,10 +633,10 @@ export class AcpLive extends LiveAdapter {
       // Custom keeps the prompt's id with the turn: forks and "Edit from here" cut its conversation by it.
       .call('session/prompt', { sessionId: this.acpSession, prompt, ...(this.o.def.id === CONSOLE_ID ? { _meta: { promptId: id } } : {}) }, 7 * 24 * 3600_000)
       .then((r) => this.turnEnded({ stopReason: r?.stopReason ?? 'end_turn' }))
-      .catch((e) => this.turnEnded({ error: (e as Error).message }));
+      .catch((e) => this.turnEnded({ error: (e as Error).message }, e instanceof RpcError ? { code: e.code, data: e.data } : undefined));
   }
 
-  private turnEnded(r: { stopReason?: string; error?: string }) {
+  private turnEnded(r: { stopReason?: string; error?: string }, why?: { code?: number; data?: unknown }) {
     if (!this.prompting) return;
     this.prompting = false;
     // Requests the agent left open end with the turn.
@@ -546,6 +650,11 @@ export class AcpLive extends LiveAdapter {
       if (r.error) this.state.error = r.error;
     }
     this.changed();
+    // A Grok Build turn the plan's usage limit stopped: said before its result, as the other agents do.
+    if (isGrok(this.o.def) && planLimitHit({ error: r.error, ...why, text: this.turn.text, tools: this.turn.tools })) {
+      this.limitStopped = true;
+      this.emit('limithit');
+    }
     this.emit('result');
   }
 
@@ -586,6 +695,8 @@ export class AcpLive extends LiveAdapter {
   async configure(cfg: LiveConfig): Promise<void> {
     if (cfg.mode) await this.setMode(cfg.mode).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
     if (cfg.model) await this.setModel(cfg.model).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
+    // A new model that does not take the effort set keeps the agent's own choice (its update says which).
+    if (cfg.effort) await this.setEffort(cfg.effort).catch((e) => Promise.reject(new HttpError(400, (e as Error).message)));
     this.changed();
   }
 

@@ -1,12 +1,12 @@
 # Usage, limits and costs
 
-Claude Code and Codex run on plans with usage limits, and every model call has a price. This topic shows where to see how much of each plan you've used and when it resets, what happens at a limit (and how to have sessions continue by themselves), what the agents did over time, and how the app estimates costs, including prices you set yourself.
+Claude Code, Codex and Grok Build run on plans with usage limits, and every model call has a price. This topic shows where to see how much of each plan you've used and when it resets, what happens at a limit (and how to have sessions continue by themselves), what the agents did over time, and how the app estimates costs, including prices you set yourself.
 
 ![Usage: how much of each plan you have used, and when it resets](images/usage.webp)
 
 ## Open the Usage page
 
-Open **System** in the sidebar (on a phone, open the sidebar first) and click its **Usage** tab. A thin bar under the System icon shows at a glance how much is left across all your paid Claude Code and Codex subscriptions, each counted by the limit it is closest to; if you only have free subscriptions it counts those, and with none it does not show. It turns red when nothing is left. Hover over it to see what each subscription has left.
+Open **Usage** in the sidebar (on a phone, open the sidebar first). A thin bar under the Usage icon shows at a glance how much is left across all your paid Claude Code, Codex and Grok Build subscriptions, each counted by the limit it is closest to; if you only have free subscriptions it counts those, and with none it does not show. It turns red when nothing is left. Hover over it to see what each subscription has left.
 
 The [Usage page](/usage) has three tabs:
 
@@ -14,37 +14,40 @@ The [Usage page](/usage) has three tabs:
 - **Activity** (`/stats`): lines changed, tokens and sessions over time.
 - **Arena** (`/arena`): which models win on your own tasks.
 
-The app reads your usage when you open the page, and every five minutes while the app is open; on the Limits tab, **Refresh** reads it again now.
+The app reads your usage when you open the page, and every five minutes while the app is open; on the Limits tab, **Refresh** reads it again now. Grok Build's usage is read from its agent a few minutes apart, and **Refresh** reads it at once too.
 
 ## Read a plan's limits
 
-The **Limits** tab has a card for Claude Code, one for Codex, and one for each account you added in [Settings → Agents → Accounts](/settings?s=accounts). On a wide screen they sit two to a row; on a phone, one under the other.
+The **Limits** tab has a card for Claude Code, one for Codex, one for Grok Build (once you have added it in [Settings → Agents → More agents](/settings?s=agents)), and one for each account you added in [Settings → Agents → Accounts](/settings?s=accounts). On a wide screen they sit two to a row; on a phone, one under the other.
 
 Each card shows the account's email and plan, how long ago the numbers were read, and one row per limit (a window of time with a cap on use):
 
 - Claude Code: **Current session (5 h)**, **Weekly · all models**, and weekly limits for one model, such as **Weekly · Sonnet only**.
 - Codex: **5-hour window**, **Weekly**, or windows of other lengths. When Codex has several limits, each row starts with the limit's name.
+- Grok Build: **Weekly**, with when it resets. The card also names the plan (SuperGrok, SuperGrok Plus or SuperGrok Heavy). Grok's own sign-in has its card, and each Grok account you added has one.
 
 Each row gives the percentage used, a bar, the percentage left, and when it resets ("resets in 2 h 15 min"; hover for the exact time). A warning sign appears at 90% or more.
 
 Depending on the plan, the card also shows:
 
 - **Extra usage** (Claude): whether paid use beyond the plan's limits is on, and how much of its monthly limit is spent.
-- **Credits** (Codex): your credit balance, or "Unlimited".
+- **Credits** (Codex, Grok Build): your credit balance, or "Unlimited".
+- **Pay as you go** (Grok Build): when the plan has it, what you spent on it this month against its cap ("$12.00 of $50.00 this month").
 - **Limit resets**: resets you can use now (see [Use a limit reset](#use-a-limit-reset)).
 - **This week by surface** (Claude): how this week's use splits between the places you use Claude.
 - **Tokens per day** (Codex): a chart of the last 30 days, with your lifetime total. A token is a piece of a word; models count their reading and writing in tokens.
 
 When something is wrong, the card says so:
 
-- "Not signed in" with **Sign in in Settings**;
+- "Not signed in" with **Sign in in Settings** (for Grok Build: "Sign in to see Grok's plan usage.");
+- on a plan run by a team, Grok Build's card says "Usage limits are managed by your team.", since it has no limits of its own to show;
 - "No usage limits reported for this plan";
 - an error with **Check the sign-in in Settings**;
 - "Showing the last known numbers: …" when the latest read failed.
 
 ## What happens when you hit a limit
 
-When a plan's usage runs out, the agent's turn stops. A notice says whose limit it hit, which limit it is and when it resets: "You've hit the Claude Code usage limit" (or Codex) with one account of that agent, "All your Claude Code accounts have hit their usage limit" when you have several and none has usage left, or the account by its name ("Work has hit its usage limit") when another still has some. It shows:
+When a plan's usage runs out, the agent's turn stops. For Grok Build that means its weekly limit, its credit limit or its pay-as-you-go spending cap; a short rate limit (a burst of requests) is not one, and passes by itself. A notice says whose limit it hit, which limit it is and when it resets: "You've hit the Claude Code usage limit" (or Codex or Grok Build) with one account of that agent, "All your Claude Code accounts have hit their usage limit" when you have several and none has usage left, or the account by its name ("Work has hit its usage limit") when another still has some. It shows:
 
 - on the start page, above the message box, for the agent (and account) you picked;
 - in a session, above the message box;
@@ -68,11 +71,11 @@ How the timing works, with the switch or with **Resume at reset**:
 - Only a turn the limit really stopped is continued, not one that finished just as the plan's usage reached 100%. A planned continue is dropped when the session goes on without it: you send a message or press **Stop**, or a turn gets through normally. A turn the agent starts by itself while it waits (when a background task or subagent of its own stops at the same limit) does not drop it. A session you stopped with **Stop** is never continued by itself, even when the limit's error came first, until you send it a message.
 - **Cancel** on the notice stops a planned continue.
 
-With more than one account for the agent, [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) carries the session on with another account right away instead, and waits only when every account is at its limit (see [Agents, accounts and models](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)). For Claude Code, [**Use API credit at a limit**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) can carry it on then, billed to an Anthropic API key you saved, instead of waiting (see [Use API credit when every account is at its limit](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit)).
+With more than one account for the agent (Claude Code, Codex or Grok Build), [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) carries the session on with another account right away instead, and waits only when every account is at its limit (see [Agents, accounts and models](/guide/agents-models#use-all-your-accounts-switch-at-a-limit)). For Claude Code, [**Use API credit at a limit**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) can carry it on then, billed to an Anthropic API key you saved, instead of waiting (see [Use API credit when every account is at its limit](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit)).
 
 ## Use a limit reset
 
-Some plans give you limit resets: Codex reset credits and Claude reset grants. Using one clears the plan's usage limits now instead of waiting for them to reset.
+Some plans give you limit resets: Codex reset credits and Claude reset grants (Grok Build has none). Using one clears the plan's usage limits now instead of waiting for them to reset.
 
 Each card lists them under **Limit resets**, with how many you have. Each reset shows its name (and how many uses are left on it), "Expires in …" (in warning colour when less than a day away) or "Does not expire", and notes such as "Works once you hit a limit" or "Not usable yet". A reset another limit holds back says which, and when it lifts: "Blocked while your weekly limit is used up (usable in …)". Some Claude resets clear only part of your allowance, so they cannot be used while your weekly limit is used up; they become usable once it resets. When there are none: "No limit resets right now", with when the next one comes, if the plan says. The app checks a Claude account's resets about every ten minutes, since Anthropic refuses checks that come more often, and shows the list it last read in between, even after the app restarts. So a reset can take a few minutes to show as usable. One you use leaves the list at once.
 
@@ -171,6 +174,7 @@ There is no button to clear Activity. Deleting a session yourself (its menu → 
 ## Ask an agent
 
 - "How much of my Claude plan is left this week, and when does it reset?"
+- "How much of my Grok plan is left this week?"
 - "Turn on resuming sessions after usage limits."
 - "Continue my session 'Refactor auth' when the Codex limit resets."
 - "What would last month's work have cost at API prices, by model?"

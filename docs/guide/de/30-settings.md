@@ -221,6 +221,9 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Screenshots für bildfähige Modelle**](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images): Modelle, die Bilder sehen, erhalten Screenshots der Seite.
 - [**Websites**](/settings?s=browser&find=Sites): Nur diese Seiten oder nie diese.
 - [**Profile**](/settings?s=browser&find=Profiles): Separate Anmeldungen für den Browser.
+- [**Vor dem Senden auf angemeldeten Websites fragen**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Bevor ein Agent auf einer Website, bei der er angemeldet ist, etwas sendet, veröffentlicht, löscht oder überweist.
+- [**Lesezeichen**](/settings?s=browser&find=Bookmarks): Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer.
+- [**Erweiterungen**](/settings?s=browser&find=Extensions): Chrome-Erweiterungen in der Desktop-App.
 
 ### Computer Use
 

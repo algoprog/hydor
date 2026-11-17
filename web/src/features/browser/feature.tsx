@@ -1,10 +1,11 @@
 // The agents' web browser: a live view to watch above the message box, taking over to log in, its steps
-// and cards in the conversation, and Settings → Browser.
+// and cards in the conversation, and Settings → Browser; and the Browser page (/browser), a browser of your own.
 import { useEffect } from 'react';
 import { Globe } from 'lucide-react';
 import type { SessionSummary } from '@shared/types';
 import { MenuItem } from '../../components/ui';
 import type { WebFeature } from '../registry';
+import { BrowserPage } from './BrowserPage';
 import { BrowserDock, showBrowser } from './Dock';
 import { BrowserNoteCard } from './Notes';
 import { BrowserSettingsBody } from './Settings';
@@ -49,5 +50,7 @@ export const browserFeature: WebFeature = {
   // A confidential session reaches no web page.
   SessionMenu: (p) => (p.s.extra?.confidential ? null : <BrowserMenuItem {...p} />),
   sessionMenuPart: 'more',
+  routes: [{ match: (p) => p === '/browser', Page: BrowserPage }],
+  nav: [{ id: 'browser', path: '/browser', label: 'Browser', icon: <Globe size={17} />, match: (p) => p === '/browser' }],
   settings: [{ id: 'browser', label: 'Browser', icon: Globe, sub: 'A web browser agents use, which you can watch and take over', Body: BrowserSettingsBody }],
 };

@@ -3,11 +3,12 @@ import { ArrowRightLeft, ArrowUp, ChevronDown, MonitorUp, Paperclip, Plus, Slide
 import type { Agent, SessionSummary } from '@shared/types';
 import { childReplyOf } from '@shared/children';
 import { isConfidential } from '@shared/confidential';
+import { accountAgentOf } from '@shared/grok';
 import { enc, lostOnTheWay, post } from '../../lib/api';
 import { warmMemory } from '../../lib/starting';
 import { openSession } from '../../lib/nav';
 import { LOCALE } from '../../i18n/locale';
-import { toast, toastError, useLive, useTimeline } from '../../lib/store';
+import { toast, toastError, useApp, useLive, useTimeline } from '../../lib/store';
 import { agentName } from '../../components/AgentIcon';
 import { EffortPicker, modelLabel, ModelPicker, ModePicker, nextMode, useCatalog } from '../../components/AgentPickers';
 import { cx, MenuItem, Popover, SettingLayout, SheetsOnPhone, useConfirm } from '../../components/ui';
@@ -163,6 +164,9 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const lv = useLive((x) => x.byKey[key]);
   const live = lv?.live ?? s.live ?? null;
   const running = !!live && live.status !== 'exited';
+  // Whose plan limit it could hit: Claude Code, Codex or Grok Build (an ACP agent); the other ACP agents have none.
+  const acpDef = useApp((x) => (s.agent === 'acp' ? x.boot?.acpAgents?.find((a) => a.id === s.acpAgent) : undefined));
+  const limitAgent = accountAgentOf(s.agent, acpDef);
   const working = running && (live!.status === 'working' || live!.status === 'waiting' || live!.status === 'starting');
   // The agent has not had its first message: it waits for the project's memory question or build (its card has the controls). Nothing runs to stop, and what is written is queued for after the first message.
   const waitsMemory = running && !!live!.memory;
@@ -417,7 +421,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     <div className="shrink-0 px-3 pb-[max(10px,var(--safe-bottom))] sm:px-6 sm:pb-5">
       <div className="mx-auto max-w-[800px]">
         <BlockedApproval sessionKey={key} agent={s.agent} running={running} mode={mode} />
-        <LimitBanner agent={s.agent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />
+        {limitAgent && <LimitBanner agent={limitAgent} account={s.account} className="mb-2" session={{ key, resumeAt: s.resumeAt, busy: working }} />}
         <GoalBar s={s} className="mb-2" />
         <WorkTray key={key} s={s} />
         <QueueList s={s} />

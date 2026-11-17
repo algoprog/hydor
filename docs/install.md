@@ -14,6 +14,10 @@ date. [Back to the README](../README.md).
   Linux with the installer: Node.js 22.12 or newer, `git`, `tmux`, a C/C++ toolchain for the native modules
   (`build-essential` and `python3` on Debian or Ubuntu), and
   [Claude Code](https://docs.anthropic.com/en/docs/claude-code) if you want it (Codex is installed with the app).
+- The browser agents use (and your own, on the Browser page) needs a Chromium only outside the desktop apps: they bring
+  their own, built into the app, and use it by default. With Docker or the installer, a Chrome or Chromium on the
+  computer is used when there is one, and Settings → Browser can download Chrome for Testing (about 170 MB) when there
+  is not (the Docker image has its own).
 - Search by meaning (memory and the Library found by what they mean, as well as by their words) is on unless you turn
   it off in Settings → Memory, and sets itself up a minute after the app first starts: it needs Python 3.10 or newer
   (or [uv](https://docs.astral.sh/uv/), which brings its own; the Docker image has Python), about 2 GB of disk (6 GB

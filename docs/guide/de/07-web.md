@@ -1,6 +1,6 @@
 # Suche und Browser
 
-Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen echten Browser bedienen. Dieser Beitrag erklärt Suchanbieter und Einrichtung, die Suchschritte in der Unterhaltung und Quellenangaben sowie die Live-Ansicht des Browsers und seine Übernahme für Anmeldungen, Prüfungen oder Zahlungen. In der Desktop-App für Mac, Windows und Linux können Agenten auch Bildschirm, Maus und Tastatur deines Computers verwenden.
+Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen echten Browser bedienen. Dieser Beitrag erklärt Suchanbieter und Einrichtung, die Suchschritte in der Unterhaltung und Quellenangaben sowie die Live-Ansicht des Browsers und seine Übernahme für Anmeldungen, Prüfungen oder Zahlungen. Er behandelt auch die Seite „Browser“, einen eigenen Browser in der App (Tabs, Lesezeichen, Chrome-Erweiterungen), und wie du einem Agenten eine Seite daraus übergibst. In der Desktop-App für Mac, Windows und Linux läuft der Browser in der App, und Agenten können auch Bildschirm, Maus und Tastatur deines Computers verwenden.
 
 ![Ein Agent hat im Web recherchiert, Seiten gelesen und Ergebnisse in einer Tabelle verglichen](images/web.webp)
 
@@ -110,7 +110,10 @@ In der Unterhaltung erscheint ein Lesen als „Gelesen“ mit dem Titel der Seit
 
 ## Der Browser für Agenten
 
-Für Websites mit Interaktionen, Formularen, Anmeldungen oder Skripten reicht ein Textabruf nicht. Agenten nutzen dafür einen echten Chromium-Browser, die Open-Source-Grundlage von Chrome. Er läuft auf dem Hydor-Computer getrennt von deinem eigenen Browser. Du kannst ihn live beobachten und jederzeit übernehmen.
+Für Websites mit Interaktionen, Formularen, Anmeldungen oder Skripten reicht ein Textabruf nicht. Agenten nutzen dafür einen Browser, der von deinem eigenen getrennt ist: Er hat keine der Anmeldungen des Chrome, Edge, Firefox oder Safari, die du benutzt. Du kannst ihn live beobachten und jederzeit übernehmen. Welcher Browser es ist, hängt davon ab, wo die App läuft:
+
+- **In der Desktop-App** (Mac, Windows, Linux) ist es der eigene Browser der App auf Basis von Chromium (die Open-Source-Grundlage von Chrome), der in der App läuft. Es muss nichts installiert werden, und die App wählt ihn, sofern du keinen anderen wählst (siehe [Chromium](/guide/web#chromium)). Seine Seiten werden im Fenster der App schnell gezeichnet, du klickst in eine hinein, um sie zu bedienen, und er arbeitet auch bei geschlossenem Fenster weiter.
+- **Überall sonst** (die App in Docker oder auf einem Server sowie ein Smartphone oder jede Webseite, die sie anzeigt) ist es ein echtes Chromium, das die App auf dem Computer startet, auf dem sie läuft, und das du als Livebild siehst.
 
 Mit aktiviertem Browser kann jeder Agent:
 
@@ -124,14 +127,15 @@ Mit aktiviertem Browser kann jeder Agent:
 - Dateien aus dem Sitzungsordner in Uploadfelder einfügen, niemals von anderen Orten;
 - die Bedienung an dich übergeben.
 
-Manches bleibt immer dir vorbehalten:
+Manches bleibt immer dir vorbehalten oder wartet auf dein OK:
 
 - **Anmeldungen ohne hinterlegte Zugangsdaten, Prüfungen und Unsicherheiten.** Agenten sollen diese an dich übergeben, einschließlich Captchas und zugesandter Einmalcodes. Muss ein Auftrag später ohne dich erneut auf ein Konto zugreifen, etwa eine geplante Aufgabe, kann der Agent stattdessen über eine Karte nach Zugangsdaten für den Tresor fragen.
 - **Bezahlen und Bestellen.** Agenten klicken nie auf zahlungs- oder bestellauslösende Schaltflächen wie Bezahlen, Jetzt kaufen, Bestellen, Abonnieren, Spenden, Jetzt buchen oder Absenden eines Formulars mit Kartenfeldern. Sie halten an und bitten dich, selbst abzuschließen.
 - **Deine Eingaben.** Passwörter, Kartennummern, Sicherheits- und Einmalcodes sowie während deiner Übernahme eingegebene Inhalte werden dem Agenten nie gezeigt. Auch passwortähnliche URL-Bestandteile werden verborgen. Aus dem Tresor befüllte Felder erscheinen als Punkte; der Agent erfährt nur, dass sie ausgefüllt wurden.
+- **Schaltflächen, die senden, veröffentlichen, löschen oder überweisen, auf einer Website, bei der der Browser angemeldet ist.** Bevor ein Agent eine drückt, wirst du gefragt, ob er darf (siehe [Schaltflächen, die senden, veröffentlichen oder löschen](/guide/web#buttons-that-send-post-or-delete)). In den Einstellungen kannst du das ausschalten.
 - **Dialogfragen der Seite**; siehe [Dialogfragen einer Webseite beantworten](/guide/web#answer-a-pages-pop-up-questions).
 
-Jede Sitzung hat einen eigenen Browser. Ohne Profil startet er ohne Anmeldung und verwirft alles beim Schließen. Mit Profil übernimmt er dessen Anmeldungen; siehe [Anmeldungen mit Profilen behalten](/guide/web#keep-sign-ins-with-profiles).
+Jede Sitzung hat einen eigenen Browser. Ohne Profil startet er ohne Anmeldung und verwirft alles beim Schließen. Mit Profil übernimmt er dessen Anmeldungen; siehe [Anmeldungen mit Profilen behalten](/guide/web#keep-sign-ins-with-profiles). Dein eigener Browser auf der Seite „Browser“ ist ein anderer, den Agenten nie verwenden, es sei denn, du übergibst ihnen eine Seite daraus (siehe [Eine Seite an einen Agenten übergeben](/guide/web#hand-a-page-to-an-agent)).
 
 ## Den Browser live beobachten
 
@@ -145,7 +149,7 @@ Am Computer:
 
 Auf dem Smartphone öffnet ein Antippen den Browser im Vollbild; × schließt die Ansicht.
 
-Das Livebild wird mehrmals pro Sekunde übertragen, solange du zusiehst. Bis zum ersten Bild steht „Verbindung zum Browser wird hergestellt…“.
+In der Desktop-App ist die Live-Ansicht die Seite selbst, von der App gezeichnet und so schnell aktualisiert, wie sich die Seite ändert, sodass sich Scrollen und Tippen wie in jedem Browser anfühlen. Anderswo ist sie ein Bild der Seite, das mehrmals pro Sekunde übertragen wird, solange du zusiehst; bis zum ersten Bild steht „Verbindung zum Browser wird hergestellt…“.
 
 ### Den Zeiger des Agenten verfolgen
 
@@ -171,7 +175,7 @@ Am Computer öffnet sich die Live-Ansicht bei Anmeldung, Zahlung oder Dialogfrag
 ### Am Computer
 
 1. Wähle **Übernehmen** in der Hinweiszeile oder im Browserbereich. „Du steuerst – der Agent wartet“ und ein farbiger Rahmen kennzeichnen die Übernahme.
-2. Bediene die Seite wie gewohnt mit Maus, Scrollrad und Tastatur. Klicke zuerst in die Seite; anschließend gehen Tastendrücke dorthin statt an App-Kurzbefehle. Eingefügte Inhalte werden als Text übernommen.
+2. Bediene die Seite wie gewohnt mit Maus, Scrollrad und Tastatur. Klicke zuerst in die Seite; anschließend gehen Tastendrücke dorthin statt an App-Kurzbefehle. Eingefügte Inhalte werden als Text übernommen. In der Desktop-App genügt ein Klick oder Tastendruck in der Seite zum Übernehmen: Der Bereich wechselt von selbst zu „Du steuerst – der Agent wartet“, und solange der Agent steuert, steht unter der Adresse „Klicke in die Seite, um sie selbst zu bedienen“.
 3. Während du steuerst, hat eine Leiste über der Seite **Zurück**, **Neu laden** und die Adresse: Gib eine Adresse ein und drücke Enter, um dorthin zu gehen.
 4. Klicke nach Abschluss in der Hinweiszeile auf **Fertig**. Die App informiert den Agenten mit dem aktuellen Seitenstand, und er setzt seine Arbeit fort.
 
@@ -191,6 +195,19 @@ Vor einem zahlungs- oder bestellauslösenden Knopf hält der Agent an, etwa „V
 - Du kannst jederzeit über **Übernehmen** selbst eingreifen, auch ohne Aufforderung. Der Agent wartet. Versucht er währenddessen einen Browserzugriff, erfährt er, dass du steuerst und er bei Rückgabe benachrichtigt wird. **An Agenten zurückgeben** gibt die Steuerung frei; ein wartender Agent erhält den aktuellen Seitenstand.
 
 Die von der App in deinem Namen gesendeten Meldungen erscheinen in der Unterhaltung. Bei einem laufenden Durchlauf warten sie bis zu dessen Ende.
+
+## Schaltflächen, die senden, veröffentlichen oder löschen
+
+Auf einer Website, bei der der Browser angemeldet ist, fragt ein Agent nach, bevor er eine Schaltfläche drückt, die etwas sendet, veröffentlicht, teilt, beantwortet, löscht, entfernt, überweist oder abhebt. Das gilt für einen Browser mit Profil (siehe [Anmeldungen mit Profilen behalten](/guide/web#keep-sign-ins-with-profiles)) und für eine Seite, die du einem Agenten übergeben hast (siehe [Eine Seite an einen Agenten übergeben](/guide/web#hand-a-page-to-an-agent)). Ein Browser, der ohne Anmeldung neu startet, hat nichts zu schützen und fragt nicht. Bezahlen und Bestellen bleiben allein deine Sache (siehe oben).
+
+Der Agent erkennt diese Schaltflächen an ihren Wörtern auf Englisch, Deutsch, Griechisch, Chinesisch, Französisch und Spanisch: Senden, Veröffentlichen, Löschen, Überweisen und Ähnliches, dazu ein bloßes „Bestätigen“ oder „Ja“, wenn die Seite von einer davon handelt (ein Dialog mit „Diesen Beitrag löschen?“). „Anmelden“, „Weiter“, „Entwurf speichern“, „Abbrechen“, eine Suchschaltfläche und das Senden eines Codes an dich selbst (Code erneut senden) werden nicht angehalten.
+
+Erreicht er eine, hält er an, beendet seinen Durchlauf und wartet. Du siehst „Möchte „Delete“ auf mail.example.com drücken“ an denselben Stellen wie andere Fragen (die Zeile im Browserbereich und eine Karte in der Unterhaltung), mit **Nicht zulassen** und **Erlauben**. Die Live-Ansicht öffnet sich dabei nicht von selbst.
+
+- **Erlauben** sagt dem Agenten, dass er die Schaltfläche jetzt drücken darf. Es gilt für einen Druck auf eine Schaltfläche mit denselben Wörtern auf dieser Website in den nächsten zwei Minuten; danach fragt der Agent erneut.
+- **Nicht zulassen** sagt dem Agenten, dass er sie nicht drücken soll. Er macht ohne sie weiter oder sagt dir, was er nicht tun konnte. Die Karte zeigt dann „Erlaubt“ oder „Nicht erlaubt“.
+
+Anfangs ist das eingeschaltet. Zum Ausschalten siehe [Vor dem Senden auf angemeldeten Websites fragen](/guide/web#ask-before-sending-on-signed-in-sites).
 
 ## Dialogfragen einer Webseite beantworten
 
@@ -214,7 +231,7 @@ Auch von dir während einer Übernahme eingegebene lokale oder private Adressen 
 
 ## Den Browser selbst öffnen
 
-Du kannst den Browser einer Sitzung öffnen, bevor der Agent es tut, etwa um dich auf einer Website anzumelden, bevor du ihn dort arbeiten lässt. Öffne das Menü der Sitzung (⋯) → **Mehr** → **Browser öffnen**. Das Fenster erscheint über dem Nachrichtenfeld: Drücke **Übernehmen** und nutze es. Ist der Browser schon geöffnet, heißt derselbe Eintrag **Browser anzeigen**. Wenn der Browser in den Einstellungen ausgeschaltet ist, bekommst du einen Hinweis darauf.
+Du kannst den Browser einer Sitzung öffnen, bevor der Agent es tut, etwa um dich auf einer Website anzumelden, bevor du ihn dort arbeiten lässt. Öffne das Menü der Sitzung (⋯) → **Mehr** → **Browser öffnen**. Das Fenster erscheint über dem Nachrichtenfeld: Drücke **Übernehmen** und nutze es. Ist der Browser schon geöffnet, heißt derselbe Eintrag **Browser anzeigen**. Wenn der Browser in den Einstellungen ausgeschaltet ist, bekommst du einen Hinweis darauf. Für einen eigenen Browser, der an keine Sitzung gebunden ist, siehe [Dein eigener Browser](/guide/web#your-own-browser).
 
 ## Downloads und Uploads
 
@@ -233,6 +250,123 @@ Ein Sitzungsbrowser schließt automatisch:
 
 Alles, was noch auf dich gewartet hat, endet damit. Der Agent öffnet den Browser erneut, wenn er ihn das nächste Mal braucht.
 
+In der Desktop-App braucht der Browser eines Agenten das Fenster der App nicht: Er arbeitet weiter, während das Fenster geschlossen oder verborgen ist, solange die App läuft (sie bleibt in der Menüleiste, im Infobereich oder im Tray). Öffne das Fenster, und seine Seiten sind zum Zusehen da.
+
+## Dein eigener Browser
+
+Die Seite **Browser** ist ein eigener Browser in der App neben dem, den Agenten benutzen: Öffne **Browser** bei den Werkzeugen der Seitenleiste oder gehe zu [Browser](/browser). Sie hat Tabs, eine Adressleiste, die auch sucht, Zurück, Vorwärts und Neu laden, Lesezeichen, Chrome-Erweiterungen, Suche auf der Seite, Downloads und eine Liste der Tabs der Agenten. Deine Anmeldungen bleiben zwischen den Besuchen erhalten, in einem eigenen Profil, das kein Agent wählen kann, und beim nächsten Öffnen sind deine Tabs wieder da (bis zu 30; leere werden weggelassen). Deine Tabs können auch Adressen auf diesem Computer und in seinem Netzwerk öffnen (etwa eine Website, die du gerade baust), aber nie Hydor selbst.
+
+In der Desktop-App sind deine Tabs echte Seiten im Fenster der App, mit der Geschwindigkeit und den Tasten jedes Browsers. Ein Menü oder Dialog der App, der sich über der Seite öffnet, nimmt sie kurz weg (ein Bild davon steht, bis er sich schließt). Anderswo ist die Seite ein Livebild eines Chromium, das auf dem Computer läuft, auf dem die App läuft, und passend zum Platz auf deinem Bildschirm gelayoutet; du klickst, scrollst und tippst hinein (siehe [Den Browser live beobachten](/guide/web#watch-the-browser-live)). Kann der Browser nicht starten (er hat etwa kein Chromium gefunden), nennt die Seite den Grund, mit **Erneut versuchen** und **Browser-Einstellungen**, das [Einstellungen → Browser](/settings?s=browser) öffnet.
+
+### Tabs und Adressleiste
+
+- Die Tableiste über der Adressleiste zeigt Symbol, Titel und **×** jedes Tabs. **+** (**Neuer Tab**) öffnet einen leeren. Ein Mittelklick schließt einen Tab. Schließt du den letzten Tab, bleibt ein leerer.
+- Die Adressleiste zeigt die Adresse der Seite. Gib eine Adresse mit oder ohne https:// ein (`example.com`, `localhost:3000`, `192.168.1.5`, eine `file://`-Adresse) und drücke Enter, um sie zu öffnen. Alles andere, was du eingibst, wird mit deinen Suchanbietern gesucht (siehe [Suchanbieter auswählen](/guide/web#choose-your-search-providers)): mit dem ersten eingeschalteten in ihrer Reihenfolge und mit DuckDuckGo, wenn keiner eingeschaltet ist. **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet es stattdessen in einem neuen Tab.
+- **Zurück**, **Vorwärts** und **Neu laden** stehen links der Adressleiste. Während eine Seite lädt, wird aus Neu laden **Stoppen**.
+- Der Stern am Ende der Adressleiste setzt ein Lesezeichen für die Seite in der Lesezeichenleiste; ausgefüllt ist sie als Lesezeichen gesetzt, und ein erneuter Klick entfernt das Lesezeichen.
+- **Menü** (⋯) bietet **Zu dieser Seite fragen**, **Hier erledigen lassen**, **Auf der Seite suchen**, **Lesezeichen**, **Erweiterungen**, **Downloads** und **Tabs der Agenten**.
+- Ist der geöffnete Tab die Chrome-Web-Store-Seite einer Erweiterung, erscheint in der Leiste die Schaltfläche **Zu Hydor hinzufügen** (siehe [Chrome-Erweiterungen](/guide/web#chrome-extensions)).
+
+Ein Link auf `/browser?url=https://example.com` öffnet die Seite Browser mit dieser Adresse in einem neuen Tab.
+
+### Tastenkürzel
+
+Auf der Seite Browser (in der Desktop-App auch aus einer Seite heraus), mit Strg unter Windows und Linux und ⌘ auf dem Mac:
+
+- **Strg+T** öffnet einen neuen Tab, und **Strg+W** schließt den geöffneten.
+- **Strg+L** springt in die Adressleiste.
+- **Strg+R** lädt neu (in der Desktop-App auch **F5**).
+- **Strg+F** öffnet die Suche auf der Seite.
+- **Alt+←** und **Alt+→** gehen zurück und vor (in der Desktop-App auf dem Mac **⌘[** und **⌘]**).
+- **Esc** schließt die Suche auf der Seite.
+
+### Auf einer Seite suchen
+
+**Strg+F** oder **Auf der Seite suchen** im Menü öffnet eine Leiste unter der Adressleiste. Tippe, und der erste Treffer wird gefunden und ins Bild gescrollt, sobald du pausierst. **Enter** springt zum nächsten Treffer und **Umschalt+Enter** zum vorigen (die Pfeile ebenso), und die Leiste zeigt „12 Treffer“ („1000+“ ab tausend) oder „Keine Übereinstimmungen“. Groß- und Kleinschreibung spielt keine Rolle, und die Suche beginnt am Ende von vorn. **Esc** oder **×** schließt die Leiste und löscht, was gefunden wurde.
+
+### Downloads
+
+Eine Datei, die eine Seite herunterlädt, wird im Ordner Downloads des Computers gespeichert, auf dem die App läuft, und steht unter **Menü** (⋯) → **Downloads** als „Wird heruntergeladen…“, „Fertig“ oder „Fehlgeschlagen“, mit ihrem Pfad. Klicke auf eine fertige, um sie in ihrem Ordner zu zeigen (in der Desktop-App) oder in der App zu öffnen (anderswo).
+
+### Wenn eine Website eine Berechtigung anfragt
+
+Möchte eine Seite in deinem eigenen Browser deine Kamera, dein Mikrofon, deinen Standort, Benachrichtigungen, deine Zwischenablage oder Ähnliches verwenden, sagt das eine Leiste über der Seite („example.com möchte deine Kamera verwenden“) mit **Nicht zulassen** und **Erlauben**. Deine Antwort wird für diese Website gemerkt, sodass sie nur einmal fragt; um zu sehen, was du erlaubt oder blockiert hast, oder um wieder gefragt zu werden, öffne **Menü** (⋯) → **Website-Berechtigungen** und drücke **Vergessen** neben einer Antwort. Das gilt in der Desktop-App; die Browser der Agenten dort lehnen jede solche Anfrage selbst ab, außer um den Bildschirm zu füllen und in deine Zwischenablage zu kopieren. Eine Dialogfrage der Seite (eine Warnung, eine Ja-Nein-Frage oder eine Texteingabe) erscheint über der Seite wie im Browser der Agenten (siehe [Dialogfragen einer Webseite beantworten](/guide/web#answer-a-pages-pop-up-questions)).
+
+### Auf dem Smartphone
+
+Die Tableiste wird zu einer Schaltfläche mit der Zahl der geöffneten Tabs: Tippe darauf für die Liste mit **×** neben jedem und **Neuer Tab**. Die obere Leiste behält **Zurück**, die Adresse und **Menü**; **Vorwärts**, **Neu laden**, der Stern und **Zu Hydor hinzufügen** stehen im Menü, ebenso **Lesezeichen**, da die Lesezeichenleiste weggelassen wird. Du steuerst ein Livebild der Seite: Tippen entspricht einem Klick, Ziehen scrollt, und **Tippen** öffnet die Tastatur deines Smartphones, daneben eine Reihe mit Tab, Enter, Esc, ⌫ und den Pfeiltasten.
+
+## Lesezeichen
+
+Die Lesezeichenleiste steht unter der Adressleiste, sobald du ein Lesezeichen darauf hast (auf dem Smartphone fehlt sie; deine Lesezeichen stehen im Menü). Klicke auf ein Lesezeichen, um es im geöffneten Tab zu öffnen; Strg+Klick (⌘+Klick auf dem Mac) oder ein Mittelklick öffnet es in einem neuen Tab. Ein Ordner öffnet eine Liste dessen, was darin ist, eine Leiste, die länger als die Seite ist, scrollt, und **»** listet alles auf. Klicke mit der rechten Maustaste auf einen Eintrag für **Öffnen**, **In einem neuen Tab öffnen**, **Bearbeiten** (**Umbenennen** bei einem Ordner) und **Löschen**.
+
+Für alle drücke **Menü** (⋯) → **Lesezeichen** oder gehe zu [Lesezeichen](/browser?panel=bookmarks). Der Bereich hat zwei Orte, **Lesezeichenleiste** und **Andere Lesezeichen**, und die Ordner darin öffnen und schließen sich.
+
+- **Neuer Ordner** (oben) fügt der Leiste einen Ordner hinzu und fragt nach seinem Namen.
+- Fahre über eine Zeile für **Nach oben verschieben**, **Nach unten**, **Bearbeiten** (**Umbenennen** bei einem Ordner) und **Löschen**. Du kannst eine Zeile auch ziehen: auf die Mitte eines Ordners, um sie hineinzulegen, oder zwischen Zeilen, um sie dort einzusortieren. Ein Ordner kann nicht in sich selbst liegen. Das Löschen eines Ordners fragt vorher und nimmt mit, was darin ist.
+- Die Adresse eines Lesezeichens beginnt mit http://, https://, file:// oder chrome-extension://. Du kannst bis zu 20.000 behalten.
+
+### Lesezeichen importieren
+
+Unter **Importieren** im Bereich listet die App die Browser auf diesem Computer auf, die Lesezeichen haben, jeweils mit der Anzahl: Chrome (und Chrome Beta), Chromium, Edge, Brave, Vivaldi, Opera, Firefox und, nur auf einem Mac, Arc und Safari. Ein Browser mit mehreren Profilen wird für jedes einzeln aufgeführt, mit dem Namen des Profils. Drücke bei einem **Importieren**, und seine Lesezeichen kommen in einen neuen Ordner am Ende der Lesezeichenleiste mit dem Namen „Imported from Chrome“ („Imported from Chrome (Work)“, wenn der Browser mehrere Profile hat). Die eigenen Ordner des Browsers bleiben erhalten: zuerst, was in seiner Lesezeichenleiste war, dann seine anderen Lesezeichen, mobile und das Menü von Firefox als Ordner, benannt, wie dieser Browser sie nennt. Links, die keine Webseiten sind, etwa javascript:-Links, und leere Ordner werden weggelassen. Firefox kann geöffnet bleiben.
+
+Safari bewahrt seine Lesezeichen dort auf, wo macOS sie schützt. Solange du es nicht erlaubst, sagt seine Zeile „Hydor may not read Safari’s bookmarks: allow it in System Settings → Privacy & Security → Full Disk Access“. Füge Hydor dort hinzu und importiere sie erneut.
+
+Um stattdessen eine Datei zu importieren, drücke **Aus einer Datei** und wähle eine Lesezeichendatei, die aus einem beliebigen Browser exportiert wurde (eine .html-Datei, bis zu 20 MB). Sie kommt in einen Ordner mit dem Namen „Imported bookmarks“.
+
+### Lesezeichen exportieren
+
+**Exportieren** unter **Importieren** speichert alle deine Lesezeichen als `bookmarks.html`, das Chrome, Firefox und Safari importieren können.
+
+## Chrome-Erweiterungen
+
+Dein eigener Browser kann Chrome-Erweiterungen ausführen: einen Passwortmanager, einen Dunkelmodus, einen Übersetzer. Drücke **Menü** (⋯) → **Erweiterungen** oder gehe zu [Erweiterungen](/browser?panel=extensions). Erweiterungen laufen im eigenen Browser der Desktop-App. Anderswo bewahrt der Bereich sie auf und sagt das („Erweiterungen laufen im eigenen Browser der Desktop-App. Sie werden hier gespeichert und dort ausgeführt.“). Eine Erweiterung läuft mit deinen Anmeldungen und kann die Websites lesen, die sie anfordert; füge also nur vertrauenswürdige hinzu.
+
+### Erweiterung hinzufügen
+
+- **Aus dem Chrome Web Store**: Füge den Link der Erweiterung (eine Adresse von chromewebstore.google.com oder chrome.google.com/webstore) oder ihre ID (32 Buchstaben von a bis p) unter **Aus dem Chrome Web Store** ein und drücke **Hinzufügen**. Oder öffne die Seite der Erweiterung in deinem eigenen Browser und drücke oben in der Leiste **Zu Hydor hinzufügen**. Die App lädt sie aus dem Chrome Web Store herunter (eine Anfrage an Google) und merkt sich ihre Web-Store-ID.
+- **Aus einem Ordner**: Drücke **Ordner auswählen** (in der Desktop-App) oder gib den Pfad des Ordners ein (anderswo: ein Ordner auf dem Computer, auf dem die App läuft), für eine entpackte Erweiterung mit einer manifest.json. Sie wird dort verwendet, wo sie liegt, und nicht kopiert, sodass Änderungen eines Entwicklers sichtbar werden.
+- **Aus deinen anderen Browsern**: Die Erweiterungen, die in Chrome, Edge, Brave und anderen Chromium-basierten Browsern auf diesem Computer installiert sind, stehen mit je einem Kontrollkästchen in der Liste. Hake die gewünschten an und drücke **Importieren**. Die schon vorhandenen sagen „Schon vorhanden“, und die, die in ihrem Browser ausgeschaltet sind, „Dort deaktiviert“.
+
+Erweiterungen werden nicht von selbst aktualisiert. Füge eine erneut aus dem Chrome Web Store hinzu, um ihre neueste Version zu erhalten; sie ersetzt die alte.
+
+### Eine ausschalten oder entfernen
+
+Jede Erweiterung im Bereich zeigt Symbol, Name und Version und einen Schalter zum Ein- und Ausschalten. **Entfernen** löscht sie (die eigenen Dateien eines Ordners bleiben). Hat eine Erweiterung eine Schaltfläche in der Symbolleiste, erscheint sie rechts der Adressleiste, solange die Erweiterung eingeschaltet ist: Klicke darauf, um ihr Popup unter der Schaltfläche zu öffnen; ein Abzeichen darauf, eine Zahl oder ein paar Buchstaben, zeigt, was die Erweiterung meldet. **Optionen** öffnet ihre Optionsseite in einem Tab.
+
+**Auch in den Browsern der Agenten** ist anfangs aus. Eingeschaltet läuft die Erweiterung auch in den Browsern der Agenten, die Anmeldungen behalten, also denen mit einem Profil (siehe [Anmeldungen mit Profilen behalten](/guide/web#keep-sign-ins-with-profiles)), und nur dort. Browser, die ohne Anmeldung neu starten, bekommen nie Erweiterungen. (Auf einem Server laden ein Chromium oder Chrome for Testing sie; Google Chrome tut das nicht mehr.)
+
+### Was möglicherweise nicht funktioniert
+
+Der Browser der Desktop-App hat nur einen Teil dessen, was Chrome Erweiterungen bietet. Inhalte, die eine Erweiterung zu Seiten hinzufügt, Popups, Optionsseiten, gespeicherte Einstellungen, Nachrichten, Abzeichen, Benachrichtigungen (als die des Systems angezeigt) und Wecker funktionieren. Was möglicherweise nicht funktioniert: Anfragen blockieren oder ändern (worauf viele Werbeblocker beruhen), das Seitenfenster, die Anmeldung mit einem Konto, Cookies, Verlauf, Lesezeichen und Downloads des Browsers, Tab-Gruppen, Hintergrundseiten, die Chrome für sie erstellt (Offscreen), Tastenkürzel einer Erweiterung und die Einträge, die eine Erweiterung zum Rechtsklickmenü hinzufügt (angenommen, nie angezeigt). Die Zeile der Erweiterung sagt, welche sie anfordert, in einer Zeile wie „Einige Teile funktionieren hier möglicherweise nicht: Anfragen blockieren oder ändern, Cookies“. Sie richtet sich nach dem, was die Erweiterung anfordert, kann also trotzdem gut funktionieren.
+
+## Eine Seite an einen Agenten übergeben
+
+Einen Agenten bekommt dein eigener Browser nie. Du kannst ihm eine Seite daraus geben, auf zwei Arten. Öffne **Menü** (⋯) und wähle **Zu dieser Seite fragen** oder **Hier erledigen lassen**: Sie funktionieren bei einer Seite einer Website, und jede öffnet unter dem Menü ein kleines Feld, in das du schreibst, was du willst, und mit **Strg+Enter** (⌘+Enter auf dem Mac) sendest.
+
+### Zu dieser Seite fragen
+
+Das Feld fragt „Was möchtest du über diese Seite wissen?“; drücke **Fragen**. Der Agent erhält eine Kopie der Seite, eine Datei mit Titel, Adresse, dem, was du darauf markiert hattest, und ihrem lesbaren Text (bis zu 200.000 Zeichen), und eine neue Sitzung startet mit deiner Frage, mit dem Agenten und Modell, die die Startseite zuletzt verwendet hat. Du landest in der Sitzung. Der Agent kann die Seite nicht anfassen oder deine Anmeldungen sehen: Er liest die Kopie. Lass die Seite zuerst fertig laden, denn die Kopie ist das, was der Tab jetzt zeigt.
+
+### Hier erledigen lassen
+
+Das Feld fragt „Was soll ein Agent auf dieser Seite tun?“ und sagt, was der Agent bekommt. Wähle **Claude Code** oder **Custom** als **Agent** (nur diese beiden lassen sich auf den Browser beschränken; die App lehnt die anderen ab) und drücke **Starten**. Der Agent bekommt:
+
+- **Einen eigenen Tab** in dem Browser, der deine Anmeldungen behält, geöffnet bei der Adresse deiner Seite: Er ist auf dieser Website als du angemeldet. Dein eigener Tab bleibt, wo er ist.
+- **Nur diese Website**: Seiten anderswo öffnen sich für ihn nicht. Bei einer Seite auf diesem Computer ist es nur diese Adresse.
+- **Nur den Browser**: keine Befehle, keine Dateien, keine Websuche, keine anderen Apps, kein Memory und keine Subagenten. Eine solche Sitzung lässt sich nicht in einem anderen Agenten fortsetzen, und ein Fork davon bleibt auf den Browser beschränkt.
+- **Einen Halt vor dem Senden**: Er fragt wie oben nach, bevor er eine Schaltfläche drückt, die etwas sendet, veröffentlicht, löscht oder überweist, und ihm ist gesagt, dass er dich fragen soll, wenn er unsicher ist (siehe [Schaltflächen, die senden, veröffentlichen oder löschen](/guide/web#buttons-that-send-post-or-delete)). Bezahlen bleibt wie immer deine Sache.
+
+Die erste Nachricht an den Agenten sagt ihm, dass deine Seite in seinem Browser geöffnet ist und dass er dort allein arbeitet. Der Browser muss in den Einstellungen eingeschaltet sein (**Ein Browser für Agenten**). Nach dem Drücken von **Starten** öffnet sich **Tabs der Agenten**, wo der Browser der Sitzung erscheint.
+
+### Die Seite zurückholen
+
+Bei einem Agentenbrowser, der deine Seite bekommen hat, sagt der Bereich über dem Nachrichtenfeld „Dein Tab von example.com“ mit **Zurückholen**, ebenso **Tabs der Agenten** und die Leiste über seiner Seite. Drücke es, um den Tab des Agenten zu schließen und die Seite als neuen Tab von dir zu öffnen, ganz vorn. Dem Agenten wird gesagt „I took the page back: it is mine again“. Sein Browser schließt sich mit seinem letzten Tab und sonst wie der jeder Sitzung, wenn die Sitzung endet (siehe [Wann der Browser schließt](/guide/web#when-the-browser-closes)).
+
+## Tabs der Agenten
+
+**Menü** (⋯) → **Tabs der Agenten** listet die Browser der Agenten auf, die gerade geöffnet sind, mit ihrer Anzahl daneben. Jeder zeigt Titel und Agent der Sitzung, was er gerade tut („Klicken auf „Anmelden““, „Wartet auf dich“, „Du steuerst – der Agent wartet“) und seine Tabs (die ersten sechs). Die Liste wird aktuell gehalten, und ein Hinweis erscheint, wenn keiner geöffnet ist. Drücke **Anzeigen**, um diesen Browser anstelle der Seite zu sehen, mit einer schmalen Leiste darüber: **Zurück zu deinen Tabs**, der Titel der Sitzung, **Öffne die Unterhaltung**, **Übernehmen** (oder **An Agenten zurückgeben**) und **Zurückholen** bei einer Seite, die du ihm übergeben hast. Klicke in der Desktop-App in seine Seite, um sie selbst zu bedienen; der Agent wartet wie bei [Für Anmeldung, Prüfungen oder Zahlungen übernehmen](/guide/web#take-over-to-log-in-solve-a-check-or-pay).
+
 ## Den Browser einrichten
 
 Öffne [Einstellungen → Funktionen → Browser](/settings?s=browser): „Ein Browser für Agenten, den du beobachten und übernehmen kannst“.
@@ -243,15 +377,17 @@ Alles, was noch auf dich gewartet hat, endet damit. Der Agent öffnet den Browse
 
 ### Chromium
 
-[Chromium](/settings?s=browser&find=Chromium) zeigt das verwendete mit seiner Version und, unter (i), wo es liegt. Die App wählt in dieser Reihenfolge: ein auf diesem Computer installiertes Chrome oder Chromium, eines, das sie selbst heruntergeladen hat, dann eines, das Playwright (ein Tool zum Testen von Browsern) installiert hat. Findet sie mehr als eines, kannst du in einer Auswahl wählen: **Beste verfügbare Variante** oder ein bestimmtes.
+[Chromium](/settings?s=browser&find=Chromium) zeigt das verwendete mit seiner Version und, unter (i), wo es liegt. Die App wählt in dieser Reihenfolge: in der Desktop-App **Der eigene Browser der Desktop-App**; ein auf diesem Computer installiertes Chrome oder Chromium, eines, das sie selbst heruntergeladen hat, dann eines, das Playwright (ein Tool zum Testen von Browsern) installiert hat. Findet sie mehr als eines, kannst du in einer Auswahl wählen: **Beste verfügbare Variante** oder ein bestimmtes.
 
 Ohne Fund bietet die App den Download von Chrome for Testing mit etwa 170 MB in den App-Datenordner an. **Chrome herunterladen** startet ihn mit Fortschrittsbalken und Fehlerhinweis bei Problemen. Die Schaltfläche bleibt verfügbar, solange keine heruntergeladene Kopie existiert, auch bei anderweitig gefundenem Chromium.
+
+Der eigene Browser der Desktop-App braucht keinen Download und hat keinen Pfad zum Anzeigen. Solange er verwendet wird, sagt die Zeile „Seiten werden im Fenster der App angezeigt.“, und **Chrome herunterladen** und **Ein Fenster anzeigen** erscheinen nicht, da keines von beiden für ihn etwas bedeutet. Wähle ein anderes Chromium, und sie kehren zurück. Die Seite Browser (dein eigener Browser) verwendet dieselbe Engine.
 
 Kann Chromes Sandbox zur Abschirmung von Webseiten auf diesem Computer nicht laufen, weist die App darauf hin. Netzwerkzugriffe bleiben trotzdem gesperrt; beschränke Profile auf benötigte Websites.
 
 ### Browserfenster anzeigen
 
-[Browserfenster anzeigen](/settings?s=browser&find=Show%20a%20window) ist zunächst aus: Der Browser läuft verborgen und wird in der App angezeigt. Aktiviert öffnet er zusätzlich ein echtes Fenster auf diesem Computer. Playwrights Headless Shell unterstützt kein Fenster; mit ihr bleibt die Option aus. Änderungen gelten beim nächsten Browserstart.
+[Browserfenster anzeigen](/settings?s=browser&find=Show%20a%20window) ist zunächst aus: Der Browser läuft verborgen und wird in der App angezeigt. Aktiviert öffnet er zusätzlich ein echtes Fenster auf diesem Computer. Playwrights Headless Shell unterstützt kein Fenster; mit ihr bleibt die Option aus. Änderungen gelten beim nächsten Browserstart. Die Option erscheint nicht, solange der eigene Browser der Desktop-App verwendet wird.
 
 ### Zugriff auf diesen Computer und sein Netzwerk sperren
 
@@ -260,6 +396,10 @@ Kann Chromes Sandbox zur Abschirmung von Webseiten auf diesem Computer nicht lau
 ### Screenshots für bildfähige Modelle
 
 [Screenshots für bildfähige Modelle](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images) ist standardmäßig aktiv. Geeignete Modelle sehen die Seite mit nummerierten Markierungen. Reine Textmodelle erhalten immer eine Textansicht. Bei ausgeschalteter Option gilt das für alle Modelle.
+
+### Vor dem Senden auf angemeldeten Websites fragen
+
+[Vor dem Senden auf angemeldeten Websites fragen](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) ist anfangs eingeschaltet. Bevor ein Agent auf einer Website, bei der er angemeldet ist, etwas sendet, veröffentlicht, löscht oder überweist, wirst du gefragt (siehe [Schaltflächen, die senden, veröffentlichen oder löschen](/guide/web#buttons-that-send-post-or-delete)). Ausgeschaltet drücken Agenten solche Schaltflächen ohne Nachfrage, auf Websites, bei denen ein Profil angemeldet ist, und auf einer Seite, die du ihnen übergeben hast. Zahlungen halten in beiden Fällen an.
 
 ### Websites erlauben oder sperren
 
@@ -282,6 +422,10 @@ Ein Profil ist ein eigener Browserordner, der Anmeldungen zwischen Sitzungen beh
 Um es zu verwenden, öffne den Browser einer Sitzung, dann **Browseroptionen** (⋯) → wähle das Profil unter **Profil**. Mit der Auswahl schließt sich der Browser. Beim nächsten Mal, wenn der Agent oder du ihn öffnest, öffnet er sich wieder, angemeldet, und das Fenster zeigt den Namen des Profils. Sitzungen, die dasselbe Profil verwenden, teilen seine Anmeldungen.
 
 Jedes Profil bietet **Bei Websites anmelden** für weitere Anmeldungen und ein **⋯**-Menü mit **Umbenennen** und **Löschen**. Löschen entfernt Anmeldungen und alle Browserdaten dieses Profils und schließt verwendende Browser. Ohne Profile erklärt die Liste, dass jeder Sitzungsbrowser ohne Anmeldung neu startet.
+
+### Dein eigenes Surfen
+
+[Einstellungen → Browser](/settings?s=browser) hat außerdem eine Gruppe **Dein eigenes Surfen** („Die Browser-Seite: Seiten, die du selbst nutzt und die Agenten nie erhalten“) mit zwei Zeilen, die die Bereiche der Seite Browser öffnen: [Lesezeichen](/settings?s=browser&find=Bookmarks) („Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer“) und [Erweiterungen](/settings?s=browser&find=Extensions) („Chrome-Erweiterungen in der Desktop-App“). Siehe [Lesezeichen](/guide/web#bookmarks) und [Chrome-Erweiterungen](/guide/web#chrome-extensions).
 
 ## Agenten deinen Computer bedienen lassen
 
@@ -340,6 +484,13 @@ Stoppen beendet die Aktion und entzieht allen Sitzungen die Freigabe. Für erneu
 - „Lass den Browser niemals facebook.com oder tiktok.com öffnen.“
 - „Zeige den Browser als Fenster auf diesem Computer und deaktiviere seine Screenshots.“
 - „Erstelle ein Browserprofil namens Einkaufen.“ Die Anmeldung führst du selbst unter Einstellungen → Browser durch.
+- „Frag mich nicht mehr, bevor Agenten auf Websites, bei denen sie angemeldet sind, Senden oder Löschen drücken.“ (Es ist Einstellungen → Browser → Vor dem Senden auf angemeldeten Websites fragen; schalte es auf dieselbe Weise wieder ein.)
+- „Ist der Browser meiner Agenten der eigene Browser der Desktop-App oder ein Chromium?“
+- „Wie gebe ich einem Agenten die Seite, die ich auf der Seite Browser ansehe?“ (**Zu dieser Seite fragen** gibt ihm eine Kopie; **Hier erledigen lassen** gibt ihm den Tab.)
+- „Setze example.org/reports in einen Ordner namens Arbeit in meiner Lesezeichenleiste.“
+- „Importiere meine Lesezeichen aus Chrome und Firefox in die Seite Browser.“ (oder: „Warum kann ich meine Safari-Lesezeichen nicht importieren?“)
+- „Welche Chrome-Erweiterungen sind in meinem Browser, und welche davon laufen auch in den Browsern der Agenten?“
+- „Füge die Erweiterung unter https://chromewebstore.google.com/detail/… zu meinem Browser hinzu.“ (Die App fragt dich jedes Mal zuerst.)
 - „Fülle für mich das Bibliotheksausweisformular auf riverside.example.org aus. Ich schaue zu.“ Der Live-Zeiger zeigt seine Klicks und Eingaben.
 - „Öffne Notizen auf meinem Mac und lege eine Notiz mit der heutigen Einkaufsliste an.“
 - „Öffne Editor und schreibe die heutige Einkaufsliste auf.“ Unter Windows zeigt der leuchtende Rand die Arbeit an, der Ring markiert den Zeiger und Esc stoppt sie.

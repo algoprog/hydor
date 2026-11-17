@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRightLeft, Clock3, RotateCcw } from 'lucide-react';
-import type { Agent, AgentUsage, LimitReset, LimitResetResult } from '@shared/types';
+import type { AccountAgent, AgentUsage, LimitReset, LimitResetResult } from '@shared/types';
+import { ACCOUNT_AGENT_NAMES } from '@shared/grok';
 import { del, enc, post, put } from '../../lib/api';
 import { pct, untilText } from '../../lib/format';
 import { toast, toastError, useApp, useAppSettings, usedUp, useUsage } from '../../lib/store';
-import { agentName } from '../../components/AgentIcon';
 import { Button, cx, useConfirm } from '../../components/ui';
 import { LOCALE } from '../../i18n/locale';
 
@@ -16,8 +16,8 @@ export function usableResets(u: AgentUsage | null | undefined): LimitReset[] {
 }
 
 /** Asks first, then spends one limit reset (of the agent's own sign-in, or an added account) and shows how it went. */
-export function useLimitReset(agent: Agent, account?: string) {
-  const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
+export function useLimitReset(agent: AccountAgent, account?: string) {
+  const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : s[agent]));
   const [confirm, confirmNode] = useConfirm();
   const [busy, setBusy] = useState(false);
 
@@ -27,11 +27,11 @@ export function useLimitReset(agent: Agent, account?: string) {
     const n = u?.resetCredits?.available ?? 1;
     const top = (u?.windows ?? []).reduce<{ label: string; usedPercent: number | null } | null>((a, w) => ((w.usedPercent ?? 0) > (a?.usedPercent ?? -1) ? w : a), null);
     const ok = await confirm({
-      title: `Use a ${agentName(agent)} limit reset?`,
+      title: `Use a ${ACCOUNT_AGENT_NAMES[agent]} limit reset?`,
       body: (
         <div className="space-y-2">
           <div>
-            This clears the {agentName(agent)} usage limits now instead of waiting for them to reset. It uses <b className="font-medium text-fg">{pick.title}</b>
+            This clears the {ACCOUNT_AGENT_NAMES[agent]} usage limits now instead of waiting for them to reset. It uses <b className="font-medium text-fg">{pick.title}</b>
             {pick.expiresAt ? `, which expires ${untilText(pick.expiresAt)}` : ''}; {n > 1 ? `${plural(n - 1, 'reset')} will be left.` : 'it is the last one.'}
           </div>
           {!u?.limited && top && (
@@ -59,11 +59,10 @@ export function useLimitReset(agent: Agent, account?: string) {
 }
 
 /** Another signed-in account of the agent (its own sign-in or an added one) with usage left; null when none. */
-function useSpareAccount(agent: Agent, account: string | undefined): { id: string | undefined; name: string } | null {
+function useSpareAccount(agent: AccountAgent, account: string | undefined): { id: string | undefined; name: string } | null {
   const added = useApp((s) => s.boot?.accounts);
   const usage = useUsage();
-  if (agent === 'acp') return null;
-  const pool: { id: string | undefined; name: string }[] = [{ id: undefined, name: usage[agent]?.account?.email ?? `your main ${agentName(agent)} account` }, ...(added ?? []).filter((a) => a.agent === agent).map((a) => ({ id: a.id, name: a.name }))];
+  const pool: { id: string | undefined; name: string }[] = [{ id: undefined, name: usage[agent]?.account?.email ?? `your main ${ACCOUNT_AGENT_NAMES[agent]} account` }, ...(added ?? []).filter((a) => a.agent === agent).map((a) => ({ id: a.id, name: a.name }))];
   return pool.find((a) => a.id !== account && !usedUp(a.id ? usage.accounts[a.id] : usage[agent])) ?? null;
 }
 
@@ -71,14 +70,14 @@ function useSpareAccount(agent: Agent, account: string | undefined): { id: strin
  * Whose usage limit it is, in words: the agent's when you have one account of it; when you have several, all of
  * them, or the one at its limit by name while another still has usage left (`spare`).
  */
-function useLimitTitle(agent: Agent, account: string | undefined, spare: { id: string | undefined } | null): string {
+function useLimitTitle(agent: AccountAgent, account: string | undefined, spare: { id: string | undefined } | null): string {
   const added = useApp((s) => s.boot?.accounts);
-  const email = useUsage((s) => (agent === 'acp' ? undefined : s[agent]?.account?.email));
+  const email = useUsage((s) => s[agent]?.account?.email);
   const others = (added ?? []).filter((a) => a.agent === agent);
-  if (agent === 'acp' || !others.length) return `You've hit the ${agentName(agent)} usage limit`;
-  if (!spare) return `All your ${agentName(agent)} accounts have hit their usage limit`;
+  if (!others.length) return `You've hit the ${ACCOUNT_AGENT_NAMES[agent]} usage limit`;
+  if (!spare) return `All your ${ACCOUNT_AGENT_NAMES[agent]} accounts have hit their usage limit`;
   const name = account ? others.find((a) => a.id === account)?.name : email;
-  return name ? `${name} has hit its usage limit` : `Your main ${agentName(agent)} account has hit its usage limit`;
+  return name ? `${name} has hit its usage limit` : `Your main ${ACCOUNT_AGENT_NAMES[agent]} account has hit its usage limit`;
 }
 
 /** Renders again every `ms` while `on`, so "in 1 h 31 min" keeps counting down. */
@@ -97,8 +96,8 @@ function useTicking(on: boolean, ms = 30_000) {
  * that on the limit's reset time as it moves), or offers to. One banner: the text has the width, and its
  * buttons go under it when there is no room beside it.
  */
-export function LimitBanner({ agent, account, className, session }: { agent: Agent; account?: string; className?: string; session?: { key: string; resumeAt?: number; busy?: boolean } }) {
-  const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : agent === 'acp' ? null : s[agent]));
+export function LimitBanner({ agent, account, className, session }: { agent: AccountAgent; account?: string; className?: string; session?: { key: string; resumeAt?: number; busy?: boolean } }) {
+  const u = useUsage((s): AgentUsage | null => (account ? (s.accounts[account] ?? null) : s[agent]));
   const reset = useLimitReset(agent, account);
   const spare = useSpareAccount(agent, account);
   const title = useLimitTitle(agent, account, spare);

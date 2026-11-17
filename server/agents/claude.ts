@@ -261,6 +261,8 @@ export function claudeSpec(o: ClaudeOpts, env: Record<string, string>): RunSpec 
   // An assistant's limits: tools switched off, and none of the user's own MCP servers.
   if (o.add?.disallowedTools?.length) args.push('--disallowedTools', o.add.disallowedTools.join(','));
   if (o.add?.strictMcp) args.push('--strict-mcp-config');
+  // Only these built-in tools (none, for a browser-only session): a list to keep, so a tool a later version adds stays off.
+  if (o.add?.builtinTools) args.push('--tools', o.add.builtinTools.join(','));
   return { cmd: config.claudeBin, args, cwd: o.cwd, env };
 }
 
