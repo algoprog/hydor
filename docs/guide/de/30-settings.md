@@ -94,7 +94,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 [Einstellungen → Computer](/settings?s=machines): Andere Computer mit Hydor von hier aus nutzen und den Zugriff auf diesen Computer verwalten. Mehr dazu unter [Smartphones, weitere Computer und Teilen](/guide/devices).
 
 - [**Computer hinzufügen**](/settings?s=machines&find=Add%20a%20machine): Ein weiterer Computer, auf dem Hydor läuft, kann von hier aus verwendet werden.
-- [**Zugriff von anderen Computern**](/settings?s=machines&find=Access%20from%20other%20machines): Tokens, die andere Computer verwenden, um dieses zu erreichen.
+- [**Zugriff von anderen Computern**](/settings?s=machines&find=Access%20from%20other%20machines): Tokens, die andere Computer verwenden, um diesen zu erreichen.
 
 ## Agenten
 
@@ -236,6 +236,8 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 
 - [**Memory**](/settings?s=memory&find=Memory): Agenten beginnen mit dem, was frühere Sitzungen gespeichert haben, und speichern auf deine Bitte Notizen.
 - [**Wiki-Memory**](/settings?s=memory&find=Wiki%20memory): Artikel, die Agenten für jedes Projekt aus seinen Dokumenten und seiner Arbeit führen: für jedes Projekt eingeschaltet, sofern seine eigenen Einstellungen nichts anderes sagen.
+- [**Wiki-Memory in Chats standardmäßig einschalten**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats): Chats verwenden diese Einstellung, sofern du nichts anderes auswählst.
+- [**Automatische Lessons Learned in Chats standardmäßig einschalten**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats): Chats verwenden diese Einstellung, sofern du nichts anderes auswählst.
 - [**Aus neuen Dokumenten lernen**](/settings?s=memory&find=Learn%20from%20new%20documents): Neue und geänderte Dokumente ergänzen Memory-Notizen und aktualisieren das Wiki, mit dem Hilfsmodell.
 - [**Höchstzahl der Dokumente für das Wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki): Ein Projekt mit mehr Dokumenten als dieser Zahl liest sie nicht in sein Wiki: Agenten durchsuchen sie stattdessen.
 - [**Wiki-Ordner**](/settings?s=memory&find=Wiki%20folder): Wo das geteilte Wiki liegt, und die Projekt-Wikis, sofern unten nichts anderes eingestellt ist.

@@ -236,6 +236,8 @@ You don’t have to know where an option lives: type what you want in the search
 
 - [**Memory**](/settings?s=memory&find=Memory): Agents start with what earlier sessions kept, and save notes when you ask.
 - [**Wiki memory**](/settings?s=memory&find=Wiki%20memory): Articles agents keep for each project, from its documents and its work: on for every project unless its own settings say otherwise.
+- [**Wiki memory on by default in chats**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats): Chats use this setting unless you choose otherwise.
+- [**Auto lessons learned by default in chats**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats): Chats use this setting unless you choose otherwise.
 - [**Learn from new documents**](/settings?s=memory&find=Learn%20from%20new%20documents): New and changed documents add memory notes and update the wiki, with the helper model.
 - [**Most documents to read into the wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki): A project with more documents than this keeps them out of its wiki: agents search them instead.
 - [**Wiki folder**](/settings?s=memory&find=Wiki%20folder): Where the shared wiki is kept, and project wikis unless set below.
