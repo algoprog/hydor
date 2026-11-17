@@ -34,6 +34,7 @@ import { MOD } from '../../lib/format';
 import { go, openFile } from '../../lib/nav';
 import { Button, cx, Empty, IconButton, Kbd, MenuItem, MenuSep, Popover, Throbber, useIsMobile } from '../../components/ui';
 import { live as socket } from '../../lib/ws';
+import { NavButton } from '../layout/PageHeader';
 import { AgentDialog, AgentPane, AgentsPanel, useAgentsRefresh } from './AgentTabs';
 import { BookmarkBar, toggleBookmark } from './BookmarkBar';
 import { BookmarksPanel } from './Bookmarks';
@@ -144,10 +145,23 @@ function DownloadsPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * The page has no header, so the toolbar holds the way back to a hidden sidebar (the drawer's on a phone-sized window);
+ * the screens without a toolbar (starting, failed to start, not in this app) keep it in their top left corner instead.
+ */
+function SidebarCorner() {
+  return (
+    <div className="absolute left-2 top-[calc(var(--safe-top)+8px)]">
+      <NavButton />
+    </div>
+  );
+}
+
 /** Where your own browser is not (a web page, another machine's pages): it is part of the desktop app, and nothing here starts it. */
 function NotHere() {
   return (
-    <div className="flex h-full items-center justify-center p-6">
+    <div className="relative flex h-full items-center justify-center p-6">
+      <SidebarCorner />
       <Empty icon={<Globe size={20} />} title="Your own browser is part of the desktop app">
         Browse the web with tabs, bookmarks, extensions and history in Hydor’s desktop app. The agents’ browsers still work everywhere: you can watch them in their sessions.
         <div className="mt-4 flex justify-center">
@@ -371,7 +385,8 @@ function OwnBrowser() {
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="relative flex h-full items-center justify-center">
+        <SidebarCorner />
         <Empty icon={<Globe size={20} />} title="The browser did not start">
           {error}
           <div className="mt-4 flex justify-center gap-2">
@@ -388,7 +403,8 @@ function OwnBrowser() {
   }
   if (!view?.open) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="relative flex h-full items-center justify-center">
+        <SidebarCorner />
         <Throbber size={30} />
       </div>
     );
@@ -467,6 +483,7 @@ function OwnBrowser() {
     <div className="flex h-full min-h-0 flex-col bg-bg">
       {!mobile && <TabStrip view={view} />}
       <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-bg px-2">
+        <NavButton />
         {mobile && <TabMenu view={view} />}
         <IconButton label="Back" disabled={tab?.canGoBack === false} onClick={() => void navigate('back')}>
           <ArrowLeft size={17} />
