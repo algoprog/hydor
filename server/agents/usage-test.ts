@@ -174,3 +174,73 @@ try {
     fs.rmSync(dir2, { recursive: true, force: true });
   }
 }
+
+// A limit the last read of the resets found is held only while it can be true: until its window resets, or until the next read is due, never past a refused read.
+{
+  const dir3 = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-usage-hold-'));
+  fs.writeFileSync(path.join(dir3, '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'test-only' } }));
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  let atLimit = true;
+  let refuse = false;
+  let reads = 0;
+  globalThis.fetch = (async () => {
+    reads++;
+    if (refuse) return new Response('{}', { status: 429 });
+    return new Response(JSON.stringify({ cedar_ember: { at_limit: atLimit, grants: [] } }), { status: 200 });
+  }) as typeof fetch;
+  const savedEvery = resetReads.every;
+  try {
+    const control = new ClaudeControl({ CLAUDE_CONFIG_DIR: dir3 });
+    let five: { utilization: number; resets_at: string } = { utilization: 100, resets_at: new Date(Date.now() + 300).toISOString() };
+    (control as any).probe = async () => ({ init, usage: { rate_limits: { five_hour: five } } });
+
+    // 1. The window is full and the resets say at limit: the report shows that limit.
+    let report = await control.usage();
+    assert.equal(report.limited?.label, report.windows[0].label, 'a full window is the limit shown');
+
+    // 2. Its reset time has passed and the window is back to 3%: the hold ends, and it does not come back on the next report.
+    await sleep(350);
+    five = { utilization: 3, resets_at: new Date(Date.now() + 5 * 3600_000).toISOString() };
+    report = await control.usage();
+    assert.equal(report.limited, null, 'a hold ends when its window has reset');
+    report = await control.usage();
+    assert.equal(report.limited, null, 'and no bare "Usage limit" comes back from the next report');
+    assert.equal(reads, 1, 'the resets were not read again');
+
+    // 3. A read that is due again still says at limit, with no known window: the hold lasts until the next read.
+    resetReads.every = 300;
+    (control as any).resetsNext = 0;
+    report = await control.usage();
+    assert.deepEqual(report.limited, { label: 'Usage limit', resetsAt: null }, 'at limit with no window known: held until the next read');
+    report = await control.usage();
+    assert.deepEqual(report.limited, { label: 'Usage limit', resetsAt: null }, 'still held on a report at once');
+
+    // 4. The next read is due after the hold, and is refused: the hold does not last beyond its time.
+    await sleep(350);
+    refuse = true;
+    report = await control.usage();
+    assert.equal(report.limited, null, 'a refused read does not keep the hold longer');
+
+    // 5. A live refusal for a weekly limit (one hour) holds through a read that is at limit with no window shown.
+    refuse = false;
+    const at = Math.floor(Date.now() / 1000) + 3600;
+    const live = control.applyRateLimit({ status: 'rejected', rateLimitType: 'seven_day', resetsAt: at });
+    (control as any).resetsNext = 0;
+    report = await control.usage();
+    assert.deepEqual(report.limited, live!.limited, 'the live refusal is what is held');
+    assert.equal(report.limited?.resetsAt, at * 1000, 'until its reset time');
+    report = await control.usage();
+    assert.deepEqual(report.limited, live!.limited, 'and still held on the next report');
+
+    // 6. The resets no longer say at limit: the hold is gone.
+    atLimit = false;
+    (control as any).resetsNext = 0;
+    report = await control.usage();
+    assert.equal(report.limited, null, 'not at limit any more, so nothing is held');
+    console.log('Limit held from the resets read only while it can be true passed');
+  } finally {
+    resetReads.every = savedEvery;
+    globalThis.fetch = originalFetch;
+    fs.rmSync(dir3, { recursive: true, force: true });
+  }
+}
