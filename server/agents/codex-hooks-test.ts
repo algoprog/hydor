@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CodexLive, codexProjectHooksMayExist, codexWikiHookConfig, codexWikiHooksMayOverlap, summarizeCodexHooks } from './codex.ts';
+import { CodexLive, cachedWikiHook, codexProjectHooksMayExist, codexWikiHookConfig, codexWikiHooksMayOverlap, summarizeCodexHooks } from './codex.ts';
 import { RpcError } from './rpc.ts';
 
 const secretCommand = 'private-command-never-exposed';
@@ -48,6 +48,21 @@ assert.equal(codexWikiHooksMayOverlap({ data: [{ hooks: [], warnings: [], errors
 assert.equal(codexWikiHooksMayOverlap(fixture), true);
 assert.equal(codexWikiHooksMayOverlap({ data: [{ hooks: [{ source: 'plugin', enabled: true }], warnings: [], errors: [] }] }), true);
 assert.equal(codexWikiHooksMayOverlap({ data: [{ hooks: [], warnings: [], errors: ['unavailable'] }] }), true);
+// What discovery finds is found once per Codex version and command, however many sessions start (it starts a second app server).
+let discoveries = 0;
+const discover = async (command: string) => { discoveries++; return { hooks: { PreCompact: [{ command }] } }; };
+const [one, two] = await Promise.all([cachedWikiHook('codex 1.0', 'node hook.js', discover), cachedWikiHook('codex 1.0', 'node hook.js', discover)]);
+assert.deepEqual(one, two);
+await cachedWikiHook('codex 1.0', 'node hook.js', discover);
+assert.equal(discoveries, 1, 'sessions after the first reuse what was found');
+await cachedWikiHook('codex 1.1', 'node hook.js', discover);
+await cachedWikiHook('codex 1.0', 'node other.js', discover);
+assert.equal(discoveries, 3, 'a new Codex version or a different command is found again');
+let failures = 0;
+const failing = async () => { failures++; throw new Error('app server unavailable'); };
+assert.equal(await cachedWikiHook('codex 2', 'node x.js', failing), null, 'a failed discovery means no hook, never an error');
+assert.equal(await cachedWikiHook('codex 2', 'node x.js', failing), null);
+assert.equal(failures, 1, 'and is not tried again at every start');
 // Hidden project configuration can become visible only after Codex trusts a workspace.
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-codex-config-'));
 try {

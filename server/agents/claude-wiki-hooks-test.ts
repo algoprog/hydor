@@ -21,6 +21,12 @@ try {
   assert.equal(settings.hooks.PreCompact[0].matcher, 'auto');
   assert.equal(settings.hooks.PostCompact[0].matcher, 'auto');
   assert.equal(settings.hooks.PreCompact[0].hooks[0].type, 'command');
+  // Exec form, as Claude Code's own hook schema describes it ("set `command` to the executable and `args` to its arguments",
+  // checked against Claude Code 2.1.325): no shell, so nothing to quote, and the bearer is never in it.
+  const hook = settings.hooks.PreCompact[0].hooks[0];
+  assert.equal(hook.command, process.execPath);
+  assert.ok(Array.isArray(hook.args) && hook.args[0] === '-e' && /^http:\/\/127\.0\.0\.1:\d+\/agent\/claude\/wiki-event$/.test(hook.args[2]));
+  assert.ok(!JSON.stringify(settings).includes(token));
   assert.equal(claudeSpec(opts, { CLAUDE_CONFIG_DIR: config }).args.includes('--settings'), false);
   fs.writeFileSync(path.join(config, 'settings.json'), JSON.stringify({ hooks: { PreCompact: [{ hooks: [] }] } }));
   assert.equal(claudeWikiHooksMayOverlap(opts, env), true);

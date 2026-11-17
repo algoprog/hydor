@@ -144,6 +144,32 @@ async function discoverWikiHook(command: string): Promise<Json | null> {
   }
 }
 
+/** What discovery found for a Codex version and hook command; a failure is remembered for a while only (it may be a passing one). */
+const hookDiscoveries = new Map<string, { at: number; found: Promise<Json | null> }>();
+const HOOK_RETRY_MS = 10 * 60_000;
+
+/**
+ * The hook's definition with its trust, found once per Codex version and command (not once per session): starting a second
+ * Codex app server to ask it takes seconds. The app trusts only its own hook (an exact command it made itself, in a layer
+ * of its own that holds nothing else), per thread; what the user's Codex has is never trusted this way.
+ */
+export function cachedWikiHook(version: string, command: string, discover: (command: string) => Promise<Json | null> = discoverWikiHook): Promise<Json | null> {
+  const key = `${version}\0${command}`;
+  const known = hookDiscoveries.get(key);
+  if (known) return known.found;
+  const entry = { at: Date.now(), found: discover(command).catch(() => null) };
+  hookDiscoveries.set(key, entry);
+  void entry.found.then((found) => { if (!found && hookDiscoveries.get(key) === entry) setTimeout(() => { if (hookDiscoveries.get(key) === entry) hookDiscoveries.delete(key); }, HOOK_RETRY_MS).unref?.(); });
+  return entry.found;
+}
+
+/** Which Codex this is: what its app server says of itself, else its program's size and time (an update changes both). */
+function codexVersion(initialized: unknown): string {
+  const agent = (initialized as Json | null)?.userAgent;
+  if (typeof agent === 'string' && agent) return agent;
+  try { const st = fs.statSync(config.codexBin); return `${config.codexBin}:${st.size}:${Math.round(st.mtimeMs)}`; } catch { return config.codexBin; }
+}
+
 /** MCP servers in Codex's own config format; the app's tools need no approval. */
 function codexServers(o: CodexOpts): Record<string, unknown> {
   const out: Record<string, Record<string, unknown>> = {};
@@ -328,7 +354,7 @@ export class CodexLive extends LiveAdapter {
 
   /** Initializes a freshly started app server and starts or resumes the thread. */
   async boot(): Promise<void> {
-    await this.rpc.call('initialize', {
+    const initialized = await this.rpc.call('initialize', {
       clientInfo: { name: 'web_agent', title: 'Web Agent', version: config.version },
       capabilities: { experimentalApi: true, requestAttestation: false },
     });
@@ -359,7 +385,7 @@ export class CodexLive extends LiveAdapter {
         const current = await this.rpc.call('config/read', { cwd: this.opts.cwd }, 5000);
         const existing = await this.rpc.call('hooks/list', { cwds: [this.opts.cwd] }, 5000);
         if (current?.config?.features?.hooks !== false && (common.config as Json)['features.hooks'] !== false && (common.config as Json).features?.hooks !== false && !codexWikiHooksMayOverlap(existing)) {
-          const wikiHook = await discoverWikiHook(this.opts.wikiHookCommand);
+          const wikiHook = await cachedWikiHook(codexVersion(initialized), this.opts.wikiHookCommand);
           if (wikiHook) Object.assign(common.config, wikiHook);
         }
       } catch { /* Continue without automatic coverage if discovery is unavailable. */ }
