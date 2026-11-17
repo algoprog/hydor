@@ -6,14 +6,16 @@ Release notes, and says what is new after it updates.
 ## 0.83.0 · 17 November 2026
 
 Your own browser grows into one you can use every day, in the desktop app: a smart address bar, Google as the home
-page, an ad blocker, history and the rest, and it is faster and smoother.
+page and search engine, an ad blocker, history and the rest, and it is faster and smoother. A message you send shows at
+once, and Naget Search keeps to the sites, dates and kinds of pages a search's words ask for.
 
 - **In the desktop app**: the Browser page is now part of the desktop app, where its pages are real pages. The web app
   and phones have no Browser button any more (the pages came there as pictures and lagged); the agents' browser in
   sessions works everywhere as before.
 - **Faster and smoother**: your own tabs connect directly rather than through the app, the app no longer follows every
-  request your pages make, the page stays in view as a picture under menus, popovers and the address bar's suggestions
-  instead of going blank, it follows the window as you resize it, and the outline around the page is gone.
+  request your pages make, the page stays in view under menus, popovers and the address bar's suggestions as a picture
+  as sharp as the page itself (on a Retina screen too) instead of a small blurry one, it follows the window as you resize
+  it, and the outline around the page is gone.
 - **A smart address bar**: as you type, your open tabs, bookmarks and the pages you visit most and most lately, the
   address completed in place, your search engine's suggestions, and **Ask an agent** to start a session with what you
   typed.
@@ -29,6 +31,18 @@ page, an ad blocker, history and the rest, and it is faster and smoother.
   with the wheel), print, full-screen video, find with a match count, muting a tab that plays sound, a padlock with the
   site's permissions, **Open in your default browser**, and more shortcuts (Ctrl+Tab, Ctrl+1…9, Ctrl+D, Ctrl+H,
   Ctrl+J, Ctrl+P). A page's file field opens the system's own file picker.
+- **A message you send shows at once**: in the conversation with the agent at work under it, or with the messages
+  waiting when it goes to the queue, and the box is free for the next one straight away (before, looking up what memory
+  has for it or starting a stopped agent again could hold it back a second or more). A message that does not go through
+  goes back into its box with a note that says why.
+- **Naget Search reads the filters in a search's words**: when an agent searches for words that ask for a site, dates,
+  a kind of page, a language, PDFs or home pages and sets no filters itself, the helper model turns them into Naget's
+  filters first (within 8 seconds), and the search's tags say what was searched. When that finds nothing, the words are
+  searched as written; other search providers get the search as written.
+- **Wiki memory**: a new Codex session picked into a project on the start page knows of that project's wiki straight
+  away; reading or searching another project's wiki needs Wiki memory on in this project as well as in the chat, so
+  turning it off while a session runs closes those too; on a phone, a project's Memory tab puts its explanation under
+  the switch. With thanks to wirrockendigital, whose contribution brought these.
 
 ## 0.82.1 · 17 November 2026
 
