@@ -32,6 +32,11 @@ try {
   assert.throws(() => applyWikiChanges(wiki, [{ path: first.originalPath, content: 'modified', expectedSha256: wikiHash(source) }]), /written only/);
   assert.throws(() => applyWikiChanges(wiki, [{ path: first.path, content: 'modified', expectedSha256: wikiHash(sourceNote) }]), /immutable/);
 
+  // Generic and automatic writers cannot create contracts or strip their kind metadata.
+  assert.throws(() => applyWikiChanges(wiki, [{ path: 'wiki/contracts/new.md', content: '# Unapproved', expectedSha256: null }]), /contract approval/);
+  const contract = '---\ndocument_kind: contract\n---\n# Existing contract\n';
+  fs.writeFileSync(path.join(wiki, 'wiki', 'existing-contract.md'), contract);
+  assert.throws(() => applyWikiChanges(wiki, [{ path: 'wiki/existing-contract.md', content: '# Removed metadata', expectedSha256: wikiHash(contract) }]), /contract approval/);
   applyWikiChanges(wiki, [{ path: 'wiki/concepts/test.md', content: '# Start\n', expectedSha256: null }]);
   const original = readWiki(wiki, 'wiki/concepts/test.md');
   fs.writeFileSync(path.join(wiki, original.path), '# Another writer\n');

@@ -86,6 +86,42 @@ function within(base: string, target: string, create: boolean): string | null {
   return real;
 }
 
+/** Resolve a prospective child without creating it, rejecting links that escape the real base. */
+function prospectiveWithin(base: string, target: string): string {
+  if (!inside(base, target)) throw new Error('A wiki folder must be inside its hub or project');
+  let current = base, missing = false;
+  for (const part of path.relative(base, target).split(path.sep)) {
+    current = path.join(current, part);
+    if (missing) continue;
+    try {
+      const st = fs.lstatSync(current);
+      if (st.isSymbolicLink()) {
+        current = fs.realpathSync(current);
+        if (!inside(base, current) || !fs.statSync(current).isDirectory()) throw new Error('A wiki folder cannot lead outside its hub or project');
+      } else if (!st.isDirectory()) throw new Error('A wiki folder is not a folder');
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+      missing = true;
+    }
+  }
+  if (!inside(base, current)) throw new Error('A wiki folder cannot lead outside its hub or project');
+  return current;
+}
+
+/** Resolve an absolute future folder through existing ancestors without making directories. */
+function prospectiveAbsolute(target: string): string {
+  let ancestor = target;
+  const tail: string[] = [];
+  while (!fs.existsSync(ancestor)) {
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) throw new Error('No existing ancestor for the wiki folder');
+    tail.unshift(path.basename(ancestor)); ancestor = parent;
+  }
+  const base = fs.realpathSync(ancestor);
+  if (!fs.statSync(base).isDirectory()) throw new Error('The wiki hub is not a folder');
+  return tail.length ? prospectiveWithin(base, path.join(base, ...tail)) : base;
+}
+
 /** A wiki folder with the folders it keeps (made when `create`). */
 function prepared(root: string, create: boolean): string {
   if (create) for (const d of ['wiki', 'raw']) fs.mkdirSync(path.join(root, d), { recursive: true, mode: 0o700 });
@@ -131,6 +167,19 @@ export function projectDir(db: DB, space: string, name: string): string {
       db.prepare('insert into wiki_project_dirs (space, dir) values (?, ?)').run(space, dir);
       return dir;
     }
+    if (n > id.length) throw new Error('No folder name for the project wiki');
+  }
+}
+
+/** Predict a project's hub directory without creating the registry table or allocating a name. */
+function prospectiveProjectDir(db: DB, space: string, name: string): string {
+  const exists = db.prepare("select 1 from sqlite_master where type = 'table' and name = 'wiki_project_dirs'").get();
+  const row = exists ? db.prepare('select dir from wiki_project_dirs where space = ?').get(space) as { dir: string } | undefined : undefined;
+  if (row) return row.dir;
+  const id = space.replace(/^sp/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+  for (let n = 6; ; n += 2) {
+    const dir = `${slug(name)}-${id.slice(0, n)}`;
+    if (!exists || !db.prepare('select 1 from wiki_project_dirs where dir = ?').get(dir)) return dir;
     if (n > id.length) throw new Error('No folder name for the project wiki');
   }
 }
@@ -235,4 +284,29 @@ export function wikiRoot(db: DB, space: string | null, o: { create?: boolean } =
   if (!hub) return null;
   const root = within(hub, path.join(hub, 'projects', projectDir(db, space, project.name)), create);
   return root ? prepared(root, create) : null;
+}
+
+/** Resolve the future project wiki without creating files or changing its project-directory registry. */
+export function prospectiveProjectWikiRoot(db: DB, space: string): string | null {
+  if (!wikiMemoryOn(db, space)) return null;
+  const project = spaceById(db, space);
+  if (!project) return null;
+  const settings = wikiSettings(db), base = projectBase(project.folder);
+  const hub = prospectiveAbsolute(path.resolve(settings.hubPath));
+  if (base) {
+    const spec = projectBinding(project.folder), parts = spec === undefined ? null : plainRelative(spec);
+    if (parts) {
+      try {
+        const target = path.join(base, ...parts);
+        if (inside(base, target) && target !== hub && !inside(target, hub)) return prospectiveWithin(base, target);
+      } catch { /* Invalid bindings fall back to the configured location, as wikiRoot does. */ }
+    }
+  }
+  if (settings.projectWikis === 'folder') {
+    if (!base) return null;
+    const parts = plainRelative(settings.projectPath);
+    if (!parts) throw new Error('The project wiki path must be inside the project');
+    return prospectiveWithin(base, path.join(base, ...parts));
+  }
+  return prospectiveWithin(hub, path.join(hub, 'projects', prospectiveProjectDir(db, space, project.name)));
 }

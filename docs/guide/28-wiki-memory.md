@@ -31,7 +31,7 @@ With wiki memory off for a project, its Memory tab says "Wiki memory is off for 
 In chat options, **Wiki memory** and **Auto lessons learned** apply to that chat. Their defaults are in **Settings → Memory → Wiki memory**. Automatic lesson suggestions also need Memory; saving a reviewed suggestion needs your confirmation. A native agent started before Wiki memory was turned on needs a restart to register its checkpoint hook.
 
 Learning from documents, learning from a project's work and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
-In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable.
+In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki contracts**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable.
 
 
 ## Where wikis are kept
@@ -182,6 +182,14 @@ In a project, an agent gets a few tools for the project's wiki, and nothing for 
 What it cannot do: write in another project's wiki; read or write hidden files and folders, Git and archive folders, retired or archived articles, or a link that leads out of the wiki; keep text with passwords or keys in it; or use wiki memory at all in a Confidential session. Ask the agent to check the wiki and it reports a basic problem list; it does not change the files for that.
 
 With **Execution tracking** off, you can still adopt a plan without creating a new register, or link an existing register without changing it. To write or update an execution record, turn execution tracking on for the project and chat. With execution tracking on, an identified register embedded in a plan can be updated through the plan revision tools in execution mode even when plan editing is off; the rest of the plan stays unchanged.
+
+## Project contracts
+
+Rebuild and restore stop when the current wiki or the selected archive contains a project contract. Hydor never moves or reactivates a reviewed contract through those actions.
+
+Ask an agent to preview a project contract from your text or an existing wiki page. The preview shows its content, scope, origin, destination and existing articles to help you check for overlap. Review the exact text and confirm to save it; rejecting it saves nothing. A source page remains unchanged. Relative Markdown links in a copied source keep pointing to the same wiki pages. If a link cannot be safely carried over, rewrite it before trying again.
+
+To change a contract, ask the agent for a revision. Review the previous and proposed text and the reason, then confirm. Hydor preserves the previous revision in a protected snapshot and asks you to review again if the source, destination or relevant existing contracts changed. Approving a contract or revision does not start implementation.
 
 ## Checkpoints and lessons learned
 

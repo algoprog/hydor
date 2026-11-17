@@ -169,6 +169,19 @@ test('by meaning: in other words, once the passages have vectors; words and mean
   assert.ok(both.hits[0].by.includes('meaning'));
 });
 
+test('path filters are applied before limits without changing the order of allowed results', async () => {
+  // Each search mode must backfill a filtered top result with the next eligible passage.
+  for (const [mode, query] of [['words', 'office expenses'], ['exact', 'the'], ['exact', '/the/i'], ['meaning', 'office expenses']] as const) {
+    const all = await searchKnowledge(db, { query, mode, limit: 25 });
+    assert.ok(all.hits.length >= 2, `fixture needs two ${mode} hits for ${query}`);
+    const excluded = all.hits[0].path;
+    const expected = all.hits.find((hit) => hit.path !== excluded);
+    assert.ok(expected, `fixture needs a second ${mode} document for ${query}`);
+    const filtered = await searchKnowledge(db, { query, mode, limit: 1, keep: (file) => file !== excluded });
+    assert.equal(filtered.hits[0]?.ref, expected.ref, `${mode} ${query}`);
+  }
+});
+
 test('the tools: passages with what to cite, more of a document around one, and what is in the bases', async () => {
   const out = await run('knowledge_search', { query: 'sick leave doctor' });
   assert.match(out, /^\d+ passages? from the user's knowledge bases\. Cite each one/);

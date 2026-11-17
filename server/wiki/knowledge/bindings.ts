@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { DB } from '../../db.ts';
 import { hubDir, wikiMemoryOn } from '../roots.ts';
-import { activeWikiDocument, redirectOf } from '../core.ts';
+import { activeWikiDocument, contractDocument, readWiki, redirectOf } from '../core.ts';
 import { knowledgeSchema } from '../../knowledge/store.ts';
 
 interface Binding { base: string; source: string; root: string; space: string | null; active: number }
@@ -97,6 +97,27 @@ export function wikiDocumentVisible(db: DB, base: string, file: string): boolean
   wikiKnowledgeSchema(db);
   const b = db.prepare('select * from kb_wiki_bindings where base = ?').get(base) as Binding | undefined;
   return !b || (wikiBaseVisible(db, base) && wikiFileActive(b.root, file));
+}
+
+/** Resolve the owner of a managed wiki base for cross-project feature gates. */
+export function wikiKnowledgeSpace(db: DB, base: string): string | null {
+  wikiKnowledgeSchema(db);
+  const binding = db.prepare('select space from kb_wiki_bindings where base = ?').get(base) as { space: string | null } | undefined;
+  return binding?.space ?? null;
+}
+
+/** Classify active contracts only inside an app-managed wiki knowledge base. */
+export function wikiKnowledgeContract(db: DB, base: string, file: string): boolean {
+  wikiKnowledgeSchema(db);
+  const binding = db.prepare('select root from kb_wiki_bindings where base = ?').get(base) as { root: string } | undefined;
+  if (!binding) return false;
+  try {
+    if (!wikiFileActive(binding.root, file)) return true;
+    const relative = path.relative(binding.root, file).split(path.sep).join('/');
+    // Binary source documents are not Markdown contracts and stay available independently.
+    if (!/\.md$/i.test(relative) && !/^wiki\/contracts\//i.test(relative)) return false;
+    return contractDocument(relative, readWiki(binding.root, relative).content);
+  } catch { return true; }
 }
 
 /** Create or replace one scoped wiki binding; a later scan indexes its existing files. */

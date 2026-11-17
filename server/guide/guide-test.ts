@@ -282,6 +282,12 @@ test('rules: reading is free; changes ask; risky ones every time; some are never
     // A lesson suggestion from a chat is kept or dismissed by the user alone.
     ['POST', '/api/wiki-lessons/n1/save'],
     ['POST', '/api/wiki-lessons/n1/dismiss'],
+    // Contract decisions are user-only; scoped wiki and knowledge tools enforce chat controls.
+    ['GET', '/api/projects/sp1/wiki'],
+    ['GET', '/api/projects/sp1/wiki/file'],
+    ['GET', '/api/projects/sp1/wiki/updates'],
+    ['GET', '/api/knowledge/kb1/docs'],
+    ['POST', '/api/knowledge/search'],
     ['POST', '/api/mcp/tokens'],
     ['POST', '/api/access-tokens'],
     ['POST', '/api/connections/secrets'],

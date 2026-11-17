@@ -57,9 +57,11 @@ function parse(text: string): { header: string[]; body: string; meta: Record<str
 }
 
 /** Prepare a byte-bound, read-only proposal with stable identifiers and exact displayed replacement. */
-export function previewRevision(root: string, input: RevisionInput): RevisionPreview {
+export function previewRevision(root: string, input: RevisionInput, kind: 'plan' | 'contract' = 'plan'): RevisionPreview {
   const relative = typeof input.path === 'string' ? input.path : '';
-  if (!/^output\/projects\/(?!\.)(?:[^/]+\/)+[^/]+\.md$/i.test(relative) || relative.split('/').some((part) => !part || part.startsWith('.') || part === '..') || /(?:^|\/)(?:_index|WHY)\.md$/i.test(relative) || /(?:^|[-_])(?:evidence|nachweise|register|status)(?:[-_.]|$)/i.test(path.posix.basename(relative))) throw new Error('Choose an active project plan');
+  // Restrict each document kind to its own active wiki area.
+  const allowedPath = kind === 'plan' ? /^output\/projects\/(?!\.)(?:[^/]+\/)+[^/]+\.md$/i.test(relative) : /^wiki\/(?:[^/]+\/)*[^/]+\.md$/i.test(relative);
+  if (!allowedPath || relative.split('/').some((part) => !part || part.startsWith('.') || part === '..') || /(?:^|\/)(?:_index|WHY)\.md$/i.test(relative) || (kind === 'plan' && /(?:^|[-_])(?:evidence|nachweise|register|status)(?:[-_.]|$)/i.test(path.posix.basename(relative)))) throw new Error(kind === 'plan' ? 'Choose an active project plan' : 'Choose an active project contract');
   if (!wikiFileActive(root, path.resolve(root, relative))) throw new Error('Choose an active project plan');
   const original = readWiki(root, relative);
   if (!/^[a-f0-9]{64}$/.test(String(input.expectedSha256 ?? '')) || original.sha256 !== input.expectedSha256) throw new Error('Plan changed; read it again');
@@ -71,8 +73,8 @@ export function previewRevision(root: string, input: RevisionInput): RevisionPre
   if (!replacement.trim() || Buffer.byteLength(replacement) > 60_000 || replacement.includes('\0') || secretIn(replacement)) throw new Error('Provide bounded plan text without credentials');
   if (!reason || !authorization || reason.length > 500 || authorization.length > 500 || /[\r\n\0]/.test(reason + authorization) || secretIn(reason + authorization)) throw new Error('Provide a safe reason and authorization source');
   const old = parse(original.content), next = parse(replacement);
-  if (old.meta.document_kind && old.meta.document_kind !== 'plan') throw new Error('The selected document is not a plan');
-  if (next.meta.document_kind && next.meta.document_kind !== 'plan') throw new Error('The replacement must remain a plan');
+  if ((kind === 'contract' && old.meta.document_kind !== kind) || (old.meta.document_kind && old.meta.document_kind !== kind)) throw new Error(kind === 'plan' ? 'The selected document is not a plan' : 'The selected document is not a contract');
+  if (next.meta.document_kind && next.meta.document_kind !== kind) throw new Error(kind === 'plan' ? 'The replacement must remain a plan' : 'The replacement must remain a contract');
   if (['archived', 'superseded', 'retired'].includes(String(next.meta.document_status ?? '').toLowerCase())) throw new Error('The replacement must remain active');
   const revision = Number(old.meta.revision ?? '1');
   if (!Number.isSafeInteger(revision) || revision < 1 || revision >= 999999) throw new Error('Invalid plan revision');
@@ -95,9 +97,9 @@ export function previewRevision(root: string, input: RevisionInput): RevisionPre
   const snapshot = `output/projects/.archive/revision-${wikiHash(documentId).slice(0, 12)}-r${String(revision).padStart(6, '0')}`;
   // Stamp only lifecycle fields; leave the supplied body and all other frontmatter intact.
   const header = next.header.filter((line) => !ownedKey(line));
-  const fields: Record<string, string | number> = { document_id: documentId, document_kind: 'plan', revision: revision + 1, revision_date: new Date().toISOString().slice(0, 10), change_reason: reason, authorization_ref: authorization, previous_revision_ref: `${snapshot}/record.json` };
+  const fields: Record<string, string | number> = { document_id: documentId, document_kind: kind, revision: revision + 1, revision_date: new Date().toISOString().slice(0, 10), change_reason: reason, authorization_ref: authorization, previous_revision_ref: `${snapshot}/record.json` };
   const stamped = `---\n${header.length ? header.join('\n') + '\n' : ''}${Object.entries(fields).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n---\n${next.body}`;
-  const proposal = { path: relative, original: original.content, originalSha256: original.sha256, content: stamped, documentId, revision, snapshot, reason, authorization };
+  const proposal = { kind, path: relative, original: original.content, originalSha256: original.sha256, content: stamped, documentId, revision, snapshot, reason, authorization };
   return { ...proposal, sha256: wikiHash(JSON.stringify(proposal)) };
 }
 
@@ -200,17 +202,17 @@ function clearLeftovers(archive: string, finalDir: string, currentSha: string): 
 }
 
 /** Save exact original bytes under both shared locks, then atomically replace the active file. */
-export function applyRevision(root: string, input: RevisionInput, expectedPreview: string): { path: string; sha256: string; revision: number; snapshot: string; protection: string } {
+export function applyRevision(root: string, input: RevisionInput, expectedPreview: string, kind: 'plan' | 'contract' = 'plan'): { path: string; sha256: string; revision: number; snapshot: string; protection: string } {
   return withWikiWriteLock(root, (apply) => {
     // Reject stale previews before creating even the archive directory.
-    if (previewRevision(root, input).sha256 !== expectedPreview) throw new Error('Plan preview changed; review it again');
+    if (previewRevision(root, input, kind).sha256 !== expectedPreview) throw new Error('Plan preview changed; review it again');
     const archive = archiveDir(root);
     const lock = path.join(archive, '.revision.lock');
     const fd = takeLock(lock);
     let temporary: string | undefined;
     let placed: string | undefined;
     try {
-      const preview = previewRevision(root, input);
+      const preview = previewRevision(root, input, kind);
       if (preview.sha256 !== expectedPreview) throw new Error('Plan preview changed; review it again');
       const snapshot = path.join(root, preview.snapshot);
       clearLeftovers(archive, snapshot, preview.originalSha256);
@@ -225,7 +227,7 @@ export function applyRevision(root: string, input: RevisionInput, expectedPrevie
       fs.writeFileSync(why, `# Historical revision ${preview.revision}\n\nPreserve the replaced state of ${preview.documentId}; not active project context.\n`, { flag: 'wx', mode: 0o600 });
       const docProtection = protect(doc), whyProtection = protect(why);
       if (docProtection !== whyProtection) throw new Error('Revision snapshot protection differs between files');
-      const record = { schema: 'wiki-document-revision/v1', document_id: preview.documentId, kind: 'plan', revision: preview.revision, original_path: preview.path, original_link_base: path.posix.dirname(preview.path), sha256: preview.originalSha256, captured_at: new Date().toISOString(), change_reason: preview.reason, authorization_ref: preview.authorization, superseded_by_revision: preview.revision + 1, protection: docProtection };
+      const record = { schema: 'wiki-document-revision/v1', document_id: preview.documentId, kind, revision: preview.revision, original_path: preview.path, original_link_base: path.posix.dirname(preview.path), sha256: preview.originalSha256, captured_at: new Date().toISOString(), change_reason: preview.reason, authorization_ref: preview.authorization, superseded_by_revision: preview.revision + 1, protection: docProtection };
       fs.writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
       if (protect(recordPath) !== docProtection) throw new Error('Revision snapshot protection differs between files');
       if (wikiHash(fs.readFileSync(doc)) !== preview.originalSha256) throw new Error('Revision snapshot verification failed');

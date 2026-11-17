@@ -7,8 +7,9 @@ import { confidentialRun } from '../confidential/index.ts';
 import { guardWikiFolder } from './settings/gitignore.ts';
 import { claimsToBePlan, EVIDENCE_AREA, inEvidenceArea, inPlansArea, PLANS_AREA } from './plans/area.ts';
 import { executionRegisterDocument } from './plans/register.ts';
-import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, redirectOf, wikiHash } from './core.ts';
+import { applyWikiChanges, contractDocument, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, redirectOf, wikiHash } from './core.ts';
 import { readWikiPart } from './sections.ts';
+import { readFollowing } from './areas/redirects.ts';
 import { wikiSearchTool } from './search-tool.ts';
 import { isHubPath } from './areas/registry.ts';
 import { areasOfArticle, withAreas, writeIndex } from './digest/write.ts';
@@ -16,7 +17,7 @@ import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts'
 import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { otherProject } from '../memory/across.ts';
 import { wikiSettings } from './settings/settings.ts';
-import { wikiEnabledForSession, wikiFeatureEnabled } from './access.ts';
+import { wikiEnabledForSession, wikiFeatureEnabled, wikiFeatureEnabledInProject } from './access.ts';
 import { inSession } from '../documents/index.ts';
 import { canRead, extractText } from '../documents/extract.ts';
 import { isSecret } from '../agent/permissions.ts';
@@ -80,7 +81,7 @@ function resolveTarget(ctx: RunCtx, name: string | undefined, create: boolean): 
  * Another project's wiki, to read only: by its name, when it does not keep itself to itself and has wiki memory on
  * (for it and for this chat). Null while nothing has been written to it. The tools that write never take it.
  */
-function otherWikiRoot(ctx: RunCtx, wiki: unknown, project: string): { root: string | null; name: string } | undefined {
+function otherWikiRoot(ctx: RunCtx, wiki: unknown, project: string): { root: string | null; name: string; space: string } | undefined {
   if (!project.trim()) return undefined;
   if (confidentialRun(ctx)) throw new Error('Wiki memory is unavailable in confidential sessions');
   if (wiki) throw new Error('Give project or wiki, not both');
@@ -88,10 +89,10 @@ function otherWikiRoot(ctx: RunCtx, wiki: unknown, project: string): { root: str
   const t = otherProject(db, ctx.key, ctx.cwd, project);
   // This project's own wiki: as the tool always worked.
   if (!t) return undefined;
-  // The current project also bounds reads from other projects.
+  // The current project bounds its chats even when another project's wiki is requested.
   if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   if (!wikiMemoryOn(db, t.id)) throw new Error(`Wiki memory is off for the project “${t.name}”`);
-  return { root: wikiRoot(db, t.id, { create: false }), name: t.name };
+  return { root: wikiRoot(db, t.id, { create: false }), name: t.name, space: t.id };
 }
 
 /** A wiki to write in: made when it is the first time. */
@@ -178,7 +179,17 @@ export function wikiTools(): RunTool[] {
         const other = otherWikiRoot(ctx, a.wiki, String(a.project ?? ''));
         const root = other ? other.root : wikiReadTarget(ctx, a.wiki);
         if (!root) return JSON.stringify({ empty: true, note: EMPTY });
-        return JSON.stringify(readWikiPart(root, String(a.path ?? ''), { section: a.section, lines: a.lines }));
+        // Apply contract controls to the full document before returning a section or line range.
+        const original = readWiki(root, String(a.path ?? ''));
+        const document = readFollowing(root, original.path);
+        // Protect both ends of a redirect so a contract cannot be disguised as an ordinary article.
+        if ((contractDocument(original.path, original.content) || contractDocument(document.path, document.content)) && !wikiFeatureEnabledInProject(ctx.deps.db, ctx.key, ctx.cwd, 'contracts', other?.space ?? null)) throw new Error('Wiki contracts are off for this chat or project');
+        const result = readWikiPart(root, String(a.path ?? ''), { section: a.section, lines: a.lines });
+        // The redirect or target may change between reads; only return the exact version checked.
+        const actual = readWiki(root, String(result.path));
+        if (actual.sha256 !== result.sha256) throw new Error('Wiki target changed; read it again');
+        if (contractDocument(actual.path, actual.content) && !wikiFeatureEnabledInProject(ctx.deps.db, ctx.key, ctx.cwd, 'contracts', other?.space ?? null)) throw new Error('Wiki contracts are off for this chat or project');
+        return JSON.stringify(result);
       },
     },
     wikiSearchTool((ctx) => wikiReadTarget(ctx)),

@@ -1,7 +1,7 @@
 // Writing what the helper chose into a wiki: articles with their sources in the frontmatter (the code writes the
 // frontmatter, the model only the body), `index.md` and `log.md`. Only paths wiki/**/*.md, index.md and log.md.
 import path from 'node:path';
-import { applyWikiChanges, readWiki, redirectOf, wikiHash } from '../core.ts';
+import { applyWikiChanges, contractDocument, readWiki, redirectOf, wikiHash } from '../core.ts';
 import { browseWiki } from '../browse.ts';
 import { areaOrder, hasAreas, hubPath, isHubPath, loadRegistry, memberPath, placedIn } from '../areas/registry.ts';
 import { snapshotArticle, type Removed } from './history.ts';
@@ -301,7 +301,12 @@ function indexLine(root: string, a: { path: string; title: string }, content?: s
  * it holds, then its articles, in its hub's reading order; an article in two areas is under both; Other last.
  */
 export function indexBlock(root: string): string {
-  const articles = browseWiki(root).articles.filter((a) => !isHubPath(a.path));
+  // Contract content is available through its reviewed view, not an automatically generated index summary.
+  const articles = browseWiki(root).articles.filter((a) => {
+    if (isHubPath(a.path)) return false;
+    const current = readOrNull(root, a.path);
+    return !!current && !contractDocument(a.path, current.content);
+  });
   const registry = loadRegistry(root);
   if (!hasAreas(registry) || articles.length < GROUP_FROM) return articles.map((a) => indexLine(root, a)).join('\n') || '(no articles yet)';
   const texts = new Map(articles.map((a) => [a.path, readOrNull(root, a.path)?.content ?? '']));
@@ -450,6 +455,11 @@ export async function storeArticle(root: string, a: StoreArticle): Promise<Store
   const removed = a.removed ?? { items: [], valid: true };
   let result: Stored = { status: 'unchanged', replaced: 0 };
   const did = await writeFile(root, a.path, (cur) => {
+    // Stop before the automatic snapshot, not merely when the later write is rejected.
+    if (contractDocument(a.path, cur ?? '')) {
+      result = { status: 'refused', reason: 'project contracts require explicit approval', replaced: 0 };
+      return null;
+    }
     if (cur != null) {
       if (a.expect != null && cur !== a.expect) {
         result = { status: 'refused', reason: 'changed meanwhile', replaced: 0 };

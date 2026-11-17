@@ -238,6 +238,7 @@
 - [**Wiki 记忆**](/settings?s=memory&find=Wiki%20memory)：智能体为每个项目根据其文档和工作保存的文章：对每个项目都开启，除非项目自己的设置另有规定。
 - [**默认在聊天中启用 Wiki 记忆**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats)：除非另行选择，聊天将使用此设置。
 - [**默认在聊天中自动建议经验总结**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats)：除非另行选择，聊天将使用此设置。
+- [**Wiki 合同**](/settings?s=memory&find=Wiki%20contracts)：项目默认值，除非项目另有选择。
 - [**Wiki 计划**](/settings?s=memory&find=Wiki%20plans)：项目默认值，除非项目另有选择。
 - [**执行跟踪**](/settings?s=memory&find=Execution%20tracking)：项目默认值，除非项目另有选择。
 - [**自动经验总结**](/settings?s=memory&find=Auto%20lessons%20learned)：项目默认值，除非项目另有选择。

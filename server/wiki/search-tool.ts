@@ -11,9 +11,9 @@ import { excerpt, searchKnowledge } from '../knowledge/search.ts';
 import { chunkById } from '../knowledge/store.ts';
 import { meaningOn, queryVector } from '../memory/embed.ts';
 import { otherProject, scopeFor } from '../memory/across.ts';
-import { activeWikiDocument } from './core.ts';
+import { activeWikiDocument, contractDocument, readWiki } from './core.ts';
 import { articleInfo, wikiBase } from './deliver.ts';
-import { wikiEnabledForSession } from './access.ts';
+import { wikiEnabledForSession, wikiFeatureEnabledInProject } from './access.ts';
 import { ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiFileActive, wikiKnowledgeSchema } from './knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
@@ -57,6 +57,8 @@ interface Place {
   root: string;
   /** Recheck the chat and target project after asynchronous searches. */
   maySearch?: () => boolean;
+  /** Recheck the chat and target project before returning contract content. */
+  mayShowContracts?: () => boolean;
   /** For the heading: “this project’s wiki”. */
   label: string;
   areas: AreaRec[] | null;
@@ -140,6 +142,10 @@ function headOf(place: Place, rel: string): (Head & { title: string; summary: st
 function wanted(place: Place, rel: string, f: { include: Include; test: ((rel: string) => boolean) | null; areaSet: Set<string> | null }): boolean {
   if (!inFolders(rel, f.include) || (f.test && !f.test(rel))) return false;
   if (place.maySearch && !place.maySearch()) return false;
+  // A disabled contract feature must also cover the newer indexed and exact-search paths.
+  if (place.mayShowContracts && !place.mayShowContracts()) {
+    try { if (contractDocument(rel, readWiki(place.root, rel).content)) return false; } catch { return false; }
+  }
   const h = headOf(place, rel);
   if (!h || h.redirect) return false;
   if (f.areaSet) {
@@ -655,6 +661,7 @@ export function wikiSearchTool(own: (ctx: RunCtx) => string | null): RunTool {
       // Resolve again at each result, including after an asynchronous index search.
       for (const place of scope.places) {
         place.maySearch = () => wikiEnabledForSession(db, ctx.key, ctx.cwd) && wikiMemoryOn(db, place.space);
+        place.mayShowContracts = () => wikiFeatureEnabledInProject(db, ctx.key, ctx.cwd, 'contracts', place.space);
       }
       const include = includeFor(o);
       const tag = scope.tag || scope.places.length > 1;

@@ -31,7 +31,7 @@ Ist Wiki-Memory für ein Projekt ausgeschaltet, steht im Tab Memory „Wiki-Memo
 In den Chat-Optionen gelten **Wiki-Memory** und **Automatische Lessons Learned** für den jeweiligen Chat. Ihre Standards stehen unter **Einstellungen → Memory → Wiki-Memory**. Automatische Vorschläge für Lessons Learned brauchen außerdem Memory; das Speichern eines geprüften Vorschlags erfordert deine Bestätigung. Ein nativer Agent, der vor dem Einschalten von Wiki-Memory gestartet wurde, muss neu gestartet werden, damit er seinen Checkpoint-Hook registriert.
 
 Für das Lernen aus Dokumenten, das Lernen aus der Arbeit eines Projekts und für Sitzungs-Checkpoints muss außerdem [Memory selbst eingeschaltet sein](/guide/memory#turn-memory-off-for-all-sessions): Bei ausgeschaltetem Memory ergänzen neue Dokumente nichts, und es werden keine Checkpoints gespeichert.
-Klappe in den Chat-Optionen **Wiki-Memory** auf, um **Automatische Lessons Learned**, **Wiki-Pläne** und **Umsetzungskontrolle** für diesen Chat zu wählen. Die Projektstandards stehen in den Einstellungen; jedes Projekt kann eigene Werte festlegen. Ist eine Funktion im Projekt aus, ist ihr Chat-Schalter nicht verfügbar.
+Klappe in den Chat-Optionen **Wiki-Memory** auf, um **Automatische Lessons Learned**, **Wiki-Verträge**, **Wiki-Pläne** und **Umsetzungskontrolle** für diesen Chat zu wählen. Die Projektstandards stehen in den Einstellungen; jedes Projekt kann eigene Werte festlegen. Ist eine Funktion im Projekt aus, ist ihr Chat-Schalter nicht verfügbar.
 
 
 ## Wo Wikis gespeichert werden
@@ -183,6 +183,14 @@ In einem Projekt erhält ein Agent einige Tools für das Wiki dieses Projekts, k
 Was er nicht kann: in das Wiki eines anderen Projekts schreiben; verborgene Dateien und Ordner, Git- und Archivordner, stillgelegte oder archivierte Artikel oder einen Link, der aus dem Wiki hinausführt, lesen oder schreiben; Text mit Passwörtern oder Keys speichern; oder Wiki-Memory in einer vertraulichen Sitzung überhaupt verwenden. Bittest du den Agenten, das Wiki zu prüfen, meldet er eine einfache Liste grundlegender Probleme; Dateien ändert er dafür nicht.
 
 Ist die **Umsetzungskontrolle** aus, kannst du trotzdem einen Plan ohne neues Register übernehmen oder ein bestehendes Register unverändert verlinken. Um einen Umsetzungsnachweis zu schreiben oder zu ändern, schalte die Umsetzungskontrolle für Projekt und Chat ein. Ist die Umsetzungskontrolle an, kann ein erkanntes, im Plan eingebettetes Register mit den Planrevisionstools im Ausführungsmodus auch bei ausgeschalteter Planbearbeitung aktualisiert werden; der übrige Plan bleibt unverändert.
+
+## Projektverträge
+
+Neuaufbau und Wiederherstellung werden gestoppt, wenn das aktuelle Wiki oder das gewählte Archiv einen Projektvertrag enthält. Hydor verschiebt oder reaktiviert bestätigte Verträge durch diese Aktionen nicht.
+
+Bitte einen Agenten, einen Projektvertrag aus deinem Text oder einer vorhandenen Wiki-Seite vorzuschlagen. Die Vorschau zeigt Inhalt, Geltungsbereich, Herkunft, Ziel und vorhandene Artikel, damit du Überschneidungen prüfen kannst. Prüfe den genauen Text und bestätige ihn zum Speichern; beim Ablehnen wird nichts gespeichert. Eine übernommene Quellseite bleibt unverändert. Relative Markdown-Verweise in der Kopie zeigen weiterhin auf dieselben Wiki-Seiten. Lässt sich ein Verweis nicht sicher übernehmen, passe ihn vor einem erneuten Versuch an.
+
+Für eine Änderung bittest du den Agenten um eine Revision. Prüfe den bisherigen und den vorgeschlagenen Text sowie den Grund und bestätige anschließend. Hydor bewahrt die vorherige Fassung in einem geschützten Snapshot auf. Ändern sich Quelle, Ziel oder relevante bestehende Verträge, musst du erneut prüfen. Die Bestätigung eines Vertrags oder einer Revision startet keine Umsetzung.
 
 ## Checkpoints und Lessons Learned
 

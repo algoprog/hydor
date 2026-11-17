@@ -119,13 +119,28 @@ function applyOne(root: string, change: WikiChange): void {
   } finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
 }
 
+/** Protect contract documents and their reserved folder from generic and automatic wiki writes. */
+export function contractDocument(relative: string, text: string): boolean {
+  if (/^wiki\/contracts(?:\/|$)/i.test(relative)) return true;
+  const front = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)?.[1] ?? '';
+  // Treat any contract-kind metadata as protected, including ambiguous quoted or commented values.
+  return /^\s*["']?document_kind["']?\s*:\s*["']?contract(?:["'\s#]|$)/im.test(front);
+}
+
 /** Apply one change at a time; partial multi-file transactions are deliberately refused. */
-export function applyWikiChanges(root: string, changes: WikiChange[], o: { plans?: boolean } = {}): { paths: string[] } {
+export function applyWikiChanges(root: string, changes: WikiChange[], o: { plans?: boolean; contracts?: boolean } = {}): { paths: string[] } {
   if (changes.length !== 1) throw new Error('Apply exactly one wiki file per operation');
   if (!writable(changes[0].path, o.plans)) throw new Error('A wiki is written only in wiki/, in index.md and log.md, in output/evidence/, and in raw/ by its ingestion; plans (output/projects/) only by the plan tools');
   // The path is judged before the lock is taken, so a refused path never waits on (or leaves) a lock.
   filePath(root, changes[0].path, true);
-  return locked(root, () => { applyOne(root, changes[0]); return { paths: [changes[0].path] }; });
+  return locked(root, () => {
+    const change = changes[0];
+    const file = filePath(root, change.path, true);
+    // Check existing bytes as well as replacement bytes so removing metadata cannot bypass approval.
+    if (!o.contracts && (contractDocument(change.path, change.content) || (fs.existsSync(file) && contractDocument(change.path, readText(file))))) throw new Error('Project contracts can only be changed through contract approval');
+    applyOne(root, change);
+    return { paths: [change.path] };
+  });
 }
 
 /** The wiki's own state (the areas registry), in a hidden folder the wiki tools never reach. */
@@ -230,9 +245,38 @@ export function wikiArchives(root: string): { name: string; dir: string }[] {
   }
 }
 
+/** A rebuild or restore must never silently move or reactivate reviewed contracts. */
+function assertNoContractsForRebuild(root: string): void {
+  const wiki = path.join(root, 'wiki');
+  // lstat also detects a dangling symbolic link, which existsSync would mistake for absence.
+  const wikiStat = fs.lstatSync(wiki, { throwIfNoEntry: false });
+  if (!wikiStat) return;
+  if (wikiStat.isSymbolicLink()) throw new Error('Cannot rebuild or restore a wiki containing symbolic links');
+  if (!wikiStat.isDirectory()) throw new Error('Cannot rebuild or restore an unsafe wiki folder');
+  const scan = (dir: string, relative: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const rel = `${relative}/${entry.name}`;
+      const file = path.join(dir, entry.name);
+      // Unknown links are not followed or assumed free of contracts.
+      if (entry.isSymbolicLink()) throw new Error('Cannot rebuild or restore a wiki containing symbolic links');
+      if (entry.isDirectory()) scan(file, rel);
+      else if (entry.isFile() && (/^wiki\/contracts\//i.test(rel) || (/\.md$/i.test(rel) && contractDocument(rel, readText(file))))) {
+        throw new Error('Rebuild and restore are unavailable for wikis or archives containing project contracts');
+      }
+    }
+  };
+  scan(wiki, 'wiki');
+}
+
 /** Moves what exists of REBUILT into a new archive `name`, under the wiki's lock: what it moved. */
 function moveOut(root: string, name: string): string[] {
   if (!ARCHIVE_NAME.test(name)) throw new Error('Invalid wiki archive name');
+  assertNoContractsForRebuild(root);
+  // Check every top-level entry before moving any of them, so a late unsafe link cannot leave a partial archive.
+  for (const entry of REBUILT) {
+    const st = fs.lstatSync(path.join(root, entry), { throwIfNoEntry: false });
+    if (st?.isSymbolicLink()) throw new Error(`Wiki path is a symbolic link: ${entry}`);
+  }
   const dest = realDir(root, ['.history', 'rebuilds', name]);
   if (fs.readdirSync(dest).length) throw new Error('That wiki archive exists already');
   const moved: string[] = [];
@@ -269,6 +313,13 @@ export function restoreWiki(root: string, name: string, keepAs: string): Promise
     locked(root, () => {
       const from = path.join(archivesDir(root), name);
       if (!wikiArchives(root).some((a) => a.name === name)) throw new Error('No such wiki archive');
+      // Never restore a contract from a historical archive without its review lifecycle.
+      assertNoContractsForRebuild(from);
+      // Do not consume an archive with links that restore would otherwise skip and then remove.
+      for (const entry of REBUILT) {
+        const st = fs.lstatSync(path.join(from, entry), { throwIfNoEntry: false });
+        if (st?.isSymbolicLink()) throw new Error(`Wiki archive path is a symbolic link: ${entry}`);
+      }
       moveOut(root, keepAs);
       for (const entry of REBUILT) {
         const src = path.join(from, entry);
@@ -288,7 +339,11 @@ export function restoreWiki(root: string, name: string, keepAs: string): Promise
 export function dropArchive(root: string, name: string): void {
   if (!ARCHIVE_NAME.test(name)) throw new Error('Invalid wiki archive name');
   const a = wikiArchives(root).find((x) => x.name === name);
-  if (a) fs.rmSync(a.dir, { recursive: true, force: true });
+  if (a) {
+    // Older upstream archives can contain contracts; do not prune them automatically.
+    try { assertNoContractsForRebuild(a.dir); } catch { return; }
+    fs.rmSync(a.dir, { recursive: true, force: true });
+  }
 }
 
 /** Coordinate protected plan snapshots with the same cooperative lock as ordinary wiki writes. Only the plan revision workflow calls this: it may write plans. */

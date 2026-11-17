@@ -46,10 +46,23 @@ function patternOf(q: string): RegExp | null {
   }
 }
 
-function byWords(db: DB, bases: string[], query: string, limit: number): number[] {
+type Keep = (path: string, base: string) => boolean;
+
+/** Filter before taking ranked matches so excluded files cannot consume the result limit. */
+function byWords(db: DB, bases: string[], query: string, limit: number, keep?: Keep): number[] {
   const fts = anyWords(query);
   if (!fts) return [];
   try {
+    if (keep) {
+      const out: number[] = [];
+      let scanned = 0;
+      const queryRows = db.prepare(`select c.id as id, d.path as path, d.base as base from kb_fts join kb_chunks c on c.id = kb_fts.rowid join kb_docs d on d.id = c.doc where kb_fts match ? and d.base in (${bases.map(() => '?').join(',')}) order by bm25(kb_fts)`);
+      for (const row of queryRows.iterate(fts, ...bases) as Iterable<{ id: number; path: string; base: string }>) {
+        if (++scanned > MAX_SCAN || out.length >= limit) break;
+        if (wikiDocumentVisible(db, row.base, row.path) && keep(row.path, row.base)) out.push(row.id);
+      }
+      return out;
+    }
     return (
       db
         .prepare(`select c.id as id from kb_fts join kb_chunks c on c.id = kb_fts.rowid join kb_docs d on d.id = c.doc where kb_fts match ? and d.base in (${bases.map(() => '?').join(',')}) order by bm25(kb_fts) limit ?`)
@@ -60,14 +73,20 @@ function byWords(db: DB, bases: string[], query: string, limit: number): number[
   }
 }
 
-function byMeaning(db: DB, bases: string[], q: Float32Array, limit: number): { id: number; score: number }[] {
+function byMeaning(db: DB, bases: string[], q: Float32Array, limit: number, keep?: Keep): { id: number; score: number }[] {
   const t = queryTable(q);
   const best: { id: number; score: number }[] = [];
+  // Look up only potential top-ranked passages when a caller needs path-level filtering.
+  const document = keep ? db.prepare('select d.base as base, d.path as path from kb_chunks c join kb_docs d on d.id = c.doc where c.id = ?') : null;
   for (const base of bases) {
     const b = vectorBlock(db, base);
     for (let i = 0, off = 0; i < b.ids.length; i++, off += BYTES) {
       const s = scoreAt(t, b.codes, off) * scale(b.codes, off);
       if (s < MIN_SIMILARITY || (best.length >= limit && s <= best[best.length - 1].score)) continue;
+      if (keep) {
+        const row = document!.get(b.ids[i]) as { base: string; path: string } | undefined;
+        if (!row || !wikiDocumentVisible(db, row.base, row.path) || !keep(row.path, row.base)) continue;
+      }
       best.push({ id: b.ids[i], score: s });
       best.sort((x, y) => y.score - x.score);
       if (best.length > limit) best.pop();
@@ -77,21 +96,31 @@ function byMeaning(db: DB, bases: string[], q: Float32Array, limit: number): { i
 }
 
 /** Passages holding the exact text (case aside), or matching the pattern, in reading order. */
-function byText(db: DB, bases: string[], query: string, limit: number): number[] {
+function byText(db: DB, bases: string[], query: string, limit: number, keep?: Keep): number[] {
   const re = patternOf(query);
   const inBases = `d.base in (${bases.map(() => '?').join(',')})`;
   if (!re) {
     const phrase = query.trim().replace(/^"(.*)"$/s, '$1');
     if (!phrase) return [];
+    if (keep) {
+      const out: number[] = [];
+      let scanned = 0;
+      const queryRows = db.prepare(`select c.id as id, d.path as path, d.base as base from kb_chunks c join kb_docs d on d.id = c.doc where ${inBases} and instr(lower(c.text), lower(?)) > 0 order by d.path, c.seq`);
+      for (const row of queryRows.iterate(...bases, phrase) as Iterable<{ id: number; path: string; base: string }>) {
+        if (++scanned > MAX_SCAN || out.length >= limit) break;
+        if (wikiDocumentVisible(db, row.base, row.path) && keep(row.path, row.base)) out.push(row.id);
+      }
+      return out;
+    }
     return (db.prepare(`select c.id as id from kb_chunks c join kb_docs d on d.id = c.doc where ${inBases} and instr(lower(c.text), lower(?)) > 0 order by d.path, c.seq limit ?`).all(...bases, phrase, limit) as { id: number }[]).map(
       (r) => r.id,
     );
   }
   const out: number[] = [];
   let n = 0;
-  for (const r of db.prepare(`select c.id as id, c.text as text from kb_chunks c join kb_docs d on d.id = c.doc where ${inBases} order by d.path, c.seq`).iterate(...bases) as Iterable<{ id: number; text: string }>) {
+  for (const r of db.prepare(`select c.id as id, c.text as text, d.path as path, d.base as base from kb_chunks c join kb_docs d on d.id = c.doc where ${inBases} order by d.path, c.seq`).iterate(...bases) as Iterable<{ id: number; text: string; path: string; base: string }>) {
     if (++n > MAX_SCAN || out.length >= limit) break;
-    if (re.test(r.text)) out.push(r.id);
+    if (re.test(r.text) && (!keep || (wikiDocumentVisible(db, r.base, r.path) && keep(r.path, r.base)))) out.push(r.id);
   }
   return out;
 }
@@ -118,7 +147,7 @@ export interface SearchResult {
 }
 
 /** The passages about a question in the bases (all of them, or all `within`, when none are named), best first; `keep` leaves out those of paths it refuses before the best are taken. */
-export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; within?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null; keep?: (path: string) => boolean }): Promise<SearchResult> {
+export async function searchKnowledge(db: DB, o: { query: string; bases?: string[]; within?: string[]; mode?: SearchMode; limit?: number; vector?: Float32Array | null; keep?: Keep }): Promise<SearchResult> {
   knowledgeSchema(db);
   const all = baseRows(db).filter((b) => wikiBaseVisible(db, b.id) && (!o.within || o.within.includes(b.id)));
   const names = new Map(all.map((b) => [b.id, b.name]));
@@ -136,14 +165,14 @@ export async function searchKnowledge(db: DB, o: { query: string; bases?: string
     fused.set(id, f);
   };
   let meaning = false;
-  if (mode === 'exact') byText(db, bases, query, limit).forEach((id, i) => add(id, i, 1, 'exact'));
+  if (mode === 'exact') byText(db, bases, query, limit, o.keep).forEach((id, i) => add(id, i, 1, 'exact'));
   else {
-    if (mode !== 'meaning') byWords(db, bases, query, pool).forEach((id, i) => add(id, i, W_WORDS, 'words'));
+    if (mode !== 'meaning') byWords(db, bases, query, pool, o.keep).forEach((id, i) => add(id, i, W_WORDS, 'words'));
     if (mode !== 'words') {
       const vec = o.vector !== undefined ? o.vector : await queryVector(db, query, { wait: true, timeoutMs: 30_000 });
       if (vec) {
         meaning = true;
-        byMeaning(db, bases, vec, pool).forEach((h, i) => {
+        byMeaning(db, bases, vec, pool, o.keep).forEach((h, i) => {
           add(h.id, i, W_MEANING, 'meaning');
           fused.get(h.id)!.meaning = h.score;
         });
@@ -156,7 +185,7 @@ export async function searchKnowledge(db: DB, o: { query: string; bases?: string
   const hits: KnowledgeHit[] = [];
   for (const [id, f] of fused) {
     const r = rows.get(id);
-    if (!r || !wikiDocumentVisible(db, r.base, r.path) || (o.keep && !o.keep(r.path))) continue;
+    if (!r || !wikiDocumentVisible(db, r.base, r.path) || (o.keep && !o.keep(r.path, r.base))) continue;
     hits.push({ ref: `kb:${r.id}`, base: r.base, baseName: names.get(r.base) ?? r.base, docId: r.doc, path: r.path, title: r.title, part: r.part ?? undefined, text: excerpt(r.text, query), score: f.rrf, by: f.by });
   }
   // Exact text keeps reading order; the rest goes by rank.

@@ -8,9 +8,10 @@ import { meaningOn } from '../memory/embed.ts';
 import { basesFor, basesOfSession } from './scope.ts';
 import { searchKnowledge, type SearchMode } from './search.ts';
 import { baseRow, baseRows, baseView, chunkById, chunksOf, docByPath, docById, docsOf, type BaseRow } from './store.ts';
-import { isWikiBase, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
+import { isWikiBase, wikiDocumentVisible, wikiKnowledgeContract, wikiKnowledgeSpace } from '../wiki/knowledge/bindings.ts';
 import { countUses } from './marks.ts';
 import { otherProject } from '../memory/across.ts';
+import { wikiFeatureEnabledInProject } from '../wiki/access.ts';
 import { wikiMemoryOn } from '../wiki/roots.ts';
 
 const MAX_READ = 14_000;
@@ -25,7 +26,7 @@ export function filled(db: DB, bases: (BaseRow & { own?: boolean; from?: string 
 
 /** What a session in `space` (or in none) is told of the bases it searches. */
 export function knowledgeInstructions(db: DB, space: string | null = null, includeWiki = true): string | null {
-  // Project wiki settings also bound shared and group wiki sources.
+  // Project-level Wiki Memory also bounds shared and group Wiki sources in agent instructions.
   const bases = filled(db, basesFor(db, space, includeWiki && wikiMemoryOn(db, space)));
   if (!bases.length) return null;
   const whose = (b: { own: boolean; from?: string }) => (space ? (b.from ? `, from the ${b.from} project` : b.own ? ', this project’s own' : ', shared') : '');
@@ -65,10 +66,13 @@ const SEARCH: RunTool = {
     const scope = basesOfSession(db, ctx.key, ctx.cwd);
     if (!scope.length) return NONE;
     const mode = (['auto', 'words', 'meaning', 'exact'] as const).includes(a.mode) ? (a.mode as SearchMode) : undefined;
-    const r = await searchKnowledge(db, { query, mode, bases: a.base ? [String(a.base)] : undefined, within: scope.map((b) => b.id), limit: Math.min(Number(a.limit) || 8, 25) });
-    // Recheck the project wiki setting after asynchronous knowledge search.
+    // Filter disabled project contracts before the search result limit is applied.
+    const keep = scope.some((base) => isWikiBase(db, base.id)) ? (file: string, base: string) =>
+      wikiFeatureEnabledInProject(db, ctx.key, ctx.cwd, 'contracts', wikiKnowledgeSpace(db, base)) || !wikiKnowledgeContract(db, base, file) : undefined;
+    const r = await searchKnowledge(db, { query, mode, bases: a.base ? [String(a.base)] : undefined, within: scope.map((b) => b.id), limit: Math.min(Number(a.limit) || 8, 25), keep });
+    // Recheck source scopes and contract switches after asynchronous search and embedding.
     const stillInScope = new Set(basesOfSession(db, ctx.key, ctx.cwd).map((base) => base.id));
-    r.hits = r.hits.filter((hit) => stillInScope.has(hit.base) && wikiDocumentVisible(db, hit.base, hit.path));
+    r.hits = r.hits.filter((hit) => stillInScope.has(hit.base) && wikiDocumentVisible(db, hit.base, hit.path) && (!wikiKnowledgeContract(db, hit.base, hit.path) || wikiFeatureEnabledInProject(db, ctx.key, ctx.cwd, 'contracts', wikiKnowledgeSpace(db, hit.base))));
     const byWordsOnly = mode !== 'exact' && mode !== 'words' && !r.meaning ? ` (by words only: search by meaning is ${meaningOn(db) ? 'not running yet' : 'off'})` : '';
     if (!r.hits.length) return `Nothing in the knowledge bases matches that${byWordsOnly}. Try other words${mode === 'exact' ? '' : ', or mode: "exact" for a name or a number'}.`;
     // What agents find is what the wiki reads first when a project has more documents than its limit.
@@ -113,7 +117,7 @@ const READ: RunTool = {
       if (!a.from) from = Math.max(0, c.seq - 1);
     } else if (a.path) doc = docByPath(db, String(a.path), within);
     else throw new Error('Give a ref (from knowledge_search) or a path');
-    if (!doc || !within.includes(doc.base) || !wikiDocumentVisible(db, doc.base, doc.path)) throw new Error(other ? `That document is not in the own documents of the project “${other.name}” (memory_search gives refs; a wiki article is opened with wiki_read and project)` : 'That document is not in a knowledge base this session searches');
+    if (!doc || !within.includes(doc.base) || !wikiDocumentVisible(db, doc.base, doc.path) || (wikiKnowledgeContract(db, doc.base, doc.path) && !wikiFeatureEnabledInProject(db, ctx.key, ctx.cwd, 'contracts', wikiKnowledgeSpace(db, doc.base)))) throw new Error(other ? `That document is not in the own documents of the project “${other.name}” (memory_search gives refs; a wiki article is opened with wiki_read and project)` : 'That document is not in a knowledge base this session searches');
     const rows = chunksOf(db, doc.id, from, count);
     // Reading another project's documents leaves its marks as they are.
     if (!other && !isWikiBase(db, doc.base)) countUses(db, [doc]);
@@ -147,7 +151,7 @@ const LIST: RunTool = {
     if (a.base) {
       const b = rows.find((x) => x.name.toLowerCase() === String(a.base).toLowerCase() || x.id === a.base);
       if (!b) return `No knowledge base is called that. There are: ${rows.map((x) => x.name).join(', ')}.`;
-      const docs = docsOf(db, baseRow(db, b.id).id, { limit: 300 }).filter((d) => d.status === 'indexed' && wikiDocumentVisible(db, d.base, d.path));
+      const docs = docsOf(db, baseRow(db, b.id).id, { limit: 300 }).filter((d) => d.status === 'indexed' && wikiDocumentVisible(db, d.base, d.path) && (!wikiKnowledgeContract(db, d.base, d.path) || wikiFeatureEnabledInProject(db, ctx.key, ctx.cwd, 'contracts', wikiKnowledgeSpace(db, d.base))));
       return `${b.name}: ${docs.length} document${docs.length === 1 ? '' : 's'}${docs.length >= 300 ? ' (the first 300)' : ''}\n${docs.map((d) => `- ${d.path} (${d.passages} passages)`).join('\n')}`;
     }
     return rows

@@ -238,6 +238,7 @@ Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem M
 - [**Wiki-Memory**](/settings?s=memory&find=Wiki%20memory): Artikel, die Agenten für jedes Projekt aus seinen Dokumenten und seiner Arbeit führen: für jedes Projekt eingeschaltet, sofern seine eigenen Einstellungen nichts anderes sagen.
 - [**Wiki-Memory in Chats standardmäßig einschalten**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats): Chats verwenden diese Einstellung, sofern du nichts anderes auswählst.
 - [**Automatische Lessons Learned in Chats standardmäßig einschalten**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats): Chats verwenden diese Einstellung, sofern du nichts anderes auswählst.
+- [**Wiki-Verträge**](/settings?s=memory&find=Wiki%20contracts): Standard für Projekte, sofern sie nichts anderes wählen.
 - [**Wiki-Pläne**](/settings?s=memory&find=Wiki%20plans): Standard für Projekte, sofern sie nichts anderes wählen.
 - [**Umsetzungskontrolle**](/settings?s=memory&find=Execution%20tracking): Standard für Projekte, sofern sie nichts anderes wählen.
 - [**Automatische Lessons Learned**](/settings?s=memory&find=Auto%20lessons%20learned): Standard für Projekte, sofern sie nichts anderes wählen.

@@ -323,6 +323,7 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Check this project's wiki for missing sources, broken links, orphaned articles and inconsistent indexes. Show the findings without changing files."))}>Check the wiki</Button>
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me capture lessons learned for this project's wiki. First ask me for the work or session context. Preview the lessons without writing anything; save selected lessons only after my explicit approval."))}>Suggest lessons learned</Button>
         <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me adopt a plan into this project's wiki. First ask me for the plan, then show existing plans and a preview. Save only after my approval; start implementation only on my separate instruction."))}>Adopt a plan</Button>
+        <Button size="sm" variant="secondary" onClick={() => onStart(tr("Help me prepare a project contract. First ask for its source and scope, review existing contracts, and show the exact proposal. Save only after my approval."))}>Propose a contract</Button>
         </>}
         {/* Update now, Rebuild from sources…, Restore the previous wiki… */}
         {view.root && <WikiActions id={id} job={job} refresh={refreshJob} />}

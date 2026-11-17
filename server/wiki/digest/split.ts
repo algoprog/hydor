@@ -3,6 +3,7 @@
 // it had: it reorganises, it does not summarise. The article's text is kept in the wiki's history first.
 import path from 'node:path';
 import { secretIn } from '../../memory/secrets.ts';
+import { contractDocument } from '../core.ts';
 import { readOrNull, slugOf, splitFront, storeArticle, bodyOf, cleanLinks, clipLine, SUMMARY_MAX, titleOfArticle, listOf, appendRevisions } from './write.ts';
 import { snapshotArticle } from './history.ts';
 import { resolvePaths } from './anchors.ts';
@@ -115,6 +116,9 @@ export async function splitArticle(
     repo?: { root: string; head: string | null } | null;
   },
 ): Promise<{ ok: true; done: SplitOutcome } | { ok: false; error: string }> {
+  // Refuse before calling the helper or creating automatic history for a reviewed contract.
+  const current = readOrNull(root, o.path);
+  if (contractDocument(o.path, o.current) || (current && contractDocument(o.path, current.content))) return { ok: false, error: 'project contracts require explicit approval' };
   const front = splitFront(o.current);
   const oldBody = front.body.trim();
   let answer: unknown;
@@ -154,6 +158,6 @@ export async function splitArticle(
   }
   await appendRevisions(root, { source: o.source, now: o.now, split: [{ path: o.path, title: titleOfArticle(o.current, o.title), parts: parts.length }] });
   const part = parts[target];
-  const current = readOrNull(root, part.path)?.content ?? '';
-  return { ok: true, done: { target: { path: part.path, title: part.title, current }, written: [{ path: o.path, title: o.title }, ...parts.map((p) => ({ path: p.path, title: p.title }))], parts: parts.length } };
+  const partCurrent = readOrNull(root, part.path)?.content ?? '';
+  return { ok: true, done: { target: { path: part.path, title: part.title, current: partCurrent }, written: [{ path: o.path, title: o.title }, ...parts.map((p) => ({ path: p.path, title: p.title }))], parts: parts.length } };
 }

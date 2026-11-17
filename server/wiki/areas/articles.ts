@@ -1,7 +1,7 @@
 // The articles of a wiki as the areas see them: every active article under wiki/ (not hubs, not redirects), with
 // its title, summary, headings, the areas its front matter names and a hash of its body (what changed since).
 import { browseWiki } from '../browse.ts';
-import { wikiHash } from '../core.ts';
+import { contractDocument, wikiHash } from '../core.ts';
 import { areasOfArticle, frontValue, headingsOf, readOrNull, splitFront, summaryOf, titleOfArticle } from '../digest/write.ts';
 import { isHubPath, OTHER, placedIn, type Area, type Registry } from './registry.ts';
 
@@ -26,7 +26,8 @@ export function areaArticles(root: string): AreaArticle[] {
   for (const a of browseWiki(root).articles) {
     if (isHubPath(a.path)) continue;
     const cur = readOrNull(root, a.path);
-    if (!cur) continue;
+    // Reviewed contracts are not ordinary articles for automatic area maintenance.
+    if (!cur || contractDocument(a.path, cur.content)) continue;
     const f = splitFront(cur.content);
     out.push({
       path: a.path,

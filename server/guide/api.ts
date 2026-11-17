@@ -36,6 +36,11 @@ const RULES: Rule[] = [
   ['POST', /^\/api\/wiki\/migration\/apply$/, 'refuse', 'The user chooses wiki folder moves in Settings.'],
   ['*', /^\/api\/auth\//, 'refuse', 'The password and signing in are the user’s alone (Settings → App → Password).'],
   ['*', /^\/api\/(fs|terminals|terminal-history|kernels|git|uploads)(\/|$)/, 'refuse', YOUR_TOOLS],
+  // Project wiki and knowledge reads must pass through session-scoped tools and feature gates.
+  ['GET', /^\/api\/projects\/[^/]+\/wiki(?:\/(?:file|updates))?$/, 'refuse', 'Use wiki_status and wiki_read for this session’s own wiki.'],
+  ['GET', /^\/api\/knowledge\/[^/]+\/docs$/, 'refuse', 'Use knowledge_list for this session’s permitted documents.'],
+  ['POST', /^\/api\/knowledge\/search$/, 'refuse', 'Use knowledge_search for this session’s permitted documents.'],
+
   ['*', /^\/api\/pdf\//, 'refuse', 'Use your PDF tools for that: pdf_look and pdf_form to see a PDF and its form, pdf_fill, pdf_write and pdf_pages to change it.'],
   ['*', /^\/api\/browser\/sessions\//, 'refuse', 'Use the browser tools (browser_open, browser_act, browser_read) for that.'],
   ['*', /^\/api\/computer\/sessions\//, 'refuse', 'Use the computer tools (computer_screenshot, computer_act) for that.'],

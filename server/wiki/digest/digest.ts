@@ -14,7 +14,7 @@ import { memoryOn, addEntry, cleanText, entries, repoRoot, sameText, titleOf } f
 import { redactSecrets, secretIn, steeringIn } from '../../memory/secrets.ts';
 import { spaceById } from '../../spaces/index.ts';
 import { browseWiki } from '../browse.ts';
-import { ingestWikiSource, wikiHash } from '../core.ts';
+import { contractDocument, ingestWikiSource, wikiHash } from '../core.ts';
 import { isWikiBase, wikiKnowledgeSchema } from '../knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { wikiSettings } from '../settings/settings.ts';
@@ -101,7 +101,12 @@ async function byMeaning(db: DB, root: string, space: string | null, doc: { titl
  */
 export async function listArticles(db: DB, root: string, space: string | null, doc: { title: string; text: string }): Promise<{ lines: ArticleLine[]; all: Set<string>; more: number; titles: Map<string, string> }> {
   // Hubs are kept from their articles, never written by the digest; redirects are not listed at all.
-  const all = browseWiki(root).articles.filter((a) => !isHubPath(a.path));
+  // Contracts are handled through their own reviewed lifecycle, never as digest targets or helper context.
+  const all = browseWiki(root).articles.filter((a) => {
+    if (isHubPath(a.path)) return false;
+    const current = readOrNull(root, a.path);
+    return !!current && !contractDocument(a.path, current.content);
+  });
   const registry = loadRegistry(root);
   const names = hasAreas(registry) ? new Map(registry.areas.map((a) => [a.id, a.name])) : null;
   const hay = doc.text.toLowerCase();
@@ -209,7 +214,8 @@ export async function digestText(db: DB, ask: DigestAsk, i: DigestTextInput): Pr
     const targets: { path: string; title: string; current?: string; area?: string }[] = [];
     for (const p of plan.update) {
       const cur = readOrNull(root, p);
-      if (!cur) continue;
+      // A review could have turned an article into a contract while the model was planning.
+      if (!cur || contractDocument(p, cur.content)) continue;
       const title0 = titleOfArticle(cur.content, listing.titles.get(p) ?? p);
       if (splitFront(cur.content).body.length > SPLIT_AT) {
         const s = await splitArticle(root, ask, { path: p, title: title0, current: cur.content, incoming: { title, text: docText, kind }, taken: new Set(listing.all), source: title, now: at, repo });

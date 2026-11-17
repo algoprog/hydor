@@ -134,6 +134,11 @@ put(betaDir, 'wiki/blog.md', article('Blog engine', 'How the blog is built', nul
 put(gammaDir, 'wiki/vault.md', article('Vault keys', 'Rotating keys', null, '# Vault keys\n\nKey rotation uses the zebra marker quokka.\n'));
 put(deltaDir, 'wiki/lab.md', article('Lab cluster', 'The lab', null, '# Lab cluster\n\nThe lab cluster runs quokka jobs.\n'));
 updateSpace(db, delta.id, { wikiMemory: false });
+// Contract content stays behind the chat and owning project's controls, including redirects.
+put(alphaDir, 'wiki/contracts/policy.md', article('Policy', 'Approved policy', null, '# Policy\n\nThe aardvarkcontract marker is here.\n', 'document_kind: contract\n'));
+put(alphaDir, 'wiki/policy-redirect.md', '---\ntitle: Policy redirect\nredirect: wiki/contracts/policy.md\n---\n');
+put(alphaDir, 'wiki/contracts/redirect.md', '---\ntitle: Contract redirect\nredirect: wiki/search-ranking.md\n---\n');
+put(betaDir, 'wiki/contracts/beta.md', article('Beta policy', 'Approved policy', null, '# Beta policy\n\nThe betacontractmarker is here.\n', 'document_kind: contract\n'));
 
 const wikiOf: Record<string, string> = {};
 for (const [dir, sp] of [[alphaDir, alpha], [betaDir, beta], [gammaDir, gamma]] as const) wikiOf[sp.id] = ensureWikiKnowledge(db, { root: path.join(dir, 'wiki-memory'), space: sp.id }).base;
@@ -153,6 +158,24 @@ const read = async (a: Record<string, unknown>, ctx = here) => JSON.parse(await 
 test('settle: the wiki is indexed', async () => {
   for (let i = 0; i < 400 && (progress.size || docsOf(db, wikiOf[alpha.id]).length < 50 || docsOf(db, wikiOf[beta.id]).length < 1 || docsOf(db, wikiOf[gamma.id]).length < 1); i++) await new Promise((r) => setTimeout(r, 25));
   assert.ok(docsOf(db, wikiOf[alpha.id]).length >= 50);
+});
+
+test('contract gates cover wiki search, redirected reads and another project', async () => {
+  const off = ctxIn('claude:contracts-off', alphaDir, { space: alpha.id, wikiFeatures: { contracts: false } });
+  await assert.rejects(read({ path: 'wiki/contracts/policy.md' }, off), /Wiki contracts are off/);
+  await assert.rejects(read({ path: 'wiki/policy-redirect.md' }, off), /Wiki contracts are off/);
+  await assert.rejects(read({ path: 'wiki/contracts/redirect.md' }, off), /Wiki contracts are off/);
+  for (const mode of ['exact', 'regex', 'words', 'hybrid']) {
+    const result = await search({ query: 'aardvarkcontract', mode }, off);
+    assert.ok(!result.includes('aardvarkcontract marker is here'), mode);
+    assert.ok(!result.includes('wiki/contracts/policy.md'), mode);
+  }
+  assert.match(await search({ query: 'aardvarkcontract', mode: 'exact' }), /wiki\/contracts\/policy.md/);
+  updateSpace(db, beta.id, { wikiFeatures: { contracts: false } });
+  try {
+    await assert.rejects(read({ path: 'wiki/contracts/beta.md', project: 'Beta' }), /Wiki contracts are off/);
+    assert.ok(!(await search({ query: 'betacontractmarker', mode: 'exact', project: 'Beta' })).includes('wiki/contracts/beta.md'));
+  } finally { updateSpace(db, beta.id, { wikiFeatures: { contracts: null } }); }
 });
 
 test('wiki switches are rechecked after a delayed semantic search', async () => {

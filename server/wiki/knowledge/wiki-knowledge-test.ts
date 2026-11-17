@@ -5,11 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { openDb, kvSet } from '../../db.ts';
 import { progress, scanSoon } from '../../knowledge/indexer.ts';
+import { setEmbedderForTests } from '../../memory/embed.ts';
 import { searchKnowledge } from '../../knowledge/search.ts';
-import { docsOf } from '../../knowledge/store.ts';
+import { createBase, docsOf } from '../../knowledge/store.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './index.ts';
-import { wikiBaseVisible, wikiDocumentVisible } from './bindings.ts';
+import { wikiBaseVisible, wikiDocumentVisible, wikiKnowledgeContract } from './bindings.ts';
 import { basesFor, basesOfSession } from '../../knowledge/scope.ts';
+import { knowledgeInstructions, knowledgeTools } from '../../knowledge/tools.ts';
+import type { RunCtx } from '../../features/types.ts';
 import { setSessionExtra } from '../../sessionExtra.ts';
 import { createSpace, deleteSpace, updateSpace } from '../../spaces/index.ts';
 import { applyWikiChanges, ingestWikiSource } from '../core.ts';
@@ -34,6 +37,11 @@ try {
   setSessionExtra(db, 'codex:wiki-on', { wikiEnabled: true });
   assert.equal(basesOfSession(db, 'codex:wiki-off').some((b) => b.id === binding.base), false);
   assert.equal(basesOfSession(db, 'codex:wiki-on').some((b) => b.id === binding.base), true);
+  // A disabled contract switch must not accidentally hide unrelated binary wiki sources.
+  fs.mkdirSync(path.join(hub, 'raw'), { recursive: true });
+  const binary = path.join(hub, 'raw', 'paper.pdf'); fs.writeFileSync(binary, Buffer.from([0, 1, 2]));
+  assert.equal(wikiKnowledgeContract(db, binding.base, binary), false);
+  fs.unlinkSync(binary);
   const again = ensureWikiKnowledge(db, { root: hub, space: null });
   assert.equal(binding.base, again.base);
   for (let i = 0; i < 100 && (!docsOf(db, binding.base).length || progress.size); i++) await new Promise((r) => setTimeout(r, 20));
@@ -55,6 +63,24 @@ try {
   assert.equal(fs.readFileSync(path.join(hub, source.originalPath), 'utf8'), sourceText);
   assert.equal(ingestWikiSource(hub, sourceText, 'manual:observatory').existing, true);
   assert.match(fs.readFileSync(path.join(hub, 'wiki/observatory.md'), 'utf8'), new RegExp(source.path));
+  // Contract switches also apply to the generic Knowledge tools, including existing index results.
+  const contractText = '---\ndocument_kind: contract\ndocument_status: active\nauthorization_ref: User\n---\nProtected quasar contract.\n';
+  applyWikiChanges(hub, [{ path: 'wiki/contracts/sources.md', content: contractText, expectedSha256: null }], { contracts: true });
+  refreshWikiKnowledge(db, hub);
+  let contractHits = await searchKnowledge(db, { query: 'quasar', mode: 'words', within: [binding.base] });
+  for (let i = 0; i < 150 && !contractHits.hits.length; i++) {
+    await new Promise((r) => setTimeout(r, 20));
+    contractHits = await searchKnowledge(db, { query: 'quasar', mode: 'words', within: [binding.base] });
+  }
+  assert.ok(contractHits.hits.length, 'fixture was indexed');
+  const ctx = { key: 'codex:wiki-on', cwd: temp, deps: { db } } as unknown as RunCtx;
+  const search = knowledgeTools().find((t) => t.name === 'knowledge_search')!;
+  const read = knowledgeTools().find((t) => t.name === 'knowledge_read')!;
+  setSessionExtra(db, ctx.key, { wikiFeatures: { contracts: false } });
+  assert.doesNotMatch(String(await search.run({ query: 'quasar', mode: 'words' }, ctx)), /Protected quasar contract/);
+  await assert.rejects(read.run({ path: path.join(hub, 'wiki/contracts/sources.md') }, ctx), /not in a knowledge base/);
+  setSessionExtra(db, ctx.key, { wikiFeatures: { contracts: true } });
+  assert.match(String(await search.run({ query: 'quasar', mode: 'words' }, ctx)), /Protected quasar contract/);
   // Retiring a document is enforced at read/search time, even before the next index scan.
   fs.writeFileSync(active, '---\ndocument_status: retired\n---\nA remarkable orange telescope.');
   assert.equal(wikiDocumentVisible(db, binding.base, active), false);
@@ -67,6 +93,47 @@ try {
   const project = ensureWikiKnowledge(db, { root: projectWiki, space: space.id });
   assert.equal(basesFor(db, space.id).some((b) => b.id === project.base), true);
   assert.equal(basesFor(db, null).some((b) => b.id === project.base), false);
+  // Group knowledge must respect both the group's chat switch and each member project's contract switch.
+  const group = createSpace(db, { name: 'Group', members: [space.id], wikiMemory: true });
+  const ordinaryBase = createBase(db, { name: 'Ordinary shared documents' });
+  const groupKey = 'codex:group-wiki';
+  setSessionExtra(db, groupKey, { space: group.id, wikiEnabled: true, wikiFeatures: { contracts: true } });
+  const groupCtx = { ...ctx, key: groupKey, cwd: temp };
+  const groupContract = path.join(projectWiki, 'wiki/contracts/group-policy.md');
+  applyWikiChanges(projectWiki, [{ path: 'wiki/contracts/group-policy.md', content: '---\ndocument_kind: contract\n---\nUnique groupnebula contract.\n', expectedSha256: null }], { contracts: true });
+  applyWikiChanges(projectWiki, [{ path: 'wiki/z-public.md', content: '# Ordinary note\n\nPublic groupnebula note.\n', expectedSha256: null }]);
+  refreshWikiKnowledge(db, projectWiki);
+  let groupHits = await searchKnowledge(db, { query: 'groupnebula', mode: 'words', within: [project.base] });
+  for (let i = 0; i < 150 && groupHits.hits.length < 2; i++) {
+    await new Promise((r) => setTimeout(r, 20));
+    groupHits = await searchKnowledge(db, { query: 'groupnebula', mode: 'words', within: [project.base] });
+  }
+  assert.ok(groupHits.hits.length, 'group contract fixture was indexed');
+  const list = knowledgeTools().find((t) => t.name === 'knowledge_list')!;
+  updateSpace(db, space.id, { wikiFeatures: { contracts: false } });
+  assert.doesNotMatch(String(await search.run({ query: 'groupnebula', mode: 'words' }, groupCtx)), /Unique groupnebula contract/);
+  // Excluding a contract must not consume the result limit ahead of an ordinary matching article.
+  assert.match(String(await search.run({ query: 'groupnebula', mode: 'exact', limit: 1 }, groupCtx)), /Public groupnebula note/);
+  await assert.rejects(read.run({ path: groupContract }, groupCtx), /not in a knowledge base/);
+  assert.doesNotMatch(String(await list.run({ base: project.base }, groupCtx)), /group-policy/);
+  updateSpace(db, space.id, { wikiFeatures: { contracts: true } });
+  assert.match(String(await search.run({ query: 'groupnebula', mode: 'words' }, groupCtx)), /Unique groupnebula contract/);
+  assert.match(String(await read.run({ path: groupContract }, groupCtx)), /Unique groupnebula contract/);
+  // A switch change during a vector lookup cannot leak already selected index results.
+  setEmbedderForTests(async () => { updateSpace(db, space.id, { wikiFeatures: { contracts: false } }); return []; });
+  assert.doesNotMatch(String(await search.run({ query: 'groupnebula', mode: 'auto' }, groupCtx)), /Unique groupnebula contract/);
+  setEmbedderForTests(async () => { updateSpace(db, group.id, { wikiMemory: false }); return []; });
+  updateSpace(db, space.id, { wikiFeatures: { contracts: true } });
+  assert.doesNotMatch(String(await search.run({ query: 'groupnebula', mode: 'auto' }, groupCtx)), /Unique groupnebula contract/);
+  setEmbedderForTests(null);
+  updateSpace(db, group.id, { wikiMemory: false });
+  assert.equal(basesOfSession(db, groupKey, temp).some((b) => b.id === project.base), false);
+  assert.equal(basesOfSession(db, groupKey, temp).some((b) => b.id === binding.base), false);
+  assert.equal(basesOfSession(db, groupKey, temp).some((b) => b.id === ordinaryBase.id), true);
+  assert.doesNotMatch(knowledgeInstructions(db, group.id) ?? '', /Wiki memory/);
+  assert.doesNotMatch(String(await search.run({ query: 'groupnebula', mode: 'words' }, groupCtx)), /Unique groupnebula contract/);
+  updateSpace(db, group.id, { wikiMemory: true });
+  deleteSpace(db, group.id);
   // The project's wiki stays bound across sessions (no flapping), and is hidden while wiki memory is off for the project.
   assert.equal(ensureWikiKnowledge(db, { root: projectWiki, space: space.id }).base, project.base);
   assert.equal(wikiBaseVisible(db, project.base), true);

@@ -281,7 +281,7 @@ agents that speak ACP and take MCP servers.
   Claude Code and Codex, the last messages go to the helper model first, up to about 14 seconds, for its summary);
   Hydor registers a hook in Claude Code and Codex for it, unless hooks or plugins of yours might already capture compactions, and
   trusts only its own Codex hook (found once per Codex version). Each chat has a collapsible **Wiki memory** group: it controls
-  automatic lessons, plans and execution tracking. Global settings provide project defaults;
+  automatic lessons, contracts, plans and execution tracking. Global settings provide project defaults;
   each project can choose its own values, and a disabled project feature is unavailable to its chats. The helper suggests lessons
   from the latest exchange as a card in the chat, which you keep (the exact text
   and its place are fixed by a hash) or dismiss, and no agent can do either for you; agents can also preview and, with your OK, save
@@ -290,7 +290,8 @@ agents that speak ACP and take MCP servers.
   and acceptance), and revises it (`wiki_plan_revision_preview`, `wiki_plan_revise`) with the old text kept as a protected snapshot,
   the plan's identity and work item numbers kept; each change shows the exact text and waits for your OK, which never authorizes carrying the plan out. Nothing else
   can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
-  write. A project's Memory tab shows its wiki read-only (its articles, sources, plans and evidence), with the updates.
+  write. Project contracts have source, scope and a reviewed revision: an agent previews a proposed contract or revision, and your
+  approval saves the exact content while preserving prior versions. A project's Memory tab shows its wiki read-only, including its articles, sources, plans and evidence.
   Areas: from ten articles a wiki's articles are grouped into areas, lasting topics (`areas:` in each article's front matter, the
   areas themselves in a hidden `.structure/areas.json`; no file moves), each with a hub kept by Hydor (`wiki/areas/<area>.md`: an
   overview, up to six key facts each checked against the article it cites, and the area's articles in reading order); `index.md`

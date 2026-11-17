@@ -6,7 +6,7 @@
 import path from 'node:path';
 import type { DB } from '../../db.ts';
 import { secretIn } from '../../memory/secrets.ts';
-import { redirectOf } from '../core.ts';
+import { contractDocument, redirectOf } from '../core.ts';
 import { shut, type DigestAsk } from '../digest/plan.ts';
 import { recordUpdate } from '../digest/store.ts';
 import { appendLines, areasOfArticle, bodyOf, cleanLinks, clipLine, freePath, frontValue, judgeRewrite, listOf, parseRemoved, readOrNull, splitFront, storeArticle, SUMMARY_MAX, titleOfArticle, writeIndex } from '../digest/write.ts';
@@ -74,6 +74,11 @@ export interface MergeDone {
 /** Does one queued merge. Never throws. */
 export async function mergeOne(root: string, ask: DigestAsk, q: QueuedMerge, now: number): Promise<MergeDone> {
   try {
+    // A queue created before a document became a contract must not expose or merge it.
+    for (const rel of [...q.from, ...(q.into ? [q.into] : [])]) {
+      const current = readOrNull(root, rel);
+      if (current && contractDocument(rel, current.content)) return { ok: false, error: 'project contracts require explicit approval' };
+    }
     const from = q.from.map((p) => partOf(root, p)).filter((p): p is Part => !!p);
     if (!from.length) return { ok: false, error: 'its articles are gone or merged already' };
     const known = new Set([...browseWiki(root).articles.map((a) => a.path), 'index.md', 'log.md']);
