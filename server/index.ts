@@ -18,6 +18,7 @@ import { kvGet, kvSet, openDb } from './db.ts';
 import { agentBaseEnv } from './env.ts';
 import { ClaudeControl, CodexControl, ensureProbeDir, publicFlow } from './agents/control.ts';
 import * as files from './files.ts';
+import { viewRoutes } from './view.ts';
 import { zipPlan, zipStream } from './zip.ts';
 import { previewItem } from './history/common.ts';
 import { findSessions, Indexer } from './indexer/index.ts';
@@ -28,7 +29,6 @@ import { Push } from './push.ts';
 import { imagesIn, readLineAt, sweepUploads, type FoundImage } from './retention.ts';
 import { noticeText } from '../shared/notice.ts';
 import { cleanTheme, isBuiltIn, MAX_THEMES, type AppTheme } from '../shared/themes.ts';
-import { inside, readLink, signLink } from './links.ts';
 import { priceOverrides, rateFor, refreshOpenRouterPrices, setPriceOverrides } from './prices.ts';
 import { Scheduler } from './scheduler.ts';
 import { accountViews, createPr, ghToken, prDescribe, prDraft, prFromUrl, refreshPr, removeAccount, reviewChanges, saveAccount, writeGuide } from './pullrequests.ts';
@@ -1205,26 +1205,8 @@ app.get('/api/fs/raw', async (req, reply) => {
   reply.header('Content-Length', st.size);
   return reply.send(fs.createReadStream(p));
 });
-/** An HTML file shown as a page: sandboxed, able to load the files next to it, for an hour. */
-app.post('/api/fs/view-link', async (req) => {
-  const p = files.resolvePath(String((req.body as any)?.path ?? ''));
-  const st = await fs.promises.stat(p).catch(() => null);
-  if (!st?.isFile()) throw new HttpError(404, 'Not found');
-  return { url: `/view/${signLink({ d: path.dirname(p) }, 3600_000)}/${encodeURIComponent(path.basename(p))}` };
-});
-app.get('/view/:token/*', async (req, reply) => {
-  const prm = req.params as Record<string, string>;
-  const link = readLink<{ d: string }>(prm.token);
-  if (!link) return reply.code(403).type('text/plain; charset=utf-8').send('This preview link has expired. Open the file again.');
-  const file = inside(link.d, prm['*'] ?? '');
-  const st = file ? await fs.promises.stat(file).catch(() => null) : null;
-  if (!file || !st?.isFile()) return reply.code(404).type('text/plain; charset=utf-8').send('Not found');
-  // An opaque origin: the page's scripts run, but never with this app's cookie or its pages.
-  reply.header('Content-Security-Policy', "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'");
-  reply.header('Content-Type', files.pageMimeFor(file));
-  reply.header('Cache-Control', 'private, no-cache');
-  return reply.send(fs.createReadStream(file));
-});
+// An HTML file shown as a page, with a link that lets it load the files next to it (server/view.ts).
+viewRoutes(app);
 app.put('/api/fs/write', async (req) => {
   const b = (req.body ?? {}) as any;
   if (typeof b.content !== 'string') throw new HttpError(400, 'Missing content');
