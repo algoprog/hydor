@@ -120,7 +120,8 @@ export const SHOPPING: AnswerUiSpec[] = [
         { name: 'Performance', specs: [
           { label: 'Chip', value: 'Apple M4, 10-core CPU' },
           { label: 'Graphics', value: '8-core GPU (10-core on higher models)' },
-          { label: 'Memory', value: '16 GB, up to 32 GB' },
+          // Explicit hardware terminology keeps the example separate from agent Memory.
+          { label: 'Memory (RAM)', value: '16 GB, up to 32 GB' },
           { label: 'Storage', value: '256 GB SSD, up to 2 TB' },
         ] },
         { name: 'Battery and power', specs: [

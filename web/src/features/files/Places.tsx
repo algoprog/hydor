@@ -45,6 +45,7 @@ export function Step({
   last,
   bare,
   fit,
+  appLabel,
 }: {
   dir: string;
   label: string;
@@ -54,6 +55,7 @@ export function Step({
   last?: boolean;
   bare?: boolean;
   fit?: boolean;
+  appLabel?: boolean;
 }) {
   const drop = useDropOn(last ? null : dir, after);
   return (
@@ -72,7 +74,8 @@ export function Step({
     >
       {icon}
       {!bare && (
-        <span translate="no" className="truncate">
+        // Application labels may translate; filesystem names retain their original spelling.
+        <span translate={appLabel ? undefined : "no"} className="truncate">
           {label}
         </span>
       )}
@@ -115,8 +118,8 @@ export function Crumbs({
   const rest = dir === top.path ? [] : pathParts(dir).slice(pathParts(top.path).length);
   // Home shows as its house alone, once the path goes on from it.
   const steps = [
-    { dir: top.path, label: top.label, icon: top.icon, bare: top.path === home && rest.length > 0 },
-    ...rest.map((n, i) => ({ dir: joinPath(top.path, rest.slice(0, i + 1).join(sepOf(dir))), label: n, icon: undefined as ReactNode, bare: false })),
+    { dir: top.path, label: top.label, icon: top.icon, appLabel: top !== base, bare: top.path === home && rest.length > 0 },
+    ...rest.map((n, i) => ({ dir: joinPath(top.path, rest.slice(0, i + 1).join(sepOf(dir))), label: n, icon: undefined as ReactNode, appLabel: false, bare: false })),
   ];
   // Five or more: the first, a fold with those between, and the last two.
   const folded = steps.length > 4 ? steps.slice(1, -2) : [];
@@ -141,10 +144,10 @@ export function Crumbs({
               </button>
             ) : last && base ? (
               // In a space's own files, the steps stay inside the space.
-              <Step dir={s.dir} label={s.label} icon={s.icon} onDir={() => {}} last />
+              <Step dir={s.dir} label={s.label} appLabel={s.appLabel} icon={s.icon} onDir={() => {}} last />
             ) : last ? (
               <span className="flex min-w-0 items-center">
-                <Step dir={s.dir} label={s.label} icon={s.icon} onDir={() => setFind(true)} last />
+                <Step dir={s.dir} label={s.label} appLabel={s.appLabel} icon={s.icon} onDir={() => setFind(true)} last />
                 <button
                   ref={findRef}
                   type="button"
@@ -157,7 +160,7 @@ export function Crumbs({
                 </button>
               </span>
             ) : (
-              <Step dir={s.dir} label={s.label} icon={s.icon} onDir={onDir} after={after} bare={s.bare} />
+              <Step dir={s.dir} label={s.label} appLabel={s.appLabel} icon={s.icon} onDir={onDir} after={after} bare={s.bare} />
             )}
           </span>
         );

@@ -18,7 +18,8 @@ if (!config.dataDir.startsWith('/tmp/')) {
   process.exit(2);
 }
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-clients-test-'));
+// Resolve the temporary root so macOS /tmp aliases do not change path comparisons.
+const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-clients-test-')));
 const db = openDb(path.join(tmp, 'test.db'));
 const updated: string[][] = [];
 watchClients(db, (ids) => updated.push(ids));
@@ -163,7 +164,8 @@ const main = async () => {
   assert.deepEqual(it, { id: 'claude', name: 'Claude Code', yours: undefined, from: '1.1.1', to: '1.2.0', ok: true });
   assert.equal(bad['claude:yours'], undefined);
   assert.equal(JSON.parse(kvGet(db, 'clients.pin') ?? 'null'), null, 'no version kept any more');
-  assert.notEqual(config.claudeBin, before);
+  // The verified updater's command remains active even when no Claude is on PATH.
+  assert.equal(config.claudeBin, link);
 
   // One so broken it no longer says its version: undone too.
   script(path.join(dir, 'versions', '1.3.0'), 'echo "Segmentation fault" >&2; exit 139');
@@ -178,6 +180,11 @@ const main = async () => {
   // A program with no updater of its own and not from npm: Update now says so, a run by itself passes it by.
   assert.equal(await updateOwn('gemini', gemini, '0.66.0', '0.67.0', bad, true), null);
   assert.match((await updateOwn('gemini', gemini, '0.66.0', '0.67.0', bad, false))?.error ?? '', /update it the way you installed it/);
+
+  // Include a second managed agent so error aggregation does not depend on the host's installed tools.
+  const managedGemini = path.join(config.dataDir, 'clients', 'node_modules', PACKAGES.gemini.pkg);
+  fs.mkdirSync(managedGemini, { recursive: true });
+  fs.writeFileSync(path.join(managedGemini, 'package.json'), JSON.stringify({ version: '0.66.0' }));
 
   // Check now (and a run by itself with Update automatically off) only looks: nothing is installed.
   const asked: string[] = [];
@@ -213,6 +220,7 @@ const main = async () => {
   startClientUpdates('check');
   await wait();
   assert.match(clientUpdates().error ?? '', /Codex: E404/, 'else each program’s');
+  assert.match(clientUpdates().error ?? '', /Gemini CLI: ETIMEDOUT/, 'the second program keeps its own error');
   assert.deepEqual(updated, [], 'nothing changed, so nothing restarted');
 
   db.close();

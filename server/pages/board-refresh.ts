@@ -12,6 +12,7 @@
 // rules.ts), each refresh's session is capped at what is left, and once it is reached refreshes wait for the next month,
 // with one notice that month.
 import fs from 'node:fs';
+import { userLang } from '../language/index.ts';
 import os from 'node:os';
 import { answerUi } from '../../shared/answer-ui/index.ts';
 import { isDataRef } from '../../shared/answer-ui/data-ref.ts';
@@ -202,7 +203,9 @@ function capNotice(d: Pick<Deps, 'db' | 'sessions'>, page: string, title: string
   const k = `boards.capNotice.${page}`;
   if (kvGet(d.db, k) === month) return;
   kvSet(d.db, k, month);
-  const resumes = new Date(monthEnd(now)).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  // Notifications use the same language as the app, including their interpolated dates.
+  const lang = userLang(d.db);
+  const resumes = new Date(monthEnd(now)).toLocaleDateString(lang === 'en' ? 'en-GB' : lang, { day: 'numeric', month: 'long' });
   d.sessions.emit('notify', {
     key: `board:${page}`,
     kind: 'waiting',

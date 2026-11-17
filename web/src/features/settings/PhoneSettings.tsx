@@ -10,6 +10,7 @@ import { enablePush, disablePush, pushState, testThisDevice, type PushState } fr
 import { canInstall, installApp, onInstallChange, phoneKind, runningInstalled } from '../../lib/install';
 import { qrCode, qrPath } from '../../lib/qr';
 import { LOCALE } from '../../i18n/locale';
+import { tr } from '../../i18n/runtime';
 import { Button, cx, Switch, Throbber } from '../../components/ui';
 import { CopyButton } from '../../components/Markdown';
 import { PHONE_PATH, type PhoneProblem, type PhoneState } from '@shared/phone';
@@ -199,7 +200,8 @@ function ProblemNotice({ p, busy, onServe, onCheck }: { p: Problem; busy: boolea
     );
   return (
     <Notice tone="err" action={p.kind === 'stop-failed' ? undefined : again}>
-      <span translate="no">{p.message}</span>
+      {/* Translate the known failure pattern while leaving diagnostic values and commands literal. */}
+      <span translate="no">{tr(p.message)}</span>
     </Notice>
   );
 }

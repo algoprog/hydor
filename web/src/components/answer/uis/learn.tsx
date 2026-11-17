@@ -59,7 +59,7 @@ import {
   X,
 } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
-import { tr } from '../../../i18n/runtime';
+import { tr, trIn } from '../../../i18n/runtime';
 import { CodeBlock } from '../../Markdown';
 import { normalizeMath } from '../../markdown-math';
 import { cx } from '../../ui';
@@ -1158,7 +1158,8 @@ const LINK_KINDS: Record<string, { icon: LucideIcon; label: () => string }> = {
   docs: { icon: BookMarked, label: () => tr('Docs') },
   book: { icon: BookOpen, label: () => tr('Book') },
   repo: { icon: Code2, label: () => tr('Code') },
-  paper: { icon: ScrollText, label: () => tr('Paper') },
+  // A research paper is distinct from the paper used for printing.
+  paper: { icon: ScrollText, label: () => trIn('research', 'Paper') },
 };
 
 function Links({ data, done }: { data: Data; done: boolean }) {

@@ -501,7 +501,11 @@ export async function updateOwn(cmd: string, bin: string, from: string, to: stri
   const got = now ?? to;
   if (!why) {
     delete bad[key];
-    if (cmd === 'claude' && kvJson('clients.pin', null)) pin(null);
+    if (cmd === 'claude' && kvJson('clients.pin', null)) {
+      pin(null);
+      // Resume the command that was just verified, even when it is not on PATH.
+      if (!process.env.CLAUDE_BIN) config.claudeBin = bin;
+    }
     return { ...item, to: got, ok: true };
   }
   bad[key] = got;

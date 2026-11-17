@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, MessageSquarePlus, Target, X } from 'lucide-react';
 import { LOCALE } from '../../../i18n/locale';
-import { tr } from '../../../i18n/runtime';
+import { tr, trIn } from '../../../i18n/runtime';
 import { cx } from '../../ui';
 import { niceTicks, XYChart } from '../charts';
 import { arr, Btn, Card, Chip, Copy, fmtDate, fmtMoney, fmtNum, Head, isObj, KeyValues, LinkOut, Md, Meter, num, parseDate, Section, Seg, seriesColor, str, textOf, useAsk, useKept, yes, type AnswerUiView, type Data } from '../kit';
@@ -691,7 +691,8 @@ function SplitBill({ data, done }: { data: Data; done: boolean }) {
       {items.length > 0 && (
         <div className="mt-4 grid gap-x-8 gap-y-3 @xl:grid-cols-2">
           <div className="min-w-0">
-            <SliderRow label={tr('Tip')} value={tipPct} min={0} max={Math.max(30, Math.ceil(tip0 + 10))} step={1} onChange={(n) => done && setTip(n)} disabled={!done} text={`${fmtNum(tipPct)}% · ${money(tipAmt, cur)}`} />
+            {/* The bill calculator uses the gratuity meaning of tip. */}
+            <SliderRow label={trIn('money', 'Tip')} value={tipPct} min={0} max={Math.max(30, Math.ceil(tip0 + 10))} step={1} onChange={(n) => done && setTip(n)} disabled={!done} text={`${fmtNum(tipPct)}% · ${money(tipAmt, cur)}`} />
           </div>
           <dl className="m-0 min-w-0 text-[13px]">
             <div className="flex justify-between gap-3 py-0.5">

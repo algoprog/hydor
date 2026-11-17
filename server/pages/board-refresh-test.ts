@@ -406,11 +406,15 @@ const salesTask = refreshTaskId(shop.id, 'csales1');
   ok(st.cap === 0.05 && Math.abs(st.spentUsd - 0.08) < 1e-9 && st.reached, `this month’s refreshes count against the cap (${JSON.stringify(st)})`);
   const made = sessions.made.length;
   const notices = sessions.notices.length;
+  // The cap notice formats its reset date in the saved UI language, not a fixed English locale.
+  kvSet(db, 'ui.language', 'de');
   db.prepare('update tasks set next_at = ? where id = ?').run(Date.now() - 1000, salesTask);
   tick();
   await settle();
   ok(sessions.made.length === made && taskRow(salesTask)!.next_at! > Date.now() && taskRow(salesTask)!.enabled === 1, 'once reached, its time comes and nothing runs: it waits for the next');
   ok(sessions.notices.length === notices + 1 && /reached the board’s \$0\.05 cap for this month/.test(sessions.notices.at(-1).body) && sessions.notices.at(-1).url === `/pages/${shop.id}`, 'the person hears once');
+  ok(/start again on 1\. /.test(sessions.notices.at(-1).body), 'the German reset date starts with the first day and its German ordinal dot');
+  kvSet(db, 'ui.language', 'en');
   db.prepare('update tasks set next_at = ? where id = ?').run(Date.now() - 1000, salesTask);
   tick();
   await settle();

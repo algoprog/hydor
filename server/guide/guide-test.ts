@@ -203,8 +203,22 @@ test('a translation takes the English headings’ ids by their place; one out of
 /** A file's link addresses, in order. */
 const linksOf = (md: string) => [...md.matchAll(/\]\(([^)\s]+)\)/g)].map((m) => m[1]);
 
+test('German native articles are loaded without fallback and retain heading positions and link targets', () => {
+  // Check every shipped article; the separate audit reports topics still awaiting translation.
+  const dir = path.join(APP_ROOT, 'docs', 'guide', 'de');
+  for (const file of fs.readdirSync(dir).filter((name) => /^\d+-[a-z0-9-]+\.md$/.test(name))) {
+    const original = fs.readFileSync(path.join(APP_ROOT, 'docs', 'guide', file), 'utf8');
+    const german = fs.readFileSync(path.join(dir, file), 'utf8');
+    const translated = translatedTopic(parseTopic(file, original), file, german);
+    assert.ok(translated, `${file}: German headings no longer match the source`);
+    assert.deepEqual(linksOf(german), linksOf(original), `${file}: German link targets changed`);
+    const shown = guideTopics('de').find((topic) => topic.id === topicId(file));
+    assert.equal(shown?.body, translated.body, `${file}: native German article fell back to English`);
+  }
+});
+
 test('the translations: every topic but the API one, each with the English headings in their places and the same links', () => {
-  for (const lang of ['zh', 'el'] as const) {
+  for (const lang of ['de', 'zh', 'el'] as const) {
     const dir = path.join(APP_ROOT, 'docs', 'guide', lang);
     const files = fs.readdirSync(dir).filter((f) => /^\d+-[a-z0-9-]+\.md$/.test(f));
     const problems: string[] = [];
@@ -601,7 +615,7 @@ test('a question asked on Help: its agent answers it from the guide, knowing the
 test('the guide’s pictures: every one it shows is there; the light one when asked for, else the one there is', async () => {
   const dir = path.join(APP_ROOT, 'docs', 'guide', 'images');
   const missing: string[] = [];
-  for (const lang of ['en', 'zh', 'el'] as const)
+  for (const lang of ['en', 'de', 'zh', 'el'] as const)
     for (const t of guideTopics(lang))
       for (const m of t.body.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
         const name = /^images\/([a-z0-9-]+\.(?:webp|png|jpg))$/.exec(m[1])?.[1];

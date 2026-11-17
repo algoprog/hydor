@@ -611,7 +611,8 @@ test('settings: the tone (trimmed, capped) and the task root (~ read as home)', 
   assert.equal(taskRoot(db), path.join(os.homedir(), 'Tasks'));
   assert.throws(() => setSettings(db, { taskRoot: 'relative/path' }), /full path/);
   setSettings(db, { taskRoot: '', tone: 'x'.repeat(2000) });
-  assert.equal(taskRoot(db), path.join(os.homedir(), 'Naget'));
+  // Clearing the custom folder restores Hydor's current default.
+  assert.equal(taskRoot(db), path.join(os.homedir(), 'Hydor'));
   assert.equal(toneOf(db).length, 600);
   setSettings(db, { tone: '' });
 });
