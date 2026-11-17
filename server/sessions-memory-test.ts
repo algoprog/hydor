@@ -284,6 +284,24 @@ test('a choice the card does not have is refused, and so is one for a question a
   assert.equal(g.sent.length, 1);
 });
 
+test('what is sent while it waits shows in the session’s summary, as queued messages do', async () => {
+  const h = await asking('first message');
+  Object.assign(h.m, { runningHelpers: () => new Map(), resumeLookup: undefined, goal: undefined });
+  await h.m.send(h.key, 'a follow-up');
+  const sum = proto.summary.call(h.m, h.key);
+  assert.equal(sum?.queue?.length, 1);
+  assert.equal(sum?.queue?.[0].text, 'a follow-up');
+  assert.equal(sum?.queueHeld, undefined, 'not paused');
+  assert.equal(sum?.live?.memory, 'asking');
+  // And it reaches the pages: the list entry the server broadcasts carries the queue.
+  const sent: any[][] = [];
+  Object.assign(h.m, { pendingSummaries: new Set(), summaryTimer: null, emit: (...a: unknown[]) => (sent.push(a), true), watchStatus: () => {}, queueSummary: proto.queueSummary, flushSummaries: proto.flushSummaries, rowToSummary: proto.rowToSummary, row: proto.row, queueOf: proto.queueOf, loadQueues: proto.loadQueues, liveState: proto.liveState });
+  h.m.queueSummary(h.key);
+  await sleep(400);
+  const upsert = sent.find((e) => e[0] === 'sessions')?.[1]?.find((x: any) => x.key === h.key);
+  assert.equal(upsert?.queue?.[0]?.text, 'a follow-up', 'broadcast with its queue');
+});
+
 test('what is sent while it waits goes after the first message, in order', async () => {
   const h = await asking('first message');
   await h.m.send(h.key, 'second');

@@ -25145,5 +25145,6 @@
 "update upgrade newest latest version claude code codex gemini opencode grok agent programs daily":"更新 升级 最新 版本 claude code codex gemini opencode grok 智能体程序 每天",
 "Which agent programs, Grok Build among them, are installed, and installing the others":"已安装哪些智能体程序（包括 Grok Build），以及安装其他程序",
 "The Claude Code, Codex and Grok Build sign-ins every session uses":"每个会话都使用的 Claude Code、Codex 和 Grok Build 登录",
-"Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP":"Gemini CLI、Grok Build、OpenCode、Goose 以及其他支持 ACP 的智能体"
+"Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP":"Gemini CLI、Grok Build、OpenCode、Goose 以及其他支持 ACP 的智能体",
+"Add to your message…":"补充你的消息…"
 }

@@ -25129,5 +25129,6 @@
 "update upgrade newest latest version claude code codex gemini opencode grok agent programs daily":"ενημέρωση αναβάθμιση νεότερη τελευταία έκδοση claude code codex gemini opencode grok προγράμματα πρακτόρων καθημερινά",
 "Which agent programs, Grok Build among them, are installed, and installing the others":"Ποια προγράμματα πρακτόρων, μεταξύ τους το Grok Build, είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων",
 "The Claude Code, Codex and Grok Build sign-ins every session uses":"Οι συνδέσεις Claude Code, Codex και Grok Build που χρησιμοποιεί κάθε συνεδρία",
-"Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP":"Gemini CLI, Grok Build, OpenCode, Goose και άλλοι πράκτορες που μιλούν ACP"
+"Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP":"Gemini CLI, Grok Build, OpenCode, Goose και άλλοι πράκτορες που μιλούν ACP",
+"Add to your message…":"Προσθέστε στο μήνυμά σας…"
 }

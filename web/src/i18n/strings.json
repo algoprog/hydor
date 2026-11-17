@@ -3222,6 +3222,7 @@
 "Add to the page":"web/src/features/pages/studio/AddPanel.tsx",
 "Add to the selection (Shift)":"web/src/features/mediaedit/picture/tools.tsx",
 "Add to this folder":"web/src/features/files/FolderView.tsx",
+"Add to your message…":"web/src/features/session/Composer.tsx",
 "Add to your profile":"web/src/features/memory/BringIn.tsx",
 "Add token":"web/src/features/settings/ModelsSettings.tsx",
 "Add up":"server/apps/templates-more.ts",
