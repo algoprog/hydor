@@ -22,7 +22,7 @@ const BASE_CSS = `
 :root:where([data-n-theme=dark]:has(>body.n-page)),html[data-n-theme=dark] .n-page{--n-bg:#000000;--n-card:#151820;--n-fg:#e9edf5;--n-muted:#8f99ab;--n-line:#262b36;--n-soft:#1b1f27;--n-accent:#8aa8ff;--n-accent-fg:#0b1226;--n-accent-soft:rgba(138,168,255,.14);--n-ok:#6fd39a;--n-warn:#f2b468;--n-err:#f28b8b;--n-info:#5cc8e8;--n-c1:#8aa8ff;--n-c2:#5cc8e8;--n-c3:#6fd39a;--n-c4:#f2b468;--n-c5:#f0a07f;--n-c6:#b9a9ff;color-scheme:dark}
 html[data-n-theme=dark]:has(>body.n-page){color-scheme:dark}
 .n-page{margin:0 auto;padding:20px;background:var(--n-bg);color:var(--n-fg);font:15px/1.55 var(--n-font);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
-.n-page code,.n-page kbd,.n-page samp,.n-page pre{font-family:var(--n-mono)}
+.n-page code,.n-page kbd,.n-page samp,.n-page pre{font-family:var(--n-mono);font-variant-ligatures:none}
 @media (max-width:480px){.n-page{padding:14px}}
 .n-page h1{font-size:22px;line-height:1.25;margin:0 0 6px;letter-spacing:-.01em}
 .n-page h2{font-size:17px;line-height:1.3;margin:22px 0 8px}

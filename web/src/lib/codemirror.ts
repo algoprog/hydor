@@ -423,7 +423,7 @@ export interface CellEditorHandle {
 const cellTheme = EditorView.theme({
   '&': { backgroundColor: 'transparent', fontSize: '13px' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.55' },
+  '.cm-scroller': { fontFamily: 'var(--font-mono)', fontVariantLigatures: 'none', lineHeight: '1.55' },
   '.cm-content': { padding: '8px 0' },
   '.cm-line': { padding: '0 12px' },
 });

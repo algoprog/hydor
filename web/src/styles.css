@@ -153,6 +153,10 @@
   --color-code-bg: var(--code-bg);
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Code shows the characters as typed: JetBrains Mono would join some into one symbol (<!-- and -> as arrows, != as ≠).
+     Tailwind's font-mono and the base styles of code, kbd, samp and pre take this; other rules in the code font say
+     font-variant-ligatures: none themselves. */
+  --font-mono--font-feature-settings: 'liga' 0, 'calt' 0;
   --shadow-pop: var(--shadow);
   --shadow-lg: var(--shadow-lg);
 }
@@ -1749,6 +1753,7 @@ html {
 
 .term-out {
   font-family: var(--font-mono);
+  font-variant-ligatures: none;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -1853,6 +1858,7 @@ html {
   margin: 0;
   padding: 2px 0;
   font-family: var(--font-mono);
+  font-variant-ligatures: none;
   font-size: 12.5px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -1888,6 +1894,7 @@ html {
 
 .diff {
   font-family: var(--font-mono);
+  font-variant-ligatures: none;
   font-size: 12px;
   line-height: 1.5;
   overflow-x: auto;
@@ -1989,6 +1996,7 @@ html {
 }
 .cm-host .cm-scroller {
   font-family: var(--font-mono);
+  font-variant-ligatures: none;
   line-height: 1.55;
 }
 .cm-host .cm-editor.cm-focused {

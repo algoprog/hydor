@@ -1376,7 +1376,7 @@ export function Timeline({
     <div className="relative min-h-0 flex-1">
       <div
         aria-hidden
-        className={cx('pointer-events-none absolute inset-x-0 top-0 z-[2] h-8 bg-gradient-to-b from-bg via-bg/60 to-transparent transition-opacity duration-300', under ? 'opacity-100' : 'opacity-0')}
+        className={cx('pointer-events-none absolute inset-x-0 top-0 z-[2] h-8 bg-gradient-to-b from-bg via-bg/60 to-transparent bg-no-repeat transition-opacity duration-300', under ? 'opacity-100' : 'opacity-0')}
       />
       {/* A pixel inside each fade's edge: where the header ends (or the message box starts) between device pixels, the
           scroller's edge and the fade round to different rows, and a line of the conversation would show past the fade. */}
@@ -1505,7 +1505,7 @@ export function Timeline({
       </div>
       <div
         aria-hidden
-        className={cx('pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-8 bg-gradient-to-t from-bg via-bg/60 to-transparent transition-opacity duration-300', below ? 'opacity-100' : 'opacity-0')}
+        className={cx('pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-8 bg-gradient-to-t from-bg via-bg/60 to-transparent bg-no-repeat transition-opacity duration-300', below ? 'opacity-100' : 'opacity-0')}
       />
       {showLatest && (
         <button
