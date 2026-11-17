@@ -10,16 +10,37 @@ export interface BrowserTab {
   url: string;
   active: boolean;
   loading?: boolean;
+  /** The page's icon (an address, or a data: URL), when it has one. */
+  favicon?: string;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
 }
 
 /**
+ * Which browser runs a session's tabs: a Chromium the server started (`chrome`, its pages seen as pictures), or the
+ * desktop app's own (`desktop`: the app's window shows its pages themselves, and you use them as in any browser).
+ */
+export type BrowserEngine = 'chrome' | 'desktop';
+
+/** BrowserSettings.chrome's value for the desktop app's own browser. */
+export const DESKTOP_CHROME = 'desktop';
+
+/** The browser of your own (the Browser page): its key, and the profile that keeps its sign-ins. Agents never get it. */
+export const BROWSING_KEY = 'browsing';
+export const BROWSING_PROFILE = 'browsing';
+
+/**
  * Something only the user can do in the browser: what the agent asked for (a login, a captcha), a
- * purchase or payment it stopped before, or an address on this machine it wants to open.
+ * purchase or payment it stopped before, an address on this machine it wants to open, or a button that would send,
+ * post, delete or transfer something on a signed-in site, which it may press only once you allow it (confirm).
  */
 export interface BrowserAsk {
   id: string;
-  kind: 'ask' | 'payment' | 'local';
-  /** The agent's reason (ask), the button it would have pressed (payment), or the address (local: host:port). */
+  kind: 'ask' | 'payment' | 'local' | 'confirm';
+  /**
+   * The agent's reason (ask), the button it would have pressed (payment, confirm: its words, as “Send”), or the
+   * address (local: host:port).
+   */
   text: string;
   url?: string;
   title?: string;
@@ -55,6 +76,27 @@ export interface BrowserView {
   downloads: { name: string; path: string; done: boolean; failed?: boolean; at: number }[];
   /** Where the agent's pointer rests, as fractions of the page: the live view shows it there until the agent acts again. */
   pointer?: { x: number; y: number };
+  /** Which browser runs it (shown as the page itself in the desktop app's window when `desktop`). */
+  engine?: BrowserEngine;
+  /**
+   * The session got its tab from your own browsing (Do this here): the site it is kept to. It works with your
+   * sign-ins there, uses nothing but the browser, and asks before it sends, posts, deletes or transfers anything.
+   */
+  handedFrom?: string;
+  /** A site asks for a permission in your own browsing (camera, microphone, location, notifications…). */
+  permission?: BrowserPermissionAsk;
+}
+
+/** A page of your own browsing asks for a permission: yours to allow or block. */
+export interface BrowserPermissionAsk {
+  id: string;
+  /** Chromium's name for it: media, geolocation, notifications, clipboard-read, midi… */
+  permission: string;
+  /** For media: which ones (video, audio). */
+  media?: string[];
+  /** The site asking (its origin). */
+  origin: string;
+  tab: string;
 }
 
 /** News from the server ({ t: 'feature', id: 'browser', key, data }); `download` goes to every page. */
@@ -75,10 +117,10 @@ export type BrowserInput =
   | { t: 'key'; type: 'down' | 'up'; key: string; code?: string; keyCode?: number; text?: string; mods?: number }
   | { t: 'text'; text: string };
 
-/** A Chromium the browser can run. */
+/** A Chromium the browser can run: `path` is DESKTOP_CHROME for the desktop app's own. */
 export interface ChromeInfo {
   path: string;
-  source: 'system' | 'playwright' | 'downloaded';
+  source: 'system' | 'playwright' | 'downloaded' | 'desktop';
   label: string;
   version?: string;
   /** Playwright's headless shell: it cannot show a window. */
@@ -99,6 +141,11 @@ export interface BrowserSettings {
   allow: string[];
   /** Never these sites. */
   block: string[];
+  /**
+   * Ask before an agent presses a button that sends, posts, publishes, deletes or transfers something on a site it is
+   * signed in to (a profile that keeps sign-ins, or a tab you handed it from your own browsing). On unless turned off.
+   */
+  confirmSignedIn?: boolean;
 }
 
 /** A named profile: a browser folder of its own that keeps logins, which the user fills by taking over. */
@@ -170,4 +217,85 @@ export function busyWords(action: string, name: string, more: { direction?: stri
     default:
       return 'Waiting';
   }
+}
+
+// ---- your own browsing: bookmarks and extensions ----------------------------------------------------------------
+
+/** The two folders every bookmark sits under, directly or in folders of its own. */
+export const BOOKMARK_ROOTS = ['bar', 'other'] as const;
+export type BookmarkRoot = (typeof BOOKMARK_ROOTS)[number];
+
+/** A bookmark (with `url`) or a folder (without). */
+export interface BookmarkNode {
+  id: string;
+  title: string;
+  url?: string;
+  /** The folder it is in: a folder's id, or 'bar' (the bookmarks bar) or 'other' (Other bookmarks). */
+  parent: string;
+  /** Its place in that folder, from 0. */
+  pos: number;
+  addedAt: number;
+}
+
+/** Bookmarks of another browser on this computer that can be imported. */
+export interface BookmarkSource {
+  /** Stable for a scan: the browser and profile ('chrome:Default', 'firefox:abc.default-release', 'safari'). */
+  id: string;
+  /** The browser's name as people know it (Google Chrome, Microsoft Edge, Firefox, Safari…). */
+  browser: string;
+  /** Its profile's name, when it has several. */
+  profile?: string;
+  /** How many bookmarks it has (folders not counted). */
+  count: number;
+  /** Why it cannot be read now, when it cannot (Safari without Full Disk Access, Firefox's file locked…). */
+  error?: string;
+}
+
+/** A Chrome extension in your own browsing (the desktop app's browser runs it). */
+export interface BrowserExtension {
+  /** Its Chrome Web Store id (32 letters a–p): from the store, the browser it came from, or its key. */
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  /** Where it came from: the Chrome Web Store, a folder on this computer, or another browser here. */
+  source: 'store' | 'folder' | 'import';
+  /** The browser it was imported from, or the folder it is loaded from. */
+  from?: string;
+  enabled: boolean;
+  /** Also in agents' browsers that keep sign-ins (profiles): off unless you turn it on. */
+  agents: boolean;
+  /** Its toolbar button, when it has one: its words and its popup page (inside the extension). */
+  action?: { title?: string; popup?: string };
+  /** Whether it has an icon (GET /api/browser/extensions/:id/icon). */
+  icon?: boolean;
+  /** Its options page inside the extension, when it has one. */
+  options?: string;
+  manifestVersion: number;
+  /** The chrome.* APIs it asks for that the desktop app's browser does not have: those parts of it may not work. */
+  unsupported?: string[];
+  installedAt: number;
+}
+
+/** An extension installed in another browser on this computer, which can be brought in. */
+export interface ExtensionSource {
+  /** `<browser source id>/<extension id>`. */
+  id: string;
+  extensionId: string;
+  browser: string;
+  profile?: string;
+  name: string;
+  version: string;
+  /** Turned on in that browser. */
+  enabled: boolean;
+  /** Already brought in. */
+  have: boolean;
+}
+
+/** Your own browsing's extensions, and those of other browsers here that can be brought in. */
+export interface ExtensionsState {
+  extensions: BrowserExtension[];
+  sources: ExtensionSource[];
+  /** Extensions run only in the desktop app's own browser; false elsewhere (they are kept, and run there). */
+  runs: boolean;
 }

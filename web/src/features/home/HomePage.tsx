@@ -340,7 +340,7 @@ function StartComposer({
     const who = agentPicked.current ? extra.assistant : prev?.assistant;
     return {
       agent: key,
-      runs: { ...prev?.runs, [key]: agent === 'acp' ? { model, mode } : { model, effort, mode } },
+      runs: { ...prev?.runs, [key]: { model, effort: sentEffort, mode } },
       ...(typeof who === 'string' ? { assistant: who } : {}),
       ...(worktree ? { worktree: true } : {}),
       ...(extra.memory === false ? { memory: false } : {}),
@@ -389,7 +389,7 @@ function StartComposer({
     saveStart(
       {
         agent: key,
-        runs: { [key]: { model, effort: agent === 'acp' ? undefined : effort, mode, account: acct ?? '' } },
+        runs: { [key]: { model, effort: sentEffort, mode, account: acct ?? '' } },
         assistant: typeof extra.assistant === 'string' ? extra.assistant : undefined,
         task,
         cwd,
@@ -409,7 +409,7 @@ function StartComposer({
       prompt,
       // The arena sets named models against each other: Automatic goes in as the model it would start on.
       model: model === AUTO_MODEL && arenaOf(extra) ? bestModel : model,
-      effort: agent === 'acp' ? undefined : effort,
+      effort: sentEffort,
       mode,
       account: acct,
       worktree: !task && !!repo && worktree,
@@ -537,7 +537,9 @@ function StartComposer({
       : modelLabel(cat, bestModel);
   // What the Options chip names: the settings under it that are not as usual.
   const levels = findModel(cat, effortModel)?.efforts ?? [];
-  const effortOn = agent !== 'acp' && !!effort && (!cat || levels.length > 0) ? effort[0].toUpperCase() + effort.slice(1) : null;
+  // An ACP agent takes an effort only when the model offers it (Grok Build does; most others do not).
+  const sentEffort = agent === 'acp' ? (effort && levels.includes(effort) ? effort : undefined) : effort;
+  const effortOn = sentEffort && (!cat || levels.length > 0) ? sentEffort[0].toUpperCase() + sentEffort.slice(1) : null;
   const modeOn = cat && mode && mode !== cat.defaultMode ? (cat.modes.find((m) => m.value === mode)?.label ?? null) : null;
   const acctOn = acct ? (accounts.find((a) => a.id === acct)?.name ?? null) : null;
   const capOn = typeof extra.capUsd === 'number' ? usd(extra.capUsd) : null;
@@ -546,7 +548,7 @@ function StartComposer({
   // Whole lines where a word is a setting's state ("Memory: on"), so each translates as one.
   const optionsTitle = [
     confidential ? 'Confidential: on' : 'Confidential: off',
-    agent !== 'acp' && (effortOn ? `Effort: ${effortOn}` : 'Effort: default'),
+    (agent !== 'acp' || levels.length > 0) && (effortOn ? `Effort: ${effortOn}` : 'Effort: default'),
     modeNow && `Permissions: ${modeNow}`,
     acctOn && `Account: ${acctOn}`,
     extra.memory === false ? 'Memory: off' : 'Memory: on',
@@ -576,7 +578,7 @@ function StartComposer({
   return (
     <div>
       <NewSpaceDialog open={newSpace} onClose={() => setNewSpace(false)} onMade={pickSpace} />
-      <LimitBanner agent={agent} account={acct} className="mb-3" />
+      {accountAgent && <LimitBanner agent={accountAgent} account={acct} className="mb-3" />}
       <div
         data-tour="composer"
         className={cx(

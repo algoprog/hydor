@@ -221,6 +221,9 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Screenshots for models that see images**](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images): Models that see images get screenshots of the page.
 - [**Sites**](/settings?s=browser&find=Sites): Only these sites, or never these.
 - [**Profiles**](/settings?s=browser&find=Profiles): Separate sign-ins for the browser.
+- [**Ask before sending on signed-in sites**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites): Before an agent sends, posts, deletes or transfers anything on a site it’s signed in to.
+- [**Bookmarks**](/settings?s=browser&find=Bookmarks): Yours, with those from the other browsers on this computer.
+- [**Extensions**](/settings?s=browser&find=Extensions): Chrome extensions, in the desktop app.
 
 ### Computer use
 

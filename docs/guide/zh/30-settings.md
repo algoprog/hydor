@@ -221,6 +221,9 @@
 - [**为能看图片的模型提供截图**](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images)：能看图的模型会收到页面截图。
 - [**网站**](/settings?s=browser&find=Sites)：仅限这些网站，或绝不访问这些网站。
 - [**个人资料**](/settings?s=browser&find=Profiles)：浏览器的独立登录。
+- [**在已登录的网站上发送前先询问**](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites)：在智能体于已登录的网站上发送、发布、删除或转账之前。
+- [**书签**](/settings?s=browser&find=Bookmarks)：你自己的，加上这台电脑上其他浏览器的。
+- [**扩展程序**](/settings?s=browser&find=Extensions)：Chrome 扩展程序，在桌面应用中使用。
 
 ### 电脑操控
 

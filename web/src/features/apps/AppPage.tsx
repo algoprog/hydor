@@ -49,7 +49,7 @@ export function RunsWith({ agent, acpAgent, model, effort, mode }: { agent: Agen
       <AgentIcon agent={agent} name={acp?.name} size={13} />
       <span className="truncate">
         {agentName(agent, acp?.name)} · {cat ? modelLabel(cat, model) : model || 'default model'}
-        {effort && agent !== 'acp' ? ` · ${effort} effort` : ''}
+        {effort ? ` · ${effort} effort` : ''}
         {modeLabel ? ` · ${modeLabel}` : ''}
       </span>
     </span>

@@ -6,7 +6,8 @@
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/browser/selftest.ts
 //   DATA_DIR=/tmp/hydor-browser-test node dist/dev/selftest.js
 //
-// It needs a Chromium (see chrome.ts); it starts its own and closes it at the end.
+// It needs a Chromium (see chrome.ts); it starts its own and closes it at the end. With HYDOR_BROWSER_ENGINE=desktop it
+// runs on the desktop app's own browser instead (desktop/scripts/browser-selftest.mjs starts the app and runs this in it).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -20,12 +21,15 @@ import { act, askUser, open, read, tabs, upload, type OpCtx } from './ops.ts';
 import { browserOf, closeAll, GLIDE_MS, setBrowserDeps } from './session.ts';
 import { setSessionOptions, setBrowserSettings } from './settings.ts';
 import { pickChrome } from './chrome.ts';
+import { DESKTOP_CHROME } from '../../shared/browser.ts';
 import { jpegLayout } from './jpeg.ts';
 import { browserTools } from './tools.ts';
 import { readMarks, stepFile } from './steps.ts';
 
 if (!process.env.DATA_DIR) throw new Error('Set DATA_DIR to a scratch folder');
 const KEY = 'claude:selftest';
+/** Whether this runs on the desktop app's own browser (Electron), which cannot do everything Chrome can. */
+const DESKTOP = process.env.HYDOR_BROWSER_ENGINE === 'desktop';
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-browser-cwd-'));
 fs.writeFileSync(path.join(cwd, 'resume.txt'), 'my resume');
 const outside = path.join(os.tmpdir(), `hydor-outside-${process.pid}.txt`);
@@ -131,8 +135,8 @@ async function main() {
   } as unknown as Deps;
   registerFeatures([], deps);
   setBrowserDeps(deps);
-  setBrowserSettings(db, { enabled: true, screenshots: true });
-  const chrome = pickChrome('');
+  setBrowserSettings(db, { enabled: true, screenshots: true, ...(DESKTOP ? { chrome: DESKTOP_CHROME } : {}) });
+  const chrome = pickChrome(DESKTOP ? DESKTOP_CHROME : '');
   if (!chrome) throw new Error('No Chromium found');
   console.log(`using ${chrome.label} (${chrome.path})`);
   // The test site is on this machine: the session allows it, as the user would for a dev server.

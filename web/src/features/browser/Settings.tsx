@@ -2,11 +2,12 @@
 // keeping pages off this machine's network, screenshots for models that see images, site lists, and
 // named profiles the user logs into by taking over.
 import { useEffect, useRef, useState } from 'react';
-import { Download, Globe, LogIn, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
+import { Bookmark, Download, Globe, LogIn, Pencil, Plus, Puzzle, Trash2, UserRound } from 'lucide-react';
 import type { BrowserSettings, BrowserSettingsState } from '@shared/browser';
 import { api, del, enc, patch, post, put } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { live as socket } from '../../lib/ws';
+import { go } from '../../lib/nav';
 import { toastError } from '../../lib/store';
 import { Button, Dialog, inputCls, MenuItem, OptionRow, Picker, Switch, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { EmptyRow, Group, MoreMenu, Notice, Row, SectionActions, Stack } from '../settings/kit';
@@ -65,6 +66,8 @@ export function BrowserSettingsBody() {
       <Throbber className="text-fg-3" />
     </div>
   );
+  // The desktop app's own browser: its pages show in the app's window, so there is nothing to download or to show a window of.
+  const desktop = st?.chrome?.source === 'desktop';
   const textarea = 'min-h-[88px] w-full resize-y rounded-[10px] border border-line-2 bg-bg-1 px-3 py-2 font-mono text-[12.5px] outline-none focus:border-accent/60';
 
   return (
@@ -91,7 +94,7 @@ export function BrowserSettingsBody() {
             icon={<Globe size={16} />}
             label={st.chrome ? (st.chrome.version ? `Version ${st.chrome.version}` : st.chrome.label) : 'None found on this machine'}
             hint={st.chrome ? st.chrome.label : 'Download Chrome for Testing (about 170 MB) into the app’s data folder'}
-            info={st.chrome && <span translate="no" className="font-mono text-[12px] break-all">{st.chrome.path}</span>}
+            info={st.chrome && !desktop && <span translate="no" className="font-mono text-[12px] break-all">{st.chrome.path}</span>}
             control={
               <>
                 {st.chromes.length > 1 && (
@@ -100,13 +103,13 @@ export function BrowserSettingsBody() {
                       <>
                         <OptionRow label="The best one found" hint="The system’s, else one downloaded here, else Playwright’s" selected={!s!.chrome} onClick={() => (close(), set({ chrome: '' }))} />
                         {st.chromes.map((c) => (
-                          <OptionRow key={c.path} label={c.label} hint={[c.version, c.path].filter(Boolean).join(' · ')} selected={s!.chrome === c.path} onClick={() => (close(), set({ chrome: c.path }))} />
+                          <OptionRow key={c.path} label={c.label} hint={[c.version, c.source === 'desktop' ? '' : c.path].filter(Boolean).join(' · ')} selected={s!.chrome === c.path} onClick={() => (close(), set({ chrome: c.path }))} />
                         ))}
                       </>
                     )}
                   </Picker>
                 )}
-                {!st.chromes.some((c) => c.source === 'downloaded') && (
+                {!desktop && !st.chromes.some((c) => c.source === 'downloaded') && (
                   <Button size="sm" variant={st.chrome ? 'secondary' : 'primary'} icon={<Download size={14} />} disabled={!!dl} onClick={getChrome}>
                     {dl ? 'Downloading…' : 'Download Chrome'}
                   </Button>
@@ -128,17 +131,20 @@ export function BrowserSettingsBody() {
                 </div>
               </div>
             )}
+            {desktop && <div className="text-[12.5px] text-fg-3">Pages show in the app’s window.</div>}
           </Row>
         )}
       </Group>
 
       <Group>
-        <Row
-          label="Show a window"
-          hint={st?.chrome?.shell ? 'Playwright’s headless shell cannot show one' : 'A window on this machine’s screen too'}
-          info="Off: the browser runs out of sight and you watch it here. On: a window on this machine’s screen too."
-          control={st && s ? <Switch on={!s.headless && !st.chrome?.shell} label="Show a window" disabled={!!st.chrome?.shell} onChange={(v) => set({ headless: !v })} /> : <Throbber className="text-fg-3" />}
-        />
+        {!desktop && (
+          <Row
+            label="Show a window"
+            hint={st?.chrome?.shell ? 'Playwright’s headless shell cannot show one' : 'A window on this machine’s screen too'}
+            info="Off: the browser runs out of sight and you watch it here. On: a window on this machine’s screen too."
+            control={st && s ? <Switch on={!s.headless && !st.chrome?.shell} label="Show a window" disabled={!!st.chrome?.shell} onChange={(v) => set({ headless: !v })} /> : <Throbber className="text-fg-3" />}
+          />
+        )}
         <Row
           label="Keep pages off this machine and its network"
           hint="Routers, printers and this app stay out of reach"
@@ -150,6 +156,11 @@ export function BrowserSettingsBody() {
           hint="The page with numbered boxes drawn on"
           info="Agents can look at the page with numbered boxes drawn on. Text-only models always get the page as text."
           control={s ? <Switch on={s.screenshots} label="Screenshots for models that see images" onChange={(v) => set({ screenshots: v })} /> : <Throbber className="text-fg-3" />}
+        />
+        <Row
+          label="Ask before sending on signed-in sites"
+          hint="Before an agent sends, posts, deletes or transfers anything on a site it’s signed in to"
+          control={s ? <Switch on={s.confirmSignedIn !== false} label="Ask before sending on signed-in sites" onChange={(v) => set({ confirmSignedIn: v })} /> : <Throbber className="text-fg-3" />}
         />
       </Group>
 
@@ -175,6 +186,11 @@ export function BrowserSettingsBody() {
             <textarea value={block} onChange={(e) => setBlock(e.target.value)} disabled={!st} className={textarea} />
           </label>
         </div>
+      </Group>
+
+      <Group title="Your own browsing" hint="The Browser page: pages you use yourself, which agents never get">
+        <Row icon={<Bookmark size={16} />} label="Bookmarks" hint="Yours, with those from the other browsers on this computer" onClick={() => go('/browser?panel=bookmarks')} />
+        <Row icon={<Puzzle size={16} />} label="Extensions" hint="Chrome extensions, in the desktop app" onClick={() => go('/browser?panel=extensions')} />
       </Group>
 
       <Profiles st={st} onChange={setSt} onLogin={setLogin} confirm={confirm} />

@@ -150,13 +150,19 @@ export function browserRoutes(d: Deps) {
     if (what === 'back') await t.back();
     else if (what === 'forward') await t.forward();
     else if (what === 'reload') await t.reload();
-    else throw new HttpError(400, 'back, forward or reload');
+    else if (what === 'stop') await t.stop();
+    else throw new HttpError(400, 'back, forward, reload or stop');
     return { view: b.view() };
   });
   app.post('/api/browser/sessions/:key/tab', async (req) => {
     const b = own(req);
     const t = b.tabs.find((x) => x.targetId === String(B(req).id ?? ''));
     if (!t) throw new HttpError(404, 'No such tab');
+    // Your own browsing is never left without a tab: closing its last one opens a blank one (session.ts tabGone).
+    if (B(req).close === true && outsideSessions(key(req))) {
+      await b.closeTab(t);
+      return { view: b.view() };
+    }
     b.setActive(t);
     b.changed();
     return { view: b.view() };

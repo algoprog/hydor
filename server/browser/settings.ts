@@ -13,7 +13,7 @@ const KEY = 'browser.settings';
 const PROFILES = 'browser.profiles';
 export const PROFILE_DIR = path.join(BROWSER_DIR, 'profiles');
 
-const DEFAULTS: BrowserSettings = { chrome: '', headless: true, blockPrivate: true, screenshots: true, allow: [], block: [] };
+const DEFAULTS: BrowserSettings = { chrome: '', headless: true, blockPrivate: true, screenshots: true, allow: [], block: [], confirmSignedIn: true };
 
 function read<T>(db: DB, k: string, fallback: T): T {
   try {
@@ -51,6 +51,7 @@ export function setBrowserSettings(db: DB, patch: Partial<BrowserSettings>): Bro
   if (patch.headless !== undefined) next.headless = !!patch.headless;
   if (patch.blockPrivate !== undefined) next.blockPrivate = !!patch.blockPrivate;
   if (patch.screenshots !== undefined) next.screenshots = !!patch.screenshots;
+  if (patch.confirmSignedIn !== undefined) next.confirmSignedIn = !!patch.confirmSignedIn;
   if (patch.allow !== undefined) next.allow = cleanSites(patch.allow);
   if (patch.block !== undefined) next.block = cleanSites(patch.block);
   kvSet(db, KEY, JSON.stringify(next));

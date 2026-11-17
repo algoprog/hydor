@@ -85,6 +85,24 @@ A question shows its choices numbered: press a number to pick one (several, for 
 
 Some requests need the app: one about a signature, or a key for one of your apps. The terminal says so and gives the session's address in the app.
 
+### When the agent's browser waits for you
+
+What an agent's browser waits for shows as a card in the chat, after any approval that is ahead of it, in the words the app uses (see [The browser agents use](/guide/web#the-browser-agents-use)):
+
+- "Needs you in the browser: …", for a login, a check or anything the agent is unsure about, with the page's address under it.
+- "Stopped before paying or ordering: …. That is yours to do".
+- "Wants to open localhost:3000, on this machine or its network".
+- "Wants to press “Send” on mail.example.com", for a button that sends, posts, deletes or transfers on a site the browser is signed in to (see [Buttons that send, post or delete](/guide/web#buttons-that-send-post-or-delete)); the card adds that it presses it only if you allow it.
+- A page's pop-up question: the site says (or asks whether to leave), with its message.
+
+The card shows its keys, and one press answers it:
+
+- For an address or a button: **y** allows it (an address, for this session) and **n** doesn't.
+- For a login, a check or a payment, which only you can do in the page: **o** opens the session's page of the app in your browser, so you can take over there, **d** says you are done, and **n** says you can't (or not now, for a payment).
+- For a pop-up question: **y** is OK (Leave, for "Leave this page?") and **n** is Cancel (Stay). An alert has only OK. For a text prompt, type your answer and press Enter, or press **y** to keep what it shows, or **n** to cancel.
+
+The terminal can't show the page itself, so use **o** to take over. When it is answered, the card shrinks to one line: "Done in the browser", "Skipped", "Allowed" or "Not allowed".
+
 ### While it works
 
 Your input line stays yours. What Enter does with a message you send while the agent works is set by **Sending while an agent works** in [Settings → App → General](/settings?s=general&find=Sending%20while%20an%20agent%20works): **Join the turn** (the default, as in the app) puts it into the running turn, and **Wait for it** queues it, to go when the turn ends (it shows as **queued**). Whichever is set, two commands decide for one message:
@@ -147,7 +165,7 @@ What you leave out comes from what the app's start page picked last, then from t
 `hydor run "…"` (or `hydor -p "…"`) starts a session with your message, follows it until the work is done, prints the agent's last reply, and ends. Done means the turn ended, no subagent is still working or still owes its reply (Claude Code's own subagents in the background included, the agent's or a subagent's), and nothing waits in the queue: an agent that ends its turn to wait for its subagents is woken by their replies or their ends, and the run waits for that turn too. A command left running in the background, such as a dev server, does not hold it up. On `--timeout` or Ctrl+C, the subagents in the background are stopped with the turn. With nothing after it, it reads the message from what is piped in: `git diff | hydor run "review this change"`.
 
 - On a terminal, short lines on the side say what happens (each step, subagents starting and finishing); `-q` turns them off.
-- Nobody is there to answer, so an approval or a question stops the run, says what it was asked, and the session waits for you in the app or with `hydor resume`. With `--mode full` (or `-y`) the agent asks nothing.
+- Nobody is there to answer, so an approval or a question stops the run, says what it was asked, and the session waits for you in the app or with `hydor resume`. What the agent's browser waits for does the same (a login, a payment, an address or a button to allow, a pop-up question), and the run says it: "The agent’s browser: Wants to press “Delete” on mail.example.com". With `--mode full` (or `-y`) the agent asks nothing.
 - `--json` prints one object at the end: `key`, `url`, `status`, `reply`, `model`, `costUsd` (with its subagents'), `tokens`, `durationMs`, `turns`, `children` (each Hydor subagent's `title`, `label`, `tier`, `costUsd`, `status`) and `error` when it failed. `--stream-json` prints a line for each change as it happens (`item`, `live`, `note`), then that object as its last line.
 - `--timeout 300` stops the turn after 300 seconds.
 
@@ -317,6 +335,8 @@ Colours are on in a terminal (true colour where it has it) and off when the outp
 - "Turn on Tab completion for the hydor command in my shell."
 - "Give me a script that runs a review of my staged changes with hydor run and fails the commit when it finds a bug."
 - "What does exit code 3 from hydor run mean?"
+- "The agent's browser wants to press Send on a site: what do I press in the terminal?"
+- "My hydor run stopped with the agent's browser waiting for a login: how do I carry on?"
 - "Set up the hydor command on my laptop to use this computer's Hydor."
 - "Which hydor command lists my scheduled tasks, and how do I turn one off from the terminal?"
 - "Which hydor command saves a session's conversation as a Markdown file?"

@@ -115,6 +115,28 @@ terminals are shells in ConPTY that the server keeps, with what they printed, si
 are junctions. `server/platform-test.ts` checks all of it on the system it runs on, and the desktop workflow runs it on
 each.
 
+The browser works through that channel too. In the desktop apps the browser agents use, and the Browser page's own, is the
+app's Electron: `desktop/browser.cjs` answers the Chrome DevTools Protocol the server speaks (`server/browser/cdp.ts`, over
+the channel with `Cdp.over`; `server/browser/desktopEngine.ts` is the server's side), each tab a view, and
+`desktop/extensions.cjs` loads Chrome extensions into your own browsing's session. Settings → Browser offers it
+(`DESKTOP_CHROME`, the value `desktop`) when the server was started by the app (`HYDOR_DESKTOP_BROWSER`).
+`server/browser/selftest.ts` drives a real browser through every tool (`npm test -- browser/selftest` runs it on a
+Chromium installed here), and `desktop/scripts/browser-selftest.mjs` runs the same one on the desktop engine. It builds
+it into `dist/dev`, starts the dev app (`electron desktop`, hidden, under `xvfb-run -a` when there is no display, with
+`--no-sandbox` where the sandbox cannot run) on a scratch `DATA_DIR`, with `HYDOR_DESKTOP_SERVER_ENTRY` running the
+check instead of the server and `HYDOR_BROWSER_ENGINE=desktop`, and exits with its code. A second run
+(`desktop/scripts/browser-ipc-check.cjs`) checks what the first cannot see, the window's side: an agent's tab watched and
+typed into through the messages the app's page sends, and your own tab shown in the window. It needs Electron in
+`desktop/node_modules` (`cd desktop && npm ci`); `--no-ipc` and `--only-ipc` pick one of the two runs. It skips what
+Electron cannot do, saying so.
+
+```bash
+node desktop/scripts/browser-selftest.mjs
+```
+
+The bookmarks, extensions, hand-offs and the stop before sending have their checks beside them in `server/browser/`
+(`bookmarks-test.ts`, `extensions-test.ts`, `browsing-test.ts`, `handoff-test.ts`, `confirm-test.ts`): no real browser and no network.
+
 Computer use (`server/computer/`, in the desktop apps) works through that channel too. `plan.ts` checks the agent's
 actions and turns them into one list of driver steps for every system, with each system's keys (macOS's key codes,
 Windows' virtual-key codes, X11's keysyms) and the screenshot's pixels mapped to the screen (points on a Mac, pixels
