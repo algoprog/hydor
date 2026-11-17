@@ -2,8 +2,10 @@
 //
 // Every wiki folder resolves (real path) inside the hub (the one absolute path, from Settings) or inside its
 // project's own folder. Nothing an agent can write (a `- Wiki:` line in AGENTS.md, an entry in wikis.json) can point
-// a wiki anywhere else. An explicitly bound project path may resolve to the configured hub itself; arbitrary paths
-// outside the hub or project remain refused (a binding in AGENTS.md is ignored, a registry entry is an error).
+// a wiki anywhere else: a path that is absolute, starts with ~, climbs with .., goes through a hidden folder or leads
+// out through a symbolic link (or to the hub itself) is refused (a binding in AGENTS.md is then ignored, a registry entry is an error).
+// Only a project has its own wiki: a session in a folder that is not a project uses the shared wiki, whatever the
+// folder holds (a .wiki folder, an AGENTS.md line).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -162,12 +164,6 @@ function projectBase(folder: string | undefined): string | null {
 /** A project's wiki folder by its AGENTS.md binding: relative, inside the project; null when there is none or it is not allowed. */
 function boundRoot(folder: string, base: string, hub: string | null, create: boolean): { root: string | null } | null {
   const spec = projectBinding(folder);
-  // An explicit relative binding may name the configured shared hub, including through a worktree symlink.
-  // Resolve it before checking project-relative paths; no other external destination is permitted.
-  if (spec && hub && !path.isAbsolute(spec) && !spec.startsWith('~') && !/^[a-z]:/i.test(spec) && !/[\0\r\n\\]/.test(spec) && !spec.split('/').some((p) => SKIP.has(p.toLowerCase()) || p.toLowerCase().startsWith('.hydor-'))) {
-    try { if (fs.realpathSync(path.resolve(base, spec)) === hub) return { root: hub }; }
-    catch { /* A missing or inaccessible binding is handled by the normal project rules. */ }
-  }
   const parts = spec === undefined ? null : plainRelative(spec);
   if (!parts) return null;
   try {
@@ -177,32 +173,6 @@ function boundRoot(folder: string, base: string, hub: string | null, create: boo
   } catch {
     return null;
   }
-}
-
-/**
- * An unregistered working folder can already have its own wiki. Return undefined only when it has no
- * binding or existing local wiki; a declared but unavailable or unsafe wiki returns null (fail closed).
- * This lookup never creates files or a synthetic Hydor project.
- */
-export function unregisteredWikiRoot(db: DB, cwd: string | undefined): string | null | undefined {
-  const base = projectBase(cwd);
-  if (!cwd || !base || projectOfFolder(allSpaces(db), cwd, os.homedir())) return undefined;
-  const spec = projectBinding(cwd);
-  if (spec !== undefined) {
-    const resolved = boundRoot(cwd, base, hubDir(db), false);
-    return resolved ? resolved.root : null;
-  }
-  const parts = plainRelative(wikiSettings(db).projectPath);
-  if (!parts) return null;
-  const candidate = path.join(base, ...parts);
-  // An existing symlink must be examined rather than mistaken for an absent wiki.
-  try { fs.lstatSync(candidate); }
-  catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT' ? undefined : null; }
-  // A worktree's local wiki link may name exactly the explicitly configured hub.
-  try { const hub = hubDir(db); if (hub && fs.realpathSync(candidate) === hub) return hub; }
-  catch { return null; }
-  try { return within(base, candidate, false); }
-  catch { return null; }
 }
 
 /** The wiki folder of a registered wiki (<hub>/wikis.json), by name: relative paths inside the hub only. Null while missing. */

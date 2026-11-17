@@ -43,11 +43,11 @@ function WikiChatOptions({ value, onChange, session = false, cwd }: { value: Ses
     <>
       <div className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 py-1.5 max-sm:min-h-11">
         <BookOpen size={14} className="shrink-0 text-fg-3" />
-        <span className="min-w-0 flex-1 text-[13.5px] text-fg-2 max-sm:text-[14.5px]">LLM Wiki</span>
-        <Switch on={state.wiki} disabled={!state.available} label="LLM Wiki for this chat" onChange={(on) => onChange({ wikiEnabled: on })} />
+        <span className="min-w-0 flex-1 text-[13.5px] text-fg-2 max-sm:text-[14.5px]">Wiki memory</span>
+        <Switch on={state.wiki} disabled={!state.available} label="Wiki memory for this chat" onChange={(on) => onChange({ wikiEnabled: on })} />
       </div>
-      {session && state.wiki && <p className="px-2.5 pb-1 text-[11.5px] leading-snug text-fg-3">If LLM Wiki was enabled after the agent started, restart the agent to enable automatic checkpoints.</p>}
-      <div className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 py-1.5 max-sm:min-h-11" title={!state.lessonsAvailable ? 'Requires LLM Wiki and Memory for this chat' : 'Propose lessons automatically; saving requires confirmation'}>
+      {session && state.wiki && <p className="px-2.5 pb-1 text-[11.5px] leading-snug text-fg-3">If Wiki memory was turned on after the agent started, restart the agent to enable automatic checkpoints.</p>}
+      <div className="flex min-h-9 items-center gap-2 rounded-lg px-2.5 py-1.5 max-sm:min-h-11" title={!state.lessonsAvailable ? 'Requires Wiki memory and Memory for this chat' : 'Propose lessons automatically; saving requires confirmation'}>
         <Lightbulb size={14} className="shrink-0 text-fg-3" />
         <span className="min-w-0 flex-1 text-[13.5px] text-fg-2 max-sm:text-[14.5px]">Auto lessons learned</span>
         <Switch on={state.lessons} disabled={!state.lessonsAvailable} label="Auto lessons learned for this chat" onChange={(on) => onChange({ wikiAutoLessons: on })} />

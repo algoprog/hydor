@@ -1,5 +1,5 @@
-// Add a project's local wiki folder to Git's ignore file when enabled, only in a Git repository.
-// Never change Git's index or existing ignore entries.
+// Add a project's wiki folder to Git's ignore file: only for wikis kept in the project's own folder, only when Settings
+// ask for it (off by default), and only in a Git repository. Never changes Git's index or existing ignore entries.
 import fs from 'node:fs';
 import path from 'node:path';
 import type { DB } from '../../db.ts';
@@ -32,27 +32,16 @@ export async function ignoreProjectWiki(project: string, wiki: string, enabled: 
 }
 
 /**
- * Guard the actual project-local wiki root, including an explicit binding, while the setting is enabled.
- * A shared or hub wiki outside the project is not added to its ignore file.
+ * What Settings say for a write in a project's wiki: only with project wikis kept in the project's folder and
+ * "add to .gitignore" on, and only when `root` (its real path) is inside that folder. Undefined when there is nothing to do.
  */
 export async function guardWikiFolder(db: DB, space: string | null, root: string): Promise<{ changed: boolean; tracked: boolean } | undefined> {
   const settings = wikiSettings(db);
   const folder = space ? spaceById(db, space)?.folder : undefined;
-  if (!folder || !settings.gitIgnore) return undefined;
+  if (!folder || settings.projectWikis !== 'folder' || !settings.gitIgnore) return undefined;
   let base: string;
   let target: string;
   try { base = fs.realpathSync(folder); target = fs.realpathSync(root); } catch { return undefined; }
-  const rel = path.relative(base, target);
-  if (!rel || rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) return undefined;
-  return ignoreProjectWiki(base, target, true);
-}
-
-/** Apply the same guard to a pre-existing wiki in an unregistered working folder. */
-export async function guardUnregisteredWikiFolder(db: DB, cwd: string, root: string): Promise<{ changed: boolean; tracked: boolean } | undefined> {
-  if (!wikiSettings(db).gitIgnore) return undefined;
-  let base: string;
-  let target: string;
-  try { base = fs.realpathSync(cwd); target = fs.realpathSync(root); } catch { return undefined; }
   const rel = path.relative(base, target);
   if (!rel || rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) return undefined;
   return ignoreProjectWiki(base, target, true);

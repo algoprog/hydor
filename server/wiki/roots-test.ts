@@ -6,7 +6,7 @@ import path from 'node:path';
 import { openDb } from '../db.ts';
 import type { RunCtx } from '../features/types.ts';
 import { createSpace, updateSpace } from '../spaces/index.ts';
-import { namedWikiRoot, plainRelative, projectDir, unregisteredWikiRoot, wikiMemoryOn, wikiRoot } from './roots.ts';
+import { namedWikiRoot, plainRelative, projectDir, wikiMemoryOn, wikiRoot } from './roots.ts';
 import { setWikiSettings } from './settings/settings.ts';
 import { wikiTools } from './tools.ts';
 
@@ -48,7 +48,6 @@ try {
   assert.ok(fs.statSync(path.join(shared, 'wiki')).isDirectory() && fs.statSync(path.join(shared, 'raw')).isDirectory());
 
   // ---- a project's wiki in the hub: readable name + id suffix, chosen once
-  setWikiSettings(db, { projectWikis: 'hub' });
   assert.equal(wikiRoot(db, shop.id), null, 'missing without create');
   const mine = wikiRoot(db, shop.id, { create: true })!;
   const dir = projectDir(db, shop.id, shop.name);
@@ -87,15 +86,20 @@ try {
   bind('linked/wiki');
   assert.equal(wikiRoot(db, shop.id, { create: true }), mine);
   assert.equal(fs.readdirSync(outside).join(), 'wiki', 'nothing was made outside');
-  // A worktree may explicitly bind the already configured shared hub, but not arbitrary outside paths.
+  // A binding that resolves to the hub (directly, or through a worktree's .wiki link) is refused too, as it always was.
   bind('../hub/_index.md');
-  assert.equal(wikiRoot(db, shop.id), shared, 'a relative binding to the configured hub is accepted');
+  assert.equal(wikiRoot(db, shop.id), mine, 'a binding to the hub is ignored');
   fs.renameSync(path.join(projectFolder, '.wiki'), path.join(projectFolder, '.wiki-local'));
   fs.symlinkSync(shared, path.join(projectFolder, '.wiki'));
   bind('.wiki/_index.md');
-  assert.equal(wikiRoot(db, shop.id), shared, 'a worktree symlink to the configured hub is accepted');
+  assert.equal(wikiRoot(db, shop.id), mine, 'a .wiki link to the hub is ignored');
+  setWikiSettings(db, { projectWikis: 'folder' });
+  fs.rmSync(agents);
+  assert.throws(() => wikiRoot(db, shop.id, { create: true }), /outside/, 'in folder mode a .wiki link to the hub is refused');
+  setWikiSettings(db, { projectWikis: 'hub' });
   fs.unlinkSync(path.join(projectFolder, '.wiki'));
   fs.renameSync(path.join(projectFolder, '.wiki-local'), path.join(projectFolder, '.wiki'));
+  bind('knowledge/wiki');
   fs.rmSync(agents);
   // A binding wins in folder mode as well.
   setWikiSettings(db, { projectWikis: 'folder' });
@@ -110,7 +114,7 @@ try {
   const d2 = projectDir(db, proj2.id, proj2.name);
   fs.symlinkSync(outside, path.join(shared, 'projects', d2));
   assert.throws(() => wikiRoot(db, proj2.id, { create: true }), /outside/);
-  fs.unlinkSync(path.join(shared, 'projects', d2));
+  fs.rmSync(path.join(shared, 'projects', d2));
 
   // ---- named wikis: relative paths inside the hub only
   fs.mkdirSync(path.join(shared, 'topics', 'one', 'wiki'), { recursive: true });
@@ -132,25 +136,15 @@ try {
   assert.throws(() => namedWikiRoot(db, '__proto__'), /registered/);
   for (const bad of ['absolute', 'tilde', 'up', 'hubup', 'deep', 'sneaky', 'sessions', 'git', 'projects', 'mine', 'internal']) assert.throws(() => namedWikiRoot(db, bad), /relative folder|outside|inside/, `registry entry ${bad} is refused`);
   fs.rmSync(path.join(shared, 'wikis.json'));
-  // Existing unregistered project wikis remain distinct from the shared hub.
-  const unregistered = path.join(tmp, 'unregistered');
-  fs.mkdirSync(unregistered);
-  assert.equal(unregisteredWikiRoot(db, unregistered), undefined, 'without a wiki, the caller may use the hub');
-  fs.mkdirSync(path.join(unregistered, '.wiki'));
-  assert.equal(unregisteredWikiRoot(db, unregistered), path.join(unregistered, '.wiki'));
-  const instructions = path.join(unregistered, 'AGENTS.md');
-  fs.writeFileSync(instructions, '- Wiki: `../hub/_index.md`\n');
-  assert.equal(unregisteredWikiRoot(db, unregistered), shared, 'an explicit exact-hub binding is accepted');
-  fs.writeFileSync(instructions, '- Wiki: `../outside/_index.md`\n');
-  assert.equal(unregisteredWikiRoot(db, unregistered), null, 'an invalid explicit binding never falls back to the hub');
-  fs.unlinkSync(instructions);
-  fs.rmdirSync(path.join(unregistered, '.wiki'));
-  fs.symlinkSync(shared, path.join(unregistered, '.wiki'));
-  assert.equal(unregisteredWikiRoot(db, unregistered), shared, 'a worktree link to the exact hub is accepted');
-  fs.unlinkSync(path.join(unregistered, '.wiki'));
-  fs.symlinkSync(outside, path.join(unregistered, '.wiki'));
-  assert.equal(unregisteredWikiRoot(db, unregistered), null, 'another external link fails closed');
   assert.throws(() => namedWikiRoot(db, 'one'), /registered/);
+
+  // ---- a folder that is not a project never becomes a project wiki: a .wiki folder or an AGENTS.md line in it changes nothing
+  const stranger = path.join(tmp, 'stranger');
+  fs.mkdirSync(path.join(stranger, '.wiki', 'wiki'), { recursive: true });
+  fs.writeFileSync(path.join(stranger, 'AGENTS.md'), '- Wiki: `.wiki/_index.md`\n');
+  const strangerCtx = { key: 'test:stranger', runId: 'r', agent: 'codex', cwd: stranger, deps: { db } } as unknown as RunCtx;
+  const strangerStatus = JSON.parse(String(await wikiTools().find((t) => t.name === 'wiki_status')!.run({}, strangerCtx)));
+  assert.equal(strangerStatus.root, shared, 'outside a project the shared wiki is used, not the folder\'s own');
 
   // ---- the tools: a session reaches only what roots resolves
   const deps = { db } as unknown as RunCtx['deps'];

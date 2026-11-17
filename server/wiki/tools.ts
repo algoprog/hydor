@@ -4,10 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import type { RunCtx, RunTool } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
-import { guardUnregisteredWikiFolder, guardWikiFolder } from './settings/gitignore.ts';
+import { guardWikiFolder } from './settings/gitignore.ts';
 import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, wikiHash } from './core.ts';
 import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts';
-import { namedWikiRoot, unregisteredWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
+import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { wikiSettings } from './settings/settings.ts';
 import { wikiEnabledForSession } from './access.ts';
 import { inSession } from '../documents/index.ts';
@@ -62,9 +62,6 @@ function resolveTarget(ctx: RunCtx, name: string | undefined, create: boolean): 
   if (!wikiMemoryOn(db, space)) throw new Error(OFF);
   if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat');
   if (!name) {
-    // An existing local binding remains authoritative even before this folder is registered as a project.
-    const bound = !space ? unregisteredWikiRoot(db, ctx.cwd) : undefined;
-    if (bound !== undefined) return bound;
     return wikiRoot(db, space, { create });
   }
   if (!wikiMemoryOn(db, null)) throw new Error('The shared wiki is off in Settings → Memory → Wiki memory');
@@ -87,9 +84,9 @@ export function wikiReadTarget(ctx: RunCtx, name?: string): string | null {
 /** Plan adoption requires the session's existing project wiki and never falls back to the shared hub. */
 export function projectWikiTarget(ctx: RunCtx): string {
   const space = wikiSpaceOfSession(ctx.deps.db, ctx.key, ctx.cwd);
-  if (!space && !unregisteredWikiRoot(ctx.deps.db, ctx.cwd)) throw new Error('This session has no bound project wiki');
+  if (!space) throw new Error('This session has no project wiki');
   const root = wikiReadTarget(ctx);
-  if (!root) throw new Error('This session has no bound project wiki');
+  if (!root) throw new Error('This session has no project wiki');
   return root;
 }
 
@@ -114,8 +111,7 @@ function wrote(ctx: RunCtx, root: string): void {
 export async function guardProject(ctx: RunCtx, root: string): Promise<{ changed: boolean; tracked: boolean } | undefined> {
   const db = ctx.deps.db;
   const space = wikiSpaceOfSession(db, ctx.key, ctx.cwd);
-  const bound = !space ? unregisteredWikiRoot(db, ctx.cwd) : undefined;
-  const guarded = !space && bound === root ? await guardUnregisteredWikiFolder(db, ctx.cwd, root) : await guardWikiFolder(db, space, root);
+  const guarded = await guardWikiFolder(db, space, root);
   // A session switch can change while the Git guard waits for filesystem work.
   if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat');
   return guarded;

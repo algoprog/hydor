@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { kvGet, kvSet, openDb } from '../../db.ts';
 import { taskRoot } from '../../assistants/store.ts';
 import { createSpace } from '../../spaces/index.ts';
-import { guardUnregisteredWikiFolder, guardWikiFolder, ignoreProjectWiki } from './gitignore.ts';
+import { guardWikiFolder, ignoreProjectWiki } from './gitignore.ts';
 import { setWikiSettings, wikiSettings } from './settings.ts';
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-settings-'));
@@ -65,13 +65,14 @@ try {
   fs.mkdirSync(path.join(plain, '.wiki'), { recursive: true });
   assert.deepEqual(await ignoreProjectWiki(plain, path.join(plain, '.wiki'), true), { changed: false, tracked: false });
   assert.equal(fs.existsSync(path.join(plain, '.gitignore')), false);
-  // The settings decide: project-local wikis, only with the switch on, even for explicit bindings in hub mode.
+  // The settings decide: only wikis kept in the project's folder, only with the switch on (it is off by default).
   const space = createSpace(db, { name: 'Plain', folder: plain });
   const repo = createSpace(db, { name: 'Repo', folder: project });
-  setWikiSettings(db, { projectWikis: 'hub', gitIgnore: true });
-  assert.equal((await guardWikiFolder(db, repo.id, path.join(project, '.wiki')))?.changed, false, 'a local binding remains protected in hub mode');
-  setWikiSettings(db, { projectWikis: 'folder', gitIgnore: false });
   fs.writeFileSync(path.join(project, '.gitignore'), 'other\n');
+  setWikiSettings(db, { projectWikis: 'hub', gitIgnore: true });
+  assert.equal(await guardWikiFolder(db, repo.id, path.join(project, '.wiki')), undefined, 'nothing is added to .gitignore while project wikis are kept in the hub');
+  assert.equal(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), 'other\n');
+  setWikiSettings(db, { projectWikis: 'folder', gitIgnore: false });
   assert.equal(await guardWikiFolder(db, repo.id, path.join(project, '.wiki')), undefined, 'explicitly switched off');
   assert.equal(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), 'other\n');
   setWikiSettings(db, { gitIgnore: true });
@@ -81,11 +82,7 @@ try {
   assert.equal((await guardWikiFolder(db, repo.id, path.join(project, '.wiki')))?.changed, true);
   assert.equal(fs.readFileSync(path.join(project, '.gitignore'), 'utf8'), 'other\n/.wiki/\n');
   assert.equal((await guardWikiFolder(db, repo.id, path.join(project, '.wiki')))?.changed, false, 'already there: no change');
-  fs.writeFileSync(path.join(project, '.gitignore'), 'other\n');
-  assert.equal((await guardUnregisteredWikiFolder(db, project, path.join(project, '.wiki')))?.changed, true, 'an unregistered project wiki is protected');
-  assert.equal(await guardUnregisteredWikiFolder(db, project, temp), undefined, 'an external shared wiki is never added');
   setWikiSettings(db, { gitIgnore: false });
-  assert.equal(await guardUnregisteredWikiFolder(db, project, path.join(project, '.wiki')), undefined, 'the unregistered guard respects opt-out');
   assert.equal(await guardWikiFolder(db, null, hubFolder), undefined);
   console.log('Wiki settings and Git ignore tests passed');
 } finally {
