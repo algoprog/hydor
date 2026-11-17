@@ -7,7 +7,8 @@
 //   - a pop-up of an agent's tab is an agent's tab too;
 //   - your own tab (onscreen) is shown in the window where asked, moves, goes away with the window, is drawn there,
 //     and still answers CDP while it is shown; its shortcuts reach the window's page;
-//   - `still` is a JPEG picture of a shown own tab (and null for an agent's tab or one that is not shown), and a resize of the
+//   - `still` is a JPEG picture of a shown own tab in the screen's own pixels, however wide (and null for an agent's tab or
+//     one that is not shown), and a resize of the
 //     window moves a shown own tab at once, by its distance from the window's edges;
 //   - what is not an own tab or an agent's tab here is refused, and a page that is not the app's own gets nothing;
 //   - what people expect of a browser, for your own tab: zoom (keys and the preload), find with its match count, mute, the
@@ -344,12 +345,27 @@ app.whenReady().then(async () => {
       const bytes = Buffer.from(url.slice('data:image/jpeg;base64,'.length), 'base64');
       assert.ok(bytes.length > 300, 'an empty picture');
       assert.deepEqual([...bytes.subarray(0, 2)], [0xff, 0xd8], 'not a JPEG');
-      const img = require('electron').nativeImage.createFromDataURL(url);
-      assert.deepEqual([img.getSize().width, img.getSize().height], [400, 300]);
+      const { nativeImage, screen } = require('electron');
+      // In the screen's own pixels (twice the place's on a Retina screen), or the window blurs it stretching it back.
+      const scale = screen.getDisplayMatching(win.getBounds()).scaleFactor;
+      const sizeOf = (u) => {
+        const s = nativeImage.createFromDataURL(u).getSize();
+        return [s.width, s.height];
+      };
+      const img = nativeImage.createFromDataURL(url);
+      assert.deepEqual(sizeOf(url), [Math.ceil(400 * scale), Math.ceil(300 * scale)]);
       // It is the page (red), not a blank.
       const bm = img.toBitmap();
-      const at = ((150 * 400) + 200) * 4;
+      const [bw, bh] = sizeOf(url);
+      const at = (Math.floor(bh / 2) * bw + Math.floor(bw / 2)) * 4;
       assert.ok(bm[at + 2] > 200 && bm[at + 1] < 60 && bm[at] < 60, 'the picture is not of the page');
+      // A page as wide as the window is not made smaller either (it was cut to 1920 pixels, blurred on a Retina screen).
+      await page(`hydorDesktop.browser.show(${id}, {x:20,y:40,w:1240,h:800})`);
+      await sleep(500);
+      const wide = await page(`hydorDesktop.browser.still(${id})`);
+      assert.deepEqual(sizeOf(wide), [Math.ceil(1240 * scale), Math.ceil(800 * scale)]);
+      await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+      await sleep(300);
       // An agent's tab has no place in the window: nothing to take a picture of.
       assert.equal(await page(`hydorDesktop.browser.still(${JSON.stringify(agent.targetId)})`), null);
       assert.equal(await page(`hydorDesktop.browser.still('NOSUCHTARGET')`), null);

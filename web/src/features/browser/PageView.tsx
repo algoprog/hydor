@@ -24,7 +24,7 @@ export interface PageRect {
 export interface DesktopBrowserBridge {
   show(target: string, rect: PageRect, opts: { fit: 'scale' | 'fill' }): Promise<boolean>;
   hide(target?: string): Promise<void>;
-  /** A picture of one of your own tabs as it is shown now (a JPEG data URL, the size of its place); null when it is not shown. An older app does not have it. */
+  /** A picture of one of your own tabs as it is shown now (a JPEG data URL of its place, in the screen's own pixels); null when it is not shown. An older app does not have it. */
   still?(target: string): Promise<string | null>;
   focus(target: string): Promise<void>;
   popup(extensionId: string, rect: PageRect): Promise<boolean>;

@@ -50,6 +50,10 @@ const ENGINES = {
   ecosia: ['Ecosia', 'https://www.ecosia.org/search?q=%s'],
   startpage: ['Startpage', 'https://www.startpage.com/do/search?q=%s'],
 };
+/** The picture of your page shown under a menu: at most this many pixels (a whole 5K screen's page fits), and a JPEG
+ * quality at which small text stays clean. */
+const STILL_PIXELS = 16_000_000;
+const STILL_QUALITY = 90;
 /** Frames to the window: at most this many a second, while someone watches. */
 const WATCH_FPS = 30;
 const IDLE_FPS = 10;
@@ -1220,8 +1224,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
   }
 
   /**
-   * A picture of a page of yours as it is now (a JPEG data URL, the size of its place), for the app's page to show where
-   * the page is taken away for a while (a menu over it): null when it is not shown, or not one of your tabs here.
+   * A picture of a page of yours as it is now (a JPEG data URL of its place, in the screen's own pixels), for the app's
+   * page to show where the page is taken away for a while (a menu over it): null when it is not shown, or not one of your
+   * tabs here.
    */
   async function still(e, target) {
     if (!fromOwnPage(e)) return null;
@@ -1230,9 +1235,12 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adb
     try {
       let img = await withTimeout(t.wc.capturePage(), 400, 'The picture');
       if (img.isEmpty()) return null;
-      const { width } = img.getSize();
-      if (width > 1920) img = img.resize({ width: 1920, quality: 'good' });
-      return `data:image/jpeg;base64,${img.toJPEG(72).toString('base64')}`;
+      // capturePage gives the screen's own pixels (two for each of the page's on a Retina screen): kept as they are, or
+      // the picture is blurred as the window stretches it back over the page. Only a giant one is made smaller.
+      const { width, height } = img.getSize();
+      const over = (width * height) / STILL_PIXELS;
+      if (over > 1) img = img.resize({ width: Math.round(width / Math.sqrt(over)), quality: 'good' });
+      return `data:image/jpeg;base64,${img.toJPEG(STILL_QUALITY).toString('base64')}`;
     } catch {
       return null;
     }
