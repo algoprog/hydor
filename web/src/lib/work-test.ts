@@ -3,13 +3,15 @@
 // Build and run:
 //   OUTDIR=dist/dev node scripts/build-server.mjs web/src/lib/work-test.ts && node dist/dev/work-test.js
 import assert from 'node:assert/strict';
-import type { BackgroundTask, SessionSummary } from '@shared/types';
-import { childrenOf, childState, needsLine, stopWords, taskKindLabel, taskKindOf, taskState, workItems, workSummary } from './work';
+import type { BackgroundTask, SessionSummary, TimelineItem, ToolSubagent } from '@shared/types';
+import { childrenOf, childState, needsLine, programSubs, stopWords, taskKindLabel, taskKindOf, taskState, workItems, workSummary } from './work';
 
 let n = 0;
 const ses = (more: Partial<SessionSummary> = {}): SessionSummary => ({ key: `claude:c${++n}`, agent: 'claude', id: String(n), title: `Child ${n}`, stats: {} as SessionSummary['stats'], ...more });
 const live = (status: string, more: Record<string, unknown> = {}) => ({ status, startedAt: 1, pendingApprovals: 0, ...more }) as unknown as SessionSummary['live'];
 const task = (id: string, status: string, more: Partial<BackgroundTask> = {}): BackgroundTask => ({ id, description: id, kind: 'local_bash', status, ...more });
+const call = (id: string, sub: Partial<ToolSubagent> = {}, ts = 100): TimelineItem =>
+  ({ kind: 'tool', id, seq: 1, ts, tool: { name: 'Agent', title: 'Agent', category: 'agent', status: 'completed', subagent: { title: `Sub ${id}`, state: 'running', ...sub } } }) as unknown as TimelineItem;
 let passed = 0;
 let total = 0;
 const test = (name: string, fn: () => void) => {
@@ -118,6 +120,53 @@ test('the program’s own subagents (tasks of kind subagent) count as subagents,
   assert.equal(w.text, '3 subagents · 1 background task · all done');
   assert.equal(workSummary(workItems([], [agent('a', 'completed')])).text, '1 subagent · all done');
   assert.equal(workSummary(workItems([], [agent('a', 'stopped'), agent('b', 'stopped')])).text, '2 subagents · all done');
+});
+
+test('the program’s subagents: one for each call that started one, one for each task no call matched', () => {
+  const items = [call('c1', { id: 'a1', type: 'Explore', model: 'sonnet' }), call('c2', { state: 'done', endedAt: 900 }, 200), { kind: 'assistant', id: 'x', seq: 3, text: 'hi' } as TimelineItem];
+  // No tasks: the call's own state, its key made from its id.
+  let subs = programSubs('claude', items, [], true);
+  assert.equal(subs.length, 2);
+  assert.deepEqual(subs[0], { key: 'claude:agent-a1', id: 'a1', toolUseId: 'c1', title: 'Sub c1', type: 'Explore', model: 'sonnet', state: 'running', startedAt: 100 });
+  assert.deepEqual([subs[1].key, subs[1].state, subs[1].startedAt, subs[1].endedAt], [undefined, 'done', 200, 900]);
+  // A running subagent died with its program when that no longer runs.
+  assert.deepEqual(programSubs('claude', items, [], false).map((x) => x.state), ['stopped', 'done']);
+  // Codex's older rollouts never wrote that a subagent finished: with its program gone, it counts as done.
+  assert.deepEqual(programSubs('codex', items, [], false).map((x) => x.state), ['done', 'done']);
+  // A task by the subagent's id, or by the call's id, says how it stands, and gives a call without a key its key.
+  const byId = task('a1', 'completed', { kind: 'local_agent', startedAt: 150, endedAt: 450 });
+  const byCall = task('t9', 'failed', { kind: 'local_agent', toolUseId: 'c2', startedAt: 250 });
+  subs = programSubs('claude', items, [byId, byCall], true);
+  assert.deepEqual(subs.map((x) => [x.state, x.startedAt, x.endedAt]), [['done', 150, 450], ['failed', 250, 900]]);
+  assert.deepEqual(subs.map((x) => x.key), ['claude:agent-a1', 'claude:agent-t9']);
+  // Codex keys are the thread's id.
+  assert.equal(programSubs('codex', [call('c1', { id: 'th1' })], [], true)[0].key, 'codex:th1');
+  // A task no call matched is one of its own, titled by its description; commands are not subagents; a task listed twice is one.
+  const lone = task('z1', 'running', { kind: 'local_agent', description: 'Search the docs', startedAt: 50, toolUseId: 'gone' });
+  subs = programSubs('claude', [call('c1', { id: 'a1' })], [lone, { ...lone, status: 'completed' }, task('cmd', 'running')], true);
+  assert.equal(subs.length, 2);
+  assert.deepEqual([subs[1].key, subs[1].title, subs[1].state, subs[1].toolUseId], ['claude:agent-z1', 'Search the docs', 'running', 'gone']);
+});
+
+test('the tray: a program subagent replaces the agent tasks it covers, is ordered as the rest, and counts as a subagent', () => {
+  const items = [call('c1', { id: 'a1' }, 100), call('c2', { id: 'a2', state: 'done', endedAt: 5000 }, 200)];
+  const tasks = [task('a1', 'running', { kind: 'local_agent', startedAt: 100 }), task('a2', 'completed', { kind: 'local_agent', endedAt: 4000 }), task('cmd', 'running', { startedAt: 300 })];
+  const subs = programSubs('claude', items, tasks, true);
+  const w = workItems([], tasks, subs);
+  // No duplicates: the two agent tasks are the two subagent rows, and the command stays a task.
+  assert.deepEqual(w.map((i) => [i.type, i.id, i.state]), [['sub', 'claude:agent-a1', 'running'], ['task', 'cmd', 'running'], ['sub', 'claude:agent-a2', 'done']]);
+  const sum = workSummary(w);
+  assert.equal(sum.text, '1 subagent and 1 background task running');
+  assert.deepEqual([sum.children, sum.tasks], [0, 2]);
+  // With a Hydor subagent too, and with everything done.
+  assert.equal(workSummary(workItems([ses({ live: live('working') })], tasks, subs)).text, '2 subagents and 1 background task running');
+  assert.equal(workSummary(workItems([], [], programSubs('codex', [call('c1', { id: 'th', state: 'done' }), call('c2', { state: 'failed' })], [], true))).text, '2 subagents · all done');
+  // Without the subagents given, an agent task is a task row, as before.
+  assert.deepEqual(workItems([], tasks).map((i) => i.type), ['task', 'task', 'task']);
+  // A subagent still running that nothing lists (its program is gone) is stopped and does not count as running.
+  const dead = workItems([], [], programSubs('claude', [call('c1', { id: 'a1' })], [], false));
+  assert.deepEqual(dead.map((i) => i.state), ['stopped']);
+  assert.equal(workSummary(dead).text, '1 subagent · all done');
 });
 
 test('what Stop says it stops: the turn, the subagents and the background tasks, each case in its own words', () => {

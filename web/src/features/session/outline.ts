@@ -2,7 +2,7 @@
 // does next) opens a part, and the steps it then takes go in it. A finished part shows as one line, its note in a few
 // words; the part under way shows its note in full and its current step. The words come from the note itself, so
 // they show at once, cost nothing and work for every agent and every session, old ones too.
-import type { AssistantItem, TimelineItem } from '@shared/types';
+import type { AssistantItem, SystemItem, TimelineItem } from '@shared/types';
 
 export interface Part {
   /** Its first item's id (a note, or the thought before it): it stays the same as the part grows. */
@@ -143,14 +143,20 @@ export function noteLike(md: string): boolean {
   return true;
 }
 
-/** A stretch of a turn: work, shown as an outline, or a text the agent wrote between its steps that reads as a reply. */
-export type Run = { kind: 'work'; id: string; items: TimelineItem[] } | { kind: 'said'; id: string; item: AssistantItem };
+/** A subagent of the program's own coming back to its lead in the middle of a turn (a system item with `subagent`). */
+export type SubagentNotice = SystemItem & { subagent: NonNullable<SystemItem['subagent']> };
+
+/**
+ * A stretch of a turn: work, shown as an outline, a text the agent wrote between its steps that reads as a reply, or a
+ * subagent's reply that reached the agent in the middle of its work.
+ */
+export type Run = { kind: 'work'; id: string; items: TimelineItem[] } | { kind: 'said'; id: string; item: AssistantItem } | { kind: 'reply'; id: string; item: SubagentNotice };
 
 /**
  * A turn's work, cut where the agent wrote what reads as a reply (noteLike says no): its answer to a message you sent
  * while it worked, or what it found before it went on. Such a text shows in its place as a reply, between the work
- * before and after it; the short notes between steps stay in the outline. A stretch of work keeps its first item's id
- * as it grows.
+ * before and after it; the short notes between steps stay in the outline. A subagent's reply (a system item with
+ * `subagent`) cuts the work the same way and shows in its place. A stretch of work keeps its first item's id as it grows.
  */
 export function runsOf(work: TimelineItem[]): Run[] {
   const out: Run[] = [];
@@ -163,6 +169,9 @@ export function runsOf(work: TimelineItem[]): Run[] {
     if (it.kind === 'assistant' && !noteLike(it.text)) {
       flush();
       out.push({ kind: 'said', id: it.id, item: it });
+    } else if (it.kind === 'system' && it.subagent) {
+      flush();
+      out.push({ kind: 'reply', id: it.id, item: it as SubagentNotice });
     } else cur.push(it);
   }
   flush();

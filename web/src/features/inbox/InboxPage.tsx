@@ -152,7 +152,7 @@ export function InboxPage() {
   // Sessions starting or stopping to wait: the list is asked again.
   const waitingSig = useSessions((s) =>
     Object.values(s.byKey)
-      .filter((x) => activityOf(x)?.status === 'waiting')
+      .filter((x) => !x.subagentOf && activityOf(x)?.status === 'waiting')
       .map((x) => `${x.key}:${x.live?.pendingApprovals ?? 0}`)
       .join(','),
   );

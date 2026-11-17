@@ -839,10 +839,11 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   const root = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const { sessionKey } = useContext(SessionCtx);
-  // Your own messages in sessions this app can drive (not ones only open elsewhere).
+  // Your own messages in sessions this app can drive (not ones only open elsewhere, nor a program's own subagent, whose
+  // first message is its lead's brief and which never takes another).
   const canEdit = useSessions((x) => {
     const s = sessionKey ? x.byKey[sessionKey] : undefined;
-    return !!s && !s.external && (s.agent !== 'acp' || s.acpAgent === 'console') && !item.meta && !item.peer && !item.id.startsWith('held:');
+    return !!s && !s.external && !s.subagentOf && (s.agent !== 'acp' || s.acpAgent === 'console') && !item.meta && !item.peer && !item.id.startsWith('held:');
   });
   const [showContext, setShowContext] = useState(false);
   const parsed = useMemo(() => {
@@ -861,7 +862,7 @@ export const UserBubble = memo(function UserBubble({ item, arrive, sent }: { ite
   }, []);
   if (item.peer) return <PeerMessage item={item} />;
   if (parsed.run) return <RunMessageRow item={item} run={parsed.run} />;
-  if (parsed.child) return <ChildReplyRow item={item} reply={parsed.child} />;
+  if (parsed.child) return <ChildReplyRow ts={item.ts} reply={parsed.child} />;
   if (item.meta === 'slash') {
     return (
       <div className="tl-item flex justify-end">

@@ -65,6 +65,7 @@ import { codexWikiHookCommand } from './wiki/session/codex-hook.ts';
 import { wikiChatEnabled } from './wiki/access.ts';
 import { wikiSettings } from './wiki/settings/settings.ts';
 import { helper } from './helper.ts';
+import { countSubagents, isAgentTask, leadOf, pendingClaudeSubagent, pendingSummary, refuseSubagent, runningTask, subagentKeyOf, subagentLive, subagentMeta, type Leads } from './subagents.ts';
 import { redactSecrets } from './memory/secrets.ts';
 import { redact as redactVault } from './connections/vault.ts';
 
@@ -369,12 +370,18 @@ function carried(db: DB, key: string): SessionExtra | undefined {
   const b = carriedBrowserOnly(db, key);
   return a || b ? { ...a, ...b } : undefined;
 }
+/** What the subagent helpers read of a manager (also of the stand-ins that tests make of one). */
+const leadsOf = (m: SessionManager): Leads => ({ db: (m as any).db, lives: (m as any).lives, external: (m as any).external });
+
 export class SessionManager extends EventEmitter {
   lives = new Map<string, Live>();
   private timelines = new Map<string, Timeline>();
   private liveTimers = new Map<string, NodeJS.Timeout>();
   private pendingSummaries = new Set<string>();
   private summaryTimer: NodeJS.Timeout | null = null;
+  /** How many program subagents (Claude Code's, Codex's own) each session has in the index, from one grouped query. */
+  private subCounts = new Map<string, number>();
+  private subCountTimer: NodeJS.Timeout | null = null;
   /** Sessions running in VS Code or a terminal (not started here). */
   external: ExternalWatcher;
 
@@ -385,9 +392,19 @@ export class SessionManager extends EventEmitter {
     private codex: CodexControl,
   ) {
     super();
+    this.subCounts = countSubagents(db);
     indexer.on('updated', ({ keys, removed }: { keys: string[]; removed: string[] }) => {
       for (const k of keys) this.pendingSummaries.add(k);
+      // A subagent's transcript the page opened before the index had it is followed from where the index found it.
+      for (const k of keys) {
+        const tl = this.timelines.get(k);
+        if (tl && !tl.filePath) {
+          const p = this.transcriptFor(k);
+          if (p) tl.setPath(p);
+        }
+      }
       this.flushSummaries();
+      this.refreshSubCounts();
       if (removed.length) this.emit('sessions', [], removed);
     });
     setInterval(() => this.reapIdle(), 5 * 60_000).unref();
@@ -469,7 +486,10 @@ export class SessionManager extends EventEmitter {
   private rowToSummary(r: Row, helpers: Map<string, Set<string>> = this.runningHelpers()): SessionSummary {
     const live = this.lives.get(r.key);
     const agent = (r.agent ?? r.app_agent) as Agent;
-    const title = r.app_title || r.title || r.first_prompt || r.app_first_prompt || 'New session';
+    // A subagent of the session's own program: named as its transcript's neighbours say, and working while its lead's agent runs it.
+    const lead = r.parent_key;
+    const sub = lead ? subagentMeta(r.key, r.path) : null;
+    const title = r.app_title || sub?.title || r.title || r.first_prompt || r.app_first_prompt || 'New session';
     const prefs: SessionPrefs | undefined =
       r.pref_model || r.pref_effort || r.pref_mode ? { model: r.pref_model ?? undefined, effort: r.pref_effort ?? undefined, mode: r.pref_mode ?? undefined } : undefined;
     return {
@@ -503,7 +523,10 @@ export class SessionManager extends EventEmitter {
         genMs: r.gen_ms || undefined,
         workMs: r.work_ms || undefined,
       },
-      live: this.liveState(r.key),
+      live: lead ? subagentLive(leadsOf(this), r.key, lead, r.created_at ?? 0) : this.liveState(r.key),
+      subagentOf: lead ?? undefined,
+      subagentType: sub?.type,
+      programSubagents: this.programCount(r.key) || undefined,
       // Set also while the session's own process is stopped between turns: its helpers' work is not over.
       helpers: helpers.get(r.key)?.size || undefined,
       external: live ? null : this.externalState(r),
@@ -531,6 +554,31 @@ export class SessionManager extends EventEmitter {
       createdByApp: !!r.created_by_app,
       prefs,
     };
+  }
+
+  /** How many program subagents a session has: those in the index, and (Claude Code) those its running agent lists that are not there yet. */
+  private programCount(key: string): number {
+    let n = this.subCounts?.get(key) ?? 0;
+    const l = this.lives.get(key);
+    if (l?.agent === 'claude') {
+      for (const t of l.adapter.tasks?.values() ?? []) {
+        if (isAgentTask('claude', t) && !this.db.prepare('select 1 from sessions where key = ?').get(subagentKeyOf('claude', t.id))) n++;
+      }
+    }
+    return n;
+  }
+
+  /** The index has new or removed rows: the subagent counts again (once in a while), and a session whose count changed is listed again. */
+  private refreshSubCounts() {
+    if (this.subCountTimer) return;
+    this.subCountTimer = setTimeout(() => {
+      this.subCountTimer = null;
+      const next = countSubagents(this.db);
+      const was = this.subCounts;
+      this.subCounts = next;
+      for (const k of new Set([...was.keys(), ...next.keys()])) if (was.get(k) !== next.get(k)) this.queueSummary(k);
+    }, 300);
+    this.subCountTimer.unref?.();
   }
 
   /** A session open elsewhere, with the background tasks its current process started (earlier runs' died with them). */
@@ -593,7 +641,26 @@ export class SessionManager extends EventEmitter {
 
   summary(key: string): SessionSummary | null {
     const r = this.row(key);
-    return r ? this.rowToSummary(r) : null;
+    // A Claude Code subagent just started, which the index has not read yet: what its lead's agent says of it.
+    return r ? this.rowToSummary(r) : pendingSummary(leadsOf(this), key);
+  }
+
+  /** The program subagents of a session, oldest first: those in the index, and those its running agent lists that are not there yet. */
+  subagentsOf(key: string): SessionSummary[] {
+    const rows = this.db.prepare(`${SELECT} where s.parent_key = ? order by coalesce(s.created_at, 0), s.key`).all(key) as Row[];
+    const helpers = this.runningHelpers();
+    const out = rows.map((r) => this.rowToSummary(r, helpers));
+    const l = this.lives.get(key);
+    if (l?.agent === 'claude') {
+      const have = new Set(rows.map((r) => r.key));
+      for (const t of l.adapter.tasks.values()) {
+        const k = subagentKeyOf('claude', t.id);
+        const s = isAgentTask('claude', t) && !have.has(k) ? pendingSummary(leadsOf(this), k) : null;
+        if (s) out.push(s);
+      }
+      out.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+    }
+    return out;
   }
 
   /**
@@ -628,13 +695,15 @@ export class SessionManager extends EventEmitter {
       const out: SessionSummary[] = [];
       const helpers = this.runningHelpers();
       for (const k of this.pendingSummaries) {
+        // Subagent transcripts and Codex child threads come too: the app keeps those out of its lists itself (subagentOf).
         const r = this.row(k);
-        // Subagent transcripts and Codex child threads are indexed, but list under their parent, not on their own.
-        if (r && (!r.parent_key || this.lives.has(k))) out.push(this.rowToSummary(r, helpers));
+        const s = r ? this.rowToSummary(r, helpers) : pendingSummary(leadsOf(this), k);
+        if (s) out.push(s);
       }
       this.pendingSummaries.clear();
       if (out.length) this.emit('sessions', out, []);
-      this.watchStatus(out);
+      // A subagent's turns are its lead's work: it has no notices of its own.
+      this.watchStatus(out.filter((s) => !s.subagentOf));
     }, 250);
   }
 
@@ -875,6 +944,16 @@ export class SessionManager extends EventEmitter {
     this.queueSummary(key);
   }
 
+  /** The last thing the agent wrote in a session, whole ('' when it has written nothing): a Codex subagent's reply, which its lead's transcript does not carry. */
+  async lastText(key: string): Promise<string> {
+    const items = (await this.timeline(key)).parser.items;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (it.kind === 'assistant' && it.text.trim()) return it.text;
+    }
+    return '';
+  }
+
   /** The start of the latest reply, when its timeline is in memory (never loads a transcript for it). */
   private lastReply(key: string): string | undefined {
     const items = this.timelines.get(key)?.parser.items ?? [];
@@ -939,6 +1018,9 @@ export class SessionManager extends EventEmitter {
     if (live?.adapter.transcriptPath) return live.adapter.transcriptPath;
     const row = this.db.prepare('select path from sessions where key = ?').get(key) as { path: string } | undefined;
     if (row?.path) return row.path;
+    // A Claude Code subagent the index has not read yet: in its lead's folder, where its lead's agent writes it.
+    const pending = pendingClaudeSubagent(leadsOf(this), key);
+    if (pending) return pending.file;
     if (key.startsWith('claude:')) {
       const app = live ? undefined : (this.db.prepare('select cwd, account from app_sessions where key = ?').get(key) as { cwd: string; account: string | null } | undefined);
       return claudeTranscriptOf(this.db, key.slice(7), live?.cwd ?? app?.cwd, live ? live.account : app?.account);
@@ -978,8 +1060,16 @@ export class SessionManager extends EventEmitter {
       }
     });
     t.on('reset', () => this.emit('items', key, [], 0, true));
-    await t.load(this.lives.has(key) || !!this.external.get(key));
+    // A program subagent that runs is live too: its last turn is open until it ends.
+    await t.load(this.lives.has(key) || !!this.external.get(key) || !!this.programRunning(key));
     return t;
+  }
+
+  /** The task that says this session is a program subagent that runs now (see subagents.ts); null for any other, and for one that has ended. */
+  private programRunning(key: string) {
+    const c = leadsOf(this);
+    const lead = leadOf(c, key);
+    return lead ? runningTask(c, key, lead) : null;
   }
 
   private sweepTimelines() {
@@ -1013,7 +1103,13 @@ export class SessionManager extends EventEmitter {
   liveSnapshot(key: string): { live: LiveState | null; overlay: LiveOverlay } {
     const l = this.lives.get(key);
     if (l) this.dateTasks(l);
-    const snap = { live: this.liveState(key), overlay: l ? l.adapter.overlay() : { items: [], patches: {}, approvals: [] } };
+    let live = this.liveState(key);
+    // A program subagent runs inside its lead: working while the lead's agent has it running.
+    if (!live && !l && /^(claude:agent-|codex:)/.test(key)) {
+      const c = leadsOf(this);
+      live = subagentLive(c, key, leadOf(c, key));
+    }
+    const snap = { live, overlay: l ? l.adapter.overlay() : { items: [], patches: {}, approvals: [] } };
     // A new session that asks to build its project's memory first: its message waits here, and the card is the question or the progress.
     const gate = this.gates.get(key);
     if (gate) snap.overlay = { ...snap.overlay, items: [...snap.overlay.items, this.heldItem(key, gate)], approvals: [...snap.overlay.approvals, cardOf(gate)] };
@@ -1067,10 +1163,13 @@ export class SessionManager extends EventEmitter {
     let lastTasks = 0;
     let turnBegan = 0;
     let lastGoal = JSON.stringify(adapter.state.goal ?? null);
+    // Its program's subagents (tasks of its own), by id: whether each ran at the last change.
+    const subs = new Map<string, boolean>();
     // Each card the user is asked (an approval, a question, a form): when it came and when it went, for a turn's breakdown.
     const asked = new Map<string, { at: number; kind: string }>();
     adapter.on('change', () => {
       emitLive();
+      this.watchSubagents(l, subs);
       const now = Date.now();
       for (const [id, a] of adapter.approvals) if (!asked.has(id)) asked.set(id, { at: now, kind: a.kind });
       for (const [id, w] of asked)
@@ -1192,6 +1291,42 @@ export class SessionManager extends EventEmitter {
     if (adapter.transcriptPath) this.timelines.get(key)?.setPath(adapter.transcriptPath);
     this.queueSummary(key);
     this.queueAncestors(key);
+  }
+
+  /**
+   * The agent's tasks changed: each of its program's own subagents whose running changed (or that is new) has its page
+   * and its lead's count listed again, a running one's conversation is followed and one that ended is read to its end.
+   * `ran`: by task id, whether each ran when this last looked.
+   */
+  private watchSubagents(l: Live, ran: Map<string, boolean>) {
+    const { adapter } = l;
+    for (const t of adapter.tasks.values()) {
+      if (!isAgentTask(adapter.agent, t)) continue;
+      const running = t.status === 'running' && !adapter.exited;
+      const was = ran.get(t.id);
+      if (was === running) continue;
+      ran.set(t.id, running);
+      const sub = subagentKeyOf(adapter.agent, t.id);
+      // A Claude Code subagent is written where its lead's transcript is: the index reads it at once, so its row is there in a moment.
+      if (adapter.agent === 'claude') this.indexer.poke([pendingClaudeSubagent(leadsOf(this), sub)?.file]);
+      if (was === undefined) this.queueSummary(l.key);
+      this.queueSummary(sub);
+      const tl = this.timelines.get(sub);
+      if (!tl) continue;
+      if (running) {
+        tl.reopen();
+        tl.poke();
+      } else {
+        // The last lines may be written just after the task ends: read them, then close its last turn.
+        setTimeout(() => {
+          if (this.programRunning(sub)) return;
+          tl.readMore()
+            .then(() => tl.finish())
+            .catch(() => {});
+          this.queueSummary(sub);
+        }, 700).unref?.();
+      }
+    }
   }
 
   private touchApp(key: string) {
@@ -1515,6 +1650,7 @@ export class SessionManager extends EventEmitter {
    * back to how they were then: a worktree's snapshot, or Claude Code's own checkpoints.
    */
   async rewind(key: string, o: { itemId: string; text: string; restoreFiles?: boolean }): Promise<string> {
+    refuseSubagent(leadsOf(this), key);
     const custom = this.isCustom(key);
     if (key.startsWith('acp:') && !custom) throw new HttpError(400, 'Not available for this agent');
     const s = this.summary(key);
@@ -1597,6 +1733,7 @@ export class SessionManager extends EventEmitter {
    * `prompt`. The two sessions link to each other.
    */
   async handoff(fromKey: string, o: Omit<CreateOpts, 'cwd' | 'title'>): Promise<string> {
+    refuseSubagent(leadsOf(this), fromKey);
     checkHandoff(this.db, fromKey);
     checkBrowserOnlyHandoff(this.db, fromKey);
     if (fromKey.startsWith('acp:') || (o.agent === 'acp' && o.acpAgent !== CONSOLE_ID)) throw new HttpError(400, 'Hand-offs go from Claude Code or Codex to the other one or to Custom');
@@ -1624,6 +1761,7 @@ export class SessionManager extends EventEmitter {
    * arrives; Codex copies the thread right away.
    */
   async fork(key: string, o: { prompt: string; images?: ImageInput[]; files?: FileInput[]; at?: string }): Promise<string> {
+    refuseSubagent(leadsOf(this), key);
     if (key.startsWith('acp:') && !this.isCustom(key)) throw new HttpError(400, 'Not available for this agent');
     const from = this.summary(key);
     const cwd = this.sessionCwd(key);
@@ -1827,7 +1965,7 @@ export class SessionManager extends EventEmitter {
   /** Whether a session's own subagents (Claude Code's Agent tool) are at work in the background. */
   private subagentsAtWork(key: string): boolean {
     const a = this.lives.get(key)?.adapter;
-    return !!a && !a.exited && [...a.tasks.values()].some((t) => t.status === 'running' && (t.kind ?? '').includes('agent'));
+    return !!a && a.agent !== 'codex' && !a.exited && [...a.tasks.values()].some((t) => t.status === 'running' && (t.kind ?? '').includes('agent'));
   }
 
   /**
@@ -1847,7 +1985,7 @@ export class SessionManager extends EventEmitter {
    */
   private subagentsToContinue(key: string): string[] {
     const a = this.lives.get(key)?.adapter;
-    if (!a || a.agent === 'acp') return [];
+    if (!a || a.agent === 'acp' || a.agent === 'codex') return [];
     const running = [...a.tasks.values()].filter((t) => t.status === 'running' && (t.kind ?? '').includes('agent')).map((t) => t.description);
     return [...new Set([...a.limitTasks.values(), ...running])];
   }
@@ -2046,6 +2184,7 @@ export class SessionManager extends EventEmitter {
    * own), which it runs as from then on. Its agent process stops first; it is started again when used.
    */
   async moveToAccount(key: string, to: string | undefined) {
+    refuseSubagent(leadsOf(this), key);
     const agent = agentOfKey(key);
     if (agent === 'acp' && !this.isGrokSession(key)) throw new HttpError(400, 'Not available for this agent');
     const from = this.accountOf(key);
@@ -2140,6 +2279,7 @@ export class SessionManager extends EventEmitter {
   }
 
   async start(key: string, cfg: LiveConfig = {}, prompt?: string): Promise<void> {
+    refuseSubagent(leadsOf(this), key);
     if (this.lives.has(key)) return;
     checkModelSwitch(this.db, key, cfg.model);
     const ext = this.external.get(key);
@@ -2304,7 +2444,8 @@ export class SessionManager extends EventEmitter {
     const turn = status === 'starting' || status === 'working' || status === 'waiting';
     if (turn) await this.interrupt(key);
     else this.holdQueue(key);
-    const tasks = (a?.state.backgroundTasks ?? []).filter((t) => t.status === 'running');
+    // Codex lists its subagents as tasks but lets none be stopped from here.
+    const tasks = a?.agent === 'codex' ? [] : (a?.state.backgroundTasks ?? []).filter((t) => t.status === 'running');
     if (a) await Promise.allSettled(tasks.map((t) => a.stopTask(t.id)));
     return { turn, tasks: tasks.length };
   }
@@ -2612,6 +2753,7 @@ export class SessionManager extends EventEmitter {
    * waits for Resume, as after a stop, so the message does not wake the session.
    */
   enqueue(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = [], hold = false) {
+    refuseSubagent(leadsOf(this), key);
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
     this.loadQueues();
     const saved = this.saveImages(images).map((i) => ({ path: i.path!, mediaType: i.mediaType }));
@@ -2786,6 +2928,7 @@ export class SessionManager extends EventEmitter {
 
   /** Hands a message to the session's agent; 'queued' when it went to the queue instead, for the agent to take later. */
   async send(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []): Promise<'queued' | undefined> {
+    refuseSubagent(leadsOf(this), key);
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
     const queued = () => {
       this.enqueue(key, text, images, files);
@@ -2822,6 +2965,7 @@ export class SessionManager extends EventEmitter {
    * message. Not for Codex, whose one app-server process serves every thread in its window.
    */
   async takeover(key: string, text = '', images: ImageInput[] = [], files: FileInput[] = []): Promise<'queued' | undefined> {
+    refuseSubagent(leadsOf(this), key);
     this.external.poll();
     const ext = this.external.get(key);
     if (ext) {
@@ -2860,6 +3004,7 @@ export class SessionManager extends EventEmitter {
   }
 
   async configure(key: string, cfg: LiveConfig) {
+    refuseSubagent(leadsOf(this), key);
     // A confidential session switches only to another model on this computer.
     checkModelSwitch(this.db, key, cfg.model);
     const l = this.lives.get(key);
@@ -3053,6 +3198,8 @@ export class SessionManager extends EventEmitter {
    * inactive sessions), its numbers stay in Activity, as for a transcript deleted elsewhere.
    */
   async remove(key: string, o: { keepActivity?: boolean } = {}) {
+    // Its transcript belongs to its lead: deleted with it.
+    refuseSubagent(leadsOf(this), key);
     dropNotes(this.db, key);
     if (this.gates.delete(key)) this.saveGates();
     const l = this.lives.get(key);

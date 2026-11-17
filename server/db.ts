@@ -59,6 +59,8 @@ create table if not exists sessions (
 );
 create index if not exists sessions_updated on sessions(updated_at desc);
 create index if not exists sessions_path on sessions(path);
+-- A session's program subagents (Claude Code's, Codex's own), counted and listed by their lead.
+create index if not exists sessions_parent on sessions(parent_key) where parent_key is not null;
 
 create table if not exists app_sessions (
   key text primary key,

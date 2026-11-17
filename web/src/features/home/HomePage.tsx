@@ -750,7 +750,7 @@ function StartComposer({
 function RecentSessions() {
   const { byKey, order } = useSessions();
   const home = useApp((s) => s.boot?.home);
-  const all = order.map((k) => byKey[k]).filter((s) => s && !s.archived);
+  const all = order.map((k) => byKey[k]).filter((s) => s && !s.archived && !s.subagentOf);
   const list = [...sortActive(all.filter((s) => activityOf(s))), ...all.filter((s) => !activityOf(s))].slice(0, 6);
   if (!list.length) return null;
   return (

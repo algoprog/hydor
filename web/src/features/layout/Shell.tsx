@@ -152,7 +152,7 @@ function movedAddress(loc: string): string | null {
 
 /** "(2) Hydor" while sessions wait for an approval or an answer. */
 function useTitleBadge() {
-  const waiting = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
+  const waiting = useSessions((s) => Object.values(s.byKey).filter((x) => !x.subagentOf && activityOf(x)?.status === 'waiting').length);
   useEffect(() => {
     document.title = waiting ? `(${waiting}) Hydor` : 'Hydor';
   }, [waiting]);

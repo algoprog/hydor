@@ -507,6 +507,20 @@ app.get('/api/sessions/:key', async (req) => {
   return { summary, ...sessions.liveSnapshot(key) };
 });
 
+/** The subagents the session's own program ran (Claude Code's, Codex's): each is a session of its own, read-only, oldest first. */
+app.get('/api/sessions/:key/subagents', async (req) => {
+  const key = K(req);
+  if (!sessions.summary(key) && !sessions.lives.has(key)) throw new HttpError(404, 'Session not found');
+  return { sessions: sessions.subagentsOf(key) };
+});
+
+/** The last thing the agent wrote in the session: a Codex subagent's reply is there, not in its lead's transcript. */
+app.get('/api/sessions/:key/last-reply', async (req) => {
+  const key = K(req);
+  if (!sessions.summary(key) && !sessions.lives.has(key)) throw new HttpError(404, 'Session not found');
+  return { text: await sessions.lastText(key) };
+});
+
 app.get('/api/sessions/:key/timeline', async (req) => {
   const key = K(req);
   const q = req.query as Record<string, string>;

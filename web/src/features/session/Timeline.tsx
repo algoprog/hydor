@@ -16,6 +16,8 @@ import { AssistantBlock, hiddenThought, SessionCtx, StepLine, stepsIcon, summari
 import { noteLike, noteTitle, partsOf, plainText, runsOf, type Part, type Run } from './outline';
 import { toolView } from '../registry';
 import { LooseNotes, TurnNotes, useSessionNotes } from './Notes';
+import { ProgramCards } from '../children/ProgramCard';
+import { ProgramReplyRow } from '../children/ChildReply';
 import { TurnCost } from './TurnCost';
 import type { SessionNote } from '@shared/features';
 import { runEndedNotice } from '@shared/apps';
@@ -844,13 +846,13 @@ const SegmentView = memo(function SegmentView({
   // stretches that did not change stay the same objects, so only the one being written is drawn again as it grows.
   const lastRuns = useRef<Run[]>([]);
   const runs = useMemo(() => {
-    const all = runsOf(work).filter((r) => r.kind === 'said' || r.items.some((i) => !hiddenThought(i)));
+    const all = runsOf(work).filter((r) => r.kind !== 'work' || r.items.some((i) => !hiddenThought(i)));
     const next: Run[] = live && all[all.length - 1]?.kind !== 'work' ? [...all, { kind: 'work', id: `${seg.id}:work`, items: [] }] : all;
     const old = new Map(lastRuns.current.map((r) => [r.id, r]));
     return (lastRuns.current = next.map((r) => {
       const o = old.get(r.id);
       if (!o || o.kind !== r.kind) return r;
-      return (o.kind === 'said' && r.kind === 'said' && o.item === r.item) || (o.kind === 'work' && r.kind === 'work' && sameItems(o.items, r.items)) ? o : r;
+      return ((o.kind === 'said' || o.kind === 'reply') && o.kind === r.kind && o.item === (r as typeof o).item) || (o.kind === 'work' && r.kind === 'work' && sameItems(o.items, r.items)) ? o : r;
     }));
   }, [work, !!live, seg.id]);
   const toggle = useCallback((id: string, open: boolean) => setOpened((o) => ({ ...o, [id]: open })), []);
@@ -864,19 +866,23 @@ const SegmentView = memo(function SegmentView({
   // the turn's end. With a single stretch it is the turn's own time.
   const spanOf = (k: number) => {
     if (runs.length === 1) return took;
-    const said = (r?: Run) => (r?.kind === 'said' ? r.item.ts : undefined);
+    const said = (r?: Run) => (r && r.kind !== 'work' ? r.item.ts : undefined);
     const from = k === 0 ? first : said(runs[k - 1]);
     const to = k === runs.length - 1 ? (seg.end?.ts ?? lastItem?.ts) : said(runs[k + 1]);
     return from != null && to != null && to > from ? to - from : 0;
   };
   const lastRun = runs.length - 1;
+  // The calls that started a subagent of the program's own, in order: the work and the reply as they stand.
+  const subCalls = useMemo(() => [...seg.work, ...seg.answer].filter((i) => i.kind === 'tool' && i.tool.subagent), [seg.work, seg.answer]);
   const replying = replyItems.some((a) => a.kind === 'assistant' && a.streaming);
   let works = 0;
 
   return (
     <section className={cx('tl-seg space-y-2', isNew && !seg.prompt && 'anim-in')}>
       {seg.prompt && seg.runEnded === undefined && <UserBubble item={seg.prompt} arrive={isNew && !seg.prompt.peer} sent={sent} />}
-      {seg.notice && (
+      {/* A subagent of the program's own that woke the agent shows as a reply; any other notice as a line. */}
+      {seg.notice?.subagent && <ProgramReplyRow ts={seg.notice.ts} reply={seg.notice.subagent} />}
+      {seg.notice && !seg.notice.subagent && (
         <div className="flex items-center gap-2 px-2 pt-2 text-[12.5px] text-fg-3">
           <Info size={13} className="shrink-0" />
           <span className="min-w-0 truncate">{seg.notice.text}</span>
@@ -890,6 +896,14 @@ const SegmentView = memo(function SegmentView({
             return (
               <div key={`text:${r.id}`} className={cx(fresh(r.id) && 'anim-in')}>
                 <AssistantBlock item={r.item} allowFork={agent === 'claude'} />
+              </div>
+            );
+          }
+          // A subagent of the program's own that came back to the agent in the middle of its work.
+          if (r.kind === 'reply') {
+            return (
+              <div key={`reply:${r.id}`} className={cx(fresh(r.id) && 'anim-in')}>
+                <ProgramReplyRow ts={r.item.ts} reply={r.item.subagent} />
               </div>
             );
           }
@@ -931,6 +945,8 @@ const SegmentView = memo(function SegmentView({
         )),
       ]}
       {!live && docs && docs.length > 0 && <TurnDocs docs={docs} sessionKey={sessionKey} />}
+      {/* The subagents of the program's own this turn started: a card each, like a Hydor subagent's. */}
+      {subCalls.length > 0 && <ProgramCards items={subCalls} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} />}
       {!live && stats.files.size > 0 && <TurnChanges files={[...stats.files.values()]} sessionKey={sessionKey} />}
       {notes.length > 0 && <TurnNotes notes={notes} ids={segIds(seg)} sessionKey={sessionKey} after />}

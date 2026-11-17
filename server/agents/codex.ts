@@ -249,10 +249,59 @@ function modeFromSettings(s: Json): string | undefined {
   return undefined;
 }
 
+/** A record's type without its spelling: subAgentActivity, SubAgentActivity and sub_agent_activity are one (the app-server and the rollouts differ). */
+const typeOf = (it: Json) => String(it.type ?? '').replace(/[_-]/g, '').toLowerCase();
+
+/** A field of a record in either spelling (agentThreadId, agent_thread_id). */
+const field = (it: Json, camel: string): any => it[camel] ?? it[camel.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)];
+
+/** A message to a subagent as people can read it: Codex may send it encrypted (Fernet tokens start gAAAA), which says nothing. */
+function readablePrompt(v: unknown): string {
+  const t = typeof v === 'string' ? v.trim() : '';
+  return t && !/^gAAAA/.test(t) ? t : '';
+}
+
+/** What a call that works with subagents is called in the conversation. */
+function collabTitle(tool: string, prompt: string): string {
+  const what = prompt ? `: ${firstLine(prompt, 100)}` : '';
+  switch (tool) {
+    case 'spawnAgent':
+      return `Start a subagent${what}`;
+    case 'sendInput':
+    case 'sendMessage':
+    case 'followupTask':
+      return `Message to a subagent${what}`;
+    case 'resumeAgent':
+      return 'Resume a subagent';
+    case 'closeAgent':
+      return 'Close a subagent';
+    case 'interruptAgent':
+      return 'Interrupt a subagent';
+    case 'wait':
+    case 'waitAgent':
+      return 'Wait for subagents';
+    case 'listAgents':
+      return 'List subagents';
+    default:
+      return tool ? `Subagents: ${tool.replace(/([A-Z])/g, ' $1').toLowerCase()}` : 'Subagents';
+  }
+}
+
 /** A live ThreadItem (camelCase, app-server shape) as a timeline item. */
 export function liveItem(it: Json, ts: number): TimelineItem | null {
   const id = String(it.id);
   const base = { id, seq: 0, ts };
+  // What a subagent does reaches the app as its task (CodexLive.onAgentItem), not as a step of the turn.
+  if (typeOf(it) === 'subagentactivity') return null;
+  if (typeOf(it) === 'collabagenttoolcall') {
+    const tool = String(it.tool ?? '');
+    const prompt = readablePrompt(it.prompt);
+    const status = it.status === 'failed' ? 'error' : it.status === 'inProgress' ? 'running' : 'ok';
+    const model = typeof it.model === 'string' && it.model ? it.model : undefined;
+    const effort = field(it, 'reasoningEffort');
+    const input = { ...(prompt ? { prompt } : {}), ...(model ? { model } : {}), ...(typeof effort === 'string' && effort ? { reasoningEffort: effort } : {}) };
+    return { ...base, kind: 'tool', tool: { name: tool || 'collabAgentToolCall', category: 'task', title: collabTitle(tool, prompt), status, ...(Object.keys(input).length ? { input } : {}) } };
+  }
   switch (it.type) {
     case 'userMessage': {
       const text = (it.content ?? []).filter((c: Json) => c.type === 'text').map((c: Json) => c.text).join('\n');
@@ -468,8 +517,63 @@ export class CodexLive extends LiveAdapter {
     this.emit('call', call);
   }
 
+  /**
+   * What a subagent's items say, as this thread's tasks (they list in the work tray and count as running work): a
+   * subagent started (or a spawnAgent call's receivers) is a running task, one spoken to runs again, one that
+   * completed, was interrupted or failed has ended. Records of both spellings (the rollouts' snake_case too).
+   */
+  private onAgentItem(it: Json, started: boolean) {
+    const type = typeOf(it);
+    if (type === 'subagentactivity') {
+      const thread = String(field(it, 'agentThreadId') ?? '');
+      const act = String(it.kind ?? '').toLowerCase();
+      const status = act === 'started' || act === 'interacted' ? 'running' : act === 'completed' ? 'completed' : act === 'interrupted' ? 'stopped' : ['errored', 'failed', 'error'].includes(act) ? 'failed' : undefined;
+      if (thread && status) this.agentTask(thread, { status, path: String(field(it, 'agentPath') ?? '') });
+      return;
+    }
+    if (type !== 'collabagenttoolcall') return;
+    const tool = String(it.tool ?? '');
+    const receivers: unknown[] = field(it, 'receiverThreadIds') ?? [];
+    const states: Json = field(it, 'agentsStates') ?? {};
+    if (tool === 'spawnAgent') {
+      // Its subagents exist from the call on; what is said of them later (their activity) names them and ends them.
+      for (const r of receivers) if (typeof r === 'string' && !this.tasks.has(r)) this.agentTask(r, { status: 'running', callId: String(it.id ?? ''), description: firstLine(readablePrompt(it.prompt), 60) });
+      return;
+    }
+    // A call's states of a subagent that is not a task here are not used: a list of agents may hold others, ended long ago.
+    const resumes = ['sendInput', 'sendMessage', 'followupTask', 'resumeAgent'].includes(tool) && started;
+    for (const [thread, st] of Object.entries(states)) {
+      const t = this.tasks.get(thread);
+      const state = String((st as Json)?.status ?? '');
+      if (!t) continue;
+      const status = state === 'completed' ? 'completed' : state === 'interrupted' ? 'stopped' : state === 'errored' ? 'failed' : state === 'shutdown' || state === 'notFound' ? (t.status === 'running' ? 'stopped' : undefined) : (state === 'running' || state === 'pendingInit') && resumes ? 'running' : undefined;
+      if (status) this.agentTask(thread, { status });
+    }
+  }
+
+  /** A subagent's task: made when first heard of, its name and call filled in as they are told. */
+  private agentTask(id: string, o: { status?: string; path?: string; callId?: string; description?: string }) {
+    const last = (o.path ?? '').split('/').filter(Boolean).pop();
+    const name = last && last !== 'root' ? last.replace(/[_-]+/g, ' ').trim() : '';
+    const readable = name ? name[0].toUpperCase() + name.slice(1) : '';
+    let t = this.tasks.get(id);
+    if (!t) {
+      t = { id, kind: 'agent', description: readable || o.description || 'Subagent', status: 'running', startedAt: this.replaying ? undefined : Date.now(), toolUseId: o.callId || undefined };
+      this.tasks.set(id, t);
+    }
+    if (readable) t.description = readable;
+    if (o.callId && !t.toolUseId) t.toolUseId = o.callId;
+    if (o.status) t.status = o.status;
+  }
+
   private onNotification(method: string, p: Json) {
     const now = Date.now();
+    // A subagent's thread runs on this connection too, and its notifications carry its own thread id: its turns, steps,
+    // settings and usage are its own, never the lead's. Only what its items tell of subagents (a deeper one it starts) counts.
+    if (typeof p.threadId === 'string' && this.sessionId && p.threadId !== this.sessionId) {
+      if (method === 'item/started' || method === 'item/completed') this.onAgentItem(p.item ?? {}, method === 'item/started');
+      return;
+    }
     switch (method) {
       case 'thread/started':
         if (!this.sessionId && p.thread) this.onThread({ thread: p.thread });
@@ -541,6 +645,7 @@ export class CodexLive extends LiveAdapter {
       }
       case 'item/started':
       case 'item/completed': {
+        this.onAgentItem(p.item ?? {}, method === 'item/started');
         const it = liveItem(p.item ?? {}, method === 'item/started' ? now : this.overlayItems.get(String(p.item?.id))?.ts ?? now);
         if (!it) break;
         const prev = this.overlayItems.get(it.id);

@@ -3,7 +3,7 @@
 // Newer CLIs write `event_msg/item_completed` records (the same ThreadItems the app
 // server streams); those are used when a turn has them. Older rollouts only have the
 // raw Responses API items (function calls, custom tool calls, messages).
-import type { FileChange, GoalInfo, Question, SessionStats, TimelineItem, TodoEntry, ToolInfo, ToolItem } from '../../shared/types.ts';
+import type { FileChange, GoalInfo, Question, SessionStats, SubagentReply, TimelineItem, TodoEntry, ToolInfo, ToolItem, ToolSubagent } from '../../shared/types.ts';
 import {
   ActivityLog,
   addFileStats,
@@ -104,6 +104,8 @@ export class CodexParser {
   private calls = new Map<string, ToolItem>();
   private provisional = new Set<string>();
   private covered = new Set<string>();
+  /** The subagents this thread started, by their thread id: the id of the spawn_agent call that did. */
+  private subThreads = new Map<string, string>();
   /** A raw user message held for one record: an item_completed UserMessage may follow it. */
   private heldPrompt: { id: string; text: string; images: number; ts?: number; at?: number } | null = null;
   /** Activity of the lines parsed in this run (not part of the saved state). */
@@ -424,6 +426,9 @@ export class CodexParser {
       case 'item_completed':
         this.onItem(p.item ?? {}, parseTs(p.completed_at_ms) ?? ts, parseTs(p.started_at_ms));
         break;
+      case 'sub_agent_activity':
+        this.onSubAgent(p, p.event_id, parseTs(p.occurred_at_ms) ?? ts);
+        break;
       case 'exec_command_end':
         this.legacyExecEnd(p);
         break;
@@ -437,6 +442,8 @@ export class CodexParser {
   }
 
   private onItem(it: Json, ts?: number, startedAt?: number) {
+    // Subagent activity is no step of the turn: it settles the call that started the subagent (and says when it came back).
+    if (it.type === 'SubAgentActivity') return this.onSubAgent(it, it.id, ts);
     if (!this.turnItems) {
       this.turnItems = true;
       // The raw copy of this prompt was held back; the structured one replaces it.
@@ -514,9 +521,6 @@ export class CodexParser {
         break;
       case 'ContextCompaction':
         this.upsert({ kind: 'system', id, seq: 0, ts, level: 'info', text: 'Context compacted' });
-        break;
-      case 'SubAgentActivity':
-        this.upsert({ kind: 'system', id, seq: 0, ts, level: 'info', text: `Subagent ${it.agent_path ?? it.agent_thread_id ?? ''} ${it.kind ?? ''}`.trim() });
         break;
       case 'Plan':
       case 'TodoList': {
@@ -671,6 +675,15 @@ export class CodexParser {
       tool = { name, category: 'read', title: String(args.path ?? ''), subtitle: 'image', status: 'running' };
     } else if (['spawn_agent', 'send_message', 'wait_agent', 'list_agents', 'followup_task', 'interrupt_agent', 'wait'].includes(name)) {
       tool = { name, category: 'task', title: agentTitle(name, args), status: 'running', input: args };
+      if (name === 'spawn_agent') {
+        const type = args.agent_type ?? args.role;
+        tool.subagent = {
+          title: subagentTitle(args),
+          type: typeof type === 'string' && type ? type : undefined,
+          model: typeof args.model === 'string' && args.model ? args.model : undefined,
+          state: 'running',
+        };
+      }
     } else if (name === 'request_user_input' || name === 'request_user_input_async') {
       tool = { name, category: 'question', title: firstLine(String(args.questions?.[0]?.question ?? 'Question for the user'), 160), status: 'running', questions: codexQuestions(args.questions) };
     } else {
@@ -678,13 +691,100 @@ export class CodexParser {
     }
     const item: ToolItem = { kind: 'tool', id: callId, seq: 0, ts, tool };
     this.calls.set(callId, item);
-    if (this.turnItems) {
+    // A spawn has no structured record that could show it twice: it shows at once, as its subagent starts.
+    if (this.turnItems && !tool.subagent) {
       // Shown only if no structured record arrives before its output (see coverOpenCalls).
       this.provisional.add(callId);
       return;
     }
     this.countCall(tool, ts);
     this.upsert(item);
+  }
+
+  // ---- subagents -----------------------------------------------------------
+
+  /** A call by its id: still open (raw calls are kept while they wait for their output), or already shown. */
+  private callById(id: string): ToolItem | undefined {
+    const open = this.calls.get(id);
+    if (open) return open;
+    const i = this.index.get(id);
+    const it = i == null ? undefined : this.items[i];
+    return it?.kind === 'tool' ? it : undefined;
+  }
+
+  /** The newest spawn_agent call for this task name whose subagent has no thread yet (a started record without the call's id). */
+  private spawnFor(path: string): ToolItem | undefined {
+    const name = lastPart(path);
+    if (!name) return undefined;
+    const fits = (it: TimelineItem | undefined): it is ToolItem =>
+      it?.kind === 'tool' && it.tool.name === 'spawn_agent' && !!it.tool.subagent && !it.tool.subagent.id && lastPart(String((it.tool.input as Json | undefined)?.task_name ?? '')) === name;
+    const open = [...this.calls.values()].reverse().find(fits);
+    if (open) return open;
+    for (let i = this.items.length - 1; i >= 0; i--) if (fits(this.items[i])) return this.items[i] as ToolItem;
+    return undefined;
+  }
+
+  /** Changes what a spawn_agent call says of its subagent, and sends the call again when that changed it. */
+  private setSubagent(call: ToolItem, change: (s: ToolSubagent) => void) {
+    const prev = call.tool.subagent;
+    if (!prev) return;
+    const next = { ...prev };
+    change(next);
+    if (JSON.stringify(next) === JSON.stringify(prev)) return;
+    call.tool = { ...call.tool, subagent: next };
+    // A raw call still waiting for its output is not shown yet; its output shows it.
+    if (!this.provisional.has(call.id)) this.upsert(call);
+  }
+
+  /** A subagent started, was spoken to, ended, was stopped or failed (both rollout formats say so). */
+  private onSubAgent(it: Json, recordId: unknown, ts?: number) {
+    const thread = it.agent_thread_id ? String(it.agent_thread_id) : '';
+    const path = String(it.agent_path ?? '');
+    const kind = String(it.kind ?? '');
+    const known = thread ? this.subThreads.get(thread) : undefined;
+    let call = known ? this.callById(known) : undefined;
+    if (kind === 'started') {
+      if (!thread) return;
+      // Its record carries the call's id, or in a newer format an id of its own that the task's name stands in for.
+      const byId = recordId ? this.callById(String(recordId)) : undefined;
+      call = call ?? (byId?.tool.subagent ? byId : this.spawnFor(path));
+      if (!call) return;
+      this.subThreads.set(thread, call.id);
+      this.setSubagent(call, (s) => {
+        s.id = thread;
+        s.key = `codex:${thread}`;
+        s.state = 'running';
+        delete s.endedAt;
+      });
+      return;
+    }
+    if (kind === 'interacted') {
+      if (call) this.setSubagent(call, (s) => ((s.state = 'running'), delete s.endedAt));
+      return;
+    }
+    const state = kind === 'completed' ? 'done' : kind === 'interrupted' ? 'stopped' : kind === 'errored' || kind === 'failed' || kind === 'error' ? 'failed' : undefined;
+    if (!state || (!thread && !path)) return;
+    if (call) this.setSubagent(call, (s) => ((s.state = state), (s.endedAt = ts)));
+    const sub = call?.tool.subagent;
+    const title = sub?.title ?? (readableName(lastPart(path)) || 'Subagent');
+    const reply: SubagentReply = {
+      key: sub?.key ?? (thread ? `codex:${thread}` : undefined),
+      id: thread || path,
+      title,
+      type: sub?.type,
+      ended: state === 'done' ? 'replied' : state === 'stopped' ? 'stopped' : 'failed',
+      text: '',
+    };
+    this.upsert({
+      kind: 'system',
+      // Prefixed: an item id here can be the id of the call that interrupted it, which is a step of its own.
+      id: `sa:${recordId ? String(recordId) : `${thread || path}:${ts}`}`,
+      seq: 0,
+      ts,
+      level: state === 'failed' ? 'error' : 'info',
+      text: `${title} ${state === 'done' ? 'finished' : state === 'stopped' ? 'was stopped' : 'stopped with an error'}`,
+      subagent: reply,
+    });
   }
 
   private countCall(tool: ToolInfo, ts?: number) {
@@ -765,6 +865,8 @@ export class CodexParser {
       tool.status = /^(Error|error:)/.test(out) ? 'error' : 'ok';
     }
     if (prev.ts && ts) tool.durationMs = ts - prev.ts;
+    // A spawn that was refused never gets a thread: its subagent ended with the call.
+    if (tool.subagent && !tool.subagent.id && tool.status === 'error') tool.subagent = { ...tool.subagent, state: 'failed', endedAt: ts };
     if (provisional) this.countCall(tool, ts);
     if (tool.files && tool.status === 'ok') {
       addFileStats(this.files, this.stats, tool.files);
@@ -905,13 +1007,40 @@ function mcpText(content: unknown): string {
   return (content as Json[]).map((c) => (c?.type === 'text' ? c.text : `[${c?.type ?? 'content'}]`)).join('\n');
 }
 
+/** A message to show, or '' when it cannot be read: Codex hides its agents' messages behind a Fernet token (gAAAA…). */
+function readableMessage(m: unknown): string {
+  if (typeof m !== 'string') return '';
+  const t = m.trim();
+  return t.startsWith('gAAAA') || (t.length >= 40 && !/\s/.test(t)) ? '' : t;
+}
+
+/** The last part of a task's name or path: /root/control_plane_audit → control_plane_audit. */
+function lastPart(path: string): string {
+  return path.replace(/\/+$/, '').replace(/^.*\//, '');
+}
+
+/** A task's name in words: control_plane_audit → Control plane audit. */
+function readableName(name: string): string {
+  const t = name.replace(/[_-]+/g, ' ').trim();
+  return t ? t[0].toUpperCase() + t.slice(1) : '';
+}
+
+/** What a spawn_agent call asked for, in a few words: its task's name, else the start of its message. */
+function subagentTitle(a: Json): string {
+  const name = readableName(lastPart(typeof a.task_name === 'string' ? a.task_name : ''));
+  if (name) return name;
+  const msg = readableMessage(a.message);
+  return msg ? firstLine(msg, 60) : 'Subagent';
+}
+
 function agentTitle(name: string, a: Json): string {
+  const msg = readableMessage(a.message);
   switch (name) {
     case 'spawn_agent':
-      return `Spawn agent${a.task_name ? ` ${a.task_name}` : ''}${a.message ? `: ${firstLine(String(a.message), 100)}` : ''}`;
+      return `Spawn agent${a.task_name ? ` ${a.task_name}` : ''}${msg ? `: ${firstLine(msg, 100)}` : ''}`;
     case 'send_message':
     case 'followup_task':
-      return `Message to ${a.target ?? a.agent ?? a.task_name ?? 'agent'}${a.message ? `: ${firstLine(String(a.message), 100)}` : ''}`;
+      return `Message to ${a.target ?? a.agent ?? a.task_name ?? 'agent'}${msg ? `: ${firstLine(msg, 100)}` : ''}`;
     case 'wait_agent':
     case 'wait':
       return `Wait for ${Array.isArray(a.targets) ? a.targets.join(', ') : a.target ?? 'agents'}`;

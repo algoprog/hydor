@@ -67,7 +67,7 @@ Der Statuspunkt zeigt den Zustand der Sitzung:
 
 Der Browser-Tab zeigt die Zahl der wartenden Sitzungen, etwa „(2) Hydor“.
 
-Vom Agenten für Teilaufgaben gestartete Hydor-Subagenten stehen eingeklappt unter der übergeordneten Sitzung, etwa „3 Subagenten · 1 benötigt dich · 2 in Arbeit“. Ein Klick zeigt sie. Siehe [Subagenten](/guide/sessions#subagents).
+Subagenten, also die vom Agenten für Teilaufgaben gestarteten Sitzungen (Hydor-Subagenten) und die, die sein Programm innerhalb der Sitzung ausführt (die eigenen von Claude Code und Codex), stehen eingeklappt unter der übergeordneten Sitzung, etwa „3 Subagenten · 1 benötigt dich · 2 in Arbeit“. Ein Klick zeigt sie. Siehe [Subagenten](/guide/sessions#subagents).
 
 Jede Sitzungszeile hat ein Menü: Fahre darüber und klicke rechts auf **⋯**, oder verwende einen Rechtsklick; auf dem Smartphone tippst du auf **⋯**. Es bietet **Umbenennen**, außerhalb von Projekten **Ordner umbenennen**, **Anheften** oder **Lösen**, **Zurückstellen**, **Abschließen**, **Archivieren** und **Löschen** mit Bestätigung. Ein Doppelklick auf den Titel oder F2 bei ausgewählter Zeile benennt die Sitzung ebenfalls um. Siehe [Umbenennen, anheften, zurückstellen, abschließen, archivieren oder löschen](/guide/sessions#rename-pin-snooze-settle-archive-or-delete).
 

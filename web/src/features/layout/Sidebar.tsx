@@ -69,7 +69,7 @@ function UsageHint() {
 
 /** The inbox, by the sidebar's title: how many sessions wait on you, here and on the other machines, on its corner. */
 function InboxButton({ active, onGo }: { active: boolean; onGo: (path: string) => void }) {
-  const here = useSessions((s) => Object.values(s.byKey).filter((x) => activityOf(x)?.status === 'waiting').length);
+  const here = useSessions((s) => Object.values(s.byKey).filter((x) => !x.subagentOf && activityOf(x)?.status === 'waiting').length);
   const there = useMachines((s) => s.list.filter((m) => m.id !== machineId && m.status.state === 'online').reduce((n, m) => n + m.status.waiting, 0));
   // Calls held in the Outbox for your OK wait on you too.
   const held = useOutbox((s) => s.held);

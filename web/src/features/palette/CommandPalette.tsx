@@ -485,7 +485,8 @@ export function CommandPalette() {
 
   const found = useMemo<Found>(() => {
     if (!open) return { top: null, groups: [] };
-    const list = Object.values(sessions);
+    // A program's own subagents show in their lead, not on their own.
+    const list = Object.values(sessions).filter((s) => !s.subagentOf);
     return q.trim() ? rank(q, entries, list, server, files, fileInfo, usage, places, home) : start(list, entries, usage, places, home);
   }, [open, q, entries, sessions, server, files, fileInfo, usage, places, home]);
 

@@ -24167,5 +24167,11 @@
   "Opens the page it came from, in a new tab of your browser": "Öffnet die Seite, von der sie kam, in einem neuen Tab deines Browsers",
   "Shows the file in its folder": "Zeigt die Datei in ihrem Ordner",
   "Visits": "Besuche",
-  "Wiki memory is off for this chat or project": "Wiki-Memory ist für diesen Chat oder dieses Projekt ausgeschaltet"
+  "Wiki memory is off for this chat or project": "Wiki-Memory ist für diesen Chat oder dieses Projekt ausgeschaltet",
+  "{0} runs it inside this session: open it to watch it": "{0} führt es in dieser Sitzung aus. Öffne es, um zuzusehen.",
+  "It ended with an error": "Es endete mit einem Fehler",
+  "It finished its work": "Es hat seine Arbeit beendet",
+  "It stopped before it finished": "Es wurde gestoppt, bevor es fertig war",
+  "Loading its reply": "Antwort wird geladen",
+  "{0} subagent of": "{0} Subagent von"
 }

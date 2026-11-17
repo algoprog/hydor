@@ -289,7 +289,7 @@ function AgentDetail({ id, onEdit }: { id: string; onEdit: (a: Partial<Assistant
   const recent = useMemo(
     () =>
       Object.values(byKey)
-        .filter((s) => s.extra?.assistant === id && !s.archived)
+        .filter((s) => s.extra?.assistant === id && !s.archived && !s.subagentOf)
         .sort((x, y) => (y.createdAt ?? 0) - (x.createdAt ?? 0))
         .slice(0, 8),
     [byKey, id],

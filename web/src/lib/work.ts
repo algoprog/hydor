@@ -1,8 +1,9 @@
 // What a session started and still has going, as one list (the work tray above its message box, features/session/WorkTray):
-// its Hydor subagents (child sessions) and its background tasks (subagents of its program's own, commands, monitors), each in a state, in the order the
-// tray shows them, with the words that sum them up. Plain functions, so tests need no page (work-test.ts).
+// its Hydor subagents (child sessions), its program's own subagents (Claude Code's, Codex's) and its background tasks
+// (commands, monitors), each in a state, in the order the tray shows them, with the words that sum them up. Plain
+// functions, so tests need no page (work-test.ts).
 import { leadsSwarm } from '@shared/swarm';
-import type { BackgroundTask, SessionSummary } from '@shared/types';
+import type { Agent, BackgroundTask, SessionSummary, TimelineItem } from '@shared/types';
 import { activityOf, isWorking, taskKindOf, type TaskKind } from './activity';
 
 export { taskKindOf, type TaskKind };
@@ -12,7 +13,23 @@ export type WorkState = 'needs' | 'running' | 'done' | 'stopped' | 'failed';
 
 export type WorkItem =
   | { type: 'child'; id: string; state: WorkState; /** When it began, or when it last did something once it ended: what the order goes by. */ at: number; s: SessionSummary }
-  | { type: 'task'; id: string; state: WorkState; at: number; t: BackgroundTask };
+  | { type: 'task'; id: string; state: WorkState; at: number; t: BackgroundTask }
+  | { type: 'sub'; id: string; state: WorkState; at: number; sub: ProgramSub };
+
+/** A subagent of the session's own program (a "Claude Code subagent", a "Codex subagent"), as its call and its task tell. */
+export interface ProgramSub {
+  /** Its own conversation's key, once its id is known: claude:agent-<id>, codex:<thread id>. */
+  key?: string;
+  id?: string;
+  /** The id of the call that started it (its task names the call). */
+  toolUseId?: string;
+  title: string;
+  type?: string;
+  model?: string;
+  state: WorkState;
+  startedAt?: number;
+  endedAt?: number;
+}
 
 /**
  * "<program> subagent" (just "Subagent" without the program's name), "Command", "Monitor", "Workflow", or "Background task"
@@ -40,6 +57,59 @@ export function taskState(t: BackgroundTask): WorkState {
   return 'done';
 }
 
+/** A program subagent's own conversation key, made from its id: claude:agent-<id>, codex:<thread id>. */
+export const programSubKey = (agent: Agent, id: string): string | undefined => (agent === 'claude' ? `claude:agent-${id}` : agent === 'codex' ? `codex:${id}` : undefined);
+
+/**
+ * The subagents of the session's own program: one for each call that started one (the timeline's `tool.subagent`), and
+ * one for each subagent task no call matched (a call not loaded yet). A task matches a call by its id or by the call's id.
+ * Its task, while there is one, says how it stands; without one the call's own state stands, except that a subagent
+ * still running when the program no longer runs (`alive` false) has ended: stopped (Claude Code), done (Codex, whose older
+ * rollouts do not say when one finished).
+ */
+export function programSubs(agent: Agent, items: TimelineItem[], tasks: BackgroundTask[], alive: boolean): ProgramSub[] {
+  const agents = tasks.filter((t) => taskKindOf(t.kind) === 'subagent');
+  const used = new Set<BackgroundTask>();
+  const out: ProgramSub[] = [];
+  for (const it of items) {
+    if (it.kind !== 'tool' || !it.tool.subagent) continue;
+    const sa = it.tool.subagent;
+    const t = agents.find((x) => (sa.id && x.id === sa.id) || x.toolUseId === it.id);
+    // Tasks listed twice (running, then ended) are one: the first stands.
+    for (const x of agents) if (t && x.id === t.id) used.add(x);
+    const id = sa.id ?? t?.id;
+    const key = sa.key ?? (id ? programSubKey(agent, id) : undefined);
+    let state: WorkState;
+    if (t) state = taskState(t);
+    // Its program no longer runs, yet nothing says it ended. Claude Code writes how each of its agents ended, so one with
+    // nothing written died with it; Codex's older rollouts never wrote that a subagent finished, so it most likely did.
+    else state = sa.state === 'running' && !alive ? (agent === 'codex' ? 'done' : 'stopped') : sa.state;
+    out.push({
+      ...(key ? { key } : {}),
+      ...(id ? { id } : {}),
+      toolUseId: it.id,
+      title: sa.title,
+      ...(sa.type ? { type: sa.type } : {}),
+      ...(sa.model ? { model: sa.model } : {}),
+      state,
+      ...((t?.startedAt ?? it.ts) ? { startedAt: t?.startedAt ?? it.ts } : {}),
+      ...((t?.endedAt ?? sa.endedAt) ? { endedAt: t?.endedAt ?? sa.endedAt } : {}),
+    });
+  }
+  const seen = new Set<string>();
+  for (const t of agents) {
+    if (used.has(t) || seen.has(t.id)) continue;
+    seen.add(t.id);
+    const key = programSubKey(agent, t.id);
+    out.push({ ...(key ? { key } : {}), id: t.id, ...(t.toolUseId ? { toolUseId: t.toolUseId } : {}), title: t.description, state: taskState(t), ...(t.startedAt ? { startedAt: t.startedAt } : {}), ...(t.endedAt ? { endedAt: t.endedAt } : {}) });
+  }
+  return out;
+}
+
+/** The subagent task that stands for a program subagent (by its id, or its call's id), when the program lists one. */
+export const taskOfSub = (sub: ProgramSub, tasks: BackgroundTask[]): BackgroundTask | undefined =>
+  tasks.find((t) => taskKindOf(t.kind) === 'subagent' && ((!!sub.id && t.id === sub.id) || (!!sub.toolUseId && t.toolUseId === sub.toolUseId)));
+
 /** How long after a Stop all a child still counts as stopped by it, rather than done, when it moves a moment later. */
 const STOP_SLACK_MS = 60_000;
 
@@ -66,16 +136,24 @@ const RANK: Record<WorkState, number> = { needs: 0, running: 1, done: 2, stopped
 
 /**
  * The tray's rows: what needs you on top, then what runs (the oldest first, so rows keep their places), then what ended,
- * the newest first. A task listed as running and as ended (one that just ended) is one row, as it stands now.
+ * the newest first. A task listed as running and as ended (one that just ended) is one row, as it stands now. The
+ * program's own subagents (`subs`, programSubs) are rows of their own, in place of the subagent tasks they cover.
  */
-export function workItems(children: SessionSummary[], tasks: BackgroundTask[]): WorkItem[] {
+export function workItems(children: SessionSummary[], tasks: BackgroundTask[], subs: ProgramSub[] = []): WorkItem[] {
   const items: WorkItem[] = children.map((s) => {
     const state = childState(s);
     return { type: 'child', id: s.key, state, s, at: state === 'running' || state === 'needs' ? (s.live?.turnStartedAt ?? s.createdAt ?? 0) : (s.updatedAt ?? 0) };
   });
   const seen = new Set<string>();
+  const covered = (t: BackgroundTask) => taskKindOf(t.kind) === 'subagent' && subs.some((x) => x.id === t.id || (!!t.toolUseId && x.toolUseId === t.toolUseId));
+  for (const sub of subs) {
+    const id = sub.key ?? sub.id ?? sub.toolUseId ?? sub.title;
+    if (seen.has(`sub:${id}`)) continue;
+    seen.add(`sub:${id}`);
+    items.push({ type: 'sub', id, state: sub.state, sub, at: sub.state === 'running' ? (sub.startedAt ?? 0) : (sub.endedAt ?? sub.startedAt ?? 0) });
+  }
   for (const t of tasks) {
-    if (seen.has(t.id)) continue;
+    if (seen.has(t.id) || covered(t)) continue;
     seen.add(t.id);
     const state = taskState(t);
     items.push({ type: 'task', id: t.id, state, t, at: state === 'running' ? (t.startedAt ?? 0) : (t.endedAt ?? t.startedAt ?? 0) });
@@ -95,15 +173,16 @@ export interface WorkSummary {
   needs: number;
   /** What runs of Hydor subagents (those waiting for you too). */
   children: number;
-  /** What runs of background tasks (the program's own subagents too). */
+  /** What runs of background tasks and of the program's own subagents. */
   tasks: number;
 }
 
 export function workSummary(items: WorkItem[]): WorkSummary {
   const kids = items.filter((i) => i.type === 'child');
-  const tasks = items.filter((i) => i.type === 'task');
+  // The program's own subagents, as their rows (sub) or as tasks that no row covers.
+  const tasks = items.filter((i) => i.type !== 'child');
   const running = tasks.filter((i) => i.state === 'running');
-  const isAgent = (i: WorkItem) => i.type === 'task' && taskKindOf(i.t.kind) === 'subagent';
+  const isAgent = (i: WorkItem) => i.type === 'sub' || (i.type === 'task' && taskKindOf(i.t.kind) === 'subagent');
   const k = kids.filter((i) => i.state === 'running' || i.state === 'needs').length;
   const t = running.length;
   const needs = kids.filter((i) => i.state === 'needs').length;

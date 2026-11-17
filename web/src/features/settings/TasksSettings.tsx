@@ -456,7 +456,7 @@ export function TaskEditor({
   const set = (p: Partial<TaskDraft>) => setD((x) => ({ ...x, ...p }));
   const sch = d.schedule;
   const recent = useMemo(
-    () => sessions.order.map((k) => sessions.byKey[k]).filter((s) => s && !s.archived && s.agent === d.agent && (d.agent !== 'acp' || s.acpAgent === d.acpAgent)).slice(0, 40),
+    () => sessions.order.map((k) => sessions.byKey[k]).filter((s) => s && !s.archived && !s.subagentOf && s.agent === d.agent && (d.agent !== 'acp' || s.acpAgent === d.acpAgent)).slice(0, 40),
     [sessions, d.agent, d.acpAgent],
   );
   // When it runs next, worked out by the server in your time zone.

@@ -1,5 +1,5 @@
 // Claude Code transcript (~/.claude/projects/<project>/<session>.jsonl) -> timeline items.
-import type { BackgroundTask, FileChange, GoalInfo, Question, SessionStats, TimelineItem, TodoEntry, ToolInfo, ToolItem } from '../../shared/types.ts';
+import type { BackgroundTask, FileChange, GoalInfo, Question, SessionStats, SubagentReply, TimelineItem, TodoEntry, ToolInfo, ToolItem, ToolSubagent } from '../../shared/types.ts';
 import {
   ActivityLog,
   addFileStats,
@@ -104,6 +104,10 @@ export class ClaudeParser {
   bg = new Map<string, BackgroundTask>();
   /** Recently finished task ids: a quick task's notification can land before the result that started it. */
   private bgEnded: string[] = [];
+  /** The Agent calls that got an agent id: the id of the call, by agent id (a task's notice names the agent). */
+  private agentCalls = new Map<string, string>();
+  /** Notices of agents coming back that were shown already: one notice can be written as a message and as an attachment. */
+  private noticed = new Set<string>();
   /** Activity of the lines parsed in this run (not part of the saved state). */
   act: ActivityLog | null;
   /** The goal set with /goal while it is not met or cleared (from the transcript's goal checks). */
@@ -397,10 +401,33 @@ export class ClaudeParser {
   }
 
   private taskNotification(id: string, text: string, ts?: number) {
+    this.taskNotices(id, text, ts, true);
+  }
+
+  /**
+   * What a task notification says, as written in a message (`asMessage`) or an attachment (the form today's versions use):
+   * a block of an agent's coming back settles its call and shows as its reply; the other blocks (a command, a monitor)
+   * show as "Background task …" when written as a message and not at all as an attachment.
+   */
+  private taskNotices(id: string, text: string, ts: number | undefined, asMessage: boolean) {
     this.tasksEnded(text);
-    const tag = (n: string) => text.match(new RegExp(`<${n}>([\\s\\S]*?)</${n}>`))?.[1]?.trim();
-    const status = tag('status') ?? 'updated';
-    const summary = tag('summary') ?? `Task ${tag('task-id') ?? ''}`;
+    const blocks = [...text.matchAll(/<task-notification>([\s\S]*?)<\/task-notification>/g)].map((m) => m[1]);
+    if (!blocks.length) {
+      if (asMessage) this.backgroundTaskItem(id, text, ts);
+      return;
+    }
+    blocks.forEach((block, k) => {
+      const sid = k ? `${id}:${k}` : id;
+      const call = this.agentCall(tagOf(block, 'tool-use-id'), tagOf(block, 'task-id'));
+      const ended = noticeEnd(tagOf(block, 'status'));
+      if (call && ended) this.agentCameBack(sid, call, block, ended, ts);
+      else if (asMessage) this.backgroundTaskItem(sid, block, ts);
+    });
+  }
+
+  private backgroundTaskItem(id: string, text: string, ts?: number) {
+    const status = tagOf(text, 'status') ?? 'updated';
+    const summary = tagOf(text, 'summary') ?? `Task ${tagOf(text, 'task-id') ?? ''}`;
     this.upsert({
       kind: 'system',
       id,
@@ -408,8 +435,73 @@ export class ClaudeParser {
       ts,
       level: status === 'failed' ? 'error' : 'info',
       text: `Background task ${status}: ${summary}`,
-      detail: tag('result'),
+      detail: tagOf(text, 'result'),
     });
+  }
+
+  /** The call that started an agent, by its id or by the agent's own id; undefined for anything else. */
+  private agentCall(toolUseId?: string, agentId?: string): ToolItem | undefined {
+    const at = (id?: string) => {
+      const i = id ? this.index.get(id) : undefined;
+      const it = i == null ? undefined : this.items[i];
+      return it?.kind === 'tool' && it.tool.subagent ? it : undefined;
+    };
+    return at(toolUseId) ?? at(agentId ? this.agentCalls.get(agentId) : undefined);
+  }
+
+  /** An agent ended a stretch of work and its lead was told: its call says how it ended, and its reply shows after it. */
+  private agentCameBack(id: string, call: ToolItem, block: string, ended: 'done' | 'failed' | 'stopped', ts?: number) {
+    const taskId = tagOf(block, 'task-id') ?? call.tool.subagent?.id ?? '';
+    const status = tagOf(block, 'status') ?? '';
+    const summary = tagOf(block, 'summary') ?? `Task ${taskId}`;
+    const result = tagOf(block, 'result');
+    // The same notice can come as an attachment and as a message.
+    const seen = `${taskId}|${status}|${result ?? ''}`;
+    if (this.noticed.has(seen)) return;
+    this.noticed.add(seen);
+    if (this.noticed.size > 200) this.noticed.delete(this.noticed.values().next().value!);
+
+    const sub = this.setAgent(call, (s) => {
+      s.state = ended;
+      s.endedAt = ts;
+      if (taskId && !s.id) {
+        s.id = taskId;
+        s.key = `claude:agent-${taskId}`;
+      }
+    });
+    if (sub?.id) this.agentCalls.set(sub.id, call.id);
+    const reply: SubagentReply = {
+      key: sub?.key ?? (taskId ? `claude:agent-${taskId}` : undefined),
+      id: taskId,
+      title: sub?.title ?? summary.match(/"([^"]+)"/)?.[1] ?? 'Subagent',
+      type: sub?.type,
+      ended: ended === 'done' ? 'replied' : ended,
+      text: (result ?? '').slice(0, 20000),
+      ...(ended !== 'done' ? { why: summary } : {}),
+    };
+    this.upsert({
+      kind: 'system',
+      id,
+      seq: 0,
+      ts,
+      level: status === 'failed' || status === 'error' ? 'error' : 'info',
+      text: `Background task ${status}: ${summary}`,
+      detail: result,
+      subagent: reply,
+    });
+  }
+
+  /** Changes what an Agent call says of its subagent and sends the call again; returns what it says now. */
+  private setAgent(call: ToolItem, change: (s: ToolSubagent) => void): ToolSubagent | undefined {
+    const prev = call.tool.subagent;
+    if (!prev) return undefined;
+    const next = { ...prev };
+    change(next);
+    const item: ToolItem = { ...call, tool: { ...call.tool, subagent: next } };
+    // A call still waiting for its result must carry the change into it.
+    if (this.pending.has(call.id)) this.pending.set(call.id, item);
+    this.upsert(item);
+    return next;
   }
 
   // ---- assistant entries ---------------------------------------------------
@@ -486,6 +578,11 @@ export class ClaudeParser {
     const id: string = b.id ?? `t${this.seq++}`;
     const tool = describeClaudeTool(String(b.name ?? 'tool'), b.input ?? {});
     if (b.name === 'TaskStop' || b.name === 'KillShell') this.taskEnded(String(b.input?.task_id ?? b.input?.shell_id ?? ''));
+    // A message to an agent that came back wakes it.
+    if (b.name === 'SendMessage' && typeof b.input?.to === 'string') {
+      const woken = this.agentCall(undefined, b.input.to);
+      if (woken && woken.tool.subagent!.state !== 'running') this.setAgent(woken, (s) => ((s.state = 'running'), delete s.endedAt));
+    }
     this.stats.toolCalls++;
     this.act?.bump(ts, 'toolCalls');
     if (tool.category === 'command' && (b.name === 'Bash' || b.name === 'Monitor' || b.name === 'PowerShell')) {
@@ -596,6 +693,24 @@ export class ClaudeParser {
           tool.subtitle = `${tool.subtitle ? tool.subtitle + ' · ' : ''}running in background`;
         }
         if (typeof r.totalDurationMs === 'number') tool.durationMs = r.totalDurationMs;
+        if (tool.subagent) {
+          const sub = { ...tool.subagent };
+          const id = r.agentId ?? text.match(/agentId: ([\w-]+)/)?.[1];
+          if (id) {
+            sub.id = String(id);
+            sub.key = `claude:agent-${id}`;
+          }
+          sub.model = r.resolvedModel ?? sub.model;
+          sub.type = r.agentType ?? sub.type;
+          if (r.isAsync || r.status === 'async_launched') sub.background = true;
+          else {
+            // The lead waited for it: how the call ended is how it ended.
+            sub.state = isError ? 'failed' : r.status === 'interrupted' || (tool.status as string) === 'interrupted' ? 'stopped' : 'done';
+            sub.endedAt = ts;
+          }
+          tool.subagent = sub;
+          if (sub.id) this.agentCalls.set(sub.id, prev.id);
+        }
         break;
       }
       case 'AskUserQuestion':
@@ -726,7 +841,7 @@ export class ClaudeParser {
       return;
     }
     if (a.type === 'queued_command' && a.commandMode === 'task-notification') {
-      this.tasksEnded(typeof a.prompt === 'string' ? a.prompt : JSON.stringify(a.prompt ?? ''));
+      this.taskNotices(m.uuid ?? a.source_uuid ?? `n${this.seq++}`, typeof a.prompt === 'string' ? a.prompt : JSON.stringify(a.prompt ?? ''), ts, false);
       return;
     }
     if (a.type === 'queued_command' && (a.commandMode === 'prompt' || a.humanTurn)) {
@@ -766,6 +881,19 @@ function asPeerMessage(text: string): { from: { name?: string; mode?: string; ad
   if (!m) return null;
   const attr = (n: string) => m[1].match(new RegExp(`${n}="([^"]*)"`))?.[1];
   return { from: { name: attr('from-name'), mode: attr('from-mode'), address: attr('from') }, body: m[2].trim() };
+}
+
+/** What a tag holds in a task notification (the first one). */
+function tagOf(text: string, name: string): string | undefined {
+  return text.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`))?.[1]?.trim();
+}
+
+/** How a task's notification says it ended, as a subagent's state; undefined when it says nothing ended. */
+function noticeEnd(status?: string): 'done' | 'failed' | 'stopped' | undefined {
+  if (status === 'completed') return 'done';
+  if (status === 'failed' || status === 'error') return 'failed';
+  if (status === 'killed' || status === 'stopped' || status === 'cancelled') return 'stopped';
+  return undefined;
 }
 
 function setOutput(tool: ToolInfo, text: string) {
@@ -875,6 +1003,13 @@ export function describeClaudeTool(name: string, input: Json): ToolInfo {
         title: s(input.description) || 'Subagent',
         subtitle: input.subagent_type,
         background: !!input.run_in_background,
+        subagent: {
+          title: s(input.description) || 'Subagent',
+          type: s(input.subagent_type) || undefined,
+          model: s(input.model) || undefined,
+          background: !!input.run_in_background,
+          state: 'running',
+        },
       };
     case 'TodoWrite':
       return { ...base, category: 'todo', title: 'Updated the plan', todos: todosFrom(input.todos), input: undefined };

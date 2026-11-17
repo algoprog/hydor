@@ -184,6 +184,50 @@ export interface ToolInfo {
   queued?: boolean;
   /** Live-only: when the step really started (ms since 1970), when that was later than the agent asked for it. */
   startedAt?: number;
+  /** The call started a subagent of the session's own program (Claude Code's Agent tool, Codex's spawn_agent). */
+  subagent?: ToolSubagent;
+}
+
+/**
+ * A subagent the session's own program ran (a "Claude Code subagent", a "Codex subagent"), as the call that started it
+ * and the transcript after it tell. It shows as a Hydor subagent does: a card under its turn, a row in the work tray,
+ * folded under its lead in the sidebar, its own conversation (read from its own transcript) when opened.
+ */
+export interface ToolSubagent {
+  /** Its own conversation's key, once its id is known: claude:agent-<agent id>, codex:<thread id>. */
+  key?: string;
+  /** Its id with its program: Claude Code's agent id (also its task's id), Codex's thread id. */
+  id?: string;
+  /** What it was asked to do, in a few words: the call's description (Claude Code), its task's name (Codex). */
+  title: string;
+  /** Its kind among its program's agents: "Explore", "general-purpose", a Codex role or nickname. */
+  type?: string;
+  /** The model it runs on, when the call or its result says ("sonnet", "claude-sonnet-5-5"). */
+  model?: string;
+  /** It works while its lead goes on (in the background); otherwise its lead waits for its reply. */
+  background?: boolean;
+  /** How it stands as the transcript tells: running until its reply, its end or its stop is written there. */
+  state: 'running' | 'done' | 'failed' | 'stopped';
+  /** When the transcript says it ended (ms since 1970). */
+  endedAt?: number;
+}
+
+/**
+ * A subagent of the session's own program ended a stretch of work and its lead heard of it (Claude Code's task
+ * notification, Codex's subagent activity): shown as a Hydor subagent's reply is, "Reply from …".
+ */
+export interface SubagentReply {
+  /** Its own conversation's key: claude:agent-<agent id>, codex:<thread id>. */
+  key?: string;
+  /** Its id with its program (Claude Code's agent and task id, Codex's thread id). */
+  id: string;
+  title: string;
+  type?: string;
+  ended: 'replied' | 'stopped' | 'failed';
+  /** What it wrote back, clipped; empty when the transcript does not carry it (Codex): its own conversation has it. */
+  text: string;
+  /** Why it stopped or failed, when that is said. */
+  why?: string;
 }
 
 interface BaseItem {
@@ -237,6 +281,8 @@ export type SystemItem = BaseItem & {
   detail?: string;
   /** A cross-session notice (a peer went idle, or a message was/wasn't delivered). */
   peer?: boolean;
+  /** The notice is a subagent of the session's own program coming back to its lead: shown as a subagent's reply. */
+  subagent?: SubagentReply;
 };
 export type TurnItem = BaseItem & {
   kind: 'turn';
@@ -429,6 +475,16 @@ export interface SessionSummary {
   /** For an ACP session: which agent (its id in Settings → More agents) and its name. */
   acpAgent?: string;
   acpName?: string;
+  /**
+   * A subagent of its program's own (a Claude Code or Codex subagent) that ran inside that session, its lead: its
+   * conversation is read from its own transcript, and it is never resumed or sent messages here. `live` is set (working)
+   * while it runs.
+   */
+  subagentOf?: string;
+  /** Such a subagent's kind among its program's agents ("Explore", a Codex role or nickname). */
+  subagentType?: string;
+  /** How many subagents of its program's own the session ran (as indexed so far): they fold under it in the sidebar. */
+  programSubagents?: number;
 }
 
 export interface WorktreeInfo {

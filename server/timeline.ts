@@ -57,8 +57,14 @@ export class Timeline extends EventEmitter {
     public filePath: string | null,
   ) {
     super();
+    this.parser = this.newParser();
+  }
+
+  /** A Claude Code subagent's transcript (claude:agent-<id>) is all sidechain entries: its own conversation. */
+  private newParser(): ClaudeParser | CodexParser | AcpParser {
     const o = { retain: true, collectChunks: false };
-    this.parser = agent === 'claude' ? new ClaudeParser(o) : agent === 'codex' ? new CodexParser(o) : new AcpParser(o);
+    if (this.agent === 'claude') return new ClaudeParser({ ...o, sidechain: this.key.startsWith('claude:agent-') });
+    return this.agent === 'codex' ? new CodexParser(o) : new AcpParser(o);
   }
 
   /** The session's goal as its transcript tells it, while one is set and not met or cleared. */
@@ -168,7 +174,7 @@ export class Timeline extends EventEmitter {
       // Rewritten (e.g. deleted and recreated): start over.
       this.offset = 0;
       this.splitter = new LineSplitter();
-      this.parser = this.agent === 'claude' ? new ClaudeParser({ retain: true, collectChunks: false }) : new CodexParser({ retain: true, collectChunks: false });
+      this.parser = this.newParser();
       this.emit('reset');
     }
     if (st.size === this.offset) return;

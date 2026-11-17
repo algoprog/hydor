@@ -74,7 +74,7 @@ function useAway(): { sum: AwaySummary | null; reload: () => void } {
     let waiting = 0;
     for (const k of s.order) {
       const x = s.byKey[k];
-      if (!x) continue;
+      if (!x || x.subagentOf) continue;
       at = Math.max(at, x.doneAt ?? 0, x.endedAt ?? 0, x.seenAt ?? 0);
       if (activityOf(x)?.status === 'waiting') waiting += 1 + (x.live?.pendingApprovals ?? 0);
     }

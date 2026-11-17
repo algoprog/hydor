@@ -235,8 +235,8 @@ function OverviewTab({ s, view, keys, memory }: { s: Space; view?: SpaceView; ke
   // Those the server listed, and any started or moved here since (the session list keeps up), the last at work first.
   const sessions = useMemo(() => {
     const out = new Map<string, SessionSummary>();
-    for (const k of keys ?? []) if (byKey[k]) out.set(k, byKey[k]);
-    for (const x of Object.values(byKey)) if (x.extra?.space === s.id) out.set(x.key, x);
+    for (const k of keys ?? []) if (byKey[k] && !byKey[k].subagentOf) out.set(k, byKey[k]);
+    for (const x of Object.values(byKey)) if (x.extra?.space === s.id && !x.subagentOf) out.set(x.key, x);
     return [...out.values()].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   }, [byKey, keys, s.id]);
   const shown = all ? sessions : sessions.slice(0, RECENT);

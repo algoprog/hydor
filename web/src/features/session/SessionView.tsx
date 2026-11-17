@@ -24,6 +24,7 @@ import { TaskItem } from './WorkRow';
 import { Timeline } from './Timeline';
 import { PrBadge, PullRequestDialog } from './PullRequest';
 import { SessionMenu } from './SessionMenu';
+import { ProgramDock, ProgramStop } from '../children/program';
 import { FindBar, showSeq } from './FindBar';
 import { FeatureDock, sessionPaneOf, useSessionSide, type SessionPane } from '../registry';
 import { ConfidentialLock } from '../confidential/feature';
@@ -49,8 +50,10 @@ function useSessionEnd(s: SessionSummary): SessionEnd | null | undefined {
 }
 
 /** What a session's status says while nothing runs, and its hover: as its work ended, else (nothing to tell) "Stopped". */
-function endedText(end: SessionEnd | null | undefined): { label: string; hint: string } {
+function endedText(end: SessionEnd | null | undefined, program?: boolean): { label: string; hint: string } {
   if (!end) return { label: 'Stopped', hint: 'Not running' };
+  // A program's own subagent takes no messages and does not resume: what it did is all there is to say.
+  if (program) return { label: endingLabel(end), hint: end.ended === 'done' ? 'It finished its work' : end.ended === 'failed' ? 'It ended with an error' : 'It stopped before it finished' };
   if (end.ended === 'done') return { label: endingLabel(end), hint: 'Its last turn finished. A message in the box continues it.' };
   if (end.ended === 'failed') return { label: endingLabel(end), hint: 'It ended with an error. Resume, or send a message, to try again.' };
   return { label: endingLabel(end), hint: 'Stopped before it finished. Resume, or send a message, to go on.' };
@@ -60,7 +63,7 @@ function StatusPill({ s, end }: { s: SessionSummary; end: SessionEnd | null | un
   const a = activityOf(s);
   // Not running, and its timeline not read yet: no word rather than one that changes a moment later.
   if (!a && end === undefined) return null;
-  const ended = endedText(end);
+  const ended = endedText(end, !!s.subagentOf);
   let label = ended.label;
   let tone = end?.ended === 'done' ? 'text-fg-2' : end?.ended === 'failed' ? 'text-err' : 'text-fg-3';
   let dot = end?.ended === 'done' ? 'bg-ok/70' : end?.ended === 'failed' ? 'bg-err' : 'bg-fg-3/60';
@@ -105,8 +108,13 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
   };
   const model = s.live?.model ?? s.model;
 
+  // A program's own subagent (one of Claude Code's or Codex's) is read-only: it is not resumed or renamed here, and only
+  // Claude Code's stops from here, while it works, as a task of its lead.
+  const program = !!s.subagentOf;
   let action: ReactNode = null;
-  if (elsewhere) {
+  if (program) {
+    action = <ProgramStop s={s} />;
+  } else if (elsewhere) {
     if (canTakeOver(s))
       action = (
         <Button size="sm" variant="secondary" icon={<Play size={14} />} title={`End it in ${s.external?.client} and continue here`} onClick={async () => (await confirm(takeoverDialog(s))) && post(`/api/sessions/${enc(s.key)}/takeover`).catch(toastError)}>
@@ -158,7 +166,7 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
                 className="h-7 min-w-0 flex-1 rounded-lg border border-accent/60 bg-bg-1 px-2 text-[15px] font-semibold outline-none"
               />
             ) : (
-              <button translate="no" onDoubleClick={() => (setTitle(s.title), setRenaming(true))} className="min-w-0 truncate text-left text-[15px] font-semibold tracking-tight" title={`${s.title} (double-click to rename)`}>
+              <button translate="no" onDoubleClick={program ? undefined : () => (setTitle(s.title), setRenaming(true))} className="min-w-0 truncate text-left text-[15px] font-semibold tracking-tight" title={program ? s.title : `${s.title} (double-click to rename)`}>
                 {s.title}
               </button>
             )}
@@ -198,18 +206,23 @@ function Header({ s, detailsOpen, onDetails, onFork }: { s: SessionSummary; deta
         >
           {!mobile && (st.linesAdded || st.linesRemoved ? <DiffStat added={st.linesAdded} removed={st.linesRemoved} compact className="text-[12px]" /> : <span>Details</span>)}
         </Button>
-        <IconButton ref={menuRef} data-tip="session-menu" label="Session menu" onClick={() => setMenu((m) => !m)}>
-          <MoreHorizontal size={18} />
-        </IconButton>
-        <SessionMenu
-          s={s}
-          anchor={menuRef}
-          open={menu}
-          onClose={() => setMenu(false)}
-          onRename={() => (setTitle(s.title), setRenaming(true))}
-          onFork={onFork}
-          onPullRequest={() => setPrOpen(true)}
-        />
+        {/* Nothing in the menu applies to a program's own subagent: it cannot be run, forked, moved, handed off or deleted. */}
+        {!program && (
+          <>
+            <IconButton ref={menuRef} data-tip="session-menu" label="Session menu" onClick={() => setMenu((m) => !m)}>
+              <MoreHorizontal size={18} />
+            </IconButton>
+            <SessionMenu
+              s={s}
+              anchor={menuRef}
+              open={menu}
+              onClose={() => setMenu(false)}
+              onRename={() => (setTitle(s.title), setRenaming(true))}
+              onFork={onFork}
+              onPullRequest={() => setPrOpen(true)}
+            />
+          </>
+        )}
       </div>
       {confirmNode}
       {s.cwd && <PullRequestDialog s={s} open={prOpen} onClose={() => setPrOpen(false)} />}
@@ -471,7 +484,7 @@ function InfoPanel({ s }: { s: SessionSummary }) {
     <div className="px-5 py-3">
       <dl className="divide-y divide-line">
         <InfoRow label="Agent">{agentName(s.agent, s.acpName)}</InfoRow>
-        <InfoRow label="Status">{a ? activityLabel(a) : endedText(end).label}</InfoRow>
+        <InfoRow label="Status">{a ? activityLabel(a) : endedText(end, !!s.subagentOf).label}</InfoRow>
         {s.cwd && (
           <InfoRow label="Folder">
             <button className="text-left font-mono text-[12.5px] hover:text-accent" onClick={() => (useUI.getState().set({ explorerRoot: s.cwd! }), go('/files'))}>
@@ -530,13 +543,18 @@ function InfoPanel({ s }: { s: SessionSummary }) {
         </div>
       )}
       <div className="mt-4">
-        <div className="mb-1.5 text-[12.5px] font-medium text-fg-3">Continue in a terminal</div>
-        <div className="flex items-center gap-2 rounded-xl bg-bg-1 px-3 py-2">
-          <code className="min-w-0 flex-1 truncate font-mono text-[12px]" title={resumeCmd}>
-            {resumeCmd}
-          </code>
-          <CopyButton text={resumeCmd} />
-        </div>
+        {/* A program's own subagent has no session of its own to resume in a terminal. */}
+        {!s.subagentOf && (
+          <>
+            <div className="mb-1.5 text-[12.5px] font-medium text-fg-3">Continue in a terminal</div>
+            <div className="flex items-center gap-2 rounded-xl bg-bg-1 px-3 py-2">
+              <code className="min-w-0 flex-1 truncate font-mono text-[12px]" title={resumeCmd}>
+                {resumeCmd}
+              </code>
+              <CopyButton text={resumeCmd} />
+            </div>
+          </>
+        )}
         <div className="mt-2 flex items-center gap-2 px-1 text-[11.5px] text-fg-3">
           <span className="truncate font-mono">{s.id}</span>
           <CopyButton text={s.id} label="Copy session id" />
@@ -656,7 +674,7 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
 
   // Looking at a session that finished since you last did marks it read (on every device); one whose turn ended another
   // way (it failed, or was quick) is marked seen too, for the start page's "While you were away".
-  const unread = !!summary && Math.max(summary.doneAt ?? 0, summary.endedAt ?? 0) > (summary.seenAt ?? 0);
+  const unread = !!summary && !summary.subagentOf && Math.max(summary.doneAt ?? 0, summary.endedAt ?? 0) > (summary.seenAt ?? 0);
   useEffect(() => {
     if (!unread) return;
     const mark = () => document.visibilityState === 'visible' && post(`/api/sessions/${enc(sessionKey)}/seen`).catch(() => {});
@@ -678,9 +696,9 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
         ctxNow.current.side?.close(sessionKey);
         ctxNow.current.setDetails(true);
       },
-      fork: summary?.external ? undefined : (at?: string) => setForking({ at }),
+      fork: summary?.external || summary?.subagentOf ? undefined : (at?: string) => setForking({ at }),
     }),
-    [sessionKey, summary?.cwd, summary?.external],
+    [sessionKey, summary?.cwd, summary?.external, summary?.subagentOf],
   );
 
   if (missing && !s) return <Empty title="Session not found">It may have been deleted.</Empty>;
@@ -721,8 +739,15 @@ export function SessionView({ sessionKey }: { sessionKey: string }) {
             )}
           </div>
           <MovedOn s={summary} />
-          <FeatureDock s={summary} />
-          <Composer s={summary} hint={pane && show === 'pane' ? pane.placeholder : undefined} />
+          {summary.subagentOf ? (
+            // A program's own subagent is read-only: a line saying whose it is, in place of the message box.
+            <ProgramDock s={summary} />
+          ) : (
+            <>
+              <FeatureDock s={summary} />
+              <Composer s={summary} hint={pane && show === 'pane' ? pane.placeholder : undefined} />
+            </>
+          )}
           <ForkDialog s={summary} at={forking} onClose={() => setForking(null)} />
         </div>
         {side ? (

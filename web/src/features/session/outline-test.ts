@@ -71,7 +71,8 @@ const thought = (): TimelineItem => ({ kind: 'thinking', id: `h${++n}`, seq: n, 
 assert.deepEqual(partsOf([]), []);
 
 // Runs: what reads as a reply shows in its place, between the work before and after it; short notes stay in the work.
-const shape = (rs: Run[]) => rs.map((r) => (r.kind === 'said' ? `said:${r.item.id}` : `work:${r.items.map((i) => i.id).join(',')}`));
+const shape = (rs: Run[]) => rs.map((r) => (r.kind === 'said' ? `said:${r.item.id}` : r.kind === 'reply' ? `reply:${r.item.id}` : `work:${r.items.map((i) => i.id).join(',')}`));
+const back = (ended: 'replied' | 'stopped' | 'failed' = 'replied'): TimelineItem => ({ kind: 'system', id: `s${++n}`, seq: n, level: 'info', text: 'Subagent replied', subagent: { id: 'a1', title: 'Look it up', ended, text: 'Found it.' } });
 {
   // Your question, its answer (a table), a step to record it, and a closing line after it (that is the reply, not here).
   const answer = note('Settled:\n\n| Model | Size |\n|---|---|\n| crawl | small |\n\nRecording it in the plan:');
@@ -98,6 +99,19 @@ const shape = (rs: Run[]) => rs.map((r) => (r.kind === 'said' ? `said:${r.item.i
   const a = note('Yes. The context filter is its own model:\n- one\n- two');
   const w = [a, tool()];
   assert.deepEqual(shape(runsOf(w)), [`said:${a.id}`, `work:${w[1].id}`]);
+}
+{
+  // A subagent's reply in the middle of the work splits it, as a text does, and shows in its place.
+  const r1 = back();
+  const r2 = back('stopped');
+  const w = [tool(), r1, tool(), thought(), r2];
+  const r = runsOf(w);
+  assert.deepEqual(shape(r), [`work:${w[0].id}`, `reply:${r1.id}`, `work:${w[2].id},${w[3].id}`, `reply:${r2.id}`]);
+  assert.equal(r[1].kind === 'reply' && r[1].item.subagent.ended, 'replied');
+  // A plain system notice (no subagent) stays among the work.
+  const plain: TimelineItem = { kind: 'system', id: 'sys', seq: 99, level: 'info', text: 'Compacted' };
+  const t1 = tool();
+  assert.deepEqual(shape(runsOf([t1, plain])), [`work:${t1.id},${plain.id}`]);
 }
 assert.deepEqual(runsOf([]), []);
 

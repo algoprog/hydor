@@ -25421,5 +25421,11 @@
   "Opens the page it came from, in a new tab of your browser": "Ανοίγει τη σελίδα από την οποία προήλθε, σε νέα καρτέλα του προγράμματος περιήγησής σας",
   "Shows the file in its folder": "Εμφανίζει το αρχείο στον φάκελό του",
   "Visits": "Επισκέψεις",
-  "Wiki memory is off for this chat or project": "Η μνήμη wiki είναι ανενεργή για αυτή τη συνομιλία ή αυτό το έργο"
+  "Wiki memory is off for this chat or project": "Η μνήμη wiki είναι ανενεργή για αυτή τη συνομιλία ή αυτό το έργο",
+  "{0} runs it inside this session: open it to watch it": "Το {0} το τρέχει μέσα σε αυτή τη συνεδρία: ανοίξτε το για να το παρακολουθήσετε",
+  "It ended with an error": "Τελείωσε με σφάλμα",
+  "It finished its work": "Ολοκλήρωσε τη δουλειά του",
+  "It stopped before it finished": "Σταμάτησε πριν ολοκληρωθεί",
+  "Loading its reply": "Φόρτωση της απάντησής του",
+  "{0} subagent of": "υποπράκτορας του {0} της συνεδρίας"
 }

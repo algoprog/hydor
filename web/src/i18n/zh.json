@@ -25437,5 +25437,11 @@
   "Opens the page it came from, in a new tab of your browser": "在你的浏览器的新标签页中打开它来源的页面",
   "Shows the file in its folder": "在文件所在的文件夹中显示该文件",
   "Visits": "访问次数",
-  "Wiki memory is off for this chat or project": "此聊天或项目已关闭 Wiki 记忆"
+  "Wiki memory is off for this chat or project": "此聊天或项目已关闭 Wiki 记忆",
+  "{0} runs it inside this session: open it to watch it": "{0} 在这个会话内部运行它：打开它可观看它的工作",
+  "It ended with an error": "它因出错而结束",
+  "It finished its work": "它完成了工作",
+  "It stopped before it finished": "它在完成前就被停止了",
+  "Loading its reply": "正在加载它的回复",
+  "{0} subagent of": "{0} 子智能体，来自"
 }

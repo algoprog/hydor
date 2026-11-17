@@ -801,7 +801,8 @@ export function SessionList({ query }: { query: string }) {
   const [confirm, confirmNode] = useConfirm();
   const sensors = useSensors(useSensor(MouseSensor, MOUSE_DRAG), useSensor(AreaTouchSensor, TOUCH_DRAG));
 
-  // Child sessions sit under their parent (folded), when it is listed too.
+  // Child sessions sit under their parent (folded), when it is listed too, and so do a program's own subagents (they
+  // are never listed on their own).
   const shown = (s: SessionSummary) => (filter === 'all' || s.agent === filter) && (!spaceFilter || s.extra?.space === spaceFilter);
   const nest = useMemo(() => nestChildren(byKey, (s) => !s.archived && shown(s)), [byKey, filter, spaceFilter]);
   // Spaces and the folders you picked have groups of their own; how you fold them is kept for this machine.
@@ -829,7 +830,7 @@ export function SessionList({ query }: { query: string }) {
   const places = useToolOrder((s) => s.places);
 
   const groups = useMemo(() => {
-    const listed = [...standIns, ...order.map((k) => byKey[k])].filter((s): s is SessionSummary => !!s && !s.archived && shown(s) && !nest.under.has(s.key));
+    const listed = [...standIns, ...order.map((k) => byKey[k])].filter((s): s is SessionSummary => !!s && !s.archived && !s.subagentOf && shown(s) && !nest.under.has(s.key));
     // The list showing one space: its sessions go by day.
     const out = groupSessions(listed, { now: new Date(), byFolder: byFolder && !spaceFilter, spaces, unpicked, places, names: folderNames, origins });
     const snz = out.find((g) => g.kind === 'snoozed');
@@ -1022,7 +1023,8 @@ export function SessionList({ query }: { query: string }) {
             parent={s.key}
             kids={kids}
             activeKey={activeKey}
-            row={(c, active) => <RowBody s={c} active={active} home={home} onMore={onMore} menuOpen={menu?.key === c.key} touch={coarse} place={place} />}
+            // A program's own subagent has no menu: nothing in it applies.
+            row={(c, active) => <RowBody s={c} active={active} home={home} onMore={c.subagentOf ? undefined : onMore} menuOpen={menu?.key === c.key} touch={coarse} place={place} />}
           />
         </Fragment>
       );
