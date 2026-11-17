@@ -410,6 +410,8 @@ function StartComposer({
       account: acct,
       worktree: !task && !!repo && worktree,
       ...(Object.keys(extra).length ? { extra } : {}),
+      // A person starting it: in a project with no wiki memory, the session may first ask to build it.
+      askMemory: true,
       ...attachmentPayload(atts),
     };
     const inTask = task;

@@ -32,6 +32,12 @@ Everything Hydor does, by area. [Back to the README](../README.md).
   app what came of the start once it can: the session opens if it started, and one press of Start never makes two
   sessions (after a minute out of reach, the page says so, with Try again). Pages, tabs, menus and dialogs open at
   once, with no fade.
+- A session you start in a project whose wiki memory is empty (but that has conversations, commits, documents, notes
+  or a README to build one from) first asks, in a card under your message, whether to build the memory: **Build memory,
+  then start** holds your message while the most important part is written (the session says Building memory, the card
+  shows the progress, with Start now and Stop building) and sends it when that is read; **Start without memory** starts
+  now and does not ask that project for a week; **Don't ask for this project** never asks again. What you send meanwhile
+  goes after your first message, and the waiting survives a restart.
 - Starter ideas under the start page's empty message box ("Ask for anything: research, documents, plans, code."):
   three example requests that change each day (everyday work, research, documents, and code in a code folder), two
   of your apps (the ones you run most, else Deep research report and Trip planner) and an automation ("Every Monday

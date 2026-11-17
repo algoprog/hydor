@@ -90,4 +90,18 @@ test('a lead working or waiting itself keeps that status; its helpers are only c
   assert.equal(activityLabel(w), 'Waiting for you');
 });
 
+test('a session waiting for its project’s memory to be built is working, and says Building memory; asking, it needs you', () => {
+  const b = activityOf(ses({ live: live('working', { memory: 'building' }) }))!;
+  assert.equal(b.status, 'working');
+  assert.equal(b.memory, true);
+  assert.equal(isBusy(b), true);
+  assert.equal(activityLabel(b), 'Building memory');
+  const q = activityOf(ses({ live: live('waiting', { memory: 'asking' }) }))!;
+  assert.equal(q.status, 'waiting');
+  assert.equal(q.memory, undefined);
+  assert.equal(activityLabel(q), 'Waiting for you');
+  assert.equal(activityOf(ses({ live: live('working') }))?.memory, undefined, 'a session at work is just working');
+  assert.equal(activityLabel(activityOf(ses({ live: live('working') }))!), 'Working');
+});
+
 console.log(`${passed}/${total} passed`);

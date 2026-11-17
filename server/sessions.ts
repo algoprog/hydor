@@ -26,6 +26,8 @@ import { ClaudeParser } from './history/claude.ts';
 import { Timeline } from './timeline.ts';
 import { removeSessionScratch } from './tasklog.ts';
 import { projectOfFolder } from './spaces/found.ts';
+import { askFor, askLater, askNever, buildApi, cardOf, loadGates, offerOf, saveGates, type Gate } from './wiki/ask.ts';
+import { jobRunning, jobState, wikiJobEvents } from './wiki/areas/jobs.ts';
 import { allSpaces } from './spaces/index.ts';
 import { checkpoint, createWorktree, removeWorktree, restoreCheckpoint, worktreeState } from './worktrees.ts';
 import { pageServerUrl, runToken } from './mcp.ts';
@@ -224,6 +226,8 @@ export interface CreateOpts {
   acpAgent?: string;
   /** Settings beyond the agent's own (memory, assistant, spending cap…). */
   extra?: SessionExtra;
+  /** A person started it on the start page: in a project with no wiki memory, it may first ask to build it (server/wiki/ask.ts). */
+  askMemory?: boolean;
 }
 
 interface Live {
@@ -287,6 +291,12 @@ function takeFirst(l: Live, text: string): string {
   l.firstNotes = undefined;
   return f;
 }
+
+/** The agent could not be started again to get the first message it was held for (it ended before it had one). */
+class GateStartError extends Error {}
+
+/** The id of the card that asks to build the project's memory first (one to a session). */
+const MEMORY_CARD = 'memory-ask';
 
 /** What models take as pictures, by a file's extension. */
 const PICTURES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
@@ -370,6 +380,9 @@ export class SessionManager extends EventEmitter {
       if (removed.length) this.emit('sessions', [], removed);
     });
     setInterval(() => this.reapIdle(), 5 * 60_000).unref();
+    // A session waiting for its project's memory to be built starts when the most important part is read, or the job ends.
+    wikiJobEvents.on('essentials', (space: string | null) => void this.buildReached(space, 'essentials'));
+    wikiJobEvents.on('end', (space: string | null, state: string) => void this.buildReached(space, state));
     setInterval(() => this.wakeSnoozed(), 30_000).unref();
     db.exec('create table if not exists checkpoints (key text not null, at integer not null, commit_id text not null); create index if not exists checkpoints_key on checkpoints (key, at);');
     setInterval(() => this.sweepTimelines(), 60_000).unref();
@@ -429,6 +442,7 @@ export class SessionManager extends EventEmitter {
       if (adapter instanceof AcpLive) adapter.restored();
       console.log(`[restore] reattached ${k} (${adapter.state.status})`);
     }
+    await this.resumeGates();
   }
 
   // ---- listing ---------------------------------------------------------------
@@ -478,7 +492,7 @@ export class SessionManager extends EventEmitter {
         genMs: r.gen_ms || undefined,
         workMs: r.work_ms || undefined,
       },
-      live: live ? { ...live.adapter.state } : null,
+      live: this.liveState(r.key),
       // Set also while the session's own process is stopped between turns: its helpers' work is not over.
       helpers: helpers.get(r.key)?.size || undefined,
       external: live ? null : this.externalState(r),
@@ -577,6 +591,7 @@ export class SessionManager extends EventEmitter {
    */
   atWork(key: string): boolean {
     const l = this.lives.get(key);
+    if (this.gates.get(key)?.state === 'building') return true;
     if (l && isRunningStatus(workStatus(l.adapter.state))) return true;
     if (this.runningHelpers().get(key)?.size) return true;
     if (l) return false;
@@ -667,7 +682,7 @@ export class SessionManager extends EventEmitter {
         const n: NotifyEvent = {
           ...base,
           kind: 'waiting',
-          body: ext ? `Waiting for you in ${ext.client}` : quick ? `${quick.title}${quick.detail ? `: ${quick.detail}` : ''}` : (s.live?.pendingApprovals ?? 0) > 0 ? 'Needs your approval' : 'Has a question for you',
+          body: this.gates.has(s.key) ? cardOf(this.gates.get(s.key)!).title : ext ? `Waiting for you in ${ext.client}` : quick ? `${quick.title}${quick.detail ? `: ${quick.detail}` : ''}` : (s.live?.pendingApprovals ?? 0) > 0 ? 'Needs your approval' : 'Has a question for you',
           approval: quick,
         };
         // In VS Code or a terminal you are likely right there: speak up only if it is still waiting a minute later.
@@ -981,7 +996,10 @@ export class SessionManager extends EventEmitter {
   liveSnapshot(key: string): { live: LiveState | null; overlay: LiveOverlay } {
     const l = this.lives.get(key);
     if (l) this.dateTasks(l);
-    const snap = l ? { live: { ...l.adapter.state }, overlay: l.adapter.overlay() } : { live: null, overlay: { items: [], patches: {}, approvals: [] } };
+    const snap = { live: this.liveState(key), overlay: l ? l.adapter.overlay() : { items: [], patches: {}, approvals: [] } };
+    // A new session that asks to build its project's memory first: its message waits here, and the card is the question or the progress.
+    const gate = this.gates.get(key);
+    if (gate) snap.overlay = { ...snap.overlay, items: [...snap.overlay.items, this.heldItem(key, gate)], approvals: [...snap.overlay.approvals, cardOf(gate)] };
     // Forms an agent asked that outlived its step: the same cards, until answered or put away (openForms.ts).
     const standing = standingForms(this.db, key).filter((f) => !snap.overlay.approvals.some((a) => a.id === f.id));
     if (standing.length) snap.overlay = { ...snap.overlay, approvals: [...snap.overlay.approvals, ...standing] };
@@ -1352,6 +1370,11 @@ export class SessionManager extends EventEmitter {
       const sp = projectOfFolder(allSpaces(this.db), wt?.repo ?? cwd, config.home);
       if (sp) o = { ...o, extra: { ...o.extra, space: sp.id } };
     }
+    // A person starting a session in a project with no wiki memory: it may ask to build it before the agent gets the message.
+    const hasFirst = !!(o.prompt?.trim() || o.images?.length || o.files?.length || o.paths?.length);
+    const ask = o.askMemory && hasFirst && !splitHandoff(o.prompt ?? '') ? await askFor(this.db, { extra: o.extra, space: typeof o.extra?.space === 'string' ? o.extra.space : null }) : null;
+    // Told to the agent when it starts, so it knows of the wiki that is about to be built (cleared once its message goes).
+    if (ask) o = { ...o, extra: { ...o.extra, memoryBuild: true } };
     const mode = o.mode || (o.agent === 'claude' ? 'default' : o.agent === 'codex' ? 'auto' : undefined);
     let account = o.account || undefined;
     // The account picked is at its usage limit: with Switch accounts at a limit on, one with usage left starts it.
@@ -1382,11 +1405,14 @@ export class SessionManager extends EventEmitter {
     const prompt = withFiles(o.prompt?.trim() ?? '', [...this.saveFiles(o.files ?? []), ...here.paths]);
     const images = [...(o.images ?? []), ...here.images];
     if (prompt || images.length) {
-      await beforeSend(l.key);
-      await this.snapshot(l.key);
       // What the capabilities have to say of the request (an app that does it); not of a conversation handed over.
       const said = splitHandoff(o.prompt ?? '') ? '' : (o.prompt?.trim() ?? '');
-      await l.adapter.sendMessage(await withNotes(l.key, prompt, said || null, takeFirst(l, prompt)), this.saveImages(images));
+      if (ask) await this.holdFirst(l.key, ask, { text: prompt, said, images });
+      else {
+        await beforeSend(l.key);
+        await this.snapshot(l.key);
+        await l.adapter.sendMessage(await withNotes(l.key, prompt, said || null, takeFirst(l, prompt)), this.saveImages(images));
+      }
     }
     this.queueSummary(l.key);
     // Its settings name its parent only now: the parent's entry counts it as a helper at work.
@@ -2021,7 +2047,7 @@ export class SessionManager extends EventEmitter {
     return a?.cwd ?? null;
   }
 
-  async start(key: string, cfg: LiveConfig = {}): Promise<void> {
+  async start(key: string, cfg: LiveConfig = {}, prompt?: string): Promise<void> {
     if (this.lives.has(key)) return;
     checkModelSwitch(this.db, key, cfg.model);
     const ext = this.external.get(key);
@@ -2041,8 +2067,8 @@ export class SessionManager extends EventEmitter {
     const account = agent === 'acp' ? undefined : this.accountOf(key);
     if (agent === 'acp') {
       const r = this.db.prepare('select acp_agent from app_sessions where key = ?').get(key) as { acp_agent: string | null } | undefined;
-      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, mode: cfg.mode ?? prefs.mode ?? undefined, acpAgent: r?.acp_agent ?? undefined });
-    } else await this.spawn(agent, cwd, agent === 'claude' ? { sessionId: id, resume: hasTranscript, model, effort, mode, account } : { threadId: id, model, effort, mode, account });
+      await this.spawn('acp', cwd, { sessionId: id, resume: true, model, mode: cfg.mode ?? prefs.mode ?? undefined, acpAgent: r?.acp_agent ?? undefined, prompt });
+    } else await this.spawn(agent, cwd, agent === 'claude' ? { sessionId: id, resume: hasTranscript, model, effort, mode, account, prompt } : { threadId: id, model, effort, mode, account, prompt });
     this.db
       .prepare(
         `insert into app_sessions (key, agent, cwd, model, effort, mode, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?)
@@ -2145,6 +2171,8 @@ export class SessionManager extends EventEmitter {
   }
 
   async interrupt(key: string) {
+    // Waiting for the memory to be built, the agent has nothing running to stop: Stop ends the build and starts the agent.
+    if (this.gates.get(key)?.state === 'building') return this.answerGate(key, 'stop');
     this.limitHits.delete(key);
     this.userStopped.add(key);
     const a = this.lives.get(key)?.adapter;
@@ -2187,6 +2215,244 @@ export class SessionManager extends EventEmitter {
     const tasks = (a?.state.backgroundTasks ?? []).filter((t) => t.status === 'running');
     if (a) await Promise.allSettled(tasks.map((t) => a.stopTask(t.id)));
     return { turn, tasks: tasks.length };
+  }
+
+  // ---- the question of building the project's memory first ----------------------------------------------------
+
+  private gateMap?: Map<string, Gate>;
+  /** Sessions whose first message is held for their project's memory (server/wiki/ask.ts), kept in the database. */
+  private get gates(): Map<string, Gate> {
+    return (this.gateMap ??= loadGates(this.db));
+  }
+  private releasing = new Set<string>();
+
+  private saveGates() {
+    saveGates(this.db, this.gates);
+  }
+
+  /** Whether a session waits for the memory question or its build (the agent has not had its first message). */
+  waitingForMemory(key: string): 'asking' | 'building' | 'failed' | null {
+    return this.gates.get(key)?.state ?? null;
+  }
+
+  /** What a session shows of the agent's state: while it waits for the memory question it needs you (asking, failed) or is building. */
+  private liveState(key: string): LiveState | null {
+    const l = this.lives.get(key);
+    const g = this.gates.get(key);
+    if (!g) return l ? { ...l.adapter.state } : null;
+    const base: LiveState = l && !l.adapter.exited ? { ...l.adapter.state } : { status: 'idle', startedAt: g.at, pendingApprovals: 0 };
+    if (g.state === 'building') return { ...base, status: 'working', turnStartedAt: base.turnStartedAt ?? g.at, memory: 'building' };
+    return { ...base, status: 'waiting', pendingApprovals: base.pendingApprovals + 1, memory: g.state };
+  }
+
+  /** The first message as the conversation shows it while it waits. */
+  private heldItem(key: string, g: Gate): TimelineItem {
+    return { kind: 'user', id: `held:${key}`, seq: 0, ts: g.at, text: g.text, images: g.images.length || undefined, ...(g.state === 'building' ? { meta: 'held' as const } : {}) };
+  }
+
+  private gateChanged(key: string) {
+    this.saveGates();
+    this.queueSummary(key);
+    const snap = this.liveSnapshot(key);
+    this.emit('live', key, snap.live, snap.overlay);
+  }
+
+  /** Holds a new session's first message and asks whether to build the project's memory first. */
+  private async holdFirst(key: string, ask: NonNullable<Awaited<ReturnType<typeof askFor>>>, m: { text: string; said: string; images: ImageInput[] }) {
+    const images = this.saveImages(m.images).map((i) => ({ path: i.path!, mediaType: i.mediaType }));
+    const now = Date.now();
+    const g: Gate = { state: 'asking', project: ask.space, name: ask.name, ...offerOf(ask.offer), at: now, text: m.text, said: m.said, images };
+    this.gates.set(key, g);
+    // It needs you from the start: said here (the list may first look at it already waiting), so it is said once.
+    this.statuses.set(key, { status: 'waiting', turnStart: now });
+    this.gateChanged(key);
+    this.notify({ key, title: this.summary(key)?.title ?? 'New session', agent: agentOfKey(key), at: now, kind: 'waiting', body: cardOf(g).title });
+  }
+
+  /** The person's choice on the card (its option ids: build, start, never, now, stop, retry). */
+  private async answerGate(key: string, decision: string): Promise<{ key: string } | void> {
+    const g = this.gates.get(key);
+    if (!g) throw new HttpError(404, 'That question is answered already');
+    const ok = (...ids: string[]) => {
+      if (!ids.includes(decision)) throw new HttpError(400, 'That choice is not on the card');
+    };
+    if (g.state === 'asking') {
+      ok('build', 'start', 'never');
+      if (decision === 'build') return this.startGateBuild(key, g);
+      if (decision === 'start') askLater(this.db, g.project);
+      else askNever(this.db, g.project);
+      return this.releaseGate(key);
+    }
+    if (g.state === 'failed') {
+      if (g.startFailed) {
+        ok('new', 'now');
+        return decision === 'new' ? this.startInNewSession(key, g) : this.releaseGate(key);
+      }
+      ok('retry', 'now');
+      return decision === 'retry' ? this.startGateBuild(key, g) : this.releaseGate(key);
+    }
+    ok('now', 'stop');
+    // Stop: what the build wrote stays; the agent starts either way, and Start now leaves the build going.
+    if (decision === 'stop') buildApi.stop(g.project);
+    return this.releaseGate(key);
+  }
+
+  /**
+   * The agent of a session that never had a message cannot start again (Codex: its thread has no history to resume, and its
+   * key is that thread's id): a new session with the same settings gets the held first message and its pictures, takes over
+   * the messages queued meanwhile (after it), and the old, empty one is archived. Does not ask again. Returns the new key.
+   */
+  private async startInNewSession(key: string, g: Gate): Promise<{ key: string }> {
+    const r = this.db.prepare('select agent, cwd, model, effort, mode, account, acp_agent, title, worktree from app_sessions where key = ?').get(key) as
+      | { agent: string | null; cwd: string | null; model: string | null; effort: string | null; mode: string | null; account: string | null; acp_agent: string | null; title: string | null; worktree: string | null }
+      | undefined;
+    if (!r) throw new HttpError(404, 'That session is gone');
+    const wt = parseJson<WorktreeInfo>(r.worktree);
+    const extra = { ...sessionExtra(this.db, key) } as SessionExtra;
+    delete extra.memoryBuild;
+    const images: ImageInput[] = g.images.flatMap((i) => {
+      try {
+        return [{ mediaType: i.mediaType, data: fs.readFileSync(i.path).toString('base64'), path: i.path }];
+      } catch {
+        return [];
+      }
+    });
+    const next = await this.create({
+      agent: (r.agent as Agent) ?? agentOfKey(key),
+      cwd: wt?.repo ?? r.cwd ?? config.defaultCwd,
+      worktree: !!wt,
+      prompt: g.text,
+      images,
+      model: r.model ?? undefined,
+      effort: r.effort ?? undefined,
+      mode: r.mode ?? undefined,
+      account: r.account ?? undefined,
+      acpAgent: r.acp_agent ?? undefined,
+      title: r.title ?? undefined,
+      extra,
+      remember: false,
+    });
+    // What was sent while it waited goes to the new session, after the first message.
+    this.loadQueues();
+    const queued = this.queues.get(key) ?? [];
+    if (queued.length) {
+      this.queues.delete(key);
+      this.held.delete(key);
+      this.db.prepare('update queued set key = ? where key = ?').run(next, key);
+      this.queues.set(next, [...(this.queues.get(next) ?? []), ...queued]);
+      this.queueSummary(next);
+    }
+    // The old one, empty, is put away: its agent, its card, its worktree, its place in the list.
+    this.gates.delete(key);
+    setSessionExtra(this.db, key, { memoryBuild: null });
+    this.gateChanged(key);
+    const old = this.lives.get(key);
+    if (old) old.adapter.stop();
+    if (wt) await this.dropWorktree(key, { deleteBranch: true }).catch(() => {});
+    this.setFlags(key, { archived: true });
+    return { key: next };
+  }
+
+  private async startGateBuild(key: string, g: Gate) {
+    g.state = 'building';
+    delete g.error;
+    this.gateChanged(key);
+    try {
+      await buildApi.start(this.db, g.project, { exclude: key });
+    } catch (e) {
+      g.state = 'failed';
+      g.error = (e as Error).message;
+      this.gateChanged(key);
+      return;
+    }
+    // A build of a small project may be past its essentials, or over, by now.
+    const j = jobState(this.db, g.project);
+    if (j?.essentialsAt || j?.state === 'done') await this.releaseGate(key);
+  }
+
+  /** A build the sessions waiting on a project's memory wait for read its essentials ('essentials') or ended ('done', 'stopped', 'failed'). */
+  private async buildReached(space: string | null, what: string) {
+    for (const [key, g] of [...this.gates]) {
+      if (g.project !== space || g.state !== 'building') continue;
+      if (what === 'failed') {
+        g.state = 'failed';
+        g.error = jobState(this.db, g.project)?.error || 'The build stopped with an error';
+        this.gateChanged(key);
+      } else await this.releaseGate(key);
+    }
+  }
+
+  /** The agent gets its held first message now, by the normal way (with the notes that bear on it, the wiki's too). */
+  private async releaseGate(key: string) {
+    const g = this.gates.get(key);
+    if (!g || this.releasing.has(key)) return;
+    this.releasing.add(key);
+    try {
+      const images: ImageInput[] = g.images.flatMap((i) => {
+        try {
+          return [{ mediaType: i.mediaType, data: fs.readFileSync(i.path).toString('base64'), path: i.path }];
+        } catch {
+          return [];
+        }
+      });
+      // What was sent while it waited was queued (held after a restart): it goes out after this message's turn.
+      if (!this.userStopped.has(key)) this.held.delete(key);
+      // Its agent may be gone before it ever got a message (the process died, or the server restarted and could not
+      // reattach it): started again as it was (same agent, folder, model, mode, account and settings, from its row), with
+      // the first message as its request so it gets the notes that fit it. Claude Code and Custom start afresh when there
+      // is no transcript yet. Codex cannot resume a thread that never had a turn ("no rollout found"), and its key is the
+      // thread's id: the card then offers Start in a new session (startInNewSession).
+      if (this.lives.get(key)?.adapter.exited) this.lives.delete(key);
+      if (!this.lives.has(key)) {
+        try {
+          await this.start(key, {}, g.said || g.text);
+        } catch (e) {
+          throw new GateStartError((e as Error).message);
+        }
+      }
+      await beforeSend(key);
+      await this.snapshot(key);
+      const l = this.live(key);
+      await l.adapter.sendMessage(await withNotes(key, g.text, g.said || null, takeFirst(l, g.text)), images);
+      this.gates.delete(key);
+      if (sessionExtra(this.db, key).memoryBuild) setSessionExtra(this.db, key, { memoryBuild: null });
+      this.gateChanged(key);
+    } catch (e) {
+      // It did not go: the card stays, to start again.
+      g.state = 'failed';
+      g.error = (e as Error).message;
+      if (e instanceof GateStartError) g.startFailed = true;
+      this.gateChanged(key);
+      throw e;
+    } finally {
+      this.releasing.delete(key);
+    }
+  }
+
+  /**
+   * At the server's start: the sessions that were asking or waiting still do (their cards come back), and one whose build
+   * reached its essentials or ended while the server was down starts its agent now.
+   */
+  private async resumeGates() {
+    for (const [key, g] of [...this.gates]) {
+      if (!this.exists(key)) {
+        this.gates.delete(key);
+        this.saveGates();
+        continue;
+      }
+      if (g.state === 'building') {
+        const j = jobState(this.db, g.project);
+        if (!j || j.kind !== 'build') {
+          g.state = 'failed';
+          g.error = 'The build did not start';
+        } else if (j.essentialsAt || j.state === 'done' || j.state === 'stopped') await this.releaseGate(key).catch(() => {});
+        else if (j.state === 'failed' || (j.state === 'running' && !jobRunning(g.project) && Date.now() - j.startedAt > 7 * 24 * 3600_000)) {
+          g.state = 'failed';
+          g.error = j.error || 'The build did not finish';
+        }
+      }
+      this.queueSummary(key);
+    }
   }
 
   // ---- queued messages --------------------------------------------------------------
@@ -2297,7 +2563,7 @@ export class SessionManager extends EventEmitter {
   }
 
   private dispatchQueued(key: string) {
-    if (this.held.has(key) || this.lives.get(key)?.adapter.state.status !== 'idle') return;
+    if (this.held.has(key) || this.gates.has(key) || this.lives.get(key)?.adapter.state.status !== 'idle') return;
     // A capability may refuse it (a spending cap reached): the queue then waits for you.
     beforeSend(key).then(
       () => {
@@ -2313,6 +2579,7 @@ export class SessionManager extends EventEmitter {
 
   /** Sends one queued message right away: into the running turn if there is one. */
   async sendQueuedNow(key: string, id: string) {
+    if (this.gates.has(key)) throw new HttpError(409, 'The agent has not started yet: it gets your first message when the memory is ready (or press Start now).');
     this.loadQueues();
     const pos = this.queues.get(key)?.findIndex((m) => m.id === id) ?? -1;
     const held = this.held.has(key);
@@ -2427,6 +2694,8 @@ export class SessionManager extends EventEmitter {
 
   async send(key: string, text: string, images: ImageInput[] = [], files: FileInput[] = []) {
     if (!text.trim() && !images.length && !files.length) throw new HttpError(400, 'Empty message');
+    // The agent has not had its first message yet (it waits for the project's memory): this one goes after it.
+    if (this.gates.has(key)) return this.enqueue(key, text, images, files);
     await beforeSend(key);
     await this.switchBeforeSend(key).catch(() => {});
     if (!this.lives.has(key)) await this.start(key);
@@ -2468,7 +2737,9 @@ export class SessionManager extends EventEmitter {
     else await this.start(key);
   }
 
-  async answer(key: string, approvalId: string, a: ApprovalAnswer) {
+  async answer(key: string, approvalId: string, a: ApprovalAnswer): Promise<{ key: string } | void> {
+    // The question of building the project's memory first: answered here, not by the agent.
+    if (approvalId === MEMORY_CARD && this.gates.has(key)) return this.answerGate(key, a.decision);
     // A standing form: its answers go to the session as your message (the agent reads them in its next turn).
     const f = standingForm(this.db, key, approvalId);
     if (f) {
@@ -2686,6 +2957,7 @@ export class SessionManager extends EventEmitter {
    */
   async remove(key: string, o: { keepActivity?: boolean } = {}) {
     dropNotes(this.db, key);
+    if (this.gates.delete(key)) this.saveGates();
     const l = this.lives.get(key);
     // Its transcript as the running agent knows it: the index may not have it yet.
     const livePath = l?.adapter.transcriptPath;
@@ -2759,6 +3031,8 @@ export class SessionManager extends EventEmitter {
     const now = Date.now();
     for (const l of this.lives.values()) {
       const s = l.adapter.state;
+      // A session waiting on the memory question or its build has had no message yet: it is not idle, it is waiting for you.
+      if (this.gates.has(l.key)) continue;
       if (s.status === 'idle' && !s.pendingApprovals && !(s.backgroundTasks?.length) && now - l.adapter.lastActivity > config.idleStopMs) {
         console.log(`[idle] stopping ${l.key}`);
         l.adapter.stop();

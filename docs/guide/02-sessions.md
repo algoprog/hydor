@@ -154,7 +154,7 @@ What you write in the box waits there while you go to other pages: the message, 
 At the top of a session:
 
 - the agent's icon and the title (double-click it to rename), and a lock for a [confidential session](#keep-a-session-confidential);
-- a status: **Working**, **Needs you**, **Ready**, **Starting**, **Stopping**, or "Open in VS Code" for a session running elsewhere; once its agent is no longer running, how the work ended: **Done** when its last turn finished (with "· 2 files made" or "· 3 files changed" when it made or changed files), **Stopped** when you stopped it or it was cut off before it finished, **Failed** when it ended with an error. Point at it for what to do next;
+- a status: **Working**, **Needs you**, **Ready**, **Starting**, **Building memory**, **Stopping**, or "Open in VS Code" for a session running elsewhere; once its agent is no longer running, how the work ended: **Done** when its last turn finished (with "· 2 files made" or "· 3 files changed" when it made or changed files), **Stopped** when you stopped it or it was cut off before it finished, **Failed** when it ended with an error. Point at it for what to do next;
 - the folder (click it to browse it in Files), a pull request badge, the account when it runs as an added one, and on wider screens the git branch and the model;
 - one button for what you can do now: **Stop** while a turn runs, **Resume** when the agent is not running (after **Stopped** or **Failed**; quieter after **Done**, since a message in the box continues the session anyway), or **Continue here** for a Claude Code session open in VS Code or a terminal;
 - **Details** (showing the lines added and removed once files changed), which opens [the details panel](#the-details-panel-changes-commands-and-info);
@@ -234,6 +234,16 @@ Click any step to open it:
 - anything else: what the agent sent and what came back.
 
 A step can be marked **background** (it keeps running), **Auto** (Custom's Auto mode decided, with the reason on hover), or show a red exit code. Background tasks (a command left running, a monitor, a workflow) are listed in a line above the message box, together with the session's subagents; open one to see its output (Claude Code) and **Stop** it, which asks first. See [Subagents](/guide/sessions#subagents).
+
+## Build a project's memory before the agent starts
+
+When you start a session on the start page in a project whose [wiki memory](/guide/wiki-memory) is still empty, and the project has something to build one from (conversations, commit messages, documents, notes, a README or a docs/ folder), the session asks first. A card under your message says **Build <project>'s memory first?**, with what it would read and about how long it takes before the agent starts. The session shows **Needs you** (and you get the notification) until you choose:
+
+- **Build memory, then start**: the memory starts building, the card turns into its progress, and the session shows **Building memory**. Your message waits ("Sent to the agent when the memory is ready") and goes to the agent as soon as the most important part is written: an overview of the project from its files, its notes and the conversations with the most in them. The rest builds on in the background, and agents find it as it lands. **Start now** sends your message at once and lets the build go on; **Stop building** stops it (what it wrote stays) and starts the agent. You can close the app: the agent starts by itself. If the build fails before that point, the card says so, with **Try again** and **Start anyway**. If the agent ended before it ever got your message (it crashed, or the computer restarted during the wait) and cannot be started again, the card offers **Start in a new session**: a new session with the same settings gets your message, takes over what you sent meanwhile, and the empty one is archived.
+- **Start without memory**: the agent starts now, and this project doesn't ask again for a week.
+- **Don't ask for this project**: it never asks for this project again. **Build from history** stays on the project's Memory page.
+
+Anything you send while it waits goes to the agent after your first message. It asks only when you start a session yourself on the start page, never for scheduled runs, apps, subagents or sessions an agent starts, and not for a project that has had a build.
 
 ## Approve or deny what the agent wants to do
 
@@ -525,3 +535,4 @@ The ⋯ button at the top right of a session opens its menu. Some items show onl
 - "Why can't my confidential session search the web, and what still works in it?"
 - "Show why attention weights sum to 1, with the equations and a numerical example."
 - "Chart the Sales tab of my Shop numbers spreadsheet by month, one line per region, and keep it current."
+- "Why did my new session ask whether to build the project's memory first, and what happens if I choose Start now?"

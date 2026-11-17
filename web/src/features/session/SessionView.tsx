@@ -66,7 +66,7 @@ function StatusPill({ s, end }: { s: SessionSummary; end: SessionEnd | null | un
   let dot = end?.ended === 'done' ? 'bg-ok/70' : end?.ended === 'failed' ? 'bg-err' : 'bg-fg-3/60';
   if (a) {
     const where = a.kind === 'external' ? ` in ${a.client}` : '';
-    if (isBusy(a)) [label, tone, dot] = [a.status === 'starting' ? 'Starting' : `Working${where}`, 'text-busy', 'bg-busy'];
+    if (isBusy(a)) [label, tone, dot] = [a.memory ? 'Building memory' : a.status === 'starting' ? 'Starting' : `Working${where}`, 'text-busy', 'bg-busy'];
     else if (a.status === 'waiting') [label, tone, dot] = [`Needs you${where}`, 'text-warn', 'bg-warn'];
     else if (a.status === 'stopping') [label, tone, dot] = ['Stopping', 'text-fg-3', 'bg-fg-3'];
     else if (inBackground(a)) [label, tone, dot] = [backgroundLine(a), 'text-busy', 'bg-busy'];

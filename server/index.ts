@@ -418,6 +418,8 @@ app.post('/api/sessions', async (req) => {
     extra: others ? { ...extra, arena: undefined } : extra,
     // A question asked on Help (or from a page in Pages, or a file in Files) leaves the agent's remembered model, effort and permissions as they were.
     remember: extra?.help || extra?.page || extra?.file ? false : undefined,
+    // The start page says a person started it (nothing else does): in a project with no wiki memory it may ask to build it first.
+    askMemory: b.askMemory === true && !others,
   };
   // The page's own id for this press of Start: sent again (its answer lost on the way), it makes no second session.
   const startId = typeof b.startId === 'string' && START_ID.test(b.startId) ? b.startId : undefined;
@@ -760,8 +762,9 @@ app.post('/api/sessions/:key/approvals/:id', async (req) => {
   const b = (req.body ?? {}) as any;
   // An app's long answers (meeting notes pasted into its card) take up to 60,000 characters, as its own form does.
   const form = b.form && typeof b.form === 'object' ? Object.fromEntries(Object.entries(b.form as Record<string, unknown>).map(([k, v]) => [k, String(v ?? '').slice(0, 60_000)])) : undefined;
-  await sessions.answer(K(req), decodeURIComponent((req.params as { id: string }).id), { decision: String(b.decision ?? ''), message: b.message, answers: b.answers, form });
-  return { ok: true };
+  const done = await sessions.answer(K(req), decodeURIComponent((req.params as { id: string }).id), { decision: String(b.decision ?? ''), message: b.message, answers: b.answers, form });
+  // The card of a session that could not start again answers with the new session that has its first message.
+  return { ok: true, ...(done?.key ? { key: done.key } : {}) };
 });
 app.post('/api/sessions/:key/config', async (req) => {
   const b = (req.body ?? {}) as any;
