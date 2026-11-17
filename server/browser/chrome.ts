@@ -8,8 +8,9 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
-import type { ChromeDownload, ChromeInfo } from '../../shared/browser.ts';
+import { DESKTOP_CHROME, type ChromeDownload, type ChromeInfo } from '../../shared/browser.ts';
 import { config } from '../config.ts';
+import { desktopChromium } from '../desktop.ts';
 import { proxyArgs } from './proxy.ts';
 
 export const BROWSER_DIR = path.join(config.dataDir, 'browser');
@@ -136,12 +137,21 @@ function downloadedChromes(): ChromeInfo[] {
 
 let found: { at: number; list: ChromeInfo[] } | null = null;
 
-/** Every Chromium found, the best first: the system's, one downloaded here, Playwright's full one, its headless shell. */
+/** In the desktop app, its own browser: its pages show in the app's window, and you use them as in any browser. */
+function desktopChrome(): ChromeInfo[] {
+  return desktopChromium ? [{ path: DESKTOP_CHROME, source: 'desktop', label: 'The desktop app’s own browser', version: desktopChromium }] : [];
+}
+
+/**
+ * Every Chromium found, the best first: the desktop app's own (in the desktop app), the system's, one downloaded here,
+ * Playwright's full one, its headless shell.
+ */
 export function findChromes(): ChromeInfo[] {
   if (found && Date.now() - found.at < 30_000) return found.list.map((c) => ({ ...c, version: c.version ?? (versionOf(c.path) || undefined) }));
   const pw = playwrightChromes();
-  const list = [...systemChromes(), ...downloadedChromes(), ...pw.filter((c) => !c.shell), ...pw.filter((c) => c.shell)];
+  const list = [...desktopChrome(), ...systemChromes(), ...downloadedChromes(), ...pw.filter((c) => !c.shell), ...pw.filter((c) => c.shell)];
   for (const c of list) {
+    if (c.source === 'desktop') continue;
     readVersion(c.path);
     c.version ??= versionOf(c.path) || undefined;
   }
@@ -185,6 +195,11 @@ interface LaunchOpts {
    * PDF or picture made on a Linux server sets lines wider than the editor shows them on a Mac or Windows (or Word).
    */
   exactText?: boolean;
+  /**
+   * Unpacked extensions to load (your own browsing's, or those you let agents use in a profile). Chromium and Chrome for
+   * Testing load them; Google Chrome itself has stopped taking them this way, and then runs without.
+   */
+  extensions?: string[];
 }
 
 function args(o: LaunchOpts, sandbox: boolean): string[] {
@@ -209,6 +224,13 @@ function args(o: LaunchOpts, sandbox: boolean): string[] {
     '--window-size=1280,800',
     ...(o.proxy ? proxyArgs(o.proxy) : []),
   ];
+  if (o.extensions?.length) {
+    const list = o.extensions.join(',');
+    a.push(`--load-extension=${list}`, `--disable-extensions-except=${list}`);
+    // Chrome 137 to 141 still load them when this is off.
+    const i = a.findIndex((x) => x.startsWith('--disable-features='));
+    a[i] += ',DisableLoadExtensionCommandLineSwitch';
+  }
   if (o.headless || o.shell) a.push('--headless');
   if (o.exactText) a.push('--font-render-hinting=none');
   if (!sandbox) a.push('--no-sandbox');
@@ -335,7 +357,19 @@ export async function downloadChrome(tell: (d: ChromeDownload) => void): Promise
 }
 
 /** Unpacks a zip file (stored or deflated entries, with their Unix modes and links) into `dest`. */
-export async function unzip(file: string, dest: string): Promise<void> {
+export async function unzip(file: string, dest: string, o: { links?: boolean; maxBytes?: number } = {}): Promise<void> {
+  const links = o.links !== false;
+  const maxBytes = o.maxBytes ?? Infinity;
+  let total = 0;
+  const tooBig = () => new Error(`The zip file unpacks to more than ${maxBytes >= 1024 * 1024 ? `${Math.round(maxBytes / 1024 / 1024)} MB` : `${maxBytes} bytes`}`);
+  /** Passes an entry's bytes on, counting them: past the cap for the whole zip file it fails (a zip bomb). */
+  async function* counted(src: AsyncIterable<Buffer>): AsyncGenerator<Buffer> {
+    for await (const c of src) {
+      total += c.length;
+      if (total > maxBytes) throw tooBig();
+      yield c;
+    }
+  }
   const fd = fs.openSync(file, 'r');
   try {
     const size = fs.fstatSync(fd).size;
@@ -360,6 +394,7 @@ export async function unzip(file: string, dest: string): Promise<void> {
       const nameLen = cd.readUInt16LE(p + 28);
       const extraLen = cd.readUInt16LE(p + 30);
       const commentLen = cd.readUInt16LE(p + 32);
+      const rawSize = cd.readUInt32LE(p + 24);
       const ext = cd.readUInt32LE(p + 38);
       const local = cd.readUInt32LE(p + 42);
       const name = cd.toString('utf8', p + 46, p + 46 + nameLen);
@@ -367,6 +402,8 @@ export async function unzip(file: string, dest: string): Promise<void> {
       const out = path.resolve(root, name);
       if (out !== root && !out.startsWith(root + path.sep)) throw new Error(`Unsafe path in zip: ${name}`);
       const mode = (ext >>> 16) & 0xffff;
+      if (!name.endsWith('/') && total + rawSize > maxBytes) throw tooBig();
+      if (!links && (mode & 0o170000) === 0o120000) throw new Error(`A link in the zip file is not allowed: ${name}`);
       if (name.endsWith('/')) {
         fs.mkdirSync(out, { recursive: true });
         continue;
@@ -376,13 +413,13 @@ export async function unzip(file: string, dest: string): Promise<void> {
       fs.readSync(fd, lh, 0, 30, local);
       const start = local + 30 + lh.readUInt16LE(26) + lh.readUInt16LE(28);
       if (method !== 0 && method !== 8) throw new Error(`Unsupported zip compression in ${name}`);
-      const read = (): NodeJS.ReadableStream => {
+      const read = (): AsyncGenerator<Buffer> => {
         const raw = compSize ? fs.createReadStream(file, { start, end: start + compSize - 1 }) : Readable.from([]);
-        return method === 8 ? raw.pipe(zlib.createInflateRaw()) : raw;
+        return counted((method === 8 ? raw.pipe(zlib.createInflateRaw()) : raw) as AsyncIterable<Buffer>);
       };
       if ((mode & 0o170000) === 0o120000) {
         const chunks: Buffer[] = [];
-        for await (const c of read() as AsyncIterable<Buffer>) chunks.push(c);
+        for await (const c of read()) chunks.push(c);
         const target = Buffer.concat(chunks).toString('utf8');
         const resolved = path.resolve(path.dirname(out), target);
         if (!resolved.startsWith(root + path.sep)) throw new Error(`Unsafe link in zip: ${name}`);

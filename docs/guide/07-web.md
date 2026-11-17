@@ -1,6 +1,6 @@
 # Search and the browser
 
-Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources each reply cites, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. In the desktop app (Mac, Windows, Linux), agents can also use the computer itself: its screen, mouse and keyboard.
+Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources each reply cites, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. It also covers the Browser page, a browser of your own in the app (tabs, bookmarks, Chrome extensions), and handing a page of it to an agent. In the desktop app (Mac, Windows, Linux), the browser runs inside the app, and agents can also use the computer itself: its screen, mouse and keyboard.
 
 ![An agent that searched the web, read pages and compared what it found in a table](images/web.webp)
 
@@ -110,7 +110,10 @@ In the conversation, a read shows as "Read" and the page's title, with the quest
 
 ## The browser agents use
 
-Some sites need clicking, forms, logins or scripts, which a plain read can't get through. For those, agents have a browser: a real Chromium (the open-source browser Chrome is built on), running on the computer where the app runs, apart from your own browser. You can watch it live and take it over at any moment.
+Some sites need clicking, forms, logins or scripts, which a plain read can't get through. For those, agents have a browser, apart from your own: it has none of the sign-ins of the Chrome, Edge, Firefox or Safari you use. You can watch it live and take it over at any moment. Which browser it is depends on where the app runs:
+
+- **In the desktop app** (Mac, Windows, Linux) it is the app's own browser, built on Chromium (the open-source browser Chrome is built on) and running inside the app. Nothing needs to be installed, and the app picks it unless you choose another (see [Chromium](/guide/web#chromium)). Its pages draw fast in the app's window, you click into one to use it, and it keeps working with the window closed.
+- **Anywhere else** (the app in Docker or on a server, and a phone or any web page looking at it) it is a real Chromium that the app starts on the computer where it runs, which you see as a live picture.
 
 With the browser on, every agent can:
 
@@ -124,14 +127,15 @@ With the browser on, every agent can:
 - attach files from the session's folder to a page's upload field (nothing from anywhere else);
 - hand the browser to you.
 
-Some things are always yours:
+Some things are always yours, or wait for your OK:
 
 - **Logins without a saved sign-in, checks and anything the agent is unsure about.** Agents are told to hand these to you rather than try them, a captcha (a check that you are a person) and a code sent to you included. When a task will need to sign in again without you, like a scheduled task, the agent may ask for the sign-in on a card instead, to keep in the vault.
 - **Paying and ordering.** An agent never presses a button that would pay or place an order (Pay, Buy now, Place order, Subscribe now, Donate, Book now, the submit button of a form with card fields…). It stops, and you are asked to finish it yourself.
+- **Buttons that send, post, delete or transfer, on a site the browser is signed in to.** Before an agent presses one, you are asked to allow it (see [Buttons that send, post or delete](/guide/web#buttons-that-send-post-or-delete)). You can turn that off in Settings.
 - **What you type.** The values of passwords, card numbers, security codes and one-time codes are never shown to the agent, and neither is anything you typed while you drove. Password-like parts of addresses are hidden from it too. A field the agent filled from the vault shows dots, and the agent only learns that it was filled.
 - **Pop-up questions** a page asks (see [Answer a page's pop-up questions](/guide/web#answer-a-pages-pop-up-questions)).
 
-Each session has a browser of its own. Without a profile it starts fresh, logged in nowhere, and keeps nothing once it closes. With a profile, it is logged in wherever the profile is (see [Keep sign-ins with profiles](/guide/web#keep-sign-ins-with-profiles)).
+Each session has a browser of its own. Without a profile it starts fresh, logged in nowhere, and keeps nothing once it closes. With a profile, it is logged in wherever the profile is (see [Keep sign-ins with profiles](/guide/web#keep-sign-ins-with-profiles)). Your own browser, on the Browser page, is a separate one that agents never use, unless you hand them a page of it (see [Hand a page to an agent](/guide/web#hand-a-page-to-an-agent)).
 
 ## Watch the browser live
 
@@ -145,7 +149,7 @@ On a computer:
 
 On a phone, tap the panel to open the browser full screen; the × closes it.
 
-The live view is a picture of the page, sent several times a second while you watch. It says "Connecting to the browser…" until the first one comes.
+In the desktop app, the live view is the page itself, drawn by the app and kept up as fast as the page changes, so scrolling and typing feel like any browser. Elsewhere it is a picture of the page, sent several times a second while you watch; it says "Connecting to the browser…" until the first one comes.
 
 ### See where the agent points
 
@@ -171,7 +175,7 @@ On a computer, the live view unfolds by itself for a login, a payment or a pop-u
 ### On a computer
 
 1. Press **Take over** on the line (or on the panel). The panel says "You are driving: the agent waits", and the live view gets a coloured outline.
-2. Use the page as in any browser: click, scroll with the wheel, type. Click into the page first; from then on your keys go to the page (the app's own shortcuts wait), and what you paste comes in as text.
+2. Use the page as in any browser: click, scroll with the wheel, type. Click into the page first; from then on your keys go to the page (the app's own shortcuts wait), and what you paste comes in as text. In the desktop app, clicking or typing in the page is enough to take over: the panel switches to "You are driving: the agent waits" by itself, and while the agent drives, a line under the address says "Click into the page to use it yourself".
 3. While you drive, a bar above the page has **Back**, **Reload** and the address: type an address and press Enter to go there.
 4. When you are finished, press **Done** on the line. The app tells the agent it is done, with the page the browser now shows, and the agent goes on.
 
@@ -191,6 +195,19 @@ When the agent reaches a button that would pay or order, it stops: "Stopped befo
 - You can take over at any time, not only when asked: press **Take over** on the panel. The agent waits; if it tries to use the browser meanwhile, it is told you have it and that it will hear when you are done. Press **Hand back** to give the browser back; if the agent was waiting for it, it gets a message with the page the browser shows.
 
 The messages the app sends the agent for you show in the conversation. If the agent is in the middle of a turn, they wait until it ends.
+
+## Buttons that send, post or delete
+
+On a site the browser is signed in to, an agent asks before it presses a button that sends, posts, publishes, shares, replies, deletes, removes, transfers or withdraws something. That is a browser that uses a profile (see [Keep sign-ins with profiles](/guide/web#keep-sign-ins-with-profiles)), and a page you handed an agent (see [Hand a page to an agent](/guide/web#hand-a-page-to-an-agent)). A browser that starts fresh, logged in nowhere, has nothing to protect and does not ask. Paying and ordering stay yours alone (see above).
+
+The agent knows these buttons by their words, in English, German, Greek, Chinese, French and Spanish: Send, Post, Publish, Delete, Transfer and the like, and a bare "Confirm" or "Yes" when the page is about one of them (a pop-up asking "Delete this post?"). "Sign in", "Next", "Save draft", "Cancel", a search button, and sending a code to yourself (Resend code) are not stopped.
+
+When it reaches one, it stops, ends its turn and waits. You see "Wants to press “Delete” on mail.example.com" in the same places as other questions (the line on the browser's panel and a card in the conversation), with **Don’t allow** and **Allow**. The live view does not open by itself.
+
+- **Allow** tells the agent it may press the button now. It lets through one press of a button with the same words, on that site, in the next two minutes; after that the agent asks again.
+- **Don’t allow** tells the agent not to press it. It carries on without, or tells you what it could not do. The card then reads "Allowed" or "Not allowed".
+
+It is on at first. To turn it off, see [Ask before sending on signed-in sites](/guide/web#ask-before-sending-on-signed-in-sites).
 
 ## Answer a page's pop-up questions
 
@@ -214,7 +231,7 @@ An address on this computer or its network that you type yourself while you driv
 
 ## Open the browser yourself
 
-You can open a session's browser before the agent does, to log in to a site before you ask it to work there, say. Open the session's menu (⋯) → **More** → **Open a browser**. The panel appears above the message box: press **Take over** and use it. When the browser is already open, the same item reads **Show the browser**. If the browser is turned off in Settings, you are told so.
+You can open a session's browser before the agent does, to log in to a site before you ask it to work there, say. Open the session's menu (⋯) → **More** → **Open a browser**. The panel appears above the message box: press **Take over** and use it. When the browser is already open, the same item reads **Show the browser**. If the browser is turned off in Settings, you are told so. For a browser of your own, not tied to a session, see [Your own browser](/guide/web#your-own-browser).
 
 ## Downloads and uploads
 
@@ -233,6 +250,123 @@ A session's browser closes by itself:
 
 Whatever was still waiting for you ends with it. The agent opens the browser again when it next needs it.
 
+In the desktop app, an agent's browser does not need the app's window: it keeps working while the window is closed or hidden, as long as the app is running (it stays in the menu bar, the notification area or the tray). Open the window and its pages are there to watch.
+
+## Your own browser
+
+The **Browser** page is a browser of your own inside the app, next to the one agents use: open **Browser** in the sidebar's tools, or go to [Browser](/browser). It has tabs, an address bar that also searches, back, forward and reload, bookmarks, Chrome extensions, find in page, downloads, and a list of the agents' tabs. It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say), but never Hydor itself.
+
+In the desktop app, your tabs are real pages shown in the app's window, with the speed and keys of any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). Elsewhere, the page is a live picture of a Chromium running on the computer where the app runs, laid out for the room it has on your screen, and you click, scroll and type into it (see [Watch the browser live](/guide/web#watch-the-browser-live)). If the browser can't start (it found no Chromium, say), the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
+
+### Tabs and the address bar
+
+- The tab strip above the address bar shows each tab's icon, title and **×**. **+** (**New tab**) opens a blank one. A middle click closes a tab. Closing the last tab leaves a blank one.
+- The address bar shows the page's address. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for, with your search providers (see [Choose your search providers](/guide/web#choose-your-search-providers)): the first one that is on, in their order, and DuckDuckGo when none is. **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead.
+- **Back**, **Forward** and **Reload** are at the left of the address bar. While a page loads, Reload is **Stop**.
+- The star at the end of the address bar bookmarks the page on the bookmarks bar; filled, it is bookmarked, and pressing it again takes the bookmark away.
+- **Menu** (⋯) has **Ask about this page**, **Do this here**, **Find in page**, **Bookmarks**, **Extensions**, **Downloads** and **Agents’ tabs**.
+- When the open tab is a Chrome Web Store page of an extension, an **Add to Hydor** button appears in the bar (see [Chrome extensions](/guide/web#chrome-extensions)).
+
+A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab.
+
+### Keyboard shortcuts
+
+On the Browser page (in the desktop app, from inside a page too), with Ctrl on Windows and Linux and ⌘ on a Mac:
+
+- **Ctrl+T** opens a new tab, and **Ctrl+W** closes the open one.
+- **Ctrl+L** goes to the address bar.
+- **Ctrl+R** reloads (**F5** too, in the desktop app).
+- **Ctrl+F** opens find in page.
+- **Alt+←** and **Alt+→** go back and forward (**⌘[** and **⌘]** on a Mac, in the desktop app).
+- **Esc** closes find in page.
+
+### Find in a page
+
+**Ctrl+F**, or **Find in page** in the menu, opens a bar under the address bar. Type, and the first match is found and scrolled into view as you pause. **Enter** goes to the next match and **Shift+Enter** to the one before (so do the arrows), and the bar says "12 matches" ("1000+" past a thousand) or "No matches". Case does not matter, and it wraps round. **Esc**, or **×**, closes the bar and clears what was found.
+
+### Downloads
+
+A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. Click a finished one to see it in its folder (in the desktop app) or to open it in the app (elsewhere).
+
+### When a site asks for a permission
+
+When a page in your own browser asks to use your camera, your microphone, your location, notifications, your clipboard or the like, a bar above the page says so ("example.com wants to use your camera") with **Don’t allow** and **Allow**. Your answer is remembered for that site, so it asks only once; to see what you allowed or blocked, or to be asked again, open **Menu** (⋯) → **Site permissions** and press **Forget** beside an answer. This is in the desktop app; the agents' browsers there refuse every such request themselves, except to fill the screen and to copy to your clipboard. A page's pop-up question (an alert, a yes-or-no or a text prompt) shows above the page, as in the agents' browser (see [Answer a page's pop-up questions](/guide/web#answer-a-pages-pop-up-questions)).
+
+### On a phone
+
+The tab strip becomes a button showing how many tabs are open: tap it for the list, with **×** beside each and **New tab**. The top bar keeps **Back**, the address and **Menu**; **Forward**, **Reload**, the star and **Add to Hydor** are in the menu, and so is **Bookmarks**, since the bookmarks bar is left out. You drive a live picture of the page: tap to click, drag to scroll, and **Type** opens your phone's keyboard, with a row of Tab, Enter, Esc, ⌫ and the arrow keys beside it.
+
+## Bookmarks
+
+The bookmarks bar sits under the address bar once you have a bookmark on it (on a phone it is left out; your bookmarks are in the menu). Click a bookmark to open it in the open tab; Ctrl+click (⌘+click on a Mac) or a middle click opens it in a new tab. A folder opens a list of what is in it, and a bar longer than the page scrolls, with **»** listing everything. Right-click an item for **Open**, **Open in a new tab**, **Edit** (**Rename** for a folder) and **Delete**.
+
+For all of them, press **Menu** (⋯) → **Bookmarks**, or go to [Bookmarks](/browser?panel=bookmarks). The panel has two places, **Bookmarks bar** and **Other bookmarks**, and the folders in them open and close.
+
+- **New folder** (at the top) adds a folder to the bar and asks for its name.
+- Point at a row for **Move up**, **Move down**, **Edit** (**Rename** for a folder) and **Delete**. You can also drag a row: onto the middle of a folder to put it inside, or between rows to place it there. A folder can't go into itself. Deleting a folder asks first, and takes what is in it.
+- A bookmark's address starts with http://, https://, file:// or chrome-extension://. You can keep up to 20,000.
+
+### Bring in bookmarks
+
+Under **Import** in the panel, the app lists the browsers on this computer that have bookmarks, each with how many: Chrome (and Chrome Beta), Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and, on a Mac only, Arc and Safari. A browser with several profiles is listed once for each, by the profile's name. Press **Import** on one and its bookmarks come into one new folder at the end of the bookmarks bar, called "Imported from Chrome" ("Imported from Chrome (Work)" when the browser has several profiles). It keeps the browser's own folders: what was on its bookmarks bar first, then its other bookmarks, mobile ones and Firefox's menu as folders named as that browser names them. Links that aren't web pages, such as javascript: ones, and empty folders are left out. Firefox can stay open.
+
+Safari keeps its bookmarks where macOS guards them. Until you allow it, its row says "Hydor may not read Safari’s bookmarks: allow it in System Settings → Privacy & Security → Full Disk Access". Add Hydor there, and bring them in again.
+
+To bring in a file instead, press **From a file** and choose a bookmarks file exported from any browser (an .html file, up to 20 MB). It comes into a folder called "Imported bookmarks".
+
+### Take your bookmarks out
+
+**Export**, under **Import**, saves all your bookmarks as `bookmarks.html`, which Chrome, Firefox and Safari can import.
+
+## Chrome extensions
+
+Your own browser can run Chrome extensions: a password manager, a dark mode, a translator. Press **Menu** (⋯) → **Extensions**, or go to [Extensions](/browser?panel=extensions). Extensions run in the desktop app's own browser. Elsewhere the panel keeps them and says so ("Extensions run in the desktop app’s own browser. They are kept here and run there."). An extension runs with your sign-ins and can read the sites it asks for, so add only ones you trust.
+
+### Add an extension
+
+- **From the Chrome Web Store**: paste the extension's link (a chromewebstore.google.com or chrome.google.com/webstore address) or its id (32 letters from a to p) under **From the Chrome Web Store**, and press **Add**. Or open the extension's page in your own browser and press **Add to Hydor** in the top bar. The app downloads it from the Chrome Web Store (a request to Google) and keeps its Web Store id.
+- **From a folder**: press **Choose a folder** (in the desktop app) or type the folder's path (elsewhere: a folder on the computer where the app runs), for an unpacked extension that has a manifest.json. It is used where it is, not copied, so a developer's changes show.
+- **From your other browsers**: the extensions installed in Chrome, Edge, Brave and other Chromium-based browsers on this computer are listed with a tick box each. Tick the ones you want and press **Bring in**. Those already here say "Already here", and those that are off in their browser say "Off there".
+
+Extensions are not updated by themselves. Add one again from the Chrome Web Store to get its newest version; it replaces the old one.
+
+### Turn one off, or take it away
+
+Each extension in the panel shows its icon, name and version, and a switch that turns it on or off. **Remove** deletes it (a folder's own files stay). When an extension has a button on the toolbar, it shows to the right of the address bar while it is on: click it to open its popup under the button, and a badge on it, a number or a few letters, shows what the extension reports. **Options** opens its options page in a tab.
+
+**Also in agents’ browsers** is off at first. Turned on, the extension also runs in the agents' browsers that keep sign-ins, those using a profile (see [Keep sign-ins with profiles](/guide/web#keep-sign-ins-with-profiles)), and those only. Browsers that start fresh never get extensions. (On a server, a Chromium or Chrome for Testing loads them; Google Chrome does not any more.)
+
+### What may not work
+
+The desktop app's browser has part of what Chrome gives extensions. Content that an extension adds to pages, popups, options pages, stored settings, messages, badges, notifications (shown as the system's) and alarms work. Things that may not: blocking or changing requests (which many ad blockers rely on), the side panel, signing in with an account, cookies, history, bookmarks and downloads of the browser, tab groups, background pages that Chrome makes for them (offscreen), keyboard shortcuts of an extension, and the items an extension adds to the right-click menu (accepted, never shown). The extension's row says which it asks for, on a line like "Some parts may not work here: blocking or changing requests, cookies". It goes by what the extension asks for, so it may still work well.
+
+## Hand a page to an agent
+
+An agent never gets your own browser. You can give it one page of it, in two ways. Open **Menu** (⋯) and pick **Ask about this page** or **Do this here**: they work on a page of a website, and each opens a small box under the menu where you write what you want and send with **Ctrl+Enter** (⌘+Enter on a Mac).
+
+### Ask about this page
+
+The box asks "What do you want to know about this page?"; press **Ask**. The agent gets a copy of the page, a file with its title, address, what you had selected on it and its readable text (up to 200,000 characters), and a new session starts with your question, on the agent and model the start page used last. You land in the session. The agent can't touch the page or see your sign-ins: it reads the copy. Let the page finish loading first, since the copy is what the tab shows now.
+
+### Do this here
+
+The box asks "What should an agent do on this page?", and says what the agent gets. Pick **Claude Code** or **Custom** as the **Agent** (only these two can be kept to the browser; the app refuses the others) and press **Start**. The agent gets:
+
+- **A tab of its own**, in the browser that keeps your sign-ins, opened at your page's address: it is signed in as you on that site. Your own tab stays where it is.
+- **Only that site**: pages elsewhere won't open for it. For a page on this computer, it is that address only.
+- **Only the browser**: no commands, no files, no web search, no other apps, no memory and no subagents. A session like this can't be continued in another agent, and a fork of it stays kept to the browser.
+- **A stop before sending**: it asks, as above, before it presses a button that sends, posts, deletes or transfers something, and it is told to ask you when it is unsure (see [Buttons that send, post or delete](/guide/web#buttons-that-send-post-or-delete)). Paying is yours, as always.
+
+The agent's first message tells it that your page is open in its browser, and that it works there alone. The browser has to be on in Settings (**A browser for agents**). After you press **Start**, **Agents’ tabs** opens, where the session's browser shows.
+
+### Take the page back
+
+On an agent's browser that got your page, the panel above its message box says "Your tab from example.com" with **Take back**, and so do **Agents’ tabs** and the bar over its page. Press it to close the agent's tab and open the page as a new tab of yours, in front. The agent is told "I took the page back: it is mine again". Its browser closes with its last tab, and otherwise as any session's does when the session ends (see [When the browser closes](/guide/web#when-the-browser-closes)).
+
+## Agents’ tabs
+
+**Menu** (⋯) → **Agents’ tabs** lists the agents' browsers that are open now, with the number of them beside it. Each shows the session's title and agent, what it is doing ("Clicking “Sign in”", "Waiting for you", "You are driving: the agent waits"), and its tabs (the first six). It is kept up to date, and there is a note when none is open. Press **Show** to see that browser in the page's place, with a thin bar above it: **Back to your tabs**, the session's title, **Open the conversation**, **Take over** (or **Hand back**), and **Take back** for a page you handed it. In the desktop app, click into its page to use it yourself; the agent waits, as in [Take over to log in, solve a check or pay](/guide/web#take-over-to-log-in-solve-a-check-or-pay).
+
 ## Set up the browser
 
 Open [Settings → Capabilities → Browser](/settings?s=browser) ("A web browser agents use, which you can watch and take over").
@@ -243,7 +377,9 @@ Open [Settings → Capabilities → Browser](/settings?s=browser) ("A web browse
 
 ### Chromium
 
-[Chromium](/settings?s=browser&find=Chromium) shows the one in use, with its version, and where it is in its (i). The app picks, in this order: a Chrome or Chromium installed on this computer, one it downloaded, then one that Playwright (a browser-testing tool) installed. When it finds more than one, a picker lets you choose: **The best one found**, or a particular one.
+[Chromium](/settings?s=browser&find=Chromium) shows the one in use, with its version, and where it is in its (i). The app picks, in this order: in the desktop app, **The desktop app’s own browser**; a Chrome or Chromium installed on this computer; one it downloaded; then one that Playwright (a browser-testing tool) installed. When it finds more than one, a picker lets you choose: **The best one found**, or a particular one.
+
+The desktop app's own browser needs no download and has no path to show. While it is the one in use, the row says "Pages show in the app’s window.", and **Download Chrome** and **Show a window** are not shown, since neither means anything for it. Choose another Chromium and they come back. The Browser page (your own browser) uses the same engine.
 
 When none is found, the row says so, and offers to download Chrome for Testing (about 170 MB) into the app's data folder: press **Download Chrome**; a bar shows the progress, and if it fails, the row says why. The button stays while no downloaded copy exists, even when another Chromium was found.
 
@@ -251,7 +387,7 @@ If Chrome's own sandbox (the wall between pages and the rest of the computer) ca
 
 ### Show a window
 
-[Show a window](/settings?s=browser&find=Show%20a%20window) is off at first: the browser runs out of sight, and you watch it in the app. On, it also opens a window on this computer's screen. Playwright's headless shell (a Chromium without a window) can't show one, so the switch stays off with it. The change applies the next time the browser starts.
+[Show a window](/settings?s=browser&find=Show%20a%20window) is off at first: the browser runs out of sight, and you watch it in the app. On, it also opens a window on this computer's screen. Playwright's headless shell (a Chromium without a window) can't show one, so the switch stays off with it. The change applies the next time the browser starts. It is not there while the desktop app's own browser is in use.
 
 ### Keep pages off this machine and its network
 
@@ -260,6 +396,10 @@ If Chrome's own sandbox (the wall between pages and the rest of the computer) ca
 ### Screenshots for models that see images
 
 [Screenshots for models that see images](/settings?s=browser&find=Screenshots%20for%20models%20that%20see%20images) is on at first: agents whose model sees images can look at the page with numbered boxes drawn on it. Models that only read text always get the page as text; with this off, every model does.
+
+### Ask before sending on signed-in sites
+
+[Ask before sending on signed-in sites](/settings?s=browser&find=Ask%20before%20sending%20on%20signed-in%20sites) is on at first. Before an agent sends, posts, deletes or transfers anything on a site it's signed in to, you are asked (see [Buttons that send, post or delete](/guide/web#buttons-that-send-post-or-delete)). Off, agents press such buttons without asking, on sites a profile is signed in to and on a page you handed them. Payments still stop either way.
 
 ### Sites: only these, never these
 
@@ -282,6 +422,10 @@ A profile is a browser folder of its own that keeps logins between sessions, so 
 To use it, open a session's browser, then **Browser options** (⋯) → pick the profile under **Profile**. Picking it closes the browser; it opens again, logged in, the next time the agent or you open it, and the panel shows the profile's name. Sessions that use the same profile share its logins.
 
 Each profile in the list has **Log in to sites** (to log in to more), and a **⋯** menu with **Rename** and **Delete**, which also deletes its logins and everything the browser kept for it, and closes the browsers using it. With no profiles yet, the list says each session's browser starts fresh, logged in nowhere.
+
+### Your own browsing
+
+[Settings → Browser](/settings?s=browser) also has a **Your own browsing** group ("The Browser page: pages you use yourself, which agents never get"), with two rows that open the Browser page's panels: [Bookmarks](/settings?s=browser&find=Bookmarks) ("Yours, with those from the other browsers on this computer") and [Extensions](/settings?s=browser&find=Extensions) ("Chrome extensions, in the desktop app"). See [Bookmarks](/guide/web#bookmarks) and [Chrome extensions](/guide/web#chrome-extensions).
 
 ## Let agents use your computer
 
@@ -340,6 +484,13 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "Never let the browser open facebook.com or tiktok.com."
 - "Show the browser in a window on this computer, and turn its screenshots off."
 - "Make a browser profile called Shopping." (Logging in to sites in it is yours to do, in Settings → Browser.)
+- "Stop asking me before agents press Send or Delete on sites they're signed in to." (it is Settings → Browser → Ask before sending on signed-in sites; turn it back on the same way)
+- "Is my agents' browser the desktop app's own or a Chromium?"
+- "How do I give an agent the page I'm looking at in the Browser page?" (**Ask about this page** gives it a copy; **Do this here** gives it the tab)
+- "Add example.org/reports to my bookmarks bar in a folder called Work."
+- "Bring my Chrome and Firefox bookmarks into the Browser page." (or: "Why can't I import my Safari bookmarks?")
+- "Which Chrome extensions are in my browser, and which of them run in the agents' browsers too?"
+- "Add the extension at https://chromewebstore.google.com/detail/… to my browser." (the app asks you first, every time)
 - "Fill in the library card form at riverside.example.org for me; I'll watch." (its pointer shows in the live view where it clicks and types)
 - "Open Notes on my Mac and start a note with today's shopping list."
 - "Open Notepad and write down today's shopping list." (on Windows; the glow around the screen shows while it works, its ring shows where it points, and Esc stops it)

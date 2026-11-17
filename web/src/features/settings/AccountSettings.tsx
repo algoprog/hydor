@@ -1,4 +1,4 @@
-// Settings → Accounts: the Claude Code and Codex sign-ins every session uses, switching accounts and API credit at a
+// Settings → Accounts: the Claude Code, Codex and Grok Build sign-ins every session uses, switching accounts and API credit at a
 // limit, and the agents’ programs on this machine.
 import { useEffect, useState, type ReactNode } from 'react';
 import { ExternalLink, KeyRound, LogIn, LogOut, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -487,8 +487,7 @@ export function AccountSettings() {
         />
       )),
   ];
-  // Switching at a limit is for Claude Code's and Codex's added accounts (Grok Build's have no usage the app reads).
-  const switchable = !!accounts?.extra.some((x) => x.agent !== 'grok');
+  const switchable = !!accounts?.extra.length;
   const limits = switchable || !!accounts?.claude.loggedIn || !!accounts?.extra.some((x) => x.agent === 'claude');
   return (
     <Stack>

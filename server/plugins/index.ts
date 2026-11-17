@@ -802,6 +802,8 @@ export const plugins: Feature = {
     });
   },
   spawn(s, d) {
+    // A browser-only session (Do this here) has the browser and nothing else: no plugin's commands, agents or servers.
+    if (s.extra.browserOnly) return undefined;
     try {
       syncPluginSkills(d.db);
     } catch (e) {

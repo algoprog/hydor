@@ -22,6 +22,14 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   them, talk to it over a message channel (its address, updates, quitting), and start it again whenever it exits. On
   Windows and from an AppImage, each version runs from a copy of itself in your local data folder, so agents that
   outlive the app and its updates never hold the app's own files.
+- **Two browser engines.** The browser agents use, and your own on the Browser page, run on one of two engines that the
+  server drives the same way, over the Chrome DevTools Protocol. In the desktop apps it is the app's own browser
+  (Electron, so Chromium): `desktop/browser.cjs` answers that protocol over the same message channel, with each tab a
+  view in the app. An agent's tabs are drawn off screen, so they work with the window closed, and reach the window as a
+  fast local picture that takes your clicks and keys as real input; your own tabs are real pages the window shows where
+  the Browser page puts them, and Chrome extensions load into them (`desktop/extensions.cjs`). Everywhere else, in Docker,
+  on a server, or for a phone looking at one, the server starts a Chromium and the app shows its pages as pictures. Either
+  way every connection of an agent's browser passes a checkpoint of the server's that keeps it off this computer's network.
 - **One memory, three parts.** Memory notes (short facts, in the app's database) are what every agent starts with;
   Wiki memory is linked Markdown articles with their sources, kept in plain files in a folder of yours (a shared
   wiki, and one folder for each project, by default inside it); documents are the files in knowledge bases, indexed

@@ -48,6 +48,7 @@ const glow = require('./glow.cjs');
 const { createNotices } = require('./notices.cjs');
 const { badgeBitmap } = require('./badge.cjs');
 const { createAwake } = require('./awake.cjs');
+const { createBrowser } = require('./browser.cjs');
 const { spawn, execFile, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
@@ -348,7 +349,8 @@ function envFile() {
 
 let baseEnv = null;
 function serverEnv(extra) {
-  baseEnv ??= loginEnv();
+  // Developing with another script as the server (below): the environment as it was given, which a test sets.
+  baseEnv ??= DEV_ENTRY ? ownEnv() : loginEnv();
   const env = { ...baseEnv, ...envFile() };
   for (const k of Object.keys(env)) if (k.startsWith('ELECTRON_') || k === 'NODE_OPTIONS') delete env[k];
   // Windows spells it Path, and an environment given to a program must have it once (as PATH: any spelling works there).
@@ -366,11 +368,18 @@ function serverEnv(extra) {
     HYDOR_DESKTOP_APP: BUNDLE,
     HYDOR_DESKTOP_UPDATABLE: updatable() ? '1' : '0',
     HYDOR_DESKTOP_CACHE: CACHE,
+    // The app has a browser of its own the server may drive (browser.cjs); this is its Chromium's version.
+    HYDOR_DESKTOP_BROWSER: process.versions.chrome,
   };
 }
 
 // ---- the server -------------------------------------------------------------------------------------------------
 
+/**
+ * Developing only (not in a packed app): a script to run instead of dist/server/index.js, with the same environment and
+ * channel, as desktop/scripts/browser-selftest.mjs does. The app quits with its exit code when it exits (no restarts).
+ */
+const DEV_ENTRY = !PACKAGED && process.env.HYDOR_DESKTOP_SERVER_ENTRY ? path.resolve(process.env.HYDOR_DESKTOP_SERVER_ENTRY) : null;
 let server = null;
 let serverUrl = null;
 let setupToken = null;
@@ -423,7 +432,7 @@ function startServer() {
   const fd = logFd();
   fs.writeSync(fd, `\n---- ${new Date().toISOString()} Hydor ${app.getVersion()} starts the server\n`);
   const node = nodeDir() ? path.join(nodeDir(), WIN ? 'node.exe' : 'node') : 'node';
-  const child = spawn(node, [path.join(serverDir(), 'dist/server/index.js')], { cwd: serverDir(), env: serverEnv(extra), stdio: ['ignore', fd, fd, 'ipc'], windowsHide: true });
+  const child = spawn(node, [DEV_ENTRY || path.join(serverDir(), 'dist/server/index.js')], { cwd: serverDir(), env: serverEnv(extra), stdio: ['ignore', fd, fd, 'ipc'], windowsHide: true });
   fs.closeSync(fd);
   server = child;
   startedAt = Date.now();
@@ -436,6 +445,12 @@ function startServer() {
     fs.rmSync(PIDFILE, { force: true });
     // The computer may sleep again: the next server says whether it should stay awake.
     awake.release('the server stopped');
+    // Its browsers' pages go with it (their connections were its).
+    browser.closeAll('the server stopped');
+    if (DEV_ENTRY) {
+      quitting = true;
+      return app.exit(code ?? 1);
+    }
     if (quitting || installing) return;
     // What it showed here goes with it: the next one says again what waits.
     forgetShown();
@@ -512,6 +527,9 @@ function onMessage(m) {
     lendEsc(false);
   } else if (m.type === 'ask' && typeof m.id === 'string') {
     void answer(m);
+  } else {
+    // The app's own browser: the server's CDP, and its answers to permission questions (browser.cjs).
+    browser.message(m);
   }
 }
 
@@ -627,6 +645,39 @@ const NOTICE_SETTINGS = MAC ? 'x-apple.systempreferences:com.apple.preference.no
 
 // What the page in the window asks (preload.cjs): only the app's own pages.
 const fromOwnPage = (e) => sameOrigin((e.senderFrame && e.senderFrame.url) || '');
+
+// The app's own browser (browser.cjs): the server drives it with CDP, and the window shows its pages. Its extensions
+// (extensions.cjs) are optional: without that file the browser runs without them.
+const browserLog = (...what) => {
+  console.log('[hydor]', ...what);
+  trace(...what);
+};
+let browser = null;
+let extensions = null;
+try {
+  extensions = require('./extensions.cjs').createExtensions({
+    log: browserLog,
+    mainWindow: () => win,
+    openTab: (url) => void browser.openTab(url).catch((e) => browserLog('a tab could not open', String((e && e.message) || e))),
+    badge: (b) => {
+      if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('hydor:browser-badge', b);
+    },
+  });
+} catch (e) {
+  if (!(e && e.code === 'MODULE_NOT_FOUND' && /extensions\.cjs/.test(String(e.message)))) browserLog('extensions did not start', String((e && e.stack) || e));
+}
+// The browser's pages are this computer's own: a page of another machine the window shows (/m/<id>/…, its tabs are that
+// machine's) gets nothing of them, as it gets no folder chooser.
+const fromThisMachine = (e) => {
+  if (!fromOwnPage(e)) return false;
+  try {
+    return !/^\/m\//.test(new URL(e.senderFrame.url).pathname);
+  } catch {
+    return false;
+  }
+};
+browser = createBrowser({ log: browserLog, toServer, mainWindow: () => win, fromOwnPage: fromThisMachine, ext: extensions });
+browser.registerIpc();
 // A forwarded machine's folders belong to its server, not this desktop computer.
 ipcMain.handle('hydor:choose-folder', async (e, current) => {
   if (!fromOwnPage(e) || /^\/m\//.test(new URL(e.senderFrame.url).pathname)) return null;
@@ -758,6 +809,7 @@ async function answer(m) {
       return reply({});
     }
     if (m.what === 'screenshot') return reply(await glow.capture(Number(m.max) || 1280, Number(m.quality) || 70));
+    if (m.what === 'browser-launch') return reply(await browser.launch(m));
     if (!MAC) return toServer({ type: 'reply', id: m.id, ok: false, error: 'only the Mac app can do that' });
     if (m.what === 'permissions') return reply(permissions());
     if (m.what === 'request' && m.which === 'accessibility') {

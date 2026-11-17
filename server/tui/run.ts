@@ -3,7 +3,7 @@
 // background, its own or a subagent's, and nothing waits in its queue: a lead that ended its turn to wait for them is woken
 // by their replies or their ends, so the turn after them is waited for), prints the agent's last
 // reply, and ends. Progress goes to stderr as short lines when that is a terminal. An approval or a question with
-// nobody to answer stops it (exit 3); --json prints one object at the end, --stream-json a line per event.
+// nobody to answer stops it (exit 3), as does what the agent's browser waits for (a login, a payment, a button to allow); --json prints one object at the end, --stream-json a line per event.
 // Exit codes: 0 done, 1 the session failed or the server refused, 2 bad usage, 3 it needs an answer, 124 timed out,
 // 130 interrupted (Ctrl+C stops the turn first).
 import { childReplyOf } from '../../shared/children.ts';
@@ -12,7 +12,7 @@ import type { LiveState, TimelineItem } from '../../shared/types.ts';
 import { UsageError, type Opts } from './args.ts';
 import { ApiError, enc, spentOf, type Conn } from './client.ts';
 import { readStdin, whyNoReply } from './commands.ts';
-import { INDENT, modelLabel, textLines, type Look } from './lines.ts';
+import { browserCard, browserWords, INDENT, modelLabel, textLines, type Look } from './lines.ts';
 import { busy, lastReply, Printer, SessionView } from './session.ts';
 import { catalogOf, newStartId, planStart, startBody, tiersOf, type Boot } from './start.ts';
 import { asciify, asciiWanted, colorWanted, makePaint } from './term.ts';
@@ -48,6 +48,9 @@ function verdict(view: SessionView, since: { settled?: number }): Pick<RunResult
   const l = view.live;
   const ask = view.overlay.approvals[0];
   if (ask) return { status: 'needs-answer', asks: ask.title };
+  // The agent's browser waits for you (a login, a check, a payment, an address on this machine, a button to allow, a pop-up question).
+  const card = browserCard(view.browser);
+  if (card) return { status: 'needs-answer', asks: `The agent’s browser: ${browserWords(card)}` };
   const helper = view.helperWaiting();
   if (helper) return { status: 'needs-answer', asks: `The subagent “${helper.note.title}” needs an answer` };
   if (l?.status === 'error') return { status: 'failed', error: l.error ?? 'The agent stopped with an error' };
