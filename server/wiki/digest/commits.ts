@@ -161,21 +161,20 @@ export async function readHistory(folder: string, max = BUILD_MAX_COMMITS): Prom
   return batches.length ? { head, commits: batches.reduce((n, b) => n + b.count, 0), batches } : null;
 }
 
-/** How many commits a build would read (the newest BUILD_MAX_COMMITS, no merges); counted by git, cached for a minute. */
-const counted = new Map<string, { at: number; n: number }>();
+/** How many commits a build would read (the newest BUILD_MAX_COMMITS, no merges) and in how many batches, made as the build makes them; kept for a minute for each HEAD. */
+const counted = new Map<string, { at: number; head: string; commits: number; batches: number }>();
 /** Forgets the counts kept for a minute (a new commit is counted at once). */
 export const forgetCommitCounts = () => counted.clear();
-export async function countHistory(folder: string, now = Date.now()): Promise<number> {
+export async function countHistory(folder: string, now = Date.now()): Promise<{ commits: number; batches: number }> {
+  if (!fs.existsSync(folder)) return { commits: 0, batches: 0 };
+  const head = (await git(folder, ['rev-parse', '--verify', '-q', 'HEAD']))?.trim() ?? '';
   const hit = counted.get(folder);
-  if (hit && now - hit.at < 60_000) return hit.n;
-  let n = 0;
-  if (fs.existsSync(folder)) {
-    const inside = await folderScope(folder);
-    const out = await git(folder, ['rev-list', '--count', '--no-merges', `--max-count=${BUILD_MAX_COMMITS}`, 'HEAD', ...inside]);
-    n = Number(out?.trim()) || 0;
-  }
-  counted.set(folder, { at: now, n });
-  return n;
+  if (hit && hit.head === head && now - hit.at < 60_000) return hit;
+  // One `git log` of at most BUILD_MAX_COMMITS messages is fast; the batches are exactly what a build will read.
+  const h = head ? await readHistory(folder) : null;
+  const r = { at: now, head, commits: h?.commits ?? 0, batches: h?.batches.length ?? 0 };
+  counted.set(folder, r);
+  return r;
 }
 
 /** A build has read the project's commits up to `head`: the daily pass goes on from there (and not before the usual time). */

@@ -8,7 +8,7 @@ import { usd } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
-import type { WikiJob } from './wikiJob';
+import type { BuildOffer as Offer, WikiJob } from './wikiJob';
 
 /** POST /api/projects/:id/wiki/rebuild without confirm. */
 interface Estimate {
@@ -26,18 +26,6 @@ interface Estimate {
 
 const when = (at: string) => new Date(at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
-/** GET /api/projects/:id/wiki/build: what building the project's wiki from its history would read. */
-interface Offer {
-  empty: boolean;
-  counts: { sessions: number; commits: number; documents: number; notes: number; files: string[] };
-  worth: boolean;
-  essentials: number;
-  sources: number;
-  minutesEssentials: number;
-  minutesAll: number;
-  helper: { label: string; priced: boolean; usd?: number };
-}
-
 /** What a build or rebuild reads, as pills' words: "38 conversations, 412 commits, 9 documents, 14 notes, README.md, docs/". */
 function readsLine(c: { sessions: number; commits: number; documents: number; notes: number; files: string[] }): string {
   const n = (k: number, one: string, many: string) => (k === 1 ? one : many);
@@ -54,8 +42,8 @@ function readsLine(c: { sessions: number; commits: number; documents: number; no
 
 const minutesText = (m: number) => (m >= 90 ? tr(`about ${Math.round(m / 60)} h`) : tr(`about ${Math.max(1, m)} min`));
 
-/** The ⋯ menu and its dialogs. `empty`: the wiki has no article yet, so it can be built from the project's history, not rebuilt. */
-export function WikiActions({ id, job, refresh, empty }: { id: string; job: WikiJob | null; refresh: () => void; empty?: boolean }) {
+/** The ⋯ menu and its dialogs. `fresh`: the wiki is new (fewer than 10 articles, no build from history run yet), so it can be built from the project's history; after that it is rebuilt. */
+export function WikiActions({ id, job, refresh, fresh }: { id: string; job: WikiJob | null; refresh: () => void; fresh?: boolean }) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState(false);
   const [rebuild, setRebuild] = useState(false);
@@ -81,7 +69,7 @@ export function WikiActions({ id, job, refresh, empty }: { id: string; job: Wiki
         <MenuItem icon={<RefreshCw size={15} />} disabled={running} onClick={() => void update()}>
           Update now
         </MenuItem>
-        {empty ? (
+        {fresh ? (
           <MenuItem
             icon={<Hammer size={15} />}
             disabled={running}
@@ -125,16 +113,13 @@ export function WikiActions({ id, job, refresh, empty }: { id: string; job: Wiki
 }
 
 /**
- * An empty wiki's way in: when the project has something to build its wiki from, a line saying what, and Build from
- * history… (the same dialog as the ⋯ menu's). Nothing when there is nothing to read, or while a job runs.
+ * A new wiki's way in (fewer than 10 articles, no build from history run yet, whatever it holds): when the project has something to
+ * build its wiki from, a line saying what, and Build from history… (the same dialog as the ⋯ menu's). Nothing when there is nothing to
+ * read, or while a job runs.
  */
-export function BuildFromHistoryPrompt({ id, job, onStarted }: { id: string; job: WikiJob | null; onStarted: () => void }) {
-  const [offer, setOffer] = useState<Offer | null>(null);
+export function BuildFromHistoryPrompt({ id, offer, job, onStarted }: { id: string; offer: Offer | null; job: WikiJob | null; onStarted: () => void }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    api<Offer>(`/api/projects/${enc(id)}/wiki/build`).then(setOffer, () => setOffer(null));
-  }, [id]);
-  if (!offer?.worth || !offer.empty || job?.state === 'running') return null;
+  if (!offer?.worth || !offer.fresh || job?.state === 'running') return null;
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel px-3 py-2.5 min-[480px]:flex-row min-[480px]:items-center">
       <p className="min-w-0 flex-1 text-[13px] leading-snug text-fg-2">{tr(`It can be built now from what the project already has: ${readsLine(offer.counts)}.`)}</p>
@@ -183,7 +168,7 @@ function BuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => vo
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void start()} disabled={!offer || busy || !offer.worth || !offer.empty}>
+          <Button variant="primary" onClick={() => void start()} disabled={!offer || busy || !offer.worth || !offer.fresh}>
             Build
           </Button>
         </>

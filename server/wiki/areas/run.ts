@@ -31,7 +31,23 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 /** What is being read now, for each wiki running a job in this process (the status shows it; it is not worth a save each time). */
 const reading = new Map<string, Map<number, string>>();
 const key = (space: string | null) => space ?? '';
-export const readingNow = (space: string | null): string[] => [...(reading.get(key(space))?.values() ?? [])];
+export const readingNow = (space: string | null): string[] => mergeCommitTitles([...(reading.get(key(space))?.values() ?? [])]);
+
+const COMMITS = /^Commits (\d{4}-\d\d-\d\d)–(\d{4}-\d\d-\d\d)$/;
+/** The commit batches read side by side as one line: "Commits 2026-10-02 – 2026-11-12" (the first of the others stays where it was). */
+export function mergeCommitTitles(titles: string[]): string[] {
+  const ranges = titles.map((t) => COMMITS.exec(t)).filter((m): m is RegExpExecArray => !!m);
+  if (ranges.length < 2) return titles;
+  const from = ranges.map((m) => m[1]).sort()[0];
+  const to = ranges.map((m) => m[2]).sort().at(-1)!;
+  const merged = `Commits ${from} – ${to}`;
+  const out: string[] = [];
+  for (const t of titles) {
+    if (!COMMITS.test(t)) out.push(t);
+    else if (!out.includes(merged)) out.push(merged);
+  }
+  return out;
+}
 
 /** Keeps the average seconds a source takes: the average of the recent ones (each new one counts a fifth). */
 export function recordSeconds(db: DB, seconds: number): void {

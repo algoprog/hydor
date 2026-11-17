@@ -32,6 +32,7 @@ import { reorganising } from './reorganise.ts';
 import { commitsAllRead, hubsPhase, jobOptions, organisePhase, readSources, stoppedNow, type JobOptions } from './run.ts';
 import { averageSeconds, BUILD_PER_HOUR, gatherHistory, historyCounts, noteTexts, readArchived, readSource, titleAndKind, type Cat, type RebuildSource } from './sources.ts';
 import { markCommitsRead } from '../digest/commits.ts';
+import { markHistoryBuilt } from './build.ts';
 
 export { readSource, titleAndKind, type RebuildSource };
 
@@ -122,9 +123,9 @@ const CHARS = { s: 6_000, d: 8_000, c: 12_000, f: 20_000 };
 
 export async function rebuildEstimate(db: DB, root: string, space: string | null = null): Promise<RebuildEstimate> {
   const project = space ? spaceById(db, space) : null;
-  const history = project ? await historyCounts(db, project, { exactDocuments: true }) : { files: [], anyFiles: false, notes: 0, commits: 0, documents: 0, sessions: 0 };
+  const history = project ? await historyCounts(db, project, { exactDocuments: true }) : { files: [], anyFiles: false, notes: 0, commits: 0, commitBatches: 0, documents: 0, sessions: 0 };
   const noteSources = project ? noteTexts(db, project).length : 0;
-  const commitSources = Math.ceil(history.commits / 50);
+  const commitSources = history.commitBatches;
   const sources = rebuildSources(root, { skip: freshOrigins({ files: history.anyFiles, notes: noteSources > 0, commits: history.commits > 0 }) });
   const articles = areaArticles(root).length;
   const fresh = (history.anyFiles ? 1 : 0) + noteSources + commitSources + history.documents + history.sessions;
@@ -481,6 +482,8 @@ export async function runRebuild(db: DB, space: string | null, root: string, job
     // The commits are read to the repository's HEAD: the daily pass goes on from there.
     if (space && job.head && commitsAllRead(job)) markCommitsRead(db, space, job.head, now());
     Object.assign(job, { state: 'done', endedAt: now(), phase: undefined, current: [], did: [summary, ...(job.did ?? [])] });
+    // A finished rebuild has read the history too: the wiki is no longer new.
+    if (space) markHistoryBuilt(db, space);
     save();
     row(summary, articles.map((a) => a.path).slice(0, 50), failed ? `Could not read: ${job.failed!.join(', ')}`.slice(0, 600) : null);
   } catch (e) {

@@ -19,7 +19,7 @@ import { addEntry, setEnabled, setLearnOn } from '../../memory/store.ts';
 import { setSessionExtra } from '../../sessionExtra.ts';
 import { createSpace, updateSpace } from '../../spaces/index.ts';
 import { ingestWikiSource } from '../core.ts';
-import { commitBatches, digestCommitsDue, parseCommits, readHistory, MAX_COMMITS, MAX_COMMIT_CHARS, COMMIT_FORMAT, forgetCommitCounts } from '../digest/commits.ts';
+import { commitBatches, digestCommitsDue, parseCommits, readHistory, MAX_COMMITS, MAX_COMMIT_CHARS, COMMIT_FORMAT } from '../digest/commits.ts';
 import { digestText } from '../digest/digest.ts';
 import { lockedArticles } from '../digest/lock.ts';
 import { PLAN_SYSTEM, PLAN_SYSTEM_CONVERSATION, WRITE_SYSTEM, WRITE_SYSTEM_CONVERSATION, type DigestAsk } from '../digest/plan.ts';
@@ -28,10 +28,13 @@ import { wikiDigest } from '../digest/index.ts';
 import { wikiHasArticles } from '../has-articles.ts';
 import { wikiRoot } from '../roots.ts';
 import { setWikiSettings } from '../settings/settings.ts';
-import { buildOffer, startBuild } from './build.ts';
+import { buildOffer, historyBuilt, markHistoryBuilt, startBuild } from './build.ts';
 import { continueWikiJob, stopWikiJob } from './control.ts';
 import { HUB_SYSTEM } from './hubs.ts';
 import { jobRunning, jobState, saveJob, setWikiJobBroadcast, wikiJobEvents } from './jobs.ts';
+import { mergeCommitTitles } from './run.ts';
+import { docsBySpace } from '../../knowledge/store.ts';
+import { ensureWikiKnowledge } from '../knowledge/bindings.ts';
 import { MERGE_SYSTEM } from './merge.ts';
 import { runPool } from './pool.ts';
 import { startRebuild, wikiJobStatus } from './rebuild.ts';
@@ -250,6 +253,89 @@ test('the offer on a wiki with an article is not empty; an index, a log, a hub a
   assert.equal((await buildOffer(db, p.space.id))!.empty, true);
   fs.writeFileSync(path.join(root, 'wiki', 'real.md'), '---\ntitle: "Real"\n---\n# Real\n\nAn article.\n');
   assert.equal((await buildOffer(db, p.space.id))!.empty, false);
+});
+
+test('a wiki is new while it has fewer than 10 articles and no build from history has run: a few articles from the background passes do not hide the offer', async () => {
+  const p = mk('Fresh');
+  fs.writeFileSync(path.join(p.folder, 'README.md'), '# Fresh\n\nA project with a README.\n');
+  const root = rootOf(p.space.id);
+  fs.mkdirSync(path.join(root, 'wiki'), { recursive: true });
+  const article = (n: number) => fs.writeFileSync(path.join(root, 'wiki', `a${n}.md`), `---\ntitle: "A${n}"\n---\n# A${n}\n\nAn article.\n`);
+  let o = (await buildOffer(db, p.space.id))!;
+  assert.deepEqual([o.empty, o.fresh, o.worth], [true, true, true]);
+  for (let i = 0; i < 3; i++) article(i);
+  o = (await buildOffer(db, p.space.id))!;
+  assert.deepEqual([o.empty, o.fresh, o.worth], [false, true, true], 'three articles: not empty, still new');
+  for (let i = 3; i < 9; i++) article(i);
+  assert.equal((await buildOffer(db, p.space.id))!.fresh, true, 'nine');
+  article(9);
+  assert.equal((await buildOffer(db, p.space.id))!.fresh, false, 'ten articles: not new any more');
+  fs.rmSync(path.join(root, 'wiki', 'a9.md'));
+  assert.equal((await buildOffer(db, p.space.id))!.fresh, true);
+  // Once a build has run for the project (the flag is set when it starts), or a rebuild has finished, it is not new, however few articles it has.
+  assert.equal(historyBuilt(db, p.space.id), false);
+  markHistoryBuilt(db, p.space.id);
+  assert.equal((await buildOffer(db, p.space.id))!.fresh, false);
+  db.prepare("delete from kv where k = ?").run(`wiki.built.${p.space.id}`);
+  // A build is accepted on a new wiki with articles, reads only what is unread, and sets the flag; it is refused at ten articles and after a build.
+  reset();
+  await startBuild(db, p.space.id, { ...opts });
+  assert.equal(historyBuilt(db, p.space.id), true, 'the flag is set when a build starts');
+  await settled(p.space.id);
+  assert.equal(jobState(db, p.space.id)!.state, 'done');
+  assert.equal((await call(p.space.id, 'POST', '/wiki/build', { confirm: true })).statusCode, 409, 'a second build is refused');
+  const q = mk('Not fresh');
+  fs.writeFileSync(path.join(q.folder, 'README.md'), '# Not fresh\n');
+  const rq = rootOf(q.space.id);
+  fs.mkdirSync(path.join(rq, 'wiki'), { recursive: true });
+  for (let i = 0; i < 10; i++) fs.writeFileSync(path.join(rq, 'wiki', `b${i}.md`), `---\ntitle: "B${i}"\n---\n# B${i}\n\nAn article.\n`);
+  const refused = await call(q.space.id, 'POST', '/wiki/build', { confirm: true });
+  assert.equal(refused.statusCode, 409);
+  assert.match(refused.body, /already has articles/);
+});
+
+test('the offer counts the sources as the build makes them: the exact commit batches, the minutes from 70 seconds a source for each worker and about three more for the areas and hubs', async () => {
+  const p = mk('Counted');
+  git(p.folder, 'init', '-q');
+  fs.writeFileSync(path.join(p.folder, 'README.md'), '# Counted\n');
+  git(p.folder, 'add', '.');
+  for (let i = 0; i < 160; i++) commit(p.folder, `Change ${i}\n\n${'Because of reasons and more reasons. '.repeat(25)}`);
+  for (let i = 0; i < 4; i++) session(`claude:cnt${i}`, p.folder, { last: NOW - i * 3600_000 });
+  const o = (await buildOffer(db, p.space.id))!;
+  const h = await gatherHistory(db, p.space, rootOf(p.space.id), { order: 'build', now: NOW });
+  const batches = h.sources.filter((s) => s.cat === 'c').length;
+  assert.ok(batches >= 8, `${batches} batches`);
+  assert.equal(o.sources, h.sources.length, 'the offer says as many sources as the build makes');
+  assert.equal(o.essentials, h.essentials);
+  assert.equal(o.counts.commits, h.counts.commits);
+  // Automatic: 3 workers; 70 seconds a source until there is a measure; 3 minutes more for the areas and hubs (10 sources or more).
+  assert.equal(o.minutesAll, Math.ceil((h.sources.length * 70) / 3 / 60 + 3));
+  assert.equal(o.minutesEssentials, Math.ceil((h.essentials * 70) / 3 / 60));
+  // With fewer sources than 10 there is no organising to wait for.
+  const tiny = mk('Tiny');
+  fs.writeFileSync(path.join(tiny.folder, 'README.md'), '# Tiny\n');
+  const t = (await buildOffer(db, tiny.space.id))!;
+  assert.equal(t.sources, 1);
+  assert.equal(t.minutesAll, Math.ceil(70 / 3 / 60) || 1);
+});
+
+test('"Reading now" shows the commit batches read side by side as one line', () => {
+  assert.deepEqual(mergeCommitTitles(['Session 3', 'Commits 2026-10-02–2026-10-20', 'Commits 2026-11-01–2026-11-12', 'Commits 2026-10-21–2026-10-31']), ['Session 3', 'Commits 2026-10-02 – 2026-11-12']);
+  assert.deepEqual(mergeCommitTitles(['Commits 2026-10-02–2026-10-20', 'Guide 1']), ['Commits 2026-10-02–2026-10-20', 'Guide 1'], 'one stays as it is');
+  assert.deepEqual(mergeCommitTitles(['A', 'B']), ['A', 'B']);
+});
+
+test("a project's document count leaves out its wiki's own knowledge base (its articles and the sources it keeps)", () => {
+  const p = mk('Counting docs');
+  const b = createBase(db, { name: 'Counting docs', space: p.space.id });
+  const d = path.join(temp, 'counting-docs-own');
+  fs.mkdirSync(d);
+  const s = addSource(db, b.id, 'folder', d);
+  doc(b.id, s.id, `${d}/one.md`, { title: 'One' });
+  const root = rootOf(p.space.id);
+  const own = ensureWikiKnowledge(db, { root, space: p.space.id });
+  for (let i = 0; i < 5; i++) saveDoc(db, { base: own.base, source: 'wiki', path: `${root}/wiki/w${i}.md`, title: `W${i}`, format: 'md', size: 10, mtime: 1, status: 'indexed', chunks: [{ text: `Wiki article ${i}, with some words.` }] });
+  assert.equal(docsBySpace(db).get(p.space.id), 1, 'only the project\'s own document');
 });
 
 // ---- the sources ----------------------------------------------------------------------------------------------------------
@@ -678,7 +764,9 @@ test('a build: essentials first and announced once, several sources at once, pro
   );
   // Not empty any more: another build is refused.
   assert.equal((await call(shop.space.id, 'POST', '/wiki/build', { confirm: true })).statusCode, 409);
-  assert.match((await call(shop.space.id, 'POST', '/wiki/build', { confirm: true })).body, /already has articles: use Update now or Rebuild/);
+  assert.match((await call(shop.space.id, 'POST', '/wiki/build', { confirm: true })).body, /already has articles or was built from history: use Update now or Rebuild/);
+  assert.equal(historyBuilt(db, shop.space.id), true, 'a build has run for the project');
+  assert.equal((await buildOffer(db, shop.space.id))!.fresh, false);
   assert.equal(lockedArticles(), 0);
   delay = 3;
   wikiJobEvents.removeAllListeners('essentials');
@@ -978,8 +1066,7 @@ test('a rebuild reads the files fresh, the kept sources oldest first except the 
   doc(base.id, src.id, `${dir}/new-guide.md`, { title: 'Brand new guide', text: 'A guide written after the build, about something the wiki never read.' });
   session('claude:shop-late', shop.folder, { title: 'A late session', last: Date.now() - 1000 });
   commit(shop.folder, 'Late commit: ship it\n\nWhy: because.');
-  assert.equal((await buildOffer(db, shop.space.id))!.counts.commits, 5, 'counted for a minute');
-  forgetCommitCounts();
+  assert.equal((await buildOffer(db, shop.space.id))!.counts.commits, 6, 'a new commit is counted at once: the count is kept for a minute for each HEAD');
   const root = rootOf(shop.space.id);
   ingestWikiSource(root, 'OLD KEPT COMMIT TEXT: commit a1 did a thing long ago, which a rebuild must not read from here.', 'commits:Shop · 2020-01-01–2020-01-02');
   const estimate = (await call(shop.space.id, 'POST', '/wiki/rebuild', {})).json();

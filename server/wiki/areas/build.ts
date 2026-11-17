@@ -5,17 +5,17 @@
 // areas are organised, the hubs written and the duplicates that reading in parallel made are merged. One at a time for each wiki; its state
 // is in the database (jobs.ts), so a build a restart cut short goes on where it stopped, and a person can stop it and go on later.
 import { HttpError } from '../../auth.ts';
-import type { DB } from '../../db.ts';
+import { kvGet, kvSet, type DB } from '../../db.ts';
 import { helperCost, helperParallel } from '../../helper.ts';
 import { memoryOn } from '../../memory/store.ts';
 import { spaceById } from '../../spaces/index.ts';
 import { markCommitsRead } from '../digest/commits.ts';
 import { changeUpdate, recordUpdate } from '../digest/store.ts';
 import { appendLines, writeIndex } from '../digest/write.ts';
-import { wikiHasArticles } from '../has-articles.ts';
+import { wikiArticleCount } from '../has-articles.ts';
 import { wikiMemoryOn, wikiRoot } from '../roots.ts';
 import { areaArticles } from './articles.ts';
-import { claimJob, finishJob, releaseJob, saveJob, type JobState } from './jobs.ts';
+import { claimJob, finishJob, jobState, releaseJob, saveJob, type JobState } from './jobs.ts';
 import { hasAreas, loadRegistry } from './registry.ts';
 import { MIN_ARTICLES } from './reorganise.ts';
 import { commitsAllRead, hubsPhase, jobOptions, organisePhase, readSources, stoppedNow, type JobOptions } from './run.ts';
@@ -26,9 +26,26 @@ export type BuildOptions = Partial<JobOptions> & {
   exclude?: string;
 };
 
+const builtKey = (space: string) => `wiki.built.${space}`;
+/**
+ * Whether a build from history has run for the project (or a rebuild has finished: it read everything too). A build that started before
+ * this was kept counts too (its job says so while it is the last one).
+ */
+export const historyBuilt = (db: DB, space: string): boolean => kvGet(db, builtKey(space)) === '1' || jobState(db, space)?.kind === 'build';
+/** A build has started, or a rebuild has finished: the history has been read. */
+export const markHistoryBuilt = (db: DB, space: string): void => kvSet(db, builtKey(space), '1');
+
+/** A wiki is new while it has fewer than MIN_ARTICLES articles and no build from history has run for the project. */
+export const wikiIsNew = (db: DB, space: string, root: string | null): boolean => !historyBuilt(db, space) && wikiArticleCount(root, MIN_ARTICLES) < MIN_ARTICLES;
+
 export interface BuildOffer {
   /** The wiki has no article yet (not counting the index, the log, the hubs and the redirects). */
   empty: boolean;
+  /**
+   * The wiki is new: fewer than 10 articles and no build from history has run for the project. The passes that run by themselves put a
+   * source or a few articles into a wiki soon after it is on, so "empty" is too strict for asking: a new wiki is one to build.
+   */
+  fresh: boolean;
   /** What the project has to read: sessions, commits and documents the wiki has not read, its memory notes, and the files found (README.md, AGENTS.md, docs/…). */
   counts: { sessions: number; commits: number; documents: number; notes: number; files: string[] };
   /** There is anything to read. */
@@ -59,10 +76,12 @@ export async function buildOffer(db: DB, space: string, o: { exclude?: string; n
   } catch {
     root = null;
   }
-  const empty = !wikiHasArticles(root);
+  const empty = wikiArticleCount(root, 1) === 0;
+  const fresh = wikiIsNew(db, space, root);
   const c = await historyCounts(db, project, { exclude: o.exclude, quick: true, exactDocuments: false, now: o.now });
   const noteSources = c.notes ? noteTexts(db, project, o.now).length : 0;
-  const commitSources = Math.ceil(c.commits / 50);
+  // The commit batches are counted as the build makes them.
+  const commitSources = c.commitBatches;
   const files = c.anyFiles ? 1 : 0;
   const sources = files + noteSources + c.sessions + commitSources + c.documents;
   // The essentials: Files, Notes and the first sessions; with few sessions the newest commit batches too, up to BUILD_ESSENTIALS_MIN.
@@ -71,14 +90,15 @@ export async function buildOffer(db: DB, space: string, o: { exclude?: string; n
   if (!essentials) essentials = Math.min(5, sources);
   const avg = averageSeconds(db);
   const workers = helperParallel(db);
-  // The organising and the hubs follow the sources: a few sequential calls.
-  const tail = avg * (3 + Math.min(12, Math.ceil(sources / 8)));
+  // The areas and the hubs follow the sources: about three minutes when the wiki will have 10 articles or more (about one an article is made for each source).
+  const tail = wikiArticleCount(root, MIN_ARTICLES) + sources >= MIN_ARTICLES ? 180 : 0;
   const cost = helperCost(db, {
     tokensIn: Math.round((sources * 14_000 + sources * 12_000 + 3_000 + (sources / 5) * 5_000) / 4),
     tokensOut: Math.round((sources * 5_000 + (sources / 5) * 1_200) / 4),
   });
   return {
     empty,
+    fresh,
     counts: { sessions: c.sessions, commits: c.commits, documents: c.documents, notes: c.notes, files: c.files },
     worth: sources > 0,
     essentials,
@@ -90,8 +110,8 @@ export async function buildOffer(db: DB, space: string, o: { exclude?: string; n
 }
 
 /**
- * Starts a build from the project's history, in the background. 409 unless the wiki is empty (an update or a rebuild is for one that
- * has articles), and while the wiki does something else at a person's request. The texts of the files, notes and commits are kept as
+ * Starts a build from the project's history, in the background. 409 unless the wiki is new (fewer than 10 articles, no build run before: an
+ * update or a rebuild is for one that has more), reading only what the wiki has not read; and while the wiki does something else at a person's request. The texts of the files, notes and commits are kept as
  * sources first, so the job's list holds paths and session keys and survives a restart.
  */
 export async function startBuild(db: DB, space: string, options: BuildOptions = {}): Promise<{ started: true; sources: number; essentials: number }> {
@@ -104,7 +124,7 @@ export async function startBuild(db: DB, space: string, options: BuildOptions = 
   if (!root) throw new HttpError(409, 'The wiki folder is not available');
   if (!claimJob(space)) throw new HttpError(409, 'The wiki is busy with a build, a rebuild, an update or a reorganisation: try again when it is done');
   try {
-    if (wikiHasArticles(root)) throw new HttpError(409, 'It already has articles: use Update now or Rebuild');
+    if (!wikiIsNew(db, space, root)) throw new HttpError(409, 'It already has articles or was built from history: use Update now or Rebuild');
     const now = (o.now ?? Date.now)();
     const h = await gatherHistory(db, project, root, { exclude: o.exclude, order: 'build', now });
     if (!h.sources.length) throw new HttpError(409, 'The project has nothing to build a wiki from yet');
@@ -133,6 +153,7 @@ export async function startBuild(db: DB, space: string, options: BuildOptions = 
       counts: { commits: h.counts.commits, sessions: h.byCat.s.length, documents: h.byCat.d.length, notes: h.counts.notes },
     };
     saveJob(db, space, job);
+    markHistoryBuilt(db, space);
     o.onUpdate?.(space);
     void runBuild(db, space, root, job, o);
     return { started: true, sources: h.sources.length, essentials: h.essentials };

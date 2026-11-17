@@ -10,7 +10,7 @@ import path from 'node:path';
 import { kvSet, openDb } from '../db.ts';
 import { createSpace, updateSpace } from '../spaces/index.ts';
 import { askFor, askLater, askNever, askedNot, buildApi, cardOf, loadGates, offerOf, saveGates, SNOOZE_MS, startedByPerson, type Gate } from './ask.ts';
-import type { BuildOffer } from './areas/build.ts';
+import { historyBuilt, markHistoryBuilt, type BuildOffer } from './areas/build.ts';
 import { claimJob, releaseJob, saveJob } from './areas/jobs.ts';
 import { setWikiSettings } from './settings/settings.ts';
 
@@ -32,6 +32,7 @@ const space = createSpace(db, { name: 'Shop API', folder });
 
 const offer = (o: Partial<BuildOffer> = {}): BuildOffer => ({
   empty: true,
+  fresh: true,
   counts: { sessions: 38, commits: 412, documents: 9, notes: 14, files: ['README.md', 'docs/'] },
   worth: true,
   essentials: 12,
@@ -51,7 +52,7 @@ const ask = (extra: Record<string, unknown> = {}, sp: string | null = space.id, 
 const reset = () => {
   offered = offer();
   kvSet(db, 'memory.enabled', '1');
-  db.prepare("delete from kv where k like 'wiki.ask.%' or k like 'wiki.job.%'").run();
+  db.prepare("delete from kv where k like 'wiki.ask.%' or k like 'wiki.job.%' or k like 'wiki.built.%'").run();
   updateSpace(db, space.id, { wikiMemory: true });
 };
 
@@ -88,8 +89,10 @@ test('every condition of the project must hold', async () => {
   updateSpace(db, space.id, { wikiMemory: false });
   assert.equal(await ask(), null, 'wiki memory off for the project');
   reset();
-  offered = offer({ empty: false });
-  assert.equal(await ask(), null, 'the wiki has articles already');
+  offered = offer({ empty: false, fresh: true });
+  assert.ok(await ask(), 'a few articles from the background passes do not stop it: the wiki is still new');
+  offered = offer({ empty: false, fresh: false });
+  assert.equal(await ask(), null, 'the wiki has 10 articles or more, or was built from history');
   offered = offer({ worth: false });
   assert.equal(await ask(), null, 'nothing to build from');
   offered = null;
@@ -110,6 +113,10 @@ test('a job running, or a build run before, stops it', async () => {
   }
   saveJob(db, space.id, { kind: 'update', state: 'done', done: 1, total: 1, startedAt: 1 });
   assert.ok(await ask(), 'an update is not a build');
+  assert.equal(historyBuilt(db, space.id), false);
+  markHistoryBuilt(db, space.id);
+  assert.equal(await ask(), null, 'a build ran before (kept apart from the last job)');
+  db.prepare("delete from kv where k like 'wiki.built.%'").run();
 });
 
 test('"Start without memory" keeps it away for a week; "Don\'t ask for this project" for good', async () => {

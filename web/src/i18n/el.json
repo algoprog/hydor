@@ -25130,5 +25130,9 @@
 "Which agent programs, Grok Build among them, are installed, and installing the others":"Ποια προγράμματα πρακτόρων, μεταξύ τους το Grok Build, είναι εγκατεστημένα, και εγκατάσταση των υπολοίπων",
 "The Claude Code, Codex and Grok Build sign-ins every session uses":"Οι συνδέσεις Claude Code, Codex και Grok Build που χρησιμοποιεί κάθε συνεδρία",
 "Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP":"Gemini CLI, Grok Build, OpenCode, Goose και άλλοι πράκτορες που μιλούν ACP",
-"Add to your message…":"Προσθέστε στο μήνυμά σας…"
+"Add to your message…":"Προσθέστε στο μήνυμά σας…",
+  "Built memory from history": "Η μνήμη δημιουργήθηκε από το ιστορικό",
+  "Rebuilt the wiki": "Το wiki αναδημιουργήθηκε",
+  "Updated the wiki": "Το wiki ενημερώθηκε",
+  "It already has articles or was built from history: use Update now or Rebuild": "Έχει ήδη άρθρα ή έχει δημιουργηθεί από το ιστορικό: χρησιμοποίησε «Ενημέρωση τώρα» ή «Αναδημιουργία»"
 }

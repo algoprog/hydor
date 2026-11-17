@@ -50,3 +50,33 @@ export function wikiHasArticles(root: string | null): boolean {
   seen.set(root, { mtime, article });
   return !!article;
 }
+
+function collect(dir: string, top: boolean, limit: number, n: { count: number }): void {
+  let list: fs.Dirent[];
+  try {
+    list = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const e of list) {
+    if (n.count >= limit) return;
+    if (e.name.startsWith('.') || e.isSymbolicLink()) continue;
+    if (e.isDirectory()) {
+      if (!(top && e.name === 'areas')) collect(path.join(dir, e.name), false, limit, n);
+    } else if (e.isFile() && e.name.endsWith('.md')) {
+      try {
+        if (redirectOf(fs.readFileSync(path.join(dir, e.name), 'utf8').slice(0, 4000)) == null) n.count++;
+      } catch {
+        /* unreadable: not counted */
+      }
+    }
+  }
+}
+
+/** How many articles the wiki at `root` has, counting no more than `limit` (it stops there: a big wiki costs no more than a small one). */
+export function wikiArticleCount(root: string | null, limit: number): number {
+  if (!root) return 0;
+  const n = { count: 0 };
+  collect(path.join(root, 'wiki'), true, limit, n);
+  return n.count;
+}

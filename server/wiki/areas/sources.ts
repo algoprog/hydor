@@ -341,8 +341,9 @@ export async function historyCounts(
   db: DB,
   project: { id: string; folder: string },
   o: { exclude?: string; exactDocuments?: boolean; quick?: boolean; now?: number } = {},
-): Promise<HistoryCounts & { anyFiles: boolean }> {
+): Promise<HistoryCounts & { anyFiles: boolean; commitBatches: number }> {
   const now = o.now ?? Date.now();
+  const history = await countHistory(project.folder, now);
   let found: { names: string[]; any: boolean };
   if (o.quick) found = quickFileNames(project.folder);
   else {
@@ -353,7 +354,8 @@ export async function historyCounts(
     files: found.names,
     anyFiles: found.any,
     notes: noteCount(db, project, now),
-    commits: await countHistory(project.folder, now),
+    commits: history.commits,
+    commitBatches: history.batches,
     documents: unreadDocuments(db, project.id, { exact: o.exactDocuments }).length,
     sessions: unreadSessions(db, project.id, { exclude: o.exclude, count: true, now }).length,
   };
@@ -556,13 +558,15 @@ export function prepareSource(c: ReadContext, id: string): Ready | null {
   return null;
 }
 
-/** The average seconds one source took recently (30 until there is a measure), kept in the database (run.ts recordSeconds). */
+/** Seconds one source takes a worker until there is a measure (measured on real projects). */
+export const DEFAULT_SECONDS = 70;
+/** The average seconds one source took recently (DEFAULT_SECONDS until there is a measure), kept in the database (run.ts recordSeconds). */
 export const AVG_KEY = 'wiki.job.avg';
 export function averageSeconds(db: DB): number {
   try {
     const a = JSON.parse(kvGet(db, AVG_KEY) || 'null') as { avg?: number } | null;
-    return a && typeof a.avg === 'number' && a.avg > 0 ? a.avg : 30;
+    return a && typeof a.avg === 'number' && a.avg > 0 ? a.avg : DEFAULT_SECONDS;
   } catch {
-    return 30;
+    return DEFAULT_SECONDS;
   }
 }

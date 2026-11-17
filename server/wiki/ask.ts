@@ -9,8 +9,8 @@ import { kvGet, kvSet, type DB } from '../db.ts';
 import { memoryOn } from '../memory/store.ts';
 import { spaceById } from '../spaces/index.ts';
 import { wikiChatEnabled } from './access.ts';
-import { buildOffer, startBuild, type BuildOffer } from './areas/build.ts';
-import { jobRunning, jobState, stopJob } from './areas/jobs.ts';
+import { buildOffer, historyBuilt, startBuild, type BuildOffer } from './areas/build.ts';
+import { jobRunning, stopJob } from './areas/jobs.ts';
 import { wikiMemoryOn } from './roots.ts';
 
 /** How long "Start without memory" keeps the question away from the project. */
@@ -52,7 +52,7 @@ export const offerOf = (o: BuildOffer): Pick<MemoryAsk, 'counts' | 'minutes' | '
 /**
  * Whether a session a person starts (`extra` and `space`, the project it is in, as create() knows them) asks to build the
  * project's memory first, and what it offers. Every condition: memory on, for the session and for the project's wiki; the
- * wiki empty with something to build from; no job running and no build ever run on it; and not said no to.
+ * wiki new (fewer than 10 articles, no build from history run) with something to build from; no job running and no build ever run on it; and not said no to.
  */
 export async function askFor(db: DB, o: { extra: SessionExtra | undefined; space: string | null | undefined; now?: number }): Promise<{ space: string; name: string; offer: BuildOffer } | null> {
   const { extra, space } = o;
@@ -61,9 +61,9 @@ export async function askFor(db: DB, o: { extra: SessionExtra | undefined; space
   if (!project) return null;
   if (!memoryOn(db) || extra?.memory === false || !wikiChatEnabled(db, extra ?? {}) || !wikiMemoryOn(db, space)) return null;
   if (askedNot(db, space, o.now)) return null;
-  if (jobRunning(space) || jobState(db, space)?.kind === 'build') return null;
+  if (jobRunning(space) || historyBuilt(db, space)) return null;
   const offer = await buildApi.offer(db, space).catch(() => null);
-  if (!offer || !offer.empty || !offer.worth) return null;
+  if (!offer || !offer.fresh || !offer.worth) return null;
   return { space, name: project.name, offer };
 }
 

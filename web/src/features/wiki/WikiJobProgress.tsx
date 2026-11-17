@@ -76,7 +76,19 @@ function Dot({ state }: { state: 'done' | 'now' | 'later' }) {
   );
 }
 
-const titleOf = (job: WikiJob) => (job.kind === 'build' ? tr('Building memory from history') : job.kind === 'rebuild' ? tr('Rebuilding the wiki') : tr('Updating the wiki'));
+/** The title follows the state: a finished job says what it did ("Built memory from history"), a running, stopped or failed one what it is. */
+const titleOf = (job: WikiJob) =>
+  job.state === 'done'
+    ? job.kind === 'build'
+      ? tr('Built memory from history')
+      : job.kind === 'rebuild'
+        ? tr('Rebuilt the wiki')
+        : tr('Updated the wiki')
+    : job.kind === 'build'
+      ? tr('Building memory from history')
+      : job.kind === 'rebuild'
+        ? tr('Rebuilding the wiki')
+        : tr('Updating the wiki');
 const phoneBtn = 'max-[479px]:min-h-11 max-[479px]:w-full';
 
 export function WikiJobProgress({ project, variant = 'panel', onStopped }: { project: string; variant?: 'panel' | 'card'; onStopped?: () => void }) {

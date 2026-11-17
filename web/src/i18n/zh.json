@@ -25146,5 +25146,9 @@
 "Which agent programs, Grok Build among them, are installed, and installing the others":"已安装哪些智能体程序（包括 Grok Build），以及安装其他程序",
 "The Claude Code, Codex and Grok Build sign-ins every session uses":"每个会话都使用的 Claude Code、Codex 和 Grok Build 登录",
 "Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP":"Gemini CLI、Grok Build、OpenCode、Goose 以及其他支持 ACP 的智能体",
-"Add to your message…":"补充你的消息…"
+"Add to your message…":"补充你的消息…",
+  "Built memory from history": "已根据历史记录构建记忆",
+  "Rebuilt the wiki": "已重建 wiki",
+  "Updated the wiki": "已更新 wiki",
+  "It already has articles or was built from history: use Update now or Rebuild": "已有文章,或已根据历史记录构建过:请使用“立即更新”或“重建”"
 }

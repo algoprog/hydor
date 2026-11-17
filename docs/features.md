@@ -316,7 +316,7 @@ agents that speak ACP and take MCP servers.
   the areas, and article lines say the area; an agent can be asked to reorganise now (`POST /api/projects/:id/wiki/reorganise`).
   The Wiki part's ⋯ menu: **Update now** (the waiting documents, unread conversations and new commits read at once; up to ten
   out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Build from history…**
-  while the wiki is empty (it reads what the project has that the wiki never read: its files, memory notes, up to 300 conversations
+  while the wiki is new (fewer than 10 articles, no build from history run yet) (it reads what the project has that the wiki never read: its files, memory notes, up to 300 conversations
   by signal, the newest 1,200 commit messages and its unread documents, what matters most first so an agent can start early, then the
   areas, hubs and merges; `/api/projects/:id/wiki/build`), **Rebuild from sources…** (an estimate of what it reads, minutes, helper
   calls and cost first; the wiki archived, the last three kept and the first one always, then the files and the kept sources in

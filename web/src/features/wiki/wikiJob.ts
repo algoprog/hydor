@@ -66,3 +66,34 @@ export function useWikiJob(id: string, active: boolean, version = 0): [WikiJob |
   const refresh = useCallback(() => setTick((n) => n + 1), []);
   return [job, refresh];
 }
+
+/** GET /api/projects/:id/wiki/build: what building the project's wiki from its history would read. `fresh`: the wiki is new (fewer than 10 articles, no build from history run), so a build is what to offer. */
+export interface BuildOffer {
+  empty: boolean;
+  fresh: boolean;
+  counts: { sessions: number; commits: number; documents: number; notes: number; files: string[] };
+  worth: boolean;
+  essentials: number;
+  sources: number;
+  minutesEssentials: number;
+  minutesAll: number;
+  helper: { label: string; priced: boolean; usd?: number };
+}
+
+/** The build offer, loaded again when a job starts or ends (a build makes the wiki not new). Null until known, or when memory or the project's wiki memory is off. */
+export function useBuildOffer(id: string, active: boolean, job: WikiJob | null): BuildOffer | null {
+  const [offer, setOffer] = useState<BuildOffer | null>(null);
+  const mark = `${job?.state}:${job?.startedAt}:${job?.kind}`;
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    api<BuildOffer>(`/api/projects/${enc(id)}/wiki/build`).then(
+      (r) => live && setOffer(r),
+      () => live && setOffer(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [id, active, mark]);
+  return offer;
+}

@@ -42,6 +42,7 @@ const space = createSpace(db, { name: 'Shop API', folder });
 
 const offer: BuildOffer = {
   empty: true,
+  fresh: true,
   counts: { sessions: 38, commits: 412, documents: 9, notes: 14, files: ['README.md', 'docs/'] },
   worth: true,
   essentials: 12,
@@ -472,7 +473,7 @@ test('create(): it sends at once when it does not ask: started by something else
   await sentAtOnce({ askMemory: true, extra: { space: space.id, parent: 'claude:abcd1234' } }, 'a subagent');
   await sentAtOnce({ askMemory: true, extra: { space: space.id, memory: false } }, 'memory off for it');
   await sentAtOnce({ askMemory: true, extra: { space: space.id }, prompt: '<conversation-handoff from="claude" session="claude:abcd1234" title="Earlier" messages="2" omitted="0">\nUser: hi\n</conversation-handoff>\n\nGo on.' }, 'a handoff');
-  buildApi.offer = async () => ({ ...offer, empty: false });
+  buildApi.offer = async () => ({ ...offer, empty: false, fresh: false });
   await sentAtOnce({ askMemory: true, extra: { space: space.id } }, 'a wiki with articles');
   buildApi.offer = async () => offer;
   const none = createSpace(db, { name: 'Elsewhere', folder: (() => { const f = path.join(tmp, 'elsewhere'); fs.mkdirSync(f); return f; })() });
