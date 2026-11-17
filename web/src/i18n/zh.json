@@ -25056,6 +25056,8 @@
 "Contract suggestions are unavailable":"合同建议不可用",
 "Default for projects unless they choose otherwise.":"项目的默认设置，除非项目另有选择。",
 "Execution tracking":"执行跟踪",
+"No plan templates found in this wiki.":"此 Wiki 中未找到计划模板。",
+"Plan templates":"计划模板",
 "Previous content":"原内容",
 "Project contract suggestion":"项目合同建议",
 "Project contracts":"项目合同",
@@ -25083,6 +25085,7 @@
 "wiki project contracts approved requirements provenance":"wiki 项目合同 已批准 要求 来源",
 "wiki project plans adoption revision":"wiki 项目计划 采用 修订",
 "Contract saved, but its suggestion card could not be updated.":"合同已保存，但无法更新建议卡片。",
+"Possible contracts to review":"待审核的可能合同",
 "Help me prepare a project contract. First ask for its source and scope, review existing contracts, and show the exact proposal. Save only after my approval.":"帮我准备项目合同。先询问来源和范围，检查现有合同并展示确切建议。仅在我批准后保存。",
 "Propose a contract":"建议合同",
 "Unknown":"未知",
@@ -25091,6 +25094,7 @@
 "Scope":"范围",
 "This session has no project wiki":"此会话没有项目 Wiki",
 "Some options are unavailable in this project.":"此项目中有些选项不可用。",
+"Open item":"待处理",
 "Change only one identified execution register section":"只能更改一个已识别的执行记录部分",
 "Choose plan or execution revision":"请选择计划修订或执行情况修订",
 "Execution control is off for this chat":"此聊天的执行跟踪已关闭",
@@ -25102,5 +25106,8 @@
 "Wiki archive path is a symbolic link: {0}":"Wiki 存档路径是符号链接：{0}",
 "Wiki contracts are off for this chat or project":"此聊天或项目已关闭 Wiki 合同",
 "Wiki target changed; read it again":"Wiki 目标已更改，请重新读取",
+"Some execution entries are not shown.":"部分执行条目未显示。",
+"Plan was not read":"未读取计划",
+"Register was not read":"未读取记录",
 "Conflicting automatic lessons choices":"自动经验总结设置相互冲突"
 }

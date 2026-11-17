@@ -34,6 +34,7 @@ Für das Lernen aus Dokumenten, das Lernen aus der Arbeit eines Projekts und fü
 
 Klappe in den Chat-Optionen **Wiki-Memory** auf, um **Automatische Lessons Learned**, **Wiki-Verträge**, **Automatische Vertragsvorschläge**, **Wiki-Pläne** und **Umsetzungskontrolle** für diesen Chat zu wählen. Die Projektstandards stehen in den Einstellungen; jedes Projekt kann eigene Werte festlegen. Ist eine Funktion im Projekt aus, ist ihr Chat-Schalter nicht verfügbar. Automatische Vertragsvorschläge benötigen Wiki-Verträge und Memory; erst wenn du den genauen Inhalt übernimmst, wird aus einem Vorschlag ein Vertrag.
 
+
 ## Wo Wikis gespeichert werden
 
 Standardmäßig liegen alle Wikis in einem Ordner: **Wiki-Ordner** unter [Einstellungen → Memory → Wiki-Memory](/settings?s=memory&find=Wiki%20folder). Anfangs ist das `.wiki` im Aufgabenordner von Hydor, zum Beispiel `~/Hydor/.wiki`. Dieser Ordner ist das gemeinsame Wiki, und das Wiki jedes Projekts ist ein eigener Ordner darin unter `projects/`, der bei Bedarf angelegt wird. Sein Name orientiert sich am Projektnamen und bleibt auch bei einer Umbenennung des Projekts erhalten. In deine Projektordner, die häufig Git-Repositories sind, wird nichts geschrieben.
@@ -154,6 +155,8 @@ Agenten können dasselbe tun, wenn du sie darum bittest („Baue das Wiki dieses
 
 ## Der Tab Memory eines Projekts
 
+Die Wiki-Ansicht zeigt auch Projektverträge, Planungsvorlagen, Pläne und Umsetzungsnachweise direkt aus dem Projekt-Wiki. Vorhandene Register im Wiki werden ebenfalls angezeigt, wenn ihr Name, eine Kennzeichnung als Ausführungsregister oder eine erkannte Registerüberschrift sie ausweist. Ein nicht gekennzeichnetes Register mit unbekanntem Namen wird möglicherweise nicht automatisch erkannt. Die Umsetzungskontrolle zeigt Aufgabe, Beschreibung und Status in einer Tabelle. Beschreibungen stammen aus entsprechend bezeichneten Spalten oder aus dem Wiki-Plan derselben Initiative, wenn eine Work-Item-ID eindeutig einem Listeneintrag zugeordnet ist. Ein separates Register unter `output/evidence/` muss direkt und eindeutig auf diesen Plan verlinken; bei einem Register neben dem Plan unter `output/projects/` dürfen keine widersprechenden Planlinks enthalten sein. Wähle eine Planbeschreibung, um ihre Quelle zu öffnen; fehlende oder mehrdeutige Angaben bleiben leer. Statussymbole zeigen nur Zustände, die der Nachweis enthält; ein nicht erkannter Status bleibt unbekannt und zeigt seinen Originalwert. Ein Hinweis erscheint, wenn die Liste begrenzt ist. Wähle einen Eintrag, um seine Quelle zu lesen. Neuaufbau und Wiederherstellung werden gestoppt, wenn das aktuelle Wiki oder das gewählte Archiv einen Projektvertrag enthält. Hydor verschiebt oder reaktiviert bestätigte Verträge durch diese Aktionen nicht.
+
 Öffne [Projekte](/projects), wähle ein Projekt und seinen Tab **Memory**. Dieser ersetzt die früheren Tabs Wissen und LLM Wiki. Seine Anzahl summiert Notizen, Artikel und Dokumente. Oben wechselst du zwischen drei Bereichen:
 
 - **Notizen**: die Memory-Notizen des Projekts wie unter Einstellungen → Memory, mit **Notiz hinzufügen**, einem Suchfeld und dem Ordner, zu dem sie gehören.
@@ -166,7 +169,7 @@ Die **Memory**-Karte im Tab Übersicht fasst den Stand zusammen („12 Notizen �
 
 ## Was Agenten damit tun können
 
-In einem Projekt erhält ein Agent einige Tools für das Wiki dieses Projekts, keine für ein anderes:
+In einem Projekt erhält ein Agent Tools für dessen Wiki und kann die Wikis anderer Projekte lesen, wenn diese Projekte das erlauben:
 
 - Er kann abfragen, wo das Wiki liegt und ob etwas darin ist, und einen Artikel oder eine Quelle lesen. Welche Artikel zu deiner Anfrage passen, erfährt er ungefragt (siehe [Das Zusammenspiel mit Notizen und Dokumenten](#how-it-sits-beside-notes-and-documents)).
 - Er kann einen Text oder ein Dokument als Quelle speichern (eine Dokumentdatei bis zu 20 MiB, unverändert, mit ihrem Text daneben; der Text kann unvollständig sein) und Artikel, `index.md` und `log.md` schreiben. Um eine Datei zu ändern, muss er sie zuvor gelesen haben, damit zwei Schreibzugriffe einander nicht überschreiben. Eine gespeicherte Quelle kann er nicht mehr ändern.
@@ -185,8 +188,6 @@ Was er nicht kann: in das Wiki eines anderen Projekts schreiben; verborgene Date
 Ist die **Umsetzungskontrolle** aus, kannst du trotzdem einen Plan ohne neues Register übernehmen oder ein bestehendes Register unverändert verlinken. Um einen Umsetzungsnachweis zu schreiben oder zu ändern, schalte die Umsetzungskontrolle für Projekt und Chat ein. Ist die Umsetzungskontrolle an, kann ein erkanntes, im Plan eingebettetes Register mit den Planrevisionstools im Ausführungsmodus auch bei ausgeschalteter Planbearbeitung aktualisiert werden; der übrige Plan bleibt unverändert.
 
 ## Projektverträge
-
-Neuaufbau und Wiederherstellung werden gestoppt, wenn das aktuelle Wiki oder das gewählte Archiv einen Projektvertrag enthält. Hydor verschiebt oder reaktiviert bestätigte Verträge durch diese Aktionen nicht.
 
 Bitte einen Agenten, einen Projektvertrag aus deinem Text oder einer vorhandenen Wiki-Seite vorzuschlagen. Die Vorschau zeigt Inhalt, Geltungsbereich, Herkunft, Ziel und vorhandene Artikel, damit du Überschneidungen prüfen kannst. Prüfe den genauen Text und bestätige ihn zum Speichern; beim Ablehnen wird nichts gespeichert. Eine übernommene Quellseite bleibt unverändert. Relative Markdown-Verweise in der Kopie zeigen weiterhin auf dieselben Wiki-Seiten. Lässt sich ein Verweis nicht sicher übernehmen, passe ihn vor einem erneuten Versuch an.
 

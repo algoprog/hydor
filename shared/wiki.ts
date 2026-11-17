@@ -50,7 +50,11 @@ export interface WikiDocuments {
 export interface WikiItem {
   path: string;
   title: string;
-
+  /** Contract metadata is shown as declared by its source document. */
+  scope?: string;
+  status?: string;
+  revision?: string;
+  origin?: string;
 }
 
 /** An area of a wiki: a group of articles about one lasting topic, with its hub (what it covers, its key facts, its articles). */
@@ -81,7 +85,14 @@ export interface ProjectWikiView {
   sources?: WikiItem[];
   /** Active project plans (output/projects/, changed only by the plan tools) and execution evidence (output/evidence/). */
   plans?: WikiItem[];
-  /** Some wiki files could not be read. */
+  /** Additional views derive directly from active wiki files. */
+  contracts?: WikiItem[];
+  /** Existing contract-like documents whose approval must be reviewed by the user. */
+  contractCandidates?: WikiItem[];
+  templates?: WikiItem[];
+  progress?: { path: string; title: string; description?: string; descriptionPath?: string; workItemId?: string; stage?: string; label: string; state: 'done' | 'open' | 'progress' | 'blocked' | 'unknown' }[];
+  /** Some execution entries exceeded the bounded overview. */
+  progressTruncated?: boolean;
   unreadable?: boolean;
   /**
    * While the wiki has areas: each area with its articles (an article in two is in both), top-level areas in order,

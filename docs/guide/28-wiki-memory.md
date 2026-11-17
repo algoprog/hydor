@@ -34,6 +34,7 @@ Learning from documents, learning from a project's work and session checkpoints 
 
 In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki contracts**, **Auto contract suggestions**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable. Automatic contract suggestions need Wiki contracts and Memory; a suggestion becomes a contract only when you accept its exact content.
 
+
 ## Where wikis are kept
 
 By default, in one folder: **Wiki folder** in [Settings → Memory → Wiki memory](/settings?s=memory&find=Wiki%20folder). It starts as `.wiki` in Hydor's task folder (for example `~/Hydor/.wiki`). The shared wiki is that folder, and each project's wiki is a folder of its own inside it, under `projects/`, made when first needed. The folder is named after the project and kept even if you rename the project. Nothing is written into your project folders, which are often Git repositories.
@@ -153,6 +154,8 @@ Agents can do the same when you ask them ("Rebuild this project's wiki from its 
 
 ## A project's Memory tab
 
+The Wiki view also shows project contracts, plan templates, plans and execution evidence directly from the project wiki. Existing registers in the wiki are also shown when they have a recognized name, an execution-register marker or a recognized register heading. An unmarked register with an unfamiliar name may not be recognized automatically. The execution overview is a table with task, description and status. Descriptions come from an explicitly labelled description column or, when a work-item ID matches one list entry in the same initiative, from its wiki plan. A separate `output/evidence/` register must link directly and unambiguously to that plan; a register next to the plan under `output/projects/` must have no conflicting plan links. Select a plan description to open its source; missing or ambiguous details stay blank. Execution markers show only states the evidence records; an unrecognized status remains unknown and shows its original value. A notice says when the list is limited. Select an item to read its source. Rebuild and restore stop when the current wiki or the selected archive contains a project contract. Hydor never moves or reactivates a reviewed contract through those actions.
+
 Open [Projects](/projects), pick a project and open its **Memory** tab. It replaces the Knowledge and LLM Wiki tabs of earlier versions, and its count adds up the notes, articles and documents. A switch at the top moves between three parts:
 
 - **Notes**: the project's memory notes, as in Settings → Memory, with **Add a note** and a search field, and the folder they belong to.
@@ -165,7 +168,7 @@ The Overview tab's **Memory** card sums it up ("12 notes · 8 articles · 5 docu
 
 ## What agents can do with it
 
-In a project, an agent gets a few tools for the project's wiki, and nothing for another:
+In a project, an agent gets tools for its wiki and can read other projects' wikis when those projects allow it:
 
 - It can see where the wiki is and whether anything is in it, and read an article or a source. It is told which articles bear on what you ask without asking (see [How it sits beside notes and documents](#how-it-sits-beside-notes-and-documents)).
 - It can keep a text or a document as a source (a document file up to 20 MiB, kept as it is, with its text next to it; the text may be incomplete) and write articles, `index.md` and `log.md`. To change a file it must have read it first, so two writers cannot overwrite each other. It cannot write a source after it is kept.
@@ -184,8 +187,6 @@ What it cannot do: write in another project's wiki; read or write hidden files a
 With **Execution tracking** off, you can still adopt a plan without creating a new register, or link an existing register without changing it. To write or update an execution record, turn execution tracking on for the project and chat. With execution tracking on, an identified register embedded in a plan can be updated through the plan revision tools in execution mode even when plan editing is off; the rest of the plan stays unchanged.
 
 ## Project contracts
-
-Rebuild and restore stop when the current wiki or the selected archive contains a project contract. Hydor never moves or reactivates a reviewed contract through those actions.
 
 Ask an agent to preview a project contract from your text or an existing wiki page. The preview shows its content, scope, origin, destination and existing articles to help you check for overlap. Review the exact text and confirm to save it; rejecting it saves nothing. A source page remains unchanged. Relative Markdown links in a copied source keep pointing to the same wiki pages. If a link cannot be safely carried over, rewrite it before trying again.
 

@@ -88,6 +88,25 @@ try {
   assert.deepEqual(bodyB.articles, [{ path: 'wiki/concepts/sky.md', title: "Bob's sky guide" }], 'a title keeps its apostrophe');
   assert.equal(bodyB.root, wikiB);
   assert.equal(bodyA.on, true);
+  // The project view derives contracts, templates and separate status stages from its own wiki.
+  fs.mkdirSync(path.join(wikiA, 'wiki', 'contracts'), { recursive: true });
+  fs.writeFileSync(path.join(wikiA, 'wiki', 'contracts', 'sources.md'), '---\ndocument_kind: contract\ntitle: Sources\nscope: Research\ndocument_status: active\nrevision: 3\nauthorization_ref: User\n---\n# Sources\n');
+  fs.writeFileSync(path.join(wikiA, 'wiki', 'template.md'), '---\ndocument_kind: plan-template\ntitle: Template\n---\n# Template\n');
+  fs.writeFileSync(path.join(wikiA, 'wiki', 'concepts', 'old-vertrag-data.md'), '# Older contract description\n');
+  fs.writeFileSync(path.join(wikiA, 'output', 'projects', 'delivery', 'nachweise.md'), '| ID | Implementierung | Auslieferung | Abnahme |\n|---|---|---|---|\n| WI-1 | abgeschlossen | offen | blockiert |\n');
+  const overview = (await list(a.id)).json();
+  assert.equal(overview.contracts[0].path, 'wiki/contracts/sources.md');
+  assert.deepEqual([overview.contracts[0].scope, overview.contracts[0].status, overview.contracts[0].revision, overview.contracts[0].origin], ['Research', 'active', '3', 'User']);
+  assert.equal(overview.contractCandidates[0].path, 'wiki/concepts/old-vertrag-data.md', 'unmarked older documents are offered for review, not promoted');
+  assert.equal(overview.contracts.length, 1);
+  assert.equal(overview.templates[0].path, 'wiki/template.md');
+  assert.deepEqual(overview.progress.map((entry: { state: string }) => entry.state), ['done', 'open', 'blocked']);
+  assert.equal((await list(b.id)).json().contracts.length, 0, 'another project does not see these contracts');
+  assert.equal((await file(a.id, overview.progress[0].path)).statusCode, 200, 'status links to its source');
+  fs.writeFileSync(path.join(wikiA, 'output', 'projects', 'delivery', 'combined.md'), '# Plan\n- [x] Planned item, not evidence\n\n<!-- hydor-execution-register: "Team dashboard" -->\n## Team dashboard\n- [ ] Review\n');
+  const withEmbedded = (await list(a.id)).json();
+  assert.deepEqual(withEmbedded.progress.filter((entry: { path: string }) => entry.path.endsWith('/combined.md')).map((entry: { title: string; state: string }) => [entry.title, entry.state]), [['Review', 'open']]);
+
   // A file that this process cannot read is reported instead of silently appearing absent.
   const unreadable = path.join(wikiA, 'wiki', 'unreadable.md');
   fs.writeFileSync(unreadable, '# Private');

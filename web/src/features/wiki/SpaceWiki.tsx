@@ -271,10 +271,11 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
     else if (href && !/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(href)) e.preventDefault();
   };
   const doc = file ? wikiDocument(file.content) : null;
-  const list = (items: WikiItem[], label: 'articles' | 'sources' | 'plans') =>
+  const contract = selected ? view?.contracts?.find((item) => item.path === selected) : undefined;
+  const list = (items: WikiItem[], label: 'articles' | 'sources' | 'plans' | 'contracts' | 'candidates' | 'templates') =>
     items.length ? (
       <section>
-        <h3 className="mb-2 text-[12px] font-semibold text-fg-3">{label === 'articles' ? 'Articles' : label === 'sources' ? 'Sources' : 'Plans and evidence'}</h3>
+        <h3 className="mb-2 text-[12px] font-semibold text-fg-3">{label === 'articles' ? 'Articles' : label === 'sources' ? 'Sources' : label === 'contracts' ? 'Project contracts' : label === 'candidates' ? 'Possible contracts to review' : label === 'templates' ? 'Plan templates' : 'Plans and evidence'}</h3>
         <div className="space-y-1">
           {items.map((item) => (
             <button
@@ -336,9 +337,28 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
       )}
       {view && on && ready && (
         <>
+          {/* Keep every status linked to the wiki document that supplies it. */}
+          {!!view.progress?.length && <section className="rounded-xl border border-line bg-panel p-4">
+            <h3 className="font-semibold">Execution tracking</h3>
+            {view.progressTruncated && <p className="mt-2 text-[12px] text-fg-3">Some execution entries are not shown.</p>}
+            <div className="mt-2 overflow-x-auto" tabIndex={0} role="region" aria-label={tr('Execution tracking')}>
+              <table className="w-full min-w-[34rem] border-collapse text-left text-[13px]">
+                <thead><tr className="border-b border-line"><th scope="col" className="p-2">Task</th><th scope="col" className="p-2">Description</th><th scope="col" className="p-2">Status</th></tr></thead>
+                <tbody>{view.progress.map((item, i) => <tr key={`${item.path}-${i}`} className="border-b border-line last:border-0">
+                  <td className="p-2 align-top"><button type="button" onClick={() => setSelected(item.path)} className="text-left hover:underline" translate="no">{item.title}</button></td>
+                  <td className="p-2 align-top">{item.descriptionPath ? <button type="button" onClick={() => setSelected(item.descriptionPath!)} className="text-left hover:underline" translate="no">{item.description}</button> : <span translate="no">{item.description || '—'}</span>}</td>
+                  <td className="whitespace-nowrap p-2 align-top"><span aria-hidden>{item.state === 'done' ? '✅' : item.state === 'open' ? '⬜' : item.state === 'progress' ? '⏳' : item.state === 'blocked' ? '⛔' : '❔'}</span> <span>{item.state === 'done' ? 'Done' : item.state === 'open' ? 'Open item' : item.state === 'progress' ? 'In progress' : item.state === 'blocked' ? 'Blocked' : 'Unknown'}</span>{item.state === 'unknown' && item.label !== 'Unknown' && <span translate="no"> ({item.label})</span>}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </section>}
           {view.truncated && <p className="text-[12px] text-fg-3">The list is limited; some files are not shown.</p>}
           <div className="grid gap-4 md:grid-cols-[minmax(180px,260px)_minmax(0,1fr)]">
             <aside className="max-h-72 space-y-4 overflow-auto rounded-xl border border-line bg-panel p-3 md:max-h-[70vh]">
+              {list(view.contracts ?? [], 'contracts')}
+              {list(view.contractCandidates ?? [], 'candidates')}
+              {list(view.templates ?? [], 'templates')}
+              {!view.templates?.length && <p className="text-[12px] text-fg-3">No plan templates found in this wiki.</p>}
               {view.areas?.length ? <AreaGroups areas={view.areas} articles={view.articles ?? []} selected={selected} onOpen={setSelected} /> : list(view.articles ?? [], 'articles')}
               {list(view.sources ?? [], 'sources')}
               {list(view.plans ?? [], 'plans')}
@@ -356,6 +376,12 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
                       Close
                     </Button>
                   </div>
+                  {contract && <dl className="mb-4 grid gap-1 rounded-lg bg-bg-2 p-3 text-[12px]">
+                    <div><dt className="inline font-semibold">Status</dt>: <dd className="inline">{contract.status ? <span translate="no">{contract.status}</span> : 'Unknown'}</dd></div>
+                    <div><dt className="inline font-semibold">Scope</dt>: <dd className="inline">{contract.scope ? <span translate="no">{contract.scope}</span> : 'Unknown'}</dd></div>
+                    <div><dt className="inline font-semibold">Revision</dt>: <dd className="inline">{contract.revision ? <span translate="no">{contract.revision}</span> : 'Unknown'}</dd></div>
+                    <div><dt className="inline font-semibold">Origin</dt>: <dd className="inline">{contract.origin ? <span translate="no">{contract.origin}</span> : 'Unknown'}</dd></div>
+                  </dl>}
                   <div onClick={openLink}>
                     <Markdown text={doc.body} className="break-words text-[14px]" />
                   </div>

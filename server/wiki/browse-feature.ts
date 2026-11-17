@@ -5,6 +5,7 @@ import type { Feature } from '../features/types.ts';
 import type { ProjectWikiView, WikiArea } from '../../shared/wiki.ts';
 import { spaceById } from '../spaces/index.ts';
 import { browseWiki } from './browse.ts';
+import { wikiOverview } from './overview.ts';
 import { readFollowing } from './areas/redirects.ts';
 import { areaArticles, membersByArea } from './areas/articles.ts';
 import { areaOrder, hasAreas, hubPath, isHubPath, loadRegistry, memberPath } from './areas/registry.ts';
@@ -60,9 +61,11 @@ export const wikiBrowse: Feature = {
         if (!on) return { status: 'off', on, inherited };
         if (!root) return { status: 'empty', on, inherited };
         const view = browseWiki(root);
+        // Derive the feature overview from the original active articles before grouping them by area.
+        const overview = wikiOverview(root, view.articles, view.plans);
         const areas = areasOf(root);
-        if (areas) view.articles = view.articles.filter((a) => !isHubPath(a.path));
-        return { status: view.articles.length || view.sources.length || view.plans.length ? 'ready' : 'empty', on, inherited, root, ...view, ...(areas ? { areas } : {}) };
+        if (areas) view.articles = view.articles.filter((article) => !isHubPath(article.path));
+        return { status: view.articles.length || view.sources.length || view.plans.length ? 'ready' : 'empty', on, inherited, root, ...view, ...overview, unreadable: view.unreadable || overview.unreadable, ...(areas ? { areas } : {}) };
       } catch {
         return { status: 'error', on: wikiMemoryOn(d.db, p.id), inherited, error: 'The project wiki cannot be read safely.' };
       }

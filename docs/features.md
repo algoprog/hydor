@@ -292,7 +292,8 @@ agents that speak ACP and take MCP servers.
   can write in `output/projects/`: agents record what was done, deployed or accepted in `output/evidence/` with the ordinary wiki
   write. Project contracts have source, scope and a reviewed revision: an agent previews a proposed contract or revision, and your
   approval saves the exact content while preserving prior versions. The helper can also suggest a new or revised contract as a card;
-  only you accept or dismiss it. A project's Memory tab shows its wiki read-only, including its articles, sources, plans and evidence.
+  only you accept or dismiss it. A project's Memory tab shows its wiki read-only, including contracts, existing templates, plans and
+  evidence. Its execution overview is a table of tasks, descriptions and explicit status markers taken directly from the wiki, with links to the source documents.
   Areas: from ten articles a wiki's articles are grouped into areas, lasting topics (`areas:` in each article's front matter, the
   areas themselves in a hidden `.structure/areas.json`; no file moves), each with a hub kept by Hydor (`wiki/areas/<area>.md`: an
   overview, up to six key facts each checked against the article it cites, and the area's articles in reading order); `index.md`
@@ -306,7 +307,7 @@ agents that speak ACP and take MCP servers.
   out-of-date articles revised, stale hubs written, five queued merges done; the areas looked at again), **Rebuild from
   sources…** (an estimate of sources, helper calls and cost first; the wiki archived, the last three kept and the first one always, then every source in
   `raw/` read again, at most 60 an hour, then the earlier articles no new one covers, the areas and hubs made anew, and old article paths redirected to the new articles;
-  sources, plans and memory notes untouched; it goes on after a restart) and **Restore the previous wiki…**; a line says what
+  sources, plans and memory notes untouched; it goes on after a restart) and **Restore the previous wiki…**; rebuild and restore are unavailable for wikis or archives containing project contracts; a line says what
   it is doing, one at a time for each wiki (`/api/projects/:id/wiki/rebuild`, `…/rebuild/restore`, `…/update`).
 - **Projects** (in the sidebar): a project's sessions, files, documents, memory, guidelines, skills and assistant
   together, like Projects in ChatGPT or Claude. Pick a project by name in the start page's folder menu instead of a

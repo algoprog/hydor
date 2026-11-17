@@ -25040,6 +25040,8 @@
 "Contract suggestions are unavailable":"Οι προτάσεις σύμβασης δεν είναι διαθέσιμες",
 "Default for projects unless they choose otherwise.":"Προεπιλογή έργων εκτός αν ορίζεται αλλιώς.",
 "Execution tracking":"Παρακολούθηση υλοποίησης",
+"No plan templates found in this wiki.":"Δεν βρέθηκαν πρότυπα σχεδίου σε αυτό το wiki.",
+"Plan templates":"Πρότυπα σχεδίων",
 "Previous content":"Προηγούμενο περιεχόμενο",
 "Project contract suggestion":"Πρόταση σύμβασης έργου",
 "Project contracts":"Συμβάσεις έργου",
@@ -25067,6 +25069,7 @@
 "wiki project contracts approved requirements provenance":"wiki συμβάσεις έργου εγκεκριμένες απαιτήσεις προέλευση",
 "wiki project plans adoption revision":"wiki σχέδια έργου υιοθέτηση αναθεώρηση",
 "Contract saved, but its suggestion card could not be updated.":"Η σύμβαση αποθηκεύτηκε, αλλά η κάρτα πρότασης δεν ενημερώθηκε.",
+"Possible contracts to review":"Πιθανές συμβάσεις προς έλεγχο",
 "Help me prepare a project contract. First ask for its source and scope, review existing contracts, and show the exact proposal. Save only after my approval.":"Βοήθησέ με να ετοιμάσω μια σύμβαση έργου. Ρώτησε πρώτα για την πηγή και το πεδίο, έλεγξε τις υπάρχουσες συμβάσεις και δείξε την ακριβή πρόταση. Αποθήκευσε μόνο μετά την έγκρισή μου.",
 "Propose a contract":"Πρότεινε σύμβαση",
 "Unknown":"Άγνωστο",
@@ -25075,6 +25078,7 @@
 "Scope":"Πεδίο εφαρμογής",
 "This session has no project wiki":"Αυτή η συνεδρία δεν έχει wiki έργου",
 "Some options are unavailable in this project.":"Ορισμένες επιλογές δεν είναι διαθέσιμες σε αυτό το έργο.",
+"Open item":"Ανοιχτό",
 "Change only one identified execution register section":"Αλλάξτε μόνο μία αναγνωρισμένη ενότητα παρακολούθησης υλοποίησης",
 "Choose plan or execution revision":"Επιλέξτε αναθεώρηση σχεδίου ή υλοποίησης",
 "Execution control is off for this chat":"Η παρακολούθηση υλοποίησης είναι απενεργοποιημένη για αυτή τη συνομιλία",
@@ -25086,5 +25090,8 @@
 "Wiki archive path is a symbolic link: {0}":"Η διαδρομή αρχείου wiki είναι συμβολικός σύνδεσμος: {0}",
 "Wiki contracts are off for this chat or project":"Οι συμβάσεις wiki είναι απενεργοποιημένες για αυτή τη συνομιλία ή αυτό το έργο",
 "Wiki target changed; read it again":"Ο προορισμός του wiki άλλαξε· διαβάστε τον ξανά",
+"Some execution entries are not shown.":"Ορισμένες καταχωρίσεις υλοποίησης δεν εμφανίζονται.",
+"Plan was not read":"Το σχέδιο δεν διαβάστηκε",
+"Register was not read":"Το μητρώο δεν διαβάστηκε",
 "Conflicting automatic lessons choices":"Αντικρουόμενες επιλογές για τα αυτόματα διδάγματα"
 }

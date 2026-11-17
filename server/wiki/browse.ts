@@ -4,7 +4,7 @@ import path from 'node:path';
 import { readWiki } from './core.ts';
 import { wikiFileActive } from './knowledge/bindings.ts';
 
-export interface WikiEntry { path: string; title: string }
+export interface WikiEntry { path: string; title: string; scope?: string; status?: string; revision?: string; origin?: string }
 
 /** The `title:` of a document's frontmatter, without its quotes ("Bob's guide" stays whole). */
 export function titleOf(content: string): string {

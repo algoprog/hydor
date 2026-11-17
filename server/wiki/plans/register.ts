@@ -2,16 +2,27 @@
 export function embeddedExecutionSections(text: string): string[] {
   const lines = text.split(/\r?\n/);
   const result: string[] = [];
+  // Headings and markers in fenced examples are never live register boundaries.
+  let fence: { char: string; length: number } | null = null;
+  const visible = lines.map((line) => {
+    const marker = /^\s{0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (marker && marker[1][0] === fence.char && marker[1].length >= fence.length && !marker[2].trim()) fence = null;
+      return '';
+    }
+    if (marker) { fence = { char: marker[1][0], length: marker[1].length }; return ''; }
+    return line;
+  });
   // A marker preserves the exact heading selected when a plan is adopted.
-  const marker = /^<!-- hydor-execution-register: ("(?:[^"\\]|\\.)*") -->$/m.exec(text);
+  const marker = /^<!-- hydor-execution-register: ("(?:[^"\\]|\\.)*") -->$/m.exec(visible.join('\n'));
   let named = '';
   if (marker) { try { named = String(JSON.parse(marker[1])); result.push(marker[0]); } catch { result.push('invalid register marker'); } }
   for (let i = 0; i < lines.length; i++) {
-    const match = /^(#{1,6})\s+(.+?)\s*$/.exec(lines[i]);
+    const match = /^(#{1,6})\s+(.+?)\s*$/.exec(visible[i]);
     if (!match || !(match[2] === named || /^(execution(?:\s+control|\s+tracking)?|evidence|implementation\s+status|umsetzungskontrolle|nachweisregister)$/i.test(match[2]))) continue;
     const start = i, level = match[1].length;
     while (i + 1 < lines.length) {
-      const next = /^(#{1,6})\s+/.exec(lines[i + 1]);
+      const next = /^(#{1,6})\s+/.exec(visible[i + 1]);
       if (next && next[1].length <= level) break;
       i++;
     }
@@ -42,10 +53,10 @@ export function executionOnlyChange(before: string, after: string): boolean {
     // A heading inside a fenced code example cannot identify an execution register.
     let fence = '';
     for (const line of text.slice(0, start).split('\n')) {
-      const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+      const match = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
       if (!match) continue;
       if (!fence) fence = match[1];
-      else if (match[1][0] === fence[0] && match[1].length >= fence.length) fence = '';
+      else if (match[1][0] === fence[0] && match[1].length >= fence.length && !match[2].trim()) fence = '';
     }
     if (fence) return null;
     return { prefix: text.slice(0, start), suffix: text.slice(start + section.length), heading: section.split('\n')[0], section };

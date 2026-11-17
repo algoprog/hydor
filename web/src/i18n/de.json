@@ -23786,6 +23786,8 @@
   "Contract suggestions are unavailable": "Vertragsvorschläge sind nicht verfügbar",
   "Default for projects unless they choose otherwise.": "Standard für Projekte, sofern sie nichts anderes wählen.",
   "Execution tracking": "Umsetzungskontrolle",
+  "No plan templates found in this wiki.": "In diesem Wiki wurden keine Planungsvorlagen gefunden.",
+  "Plan templates": "Planungsvorlagen",
   "Previous content": "Bisheriger Inhalt",
   "Project contract suggestion": "Projektvertragsvorschlag",
   "Project contracts": "Projektverträge",
@@ -23813,6 +23815,7 @@
   "wiki project contracts approved requirements provenance": "Wiki Projektverträge bestätigte Anforderungen Herkunft",
   "wiki project plans adoption revision": "Wiki Projektpläne Übernahme Revision",
   "Contract saved, but its suggestion card could not be updated.": "Der Vertrag wurde gespeichert, aber seine Vorschlagskarte konnte nicht aktualisiert werden.",
+  "Possible contracts to review": "Mögliche Verträge zur Prüfung",
   "Help me prepare a project contract. First ask for its source and scope, review existing contracts, and show the exact proposal. Save only after my approval.": "Hilf mir, einen Projektvertrag vorzubereiten. Frage zuerst nach Quelle und Geltungsbereich, prüfe bestehende Verträge und zeige den genauen Vorschlag. Speichere erst nach meiner Bestätigung.",
   "Propose a contract": "Vertrag vorschlagen",
   "Unknown": "Unbekannt",
@@ -23821,6 +23824,7 @@
   "Scope": "Geltungsbereich",
   "This session has no project wiki": "Diese Sitzung hat kein Projekt-Wiki",
   "Some options are unavailable in this project.": "Einige Optionen sind in diesem Projekt nicht verfügbar.",
+  "Open item": "Offen",
   "Change only one identified execution register section": "Ändere nur einen eindeutig erkannten Abschnitt der Umsetzungskontrolle",
   "Choose plan or execution revision": "Wähle eine Plan- oder Umsetzungsrevision",
   "Execution control is off for this chat": "Die Umsetzungskontrolle ist für diesen Chat ausgeschaltet",
@@ -23832,5 +23836,8 @@
   "Wiki archive path is a symbolic link: {0}": "Der Wiki-Archivpfad ist eine symbolische Verknüpfung: {0}",
   "Wiki contracts are off for this chat or project": "Wiki-Verträge sind für diesen Chat oder dieses Projekt ausgeschaltet",
   "Wiki target changed; read it again": "Das Wiki-Ziel hat sich geändert; lies es erneut",
+  "Some execution entries are not shown.": "Einige Umsetzungseinträge werden nicht angezeigt.",
+  "Plan was not read": "Der Plan wurde nicht gelesen",
+  "Register was not read": "Das Register wurde nicht gelesen",
   "Conflicting automatic lessons choices": "Widersprüchliche Einstellungen für automatische Lessons Learned"
 }
