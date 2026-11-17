@@ -164,6 +164,8 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
   const live = lv?.live ?? s.live ?? null;
   const running = !!live && live.status !== 'exited';
   const working = running && (live!.status === 'working' || live!.status === 'waiting' || live!.status === 'starting');
+  // The agent has not had its first message: it waits for the project's memory question or build (its card has the controls). Nothing runs to stop, and what is written is queued for after the first message.
+  const waitsMemory = running && !!live!.memory;
   // Open in VS Code or a terminal: a Claude session moves here on send (after asking);
   // a Codex one stays read-only until it is closed there.
   const ext = running ? null : (s.external ?? null);
@@ -313,7 +315,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
     if (move) return handOff(t);
     if ((!t && !atts.length) || busy || locked) return;
     if (takeover ? !(await confirm(takeoverDialog(s))) : !running && !(await confirmResume(s))) return;
-    const queue = working && !takeover && (followUpPref() === 'queue') !== opposite;
+    const queue = working && !takeover && (waitsMemory || (followUpPref() === 'queue') !== opposite);
     setBusy(true);
     // The message shows these pictures the moment it does, not once the agent has written it down (lib/attachments.ts).
     const went = sendingPictures(key, t, atts, queue);
@@ -544,13 +546,15 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 ? `Open in ${ext!.client} — continue there, or close it there to resume here`
                 : takeover
                   ? `Open in ${ext!.client} — sending moves it here`
-                  : working
-                    ? workingPlaceholder(touch)
-                    : hint
-                      ? hint
-                      : running
-                        ? `Message ${s.agent === 'claude' ? 'Claude' : s.agent === 'codex' ? 'Codex' : (s.acpName ?? 'the agent')}…`
-                        : 'Message to continue…'
+                  : waitsMemory
+                    ? 'Add to your message…'
+                    : working
+                      ? workingPlaceholder(touch)
+                      : hint
+                        ? hint
+                        : running
+                          ? `Message ${s.agent === 'claude' ? 'Claude' : s.agent === 'codex' ? 'Codex' : (s.acpName ?? 'the agent')}…`
+                          : 'Message to continue…'
             }
             className="block max-h-[40vh] min-h-[48px] w-full resize-none bg-transparent px-5 pt-3.5 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-fg-3 focus-visible:outline-none disabled:cursor-not-allowed"
           />
@@ -639,7 +643,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 e.target.value = '';
               }}
             />
-            {(working || background) && (
+            {(working || background) && !waitsMemory && (
               <button
                 onClick={stopAll}
                 title={['Stop', stops.note].filter(Boolean).join('\n')}
@@ -650,7 +654,7 @@ export function Composer({ s, hint }: { s: SessionSummary; hint?: string }) {
                 <Square size={12} fill="currentColor" strokeWidth={0} />
               </button>
             )}
-            {(!working || canSend) && (
+            {(!working || canSend || waitsMemory) && (
               <button
                 onClick={() => send()}
                 disabled={!canSend}

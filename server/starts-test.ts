@@ -145,6 +145,7 @@ test('a Custom process from before the update queues unsupported follow-ups with
   let error = new RpcError('_hydor/message is not supported', -32601);
   const live = { agent: 'acp', adapter: { state: { status: 'working' }, sendMessage: async () => { throw error; } } };
   const m: any = {
+    gates: new Map(),
     lives: new Map([[key, live]]), live: () => live, isCustom: () => true,
     switchBeforeSend: async () => {}, snapshot: async () => {}, limitHits: new Map(), userStopped: new Set(),
     takeMoveNote: () => '', emit: () => {}, saveFiles: () => [], saveImages: (v: unknown) => v,
@@ -163,6 +164,7 @@ test('Send now keeps an unsupported Custom follow-up in the persistent queue', a
   const key = 'acp:old-queued';
   const m: any = {
     db, queues: new Map(), held: new Set(), queuesLoaded: true,
+    gates: new Map(),
     lives: new Map([[key, { adapter: { state: { status: 'working' } } }]]),
     queueSummary: () => {}, saveImages: () => [], saveFiles: () => [], isCustom: () => true,
     take: proto.take, loadQueues: proto.loadQueues, reorderQueued: proto.reorderQueued, dispatchQueued: proto.dispatchQueued,

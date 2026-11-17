@@ -6,7 +6,9 @@ import path from 'node:path';
 import { kvSet, openDb } from '../../db.ts';
 import { areaArticles } from '../areas/articles.ts';
 import { mergeOne } from '../areas/merge.ts';
-import { listArticles } from './digest.ts';
+import { setWikiSettings } from '../settings/settings.ts';
+import { digestText, listArticles } from './digest.ts';
+import { PLAN_SYSTEM } from './plan.ts';
 import { splitArticle } from './split.ts';
 import { storeArticle, writeIndex } from './write.ts';
 
@@ -44,6 +46,41 @@ try {
   assert.equal(asks, 0);
   for (const [rel, content] of Object.entries(files)) assert.equal(fs.readFileSync(path.join(root, rel), 'utf8'), content);
   assert.equal(fs.existsSync(path.join(root, '.history')), false);
+
+  // A document turned into a contract during the planning call must not reach the later writing call.
+  setWikiSettings(db, { enabled: true, hubPath: root });
+  const ordinary = path.join(root, 'wiki/ordinary.md');
+  const promoted = files['wiki/ordinary.md'].replace('title: Ordinary article', 'title: Ordinary article\ndocument_kind: contract');
+  const input = { space: null, base: 'test', title: 'Source', path: 'synthetic.md', origin: 'synthetic', text: 'Synthetic project information for the wiki.', cut: false, kind: 'document' as const, notes: false, hash: 'synthetic', now: () => Date.now(), source: null, quiet: true };
+  const prompts: string[] = [];
+  await digestText(db, async (q) => {
+    prompts.push(q.prompt);
+    if (q.system === PLAN_SYSTEM) {
+      await Promise.resolve();
+      fs.writeFileSync(ordinary, promoted);
+      return { update: ['wiki/ordinary.md'], create: [{ title: 'Separate topic' }], notes: [] };
+    }
+    return { articles: [{ path: 'wiki/separate-topic.md', content: '# Separate topic\n\nA separate useful article for this test.\n' }] };
+  }, input);
+  assert.equal(prompts.length, 2, 'an unrelated article still reaches the writer');
+  assert.ok(prompts.every((prompt) => !prompt.includes('protected-marker-one') && !prompt.includes('protected-marker-two')));
+  assert.ok(prompts.every((prompt) => !prompt.includes('wiki/contracts/standard.md') && !prompt.includes('wiki/references/custom.md')));
+  assert.ok(!prompts[1].includes('wiki/ordinary.md') && !prompts[1].includes('Ordinary article'), 'the newly protected contract is not supplied to the writer');
+  assert.equal(fs.readFileSync(ordinary, 'utf8'), promoted);
+
+  // A contract created while the writer is answering is protected again immediately before storage.
+  fs.writeFileSync(ordinary, files['wiki/ordinary.md']);
+  let writing = false;
+  await digestText(db, async (q) => {
+    if (q.system === PLAN_SYSTEM) return { update: ['wiki/ordinary.md'], create: [], notes: [] };
+    writing = true;
+    await Promise.resolve();
+    fs.writeFileSync(ordinary, promoted);
+    return { articles: [{ path: 'wiki/ordinary.md', content: '# Ordinary article\n\nAn ordinary useful article.\n\nA synthetic addition.\n' }] };
+  }, input);
+  assert.equal(writing, true);
+  assert.equal(fs.readFileSync(ordinary, 'utf8'), promoted, 'the reviewed contract is never rewritten');
+  assert.equal(fs.existsSync(path.join(root, '.history')), false, 'no automatic contract snapshot is made');
 } finally {
   db.close();
   fs.rmSync(root, { recursive: true, force: true });

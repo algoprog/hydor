@@ -100,21 +100,21 @@ You don’t have to know where an option lives: type what you want in the search
 
 ### Accounts
 
-[Settings → Accounts](/settings?s=accounts): the Claude Code and Codex sign-ins every session uses. More in [Agents, accounts and models](/guide/agents-models).
+[Settings → Accounts](/settings?s=accounts): the Claude Code, Codex and Grok Build sign-ins every session uses. More in [Agents, accounts and models](/guide/agents-models).
 
-- [**Accounts**](/settings?s=accounts&find=Accounts): The Claude Code and Codex sign-ins sessions use, and more you add.
+- [**Accounts**](/settings?s=accounts&find=Accounts): The Claude Code, Codex and Grok Build sign-ins sessions use, and more you add.
 - [**Switch accounts at a limit**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit): A session that runs out of usage carries on with another account.
 - [**Use API credit at a limit**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit): When every Claude Code account is at its limit, sessions carry on billed to an Anthropic API key.
-- [**Agent programs**](/settings?s=accounts&find=Agent%20programs): Which agent programs are installed, and installing the others.
+- [**Agent programs**](/settings?s=accounts&find=Agent%20programs): Which agent programs, Grok Build among them, are installed, and installing the others.
 - [**Update automatically**](/settings?s=accounts&find=Update%20automatically): Keeps Claude Code, Codex and the other agent programs at their newest version.
 
 ### More agents
 
-[Settings → More agents](/settings?s=agents): Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP. More in [Agents, accounts and models](/guide/agents-models).
+[Settings → More agents](/settings?s=agents): Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP. More in [Agents, accounts and models](/guide/agents-models).
 
 - [**Your agents**](/settings?s=agents&find=Your%20agents): Agents that show next to Claude Code and Codex.
 - [**Add your own**](/settings?s=agents&find=Add%20your%20own): Any agent that speaks ACP, by its command.
-- [**Agents that speak ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code and Goose, ready to add.
+- [**Agents that speak ACP**](/settings?s=agents&find=Agents%20that%20speak%20ACP): Gemini CLI, OpenCode, Qwen Code, Goose and Grok Build, ready to add.
 
 ### Models
 

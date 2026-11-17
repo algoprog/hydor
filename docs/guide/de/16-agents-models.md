@@ -1,6 +1,6 @@
 # Agenten, Konten und Modelle
 
-Hydor verwendet Claude Code, Codex, den eigenen Agenten Custom für beliebige Modelle und weitere ACP-Agenten wie Gemini CLI, OpenCode, Qwen Code oder Goose. Hier erfährst du die Unterschiede, wie Programme installiert und aktualisiert werden, wie du ein oder mehrere Konten anmeldest und wie Custom Modelle von OpenRouter, Ollama, Hugging Face oder OpenAI-kompatiblen Servern nutzt.
+Hydor verwendet Claude Code, Codex, den eigenen Agenten Custom für beliebige Modelle und weitere ACP-Agenten wie Gemini CLI, OpenCode, Qwen Code, Goose oder Grok Build. Hier erfährst du die Unterschiede, wie Programme installiert und aktualisiert werden, wie du ein oder mehrere Konten anmeldest und wie Custom Modelle von OpenRouter, Ollama, Hugging Face oder OpenAI-kompatiblen Servern nutzt.
 
 ![Agentenauswahl auf der Startseite: Claude Code, Codex oder Custom](images/agents-models.webp)
 
@@ -11,7 +11,7 @@ Der Agent ist das Programm, das deine Nachricht liest, Tools wie Dateien, Befehl
 - **Claude Code** (Anthropic). Läuft mit deinem Claude-Abo oder rechnet über ein Anthropic-API-Konto ab. Seine Modelle sind die von Anthropic (Opus, Sonnet, Haiku). Es hat eigene Nutzungslimits, die die [Nutzungsseite](/usage) zeigt.
 - **Codex** von OpenAI nutzt dein ChatGPT-Abo und OpenAI-Modelle. Auch seine Limits stehen unter Nutzung. Codex wird mitgeliefert.
 - **Custom** nutzt alle unter [Einstellungen → Agenten → Modelle](/settings?s=models) eingerichteten Modelle: OpenRouter, lokale Ollama- oder vLLM-Modelle und OpenAI-kompatible Endpunkte. Geeignet für offene, günstigere oder vollständig lokale Modelle. Siehe [Custom, der eigene Agent der App](/guide/custom).
-- **Agenten mit ACP-Unterstützung** wie Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI und Auggie oder ein eigener Befehl. ACP, das Agent Client Protocol, standardisiert die Verbindung zwischen App und Agentenprogramm. Jeder verwendet seine eigene Anmeldung und Modelle.
+- **Agenten mit ACP-Unterstützung** wie Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie und Grok Build (der Coding-Agent von xAI, mit seinen Grok-Modellen) oder ein eigener Befehl. ACP, das Agent Client Protocol, standardisiert die Verbindung zwischen App und Agentenprogramm. Jeder verwendet seine eigene Anmeldung und Modelle.
 
 Unterstützung in der App:
 
@@ -19,7 +19,8 @@ Unterstützung in der App:
 - **Fortsetzen in…** (die Unterhaltung an einen anderen Agenten übergeben): von Claude Code oder Codex aus an den jeweils anderen oder an Custom.
 - Aufwand (wie intensiv das Modell nachdenkt): Claude Code und Codex, bei Modellen, die ihn anbieten.
 - Denkaufwand: Claude Code und Codex bei geeigneten Modellen.
-- Mehrere Konten, Abolimits und Limit-Resets: Claude Code und Codex.
+- Mehrere Konten: Claude Code, Codex und Grok Build.
+- Abolimits und Limit-Resets: Claude Code und Codex. (Grok Build hat hier noch keine Nutzungsanzeigen.)
 
 ## Agent und Modell für eine neue Sitzung wählen
 
@@ -65,11 +66,11 @@ Unter **Modellstufen in Sitzungen** stehen zwei standardmäßig aktive Schalter:
 
 ## Agentenprogramme werden automatisch installiert
 
-Claude Code, Codex, Gemini CLI und andere sind lokale Programme. Du musst sie nicht manuell installieren.
+Claude Code, Codex, Gemini CLI, Grok Build und andere sind lokale Programme. Du musst sie nicht manuell installieren.
 
-Unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Agent%20programs) zeigt **Agentenprogramme** Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie und Programme mit ACP-Adapter. Jeder Eintrag nennt Sitzungsprogrammversion und Quelle:
+Unter [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Agent%20programs) zeigt **Agentenprogramme** Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build (sobald du es hinzugefügt hast) und Programme mit ACP-Adapter. Jeder Eintrag nennt Sitzungsprogrammversion und Quelle:
 
-- **Eigene Installation**;
+- **Eigene Installation** (bei Grok Build auch mit dem Installer von xAI, der es in `~/.grok/bin` ablegt);
 - **von der App installiert**: Die App hat es in ihrem eigenen Ordner installiert.
 - **Mit der App geliefert**, etwa Codex;
 - **Nicht installiert: Wird bei der ersten Nutzung automatisch installiert**. **Installieren** startet sofort.
@@ -85,8 +86,8 @@ Goose, Kimi CLI und einige andere Agenten stehen nicht in dieser Liste: Installi
 Ist [**Automatisch aktualisieren**](/settings?s=accounts&find=Update%20automatically) an, die letzte Zeile unter **Agentenprogramme** (es ist an, solange du es nicht ausschaltest), bringt die App jedes Agentenprogramm einmal am Tag auf seine neueste Version. Der erste Lauf kommt etwa zehn Minuten nach dem Start der App.
 
 - App-eigene Kopien werden mit npm aktualisiert. Codex kann so eine neuere Kopie als die mitgelieferte verwenden.
-- Deine eigenen Installationen aktualisieren sich mit ihrem eigenen Updater: `claude update` für Claude Code, `codex update` für Codex (das, das dein Terminal startet), `opencode upgrade` für OpenCode.
-- Mit `npm install -g` global installierte Gemini-CLI-, Qwen-Code-, Auggie- und ACP-Adapter-Programme werden mit npm aktualisiert, sofern Schreibrechte bestehen. Andere Installationswege bleiben deiner eigenen Verwaltung überlassen.
+- Deine eigenen Installationen aktualisieren sich mit ihrem eigenen Updater: `claude update` für Claude Code, `codex update` für Codex (das, das dein Terminal startet), `opencode upgrade` für OpenCode, `grok update` für Grok Build.
+- Mit `npm install -g` global installierte Gemini-CLI-, Qwen-Code-, Auggie-, Grok-Build- und ACP-Adapter-Programme werden mit npm aktualisiert, sofern Schreibrechte bestehen. Andere Installationswege bleiben deiner eigenen Verwaltung überlassen.
 - Claude Code folgt seinem konfigurierten Releasekanal: `"autoUpdatesChannel": "stable"` nutzt stabil, sonst aktuell.
 - Ist Claude Codes eigener Updater über `DISABLE_AUTOUPDATER=1` aus, wie im Docker-Image, aktualisiert Hydor deine Claude-Code-Installation ebenfalls nicht automatisch. **Jetzt aktualisieren** funktioniert weiterhin.
 
@@ -100,9 +101,9 @@ Unter dieser Zeile steht, wann die App zuletzt nachgesehen hat, etwa „Aktuell 
 
 Laufende Sitzungen machen mit der Version weiter, mit der sie gestartet sind. Neue Sitzungen verwenden die neue. Bei ausgeschaltetem **Automatisch aktualisieren** sieht die App trotzdem einmal am Tag nach und zeigt, was verfügbar ist, installiert aber nichts, bis du auf **Jetzt aktualisieren** klickst.
 
-## Claude Code und Codex anmelden
+## Claude Code, Codex und Grok Build anmelden
 
-Claude Code und Codex brauchen eine Anmeldung, bevor sie arbeiten können. Öffne [Einstellungen → Agenten → Konten](/settings?s=accounts) (auf dem Smartphone ist Einstellungen eine Liste von Abschnitten: Tippe unter Agenten auf **Konten**; mit dem Titel oben kommst du zurück). Die Gruppe **Konten** (ihr (i) sagt, dass das die Anmeldungen sind, die deine Sitzungen verwenden, und dass du ein weiteres Abo hinzufügen kannst, zum Beispiel ein Arbeits- und ein privates, und beim Start einer Sitzung eines davon auswählst) listet zuerst die eigene Anmeldung jedes Agenten und dann die Konten, die du dafür hinzugefügt hast. Bei jedem steht ein grünes Häkchen mit E-Mail, Abo und Anmeldemethode oder ein rotes Kreuz mit „Nicht angemeldet“ oder dem, was schiefgegangen ist.
+Claude Code und Codex brauchen eine Anmeldung, bevor sie arbeiten können, und Grok Build ebenso, sobald du es hinzugefügt hast (siehe [Gemini CLI, OpenCode und andere ACP-Agenten hinzufügen](#add-gemini-cli-opencode-and-other-acp-agents)). Öffne [Einstellungen → Agenten → Konten](/settings?s=accounts) (auf dem Smartphone ist Einstellungen eine Liste von Abschnitten: Tippe unter Agenten auf **Konten**; mit dem Titel oben kommst du zurück). Die Gruppe **Konten** (ihr (i) sagt, dass das die Claude-Code-, Codex- und Grok-Build-Anmeldungen sind, die deine Sitzungen verwenden, und dass du ein weiteres Abo hinzufügen kannst, zum Beispiel ein Arbeits- und ein privates, und beim Start einer Sitzung eines davon auswählst) listet zuerst die eigene Anmeldung jedes Agenten und dann die Konten, die du dafür hinzugefügt hast. Auch die eigene Anmeldung von Grok Build hat dort eine Zeile, **Grok Build**, die erscheint, sobald es hinzugefügt ist. Bei jedem steht ein grünes Häkchen mit E-Mail, Abo und Anmeldemethode oder ein rotes Kreuz mit „Nicht angemeldet“ oder dem, was schiefgegangen ist.
 
 So meldest du dich an:
 
@@ -110,28 +111,34 @@ So meldest du dich an:
 2. Wähle, wie:
    - Claude Code: **Claude-Abonnement** (dein Claude-Abo) oder **Konsole (API-Abrechnung)** (ein Anthropic-API-Konto).
    - Codex: **Gerätecode** oder **Browserumleitung**.
+   - Grok Build: nichts zu wählen, es meldet sich immer mit einem Code an.
 3. Klicke auf **Anmeldelink abrufen**.
 4. Folge den Schritten:
    - Claude Code: Öffne den Link (**Anmeldeseite öffnen**), bestätige den Zugriff in deinem Browser, füge dann den Code, den die Seite zeigt, in **Code von der Seite einfügen** ein und klicke auf **Anmeldung abschließen**.
    - Codex mit Gerätecode: Link auf einem beliebigen Gerät öffnen, bei ChatGPT anmelden und Einmalcode eingeben. Der Dialog erkennt den Abschluss automatisch.
    - Codex, Browserumleitung: Nach der Anmeldung versucht dein Browser, eine „localhost“-Seite zu öffnen, und scheitert. Kopiere die Adresse dieser Seite, füge sie in **localhost-Adresse aus deinem Browser einfügen** ein und klicke auf **Anmeldung abschließen**.
+   - Grok Build: Du erhältst einen Link und einen Einmalcode. Öffne den Link auf einem beliebigen Gerät, melde dich mit deinem Grok-Konto an und bestätige den Code (**2. Bestätige diesen Code**). Es wird nichts zurückgefügt: Der Dialog erkennt selbst, wann du fertig bist.
 
 Eine Meldung bestätigt den Erfolg. Bei Fehlern nennt der Dialog den Grund; **Erneut versuchen** startet neu.
 
-Danach erlaubt **Konto wechseln** dieselbe Anmeldung mit einem anderen Konto. **Abmelden** im Menü **⋯** meldet das Agentenprogramm auf diesem Computer nach Bestätigung ab, auch für dessen Terminals und Editoren.
+Danach erlaubt **Konto wechseln** dieselbe Anmeldung mit einem anderen Konto (bei Grok Build mit einem neuen Code). **Abmelden** im Menü **⋯** meldet das Agentenprogramm auf diesem Computer nach Bestätigung ab, auch für dessen Terminals und Editoren.
+
+Startest du eine Grok-Build-Sitzung, während es abgemeldet ist, bricht die Sitzung ab mit „Grok Build is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again.“ Melde dich dort an und sende deine Nachricht erneut. Statt eines Abos funktioniert für Grok Build auch ein xAI-API-Key in `XAI_API_KEY`, in der Umgebung der Agenten.
 
 Die Willkommenstour (über **Hilfe** in der Seitenleiste) fragt, welche Agenten und Modelle du nutzen möchtest, und führt dich ebenfalls durch diese Anmeldungen.
 
 ## Ein zweites Konto für Arbeit oder Privat hinzufügen
 
-Du kannst mehr als ein Claude-Code- oder Codex-Konto anmelden, zum Beispiel ein Arbeits-Abo und ein privates Abo, und pro Sitzung eines auswählen.
+Du kannst mehr als ein Claude-Code-, Codex- oder Grok-Build-Konto anmelden, zum Beispiel ein Arbeits-Abo und ein privates Abo, und pro Sitzung eines auswählen.
 
 1. Öffne [Einstellungen → Agenten → Konten](/settings?s=accounts&find=Accounts).
 2. Klicke neben dem Titel der Gruppe **Konten** auf **Konto hinzufügen**.
-3. Wähle **Claude Code** oder **Codex**, gib einen Namen ein (bis zu 40 Zeichen, etwa „Arbeit“ oder „Privat“) und klicke auf **Hinzufügen und anmelden**.
+3. Wähle **Claude Code**, **Codex** oder **Grok Build** (wird angeboten, sobald Grok Build eingerichtet ist), gib einen Namen ein (bis zu 40 Zeichen, etwa „Arbeit“ oder „Privat“) und klicke auf **Hinzufügen und anmelden**.
 4. Der Anmeldedialog für das neue Konto öffnet sich. Melde dich an, wie oben beschrieben.
 
 Jedes hinzugefügte Konto meldet sich für sich an und behält seinen eigenen Sitzungsverlauf. Deine Einstellungen, Anweisungen, Skills und Plugins werden mit der Hauptanmeldung des Agenten geteilt, Änderungen gelten also für beide. Bei Claude Code ist ein Ordner, dem du mit der Hauptanmeldung vertraut hast, auch für ein hinzugefügtes Konto vertrauenswürdig, sodass in dessen Sitzungen die eigenen Berechtigungsregeln des Ordners gelten. Zwei Konten desselben Agenten können nicht denselben Namen haben.
+
+Ein hinzugefügtes Grok-Build-Konto hat einen eigenen Ordner mit seiner Anmeldung und dem eigenen Sitzungsverlauf von Grok. Die Einstellungen der Grok-CLI teilt es mit deiner Hauptanmeldung: Konfiguration, Regeln (`AGENTS.md`), Skills, Plugins und MCP-Anmeldungen.
 
 Jedes hinzugefügte Konto hat eine eigene Zeile unter der eigenen Anmeldung des Agenten, mit **Anmelden** oder **Konto wechseln**. Sein Menü **⋯** enthält **Abmelden**, **Umbenennen** und **Entfernen**:
 
@@ -139,17 +146,19 @@ Jedes hinzugefügte Konto hat eine eigene Zeile unter der eigenen Anmeldung des 
 - **Abmelden** unterbricht die Arbeitsfähigkeit seiner Sitzungen bis zur erneuten Anmeldung.
 - **Entfernen** nimmt das Konto aus der App. Seine Sitzungen verschwinden aus der Liste, aber ihr Verlauf bleibt auf dem Datenträger, es sei denn, du setzt zusätzlich das Häkchen bei **Auch die Anmeldung und den Verlauf seiner Sitzungen löschen**. Ein Konto kannst du nicht entfernen, solange Sitzungen mit ihm laufen: Beende sie zuerst.
 
-Die [Nutzungsseite](/usage) zeigt pro Konto eine eigene Karte mit Limits.
+Die [Nutzungsseite](/usage) zeigt pro hinzugefügtem Claude-Code- oder Codex-Konto eine eigene Karte mit Limits. Grok Build hat noch keine Nutzungsanzeigen.
 
 ## Das Konto einer Sitzung wählen
 
-Hat der gewählte Agent zusätzliche Konten, erscheint auf der Startseite unter **Optionen** die Zeile **Konto**:
+Hat der gewählte Agent zusätzliche Konten (bei Grok Build, sobald du eines hinzugefügt hast), erscheint auf der Startseite unter **Optionen** die Zeile **Konto**:
 
-- **Deine Anmeldung** ist das eigene Konto des Programms (das erste für diesen Agenten unter **Konten**).
+- **Deine Anmeldung** ist das eigene Konto des Programms (das erste für diesen Agenten unter **Konten**; bei Grok Build das eigene Konto der Grok-Build-CLI).
 - Zusätzliche Konten stehen mit ihrem Namen in der Liste.
 - **Konten verwalten** öffnet die Kontoeinstellungen.
 
-Die Startseite merkt sich deine Wahl für diesen Agenten, an jedem Ort gleich. Eine Sitzung, die mit einem hinzugefügten Konto läuft, zeigt oben in der Sitzung den Namen dieses Kontos mit einem Personensymbol. Wenn dieses Konto ein Nutzungslimit erreicht, betrifft der Limit-Hinweis über dem Nachrichtenfeld dieses Konto. Das Konto wird beim Start der Sitzung festgelegt. Es ändert sich nur von selbst, wenn **Bei erreichtem Limit das Konto wechseln** (siehe unten) eingeschaltet ist.
+Die Startseite merkt sich deine Wahl für diesen Agenten, an jedem Ort gleich. Eine Sitzung, die mit einem hinzugefügten Konto läuft, zeigt oben in der Sitzung den Namen dieses Kontos mit einem Personensymbol. Wenn dieses Konto ein Nutzungslimit erreicht, betrifft der Limit-Hinweis über dem Nachrichtenfeld dieses Konto. Das Konto wird beim Start der Sitzung festgelegt. Es ändert sich nur von selbst, wenn **Bei erreichtem Limit das Konto wechseln** (siehe unten, nur Claude Code und Codex) eingeschaltet ist.
+
+Um eine Sitzung selbst zu einem anderen Konto zu verschieben, klicke auf den **Konto**-Chip der Sitzung und wähle eines. Das geht bei Claude-Code-, Codex- und Grok-Build-Sitzungen und gilt ab deiner nächsten Nachricht. Der Grok-Verlauf einer Grok-Build-Sitzung zieht mit um; kann Grok sie unter dem anderen Konto nicht wieder öffnen, beginnt sie dort neu, mit einem Hinweis.
 
 ## Alle Konten nutzen: bei Limits wechseln
 
@@ -158,7 +167,7 @@ Mit zwei oder mehr Konten für denselben Agenten kann die App alle nutzen: Wenn 
 - Wenn ein Durchlauf stoppt, weil das Konto der Sitzung sein Nutzungslimit erreicht hat, wählt die App ein anderes angemeldetes Konto desselben Agenten, das noch Nutzung übrig hat (das am wenigsten genutzte), verschiebt die Sitzung mit ihrem gesamten Verlauf dorthin und sendet „… hat sein Nutzungslimit erreicht, deshalb läuft diese Sitzung jetzt auf …. Mach dort weiter, wo du aufgehört hast.“ Ein Hinweis oben in der App sagt, zu welchem Konto die Sitzung gewechselt ist.
 - Die Subagenten, die eine Claude-Code-Sitzung im Hintergrund ausführt, laufen ebenfalls weiter. Die, die beim Erreichen des Limits noch arbeiten, halten beim nächsten Schritt an, und ihre Arbeit bleibt erhalten. Die App wartet auf sie (höchstens zwei Minuten), bevor sie die Sitzung verschiebt. Die Nachricht nennt sie dann, und der Agent führt jeden dort fort, wo er angehalten hat. Wenn nur die Subagenten an ein Limit stoßen (eines nur für ihr Modell), wechselt die Sitzung, sobald ihr Durchlauf beendet ist und keiner von ihnen mehr arbeitet.
 - Hydor-Subagenten (die Sitzungen, die ein Agent startet, um einen Teil seiner Arbeit zu erledigen) sind eigene Sitzungen, daher wird jede von selbst verschoben, wenn ein Limit ihren Durchlauf stoppt. Der Agent, der sie gestartet hat, erfährt, dass sie weiterläuft und nicht, dass sie fehlgeschlagen ist, und bekommt ihre Antwort, wenn sie fertig ist.
-- Deine Hauptanmeldung und jedes hinzugefügte Konto zählen alle. Claude-Code-Konten lösen Claude-Code-Konten ab, Codex-Konten Codex-Konten.
+- Deine Hauptanmeldung und jedes hinzugefügte Konto zählen alle. Claude-Code-Konten lösen Claude-Code-Konten ab, Codex-Konten Codex-Konten. Grok-Build-Konten wechseln noch nicht bei einem Limit.
 - Codex-Ziele wechseln mit und laufen weiter.
 - Wenn jedes Konto sein Limit erreicht hat, wechselt nichts (es sei denn, **Bei erreichtem Limit API-Guthaben verwenden** ist eingeschaltet, siehe unten). Ist **Nach dem Zurücksetzen von Nutzungslimits fortsetzen** eingeschaltet, läuft die Sitzung weiter, sobald das erste Konto zurückgesetzt wird, und zwar mit diesem Konto. Mehr dazu unter [Nutzung, Limits und Kosten](/guide/usage#continue-sessions-automatically-after-a-limit).
 - Eine neue Sitzung, die mit einem Konto an seinem Limit gestartet wird, startet stattdessen mit einem Konto, das noch Nutzung übrig hat. Und eine Nachricht, die du an eine Sitzung sendest, deren Konto am Limit ist, verschiebt die Sitzung zuerst, damit die Nachricht nicht abgewiesen wird. Mit deiner Nachricht erfährt der Agent, dass er jetzt auf einem Konto mit verbleibender Nutzung läuft, sodass er nicht auf das Zurücksetzen des alten Kontos wartet, und welche seiner Subagenten weitermachen können.
@@ -187,17 +196,23 @@ Danach gilt:
 Öffne [Einstellungen → Agenten → Weitere Agenten](/settings?s=agents&find=Agents%20that%20speak%20ACP).
 
 - **Deine Agenten** (sie erscheinen neben Claude Code und Codex, wenn du eine Sitzung startest) listet zuerst Custom und dann die Agenten, die du hinzugefügt hast. Bei jedem steht ein Häkchen, wenn sein Programm hier installiert ist, oder ein Kreuz und „nicht installiert“.
-- **Agenten mit ACP-Unterstützung** (installiere einen, melde dich einmal in seiner eigenen CLI an und füge ihn dann hier hinzu) listet die bekannten, die du noch nicht hinzugefügt hast: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie und weitere. Die installierten stehen zuerst. Bei einer Zeile mit „Nicht installiert“ steht, wie du es bekommst. Die Liste zeigt die ersten paar, die nicht installiert sind; **Alle anzeigen** zeigt den Rest.
+- **Agenten mit ACP-Unterstützung** (installiere einen, melde dich einmal in seiner eigenen CLI an und füge ihn dann hier hinzu) listet die bekannten, die du noch nicht hinzugefügt hast: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build und weitere. Die installierten stehen zuerst. Bei einer Zeile mit „Nicht installiert“ steht, wie du es bekommst. Die Liste zeigt die ersten paar, die nicht installiert sind; **Alle anzeigen** zeigt den Rest.
 
 Zum Hinzufügen:
 
 1. Klicke am Ende der Zeile auf **Hinzufügen**. Die Schaltfläche ist hervorgehoben, wenn das Programm schon installiert ist.
-2. Wenn die App weiß, wie man es installiert (Gemini CLI, OpenCode, Qwen Code, Auggie und die Agenten, die einen ACP-Adapter brauchen), installiert sie es jetzt im Hintergrund. Goose, Kimi CLI und die anderen installierst du selbst, mit dem Befehl oder der Adresse in ihrer Zeile.
+2. Wenn die App weiß, wie man es installiert (Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build und die Agenten, die einen ACP-Adapter brauchen), installiert sie es jetzt im Hintergrund. Goose, Kimi CLI und die anderen installierst du selbst, mit dem Befehl oder der Adresse in ihrer Zeile.
 3. Melde dich einmal im eigenen Programm des Agenten an: Öffne das [Terminal](/terminal), führe seinen Befehl aus (zum Beispiel `gemini`) und folge seiner Anmeldung. Wenn du das überspringst, sagt dir eine Sitzung: „Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again.“
 
 Danach erscheint der Agent unter **Ausführungsumgebung** auf der Startseite.
 
 Um einen hinzugefügten Agenten zu ändern, klicke auf **Bearbeiten**. Um ihn zu entfernen, öffne sein Menü **⋯**, wähle **Entfernen** und bestätige: Seine Sitzungen bleiben aufgelistet, aber um sie fortzusetzen, muss der Agent erneut eingerichtet werden. Custom ist eingebaut: Seine Zeile sagt „Eingebaut: Modelle von OpenRouter, Ollama und vLLM, in Einstellungen → Modelle“ und hat statt Bearbeiten und Entfernen eine Schaltfläche **Modelle**.
+
+### Grok Build
+
+**Grok Build** ist der Coding-Agent von xAI (das Programm `grok`). Klicke in seiner Zeile auf **Hinzufügen**, mehr ist nicht nötig: Die App installiert es beim ersten Bedarf aus npm (`@xai-official/grok`) oder nutzt eines, das schon da ist, auch eines vom Installer von xAI in `~/.grok/bin`. Danach steht es unter **Agentenprogramme** und wird wie die anderen aktuell gehalten. Hydor führt es über ACP aus, mit den eigenen Tools der App, den Freigabekarten und den Grok-Modellen.
+
+Es meldet sich anders an als die übrigen ACP-Agenten: nicht im Terminal, sondern unter [Einstellungen → Agenten → Konten](/settings?s=accounts), wo eine Zeile **Grok Build** erscheint, sobald es hinzugefügt ist (siehe [Claude Code, Codex und Grok Build anmelden](#sign-claude-code-codex-and-grok-build-in)). Dort kannst du auch weitere Grok-Konten hinzufügen.
 
 ### Ein eigenes Agentenprogramm hinzufügen
 
@@ -228,7 +243,7 @@ Manche Agenten in der Liste sind Programme, die du selbst einrichtest, und ein p
 Die App öffnet eine Sitzung im Ordner, den du wählst, zeigt die Nachrichten und Schritte des Agenten und fragt dich immer, wenn der Agent um Erlaubnis bittet. Einiges funktioniert anders als bei Claude Code und Codex:
 
 - Er nimmt eine Nachricht nach der anderen an. Eine Nachricht, die du sendest, während er arbeitet, wartet in der Warteschlange über dem Nachrichtenfeld und geht raus, wenn der Durchlauf endet. (Custom funktioniert ebenso.)
-- Kann ein Agent alte Sitzungen nicht wieder öffnen, beginnt die Fortsetzung ohne früheren Unterhaltungskontext. Die Sitzung erklärt das.
+- Kann ein Agent alte Sitzungen nicht wieder öffnen, beginnt die Fortsetzung ohne früheren Unterhaltungskontext. Die Sitzung erklärt das. Dasselbe passiert, wenn ein Agent eine Sitzung früher wieder öffnen konnte und es nicht mehr kann: Sie läuft mit einem Hinweis neu weiter, statt zu scheitern.
 - Bildanhänge kommen nur bei Bildunterstützung an.
 - Ziele, Verzweigungen und Übergaben fehlen bei anderen ACP-Agenten; Custom unterstützt Ziele und Verzweigungen.
 - Die Tools der App (Seiten, Suche, Memory …) erreichen einen Agenten als MCP-Server: über eine Adresse, wenn der Agent das annimmt, sonst über ein kleines Programm, das die App für ihn startet. Ein Agent, der keines von beidem annimmt, arbeitet nur mit seinen eigenen Tools, bekommt aber trotzdem die Richtlinien, Memory-Notizen und Skills.
@@ -408,6 +423,8 @@ Ein [Hugging-Face-Token](/settings?s=models&find=Hugging%20Face%20token) erlaubt
 - „Welche Agentenprogramme sind installiert? Installiere Gemini CLI.“
 - „Sind Claude Code und Codex aktuell? Aktualisiere sie jetzt.“
 - „Füge OpenCode hinzu.“
+- „Füge Grok Build hinzu und melde es mit meinem Grok-Abo an.“
+- „Füge ein zweites Grok-Konto für die Arbeit hinzu und starte meine nächste Sitzung damit.“
 - „Füge Gemini CLI und Goose hinzu und sage mir, was ich noch selbst installieren muss.“
 - „Finde ein bildfähiges Hugging-Face-Modell, das hier gut läuft. Prüfe und installiere die passende Größe.“
 - „Füge das neueste DeepSeek-Modell von OpenRouter hinzu.“ Voraussetzung ist dein OpenRouter-Key.

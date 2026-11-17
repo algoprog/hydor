@@ -76,6 +76,21 @@ try {
   assert.equal(bindings()[0].active, 1);
   await wiki.spawn!({ ...info, key: 'claude:s2', runId: 'r2' }, deps);
   assert.deepEqual(bindings(), [{ ...bindings()[0], active: 1 }], 'a second session keeps the same binding bound');
+  // LOOK only while the wiki has an article (or the session waits for a build of it): an empty wiki says nothing of itself.
+  const sky = path.join(root, 'wiki', 'concepts', 'sky.md');
+  const skyText = fs.readFileSync(sky, 'utf8');
+  fs.rmSync(sky);
+  const empty = (await wiki.spawn!({ ...info, key: 'claude:s3', runId: 'r3' }, deps))!;
+  assert.doesNotMatch((empty.instructions ?? []).join(' '), /Wiki memory is on/, 'no article: no instruction');
+  setSessionExtra(db, 'claude:s3', { memoryBuild: true });
+  assert.match(((await wiki.spawn!({ ...info, key: 'claude:s3', runId: 'r4' }, deps))!.instructions ?? []).join(' '), /Wiki memory is on/, 'a session that waits for a build is told');
+  assert.match(((await wiki.spawn!({ ...info, key: 'claude:s4', runId: 'r5', extra: { space: space.id, memoryBuild: true } }, deps))!.instructions ?? []).join(' '), /Wiki memory is on/, 'also from the extra it is spawned with');
+  fs.mkdirSync(path.dirname(sky), { recursive: true });
+  fs.writeFileSync(path.join(root, 'wiki', 'redirect.md'), '---\nredirect: wiki/concepts/sky.md\n---\n');
+  assert.doesNotMatch(((await wiki.spawn!({ ...info, key: 'claude:s5', runId: 'r6' }, deps))!.instructions ?? []).join(' '), /Wiki memory is on/, 'a redirect is no article');
+  fs.rmSync(path.join(root, 'wiki', 'redirect.md'));
+  fs.writeFileSync(sky, skyText);
+  assert.match(((await wiki.spawn!({ ...info, key: 'claude:s6', runId: 'r7' }, deps))!.instructions ?? []).join(' '), /Wiki memory is on/, 'an article again: told again (the check follows the folder)');
   // A confidential session gets nothing.
   assert.equal(await wiki.spawn!({ ...info, extra: { space: space.id, confidential: true } }, deps), undefined);
   // The project's own switch: off for this project, whatever Settings say.

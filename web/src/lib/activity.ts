@@ -13,6 +13,8 @@ export interface Activity {
   agents: number;
   /** Hydor subagents it started that are still running (starting, working or waiting, or kept working by subagents of their own). */
   helpers: number;
+  /** Its project's memory is being built first: the agent has not had its first message, and the session works on that. */
+  memory?: true;
 }
 
 export type TaskKind = 'subagent' | 'command' | 'monitor' | 'workflow' | 'task';
@@ -34,7 +36,7 @@ export function activityOf(s: SessionSummary | undefined | null): Activity | nul
   if (!s) return null;
   const l = s.live;
   const helpers = s.helpers ?? 0;
-  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0, agents: agentsIn(l.backgroundTasks), helpers };
+  if (l && l.status !== 'exited' && l.status !== 'error') return { kind: 'app', status: l.status, background: l.backgroundTasks?.length ?? 0, agents: agentsIn(l.backgroundTasks), helpers, ...(l.memory === 'building' ? { memory: true as const } : {}) };
   const e = s.external;
   if (e) return { kind: 'external', status: e.status, client: e.client, detail: e.detail, background: e.backgroundTasks?.length ?? 0, agents: agentsIn(e.backgroundTasks), helpers };
   // Its own process has stopped between turns, but its Hydor subagents still run: it is not done.
@@ -70,7 +72,7 @@ export function activityLabel(a: Activity): string {
   const where = a.kind === 'external' ? ` in ${a.client}` : '';
   switch (a.status) {
     case 'working':
-      return `Working${where}`;
+      return a.memory ? 'Building memory' : `Working${where}`;
     case 'starting':
       return 'Starting';
     case 'waiting':

@@ -17,6 +17,7 @@ import { ICON, KIND_COLOR } from '../apps/stepKinds';
 import { Elapsed } from './items';
 import { allAnswered, answerOf, QuestionForm, type Picks } from './QuestionForm';
 import { tr } from '../../i18n/runtime';
+import { MemoryBuildCard } from './MemoryBuildCard';
 
 function FileDetail({ detail }: { detail: string }) {
   // "path\n@@ … diff" blocks, possibly several, possibly led by a reason line.
@@ -47,6 +48,8 @@ const SignatureApproval = lazy(() => import('../signatures/Cards').then((m) => (
 
 /** `base`: the machine the session is on, when it is not the one the page shows (the inbox lists them all). */
 export function ApprovalCard(props: { a: ApprovalRequest; sessionKey: string; agent: Agent; id?: string; base?: string; onDone?: () => void }) {
+  // Whether to build the project's memory first, and the build while the agent's first message waits for it.
+  if (props.a.memory) return <MemoryBuildCard a={props.a} sessionKey={props.sessionKey} id={props.id} base={props.base} onDone={props.onDone} />;
   if (props.a.signature)
     return (
       <Suspense fallback={null}>

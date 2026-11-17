@@ -1,7 +1,7 @@
 // Script tests for added accounts: where a Claude session's transcript is, found in any account's folder once
 // written and, before the CLI has written it (a session just started), expected in the folder of the account
 // the session runs as, so its timeline follows the file the CLI writes; and the folders an added account trusts
-// (shareTrust). Build and run with scratch folders:
+// (shareTrust); and Grok Build's accounts (GROK_HOME, the settings linked in and the sign-in not, the mismatch errors). Build and run with scratch folders:
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/accounts-test.ts
 //   DATA_DIR=/tmp/hydor-test-accounts CLAUDE_CONFIG_DIR=/tmp/hydor-test-accounts/claude node dist/dev/accounts-test.js
 import assert from 'node:assert/strict';
@@ -9,7 +9,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { accountById, addAccount, claudeTranscriptOf, removeAccount, shareTrust } from './accounts.ts';
+import { accountById, accountEnv, accountPool, addAccount, claudeTranscriptOf, grokHome, grokHomeOf, grokSessionMove, moveAcross, removeAccount, shareTrust } from './accounts.ts';
+import { HttpError } from './auth.ts';
 import { config } from './config.ts';
 import { openDb } from './db.ts';
 
@@ -116,6 +117,69 @@ removeAccount(db, work.id, true);
   shareTrust(acct, '/home/u/proj', main);
   assert.equal(fs.readFileSync(target, 'utf8'), targetText, 'the symlink target is unchanged');
 
+  fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+// A Grok Build account: its own GROK_HOME, the settings of the default home linked in, never its sign-in or sessions.
+{
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-grok-test-'));
+  const home = path.join(scratch, 'grok-home');
+  const was = process.env.GROK_HOME;
+  process.env.GROK_HOME = home;
+  assert.equal(grokHome(), home, 'GROK_HOME names the default home');
+  fs.mkdirSync(path.join(home, 'skills'), { recursive: true });
+  fs.mkdirSync(path.join(home, 'sessions'), { recursive: true });
+  for (const f of ['config.toml', 'AGENTS.md', 'auth.json', 'agent_id', 'skills/s.md', 'sessions/x.json']) fs.writeFileSync(path.join(home, f), 'x');
+
+  const grok = addAccount(db, 'grok', 'Work');
+  const claude = addAccount(db, 'claude', 'Work');
+  const dir = accountById(db, grok.id)!.dir;
+  assert.equal(grok.agent, 'grok');
+  assert.deepEqual(accountEnv(db, 'grok', grok.id), { GROK_HOME: dir }, 'an added Grok account runs with its own GROK_HOME');
+  assert.deepEqual(accountEnv(db, 'grok', undefined), {}, 'the default account: the program’s own home');
+  assert.deepEqual(accountEnv(db, 'claude', claude.id), { CLAUDE_CONFIG_DIR: accountById(db, claude.id)!.dir });
+  for (const f of ['config.toml', 'AGENTS.md', 'skills']) assert.ok(fs.lstatSync(path.join(dir, f)).isSymbolicLink(), `${f} is linked from the default home`);
+  assert.equal(fs.readFileSync(path.join(dir, 'skills/s.md'), 'utf8'), 'x', 'a linked folder shows the default home’s files');
+  for (const f of ['auth.json', 'agent_id', 'sessions']) assert.equal(fs.existsSync(path.join(dir, f)), false, `${f} is never shared`);
+  assert.equal(fs.existsSync(path.join(dir, 'requirements.toml')), false, 'what the default home does not have is not linked');
+
+  assert.throws(() => accountEnv(db, 'claude', grok.id), (e) => e instanceof HttpError && e.status === 400 && /Grok Build account/.test(e.message), 'a Grok account is not a Claude Code one');
+  assert.throws(() => accountEnv(db, 'grok', claude.id), (e) => e instanceof HttpError && e.status === 400 && /Claude Code account/.test(e.message));
+  assert.throws(() => accountEnv(db, 'grok', 'gone'), (e) => e instanceof HttpError && e.status === 404);
+  assert.throws(() => addAccount(db, 'gemini' as never, 'x'), (e) => e instanceof HttpError && e.message === 'Pick Claude Code, Codex or Grok Build');
+  assert.throws(() => addAccount(db, 'grok', 'work'), (e) => e instanceof HttpError && e.status === 409, 'one name once per program');
+  assert.deepEqual(accountPool(db, 'grok'), [undefined, grok.id]);
+  assert.deepEqual(accountPool(db, 'claude'), [undefined, claude.id]);
+
+  // Moving a session between Grok accounts: its folder (found by scanning, whatever the cwd's folder is called) goes to the same place
+  // under the other home; the index stays; a destination that exists, or no folder at all, is told apart.
+  assert.equal(grokHomeOf(db, grok.id), dir);
+  assert.equal(grokHomeOf(db, undefined), home);
+  {
+    const gid = '01a1e8cf-aaaa-bbbb-cccc-1234567890ab';
+    const folder = path.join(home, 'sessions', '%2Ftmp%2Fproj', gid);
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, 'summary.json'), '{}');
+    fs.writeFileSync(path.join(home, 'sessions', 'session_search.sqlite'), 'idx');
+    const move = grokSessionMove(db, gid, undefined, grok.id)!;
+    assert.deepEqual(move, [folder, path.join(dir, 'sessions', '%2Ftmp%2Fproj', gid)]);
+    assert.equal(grokSessionMove(db, 'no-such-session', undefined, grok.id), null, 'no folder: nothing to move');
+    assert.equal(grokSessionMove(db, '../x', undefined, grok.id), null, 'not an id');
+    moveAcross(...move);
+    assert.ok(fs.existsSync(path.join(move[1], 'summary.json')));
+    assert.equal(fs.existsSync(folder), false);
+    assert.ok(fs.existsSync(path.join(home, 'sessions', 'session_search.sqlite')), 'the index stays');
+    assert.deepEqual(grokSessionMove(db, gid, grok.id, undefined), [move[1], folder], 'and back');
+    fs.mkdirSync(folder, { recursive: true });
+    assert.throws(() => grokSessionMove(db, gid, grok.id, undefined), (e) => e instanceof HttpError && e.status === 409, 'the other account has it already');
+  }
+
+  removeAccount(db, grok.id, true);
+  removeAccount(db, claude.id, true);
+  assert.equal(fs.existsSync(dir), false, 'wiped with its account');
+  assert.ok(fs.existsSync(path.join(home, 'auth.json')), 'the default home is untouched');
+  if (was === undefined) delete process.env.GROK_HOME;
+  else process.env.GROK_HOME = was;
   fs.rmSync(scratch, { recursive: true, force: true });
 }
 

@@ -8,6 +8,12 @@ import type { SignatureCard } from './signatures.ts';
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
 export type Agent = 'claude' | 'codex' | 'acp';
 
+/**
+ * A program whose sign-ins the app manages as accounts (Settings → Agents → Accounts): Claude Code, Codex, and Grok Build
+ * (an ACP agent, the `grok` program: shared/grok.ts tells it apart).
+ */
+export type AccountAgent = 'claude' | 'codex' | 'grok';
+
 /** An ACP agent the app can start (Settings → More agents). */
 export interface AcpAgentDef {
   id: string;
@@ -103,7 +109,29 @@ export interface ApprovalRequest {
    * with the saved one's id alone), or where an agent would place one, to allow or deny.
    */
   signature?: SignatureCard;
+  /**
+   * The question a new session in a project with no wiki memory asks first (build it, then start the agent), and, once
+   * answered, the build's progress: answered by its own options (build, start, never, now, stop, retry).
+   */
+  memory?: MemoryAsk;
   createdAt: number;
+}
+
+/** What the card of "Build the project's memory first?" shows (server/wiki/ask.ts). */
+export interface MemoryAsk {
+  /** asking: the question; building: its progress, the agent not started yet; failed: the build ended before the essentials were read. */
+  state: 'asking' | 'building' | 'failed';
+  /** The project's id and name. */
+  project: string;
+  name: string;
+  /** What it will read: counts, and the files found (README.md, docs/…). */
+  counts: { sessions: number; commits: number; documents: number; notes: number; files: string[] };
+  /** About how many minutes until the agent starts, and what the helper model costs (priced: its dollars; else it uses the plan). */
+  minutes: number;
+  helper: { label: string; priced: boolean; usd?: number };
+  error?: string;
+  /** state failed: the agent could not be started for the message (it ended before it had one), not the build. */
+  startFailed?: true;
 }
 
 export type ToolCategory =
@@ -170,7 +198,7 @@ export type UserItem = BaseItem & {
   text: string;
   images?: number;
   /** queued: typed while the agent was busy; slash: a slash command; note: injected by the harness. */
-  meta?: 'queued' | 'slash' | 'note' | 'command-output';
+  meta?: 'queued' | 'slash' | 'note' | 'command-output' | 'held';
   /** Set when the text is a message delivered from another Claude session (on the user's behalf). */
   peer?: PeerFrom;
   /** The message opened with a conversation carried over from another agent's session; `text` is the request after it. */
@@ -317,6 +345,8 @@ export interface LiveState {
   cacheTtlMs?: number;
   /** The goal the agent is working towards, while one is set (`/goal`). */
   goal?: GoalInfo;
+  /** A new session in a project with no wiki memory first asks to build it (asking, failed: it needs you) and waits for it (building): the agent has not got its first message yet. */
+  memory?: 'asking' | 'building' | 'failed';
 }
 
 /** A session running in another client (VS Code, a terminal), detected on this machine. */
@@ -424,7 +454,7 @@ export interface PullRequestInfo {
 /** An account added for an agent, beside the CLI's own (Settings → Accounts). */
 export interface AgentAccount {
   id: string;
-  agent: Agent;
+  agent: AccountAgent;
   name: string;
 }
 
@@ -690,7 +720,7 @@ export interface LimitResetResult {
 }
 
 export interface AccountStatus {
-  agent: Agent;
+  agent: AccountAgent;
   loggedIn: boolean;
   email?: string;
   plan?: string;
@@ -701,7 +731,7 @@ export interface AccountStatus {
 
 export interface LoginFlow {
   id: string;
-  agent: Agent;
+  agent: AccountAgent;
   method: string;
   state: 'starting' | 'waiting' | 'verifying' | 'done' | 'failed' | 'cancelled';
   url?: string;

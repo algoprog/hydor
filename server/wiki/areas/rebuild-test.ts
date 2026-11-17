@@ -95,7 +95,9 @@ const tree = (rel: string): string =>
         .join('\n'),
     )
     .digest('hex');
-const rawBefore = tree('raw');
+let rawBefore = tree('raw');
+const rawList = () => fs.readdirSync(path.join(root, 'raw', 'articles')).sort();
+const rawListBefore = rawList();
 const outputBefore = tree('output');
 const oldWiki = Object.fromEntries(['wiki/crawl-scheduler.md', 'wiki/bm25.md', 'wiki/team-lunch.md'].map((p) => [p, read(p)]));
 
@@ -163,8 +165,11 @@ test('the estimate: the sources (an article that cites none counts), the calls, 
   const res = await call('POST', '/wiki/rebuild', {});
   assert.equal(res.statusCode, 200, res.body);
   const e = res.json();
-  assert.equal(e.sources, 5);
-  assert.equal(e.calls, 2 * 5 + 1 + 1 + 2, 'two a source, the proposal, one fit check, a hub for each of the two areas');
+  // The five kept sources, and the project's memory note, read fresh (the project's folder has no files, no commits, no conversations or documents).
+  assert.equal(e.sources, 6);
+  assert.deepEqual(e.reads, { kept: 5, files: [], notes: 1, commits: 0, commitSources: 0, documents: 0, sessions: 0 });
+  assert.ok(e.minutes >= 1 && e.workers >= 1);
+  assert.equal(e.calls, 2 * 6 + 1 + 1 + 2, 'two a source, the proposal, one fit check, a hub for each of the two areas');
   assert.equal(e.callsMax, e.calls + 2 * 7, 'at most two more for each article of the wiki now');
   assert.ok(e.chars > 100);
   assert.deepEqual([e.helper.model, e.helper.priced], ['auto', false]);
@@ -186,26 +191,31 @@ test('a rebuild: archived first; every source read again, none kept twice; what 
   assert.equal((await call('POST', '/wiki/update', {})).statusCode, 409);
   assert.equal((await call('POST', '/wiki/reorganise')).statusCode, 409);
   const running = (await call('GET', '/wiki/rebuild')).json();
-  assert.deepEqual([running.state, running.kind, running.phase, running.done, running.total], ['running', 'rebuild', 'sources', 0, 5]);
-  assert.match(updatesOf(db, space.id)[0].document, /^Rebuilding: 0 of 5 sources$/);
+  assert.deepEqual([running.state, running.kind, running.phase, running.done, running.total], ['running', 'rebuild', 'sources', 0, 6]);
+  assert.match(updatesOf(db, space.id)[0].document, /^Rebuilding: 0 of 6 sources$/);
   gate = null;
   open();
   await settled();
   const status = (await call('GET', '/wiki/rebuild')).json();
   assert.equal(status.state, 'done', JSON.stringify(status));
   assert.equal(status.kind, 'rebuild');
-  assert.deepEqual([status.done, status.total], [7, 7], 'the five sources, then the two earlier articles no new one covered');
-  assert.match(status.did[0], /^Rebuilt from 5 sources and 2 earlier articles no new one covered: 6 articles in 2 areas/);
+  assert.deepEqual([status.done, status.total], [8, 8], 'the six sources, then the two earlier articles no new one covered');
+  assert.match(status.did[0], /^Rebuilt from 6 sources and 2 earlier articles no new one covered: 6 articles in 2 areas/);
   assert.equal(status.archives.length, 1);
   assert.equal(status.archives[0].articles, 7, 'the old wiki: its articles, not its hubs or redirects');
   // The old wiki is archived whole; the sources and plans never moved; nothing kept twice; no memory note touched.
   const arch = path.join(root, '.history', 'rebuilds', fs.readdirSync(path.join(root, '.history', 'rebuilds'))[0]);
   for (const f of ['wiki/crawl-scheduler.md', 'wiki/areas/crawling.md', 'index.md', 'log.md', '.structure/areas.json']) assert.ok(fs.existsSync(path.join(arch, f)), f);
   assert.equal(fs.readFileSync(path.join(arch, 'wiki/bm25.md'), 'utf8'), oldWiki['wiki/bm25.md']);
-  assert.equal(tree('raw'), rawBefore, 'raw/ untouched: no source kept a second time');
+  // raw/ only gained what the rebuild makes fresh (the project's memory notes, kept as one source): none of its sources kept a second time.
+  const added = rawList().filter((f) => !rawListBefore.includes(f));
+  assert.equal(added.length, 2, 'one source, its note and its original');
+  assert.match(read(`raw/articles/${added.find((f) => f.endsWith('.md'))}`), /^source: "notes:Engine · \d{4}-\d\d-\d\d · 1 of 1"$/m);
+  assert.ok(rawListBefore.every((f) => rawList().includes(f)), 'no source went');
+  rawBefore = tree('raw');
   assert.equal(tree('output'), outputBefore, 'output/ untouched');
   assert.equal(noteCount(), notesBefore, 'memory notes untouched');
-  assert.equal(asked.filter((q) => q.system === PLAN_SYSTEM || q.system === PLAN_SYSTEM_CONVERSATION).length, 7);
+  assert.equal(asked.filter((q) => q.system === PLAN_SYSTEM || q.system === PLAN_SYSTEM_CONVERSATION).length, 8);
   assert.ok(asked.some((q) => q.system === PLAN_SYSTEM && q.prompt.includes('Document "Office plants"')), 'an earlier article no new one covered, read as a source');
   assert.ok(asked.some((q) => q.system === PLAN_SYSTEM_CONVERSATION && q.prompt.includes('Conversation "Fix the crawler memory"')), 'a conversation read as one');
   assert.ok(asked.find((q) => q.system === PROPOSE_SYSTEM)?.strong, 'the areas by the stronger model');
@@ -219,7 +229,7 @@ test('a rebuild: archived first; every source read again, none kept twice; what 
   );
   assert.ok(fs.existsSync(path.join(root, 'wiki/areas/ranking.md')));
   assert.match(read('index.md'), /<!-- articles:start -->/);
-  assert.match(read('log.md'), /rebuilt from 5 sources and 2 earlier articles no new one covered: 6 articles/);
+  assert.match(read('log.md'), /rebuilt from 6 sources and 2 earlier articles no new one covered: 6 articles/);
   // Old paths: to the new article holding what they said, else the index; an old redirect where its target went; an old hub to the new hub.
   const to = (p: string) => /^redirect: (\S+)$/m.exec(read(p))?.[1];
   assert.equal(to('wiki/crawl-scheduler.md'), 'wiki/crawl-scheduling.md');
@@ -236,7 +246,7 @@ test('a rebuild: archived first; every source read again, none kept twice; what 
   // One row in Recent updates for the whole of it.
   const rows = updatesOf(db, space.id).filter((u) => u.path.startsWith('rebuild:'));
   assert.equal(rows.length, 1);
-  assert.match(rows[0].document, /^Rebuilt from 5 sources and 2 earlier articles/);
+  assert.match(rows[0].document, /^Rebuilt from 6 sources and 2 earlier articles/);
   assert.equal(updatesOf(db, space.id).filter((u) => /^rebuild:(?:raw|wiki)\//.test(u.path)).length, 0, 'no row for each source');
 });
 

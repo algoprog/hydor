@@ -1,32 +1,22 @@
 // The Memory tab's Wiki part: the ⋯ menu beside its buttons (Update now, Rebuild from sources…, Restore the previous
-// wiki…), the dialogs they open, and the line that says what the wiki is doing at a person's request ("Rebuilding: 12
-// of 26 sources"). The status loads again every few seconds while something runs, and when the server says the wiki changed.
+// wiki…), and the dialogs they open. What the wiki is doing is WikiJobProgress's.
 import { useEffect, useRef, useState } from 'react';
-import { History, MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react';
+import { Hammer, History, MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react';
 import { Button, Dialog, IconButton, MenuItem, Popover, Throbber } from '../../components/ui';
 import { api, enc, post } from '../../lib/api';
 import { usd } from '../../lib/format';
 import { toast, toastError } from '../../lib/store';
 import { tr } from '../../i18n/runtime';
 import { LOCALE } from '../../i18n/locale';
-
-/** GET /api/projects/:id/wiki/rebuild. */
-export interface WikiJob {
-  state: 'idle' | 'running' | 'done' | 'failed';
-  kind?: 'rebuild' | 'update' | 'reorganise';
-  phase?: string;
-  done: number;
-  total: number;
-  startedAt?: number;
-  endedAt?: number;
-  error?: string;
-  did?: string[];
-  archives: { at: string; articles: number }[];
-}
+import type { BuildOffer as Offer, WikiJob } from './wikiJob';
 
 /** POST /api/projects/:id/wiki/rebuild without confirm. */
 interface Estimate {
   sources: number;
+  /** What it reads besides the sources the wiki kept: the project's files, notes, commits, and the documents and conversations the wiki never read. */
+  reads?: { kept: number; files: string[]; notes: number; commits: number; commitSources: number; documents: number; sessions: number };
+  minutes?: number;
+  workers?: number;
   calls: number;
   callsMax: number;
   chars: number;
@@ -34,64 +24,31 @@ interface Estimate {
   articles: number;
 }
 
-/** The wiki's job status, polled while one runs. */
-export function useWikiJob(id: string, active: boolean, version: number): [WikiJob | null, () => void] {
-  const [job, setJob] = useState<WikiJob | null>(null);
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let live = true;
-    api<WikiJob>(`/api/projects/${enc(id)}/wiki/rebuild`).then(
-      (r) => live && setJob(r),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [id, active, version, tick]);
-  useEffect(() => {
-    if (job?.state !== 'running') return;
-    const t = setTimeout(() => setTick((n) => n + 1), 3000);
-    return () => clearTimeout(t);
-  }, [job, tick]);
-  return [job, () => setTick((n) => n + 1)];
-}
-
-const PHASE: Record<string, string> = {
-  organise: 'Rebuilding: organising the areas',
-  hubs: 'Rebuilding: writing the hubs',
-  redirects: 'Rebuilding: pointing old paths to the new articles',
-  documents: 'Updating: reading waiting documents',
-  conversations: 'Updating: reading conversations',
-  commits: 'Updating: reading commits',
-  drift: 'Updating: checking articles against the code',
-  merges: 'Updating: doing queued merges',
-  areas: 'Updating: reorganising the areas',
-};
-
-/** What the wiki is doing, in a line: while it runs, and for a while after it ended (what it did, or why it stopped). */
-function progressLine(job: WikiJob | null): { text: string; running: boolean; failed?: boolean } | null {
-  if (!job || job.state === 'idle') return null;
-  if (job.state === 'running') {
-    if (job.kind === 'reorganise') return { text: tr('Reorganising the areas'), running: true };
-    if (job.kind === 'rebuild' && (!job.phase || job.phase === 'sources')) return { text: tr(`Rebuilding: ${job.done} of ${job.total} sources`), running: true };
-    if (job.kind === 'update' && job.phase === 'hubs') return { text: tr('Updating: writing the hubs'), running: true };
-    return { text: tr(PHASE[job.phase ?? ''] ?? (job.kind === 'rebuild' ? 'Rebuilding' : 'Updating')), running: true };
-  }
-  // A finished run is shown for half an hour.
-  if (!job.endedAt || Date.now() - job.endedAt > 30 * 60_000) return null;
-  if (job.state === 'failed') return { text: `${job.kind === 'rebuild' ? tr('The rebuild stopped') : job.kind === 'update' ? tr('The update stopped') : tr('The reorganisation stopped')}: ${job.error ?? ''}`, running: false, failed: true };
-  return { text: (job.did ?? []).join(' · '), running: false };
-}
-
 const when = (at: string) => new Date(at).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
 
-/** The ⋯ menu, its dialogs and the progress line. */
-export function WikiActions({ id, job, refresh }: { id: string; job: WikiJob | null; refresh: () => void }) {
+/** What a build or rebuild reads, as pills' words: "38 conversations, 412 commits, 9 documents, 14 notes, README.md, docs/". */
+function readsLine(c: { sessions: number; commits: number; documents: number; notes: number; files: string[] }): string {
+  const n = (k: number, one: string, many: string) => (k === 1 ? one : many);
+  return [
+    c.sessions ? n(c.sessions, tr('1 conversation'), tr(`${c.sessions.toLocaleString(LOCALE)} conversations`)) : '',
+    c.commits ? n(c.commits, tr('1 commit'), tr(`${c.commits.toLocaleString(LOCALE)} commits`)) : '',
+    c.documents ? n(c.documents, tr('1 document'), tr(`${c.documents.toLocaleString(LOCALE)} documents`)) : '',
+    c.notes ? n(c.notes, tr('1 note'), tr(`${c.notes.toLocaleString(LOCALE)} notes`)) : '',
+    c.files.length ? c.files.join(', ') : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+const minutesText = (m: number) => (m >= 90 ? tr(`about ${Math.round(m / 60)} h`) : tr(`about ${Math.max(1, m)} min`));
+
+/** The ⋯ menu and its dialogs. `fresh`: the wiki is new (fewer than 10 articles, no build from history run yet), so it can be built from the project's history; after that it is rebuilt. */
+export function WikiActions({ id, job, refresh, fresh }: { id: string; job: WikiJob | null; refresh: () => void; fresh?: boolean }) {
   const anchor = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState(false);
   const [rebuild, setRebuild] = useState(false);
   const [restore, setRestore] = useState(false);
+  const [build, setBuild] = useState(false);
   const running = job?.state === 'running';
   const update = async () => {
     setMenu(false);
@@ -112,16 +69,29 @@ export function WikiActions({ id, job, refresh }: { id: string; job: WikiJob | n
         <MenuItem icon={<RefreshCw size={15} />} disabled={running} onClick={() => void update()}>
           Update now
         </MenuItem>
-        <MenuItem
-          icon={<History size={15} />}
-          disabled={running}
-          onClick={() => {
-            setMenu(false);
-            setRebuild(true);
-          }}
-        >
-          Rebuild from sources…
-        </MenuItem>
+        {fresh ? (
+          <MenuItem
+            icon={<Hammer size={15} />}
+            disabled={running}
+            onClick={() => {
+              setMenu(false);
+              setBuild(true);
+            }}
+          >
+            Build from history…
+          </MenuItem>
+        ) : (
+          <MenuItem
+            icon={<History size={15} />}
+            disabled={running}
+            onClick={() => {
+              setMenu(false);
+              setRebuild(true);
+            }}
+          >
+            Rebuild from sources…
+          </MenuItem>
+        )}
         {!!job?.archives.length && (
           <MenuItem
             icon={<RotateCcw size={15} />}
@@ -135,21 +105,95 @@ export function WikiActions({ id, job, refresh }: { id: string; job: WikiJob | n
           </MenuItem>
         )}
       </Popover>
+      {build && <BuildDialog id={id} onClose={() => setBuild(false)} onStarted={refresh} />}
       {rebuild && <RebuildDialog id={id} onClose={() => setRebuild(false)} onStarted={refresh} />}
       {restore && job && <RestoreDialog id={id} archives={job.archives} onClose={() => setRestore(false)} onDone={refresh} />}
     </>
   );
 }
 
-/** The line under the buttons: what the wiki is doing. */
-export function WikiProgress({ job }: { job: WikiJob | null }) {
-  const line = progressLine(job);
-  if (!line) return null;
+/**
+ * A new wiki's way in (fewer than 10 articles, no build from history run yet, whatever it holds): when the project has something to
+ * build its wiki from, a line saying what, and Build from history… (the same dialog as the ⋯ menu's). Nothing when there is nothing to
+ * read, or while a job runs.
+ */
+export function BuildFromHistoryPrompt({ id, offer, job, onStarted }: { id: string; offer: Offer | null; job: WikiJob | null; onStarted: () => void }) {
+  const [open, setOpen] = useState(false);
+  if (!offer?.worth || !offer.fresh || job?.state === 'running') return null;
   return (
-    <p role="status" className={`flex items-center gap-2 text-[12.5px] leading-snug ${line.failed ? 'text-err' : 'text-fg-3'}`}>
-      {line.running && <Throbber size={13} />}
-      <span translate={line.running ? undefined : 'no'}>{line.text}</span>
-    </p>
+    <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel px-3 py-2.5 min-[480px]:flex-row min-[480px]:items-center">
+      <p className="min-w-0 flex-1 text-[13px] leading-snug text-fg-2">{tr(`It can be built now from what the project already has: ${readsLine(offer.counts)}.`)}</p>
+      <Button variant="primary" size="sm" className="min-h-11 w-full min-[480px]:min-h-0 min-[480px]:w-auto" onClick={() => setOpen(true)}>
+        Build from history…
+      </Button>
+      {open && <BuildDialog id={id} onClose={() => setOpen(false)} onStarted={onStarted} />}
+    </div>
+  );
+}
+
+/** What a job costs, in words: the Claude plan on Automatic, else the price when the app has one. */
+function costLine(h: { model?: string; label: string; priced: boolean; usd?: number; usdMax?: number }): string {
+  if (h.model === 'auto' || (h.model === undefined && h.label === 'Automatic' && !h.priced)) return tr('It uses your Claude plan.');
+  if (!h.priced) return tr(`${h.label} has no price in the app: its cost is not known.`);
+  return h.usdMax != null && h.usdMax > (h.usd ?? 0) ? tr(`About ${usd(h.usd ?? 0)}, at most ${usd(h.usdMax)}, with ${h.label}.`) : tr(`About ${usd(h.usd ?? 0)} with ${h.label}.`);
+}
+
+function BuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => void; onStarted: () => void }) {
+  const [offer, setOffer] = useState<Offer | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api<Offer>(`/api/projects/${enc(id)}/wiki/build`).then(setOffer, (e) => setError((e as Error).message));
+  }, [id]);
+  const start = async () => {
+    setBusy(true);
+    try {
+      await post(`/api/projects/${enc(id)}/wiki/build`, { confirm: true });
+      toast(tr('Building memory from the project’s history'));
+      onStarted();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={tr('Build from history')}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => void start()} disabled={!offer || busy || !offer.worth || !offer.fresh}>
+            Build
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3 text-[13.5px] leading-relaxed">
+        <p>Hydor reads what this project has that its wiki has not read: its files, memory notes, conversations, commit messages and documents. It reads what matters most first and the rest after, several at a time, and then organises the articles into areas. You can stop it and continue later, and keep working meanwhile.</p>
+        {!offer && !error && <Throbber />}
+        {offer && !offer.worth && <p className="text-fg-3">There is nothing to read yet.</p>}
+        {offer && offer.worth && (
+          <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
+            <div translate="no" className="font-medium">
+              {readsLine(offer.counts)}
+            </div>
+            <div className="text-fg-3">{tr(`${minutesText(offer.minutesEssentials)} for what matters most, ${minutesText(offer.minutesAll)} in all.`)}</div>
+            <div className="text-fg-3">{costLine({ ...offer.helper, model: offer.helper.label === 'Automatic' ? 'auto' : undefined })}</div>
+          </div>
+        )}
+        {error && (
+          <p role="alert" translate="no" className="text-err">
+            {error}
+          </p>
+        )}
+      </div>
+    </Dialog>
   );
 }
 
@@ -173,15 +217,7 @@ function RebuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => 
       setBusy(false);
     }
   };
-  const cost = estimate
-    ? estimate.helper.model === 'auto'
-      ? tr('Automatic uses your Claude account’s usage: Claude Haiku, and Sonnet for the areas.')
-      : estimate.helper.priced
-        ? estimate.helper.usdMax != null && estimate.helper.usdMax > (estimate.helper.usd ?? 0)
-          ? tr(`About ${usd(estimate.helper.usd ?? 0)}, at most ${usd(estimate.helper.usdMax)}, with ${estimate.helper.label}.`)
-          : tr(`About ${usd(estimate.helper.usd ?? 0)} with ${estimate.helper.label}.`)
-        : tr(`${estimate.helper.label} has no price in the app: its cost is not known.`)
-    : '';
+  const cost = estimate ? (estimate.helper.model === 'auto' ? tr('Automatic uses your Claude account’s usage: Claude Haiku, and Sonnet for the areas.') : costLine(estimate.helper)) : '';
   return (
     <Dialog
       open
@@ -199,15 +235,20 @@ function RebuildDialog({ id, onClose, onStarted }: { id: string; onClose: () => 
       }
     >
       <div className="space-y-3 text-[13.5px] leading-relaxed">
-        <p>Hydor reads every source this wiki was built from again (the text of its documents, conversations, commit messages and notes moved from memory) and writes its articles, areas and hubs anew. The sources, plans and memory notes stay as they are.</p>
+        <p>Hydor reads every source this wiki was built from again (the text of its documents, conversations, commit messages and notes moved from memory), and what the wiki never read: the project's files, its commit history, its memory notes, and the documents and conversations it has not read yet. It writes the articles, areas and hubs anew. The sources, plans and memory notes stay as they are.</p>
         <p>The current wiki is archived first, and you can put it back with Restore the previous wiki (the last three are kept, and the wiki as it was before its first rebuild). Paths of articles that are gone lead to the new articles that hold what they said.</p>
         {!estimate && !error && <Throbber />}
         {estimate && (
           <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
             <div className="font-medium">{tr(`${estimate.sources} sources · about ${estimate.calls} helper calls · ${Math.round(estimate.chars / 1000)}k characters to read`)}</div>
+            {estimate.reads && (
+              <div translate="no" className="text-fg-3">
+                {readsLine({ sessions: estimate.reads.sessions, commits: estimate.reads.commits, documents: estimate.reads.documents, notes: estimate.reads.notes, files: estimate.reads.files })}
+              </div>
+            )}
             {estimate.callsMax > estimate.calls && <div className="text-fg-3">{tr(`Up to ${estimate.callsMax} calls if earlier articles that no new one covers must be read again.`)}</div>}
             <div className="text-fg-3">{cost}</div>
-            <div className="text-fg-3">{tr('One source at a time, at most 60 an hour: a big wiki takes hours. You can keep working meanwhile.')}</div>
+            <div className="text-fg-3">{estimate.minutes ? tr(`${minutesText(estimate.minutes)}, ${estimate.workers ?? 1} at a time. You can keep working meanwhile.`) : tr('You can keep working meanwhile.')}</div>
           </div>
         )}
         {error && (

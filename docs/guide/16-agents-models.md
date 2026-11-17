@@ -1,6 +1,6 @@
 # Agents, accounts and models
 
-Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI, OpenCode, Qwen Code or Goose. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
+Hydor runs several AI agents: Claude Code, Codex, Custom (the app's own agent, for any model) and other agents that speak ACP, such as Gemini CLI, OpenCode, Qwen Code, Goose or Grok Build. This topic explains how they differ, how their programs install and stay current, how to sign them in (more than one account too), and where Custom's models come from: OpenRouter, Ollama, Hugging Face models run on this computer, or any OpenAI-compatible endpoint.
 
 ![Picking the agent on the start page: Claude Code, Codex or Custom](images/agents-models.webp)
 
@@ -11,15 +11,15 @@ An agent is the program that does the work in a session: it reads your message, 
 - **Claude Code** (Anthropic). Runs on your Claude plan, or bills an Anthropic API account. Its models are Anthropic's (Opus, Sonnet, Haiku). It has its own usage limits, which the [Usage page](/usage) shows.
 - **Codex** (OpenAI). Runs on your ChatGPT plan. Its models are OpenAI's. It has usage limits too, shown on the Usage page. Codex comes with the app.
 - **Custom**, the app's own agent. It runs any model you add in [Settings → Agents → Models](/settings?s=models): models through OpenRouter, models on this computer (with Ollama or vLLM), or any OpenAI-compatible endpoint. Use it for open models, cheaper models, or models that never leave your computer. See [Custom, the app's own agent](/guide/custom).
-- **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and others, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once in its own program and uses its own models.
+- **Agents that speak ACP**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build (xAI's coding agent, with its Grok models) and others, or a command of your own. ACP (the Agent Client Protocol) is a common way for an app to talk to an agent program. Each signs in once in its own program and uses its own models.
 
 What each can do in the app:
 
 - Goals (the agent keeps working until a condition holds) and forks (a copy of the session from an earlier reply): Claude Code, Codex and Custom. Not the other ACP agents.
 - **Continue in…** (hand the conversation to another agent): from Claude Code or Codex, to the other one or to Custom.
 - Effort (how hard the model thinks): Claude Code and Codex, for models that offer it.
-- More than one account: Claude Code and Codex.
-- Plan usage limits and limit resets: Claude Code and Codex.
+- More than one account: Claude Code, Codex and Grok Build.
+- Plan usage limits and limit resets: Claude Code and Codex. (Grok Build has no usage meters here yet.)
 
 ## Pick the agent and model for a new session
 
@@ -65,11 +65,11 @@ Two switches in the **Tiers in sessions** group under the tiers say how sessions
 
 ## Agent programs install and update themselves
 
-Claude Code, Codex, Gemini CLI and the others are programs on this computer. You don't have to install them by hand.
+Claude Code, Codex, Gemini CLI, Grok Build and the others are programs on this computer. You don't have to install them by hand.
 
-Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and look at the **Agent programs** group. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie and the agents that need an ACP adapter, each with the version the sessions run and where it comes from:
+Open [Settings → Agents → Accounts](/settings?s=accounts&find=Agent%20programs) and look at the **Agent programs** group. It lists Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build (once you have added it) and the agents that need an ACP adapter, each with the version the sessions run and where it comes from:
 
-- **your own install**: you installed it yourself.
+- **your own install**: you installed it yourself (for Grok Build, also with xAI's own installer, which puts it in `~/.grok/bin`).
 - **installed by the app**: the app installed it in its own folder.
 - **comes with the app**: Codex ships with the app.
 - **Not here: installs by itself when first used**: missing. Click **Install** to get it now.
@@ -85,8 +85,8 @@ Goose, Kimi CLI and some other agents aren't in this list: install them yourself
 With [**Update automatically**](/settings?s=accounts&find=Update%20automatically) on, the last row of **Agent programs** (it is on unless you turn it off), the app brings each agent program up to its newest version once a day. The first run comes about ten minutes after the app starts.
 
 - The copies the app installed update with npm, in its own folder. Codex switches to a copy newer than the one the app came with.
-- Your own installs update with their own updater: `claude update` for Claude Code, `codex update` for Codex (the one your terminal runs), `opencode upgrade` for OpenCode.
-- Gemini CLI, Qwen Code, Auggie or an agent with an ACP adapter that you installed with `npm install -g` update with npm, when your user may write to that folder. Anything installed another way is left for you to update the way you installed it.
+- Your own installs update with their own updater: `claude update` for Claude Code, `codex update` for Codex (the one your terminal runs), `opencode upgrade` for OpenCode, `grok update` for Grok Build.
+- Gemini CLI, Qwen Code, Auggie, Grok Build or an agent with an ACP adapter that you installed with `npm install -g` update with npm, when your user may write to that folder. Anything installed another way is left for you to update the way you installed it.
 - Claude Code follows its own release line: the stable one when its settings say `"autoUpdatesChannel": "stable"`, else the latest.
 - If you turned Claude Code's own updates off with `DISABLE_AUTOUPDATER=1` (the Docker image does), the app doesn't update your Claude Code by itself either. **Update now** still does.
 
@@ -100,9 +100,9 @@ Under that row, it says when the app last looked, like "Up to date · checked 2h
 
 Sessions that are running carry on with the version they started with; new sessions use the new one. With **Update automatically** off, the app still looks once a day and shows what is out, but installs nothing until you click **Update now**.
 
-## Sign Claude Code and Codex in
+## Sign Claude Code, Codex and Grok Build in
 
-Claude Code and Codex need a sign-in before they can work. Open [Settings → Agents → Accounts](/settings?s=accounts) (on a phone, Settings is a list of sections: tap **Accounts** under Agents; the title at the top takes you back). The **Accounts** group (its (i) says these are the sign-ins your sessions use, and that you can add another subscription, a work and a personal one say, and pick one when you start a session) lists each agent's own sign-in first, then any accounts you added for it. Each shows a green check with the email, plan and sign-in method, or a red cross with "Not signed in" or what went wrong.
+Claude Code and Codex need a sign-in before they can work, and so does Grok Build once you have added it (see [Add Gemini CLI, OpenCode and other ACP agents](#add-gemini-cli-opencode-and-other-acp-agents)). Open [Settings → Agents → Accounts](/settings?s=accounts) (on a phone, Settings is a list of sections: tap **Accounts** under Agents; the title at the top takes you back). The **Accounts** group (its (i) says these are the Claude Code, Codex and Grok Build sign-ins your sessions use, and that you can add another subscription, a work and a personal one say, and pick one when you start a session) lists each agent's own sign-in first, then any accounts you added for it. Grok Build's own sign-in has a row there too, **Grok Build**, which shows once it is added. Each shows a green check with the email, plan and sign-in method, or a red cross with "Not signed in" or what went wrong.
 
 To sign in:
 
@@ -110,28 +110,34 @@ To sign in:
 2. Pick how:
    - Claude Code: **Claude subscription** (your Claude plan) or **Console (API billing)** (an Anthropic API account).
    - Codex: **Device code** or **Browser redirect**.
+   - Grok Build: nothing to pick, it always signs in with a code.
 3. Click **Get sign-in link**.
 4. Follow the steps the dialog shows:
    - Claude Code: open the link (**Open sign-in page**), approve access in your browser, then paste the code the page shows into **Paste the code from the page** and click **Finish sign-in**.
    - Codex, Device code: open the link on any device, sign in to ChatGPT and enter the one-time code shown in the dialog. The dialog notices by itself when you are done.
    - Codex, Browser redirect: after you sign in, your browser tries to open a "localhost" page and fails. Copy that page's address, paste it into **Paste the localhost address from your browser** and click **Finish sign-in**.
+   - Grok Build: you get a link and a one-time code. Open the link on any device, sign in with your Grok account and confirm the code (**2. Confirm this code**). Nothing is pasted back: the dialog notices by itself when you are done.
 
-When it works you see "Claude Code is signed in" (or Codex). If it fails, the dialog says why; click **Try again**.
+When it works you see "Claude Code is signed in" (or Codex, or Grok Build). If it fails, the dialog says why; click **Try again**.
 
-Once signed in, the button reads **Switch account**: it starts the same sign-in for another account. **Sign out** is in the row's **⋯** menu: it signs the program out on this computer, for every terminal and editor that uses it, after you confirm.
+Once signed in, the button reads **Switch account**: it starts the same sign-in for another account (for Grok Build, a new code). **Sign out** is in the row's **⋯** menu: it signs the program out on this computer, for every terminal and editor that uses it, after you confirm.
+
+If you start a Grok Build session while it is signed out, the session stops with "Grok Build is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again." Sign in there and send your message again. An xAI API key in `XAI_API_KEY`, in the agents' environment, works for Grok Build instead of a subscription.
 
 The welcome tour (from **Help** in the sidebar) asks which agents and models you want to use and walks you through these sign-ins too.
 
 ## Add a second account (work and personal)
 
-You can sign in more than one Claude Code or Codex account, for example a work plan and a personal plan, and pick one per session.
+You can sign in more than one Claude Code, Codex or Grok Build account, for example a work plan and a personal plan, and pick one per session.
 
 1. Open [Settings → Agents → Accounts](/settings?s=accounts&find=Accounts).
 2. Click **Add an account**, beside the title of the **Accounts** group.
-3. Choose **Claude Code** or **Codex**, type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
+3. Choose **Claude Code**, **Codex** or **Grok Build** (it is offered once Grok Build is set up), type a name (up to 40 characters, like "Work" or "Personal") and click **Add and sign in**.
 4. The sign-in dialog opens for the new account. Sign in as described above.
 
 Each added account signs in on its own and keeps its own session history. Your settings, instructions, skills and plugins are shared with the agent's main sign-in, so changes apply to both. For Claude Code, a folder you trusted with the main sign-in is trusted with an added account too, so the folder's own permission rules apply in its sessions. Two accounts of the same agent can't have the same name.
+
+An added Grok Build account has a folder of its own with its sign-in and Grok's own session history. It shares the Grok CLI's own settings with your main sign-in: its config, rules (`AGENTS.md`), skills, plugins and MCP sign-ins.
 
 Each added account has its own row, under the agent's own sign-in, with **Sign in** or **Switch account**; its **⋯** menu has **Sign out**, **Rename** and **Remove**:
 
@@ -139,17 +145,19 @@ Each added account has its own row, under the agent's own sign-in, with **Sign i
 - **Sign out** stops the sessions that run as this account from working until it signs in again.
 - **Remove** takes the account out of the app. Its sessions leave the list, but their history stays on disk, unless you also tick **Also delete its sign-in and the history of its sessions**. You can't remove an account while sessions are running as it: stop them first.
 
-The [Usage page](/usage) shows a card for every added account, with its own limits.
+The [Usage page](/usage) shows a card for every added Claude Code or Codex account, with its own limits. Grok Build has no usage meters yet.
 
 ## Pick the account a session runs as
 
-When the agent you picked has added accounts, the start page's **Options** shows an **Account** row. Click it:
+When the agent you picked has added accounts (for Grok Build, once you added one), the start page's **Options** shows an **Account** row. Click it:
 
-- **Your sign-in** is the program's own account (the first one for that agent in **Accounts**).
+- **Your sign-in** is the program's own account (the first one for that agent in **Accounts**; for Grok Build, "The Grok Build CLI's own account").
 - Each added account is listed by name.
 - **Manage accounts** opens Settings → Agents → Accounts.
 
-The start page remembers your choice for that agent, the same in every place. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below).
+The start page remembers your choice for that agent, the same in every place. A session running as an added account shows that account's name, with a person icon, at the top of the session. If that account hits a usage limit, the limit notice above the message box is about that account. The account is set when the session starts. It changes by itself only with **Switch accounts at a limit** (below, Claude Code and Codex only).
+
+To move a session to another account yourself, click the session's own **Account** chip and pick one. This works for Claude Code, Codex and Grok Build sessions, and takes effect from your next message. A Grok Build session's Grok history moves with it; if Grok can't reopen it under the other account, it starts afresh there, with a note.
 
 ## Use all your accounts: switch at a limit
 
@@ -158,7 +166,7 @@ With two or more accounts for the same agent, the app can use them all: when one
 - When a turn stops because the session's account hit its usage limit, the app picks another signed-in account of the same agent that still has usage (the least used one), moves the session there with all its history, and sends "… reached its usage limit, so this session now runs on …. Continue where you left off." A note at the top of the app says which account it moved to.
 - The subagents a Claude Code session runs in the background carry on too. Those still working when the limit hits stop at their next step with their work kept, and the app waits for them (two minutes at most) before it moves the session. The message then names them, and the agent continues each one where it stopped. If only the subagents hit a limit (one for their model alone), the session moves once its turn has ended and none of them is still working.
 - Hydor subagents (the sessions an agent starts to do part of its work) are sessions of their own, so each one moves by itself when a limit stops its turn. The agent that started it hears that it carries on, not that it failed, and gets its reply when it finishes.
-- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex.
+- Your main sign-in and each added account all count. Claude Code accounts take over from Claude Code accounts, Codex from Codex. Grok Build accounts don't switch at a limit yet.
 - A Codex goal moves with the session and keeps going.
 - When every account is at its limit, nothing moves (unless **Use API credit at a limit** is on, below). With **Resume after usage limits** on, the session continues when the first account resets, on that account. More in [Usage, limits and costs](/guide/usage#continue-sessions-automatically-after-a-limit).
 - A new session started on an account that is at its limit starts on one with usage left instead, and a message you send to a session whose account is at its limit moves the session first, so the message isn't turned away. With your message, the agent learns that it now runs on an account with usage left, so it doesn't wait for the old account's reset, and which of its subagents can go on.
@@ -187,17 +195,23 @@ What happens then:
 Open [Settings → Agents → More agents](/settings?s=agents&find=Agents%20that%20speak%20ACP).
 
 - **Your agents** (they show next to Claude Code and Codex when you start a session) lists Custom first, then the agents you added. Each shows a check when its program is installed here, or a cross and "not installed".
-- **Agents that speak ACP** (install one, sign in once in its own CLI, then add it here) lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie and others. The installed ones come first. A row that says "Not installed" says how to get it. The list shows the first few that are not installed; **Show all** shows the rest.
+- **Agents that speak ACP** (install one, sign in once in its own CLI, then add it here) lists the known ones you haven't added yet: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI, Auggie, Grok Build and others. The installed ones come first. A row that says "Not installed" says how to get it. The list shows the first few that are not installed; **Show all** shows the rest.
 
 To add one:
 
 1. Click **Add** at the end of its row. The button stands out when the program is already installed.
-2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie and the agents that need an ACP adapter), it installs it now, in the background. Goose, Kimi CLI and the others you install yourself, with the command or address in their row.
+2. If the app knows how to install it (Gemini CLI, OpenCode, Qwen Code, Auggie, Grok Build and the agents that need an ACP adapter), it installs it now, in the background. Goose, Kimi CLI and the others you install yourself, with the command or address in their row.
 3. Sign in once in the agent's own program: open the [Terminal](/terminal), run its command (for example `gemini`) and follow its sign-in. If you skip this, a session tells you: "Gemini CLI is not signed in. Run gemini once in a terminal and sign in there, then try again."
 
 The agent now shows in the start page's **Runs on** list.
 
 To change an added agent, click **Edit**. To take it out, open its **⋯** menu, choose **Remove** and confirm: its sessions stay listed, but continuing them needs the agent set up again. Custom is built in: its row says "Built in: models from OpenRouter, Ollama and vLLM, in Settings → Models" and has a **Models** button instead of Edit and Remove.
+
+### Grok Build
+
+**Grok Build** is xAI's coding agent (the `grok` program). Click **Add** in its row, and that is all: the app installs it from npm (`@xai-official/grok`) the first time it is needed, or uses one that is already here, including one from xAI's own installer in `~/.grok/bin`. It then shows under **Agent programs** and is kept up to date with the others. Hydor runs it over ACP, with the app's own tools, approval cards and Grok's models.
+
+It signs in differently from the other ACP agents: not in the Terminal, but under [Settings → Agents → Accounts](/settings?s=accounts), where a **Grok Build** row appears as soon as it is added (see [Sign Claude Code, Codex and Grok Build in](#sign-claude-code-codex-and-grok-build-in)). You can add more Grok accounts there too.
 
 ### Add an agent of your own
 
@@ -228,7 +242,7 @@ Some agents in the list are programs you set up yourself, and a few things diffe
 The app opens a session in the folder you pick, shows the agent's messages and steps, and asks you whenever the agent asks for permission. Some things work differently from Claude Code and Codex:
 
 - It takes one message at a time. A message you send while it works waits in the queue above the message box and goes out when the turn ends. (Custom works this way too.)
-- An agent that can't reopen earlier sessions starts afresh when you continue an old one, without the conversation above it. The session says so.
+- An agent that can't reopen earlier sessions starts afresh when you continue an old one, without the conversation above it. The session says so. The same happens when an agent could reopen a session before but can no longer: it carries on afresh, with a note, instead of failing.
 - Pictures you attach reach it only if it accepts images.
 - Goals, forks and hand-offs aren't available (Custom has goals and forks).
 - The app's tools (pages, search, memory…) reach an agent as an MCP server: by address when the agent accepts that, otherwise through a small program the app starts for it. An agent that takes none of them works with its own tools alone, but still gets the guidelines, memory notes and skills.
@@ -408,6 +422,8 @@ A [Hugging Face token](/settings?s=models&find=Hugging%20Face%20token) lets the 
 - "Which agent programs are installed here? Install Gemini CLI."
 - "Are Claude Code and Codex up to date? Update them now."
 - "Add OpenCode to my agents."
+- "Add Grok Build to my agents and sign it in with my Grok subscription."
+- "Add a second Grok account for work, and start my next session on it."
 - "Add Gemini CLI and Goose to my agents, and tell me what I still have to install."
 - "Find a model on Hugging Face that runs well on this computer and sees images, check it, and install the best size."
 - "Add the newest DeepSeek model from OpenRouter to my models." (once your OpenRouter key is set)

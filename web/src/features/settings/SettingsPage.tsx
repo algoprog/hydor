@@ -64,8 +64,8 @@ const GROUPS: { label: string; items: SectionDef[] }[] = [
   {
     label: 'Agents',
     items: [
-      { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code and Codex sign-ins every session uses' },
-      { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, OpenCode, Qwen Code, Goose and other agents that speak ACP' },
+      { id: 'accounts', label: 'Accounts', icon: UserRound, sub: 'The Claude Code, Codex and Grok Build sign-ins every session uses' },
+      { id: 'agents', label: 'More agents', icon: Bot, sub: 'Gemini CLI, Grok Build, OpenCode, Goose and other agents that speak ACP' },
       { id: 'models', label: 'Models', icon: Cpu, sub: 'Models for Custom, the app’s own agent: OpenRouter, Ollama, and Hugging Face models run here with vLLM' },
       { id: 'guidelines', label: 'Agent Guidelines', icon: ScrollText, sub: 'What every agent follows: in every session, in a project, or in one session' },
       { id: 'mcp', label: 'MCP servers', icon: Plug, sub: 'Tools the agents can call', folder: true },
