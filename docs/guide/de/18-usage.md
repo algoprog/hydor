@@ -10,7 +10,7 @@ Claude Code und Codex nutzen Abonnements mit Nutzungslimits. Gleichzeitig lässt
 
 Die [Nutzungsseite](/usage) hat drei Tabs:
 
-- **Limits** (`/usage`): verbleibendes Kontingent und nächste Zurücksetzung.
+- **Grenzen** (`/usage`): verbleibendes Kontingent und nächste Zurücksetzung.
 - **Aktivität** (`/stats`): geänderte Zeilen, Token und Sitzungen im Zeitverlauf.
 - **Arena** (`/arena`): welche Modelle bei deinen eigenen Aufgaben gewinnen.
 
@@ -18,7 +18,7 @@ Die App aktualisiert den Verbrauch beim Öffnen der Seite und danach alle fünf 
 
 ## Die Limits eines Abos verstehen
 
-Der Tab **Limits** zeigt Karten für Claude Code, Codex und jedes Konto, das du unter [Einstellungen → Agenten → Konten](/settings?s=accounts) hinzugefügt hast. Auf breiten Bildschirmen stehen zwei Karten nebeneinander, auf Smartphones untereinander.
+Der Tab **Grenzen** zeigt Karten für Claude Code, Codex und jedes Konto, das du unter [Einstellungen → Agenten → Konten](/settings?s=accounts) hinzugefügt hast. Auf breiten Bildschirmen stehen zwei Karten nebeneinander, auf Smartphones untereinander.
 
 Jede Karte zeigt E-Mail-Adresse und Tarif des Kontos, das Alter der angezeigten Werte und eine Zeile pro Limit. Ein Limit begrenzt die Nutzung innerhalb eines Zeitfensters:
 
@@ -46,8 +46,6 @@ Bei Problemen erscheint ein entsprechender Hinweis:
 
 Ist das Kontingent eines Abos aufgebraucht, endet der laufende Agentendurchlauf. Ein Hinweis nennt das Konto, das betroffene Limit und den Zeitpunkt der Zurücksetzung. Bei einem einzelnen Konto heißt es beispielsweise „Du hast das Nutzungslimit von Claude Code erreicht“, entsprechend auch für Codex. Sind alle Konten eines Agenten ausgeschöpft, erscheint „Alle deine Claude-Code-Konten haben ihr Nutzungslimit erreicht“. Hat ein anderes Konto noch Kontingent, wird das betroffene Konto namentlich genannt, etwa „Arbeit hat sein Nutzungslimit erreicht“.
 
-Der Hinweis erscheint:
-
 - auf der Startseite über dem Nachrichtenfeld, passend zum ausgewählten Agenten und Konto;
 - in der Sitzung über dem Nachrichtenfeld;
 - auf der Karte des Abos unter Nutzung.
@@ -61,26 +59,22 @@ Ist das Limit bereits aufgehoben, die automatische Fortsetzung aber noch aussteh
 
 ## Sitzungen nach einem Limit automatisch fortsetzen
 
-Öffne [Einstellungen → App → Allgemein](/settings?s=general&find=Resume%20after%20usage%20limits) und aktiviere **Nach Nutzungslimits fortsetzen**, damit jede durch ein Limit unterbrochene Sitzung automatisch weiterläuft. Die Fortsetzung erfolgt eine Minute nach der Zurücksetzung. Die Funktion ist zunächst deaktiviert und arbeitet auch ohne geöffneten Browser.
+Damit jede Sitzung, die ein Limit erreicht, von selbst weiterläuft, öffne [Einstellungen → App → Allgemein](/settings?s=general&find=Resume%20after%20usage%20limits) und aktiviere **Nach dem Zurücksetzen von Nutzungslimits fortsetzen** (wenn ein Durchgang endet, weil die Nutzung eines Abos aufgebraucht ist, läuft die Sitzung eine Minute nach dem Zurücksetzen des Limits von selbst weiter). Die Funktion ist ausgeschaltet, bis du sie einschaltest. Sie arbeitet auch, wenn kein Browser geöffnet ist. Ist sie an, zeigt eine Sitzung keine Warnung, wenn ein Limit sie stoppt: Eine Zeile über dem Nachrichtenfeld nennt, wessen Limit erreicht wurde (wie die Benachrichtigung), welches Limit und „Wird automatisch fortgesetzt in …“, mit **Reset verwenden**, wenn das Konto einen hat, und **Abbrechen**.
 
-Bei aktivierter Funktion zeigt die Sitzung keine Warnbox, sondern eine Zeile über dem Nachrichtenfeld: betroffenes Konto und Limit sowie „Wird automatisch fortgesetzt in …“. Falls vorhanden, erscheinen **Reset verwenden** und **Abbrechen**.
-
-Für diese Einstellung und **Nach Zurücksetzung fortsetzen** gilt:
+So funktioniert das Timing, mit dem Schalter oder mit **Beim Zurücksetzen fortsetzen**:
 
 - Der geplante Zeitpunkt liegt eine Minute nach der zuletzt vom Anbieter gemeldeten Zurücksetzung. Während der Wartezeit fragt die App den Verbrauch regelmäßig ab, kurz vor Ablauf häufiger. Verschiebt der Anbieter den Termin, passt die App ihn an.
 - Wird das Limit früher aufgehoben, etwa durch einen Reset oder die Anmeldung mit einem anderen Konto, läuft die Sitzung sofort weiter. Wurde sie innerhalb der letzten 15 Minuten bereits vorzeitig fortgesetzt und erneut gestoppt, wartet sie stattdessen auf die reguläre Zurücksetzung.
-- Nur tatsächlich durch das Limit gestoppte Durchläufe werden fortgesetzt. Ein normal beendeter Durchlauf bei genau 100 % Verbrauch zählt nicht dazu. Eine geplante Fortsetzung entfällt, sobald du eine Nachricht sendest, **Stoppen** drückst oder ein Durchlauf regulär abgeschlossen wird. Ein selbst gestarteter Durchlauf während der Wartezeit, etwa wenn eine Hintergrundaufgabe oder ein Unteragent am selben Limit stoppt, hebt die Planung nicht auf. Eine von dir gestoppte Sitzung wird niemals automatisch fortgesetzt, bis du ihr erneut schreibst – auch wenn zuvor bereits der Limitfehler aufgetreten war.
+- Fortgesetzt wird nur ein Durchgang, den das Limit wirklich gestoppt hat, nicht einer, der gerade fertig wurde, als die Nutzung des Abos 100 % erreichte. Eine geplante Fortsetzung entfällt, wenn die Sitzung ohne sie weitergeht: Du sendest eine Nachricht oder drückst **Stoppen**, oder ein Durchgang läuft normal durch. Ein Durchgang, den der Agent während des Wartens von selbst startet (wenn eine eigene Hintergrundaufgabe oder ein eigener Subagent am selben Limit stoppt), lässt sie nicht entfallen. Eine Sitzung, die du mit **Stoppen** angehalten hast, wird nie von selbst fortgesetzt, auch wenn der Fehler des Limits zuerst kam, bis du ihr eine Nachricht sendest.
 - **Abbrechen** im Hinweis hebt die geplante Fortsetzung auf.
 
 Bei mehreren Konten setzt [**Bei einem Limit das Konto wechseln**](/settings?s=accounts&find=Switch%20accounts%20at%20a%20limit) die Sitzung sofort mit einem anderen Konto fort. Gewartet wird erst, wenn alle Konten ausgeschöpft sind; siehe [Agenten, Konten und Modelle](/guide/agents-models#use-all-your-accounts-switch-at-a-limit). Für Claude Code kann [**Bei einem Limit API-Guthaben verwenden**](/settings?s=accounts&find=Use%20API%20credit%20at%20a%20limit) stattdessen den gespeicherten Anthropic-API-Key zur Abrechnung nutzen; siehe [API-Guthaben verwenden, wenn alle Konten ausgeschöpft sind](/guide/agents-models#use-api-credit-when-every-account-is-at-its-limit).
 
 ## Einen Limit-Reset verwenden
 
-Manche Tarife enthalten Limit-Resets: Reset-Guthaben bei Codex und gewährte Resets bei Claude. Ein Reset setzt die Nutzungslimits sofort zurück, ohne auf den regulären Termin zu warten.
+Manche Abos geben dir Limit-Resets: Reset-Guthaben bei Codex und Reset-Gutschriften bei Claude. Wenn du einen verwendest, werden die Nutzungslimits des Abos sofort zurückgesetzt, statt dass du auf ihr Zurücksetzen wartest.
 
-Unter **Limit-Resets** siehst du Anzahl und Namen der verfügbaren Resets sowie ihre verbleibenden Verwendungen. Dazu kommen Ablaufhinweise wie „Läuft ab in …“, bei weniger als einem Tag in Warnfarbe, oder „Läuft nicht ab“. Hinweise wie „Nach Erreichen eines Limits nutzbar“ oder „Noch nicht nutzbar“ erklären Einschränkungen. Blockiert ein anderes Limit den Reset, nennt die App den Grund und den frühesten Zeitpunkt, etwa „Bei ausgeschöpftem Wochenlimit gesperrt; nutzbar in …“. Manche Claude-Resets setzen nur einen Teil des Kontingents zurück und sind bei ausgeschöpftem Wochenlimit erst nach dessen regulärer Zurücksetzung nutzbar.
-
-Ohne verfügbare Resets erscheint „Aktuell keine Limit-Resets“, gegebenenfalls mit dem nächsten vom Tarif angekündigten Termin. Claude-Resets prüft die App etwa alle zehn Minuten, da Anthropic häufigere Abfragen ablehnt. Dazwischen zeigt sie die zuletzt gelesene Liste, auch nach einem Neustart. Ein gerade freigeschalteter Reset kann deshalb einige Minuten verzögert erscheinen. Verwendete Resets verschwinden sofort.
+Jede Karte listet sie unter **Limit-Resets** auf, mit der Anzahl, die du hast. Jeder Reset zeigt seinen Namen (und wie viele Verwendungen er noch hat), „Läuft ab in …“ (in Warnfarbe, wenn es weniger als einen Tag dauert) oder „Läuft nicht ab“ und Hinweise wie „Nutzbar, sobald du ein Limit erreichst“ oder „Noch nicht nutzbar“. Ein Reset, den ein anderes Limit zurückhält, sagt, welches, und wann es endet: „Gesperrt, solange dein Wochenlimit aufgebraucht ist (nutzbar in …)“. Manche Claude-Resets setzen nur einen Teil deines Kontingents zurück, sodass du sie nicht verwenden kannst, solange dein Wochenlimit aufgebraucht ist; nutzbar werden sie, sobald es zurückgesetzt wird. Gibt es keine: „Im Moment gibt es keine Limit-Resets“, mit dem Zeitpunkt des nächsten, wenn das Abo ihn nennt. Die App prüft die Resets eines Claude-Kontos etwa alle zehn Minuten, da Anthropic häufigere Abfragen ablehnt, und zeigt dazwischen die zuletzt gelesene Liste, auch nach einem Neustart der App. Ein Reset kann deshalb einige Minuten brauchen, bis er als nutzbar erscheint. Einer, den du verwendest, verschwindet sofort aus der Liste.
 
 1. Klicke neben einem Reset auf **Verwenden** oder im Limithinweis auf **Reset verwenden**. Dort wird der erste aktuell nutzbare Reset gewählt.
 2. Lies die Bestätigung: Dort stehen der verwendete Reset, dessen Ablaufdatum und der verbleibende Bestand. Ist kein Limit erreicht, erscheint eine entsprechende Warnung.
@@ -117,13 +111,13 @@ Der kleine Pfeil auf einer Kachel vergleicht den Wert mit dem unmittelbar vorher
 
 Darunter findest du in beiden Ansichten:
 
-- **Nach Agent**: Sitzungen, Prompts, Zeilen sowie Ein- und Ausgabe je Agent.
+- **Nach Agent**: jeder Agent mit Namen (Claude Code, Codex, Custom, Gemini CLI und die anderen, die etwas getan haben), mit Sitzungen, Prompts, Zeilen, Eingabe und Ausgabe.
 - **Aktivste Projekte**: die Ordner mit den meisten geänderten Zeilen.
 - **Nach Modell**: Sitzungen, Prompts, Eingabetoken, Eingabetoken aus dem Cache, Ausgabetoken und API-Kosten je Modell. Das gilt auch für Custom-Modelle von OpenRouter, Ollama oder vLLM. Klicke auf ein Modell, um die gesamte Seite darauf einzugrenzen. Bei unbekanntem Preis erscheint **Preis festlegen**. Beim Darüberfahren siehst du den Preis pro Million Token und seine Quelle: „eigener Preis“ oder „öffentliche Preistabelle“.
 
 Auf Smartphones stehen zwei Kacheln nebeneinander; einige Tabellenspalten werden ausgeblendet.
 
-Sobald Agenten heute etwas bearbeitet haben, zeigt die Startseite unter dem Nachrichtenfeld eine Tagesübersicht, etwa „Heute · 7 Sitzungen · 12 Dateiänderungen · $0.84“. Werte von null werden ausgelassen. Der Geldbetrag entspricht den geschätzten API-Kosten. Bei Claude-Code- oder Codex-Abos zahlst du stattdessen die Abogebühr; darauf weist der Infotext hin. Beim Darüberfahren siehst du Zeilenänderungen, Ein- und Ausgabetoken sowie Prompts. Ein Klick öffnet Aktivität.
+Die Startseite fasst den heutigen Tag in einer Zeile unter dem Nachrichtenfeld zusammen, sobald die Agenten heute etwas getan haben: „Heute · 7 Sitzungen · 12 Dateiänderungen · $0.84“, wobei ein Teil, der null ist, entfällt. Das Geld sind die **API-Kosten (geschätzt)** des Tages: Bei einem Abo (Claude Code, Codex) zahlst du stattdessen die Gebühr deines Abos, wie der Hinweis beim Darüberfahren sagt. Fahre über die Zeile, um die hinzugefügten und entfernten Zeilen, die Eingabe- und Ausgabe-Tokens und die Prompts zu sehen; ein Klick darauf öffnet Aktivität.
 
 ## Wie die Kostenschätzung funktioniert
 
@@ -132,8 +126,8 @@ Claude- und ChatGPT-Abos haben einen festen Preis. Deshalb zeigt die App, was di
 - Grundlage ist die öffentliche Preistabelle von LiteLLM. Die App lädt sie höchstens einmal täglich und hält sie auch offline bereit.
 - Selbst festgelegte Preise haben Vorrang.
 - Die Token einer Sitzung werden dem verwendeten Modell zugeordnet. Bei Modellwechseln gilt das zuletzt genutzte Modell.
-- Eingabetoken aus dem Cache werden zum Cache-Preis berechnet. Fehlt dieser, gilt der normale Eingabepreis.
-- Modelle mit unbekanntem Preis, etwa nur der Familienbezeichnung „opus“ oder ohne Eintrag in der Tabelle, fließen mit null in die Summe ein. Unter **Nach Modell** erscheint **Preis festlegen**.
+- Eingabe aus dem Cache (Text, den das Modell schon früher gelesen hat und der aus seinem Cache kommt) wird zum Cache-Preis berechnet, oder zum Eingabepreis, wenn es keinen gibt.
+- Modelle ohne bekannten Preis (nur ein Familienname wie „opus“ oder ein Modell, das die Tabelle nicht aufführt) zählen in den Summen nichts und zeigen unter „Nach Modell“ **einen Preis festlegen**.
 
 OpenRouter-Preise einschließlich Cache-Preisen lädt die App automatisch. Du musst sie nicht eintragen. Ist kein Preis verfügbar, steht unter **Nach Modell** ein Strich statt der Aufforderung zur Preiseingabe.
 
@@ -142,7 +136,7 @@ Ausgabenlimits verwenden dieselben Preise. Meldet ein Agent tatsächliche Kosten
 ## Eigene Modellpreise festlegen
 
 1. Klicke im Tab **Aktivität** oberhalb von **Nach Modell** auf **Modellpreise** oder bei einem Modell auf **Preis festlegen**.
-2. Der Dialog zeigt die aktuell sichtbaren Modelle und alle Modelle mit bereits hinterlegtem Preis. Für jedes gibt es **Eingabe**, **Cache** und **Ausgabe**, jeweils in US-Dollar pro Million Token. Leere Felder übernehmen den grau angezeigten öffentlichen Preis.
+2. Der Dialog **Modellpreise** listet die Modelle in der Ansicht und alle, für die du schon einen Preis festgelegt hast. Jedes hat **Eingabe**, **Aus dem Cache** und **Ausgabe**, in Dollar pro Million Tokens. Leere Felder verwenden den Preis aus der öffentlichen Tabelle, der grau angezeigt wird.
 3. Trage deine Preise ein. Eingabe und Ausgabe sind erforderlich. Der Cache-Preis ist optional; ohne Angabe gilt der Eingabepreis.
 4. Für ein nicht aufgeführtes Modell trägst du dessen ID unter **Weitere Modell-ID** ein und klickst auf **Hinzufügen**.
 5. Klicke auf **Preise speichern**.
@@ -151,24 +145,24 @@ Das Papierkorbsymbol **Preis aus der Tabelle verwenden** entfernt deinen eigenen
 
 ## Jede Sitzung bleibt erhalten
 
-Die App bewahrt Sitzungen und ihre Kennzahlen unabhängig davon auf, wie sich das jeweilige Agentenprogramm verhält. Claude Code löscht Gespräche normalerweise nach 30 Tagen. Daher weist die App jedes Claude-Code-Konto ohne eigene Aufbewahrungsangabe an, sie zu behalten. Zusätzlich hält sie eine eigene Dateiverknüpfung zu jedem Gespräch von Claude Code und Codex. Löscht das Agentenprogramm oder jemand anderes die ursprüngliche Datei, bleibt das Gespräch aufgelistet und zugänglich. Die Verknüpfung ist dieselbe Datei unter einem zweiten Namen und benötigt keinen zusätzlichen Speicherplatz.
+Die App bewahrt Sitzungen und ihre Kennzahlen unabhängig davon auf, wie sich das jeweilige Agentenprogramm verhält. Claude Code löscht Unterhaltungen normalerweise nach 30 Tagen. Daher weist die App jedes Claude-Code-Konto ohne eigene Aufbewahrungsangabe an, sie zu behalten. Zusätzlich hält sie eine eigene Dateiverknüpfung zu jeder Unterhaltung von Claude Code und Codex. Löscht das Agentenprogramm oder jemand anderes die ursprüngliche Datei, bleibt die Unterhaltung aufgelistet und zugänglich. Die Verknüpfung ist dieselbe Datei unter einem zweiten Namen und benötigt keinen zusätzlichen Speicherplatz.
 
 Gelöscht werden Sitzungen, die seit einem Jahr inaktiv sind, sofern du das nicht unter [Einstellungen → Allgemein → Inaktive Sitzungen löschen](/settings?s=general&find=Delete%20inactive%20sessions) änderst; siehe [Inaktive Sitzungen löschen](/guide/app#delete-inactive-sessions). Die zugehörigen Kennzahlen bleiben in Aktivität erhalten.
 
-Gespräche, die Claude Code bereits vor Einführung dieser Aufbewahrung gelöscht hat, lassen sich nicht wiederherstellen. Die Aktivitätshistorie beginnt mit der ersten Erfassung durch die App.
+Unterhaltungen, die Claude Code bereits vor Einführung dieser Aufbewahrung gelöscht hat, lassen sich nicht wiederherstellen. Die Aktivitätshistorie beginnt mit der ersten Erfassung durch die App.
 
 ## Die Ausgaben einer Sitzung begrenzen
 
-Ein Ausgabenlimit stoppt die Sitzung, sobald der festgelegte Betrag erreicht ist. Gerechnet wird mit API-Preisen, unabhängig von deinem Abo. Gestartete Unteragenten zählen mit.
+Ein Ausgabenlimit stoppt die Sitzung, sobald der festgelegte Betrag erreicht ist. Gerechnet wird mit API-Preisen, unabhängig von deinem Abo. Gestartete Subagenten zählen mit.
 
-- Neue Sitzung: Öffne auf der Startseite **Optionen → Ausgabenlimit**. Wähle $1, $5, $10 oder $25 oder gib einen Betrag ein und klicke auf **Festlegen**. **Kein Limit** entfernt die Begrenzung.
-- Laufende Sitzung: Öffne das Sitzungsmenü (⋯) → **Sitzungseinstellungen → Ausgabenlimit**. Der Dialog zeigt den bisherigen Verbrauch. Gib ein Limit ab $0.01 ein und klicke auf **Limit festlegen** oder **Ändern**. **Limit entfernen** hebt es auf.
+- Für eine neue Sitzung: Wähle auf der Startseite **Optionen** → **Ausgabenlimit**. Wähle $1, $5, $10 oder $25 oder gib einen Betrag ein und klicke auf **Set**. **Keine Obergrenze** hebt es auf.
+- Für eine laufende Sitzung: das Menü der Sitzung (⋯) → **Sitzungseinstellungen** → **Ausgabenlimit**. Der Dialog zeigt, was sie bisher ausgegeben hat. Gib ein Limit ein (ab $0.01) und klicke auf **Limit festlegen** oder **Veränderung**; **Limit entfernen** hebt es auf.
 
 Bei aktivem Limit steht über dem Nachrichtenfeld etwa „$1.20 von $5.00“ mit **Ändern**. Nach dem Modellaufruf, der das Limit erreicht, stoppt der Agent. Unter dem Durchlauf erscheint „Am Ausgabenlimit gestoppt“. Neue Nachrichten warten, bis du das Limit mit **Limit erhöhen…** anhebst oder entfernst. Mehr dazu unter [Sitzungen](/guide/sessions).
 
 ## Der Tab Arena
 
-Der Tab **Arena** (`/arena`) zeigt, welche Modelle bei deinen Aufgaben gewinnen. Auf der Startseite sendet **Optionen → Arena** deinen Prompt zusätzlich an ein oder zwei Modelle; du wählst die beste Antwort. Die Rangliste verwendet eine Elo-Wertung ab 1000 auf Grundlage deiner entschiedenen Vergleiche. Dazu zeigt sie, wie oft du ein Modell gewählt hast, seine Gewinnquote sowie aktuelle entschiedene und offene Vergleiche. Siehe [Deep research, Zweitmeinungen und mehrere Agenten](/guide/research).
+Der Tab **Arena** (`/arena`) zeigt, welche Modelle bei deinen eigenen Aufgaben gewinnen. Auf der Startseite schickt **Optionen** → **Arena** deinen Prompt zusätzlich an ein oder zwei weitere Modelle; du behältst die beste Antwort. Der Tab ordnet die Modelle nach einer Wertung (einer Elo-Wertung, die bei 1000 beginnt) über die Vergleiche, die du entschieden hast, mit der Häufigkeit, mit der jedes behalten wurde, und seiner Gewinnquote, und listet aktuelle Vergleiche auf, entschiedene und noch offene. Siehe [Tiefgehende Recherche, Zweitmeinungen und mehrere Agenten](/guide/research).
 
 ## Kann ich die Zahlen zurücksetzen?
 
@@ -180,7 +174,7 @@ Es gibt keinen Knopf zum Leeren der Aktivitätsdaten. Löschst du eine Sitzung s
 - „Aktiviere die automatische Fortsetzung nach Nutzungslimits.“
 - „Setze meine Sitzung ‚Refactor auth‘ fort, sobald das Codex-Limit zurückgesetzt ist.“
 - „Was hätte die Arbeit des letzten Monats zu API-Preisen je Modell gekostet?“
-- „Warum zeigt die Heute-Zeile $3.10, obwohl ich ein Abo habe?“
+- „Warum zeigt die Heute-Zeile auf meiner Startseite $3.10, obwohl ich ein Abo habe?“
 - „Zähle meine Ollama-Modelle bei der Kostenschätzung als kostenlos.“
 - „Wie viel hat Custom diesen Monat erledigt und mit welchen Modellen?“
 - „Lösche Sitzungen erst nach zwei Jahren Inaktivität statt nach einem.“

@@ -1,6 +1,6 @@
 # Suche und Browser
 
-Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen echten Browser bedienen. Dieser Beitrag erklärt Suchanbieter und Einrichtung, die Suchschritte im Gespräch und Quellenangaben sowie die Live-Ansicht des Browsers und seine Übernahme für Anmeldungen, Prüfungen oder Zahlungen. In der Desktop-App für Mac, Windows und Linux können Agenten auch Bildschirm, Maus und Tastatur deines Computers verwenden.
+Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen echten Browser bedienen. Dieser Beitrag erklärt Suchanbieter und Einrichtung, die Suchschritte in der Unterhaltung und Quellenangaben sowie die Live-Ansicht des Browsers und seine Übernahme für Anmeldungen, Prüfungen oder Zahlungen. In der Desktop-App für Mac, Windows und Linux können Agenten auch Bildschirm, Maus und Tastatur deines Computers verwenden.
 
 ![Ein Agent hat im Web recherchiert, Seiten gelesen und Ergebnisse in einer Tabelle verglichen](images/web.webp)
 
@@ -9,7 +9,7 @@ Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen ech
 Alle hier ausgeführten Agenten, darunter Claude Code, Codex, Custom und ACP-Agenten, erhalten drei App-Tools: Websuche, Seitenabruf und die Suche nach Bildern und Videos zu konkreten Dingen. Sie funktionieren modellunabhängig; auch ein kleines lokales Modell kann damit genauso recherchieren wie ein großes.
 
 - Suchanfragen verwenden die Anbieter unter **Einstellungen → Funktionen → Suche** in ihrer Reihenfolge. Der erste aktivierte Anbieter antwortet. Fehlen Key oder Kontingent, ist der Anbieter unerreichbar oder verlangt er eine Bot-Prüfung, wird der nächste versucht. Das Ergebnis nennt dem Agenten den verwendeten Anbieter.
-- Agenten können bis zu 100 Ergebnisse anfordern und nach Websites einschließlich Ausschlüssen, Zeitraum, Sprache, PDF-Dateien oder offiziellen Startseiten filtern, etwa Personen- oder Unternehmensseiten. Naget Search unterstützt außerdem Kategorien wie wissenschaftliche Arbeiten, Preprints, biomedizinische Veröffentlichungen, US-Patente, Unternehmensberichte, Nachrichten, Dokumentation und Diskussionen. Unterstützt ein Anbieter einen Filter nicht, erfährt der Agent das.
+- Agenten können bis zu 100 Ergebnisse anfordern und nach Websites einschließlich Ausschlüssen, Zeitraum, Sprache, PDF-Dateien oder offiziellen Startseiten filtern, etwa Personen- oder Unternehmensseiten. Naget Search unterstützt außerdem Kategorien wie Papers, Preprints, biomedizinische Veröffentlichungen, US-Patente, Unternehmensberichte, Nachrichten, Dokumentation und Diskussionen. Unterstützt ein Anbieter einen Filter nicht, erfährt der Agent das.
 - Naget Search kann pro Treffer statt eines gewöhnlichen Auszugs gezielt die zur Frage passenden Sätze liefern. Das dauert länger und wird verwendet, wenn Fakten aus den Seiten benötigt werden. Dafür ist kein Key nötig.
 - Für Listen von Spielen, Filmen, Orten, Gerichten, Produkten oder Teams können Agenten jeweils ein Bild finden: bevorzugt aus dem passenden Wikipedia-Artikel, etwa Cover, Ortsfoto oder Vereinswappen, sonst das Vorschaubild einer zugehörigen Webseite. Auf Wunsch kommt ein YouTube-Video hinzu, dessen Titel das Objekt ausdrücklich nennt, etwa Trailer, Rezept oder Höhepunkte. Ohne eindeutige Zuordnung bleibt der Eintrag ohne Bild oder Video. Apps verwenden diese Inhalte in Antworten; siehe [Apps](/guide/apps).
 - Agenten sollen verwendete Seiten mit einer Nummer in Klammern direkt an der belegten Aussage und einer Liste genau dieser Seiten am Antwortende zitieren. Die App stellt daraus Links und Quellenkarten dar; siehe [Quellen unter einer Antwort ansehen](/guide/web#see-the-sources-under-a-reply). Suchergebnisse und Webseiten gelten als Informationen, niemals als Anweisungen.
@@ -25,18 +25,18 @@ Claude Code und Codex besitzen zusätzlich eigene Webtools. Deren zitierte Quell
 Unter [Anbieter](/settings?s=search&find=Providers) gilt „Von oben nach unten: Der erste aktivierte Anbieter antwortet“. Jede Zeile zeigt:
 
 - den Namen, beim ersten aktivierten Anbieter **Standard** und gegebenenfalls Warnungen wie **Key erforderlich** oder **Adresse deiner Instanz erforderlich**;
-- eine Kurzbeschreibung. **(i)** ergänzt unterstützte Suchfilter, etwa „Bis zu 100 Ergebnisse · Kategorien · Zeitraum · Startseiten · passende Seitenauszüge“;
+- eine Zeile dazu, was er ist; das (i) neben seinem Namen ergänzt, worauf er eine Suche beschränken kann, etwa „Bis zu 100 Ergebnisse · Kategorien · Zeiträume · Startseiten · die Teile von Seiten, die antworten“;
 - falls vorhanden eine gekürzte Kennzeichnung des gespeicherten Keys wie „sk-ab…12cd“, niemals den vollständigen Wert;
 - den letzten Fehler in Rot mit Zeitangabe;
-- rechts einen Schalter und ein **⋯**-Menü mit **Key hinzufügen** oder **Key ändern**, **Adresse festlegen** oder **Adresse ändern**, **Testen**, bei aktiven nachgeordneten Anbietern **Als Standard festlegen** sowie **Nach oben** und **Nach unten**.
+- ein Schalter rechts, der ihn ein- oder ausschaltet, und ein **⋯**-Menü mit **Key hinzufügen** (oder **Key ändern**), **Adresse festlegen** (oder **Adresse ändern**), **Testen**, **Als Standard festlegen** (bei einem Anbieter, der an, aber nicht der erste ist) sowie **Nach oben verschieben** und **Nach unten**, um seinen Platz in der Reihenfolge zu ändern.
 
-**(i)** neben **Anbieter** erklärt, dass alle Modelle Websuche und Seitenabruf nutzen können und externe Inhalte nur Informationen, keine Agentenanweisungen sind.
+Das (i) neben **Anbieter** sagt, dass Agenten das Web durchsuchen und Seiten lesen können, egal welches Modell sie nutzen, und dass Suchergebnisse und Seiten externe Daten sind, die Agenten als Information nutzen, nie als Anweisungen.
 
 **Als Standard festlegen** verschiebt den Anbieter nach oben. Die anfängliche Reihenfolge lautet Naget Search, SearXNG, Brave Search und DuckDuckGo. Naget Search und DuckDuckGo sind aktiviert. SearXNG und Brave Search bleiben bis zur Eingabe ihrer Voraussetzungen deaktiviert.
 
 ### Naget Search
 
-[Naget Search](/settings?s=search&find=Naget%20Search) ist der Standardanbieter mit einem eigenen Index für Web, wissenschaftliche Arbeiten, Patente und Unternehmensberichte. Ohne Key steht ein kostenloses Tageskontingent bereit. Nach der ersten Antwort zeigt die Zeile **Heute noch kostenlos verfügbar**, einen Balken und die nächste Freigabezeit. Ist das Kontingent verbraucht, erscheint ein Hinweis; bis zur Erneuerung antwortet der nächste Anbieter.
+[Naget Search](/settings?s=search&find=Naget%20Search) ist der Standardanbieter mit einem eigenen Index für Web, Papers, Patente und Unternehmensberichte. Ohne Key steht ein kostenloses Tageskontingent bereit. Nach der ersten Antwort zeigt die Zeile **Heute noch kostenlos verfügbar**, einen Balken und die nächste Freigabezeit. Ist das Kontingent verbraucht, erscheint ein Hinweis; bis zur Erneuerung antwortet der nächste Anbieter.
 
 Ein Key von naget.com ermöglicht mehr Anfragen. Die Anzeige nennt dann **Verbleibende Credits**. Mit Key kann Naget Search auch beim Seitenabruf die zur Frage passenden Sätze auswählen; siehe [Ganze Seiten oder gezielt passende Abschnitte lesen](/guide/web#read-whole-pages-or-only-the-parts-that-answer-a-question). Ohne Key wählt die App Absätze nach Wörtern aus. Passende Sätze direkt in Suchergebnissen sind auch ohne Key möglich. „Naget Search benötigt derzeit einen Key“ bedeutet, dass Anfragen ohne Key gerade abgelehnt werden; bis zur Eingabe übernimmt der nächste Anbieter.
 
@@ -44,7 +44,7 @@ Das Formular enthält außerdem **Adresse**, standardmäßig https://naget.com. 
 
 ### SearXNG
 
-[SearXNG](/settings?s=search&find=SearXNG) ist eine selbst betriebene Metasuchmaschine, die mehrere Suchmaschinen gleichzeitig abfragt, ohne ein Nutzungsprofil über dich anzulegen. Benötigt wird kein Key, sondern nur die Instanzadresse: **⋯ → Adresse festlegen**, etwa https://searx.example.org, dann **Speichern**. Die Adresse aktiviert den Anbieter. Er liefert bis zu 100 Ergebnisse.
+[SearXNG](/settings?s=search&find=SearXNG) ist eine Suchmaschine, die du selbst betreibst, die viele Suchmaschinen auf einmal fragt und nichts über dich aufzeichnet. Sie braucht keinen Key, nur die Adresse deiner Instanz: Öffne ihr **⋯**-Menü, wähle **Adresse festlegen**, gib sie ein (etwa https://searx.example.org) und drücke auf **Speichern**. Mit einer Adresse wird sie eingeschaltet. Sie liefert bis zu 100 Ergebnisse.
 
 ### Brave Search
 
@@ -56,7 +56,7 @@ Das Formular enthält außerdem **Adresse**, standardmäßig https://naget.com. 
 
 ### Key oder Adresse hinzufügen oder ändern
 
-1. Öffne in der Anbieterzeile **⋯ → Key hinzufügen**, **Key ändern**, **Adresse festlegen** oder **Adresse ändern**.
+1. Öffne in der Zeile des Anbieters das **⋯**-Menü und wähle **Key hinzufügen** (oder **Key ändern**, **Adresse festlegen**, **Adresse ändern**).
 2. Füge den Key unter **Key** ein, wo er als Punkte erscheint, oder gib die **Adresse** an. Bei Naget Search ist der Key als optional für zusätzliche Anfragen gekennzeichnet.
 3. **Speichern** übernimmt die Angaben; **Abbrechen** verwirft sie.
 
@@ -64,7 +64,7 @@ Das Hinterlegen einer benötigten Adresse oder eines Keys aktiviert den Anbieter
 
 ### Einen Anbieter testen
 
-**⋯ → Testen** führt eine kleine Anfrage nur mit diesem Anbieter aus, ohne Wechsel zum nächsten. Dabei werden auch noch nicht gespeicherte Formulareingaben verwendet. Du siehst „Funktioniert“, Trefferzahl, Dauer und die ersten drei Ergebnisse als Links oder die Fehlerursache. Ein erfolgreicher Test des gespeicherten Anbieters löscht außerdem seine alte Fehlermeldung.
+Öffne das **⋯**-Menü einer Zeile und wähle **Testen**. Die App führt eine kleine Suche nur mit diesem Anbieter aus, ohne auf den nächsten auszuweichen, und mit dem, was du in sein Formular getippt hast, noch bevor du es speicherst. Du siehst „Funktioniert:“, die Zahl der Ergebnisse und wie lange es dauerte, mit den ersten drei Ergebnissen als Links, oder den Grund, warum es fehlschlug. Einen Anbieter zu testen, wie er gespeichert ist, löscht außerdem seinen alten Fehler, sobald er wieder funktioniert.
 
 ### Ergebnisse pro Suche
 
@@ -74,7 +74,7 @@ Ein Hinweis unten auf der Seite verlinkt die Entwickleranleitung zum Ergänzen w
 
 ### Wenn kein Anbieter antworten kann
 
-Scheitern alle aktivierten Anbieter oder sind alle ausgeschaltet, erhält der Agent die einzelnen Gründe. Claude Code und Codex verwenden dann für diese und weitere Anfragen des Auftrags ihre eigene integrierte Websuche, Claude Code WebSearch beziehungsweise die Codex-Websuche, und zitieren wie gewohnt. Erst wenn auch diese scheitert, verweisen sie dich auf Einstellungen → Suche. Andere Agenten wie Custom haben keine eigene Websuche. Sie sollen dich darauf hinweisen, dort einen Key zu hinterlegen oder einen anderen Anbieter zu aktivieren. Bei [Deep research](/guide/research) sind die agenteneigenen Websuchen deaktiviert, damit jede Anfrage zum Suchbudget zählt; dort erfährst du ebenfalls, was zu korrigieren ist.
+Scheitern alle aktivierten Anbieter oder sind alle ausgeschaltet, erhält der Agent die einzelnen Gründe. Claude Code und Codex verwenden dann für diese und weitere Anfragen des Auftrags ihre eigene integrierte Websuche, Claude Code WebSearch beziehungsweise die Codex-Websuche, und zitieren wie gewohnt. Erst wenn auch diese scheitert, verweisen sie dich auf Einstellungen → Suche. Andere Agenten wie Custom haben keine eigene Websuche. Sie sollen dich darauf hinweisen, dort einen Key zu hinterlegen oder einen anderen Anbieter zu aktivieren. Bei [Tiefgehende Recherche](/guide/research) sind die agenteneigenen Websuchen deaktiviert, damit jede Anfrage zum Suchbudget zählt; dort erfährst du ebenfalls, was zu korrigieren ist.
 
 ## Suchergebnisse ansehen
 
@@ -106,7 +106,7 @@ Reichen Suchauszüge nicht, liest der Agent die Seite. Lange Seiten kommen in Ab
 
 Auch PDFs werden als Text gelesen. So lassen sich nur öffentliche Webseiten abrufen, keine lokalen oder privaten Netzwerkadressen. Der [Browser](/guide/web#the-browser-agents-use) kann diese nach deiner Freigabe öffnen. Ein Seitenabruf wird zehn Minuten gespeichert, sodass weitere Abschnitte sofort verfügbar sind.
 
-Im Gespräch steht „Gelesen“ mit Seitentitel, auf breiten Bildschirmen auch der Frage. Ein Klick zeigt Adresse, Abschnitt wie „Teil 1 von 3“ oder „Passende Abschnitte“ und den an den Agenten übergebenen Text.
+In der Unterhaltung erscheint ein Lesen als „Gelesen“ mit dem Titel der Seite, auf breiteren Bildschirmen mit der Frage, die an sie gestellt wurde. Klicke darauf, um die Adresse zu sehen, welcher Teil es war („Teil 1 von 3“) oder „die Teile, die antworten“ auf die Frage, und den Text, den der Agent bekam.
 
 ## Der Browser für Agenten
 
@@ -141,7 +141,7 @@ Am Computer:
 
 - Eingeklappt zeigt der Bereich links ein kleines Livebild. Klicke darauf, auf den Titel oder auf **Live-Ansicht anzeigen**, um ihn zu öffnen. **Live-Ansicht ausblenden** klappt ihn ein.
 - **Vollbild** zeigt den Browser über der gesamten App, **Vollbild schließen** kehrt zurück.
-- **Übernehmen** übergibt dir die Steuerung; **Browseroptionen** unter **⋯** öffnet das Menü.
+- **Übernehmen** lässt dich den Browser selbst bedienen (siehe unten), und **Browseroptionen** (⋯) öffnet sein Menü.
 
 Auf dem Smartphone öffnet ein Antippen den Browser im Vollbild; × schließt die Ansicht.
 
@@ -151,19 +151,19 @@ Das Livebild wird mehrmals pro Sekunde übertragen, solange du zusiehst. Bis zum
 
 Da der Browser unsichtbar im Hintergrund läuft, zeigt die Live-Ansicht einen großen Pfeil in der App-Farbe mit weichem Leuchtrand und **Agent**-Kennzeichnung.
 
-- Vor Klicken, Tippen oder Scrollen gleitet der Zeiger in etwa einer Drittelsekunde zum Ziel. Solange du zusiehst, wartet der Agent diese Bewegung ab. Ohne Zuschauer entfällt die Wartezeit.
+- Bevor der Agent klickt, tippt oder scrollt, gleitet sein Zeiger von seiner bisherigen Stelle an diese Stelle, in etwa einer Drittelsekunde, damit dein Auge ihm folgen kann. Solange du zusiehst, wartet der Agent darauf; wenn niemand den Browser ansieht, wartet er nicht.
 - Beim Klick breitet sich ein Ring aus, beim Doppelklick zwei. Eingabefelder und Auswahllisten erhalten kurz einen Rahmen. Scrollpfeile zeigen die Richtung; gedrückte Tasten wie Enter, Tab oder Strg+A erscheinen neben der Kennzeichnung.
-- Der Zeiger bleibt am letzten Aktionsort. Im kleinen Vorschaubild erscheint er als kleiner Pfeil.
-- Während deiner Übernahme verschwindet der Agentenzeiger. Er kehrt bei Rückgabe zurück.
+- Der Zeiger bleibt dort, wo der Agent zuletzt gehandelt hat. Im kleinen Bild des eingeklappten Panels erscheint er als kleiner Pfeil.
+- Während du steuerst, verschwindet der Zeiger des Agenten aus der Live-Ansicht: Deiner ist der einzige. Er kommt zurück, wenn du den Browser zurückgibst.
 
-Jeder Browserschritt steht außerdem im Gespräch, etwa „github.com geöffnet“, „Schaltfläche [12] ‚Anmelden‘ angeklickt“ oder „Dich gebeten: Bei GitHub anmelden“, mit einem kleinen Bild der Seite danach. Ein Klick auf die Zeile öffnet das größere Bild und die vollständige Antwort des Tools. Im großen Bild markieren Ringe Klickstellen und gestrichelte Rahmen Eingabefelder, bei mehreren Aktionen nummeriert. Die App speichert Bilder der letzten 400 Schritte je Sitzung. Nach einem Monat ohne Sitzungsnutzung werden sie gelöscht.
+Jeder Browserschritt steht außerdem in der Unterhaltung, etwa „github.com geöffnet“, „Schaltfläche [12] ‚Anmelden‘ angeklickt“ oder „Dich gebeten: Bei GitHub anmelden“, mit einem kleinen Bild der Seite danach. Ein Klick auf die Zeile öffnet das größere Bild und die vollständige Antwort des Tools. Im großen Bild markieren Ringe Klickstellen und gestrichelte Rahmen Eingabefelder, bei mehreren Aktionen nummeriert. Die App speichert Bilder der letzten 400 Schritte je Sitzung. Nach einem Monat ohne Sitzungsnutzung werden sie gelöscht.
 
 ## Für Anmeldung, Prüfungen oder Zahlungen übernehmen
 
-Braucht der Agent dich im Browser, erscheint dies gleichzeitig:
+Wenn ein Agent dich im Browser braucht, erfährst du es an mehreren Stellen zugleich:
 
 - oben im Browserbereich mit passenden Schaltflächen;
-- als Gesprächskarte, etwa „Benötigt dich im Browser: Bei GitHub anmelden“, mit **Anzeigen**, auf dem Smartphone **Öffnen**;
+- als Unterhaltungskarte, etwa „Benötigt dich im Browser: Bei GitHub anmelden“, mit **Anzeigen**, auf dem Smartphone **Öffnen**;
 - als Benachrichtigung und Eintrag im [Posteingang](/inbox). Siehe [Posteingang und Benachrichtigungen](/guide/inbox).
 
 Am Computer öffnet sich die Live-Ansicht bei Anmeldung, Zahlung oder Dialogfrage automatisch und klappt nach Erledigung wieder ein, sofern du sie nicht selbst geöffnet hattest.
@@ -172,7 +172,7 @@ Am Computer öffnet sich die Live-Ansicht bei Anmeldung, Zahlung oder Dialogfrag
 
 1. Wähle **Übernehmen** in der Hinweiszeile oder im Browserbereich. „Du steuerst – der Agent wartet“ und ein farbiger Rahmen kennzeichnen die Übernahme.
 2. Bediene die Seite wie gewohnt mit Maus, Scrollrad und Tastatur. Klicke zuerst in die Seite; anschließend gehen Tastendrücke dorthin statt an App-Kurzbefehle. Eingefügte Inhalte werden als Text übernommen.
-3. Über der Seite stehen **Zurück**, **Neu laden** und die Adresszeile. Eine Adresse mit Enter öffnet sie.
+3. Während du steuerst, hat eine Leiste über der Seite **Zurück**, **Neu laden** und die Adresse: Gib eine Adresse ein und drücke Enter, um dorthin zu gehen.
 4. Klicke nach Abschluss in der Hinweiszeile auf **Fertig**. Die App informiert den Agenten mit dem aktuellen Seitenstand, und er setzt seine Arbeit fort.
 
 ### Auf dem Smartphone
@@ -190,7 +190,7 @@ Vor einem zahlungs- oder bestellauslösenden Knopf hält der Agent an, etwa „V
 - **Nicht möglich** meldet dem Agenten, dass du die Bitte nicht erfüllen konntest.
 - Du kannst jederzeit über **Übernehmen** selbst eingreifen, auch ohne Aufforderung. Der Agent wartet. Versucht er währenddessen einen Browserzugriff, erfährt er, dass du steuerst und er bei Rückgabe benachrichtigt wird. **Zurückgeben** gibt die Steuerung frei; ein wartender Agent erhält den aktuellen Seitenstand.
 
-Die von der App in deinem Namen gesendeten Meldungen erscheinen im Gespräch. Bei einem laufenden Durchlauf warten sie bis zu dessen Ende.
+Die von der App in deinem Namen gesendeten Meldungen erscheinen in der Unterhaltung. Bei einem laufenden Durchlauf warten sie bis zu dessen Ende.
 
 ## Dialogfragen einer Webseite beantworten
 
@@ -204,23 +204,23 @@ Auch von dir während einer Übernahme eingegebene lokale oder private Adressen 
 
 ## Das Browsermenü
 
-**Browseroptionen** unter **⋯** bietet:
+**Browseroptionen** (⋯) am Panel öffnet ein Menü:
 
 - **Tabs**, wenn mehrere offen sind: Wähle den sichtbaren Tab. Öffnet eine Seite einen neuen Tab, arbeitet der Agent dort weiter.
-- **Im Sitzungsordner gespeichert**: zuletzt heruntergeladene Dateien zum Öffnen.
+- **Wird im Sitzungsordner gespeichert**: die neuesten Dateien, die der Browser heruntergeladen hat; wähle eine, um sie zu öffnen.
 - **Profil – Wechsel startet den Browser neu**: **Neu, ohne Anmeldungen** oder eines deiner Profile. Die Auswahl erscheint nach dem ersten angelegten Profil. Ein Wechsel schließt den Browser; beim nächsten Einsatz startet er mit dem neuen Profil.
 - **Websites für diese Sitzung**: **Nur diese Websites**, leer für uneingeschränkte Auswahl, und **Diese Websites nie**, jeweils eine pro Zeile. Sie ergänzen die Listen unter Einstellungen → Browser. **Speichern** übernimmt sie.
 - **Browser schließen**.
 
 ## Den Browser selbst öffnen
 
-Du kannst den Sitzungsbrowser vor dem Agenten öffnen, etwa um dich vor einem Auftrag anzumelden. Wähle **⋯ → Mehr → Browser öffnen** im Sitzungsmenü und dann **Übernehmen** im Bereich über dem Nachrichtenfeld. Ist er bereits geöffnet, heißt der Eintrag **Browser anzeigen**. Bei deaktiviertem Browser in den Einstellungen erscheint ein entsprechender Hinweis.
+Du kannst den Browser einer Sitzung öffnen, bevor der Agent es tut, etwa um dich auf einer Website anzumelden, bevor du ihn dort arbeiten lässt. Öffne das Menü der Sitzung (⋯) → **Mehr** → **Browser öffnen**. Das Fenster erscheint über dem Nachrichtenfeld: Drücke **Übernehmen** und nutze es. Ist der Browser schon geöffnet, heißt derselbe Eintrag **Browser anzeigen**. Wenn der Browser in den Einstellungen ausgeschaltet ist, bekommst du einen Hinweis darauf.
 
 ## Downloads und Uploads
 
 Heruntergeladene Dateien liegen im Unterordner downloads des Sitzungsordners. Der Agent erfährt den Pfad. Das Browsermenü zeigt die neuesten Dateien unter **Im Sitzungsordner gespeichert**.
 
-Agenten können nur Dateien aus dem Sitzungsordner hochladen. Kopiere andere Dateien zuerst dorthin. Siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git).
+Ein Agent kann Dateien nur aus dem Ordner der Sitzung an das Upload-Feld einer Seite anhängen. Soll er eine andere Datei hochladen, kopiere sie zuerst in diesen Ordner (siehe [System: Dateien, Git, Terminal und Vorschau](/guide/files-git)).
 
 ## Wann der Browser schließt
 
@@ -229,9 +229,9 @@ Ein Sitzungsbrowser schließt automatisch:
 - nach 15 Minuten ohne Bedienung oder Zuschauer, beziehungsweise nach zwei Stunden, wenn er auf dich wartet oder du steuerst;
 - beim Schließen des letzten Tabs;
 - beim Stoppen des Agentenprogramms oder Löschen der Sitzung;
-- beim Profilwechsel oder Löschen des verwendeten Profils.
+- wenn du ein anderes Profil dafür wählst oder das Profil löschst, das er verwendet.
 
-Offene Rückfragen enden dabei ebenfalls. Bei Bedarf öffnet der Agent den Browser erneut.
+Alles, was noch auf dich gewartet hat, endet damit. Der Agent öffnet den Browser erneut, wenn er ihn das nächste Mal braucht.
 
 ## Den Browser einrichten
 
@@ -239,11 +239,11 @@ Offene Rückfragen enden dabei ebenfalls. Bei Bedarf öffnet der Agent den Brows
 
 ### Ein Browser für Agenten
 
-[Ein Browser für Agenten](/settings?s=browser&find=A%20browser%20for%20agents) neben der Überschrift aktiviert oder deaktiviert den Browser für alle Agenten. Sobald Chromium gefunden wurde, ist er standardmäßig aktiv; vorher lässt er sich nicht einschalten. Ohne Aktivierung erhalten Agenten keine Browsertools.
+[Ein Browser für Agenten](/settings?s=browser&find=A%20browser%20for%20agents) ist der Schalter neben dem Titel des Abschnitts. Er schaltet den Browser für alle Agenten ein oder aus. Er ist von selbst eingeschaltet, sobald ein Chromium gefunden wurde, und lässt sich erst einschalten, wenn eines da ist. Ist er ausgeschaltet, bekommen Agenten die Tools des Browsers nicht. Jeder Agent hat außerdem einen eigenen Schalter **Nutze einen Browser** unter [Erlaubte Werkzeuge](/guide/agents#what-it-may-use): Ein Agent, bei dem er aus ist, bekommt die Tools des Browsers nicht, egal was hier eingestellt ist.
 
 ### Chromium
 
-[Chromium](/settings?s=browser&find=Chromium) nennt die verwendete Version und unter **(i)** ihren Pfad. Die automatische Auswahl bevorzugt installiertes Chrome oder Chromium, danach eine von der App heruntergeladene Version und schließlich eine Playwright-Installation. Bei mehreren Funden kannst du **Beste gefundene Version** oder eine konkrete Installation wählen.
+[Chromium](/settings?s=browser&find=Chromium) zeigt das verwendete mit seiner Version und, unter (i), wo es liegt. Die App wählt in dieser Reihenfolge: ein auf diesem Computer installiertes Chrome oder Chromium, eines, das sie selbst heruntergeladen hat, dann eines, das Playwright (ein Tool zum Testen von Browsern) installiert hat. Findet sie mehr als eines, kannst du in einer Auswahl wählen: **Beste verfügbare Variante** oder ein bestimmtes.
 
 Ohne Fund bietet die App den Download von Chrome for Testing mit etwa 170 MB in den App-Datenordner an. **Chrome herunterladen** startet ihn mit Fortschrittsbalken und Fehlerhinweis bei Problemen. Die Schaltfläche bleibt verfügbar, solange keine heruntergeladene Kopie existiert, auch bei anderweitig gefundenem Chromium.
 
@@ -277,21 +277,21 @@ Ein Profil ist ein eigener Browserordner, der Anmeldungen zwischen Sitzungen beh
 1. Wähle **Neues Profil**, gib etwa Arbeit oder Einkaufen als Namen ein und klicke **Hinzufügen**.
 2. Im Fenster „Bei Websites anmelden · Arbeit“ gibst du etwa github.com/login ein und wählst **Öffnen**.
 3. Bediene die Seite wie gewohnt und melde dich an. Auf dem Smartphone öffnet **Tastatur** die Bildschirmtastatur. Weitere Websites kannst du genauso öffnen.
-4. Schließe das Fenster. Die Anmeldungen bleiben im Profil.
+4. Schließe das Fenster, wenn du fertig bist. Die Anmeldungen bleiben im Profil.
 
-Wähle das Profil im Sitzungsbrowser über **Browseroptionen → Profil**. Der Browser schließt und öffnet beim nächsten Aufruf durch dich oder den Agenten mit den gespeicherten Anmeldungen. Der Bereich nennt den Profilnamen. Sitzungen mit demselben Profil teilen seine Anmeldungen.
+Um es zu verwenden, öffne den Browser einer Sitzung, dann **Browseroptionen** (⋯) → wähle das Profil unter **Profil**. Mit der Auswahl schließt sich der Browser. Beim nächsten Mal, wenn der Agent oder du ihn öffnest, öffnet er sich wieder, angemeldet, und das Fenster zeigt den Namen des Profils. Sitzungen, die dasselbe Profil verwenden, teilen seine Anmeldungen.
 
 Jedes Profil bietet **Bei Websites anmelden** für weitere Anmeldungen und ein **⋯**-Menü mit **Umbenennen** und **Löschen**. Löschen entfernt Anmeldungen und alle Browserdaten dieses Profils und schließt verwendende Browser. Ohne Profile erklärt die Liste, dass jeder Sitzungsbrowser ohne Anmeldung neu startet.
 
 ## Agenten deinen Computer bedienen lassen
 
-In der Desktop-App für Mac, Windows und Linux können Agenten den Computer wie eine Person vor Ort bedienen: Bildschirm ansehen, Maus und Tastatur in beliebigen Apps verwenden, etwa Notizen oder Kalender am Mac, Editor oder Excel unter Windows, Dateien unter Linux und Programme ohne Browserzugang. Websites werden weiterhin im schnelleren und sichereren Browser bearbeitet. Computer Use ist zunächst ausgeschaltet.
+In der Desktop-App können Agenten auf einem Mac, unter Windows und unter Linux auch den Computer selbst bedienen, wie eine Person davor: Sie sehen seinen Bildschirm und benutzen Maus und Tastatur, in jeder App (Notizen oder Kalender auf einem Mac, Editor oder Excel unter Windows, Dateien unter Linux, eine App, die der Browser nicht erreichen kann). Bei Websites bleiben sie beim Browser, der schneller und sicherer ist. Die Computersteuerung ist anfangs ausgeschaltet. Jeder Agent hat außerdem einen eigenen Schalter **Nutze den Computer** unter [Erlaubte Werkzeuge](/guide/agents#what-it-may-use): Ein Agent, bei dem er aus ist, kann den Computer nicht bedienen, auch wenn die Computersteuerung eingeschaltet ist.
 
 ### Computer Use aktivieren
 
 Öffne [Einstellungen → Funktionen → Computer Use](/settings?s=computer) mit „Agenten sehen deinen Bildschirm und bedienen Maus und Tastatur in der Desktop-App“. Aktiviere [**Computer Use**](/settings?s=computer&find=Computer%20use) neben der Überschrift. Je nach System gilt anschließend:
 
-- **Mac**: Erteile Hydor die beiden macOS-Berechtigungen. Neben [**Bedienungshilfen**](/settings?s=computer&find=Accessibility) für Maus und Tastatur öffnet **Erlauben…** die Systemeinstellungen unter **Datenschutz & Sicherheit → Bedienungshilfen**, nachdem macOS um Erlaubnis zur Computersteuerung gefragt hat. Aktiviere dort **Hydor**. Neben [**Bildschirmaufnahme**](/settings?s=computer&find=Screen%20Recording) öffnet **Erlauben…** die entsprechende Freigabe unter **Bildschirmaufnahme**, ab macOS 15 **Bildschirm- & Systemaudioaufnahme**. Aktiviere **Hydor**. Falls macOS Beenden und Neustarten verlangt, folge dem Hinweis; laufende Agenten arbeiten weiter. Erteilte Berechtigungen zeigen **Erlaubt** und bleiben bei Updates bestehen. Ist Hydor in den Systemeinstellungen aktiv, aber hier steht weiterhin **Erlauben…**, stammt die Freigabe möglicherweise von vor Version 0.28.1, als sie nach Updates erneut nötig war. **Erlauben…** entfernt die alte Zuordnung; aktiviere Hydor danach erneut.
+- **Auf einem Mac** erteilst du Hydor die zwei Berechtigungen von macOS. Drücke neben [**Barrierefreiheit**](/settings?s=computer&find=Accessibility), der Berechtigung von macOS zur Nutzung von Maus und Tastatur, auf **Erlauben…**. macOS fragt, ob Hydor diesen Computer steuern darf, und seine Systemeinstellungen öffnen sich bei **Datenschutz & Sicherheit → Bedienungshilfen**: Schalte dort **Hydor** ein. Drücke neben [**Bildschirmaufzeichnung**](/settings?s=computer&find=Screen%20Recording), der Berechtigung von macOS zum Sehen des Bildschirms, auf **Erlauben…** und schalte **Hydor** unter **Bildschirmaufnahme** ein (**Bildschirm- & Systemaudioaufnahme** ab macOS 15). Wenn macOS verlangt, Hydor zu beenden und neu zu öffnen, tu das: Laufende Agenten arbeiten weiter. Eine Berechtigung, die macOS erteilt hat, zeigt **Erlaubt** und bleibt bei Updates der App erhalten. Wenn die Systemeinstellungen **Hydor** als eingeschaltet zeigen, die Einstellungen aber weiter **Erlauben…** sagen, stammt dieser Schalter aus einer früheren Version (vor 0.28.1 brauchte jedes Update die Berechtigungen erneut): Drücke **Erlauben…**, was ihn zurücksetzt, und schalte **Hydor** noch einmal ein.
 - **Windows**: Keine zusätzliche Freigabe nötig. Programme mit Administratorrechten und der gesperrte Bildschirm sind nicht erreichbar.
 - **Linux**: Erforderlich sind ein X11- beziehungsweise Xorg-Desktop und Python 3, das meist vorhanden ist. Wayland, heute bei vielen GNOME- und KDE-Systemen Standard, erlaubt anderen Apps keinen solchen Bildschirm-, Maus- und Tastaturzugriff. Die Einstellungen erklären das und den Wechsel zu X11. Unter Ubuntu wählst du am Anmeldebildschirm über das Zahnrad **Ubuntu on Xorg**.
 
@@ -304,7 +304,7 @@ Beim ersten gewünschten Computerzugriff pro Sitzung fragt eine Karte „Darf de
 - den verkleinerten Hauptbildschirm sehen, keine weiteren Bildschirme;
 - klicken, doppelklicken, rechtsklicken, ziehen, scrollen und den Zeiger bewegen;
 - Text in beliebigen Sprachen eingeben und Tastenkombinationen drücken, etwa ⌘C am Mac oder Strg+C unter Windows und Linux;
-- Apps nach ihrem Namen aus Start- oder Anwendungsmenü öffnen.
+- eine App über ihren Namen öffnen, so wie ihn das Startmenü oder das Anwendungsmenü zeigt.
 
 Während der Bedienung leuchten auf allen Bildschirmen die Ränder. Unten steht „Ein Agent bedient deinen Mac“ beziehungsweise PC oder Computer sowie „Esc zum Stoppen“. Die Anzeige lässt Klicks durch und erhält nie den Tastaturfokus. Sie ist nur für dich sichtbar: Für Agentenscreenshots wird sie kurz ausgeblendet. Unter Linux benötigt sie einen Desktop mit Fenster-Compositing, etwa GNOME, KDE, Xfce, Cinnamon oder MATE. Ohne diesen Effekt meldet immerhin das Tray-Symbol die aktive Bedienung.
 
@@ -312,19 +312,19 @@ Während der Bedienung leuchten auf allen Bildschirmen die Ränder. Unten steht 
 
 Der Agent bewegt deinen echten Mauszeiger, der leicht zu übersehen ist. Deshalb umgibt ihn ein großer Ring mit weichem Leuchtrand in den Anzeigefarben und einer **Agent**-Kennzeichnung:
 
-- Der Zeiger gleitet innerhalb einer Viertelsekunde ans Ziel, statt zu springen. Der Ring folgt mit.
+- der Mauszeiger gleitet in einer Viertelsekunde zu jeder Stelle, statt dorthin zu springen, und der Ring bewegt sich mit, damit dein Auge folgen kann;
 - Ein Klick erzeugt eine Welle, ein Rechtsklick eine gestrichelte, ein Doppelklick zwei. Beim Ziehen zieht sich der Ring zusammen und folgt der Bewegung.
 - Eingegebener Text und gedrückte Tasten wie Strg+S oder Enter erscheinen kurz neben der Kennzeichnung. Pfeile zeigen Scrollrichtungen.
 
 Der Ring gehört zur Randanzeige: Klicks gehen hindurch, er erhält keinen Tastaturfokus, erscheint nicht auf Agentenscreenshots und benötigt unter Linux Fenster-Compositing.
 
-Jeder Schritt steht im Gespräch mit einem kleinen Screenshot danach. Ein Klick auf das Bild vergrößert es; die Zeile öffnet das vollständige Tool-Ergebnis. Im großen Bild markieren Ringe Klicks, bei Doppel- und Rechtsklick entsprechend doppelt oder gestrichelt, Linien Ziehbewegungen und Pfeile Scrollen. Mehrere Aktionen werden nummeriert. Die App speichert die letzten 200 Schrittbilder je Sitzung und entfernt sie nach einem Monat ohne Sitzungsnutzung.
+Jeder Schritt steht in der Unterhaltung mit einem kleinen Screenshot danach. Ein Klick auf das Bild vergrößert es; die Zeile öffnet das vollständige Tool-Ergebnis. Im großen Bild markieren Ringe Klicks, bei Doppel- und Rechtsklick entsprechend doppelt oder gestrichelt, Linien Ziehbewegungen und Pfeile Scrollen. Mehrere Aktionen werden nummeriert. Die App speichert die letzten 200 Schrittbilder je Sitzung und entfernt sie nach einem Monat ohne Sitzungsnutzung.
 
 Agenten sollen vor dem Handeln den Bildschirm ansehen, für Websites den Browser verwenden und niemals Passwörter, Kartennummern oder Codes eintippen beziehungsweise zahlen, kaufen oder Geld versenden. Dafür stoppen sie und bitten dich um Übernahme. Nur eine Sitzung darf den Computer gleichzeitig bedienen.
 
 ### Computer Use sofort stoppen
 
-Während der Bedienung zeigen Randanzeige, App-Symbol und Sitzung den Zugriff an. Am Mac steht etwa „Agent bedient deinen Mac“ in der Menüleiste und über dem Nachrichtenfeld. Zum sofortigen Stoppen:
+Solange ein Agent den Computer bedient, sind das Leuchten und sein Hinweis zu sehen, das Symbol der App zeigt es an (auf einem Mac steht daneben in der Menüleiste „Agent verwendet deinen Mac“), und seine Sitzung zeigt über dem Nachrichtenfeld „Der Agent verwendet deinen Mac“ (deinen PC, deinen Computer). Um ihn sofort zu stoppen:
 
 - drücke in einer beliebigen App **Esc**, am Mac auch **⌘⇧Esc**. Esc stoppt nur bei laufender Agentenbedienung. Ein vom Agenten selbst gedrücktes Escape, etwa zum Schließen eines Dialogs, stoppt ihn nicht;
 - wähle **Stoppen** im Menü des App-Symbols, am Mac in der Menüleiste, unter Windows im Infobereich, unter Linux im System-Tray;

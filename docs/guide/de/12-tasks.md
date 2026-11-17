@@ -34,14 +34,14 @@ Das automatische Fortsetzen nach einem Nutzungslimit ist eine separate Einstellu
 
 Unter [Einstellungen → Geplante Aufgaben](/settings?s=tasks) zeigt **Deine Aufgaben** die Zeitzone und Aufgaben, älteste zuerst. Das (i) erklärt das Nachholen verpasster Läufe. Die Liste aktualisiert sich bei Starts und Abschlüssen. **Wochenansicht** neben **Neue Aufgabe** öffnet den Kalender; siehe [Wochenübersicht: bisherige und kommende Läufe](#see-the-week-what-ran-and-what-runs-next). Jede Zeile zeigt:
 
-- Auslösersymbol, etwa Kalender, Auge oder Webhook, Aufgabenname und Agentensymbol.
+- Ein Symbol für den Auslöser (ein Kalender, ein Auge für eine Überwachung, ein Webhook-Zeichen), der Name der Aufgabe und das Symbol ihres Agenten.
 - Zeitplan und Ort, etwa „Werktags um 09:00 · neue Sitzung in reports · nächster Lauf in 14 Std. 20 Min.“, oder den Hinweis auf eine bestehende Sitzung.
 - Bei Überwachungen die letzte Prüfung, etwa „Vor 5 Min. geprüft: 12 Einträge, 2 neu“, bei Fehlern gelb.
 - Bei automatischer Pause den Grund mit „Zum erneuten Versuch aktivieren“.
-- Bis zu sechs Ergebnisdots, älteste zuerst: grün für abgeschlossen, gelb für teilweise erledigt oder blockiert, rot für fehlgeschlagen oder Fehler, grau für nichts Neues. Daneben stehen **Verlauf**, der letzte Lauf mit möglichem Startfehler und **Öffnen** für dessen Sitzung.
-- Bei Webhooks die Adresse mit Kopierknopf und gegebenenfalls dem Zielort im auslösenden Dienst.
+- Punkte für die letzten Läufe (bis zu sechs, die ältesten zuerst: grün für erledigt, gelb für teilweise erledigt oder blockiert, rot für fehlgeschlagen oder einen Fehler, grau für nichts Neues) mit **Verlauf** daneben; **Letzter Lauf vor 3 Std.** (in Rot, mit dem Grund, wenn der letzte Lauf nicht starten konnte); und **Öffnen**, das die Sitzung des letzten Laufs öffnet.
+- Bei einer Webhook-Aufgabe ihre Adresse mit einer Schaltfläche zum Kopieren und, bei einer aus einem Beispiel erstellten, wo du sie in dem Dienst einfügst, der sie aufruft.
 
-Rechts stehen Aktivierungsschalter und Menü (⋯) mit **Jetzt ausführen**, **Ohne Versand testen**, **Bearbeiten**, **Verlauf**, **Duplizieren**, bei Webhooks **Neue Adresse**, und **Löschen**.
+Rechts in jeder Zeile stehen ein Schalter, der die Aufgabe pausiert oder einschaltet, und das Menü der Aufgabe (⋯): **Jetzt ausführen**, **Ohne Versand testen**, **Bearbeiten**, **Verlauf**, **Duplizieren**, **Neue Adresse** (nur bei Webhook-Aufgaben) und **Löschen**.
 
 Auch eine Board-Karte, die sich automatisch aktuell hält, steht in der Liste, dem Board zugeordnet, etwa „Geschäft · Umsatz nach Tagen: aktualisieren“. Ihre Zeile enthält den Schalter, **Jetzt aktualisieren** und **Board öffnen**. Letzteres öffnet ihre Einstellungen auf dem Board: Frage, Zeitplan und Modellstufe änderst du dort. **Aktualisierung beenden**, das Entfernen der Karte oder das Löschen des Boards entfernt den Eintrag aus dieser Liste. Siehe [Karten aktuell halten](/guide/library#keep-cards-up-to-date).
 
@@ -52,66 +52,66 @@ Ohne Aufgaben erscheint der Hinweis, ein Beispiel zu wählen oder einen Agenten 
 Unter [Agenten → Zeitpläne](/agents/schedules) im Tab **Zeitpläne** siehst du alles, was automatisch läuft. **Wochenansicht** in den Aufgabeneinstellungen und die Suche öffnen denselben Bereich. Er vereint geplante Aufgaben, Agentenzeitpläne, App-Zeitpläne einschließlich **Automatisch aktualisieren**, automatisch aktualisierte Board-Karten, Überwachungen und Webhooks. So erkennst du kommende Aufgaben, gleichzeitige Starts und vergangene Ergebnisse.
 
 - **Woche**: Montag bis Sonntag stehen nebeneinander, Stunden am Rand, heute hervorgehoben und die aktuelle Uhrzeit als Linie. Ausgeführte Läufe erscheinen als Blöcke: grün **Abgeschlossen**, grau **Nichts Neues**, gelb **Braucht dich** bei teilweiser Erledigung oder Blockade, rot **Fehlgeschlagen** oder Fehler. Kommende Läufe sind blass und gestrichelt. Starten mehr als drei gleichzeitig, stehen zwei sichtbar neben einem Sammelblock wie **+2**.
-- **Tagesspalten** nennen Kosten und Fehleranzahl.
+- **Die Spalte jedes Tages** nennt, was seine Läufe gekostet haben und wie viele fehlgeschlagen sind.
 - **Häufige Wiederholungen, Überwachungen und Webhooks** erscheinen oberhalb der Stunden in einem Band pro Aufgabe. Das gilt für Aufgaben mit mehr als acht Läufen täglich sowie für alle Überwachungen und Webhooks. Pro Tag siehst du Ergebnisverteilung, Anzahl und etwa **+48** kommende Läufe. Ein Klick auf die Zeile klappt das Band ein.
-- **Ein Laufblock** öffnet Ergebnis, Zeitpunkt, Dauer, Kosten, gegebenenfalls anderen Auslöser, Agentenzusammenfassung, **Sitzung öffnen** oder bei Apps **Lauf öffnen** und **Bearbeiten**. Kommende Läufe zeigen Termin und Bearbeitung. Ein Tagesfeld im Band zählt Ergebnisse und bietet **Letzten öffnen**, sofern eine Sitzung existiert.
+- **Klicke auf einen Block**, um seine Karte zu sehen: wie es lief, wann, wie lange es dauerte und was es kostete, was es gestartet hat (wenn es nicht der Zeitplan war), die einzeilige Zusammenfassung des Agenten, **Sitzung öffnen** (oder **Lauf öffnen**, bei einer App) und **Bearbeiten**. Bei einem kommenden Lauf steht, wann er läuft, mit **Bearbeiten**. Der Tag eines Bands zählt seine Läufe danach, wie sie verlaufen sind, mit **Letzten Durchlauf öffnen**, wenn es eine Sitzung gibt.
 - **‹** und **›** wechseln Wochen, **Heute** kehrt zurück. **Woche** und **Monat** wechseln zur Monatsansicht mit Tagesbalken, Anzahl der Läufe, Fehler, bevorstehenden Ausführungen und Kosten. Häufige Wiederholungen stehen etwa als **+48 Wiederholungen**. Ein Klick öffnet die Woche des Tages.
-- Die Zeile über dem Kalender summiert Ausführungen, Fehler, Kosten und kommende Läufe und erklärt Farben und Zeitzone.
-- Filter wie **Alle**, **Aufgaben**, **Agenten**, **Apps**, **Boards**, **Überwachungen**, **Webhooks** und **Pausiert** mit Anzahl begrenzen Kalender, Summen und Liste.
+- Die Zeile über dem Kalender summiert, was angezeigt wird: wie viele liefen, wie viele fehlschlugen, was sie gekostet haben und wie viele noch kommen, dann was die Farben bedeuten und deine Zeitzone.
+- **Die Filter** oben (**Alle**, **Aufgaben**, **Agenten**, **Apps**, **Boards**, **Beobachter**, **Webhooks**, **Pausiert**, jeweils mit der Anzahl) zeigen nur diese: im Kalender, in seinen Summen und in der Liste.
 
-Unter dem Kalender steht **Alles, was automatisch läuft**: zuerst nächste Termine, dann Überwachungen und Webhooks, danach Pausiertes. Jede Zeile zeigt Name, Zugehörigkeit zu Agent, App, Board oder Aufgabe, Zeitplan, nächsten Termin, Pausengrund, Ergebnisdots, letzten Lauf, Zusammenfassung und **Öffnen**. Der Schalter pausiert oder aktiviert. Der Stift öffnet den passenden Bearbeitungsort: Agentenseite, **Läufe** der App oder bei automatischer Aktualisierung deren **Einstellungen**, bei Board-Karten **Aktuell halten…** auf ihrem Board ([Karten aktuell halten](/guide/library#keep-cards-up-to-date)) und für andere Aufgaben das Aufgabenformular.
+Unter dem Kalender listet **Alles, was automatisch läuft** jeden einzelnen Eintrag auf: zuerst, was als Nächstes läuft, dann Beobachter und Webhooks, dann das Pausierte. Eine Zeile zeigt ihren Namen und wem sie gehört (**Agent ·** und der Agent, **App ·** und die App, **Board ·** und das Board oder **Aufgabe**), wann sie läuft und wann das nächste Mal, warum sie sich selbst pausiert hat, Punkte für die letzten Läufe mit **Letzter Lauf vor 3 Std.:** und wie er verlief, die Zusammenfassung des Agenten und **Öffnen**. Der Schalter pausiert sie oder schaltet sie ein. Der Stift öffnet sie dort, wo du sie änderst: den Zeitplan eines Agenten auf der Seite des Agenten, den einer App unter **Ausführungen** der App (oder unter **Einstellungen** ihrer Seite, für **Automatisch aktualisieren**), die Aktualisierungen einer Board-Karte auf ihrem Board (ihr **Aktuell halten…**: [Karten aktuell halten](/guide/library#keep-cards-up-to-date)), jede andere Aufgabe hier unter Einstellungen → Geplante Aufgaben, mit geöffnetem Formular.
 
 Alle Zeiten sind lokal. Auf Smartphones zeigt die Ansicht jeweils einen Tag; **‹**, **›** oder seitliches Wischen wechseln den Tag.
 
 ## Eine neue Aufgabe erstellen
 
 1. Öffne [Einstellungen → Geplante Aufgaben](/settings?s=tasks) und [**Neue Aufgabe**](/settings?s=tasks&find=New%20task) neben dem Titel. Das Formular **Neue geplante Aufgabe** erscheint.
-2. Gib Namen, Agent, Ordner und Prompt an.
+2. Gib einen Namen ein, wähle den Agenten und den Ordner und schreib den Prompt.
 3. Wähle unter **Wann** den Auslöser.
-4. Lege unter **Jeder Lauf** Ziel und Grenzen fest.
+4. Wähle unter **Jeder Lauf**, wohin jeder Lauf geht und welche Grenzen er hat.
 5. Mit **Testlauf** kannst du die Aufgabe ohne Speichern erproben; siehe [Eine Aufgabe testen](/guide/tasks#try-a-task-with-a-test-run).
 6. Wähle **Aufgabe erstellen**.
 
-Erstellen und Testen sind erst mit Namen und Prompt möglich. Neue Aufgaben starten standardmäßig werktags um 09:00 mit dem zuletzt auf der Startseite gewählten Agenten im Standardordner der App, meist deinem persönlichen Ordner.
+**Aufgabe erstellen** und **Testlauf** sind erst möglich, wenn die Aufgabe einen Namen und einen Prompt hat. Eine neue Aufgabe ist so eingestellt, dass sie werktags um 09:00 läuft, mit dem Agenten, den du zuletzt auf der Startseite gewählt hast, im Standardordner der App (meist dein Home-Ordner).
 
 ### Name, Agent und Ordner
 
-- **Name**, etwa „Morgendliche CI-Zusammenfassung“: erscheint in Liste, Benachrichtigungen und Sitzungstiteln wie „Morgenüberblick · 3. Nov., 07:30“. Maximal 120 Zeichen.
-- **Agent**: Claude Code, Codex, Custom oder ein hinzugefügter Agent; siehe [Agenten, Konten und Modelle](/guide/agents-models). Ein Wechsel leert Modell und Denkaufwand und setzt die üblichen Berechtigungen des Agenten.
-- **Ordner**: Gib einen vorhandenen Pfad ein oder wähle ihn aus und bestätige mit **Diesen Ordner verwenden**.
+- **Name** (das Feld mit „Name, z. B. Morgendliche CI-Zusammenfassung“): wie die Aufgabe in der Liste, in Benachrichtigungen und in den Titeln der Sitzungen ihrer Läufe erscheint („Morgenüberblick · 3. Nov., 07:30“). Bis zu 120 Zeichen.
+- Der Agent-Chip: wer sie ausführt. Claude Code, Codex, Benutzerdefiniert oder ein anderer Agent, den du hinzugefügt hast (siehe [Agenten, Konten und Modelle](/guide/agents-models)). Wenn du einen anderen Agenten wählst, werden Modell und Aufwand zurückgesetzt und die üblichen Berechtigungen dieses Agenten gesetzt.
+- Der Ordner-Chip: der Ordner, in dem jeder Lauf arbeitet. Gib einen Pfad ein oder wähle einen, und wähle dann **Diesen Ordner verwenden**. Der Ordner muss existieren.
 
 ### Modell, Denkaufwand, Berechtigungen und weitere Optionen
 
 Darunter stehen die Auswahlelemente der Startseite:
 
 - **Modell** und **Denkaufwand** verwenden ohne eigene Auswahl die Agentenstandards.
-- **Berechtigungen** bestimmen den Handlungsspielraum. Neue Aufgaben verwenden **Nachfragen** bei Claude Code, **Auto** bei Codex und **Auto** bei Custom: Routinearbeiten laufen, riskante Aktionen fragen nach. Benötigt ein unbeaufsichtigter Lauf Zustimmung, wartet sie in Sitzung und [Posteingang](/guide/inbox).
-- **Agent**, **Memory**, sofern aktiv, **Ausgabenlimit**, **Swarm** und **Research** gelten für jede neue Laufsitzung wie auf der Startseite; siehe [Sitzungen](/guide/sessions), [Agenten](/guide/agents) und [Memory](/guide/memory). Eine Aufgabe mit einem deiner Agenten erscheint auch in dessen Zeitplänen, nutzt seine Modellstufe und zählt zum Monatsbudget. Fehlerhafte oder mit Fehler gestoppte Läufe werden eine Stufe höher bis Best wiederholt, außer **Bei fehlgeschlagener Prüfung hochstufen** ist deaktiviert. Bei Agenten mit eigenem dauerhaftem Gespräch wird dort weitergeschrieben statt eine neue Sitzung zu starten.
+- **Berechtigungen** bestimmen den Handlungsspielraum. Neue Aufgaben verwenden **Nachfragen** bei Claude Code, **Automatisch** bei Codex und **Automatisch** bei Custom: Routinearbeiten laufen, riskante Aktionen fragen nach. Benötigt ein unbeaufsichtigter Lauf Zustimmung, wartet sie in Sitzung und [Posteingang](/guide/inbox).
+- **Agent**, **Memory**, sofern aktiv, **Ausgabenlimit**, **Schwarm** und **Forschung** gelten für jede neue Laufsitzung wie auf der Startseite; siehe [Sitzungen](/guide/sessions), [Agenten](/guide/agents) und [Memory](/guide/memory). Eine Aufgabe mit einem deiner Agenten erscheint auch in dessen Zeitplänen, nutzt seine Modellstufe und zählt zum Monatsbudget. Fehlerhafte oder mit Fehler gestoppte Läufe werden eine Stufe höher bis Best wiederholt, außer **Bei fehlgeschlagener Prüfung hochstufen** ist deaktiviert. Bei Agenten mit eigener dauerhafter Unterhaltung wird dort weitergeschrieben statt eine neue Sitzung zu starten.
 
 ### Der Prompt
 
-Schreibe die Aufgabe vollständig auf. Ein neuer Lauf kennt das Gespräch nicht, aus dem die Idee stammt. Der Prompt darf bis zu 50.000 Zeichen enthalten.
+Was der Agent jedes Mal tun soll. Schreib es als vollständige Anweisungen auf: Ein Lauf beginnt von vorn und kann die Unterhaltung nicht sehen, in der du die Idee hattest. Er darf bis zu 50.000 Zeichen lang sein.
 
-Die erste Nachricht ergänzt Namen, Zeitplan, Auslöser, aktuelle Uhrzeit, Bitte um Ergebnisbericht und Notizen früherer Läufe. In der Sitzung erscheint das kompakt als „Geplante Aufgabe Morgenüberblick · Werktags um 07:30“. Ein Klick zeigt Prompt und die **Von der App für diesen Lauf ergänzten Angaben**.
+Die erste Nachricht jedes Laufs enthält mehr als deinen Prompt: eine Zeile mit dem Namen der Aufgabe, wie oft sie läuft, warum dieser Lauf gestartet wurde und der aktuellen Uhrzeit; eine Bitte, zu berichten, wie es lief; und die Notizen der Aufgabe aus früheren Läufen. In der Sitzung des Laufs erscheint das alles als eine Zeile, etwa „Geplante Aufgabe Morgenüberblick · Werktags um 07:30“. Wähle sie, um den Prompt und, unter „Von der App für diesen Lauf hinzugefügt“, den Rest zu lesen.
 
 ### Wann die Aufgabe läuft
 
 **Wann** bietet **Zu einer Uhrzeit**, **Wiederholt**, **Einmalig**, **Überwachen** und **Webhook**. Für die ersten drei zeigt „Nächste Läufe: …“ bis zu drei Termine in deiner Zeitzone.
 
-- **Zu einer Uhrzeit**: Uhrzeit und Wochentage. Ein Klick schaltet einen Tag um; mindestens einer bleibt aktiv. Alle sieben bedeuten täglich.
-- **Cron-Ausdruck…** unter der Uhrzeit wandelt die Auswahl in einen bearbeitbaren Standardausdruck um. **Stattdessen eine Uhrzeit** wechselt zurück. Die fünf Felder stehen für Minute, Stunde, Monatstag, Monat und Wochentag, 0 oder 7 für Sonntag. `*/15 9-17 * * 1-5` läuft werktags alle 15 Minuten von 09:00 bis 17:45. Monats- und Tagesnamen wie `jan`, `mon` sowie `@hourly`, `@daily`, `@weekly`, `@monthly` und `@yearly` funktionieren ebenfalls. Ungültige Ausdrücke werden beim Speichern mit Begründung abgewiesen.
+- **Zu einer Uhrzeit**: eine Tageszeit und die Wochentage (S M T W T F S). Wähle einen Tag, um ihn ein- oder auszuschalten; alle sieben bedeuten jeden Tag, und mindestens einer bleibt immer eingeschaltet.
+- **Cron-Ausdruck…** (unter **Zu einer Uhrzeit**) wandelt die Uhrzeit und die Tage in einen Cron-Ausdruck um, eine gängige Schreibweise für Zeitpläne, den du dann ändern kannst; **Stattdessen eine Tageszeit** geht zurück. Er hat fünf Felder: Minute, Stunde, Tag des Monats, Monat und Wochentag (0 oder 7 ist Sonntag), in deiner Zeitzone. `*/15 9-17 * * 1-5` läuft werktags alle 15 Minuten von 09:00 bis 17:45. Monats- und Tagesnamen (`jan`, `mon`) und die Kürzel `@hourly`, `@daily`, `@weekly`, `@monthly` und `@yearly` funktionieren ebenfalls. Ein Ausdruck, der nicht funktioniert, wird beim Speichern mit dem Grund abgelehnt.
 - **Wiederholt**: alle angegebenen Minuten oder Stunden, mindestens fünf Minuten. Neue Wiederholungen laufen stündlich; der erste Lauf startet ein Intervall nach dem Speichern.
-- **Einmalig**: Datum und Uhrzeit, zunächst in einer Stunde. Danach deaktiviert sich die Aufgabe, bleibt aber zum erneuten Ausführen oder Löschen in der Liste.
+- **Einmal**: ein Datum und eine Uhrzeit (zu Beginn in einer Stunde). Nach ihrem Lauf schaltet sich die Aufgabe selbst aus, bleibt aber in der Liste: Du kannst sie mit **Jetzt ausführen** erneut ausführen oder löschen.
 - **Überwachen**: siehe [Änderungen überwachen](/guide/tasks#watch-for-a-change).
 - **Webhook**: siehe [Läufe per Webhook starten](/guide/tasks#start-runs-from-another-service-with-a-webhook).
 
-Desktop-Apps verhindern automatischen Ruhezustand kurz vor einem Termin und während des Laufs; siehe [Den Computer wach halten](/guide/app#keep-the-computer-awake). Reine Überwachungsprüfungen halten ihn nicht wach. Ein geschlossener Laptopdeckel versetzt ihn weiterhin in den Ruhezustand. Verpasste Aufgaben laufen nach dem Aufwachen. Für zeitkritische Aufgaben nutze einen dauerhaft eingeschalteten Rechner.
+Desktop-Apps verhindern automatischen Ruhezustand kurz vor einem Termin und während des Laufs; siehe [Den Computer wach halten](/guide/app#keep-the-computer-awake). Reine Überwachungsprüfungen halten ihn nicht wach. Ein geschlossener Laptopdeckel versetzt ihn weiterhin in den Ruhezustand. Verpasste Aufgaben laufen nach dem Aufwachen. Für zeitkritische Aufgaben nutze einen dauerhaft eingeschalteten Computer.
 
 ### Jeder Lauf
 
-- **Startet eine neue Sitzung**, der Standard, oder **Schreibt in:** eine der 40 neuesten nicht archivierten Sitzungen desselben Agenten. Bestehende Sitzungen behalten Modell und Einstellungen. Bei beschäftigtem Agenten wartet die Nachricht bis zum Durchlaufende. Nur der eigene Anteil zählt zu den Laufkosten.
-- **Stoppt oberhalb von $** begrenzt den einzelnen Lauf zu API-Preisen, geprüft nach jedem Modellaufruf. Leer bedeutet unbegrenzt. Es ist dasselbe Ausgabenlimit wie oben und gilt für neue Sitzungen.
-- **Nach [3] Fehlern in Folge pausieren** stoppt weitere automatische Läufe mit Begründung. 0 deaktiviert diese Pause; maximal 50.
+- **Startet eine neue Sitzung** (der Standard) oder **Sendet an:** eine deiner letzten Sitzungen mit demselben Agenten (die 40 jüngsten, die nicht archiviert sind). Wenn du in eine Sitzung sendest, bleiben alle Läufe in einer Unterhaltung, die ihr eigenes Modell und ihre eigenen Einstellungen nutzt. Ist der Agent dort beschäftigt, wartet die Nachricht des Laufs in seiner Warteschlange, bis der Durchgang endet, und zu den Kosten des Laufs zählt nur sein eigener Anteil.
+- **Stoppt oberhalb von $**: ein Ausgabenlimit für jeden Lauf, zu API-Preisen. Die Sitzung des Laufs stoppt, sobald sie so viel ausgegeben hat (geprüft nach jedem Modellaufruf). Leer bedeutet kein Limit. Es ist dasselbe Limit wie der Chip **Ausgabenlimit** oben und gilt wie dieser für neue Sitzungen.
+- **Pausieren nach [3] Fehlern in Folge**: Die Aufgabe pausiert sich selbst nach so vielen fehlgeschlagenen Läufen in Folge und sagt dir, warum. 0 bedeutet, dass Fehler sie nie pausieren; der Höchstwert ist 50.
 
 Darunter steht sinngemäß: Ein Lauf meldet sein Ergebnis; ohne neue Informationen bleibt er still, Fehler werden immer gemeldet.
 
@@ -120,42 +120,42 @@ Darunter steht sinngemäß: Ein Lauf meldet sein Ergebnis; ohne neue Information
 Eine Überwachung prüft regelmäßig ohne Modell und startet den Agenten nur bei Änderungen. Wähle **Überwachen** unter **Wann** und dann eine Quelle:
 
 - **Feed**: die **Adresse** eines RSS- oder Atom-Feeds mit neuen Beiträgen einer Website, eines Blogs oder Code-Hosters. Neue Einträge wecken den Agenten mit Titel, Link, Datum und Zusammenfassung, höchstens 25 gleichzeitig.
-- **Seite**: eine Webadresse und der relevante **Bereich**:
+- **Seite**: die **Adresse** einer Webseite, und **Welcher Abschnitt** zählt:
   - **Ganze Seite** berücksichtigt Änderungen am lesbaren Text.
   - **Nahe einem Text** berücksichtigt Zeilen mit dem Suchtext und jeweils eine Nachbarzeile davor und danach, etwa rund um „Preis“.
   - **Selektor** wählt über einfache CSS-Selektoren einen Bereich: Tag, `#id`, `.class` oder `[attribute=value]`, kombiniert oder verschachtelt wie `main .price`.
 
-  Der Lauf erhält neue und entfernte Zeilen. Seitenskripte werden nicht ausgeführt. Prüfe deshalb mit **Testen**, ob die Überwachung den gewünschten Inhalt sieht.
-- **JSON**: die **Adresse** einer API-Antwort und **Wert unter** einem Pfad wie `data.price` oder `data.items[0].price`. Der Agent startet, wenn sich der Wert ändert, einem Vergleichswert entspricht oder nicht entspricht, darüber oder darunter liegt oder ihn enthält. Zahlen werden numerisch verglichen. Eine Bedingung startet den Agenten beim Eintreten, nicht bei jeder weiteren Prüfung.
-- **Ordner**: ein lokaler Ordner mit optionalem Dateimuster wie `*.pdf` unter **Nur passende Dateien**. `*` steht für beliebigen Text, `?` für ein Zeichen. Neue Dateien werden mit Namen, Größen und Datum übergeben. Versteckte Dateien und Unterordner bleiben unberücksichtigt.
-- **Befehl**: läuft bei jeder Prüfung mit deiner Shell im Aufgabenordner für höchstens eine Minute. Wähle **Bei geänderter Ausgabe** oder **Bei geändertem Exit-Code**. Exit-Code 0 bedeutet gewöhnlich Erfolg. Der Lauf erhält Ausgabe und Unterschiede.
+  Der Lauf bekommt die Zeilen, die dazugekommen sind, und die Zeilen, die weggefallen sind. Die Überwachung liest die Seite so, wie der Server sie erhält, ohne die Skripte der Seite auszuführen. Prüfe deshalb mit **Testen**, ob sie sieht, was du siehst.
+- **JSON**: die **Adresse** einer JSON-Antwort (das Datenformat, das die APIs vieler Dienste liefern), **Wert unter** einem Pfad wie `data.price` oder `data.items[0].price`, und **Agenten starten, wenn der Wert** sich ändert, gleich ist, nicht gleich ist, darüber liegt, darunter liegt oder einen **Wert** enthält. Zahlen werden als Zahlen verglichen. Eine Bedingung weckt den Agenten, wenn sie zu gelten beginnt, nicht bei jeder Prüfung, solange sie gilt.
+- **Ordner**: ein **Ordner** auf diesem Computer und, wenn du magst, **Nur Dateien mit diesem Muster**, ein Muster wie `*.pdf` (`*` steht für beliebigen Text, `?` für ein Zeichen). Neue Dateien wecken den Agenten, mit ihren Namen, Größen und Daten. Versteckte Dateien und Unterordner bleiben unberücksichtigt.
+- **Befehl**: ein **Befehl**, der bei jeder Prüfung mit deiner Shell im Ordner der Aufgabe läuft, höchstens eine Minute lang, und ob der Agent geweckt wird, **Wenn sich die Ausgabe ändert** oder **Bei geändertem Exit-Code** (die Zahl, mit der ein Befehl endet: 0 bedeutet meist, dass er funktioniert hat). Der Lauf bekommt die Ausgabe und das, was sich darin geändert hat.
 - **E-Mail**: neue Nachrichten eines [verbundenen E-Mail-Kontos](/guide/connections#connect-your-email). Wähle **Konto** und **Ordner**, standardmäßig Posteingang, sowie optional **Absender enthält**, **Betreff enthält** oder **Nur ungelesene Nachrichten**. Jede neue E-Mail startet einen eigenen Lauf, maximal zehn pro Prüfung, mit Absender, Empfängern, Datum, Betreff und Text als externen Daten. Anhänge landen unter email-attachments im Aufgabenordner. Bei mehr als zehn neuen Nachrichten starten die neuesten zehn; der erste Lauf nennt die älteren in einer Zusammenfassung. Auch nach Neustarts löst dieselbe E-Mail keinen zweiten Lauf aus.
-- **Verbundene App**: neue Deals, Kontakte, Dateien, Tickets, Zahlungen oder andere Einträge aus [verbundenen Apps](/guide/connections). Wähle **Konto** und ein aktiviertes lesendes Listen- oder Such-**Tool**. Sendende, ändernde, löschende oder zahlende Tools werden nicht angeboten. **Vorlage wählen** bietet etwa **Neue Dateien**, **Neue Kontakte**, **Neue Deals**, **Neue Tickets** und **Neue Zahlungen**, wählt ein passendes Konto-Tool und füllt Felder vor. Passe sie bei Bedarf an. `{{now}}` steht für den Prüfzeitpunkt, `{{now+2d}}` für zwei Tage später; auch `{{today}}` und `{{tomorrow}}` sind möglich. **Ausprobieren** ruft das Tool einmal auf und zeigt Eintragsliste unter **Einträge befinden sich in**, eindeutiges Feld unter **Unterschieden anhand von**, erste Einträge und vollständige **Antwort**. Korrigiere Liste oder Identifikationsfeld bei Bedarf. Jeder neue Eintrag startet höchstens einmal einen Lauf, maximal zehn pro Prüfung, als externe Daten. Weitere Einträge werden im ersten Lauf genannt. Bitte das Tool über seine Felder möglichst um die neuesten Einträge zuerst und eine ausreichende Anzahl.
-  - **Vor jedem Termin**: Bei Kalendern wird nicht jeder neue Eintrag verarbeitet, sondern ein Lauf **15 Min.**, **30 Min.**, **1 Stunde** vorher oder **Am Vorabend** zu einer gewählten Uhrzeit gestartet. Optional gelten **Titel enthält** oder **Nur Termine mit anderen Personen**. Verwende ein Tool zum Auflisten kommender Termine mit etwa `{{now}}` bis `{{now+2d}}`. Nach **Ausprobieren** wählst du das Feld **Startzeit in**. Termine werden bei jeder Prüfung und nochmals zum jeweiligen Auslösezeitpunkt gelesen. Verschobene Termine werden zum neuen Zeitpunkt berücksichtigt, abgesagte nicht.
+- **Verbundene App**: etwas Neues in einer der Apps, die du verbunden hast (siehe [Verbundene Apps](/guide/connections)), etwa ein neuer Deal oder Kontakt in einem CRM, eine neue Datei in einem Cloud-Laufwerk, ein neues Ticket oder eine neue Zahlung. Wähle das **Konto** und dann das **Werkzeug**, das bei jeder Prüfung aufgerufen wird: Angeboten werden nur Werkzeuge, die nachsehen (auflisten oder suchen), nie eines, das sendet, ändert, löscht oder bezahlt, und nur solche, die für das Konto aktiviert sind. **Ausgangspunkt** bietet fertige Startpunkte, wo die App solche Dinge enthält (**Neue Dateien**, **Neue Kontakte**, **Neue Verkaufschancen**, **Neue Tickets**, **Neue Zahlungen** und weitere): Jeder wählt eines der Werkzeuge des Kontos und füllt dessen Felder aus. Fülle die Felder des Werkzeugs nach Belieben aus; in einem Feld steht `{{now}}` für den Zeitpunkt jeder Prüfung und `{{now+2d}}` für zwei Tage später (auch `{{today}}` und `{{tomorrow}}`). **Ausprobieren** ruft das Werkzeug einmal auf und zeigt, was zurückkam: wo die Einträge in seiner Antwort stehen (**Einträge befinden sich in**), das Feld, an dem man sie unterscheidet (**Eindeutige Kennung**, etwa eine ID oder eine Adresse), die ersten Einträge und die **Vollständige Tool-Antwort** im Ganzen. Wähle dort eine andere Liste oder ein anderes Feld, wenn das gefundene nicht passt. Jeder neue Eintrag startet dann einen eigenen Lauf, höchstens 10 pro Prüfung, mit dem Eintrag als externen Daten; kommen mehr auf einmal, nennt der erste Lauf die anderen in einer Zeile. Ein Eintrag startet nie zwei Läufe, auch nicht nach einem Neustart der App. Bitte das Werkzeug, die neuesten zuerst und genug davon zu liefern, wo seine Felder das erlauben.
+  - **Vor jedem Termin**: für einen verbundenen Kalender ein Lauf zu einer festen Zeit vor jedem seiner Termine, statt einen für jeden neuen Eintrag. **Lauf starten** **15 Min.**, **30 Min.** oder **1 Stunde** vor jedem Termin, oder **Am Abend zuvor** **Um** einer Uhrzeit deiner Wahl, und wenn du magst nur für Termine, bei denen der **Titel enthält** einen bestimmten Text, oder **Nur Termine mit weiteren Personen**. Verwende das Werkzeug, das deine Termine auflistet, mit Feldern von `{{now}}` bis `{{now+2d}}` oder so, und wähle nach **Ausprobieren** unter **Startzeit in** das Feld mit dem Beginn jedes Termins. Der Beobachter liest bei jeder Prüfung die anstehenden Termine und noch einmal zum Zeitpunkt jedes Termins. Ein verschobener Termin bekommt seinen Lauf vor der neuen Zeit; ein abgesagter bekommt keinen.
 
 Anschließend:
 
 - **Alle [Zahl] Minuten prüfen** legt ein Intervall von einer Minute bis einer Woche fest, standardmäßig 15 Minuten.
 - **Adressen auf diesem Computer oder in seinem Netzwerk erlauben** gilt für Feeds, Seiten und JSON und ist standardmäßig aus. Nur du kannst dies im Formular freigeben. Vom Agenten vorgeschlagene Überwachungen erreichen dein eigenes Netzwerk nie.
-- **Testen** zeigt den aktuellen Stand, etwa „12 Einträge, erste Prüfung“, eine Inhaltsprobe oder den Fehler.
+- **Testen**: zeigt, was der Beobachter jetzt sieht, mit einer Zeile wie „12 Einträge (erste Prüfung)“ und einer Probe des Gelesenen, oder was schiefgegangen ist.
 
 Dabei gilt:
 
 - Die erste Prüfung nach dem Speichern erfasst nur den Ausgangszustand. Erst spätere Änderungen starten den Agenten. Eine geänderte Quelle setzt den Ausgangszustand neu.
-- Gelesene Inhalte sind ausdrücklich externe Arbeitsdaten, keine Anweisungen.
+- Was gelesen wurde, kommt als externe Daten gekennzeichnet beim Agenten an: Er arbeitet damit, folgt ihm aber nie als Anweisungen.
 - Änderungen während eines noch laufenden vorherigen Laufs warten auf die nächste Prüfung. Neue E-Mails, App-Einträge und Kalendertermine sind ausgenommen und starten eigene Läufe.
-- Scheitert eine Prüfung, etwa wegen Ausfall, fehlendem Seitentext, abgemeldetem Konto oder geänderter Antwortstruktur, meldet die Zeile den Fehler und startet keinen Lauf aus ungelesenen Daten. Nach der eingestellten Anzahl aufeinanderfolgender Fehler pausiert die Aufgabe mit Begründung.
-- **Jetzt ausführen** übergibt den aktuellen Stand statt einer Änderung.
+- Schlägt eine Prüfung fehl (die Website ist nicht erreichbar, der Text steht nicht mehr auf der Seite, eine verbundene App ist abgemeldet oder ihre Antwort hat sich geändert), sagt die Zeile das, und es startet kein Lauf mit dem, was nicht gelesen werden konnte. Nach so vielen fehlgeschlagenen Prüfungen in Folge, wie **Pausieren nach … Fehlern in Folge** erlaubt, pausiert die Aufgabe: „Nach 3 fehlgeschlagenen Prüfungen in Folge pausiert: …“.
+- **Jetzt ausführen** bei einer Beobachter-Aufgabe startet den Agenten mit dem, was der Beobachter jetzt sieht, und nicht mit einer Änderung.
 
 ## Läufe per Webhook starten
 
-Ein Webhook ist eine Adresse, die ein Dienst bei einem Ereignis aufruft, etwa bei einem Pull Request, einer Formularantwort oder aus deinem Skript. Wähle **Webhook** unter **Wann** und speichere die Aufgabe. Danach erscheint die kopierbare Adresse in ihrer Zeile. Sie funktioniert ohne Anmeldung, weil ihr geheimer Bestandteil den Zugriff erlaubt. Halte sie privat und bevorzuge Berechtigungen mit Rückfrage vor Änderungen. Der Dienst muss Hydor unter dieser Adresse erreichen können.
+Ein Webhook ist eine Adresse, die ein anderer Dienst aufruft, wenn etwas passiert: GitHub, wenn ein Pull-Request geöffnet wird, ein Formular, wenn jemand es abschickt, ein Skript von dir. Wähle **Webhook** unter **Wann** und speichere die Aufgabe, um ihre Adresse zu erhalten („Speichere die Aufgabe, um ihre Adresse zu erhalten. Jeder Aufruf startet einen Lauf.“). Sie erscheint in der Zeile der Aufgabe, mit einer Schaltfläche zum Kopieren. Die Adresse funktioniert ohne Anmeldung in der App, weil ihr geheimer Teil die Erlaubnis ist: Halte sie privat und bevorzuge einen Berechtigungsmodus, der vor Änderungen fragt. Der Dienst muss diese App unter dieser Adresse erreichen können.
 
 Diese Platzhalter übernehmen Aufrufdaten in den Prompt:
 
-- `{{body.path.to.field}}` liest JSON, Formulardaten oder Text, etwa `{{body.pull_request.html_url}}`.
+- `{{body.path.to.field}}`: ein Wert aus dem, was der Dienst gesendet hat (JSON, ein Formular oder reiner Text), etwa `{{body.pull_request.html_url}}`.
 - `{{headers.name}}` liest einen Header. Zugangsdaten enthaltende Header wie Authorization, Cookies, Signaturen und Tokens werden niemals übernommen.
-- `{{query.name}}` liest URL-Parameter hinter `?`.
+- `{{query.name}}`: ein Wert aus der Query der Adresse (der Teil nach `?`).
 - `{{body}}` übernimmt den gesamten Inhalt, `{{request}}` Inhalt, Header und URL-Parameter gemeinsam.
 
 Die Daten werden als externe Inhalte gekennzeichnet. **Jetzt ausführen** sendet den unveränderten Prompt ohne Ersetzung durch einen echten Aufruf.
@@ -164,28 +164,28 @@ Unter der Adresse stehen:
 
 - **Signaturgeheimnis (optional)**: Trage einen Wert ein oder wähle **Erzeugen** und hinterlege denselben Wert beim Dienst. Aufrufe benötigen dann eine HMAC-SHA256-Signatur des Inhalts, wie sie GitHub, Gitea und andere liefern. Auch GitLabs Token-Header wird unterstützt. Ohne korrekten Nachweis wird der Aufruf abgelehnt.
 - **Signatur-Header**: erscheint bei gesetztem Geheimnis. Leer werden Standardheader wie X-Hub-Signature-256, X-Gitea-Signature oder X-Signature-256 verwendet. Alternativ gibst du den eigenen Headernamen an.
-- **Filter (optional)**: **Nur ausführen, wenn** oder **Überspringen, wenn** ein Datenpfad einem Wert entspricht, etwa `body.action` gleich `opened`, `headers.x-github-event` gleich `push` oder `query.kind` gleich `daily`. Ohne Präfix wird der Body gelesen. Ausgefilterte Aufrufe werden beantwortet, starten aber nichts.
+- **Filter (optional)**: **Nur ausführen, wenn** oder **Überspringen, wenn** ein Pfad im Aufruf einem Wert **ist**: `body.action` ist `opened`, `headers.x-github-event` ist `push`, `query.kind` ist `daily`. Ein Pfad ohne `body.`, `headers.` oder `query.` liest den Body. Ein Aufruf, den der Filter ausschließt, wird beantwortet und startet nichts.
 
 Für eingehende Aufrufe gilt:
 
 - Derselbe Idempotency-Key oder dieselbe Zustellungs-ID von GitHub, Gitea oder GitLab startet nur einmal einen Lauf. IDs werden eine Woche gespeichert.
 - Aufrufe innerhalb von fünf Sekunden nach dem letzten Aufgabenlauf werden abgewiesen, damit Ereignisspitzen nur einen Lauf auslösen.
 - Pausierte Aufgaben lehnen Aufrufe ab. Die Nutzlast darf bis zu 2 MB groß sein.
-- Die Antwort kommt sofort mit dem Sitzungslink. `?wait=60` wartet bis zu 60 Sekunden auf die Agentenantwort, maximal sind 300 möglich. Läuft der Agent dann noch, erhältst du seinen Link.
+- Der Aufruf wird sofort beantwortet, mit einem Link zur Sitzung des Laufs. Hänge `?wait=60` an die Adresse, um bis zu 60 Sekunden (höchstens 300) in der Antwort auf die Antwort des Agenten zu warten; ein Lauf, der dann noch läuft, antwortet mit einem Link dazu.
 
 ## Einer Webhook-Aufgabe eine neue Adresse geben
 
-Ist die Adresse bekannt geworden oder soll ein Dienst sie nicht mehr nutzen, öffne das Aufgabenmenü (⋯) → **Neue Adresse** und bestätige. Die bisherige Adresse wird ungültig; aktualisiere alle aufrufenden Dienste. Normales Bearbeiten behält die Adresse, ein Duplikat erhält eine eigene.
+Wenn die Adresse bekannt geworden ist oder ein Dienst sie nicht mehr aufrufen soll: Menü der Aufgabe (⋯) → **Neue Adresse**, dann bestätige **Neue Adresse** („Die bisherige Adresse funktioniert nicht mehr. Aktualisiere die Dienste, die sie aufrufen.“). Beim Bearbeiten einer Webhook-Aufgabe bleibt ihre Adresse erhalten; ein Duplikat bekommt eine eigene Adresse.
 
 ## Mit einem Beispiel beginnen
 
-Unter der Liste findest du [**Mit einem Beispiel beginnen**](/settings?s=tasks&find=Start%20from%20an%20example). Zunächst sind vier Einträge sichtbar. **Alle Beispiele anzeigen** und **Weniger Beispiele anzeigen** erweitern oder kürzen die Liste. Die Gruppen heißen **Alltag**, **Überwachen** und **Entwicklung**. Wähle ein Beispiel, fülle das kurze Formular aus, bestimme unter **Ausgeführt von** den Agenten und klicke auf **Aufgabe erstellen**. **Weitere Optionen…** öffnet stattdessen das vorausgefüllte vollständige Formular. Optionale Felder dürfen leer bleiben. Schalter wie **Pull Requests öffnen** legen fest, was der Agent tun darf.
+Unter der Liste findest du [**Mit einem Beispiel beginnen**](/settings?s=tasks&find=Start%20from%20an%20example). Zunächst sind vier Einträge sichtbar. **Alle Beispiele anzeigen** und **Weniger Beispiele anzeigen** erweitern oder kürzen die Liste. Die Gruppen heißen **Alltag**, **Überwachen** und **Entwicklung**. Wähle ein Beispiel, fülle das kurze Formular aus, bestimme unter **Ausgeführt von** den Agenten und klicke auf **Aufgabe erstellen**. **Weitere Optionen…** öffnet stattdessen das vorausgefüllte vollständige Formular. Optionale Felder dürfen leer bleiben. Schalter wie **Pull-Requests öffnen** legen fest, was der Agent tun darf.
 
 **Alltag**
 
 - [**Morgenüberblick**](/settings?s=tasks&find=Morning%20brief): Wetter, Neuigkeiten zu deinen Themen und Tagesplanung. Wähle Uhrzeit, zunächst 07:30, Wochentage, Stadt und Nachrichtenthemen. Verbundene Kalender und E-Mail-Konten ergänzen heutige Termine und dringende Nachrichten.
 - [**Neuigkeiten zu einem Thema**](/settings?s=tasks&find=News%20on%20a%20topic): tatsächlich neue Informationen mit Quellen zu gewählten Zeiten, zunächst täglich 09:00. Ohne Neuigkeiten bleibt die Aufgabe still.
-- [**Wochenbericht aus einem Ordner**](/settings?s=tasks&find=Weekly%20report%20from%20a%20folder): Änderungen der letzten sieben Tage, offene Arbeit und drei Vorschläge für die nächste Woche, zunächst freitags 16:00. Dateien bleiben unverändert.
+- [**Wochenbericht aus einem Ordner**](/settings?s=tasks&find=Weekly%20report%20from%20a%20folder): an einem Wochentag (zunächst freitags um 16:00 Uhr), was sich in den letzten sieben Tagen in einem Ordner oder Repository geändert hat und was unfertig wirkt, mit drei Vorschlägen für die nächste Woche. Sie ändert keine Dateien.
 - [**E-Mail-Zusammenfassung**](/settings?s=tasks&find=Inbox%20digest): neue Nachrichten seit dem letzten Lauf, dringende zuerst. Nur lesend und mit verbundenem E-Mail-Konto; siehe [Verbundene Apps, Keys und Tools](/guide/connections).
 - [**Nach Gewohnheiten fragen**](/settings?s=tasks&find=Habit%20check-in): freundliche Rückfrage zur Gewohnheit, zunächst täglich 20:00. Die Serie erfolgreicher Tage bleibt in den Aufgabennotizen erhalten.
 - [**Erinnerung**](/settings?s=tasks&find=Reminder): Hinweis zur gewählten Uhrzeit und an gewählten Tagen, zunächst werktags 09:00. Für einmalige Termine siehe [Erinnerungen](/guide/tasks#reminders).
@@ -201,19 +201,19 @@ Unter der Liste findest du [**Mit einem Beispiel beginnen**](/settings?s=tasks&f
 
 **Entwicklung**, mehr unter [Entwicklung](/guide/engineering)
 
-- [**Neue Pull Requests prüfen**](/settings?s=tasks&find=Review%20new%20pull%20requests): Webhook-Aufgabe im Repository-Ordner für GitHub oder Gitea, nur bei `opened`. Der Agent prüft Änderungen und schlägt Korrekturen vor, ohne Push oder Merge. Kopiere die gespeicherte Adresse in die Repository-Webhook-Einstellungen und wähle bei einzelnen Ereignissen nur **Pull requests**.
+- [**Neue Pull-Requests prüfen**](/settings?s=tasks&find=Review%20new%20pull%20requests): eine Webhook-Aufgabe in einem Repository-Ordner, die GitHub oder Gitea für jeden neuen Pull-Request aufruft (sie läuft nur, wenn der Aufruf `opened` sagt). Der Agent prüft die Änderung und schlägt Korrekturen vor, ohne zu pushen oder zu mergen. Sobald sie gespeichert ist, kopiere ihre Adresse in die Webhook-Einstellungen des Repositorys, wie ihre Zeile es sagt (unter den einzelnen Ereignissen nur **Pull-Requests**).
 - [**CI-Diagnose**](/settings?s=tasks&find=CI%20doctor): Fehlgeschlagene Läufe in GitHub Actions, GitLab CI, Buildkite oder CircleCI starten einen Agenten. Er liest Protokolle, unterscheidet sporadische und tatsächliche Fehler und wiederholt den Lauf oder erstellt je nach Freigabe einen Draft-Pull-Request. Siehe [CI-Diagnose](/guide/engineering#ci-doctor).
 - [**Issues einordnen**](/settings?s=tasks&find=Issue%20triage): vergibt Labels, findet Duplikate, fragt nach fehlenden Angaben und versucht kleine Korrekturen als Draft-Pull-Request. Siehe [Issues einordnen](/guide/engineering#issue-triage).
-- [**Abhängigkeiten pflegen**](/settings?s=tasks&find=Dependency%20gardener): wöchentliche Updates, zunächst montags 09:00, in getesteten Worktrees. Sicherheitskorrekturen zuerst, ein Pull Request je Risikostufe oder ein Bericht. Siehe [Abhängigkeiten pflegen](/guide/engineering#dependency-gardener).
+- [**Abhängigkeiten pflegen**](/settings?s=tasks&find=Dependency%20gardener): wöchentliche Updates, zunächst montags 09:00, in getesteten Worktrees. Sicherheitskorrekturen zuerst, ein Pull-Request je Risikostufe oder ein Bericht. Siehe [Abhängigkeiten pflegen](/guide/engineering#dependency-gardener).
 - [**Erste Hilfe bei Störungen**](/settings?s=tasks&find=Incident%20first%20responder): Alarme aus Sentry, Grafana, Datadog, Better Stack oder anderen Diensten starten einen Agenten, der dich sofort informiert, die wahrscheinliche Ursache sucht und vor jedem Rollback nachfragt. Siehe [Erste Hilfe bei Störungen](/guide/engineering#incident-first-responder).
 
 Webhook-Beispiele erklären im Formular und nach dem Speichern unter ihrer Adresse, wo du diese beim Dienst hinterlegen musst.
 
 ## Eine Aufgabe testen
 
-**Testlauf** unten im Formular führt die aktuelle Aufgabe einmal ohne Speichern aus. Wie ein echter Lauf erhält er eine Sitzung namens „Test: <Name> · <Zeit>“. Im Formular erscheinen Ergebnis und **Sitzung öffnen**. Testfehler zählen nicht für die automatische Aufgabenpause. Beim Testen einer bestehenden Aufgabe werden ihre Notizen gelesen und der Test im Verlauf erfasst. Neue Aufgaben haben noch keine Notizen.
+**Testlauf** in der Fußzeile des Formulars führt die Aufgabe einmal jetzt aus, so wie das Formular sie hat, ohne sie zu speichern. Er läuft wie ein echter Lauf, in einer eigenen Sitzung mit dem Titel „Test: <Name> · <Zeit>“, und ein Streifen im Formular zeigt **Testlauf** mit dem Ergebnis, sobald er endet, und **Sitzung öffnen**. Ein Testlauf zählt nie zu den Fehlern, die eine Aufgabe pausieren. Wenn du eine Aufgabe beim Bearbeiten testest, liest der Testlauf ihre Notizen und erscheint in ihrem Verlauf als **Testlauf**; eine neue Aufgabe hat noch keine Notizen.
 
-Zum Testen sendender, veröffentlichender oder löschender Aufgaben ohne externe Auswirkungen wähle im Menü **Weitere Testmöglichkeiten** neben **Testlauf** die Option **Ohne Versand testen**. Sie steht auch im Menü gespeicherter Aufgaben. Alle extern wirkenden Konto-Tools für Senden, Veröffentlichen, Antworten, Einladen, Teilen, Löschen und Bezahlen sowie alle Tools mit **Vorher fragen** werden nur als „Wäre gesendet worden“ erfasst. Der Agent erfährt davon und arbeitet weiter, als sei der Aufruf erfolgreich gewesen. Formular, **Verlauf** und Sitzung zeigen die vorgesehenen Aktionen. Im Postausgang bleibt nichts zurück. Lesen funktioniert normal. Siehe [Verbundene Apps, Keys und Tools](/guide/connections#ask-first-calls-that-wait-for-your-ok).
+Um eine Aufgabe zu testen, die sendet, veröffentlicht oder löscht, ohne dass etwas nach außen geht, öffne das Menü neben **Testlauf** (**Weitere Möglichkeiten zum Testen**) und wähle **Ohne Versand testen**, oder wähle **Ohne Versand testen** im Menü (⋯) einer gespeicherten Aufgabe. Sie läuft genauso, aber jeder Aufruf eines Werkzeugs eines verbundenen Kontos, das nach außen wirkt (sendet, veröffentlicht, antwortet, einlädt, teilt, löscht oder bezahlt), und jeder Aufruf eines Werkzeugs mit „Vorher fragen“ wird als „wäre gesendet worden“ festgehalten und nie ausgeführt. Der Agent erfährt das und macht weiter, als wäre es hinausgegangen. Ihr Streifen, ihr Lauf im **Verlauf** und ihre Sitzung listen auf, was sie **Wäre gesendet worden**, und danach wartet nichts im Postausgang. Lesen funktioniert wie gewohnt. Siehe [Verbundene Apps, Keys und Tools](/guide/connections#ask-first-calls-that-wait-for-your-ok).
 
 ## Eine Aufgabe sofort ausführen
 
@@ -221,13 +221,13 @@ Zum Testen sendender, veröffentlichender oder löschender Aufgaben ohne externe
 
 ## Ergebnisse der Läufe ansehen
 
-**Verlauf** im Aufgabenmenü oder neben den Ergebnisdots zeigt die neuesten 50 Läufe, neueste zuerst. Die App bewahrt 100 pro Aufgabe auf. Jeder Eintrag enthält:
+Das Menü der Aufgabe (⋯) → **Verlauf**, oder **Verlauf** neben den Punkten, öffnet die Läufe der Aufgabe, neueste zuerst (die letzten 50 werden angezeigt; die App behält 100 pro Aufgabe). Jeder Lauf zeigt:
 
 - Ergebnis: **Läuft**, **Abgeschlossen**, **Teilweise erledigt**, **Blockiert** bei fehlendem Zugang oder Entscheidung, **Fehlgeschlagen**, **Nichts Neues** oder **Fehler**, wenn der Start oder Durchlauf scheiterte.
-- Startzeit, Auslöser wie Zeitplan, Webhook, Überwachung, manuell, Wiederholung oder Test, Dauer und Kosten.
-- Bei Tests ohne Versand die vorgesehenen Aufrufe mit Konto, Tool und Empfänger.
+- wann er gestartet wurde, was ihn gestartet hat (**Nach Zeitplan**, **Webhook**, **Beobachter**, **Jetzt ausführen**, **Wiederholen**, **Testlauf** oder **Ohne Versand testen**), wie lange er gedauert hat und was er gekostet hat.
+- Bei einem Test ohne Versand, was er **Wäre gesendet worden**: jeder Aufruf, mit dem Konto, dem Werkzeug und dem Empfänger, an den er gegangen wäre.
 - Die einzeilige Agentenzusammenfassung. Ein Klick auf lange Texte öffnet die vollständige letzte Antwort.
-- **Sitzung öffnen** und **Mit denselben Eingaben erneut ausführen** für denselben Webhook-Aufruf oder dieselbe beobachtete Änderung.
+- **Sitzung öffnen** und **Mit derselben Eingabe erneut ausführen**, was die Aufgabe noch einmal mit dem ausführt, was dieser Lauf bekommen hat: derselbe Webhook-Aufruf oder dieselbe Änderung, die ein Beobachter gesehen hat.
 
 Das Ergebnis stammt aus dem Abschlussbericht des Agenten. Fehlt er, entscheidet die App: **Fehler** bei einem fehlerhaften Durchlaufende, **Nichts Neues** bei Antworten mit [SILENT] oder reinem Hinweis auf fehlende Neuigkeiten, ansonsten **Abgeschlossen**. In der Sitzung erscheint der Bericht als Schritt, etwa „Als abgeschlossen gemeldet: …“.
 
@@ -237,57 +237,57 @@ Unter dem Verlauf steht **Notizen für weitere Läufe**: bereits gemeldete Inhal
 
 ## Benachrichtigungen einer Aufgabe
 
-Läufe verwenden die üblichen Sitzungsbenachrichtigungen mit Sitzungstitel und Agentenzusammenfassung gemäß deinen Einstellungen; siehe [Posteingang und Benachrichtigungen](/guide/inbox).
+Ein Lauf sagt dir mit der üblichen Benachrichtigung seiner Sitzung, wie er gelaufen ist, mit dem Namen der Sitzung als Titel und der einzeiligen Zusammenfassung des Agenten. Sie folgt deinen Benachrichtigungseinstellungen (siehe [Posteingang und Benachrichtigungen](/guide/inbox)).
 
 - Ohne neue Informationen erfolgt keine Meldung.
-- Fehlgeschlagene oder mit Fehler beendete Läufe melden sich immer.
+- Ein fehlgeschlagener Lauf oder einer, der mit einem Fehler endete, sendet immer eine Fehlermeldung.
 - Blockierte Läufe beginnen mit „Blockiert:“ und nennen den Bedarf.
-- Nicht gestartete Läufe, etwa bei fehlendem Ordner oder gelöschter Zielsitzung, melden „Start nicht möglich: …“.
+- Ein Lauf, der nicht starten konnte (sein Ordner ist weg, die Sitzung, in die er schreibt, wurde gelöscht), sendet eine Fehlermeldung: „Konnte nicht gestartet werden: …“.
 - Automatische Aufgabenpausen nennen ihren Grund.
-- Läufe in bestehenden Gesprächen ändern deren Benachrichtigungseinstellungen nicht.
+- Läufe in bestehenden Unterhaltungen ändern deren Benachrichtigungseinstellungen nicht.
 
-Dringendes kann der Agent schon während der Arbeit über notify_user melden. Das gilt auch für andere Agenten und App-Schritte.
+Ein Agent kann dir auch während der Arbeit eine Benachrichtigung schicken (sein Werkzeug notify_user), für etwas, das nicht bis zum Ende des Laufs warten kann; das kann jeder Agent, und auch der Schritt einer App.
 
 ## Aufgaben pausieren, aktivieren, ändern, duplizieren oder löschen
 
 - **Pausieren oder aktivieren** erfolgt über den Zeilenschalter. Pausierte Aufgaben führen weder Läufe noch Prüfungen aus und lehnen Webhooks ab. Das Aktivieren löscht Fehlerzähler und Pausengrund.
-- **Automatische Pause** folgt nach der eingestellten Anzahl aufeinanderfolgender Fehler. Die Zeile nennt Anzahl und letzten Fehler.
-- **Bearbeiten** öffnet **Aufgabe bearbeiten**; bestätige mit **Speichern**.
+- **Automatische Pause**: Nach der eingestellten Anzahl von Fehlern in Folge pausiert die Aufgabe, und ihre Zeile sagt, warum („Nach 3 fehlgeschlagenen Läufen in Folge pausiert. Zuletzt: …“).
+- **Bearbeiten**: Menü der Aufgabe (⋯) → **Bearbeiten** öffnet das Formular als **Aufgabe bearbeiten**; wähle **Speichern**.
 - **Duplizieren** öffnet einen vorausgefüllten Entwurf namens „<Name> (Kopie)“ zum Anpassen und Speichern.
 - **Löschen** fragt nach. Aufgabe und Verlauf verschwinden; gestartete Sitzungen bleiben.
 
 ## Einen Agenten eine Aufgabe einrichten lassen
 
-Bitte im Gespräch etwa „Erinnere mich Freitag um 9 an den Zahnarzt“, „Fasse jeden Montagmorgen die Issues der letzten Woche zusammen“ oder „Melde Änderungen dieser Seite“. Der Vorschlag erscheint als Karte und wird erst nach deiner Antwort gespeichert.
+Bitte in der Unterhaltung etwa „Erinnere mich Freitag um 9 an den Zahnarzt“, „Fasse jeden Montagmorgen die Issues der letzten Woche zusammen“ oder „Melde Änderungen dieser Seite“. Der Vorschlag erscheint als Karte und wird erst nach deiner Antwort gespeichert.
 
 Die Karte fragt **Diese Aufgabe planen?** mit Namen und **Wartet auf dich** und zeigt:
 
-- **Wann**: Zeitplan und kommende Termine in deiner Zeitzone. Bei Überwachungen Quelle, Intervall und Adresse, Befehl oder Konto-Tool sowie den Hinweis, dass zuerst geprüft und der Agent erst bei Änderungen gestartet wird.
+- **Wann**: der Zeitplan in Worten, mit den nächsten Läufen in deiner Zeitzone. Bei einem Beobachter, was er beobachtet und wie oft, mit der Adresse, dem Befehl oder dem Werkzeug einer verbundenen App, und „Es sieht richtig aus, nachdem du bestätigst, und der Agent wacht nur auf, wenn sich etwas geändert hat.“
 - **Aufgabe**: den Prompt, bei langen Texten über **Vollständig anzeigen**.
-- **Ausführung**: Agent, Modell und neue Sitzung im Ordner oder dieses Gespräch.
+- **Ausführungen**: der Agent, sein Modell und wo: eine neue Sitzung in einem Ordner oder in dieser Unterhaltung.
 
 Du wählst:
 
 - **Einplanen** zum Speichern und Aktivieren.
-- **Bearbeiten…** zum Anpassen im vollständigen Formular, ebenfalls mit **Einplanen**.
+- **Bearbeiten…**: öffnet das Aufgabenformular mit allem ausgefüllt, um zuerst einen beliebigen Teil zu ändern; seine Schaltfläche heißt ebenfalls **Einplanen**.
 - **Nicht jetzt** zum Ablehnen.
 
-Der Agent erhält deine Antwort einschließlich Änderungen automatisch. Die Karte bleibt mit Ergebnis, nächstem Termin und Link zu **Geplante Aufgaben** im Gespräch und zeigt geräteübergreifend denselben Stand.
+Der Agent erfährt deine Antwort als Nachricht, einschließlich der Teile, die du geändert hast, du musst es ihm also nicht sagen. Die Karte bleibt mit dem Ergebnis in der Unterhaltung („Geplant“, „Nächster Lauf …“, ein Link zu **Geplante Aufgaben**) und zeigt auf deinen anderen Geräten dasselbe.
 
-Ohne andere Vorgaben übernimmt die Aufgabe Agent, Modell, Berechtigungen und Ordner des Gesprächs. Neue Laufsitzungen erhalten außerdem dessen Agentenprofil, Memory, Ausgabenlimit, verbundene Konten und Projekt. Bittest du um Einträge hier im Gespräch, verwenden alle Läufe stattdessen diese Sitzung.
+Ohne andere Vorgaben übernimmt die Aufgabe Agent, Modell, Berechtigungen und Ordner des Unterhaltung. Neue Laufsitzungen erhalten außerdem dessen Agentenprofil, Memory, Ausgabenlimit, verbundene Konten und Projekt. Bittest du um Einträge hier in der Unterhaltung, verwenden alle Läufe stattdessen diese Sitzung.
 
-Agenten können Aufgaben auch ändern, pausieren, reaktivieren oder löschen, immer mit vorheriger Karte. Änderungsfragen zeigen alte Werte durchgestrichen über neuen Werten. Die Entscheidungen lauten etwa **Ändern** oder **Beibehalten**, **Pausieren** oder **Weiterlaufen lassen**, **Aktivieren** oder **Pausiert lassen**, **Löschen** oder **Behalten**. Auflisten mit nächstem Termin und letztem Ergebnis ist ebenfalls möglich.
+Agenten können deine Aufgaben auch ändern, pausieren, wieder aktivieren oder löschen, immer zuerst mit einer Karte: **Diese Aufgabe ändern?** (die Teile, die sich ändern, der alte Wert durchgestrichen über dem neuen), **Diese Aufgabe pausieren?**, **Diese Aufgabe wieder aktivieren?** oder **Diese Aufgabe löschen?**, jeweils mit eigenem Ja und Nein (**Ändern** oder **Unverändert lassen**, **Pausieren** oder **Weiterlaufen lassen**, **Aktivieren** oder **Pausiert lassen**, **Löschen** oder **Beibehalten**). Sie können auch deine Aufgaben auflisten, mit dem nächsten Lauf jeder Aufgabe und dem Ergebnis des letzten Laufs.
 
 Grenzen:
 
-- Höchstens fünf unbeantwortete Vorschläge pro Gespräch.
+- Eine Unterhaltung kann bis zu fünf Vorschläge haben, die auf deine Antwort warten.
 - Ab 100 vorhandenen Aufgaben können Agenten keine weiteren vorschlagen.
 - Ein geplanter Lauf darf keine Aufgaben erstellen oder ändern; stattdessen soll er es im Bericht vorschlagen.
 - Vorgeschlagene Überwachungen dürfen nicht auf deinen Computer oder dein privates Netzwerk zugreifen.
 
 ## Aus einer Sitzung eine Aufgabe machen
 
-Für wiederkehrende Arbeit öffne das Sitzungsmenü (⋯) → **Mehr → Als Automatisierung einrichten**. Das [Hilfsmodell](/settings?s=models&find=Helper%20model) liest das Gespräch und erstellt einen eigenständig wiederholbaren Prompt ohne einmalige Details, mit deinen Korrekturen und einem passenden Auslöser. Agent, Modell, Denkaufwand, Berechtigungen, Ordner und Sitzungseinstellungen werden übernommen. Bei Worktrees dient das ursprüngliche Repository als Arbeitsort.
+Wenn eine Sitzung etwas getan hat, das du noch einmal erledigt haben willst: Menü der Sitzung (⋯) → **Mehr** → **In Automatisierung umwandeln**. Das [Hilfsmodell](/settings?s=models&find=Helper%20model) liest die Unterhaltung und entwirft eine Aufgabe: einen Prompt, der von allein wieder laufen kann (ohne die einmaligen Details dieses Mals, mit deinen eingearbeiteten Korrekturen), und einen passenden Auslöser. Agent, Modell, Aufwand, Berechtigungen, Ordner und die Einstellungen der Sitzung kommen aus der Sitzung; eine Sitzung in einem Worktree läuft im Repository, aus dem sie stammt.
 
 Das Formular **Neue Automatisierung aus dieser Sitzung** erklärt die Auslöserwahl. Passe alles an, teste und speichere. Die Aufgabe erscheint unter [Einstellungen → Geplante Aufgaben](/settings?s=tasks). Ohne eigene Nachrichten lässt sich eine Sitzung nicht umwandeln.
 
@@ -297,11 +297,11 @@ Eine Erinnerung ist eine Aufgabe, die dir zu einem Termin eine Nachricht in der 
 
 - Bitte einen Agenten: „Erinnere mich morgen um 8 daran, die Mülltonnen rauszustellen“. Bestätige den einmaligen Vorschlag.
 - Nutze das Beispiel [**Erinnerung**](/settings?s=tasks&find=Reminder) für wiederkehrende Tage.
-- Erstelle eine **Neue Aufgabe** mit **Einmalig** und einem Prompt wie „Erinnere mich in einem freundlichen Satz daran, den Zahnarzt anzurufen“.
+- Erstelle eine **Neue Aufgabe** mit **Einmal** unter **Wann** und einem Prompt wie „Erinnere mich in einem freundlichen Satz daran, den Zahnarzt anzurufen.“
 
 ## Auf dem Smartphone
 
-[Einstellungen → Geplante Aufgaben](/settings?s=tasks) funktioniert mobil genauso. [Zeitpläne](/agents/schedules) zeigt jeweils einen Tag. Aufgabenformulare, Beispiele und Bestätigungen vor Löschen oder neuer Webhook-Adresse öffnen sich von unten. Auslöser und Überwachungsarten sind bei Platzmangel seitlich scrollbar; Beispiele stehen untereinander. Aktiviere mobile Benachrichtigungen, um bei geschlossener App informiert zu werden; siehe [Posteingang und Benachrichtigungen](/guide/inbox).
+[Einstellungen → Geplante Aufgaben](/settings?s=tasks) funktioniert auf einem Smartphone genauso, und [Zeitpläne](/agents/schedules) zeigt jeweils einen Tag. Das Aufgabenformular, die Formulare der Beispiele und die Bestätigungen (vor **Löschen** oder **Neue Adresse**) öffnen sich als Blätter vom unteren Bildschirmrand. Die Auswahl unter **Wann** und die Arten eines Beobachters scrollen seitlich, wenn sie nicht passen, und die Beispiele stehen als eine Spalte von Zeilen untereinander. Um von deinen Aufgaben zu hören, wenn die App geschlossen ist, aktiviere Benachrichtigungen für das Smartphone (siehe [Posteingang und Benachrichtigungen](/guide/inbox)).
 
 ## Frag einen Agenten
 
@@ -310,13 +310,13 @@ Eine Erinnerung ist eine Aufgabe, die dir zu einem Termin eine Nachricht in der 
 - „Überwache diese Produktseite und melde dich, wenn der Preis unter 99 € fällt.“
 - „Wenn eine Rechnung meines Steuerberaters per E-Mail ankommt, speichere das PDF unter ~/Invoices und ergänze meine Ausgabentabelle.“
 - „Starte bei einem neuen HubSpot-Deal eine Aufgabe: Recherchiere das Unternehmen und entwirf eine erste Antwort an den Kontakt.“
-- „Bereite mich 30 Minuten vor jedem Kundentermin im Google-Kalender auf die Person und unsere letzten Gespräche vor.“
+- „Bereite mich 30 Minuten vor jedem Kundentermin im Google-Kalender auf die Person und unsere letzten Unterhaltungen vor.“
 - „Welche geplanten Aufgaben sind diese Woche warum fehlgeschlagen?“
 - „Welche Karten auf meinen Boards werden morgen früh aktualisiert und was kosten diese Aktualisierungen pro Monat?“
 - „Was läuft morgen automatisch und wann?“
 - „Warum starteten Montag so viele Aufgaben um 08:00? Verteile sie zeitlich.“
 - „Pausiere meinen Morgenüberblick“ oder „Starte den Wochenbericht jetzt“.
 - „Teste die Rechnungserinnerungen ohne Versand und zeige die vorgesehenen E-Mails.“
-- „Mache dieses Gespräch zu einer Aufgabe für jeden Montag um 9.“
+- „Mache diese Unterhaltung zu einer Aufgabe für jeden Montag um 9.“
 - „Starte meine Leselisten-App mit dem Beitragslink, sobald dieser Feed einen neuen Beitrag hat.“
 - „Richte für ~/code/shop eine CI-Diagnose mit GitHub Actions ein, die sporadisch fehlschlagende Jobs wiederholen darf.“

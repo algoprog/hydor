@@ -1,6 +1,6 @@
 # Experimente
 
-Experimente führt Trainings- und Evaluationsjobs für dich aus. Ein Job wartet, bis auf einem deiner Rechner eine GPU mit genügend freiem Speicher verfügbar ist, oder bis er in der Warteschlange eines Clusters an der Reihe ist. Danach läuft er selbstständig. Dabei werden Code samt Änderungen, Einstellungen, Seed und Umgebung sowie Protokoll, Metriken und mögliche Eingriffe des zuständigen Agenten dokumentiert. Du kannst Läufe vergleichen oder eine Ergebnistabelle mit Signifikanztests für deine wissenschaftliche Arbeit erstellen. Auch Agenten nutzen diese Funktion: Bitte einen Agenten, etwas auf einer freien GPU zu trainieren oder auszuwerten. Er startet hier einen Lauf, während sein Gespräch verfügbar bleibt.
+Experimente führt Trainings- und Evaluationsjobs für dich aus. Ein Job wartet, bis auf einem deiner Computer eine GPU mit genügend freiem Speicher verfügbar ist, oder bis er in der Warteschlange eines Clusters an der Reihe ist. Danach läuft er selbstständig. Dabei werden Code samt Änderungen, Einstellungen, Seed und Umgebung sowie Protokoll, Metriken und mögliche Eingriffe des zuständigen Agenten dokumentiert. Du kannst Läufe vergleichen oder eine Ergebnistabelle mit Signifikanztests für dein Paper erstellen. Auch Agenten nutzen diese Funktion: Bitte einen Agenten, etwas auf einer freien GPU zu trainieren oder auszuwerten. Er startet hier einen Lauf, während seine Unterhaltung verfügbar bleibt.
 
 ![System → Experimente: nach Experiment gruppierte Läufe, darüber Warteschlange und GPUs, daneben Protokoll und Metriken eines Laufs](images/experiments.webp)
 
@@ -14,7 +14,7 @@ Darunter stehen deine Läufe, nach Experiment gruppiert. Das Experiment mit dem 
 
 - **Eingereiht**: Der Lauf wurde gerade hinzugefügt. **Wartet auf eine GPU**, **Wartet** oder **In der Cluster-Warteschlange**: Der Lauf wäre an der Reihe, aber benötigte Ressourcen sind noch belegt. Beim Darüberfahren erfährst du den Grund.
 - **Wird gestartet**, **Läuft seit 2 Std. 13 Min.**, **Wird gestoppt**.
-- **Abgeschlossen**: mit Exit-Code 0 beendet. Außerdem **Fehlgeschlagen**, **Gestoppt**, **Vorzeitig gestoppt** für den vorzeitigen Abbruch innerhalb eines Sweeps und **Prozess nicht mehr auffindbar**, etwa nach einem Rechnerneustart.
+- **Abgeschlossen**: mit Exit-Code 0 beendet. Außerdem **Fehlgeschlagen**, **Gestoppt**, **Vorzeitig gestoppt** für den vorzeitigen Abbruch innerhalb eines Sweeps und **Prozess nicht mehr auffindbar**, etwa nach einem Computerneustart.
 
 **Suchen** rechts oberhalb der Liste öffnet eine Suche nach Name, Experiment oder Befehl sowie Filter nach Status und Ausführungsort. **× N angezeigt** entfernt aktive Filter.
 
@@ -24,7 +24,7 @@ Sind noch keine Läufe vorhanden, erklärt die Seite die Funktion und bietet **N
 
 1. Klicke oben rechts auf [**Neuer Lauf**](/system/experiments?new=1).
 2. Trage den **Befehl** so ein, wie du ihn im Arbeitsordner ausführen würdest: `python train.py --lr 3e-4`.
-3. Wähle den **Ordner** und den **Ausführungsort**: **Dieser Computer**, einen anderen deiner Rechner oder einen Cluster; siehe [Ausführungsorte](#where-runs-go).
+3. Wähle den **Ordner** und den **Ausführungsort**: **Dieser Computer**, einen anderen deiner Computer oder einen Cluster; siehe [Ausführungsorte](#where-runs-go).
 4. Lege die Anzahl der **GPUs** fest. Mit 0 läuft der Job ohne GPU. Unter **Freier Speicher je GPU (GB)** gibst du den Speicherbedarf an. Ohne Angabe wartet der Job auf eine vollständig ungenutzte GPU.
 5. Vergib bei Bedarf einen **Namen**; ansonsten wird der Skriptname verwendet. Unter **Experiment** ordnest du den Lauf einer gemeinsamen Liste und Vergleichsgruppe zu.
 6. Klicke auf **Starten**.
@@ -33,7 +33,7 @@ Unter **Weitere Optionen** findest du:
 
 - **Einstellungen**: Zeilen im Format name=value, die mit dem Lauf gespeichert und in Tabellen verglichen werden. Die App erkennt außerdem Parameter im Befehl: `--name value`, `--name=value` und `name=value` hinter dem Programm, wie bei Hydra. `{name}` im Befehl wird durch den jeweiligen Einstellungswert ersetzt.
 - **Seed**: `{seed}` übernimmt den Wert im Befehl; ein vorhandenes `--seed` wird ebenfalls erkannt. **Priorität**: Höhere Werte kommen zuerst. **Zeitlimit (Stunden)**: Danach wird der Lauf gestoppt.
-- **Metrikdatei**: eine Datei mit Metriken als JSON-Zeilen zusätzlich zur Konsolenausgabe. **Bewertungen je Beispiel**: eine Datei mit Einzelbewertungen; siehe [Ergebnistabellen für wissenschaftliche Arbeiten](#results-tables-for-your-paper).
+- **Metrikdatei**: eine Datei mit Metriken als JSON-Zeilen zusätzlich zur Konsolenausgabe. **Bewertungen je Beispiel**: eine Datei mit Einzelbewertungen; siehe [Ergebnistabellen für Papers](#results-tables-for-your-paper).
 - **Benachrichtigungen**: **Bei Abschluss** und **Bei einem Fehler** sind standardmäßig aktiviert. Optional gibt es **Wenn eine Metrik einen Schwellenwert überschreitet**, etwa „val_acc > 0.9“.
 - **Zuständiger Agent**: siehe [Der zuständige Agent](#the-agent-on-call).
 - Bei SLURM-Clustern zusätzlich **Prozessoren**, **Arbeitsspeicher (GB)** und **Partition**.
@@ -44,14 +44,14 @@ Anschließend öffnet sich der neue Lauf, damit du seinen Start verfolgen kannst
 
 - Jobs werden nach Priorität und danach nach Wartezeit berücksichtigt. GPU-Jobs erhalten GPUs mit mindestens dem angeforderten freien Speicher, die kein anderer deiner Läufe belegt. Die GPU mit dem meisten freien Speicher kommt zuerst. Fehlen Ressourcen, zeigt die App den Grund, etwa „Wartet auf 1 GPU mit 20 GB freiem Speicher; aktuell höchstens 12 GB auf GPU 2 verfügbar; GPU 0 ist durch einen anderen deiner Läufe belegt“. Ein später eingereihter kleinerer Job darf vorher starten, wenn seine Ressourcen bereits frei sind.
 - Jobs ohne GPU starten sofort, mit begrenzter Parallelität. Die Anzahl legst du unter [Ausführungsorte](#where-runs-go) fest. Der Standard ist ein Viertel der CPU-Threads, mindestens 1 und höchstens 4.
-- Fordert ein Job mehr GPUs an, als vorhanden sind, oder eine GPU auf einem Rechner ohne NVIDIA-GPU, schlägt er sofort mit einer Erklärung fehl.
+- Fordert ein Job mehr GPUs an, als vorhanden sind, oder eine GPU auf einem Computer ohne NVIDIA-GPU, schlägt er sofort mit einer Erklärung fehl.
 - Ein Lauf sieht über CUDA_VISIBLE_DEVICES nur seine zugewiesenen GPUs. Ein Lauf ohne GPU sieht keine. Außerdem erhält er HYDOR_RUN als Kennung, HYDOR_RUN_DIR als Laufordner und HYDOR_SEED. PYTHONUNBUFFERED sorgt dafür, dass Python-Ausgaben sofort im Protokoll erscheinen.
 - Läufe bleiben bei Neustarts oder Updates der App in tmux aktiv, ohne tmux als Hintergrundprozesse. Nach dem Neustart findet die App sie wieder, liest zwischenzeitliche Ausgaben und erkennt beendete Prozesse. Ein verschwundener Prozess erhält den Status **Prozess nicht mehr auffindbar**.
 
 ## Was ein Lauf aufzeichnet
 
 - **Code**: Beim Start werden Commit, Branch und noch nicht committete Git-Änderungen des Arbeitsordners erfasst. Nicht eingecheckte Änderungen werden als Patch gespeichert, ohne Binärdateien und bis höchstens 2 MB. Hinzu kommt die Anzahl nicht von Git erfasster Dateien.
-- **Umgebung**: Rechner, verwendete Python-Version und installierte Versionen von PyTorch, Transformers, JAX, TensorFlow und NumPy. Dafür werden Paketmetadaten gelesen, keine Pakete importiert. Bei GPU-Nutzung kommen CUDA- und Treiberversion sowie GPU-Namen hinzu.
+- **Umgebung**: Computer, verwendete Python-Version und installierte Versionen von PyTorch, Transformers, JAX, TensorFlow und NumPy. Dafür werden Paketmetadaten gelesen, keine Pakete importiert. Bei GPU-Nutzung kommen CUDA- und Treiberversion sowie GPU-Namen hinzu.
 - **Einstellungen und Seed**, **Protokoll**, **Exit-Code** und ein eigener Ordner in den App-Daten mit Protokoll, Patch, Exit-Code und Metriken.
 - **Metriken** aus der laufenden Ausgabe: `key=value`-Paare wie `loss=0.42`, JSON-Objekte pro Zeile wie `{"step": 100, "loss": 0.42}`, ausgegebene Python-Dictionaries wie beim Hugging-Face-Trainer, Keras-Ausgaben wie „loss: 0.41 - accuracy: 0.87“ und die Metrikdatei. Der Schritt wird aus `step`, `global_step`, `iter` oder `epoch` gelesen. Für jede Metrik speichert die App den letzten und den besten Wert sowie eine Zeitreihe. Bei Verlust, Fehler, Perplexität und ähnlich benannten Metriken gelten kleinere Werte als besser, bei anderen größere.
 
@@ -64,13 +64,13 @@ Klicke auf einen Lauf. Auf breiten Bildschirmen öffnet er sich neben der Liste,
 - **Metriken** zeigt jede Metrik über die Schritte hinweg mit letztem und bestem Wert. **Alle N** blendet mehr als vier Metriken ein.
 - **Protokoll** zeigt die Ausgabe, neueste Zeilen unten. **Folgen** hält bei laufenden Jobs die neueste Ausgabe im Blick. Scrollst du nach oben, wird das automatische Nachführen unterbrochen.
 - **Ausführung** zeigt Befehl, Ordner, Commit, Branch, Patch über **Änderungen ansehen**, Einstellungen, Seed und Umgebung sowie den ursprünglichen Lauf bei Wiederholungen und die Sitzung, die ihn gestartet hat.
-- **Ereignisse** zeigt mit Zeitstempeln Wartezeit, Start und Ende sowie Beobachtungen und Eingriffe des zuständigen Agenten. **Sitzung öffnen** führt zu dessen Gespräch.
+- **Ereignisse** zeigt mit Zeitstempeln Wartezeit, Start und Ende sowie Beobachtungen und Eingriffe des zuständigen Agenten. **Sitzung öffnen** führt zu deren Unterhaltung.
 
 **Stoppen** sendet zunächst Strg+C an die Programme. Nach zehn Sekunden werden noch aktive Prozesse zwangsweise beendet. Wartende Läufe werden sofort aus der Warteschlange entfernt.
 
 ## Der zuständige Agent
 
-Unter **Weitere Optionen → Zuständiger Agent** wählst du:
+Unter **Weitere Optionen** → **Überwachung durch einen Agenten**:
 
 - **Aus**, die Voreinstellung: Probleme werden weiterhin auf der Laufseite erfasst.
 - **Benachrichtigen**: Du erhältst bei einem Problem eine Benachrichtigung.
@@ -92,13 +92,13 @@ Markiere die gewünschten Läufe. Unten erscheint eine Leiste mit **Vergleichen*
 
 Das Menü (⋯) eines Experiments bietet **Tabelle erstellen** aus abgeschlossenen Läufen, **Die letzten 6 vergleichen** und **Alle auswählen**.
 
-## Ergebnistabellen für wissenschaftliche Arbeiten
+## Ergebnistabellen für Papers
 
 **Tabelle erstellen** aus der Auswahl oder dem Experimentmenü öffnet eine konfigurierbare Tabelle:
 
 - **Spalten**: Wähle die Metriken durch Anklicken. Der Pfeil legt fest, ob größere oder kleinere Werte besser sind.
 - **Zeilen**: **Nach Experiment** oder nach einer Einstellung, die sich zwischen Läufen unterscheidet, etwa **Nach lr**.
-- **Baseline**: die Vergleichszeile, standardmäßig die erste.
+- **Grundlinie**: die Zeile, gegen die die anderen getestet werden (die erste Zeile, wenn du keine auswählst).
 - **Test gegen die Baseline**: **Automatisch wählen** verwendet gepaarte Tests über Beispiele, wenn Einzelbewertungen vorliegen, andernfalls gepaarte Tests über gemeinsame Seeds und sonst einen Welch-t-Test über Seeds. Manuell verfügbar sind **Welch-t-Test über Seeds**, **Gepaarter t-Test nach Seed oder Beispiel**, **Gepaartes Bootstrap über Beispiele** und **Kein Test**.
 - **Beschriftung**.
 
@@ -131,8 +131,8 @@ Die Läufe erscheinen gemeinsam unter dem Experiment. **Sweep** neben seinem Nam
 Öffne oben **Mehr** (⋯) → [**Ausführungsorte**](/system/experiments?places=1):
 
 - **Dieser Computer**: seine GPUs und die Einstellung **Jobs ohne GPU: höchstens N gleichzeitig**.
-- **Andere Rechner**: verbundene Rechner aus [Einstellungen → Rechner](/settings?s=machines). Ein dort gestarteter Lauf wird dort gespeichert und überwacht. Auch zuständiger Agent und Benachrichtigungen laufen dort; die Nachrichten werden hier zugestellt. Die Liste zeigt Läufe aller verbundenen Rechner mit ihrem Ausführungsort. Öffnen liest die dortigen Daten, Stoppen beendet den Lauf dort.
-- **Cluster**: per SSH erreichbare Rechner, auf denen keine zusätzliche Installation nötig ist.
+- **Andere Computer**: verbundene Computer aus [Einstellungen → Computer](/settings?s=machines). Ein dort gestarteter Lauf wird dort gespeichert und überwacht. Auch zuständiger Agent und Benachrichtigungen laufen dort; die Nachrichten werden hier zugestellt. Die Liste zeigt Läufe aller verbundenen Computer mit ihrem Ausführungsort. Öffnen liest die dortigen Daten, Stoppen beendet den Lauf dort.
+- **Cluster**: per SSH erreichbare Computer, auf denen keine zusätzliche Installation nötig ist.
 
 ### Einen Cluster hinzufügen
 
@@ -145,7 +145,7 @@ Die Läufe erscheinen gemeinsam unter dem Experiment. **Sweep** neben seinem Nam
 
 **Prüfen** führt zunächst `ssh host true` aus. Bei SLURM folgt `sinfo` zur Auflistung der Partitionen, bei reinem SSH werden `nvidia-smi` und tmux geprüft. **Hinzufügen** speichert den Cluster. In der Liste gibt es je Cluster **Prüfen** und **Entfernen**.
 
-Cluster-Jobs laufen in einem dortigen Ordner. Der Code muss bereits vorhanden sein, beispielsweise durch Klonen des Repositorys. Für **SLURM** erstellt die App ein Batchskript mit GPU-Anzahl als `--gres=gpu:N`, Prozessoren, Speicher, Zeitlimit als `--time`, Partition, Konto, Vorbereitungsbefehlen und dem eigentlichen Befehl. Anschließend reicht sie es mit sbatch ein. Während der Wartezeit erklärt der Status den SLURM-Grund verständlich, etwa „Andere Jobs haben Vorrang (Priority)“. Die App verfolgt den Job mit squeue und sacct, kopiert laufend sein Protokoll und beendet ihn über **Stoppen** mit scancel. Bei **SSH ohne Scheduler** wählt sie GPUs wie auf dem lokalen Rechner und startet den Lauf dort in tmux. Pro Cluster bleibt eine SSH-Verbindung offen, um die Überwachung schlank zu halten.
+Cluster-Jobs laufen in einem dortigen Ordner. Der Code muss bereits vorhanden sein, beispielsweise durch Klonen des Repositorys. Für **SLURM** erstellt die App ein Batchskript mit GPU-Anzahl als `--gres=gpu:N`, Prozessoren, Speicher, Zeitlimit als `--time`, Partition, Konto, Vorbereitungsbefehlen und dem eigentlichen Befehl. Anschließend reicht sie es mit sbatch ein. Während der Wartezeit erklärt der Status den SLURM-Grund verständlich, etwa „Andere Jobs haben Vorrang (Priority)“. Die App verfolgt den Job mit squeue und sacct, kopiert laufend sein Protokoll und beendet ihn über **Stoppen** mit scancel. Bei **SSH ohne Scheduler** wählt sie GPUs wie auf dem lokalen Computer und startet den Lauf dort in tmux. Pro Cluster bleibt eine SSH-Verbindung offen, um die Überwachung schlank zu halten.
 
 ## Auf dem Smartphone
 
@@ -158,5 +158,5 @@ Die Liste füllt den Bildschirm; Metriken stehen je Lauf in einer eigenen Zeile.
 - „Teste die Lernraten 1e-4, 3e-4 und 1e-3 mit den Seeds 1, 2 und 3 als Sweep. Stoppe schlechte Läufe vorzeitig.“
 - „Warum ist mein letzter Lauf fehlgeschlagen? Ist die Korrektur eindeutig, starte ihn erneut.“
 - „Lass einen Agenten diesen Trainingslauf überwachen. Bei Speichermangel soll er die Batchgröße halbieren und am letzten Checkpoint fortsetzen.“
-- „Erstelle eine LaTeX-Tabelle der lora-Experimente mit Accuracy und F1 gegenüber der Baseline einschließlich Signifikanztests und füge sie in meine wissenschaftliche Arbeit ein.“
+- „Erstelle eine LaTeX-Tabelle der lora-Experimente mit Accuracy und F1 gegenüber der Baseline einschließlich Signifikanztests und füge sie in meine Paper ein.“
 - „Welcher meiner Läufe dieser Woche hatte den besten Validierungsverlust und welche Einstellungen wurden verwendet?“

@@ -2,13 +2,13 @@
 
 Verbinde E-Mail, Notion, GitHub, Stripe, lokale Ordner und andere Dienste einmal unter **Apps → Verbundene Apps**. Danach können alle Agenten und Apps damit arbeiten. API-Keys und Anmeldedaten liegen verschlüsselt im Tresor und werden verwendet, ohne dass Agenten die Werte sehen. Zusätzliche Tool-Server lassen sich für Claude Code und Codex einrichten, Plugins auch für Claude Code. So arbeiten Agenten mit deinen Konten und erhalten weitere Werkzeuge.
 
-![Apps → Verbundene Apps: verbundene Dienste, Marktplatz und Keys](images/connections.webp)
+![Apps → Verbundene Apps: die Dienste, die du verbunden hast, der Marktplatz und deine Keys](images/connections.webp)
 
 ## Was Verbindungen, Keys und Tools sind
 
-An drei Stellen ergänzt du Werkzeuge für Agenten:
+Agenten können mehr, wenn du ihnen Werkzeuge gibst. Dafür gibt es drei Stellen:
 
-- **Verbundene Apps** unter [Apps → Verbundene Apps](/apps/connected): Marktplatzdienste, einmal für Claude Code, Codex, Custom, ACP-Agenten und deren Apps verbunden. Jedes Konto stellt seine Tools bereit.
+- **Verbundene Apps** ([Apps → Verbundene Apps](/apps/connected)): Dienste aus einem Marktplatz, einmal für alle Agenten verbunden: Claude Code, Codex, Benutzerdefiniert und die Agenten, die ACP sprechen, und die Apps, die sie ausführen. Jedes verbundene Konto gibt den Agenten seine Werkzeuge.
 - **Tresor** im Tab **Keys** derselben Seite: API-Keys, Tokens und Anmeldepasswörter. Ein API-Key erlaubt Programmen, einen Dienst über dein Konto zu verwenden. Agenten nutzen diese Daten für Aufrufe, Webseitenanmeldungen und Programme, sehen die Werte aber nicht.
 - **MCP-Server und Plugins** unter [Einstellungen → MCP-Server](/settings?s=mcp) und [Einstellungen → Plugins](/settings?s=plugins): selbst eingerichtete Tool-Server in den eigenen Einstellungen von Claude Code und Codex sowie Plugins mit Skills und Tools für alle Agenten; siehe [Plugins](/guide/plugins).
 
@@ -18,28 +18,28 @@ MCP, das Model Context Protocol, ist ein gemeinsamer Standard für Agentenwerkze
 
 Öffne **Apps** in der Seitenleiste und den Tab **Verbundene Apps** oder direkt [Apps → Verbundene Apps](/apps/connected). Frühere Links zum Einstellungsbereich Verbindungen führen ebenfalls hierher. Unter Erklärung und **Dienst verbinden** stehen drei Tabs:
 
-- **Verbunden** zeigt Konten und Zustand mit ihrer Anzahl. Auch der übergeordnete Tab zählt die Konten.
+- **Verbunden**: die Konten, die du verbunden hast, und wie es jedem geht. Die Zahl auf dem Tab zählt sie; auch der Tab **Verbundene Apps** zählt sie.
 - **Marktplatz** enthält verfügbare Dienste.
 - **Keys** öffnet den Tresor und zählt gespeicherte Keys.
 
-Mit vorhandenen Konten öffnet sich **Verbunden**, sonst **Marktplatz**. Tabs haben eigene Adressen wie `/apps/connected?tab=market` und `?tab=keys`. Mobil sind sie seitlich scrollbar; Dialoge öffnen sich von unten.
+Die Seite öffnet sich auf **Verbunden**, wenn du etwas verbunden hast, und auf **Marktplatz**, wenn nicht; jeder Tab hat eine eigene Adresse (`/apps/connected?tab=market`, `?tab=keys`). Auf einem Smartphone scrollen die Tabs seitlich, und Dialoge steigen vom unteren Bildschirmrand auf.
 
 ## Einen Dienst im Marktplatz finden
 
 Öffne den [Marktplatz](/apps/connected?tab=market).
 
-- Die Suche berücksichtigt Namen, Beschreibungen, Schlüsselwörter und Kategorien. Jedes eingegebene Wort muss passen.
-- Kategorien mit Anzahl grenzen die Auswahl ein: **Alle Dienste**, **Notizen und Dokumente**, **Aufgaben und Projekte**, **E-Mail, Chat und Meetings**, **Kalender und Planung**, **Dateien und Speicher**, **Design und Medien**, **Entwicklertools**, **Cloud und Hosting**, **Datenbanken und Daten**, **Analyse und Überwachung**, **Vertrieb, Marketing und Support**, **Zahlungen und Finanzen**, **Websites und Shops**, **Suche und Web**, **KI und Automatisierung**, **Reisen und Alltag** und **Auf diesem Computer**. Am Computer stehen sie seitlich, bei wenig Platz als horizontal scrollbare Auswahl unter der Suche.
-- **Empfohlen** zeigt größere Karten bekannter Dienste wie Notion, Linear, GitHub, Figma, Stripe oder Zapier, solange Suche und Kategorien nicht eingeschränkt sind. Pfeile verschieben die Reihe. Darunter folgen alle Dienste, die Kategorie oder Suchtreffer mit Anzahl. Auf Smartphones stehen sie in einer Liste.
+- Das Suchfeld („{0} Dienste durchsuchen: E-Mail, Notion, Rechnungen …“) sucht in Namen, Beschreibungen, Schlüsselwörtern und Kategorien. Jedes Wort, das du eintippst, muss passen.
+- Die Kategorien, jeweils mit der Anzahl ihrer Dienste, zeigen sich eine nach der anderen: **Alle Dienste** (**Alle** als Chip), **Notizen und Dokumente**, **Aufgaben & Projekte**, **E-Mail, Chat und Besprechungen**, **Kalender und Terminplanung**, **Dateien und Speicher**, **Design & Medien**, **Entwicklertools**, **Cloud & Hosting**, **Datenbanken & Daten**, **Analyse und Überwachung**, **Vertrieb, Marketing und Support**, **Zahlungen und Finanzen**, **Websites und Shops**, **Suche und das Web**, **KI & Automatisierung**, **Reisen und Alltag** und **Auf diesem Computer**. Auf einem Computer sind sie eine Liste neben den Diensten; auf einem schmaleren Bildschirm sind es Chips unter dem Suchfeld, die seitlich scrollen.
+- **Hervorgehoben**: eine Reihe größerer Karten für bekannte Dienste (Notion, Linear, GitHub, Figma, Stripe, Zapier …). Sie erscheint, solange du nicht gesucht oder eine Kategorie gewählt hast; auf einem Computer scrollen ihre Pfeile sie. Die Dienste folgen unter **Alle Dienste** (oder der gewählten Kategorie, oder **Gefunden**, wenn du suchst), mit ihrer Anzahl. Auf einem Smartphone sind sie die Zeilen einer Liste.
 
-Jede Karte nennt Dienst, mögliche Agentenaktionen und Verbindungsart:
+Jede Karte zeigt den Namen des Dienstes, was ein Agent damit tun kann und wie er sich verbindet:
 
 - **Browseranmeldung**: Anmeldung beim Dienst im Browser.
 - **API-Key**: einen vom Dienst bereitgestellten Key einfügen.
 - **Keine Anmeldung**: keine Zugangsdaten erforderlich.
 - **Läuft auf diesem Computer**: Hydor startet bei Bedarf ein lokales Programm.
 - **Läuft hier mit einem Key**: lokales Programm mit deinem Key.
-- **Adresse und App-Passwort**: E-Mail-Zugang für Mailprogramme.
+- **Adresse und App-Passwort**: deine E-Mail-Adresse und ein Passwort, das für Mailprogramme erstellt wurde (E-Mail).
 
 Ein Häkchen bedeutet, dass die Serverantwort mit dem Katalogeintrag abgeglichen wurde. **Nicht geprüft** bedeutet, dass dieser Test noch fehlt. Bereits verbundene Dienste zeigen **Verbunden** oder **Erneut anmelden** statt **Verbinden**.
 
@@ -53,21 +53,21 @@ Beispiele:
 - **Geschäftliches**: Stripe, PayPal, Plaid, Square, HubSpot, Intercom, Attio, Klaviyo, Webflow, Wix, WordPress.com.
 - **Suche und Web**: Exa, Perplexity, Tavily, Brave Search, Firecrawl, Wolfram und ein Playwright-Browser.
 - **KI und Alltag**: Hugging Face, Zapier, AllTrails, Kiwi.com, trivago, Strava.
-- **Auf diesem Computer**: gewählte lokale Ordner, Git, Uhrzeit und ein Wissensgraph.
+- **Auf diesem Computer**: Dateien auf diesem Computer (die Ordner, die du auswählst), Git, Uhrzeit und ein Memory-Graph.
 
 Ohne Treffer erscheint **Kein passender Dienst**. Du kannst selbst einen ergänzen; siehe [Einen Dienst zum Marktplatz hinzufügen](/guide/connections#add-a-service-to-the-marketplace). Neue Dienste kommen mit App-Updates hinzu.
 
 ## Einen Dienst verbinden
 
-1. Klicke auf die Karte. Der Dialog erklärt Funktionen, Kategorie, Verbindungsart, Prüfdatum oder fehlende Prüfung. **Website** und **Dokumentation** führen zum Anbieter. Ein Kasten zeigt Serveradresse oder lokalen Befehl und erklärt, dass alle Agenten die Tools unter dem Kurznamen, etwa „notion“, erhalten. Du kannst sie pro Sitzung deaktivieren.
-2. Lies gegebenenfalls den gelben Hinweis, etwa zu benötigtem uv beziehungsweise uvx oder einem eigenen OAuth-Client.
+1. Klicke auf die Karte des Dienstes. Ein Dialog zeigt, was er tut, seine Kategorie, wie er sich verbindet, und **Geprüft** mit einem Datum (oder **Adresse noch nicht überprüft**). **Website** und **Dokumente** führen zum Dienst. Ein Kasten zeigt, wo er läuft: die Adresse des Servers oder den Befehl, den er hier ausführt. Er sagt außerdem, dass jeder Agent die Werkzeuge des Dienstes unter seinem Kurznamen bekommt (die von Notion unter „notion“) und dass du ihn pro Sitzung ausschalten kannst.
+2. Lies den Hinweis im gelben Kasten, falls es einen gibt. Er sagt, was du zuerst wissen solltest, etwa „Benötigt uv (uvx) auf diesem Computer.“, oder dass ein Dienst einen eigenen Anmelde-Client braucht.
 3. Fülle die Felder aus und klicke auf **Verbinden** beziehungsweise **Bei … anmelden**.
 
 Danach erscheint der Dienst unter **Verbunden** und wird im Hintergrund getestet. Die benötigten Angaben hängen vom Dienst ab.
 
 ### Dienste ohne Zugangsdaten
 
-Klicke auf **Verbinden**. Manche Dienste benötigen Einstellungen: GitLab eine Serveradresse, standardmäßig gitlab.com, lokale Dateien erlaubte Ordner mit einem vollständigen Pfad pro Zeile und SQLite eine Datenbankdatei. Lokale Dateien dürfen nur innerhalb erlaubter Ordner gelesen und geändert werden. Optionale Felder dürfen leer bleiben. **Abrufen** neben einem Feld verlinkt zur Bezugsquelle des Werts.
+Klicke auf **Verbinden**. Manche fragen zuerst nach einer Einstellung. GitLab fragt nach seiner Adresse (gitlab.com, außer du betreibst ein eigenes). Dateien auf diesem Computer fragt nach den Ordnern, die es verwenden darf, als vollständige Pfade, einer pro Zeile; es kann nur innerhalb davon Dateien lesen und ändern. SQLite fragt nach der Datenbankdatei. Felder mit der Markierung **optional** können leer bleiben. **Abrufen** neben einem Feld führt zu der Stelle, wo du diesen Wert bekommst.
 
 ### Dienste mit einem Key
 
@@ -78,38 +78,38 @@ Der Key wird verschlüsselt im Tresor gespeichert. Danach sind nur seine letzten
 ### Dienste mit Browseranmeldung
 
 1. Klicke auf **Bei … anmelden**.
-2. Am Computer öffnet sich ein kleines Fenster, mobil die Anmeldeseite im selben Tab.
+2. Auf einem Computer öffnet sich ein kleines Fenster. Auf einem Smartphone öffnet sich stattdessen die Anmeldeseite des Dienstes im selben Tab.
 3. Melde dich an und erlaube den Zugriff. Hydor zeigt währenddessen „Wartet auf den Abschluss deiner Anmeldung…“.
-4. Eine Meldung bestätigt die Verbindung. Mobil kehrst du zu Apps → Verbundene Apps zurück.
+4. Wenn du fertig bist, sagt eine Meldung, dass das Konto verbunden ist. Auf einem Smartphone kehrst du zu Apps → Verbundene Apps zurück.
 
 Tokens bleiben verschlüsselt auf diesem Computer und werden automatisch erneuert. Agenten sehen sie nie. Schließe die Anmeldung innerhalb von 15 Minuten ab, sonst starte erneut. Verweigerter Zugriff wird entsprechend gemeldet.
 
-Asana, Box, HubSpot, Slack, Google-Apps und manche andere Dienste benötigen einen eigenen OAuth-Client. Ihr Dialog öffnet **Eigene Client-ID erforderlich** mit Anleitung. Andere bieten **Eigene Client-ID verwenden (optional)**; diese Option öffnet sich auch, wenn automatische Clientregistrierung nicht möglich ist.
+Manche Dienste lassen dich nur über einen eigenen Anmelde-Client (eine OAuth-App) anmelden: Asana, Box, HubSpot, Slack und die Apps von Google zum Beispiel. Ihr Dialog öffnet **Deine eigene Client-ID (dieser Dienst benötigt eine)** mit dem, was zu tun ist. Andere Browser-Anmeldungen bieten dasselbe als **Eigene Client-ID verwenden (optional)** an, was sich auch von selbst öffnet, wenn sich zeigt, dass ein Dienst nicht zulässt, dass sich Apps selbst registrieren.
 
 1. Erstelle den Client in den Entwicklereinstellungen des Dienstes.
-2. Hinterlege die kopierbare **Callback-Adresse** aus Hydor.
+2. Gib ihm die Adresse unter **Callback-Adresse für den Dienst** (sie hat eine Schaltfläche zum Kopieren).
 3. Füge **Client-ID** und gegebenenfalls **Client-Geheimnis** ein.
 4. Klicke auf **Bei … anmelden**.
 
 ### Dienste auf diesem Computer
 
-Diese starten pro Sitzungsagent ein Programm über npx oder uvx. Beim ersten Test kann der Download dauern. Benötigte Keys werden beim Start aus dem Tresor in die Prozessumgebung übernommen, niemals in die für andere Programme lesbare Befehlszeile.
+Diese starten hier für den Agenten jeder Sitzung ein Programm (mit npx oder uvx). Der erste Test kann etwas dauern, wenn das Programm erst heruntergeladen werden muss. Ein Key, den ein solcher Dienst braucht, kommt beim Start aus dem Tresor in seine Umgebung. Er erscheint nie in einer Befehlszeile, in der andere Programme ihn lesen könnten.
 
 ## Dein E-Mail-Konto verbinden
 
 Mit Adresse und App-Passwort können Agenten E-Mails lesen, suchen, ordnen, entwerfen und senden. Unterstützt werden Gmail, iCloud Mail, Fastmail, Yahoo, AOL, GMX, WEB.DE, Zoho, Posteo, mailbox.org, Proton Mail über Bridge und viele Firmen- und Bildungskonten.
 
-1. Öffne den [Marktplatz](/apps/connected?tab=market) und wähle **Email** unter **E-Mail, Chat und Meetings** oder per Suche.
-2. Gib deine **E-Mail-Adresse** ein. Hydor sucht die Mailserver automatisch. Bekannte Anbieter erhalten eine Anleitung für App-Passwörter mit Link zur Anbieterhilfe.
-3. Erstelle ein App-Passwort und füge es ein.
+1. Öffne den [Marktplatz](/apps/connected?tab=market) und wähle **E-Mail** unter **E-Mail, Chat und Meetings** oder per Suche.
+2. Gib deine **E-Mail-Adresse** ein. Hydor findet deine Mailserver von selbst. Für einen Anbieter, den es kennt, zeigt es, wie du dort ein App-Passwort erstellst, und **Anleitung zum Erstellen** öffnet die eigene Hilfeseite des Anbieters.
+3. Erstelle ein App-Passwort (siehe unten) und füge es in **App-Passwort** ein.
 4. Gib optional **Deinen Namen** für ausgehende Nachrichten an.
-5. Klicke auf **Verbinden**. Hydor prüft Lese- und Versandzugang vor dem Speichern und erklärt Fehler wie falsche Zugangsdaten, erforderliches App-Passwort oder nicht erreichbare Server.
+5. Klicke auf **Verbinden**. Hydor meldet sich zum Lesen und zum Senden an, bevor es etwas speichert. Schlägt das fehl, sagt es, warum: ein falsches Passwort oder ein falscher Benutzername, dass dein Anbieter ein App-Passwort statt deines üblichen will, oder dass ein Server nicht geantwortet hat.
 
-Das App-Passwort liegt verschlüsselt im lokalen Tresor und bleibt für Agenten unsichtbar. Für weitere Konten öffne **Email** erneut und wähle **Weiteres Konto hinzufügen**.
+Das App-Passwort liegt verschlüsselt im lokalen Tresor und bleibt für Agenten unsichtbar. Für weitere Konten öffne **E-Mail** erneut und wähle **Weiteres Konto hinzufügen**.
 
 ### Ein App-Passwort erstellen
 
-App-Passwörter werden separat für Mailprogramme in den Sicherheitseinstellungen deines Kontos erzeugt. Meist muss zuerst Zwei-Faktor-Authentifizierung aktiv sein.
+Ein App-Passwort ist ein eigenes Passwort für Mailprogramme, das in den Sicherheitseinstellungen deines Kontos erstellt wird und anstelle des Passworts verwendet wird, mit dem du dich im Web anmeldest. Bei den meisten Anbietern musst du zuerst die Bestätigung in zwei Schritten einschalten.
 
 - **Gmail**: Aktiviere die Bestätigung in zwei Schritten und öffne im Google-Konto **Sicherheit → App-Passwörter**. Firmen- und Bildungskonten benötigen eine Freigabe der Administration.
 - **iCloud Mail**: account.apple.com → **Anmeldung und Sicherheit → Anwendungsspezifische Passwörter**.
@@ -122,7 +122,7 @@ App-Passwörter werden separat für Mailprogramme in den Sicherheitseinstellunge
 
 Bei unbekannten Anbietern liest Hydor öffentlich bereitgestellte Mailprogrammeinstellungen. Dafür wird Mozillas öffentliches Anbieterverzeichnis mit deiner Domain, niemals mit der vollständigen Adresse, abgefragt. Ohne Treffer werden imap. und smtp. vor deiner Domain versucht und bei der Anmeldung geprüft.
 
-Scheitert das, öffne **Server und Benutzername** und trage IMAP- und SMTP-Server, Ports und Verschlüsselung, **SSL/TLS** oder **STARTTLS**, gemäß Anbieterhilfe ein. Ergänze einen abweichenden Benutzernamen. Unverschlüsselte Verbindungen sind nur zum lokalen Computer erlaubt, etwa für Proton Mail Bridge.
+Schlägt das fehl, öffne **Server und Benutzername** und trage die Server für eingehende (IMAP) und ausgehende (SMTP) Mails, ihre Ports und ihre Sicherheit (**SSL/TLS** oder **STARTTLS**) so ein, wie die Hilfeseiten deines Anbieters sie angeben, und den Benutzernamen, wenn er nicht deine ganze Adresse ist. Eine Verbindung ohne Verschlüsselung ist nur zu diesem Computer erlaubt (eine Bridge wie Proton Mail Bridge).
 
 ### Outlook.com und Microsoft 365
 
@@ -137,13 +137,13 @@ Unter **Verbunden** listet Email deine Konten nach Adresse. **Testen** prüft ih
 Tools stehen unter „email“ zur Verfügung. Bei mehreren Konten wählst du das gewünschte Konto über seine Adresse. Ohne Adressangabe wird das erste Konto verwendet.
 
 - **list_folders**, **search_email** mit Filtern nach Absender, Empfänger, Betreff, Text, Datum, ungelesen, markiert und Anhängen, neueste zuerst, und **read_email** mit Beteiligten, Text und Anhangsnamen und -größen. Lesen markiert keine Nachricht als gelesen.
-- **save_attachments** speichert Anhänge im Sitzungsordner.
+- **save_attachments** speichert die Anhänge einer E-Mail im Ordner der Sitzung.
 - **mark_email** setzt gelesen, ungelesen und Markierungen. **move_email** verschiebt in andere Ordner, niemals in den Papierkorb.
 - **save_draft** speichert einen Entwurf zum späteren manuellen Versand und sendet nichts.
 - **send_email** sendet sofort eine neue Nachricht oder Thread-Antwort, optional mit Dateien aus dem Sitzungsordner, und speichert eine Kopie unter Gesendet.
 - **delete_email** verschiebt Nachrichten in den Papierkorb oder löscht sie endgültig.
 
-Zum Unterbinden von Versand und Löschen deaktiviere **send_email** und **delete_email** unter **Tools**; siehe [Konten oder einzelne Tools deaktivieren](/guide/connections#turn-an-account-or-some-of-its-tools-off). E-Mail-Inhalte sind externe Daten und dürfen nicht als Anweisungen befolgt werden. Für neue E-Mails lassen sich Aufgaben starten; siehe [Änderungen überwachen](/guide/tasks#watch-for-a-change).
+Zum Unterbinden von Versand und Löschen deaktiviere **send_email** und **delete_email** unter **Werkzeuge**; siehe [Konten oder einzelne Tools deaktivieren](/guide/connections#turn-an-account-or-some-of-its-tools-off). E-Mail-Inhalte sind externe Daten und dürfen nicht als Anweisungen befolgt werden. Für neue E-Mails lassen sich Aufgaben starten; siehe [Änderungen überwachen](/guide/tasks#watch-for-a-change).
 
 ## Eine Verbindung prüfen
 
@@ -154,28 +154,28 @@ Unter **Verbunden** zeigt jedes Konto seinen Zustand:
 - **Erneute Anmeldung erforderlich**, wenn die Anmeldung nicht erneuert werden konnte.
 - **Funktioniert nicht** mit Begründung.
 
-**Testen** verbindet sich wie ein Agent und liest die Tools. Eine Meldung bestätigt Funktion und Anzahl oder erklärt Fehler wie abgelehnten Key oder erforderliche Neuanmeldung. Direkt nach dem Verbinden erfolgt dieser Test automatisch.
+**Testen** verbindet sich mit dem Dienst so, wie es Agenten tun werden, und listet seine Werkzeuge auf. Eine Meldung sagt, dass das Konto funktioniert und wie viele Werkzeuge es hat, oder was schiefgegangen ist: „Der Key wurde abgelehnt“ oder „Die Anmeldung wurde abgelehnt: Verbinde erneut“ (das Konto zeigt dann **Eine erneute Anmeldung ist erforderlich**). Konten werden direkt nach dem Verbinden von selbst getestet.
 
 ## Konten oder einzelne Tools deaktivieren
 
 - **Alle Sitzungen**, mobil nur der Schalter: Aktivierte Konten stehen allen Sitzungen zur Verfügung, sofern sie dort nicht deaktiviert sind. Deaktivierte Konten müssen pro Sitzung ausdrücklich aktiviert werden. Neue Konten sind zunächst aktiv.
-- **Tools** erscheint nach dem ersten erfolgreichen Auflisten. Jedes Tool zeigt Beschreibung und **Aktiviert**, **Vorher fragen** oder **Deaktiviert**. Aktivierte Tools dürfen frei verwendet werden, bei Rückfragen wartet jeder Aufruf im Postausgang. Deaktivierte Tools erhalten Agenten nicht. Sendende, veröffentlichende, antwortende, einladende, teilende, löschende, zahlende, überweisende oder erstattende Tools sind als **Wirkt nach außen** markiert. Versucht ein Agent ein deaktiviertes Tool, erhält er den entsprechenden Hinweis.
+- **Werkzeuge** erscheint nach dem ersten erfolgreichen Auflisten. Jedes Tool zeigt Beschreibung und **Aktiviert**, **Vorher fragen** oder **Deaktiviert**. Aktivierte Tools dürfen frei verwendet werden, bei Rückfragen wartet jeder Aufruf im Postausgang. Deaktivierte Tools erhalten Agenten nicht. Sendende, veröffentlichende, antwortende, einladende, teilende, löschende, zahlende, überweisende oder erstattende Tools sind als **Wirkt nach außen** markiert. Versucht ein Agent ein deaktiviertes Tool, erhält er den entsprechenden Hinweis.
 
 ## Vorher fragen: Aufrufe zur Freigabe
 
 Ein Tool mit **Vorher fragen** wird niemals sofort ausgeführt. Hydor hält den Aufruf von Claude Code, Codex, Custom, anderen Agenten, geplanten Aufgaben oder Apps zurück. Der Agent erfährt sofort von der ausstehenden Freigabe und arbeitet weiter oder beendet den Durchlauf mit Hinweis. Er soll keinen anderen Weg versuchen. Der bearbeitbare Entwurf wartet oben im [Posteingang](/inbox) unter **Postausgang**, bis du **Senden** oder **Verwerfen** wählst; siehe [Der Postausgang](/guide/inbox#the-outbox-calls-held-for-your-ok).
 
-- Neu verbundene Konten setzen nach außen wirkende Tools standardmäßig auf **Vorher fragen**, andere auf **Aktiviert**. Unter **Tools** kannst du das ändern.
+- Neu verbundene Konten setzen nach außen wirkende Tools standardmäßig auf **Vorher fragen**, andere auf **Aktiviert**. Unter **Werkzeuge** kannst du das ändern.
 - Frühere Konten behalten ihre Einstellungen, damit bestehende Abläufe funktionieren. Eine Aktion wie **Bei 3 Tools für Senden, Veröffentlichen, Löschen oder Bezahlen vorher fragen** stellt alle entsprechenden Tools gemeinsam um. Sie erscheint, solange solche Tools ohne ausdrückliche Auswahl aktiviert sind.
-- Die Vorgabe gilt für alle Sitzungen und Berechtigungsmodi, einschließlich **Vollzugriff**. Agenten können sie nur nach deiner Zustimmung auf einer Karte ändern und zurückgehaltene Aufrufe nicht selbst senden. Eine zusätzliche Agentenfreigabe entfällt, damit du nur einmal im Postausgang zustimmst.
-- Die Einordnung basiert auf Tool-Name, Beschreibung und Anbieterhinweisen wie „nur lesend“ oder „löscht“. Prüfe die Markierungen und stelle weitere Tools bei Bedarf selbst auf **Vorher fragen**.
+- „Vorher fragen“ ist deine eigene Einstellung für das Konto, es gilt also in jeder Sitzung und jedem Berechtigungsmodus, auch bei **Voller Zugriff**. Agenten können es nicht ändern, ohne dich auf einer Karte zu fragen, und können einen zurückgehaltenen Aufruf nicht selbst senden. Wo ein Agent auch vor der Nutzung des Werkzeugs fragen würde (die eigene Karte von Claude Code oder Benutzerdefiniert), tut er es nicht: Du sagst einmal Ja, im Postausgang.
+- Ob ein Werkzeug nach außen wirkt, wird an seinem Namen, seiner Beschreibung und den Hinweisen beurteilt, die sein Dienst gibt (etwa „liest nur“ oder „löscht“). Sieh dir die Markierungen an und stelle jedes andere Werkzeug selbst auf „Vorher fragen“.
 
 Geplante Aufgaben kannst du mit **Ohne Versand testen** ohne externe Aktionen erproben; siehe [Geplante Aufgaben](/guide/tasks#try-a-task-with-a-test-run).
 
 ## Eine Verbindung ändern oder erneut anmelden
 
 - **Ändern** öffnet bei Keys oder Einstellungen das Formular mit bisherigen Angaben. Gespeicherte Geheimnisse zeigen „Gespeichert: zum Beibehalten leer lassen“. Nur ein neuer Wert ersetzt sie. Bestätige mit **Speichern**.
-- **Erneut anmelden** erneuert Browseranmeldungen. Bis dahin stehen Konten mit abgelaufener Anmeldung Agenten nicht zur Verfügung.
+- **Erneut anmelden** (bei Browser-Anmeldungen) meldet dich neu an. Wenn ein Konto **Eine erneute Anmeldung ist erforderlich** zeigt, bekommen Agenten es nicht mehr, bis du dich erneut anmeldest.
 
 Ändert der Katalog Adresse oder Anmeldeverfahren eines Dienstes, bleibt das bestehende Konto beim alten Ziel. Die Karte erklärt, dass erst erneutes Verbinden die Änderung übernimmt. Keys und Tokens werden ohne deine erneute Verbindung nicht an eine neue Adresse gesendet.
 
@@ -187,48 +187,50 @@ Klicke auf **Verbindung trennen**, mobil das Steckersymbol, und bestätige. Die 
 
 Sitzungen erhalten standardmäßig alle Konten mit aktivem Schalter **Alle Sitzungen**. Für Ausnahmen:
 
-1. Öffne das Sitzungsmenü (⋯) → **Sitzungseinstellungen → Verbundene Konten**.
+1. Öffne das Menü der Sitzung (⋯) → **Sitzungseinstellungen** → **Verbundene Konten**.
 2. Aktiviere oder deaktiviere einzelne Konten. Die Anzeige unterscheidet allgemeine Aktivierung, allgemeine Deaktivierung und nur hier geltende Ausnahmen.
 3. Klicke auf **Fertig**.
 
-Online-Dienste übernehmen die Änderung sofort, lokale Dienste beim nächsten Agentenstart. Ohne Verbindungen bietet der Dialog **Verbundene Apps öffnen**. Eigene Agenten können ebenfalls bestimmte Konten für ihre Sitzungen aktivieren; siehe [Agenten](/guide/agents).
+Dienste im Internet übernehmen die Änderung sofort. Dienste, die auf diesem Computer laufen, übernehmen sie, wenn der Agent das nächste Mal startet. Wenn noch nichts verbunden ist, bietet der Dialog **Verbundene Apps öffnen** an.
+
+Ein Agent kann auch Konten für die Sitzungen einschalten, die als er starten: siehe [Agenten](/guide/agents).
 
 ## Wie Agenten verbundene Konten verwenden
 
-- Claude Code, Codex, Custom und ACP-Agenten erhalten dieselben Tools unter dem Kurznamen des Dienstes.
-- Beim Start erfährt der Agent von vorhandenen Konten und soll sie für passende Aufgaben verwenden. Er kann Konten und gespeicherte Keys nach Namen auflisten.
+- Jede Art von Agent bekommt ein verbundenes Konto auf dieselbe Weise: Claude Code, Codex, Custom und die ACP-Agenten erhalten seine Tools unter dem Kurznamen des Dienstes.
+- Zu Beginn einer Sitzung erfährt der Agent, welche deiner Konten verbunden sind, und dass er sie nutzen soll, wenn eine Aufgabe sie betrifft. Er kann auch auflisten, was verbunden ist und welche Keys gespeichert sind, jeweils nur mit Namen.
 - Verfügbar sind nur aktivierte, angemeldete Konten. Tokens werden auch ohne aktive Verwendung im Hintergrund erneuert, damit lange Sitzungen funktionieren.
 - Keys und Tokens gelangen weder in Agenteneinstellungen noch Befehlszeilen. Bekannte Werte werden in Tool-Antworten maskiert.
-- Tools mit **Vorher fragen** kennzeichnen das in ihrer Beschreibung. Nach Senden oder Verwerfen wird die Entscheidung in der Sitzung sichtbar und erreicht den Agenten mit deiner nächsten Nachricht.
-- Geplante Aufgaben können auf neue Deals, Dateien, Tickets oder Zahlungen und auf bevorstehende Kalendertermine reagieren. Die App prüft selbst ohne Modell über rein lesende Konto-Tools, niemals über sendende, ändernde, löschende oder zahlende Tools; siehe [Änderungen überwachen](/guide/tasks#watch-for-a-change).
+- Ein Tool mit „Vorher fragen“ sagt das in seiner Beschreibung, und der Agent erfährt, dass ein Aufruf darauf auf dein OK wartet. Sobald du den Aufruf sendest oder verwirfst, zeigt die Sitzung, was passiert ist, und der Agent erfährt es mit deiner nächsten Nachricht.
+- Eine geplante Aufgabe kann starten, wenn in einem Konto etwas Neues auftaucht (ein neuer Deal, eine neue Datei, ein neues Ticket oder eine neue Zahlung), oder eine eingestellte Zeit vor jedem Termin in einem verbundenen Kalender. Bei jeder Prüfung ruft Hydor selbst und ohne Modell eines der Tools des Kontos auf, das nur liest, und niemals eines, das sendet, ändert, löscht oder bezahlt (siehe [Änderungen überwachen](/guide/tasks#watch-for-a-change)).
 - Die Suche mit Strg+K beziehungsweise ⌘K findet auch verbundene Konten.
 
 ## Einen Dienst zum Marktplatz hinzufügen
 
-Du kannst über einen Pull Request im GitHub-Repository von Hydor Dienste ergänzen oder korrigieren. **So fügst du einen hinzu** unten im Marktplatz öffnet die Anleitung.
+Du kannst über einen Pull-Request im GitHub-Repository von Hydor Dienste ergänzen oder korrigieren. **So fügst du einen hinzu** unten im Marktplatz öffnet die Anleitung.
 
-1. Erstelle gemäß Anleitung eine JSON-Datei unter `catalog/` mit Name, verständlicher Funktionsbeschreibung, Kategorie, Symbol, Farbe, Website, Dokumentation, Serveradresse oder lokalem Befehl, Anmeldeverfahren und auszufüllenden Feldern.
+1. Schreibe eine kleine JSON-Datei für den Dienst in den Ordner `catalog/` des Repositorys, wie es die dortige Anleitung beschreibt. Sie enthält den Namen des Dienstes, einen einfachen Satz dazu, was ein Agent damit tun kann, seine Kategorie, sein Symbol und seine Farbe, Startseite und Dokumentation, seinen Server (eine Adresse oder einen Befehl, der hier läuft) und wie die Anmeldung funktioniert (keine, eine Anmeldung im Browser oder ein Key) sowie Felder, die Leute ausfüllen.
 2. Verwende den offiziellen MCP-Server des Anbieters mit dokumentierter Adresse, sofern vorhanden. Lokale Programme sind sinnvoll, wenn kein solcher Server existiert oder lokale Funktionen wie Dateizugriff benötigt werden.
 3. Trage keine Keys oder Tokens ein. Nutzer hinterlegen ihre eigenen im Tresor.
 4. Führe die beschriebene Prüfung aus. Sie validiert die Datei und kann die Serverantwort prüfen.
-5. Reiche den Pull Request ein. Nach dem Merge erscheint der Dienst mit dem nächsten Update im Marktplatz.
+5. Reiche den Pull-Request ein. Nach dem Merge erscheint der Dienst mit dem nächsten Update im Marktplatz.
 
 ## Keys im Tresor speichern
 
 Öffne den [Tab Keys](/apps/connected?tab=keys). API-Keys, Tokens und Anmeldepasswörter liegen verschlüsselt auf diesem Computer. Weder hier noch für Agenten werden sie erneut angezeigt; sichtbar bleiben nur die letzten Zeichen.
 
-Agenten verwenden sie über Hydors Webanfragen, Browser und ausdrücklich erlaubte lokale Befehle. Die App fügt Werte selbst und nur an erlaubten Stellen ein.
+Agenten verwenden sie über Hydors eigene Tools: sein Tool für Webanfragen, seinen Browser und Befehle auf diesem Computer, wo du das erlaubst. Die App fügt den Key selbst ein, und nur dort, wo du es erlaubst.
 
 Jeder Key zeigt:
 
 - Namen und maskierte Wertvorschau wie „…f3a9“;
 - Notiz;
-- erlaubte Hosts und gegebenenfalls **In Befehlen** oder **Noch keine Hosts erlaubt**;
+- die Hosts, an die er gesendet werden darf, und **in Befehlen**, wenn Befehle auf diesem Computer ihn verwenden dürfen (**Noch keine Hosts erlaubt**, wenn keins von beidem gilt);
 - letzte Verwendung oder „Noch nicht verwendet“ sowie Erstellung und letzte Wertänderung.
 
 Ohne Keys erklärt die Seite das Hinzufügen oder Anfragen durch Agenten.
 
-Auch Apps können Wetter-, Karten- oder andere Keys benötigen. Du gibst sie auf der App-Seite, Installationskarte oder Gesprächskarte ein; siehe [Benötigte Keys hinterlegen](/guide/apps#give-it-the-keys-it-needs). Sie liegen hier unter den von der App vorgegebenen Namen und Hosts. Die Notiz nennt die zugehörige App.
+Auch Apps können Wetter-, Karten- oder andere Keys benötigen. Du gibst sie auf der App-Seite, Installationskarte oder ihrer Karte in einer Sitzung ein; siehe [Benötigte Keys hinterlegen](/guide/apps#give-it-the-keys-it-needs). Sie liegen hier unter den von der App vorgegebenen Namen und Hosts. Die Notiz nennt die zugehörige App.
 
 ### Einen Key hinzufügen
 
@@ -238,14 +240,14 @@ Auch Apps können Wetter-, Karten- oder andere Keys benötigen. Du gibst sie auf
 4. **Erlaubte Hosts**: bis zu 20 durch Kommas getrennte Adressen wie api.example.com. Der Key wird nur über HTTPS an diese Hosts und ihre Subdomains gesendet. Ohne Host ist keine Verwendung möglich.
 5. **Befehle auf diesem Computer dürfen ihn verwenden** ist zunächst aus. Aktiviere es bei Bedarf für Datenbankpasswörter oder Git-Tokens; siehe [Befehle mit Keys](/guide/connections#commands-that-use-a-key).
 6. **Notiz** erklärt den Zweck und ist für Agenten sichtbar.
-7. **Übermittlung**, optional: Standardmäßig steht der Key hinter „Bearer “ im Authorization-Header. Du kannst Headernamen wie X-Api-Key und das Präfix ändern. Bei anderen Headern kann das Präfix leer bleiben. Alternativ kannst du einen URL-Parameter wie api_key wählen.
+7. **Übermittlung** (optional): Standardmäßig steht der Key im Authorization-Header, nach „Bearer “. Du kannst die **Kopfzeile** ändern (etwa X-Api-Key) und was **Vor dem Key** steht (nichts, bei anderen Headern) oder ihn stattdessen **Oder als Abfrageparameter** senden (etwa api_key).
 8. Klicke auf **Speichern**.
 
 Bereits vorhandene Namen werden abgelehnt. Ersetze stattdessen den Wert des bestehenden Keys.
 
 ### Den Wert eines Keys ersetzen
 
-Klicke auf den runden Pfeil **Neuer Wert**, füge ihn ein und wähle **Ersetzen**. Hosts, Notiz und Übermittlungsart bleiben erhalten.
+Klicke auf den runden Pfeil (**Neuer Wert**) neben dem Key, füge den neuen Wert in **Neuer Wert** ein und klicke auf **Ersetzen**. Die Hosts, die Notiz und die Übermittlung bleiben, wie sie waren.
 
 ### Erlaubte Ziele eines Keys ändern
 
@@ -257,53 +259,53 @@ Klicke auf den Papierkorb **Löschen** und bestätige. Der Wert wird endgültig 
 
 ### Wie Agenten einen Key verwenden dürfen
 
-- Dienste nach Key-Namen aufrufen. Die App fügt ihn gemäß Einstellung oder als Platzhalter wie {{GITHUB_TOKEN}} in Adresse, Header oder Inhalt ein. Auch Benutzername und Passwort einer Basic-Anmeldung sind möglich.
-- Werte nach Namen in einzeilige Browser-Anmeldefelder eintragen, nur auf erlaubten Hosts über HTTPS oder lokal. Das Feld zeigt danach Punkte; der Agent sieht lediglich, dass es aus dem Tresor befüllt wurde.
-- Lokal über Befehle nutzen, wenn du das am Key freigegeben und den Befehl erlaubt hast; siehe [Befehle mit Keys](/guide/connections#commands-that-use-a-key).
-- Im Web ausschließlich erlaubte Hosts und Subdomains über HTTPS erreichen, niemals lokale Rechner oder Netzwerke. Weiterleitungen zu unerlaubten Hosts werden nicht verfolgt.
+- Einen Dienst mit ihm über seinen Namen aufrufen. Die App fügt den Key in die Anfrage ein: dort, wo er dafür eingerichtet ist, oder dort, wo der Agent seinen Namen in doppelten geschweiften Klammern schreibt (etwa {{GITHUB_TOKEN}}), in der Adresse, in einem Header oder im Inhalt, oder als Benutzername und Passwort einer Basic-Anmeldung.
+- Ihn über seinen Namen in die Anmeldeseite einer Website in ihrem Browser eintippen: nur in ein einzeiliges Feld, auf einer Seite eines der Hosts des Keys, über https (oder auf diesem Computer). Das Feld zeigt dann Punkte, und der Agent sieht nur, dass es aus dem Tresor befüllt wurde.
+- Ihn einem Befehl auf diesem Computer geben, wenn du **Befehle auf diesem Computer dürfen den Key verwenden** eingeschaltet hast, und nur, sobald du den Befehl erlaubst (siehe [Befehle mit Keys](/guide/connections#commands-that-use-a-key)).
+- Im Web ausschließlich erlaubte Hosts und Subdomains über HTTPS erreichen, niemals lokale Computer oder Netzwerke. Weiterleitungen zu unerlaubten Hosts werden nicht verfolgt.
 - Für einen einzelnen Aufruf Header oder URL-Parameter abweichend wählen.
-- Namen, Hosts und Notizen sehen, niemals Werte. Antworten, Seiten und Befehlsausgaben maskieren die Keys.
+- Die Namen, Hosts und Notizen der Keys sehen. Niemals ihre Werte: Antworten, Seiten und das, was Befehle ausgeben, kommen mit maskiertem Key zurück.
 
 ## Wenn ein Agent nach einem Key fragt
 
-Agenten sollen Passwörter, Tokens und Keys niemals im Chat anfordern. Fehlt ein benötigter Key, erscheint stattdessen **Der Agent fragt nach einem Key** mit Name, Begründung und häufig Bezugsquelle.
+Agenten sind angewiesen, dich nie zu bitten, ein Passwort, einen Token oder einen Key in den Chat zu tippen. Braucht eine Aufgabe einen Key, der nicht gespeichert ist, zeigt der Agent stattdessen eine Karte in der Unterhaltung: **Der Agent fragt nach einem Key**, mit dem Namen des Keys und dem Grund, warum er ihn braucht (oft auch, wo du ihn bekommst).
 
 1. Füge den Wert in das Feld ein.
 2. Prüfe die vorgeschlagenen Hosts unter **Nur senden an** und ändere sie bei Bedarf. Ohne Host ist keine Nutzung möglich.
 3. Klicke auf **Im Tresor speichern**.
 
-Der Key gelangt direkt in den verschlüsselten Tresor, nicht ins Gespräch. Die Karte bestätigt die Speicherung. Der Agent erfährt nur, dass der Key nun vorhanden ist, und kann weiterarbeiten.
+Der Key gelangt direkt in den verschlüsselten Tresor, nicht in die Unterhaltung. Die Karte bestätigt die Speicherung. Der Agent erfährt nur, dass der Key nun vorhanden ist, und kann weiterarbeiten.
 
-- **Nicht jetzt** lehnt ab. Der Agent soll ohne Key fortfahren oder Alternativen erklären. **Doch eingeben** auf der Karte erlaubt eine spätere Änderung deiner Entscheidung.
-- Offene Karten erscheinen auch im [Posteingang](/guide/inbox) als Key-Anfrage. **Öffnen** führt zur Sitzung.
-- Existiert der Name bereits, soll der Agent den vorhandenen Key nutzen. Funktioniert dieser nicht mehr, darf er einen Ersatz anfragen. Das Feld weist dann auf das Ersetzen hin.
-- Bei lokaler Befehlsnutzung zeigt die Karte **Befehle auf diesem Computer dürfen ihn verwenden**, zunächst aktiviert. Deaktivierst du dies, bleibt die Verwendung auf erlaubten Hosts möglich. Für vorhandene Keys heißt die Karte **Der Agent möchte einen Key in Befehlen verwenden**. Lass das Wertfeld leer, um den bisherigen Wert zu behalten, und speichere.
+- **Nicht jetzt** lehnt ab. Der Agent erfährt, dass du ihn lieber jetzt nicht gibst, und soll ohne ihn weitermachen oder sagen, was sonst funktionieren würde. Die Karte sagt dann, dass du ihn nicht gegeben hast, mit **Doch eingeben**, falls du es dir anders überlegst.
+- Solange eine Karte wartet, erscheint sie auch im [Posteingang](/guide/inbox) als „Fragt nach einem Key“ mit dem Namen des Keys. **Öffnen** bringt dich zur Sitzung.
+- Ist ein Key mit diesem Namen schon im Tresor, soll der Agent ihn verwenden, und die Karte sagt nur, dass er im Tresor ist. Wenn ein gespeicherter Key nicht mehr funktioniert, kann der Agent noch einmal fragen: Das Feld sagt dann, dass es den gespeicherten Key ersetzt.
+- Braucht der Agent den Key in Befehlen auf diesem Computer, hat die Karte auch **Befehle auf diesem Computer dürfen den Key verwenden**, zunächst eingeschaltet. Schalte es aus, wenn du das nicht möchtest; der Agent kann den Key trotzdem auf seinen Hosts verwenden. Bei einem Key, der schon gespeichert ist, heißt die Karte **Der Agent möchte einen Key in Befehlen verwenden**: Lass das Feld leer, um den Wert zu behalten, und klicke auf **Im Tresor speichern**.
 
 ### Eine Anmeldung mit mehreren Feldern
 
 Bei Webseiten- oder Dienstanmeldungen fragt **Der Agent bittet um Anmeldedaten** alle nötigen Angaben gemeinsam ab, etwa E-Mail und Passwort oder Datenbankadresse, Benutzer und Passwort. Geheimnisse sind verdeckt; das Augensymbol zeigt sie an.
 
-1. Fülle Pflichtfelder aus. Optionale Felder dürfen leer bleiben.
+1. Fülle die Felder aus. Eines, das mit **optional** markiert ist, darf leer bleiben.
 2. Prüfe die erlaubten Hosts unter **Nur senden an**.
 3. Klicke auf **Im Tresor speichern**.
 
-Jedes Geheimnis erhält einen eigenen Key-Namen, etwa VOLTARO_PASSWORD. Mit **Der Agent sieht diese Angabe** markierte Daten wie Serveradressen sind nicht geheim, werden direkt übergeben und nicht im Tresor gespeichert. Vorhandene Werte bleiben bei leeren Feldern erhalten. Nach dem Speichern listet die Karte die Keys. Der Agent kann sich damit auf erlaubten Hosts im Browser anmelden, ohne die Werte zu sehen.
+Jedes Geheimnis kommt als eigener Key in den Tresor, benannt nach der Anmeldung (aus einem Voltaro-Passwort wird VOLTARO_PASSWORD). Ein Feld mit der Markierung **Diese Angabe ist für den Agenten sichtbar** ist eine Angabe, die nicht geheim ist, etwa die Adresse eines Servers: Der Agent bekommt, was du dort eintippst, und es wird nicht im Tresor aufbewahrt. Ein Feld, das der Tresor schon hat, sagt das: Lass es leer, um zu behalten, was gespeichert ist. Nach dem Speichern listet die Karte die Keys auf, und der Agent kann sich damit in seinem Browser anmelden, nur auf diesen Hosts und ohne sie zu sehen.
 
 ## Befehle mit Keys
 
-Manche Aufgaben brauchen Zugangsdaten in lokalen Programmen: GitHub-Push mit Token, Datenbankzugriff oder Dienstaufrufe aus Skripten. Dafür gibt es ein Tool, das einen Befehl mit Tresor-Keys als Umgebungsvariablen unter ihren jeweiligen Namen startet. Die Rückgabe maskiert bekannte Werte.
+Manche Aufgaben brauchen ein Passwort oder einen Token in einem Programm auf diesem Computer: mit einem Token zu GitHub pushen, mit seinem Passwort eine Datenbank lesen, ein Skript, das einen Dienst aufruft. Dafür haben Agenten ein Tool, das einen Befehl ausführt, bei dem Keys aus dem Tresor in seiner Umgebung stehen, jeweils unter ihrem eigenen Namen. Was der Befehl ausgibt, kommt mit maskierten Keys zum Agenten zurück.
 
 - Nur Keys mit aktivem **Befehle auf diesem Computer dürfen ihn verwenden** werden übergeben. Das stellst du im Stiftdialog oder bei der Anfrage ein.
 - Vor der Ausführung zeigt **Befehl ausführen mit …** die Key-Namen, den Befehl und seinen Zweck. **Erlauben** gilt einmal. **Für diese Sitzung erlauben** erlaubt spätere Befehle derselben Sitzung mit denselben Keys bis zum App-Neustart. **Nicht ausführen** lehnt ab; du kannst eine Alternative nennen.
-- Vollzugriff führt diese Befehle wie andere ohne Rückfrage aus. Im Planmodus laufen keine.
+- Eine Sitzung mit Vollzugriff führt diese Befehle ohne Nachfrage aus, wie ihre anderen Befehle auch. Im Planmodus läuft keiner.
 - Programme können grundsätzlich alles tun, auch Keys an andere Orte senden. Erlaube deshalb nur verstandene Befehle und nur bei tatsächlich benötigten Keys.
 - Standardmäßig endet ein Befehl nach zwei Minuten; der Agent kann bis zu zehn Minuten anfordern.
 
 ## Ein Formular eines Dienstes ausfüllen
 
-Ein Dienst kann während der Arbeit Datum, Auswahl, Bestätigung oder das Öffnen einer Seite benötigen. Unabhängig vom Agenten erscheint eine Karte in Sitzung und [Posteingang](/guide/inbox):
+Manche Dienste brauchen mitten in einer Aufgabe etwas von dir: ein Datum, eine Auswahl, ein Ja oder Nein oder eine Seite, die du öffnen sollst. Egal, welcher Agent arbeitet: Die Anfrage erscheint als Karte in der Sitzung, neben den Genehmigungen des Agenten, und im [Posteingang](/guide/inbox). Der Titel der Karte sagt, was der Dienst will:
 
-- **… bittet dich, ein Formular auszufüllen** zeigt Nachricht und Felder: kurze oder lange Texte, Zahlen, Daten, Ja-Nein-Schalter und Einzel- oder Mehrfachauswahl. **Senden** übermittelt die Angaben. Fehlende Pflichtfelder und ungültige Zahlen werden vorher markiert. Weitere unzulässige Antworten wie zu lange Texte, falsche E-Mail-Adressen oder zu wenige Auswahlen nennt die Karte mit Korrekturhinweis und bleibt offen.
+- **… bittet dich, ein Formular auszufüllen**: die Nachricht des Dienstes, dann seine Felder als Formular. Es gibt Textfelder, längere Texte, Zahlen, Daten, einen Schalter für Ja oder Nein sowie Chips oder eine Liste zum Auswählen (bei Chips kannst du mehrere wählen, wenn der Dienst mehr als einen erlaubt). Klicke auf **Senden**. Leere Felder, die er braucht („Benötigt“), und Zahlen, die keine Zahlen sind, werden markiert, bevor etwas abgeschickt wird. Eine Antwort, die der Dienst nicht annehmen kann (zu lang, keine E-Mail-Adresse, zu wenige ausgewählt), wird mit einem Hinweis, was zu korrigieren ist, abgelehnt, und die Karte bleibt.
 - **… bittet dich, eine Seite zu öffnen** zeigt einen Link. **Öffnen** startet einen neuen Tab etwa zur Anmeldung oder Freigabe und meldet das dem Dienst.
 - **… bittet um Zustimmung** ist eine Ja-Nein-Frage. **Erlauben** bestätigt.
 
@@ -313,42 +315,42 @@ Ein Dienst kann während der Arbeit Datum, Auswahl, Bestätigung oder das Öffne
 
 Unter [Einstellungen → Agenten → MCP-Server](/settings?s=mcp) verwaltest du Tool-Server in den eigenen Agenteneinstellungen, etwa eigene Server oder Tools außerhalb des Marktplatzes. Neue Sitzungen laden sie; laufende übernehmen Änderungen beim Neustart. Custom verwendet sie ebenfalls, außer SSE-Servern; siehe [Custom](/guide/custom).
 
-Claude-Code- und Codex-Server stehen in getrennten Gruppen. **Server hinzufügen** steht neben dem Titel. Über **Ordner** oben wählst du die für Claude Code relevanten ordnerspezifischen Server. Das (i) jeder Gruppe erklärt, wann Änderungen übernommen werden.
+Die Seite listet die Server von Claude Code und die von Codex in zwei Gruppen, und **Server hinzufügen** steht neben dem Titel der Seite. Der **Ordner**-Chip oben wählt den Ordner, dessen Server du siehst, denn Claude Code kann Server für einen Ordner ebenso wie für alle Ordner speichern. Das (i) neben dem Namen jeder Gruppe sagt, dass neue Sitzungen die Server laden und laufende Änderungen bei ihrem Neustart übernehmen.
 
 Jeder Server zeigt:
 
-- Namen und Typ: lokaler **Befehl**, **HTTP** oder das ältere **SSE**;
+- seinen Namen und seinen Typ: **Befehl** (ein Programm, das dieser Computer ausführt) oder **HTTP** oder **SSE** (ein Server unter einer Adresse; SSE ist die ältere Art);
 - bei Claude Code den Geltungsbereich: **Alle Ordner**, **Dieser Ordner, nur für dich** oder **Dieser Ordner, geteilt**;
-- **Deaktiviert**, falls in Codex abgeschaltet;
+- **Aus** bei einem Codex-Server, der in den eigenen Einstellungen von Codex ausgeschaltet ist;
 - Befehl oder Adresse und die Namen von Umgebungsvariablen, Headern oder Bearer-Token-Variablen. Werte bleiben auf dem Server verborgen;
-- nach einer Prüfung den Verbindungszustand.
+- nach einer Prüfung, wie es dem Server geht (ein Abzeichen am Ende seiner Zeile).
 
 ### Einen Server hinzufügen
 
-Öffne [Server hinzufügen](/settings?s=mcp&find=Add%20server). Der Dialog fragt:
+Klicke auf [Server hinzufügen](/settings?s=mcp&find=Add%20server). Der Dialog **MCP-Server hinzufügen** fragt:
 
 - **Hinzufügen zu**: Claude Code, Codex oder standardmäßig beide.
 - **Name**: bis zu 64 Buchstaben, Ziffern, Punkte, Bindestriche oder Unterstriche, beginnend mit Buchstabe oder Ziffer. Tool-Namen bestehen daraus, einem Schrägstrich und dem Tool-Namen.
-- **Typ**: Befehl, HTTP oder SSE. Codex unterstützt SSE nicht und wird bei dieser Auswahl ausgeschlossen.
+- **Typ**: **Befehl**, **HTTP** oder **SSE**. Codex unterstützt SSE nicht, deshalb schließt die Wahl von SSE Codex aus.
 - Für Befehle:
-  - **Befehl** als vollständige Zeile, etwa `npx -y @modelcontextprotocol/server-github`. Er startet beim Sitzungsbeginn auf diesem Rechner. Argumente mit Leerzeichen benötigen Anführungszeichen. ~ am Argumentanfang steht für deinen persönlichen Ordner.
+  - **Befehl** als vollständige Zeile, etwa `npx -y @modelcontextprotocol/server-github`. Er startet beim Sitzungsbeginn auf diesem Computer. Argumente mit Leerzeichen benötigen Anführungszeichen. ~ am Argumentanfang steht für deinen persönlichen Ordner.
   - **Umgebung** mit einer KEY=value-Zeile pro Variable. Zeilen mit # werden ignoriert. Werte werden in den Agentenkonfigurationen gespeichert und hier nicht erneut angezeigt.
 - Für HTTP und SSE:
-  - **URL** mit http:// oder https://.
-  - **Header** für Claude Code, eine Zeile „Name: Wert“ etwa für API-Keys. OAuth-Server benötigen keine; du meldest dich nach dem Hinzufügen an.
-  - **Bearer-Token-Variable** für Codex, optional: Name einer Umgebungsvariablen mit dem zu sendenden Token.
+  - **URL**: die Adresse des Servers, beginnend mit http:// oder https://.
+  - **Header** (für Claude Code): eine Zeile „Name: Wert“ pro Header, für Server, die einen API-Key annehmen. Server, die eine Anmeldung im Browser (OAuth) nutzen, brauchen keine: Melde dich nach dem Hinzufügen in der Liste an.
+  - **Bearer-Token-Variable** (für Codex, optional): der Name einer Umgebungsvariablen, deren Wert Codex als Bearer-Token sendet.
 - **Wo Claude Code ihn verwendet**, bei alleiniger Claude-Code-Auswahl **Geltungsbereich**:
-  - **Alle Ordner**, der Standard, gilt für alle Sitzungen dieses Rechners.
+  - **Alle Ordner**, der Standard, gilt für alle Sitzungen dieses Computers.
   - **Dieser Ordner** gilt nur im oben gewählten Ordner und liegt in deinen persönlichen Claude-Code-Einstellungen.
-  - **Geteilte .mcp.json** speichert im Projektordner für alle am Repository Arbeitenden.
+  - **Geteilte .mcp.json**: wird in einer .mcp.json-Datei in diesem Ordner gespeichert, damit alle, die im Repository arbeiten, ihn bekommen.
 
   Codex-Server gelten immer für alle Ordner.
 
-**Server hinzufügen** verwendet die eigenen Einrichtungsbefehle der Agenten. So bleiben deren Einstellungen im erwarteten Format. Bei Ablehnung zeigt der Dialog die Agentenantwort. Korrigiere die Angaben und wiederhole; nur fehlgeschlagene Agenteneinrichtungen werden erneut versucht.
+Klicke im Dialog auf **Server hinzufügen**. Hydor fügt ihn über den eigenen Befehl jedes Agenten hinzu, damit deren Einstellungen so bleiben, wie sie sie erwarten. Lehnt ein Agent ab, zeigt der Dialog, dass er den Server nicht hinzugefügt hat, mit dem, was der Agent gesagt hat. Behebe, was nicht stimmt, und klicke noch einmal auf **Server hinzufügen**: Es werden nur die Agenten erneut versucht, bei denen es fehlgeschlagen ist.
 
 ### Serververbindungen prüfen
 
-[Verbindungen prüfen](/settings?s=mcp&find=Check%20connections) neben der Gruppenüberschrift startet Server wie eine neue Sitzung und zeigt:
+[Verbindungen prüfen](/settings?s=mcp&find=Check%20connections) am Ende des Titels der Gruppe von Claude Code oder Codex startet jeden Server so, wie es eine neue Sitzung täte, und zeigt, wie es jeweils ausgegangen ist:
 
 - **Verbunden** mit Tool-Anzahl;
 - **Anmeldung erforderlich**;
@@ -360,11 +362,11 @@ Dafür wird kein Modell verwendet. Die Prüfung dauert gegebenenfalls ein bis zw
 
 ### Bei einem Server anmelden
 
-OAuth-Server benötigen eine einmalige Anmeldung. **Anmelden** erscheint bei entsprechendem Prüfergebnis. Alternativ wähle im Menü **⋯** **Im Terminal anmelden (OAuth)**. Ein App-Terminal öffnet die agenteneigene Anmeldung. Folge den dortigen Schritten.
+Ein Server unter einer Adresse, der sich mit OAuth anmeldet, braucht einmalig eine Anmeldung. Klicke auf **Anmelden** (zu sehen, wenn eine Prüfung sagt, dass eine Anmeldung nötig ist), oder öffne das Menü **⋯** des Servers und wähle **Im Terminal anmelden (OAuth)**. In der App öffnet sich ein Terminal, in dem die eigene Anmeldung des Agenten für diesen Server läuft: Folge dort seinen Schritten.
 
 ### Einen Server entfernen
 
-Wähle im Menü **⋯** **Entfernen** und bestätige. Der Agent lädt den Server nicht mehr. Bereits laufende Sitzungen behalten ihn bis zum Neustart.
+Öffne das Menü **⋯** des Servers, wähle **Entfernen** und bestätige mit **Entfernen**. Der Agent lädt ihn dann nicht mehr. Bereits laufende Sitzungen behalten ihn, bis sie neu starten.
 
 ## Plugins zu Claude Code hinzufügen
 
@@ -372,7 +374,7 @@ Claude Code hat eigene Plugins mit Skills, Befehlen, Agenten, Hooks und MCP-Serv
 
 ### Installierte Plugins
 
-**Installiert** zeigt lokale Claude-Code-Plugins mit Name, Marktplatz, Version und Beschreibung. Neue Claude-Code-Sitzungen laden sie.
+**Installiert** listet die Plugins von Claude Code auf diesem Computer. Neue Claude-Code-Sitzungen laden sie. Jedes zeigt seinen Namen, seinen Marktplatz, seine Version und was es tut.
 
 - Der Schalter aktiviert oder deaktiviert ohne Entfernung.
 - **Deinstallieren** im Menü **⋯** fragt nach. Neue Sitzungen laden danach keine zugehörigen Skills, Befehle oder Server mehr.
@@ -387,7 +389,7 @@ Hydor fragt die Plugin-Liste höchstens alle zehn Minuten und nach Änderungen e
 
 ### Plugin-Marktplätze
 
-**Marktplätze** zeigt die Kataloge für Claude-Code-Plugins.
+**Marktplätze** listet die Kataloge, aus denen Claude Code Plugins installiert.
 
 - **Hinzufügen** neben der Überschrift akzeptiert GitHub-owner/repo, Git-URL oder lokalen Ordner. Bestätige im Dialog mit **Hinzufügen**.
 - Der Papierkorb mit Bestätigung entfernt den Marktplatz und deinstalliert auch daraus bezogene Plugins.
@@ -401,7 +403,7 @@ Diese Aktionen können Agenten mit deiner Kartenfreigabe übernehmen. Key-Werte 
 - „Entwirf eine Antwort auf Annas letzte E-Mail: Ich kann mich Donnerstag treffen. Speichere sie als Entwurf.“
 - „Speichere Anhänge der Rechnungen dieses Monats in diesem Ordner.“
 - „Verbinde Context7 für Bibliotheksdokumentation.“
-- „Deaktiviere Gmail für alle Sitzungen außer dieser.“
+- „Schalte Gmail für jede Sitzung aus, aber lass es in dieser an.“
 - „Zeige Notions Tools und deaktiviere die zum Löschen von Seiten.“
 - „Stelle Gmails Versand- und Löschtools auf Vorher fragen und lasse den Rest aktiv.“
 - „Füge für Claude Code und Codex den MCP-Server npx -y @modelcontextprotocol/server-memory hinzu und prüfe die Verbindung.“

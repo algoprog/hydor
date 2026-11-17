@@ -1,6 +1,6 @@
 # Custom, der eigene Agent der App
 
-Custom ist Hydors eigener Agent. Er verwendet Modelle von OpenRouter, Ollama, vLLM oder anderen OpenAI-kompatiblen Servern mit denselben Tools, Skills und Verbindungen wie Claude Code und Codex. Hier erfährst du, was Custom kann, wie Berechtigungen und Befehlsprüfungen funktionieren und wie Auto-Modus, Sandbox, Ziele, lange Gespräche, schwächere Modelle und Einstellungen zusammenspielen.
+Custom ist Hydors eigener Agent. Er verwendet Modelle von OpenRouter, Ollama, vLLM oder anderen OpenAI-kompatiblen Servern mit denselben Tools, Skills und Verbindungen wie Claude Code und Codex. Hier erfährst du, was Custom kann, wie Berechtigungen und Befehlsprüfungen funktionieren und wie Auto-Modus, Sandbox, Ziele, lange Unterhaltungen, schwächere Modelle und Einstellungen zusammenspielen.
 
 ![Einstellungen → Modelle: Hilfsmodell und Modelle auf diesem Computer](images/custom.webp)
 
@@ -21,8 +21,8 @@ Wie andere Agenten liest Custom `AGENTS.md` oder `CLAUDE.md` des Projekts und be
 ## Eine Custom-Sitzung starten
 
 1. Klicke auf der Startseite auf **Agent** und wähle **Custom** mit dem Hinweis „Beliebiges Modell: OpenRouter, Ollama, vLLM“.
-2. Wähle unter **Modell** eines deiner Modelle. Ist die Liste leer, ergänze zuerst eines über **Agent → Modelle für Custom**.
-3. Wähle unter **Optionen → Berechtigungen** den gewünschten Modus; siehe [Was Custom ohne Rückfrage tun darf](#choose-what-custom-may-do-without-asking). Eine Einstellung für den Denkaufwand gibt es bei Custom nicht.
+2. Klicke auf **Modell** und wähle eines deiner Modelle. Ist die Liste leer, füge zuerst ein Modell hinzu: **Agent** → **Modelle für Custom**.
+3. Wähle unter **Optionen** die **Berechtigungen** (siehe [Was Custom ohne Rückfrage tun darf](#choose-what-custom-may-do-without-asking)). Eine Einstellung für den Denkaufwand gibt es bei Custom nicht.
 4. Schreibe die Aufgabe und drücke Enter.
 
 Ein lokales vLLM-Modell startet bei der ersten Verwendung. Die Sitzung meldet etwa „… wird mit vLLM gestartet; beim ersten Mal dauert das ein bis zwei Minuten“.
@@ -37,7 +37,7 @@ Du kannst das Modell im Menü unter dem Nachrichtenfeld wechseln. Das neue Model
 - **Dokumente**: PDF, Word, Excel, PowerPoint, OpenDocument, RTF und EPUB als Text lesen.
 - **Bilder**: Anhänge, geöffnete Bilddateien und Bilder aus Webseiten oder Tools verarbeiten. Bildfähige Modelle erhalten das Bild direkt; sonst beschreibt es das Hilfsmodell. Siehe [Bilder für Modelle ohne Bildverarbeitung](#images-for-models-that-dont-see).
 - **Befehle**: Shell-Befehle im Sitzungsordner standardmäßig bis zu zwei, maximal zehn Minuten ausführen. Server, Watcher und andere Dauerprozesse laufen im Hintergrund. Custom kann ihre Ausgabe lesen und sie stoppen. Beim Beenden von Custom werden sie ebenfalls gestoppt; der nächste Durchlauf erfährt, welche Prozesse noch laufen.
-- **Webseiten**: Inhalte mit Überschriften, Links, Listen und Tabellen als bereinigten Text abrufen, auch PDFs und Office-Dateien im Web. Nur öffentliche Adressen sind direkt erreichbar. Für diesen Rechner oder sein Netzwerk verwendet Custom Befehle wie `curl`.
+- **Webseiten**: Inhalte mit Überschriften, Links, Listen und Tabellen als bereinigten Text abrufen, auch PDFs und Office-Dateien im Web. Nur öffentliche Adressen sind direkt erreichbar. Für diesen Computer oder sein Netzwerk verwendet Custom Befehle wie `curl`.
 - **Planung**: Bei mehrstufigen Aufgaben eine sichtbare Checkliste führen und Schritte abhaken.
 - **Skills**: passende Skills aus dem Projekt, deinen Claude-Code- und Codex-Ordnern und der [Skill-Bibliothek](/guide/skills) laden. Custom kennt Gruppen und Namen und kann nach einer kurzen Aufgabenbeschreibung suchen.
 - **MCP-Server**: für Claude Code eingerichtete globale und ordnerspezifische Tool-Server, die `.mcp.json` des Projekts und die Server von Codex verwenden.
@@ -51,7 +51,7 @@ Jeder Schritt erhält einen verständlichen Namen wie „index.ts lesen“, „R
 
 - **Nachfragen**, die Voreinstellung: fragt vor Dateiänderungen und Befehlen. Rein lesende Befehle wie `ls`, `cat` oder `git status` laufen ohne Rückfrage.
 - **Änderungen akzeptieren**: erlaubt Dateiänderungen im Sitzungsordner. Befehle mit Auswirkungen und Aktionen außerhalb des Ordners benötigen Zustimmung.
-- **Auto**: Routinearbeiten laufen direkt, riskantere Schritte prüft eine schnelle Bewertung. Siehe [Auto-Modus](#auto-mode).
+- **Automatisch**: Routinearbeiten laufen direkt, riskantere Schritte prüft eine schnelle Bewertung. Siehe [Auto-Modus](#auto-mode).
 - **Vollzugriff**: Tools und Befehle laufen ohne Freigabefragen und ohne [Befehls-Sandbox](#the-sandbox-for-commands), einschließlich Administratorbefehlen und Änderungen außerhalb des Ordners. Es gelten weiterhin die Rechte deines Computerkontos; fehlende Administratorrechte werden dadurch nicht erteilt. Vertrauliche Sitzungen behalten ihre Netzwerkbeschränkungen.
 - **Planen**: ausschließlich lesen und planen, keine Dateiänderungen oder Befehle. Custom nutzt nur lesende Tools und endet mit einem nummerierten Plan. Zur Umsetzung wechselst du den Modus und beauftragst die Ausführung.
 
@@ -69,7 +69,7 @@ Bei Befehlen zerlegt **Immer erlauben** die Eingabe an `&&`, `;`, `|` und ähnli
 
 **Immer erlauben** wird nicht angeboten, wenn eine sichere Regel unmöglich ist:
 
-- bei direkt eingebettetem Code wie `python -c "…"`;
+- bei Code, der direkt im Befehl steht (etwa `python -c "…"`);
 - bei vorab nicht bestimmbaren Dateinamen;
 - bei nicht zuverlässig auswertbaren Befehlen;
 - bei riskanten Befehlen mit zwingender Rückfrage.
@@ -80,7 +80,7 @@ Außer im Vollzugriff benötigen diese Aktionen jedes Mal deine Zustimmung, auch
 
 - Ausführung als Administrator, etwa mit `sudo`;
 - Löschen außerhalb des Sitzungsordners, Löschen des Sitzungsordners selbst oder Löschen vorab nicht bestimmbarer Dateien;
-- Downloads direkt an eine Shell weitergeben oder sofort ausführen;
+- einen Download direkt an eine Shell weiterreichen oder einen Download sofort ausführen;
 - Rohdaten auf Datenträger schreiben, formatieren oder Partitionen ändern;
 - den Computer herunterfahren oder neu starten;
 - geplante Systemaufgaben über `crontab` ändern;
@@ -97,7 +97,7 @@ Im Auto-Modus entscheiden stattdessen dessen Regeln und Schnellprüfung. Im Voll
 
 ## Auto-Modus
 
-Im Auto-Modus laufen Routinearbeiten ohne Unterbrechung. Für andere Aktionen wirst du gefragt. Wähle dafür **Auto** unter **Berechtigungen**.
+Im Auto-Modus laufen Routinearbeiten ohne Unterbrechung. Für andere Aktionen wirst du gefragt. Wähle dafür **Automatisch** unter **Berechtigungen**.
 
 Jeder sonst zustimmungspflichtige Schritt durchläuft diese Prüfungen:
 
@@ -111,7 +111,7 @@ Jeder sonst zustimmungspflichtige Schritt durchläuft diese Prüfungen:
 
 Die Schnellprüfung sieht ausschließlich deine eigenen Nachrichten, die erste und die letzten zehn, ein mögliches Ziel, den Ordner und die geplante Aktion. Bei Dateiänderungen sieht sie den Anfang des neuen Textes. Gelesene Webseiten und Dateien erhält sie nicht und können sie deshalb nicht beeinflussen. Scheitert die Prüfung oder dauert sie länger als 45 Sekunden, entscheidest du. Innerhalb eines Durchlaufs erhält derselbe Schritt dieselbe Entscheidung. In [vertraulichen Sitzungen](/guide/sessions#keep-a-session-confidential) bleibt die Prüfung lokal: durch ein lokales Hilfsmodell oder andernfalls das Sitzungsmodell.
 
-Automatisch erlaubte Schritte tragen **Auto** mit einer Begründung beim Darüberfahren. Gestoppte Schritte zeigen die Kennzeichnung rot und „Auto hat diesen Schritt gestoppt: …“. Rückfragen beginnen mit „Auto:“ und der Begründung.
+Automatisch erlaubte Schritte tragen **Automatisch** mit einer Begründung beim Darüberfahren. Gestoppte Schritte zeigen die Kennzeichnung rot und „Auto hat diesen Schritt gestoppt: …“. Rückfragen beginnen mit „Auto:“ und der Begründung.
 
 Unter [Einstellungen → Funktionen → Custom](/settings?s=custom&find=Auto%20mode) erklärt das (i) der Zeile **Auto-Modus** dieselben Regeln. Dort gibt es keinen zusätzlichen Schalter.
 
@@ -119,8 +119,8 @@ Unter [Einstellungen → Funktionen → Custom](/settings?s=custom&find=Auto%20m
 
 Im Auto-Modus können Befehle in einer Sandbox laufen. Schreibzugriffe sind dann auf Sitzungsordner und temporäre Ordner begrenzt; der restliche Computer ist schreibgeschützt. Netzwerkzugriffe bleiben möglich. Bei einem Git-Worktree oder Unterordner eines Repositorys bleibt auch der eigentliche Repository-Ordner beschreibbar, damit Git committen kann. Paketmanager verwenden temporäre Cache-Ordner. Die Umsetzung hängt vom Betriebssystem ab:
 
-- **Linux**: bubblewrap erlaubt Schreiben im Sitzungsordner, in `/tmp` und im Repository-Ordner.
-- **Mac**: macOS Seatbelt begrenzt Schreiben auf Sitzungsordner, temporäre Ordner und Repository-Ordner.
+- **Linux**: Es nutzt bubblewrap. Befehle dürfen Dateien im Ordner der Sitzung, im temporären Ordner (`/tmp`) und im eigenen Ordner des Repositorys ändern.
+- **Mac**: Es nutzt Seatbelt, die Sandbox, die zu macOS gehört. Die Regel ist dieselbe: der Ordner der Sitzung, die temporären Ordner und der eigene Ordner des Repositorys.
 - **Windows**: Befehle laufen mit niedriger Integritätsstufe. Lesen ist überall möglich, Schreiben nur in entsprechend markierten Ordnern. Hydor markiert Sitzungs- und Repository-Ordner bei der ersten Nutzung dauerhaft. Temporäre Dateien und Paket-Caches liegen in einem eigenen Ordner unter `AppData\LocalLow\Hydor`. Persönlicher Ordner, ganze Laufwerke, Windows, Program Files und App-Datenordner werden nie markiert; dort laufen Befehle ohne Sandbox. Weil Git Bash bei niedriger Integritätsstufe seine internen Abläufe nicht mit normalen Bash-Fenstern teilen kann, legt Hydor außerdem Git-Programmdateien unter `AppData\Local\Hydor\sandbox` ab. Auf demselben Laufwerk sind das platzsparende Verknüpfungen auf dieselben Dateien.
 
 Stößt ein Befehl an die Sandbox-Grenzen, erfährt Custom davon. Er arbeitet innerhalb der Beschränkung weiter oder erklärt, was außerhalb erledigt werden muss.
@@ -129,14 +129,14 @@ Unter [Einstellungen → Funktionen → Custom](/settings?s=custom&find=Sandbox%
 
 Kann die Sandbox nicht starten, ist der Schalter ausgegraut und nennt den Grund. Befehle laufen dann ohne Sandbox. Unter Linux fehlt oft bubblewrap oder es darf, etwa in manchen Containern, nicht starten. Auf dem Mac ist Seatbelt fehlgeschlagen. Unter Windows erstellt Hydor zunächst einen kleinen Helfer mit dem mitgelieferten .NET Framework und benötigt Git for Windows. Fehlende Voraussetzungen oder Startfehler werden genannt. In Nachfragen und Änderungen akzeptieren wird keine Sandbox verwendet: Nicht rein lesende Befehle warten dort auf deine Zustimmung oder eine passende Regel aus **Immer erlauben**.
 
-In [vertraulichen Sitzungen](/guide/sessions#keep-a-session-confidential) läuft jeder Befehl ohne Netzwerk, unabhängig von Modus und Sandbox-Schalter. Internet, andere Rechner und lokale Server sind dann nicht erreichbar. Dateirechte richten sich weiterhin nach dem Modus. Das funktioniert mit bubblewrap unter Linux und Seatbelt auf dem Mac. Windows kann das Netzwerk so nicht abschalten. Dort und bei nicht verfügbarer Sandbox fragt jeder Befehl in jedem Modus nach, ohne **Immer erlauben**. Custom erhält den Hinweis; Netzwerkversuche erfahren den Grund ihres Scheiterns.
+In [vertraulichen Sitzungen](/guide/sessions#keep-a-session-confidential) läuft jeder Befehl ohne Netzwerk, unabhängig von Modus und Sandbox-Schalter. Internet, andere Computer und lokale Server sind dann nicht erreichbar. Dateirechte richten sich weiterhin nach dem Modus. Das funktioniert mit bubblewrap unter Linux und Seatbelt auf dem Mac. Windows kann das Netzwerk so nicht abschalten. Dort und bei nicht verfügbarer Sandbox fragt jeder Befehl in jedem Modus nach, ohne **Immer erlauben**. Custom erhält den Hinweis; Netzwerkversuche erfahren den Grund ihres Scheiterns.
 
 ## Custom ein Ziel geben
 
 Ein Ziel lässt Custom über mehrere Durchläufe weiterarbeiten, bis eine Bedingung erfüllt ist, etwa „npm test ist erfolgreich und die Upload-Seite verarbeitet Dateien mit 2 GB“.
 
 1. Öffne das Sitzungsmenü (⋯) → **Ziel festlegen**.
-2. Beschreibe den gewünschten Abschluss als überprüfbare Bedingung.
+2. Beschreibe, wie „fertig“ aussieht, als Bedingung, die zutrifft, wenn die Arbeit erledigt ist.
 3. Klicke auf **Daran arbeiten** oder drücke Strg+Enter beziehungsweise ⌘Enter auf dem Mac.
 
 Custom beginnt sofort. Läuft bereits ein Durchlauf, wird das Ziel nach dessen Ende geprüft.
@@ -152,7 +152,7 @@ Deine eigenen Nachrichten haben Vorrang. Die Zielprüfung wartet, bis die Wartes
 
 Das Ziel pausiert mit Begründung, wenn:
 
-- die unter **Runden bis zur Zielpause** eingestellte Anzahl erreicht ist, standardmäßig 30;
+- es so viele nächste Schritte gesendet hat, wie **Runden bis zur Zielpause** in den Einstellungen erlaubt (30, solange du es nicht änderst);
 - drei aufeinanderfolgende Runden keinen Fortschritt gebracht haben;
 - du den Agenten stoppst, ein Durchlauf fehlschlägt, kein Agent läuft oder die Prüfung selbst scheitert.
 
@@ -160,18 +160,18 @@ Die Zielanzeige über dem Nachrichtenfeld zeigt Zieltext, Zustand, Anzahl und Da
 
 Unter [Einstellungen → Funktionen → Custom](/settings?s=custom&find=Rounds%20before%20a%20goal%20pauses) wählst du in der Gruppe **Ziele** für **Runden bis zur Zielpause** zwischen **10**, **30** und **100**.
 
-## Lange Gespräche und umfangreiche Ausgaben
+## Lange Unterhaltungen und umfangreiche Ausgaben
 
-Jedes Modell kann nur eine begrenzte Textmenge gleichzeitig lesen, seinen Kontext. Custom hält Gespräche automatisch innerhalb dieser Grenze. Daher gibt es hier keine Schaltfläche zum Komprimieren:
+Jedes Modell kann nur eine begrenzte Textmenge gleichzeitig lesen, seinen Kontext. Custom hält Unterhaltungen automatisch innerhalb dieser Grenze. Daher gibt es hier keine Schaltfläche zum Komprimieren:
 
 1. Wird der Kontext knapp, räumt Custom zunächst alte Tool-Ausgaben auf und reserviert Platz für die Antwort. Die Sitzung meldet „Alte Tool-Ausgaben wurden entfernt, um im Modellkontext zu bleiben“.
-2. Reicht das nicht, fasst das Modell den älteren Gesprächsteil in Arbeitsnotizen zusammen. Bei späteren Kürzungen aktualisiert es diese Notizen. Plan und verwendete Skills bleiben erhalten.
+2. Reicht das nicht, fasst das Modell den früheren Teil in Notizen zusammen, mit denen die Arbeit weitergeht („Die frühere Unterhaltung wird zusammengefasst, damit der Kontext des Modells reicht …“). Beim nächsten Mal aktualisiert es diese Notizen, statt von vorn zu beginnen. Dein Plan und die verwendeten Skills bleiben in jedem Fall erhalten.
 
 Meldet der Modellserver eine zu lange Anfrage, lernt Custom daraus die tatsächliche Kontextgrenze und komprimiert sofort. Nur die neuesten Bilder werden bei jeder Anfrage mitgesendet.
 
 Die zu Beginn aus Memory übernommenen Informationen bleiben während der Arbeit unverändert. So kann der Modellserver zwischengespeicherten Kontext wiederverwenden, was schneller und günstiger ist. Nach jeder Komprimierung liest Custom Memory passend zu deiner neuesten Nachricht erneut; siehe [Womit ein Agent beginnt](/guide/memory#what-an-agent-starts-with).
 
-Der Ring neben dem Nachrichtenfeld zeigt die Kontextauslastung in Prozent. Beim Darüberfahren siehst du Tokenanzahl und Verteilung. Unter **Optionen → Kontext** steht etwa „42 % belegt“. Ein kleiner Pfeil öffnet die zunächst eingeklappte Aufschlüsselung: **Anweisungen**, **Projektanweisungen**, **Memory**, **App-Funktionen**, **Skills**, **Tools** und **Gespräch**, jeweils mit Tokenzahl und Anteilbalken. Leere Bereiche entfallen. Die Werte werden aus dem Text geschätzt und an die vom Modellserver gemeldete Gesamtzahl angepasst. Der Ring ist bei Custom nicht anklickbar, da die Komprimierung automatisch erfolgt. Claude Code und Codex behalten dagegen **Komprimieren**; siehe [Kontext, Cache und Geschwindigkeit ablesen](/guide/sessions#read-the-meters-context-cache-and-speed).
+Der Ring neben dem Nachrichtenfeld zeigt in Prozent, wie voll der Kontext des Modells ist; fahre darüber, um die Tokens und ihre Verteilung zu sehen. Unter **Optionen** (dem Chip unter dem Nachrichtenfeld) steht in der Zeile **Kontext** etwa „42 % genutzt“, mit einem kleinen Pfeil: Klicke darauf, um die Aufschlüsselung ein- oder auszublenden, die zunächst eingeklappt ist: **Anweisungen**, **Projektanweisungen**, **Memory**, **App-Funktionen**, **Skills**, **Werkzeuge** und **Unterhaltung**, jeweils mit ihren Tokens und einem schmalen Balken für ihren Anteil. Ein Teil, in dem nichts steht, entfällt. Die Werte werden aus dem Text geschätzt und auf das umgerechnet, was der Server des Modells gezählt hat. Ein Klick auf den Ring bewirkt in einer Custom-Sitzung nichts, da Custom selbst verdichtet; Sitzungen mit Claude Code und Codex behalten ihren Ring und **Verdichten** (siehe [Kontext, Cache und Geschwindigkeit ablesen](/guide/sessions#read-the-meters-context-cache-and-speed)).
 
 Auch lange Ausgaben füllen den Kontext nicht unbegrenzt. Überschreitet eine Befehls-, Seiten- oder Tool-Ausgabe ihren Anteil am Kontext, speichert Custom sie vollständig im Sitzungsordner. Das Modell erhält Anfang, Ende und Dateipfad. Bei Befehlen wird mehr vom Ende gezeigt, wo häufig Fehler stehen. Den Rest kann es abschnittsweise lesen oder durchsuchen. Diese Dateien werden nach einer Woche gelöscht.
 
@@ -179,16 +179,16 @@ Auch lange Ausgaben füllen den Kontext nicht unbegrenzt. Überschreitet eine Be
 
 Vor deiner Nachricht erhält das Modell in dieser Reihenfolge:
 
-- Customs Arbeitsregeln mit Modus und Ordner, Agentenanweisungen und deine Agentenrichtlinien: **Anweisungen**;
-- `AGENTS.md` oder `CLAUDE.md` des Projekts: **Projektanweisungen**;
+- Die eigenen Regeln von Custom (wie es arbeitet, der Modus, der Ordner), die Anweisungen des Agenten und deine Agentenrichtlinien: **Anweisungen** in der Aufschlüsselung;
+- die Anweisungen des Projekts, seine `AGENTS.md` oder `CLAUDE.md`: **Projektanweisungen**;
 - passende Informationen aus [Memory](/guide/memory#what-an-agent-starts-with): **Memory**;
 - Vorgaben der App-Funktionen, etwa zur Darstellung von Antworten, zum Schutz von Keys und Passwörtern, zum Aufräumen und zur vollständigen Nutzung verfügbarer Funktionen wie Bilder, Apps, Browser und Dokumente: **App-Funktionen**;
 - **Skills**, nach Gruppen: projekteigene, persönliche und Bibliotheksgruppen wie Programmierung oder Dokumente. Custom lädt nach Namen oder sucht anhand der Aufgabe. Höchstens 200 Skills werden berücksichtigt, davon maximal 40 persönliche und projekteigene. Zu deiner ersten Nachricht passende Skills enthalten ihren Einsatzzweck;
-- vollständig verfügbare Tools und eine kurze Liste weiterer Tools: **Tools**.
+- vollständig verfügbare Tools und eine kurze Liste weiterer Tools: **Werkzeuge**.
 
 Funktionsspezifische Tool-Anleitungen werden erst mit dem jeweiligen Tool geladen. Solange es nur in der Kurzliste steht, wartet auch seine Anleitung. Beim Nachschlagen oder Verwenden wird sie ergänzt. Allgemeine Regeln bleiben immer vorhanden. Claude Code und Codex erhalten weiterhin alle App-Anweisungen beim Start.
 
-So fällt die erste Anfrage bei Modellen mit kleinem Kontext kürzer aus. Die Verteilung siehst du unter **Optionen**; siehe [Lange Gespräche und umfangreiche Ausgaben](#long-conversations-and-long-output).
+So fällt die erste Anfrage bei Modellen mit kleinem Kontext kürzer aus. Die Verteilung siehst du unter **Optionen**; siehe [Lange Unterhaltungen und umfangreiche Ausgaben](#long-conversations-and-long-output).
 
 ## Wie Custom schwächere Modelle unterstützt
 
@@ -215,13 +215,13 @@ Andernfalls beschreibt das Hilfsmodell Bildinhalt und Anordnung und gibt vorhand
 
 ## Verzweigen und ab hier bearbeiten
 
-Custom-Sitzungen lassen sich wie Claude-Code- und Codex-Sitzungen über das Sitzungsmenü (⋯) → **Verzweigen** kopieren. Mit **Ab hier bearbeiten** änderst du eine frühere eigene Nachricht: Das Gespräch geht in einer Kopie unmittelbar vor dieser Nachricht weiter; die bisherige Sitzung wird archiviert. **Dateien auf den Stand vor dieser Nachricht zurücksetzen** macht spätere Dateiänderungen rückgängig. Bei Custom gilt das nur für Änderungen seiner eigenen Dateiwerkzeuge. Änderungen durch Befehle bleiben bestehen.
+Custom-Sitzungen lassen sich wie Claude-Code- und Codex-Sitzungen über das Sitzungsmenü (⋯) → **Verzweigen** kopieren. Mit **Ab hier bearbeiten** änderst du eine frühere eigene Nachricht: Die Unterhaltung geht in einer Kopie unmittelbar vor dieser Nachricht weiter; die bisherige Sitzung wird archiviert. **Dateien auf den Stand vor dieser Nachricht zurücksetzen** macht spätere Dateiänderungen rückgängig. Bei Custom gilt das nur für Änderungen seiner eigenen Dateiwerkzeuge. Änderungen durch Befehle bleiben bestehen.
 
-Custom speichert Gespräche auf dem Datenträger und setzt sie nach einem App-Neustart fort.
+Custom speichert Unterhaltungen auf dem Datenträger und setzt sie nach einem App-Neustart fort.
 
 ## Was Custom kostet
 
-- Bei OpenRouter-Modellen verwendet die Sitzung die pro Aufruf gemeldeten tatsächlichen Kosten. Claude-Modelle werden ausdrücklich zur Nutzung des Gesprächs-Caches aufgefordert; andere tun das selbst. Das erneute Lesen kostet so ungefähr ein Zehntel. Die angebotenen Tools ändern sich höchstens einmal pro Sitzung. Tools für Hintergrundbefehle bleiben nach dem ersten Einsatz verfügbar, damit der Cache bestehen bleibt.
+- Bei OpenRouter-Modellen verwendet die Sitzung die pro Aufruf gemeldeten tatsächlichen Kosten. Claude-Modelle werden ausdrücklich dazu aufgefordert, die Unterhaltung in ihrem Cache zu behalten; andere tun das selbst. Das erneute Lesen kostet so ungefähr ein Zehntel. Die angebotenen Tools ändern sich höchstens einmal pro Sitzung. Tools für Hintergrundbefehle bleiben nach dem ersten Einsatz verfügbar, damit der Cache bestehen bleibt.
 - Lokale Modelle über Ollama oder vLLM: keine Modellgebühren.
 - Andere Endpunkte: Berechnung anhand der Token wie bei anderen Agenten; siehe [Nutzung, Limits und Kosten](/guide/usage).
 
@@ -246,7 +246,7 @@ Die Modelle von Custom und das für Prüfungen zuständige **Hilfsmodell** finde
 - „Setze für meine Custom-Sitzung ‚Upload-Seite‘ das Ziel: npm test ist erfolgreich und Uploads mit 2 GB funktionieren.“
 - „Welches Hilfsmodell nutzt Auto und kann es Bilder verarbeiten?“
 - „Kann dieser Computer Befehle vertraulicher Sitzungen ohne Netzwerk ausführen?“
-- „Füge Qwen3 Coder von OpenRouter für Custom hinzu.“ Voraussetzung ist ein hinterlegter OpenRouter-Key.
+- „Füge Qwen3 Programmierer von OpenRouter für Custom hinzu.“ Voraussetzung ist ein hinterlegter OpenRouter-Key.
 - „Zeige meine OpenRouter-Nutzung und -Kosten ohne manuelle Modellpreise.“
 - „Warum ist meine erste Anfrage an Custom für ein lokales Modell so lang?“
 - „Wie voll ist der Kontext meiner Custom-Sitzung und was belegt den meisten Platz?“

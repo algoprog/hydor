@@ -184,13 +184,13 @@ test('German covers the extracted catalog and preserves interpolation values', (
   assert.equal(german('system::Memory'), 'Arbeitsspeicher');
   assert.equal(german('Memory'), 'Memory');
   assert.equal(german('Memory for this session'), 'Memory für diese Sitzung');
-  // Deep research is the feature's name in German, including its dynamic status.
-  assert.equal(german('Deep research'), 'Deep research');
-  assert.equal(german('Deep research: on'), 'Deep research: ein');
+  // Deep research is "tiefgehende Recherche" in German, including its dynamic status.
+  assert.equal(german('Deep research'), 'Tiefgehende Recherche');
+  assert.equal(german('Deep research: on'), 'Tiefgehende Recherche: ein');
   // Options and dynamic status labels retain the related feature names as well.
-  assert.equal(german('Swarm'), 'Swarm');
-  assert.equal(german('Swarm: on'), 'Swarm: ein');
-  assert.equal(german('Research'), 'Research');
+  assert.equal(german('Swarm'), 'Schwarm');
+  assert.equal(german('Swarm: on'), 'Schwarm: ein');
+  assert.equal(german('Research'), 'Forschung');
   // Known structured server failures are extracted too; arbitrary tool diagnostics remain literal values.
   for (const key of ['the agent gave no answer', 'Tailscale didn’t publish the app{0}.{1}']) assert.ok(read('strings.json')[key], `Missing visible server failure: ${key}`);
   assert.equal(german('the agent gave no answer'), 'der Agent hat keine Antwort geliefert');
@@ -246,7 +246,7 @@ test('German covers the extracted catalog and preserves interpolation values', (
   assert.equal(dict['YYYY-MM-DD HH:MM'], 'YYYY-MM-DD HH:MM');
   assert.ok(dict['The start is a day written as YYYY-MM-DD'].includes('YYYY-MM-DD'));
   // Guide topic titles are translated even when the guide body is in English.
-  assert.equal(german('Research: papers, writing and the lab'), 'Research: Publikationen, Schreiben und Labor');
+  assert.equal(german('Research: papers, writing and the lab'), 'Forschung: Papers, Schreiben und Labor');
   // Product names and executable fragments are not ordinary prose.
   for (const key of ['Codex', 'Anthropic', 'Mermaid', 'Markdown', 'NORM.DIST(x, mean, standard_dev, cumulative)', 'linear infinite', 'codex resume {0}', 'npm install', 'kubectl rollout undo deployment/web', 'input, textarea, select, [contenteditable]', '“{0} (filled).pdf”']) {
     assert.equal(dict[key], key, `German must preserve ${key}`);

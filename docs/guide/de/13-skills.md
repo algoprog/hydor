@@ -41,11 +41,11 @@ Custom liest mehrere Ordner in dieser Reihenfolge: projekteigene Skills aus `.cl
 
 ## Erkennen, wann ein Agent einen Skill verwendet
 
-Lädt ein Agent einen Skill, erscheint im Gespräch eine kleine Anzeige wie **Skill wird verwendet: research**. Während des Lesens dreht sich ein Ladesymbol. Das funktioniert mit Claude Code, Codex und Custom.
+Lädt ein Agent einen Skill, erscheint in der Unterhaltung eine kleine Anzeige wie **Skill wird verwendet: research**. Während des Lesens dreht sich ein Ladesymbol. Das funktioniert mit Claude Code, Codex und Custom.
 
 Klicke auf die Anzeige, um Anleitung, Einsatzzweck und Verlauf zu lesen. Stammt der Skill nicht aus der App-Bibliothek, weist das Fenster auf den eigenen Skills-Ordner des Agenten oder den Projektordner hin. Wurde ein projekteigener Skill verwendet, öffnet sich genau dieser. Die Kennzeichnung zeigt den Projektnamen; **Skills des Projekts** öffnet dessen Skills-Tab.
 
-Haben Wörter deiner Nachricht den Skill in eine Custom-Sitzung eingebunden, nennt die Anzeige diese Wörter, etwa „durch ‚research‘ in deiner Nachricht eingebunden“. Siehe [Skills anhand von Schlüsselwörtern einbinden](#bring-skills-in-by-keywords).
+Haben Wörter deiner Nachricht den Skill in eine Custom-Sitzung eingebunden, nennt die Anzeige diese Wörter, etwa „durch ‚Forschung‘ in deiner Nachricht eingebunden“. Siehe [Skills anhand von Schlüsselwörtern einbinden](#bring-skills-in-by-keywords).
 
 Jedes Laden zählt als Verwendung. Bei Bibliotheksskills zeigt die Zeile die Anzahl der Verwendungen und den Zeitpunkt der letzten Nutzung.
 
@@ -58,7 +58,7 @@ Von oben nach unten findest du:
 - Neben dem Titel **Neuer Skill** und das Menü **⋯** mit **Passende Skills vorschlagen**, **Skills anhand von Schlüsselwörtern einbinden**, **Dein Skills-Ordner** zum Öffnen in Dateien, **Weitere Skills über Plugins** für [Einstellungen → Plugins](/settings?s=plugins) und **So erhalten Agenten Skills**.
 - Ausstehende Agentenvorschläge, sofern vorhanden; siehe [Einen Skill-Vorschlag bestätigen, bearbeiten oder verwerfen](#approve-edit-or-dismiss-a-proposed-skill). Das (i) erklärt, dass erst nach deiner Zustimmung gespeichert wird.
 - Ein Suchfeld und die Filter **Alle**, **Eingebaut**, **Deine Skills**, **Von Plugins**, **Claude Code und Codex** und **In Projekten**. Leere Filter werden ausgeblendet.
-- Skills nach Einsatzzweck: **Arbeitsweisen**, **Schreiben**, **Dokumente**, **Recherche und Web**, **Planung und Entscheidungen**, **Daten und Zahlen**, **Design und Bilder**, **Programmierung**, **KI-Modelle** und **Diese App**. Die Überschrift nennt die Anzahl. Lange Gruppen zeigen zunächst acht Einträge und **Alle anzeigen**. Danach folgen eigene Skills von Claude Code und Codex sowie je eine Gruppe für Projekte mit eigenen Skills.
+- die Skills, in Gruppen nach ihrem Zweck (der Titel jeder Gruppe nennt, wie viele sie enthält, und eine lange Gruppe zeigt ihre ersten acht mit **Alle anzeigen**): **Arbeitsweisen**, **Schreiben**, **Dokumente**, **Recherche und Web**, **Planung und Entscheidungen**, **Daten und Zahlen**, **Design und Bilder**, **Programmierung**, **KI-Modelle** und **Diese App**; dann **Eigene Skills von Claude Code**, **Eigene Skills von Codex** und eine Gruppe für jedes Projekt mit eigenen Skills;
 - Am Ende entfernte eigene Skills, die du wiederherstellen kannst.
 
 Jede Zeile zeigt Name, Einsatzzweck, Schalter und ein (i) mit Quelle und Nutzungshäufigkeit. Ein Klick auf den Namen öffnet den Skill. Claude-Code- und Codex-Skills werden so aufgeführt, wie sie in den jeweiligen Ordnern vorliegen: deine eigenen und mit dem Agenten gelieferte Skills. Die Skills eines Projektordners aus `.claude/skills` findest du im **Skills**-Tab des Projekts.
@@ -82,15 +82,15 @@ Projekteigene Skills haben hier keinen Schalter. Du änderst sie im **Skills**-T
 
 ## Einen Skill und seinen Verlauf lesen
 
-Klicke auf den Skill-Namen oder eine Anzeige **Skill wird verwendet** im Gespräch. Das Fenster zeigt:
+Klicke auf den Skill-Namen oder eine Anzeige **Skill wird verwendet** in der Unterhaltung. Das Fenster zeigt:
 
-- Quelle, Gruppe und Anzahl der Verwendungen;
+- woher er kommt, seine Gruppe und wie oft Agenten ihn verwendet haben;
 - den Schalter mit **Für Agenten verfügbar** oder **Deaktiviert: für Agenten nicht verfügbar**;
 - Projekte mit abweichender Einstellung, jeweils **Aktiviert** oder **Deaktiviert**. Ein Klick öffnet den Skills-Tab des Projekts;
 - Einsatzzweck und gegebenenfalls Schlüsselwörter unter „Custom bindet es auf deine Anweisung ein“;
 - die Anleitung, wie Agenten sie lesen;
 - **Verlauf**, sofern Änderungen vorliegen: neueste zuerst mit **Gespeichert**, **Geändert**, **Entfernt** oder **Wiederhergestellt**, Zeitpunkt sowie hinzugefügten und entfernten Zeilen. Ein Klick zeigt die Änderungen zeilenweise;
-- unten den Dateipfad. Ein Klick öffnet ihn in Dateien.
+- ganz unten, wo seine Datei liegt: Klicke darauf, um sie in Dateien anzuzeigen.
 
 Welche Aktionen unten verfügbar sind, hängt vom Skill ab:
 
@@ -123,7 +123,7 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 - **translation**: übersetzt Dokumente, Nachrichten, Seiten, App-Texte und Untertitel sinngenau und natürlich. Ein Glossar hält Begriffe und Namen konsistent; Zahlen und Datumsangaben werden für die Zielregion angepasst und das Ergebnis geprüft.
 - **social-media**: plant und schreibt plattformspezifische Beiträge für LinkedIn, X, Instagram, Mastodon, Bluesky und weitere Dienste, passt Botschaften an und führt einen Redaktionskalender.
 - **seo**: verbessert die Auffindbarkeit von Websites, Shops und Blogs in Suchmaschinen und KI-Antworten. Prüft Seiten, Titel, Beschreibungen, Indexierung, strukturierte Daten und KI-Crawler und misst Ergebnisse ohne Rankingversprechen.
-- **release-notes**: erstellt aus Commits und Pull Requests verständliche Release Notes und Changelog-Einträge und bestimmt die nächste Versionsnummer.
+- **release-notes**: erstellt aus Commits und Pull-Requests verständliche Release Notes und Changelog-Einträge und bestimmt die nächste Versionsnummer.
 
 **Dokumente**
 
@@ -137,9 +137,9 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 - **research**: plant die nötigen Suchen, recherchiert zunächst breit und dann gezielt in Fachartikeln, Patenten, Nachrichten und offiziellen Unterlagen. Zentrale Aussagen werden durch zwei unabhängige Quellen oder eine Primärquelle geprüft. Die Antwort enthält Quellen und nennt offene Punkte.
 - **spin-check**: prüft Werbung, virale Beiträge, Verkaufsaussagen und andere Behauptungen auf Wahrheit, Irreführung oder Betrug. Jede Aussage wird mit einer geeigneten Quelle abgeglichen; Überzeugungstechniken und Einzelurteile werden benannt.
 - **papers**: unterstützt die vertiefte Arbeit mit wissenschaftlicher Literatur: Zitierbeziehungen, rechtmäßig verfügbare Volltexte, Zusammenfassungen, Studienvergleiche, Qualitätsbewertung und korrektes Zitieren.
-- **peer-review**: begutachtet eigene Entwürfe oder zugewiesene Artikel anhand des Bewertungsformulars und der Punkteskala der jeweiligen Publikation. Prüft kritische Schwachstellen einzeln und beantwortet Gutachten innerhalb der vorgegebenen Länge, ohne noch nicht vorliegende Ergebnisse zu versprechen.
+- **peer-review**: begutachtet eigene Entwürfe oder zugewiesene Artikel anhand des Bewertungsformulars und der Punkteskala der jeweiligen Paper. Prüft kritische Schwachstellen einzeln und beantwortet Gutachten innerhalb der vorgegebenen Länge, ohne noch nicht vorliegende Ergebnisse zu versprechen.
 - **reproduce-paper**: reproduziert veröffentlichte Ergebnisse mit genauem Zielwert, Originalcode und Einstellungen, sauberer Umgebung, Daten und Checkpoints. Vor dem vollständigen Lauf steht ein kleiner Test; lange Läufe gehören in [Experimente](/guide/experiments). Ergebnisse werden unter vergleichbaren Bedingungen geprüft und Änderungen dokumentiert.
-- **figures-for-papers**: erstellt druckfähige Abbildungen in Spaltenbreite und Schrift der Publikationsvorlage, mit für Farbsehschwächen geeigneten Farben und als Vektor-PDF mit eingebetteten Schriften ohne Type 3. Eine gemeinsame Stildatei hält alle Abbildungen konsistent.
+- **figures-for-papers**: erstellt druckfähige Abbildungen in Spaltenbreite und Schrift des Paperssvorlage, mit für Farbsehschwächen geeigneten Farben und als Vektor-PDF mit eingebetteten Schriften ohne Type 3. Eine gemeinsame Stildatei hält alle Abbildungen konsistent.
 - **blocked-pages**: sucht geordnet nach anderen Zugängen zu benötigten Seiteninhalten, wenn Fehler, Paywalls, Cookie-Schranken, Bot-Prüfungen oder JavaScript das Lesen verhindern. Unberechtigte Zugriffsbarrieren werden nicht umgangen.
 - **web-scraping**: sammelt strukturierte Daten wie Angebote, Tabellen, Preise oder Kataloge rücksichtsvoll und zuverlässig als CSV oder JSON und prüft die Ergebnisse.
 - **maps-and-places**: ermittelt ohne kostenpflichtige Kartendienste Koordinaten, Orte in der Nähe, Entfernungen, Routen, Reisezeiten, Zeitzonen und Öffnungszeiten und bindet Karten in Seiten ein.
@@ -167,9 +167,9 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 **Design und Bilder**
 
 - **image-prompts**: erstellt Bilder und kurze Videos mit den Bildmodellen der App. Unterstützt Beschreibung, Größen, Text im Bild, konsistente Figuren und Stile sowie Bildbearbeitung.
-- **diagrams**: erstellt verständliche Flussdiagramme, Zeitleisten, Organigramme, Mindmaps und Architekturdiagramme im Gespräch oder als gespeicherte Seite.
+- **diagrams**: erstellt verständliche Flussdiagramme, Zeitleisten, Organigramme, Mindmaps und Architekturdiagramme in der Unterhaltung oder als gespeicherte Seite.
 - **infographics**: erstellt einseitige visuelle Erklärungen wie Infografiken, Vergleichsposter, Prozessgrafiken und Zeitleisten. Botschaft und belegte Fakten stehen vor Aufbau und Gestaltung; der tatsächliche Export wird in seiner späteren Anzeigegröße geprüft.
-- **ui-mockups**: zeigt vor dem Bau einer Ansicht oder Seite zwei oder drei schnelle, deutlich unterschiedliche Entwürfe zum Vergleichen und Auswählen direkt im Gespräch.
+- **ui-mockups**: zeigt vor dem Bau einer Ansicht oder Seite zwei oder drei schnelle, deutlich unterschiedliche Entwürfe zum Vergleichen und Auswählen direkt in der Unterhaltung.
 - **brand-kit**: entwickelt eine Marke für kleine Unternehmen, Vereine oder Projekte: Zielgruppe, Tonalität, auf Kontrast geprüfte Farben, kostenlose Schriften, Logoideen sowie einen kompakten Markenleitfaden und ein Markenhandbuch. Setzt die Gestaltung auf Profilen und Karten ein.
 - **youtube-thumbnails**: entwickelt Thumbnails und Titel mit einem gemeinsamen, ehrlichen Versprechen: drei unterschiedliche Ideen, auch klein gut lesbar, in einer Vorschau neben anderen Videos geprüft und mit YouTubes Test & Compare getestet.
 
@@ -181,19 +181,19 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 - **refactoring**: ändert die Codestruktur ohne Verhaltensänderung, in kleinen Schritten bei durchgehend erfolgreichen Tests.
 - **codebase-tour**: erschließt eine unbekannte Codebasis: Build, Start, Tests, Bestandteile und Ablageorte, mit kurzem Überblick und Diagramm.
 - **git-rescue**: hilft sicher bei Git-Problemen wie rückgängig zu machenden Commits, verlorener Arbeit, Konflikten oder versehentlich eingecheckten Zugangsdaten, immer mit vorheriger Sicherung.
-- **github**: bearbeitet Pull Requests, Reviews, Checks und Protokolle, Issues und Releases über gh oder die GitHub-API.
+- **github**: bearbeitet Pull-Requests, Reviews, Checks und Protokolle, Issues und Releases über gh oder die GitHub-API.
 - **api-requests**: ruft Web-APIs auf und untersucht Fehler, mit gespeicherten Keys für die Anmeldung, Fehlerantworten, seitenweisen Ergebnissen, Zugriffslimits und Wiederholungsversuchen.
 - **frontend-polish**: verbessert Layout, Abstände, Typografie, Farben, Kontraste, Zustände, mobile Darstellung und Tastaturbedienung einer Webseite. Die Prüfung erfolgt anhand echter Screenshots.
 - **web-accessibility**: prüft Websites und Web-Apps mit Tools und manuell auf Tastaturbedienung, Screenreader, Zoom, Kontraste, Untertitel, Formulare und Dialoge und berichtet die Ergebnisse nachvollziehbar.
 - **web-app-qa**: testet eine Web-App im Browser wie ein anspruchsvoller Nutzer und dokumentiert gefundene Fehler mit Schritten und Belegen.
 - **docker**: schreibt Dockerfiles und Compose-Dateien, baut und untersucht Container und räumt vorsichtig auf.
-- **servers**: verwaltet Rechner über SSH: Updates, Dienste, Speicherplatz, Benutzer und Keys, Firewall und Backups. Vor Zugriffsänderungen muss ein Rückweg gesichert sein. Änderungen beginnen auf einem Rechner und werden einzeln geprüft.
+- **servers**: verwaltet Computer über SSH: Updates, Dienste, Speicherplatz, Benutzer und Keys, Firewall und Backups. Vor Zugriffsänderungen muss ein Rückweg gesichert sein. Änderungen beginnen auf einem Computer und werden einzeln geprüft.
 - **security-check**: prüft praktisch auf offengelegte Zugangsdaten, Injection, Berechtigungen und veraltete Pakete und bewertet Probleme nach Schweregrad.
 - **performance**: verbessert Geschwindigkeit durch Messen, Erkennen des größten Engpasses, Korrigieren und erneutes Messen.
 - **mcp-servers**: erstellt MCP-Server mit sinnvoll gestalteten neuen Tools, testet sie und verbindet sie mit Agenten.
 - **ci-doctor**: untersucht fehlgeschlagene Läufe von GitHub Actions, GitLab CI, Buildkite oder CircleCI. Findet den ersten tatsächlichen Protokollfehler, unterscheidet sporadische von dauerhaften Fehlern und reproduziert im Worktree. Je nach Auftrag folgt genau eine Wiederholung, ein Draft-Pull-Request oder ein Bericht.
 - **issue-triage**: vergibt passende Projektlabels für neue Issues, sucht Duplikate mit verschiedenen Formulierungen, benennt Unsicherheit, fragt freundlich nach fehlenden Angaben und versucht kleine Korrekturen als Draft-Pull-Request.
-- **dependency-upgrades**: erkennt veraltete oder sicherheitskritische Abhängigkeiten und aktualisiert nach Risiko getrennt: Sicherheitskorrekturen, Patch-, Minor- und Major-Updates. Jede Gruppe wird im Worktree getestet, mit gelesenen Release Notes und eigenem Pull Request.
+- **dependency-upgrades**: erkennt veraltete oder sicherheitskritische Abhängigkeiten und aktualisiert nach Risiko getrennt: Sicherheitskorrekturen, Patch-, Minor- und Major-Updates. Jede Gruppe wird im Worktree getestet, mit gelesenen Release Notes und eigenem Pull-Request.
 - **incident-response**: informiert bei Alarmen oder Ausfällen sofort, erstellt eine Zeitleiste aus Fehlern, Deployments und Änderungen und belegt die vermutete Ursache. Ein Rollback wird vorgeschlagen und vorher abgestimmt. Anschließend folgt eine sachliche Nachbetrachtung ohne Schuldzuweisungen.
 - **git-bisect**: findet mit einem Prüfskript und git bisect run in einem eigenen Worktree den verursachenden Commit und erklärt den Fehler; siehe [Die verursachende Änderung finden](/guide/engineering#find-what-broke-it).
 
@@ -206,7 +206,7 @@ Die App bringt die folgenden Skills mit, nach denselben Gruppen wie auf der Skil
 
 **Diese App**
 
-- **everyday-help**: beantwortet „Was kannst du für mich tun?“ mit einem kurzen Gespräch über deinen Alltag, jeweils einer Frage und ein oder zwei passenden Ideen aus den tatsächlichen App-Funktionen. Mit deiner Zustimmung wird eine kleine Hilfe eingerichtet.
+- **everyday-help**: beantwortet „Was kannst du für mich tun?“ mit einer kurzen Unterhaltung über deinen Alltag, jeweils einer Frage und ein oder zwei passenden Ideen aus den tatsächlichen App-Funktionen. Mit deiner Zustimmung wird eine kleine Hilfe eingerichtet.
 - **app-builder**: erstellt oder ändert deine Apps. Klärt Ein- und Ausgabe, wählt kostengünstige Schritte für jede Teilaufgabe, ergänzt Beispiele mit Prüfungen, testet vor der Übergabe und nennt die Kosten eines Laufs.
 - **skill-authoring**: hilft beim Schreiben guter Skills: wann sich einer lohnt, Einsatzzweck, Aufbau, Prüfungen und Verbesserungen nach der Nutzung.
 - **plugin-authoring**: erstellt, paketiert, prüft und teilt Plugins und erklärt Inhalt, Format und Einbindung; siehe [Plugins](/guide/plugins).
@@ -254,7 +254,7 @@ Gespeichert wird erst nach deiner Zustimmung. Bis dahin arbeitet der Agent weite
 
 ### Was die Karte zeigt
 
-Der Vorschlag erscheint während der weiteren Arbeit als Karte im Gespräch, außerhalb der eingeklappten Schritte. Oben steht **Als Skill speichern?**, **Diesen Skill verbessern?** oder **Diesen eingebauten Skill verbessern?**, dazu Name und Status: **Wartet auf dich**, **Gespeichert**, **Verworfen** oder **Ersetzt**.
+Der Vorschlag erscheint während der weiteren Arbeit als Karte in der Unterhaltung, außerhalb der eingeklappten Schritte. Oben steht **Als Skill speichern?**, **Diesen Skill verbessern?** oder **Diesen eingebauten Skill verbessern?**, dazu Name und Status: **Wartet auf dich**, **Gespeichert**, **Verworfen** oder **Ersetzt**.
 
 Darunter stehen:
 
@@ -276,7 +276,7 @@ Custom erhält den Skill ab dem nächsten Durchlauf, Claude Code und Codex ab ih
 ### Den Vorschlag zuerst bearbeiten
 
 1. Klicke auf **Bearbeiten…**. Ein Fenster zeigt den vollständigen Skill als Text.
-2. Passe ihn an. Die Zeilen zwischen `---` enthalten den Namen, der erhalten bleiben muss, und den Einsatzzweck. Darunter folgt die Anleitung für Agenten.
+2. Ändere, was du willst. Die Zeilen oben (zwischen den `---`-Zeilen) enthalten seinen Namen, der bleiben muss, und die Zeile dazu, wann er verwendet wird. Alles darunter ist die Anleitung, der Agenten folgen.
 3. Klicke auf **Speichern und genehmigen**.
 
 Die Karte zeigt anschließend die gespeicherte Version und weist auf deine Bearbeitung hin. Die App prüft deinen Text wie den Vorschlag des Agenten: Einsatzzweck, konkrete Arbeitsschritte und keine Geheimnisse.
@@ -302,19 +302,19 @@ Bei solchen Warnungen fragt die App erneut: **Trotz dieser Warnungen speichern?*
 
 Ein Vorschlag wartet an drei Stellen. Deine Entscheidung wird überall und auf allen Geräten angezeigt:
 
-- Auf der Karte im ursprünglichen Gespräch.
+- Auf der Karte in der ursprünglichen Unterhaltung.
 - Oben unter [Einstellungen → Skills](/settings?s=skills) als „Ein Agent schlägt einen Skill vor“ oder mit der Anzahl der Vorschläge. Jede Zeile nennt **Neuer Skill:** oder **Änderung an**, Name, Zeitpunkt, Ursprungsgespräch als Link und gegebenenfalls „enthält Warnungen“. **Prüfen** öffnet dieselbe Karte in einem Fenster.
-- Im [Posteingang](/inbox) als „Schlägt einen neuen Skill vor: …“ oder „Schlägt eine Änderung am Skill … vor“. **Öffnen** führt zur Karte im Gespräch. Siehe [Posteingang und Benachrichtigungen](/guide/inbox).
+- Im [Posteingang](/inbox) als „Schlägt einen neuen Skill vor: …“ oder „Schlägt eine Änderung am Skill … vor“. **Öffnen** führt zur Karte in der Unterhaltung. Siehe [Posteingang und Benachrichtigungen](/guide/inbox).
 
 ### Grenzen
 
 - Ein Vorschlag darf höchstens 20.000 Zeichen enthalten. Längere Anleitungen werden abgelehnt; der Agent soll sich auf die wesentlichen Schritte beschränken.
 - Ein neuer Skill benötigt einen freien Namen aus kurzen kleingeschriebenen Wörtern mit Bindestrichen, etwa release-notes.
-- Pro Gespräch können höchstens fünf Vorschläge gleichzeitig auf deine Entscheidung warten.
+- Pro Unterhaltung können höchstens fünf Vorschläge gleichzeitig auf deine Entscheidung warten.
 - Schlägt der Agent denselben Skill erneut vor, bevor du antwortest, ersetzt der neue Vorschlag den alten. Dieser erhält den Status **Ersetzt**.
 - Wurde seit dem Vorschlag ein gleichnamiger Skill gespeichert oder der betreffende Skill geändert, schlägt die Bestätigung mit einer Meldung fehl. Verwirf den Vorschlag und frage den Agenten erneut.
 - Agenten können nur Bibliotheksskills und projekteigene Skills auf diese Weise verbessern. Eigene Skills von Claude Code und Codex bearbeitest du direkt unter [Einstellungen → Skills](/settings?s=skills).
-- Beantwortete Vorschläge bleiben ein halbes Jahr auf ihren Karten in alten Gesprächen erhalten.
+- Beantwortete Vorschläge bleiben ein halbes Jahr auf ihren Karten in alten Unterhaltungen erhalten.
 
 ## Passende Skills für neue Sitzungen
 
@@ -330,18 +330,18 @@ Manche Modelle laden Skills selten selbstständig. Für sie kann Custom einen Sk
 
 Die Einstellung findest du im Menü **⋯** unter [Einstellungen → Skills](/settings?s=skills&find=Bring%20skills%20in%20by%20keywords): **Skills anhand von Schlüsselwörtern einbinden**. Die Funktion ist standardmäßig an und betrifft nur Custom. Claude Code und Codex laden Skills selbst. Auch bei deaktivierter Einstellung sieht Custom weiterhin seine Skills-Liste und kann passende Anleitungen selbst laden.
 
-Wird ein Skill durch Schlüsselwörter eingebunden, steht unter deiner Nachricht etwa **Skill wird verwendet: research** und „durch ‚research‘ in deiner Nachricht eingebunden“. Ein Klick öffnet den Skill.
+Wird ein Skill durch Schlüsselwörter eingebunden, steht unter deiner Nachricht etwa **Skill wird verwendet: Forschung** und „durch ‚Forschung‘ in deiner Nachricht eingebunden“. Ein Klick öffnet den Skill.
 
 ### Wie Schlüsselwörter erkannt werden
 
-- Ein Schlüsselwort muss ein ganzes Wort treffen. Groß- und Kleinschreibung ist egal. „research“ passt nicht zu „researchers“.
+- Ein Schlüsselwort muss ein ganzes Wort treffen. Groß- und Kleinschreibung ist egal. „Forschung“ passt nicht zu „Forschungers“.
 - Ein Schlüsselwort mit abschließendem * passt auch auf längere Wörter: „renovat*“ auf renovate und renovation, „debug*“ auf debugging.
 - Nachrichten mit weniger als vier Wörtern binden nichts ein. „ok, go on“ lädt deshalb keinen Skill.
 - Höchstens zwei Skills werden gleichzeitig eingebunden. Die meisten passenden Schlüsselwörter bestimmen die Reihenfolge.
 - Ein eingebundener Skill gilt für die aktuelle und die nächsten zwei Nachrichten. So können Rückfragen oder Recherchen mehrere Durchläufe umfassen. Neue passende Skills ersetzen ältere.
 - Zu lange Skills werden auf die verfügbare Kontextgröße gekürzt. Der Agent erhält den Hinweis, den Rest selbst zu laden.
 
-Eingebaute Skills mit Schlüsselwörtern sind unter anderem app-builder mit „make a template“, „make an app“, „automate“; clarify-first mit „plan a trip“, „business plan“, „renovat*“; clean-up mit „clean up after“, „leftover files“; decisions-log mit „while I'm away“, „overnight“; evidence-before-done mit „double-check“, „verify“; research mit „research“, „find sources“, „literature review“; troubleshooting mit „not working“, „keeps crashing“, „debug*“ und writing mit „draft a“, „proofread“, „cover letter“. Viele weitere Skills haben ebenfalls einige Schlüsselwörter. Die Dokument-Skills haben keine; Custom lädt sie bei passenden Aufgaben selbst. Die tatsächlichen Schlüsselwörter siehst du im jeweiligen Skill-Fenster.
+Eingebaute Skills mit Schlüsselwörtern sind unter anderem app-builder mit „make a template“, „make an app“, „automate“; clarify-first mit „plan a trip“, „business plan“, „renovat*“; clean-up mit „clean up after“, „leftover files“; decisions-log mit „while I'm away“, „overnight“; evidence-before-done mit „double-check“, „verify“; Forschung mit „Forschung“, „find sources“, „literature review“; troubleshooting mit „not working“, „keeps crashing“, „debug*“ und writing mit „draft a“, „proofread“, „cover letter“. Viele weitere Skills haben ebenfalls einige Schlüsselwörter. Die Dokument-Skills haben keine; Custom lädt sie bei passenden Aufgaben selbst. Die tatsächlichen Schlüsselwörter siehst du im jeweiligen Skill-Fenster.
 
 ### Einem Skill Schlüsselwörter geben
 
@@ -360,7 +360,7 @@ Claude Code und Codex lesen auch Skills aus eigenen Ordnern: persönliche Skills
 
 Für Claude Code listet Einstellungen → Skills deine Skills aus `~/.claude/skills`; für Codex die von Codex für alle Ordner gemeldeten Skills. Der **Skills**-Tab eines Projekts zeigt zusätzlich die dortigen Skills mit projektspezifischen Schaltern. Konnten einzelne nicht gelesen werden, etwa weil Codex nicht antwortet oder eine Datei unlesbar ist, erklärt eine Zeile unter der Liste das Problem.
 
-Erstelle einen Skill über **Neuer Skill** und wähle unter **Verfügbar für** Claude Code oder Codex; siehe [Einen eigenen Skill schreiben](#write-a-skill-of-your-own). Öffne einen Skill zum Lesen. **Ändern** öffnet SKILL.md im Editor. Bearbeite sie, klicke auf **Speichern** und dann **Fertig**. **Ordner in Dateien öffnen** zeigt den Skill-Ordner mit allen weiteren Dateien.
+Schreibe einen mit **Neuer Skill** und wähle unter **Verfügbar für** **Claude Code** oder **Codex** (siehe [Einen eigenen Skill schreiben](#write-a-skill-of-your-own)). Öffne einen, um ihn zu lesen; **Veränderung** öffnet seine SKILL.md in einem Editor: Ändere sie, klicke auf **Speichern**, dann auf **Fertig**. **Ordner unter „Dateien“ öffnen** zeigt den Ordner des Skills mit allen weiteren Dateien darin.
 
 ## Frag einen Agenten
 

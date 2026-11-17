@@ -38,20 +38,22 @@ rename or remove something users can see or do (a page, a button, a setting or a
 1. **The guide**, `docs/guide/NN-<topic>.md`: the app's Help page shows it, the search box (Ctrl+K) finds its
    sections, and agents read it (`app_guide`) to answer questions about the app and to know how to change it for
    the user. Change the section that describes the feature, and its topic's "Ask an agent" examples. The guide is
-   also in Chinese and Greek (`docs/guide/zh/`, `docs/guide/el/`: every topic but the API), shown when the app is
-   in that language: change the translations with the English. A translation keeps the English topic's headings
-   in the same places (they take its section ids) and the same link addresses in the same order, on-screen labels
-   as the app's own dictionaries translate them (`web/src/i18n/*.json`); a topic out of step shows in English.
-   A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all three
-   languages from `shared/find-catalog.ts` and the dictionaries. An `/api/` route goes in
-   `docs/guide/90-api.md`, one bullet in its area:
+   also in German, Chinese and Greek (`docs/guide/de/`, `docs/guide/zh/`, `docs/guide/el/`: every topic but the
+   API), shown when the app is in that language: change the translations with the English, in the same commit.
+   A translation keeps the English topic's headings in the same places (they take its section ids) and the same
+   link addresses in the same order, on-screen labels as the app's own dictionaries translate them
+   (`web/src/i18n/*.json`, in bold as in English); a topic out of step shows in English. German terms: one word per
+   concept as `web/src/i18n/de.json` has it (Paper, Subagent, Pull-Request, Unterhaltung, Computer, Tab…), informal "du".
+   A Settings section or option: run `npm run guide:settings`, which writes `30-settings.md` in all four
+   languages (English, German, Chinese and Greek) from `shared/find-catalog.ts` and the dictionaries.
+   An `/api/` route goes in `docs/guide/90-api.md`, one bullet in its area:
    `` - `METHOD /api/path/:param` — what it does. Body: `{ field: type — meaning }`. Returns: `{ … }`. `` (routes
    agents must not use are listed in `server/guide/api.ts` RULES, which refuses them, and in the test's
    `UNDOCUMENTED`). Write as the guide does: plain words for people who are not programmers, second person, the
    UI's own labels in bold with arrows (**Settings → Capabilities → Memory**), links to the place
    (`/settings?s=<section>&find=<option>`, `/guide/<topic>#<section>`), no source file names. Each topic shows a
    picture of its part of the app (`docs/guide/images/<topic>.webp`, and `-light.webp`, under its intro in all
-   three languages): when that part's look changes, take it again with `scripts/guide-shots` (its README says how).
+   four languages): when that part's look changes, take it again with `scripts/guide-shots` (its README says how).
 2. **The GitHub docs**: `README.md` (what the app is and does) and `docs/features.md` (everything, by area), plus the
    ones the change touches: `docs/install.md`, `docs/configuration.md`, `docs/how-it-works.md`, `docs/machines.md`,
    `docs/remote-access.md`, `docs/search-providers.md`, `docs/development.md`.
@@ -59,7 +61,7 @@ rename or remove something users can see or do (a page, a button, a setting or a
    of it; keep them saying what the app does now.
 4. **The search box and translations**: `shared/find-catalog.ts` and the shipped vectors (below; the guide's sections
    are searchable too, so a changed section needs `npm run find:vectors`), and new UI text in `web/src/i18n`
-   (`npm run i18n:extract`, then translate it into Chinese and Greek). Where a page shows what people or agents
+   (`npm run i18n:extract`, then translate it into German, Chinese and Greek). Where a page shows what people or agents
    wrote (names, descriptions, notes, captions), mark it `translate="no"`; write dates and times with `LOCALE`
    (`web/src/i18n/locale.ts`).
 5. **Release notes** in `CHANGELOG.md` when you make a version (above).

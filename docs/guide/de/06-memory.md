@@ -28,7 +28,7 @@ Memory funktioniert in Sitzungen, die diese App selbst ausführt, nicht in ledig
 
 ## Wie Notizen entstehen
 
-Agenten speichern Notizen, wenn du sie darum bittest, etwa „Merk dir, dass ich vegetarisch esse“ oder „Merk dir, dass der Testserver test.example.com heißt“. Außerdem können sie dauerhafte Erkenntnisse speichern, die spätere Sitzungen nicht selbst aus den Projektdateien ableiten könnten: Wünsche, Entscheidungen mit Begründung, Stolperfallen oder aus Erfahrung entstandene Regeln. Nach einer Antwort wird nicht pauschal etwas gespeichert. Notizen entstehen durch gezieltes Speichern der Agenten, deine eigenen Eingaben und die Bereinigung vorhandener Notizen. Bei aktiviertem [Aus Gesprächen lernen](/guide/memory#learn-from-conversations) ergänzt diese höchstens drei täglich übersehene Erkenntnisse.
+Agenten speichern Notizen, wenn du sie darum bittest, etwa „Merk dir, dass ich vegetarisch esse“ oder „Merk dir, dass der Testserver test.example.com heißt“. Außerdem können sie dauerhafte Erkenntnisse speichern, die spätere Sitzungen nicht selbst aus den Projektdateien ableiten könnten: Wünsche, Entscheidungen mit Begründung, Stolperfallen oder aus Erfahrung entstandene Regeln. Nach einer Antwort wird nicht pauschal etwas gespeichert. Notizen entstehen durch gezieltes Speichern der Agenten, deine eigenen Eingaben und die Bereinigung vorhandener Notizen. Bei aktiviertem [Aus Unterhaltungen lernen](/guide/memory#learn-from-conversations) ergänzt diese höchstens drei täglich übersehene Erkenntnisse.
 
 - **Der Agent wählt den Bereich**: persönlich, Projekt oder Sitzung.
 - **Ein Fakt pro auffindbarer Notiz**: Jede Notiz beschreibt einen Sachverhalt als eigenständig verständlichen Satz und nennt das Thema, etwa Projekt, Werkzeug, Person oder Ort. So lässt sie sich auch mit anders formulierten Fragen finden. Was jeder Agent immer über dich wissen soll, gehört ins Profil. Inhalte, die bereits aus Projektdateien oder Git-Verlauf hervorgehen, sollen nicht erneut gespeichert werden: Code und Ablageorte ändern sich, und die Dateien bleiben die bessere Quelle.
@@ -74,16 +74,16 @@ Im **⋯**-Menü der geöffneten Anzeige schaltet **Memory für diese Sitzung** 
 
 Jeder Agent erhält einmal eine kurze Erklärung zu Memory, dein Profil, einen Index der gespeicherten Einträge und passende Notizen zu deinem Auftrag:
 
-- **Zeitpunkt**: Claude Code und Codex erhalten Erklärung, Profile, vollständige Notizen kleiner Bereiche und den Index in ihren Startanweisungen; auftragsbezogene Notizen kommen mit der ersten Nachricht. Solange sich Projektnotizen nicht ändern, bleiben die Startanweisungen für dessen Sitzungen gleich. Der Modellanbieter kann seinen Cache wiederverwenden, was Zeit und Kosten spart. ACP-Agenten erhalten alles mit der ersten Nachricht. [Custom](/guide/custom) erhält die Inhalte ebenfalls mit der ersten Nachricht und behält sie während der Arbeit. Erst nach Verdichtung eines langen Gesprächs liest es Memory erneut passend zur neuesten Nachricht. Wird eine Sitzung innerhalb einer Stunde fortgesetzt, etwa nach einem App-Neustart, erhält sie dieselben Anweisungen samt eigenen Notizen und passenden Einträgen zur letzten Nachricht, damit der Anbieter den Gesprächs-Cache weiterverwenden kann.
+- **Zeitpunkt**: Claude Code und Codex erhalten Erklärung, Profile, vollständige Notizen kleiner Bereiche und den Index in ihren Startanweisungen; auftragsbezogene Notizen kommen mit der ersten Nachricht. Solange sich Projektnotizen nicht ändern, bleiben die Startanweisungen für dessen Sitzungen gleich. Der Modellanbieter kann seinen Cache wiederverwenden, was Zeit und Kosten spart. ACP-Agenten erhalten alles mit der ersten Nachricht. [Custom](/guide/custom) erhält die Inhalte ebenfalls mit der ersten Nachricht und behält sie während der Arbeit. Erst nach Verdichtung einer langen Unterhaltung liest es Memory erneut passend zur neuesten Nachricht. Wird eine Sitzung innerhalb einer Stunde fortgesetzt, etwa nach einem App-Neustart, erhält sie dieselben Anweisungen samt eigenen Notizen und passenden Einträgen zur letzten Nachricht, damit der Anbieter den Cache der Unterhaltung weiterverwenden kann.
 - **Inhalt**: [Dein Profil](/guide/memory#your-profile), ein vorhandenes Projektprofil, bei fortgesetzten Sitzungen deren eigene Notizen und bei kleinen Bereichen ohne Themen alle persönlichen beziehungsweise projektspezifischen Notizen. Aus größeren Bereichen kommen passende Notizen und Themen zum Auftrag, standardmäßig höchstens zehn. Das änderst du über [Notizen beim Agentenstart](/settings?s=memory&find=Notes%20each%20agent%20starts%20with). Gibt es weniger passende Inhalte, wird nicht aufgefüllt. Einzelnotizen, die ein bereits übergebenes Thema zusammenfasst, werden ausgelassen.
 - **Index**: Für größere Bereiche erhält der Agent die Titel von Notizen und Themen, bei Custom nur die noch nicht übergebenen, damit er bei Bedarf gezielt nachschlagen kann. Ein Thema steht für seine Einzelnotizen. Die [automatische Bereinigung](/guide/memory#tidy-up-automatically) erstellt die Titel; vorher dienen die ersten Wörter als Titel.
 - **Auswahl passender Notizen**: Eine hybride Suche kombiniert eine Rangliste nach Wörtern, mit besonderem Gewicht für seltene Begriffe, und bei aktivierter semantischer Suche eine Liste nach Bedeutung. So findet „Fass dich kurz“ auch „Mag kurze Antworten“. Beide Listen werden anhand ihrer Rangfolge zusammengeführt. Häufig und kürzlich aktiv nachgeschlagene Notizen erhalten etwas mehr Gewicht. Eine Notiz gilt nur als passend, wenn sie sich für den konkreten Auftrag vom übrigen Bestand abhebt. Ihre Ähnlichkeit wird deshalb relativ zur Ähnlichkeit aller Notizen zur Anfrage bewertet. Das semantische Modell startet bereits beim Tippen. Eine Sitzung wartet jedoch nie darauf; ist es noch nicht bereit, werden Notizen nach Wörtern ausgewählt.
 - **Passende Skills**: Dieselbe Suchmethode nennt eindeutig zur ersten Nachricht passende Skills. Siehe [Passende Skills für eine neue Sitzung](/guide/skills#skills-that-fit-a-new-session).
 - **Umgang damit**: Notizen sind Hintergrundwissen. Der Agent weiß, dass sie veraltet sein können, welche ungeprüft sind und dass deine aktuellen Angaben Vorrang haben. Er soll sie nur erwähnen, wenn sie helfen.
 
-Als auftragsbezogen übergebene Notizen zählen als **benötigt**. Die Einstellungen zeigen Zahl und Zeitpunkt der Nutzung unter **Von Agenten benötigt**. Seit Monaten unbenutzte Einträge stehen unter **Länger nicht benötigt** zur Prüfung; siehe [Länger nicht benötigte Notizen](/guide/memory#notes-no-agent-needed-lately). Für eine spätere Höherstufung zählt aber nur aktives Nachschlagen, nicht die automatische Übergabe beim Start.
+Die Notizen, die ein Agent bekommen hat, weil sie zu deiner Anfrage passen, zählen als **benötigt**. Die Einstellungen zeigen, wie oft jede Notiz benötigt wurde und wann zuletzt (**Von Agenten verwendet**, in der Notiz), und listen die Notizen, die seit Monaten kein Agent benötigt hat, unter **Länger nicht verwendet** auf, damit du sie behalten oder löschen kannst (siehe [Notizen, die länger kein Agent benötigt hat](/guide/memory#notes-no-agent-needed-lately)). Welche Notizen beim nächsten Mal zuerst kommen, berücksichtigt nur, was Agenten selbst nachgeschlagen haben: Eine Notiz am Anfang übergeben zu bekommen, bringt sie nicht wieder an die erste Stelle.
 
-Agenten erhalten außerdem Tools zum Speichern mit Bereich, Herkunft und Enddatum, zum Korrigieren und Vergessen, zum Nachschlagen nach Wörtern und Bedeutung einschließlich der Einzelnotizen eines Themas, zum Aktualisieren deines Profils und zum Durchsuchen und Lesen früherer Gespräche. Siehe [Frühere Sitzungen durchsuchen](/guide/memory#search-earlier-sessions). Auch aktiv nachgeschlagene Notizen zählen als benötigt.
+Agenten erhalten außerdem Tools zum Speichern mit Bereich, Herkunft und Enddatum, zum Korrigieren und Vergessen, zum Nachschlagen nach Wörtern und Bedeutung einschließlich der Einzelnotizen eines Themas, zum Aktualisieren deines Profils und zum Durchsuchen und Lesen früherer Unterhaltungen. Siehe [Frühere Sitzungen durchsuchen](/guide/memory#search-earlier-sessions). Auch aktiv nachgeschlagene Notizen zählen als benötigt.
 
 ## Memory für eine Sitzung ausschalten
 
@@ -100,7 +100,7 @@ In laufenden Sitzungen schaltest du Memory über **⋯ → Sitzungseinstellungen
 Ohne Memory liest und schreibt eine Sitzung keine Notizen:
 
 - Der Agent erhält weder Notizen, Profil noch Memory-Tools. Aus der Sitzung wird nichts gespeichert.
-- Andere Sitzungen finden sie nicht in früheren Gesprächen und können sie nicht lesen.
+- Andere Sitzungen finden sie nicht in früheren Unterhaltungen und können sie nicht lesen.
 
 Auch geplante Aufgaben haben im Editor denselben Memory-Schalter; siehe [Geplante Aufgaben](/guide/tasks). Aufrufe über die öffentliche Seite einer App laufen immer ohne Memory; siehe [Apps](/guide/apps).
 
@@ -113,7 +113,7 @@ Solange es ausgeschaltet ist:
 - erhält kein Agent Notizen, Profil oder Memory-Tools und wird nichts gespeichert;
 - bleiben vorhandene Notizen erhalten und nach erneuter Aktivierung wieder verfügbar;
 - fehlt die Memory-Option auf der Startseite und zeigt die Suche per Strg+K keine Notizen;
-- sind **Aus Gesprächen lernen**, **Automatisch bereinigen**, **Letzte Bereinigung** mit **Jetzt bereinigen** und **Nach Bedeutung suchen** ausgegraut;
+- sind **Aus Unterhaltungen lernen**, **Automatisch bereinigen**, **Letzte Bereinigung** mit **Jetzt bereinigen** und **Nach Bedeutung suchen** ausgegraut;
 - bleiben Profil und Notizen sichtbar und lassen sich weiterhin lesen, bearbeiten, ergänzen, löschen und exportieren.
 
 ## Einstellungen → Memory
@@ -122,12 +122,12 @@ Alles zu Memory steht unter [Einstellungen → Funktionen → Memory](/settings?
 
 - **Dein Profil**: Informationen für jeden Agenten, mit **Bearbeiten** und **⋯**-Menü. Siehe [Dein Profil](/guide/memory#your-profile).
 - **Notizen**: alle Einträge mit **Notiz hinzufügen**, Suche und Bereichsübersicht. Siehe [Notizen](/guide/memory#notes).
-- **Lernen**: **Aus Gesprächen lernen**, **Automatisch bereinigen** und **Letzte Bereinigung** mit **Änderungen ansehen** und **Jetzt bereinigen**.
-- **Wiki-Memory**: Projekt-Wikis, Lernen aus neuen Dokumenten und Speicherorte; siehe [Wiki-Memory](#wiki-memory).
+- **Lernen**: **Aus Unterhaltungen lernen**, **Automatisch bereinigen** und **Letzte Bereinigung** mit **Änderungen ansehen** und **Jetzt bereinigen**.
+- **Wiki-Memory**: ob Projekte ein Wiki führen, das Lernen aus neuen Dokumenten und wo Wikis gespeichert werden (siehe [Wiki-Memory](#wiki-memory)).
 - **Was Agenten erhalten**: **Nach Bedeutung suchen**, **Notizen beim Agentenstart** und **Profillänge**.
 - **Deine Daten**: **Importieren…** aus anderen Assistenten, **Exportieren** als Markdown oder JSON und **Alles löschen…**.
 
-Ein **(i)** neben einer Einstellung erklärt sie genauer. Auf dem Smartphone öffnest du **Memory** aus der Einstellungsliste als eigene Seite. Notizen nutzen die volle Breite; Menüs öffnen sich als Bedienfelder von unten.
+Neben dem Namen einer Zeile kann eine **(i)**-Schaltfläche stehen, die mehr darüber sagt, was die Zeile bewirkt. Auf dem Smartphone öffnen sich die Einstellungen als Liste: Tippe auf **Memory**, um es auf einer eigenen Seite zu öffnen. Dort nehmen die Notizen die ganze Breite des Bildschirms ein, und jedes Menü auf der Seite öffnet sich als Blatt vom unteren Bildschirmrand.
 
 ### Wiki-Memory
 
@@ -146,8 +146,8 @@ Die Gruppe **Notizen** listet alle Einträge und nennt ihre Anzahl neben der Üb
 
 Unter der Überschrift stehen Suche und Bereichsübersicht. Jeder Bereich öffnet eine eigene Seite:
 
-- **Über dich**: persönliche Notizen samt Anzahl.
-- **Jedes Projekt** mit Ordnername, Anzahl und Pfad, zuletzt geänderte zuerst. Anfangs erscheinen fünf Projekte; **N weitere Projekte anzeigen** öffnet den Rest.
+- **Über dich**: die Notizen über dich, mit ihrer Anzahl.
+- **Jedes Projekt**, mit dem Namen seines Ordners, der Zahl seiner Notizen und dem Pfad des Ordners, das zuletzt geänderte Projekt zuerst. Die ersten fünf werden gezeigt; **N weitere Projekte anzeigen** zeigt den Rest.
 - **Sitzungen**: Notizen einzelner Sitzungen.
 - **Länger nicht benötigt** bei seit vier Monaten ungenutzten Notizen. Siehe [Länger nicht benötigte Notizen](/guide/memory#notes-no-agent-needed-lately).
 - **Gelöschte Notizen** mit 30 Tagen Wiederherstellungsfrist. Siehe [Gelöschte Notizen](/guide/memory#deleted-notes).
@@ -162,18 +162,18 @@ Jeder Eintrag zeigt die ersten zwei Zeilen, bei Zusammenfassungen mit **Thema** 
 
 Ein Klick öffnet den Dialog **Notiz**, **Thema** oder **Profil** mit vollständigem Text und **Bearbeiten**. Darunter stehen:
 
-- **Bereich**: **Über dich**, Projekt mit Ordnername und Pfad oder die anklickbare zugehörige Sitzung.
+- **Wo**: **Über dich**, das Projekt (der Name und Pfad seines Ordners) oder die Sitzung, zu der sie gehört (klicke auf ihren Namen, um die Sitzung zu öffnen).
 - **Geschrieben**: **Hinzugefügt** oder **Geändert**, Zeitpunkt, **von dir**, **von einem Agenten** oder **vom Hilfsmodell** bei Bereinigung sowie die anklickbare Herkunftssitzung. Beim Darüberfahren erscheinen genaue Daten.
 - **Herkunft**: **Von dir mitgeteilt**, **Geprüft** oder **Noch ungeprüft**, mit Erklärung beim Darüberfahren. Ältere Notizen ohne erfasste Herkunft zeigen nichts.
 - **Von Agenten benötigt**: **Einmal**, **N-mal** mit letztem Zeitpunkt oder **Noch nicht**.
-- **Enddatum**: Datum oder **Keines**, mit **Ändern**.
+- **Enddatum**: das Datum oder **Keine**, mit **Veränderung** (siehe unten).
 - **Fasst zusammen** bei Themen und Profilen: Zahl der Einzelnotizen. **Anzeigen** listet sie auf, gelöschte durchgestrichen.
 - **Verlauf**: **Anzeigen** listet alle Ereignisse, neueste zuerst: Hinzufügen, Ändern mit altem und neuem Text, Löschen, Wiederherstellen, Enddatum mit „Bis“ oder „Entfernt“ sowie Herkunft. Dazu stehen Zeitpunkt, Urheber, Sitzung und Grund. **Ausblenden** schließt den Verlauf.
 
 Die Schaltflächen:
 
 - **Bearbeiten**: bis zu 500 Zeichen, bei Themen oder Profilen 800. Enter speichert, Umschalt+Enter fügt eine Zeile ein, Escape oder **Abbrechen** verwirft. Texte mit erkennbaren Geheimnissen lassen sich nicht speichern.
-- **Enddatum → Ändern**: Wähle unter „Gültig bis“ ein Datum und **Speichern**. Die Gültigkeit endet am Ende dieses Tages. Möglich sind Daten von morgen bis fünf Jahre in die Zukunft. **Kein Enddatum** entfernt die Befristung.
+- **Enddatum** → **Veränderung**: Wähle unter „Gültig bis“ ein Datum und drücke auf **Speichern**. Die Notiz hört am Ende dieses Tages auf, wahr zu sein: ab morgen bis zu fünf Jahre im Voraus. **Kein Enddatum** nimmt ein Enddatum weg.
 - **Löschen** unten links entfernt die Notiz und schließt den Dialog mit „Gelöscht. Die Notiz bleibt 30 Tage unter Gelöschte Notizen.“
 - **Behalten**, wenn du die Notiz aus **Länger nicht benötigt** geöffnet hast; siehe unten.
 - **Schließen** oder Escape verlässt den Dialog.
@@ -192,7 +192,7 @@ Gelöschte Notizen bieten stattdessen **Wiederherstellen** und **Endgültig lös
 
 Wurden Notizen vier Monate nicht benötigt, erscheint **Länger nicht benötigt** in der Übersicht mit Anzahl, etwa „3 Notizen seit vier Monaten nicht benötigt“. Die Seite erklärt: „Kein Agent hat diese Notizen seit vier Monaten benötigt. Behalte Wichtiges und lösche den Rest.“ Sie hat kein Suchfeld.
 
-Vorgeschlagen werden nur persönliche und Projektnotizen, keine Themen, Profile, befristeten Notizen oder Sitzungsnotizen. Jede Zeile bietet **Behalten**, das die Notiz als heute benötigt markiert und aus der Liste nimmt, sowie **Löschen**. Du kannst den vollständigen Eintrag mit Nutzung und Verlauf zuerst öffnen; dort haben **Behalten** und **Löschen** dieselbe Wirkung. Ist die Liste leer, steht „Alle Notizen wurden kürzlich benötigt“ und der Bereich verschwindet aus der Übersicht.
+Vorgeschlagen werden nur Notizen über dich und über Projekte, nie Themen, Profile, Notizen mit einem Enddatum oder Notizen von Sitzungen. Jede Zeile hat zwei Schaltflächen: **Behalten**, das die Notiz als heute benötigt zählt, sodass sie die Liste verlässt, und **Löschen**, das sie entfernt. Öffne eine Notiz, um sie zuerst ganz zu lesen, mit ihrer Zeile **Von Agenten verwendet** und ihrem Verlauf: Dort tun **Beibehalten** und **Löschen** dasselbe. Sind keine mehr übrig, steht dort „Jede Notiz wurde kürzlich benötigt“, und die Zeile verlässt den Index.
 
 ### Gelöschte Notizen
 
@@ -203,7 +203,7 @@ Vorgeschlagen werden nur persönliche und Projektnotizen, keine Themen, Profile,
 
 ### Automatisch bereinigen
 
-[Automatisch bereinigen](/settings?s=memory&find=Tidy%20up%20automatically) unter **Lernen** hält Memory kurz und aktuell. Die Funktion ist standardmäßig aktiviert und führt einmal täglich sinngleiche Notizen zusammen und bündelt verwandte Inhalte. Das Hilfsmodell erledigt dies: ein kleines Modell für Hintergrundaufgaben, wählbar unter [Einstellungen → Modelle → Hilfsmodell](/settings?s=models&find=Helper%20model). Siehe [Agenten, Konten und Modelle](/guide/agents-models). Es liest nur Notizen, außer [Aus Gesprächen lernen](/guide/memory#learn-from-conversations) ist aktiv. Dann liest es zuerst die Gespräche seit der letzten Bereinigung. Sitzungsnotizen bleiben unberührt, da sie wenige sind und mit der Sitzung gelöscht werden.
+[Automatisch bereinigen](/settings?s=memory&find=Tidy%20up%20automatically) unter **Lernen** hält Memory kurz und aktuell. Die Funktion ist standardmäßig aktiviert und führt einmal täglich sinngleiche Notizen zusammen und bündelt verwandte Inhalte. Das Hilfsmodell erledigt dies: ein kleines Modell für Hintergrundaufgaben, wählbar unter [Einstellungen → Modelle → Hilfsmodell](/settings?s=models&find=Helper%20model). Siehe [Agenten, Konten und Modelle](/guide/agents-models). Es liest nur Notizen, außer [Aus Unterhaltungen lernen](/guide/memory#learn-from-conversations) ist aktiv. Dann liest es zuerst die Unterhaltungen seit der letzten Bereinigung. Sitzungsnotizen bleiben unberührt, da sie wenige sind und mit der Sitzung gelöscht werden.
 
 Jede Bereinigung umfasst:
 
@@ -213,14 +213,14 @@ Jede Bereinigung umfasst:
 
 Die Bereinigung läuft etwa täglich, sobald die App aktiv ist, auch auf nachts schlafenden Computern. Voraussetzungen sind mindestens 20 Stunden seit der letzten Bereinigung, neue Inhalte wie eine Nachricht oder geänderte Notiz und zehn Minuten Eingabepause. Während du tippst, startet sie nicht. Ohne neue Inhalte entfällt sie. Jede Änderung wird im Notizverlauf dem Hilfsmodell zugeschrieben. Die Änderungen der letzten wirksamen Bereinigung lassen sich zurücknehmen; siehe [Jetzt bereinigen und Änderungen zurücknehmen](/guide/memory#tidy-up-now-and-undo-its-changes).
 
-### Aus Gesprächen lernen
+### Aus Unterhaltungen lernen
 
-[Aus Gesprächen lernen](/settings?s=memory&find=Learn%20from%20conversations), die erste Einstellung unter **Lernen**, ist standardmäßig aktiv. Einmal täglich korrigiert sie durch Gespräche widerlegte Notizen und ergänzt von Agenten übersehene Erkenntnisse. **(i)** erklärt, dass das Hilfsmodell während der Bereinigung Gespräche seit dem letzten Lauf liest, ausgenommen Sitzungen ohne Memory, damit Korrekturen vornimmt, ungeprüfte Notizen überprüft und täglich nur wenige neue Inhalte speichert. Das ist der erste Schritt jeder automatischen oder über **Jetzt bereinigen** gestarteten Bereinigung.
+[Aus Unterhaltungen lernen](/settings?s=memory&find=Learn%20from%20conversations), die erste Einstellung unter **Lernen**, ist standardmäßig aktiv. Einmal täglich korrigiert sie durch Unterhaltungen widerlegte Notizen und ergänzt von Agenten übersehene Erkenntnisse. **(i)** erklärt, dass das Hilfsmodell während der Bereinigung Unterhaltungen seit dem letzten Lauf liest, ausgenommen Sitzungen ohne Memory, damit Korrekturen vornimmt, ungeprüfte Notizen überprüft und täglich nur wenige neue Inhalte speichert. Das ist der erste Schritt jeder automatischen oder über **Jetzt bereinigen** gestarteten Bereinigung.
 
 Agenten speichern während der Arbeit, bevor der weitere Verlauf bekannt ist. Dadurch können Notizen schon anfangs falsch sein oder später veralten, während manche dauerhaften Erkenntnisse fehlen. Das Hilfsmodell liest projektweise deine Nachrichten und die letzte Antwort jedes Durchlaufs, niemals Anhänge, eingefügte Fremdtexte, Zwischenschritte, Tool-Ausgaben oder Webseiten. Dazu erhält es passende Notizen und:
 
-- **korrigiert** durch das Gespräch widerlegte oder veraltete Einträge beziehungsweise entfernt sie, wenn nichts Gültiges übrig bleibt;
-- **bestätigt** ungeprüfte Notizen, deren Richtigkeit das Gespräch zeigt; dafür liest es auch das Gespräch, in dem die Notiz entstand;
+- **korrigiert** durch die Unterhaltung widerlegte oder veraltete Einträge beziehungsweise entfernt sie, wenn nichts Gültiges übrig bleibt;
+- **bestätigt** ungeprüfte Notizen, deren Richtigkeit die Unterhaltung zeigt; dafür liest es auch die Unterhaltung, in der die Notiz entstand;
 - **speichert** Informationen für spätere Sitzungen, die nicht aus den Projektdateien hervorgehen: Wünsche, Korrekturen, Entscheidungen mit Begründung oder Stolperfallen. Höchstens drei pro Tag halten Memory klein. Die anschließende Bereinigung führt sie wie andere neue Einträge mit ähnlichen Notizen zusammen.
 
 Verweist eine Projektnotiz auf eine nicht mehr vorhandene Datei, erhält das Hilfsmodell einen Hinweis, um sie korrigieren zu können.
@@ -229,26 +229,26 @@ Nicht gelesen werden Sitzungen ohne Memory, einschließlich vertraulicher Sitzun
 
 ### Jetzt bereinigen und Änderungen zurücknehmen
 
-**Letzte Bereinigung** unter **Automatisch bereinigen** zeigt den letzten Lauf:
+Die Zeile **Letztes Aufräumen** unter **Automatisch aufräumen** meldet das letzte Aufräumen in ihrem Hinweis:
 
 - „Noch nicht bereinigt“;
 - „Wird bereinigt…“ während der Verarbeitung;
 - etwa „Vor 3 Std.: 2 hinzugefügt, 1 aktualisiert, 3 entfernt“ oder „Vor 3 Std.: keine Änderungen nötig, 14 Notizen geprüft“;
-- „12 Gespräche gelesen“, wenn [Aus Gesprächen lernen](/guide/memory#learn-from-conversations) Gespräche verarbeitet hat. Bei einem Fehler steht darunter „Lernen aus Gesprächen angehalten:“ mit Grund; die übrige Bereinigung läuft trotzdem;
+- „12 Unterhaltungen gelesen“, wenn [Aus Unterhaltungen lernen](/guide/memory#learn-from-conversations) Unterhaltungen verarbeitet hat. Bei einem Fehler steht darunter „Lernen aus Unterhaltungen angehalten:“ mit Grund; die übrige Bereinigung läuft trotzdem;
 - bei einem ergebnislosen letzten Lauf und zuvor erfolgten Änderungen etwa „Vor 3 Std.: keine Änderungen nötig. Davor, vor 2 Tagen:“ mit der früheren Änderungsliste. Sie bleibt rückgängig machbar, bis ein weiterer Lauf etwas ändert;
 - bei Fehlern den Grund nach der Zeit, etwa ein nicht antwortendes Hilfsmodell.
 
-**Änderungen ansehen** rechts erscheint, wenn die letzte wirksame Bereinigung Änderungen hatte. Der Dialog zeigt pro Eintrag **Hinzugefügt**, **Aktualisiert**, **Entfernt**, **Befristet**, **Ohne Enddatum**, **Geprüft** oder **Rückgängig gemacht**, gegebenenfalls **Thema** oder **Profil**, Bereich und Grund wie „Mit #12 zusammengeführt“, „Fasst 5 verwandte Notizen zusammen“ oder „Aus ‚Uploadseite‘ gelernt“. Der alte Text steht durchgestrichen über dem neuen. **Gespräch öffnen**, die Sprechblase, öffnet die Quelle. Der Pfeil **Diese Änderung rückgängig machen** entfernt Ergänzungen, setzt Änderungen zurück, stellt Gelöschtes wieder her, entfernt neu gesetzte Enddaten oder setzt eine Bestätigung wieder auf ungeprüft. Schließe den Dialog anschließend.
+**Änderungen** rechts in der Zeile (sichtbar, wenn das letzte Aufräumen etwas geändert hat) öffnet „Was das letzte Aufräumen geändert hat“. Jede Änderung zeigt ein Abzeichen (Hinzugefügt, Aktualisiert, Entfernt, Endet, Kein Enddatum, Geprüft oder Rückgängig gemacht), **Thema** oder **Profil**, wenn es eines ist, den Ort und den Grund („Mit #12 zusammengeführt“, „Fasst 5 verwandte Notizen zusammen“, „Aus ‚Upload-Seite‘ gelernt“) und den Text, den alten durchgestrichen über dem neuen. Die Sprechblasen-Schaltfläche (**Öffne die Unterhaltung**) öffnet die Unterhaltung, aus der eine Änderung gelernt wurde. Die Pfeil-Schaltfläche (**Diese Änderung rückgängig machen**) macht eine rückgängig: Was sie hinzugefügt hat, verschwindet, was sie geändert hat, bekommt seinen alten Text zurück, was sie gelöscht hat, kommt zurück, ein von ihr gesetztes Enddatum wird entfernt, und eine Notiz, die sie geprüft hat, gilt wieder als ungeprüft. Schließe den Dialog, wenn du fertig bist.
 
-[Jetzt bereinigen](/settings?s=memory&find=Tidy%20up%20now) in derselben Zeile startet sofort eine Bereinigung, unabhängig von der Automatik. „Bereinigung läuft: Das dauert ein bis zwei Minuten.“ Memory muss eingeschaltet sein.
+[Jetzt aufräumen](/settings?s=memory&find=Tidy%20up%20now), die Schaltfläche in derselben Zeile, startet sofort ein Aufräumen, ob **Automatisch aufräumen** an ist oder nicht: „Wird aufgeräumt: Das dauert ein bis zwei Minuten“. Dafür muss Memory eingeschaltet sein.
 
 ### Nach Bedeutung suchen
 
 [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning) unter **Was Agenten erhalten** findet Notizen, Bibliotheksinhalte und weitere Einträge sowohl nach Wörtern als auch nach Bedeutung. Dafür läuft LightOns Modell mDenseOn mit Unterstützung für neun Sprachen auf diesem Computer. Die Funktion ist standardmäßig aktiviert. Die hybride Suche führt Wort- und Bedeutungsranglisten zusammen. Deine Notizen werden dafür nicht an einen externen Dienst gesendet. Ohne diese Funktion zählt nur der Wortlaut. Bei aktivierter Funktion:
 
 - starten Agenten auch mit passenden Notizen, die anders formuliert sind als dein Auftrag;
-- finden Agententools und die Notizensuche Einträge nach Bedeutung und Wörtern;
-- werden sinngleiche neue Notizen nicht doppelt gespeichert und verwandte Inhalte semantisch bereinigt;
+- Agenten, die Notizen nachschlagen, und das Suchfeld der Gruppe **Notizen** finden sie nach Bedeutung ebenso wie nach Wörtern.
+- Eine Notiz, die dasselbe sagt wie eine schon gespeicherte, nur mit anderen Worten, wird nicht noch einmal gespeichert, und das Aufräumen gruppiert Notizen nach Bedeutung.
 - findet die Bibliothek Seiten, Dokumente, Bilder und weitere Inhalte anhand der Bedeutung von Titel und Beschreibung. Siehe [Deine Seiten finden](/guide/library#find-your-pages);
 - findet die Suche per Strg+K Seiten, Einstellungen, Sitzungen, Apps und weitere Inhalte sinngemäß. Auch Wissensdatenbanken werden semantisch durchsucht. Siehe [Projekte und Wissen](/guide/projects).
 
@@ -288,7 +288,7 @@ Darunter legt [Profillänge](/settings?s=memory&find=Profile%20length) die maxim
 1. Wähle unter **Auf diesem Computer**, was gelesen werden soll. Hydor erkennt die Ablagen und zeigt die Zahl der Memory-Dateien:
    - **Claude Code**: projektspezifisches Memory und deine CLAUDE.md für jedes Projekt, auch für zusätzlich hinterlegte Hydor-Konten.
    - **Codex**: seine Memory-Einträge und deine AGENTS.md.
-   - **Andere Agenten**: persönliche Memory-Dateien oder ordnerbezogene Arbeitsanweisungen, soweit vorhanden. Hydor liest daraus deine Arbeitsvorlieben, niemals Anmeldedaten, Keys oder Einstellungen. Ist eine Ablage gerade in Verwendung, liest Hydor eine Kopie, damit der andere Agent weiterlaufen kann.
+   - **Andere Agenten**: Manche anderen Agenten führen Memory-Dateien über dich (was sie über dich und deine Arbeit wissen), und manche führen die Anweisungen, die du ihnen für jeden Ordner gegeben hast. Hydor liest diese, um zu erfahren, wie du gern arbeitest. Es liest nie ihre Anmeldungen, Keys oder Einstellungen. Führt ein Agent sein Memory in einem Speicher, der gerade in Benutzung ist, liest Hydor eine Kopie, sodass dieser Agent währenddessen weiterlaufen kann.
 2. Unter **Aus einem Export** nimmt **Export hinzufügen** die von ChatGPT oder Claude bereitgestellte ZIP-Datei oder ihre conversations.json an. Du erhältst sie bei ChatGPT unter Einstellungen → Datenkontrollen → Daten exportieren, bei Claude unter Einstellungen → Datenschutz → Daten exportieren. Die Anzeige nennt enthaltenes Claude-Memory beziehungsweise benutzerdefinierte ChatGPT-Anweisungen sowie Zahl und Zeitraum der Chats. Aus Chats werden nur deine Nachrichten gelesen, neueste zuerst, nicht die Antworten oder Anhänge.
 3. Klicke auf **Einlesen starten**. Das [Hilfsmodell](/settings?s=models&find=Helper%20model) verarbeitet abschnittsweise die Quelle zusammen mit vorhandenen Notizen und behält nur dauerhafte Informationen. Bereits gespeicherte Inhalte, auch sinngleich formulierte, Geheimnisse und Agenten-Steueranweisungen werden ausgelassen. Große Bestände brauchen einige Minuten. Du kannst den Dialog schließen; **Stoppen** bricht ab.
 4. Wähle unerwünschte Vorschläge ab. Zuerst erscheinen persönliche Notizen unter **Über dich**, danach Projekte nach Ordner, sofern die Quelle zu einem lokal vorhandenen Projekt gehört. **Deinem Profil hinzufügen** zeigt vorgeschlagene Ergänzungen zu [deinem Profil](/guide/memory#your-profile). **N Notizen hinzufügen** übernimmt die Auswahl, **Verwerfen** verwirft alle Vorschläge.
@@ -299,11 +299,11 @@ Importierte Notizen nennen ihre Herkunft im Verlauf, etwa „Aus Claude Code imp
 
 ### Alles löschen…
 
-[Alles löschen…](/settings?s=memory&find=Clear%20all%E2%80%A6) als letzter Eintrag unter **Deine Daten** entfernt sämtliche Notizen und Verläufe sowie dein Profil. Die Bestätigung erklärt: „Alles in Memory löschen? Alle Notizen über dich, deine Projekte und Sitzungen werden mit ihrem Verlauf entfernt. Das lässt sich nicht rückgängig machen. Exportiere zuerst eine Kopie, wenn du sie behalten möchtest.“ **Alles löschen** führt die Aktion aus. Ohne Notizen, unabhängig vom Profil, ist die Schaltfläche ausgegraut.
+[Alles löschen…](/settings?s=memory&find=Clear%20all%E2%80%A6), die letzte Zeile der Gruppe **Deine Daten** (**Gesamtes Memory löschen**), löscht jede Notiz und ihren Verlauf und mit ihnen dein Profil. Es fragt zuerst: „Gesamtes Memory löschen? Jede Notiz über dich, deine Projekte und deine Sitzungen geht mit ihrem Verlauf. Das lässt sich nicht rückgängig machen; exportiere zuerst, um eine Kopie zu behalten.“ Klicke auf **Alles löschen**, um fortzufahren. Die Schaltfläche ist ausgegraut, wenn es keine Notizen gibt (ohne dein Profil gezählt).
 
 ## Frühere Sitzungen durchsuchen
 
-Agenten können neben Notizen auch frühere Gespräche mit beliebigen Agenten durchsuchen. Bei „Was haben wir letzten Monat zum Veranstaltungsort entschieden?“ sucht der Agent in deinen Nachrichten und Antworten nach allen Suchwörtern. Mit [semantischer Suche](/guide/memory#search-by-meaning) durchsucht er zusätzlich deine damaligen Aufträge sinngemäß, damit andere Formulierungen ebenfalls treffen. Bei Bedarf sucht er auch nach ausgeführten Befehlen und geänderten Dateien. Deine eigenen Nachrichten erhalten im Hintergrund schrittweise Vektoren, neueste zuerst; Anhänge und eingefügte Fremdtexte bleiben außen vor. Anschließend liest der Agent die passende Sitzung mit Nachrichten und Schritttiteln in zeitlicher Reihenfolge.
+Agenten können neben Notizen auch frühere Unterhaltungen mit beliebigen Agenten durchsuchen. Bei „Was haben wir letzten Monat zum Veranstaltungsort entschieden?“ sucht der Agent in deinen Nachrichten und Antworten nach allen Suchwörtern. Mit [semantischer Suche](/guide/memory#search-by-meaning) durchsucht er zusätzlich deine damaligen Aufträge sinngemäß, damit andere Formulierungen ebenfalls treffen. Bei Bedarf sucht er auch nach ausgeführten Befehlen und geänderten Dateien. Deine eigenen Nachrichten erhalten im Hintergrund schrittweise Vektoren, neueste zuerst; Anhänge und eingefügte Fremdtexte bleiben außen vor. Anschließend liest der Agent die passende Sitzung mit Nachrichten und Schritttiteln in zeitlicher Reihenfolge.
 
 Sitzungen ohne Memory sind von der Suche ausgeschlossen und lassen sich aus anderen Sitzungen nicht lesen. Diese Tools stehen nur bei aktiviertem Memory in der aktuellen Sitzung zur Verfügung.
 
@@ -320,7 +320,7 @@ Du kannst selbst mit Strg+K beziehungsweise ⌘K frühere Sitzungen nach Titeln 
 - „Welche Notizen hat seit Monaten kein Agent benötigt? Lösche die zur alten Website.“
 - „Die Notiz zur Lissabon-Reise gilt nur bis 12. Mai. Setze dieses Enddatum.“
 - „Welche Notizen zu diesem Projekt sind noch ungeprüft? Gleiche sie mit dem Code ab.“
-- „Deaktiviere das Lernen aus Gesprächen, aber behalte die Bereinigung bei.“
+- „Deaktiviere das Lernen aus Unterhaltungen, aber behalte die Bereinigung bei.“
 - „Schalte Memory für die Sitzung Steuererklärung aus.“
 - „Importiere, was Claude Code und Codex über mich wissen, und zeige mir die Vorschläge vor dem Hinzufügen.“
 - „Ich habe vorher einen anderen Agenten verwendet. Übernimm sein Wissen über mich und meine eigenen Skills und zeige mir zuerst die Liste.“

@@ -1,5 +1,5 @@
 // npm run guide:settings: writes the guide's "Every setting" topic (docs/guide/30-settings.md, and its translations
-// in docs/guide/zh/ and docs/guide/el/) from what the search box knows of Settings (shared/find-catalog.ts: each
+// in docs/guide/de/, docs/guide/zh/ and docs/guide/el/) from what the search box knows of Settings (shared/find-catalog.ts: each
 // section and the options in it), the app's own translations of those words (web/src/i18n), and the translated
 // topics' titles. Run it after adding, renaming or rewording a Settings section or option (AGENTS.md, "Docs").
 import fs from 'node:fs';
@@ -44,6 +44,23 @@ const TEXT = {
     ask: 'Ask an agent',
     examples: ['Where do I change what Enter does while an agent works?', 'Turn on the notification sound.', 'Show me my search settings.', 'Set the helper model to the cheapest one.', 'Turn off memory for new sessions.'],
     quote: (s) => `"${s}"`,
+  },
+  de: {
+    title: 'Alle Einstellungen',
+    intro:
+      'Hier findest du sämtliche Einstellungsbereiche in der Reihenfolge der App, jeweils mit einem direkten Link und einem Verweis auf den passenden Hilfeartikel. Nutze diese Übersicht, um eine Einstellung zu finden. Die verlinkten Artikel erklären ihre Verwendung.',
+    layout: 'Aufbau der Einstellungen',
+    layoutText: [
+      'Öffne **Einstellungen** in der Seitenleiste. Am Computer gibt es oben drei Tabs: **App** für die Anwendung selbst, **Agenten** für die Agenten und ihre Anweisungen sowie **Funktionen** für gemeinsame Ergänzungen wie Suche, Browser und Memory. Links stehen die Bereiche des gewählten Tabs, rechts der geöffnete Bereich. Auf dem Handy erscheinen alle Bereiche in einer Liste. Tippe einen an, um ihn zu öffnen; der Pfeil oben führt zurück.',
+      'Du musst nicht wissen, wo eine Option liegt: Gib in der Suche (Strg+K, auf dem Mac ⌘K) beispielsweise „dunkles Design“ oder „Benachrichtigungen“ ein und wähle den Treffer. Die App öffnet den richtigen Bereich und hebt die Option hervor. Du kannst auch einen Agenten mit der Änderung beauftragen ([Agenten die App bedienen lassen](/guide/ask-agents)).',
+    ],
+    more: 'Mehr dazu unter',
+    stop: '.',
+    colon: ': ',
+    gap: ' ',
+    ask: 'Beispielaufträge',
+    examples: ['Wo ändere ich die Funktion von Enter während der Agent arbeitet?', 'Aktiviere den Benachrichtigungston.', 'Zeige meine Sucheinstellungen.', 'Wähle das günstigste Hilfsmodell.', 'Deaktiviere Memory für neue Sitzungen.'],
+    quote: (s) => `„${s}“`,
   },
   zh: {
     title: '所有设置',
@@ -97,9 +114,9 @@ function topicTitle(lang, id) {
 const findParam = (words) => encodeURIComponent(words).replace(/[()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
 const PROPER = /^(CLAUDE|Gemini|GitHub|Claude|Codex|OpenRouter|Ollama|MCP|ACP|Naget|Hydor)/;
-const lower = (s, lang) => (PROPER.test(s) || lang === 'zh' ? s : s[0].toLocaleLowerCase(lang) + s.slice(1));
+const lower = (s, lang) => (PROPER.test(s) || lang === 'zh' || lang === 'de' ? s : s[0].toLocaleLowerCase(lang) + s.slice(1));
 
-for (const lang of ['en', 'zh', 'el']) {
+for (const lang of ['en', 'de', 'zh', 'el']) {
   const t = TEXT[lang];
   const dict = lang === 'en' ? {} : JSON.parse(fs.readFileSync(path.join(ROOT, 'web', 'src', 'i18n', `${lang}.json`), 'utf8'));
   const tr = (s) => dict[s] ?? s;

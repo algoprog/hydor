@@ -6,7 +6,7 @@ Dieser Beitrag führt dich durch Hydor: was die App ist, wie ihre Oberfläche au
 
 ## Was Hydor ist
 
-Hydor führt KI-Agenten auf deinem eigenen Computer aus. Du bedienst sie in einem beliebigen Browser, am Schreibtisch oder auf dem Smartphone. Ein Agent arbeitet an deinem Auftrag: Er liest und schreibt Dateien, führt Befehle aus, recherchiert im Web und berichtet über seine Arbeit. Du kannst Claude Code und Codex mit deinen bestehenden Abos nutzen, Custom als eigenen App-Agenten mit beliebigen Modellen einschließlich offener lokaler Modelle sowie weitere Agenten wie Gemini CLI oder OpenCode. Jedes Gespräch mit einem Agenten ist eine **Sitzung**. Sie läuft auch bei geschlossener Seite weiter. So kannst du am Schreibtisch beginnen und später vom Smartphone antworten. Neben Programmierung unterstützt Hydor Recherche, Schreiben, Dokumente, Planung und alltägliche Aufgaben.
+Hydor führt KI-Agenten auf deinem eigenen Computer aus. Du bedienst sie in einem beliebigen Browser, am Schreibtisch oder auf dem Smartphone. Ein Agent arbeitet an deinem Auftrag: Er liest und schreibt Dateien, führt Befehle aus, recherchiert im Web und berichtet über seine Arbeit. Du kannst Claude Code und Codex mit deinen bestehenden Abos nutzen, Custom als eigenen App-Agenten mit beliebigen Modellen einschließlich offener lokaler Modelle sowie weitere Agenten wie Gemini CLI oder OpenCode. Jede Unterhaltung mit einem Agenten ist eine **Sitzung**. Sie läuft auch bei geschlossener Seite weiter. So kannst du am Schreibtisch beginnen und später vom Smartphone antworten. Neben Programmierung unterstützt Hydor Recherche, Schreiben, Dokumente, Planung und alltägliche Aufgaben.
 
 ## Die Oberfläche kennenlernen
 
@@ -46,12 +46,12 @@ Für eine reine Tagesansicht deaktiviere **Nach Ordner oder Projekt gruppieren**
 
 Archivierte Sitzungen erscheinen nicht in der Liste, bleiben aber über **Sitzungen suchen** auffindbar. Vor der ersten Sitzung steht dort „Noch keine Sitzungen“.
 
-Jede Zeile zeigt Agentensymbol mit Statuspunkt, Sitzungstitel und eine zweite Zeile. Läuft der Agent, steht dort seine Aktivität, etwa „In Arbeit · 2 Min. 10 Sek.“, nach früheren Durchläufen ergänzt um die Gesamtzeit wie „In Arbeit · 2 Min. 10 Sek. (47 Min.)“, „Benötigt dich“, „Bereit“, „In Arbeit · 1 im Hintergrund“ oder „In VS Code geöffnet“. Andernfalls erscheinen Ordner, bei deinem Benutzerordner „Benutzerordner“, Zeit seit letzter Aktivität und hinzugefügte beziehungsweise entfernte Zeilen. In Projektgruppen genügt eine Zeile, da der Ordner bereits in der Überschrift steht: Titel, gegebenenfalls Worktree-Branch, Zeit seit letzter Aktivität beziehungsweise aktuelle Arbeit oder Rückfrage. Hinter dem Titel können kleine Symbole stehen:
+Jede Zeile zeigt das Symbol des Agenten mit einem Statuspunkt, den Titel der Sitzung und eine zweite Zeile. Solange der Agent läuft, steht in der zweiten Zeile, was er gerade tut („Arbeitet · 2 Min. 10 Sek.“; wenn er nach früheren Durchläufen insgesamt schon länger gearbeitet hat, steht dort auch diese Gesamtzeit, „Arbeitet · 2 Min. 10 Sek. (47 Min.)“; „Braucht dich“, „Bereit“, „Arbeitet · 1 im Hintergrund“, „In VS Code öffnen“). Sonst zeigt die Zeile den Ordner („Persönlicher Ordner“ bei deinem eigenen), wie lange die Sitzung zuletzt aktiv war und wie viele Zeilen der Agent hinzugefügt und entfernt hat. Unter **Projekte**, wo schon die Gruppe den Ordner nennt, hat eine Zeile nur eine Zeile mit dem Titel, dann (nach dem Branch eines Worktrees) wie lange die Sitzung zuletzt aktiv war, oder was der Agent gerade tut, solange er arbeitet oder dich braucht. Hinter dem Titel können kleine Symbole stehen:
 
 - Ein Punkt in Akzentfarbe bedeutet, dass die Sitzung seit deinem letzten Besuch fertig geworden ist. Die zweite Zeile zeigt etwa „Abgeschlossen · vor 5 Min.“. Öffnen markiert sie auf allen Geräten als gelesen.
 - Eine Pull-Request-Anzeige nennt dessen Status.
 - Ein Zielsymbol zeigt ein gesetztes Ziel.
-- Eine Stecknadel zeigt eine angeheftete Sitzung; in der gleichnamigen Gruppe entfällt sie.
+- eine Stecknadel: Die Sitzung ist angepinnt (in der Gruppe **Angepinnt**, die das schon sagt, gibt es keine).
 
 Beim Start und während der Arbeit verwendet Custom die Hydor-Ladeanimation mit steigendem und fallendem Wasser im Ω statt eines rotierenden Agentensymbols. Ladeanzeigen sind neben ihrem Text vertikal zentriert.
 
@@ -93,7 +93,7 @@ Das ist die Standardreihenfolge. Ziehe ein Werkzeug an eine andere Position; auf
 - **Ausführen mit**: das Agentenprogramm, etwa Claude Code, Codex, Custom oder ein hinzugefügter Agent.
 - **Modell**: dessen Modell.
 - **Ordner**: der Arbeitsordner, ein Projekt oder ein neuer Aufgabenordner.
-- **Agent**: die Rolle, etwa General, Researcher, Writer, Coder, Tutor, Planner, Analyst, App builder oder ein eigener Agent. Siehe [Agenten](/guide/agents).
+- **Agent**: die Rolle, etwa Allgemein, Forscher, Schriftsteller, Programmierer, Nachhilfelehrer, Planer, Analyst, App builder oder ein eigener Agent. Siehe [Agenten](/guide/agents).
 - **Optionen**: Denkaufwand, Berechtigungen, Memory, Ausgabenlimit und mehr. Abweichungen vom Standard werden direkt an der Schaltfläche genannt.
 
 Am Computer steht darunter „Enter zum Starten · Umschalt+Enter für eine neue Zeile“. Ist das Abo-Kontingent des Agenten ausgeschöpft, nennt ein Hinweis über dem Feld das Limit und die Rücksetzzeit.
@@ -138,14 +138,14 @@ Im Terminal listet `hydor away` dieselben Ereignisse auf; `hydor away seen` mark
 3. Wähle unter dem Nachrichtenfeld über **Ausführen mit** das Programm und daneben über **Modell** sein Modell. Zum Einstieg genügt das als „Standard“ markierte Modell.
 4. Wähle unter **Ordner** den Arbeitsort:
    - ein **Projekt**, um in dessen Ordner mit seinen Dokumenten und Richtlinien zu arbeiten;
-   - einen zuletzt verwendeten **Ordner** oder über **Durchsuchen** beziehungsweise **Projekt oder Ordner suchen oder Pfad eingeben** einen anderen;
+   - einer der Ordner, die du zuletzt verwendet hast, unter **Ordner**, oder ein anderer: Mit **Durchsuchen** durchsuchst du deine Ordner, oder du gibst den Namen oder Pfad eines Ordners in **Projekt oder Ordner suchen oder Pfad eingeben** ein;
    - **Neuer Aufgabenordner** für einen nach deinem Auftrag benannten Ordner in `~/Hydor`, sofern du den Ort nicht unter [Einstellungen → Funktionen → Deine Agenten](/settings?s=assistants&find=Task%20folders) änderst.
 
-   Die meisten Agenten starten ohne eigene Ordnerauswahl in einem neuen Aufgabenordner. Coder arbeitet im gewählten Ordner.
+   Die meisten Agenten starten ohne eigene Ordnerauswahl in einem neuen Aufgabenordner. Programmierer arbeitet im gewählten Ordner.
 5. Beschreibe deinen Auftrag, stelle eine Frage oder füge eine Fehlermeldung in das Nachrichtenfeld ein. Hänge Dateien über die Büroklammer an oder ziehe sie auf das Feld. Bereits lokal vorhandene Dateien übernimmst du auf der Dateien-Seite über **Sitzung mit dieser Datei starten** im Dateimenü. Siehe [Eine Sitzung mit Dateien starten](/guide/files-git#start-a-session-with-files).
 6. Drücke Enter oder **Starten**, auf dem Smartphone den runden Pfeil.
 
-Die Sitzung öffnet sich. Du siehst die einzelnen Schritte in verständlicher Form und am Ende die Antwort. Braucht ein Befehl oder eine Dateiänderung eine Freigabe, erscheint eine Karte mit **Erlauben** und **Ablehnen**. Im Nachrichtenfeld unten setzt du das Gespräch fort. Deine Startseitenauswahl bleibt geräteübergreifend für die nächste Sitzung gespeichert.
+Die Sitzung öffnet sich. Du siehst die einzelnen Schritte in verständlicher Form und am Ende die Antwort. Braucht ein Befehl oder eine Dateiänderung eine Freigabe, erscheint eine Karte mit **Erlauben** und **Ablehnen**. Im Nachrichtenfeld unten setzt du die Unterhaltung fort. Deine Startseitenauswahl bleibt geräteübergreifend für die nächste Sitzung gespeichert.
 
 Weiter geht es mit [Sitzungen](/guide/sessions), wo alle Sitzungsfunktionen beschrieben sind.
 
@@ -168,7 +168,7 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 
 ### Suchbereiche auswählen
 
-**Suchen in** am Feldende zeigt den Suchbereich an, zunächst **Überall**. Ein Klick öffnet **Sitzungen**, **Nachrichten** für Gesprächsinhalte, **Projekte**, **Bibliothek** für Seiten, Bilder und Videos, **Apps**, **Dateien**, **Memory**, **Geplante Aufgaben**, **Agenten**, **Skills**, **Verbindungen**, **Einstellungen** einschließlich Designs, **Navigation und Aktionen** für App-Seiten und Funktionen sowie **Hilfe**.
+**Suchen in** am Feldende zeigt den Suchbereich an, zunächst **Überall**. Ein Klick öffnet **Sitzungen**, **Nachrichten** für Unterhaltungsinhalte, **Projekte**, **Bibliothek** für Seiten, Bilder und Videos, **Apps**, **Dateien**, **Memory**, **Geplante Aufgaben**, **Agenten**, **Skills**, **Verbindungen**, **Einstellungen** einschließlich Designs, **Navigation und Aktionen** für App-Seiten und Funktionen sowie **Hilfe**.
 
 - Wähle einen oder mehrere Bereiche. Die Suche beschränkt sich darauf, und die Schaltfläche nennt sie in Akzentfarbe, etwa „Sitzungen, Bibliothek“ oder „3 Bereiche“. Ein erneuter Klick entfernt einen Bereich; **Überall** aktiviert wieder alle.
 - Ohne Suchtext siehst du die Inhalte der ausgewählten Bereiche, häufig genutzte zuerst: letzte Sitzungen, Projekte und Seiten, Einstellungsbereiche oder Hilfethemen. Nachrichten, Memory-Notizen und Dateien erscheinen erst nach einer Eingabe.
@@ -179,8 +179,8 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 
 - Der **Beste Treffer** steht oben. Danach folgen Kategorien mit bis zu vier Zeilen. „3 weitere in Sitzungen“ zeigt den Rest.
 - Auf breiten Bildschirmen zeigt eine Vorschau neben der Liste weitere Angaben zum ausgewählten Treffer und seinem Ziel.
-- ↑ und ↓ wechseln den Treffer, Enter öffnet ihn. Esc leert die Eingabe; ein zweites Esc schließt die Suche. Ist die Bereichsauswahl geöffnet, schließt Esc zuerst diese.
-- Ohne Suchtext erscheinen **Letzte Sitzungen** und **Vorschläge** für häufig genutzte Orte, anfangs einige hilfreiche Standardziele. Bei eingeschränktem Suchbereich erscheinen stattdessen dessen Inhalte.
+- Mit ↑ und ↓ wechselst du zwischen den Treffern, mit Enter öffnest du einen. Esc leert, was du eingegeben hast, und ein zweites Esc schließt die Suche (ist die Liste **Suchen in** geöffnet, schließt Esc zuerst die Liste).
+- Ohne Eingabe zeigt die Suche **Letzte Sitzungen** und **Vorschläge**: die Orte, die du am häufigsten nutzt (bis sie diese kennt, ein paar nützliche). Sind in **Suchen in** Orte ausgewählt, zeigt sie stattdessen, was diese enthalten.
 - Unten steht **Wörter** oder **Wörter und Bedeutung**. Mit aktiviertem [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning), standardmäßig unter Einstellungen → Funktionen → Memory eingeschaltet, findet die Suche auch sinngleiche Formulierungen und andere Sprachen.
 
 ### Die Suche lernt deine Nutzung kennen
@@ -208,10 +208,10 @@ Auf iPhone und iPad funktionieren Benachrichtigungen nur in der zum Home-Bildsch
 
 ### Die Seitenleiste als Menü
 
-- **Menü** oben links öffnet die bildschirmfüllende Seitenleiste.
+- Die Schaltfläche **Menü** oben links auf jeder Seite öffnet sie. Sie füllt den Bildschirm.
 - Tippe auf eine Sitzung oder ein Werkzeug, um dorthin zu wechseln und das Menü zu schließen. Auch **Menü schließen**, das ×, schließt es.
 - Halte eine Sitzung kurz gedrückt und ziehe sie, um aktive oder angeheftete Sitzungen umzusortieren oder sie anzuheften.
-- Halte ein Werkzeug unten kurz gedrückt und ziehe es an eine andere Position.
+- Halte ein Werkzeug unten einen Moment gedrückt, um es aufzunehmen, und ziehe es dann an eine andere Stelle zwischen den anderen.
 - **⋯** am Zeilenende öffnet das Sitzungsmenü mit **Umbenennen**, **Ordner umbenennen**, **Anheften**, **Zurückstellen**, **Abschließen**, **Archivieren** und **Löschen** mit Bestätigung.
 
 ### Menüs als Bedienfelder
@@ -224,7 +224,7 @@ Auf dem Smartphone öffnen die Startseitenauswahlen für Programm, Modell, Ordne
 - Enter fügt eine neue Zeile ein. Der runde Pfeil startet eine Sitzung oder sendet eine Nachricht. Mit angeschlossener Tastatur senden auch Strg+Enter beziehungsweise ⌘Enter.
 - In der Sitzung zeigt eine Schaltfläche das Modell und bei Abweichungen Denkaufwand und Berechtigungen. Sie öffnet ein Bedienfeld mit **Modell**, **Denkaufwand**, **Berechtigungen**, Kontextauslastung und **Verdichten**.
 - Markiere einen Teil einer Antwort oder deiner Nachricht, um darunter **Zitieren** einzublenden.
-- **Details** öffnet sich nur auf Anforderung über dem Gespräch.
+- **Details** öffnet sich nur auf Anforderung über der Unterhaltung.
 - Die Suche füllt den Bildschirm; **Abbrechen** schließt sie.
 - Die Screenshot-Funktion gibt es nur am Computer.
 
@@ -243,7 +243,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 | Umschalt+Enter | Neue Zeile | Nachrichtenfeld |
 | Strg+Enter | Während der Arbeit das Gegenteil von Enter: Nachricht einreihen statt im laufenden Durchlauf senden oder umgekehrt; auf dem Smartphone senden | Nachrichtenfeld |
 | Umschalt+Tab | Zum nächsten Berechtigungsmodus wechseln | Nachrichtenfeld auf Startseite oder in Sitzung |
-| ↑ im leeren Feld | Frühere Sitzungsnachrichten nacheinander laden; ↓ geht vorwärts | Nachrichtenfeld einer Sitzung |
+| ↑ in einem leeren Feld | Holt deine früheren Nachrichten in dieser Sitzung zurück, eine nach der anderen (↓ geht wieder vorwärts) | Das Nachrichtenfeld in einer Sitzung |
 | Strg+S | Entwurf beiseitelegen; im leeren Feld wiederherstellen | Nachrichtenfeld einer Sitzung |
 | @ | Dateien im Sitzungsordner zum Erwähnen auflisten | Nachrichtenfeld |
 | / am Anfang | Befehle und Skills des Agenten anzeigen, bei Claude Code | Nachrichtenfeld |
@@ -277,7 +277,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 - „Finde die Sitzung zur Lissabon-Reise und hefte sie an.“
 - „Warum steht eine auf ihre Kontingentfreigabe wartende Sitzung noch unter Aktiv?“
 - „Zeige meine Sitzungen in der Seitenleiste nach Tagen, ohne Ordnergruppen.“
-- „Wähle auf der Startseite beim nächsten Öffnen Claude Code mit dem Agenten Researcher.“
+- „Wähle auf der Startseite beim nächsten Öffnen Claude Code mit dem Agenten Forscher.“
 - „Blende die Einstiegsideen unter dem Nachrichtenfeld aus.“
 - „Was ist während meiner Abwesenheit passiert? Ist etwas fehlgeschlagen?“
 - „Markiere alle Ereignisse während meiner Abwesenheit als gesehen.“

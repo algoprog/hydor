@@ -10,7 +10,7 @@ Richtlinien sind Anweisungen in normaler Sprache. Die App übergibt sie dem Agen
 
 Du musst nicht wissen, wie die einzelnen Agenten ihre Anweisungen einlesen. Claude Code und Codex haben dafür eigene Dateien, CLAUDE.md und AGENTS.md; andere Agenten nutzen andere Verfahren. Die App übergibt deine Richtlinien selbst an jeden Agenten. Deshalb genügt ein gemeinsamer Text.
 
-Deine konkrete Anweisung im Gespräch hat Vorrang: Steht in den Richtlinien „kurze Antworten“ und du verlangst einen ausführlichen Bericht, erhältst du den Bericht.
+Deine konkrete Anweisung in der Unterhaltung hat Vorrang: Steht in den Richtlinien „kurze Antworten“ und du verlangst einen ausführlichen Bericht, erhältst du den Bericht.
 
 ## Die drei Ebenen
 
@@ -59,7 +59,7 @@ Derselbe Dialog zeigt auch die Projektrichtlinien, sofern du ein Projekt gewähl
 1. Öffne das Sitzungsmenü (⋯) → **Sitzungseinstellungen → Richtlinien**.
 2. Ändere die Vorgaben unter **Diese Sitzung**, für das Projekt oder für alle Sitzungen und klicke auf **Speichern**.
 
-Die Änderung gilt ab deiner nächsten Nachricht. Claude Code und Codex lesen Anweisungen beim Start. Deshalb startet die App den Agenten mit der nächsten Nachricht unauffällig neu; das Gespräch läuft an derselben Stelle weiter. Solange der Agent einen Durchlauf bearbeitet, ein Ziel verfolgt oder Hintergrundaufgaben ausführt, wartet die App mit dem Neustart, bis er frei ist. Custom liest die Richtlinien ohnehin vor jedem Durchlauf. Andere Agenten wie Gemini CLI oder OpenCode übernehmen geänderte Richtlinien erst in ihrer nächsten Sitzung.
+Die Änderung gilt ab deiner nächsten Nachricht. Claude Code und Codex lesen Anweisungen beim Start. Deshalb startet die App den Agenten mit der nächsten Nachricht unauffällig neu; die Unterhaltung läuft an derselben Stelle weiter. Solange der Agent einen Durchlauf bearbeitet, ein Ziel verfolgt oder Hintergrundaufgaben ausführt, wartet die App mit dem Neustart, bis er frei ist. Custom liest die Richtlinien ohnehin vor jedem Durchlauf. Andere Agenten wie Gemini CLI oder OpenCode übernehmen geänderte Richtlinien erst in ihrer nächsten Sitzung.
 
 ## Was gute Richtlinien ausmacht
 

@@ -9,7 +9,7 @@ Ein Plugin bündelt alles, was Agenten für eine bestimmte Aufgabe brauchen: Ski
 Ein Plugin ist ein Ordner, der Folgendes enthalten kann:
 
 - **Skills**: beschriebene Arbeitsweisen, die Agenten bei passenden Aufgaben laden. Solange das Plugin aktiviert ist, erscheinen sie in der [Skill-Bibliothek](/guide/skills).
-- **Tools**: Tool-Server (MCP-Server), die Agenten zusätzliche Möglichkeiten geben, etwa Text aus Bildern zu lesen oder Datenbanken abzufragen. Ein Server läuft auf diesem Computer oder ist als Dienst unter einer Adresse erreichbar.
+- **Werkzeuge**: Tool-Server (MCP-Server), die Agenten zusätzliche Möglichkeiten geben, etwa Text aus Bildern zu lesen oder Datenbanken abzufragen. Ein Server läuft auf diesem Computer oder ist als Dienst unter einer Adresse erreichbar.
 - **Anweisungen**: zusätzliche Anweisungen für jeden Agenten, solange das Plugin aktiviert ist.
 - **Eigene Dateien**: Daten, Vorlagen, Bilder oder Skripte für die Skills und Tools des Plugins.
 - **Voraussetzungen**: andere Plugins, Python- oder Node-Pakete, Programme auf diesem Computer, herunterzuladende Dateien und Keys aus deinem Tresor.
@@ -100,12 +100,12 @@ Während der Einrichtung siehst du die einzelnen Schritte. Ein Plugin mit dem Na
 
 ## Ein eigenes Plugin erstellen
 
-1. Klicke auf **Hinzufügen → Plugin erstellen**.
+1. Klicke auf **Hinzufügen** und dann auf **Plugin erstellen**.
 2. Gib einen **Namen** und den Zweck an und klicke auf **Erstellen**. Das Plugin wird hinzugefügt und aktiviert; der Editor öffnet sich.
 3. Fülle die Tabs aus und klicke auf **Speichern**:
    - **Über dieses Plugin**: Anzeigename, Version (bei einer neuen veröffentlichten Fassung erhöhen), Zweck, Kategorie und Bild.
    - **Skills**: **Skill schreiben** mit Name, Kategorie, Einsatzbedingungen und Anweisungen, oder **Eigenen Skill kopieren** aus deiner Skill-Sammlung. Klicke auf einen Skill, um ihn zu bearbeiten.
-   - **Tools**: **Tool-Server hinzufügen**, entweder **Ein Programm hier** mit Programm, einem Argument pro Zeile und Umgebungsvariablen als NAME=value-Zeilen oder **Eine Adresse** mit MCP-Server-Adresse und Headern. `${PLUGIN_ROOT}` steht für den Plugin-Ordner, `${PLUGIN_DATA}` für den Datenordner. Ein Server-Argument kann zum Beispiel `${PLUGIN_ROOT}/files/server.py` lauten.
+   - **Werkzeuge**: **Tool-Server hinzufügen**, entweder **Ein Programm hier** mit Programm, einem Argument pro Zeile und Umgebungsvariablen als NAME=value-Zeilen oder **Eine Adresse** mit MCP-Server-Adresse und Headern. `${PLUGIN_ROOT}` steht für den Plugin-Ordner, `${PLUGIN_DATA}` für den Datenordner. Ein Server-Argument kann zum Beispiel `${PLUGIN_ROOT}/files/server.py` lauten.
    - **Voraussetzungen**: Python-Pakete, Node-Pakete, Programme, Keys, andere Plugins und Downloads, jeweils ein Eintrag pro Zeile.
    - **Dateien**: **Dateien hinzufügen** nimmt Dateien in das Plugin auf, bis zu 50 MB pro Datei und 200 MB insgesamt. Der Papierkorb entfernt eine Datei. Dateien werden sofort hinzugefügt oder entfernt; **Speichern** ist dafür nicht nötig.
    - **Anweisungen**: ergänzende Anweisungen, die jeder Agent bei aktiviertem Plugin erhält.
@@ -118,7 +118,7 @@ Selbst erstellte Plugins liegen im Datenordner der App unter plugins/mine. Zum s
 
 ## Ein Plugin teilen
 
-- **Als Datei**: Öffne das Plugin und wähle **⋯ → Als ZIP verpacken**, oder dieselbe Option im Editor. Andere fügen es über **Hinzufügen → Aus einer ZIP-Datei** hinzu. Die eingerichtete Umgebung wird nicht mit verpackt, sondern am Ziel neu erstellt.
+- **Als Datei**: Öffne das Plugin und wähle **⋯ → In eine ZIP-Datei packen** (oder **In eine ZIP-Datei packen** in seinem Editor). Jeder kann es mit **Hinzufügen → Aus einer ZIP-Datei** hinzufügen. Seine Einrichtung wird nicht mit verpackt: Sie wird dort, wo es hinzugefügt wird, neu durchgeführt.
 - **Als Link**: Lege den Plugin-Ordner in einem Git-Repository ab, etwa auf GitHub. Andere fügen das Plugin über **Hinzufügen → Über einen Link** hinzu und erhalten neue Versionen über **Neueste Version herunterladen**.
 
 Auch andere Tools mit Unterstützung für das Format Agent Plugins können seine Skills und Tool-Server verwenden. App-spezifische Angaben wie Voraussetzungen und Anweisungen liegen im Abschnitt `com.naget.agent`, den andere Tools überspringen.
@@ -138,7 +138,7 @@ Jede von der App gestartete Sitzung erhält die aktivierten und vollständig ein
 
 - **Skills** über die Skill-Bibliothek, wie alle anderen Skills; siehe [Welche Agenten welche Skills erhalten](/guide/skills#which-agents-get-which-skills). Ist ein Skill-Name bereits vergeben, wird der Plugin-Skill ausgelassen. Im Plugin-Fenster steht, welchen Skill Agenten stattdessen erhalten;
 - **Tool-Server** als MCP-Server, gestartet im Plugin-Ordner mit den eigenen Paketen;
-- **Anweisungen** samt Angabe, wo Pakete und Dateien liegen.
+- ihre **Anweisungen**, mit einer Zeile dazu, wo ihre Pakete und Dateien liegen.
 
 Ein Plugin kann auf bestimmte Agenten beschränkt sein; das steht im Detailfenster. Laufende Sitzungen erhalten Änderungen am Plugin erst bei ihrem nächsten Start.
 

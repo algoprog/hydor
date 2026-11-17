@@ -15,7 +15,7 @@ Much of Hydor can grow without touching its core, and those are the best first c
 - **An app template** (`server/apps/templates*.ts`): a small tool for one job, with a form, steps and a view.
 - **An answer UI** (`shared/answer-ui/`, drawn by `web/src/components/answer/`): a card, chart or table agents fill in
   as they answer.
-- **A translation**: the app is in English, German, Chinese and Greek (`web/src/i18n/`; the guide is also in Chinese and Greek: `docs/guide/zh/`, `docs/guide/el/`);
+- **A translation**: the app is in English, German, Chinese and Greek (`web/src/i18n/`; the guide is also in German, Chinese and Greek: `docs/guide/de/`, `docs/guide/zh/`, `docs/guide/el/`);
   a new language, or better words in one, is welcome.
 - **The guide** (`docs/guide/`): what it says wrong or leaves out.
 
@@ -51,7 +51,7 @@ changes. A change to how a page looks or works comes with pictures of it before 
 ## What a change brings with it
 
 The app is described in several places, and people and agents rely on each: a change to something people can see or
-do updates the guide (in all three languages), the feature list and the README where they describe it, the search
+do updates the guide (in all four languages), the feature list and the README where they describe it, the search
 box's catalog and its vectors, and the texts in `web/src/i18n`. [AGENTS.md](AGENTS.md) says which, and the guide's
 test (`npm test -- guide/`) checks much of it. Code you change keeps the style around it (there is no formatter run
 over existing files), and new text is written as the guide is: plain words, for people who are not programmers.
