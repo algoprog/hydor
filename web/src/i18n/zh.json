@@ -25067,6 +25067,7 @@
 "Turn on Wiki memory for this project first.":"请先为此项目开启 Wiki 记忆。",
 "Unavailable because a project, Wiki memory or Memory setting is off":"项目、Wiki 记忆或记忆设置已关闭，无法使用",
 "Wiki contracts":"Wiki 合同",
+"Contract inventory is incomplete":"合同清单不完整",
 "Wiki contracts are off for this chat":"此聊天的 Wiki 合同已关闭",
 "Wiki feature defaults must be on or off":"Wiki 功能默认值必须为开启或关闭",
 "Wiki plans":"Wiki 计划",
