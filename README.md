@@ -243,7 +243,7 @@ See [all features](docs/features.md), or the [user guide](docs/guide/), which th
 - [Remote access](docs/remote-access.md): your phone and other devices, over HTTPS (Tailscale in a few clicks)
 - [Several machines](docs/machines.md): agents on other machines, from one place
 - [How it works](docs/how-it-works.md): architecture and security
-- [How memory works](docs/memory.md): what agents are given and when, how notes and the wiki stay current, and what you control
+- [How memory works](docs/memory.md): what agents are given, how notes and the wiki stay current, and what you control
 - [Memory internals](docs/memory-internals.md): the tables, search and picking, delivery for each agent, the budgets and what runs when
 - [Privacy](docs/privacy.md): what leaves your computer, host by host: no telemetry, and how to turn each connection off
 - [Compared with other agents](docs/compare/README.md), with sources
