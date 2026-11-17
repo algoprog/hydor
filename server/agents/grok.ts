@@ -1,19 +1,22 @@
-// Grok Build's sign-in: which account the `grok` program is signed in as, and signing in and out of it. Grok keeps everything in
-// its home folder (GROK_HOME, ~/.grok): the default account is that folder, an added account is a folder of its own
-// (server/accounts.ts). Sessions run over ACP (server/agents/acp.ts); this is only the account side, a program run for each
-// question (`grok models` says whether it is signed in; `grok login --device-auth` signs in with a code, nothing to paste).
+// Grok Build's accounts: which account the `grok` program is signed in as, signing in and out of it, and what its agent says
+// of the account (its models and their efforts). Grok keeps everything in its home folder (GROK_HOME, ~/.grok): the default
+// account is that folder, an added account is a folder of its own (server/accounts.ts). Sessions run over ACP
+// (server/agents/acp.ts); this is only the account side, a program run for each question (`grok models` says whether it is
+// signed in; `grok login --device-auth` signs in with a code, nothing to paste; its agent, started briefly, answers the rest).
 import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
-import type { AccountStatus, LoginFlow } from '../../shared/types.ts';
+import type { AccountStatus, LoginFlow, ModelOption } from '../../shared/types.ts';
 import { accountEnv } from '../accounts.ts';
 import { ensureCommand } from '../clients.ts';
-import { paths } from '../config.ts';
+import { config, paths } from '../config.ts';
 import type { DB } from '../db.ts';
 import { agentBaseEnv } from '../env.ts';
 import { execProgram, launch } from '../platform.ts';
-import { findCommand } from './acp.ts';
+import { acpModelOptions, findCommand } from './acp.ts';
+
+type Json = Record<string, any>;
 
 const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
 const clean = (text: string) => text.replace(ANSI, '').replace(/\r/g, '');
@@ -61,6 +64,74 @@ function grokEnv(extra: Record<string, string>): Record<string, string> {
 
 type Flow = LoginFlow & { proc?: ChildProcess; buf?: string };
 
+/** A call's answer from Grok Build's agent: its result, or its error (an error is an answer too). */
+export type GrokAnswer = { result?: Json; error?: { code?: number; message: string; data?: unknown } };
+
+/**
+ * Asks Grok Build's agent about the account rather than a session (its models, its plan's billing): starts
+ * `grok agent --no-leader stdio` for a moment, initializes it, makes each call in turn and stops it. `extraEnv` points it at an
+ * added account (GROK_HOME). Throws when grok is not installed, does not start, or takes longer than `timeoutMs`.
+ */
+export async function grokAsk(extraEnv: Record<string, string>, calls: { method: string; params?: Json }[], timeoutMs = 30_000): Promise<{ init: Json; results: GrokAnswer[] }> {
+  const env = grokEnv(extraEnv);
+  const bin = findCommand('grok', env);
+  if (!bin) throw new Error('Grok Build is not installed');
+  fs.mkdirSync(paths.probe, { recursive: true });
+  const run = launch(bin, ['agent', '--no-leader', 'stdio'], env);
+  const proc = spawn(run.cmd, run.args, { cwd: paths.probe, env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+  const waiting = new Map<number, (m: Json) => void>();
+  let buf = '';
+  proc.stdout!.on('data', (d: Buffer) => {
+    buf += d.toString('utf8');
+    for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+      const line = buf.slice(0, i);
+      buf = buf.slice(i + 1);
+      try {
+        const m = JSON.parse(line);
+        // Answers only: the agent's own notes and requests (session setup, MCP servers) are not ours to answer here.
+        if (m.id != null && !m.method) waiting.get(Number(m.id))?.(m);
+      } catch {}
+    }
+  });
+  proc.stdin!.on('error', () => {});
+  const gone = new Promise<never>((_, reject) => {
+    proc.on('error', reject);
+    proc.on('exit', () => reject(new Error('Grok Build stopped before it answered')));
+  });
+  gone.catch(() => {});
+  let next = 1;
+  const call = (method: string, params: Json = {}) =>
+    Promise.race([
+      new Promise<Json>((resolve) => {
+        const id = next++;
+        waiting.set(id, resolve);
+        proc.stdin!.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      }),
+      gone,
+    ]);
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Grok Build did not answer in time')), timeoutMs);
+  });
+  late.catch(() => {});
+  const work = async () => {
+    const init = await call('initialize', { protocolVersion: 1, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, clientInfo: { name: 'hydor', title: 'Hydor', version: config.version } });
+    if (init.error) throw new Error(String(init.error.message ?? 'Grok Build did not start'));
+    const results: GrokAnswer[] = [];
+    for (const c of calls) {
+      const r = await call(c.method, c.params);
+      results.push(r.error ? { error: { code: r.error.code, message: String(r.error.message ?? 'error'), data: r.error.data } } : { result: r.result ?? {} });
+    }
+    return { init: init.result ?? {}, results };
+  };
+  try {
+    return await Promise.race([work(), late]);
+  } finally {
+    clearTimeout(timer);
+    proc.kill();
+  }
+}
+
 /** Account calls for one Grok Build account: its sign-in status, signing in with a device code, and signing out. */
 export class GrokControl extends EventEmitter {
   /** `extraEnv` points it at an added account (GROK_HOME); none for the default one. */
@@ -68,6 +139,20 @@ export class GrokControl extends EventEmitter {
     super();
   }
   flows = new Map<string, Flow>();
+  private modelsKept?: { at: number; models: ModelOption[] };
+
+  /**
+   * Grok Build's models for this account, each with the efforts it takes, as its agent lists them (before any session:
+   * the start page's pickers). Kept ten minutes; a sign-in or sign-out forgets them, since the list depends on it.
+   */
+  async models(): Promise<ModelOption[]> {
+    if (this.modelsKept && Date.now() - this.modelsKept.at < 10 * 60_000) return this.modelsKept.models;
+    const { init, results } = await grokAsk(this.extraEnv, [{ method: '_x.ai/models/list' }]);
+    const listed = results[0]?.result;
+    const models = acpModelOptions(Array.isArray(listed?.availableModels) ? listed : init._meta?.modelState);
+    this.modelsKept = { at: Date.now(), models };
+    return models;
+  }
 
   /** Whether grok is signed in here, from `grok models` (a quick call that needs no model turn). */
   async account(): Promise<AccountStatus> {
@@ -130,7 +215,10 @@ export class GrokControl extends EventEmitter {
         flow.error = lastLines(flow.buf ?? '') || why || 'Sign-in failed';
       }
       this.emit('flow', flow);
-      if (ok) this.emit('account');
+      if (ok) {
+        this.modelsKept = undefined;
+        this.emit('account');
+      }
     };
     proc.on('error', (e) => finish(false, e.message));
     proc.on('close', (code) => finish(code === 0, `grok stopped with code ${code}`));
@@ -163,6 +251,7 @@ export class GrokControl extends EventEmitter {
       fs.mkdirSync(paths.probe, { recursive: true });
       await new Promise<void>((resolve) => execProgram(bin, ['logout'], { env, cwd: paths.probe, timeout: 20_000 }, () => resolve()));
     }
+    this.modelsKept = undefined;
     this.emit('account');
   }
 }

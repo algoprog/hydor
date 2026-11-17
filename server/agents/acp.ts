@@ -55,6 +55,44 @@ const SIGN_IN: Record<string, string> = { pi: 'pi (then /login)', hermes: 'herme
  */
 const HEADLESS_AUTH = ['cached_token', 'xai.api_key'];
 
+// ---- models and their efforts ---------------------------------------------------------------------
+
+/** The session's thought-level option (ACP config options, category `thought_level`): its id, the values it takes, the one set. */
+export function thoughtOption(configOptions: unknown): { id: string; options: string[]; current?: string } | null {
+  if (!Array.isArray(configOptions)) return null;
+  const o = configOptions.find((c: Json) => c?.category === 'thought_level' || c?.id === 'reasoning_effort');
+  if (!o || !Array.isArray(o.options)) return null;
+  // Options may come in groups ({ group, options }).
+  const flat: Json[] = o.options.flatMap((x: Json) => (Array.isArray(x?.options) ? x.options : [x]));
+  const options = flat.map((x) => String(x?.value ?? x?.id ?? '')).filter(Boolean);
+  return options.length ? { id: String(o.id), options, current: o.currentValue != null ? String(o.currentValue) : undefined } : null;
+}
+
+/**
+ * The models an ACP agent offers (a session's `models`, or Grok Build's `_meta.modelState`), each with the reasoning efforts
+ * it takes: the model's own list (Grok Build sends one per model in `_meta.reasoningEfforts`), else the session's
+ * thought-level option, which applies to every model.
+ */
+export function acpModelOptions(state: Json | null | undefined, thought?: { options: string[]; current?: string } | null): ModelOption[] {
+  const list: Json[] = Array.isArray(state?.availableModels) ? state!.availableModels : [];
+  return list
+    .filter((m) => m?.modelId != null)
+    .map((m) => {
+      const own: Json[] = Array.isArray(m._meta?.reasoningEfforts) ? m._meta.reasoningEfforts : [];
+      const efforts = own.length ? own.map((e) => String(e?.value ?? e?.id ?? '')).filter(Boolean) : (thought?.options ?? []);
+      const marked = own.find((e) => e?.default);
+      const def = String((own.length ? (marked?.value ?? marked?.id ?? m._meta?.reasoningEffort) : thought?.current) ?? '');
+      return {
+        value: String(m.modelId),
+        label: String(m.name ?? m.modelId),
+        description: m.description ?? undefined,
+        efforts,
+        defaultEffort: def && efforts.includes(def) ? def : undefined,
+        isDefault: state?.currentModelId != null && String(state.currentModelId) === String(m.modelId) ? true : undefined,
+      };
+    });
+}
+
 // ---- the list of agents ---------------------------------------------------------------------------
 
 /** Custom, the app's own agent (server/agent; its id stays 'console'): any model from Settings → Models. */
