@@ -1,5 +1,5 @@
-// Agents that speak the Agent Client Protocol (agentclientprotocol.com): Gemini CLI, OpenCode, Qwen
-// Code, Goose and others, each started as `<command> <args>` and driven over JSON-RPC on stdio.
+// Agents that speak the Agent Client Protocol (agentclientprotocol.com): Gemini CLI, OpenCode, Grok Build,
+// Qwen Code, Goose and others, each started as `<command> <args>` and driven over JSON-RPC on stdio.
 //
 // The app is the ACP client. It opens a session (session/new, or session/load to continue one when the
 // agent can), sends prompts (session/prompt, which returns when the turn ends), answers permission
@@ -9,6 +9,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isGrok } from '../../shared/grok.ts';
 import { CONTEXT_PARTS, type AcpAgentDef, type ApprovalOption, type LiveState, type ModelOption } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
 import { APP_ROOT, config } from '../config.ts';
@@ -30,6 +31,9 @@ export const ACP_DIR = path.join(config.dataDir, 'acp');
 export const ACP_PRESETS: AcpAgentDef[] = [
   { id: 'gemini', name: 'Gemini CLI', command: 'gemini', args: ['--experimental-acp'], hint: 'npm install -g @google/gemini-cli' },
   { id: 'opencode', name: 'OpenCode', command: 'opencode', args: ['acp'], hint: 'npm install -g opencode-ai' },
+  // Grok Build (xAI) signs in with a Grok subscription (Settings → Agents → Accounts) or an xAI API key (XAI_API_KEY).
+  // --no-leader: each session runs its own agent rather than joining a shared Grok leader, so it keeps its account's GROK_HOME.
+  { id: 'grok', name: 'Grok Build', command: 'grok', args: ['agent', '--no-leader', 'stdio'], hint: 'npm install -g @xai-official/grok' },
   { id: 'qwen', name: 'Qwen Code', command: 'qwen', args: ['--experimental-acp'], hint: 'npm install -g @qwen-code/qwen-code' },
   { id: 'goose', name: 'Goose', command: 'goose', args: ['acp'], hint: 'block.github.io/goose' },
   { id: 'kimi', name: 'Kimi CLI', command: 'kimi', args: ['--acp'], hint: 'github.com/MoonshotAI/kimi-cli' },
@@ -44,6 +48,12 @@ export const ACP_PRESETS: AcpAgentDef[] = [
 
 /** Where an agent's own sign-in is, when its ACP command is not it (Pi's adapter is pi-acp; Hermes signs in with its model setup). */
 const SIGN_IN: Record<string, string> = { pi: 'pi (then /login)', hermes: 'hermes model' };
+
+/**
+ * Sign-ins an agent may be asked to use when it says it needs one, as it offers them: those that need nobody at a
+ * browser (Grok Build's saved sign-in, then its xAI API key when XAI_API_KEY is set for it). Others are never chosen.
+ */
+const HEADLESS_AUTH = ['cached_token', 'xai.api_key'];
 
 // ---- the list of agents ---------------------------------------------------------------------------
 
@@ -216,6 +226,7 @@ export class AcpLive extends LiveAdapter {
       60_000,
     );
     this.caps = init?.agentCapabilities ?? {};
+    const offered = new Set<string>(Array.isArray(init?.authMethods) ? init.authMethods.map((m: Json) => String(m?.id ?? '')) : []);
     // The app's own server and the capabilities' servers: by address for agents that take HTTP, else commands.
     const http = !!this.caps.mcpCapabilities?.http;
     const pairs = (o?: Record<string, string>) => Object.entries(o ?? {}).map(([name, value]) => ({ name, value }));
@@ -232,12 +243,25 @@ export class AcpLive extends LiveAdapter {
       d.type === 'http' ? (http ? [{ type: 'http', name, url: d.url, headers: pairs(d.headers) }] : [bridged(name, d.url, d.headers)]) : [{ name, command: d.command, args: d.args ?? [], env: pairs(d.env) }],
     );
     if (this.o.pageServer) mcpServers.push(http ? { type: 'http', name: PAGE_SERVER, url: this.o.pageServer, headers: [] } : bridged(PAGE_SERVER, this.o.pageServer));
+    const unsigned = (e: unknown) => /auth/i.test((e as Error).message) || (e as { code?: number }).code === -32000;
     const auth = (e: unknown) => {
-      const m = (e as Error).message;
-      // Signing in happens in the agent's own CLI (in a terminal), once.
-      if (/auth/i.test(m) || (e as { code?: number }).code === -32000)
-        throw new HttpError(401, `${this.o.def.name} is not signed in. Run ${SIGN_IN[this.o.def.id] ?? this.o.def.command} once in a terminal and sign in there, then try again.`);
-      throw e;
+      if (!unsigned(e)) throw e;
+      // Grok Build signs in here, in Settings → Agents → Accounts; other agents in their own CLI (in a terminal), once.
+      if (isGrok(this.o.def)) throw new HttpError(401, `${this.o.def.name} is not signed in: sign in with your Grok account in Settings → Agents → Accounts, then try again.`);
+      throw new HttpError(401, `${this.o.def.name} is not signed in. Run ${SIGN_IN[this.o.def.id] ?? this.o.def.command} once in a terminal and sign in there, then try again.`);
+    };
+    // An agent that wants a sign-in named first (Grok Build) is asked to use one it offers that needs nobody at a browser, once.
+    let asked = false;
+    const signedIn = async (go: () => Promise<Json>): Promise<Json> => {
+      try {
+        return await go();
+      } catch (e) {
+        const methodId = !asked && unsigned(e) ? HEADLESS_AUTH.find((m) => offered.has(m)) : undefined;
+        if (!methodId) throw e;
+        asked = true;
+        await this.rpc.call('authenticate', { methodId, _meta: { headless: true } }, 60_000);
+        return go();
+      }
     };
     // An agent that refuses MCP servers in the session's request (OpenClaw's bridge does) is asked again without them.
     let noted = false;
@@ -252,14 +276,14 @@ export class AcpLive extends LiveAdapter {
       // The agent replays the conversation as updates: the transcript has it already.
       this.loading = true;
       try {
-        const r = await open('session/load', { sessionId: this.acpSession, cwd: this.o.cwd }).catch(auth);
+        const r = await signedIn(() => open('session/load', { sessionId: this.acpSession, cwd: this.o.cwd })).catch(auth);
         this.offers(r);
       } finally {
         this.loading = false;
       }
     } else {
       if (resume && this.acpSession) this.record({ t: 'note', text: `${this.o.def.name} cannot reopen earlier sessions: it starts afresh here, without the conversation above.` });
-      const r = await open('session/new', { cwd: this.o.cwd }).catch(auth);
+      const r = await signedIn(() => open('session/new', { cwd: this.o.cwd })).catch(auth);
       this.acpSession = String(r?.sessionId ?? '');
       if (!this.acpSession) throw new Error('The agent did not open a session');
       this.record({ t: 'session', acpSession: this.acpSession });

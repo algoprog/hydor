@@ -8,6 +8,12 @@ import type { SignatureCard } from './signatures.ts';
 /** Claude Code, Codex, or an agent that speaks the Agent Client Protocol (Gemini CLI, OpenCode…). */
 export type Agent = 'claude' | 'codex' | 'acp';
 
+/**
+ * A program whose sign-ins the app manages as accounts (Settings → Agents → Accounts): Claude Code, Codex, and Grok Build
+ * (an ACP agent, the `grok` program: shared/grok.ts tells it apart).
+ */
+export type AccountAgent = 'claude' | 'codex' | 'grok';
+
 /** An ACP agent the app can start (Settings → More agents). */
 export interface AcpAgentDef {
   id: string;
@@ -448,7 +454,7 @@ export interface PullRequestInfo {
 /** An account added for an agent, beside the CLI's own (Settings → Accounts). */
 export interface AgentAccount {
   id: string;
-  agent: Agent;
+  agent: AccountAgent;
   name: string;
 }
 
@@ -714,7 +720,7 @@ export interface LimitResetResult {
 }
 
 export interface AccountStatus {
-  agent: Agent;
+  agent: AccountAgent;
   loggedIn: boolean;
   email?: string;
   plan?: string;
@@ -725,7 +731,7 @@ export interface AccountStatus {
 
 export interface LoginFlow {
   id: string;
-  agent: Agent;
+  agent: AccountAgent;
   method: string;
   state: 'starting' | 'waiting' | 'verifying' | 'done' | 'failed' | 'cancelled';
   url?: string;
