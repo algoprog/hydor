@@ -5,13 +5,19 @@
   </picture>
 </h1>
 
-<p align="center"><i>ὕδωρ, "water" in ancient Greek: it takes the shape of whatever holds it.</i></p>
+<h3 align="center">The everything app for AI agents</h3>
 
 <p align="center">
-  Run <b>Claude Code</b>, <b>Codex</b> or <b>any model</b> on your own computer, with one memory, from any device.
+  Claude Code and Codex on the plans you already pay for, or any model, local ones too, with unified memory. They
+  code, research, write and run your routine work on your own computer, answer with charts, maps and apps, and check
+  with you on your phone.
 </p>
 
-<p align="center"><a href="https://hydor.app"><b>hydor.app</b></a></p>
+<p align="center">
+  <sub><b>Works with</b> Claude Code · Codex · Gemini CLI · OpenCode · Qwen Code · Goose · Kimi CLI · Auggie · OpenRouter · Ollama · vLLM · llama.cpp</sub>
+</p>
+
+<p align="center"><a href="https://hydor.app"><b>hydor.app</b></a> · free and open source</p>
 
 <p align="center">
   <a href="https://github.com/algoprog/hydor/releases/latest/download/Hydor-arm64-mac.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-Apple_silicon-111?style=for-the-badge&logo=apple&logoColor=white" alt="Download for Mac (Apple silicon)" /></a>
@@ -33,89 +39,80 @@
   <a href="docs/media/hydor-intro.mp4"><img src="docs/media/hydor-intro.webp" width="720" alt="A 110-second tour of Hydor: any agent and any model, sessions followed from any device, research with its sources, apps with views of their own, pictures, video and music made with AI, and the Library" /></a>
 </p>
 
-Hydor is a free, open-source app that runs the AI agents you already use on your own computer, with one memory for
-all of them and every session in your pocket: the official `claude` and `codex` tools on the plans you pay for,
-Gemini CLI and other agents, and its own agent for any model, open-weight ones included. Sessions keep running when
-you close the tab, and the ones you start in VS Code or a terminal show up too.
+<p align="center">
+  <b>140+</b> answer UIs · <b>37</b> ready-made apps · <b>70+</b> skills · <b>4</b> languages · <b>zero</b> telemetry
+</p>
 
-## Three ways in
+> [!TIP]
+> **A team that costs less.** A strong model leads and hands the clear parts to cheaper subagents. In our benchmark the
+> team passed every check at 9% less than the best tier alone, and 67% less than running everything on the strongest
+> model ([the numbers](docs/plans/tiers-and-the-team.md)).
 
-**For coding.** Run the official Claude Code and Codex on the plans you already pay for, and follow, steer and approve
-their work from your phone: every step in plain words, every change as a diff. A strong model leads and hands the clear
-parts to cheaper subagents: in our benchmark of 10 November 2026 the team passed every check at 9% less than the best
-tier alone, and 67% less than running everything on the strongest model
-([the numbers](docs/plans/tiers-and-the-team.md)). See [Sessions](docs/guide/02-sessions.md).
+## What you can hand it
 
-**For everything else.** Research with cited sources, a browser you can take over, and a Library where agents write
-documents, slides, spreadsheets, LaTeX and diagrams that you edit as in Word, PowerPoint, Excel and Overleaf, and boards
-that keep the answer cards you pin from replies (a chart, this week's numbers, the weather) together, each card brought
-up to date by an agent on a schedule if you like, within a monthly cap. Small
-[apps](docs/guide/10-apps.md) do one job each, from a trip plan to a product comparison. See the
-[Library](docs/guide/11-library.md) and [research](docs/guide/08-research.md).
+- **"Fix the failing checkout tests"**, then approve `npm test` from your phone's notification.
+- **"Plan 4 days in Lisbon in May"**: a day-by-day plan on a map, what to book and the budget, then slides of it.
+- **"Find the best e-bike under $2,000 for a hilly commute"**: a cited answer with a comparison table, and a
+  spreadsheet to open.
+- **"Every Monday at 8, sum up last week's sales"**: an agent of your own does it on schedule and tells you.
+- **"Remember that I'm vegetarian"**: every agent knows it from then on, in every project.
+- **"Turn my paper into a talk, a poster and a thread"**: one of 37 ready-made apps.
+- **From Telegram, Discord or Slack**: a photo of a receipt, a file or a voice message to one of your agents.
 
-**Private.** Confidential sessions that use only models on your own computer, a vault of keys that agents use without
-seeing them, and no telemetry: there are no analytics libraries in the code. Your sessions, files and memory live on
-your machine. See [keep a session confidential](docs/guide/02-sessions.md#keep-a-session-confidential) and
-[how it works](docs/how-it-works.md).
+## Why Hydor
 
-## Already use another agent?
-
-- **Run it inside Hydor.** Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie run as agents of
-  Hydor, beside Claude Code, Codex and its own agent ([agents and models](docs/guide/16-agents-models.md)).
-- **Bring in what it knows.** **Settings → Memory → Bring in** takes the memory and the skills you made in other
-  agents, and what ChatGPT, Claude, Claude Code and Codex know about you. You see it all first and pick what comes
-  over, and the setup tour offers it when it finds another agent on this computer ([memory](docs/guide/06-memory.md)).
-- **Your projects come along.** The folders you work in with Claude Code and Codex, and Codex's own projects, become
-  Hydor projects by themselves, with their sessions, and get documents, skills and guidelines of their own
-  ([projects](docs/guide/04-projects.md#projects-found-in-claude-code-and-codex)).
-- **Talk to your agents from a chat app.** Telegram, Discord or Slack, under **Settings → Chat apps**: send a photo of a
-  receipt, a file or a voice message to one of your own agents with `/as` ([devices](docs/guide/20-devices.md)).
-- **Share to Hydor.** Installed on Android or a computer, the app is in the share sheet: what you share opens in the
-  start page's message box ([devices](docs/guide/20-devices.md#share-to-hydor-from-other-apps)).
-
-## Learns, with your OK
-
-Memory is one system for every agent, in three parts: notes (short facts, found by meaning and checked against your
-conversations each day), **Wiki memory** (linked articles with their sources that agents keep for each project, on by
-default) and your documents. A new or changed document adds notes and updates the wiki (a project with more documents than a limit you set keeps them out of its wiki, and agents search them), and about once a day the
-helper adds what each project's recent conversations settled to its wiki. Chats can suggest lessons too (a card you keep or dismiss),
-and a chat's own switches turn Wiki memory and those suggestions on or off. An agent can adopt a plan into a project's wiki and revise it,
-each change with your OK and every earlier revision kept; before an automatic compaction Claude Code and Codex save a checkpoint of the chat.
-Each project's **Memory** tab shows all three. After a hard task an agent can propose its method as a skill. Nothing is kept until you approve it, and you can read, edit and
-delete all of it ([memory](docs/guide/06-memory.md), [wiki memory](docs/guide/28-wiki-memory.md), [skills](docs/guide/13-skills.md)).
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-agents.webp" alt="A session in Hydor: each step in plain words, an edit with its diff, and a command waiting for approval" />
+      <p><b><a href="docs/guide/16-agents-models.md">Every agent, one app</a></b><br />
+      Claude Code and Codex on the plans you already pay for, six more agents, or Hydor's own agent with any model. Every step in plain words, every change as a diff.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-phone.webp" alt="The same session on a phone, waiting for approval to run the tests" />
+      <p><b><a href="docs/guide/20-devices.md">In your pocket</a></b><br />
+      Sessions keep running when you close the tab. Approve from the notification, or message your agents from Telegram, Discord or Slack.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-memory.webp" alt="Memory in Hydor: your profile, and notes for each project" />
+      <p><b><a href="docs/guide/06-memory.md">Unified memory</a></b><br />
+      Tell one agent once and they all know: notes, a wiki that keeps itself current, and your documents. Read, edit or undo every note.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-answers.webp" alt="The Trip planner app's answer: four days in Lisbon on a map, day by day" />
+      <p><b><a href="docs/guide/10-apps.md">Answers you can use</a></b><br />
+      140+ live UIs (charts, maps, tables, quizzes, code you can run) and 37 ready-made apps that open their answer in a view of their own.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-automation.webp" alt="Scheduled tasks: a morning brief, a price watch and a weekly report" />
+      <p><b><a href="docs/guide/12-tasks.md">Work that runs by itself</a></b><br />
+      Agents of your own on schedules, watchers and webhooks, or keeping at a goal, each within a monthly budget.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/media/readme-library.webp" alt="Slides an agent made, open in the Library's editor" />
+      <p><b><a href="docs/guide/11-library.md">A Library they write in</a></b><br />
+      Documents, slides, spreadsheets, LaTeX and diagrams you edit like Word, PowerPoint, Excel and Overleaf.</p>
+    </td>
+  </tr>
+</table>
 
 ## How it compares
 
-Hydor runs the official Claude Code and Codex on your own plans, gives every agent one memory, puts every session on a
-phone app with notifications and approvals, and keeps what agents write in a Library you can edit. Its own agent works
-with any model, and a strong model can lead cheaper subagents. Each comparison has its sources:
-[how Hydor compares with other agents](docs/compare/README.md).
+| | Hydor | [Hermes Agent](docs/compare/hermes-agent.md) | [pi](docs/compare/pi.md) | [Atomic Agent](docs/compare/atomic-agent.md) | [OpenClaw](docs/compare/openclaw.md) |
+|---|:-:|:-:|:-:|:-:|:-:|
+| **Official Claude Code and Codex**, on your own plans | ✓ | Partial | — | Partial | Partial |
+| **Runs other agents inside it**: Gemini CLI, OpenCode, Goose and more | ✓ | Partial | — | Partial | Partial |
+| **One memory for every agent** | ✓ | Partial | — | Partial | Partial |
+| **Phone app**, approve from the notification | ✓ | Partial | Partial | Partial | Partial |
+| **No telemetry** | ✓ | ✓ | — | — | ✓ |
+| **A strong model leading cheaper subagents** | ✓ | Partial | — | Partial | Partial |
 
-## What else it does
-
-- **Agents of your own**: say what one should do and it is drafted for you; each works on its own schedules, on a model
-  tier, with a monthly budget, and can hand parts of its work to other agents. Every change is a version to compare and
-  bring back, examples check it still does its job, and it travels as a file to install on another Hydor.
-- **Work that runs by itself**: scheduled tasks, watchers (a new email, a new deal, file or ticket in a connected app,
-  or the half hour before each meeting starts one too), webhooks, and goals an agent keeps working on, all on one
-  week view: what ran, how it went, and what runs next.
-- **Your email**: connect any mail account with an app password, and agents search, read, sort, draft and send.
-- **Answers you can use**: replies show maths, diagrams, pictures and more than 140 answer UIs (tables, charts, maps,
-  recipes, forecasts, quizzes, practice problems checked as you answer, code you can run) that agents fill in as they
-  answer; tables and charts can read their numbers straight from a Library spreadsheet or a data file and stay current;
-  each opens full screen and saves as a picture, and a whole conversation exports as Markdown or a Library document.
-- **For researchers and engineers**: a paper radar and a check before you submit, experiments that wait for a free GPU,
-  failed CI runs looked into, issues triaged, large changes made by a team of agents.
-- **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.
-- **In your terminal**: the `hydor` command talks to an agent with a menu that completes as you type, runs one
-  request from a script, and does everything the app does (sessions, projects, agents, memory, skills, keys, every
-  setting…), with Tab completion for bash, zsh and fish.
-- **Your choice of permissions**: approvals for risky steps, Auto mode that checks them, a command sandbox, or Full
-  access when you want none of it. And whatever the mode, a connected account's tools that send, post, delete or pay
-  can be set to Ask first: each call waits in your Outbox, as a draft you can change, until you send it.
-- **English, German, Chinese and Greek.**
-
-See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.
+Checked on 10 November 2026, from each project's own pages. What each "Partial" means, with its sources:
+[the full comparison](docs/compare/README.md).
 
 ## Quick start
 
@@ -162,6 +159,78 @@ hydor completion install                           # Tab completion in your shel
 
 On a Mac, the app puts the command on your PATH by itself.
 
+
+## Everything else it does
+
+<details>
+<summary>Coming from another agent, memory, privacy, automation, research, devices and the terminal</summary>
+
+**Coming from another agent**
+
+- **Run it inside Hydor**: Gemini CLI, OpenCode, Qwen Code, Goose, Kimi CLI and Auggie run as agents of Hydor, beside
+  Claude Code, Codex and its own agent, and sessions you start in VS Code or a terminal show up too
+  ([agents and models](docs/guide/16-agents-models.md)).
+- **Bring in what it knows**: **Settings → Memory → Bring in** takes the memory and skills you made in other agents,
+  and what ChatGPT, Claude, Claude Code and Codex know about you. You pick what comes over ([memory](docs/guide/06-memory.md)).
+- **Your projects come along**: the folders you work in with Claude Code and Codex become Hydor projects, with their
+  sessions ([projects](docs/guide/04-projects.md#projects-found-in-claude-code-and-codex)).
+
+**Memory that learns, with your OK**
+
+- Notes (short facts, found by meaning), **Wiki memory** (linked articles with their sources that agents keep for each
+  project) and your documents, in one memory. Agents can look through all your projects, and a project can keep
+  itself to itself.
+- About once a day, what each project's conversations settled goes into its wiki, and after a hard task an agent can
+  propose its method as a skill. Read, edit and delete all of it ([memory](docs/guide/06-memory.md),
+  [wiki memory](docs/guide/28-wiki-memory.md), [how memory works](docs/memory.md)).
+
+**Private and in your control**
+
+- **Confidential** sessions use only models on your own computer, agents use keys from a vault without seeing them,
+  and there is no telemetry: there are no analytics libraries in the code ([privacy](docs/privacy.md)).
+- Approvals for risky steps, Auto mode that checks them, a command sandbox, or Full access. A connected account's
+  tools that send, post, delete or pay can be set to **Ask first**: each call waits in your Outbox, as a draft you can
+  change, until you send it.
+
+**Agents and work that runs by itself**
+
+- **Agents of your own**: describe one and it is drafted for you, with schedules, a model tier, a monthly budget and
+  the agents it may hand work to. Every change is a version, examples check it still does its job, and it travels as
+  a file to install on another Hydor ([agents](docs/guide/05-agents.md)).
+- Scheduled tasks, watchers (a new email, deal, file or ticket in a connected app, or the half hour before a meeting),
+  webhooks, and goals an agent keeps working on, all on one week view ([tasks](docs/guide/12-tasks.md)).
+- **Your email**: connect any mail account with an app password, and agents search, read, sort, draft and send.
+
+**Research, answers and the Library**
+
+- Research with cited sources, deep research reports, and a browser you can watch and take over
+  ([research](docs/guide/08-research.md)).
+- Answer UIs open full screen and save as pictures, tables and charts can read a Library spreadsheet or a data file
+  and stay current, and a conversation exports as Markdown or a Library document.
+- **Boards** keep the cards you pin from replies together, each brought up to date by an agent on a schedule if you
+  like, within a monthly cap ([Library](docs/guide/11-library.md)).
+- Pictures, video, music and voice-overs made with AI, and edits to your own.
+
+**For researchers and engineers**
+
+- A paper radar and a check before you submit, experiments that wait for a free GPU, failed CI runs looked into,
+  issues triaged, and large changes made by a team of agents ([researchers](docs/guide/25-researchers.md),
+  [engineering](docs/guide/26-engineering.md)).
+
+**Everywhere**
+
+- Desktop apps for Mac, Windows and Linux, your phone's home screen with notifications, the share sheet on Android
+  and computers, and several machines from one place ([devices](docs/guide/20-devices.md),
+  [several machines](docs/machines.md)).
+- **Your computer too**: in the desktop apps, agents can use your screen, mouse and keyboard once you allow it.
+- **In your terminal**: the `hydor` command talks to an agent, runs one request from a script, and does everything
+  the app does, with Tab completion for bash, zsh and fish ([terminal](docs/guide/27-terminal.md)).
+- In English, German, Chinese and Greek.
+
+See [all features](docs/features.md), or the [user guide](docs/guide/), which the app also shows under Help.
+
+</details>
+
 ## Documentation
 
 - [Features](docs/features.md): everything the app does
@@ -176,6 +245,8 @@ On a Mac, the app puts the command on your PATH by itself.
 - [Compared with other agents](docs/compare/README.md), with sources
 - [Development](docs/development.md): building and changing the app
 - [Contributing](CONTRIBUTING.md), [security](SECURITY.md) and the [code of conduct](CODE_OF_CONDUCT.md)
+
+<p align="center"><i>ὕδωρ, "water" in ancient Greek: it takes the shape of whatever holds it.</i></p>
 
 ## License
 
