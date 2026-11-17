@@ -37,6 +37,7 @@ try {
   fs.writeFileSync(path.join(wiki, original.path), '# Another writer\n');
   assert.throws(() => applyWikiChanges(wiki, [{ path: original.path, content: '# Stale\n', expectedSha256: original.sha256 }]), /conflict/);
   assert.equal(readWiki(wiki, original.path).content, '# Another writer\n');
+  assert.equal(activeWikiDocument('---\n"document_status": "retired"\n---\nHidden'), false, 'quoted retirement metadata is excluded');
   assert.throws(() => readWiki(wiki, '../outside'), /Invalid/);
   assert.throws(() => readWiki(wiki, '.ARCHIVE/x.md'), /hidden/);
   assert.equal(activeWikiDocument('---\nstatus: archived\n---\nActive plan'), true);

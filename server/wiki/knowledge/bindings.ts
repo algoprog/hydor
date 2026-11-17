@@ -48,7 +48,7 @@ export function isWikiBase(db: DB, base: string): boolean {
 }
 
 /** A path and each ancestor must stay inside its wiki, without symlinks or hidden historical trees. */
-export function wikiFileActive(root: string, file: string): boolean {
+export function wikiFileActive(root: string, file: string, options: { reportErrors?: boolean } = {}): boolean {
   try {
     const relative = path.relative(root, file);
     if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return false;
@@ -85,7 +85,11 @@ export function wikiFileActive(root: string, file: string): boolean {
       }
     }
     return true;
-  } catch { return false; }
+  } catch (error) {
+    // A browser can report inaccessible content while other callers retain fail-closed filtering.
+    if (options.reportErrors) throw error;
+    return false;
+  }
 }
 
 /** Read and search paths of managed wiki bases only while their own document is active. */

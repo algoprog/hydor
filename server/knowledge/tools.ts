@@ -11,6 +11,7 @@ import { baseRow, baseRows, baseView, chunkById, chunksOf, docByPath, docById, d
 import { isWikiBase, wikiDocumentVisible } from '../wiki/knowledge/bindings.ts';
 import { countUses } from './marks.ts';
 import { otherProject } from '../memory/across.ts';
+import { wikiMemoryOn } from '../wiki/roots.ts';
 
 const MAX_READ = 14_000;
 const NONE = 'There are no knowledge bases for this session yet (the user adds documents in Projects: shared knowledge for every session, or a project’s own).';
@@ -24,7 +25,8 @@ export function filled(db: DB, bases: (BaseRow & { own?: boolean; from?: string 
 
 /** What a session in `space` (or in none) is told of the bases it searches. */
 export function knowledgeInstructions(db: DB, space: string | null = null, includeWiki = true): string | null {
-  const bases = filled(db, basesFor(db, space, includeWiki));
+  // Project wiki settings also bound shared and group wiki sources.
+  const bases = filled(db, basesFor(db, space, includeWiki && wikiMemoryOn(db, space)));
   if (!bases.length) return null;
   const whose = (b: { own: boolean; from?: string }) => (space ? (b.from ? `, from the ${b.from} project` : b.own ? ', this project’s own' : ', shared') : '');
   return [
@@ -60,10 +62,13 @@ const SEARCH: RunTool = {
     const db = ctx.deps.db;
     const query = String(a.query ?? '').trim();
     if (!query) throw new Error('query is empty');
-    const scope = basesOfSession(db, ctx.key);
+    const scope = basesOfSession(db, ctx.key, ctx.cwd);
     if (!scope.length) return NONE;
     const mode = (['auto', 'words', 'meaning', 'exact'] as const).includes(a.mode) ? (a.mode as SearchMode) : undefined;
     const r = await searchKnowledge(db, { query, mode, bases: a.base ? [String(a.base)] : undefined, within: scope.map((b) => b.id), limit: Math.min(Number(a.limit) || 8, 25) });
+    // Recheck the project wiki setting after asynchronous knowledge search.
+    const stillInScope = new Set(basesOfSession(db, ctx.key, ctx.cwd).map((base) => base.id));
+    r.hits = r.hits.filter((hit) => stillInScope.has(hit.base) && wikiDocumentVisible(db, hit.base, hit.path));
     const byWordsOnly = mode !== 'exact' && mode !== 'words' && !r.meaning ? ` (by words only: search by meaning is ${meaningOn(db) ? 'not running yet' : 'off'})` : '';
     if (!r.hits.length) return `Nothing in the knowledge bases matches that${byWordsOnly}. Try other words${mode === 'exact' ? '' : ', or mode: "exact" for a name or a number'}.`;
     // What agents find is what the wiki reads first when a project has more documents than its limit.
@@ -97,7 +102,7 @@ const READ: RunTool = {
     const db = ctx.deps.db;
     // Another project's own documents (not its wiki: wiki_read with project), when it is open to this session.
     const other = otherProject(db, ctx.key, ctx.cwd, a.project);
-    const within = (other ? baseRows(db).filter((b) => b.space === other.id && !isWikiBase(db, b.id)) : basesOfSession(db, ctx.key)).map((b) => b.id);
+    const within = (other ? baseRows(db).filter((b) => b.space === other.id && !isWikiBase(db, b.id)) : basesOfSession(db, ctx.key, ctx.cwd)).map((b) => b.id);
     let doc: ReturnType<typeof docById>;
     let from = Math.max(0, (Number(a.from) || 1) - 1);
     const count = Math.max(1, Math.min(Number(a.count) || 6, 30));
@@ -137,7 +142,7 @@ const LIST: RunTool = {
   annotations: { readOnlyHint: true },
   async run(a, ctx) {
     const db = ctx.deps.db;
-    const rows = basesOfSession(db, ctx.key);
+    const rows = basesOfSession(db, ctx.key, ctx.cwd);
     if (!rows.length) return NONE;
     if (a.base) {
       const b = rows.find((x) => x.name.toLowerCase() === String(a.base).toLowerCase() || x.id === a.base);

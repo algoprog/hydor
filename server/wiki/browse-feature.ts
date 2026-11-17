@@ -10,7 +10,7 @@ import { areaArticles, membersByArea } from './areas/articles.ts';
 import { areaOrder, hasAreas, hubPath, isHubPath, loadRegistry, memberPath } from './areas/registry.ts';
 import { listOf, readOrNull, splitFront } from './digest/write.ts';
 import { wikiFileActive } from './knowledge/bindings.ts';
-import { wikiMemoryOn, wikiRoot } from './roots.ts';
+import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 
 /** The wiki's areas with their articles, for the Memory tab; undefined while it has none. */
 function areasOf(root: string): WikiArea[] | undefined {
@@ -42,6 +42,16 @@ export const wikiBrowse: Feature = {
       const on = wikiMemoryOn(d.db, id);
       return { on, root: on ? wikiRoot(d.db, id) : null };
     };
+    // Resolve the project exactly as the wiki tools do, including inherited parent sessions.
+    d.app.get('/api/wiki/project', async (req) => {
+      const query = req.query as { session?: string; cwd?: string; space?: string };
+      if (query.session) {
+        const session = d.sessions.summary(query.session);
+        if (!session) throw new HttpError(404, 'No such session');
+        return { space: wikiSpaceOfSession(d.db, query.session, session.cwd) };
+      }
+      return { space: query.space && spaceById(d.db, query.space) ? query.space : wikiSpaceOfSession(d.db, '', query.cwd) };
+    });
     d.app.get('/api/projects/:id/wiki', async (req): Promise<ProjectWikiView> => {
       const p = project(String((req.params as { id: string }).id));
       const inherited = p.wikiMemory === undefined;

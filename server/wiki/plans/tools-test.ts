@@ -70,6 +70,25 @@ try {
   const translated = previewPlan(root, { slug: 'deutsch', origin: 'Chat', content: '# Plan\nWP-03: Prüfen.\n', registerContent: '## Umsetzungskontrolle\nUmsetzung: offen.\nAuslieferung: nicht beauftragt.\nAbnahme: offen.' });
   assert.match(translated.content, /## Umsetzungskontrolle/);
   assert.doesNotMatch(translated.content, /Implementation: not started/);
+  // Disabling execution still permits a plan without creating a new register.
+  let executionEnabled = false;
+  const guarded = planTools(() => root, undefined, () => executionEnabled);
+  const guardedPreview = guarded.find((tool) => tool.name === 'wiki_plan_preview')!;
+  const guardedAdopt = guarded.find((tool) => tool.name === 'wiki_plan_adopt')!;
+  const standalone = { slug: 'standalone', origin: 'Chat', content: '# Plan\nWP-04: define scope.\n' };
+  const withoutRegister = JSON.parse(String(await guardedPreview.run(standalone, ctx)));
+  assert.equal(withoutRegister.registerPath, null);
+  assert.doesNotMatch(withoutRegister.content, /undefined|execution-register/);
+  await assert.rejects(guardedPreview.run({ ...standalone, registerContent }, ctx), /Execution control is off/);
+  await assert.rejects(guardedPreview.run({ ...standalone, content: '# Plan\n## Execution control\n- [ ] Pending\n' }, ctx), /Execution control is off/);
+  mutate = () => { executionEnabled = true; };
+  await assert.rejects(guardedAdopt.run({ ...standalone, sha256: withoutRegister.sha256 }, ctx), /preview changed/i);
+  assert.equal(fs.existsSync(path.join(root, withoutRegister.path)), false);
+  mutate = null;
+  executionEnabled = false;
+  const adopted = JSON.parse(String(await guardedAdopt.run({ ...standalone, sha256: withoutRegister.sha256 }, ctx)));
+  assert.equal(adopted.registerPath, null);
+  assert.equal(fs.readFileSync(path.join(root, withoutRegister.path), 'utf8'), withoutRegister.content);
   // The register is evidence, never inside the plans area (where only these tools write).
   for (const bad of ['output/projects/existing/evidence.md', 'wiki/references/proposal.md', 'output/evidence/../projects/existing/evidence.md', 'output/evidence/existing/missing.md']) assert.throws(() => previewPlan(root, { ...args, slug: 'other', registerPath: bad }), /execution register|not an active|Missing|ENOENT/, bad);
   assert.throws(() => previewPlan(root, { slug: 'wrong', origin: 'Chat', content: '# Plan\n## Evidence\nExisting\n' }), /appears to contain a register/);

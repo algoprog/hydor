@@ -1,6 +1,7 @@
 // Settings → Memory → Wiki memory: on for every project unless its own settings say otherwise, learning from new
 // documents, where the shared wiki and the project wikis are kept (paths refer to the computer running Hydor).
 import { useEffect, useRef, useState } from 'react';
+import { WIKI_FEATURES, type WikiFeature } from '@shared/wiki-controls';
 import type { WikiMemorySettings } from '@shared/wiki';
 import { Popover, Segmented, Switch } from '../../components/ui';
 import { api, post, put } from '../../lib/api';
@@ -10,6 +11,12 @@ import { Group, Row } from '../settings/kit';
 import { DocumentLimit } from './DocumentLimit';
 import { WikiMigration, type WikiMigrationAction, type WikiMigrationConflict, type WikiMigrationPreview } from './WikiMigration';
 import { WikiFolderFinder } from './WikiFolderFinder';
+
+// The visible labels also identify these options in the Settings search catalog.
+const projectFeatureLabels: Record<WikiFeature, string> = {
+  autoLessons: 'Auto lessons learned', contracts: 'Wiki contracts', autoContracts: 'Auto contract suggestions',
+  plans: 'Wiki plans', execution: 'Execution tracking',
+};
 
 type WikiSettingsState = WikiMemorySettings;
 type WikiMigrationResult = WikiSettingsState & { migration?: { sourceBackup: string; targetBackup: string | null } };
@@ -28,6 +35,19 @@ export function WikiSettings() {
     api<WikiSettingsState>('/api/wiki/settings').then((value) => { saved.current = value; setSettings(value); }).catch(toastError);
   }, []);
   /** Serialize individual changes so rapid edits cannot overwrite each other. */
+  /** Send just one feature so another setting cannot be overwritten by an older snapshot. */
+  const saveFeature = (key: WikiFeature, on: boolean) => {
+    queue.current = queue.current.then(async () => {
+      try {
+        const result = await put<WikiSettingsState>('/api/wiki/settings', { featureDefaults: { [key]: on } });
+        if (saved.current) saved.current = { ...saved.current, featureDefaults: result.featureDefaults };
+        setSettings((current) => current && current.featureDefaults[key] === on ? { ...current, featureDefaults: { ...current.featureDefaults, [key]: result.featureDefaults[key] } } : current);
+      } catch (error) {
+        toastError(error);
+        setSettings((current) => current && current.featureDefaults[key] === on && saved.current ? { ...current, featureDefaults: { ...current.featureDefaults, [key]: saved.current.featureDefaults[key] } } : current);
+      }
+    });
+  };
   const save = <K extends keyof WikiSettingsState>(key: K, value: WikiSettingsState[K]) => {
     queue.current = queue.current.then(async () => {
       if (saved.current?.[key] === value) return;
@@ -107,6 +127,7 @@ export function WikiSettings() {
       <Row label="Wiki memory" hint="On for every project unless its own settings say otherwise." control={<Switch label="Wiki memory" on={settings.enabled} onChange={(enabled) => { setSettings((current) => current && { ...current, enabled }); save('enabled', enabled); }} />} />
       <Row label="Wiki memory on by default in chats" hint="Chats use this setting unless you choose otherwise." control={<Switch label="Wiki memory on by default in chats" on={settings.defaultChatEnabled} onChange={(defaultChatEnabled) => { setSettings((current) => current && { ...current, defaultChatEnabled }); save('defaultChatEnabled', defaultChatEnabled); }} />} />
       <Row label="Auto lessons learned by default in chats" hint="Chats use this setting unless you choose otherwise." control={<Switch label="Auto lessons learned by default in chats" on={settings.defaultAutoLessons} onChange={(defaultAutoLessons) => { setSettings((current) => current && { ...current, defaultAutoLessons }); save('defaultAutoLessons', defaultAutoLessons); }} />} />
+      {WIKI_FEATURES.filter((key) => key !== 'autoContracts' && key !== 'contracts').map((key) => <Row key={key} label={projectFeatureLabels[key]} hint="Default for projects unless they choose otherwise." control={<Switch label={projectFeatureLabels[key]} disabled={!settings.enabled} on={settings.featureDefaults[key] !== false} onChange={(on) => { setSettings((current) => current && { ...current, featureDefaults: { ...current.featureDefaults, [key]: on } }); saveFeature(key, on); }} />} />)}
       <Row label="Learn from new documents" hint="New and changed documents add memory notes and update the wiki, with the helper model." control={<Switch label="Learn from new documents" on={settings.fromDocuments} onChange={(fromDocuments) => { setSettings((current) => current && { ...current, fromDocuments }); save('fromDocuments', fromDocuments); }} />} />
       <Row label="Most documents to read into the wiki" hint="With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all." control={<DocumentLimit label="Most documents to read into the wiki" value={settings.documentLimit} onCommit={(documentLimit) => { setSettings((current) => current && { ...current, documentLimit }); save('documentLimit', documentLimit); }} />} />
       <Row label="Wiki folder" hint="Where the shared wiki is kept, and project wikis unless set below. An absolute path on the computer running Hydor.">

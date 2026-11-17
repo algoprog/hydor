@@ -664,7 +664,7 @@ export function useConfirm() {
 
 // ---- segmented ------------------------------------------------------------------------
 
-export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: { value: T; label: ReactNode; icon?: ReactNode }[]; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
+export function Segmented<T extends string>({ value, options, onChange, size = 'md', disabled = false }: { value: T; options: { value: T; label: ReactNode; icon?: ReactNode }[]; onChange: (v: T) => void; size?: 'sm' | 'md'; disabled?: boolean }) {
   // The chosen option's pill glides to the next one (placed at once the first time).
   const box = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ x: number; w: number; glide: boolean } | null>(null);
@@ -682,7 +682,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = '
     return () => ro.disconnect();
   }, [value, options.length]);
   return (
-    <div ref={box} className="relative inline-flex rounded-[10px] bg-bg-2 p-0.5">
+    <div ref={box} className={cx("relative inline-flex rounded-[10px] bg-bg-2 p-0.5", disabled && "opacity-50")}>
       {pill && (
         <span
           aria-hidden
@@ -694,6 +694,7 @@ export function Segmented<T extends string>({ value, options, onChange, size = '
         <button
           key={o.value}
           data-seg={o.value}
+          disabled={disabled}
           type="button"
           onClick={() => onChange(o.value)}
           className={cx(

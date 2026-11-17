@@ -104,6 +104,11 @@ test('a project has its own wiki memory switch: absent follows Settings, null cl
   assert.equal(spaceById(db, w.id)!.wikiMemory, undefined);
   assert.equal(createSpace(db, { name: 'Follows' }).wikiMemory, undefined);
   assert.equal(createSpace(db, { name: 'Follows too', wikiMemory: null }).wikiMemory, undefined);
+  // Feature choices merge independently and null restores inheritance.
+  assert.deepEqual(updateSpace(db, w.id, { wikiFeatures: { plans: false, execution: true } }).wikiFeatures, { plans: false, execution: true });
+  assert.deepEqual(updateSpace(db, w.id, { wikiFeatures: { plans: null } }).wikiFeatures, { execution: true });
+  assert.equal(updateSpace(db, w.id, { wikiFeatures: { execution: null } }).wikiFeatures, undefined);
+  assert.throws(() => updateSpace(db, w.id, { wikiFeatures: { plans: 'yes' } }), /true, false or null/);
   assert.throws(() => updateSpace(db, w.id, { wikiMemory: 'yes' }), /true, false or null/);
   assert.throws(() => createSpace(db, { name: 'Bad', wikiMemory: 1 }), /true, false or null/);
   deleteSpace(db, w.id);

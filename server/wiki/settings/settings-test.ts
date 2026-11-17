@@ -14,7 +14,18 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-settings-'));
 const dbPath = path.join(temp, 'app.db');
 let db = openDb(dbPath);
 try {
-  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: true, documentLimit: 100, hubPath: path.join(taskRoot(db), '.wiki'), projectWikis: 'hub', projectPath: '.wiki', gitIgnore: false, defaultChatEnabled: true, defaultAutoLessons: false }, 'on by default; project wikis in the hub; .gitignore left alone');
+  const featureDefaults = { autoLessons: true, contracts: true, autoContracts: true, plans: true, execution: true };
+  assert.deepEqual(wikiSettings(db), { featureDefaults, enabled: true, fromDocuments: true, documentLimit: 100, hubPath: path.join(taskRoot(db), '.wiki'), projectWikis: 'hub', projectPath: '.wiki', gitIgnore: false, defaultChatEnabled: true, defaultAutoLessons: true }, 'on by default; project wikis in the hub; .gitignore left alone');
+  // A saved off choice survives the new enabled default.
+  setWikiSettings(db, { defaultAutoLessons: false });
+  assert.equal(wikiSettings(db).defaultAutoLessons, false);
+  setWikiSettings(db, { defaultAutoLessons: true });
+  // Feature defaults persist independently and reject invalid input before any writes.
+  setWikiSettings(db, { featureDefaults: { contracts: false } });
+  assert.equal(wikiSettings(db).featureDefaults.contracts, false);
+  assert.throws(() => setWikiSettings(db, { featureDefaults: { contracts: 'off' } as never, enabled: false }));
+  assert.equal(wikiSettings(db).enabled, true);
+  setWikiSettings(db, { featureDefaults: { contracts: true } });
   setWikiSettings(db, { defaultChatEnabled: false, defaultAutoLessons: true });
   assert.deepEqual([wikiSettings(db).projectWikis, wikiSettings(db).gitIgnore, wikiSettings(db).defaultChatEnabled, wikiSettings(db).defaultAutoLessons], ['hub', false, false, true], 'explicit preferences override defaults; the project settings stay');
   setWikiSettings(db, { enabled: false });
@@ -44,7 +55,7 @@ try {
   setWikiSettings(db, { documentLimit: 100 });
   db.close();
   db = openDb(dbPath);
-  assert.deepEqual(wikiSettings(db), { enabled: true, fromDocuments: false, documentLimit: 100, hubPath: temp, projectWikis: 'folder', projectPath: 'notes/wiki', gitIgnore: false, defaultChatEnabled: false, defaultAutoLessons: true });
+  assert.deepEqual(wikiSettings(db), { featureDefaults, enabled: true, fromDocuments: false, documentLimit: 100, hubPath: temp, projectWikis: 'folder', projectPath: 'notes/wiki', gitIgnore: false, defaultChatEnabled: false, defaultAutoLessons: true });
   const project = path.join(temp, 'project');
   const hubFolder = path.join(temp, 'hub');
   fs.mkdirSync(path.join(project, '.wiki'), { recursive: true });

@@ -7,7 +7,7 @@ import { sessionExtra } from '../sessionExtra.ts';
 import { allSpaces } from '../spaces/index.ts';
 import { baseRows, type BaseRow } from './store.ts';
 import { isWikiBase, wikiBaseVisible } from '../wiki/knowledge/bindings.ts';
-import { wikiChatEnabled } from '../wiki/access.ts';
+import { wikiEnabledForSession } from '../wiki/access.ts';
 
 /** The space a session works in: its own, else that of the session that started it. */
 export function spaceOfSession(db: DB, extra: SessionExtra): string | null {
@@ -37,7 +37,8 @@ export function basesFor(db: DB, space: string | null, includeWiki = true): (Bas
 }
 
 /** The bases the session of a tool call searches. */
-export const basesOfSession = (db: DB, key: string) => {
+export const basesOfSession = (db: DB, key: string, cwd?: string) => {
   const extra = sessionExtra(db, key);
-  return basesFor(db, spaceOfSession(db, extra), wikiChatEnabled(db, extra));
+  // A disabled project wiki bounds every wiki source, including shared and group-member bases.
+  return basesFor(db, spaceOfSession(db, extra), wikiEnabledForSession(db, key, cwd));
 };

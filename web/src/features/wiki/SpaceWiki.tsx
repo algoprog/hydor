@@ -309,7 +309,8 @@ export function SpaceWiki({ id, view, version, onStart }: { id: string; view: Pr
           {view.error ? <span translate="no">{view.error}</span> : 'The project’s wiki memory could not be opened.'}
         </p>
       )}
-      {view && on && view.status !== 'error' && !ready && <p className="text-[13px] text-fg-3">Nothing here yet. Agents add to it as they work, and new documents update it.</p>}
+      {view && on && view.unreadable && <p role="alert" className="text-[12px] text-fg-3">Some wiki documents could not be read.</p>}
+      {view && on && view.status !== 'error' && !ready && !view.unreadable && <p className="text-[13px] text-fg-3">Nothing here yet. Agents add to it as they work, and new documents update it.</p>}
       {view && on && view.root && (
         <p className="text-[12px] break-all text-fg-3">
           <span>Folder</span>: <span translate="no">{tildify(view.root, home)}</span>

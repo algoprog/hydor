@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openDb } from '../../db.ts';
 import type { RunCtx } from '../../features/types.ts';
+import { setSessionExtra } from '../../sessionExtra.ts';
 import { applyWikiChanges, readWiki } from '../core.ts';
 import { setWikiSettings } from '../settings/settings.ts';
 import { wikiTools } from '../tools.ts';
@@ -58,6 +59,21 @@ try {
   const have = readWiki(hub, 'output/evidence/x/done.md');
   await write('output/evidence/x/done.md', '# Done\nWP-01: accepted.\n', have.sha256);
   await assert.rejects(write('output/evidence/x/plan.md', header), /not written in output\/evidence/, 'a plan header in evidence is refused');
+
+  // Explicitly identified registers remain protected even in ordinary wiki directories.
+  const marked = '---\ndocument_kind: execution-register\n---\n# Progress\n- task: open\n';
+  fs.writeFileSync(path.join(hub, 'wiki', 'dashboard.md'), marked);
+  const markedHash = readWiki(hub, 'wiki/dashboard.md').sha256;
+  setSessionExtra(db, ctx.key, { wikiFeatures: { execution: false } });
+  await assert.rejects(write('wiki/dashboard.md', '# Removed marker\n', markedHash), /Execution control is off/);
+  await assert.rejects(write('wiki/nachweise.md', '# Notes\n'), /Execution control is off/);
+  await assert.rejects(write('wiki/custom.md', '---\ndocument_kind: evidence\n---\n# Progress\n'), /Execution control is off/);
+  await assert.rejects(write('wiki/new-dashboard.md', '# Page\n\n## Umsetzungskontrolle\n\n- Open\n'), /Execution control is off/);
+  assert.equal(fs.readFileSync(path.join(hub, 'wiki', 'dashboard.md'), 'utf8'), marked);
+  await write('wiki/ordinary.md', '# An ordinary wiki article\n');
+  setSessionExtra(db, ctx.key, { wikiFeatures: { execution: true } });
+  await write('wiki/dashboard.md', marked.replace('open', 'done'), markedHash);
+  assert.match(readWiki(hub, 'wiki/dashboard.md').content, /done/);
   console.log('Plans area tests passed');
 } finally {
   db.close();

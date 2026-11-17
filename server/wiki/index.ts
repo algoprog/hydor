@@ -3,14 +3,44 @@ import type { Feature, RunCtx } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { sessionMemoryOn } from '../memory/store.ts';
 import { lessonsTools } from './lessons/tools.ts';
+import { readWiki } from './core.ts';
+import { spaceById } from '../spaces/index.ts';
 import { guardProject, projectWikiTarget, wikiTarget, wikiTools } from './tools.ts';
 import { planTools } from './plans/tools.ts';
 import { revisionTools } from './plans/revision-tools.ts';
-import { wikiChatEnabled, wikiEnabledForSession } from './access.ts';
+import { wikiChatEnabled, wikiEnabledForSession, wikiFeatureEnabled } from './access.ts';
 import { LANGS } from '../../shared/i18n.ts';
 import { userLang } from '../language/index.ts';
 import { deactivateProjectWikiKnowledge, ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
+import { embeddedExecutionSections, executionOnlyChange } from './plans/register.ts';
+
+// Check the current setting both before and after an approval prompt.
+function planTarget(ctx: RunCtx): string {
+  if (!wikiFeatureEnabled(ctx.deps.db, ctx.key, ctx.cwd, 'plans')) throw new Error('Wiki plans are off for this chat');
+  return projectWikiTarget(ctx);
+}
+
+/** Execution-only revisions remain available when plan editing is disabled. */
+function revisionTarget(ctx: RunCtx, args: Record<string, any>): string {
+  if (args.mode === undefined || args.mode === 'plan') return planTarget(ctx);
+  if (args.mode !== 'execution') throw new Error('Choose plan or execution revision');
+  if (!wikiFeatureEnabled(ctx.deps.db, ctx.key, ctx.cwd, 'execution')) throw new Error('Execution control is off for this chat');
+  return projectWikiTarget(ctx);
+}
+
+/** A disabled execution switch prevents edits of registers embedded within plans. */
+function guardPlanRevision(ctx: RunCtx, root: string, args: Record<string, any>): void {
+  if (args.mode === 'execution') {
+    const previous = readWiki(root, String(args.path ?? '')).content;
+    if (!executionOnlyChange(previous, String(args.content ?? ''))) throw new Error('Change only one identified execution register section');
+    return;
+  }
+  if (wikiFeatureEnabled(ctx.deps.db, ctx.key, ctx.cwd, 'execution')) return;
+  const previous = readWiki(root, String(args.path ?? '')).content;
+  if (JSON.stringify(embeddedExecutionSections(previous)) !== JSON.stringify(embeddedExecutionSections(String(args.content ?? '')))) throw new Error('Execution control is off; the embedded register cannot be changed');
+}
+
 import { areasLine } from './areas/tend.ts';
 
 /** What every agent is told while wiki memory is on: that it is there and how to look in it. */
@@ -25,7 +55,7 @@ const KEEP =
   'To keep something in the wiki: wiki_ingest_document or wiki_ingest_text save a source (never with passwords or keys); then read the articles it touches, update or add them with wiki_write (give the sha256 you read), cite the source in their frontmatter, and note it in index.md and log.md. Do not redo sources that have not changed.';
 const CHECK = 'wiki_check finds missing sources and broken links. Lessons from a session are kept only through wiki_lessons_preview and wiki_lessons_save, which ask the user.';
 const PLANS =
-  'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Approval of a plan change does not authorize implementation. Plans (output/projects/) are changed only with these tools: wiki_write cannot write there. Record what was done, deployed or accepted in output/evidence/<plan>/<name>.md with wiki_write.';
+  'Use wiki_plan_preview to review adoption of an existing plan and wiki_plan_revision_preview and wiki_plan_revise to continue a plan without losing prior revisions. Use mode execution for an identified embedded register, even if plan editing is off. Approval of a plan change does not authorize implementation. Plans (output/projects/) are changed only with these tools: wiki_write cannot write there. With execution tracking off, omit a new register; a plan may still reference an existing one. Record what was done, deployed or accepted in output/evidence/<plan>/<name>.md with wiki_write when execution tracking is on.';
 const KEEP_TOOLS = ['wiki_ingest_document', 'wiki_ingest_text', 'wiki_write'];
 const CHECK_TOOLS = ['wiki_check', 'wiki_lessons_preview', 'wiki_lessons_save'];
 const PLAN_TOOLS = ['wiki_plan_adopt', 'wiki_plan_preview', 'wiki_plan_revision_preview', 'wiki_plan_revise'];
@@ -34,11 +64,13 @@ const PLAN_TOOLS = ['wiki_plan_adopt', 'wiki_plan_preview', 'wiki_plan_revision_
 export const wiki: Feature = {
   id: 'wiki',
   tools: (ctx) => !confidentialRun(ctx) && wikiEnabledForSession(ctx.deps.db, ctx.key, ctx.cwd)
-    ? [...wikiTools(), ...planTools(projectWikiTarget, guardProject), ...revisionTools(projectWikiTarget, guardProject), ...(sessionMemoryOn(ctx.deps.db, ctx.key) ? lessonsTools((c: RunCtx) => wikiTarget(c), guardProject) : [])]
+    ? [...wikiTools(), ...planTools(planTarget, guardProject, (c) => wikiFeatureEnabled(c.deps.db, c.key, c.cwd, 'execution')), ...revisionTools(revisionTarget, guardProject, guardPlanRevision), ...(sessionMemoryOn(ctx.deps.db, ctx.key) ? lessonsTools((c: RunCtx) => wikiTarget(c), guardProject) : [])]
     : [],
   spawn: (s, d) => {
     if (!wikiChatEnabled(d.db, s.extra)) return undefined;
-    const space = wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
+    // Before a new session has a key, retain its explicitly selected project.
+    const selected = !s.key && typeof s.extra.space === 'string' ? spaceById(d.db, s.extra.space) : null;
+    const space = selected?.id ?? wikiSpaceOfSession(d.db, s.key ?? '', s.cwd);
     // Wiki knowledge: each wiki that exists is bound as its project's (or the shared) documents and stays bound; off unbinds it.
     for (const sp of space ? [space, null] : [null]) {
       try {

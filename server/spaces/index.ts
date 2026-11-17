@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { MAX_WIKI_DOCUMENTS } from '../../shared/wiki.ts';
 import { isGroup, MAX_FOLDERS, MAX_GROUP, MAX_SPACE_INSTRUCTIONS, SPACE_COLORS, type FoundIn, type Space, type SpaceView } from '../../shared/spaces.ts';
+import { WIKI_FEATURES, type WikiChoices } from '../../shared/wiki-controls.ts';
 import { taskRoot } from '../assistants/store.ts';
 import { HttpError } from '../auth.ts';
 import type { DB } from '../db.ts';
@@ -140,6 +141,18 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
   // Wiki memory for this project: true or false is its own switch, null follows Settings → Memory, absent keeps what it was.
   if (b.wikiMemory !== undefined && b.wikiMemory !== null && typeof b.wikiMemory !== 'boolean') throw new HttpError(400, 'wikiMemory: true, false or null');
   const wikiMemory: boolean | null = b.wikiMemory !== undefined ? (b.wikiMemory as boolean | null) : (prev?.wikiMemory ?? null);
+  // Feature overrides are patched individually; null removes an override and restores inheritance.
+  let wikiFeatures: WikiChoices | undefined = prev?.wikiFeatures;
+  if (b.wikiFeatures !== undefined) {
+    if (!b.wikiFeatures || typeof b.wikiFeatures !== 'object' || Array.isArray(b.wikiFeatures)) throw new HttpError(400, 'wikiFeatures: expected feature choices');
+    wikiFeatures = { ...wikiFeatures };
+    for (const [key, value] of Object.entries(b.wikiFeatures)) {
+      if (!WIKI_FEATURES.includes(key as typeof WIKI_FEATURES[number]) || (value !== null && typeof value !== 'boolean')) throw new HttpError(400, 'wikiFeatures: true, false or null');
+      if (value === null) delete wikiFeatures[key as keyof WikiChoices];
+      else wikiFeatures[key as keyof WikiChoices] = value as boolean;
+    }
+    if (!Object.keys(wikiFeatures).length) wikiFeatures = undefined;
+  }
   // The most documents its wiki reads: a whole number, null follows Settings, absent keeps what it was.
   if (b.wikiDocumentLimit !== undefined && b.wikiDocumentLimit !== null && (typeof b.wikiDocumentLimit !== 'number' || !Number.isInteger(b.wikiDocumentLimit) || b.wikiDocumentLimit < 0 || b.wikiDocumentLimit > MAX_WIKI_DOCUMENTS)) throw new HttpError(400, `wikiDocumentLimit: a whole number from 0 to ${MAX_WIKI_DOCUMENTS}, or null`);
   const wikiDocumentLimit: number | null = b.wikiDocumentLimit !== undefined ? (b.wikiDocumentLimit as number | null) : (prev?.wikiDocumentLimit ?? null);
@@ -154,6 +167,7 @@ function fields(b: Record<string, unknown>, prev: Space | undefined, nextColor =
     assistant: (b.assistant !== undefined ? clean(b.assistant, 80) : prev?.assistant) || undefined,
     ...(shared ? {} : { sharedKnowledge: false }),
     ...(wikiMemory === null ? {} : { wikiMemory }),
+    ...(wikiFeatures ? { wikiFeatures } : {}),
     ...(wikiDocumentLimit === null ? {} : { wikiDocumentLimit }),
     ...(memoryShared ? {} : { memoryShared: false }),
   };
@@ -199,7 +213,7 @@ export function createSpace(db: DB, b: Record<string, unknown>, own?: { found?: 
 export function updateSpace(db: DB, id: string, b: Record<string, unknown>): Space {
   const prev = spaceById(db, id);
   if (!prev) throw new HttpError(404, 'No such project');
-  const { sharedKnowledge: _was, wikiMemory: _wm, wikiDocumentLimit: _wl, memoryShared: _ms, members: _had, folders: _also, ...kept } = prev;
+  const { sharedKnowledge: _was, wikiMemory: _wm, wikiFeatures: _wf, memoryShared: _ms, wikiDocumentLimit: _wl, members: _had, folders: _also, ...kept } = prev;
   const members = membersOf(db, b, prev);
   const folders = foldersOf(b, prev, prev.folder);
   const next: Space = { ...kept, ...fields(b, prev), ...(members ? { members } : {}), ...(folders ? { folders } : {}) };
@@ -351,7 +365,7 @@ export const spaces: Feature = {
       const s = updateSpace(d.db, id(req), body(req));
       changed();
       // The project's wiki memory pages refresh when its switch moves.
-      if (before?.wikiMemory !== s.wikiMemory || before?.wikiDocumentLimit !== s.wikiDocumentLimit) d.broadcast({ t: 'feature', id: 'wiki', data: { space: s.id } });
+      if (before?.wikiMemory !== s.wikiMemory || JSON.stringify(before?.wikiFeatures) !== JSON.stringify(s.wikiFeatures) || before?.wikiDocumentLimit !== s.wikiDocumentLimit) d.broadcast({ t: 'feature', id: 'wiki', data: { space: s.id } });
       return s;
     });
     d.app.delete('/api/projects/:id', async (req) => {

@@ -32,6 +32,7 @@ import { openShareDialog } from './ShareHost';
 import { SpaceFiles } from './SpaceFiles';
 import { SpaceSkillsTab } from './SpaceSkills';
 import { DEFAULT_WIKI_DOCUMENTS } from '@shared/wiki';
+import { WIKI_FEATURES, WIKI_FEATURE_LABELS, type WikiFeature } from '@shared/wiki-controls';
 import { DocumentLimit } from '../wiki/DocumentLimit';
 import { DocumentsNoteOf, SpaceWiki } from '../wiki/SpaceWiki';
 import { useSpaceMemory, useWikiSettings, type SpaceMemory } from '../wiki/spaceMemory';
@@ -600,6 +601,14 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
       toastError(e);
     }
   };
+  const wikiFeaturesDefault = useWikiSettings()?.featureDefaults;
+  /** Save each project override without replacing the other choices. */
+  const setWikiFeature = async (key: WikiFeature, choice: 'inherit' | 'on' | 'off') => {
+    try {
+      onSaved(await patch<Space>(`/api/projects/${enc(s.id)}`, { wikiFeatures: { [key]: choice === 'inherit' ? null : choice === 'on' } }));
+      onWikiChanged();
+    } catch (e) { toastError(e); }
+  };
   const wikiLimit = useWikiSettings()?.documentLimit ?? DEFAULT_WIKI_DOCUMENTS;
   const limitChoice = s.wikiDocumentLimit === undefined ? 'inherit' : 'own';
   /** The most documents its wiki reads saves at once too: a number of its own, or null (as in Settings). */
@@ -698,6 +707,13 @@ function SettingsTab({ s, onSaved, onWikiChanged }: { s: Space; onSaved: (next: 
             ))}
           </div>
         </Row>
+        {WIKI_FEATURES.filter((key) => key !== 'autoContracts' && key !== 'contracts').map((key) => <Row key={key} title={WIKI_FEATURE_LABELS[key]} sub="Choose this project's setting or follow Settings.">
+          {!(s.wikiMemory ?? wikiDefault) && <p className="text-fg-3">Turn on Wiki memory for this project first.</p>}
+          <Segmented size="sm" disabled={!(s.wikiMemory ?? wikiDefault)} value={s.wikiFeatures?.[key] === undefined ? 'inherit' : s.wikiFeatures[key] ? 'on' : 'off'} onChange={(choice) => void setWikiFeature(key, choice)} options={[
+            { value: 'inherit', label: wikiFeaturesDefault?.[key] === false ? 'As in Settings (Off)' : 'As in Settings (On)' },
+            { value: 'on', label: 'On' }, { value: 'off', label: 'Off' },
+          ]} />
+        </Row>)}
         <Row title="Wiki memory" sub="Articles agents keep for this project, from its documents and its work.">
           <Segmented
             size="sm"

@@ -11,10 +11,9 @@ import { excerpt, searchKnowledge } from '../knowledge/search.ts';
 import { chunkById } from '../knowledge/store.ts';
 import { meaningOn, queryVector } from '../memory/embed.ts';
 import { otherProject, scopeFor } from '../memory/across.ts';
-import { sessionExtra } from '../sessionExtra.ts';
 import { activeWikiDocument } from './core.ts';
 import { articleInfo, wikiBase } from './deliver.ts';
-import { wikiChatEnabled } from './access.ts';
+import { wikiEnabledForSession } from './access.ts';
 import { ensureWikiKnowledge } from './knowledge/index.ts';
 import { wikiFileActive, wikiKnowledgeSchema } from './knowledge/bindings.ts';
 import { wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
@@ -56,6 +55,8 @@ interface Place {
   project: string | null;
   space: string | null;
   root: string;
+  /** Recheck the chat and target project after asynchronous searches. */
+  maySearch?: () => boolean;
   /** For the heading: “this project’s wiki”. */
   label: string;
   areas: AreaRec[] | null;
@@ -138,6 +139,7 @@ function headOf(place: Place, rel: string): (Head & { title: string; summary: st
 /** Whether a file may be a result: where it is, what it is, and which area. Redirect stubs and retired files never are. */
 function wanted(place: Place, rel: string, f: { include: Include; test: ((rel: string) => boolean) | null; areaSet: Set<string> | null }): boolean {
   if (!inFolders(rel, f.include) || (f.test && !f.test(rel))) return false;
+  if (place.maySearch && !place.maySearch()) return false;
   const h = headOf(place, rel);
   if (!h || h.redirect) return false;
   if (f.areaSet) {
@@ -559,7 +561,8 @@ function placesFor(ctx: RunCtx, own: (ctx: RunCtx) => string | null, input: stri
     const places = mine();
     return { places, label: places[0]?.label ?? (space ? 'this project’s wiki' : 'the shared wiki'), notes: [], tag: false };
   }
-  if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) throw new Error('Wiki memory is off for this chat');
+  // Other-project and all-project searches remain bounded by the current project's wiki switch.
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   const notes: string[] = [];
   const add = (places: Place[], t: { id: string; name: string; here: boolean }) => {
     if (!wikiMemoryOn(db, t.id)) {
@@ -649,6 +652,10 @@ export function wikiSearchTool(own: (ctx: RunCtx) => string | null): RunTool {
       if (o.mode === 'regex') regexOf(o.query, o.caseSensitive);
       if (o.path.includes('\0') || o.path.includes('..') || o.path.startsWith('/') || /(^|\/)\.[^/]/.test(o.path)) throw new Error('path must be a relative path inside the wiki, with no hidden folders and no “..”');
       const scope = placesFor(ctx, own, String(a.project ?? ''));
+      // Resolve again at each result, including after an asynchronous index search.
+      for (const place of scope.places) {
+        place.maySearch = () => wikiEnabledForSession(db, ctx.key, ctx.cwd) && wikiMemoryOn(db, place.space);
+      }
       const include = includeFor(o);
       const tag = scope.tag || scope.places.length > 1;
       const mark = (what: string) => `Searched ${scope.label} (${what}) for “${one(o.query, 120)}”${o.area ? ` in area “${one(o.area, 60)}”` : ''}${o.path ? ` under ${one(o.path, 60)}` : ''}.`;
@@ -719,6 +726,9 @@ export function wikiSearchTool(own: (ctx: RunCtx) => string | null): RunTool {
       }
       if (waiting.length) notes.push(`${waiting.join(', ')}: the wiki is still being indexed for search: try again in a moment, or use mode exact (it reads the files at once).`);
       if (o.mode === 'hybrid' && !meaning) notes.push('(Search by meaning is off or not ready: this used words only.)');
+      // A feature may have been disabled while a vector or index search was running.
+      const visible = cands.filter((candidate) => wanted(candidate.place, candidate.rel, filterFor(candidate.place)));
+      cands.splice(0, cands.length, ...visible);
       cands.sort((x, y) => y.score - x.score);
       const groups: { title: string; lines: string[] }[] = [];
       const wantAreas = o.level === 'any' || o.level === 'area';

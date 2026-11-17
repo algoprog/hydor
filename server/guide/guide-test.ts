@@ -503,6 +503,12 @@ test('app_api: a chat’s Wiki memory switches ask in every mode; a lesson sugge
     assert.match(full.cards[before].card.detail!, /Wiki memory/);
     assert.deepEqual(full.cards[before].card.options.map((o) => o.id), ['accept', 'deny'], 'never allowed for the rest of the session');
   }
+  // New feature and project controls also require a user card, even in Full access.
+  for (const [method, p, body] of [['PUT', '/api/wiki/settings', { featureDefaults: { contracts: false } }], ['PUT', '/api/wiki/settings', { enabled: false }], ['PATCH', '/api/projects/sp1', { wikiFeatures: { contracts: false } }], ['PATCH', '/api/projects/sp1', { wikiMemory: false }], ['PATCH', '/api/sessions/this/extra', { wikiFeatures: { plans: false } }]] as const) {
+    const before = full.cards.length;
+    await appApi({ method, path: p, body }, ctxOf(app, full));
+    assert.equal(full.cards.length, before + 1, `${method} ${p} requires a card`);
+  }
   const settled = full.cards.length;
   r = await appApi({ method: 'PUT', path: '/api/wiki/settings', body: { fromDocuments: false } }, ctxOf(app, full));
   assert.equal(full.cards.length, settled, 'the other Wiki memory settings ask nothing in Full access');

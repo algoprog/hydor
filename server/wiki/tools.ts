@@ -6,6 +6,7 @@ import type { RunCtx, RunTool } from '../features/types.ts';
 import { confidentialRun } from '../confidential/index.ts';
 import { guardWikiFolder } from './settings/gitignore.ts';
 import { claimsToBePlan, EVIDENCE_AREA, inEvidenceArea, inPlansArea, PLANS_AREA } from './plans/area.ts';
+import { executionRegisterDocument } from './plans/register.ts';
 import { applyWikiChanges, checkOrigin, checkWiki, ingestWikiDocument, ingestWikiSource, readWiki, redirectOf, wikiHash } from './core.ts';
 import { readWikiPart } from './sections.ts';
 import { wikiSearchTool } from './search-tool.ts';
@@ -15,8 +16,7 @@ import { ensureWikiKnowledge, refreshWikiKnowledge } from './knowledge/index.ts'
 import { namedWikiRoot, wikiMemoryOn, wikiRoot, wikiSpaceOfSession } from './roots.ts';
 import { otherProject } from '../memory/across.ts';
 import { wikiSettings } from './settings/settings.ts';
-import { wikiChatEnabled, wikiEnabledForSession } from './access.ts';
-import { sessionExtra } from '../sessionExtra.ts';
+import { wikiEnabledForSession, wikiFeatureEnabled } from './access.ts';
 import { inSession } from '../documents/index.ts';
 import { canRead, extractText } from '../documents/extract.ts';
 import { isSecret } from '../agent/permissions.ts';
@@ -88,7 +88,8 @@ function otherWikiRoot(ctx: RunCtx, wiki: unknown, project: string): { root: str
   const t = otherProject(db, ctx.key, ctx.cwd, project);
   // This project's own wiki: as the tool always worked.
   if (!t) return undefined;
-  if (!wikiChatEnabled(db, sessionExtra(db, ctx.key))) throw new Error('Wiki memory is off for this chat');
+  // The current project also bounds reads from other projects.
+  if (!wikiEnabledForSession(db, ctx.key, ctx.cwd)) throw new Error('Wiki memory is off for this chat or project');
   if (!wikiMemoryOn(db, t.id)) throw new Error(`Wiki memory is off for the project “${t.name}”`);
   return { root: wikiRoot(db, t.id, { create: false }), name: t.name };
 }
@@ -236,10 +237,19 @@ export function wikiTools(): RunTool[] {
         // The plans area (output/projects/, and output/ but for its evidence folder) is the plan tools' alone: whatever the
         // file is called, whatever its header says, no generic write creates or changes anything there.
         if (inPlansArea(a.path)) throw new Error(`Plans (${PLANS_AREA}/) are adopted with wiki_plan_preview and wiki_plan_adopt and changed with wiki_plan_revision_preview and wiki_plan_revise, which show the exact text, ask the user and keep earlier revisions. wiki_write cannot write there. Record what was done, deployed or accepted in ${EVIDENCE_AREA}/<plan>/<name>.md.`);
+        // Execution evidence is controlled independently of plan editing.
+        if (inEvidenceArea(a.path) && !wikiFeatureEnabled(ctx.deps.db, ctx.key, ctx.cwd, 'execution')) throw new Error('Execution control is off for this chat');
         if (inEvidenceArea(a.path) && claimsToBePlan(a.content)) throw new Error(`A plan is not written in ${EVIDENCE_AREA}/: use the plan tools`);
         // Hubs are kept from their articles; an article merged into another is a redirect that stays one.
         if (isHubPath(a.path)) throw new Error('Hubs are kept by Hydor from their articles: change the articles instead');
         const root = wikiTarget(ctx, a.wiki);
+        // Check both versions so a write cannot remove a register marker to bypass the switch.
+        const guardExecution = () => {
+          if (wikiFeatureEnabled(ctx.deps.db, ctx.key, ctx.cwd, 'execution')) return;
+          const previous = a.expectedSha256 === null ? '' : readWiki(root, a.path as string).content;
+          if (executionRegisterDocument(a.path as string, a.content as string) || executionRegisterDocument(a.path as string, previous)) throw new Error('Execution control is off for this chat');
+        };
+        guardExecution();
         const article = /^wiki\/.+\.md$/i.test(a.path);
         let content = a.content;
         if (article) {
@@ -257,6 +267,8 @@ export function wikiTools(): RunTool[] {
         }
         const guard = await guardProject(ctx, root);
         if (wikiReadTarget(ctx, a.wiki) !== root) throw new Error('Wiki target changed; review the preview again');
+        if (inEvidenceArea(a.path) && !wikiFeatureEnabled(ctx.deps.db, ctx.key, ctx.cwd, 'execution')) throw new Error('Execution control changed; review the write again');
+        guardExecution();
         const result = applyWikiChanges(root, [{ path: a.path, content, expectedSha256: a.expectedSha256 }]);
         // The index lists every article (by area): it follows each article written.
         if (article) await writeIndex(root).catch((e) => console.warn(`[wiki] index: ${(e as Error).message}`));

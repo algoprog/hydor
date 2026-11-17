@@ -9,7 +9,7 @@ import { userLang, wordsForLang } from '../../language/index.ts';
 import { sessionMemoryOn } from '../../memory/store.ts';
 import { addNote, getNote, notesOf, updateNote } from '../../notes.ts';
 import { sessionExtra } from '../../sessionExtra.ts';
-import { wikiAutoLessonsEnabled, wikiEnabledForSession } from '../access.ts';
+import { wikiFeatureEnabled, wikiEnabledForSession } from '../access.ts';
 import { applyWikiChanges } from '../core.ts';
 import { refreshWikiKnowledge } from '../knowledge/index.ts';
 import { guardProject, wikiTarget } from '../tools.ts';
@@ -26,7 +26,7 @@ const lastAttempt = new Map<string, number>();
 const scheduled = new Map<string, ReturnType<typeof setTimeout>>();
 const MIN_INTERVAL = 60_000;
 const fingerprint = (lesson: Lesson) => crypto.createHash('sha256').update(`${lesson.title.trim().toLowerCase()}\n${lesson.lesson.trim().toLowerCase()}`).digest('hex');
-const enabled = (d: Deps, key: string) => sessionMemoryOn(d.db, key) && wikiAutoLessonsEnabled(d.db, sessionExtra(d.db, key)) && wikiEnabledForSession(d.db, key, d.sessions.summary(key)?.cwd);
+const enabled = (d: Deps, key: string) => sessionMemoryOn(d.db, key) && wikiFeatureEnabled(d.db, key, d.sessions.summary(key)?.cwd, 'autoLessons') && wikiEnabledForSession(d.db, key, d.sessions.summary(key)?.cwd);
 
 /** Resolve only the session's wiki through the same target selection and Git guard as ordinary wiki tools. */
 function context(d: Deps, key: string): RunCtx {

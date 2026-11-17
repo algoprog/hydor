@@ -1,3 +1,5 @@
+import type { WikiChoices } from './wiki-controls.ts';
+
 // What the app's capabilities (search, browser, memory, assistants…) share between server and pages:
 // the settings a session keeps beyond its agent's own, and the notes the app adds to a conversation.
 import type { ArenaStart } from './arena.ts';
@@ -12,6 +14,8 @@ export interface SessionExtra {
   wikiEnabled?: boolean;
   /** Override automatic reviewable lesson suggestions for this chat. */
   wikiAutoLessons?: boolean;
+  /** Per-chat wiki feature choices, bounded by the project settings. */
+  wikiFeatures?: WikiChoices;
   /** The assistant it started as (Researcher, Writer…). */
   assistant?: string;
   /** Most this session may spend, in US dollars (API prices); none when unset. */

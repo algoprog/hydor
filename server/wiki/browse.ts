@@ -19,12 +19,13 @@ export function titleOf(content: string): string {
 }
 
 /** List active Markdown articles and source notes, without opening hidden or linked directories. */
-export function browseWiki(root: string): { articles: WikiEntry[]; sources: WikiEntry[]; plans: WikiEntry[]; truncated: boolean } {
+export function browseWiki(root: string): { articles: WikiEntry[]; sources: WikiEntry[]; plans: WikiEntry[]; truncated: boolean; unreadable: boolean } {
   const articles: WikiEntry[] = [];
   const sources: WikiEntry[] = [];
   const plans: WikiEntry[] = [];
   let visited = 0;
   let truncated = false;
+  let unreadable = false;
   const visit = (relative: string, out: WikiEntry[]) => {
     const dir = path.join(root, relative);
     // Never enter a nested content area through a symlinked ancestor.
@@ -41,11 +42,12 @@ export function browseWiki(root: string): { articles: WikiEntry[]; sources: Wiki
       if (entry.isDirectory()) visit(name, out);
       else if (entry.isFile() && /\.md$/i.test(entry.name) && entry.name !== '_index.md') {
         try {
-          if (!wikiFileActive(root, path.join(root, name))) continue;
+          if (!wikiFileActive(root, path.join(root, name), { reportErrors: true })) continue;
           const document = readWiki(root, name);
           out.push({ path: name, title: titleOf(document.content) || entry.name.replace(/\.md$/i, '') });
         } catch {
-          // Inactive, inaccessible or unsafe documents are not listed.
+          // Inaccessible documents are not listed, but must not look like an empty wiki.
+          unreadable = true;
         }
       }
     }
@@ -54,5 +56,5 @@ export function browseWiki(root: string): { articles: WikiEntry[]; sources: Wiki
   visit('raw', sources);
   visit('output/projects', plans);
   visit('output/evidence', plans);
-  return { articles, sources, plans, truncated };
+  return { articles, sources, plans, truncated, unreadable };
 }

@@ -10,6 +10,7 @@ import { createSpace, updateSpace } from '../spaces/index.ts';
 import { setWikiSettings } from './settings/settings.ts';
 import { wikiRoot } from './roots.ts';
 import { wikiBrowse } from './browse-feature.ts';
+import { setSessionExtra } from '../sessionExtra.ts';
 
 const temp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-wiki-browse-')));
 const db = openDb(path.join(temp, 'test.db'));
@@ -41,7 +42,7 @@ try {
   const a = createSpace(db, { name: 'Project A', folder: projectA });
   const b = createSpace(db, { name: 'Project B', folder: projectB });
   const c = createSpace(db, { name: 'Project C', folder: projectC });
-  const deps = { app, db } as unknown as Deps;
+  const deps = { app, db, sessions: { summary: (key: string) => key === 'codex:child' ? { cwd: projectB } : null } } as unknown as Deps;
   setWikiSettings(db, { hubPath: path.join(temp, 'hub'), projectWikis: 'hub' });
   const wikiB = wikiRoot(db, b.id, { create: true })!;
   fs.mkdirSync(path.join(wikiB, 'wiki', 'concepts'), { recursive: true });
@@ -49,6 +50,13 @@ try {
   assert.ok(wikiB.startsWith(fs.realpathSync(path.join(temp, 'hub', 'projects')) + path.sep));
   wikiBrowse.routes!(deps);
   await app.ready();
+  setSessionExtra(db, 'codex:parent', { space: a.id });
+  setSessionExtra(db, 'codex:child', { parent: 'codex:parent' });
+  // A child session follows its inherited project, even when its working directory is elsewhere.
+  assert.equal((await app.inject({ method: 'GET', url: '/api/wiki/project?session=codex%3Achild' })).json().space, a.id);
+  assert.equal((await app.inject({ method: 'GET', url: `/api/wiki/project?cwd=${encodeURIComponent(projectB)}` })).json().space, b.id);
+  assert.equal((await app.inject({ method: 'GET', url: `/api/wiki/project?cwd=${encodeURIComponent(projectB)}&space=${a.id}` })).json().space, a.id);
+  assert.equal((await app.inject({ method: 'GET', url: '/api/wiki/project?session=missing' })).statusCode, 404);
   const list = async (id: string) => app.inject({ method: 'GET', url: `/api/projects/${id}/wiki` });
   const file = async (id: string, rel: string) => app.inject({ method: 'GET', url: `/api/projects/${id}/wiki/file?path=${encodeURIComponent(rel)}` });
 
@@ -80,6 +88,16 @@ try {
   assert.deepEqual(bodyB.articles, [{ path: 'wiki/concepts/sky.md', title: "Bob's sky guide" }], 'a title keeps its apostrophe');
   assert.equal(bodyB.root, wikiB);
   assert.equal(bodyA.on, true);
+  // A file that this process cannot read is reported instead of silently appearing absent.
+  const unreadable = path.join(wikiA, 'wiki', 'unreadable.md');
+  fs.writeFileSync(unreadable, '# Private');
+  fs.chmodSync(unreadable, 0);
+  try {
+    let denied = false;
+    try { fs.readFileSync(unreadable); } catch { denied = true; }
+    if (denied) assert.equal((await list(a.id)).json().unreadable, true);
+  } finally { fs.chmodSync(unreadable, 0o600); fs.rmSync(unreadable); }
+
   const article = await file(a.id, 'wiki/concepts/sky.md');
   assert.equal(article.statusCode, 200);
   assert.match(article.json().content, /\[Source\]\(\.\.\/\.\.\/raw\/articles\/source\.md\)/);

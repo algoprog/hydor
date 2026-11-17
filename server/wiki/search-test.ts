@@ -12,6 +12,7 @@ import type { Deps, RunCtx, RunTool } from '../features/types.ts';
 import { progress } from '../knowledge/indexer.ts';
 import { docsOf } from '../knowledge/store.ts';
 import { setSessionExtra } from '../sessionExtra.ts';
+import { setEmbedderForTests } from '../memory/embed.ts';
 import { createSpace, updateSpace } from '../spaces/index.ts';
 import { ensureWikiKnowledge } from './knowledge/index.ts';
 import { setWikiSettings } from './settings/settings.ts';
@@ -152,6 +153,24 @@ const read = async (a: Record<string, unknown>, ctx = here) => JSON.parse(await 
 test('settle: the wiki is indexed', async () => {
   for (let i = 0; i < 400 && (progress.size || docsOf(db, wikiOf[alpha.id]).length < 50 || docsOf(db, wikiOf[beta.id]).length < 1 || docsOf(db, wikiOf[gamma.id]).length < 1); i++) await new Promise((r) => setTimeout(r, 25));
   assert.ok(docsOf(db, wikiOf[alpha.id]).length >= 50);
+});
+
+test('wiki switches are rechecked after a delayed semantic search', async () => {
+  kvSet(db, 'memory.meaning', '1');
+  try {
+    // The other project's wiki may be disabled while the embedding call is in flight.
+    setEmbedderForTests(async () => { updateSpace(db, beta.id, { wikiMemory: false }); return []; });
+    assert.doesNotMatch(await search({ query: 'quokka', project: 'Beta', mode: 'hybrid' }), /wiki\/blog\.md/);
+    updateSpace(db, beta.id, { wikiMemory: null });
+    // The current project can also disable wiki access before the search returns.
+    setEmbedderForTests(async () => { updateSpace(db, alpha.id, { wikiMemory: false }); return []; });
+    assert.doesNotMatch(await search({ query: 'quokka', project: 'Beta', mode: 'hybrid' }), /wiki\/blog\.md/);
+  } finally {
+    setEmbedderForTests(null);
+    kvSet(db, 'memory.meaning', '0');
+    updateSpace(db, alpha.id, { wikiMemory: null });
+    updateSpace(db, beta.id, { wikiMemory: null });
+  }
 });
 
 // ---- wiki_read: section and lines
@@ -448,6 +467,9 @@ test('a session outside a project searches the shared wiki; wiki memory off for 
   await assert.rejects(search({ query: 'quokka', project: 'Beta' }, secret), /unavailable in confidential sessions/);
   updateSpace(db, alpha.id, { wikiMemory: false });
   await assert.rejects(search({ query: 'quokka' }), /Wiki memory is off for this project/);
+  // Another project's open wiki must not bypass this chat's disabled project.
+  await assert.rejects(search({ query: 'quokka', project: 'Beta' }), /Wiki memory is off for this chat or project/);
+  await assert.rejects(read({ path: 'wiki/blog.md', project: 'Beta' }), /Wiki memory is off for this chat or project/);
   updateSpace(db, alpha.id, { wikiMemory: null });
 });
 

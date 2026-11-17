@@ -586,6 +586,10 @@ row('memory', 'Auto lessons learned by default in chats', 'switch', {
   write: put('/api/wiki/settings', (v) => ({ defaultAutoLessons: v })),
   note: 'Lessons are only suggested: saving one always asks you first.',
 });
+// These project defaults follow the same settings endpoint as the web interface.
+row('memory', 'Wiki plans', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.plans'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { plans: v } })) });
+row('memory', 'Execution tracking', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.execution'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { execution: v } })) });
+row('memory', 'Auto lessons learned', 'switch', { read: rd('/api/wiki/settings', 'featureDefaults.autoLessons'), write: put('/api/wiki/settings', (v) => ({ featureDefaults: { autoLessons: v } })) });
 row('memory', 'Learn from new documents', 'switch', {
   read: rd('/api/wiki/settings', 'fromDocuments'),
   write: put('/api/wiki/settings', (v) => ({ fromDocuments: v })),

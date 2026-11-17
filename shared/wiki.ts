@@ -6,6 +6,8 @@ export const MAX_WIKI_DOCUMENTS = 100_000;
 /** The default limit: a project with more documents has only this many read into its wiki (the pinned, the most used, the newest). */
 export const DEFAULT_WIKI_DOCUMENTS = 100;
 
+import type { WikiChoices } from './wiki-controls.ts';
+
 /** Settings → Memory → Wiki memory (GET and PUT /api/wiki/settings). */
 export interface WikiMemorySettings {
   /** Wiki memory for the shared wiki, and for every project that does not say otherwise (Space.wikiMemory). Default on. */
@@ -30,6 +32,8 @@ export interface WikiMemorySettings {
   defaultChatEnabled: boolean;
   /** Automatically suggest lessons in chats without a session-specific choice. Default off. */
   defaultAutoLessons: boolean;
+  /** Project defaults for separately controlled wiki capabilities. */
+  featureDefaults: WikiChoices;
 }
 
 /** How many documents a place's knowledge holds against the most its wiki reads (GET /api/projects/:id/wiki/updates, GET /api/wiki/updates). */
@@ -46,6 +50,7 @@ export interface WikiDocuments {
 export interface WikiItem {
   path: string;
   title: string;
+
 }
 
 /** An area of a wiki: a group of articles about one lasting topic, with its hub (what it covers, its key facts, its articles). */
@@ -76,6 +81,8 @@ export interface ProjectWikiView {
   sources?: WikiItem[];
   /** Active project plans (output/projects/, changed only by the plan tools) and execution evidence (output/evidence/). */
   plans?: WikiItem[];
+  /** Some wiki files could not be read. */
+  unreadable?: boolean;
   /**
    * While the wiki has areas: each area with its articles (an article in two is in both), top-level areas in order,
    * each followed by its sub-areas, Other last. `articles` then leaves the hubs out (each area links its own).

@@ -27,7 +27,7 @@ type Rule = [methods: string, path: RegExp, level: Level, why?: string];
 const YOUR_TOOLS = 'Use your own tools for that (files, commands, git): they ask the user as the session’s permissions say.';
 const CAP = 'This changes a spending cap: how much may be spent before the work stops.';
 const PERMISSIONS = 'This changes what the agent may do without asking you.';
-const WIKI_SWITCH = 'This changes whether Wiki memory, and automatic lesson suggestions from the conversation, are used in chats: a chat’s own choice (Memory options of the chat) or the default for chats (Settings → Memory → Wiki memory).';
+const WIKI_SWITCH = 'This changes Wiki memory or its features for a chat, project, or project defaults: the user decides.';
 const TOOL_STATES = 'This changes which of a connected account’s tools agents may use, and which wait for your OK in the Outbox first.';
 
 /** The first rule that matches decides. */
@@ -136,8 +136,10 @@ function askedFor(path: string, body: Json): { level: Level; why: string } | nul
   if (s?.[1] === '/config' && body.mode !== undefined) return { level: 'ask', why: PERMISSIONS };
   if (s?.[1] === '/extra' && body.capUsd !== undefined) return { level: 'ask', why: CAP };
   // A chat's Wiki memory and automatic lessons switches, and their defaults for chats: what the conversation is learned from is the user's say, in every mode.
-  if (s?.[1] === '/extra' && (body.wikiEnabled !== undefined || body.wikiAutoLessons !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
-  if (path === '/api/wiki/settings' && (body.defaultChatEnabled !== undefined || body.defaultAutoLessons !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
+  if (s?.[1] === '/extra' && (body.wikiEnabled !== undefined || body.wikiAutoLessons !== undefined || body.wikiFeatures !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
+  if (path === '/api/wiki/settings' && (body.enabled !== undefined || body.defaultChatEnabled !== undefined || body.defaultAutoLessons !== undefined || body.featureDefaults !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
+  // Project feature choices bound every chat and remain a user decision in every agent mode.
+  if (/^\/api\/projects\/[^/]+$/.test(path) && (body.wikiMemory !== undefined || body.wikiFeatures !== undefined)) return { level: 'ask', why: WIKI_SWITCH };
   // A connected account's tools On, Ask first or Off: the user's say over what goes out without their OK.
   if (/^\/api\/connections\/[^/]+$/.test(path) && !/^\/api\/connections\/(catalog|secrets|requests|session|flows)$/.test(path) && body.tools !== undefined) return { level: 'ask', why: TOOL_STATES };
   return null;

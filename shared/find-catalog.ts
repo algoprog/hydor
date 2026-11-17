@@ -237,6 +237,10 @@ export const OPTIONS: [string, string, string, string, string?][] = [
   ['memory', 'Wiki memory', 'wiki articles knowledge llm wiki karpathy markdown sources project wiki shared wiki on off default each project', 'Articles agents keep for each project, from its documents and its work: on for every project unless its own settings say otherwise'],
   ['memory', 'Wiki memory on by default in chats', 'wiki memory chat default switch each chat on off conversation use the wiki', 'Chats use this setting unless you choose otherwise'],
   ['memory', 'Auto lessons learned by default in chats', 'wiki memory lessons learned suggestions automatic chat default switch conversation suggest lessons keep dismiss', 'Chats use this setting unless you choose otherwise'],
+  // Wiki feature defaults can be overridden by each project.
+  ['memory', 'Wiki plans', 'wiki project plans adoption revision', 'Default for projects unless they choose otherwise'],
+  ['memory', 'Execution tracking', 'wiki plan execution evidence progress status', 'Default for projects unless they choose otherwise'],
+  ['memory', 'Auto lessons learned', 'wiki automatic lessons suggestions project default', 'Default for projects unless they choose otherwise'],
   ['memory', 'Learn from new documents', 'wiki memory digest documents knowledge new changed added files notes articles helper model update learn read', 'New and changed documents add memory notes and update the wiki, with the helper model'],
   ['memory', 'Most documents to read into the wiki', 'wiki memory documents limit maximum most number count too many large many documents project knowledge read helper model retrieval search pinned pin most used newest overview default 100 per project own number', 'With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all'],
   ['memory', 'Wiki folder', 'wiki memory hub folder shared wiki path where kept move migrate backup browse location directory', 'Where the shared wiki is kept, and project wikis unless set below'],

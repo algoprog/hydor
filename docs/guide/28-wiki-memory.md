@@ -31,6 +31,8 @@ With wiki memory off for a project, its Memory tab says "Wiki memory is off for 
 In chat options, **Wiki memory** and **Auto lessons learned** apply to that chat. Their defaults are in **Settings → Memory → Wiki memory**. Automatic lesson suggestions also need Memory; saving a reviewed suggestion needs your confirmation. A native agent started before Wiki memory was turned on needs a restart to register its checkpoint hook.
 
 Learning from documents, learning from a project's work and session checkpoints also need [Memory](/guide/memory#turn-memory-off-for-all-sessions) itself to be on: with Memory off, new documents add nothing and no checkpoints are saved.
+In chat options, expand **Wiki memory** to set **Auto lessons learned**, **Wiki plans** and **Execution tracking** for that chat. Their project defaults are in Settings and each project can choose its own. When the project turns a feature off, its chat control is unavailable.
+
 
 ## Where wikis are kept
 
@@ -179,6 +181,8 @@ In a project, an agent gets a few tools for the project's wiki, and nothing for 
 
 What it cannot do: write in another project's wiki; read or write hidden files and folders, Git and archive folders, retired or archived articles, or a link that leads out of the wiki; keep text with passwords or keys in it; or use wiki memory at all in a Confidential session. Ask the agent to check the wiki and it reports a basic problem list; it does not change the files for that.
 
+With **Execution tracking** off, you can still adopt a plan without creating a new register, or link an existing register without changing it. To write or update an execution record, turn execution tracking on for the project and chat. With execution tracking on, an identified register embedded in a plan can be updated through the plan revision tools in execution mode even when plan editing is off; the rest of the plan stays unchanged.
+
 ## Checkpoints and lessons learned
 
 With wiki memory and memory both on, Hydor's Custom agent can save a checkpoint of a session when it compacts its own context, to carry on from afterwards. There is one checkpoint per session, written over each time, in the shared wiki folder. It holds a redacted summary or only the event: never a full transcript. For Claude Code and Codex, Hydor attempts a checkpoint when you start compaction from Hydor and, when its native hook is registered, before automatic compaction. Existing or hidden hooks, plugins, policy or unavailable hook discovery can prevent registration. Just before an automatic compaction, the last messages of the session go to the helper model to write the summary, which can take up to about 14 seconds; the compaction waits for it, and goes on without a checkpoint when it takes longer. A checkpoint can contain only metadata when no summary is available. For Codex, Hydor trusts only its own hook (an exact command it made itself, handed to that session alone); a hook of yours is never trusted this way, and Hydor looks for it once for each Codex version rather than at every start. Check the session details to see its latest outcome. A failed checkpoint does not stop compaction. Turning memory off for a session, or all of it, prevents checkpoints and their use; existing ones stay.
@@ -187,7 +191,7 @@ Hydor uses the checkpoint to carry a session on. When you resume a Claude Code o
 
 Ask an agent to preview lessons learned from a session: it writes nothing. It uses the indexed messages, so the latest may be missing. Saving selected lessons asks for your confirmation first.
 
-With **Auto lessons learned** on for a chat, the helper looks at each turn's last exchange (about once a minute at most, never in a Confidential chat or with memory off) and, when it finds something worth keeping, adds a suggestion as a card in the chat: the lessons, with their evidence and the place they would go. Nothing is written until you keep it there, and what you keep is exactly what you saw; or you dismiss it. Agents cannot keep or dismiss a suggestion for you, and they ask you before they change either of a chat's two switches. The switch is off at first: turn it on for every chat in Settings, or for one chat in its options.
+With **Auto lessons learned** on for a chat, the helper looks at each turn's last exchange (about once a minute at most, never in a Confidential chat or with memory off) and, when it finds something worth keeping, adds a suggestion as a card in the chat: the lessons, with their evidence and the place they would go. Nothing is written until you keep it there, and what you keep is exactly what you saw; or you dismiss it. Agents cannot keep or dismiss a suggestion for you, and they ask you before they change a chat’s wiki switches. The switch is on by default unless you previously saved it as off. Change the default in Settings or the choice for one chat in its options.
 
 ## Move the wiki folder
 

@@ -238,6 +238,9 @@ You don’t have to know where an option lives: type what you want in the search
 - [**Wiki memory**](/settings?s=memory&find=Wiki%20memory): Articles agents keep for each project, from its documents and its work: on for every project unless its own settings say otherwise.
 - [**Wiki memory on by default in chats**](/settings?s=memory&find=Wiki%20memory%20on%20by%20default%20in%20chats): Chats use this setting unless you choose otherwise.
 - [**Auto lessons learned by default in chats**](/settings?s=memory&find=Auto%20lessons%20learned%20by%20default%20in%20chats): Chats use this setting unless you choose otherwise.
+- [**Wiki plans**](/settings?s=memory&find=Wiki%20plans): Default for projects unless they choose otherwise.
+- [**Execution tracking**](/settings?s=memory&find=Execution%20tracking): Default for projects unless they choose otherwise.
+- [**Auto lessons learned**](/settings?s=memory&find=Auto%20lessons%20learned): Default for projects unless they choose otherwise.
 - [**Learn from new documents**](/settings?s=memory&find=Learn%20from%20new%20documents): New and changed documents add memory notes and update the wiki, with the helper model.
 - [**Most documents to read into the wiki**](/settings?s=memory&find=Most%20documents%20to%20read%20into%20the%20wiki): With more documents than this, a project’s wiki reads the pinned, the most used and the newest of them: agents search them all.
 - [**Wiki folder**](/settings?s=memory&find=Wiki%20folder): Where the shared wiki is kept, and project wikis unless set below.

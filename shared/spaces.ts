@@ -1,3 +1,5 @@
+import type { WikiChoices } from './wiki-controls.ts';
+
 // Spaces: a project's sessions, files, documents, memory, instructions, skills and assistant in one place,
 // picked by name on the start page in place of a folder. Each space has a folder of its own (its files, and so
 // its project memory), and can work with other folders of yours where they are; knowledge bases of its own
@@ -23,6 +25,8 @@ export interface Space {
   sharedKnowledge?: boolean;
   /** Wiki memory for this project: true on, false off; absent: as Settings → Memory → Wiki memory says for projects (shared/wiki.ts). */
   wikiMemory?: boolean;
+  /** Per-project overrides of the installation wiki feature defaults. */
+  wikiFeatures?: WikiChoices;
   /**
    * Whether agents in the user's other projects may search and read this project's notes, wiki, documents and
    * conversations (read only, only when they look for them). Absent or true: they may; false: they may not.

@@ -13,7 +13,7 @@ export const wikiHash = (data: string | Buffer) => crypto.createHash('sha256').u
 /** A frontmatter document's own retirement status, never a generic task status. */
 export function activeWikiDocument(text: string): boolean {
   const m = /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  return !m || !/^document_status\s*:\s*["']?(?:archived|superseded|retired)["']?\s*(?:#.*)?$/im.test(m[1]);
+  return !m || !/^\s*["']?document_status["']?\s*:\s*["']?(?:archived|superseded|retired)["']?\s*(?:#.*)?$/im.test(m[1]);
 }
 
 /**
