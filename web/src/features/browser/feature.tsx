@@ -10,6 +10,7 @@ import { BrowserDock, showBrowser } from './Dock';
 import { BrowserNoteCard } from './Notes';
 import { BrowserSettingsBody } from './Settings';
 import { BrowserStep } from './Steps';
+import { ownBrowserHere } from './browsing';
 import { browserCall, listenBrowser, loadBrowser, useBrowser } from './store';
 
 /** In a session's menu: open its browser yourself (to log in before asking the agent), or show it. */
@@ -51,6 +52,8 @@ export const browserFeature: WebFeature = {
   SessionMenu: (p) => (p.s.extra?.confidential ? null : <BrowserMenuItem {...p} />),
   sessionMenuPart: 'more',
   routes: [{ match: (p) => p === '/browser', Page: BrowserPage }],
-  nav: [{ id: 'browser', path: '/browser', label: 'Browser', icon: <Globe size={17} />, match: (p) => p === '/browser' }],
+  // Your own browser is part of the desktop app, on its own computer: no button for it anywhere else (the page itself says so
+  // when it is opened by its address). The desktop app's bridge is there from the first frame, so this is settled once.
+  nav: ownBrowserHere() ? [{ id: 'browser', path: '/browser', label: 'Browser', icon: <Globe size={17} />, match: (p) => p === '/browser' }] : [],
   settings: [{ id: 'browser', label: 'Browser', icon: Globe, sub: 'A web browser agents use, which you can watch and take over', Body: BrowserSettingsBody }],
 };

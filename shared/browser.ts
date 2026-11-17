@@ -74,6 +74,8 @@ export interface BrowserView {
   viewport: { w: number; h: number; mobile?: boolean };
   /** Files the browser saved lately, into the session's folder. */
   downloads: { name: string; path: string; done: boolean; failed?: boolean; at: number }[];
+  /** Tabs you closed lately (your own browsing), newest first: to open again (Ctrl+Shift+T). */
+  closed?: ClosedTab[];
   /** Where the agent's pointer rests, as fractions of the page: the live view shows it there until the agent acts again. */
   pointer?: { x: number; y: number };
   /** Which browser runs it (shown as the page itself in the desktop app's window when `desktop`). */
@@ -298,4 +300,61 @@ export interface ExtensionsState {
   sources: ExtensionSource[];
   /** Extensions run only in the desktop app's own browser; false elsewhere (they are kept, and run there). */
   runs: boolean;
+}
+
+// ---- your own browsing: what you set for it, its history and the address bar's suggestions ----------------------
+
+/** The search engines the address bar can use (`custom`: a template of your own with %s for the words). */
+export const SEARCH_ENGINES = ['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'startpage', 'custom'] as const;
+export type SearchEngine = (typeof SEARCH_ENGINES)[number];
+
+/** Your own browser's settings (the Browser page's settings panel). */
+export interface BrowsingPrefs {
+  /** The home page: the Home button, new tabs and a first start open it (Google unless you change it). */
+  home: string;
+  /** Where words typed in the address bar are searched. */
+  engine: SearchEngine;
+  /** For `custom`: the search page's address with %s where the words go. */
+  customSearch?: string;
+  /** Search suggestions from the engine as you type (what you type goes to it, as in any browser). */
+  suggest: boolean;
+  /** Block ads and trackers (the desktop app's own blocker). */
+  adblock: boolean;
+  /** Sites where ads are allowed (hosts, without www.). */
+  allowAds: string[];
+}
+
+/** A page you visited in your own browser. */
+export interface HistoryEntry {
+  id: number;
+  url: string;
+  title: string;
+  /** When you last visited it (ms). */
+  at: number;
+  /** How many times you visited it, and typed its address. */
+  visits: number;
+  typed: number;
+}
+
+/** A tab you closed lately, to open again. */
+export interface ClosedTab {
+  url: string;
+  title: string;
+  at: number;
+}
+
+/** One suggestion under the address bar. */
+export type Suggestion =
+  /** A page: from your history or bookmarks, or what you typed as an address. */
+  | { kind: 'history' | 'bookmark' | 'url'; url: string; title?: string }
+  /** One of your open tabs: switch to it. */
+  | { kind: 'tab'; url: string; title?: string; tab: string }
+  /** Words to search with your search engine. */
+  | { kind: 'search'; text: string };
+
+/** The address bar's suggestions for what you typed. */
+export interface SuggestResult {
+  /** The address to complete what you typed to, inline (it starts with what you typed, scheme and www. left out). */
+  inline?: string;
+  items: Suggestion[];
 }

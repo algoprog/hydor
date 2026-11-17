@@ -217,14 +217,41 @@ agents that speak ACP and take MCP servers.
   German, Greek, Chinese, French and Spanish; **Ask before sending on signed-in sites** turns it off), as it always
   stops before paying. The desktop app's own browser is in Settings → Browser's list and chosen first; with it,
   **Show a window** and the download of a Chrome are not shown.
-- **Your own browser** (the **Browser** tool in the sidebar): tabs (kept between visits, up to 30), an address bar that
-  opens an address (with or without https://, `localhost:3000`, a file) or searches with your search providers, back,
-  forward, reload and stop, a star and a bookmarks bar (folders, a » menu for a long bar, right-click to edit),
-  find in page (Ctrl/⌘+F, with the number of matches), shortcuts (Ctrl/⌘+T, W, L, R, F, Alt+←, Alt+→), downloads into
-  your Downloads folder, the permissions a site asks for (camera, microphone, location, notifications… with Block and
-  Allow, remembered for the site), a page's pop-up questions, and on a phone a tab list and a menu. In the desktop app its tabs are real pages in
-  the window; elsewhere a live picture of a Chromium you drive. It keeps your sign-ins in a profile of its own that agents
-  can never pick, and it can open addresses on your own network (never Hydor itself).
+- **Your own browser** (the **Browser** tool in the sidebar, in the desktop app only: the web app and a phone have no
+  Browser button, and `/browser` there says it is part of the desktop app; the agents' browsers work everywhere): its
+  tabs are real pages in the app's window, connecting to sites directly like any browser, kept between visits (up to
+  30). It keeps your sign-ins in a profile of its own that agents can never pick, and it can open addresses on your own
+  network.
+  - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
+    you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
+    search engine's suggestions and **Ask an agent**, which starts a session with your words; the rest of an address
+    completes in place (Tab or → takes it); Shift+Delete forgets a history suggestion. An address opens with or without
+    https://, `localhost:3000` and files work, Alt+Enter or Ctrl/⌘+Enter opens in a new tab.
+  - **A home page and a search engine**: a Home button and new tabs open your home page (Google at first); the address
+    bar searches with Google, DuckDuckGo, Bing, Brave, Ecosia, Startpage or a search address of your own, with search
+    suggestions you can turn off.
+  - **History**: a panel with a search box, by day, a way to delete one page, **Recently closed** and **Clear browsing
+    data…**; Ctrl/⌘+Shift+T opens the tab you closed last. It stays on this computer, the last 20,000 pages.
+  - **Browser settings**: home page (**Use the current page**), search engine, search suggestions, **Block ads and
+    trackers**, and **Clear browsing data** (history, cookies and site data, cached files, with a time range for the
+    history).
+  - **An ad and tracker blocker**, on at first, with Ghostery's lists (downloaded once, refreshed weekly): the
+    padlock's popover counts what was blocked on the page and lets you **Allow ads on this site**. An extension's own
+    request blocking may not run while it is on.
+  - **A padlock and site info** (a secure connection, or Not secure), with what the site may use, each answer with
+    **Forget**.
+  - **A right-click menu** on pages: Back, Forward, Reload; for a link, open it in a new tab or your default browser
+    and copy it; for a picture, open, save, copy it and its address; for selected text, Copy, Search with your engine
+    and Ask an agent about it; in a field, spelling suggestions, Undo, Redo, Cut, Copy, Paste, Select all; Bookmark this
+    page, Print… and Inspect.
+  - **Zoom** (Ctrl/⌘ with + − 0, and Ctrl and the wheel, with a chip that resets it), **print**, full-screen video,
+    **find in page** (Ctrl/⌘+F, "3 of 12", Match case), a speaker on a tab that plays sound to mute it, and **Open in
+    your default browser**.
+  - A star and a bookmarks bar (folders, a » menu for a long bar, right-click to edit), downloads into your Downloads
+    folder, the permissions a site asks for (camera, microphone, location, notifications… with Block and Allow,
+    remembered for the site), a page's pop-up questions.
+  - Shortcuts (Ctrl/⌘ with T, W, L, R, F, D, H, J, P, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl/⌘+Shift+T;
+    Ctrl/⌘+Shift+Delete; F5; Alt+← and Alt+→).
 - **Bookmarks**: the bookmarks bar and Other bookmarks, folders, moving by dragging or with arrows, up to 20,000. Bring them
   in from the other browsers on this computer (Chrome, Chromium, Edge, Brave, Vivaldi, Opera, Firefox, and on a Mac
   Arc and Safari, each profile by its name, into one new folder that keeps the browser's own folders; Safari needs Full Disk
@@ -1657,7 +1684,7 @@ programs shows each program's version and what is out, with Check now, Update no
   the screen after it. Agents are told to look before they act and to leave passwords and payments to you.
 - Works on phones and can be installed as an app. Four themes, light and dark, and your own: every colour
   can be changed.
-- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, Browser, Usage, System, Settings, Search, Help: ten tools in two rows of five) stay in
+- The tools at the bottom of the sidebar (Library, Projects, Apps, Agents, Browser, Usage, System, Settings, Search, Help: ten tools in two rows of five; nine without Browser, which is in the desktop app only) stay in
   the order you drag them into, as sessions do, the same on every device; on a phone, hold one a moment to pick
   it up. On a computer, right-click one for Back to the usual order.
 - One search for everything, like Spotlight: `Ctrl+K` (⌘K on a Mac) or Search in the sidebar finds pages,

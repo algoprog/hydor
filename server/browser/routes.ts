@@ -2,10 +2,11 @@
 // user taking over and handing back, answering what waits for them). All under /api/, signed in.
 import fs from 'node:fs';
 import type { FastifyRequest } from 'fastify';
-import type { BrowserInput, BrowserSettingsState } from '../../shared/browser.ts';
+import { BROWSING_KEY, type BrowserInput, type BrowserSettingsState } from '../../shared/browser.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
 import type { Deps } from '../features/types.ts';
+import { requireDesktop } from './browsing.ts';
 import { downloadChrome, downloadState, findChromes, pickChrome, sandboxOff, forgetChromes } from './chrome.ts';
 import { hostPort, isPrivate, refusal } from './guard.ts';
 import { normalizeUrl } from './ops.ts';
@@ -88,6 +89,8 @@ export function browserRoutes(d: Deps) {
   app.post('/api/browser/sessions/:key/open', async (req) => {
     const k = key(req);
     if (!browserSettings(db).enabled) throw new HttpError(409, 'The browser is turned off in Settings → Browser');
+    // Your own browsing runs in the desktop app only.
+    if (k === BROWSING_KEY) requireDesktop();
     const b = await ensureBrowser(k, cwdOf(k));
     const url = normalizeUrl(String(B(req).url ?? ''));
     if (url && /^https?:$/.test(url.protocol)) await userNavigate(k, url);

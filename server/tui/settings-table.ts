@@ -514,6 +514,7 @@ row('browser', 'Ask before sending on signed-in sites', 'switch', {
 });
 row('browser', 'Bookmarks', 'page', { note: 'The Browser page’s bookmarks are kept, imported and exported on the page.' });
 row('browser', 'Extensions', 'page', { note: 'Chrome extensions are added and switched on the Browser page.' });
+row('browser', 'Browser settings', 'page', { note: 'The Browser page’s home page, search engine, ad blocker and clearing of what it kept are set on the page.' });
 row('browser', 'Sites', 'list', {
   items: 'allow:<site> (only these) and block:<site> (never these), such as allow:example.com',
   check: (v) => {

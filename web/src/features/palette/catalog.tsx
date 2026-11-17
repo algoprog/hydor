@@ -4,7 +4,7 @@
 // says where it is and goes there: a setting opens its section and points at it by its words (`find=`,
 // lib/pointAt.ts).
 import type { ReactNode } from 'react';
-import { Activity, ArrowRight, AudioLines, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SquareTerminal, TrendingUp } from 'lucide-react';
+import { Activity, ArrowRight, AudioLines, Blocks, MonitorCog, BookOpen, Bot, Cable, CalendarClock, CircleHelp, FileSearch, Folders, FolderTree, Gauge, GitBranch, Globe, Headphones, History, ImageIcon, Images, LayoutGrid, Library, LibraryBig, MonitorSmartphone, Moon, Palette, PanelLeft, Play, ScrollText, Settings, Sparkles, SquarePen, SlidersHorizontal, SquareTerminal, TrendingUp } from 'lucide-react';
 import type { Findable } from '@shared/find';
 import { catalogItems, type CatalogItem } from '@shared/find-catalog';
 import { AGENT_TOPICS, plainText } from '@shared/guide';
@@ -25,6 +25,7 @@ import { openReleaseNotes } from '../settings/Releases';
 import { settingsSections } from '../settings/SettingsPage';
 import { SpaceMark } from '../spaces/parts';
 import { startTour } from '../tour/Tour';
+import { ownBrowserHere } from '../browser/browsing';
 import { openAsk } from '../guide/ask';
 import { loadGuide } from '../guide/state';
 import { startHandsFree } from '../voice/HandsFree';
@@ -72,6 +73,10 @@ const PAGE_WORDS: Record<NonNullable<PageInfo['kind']> | 'page', string> = {
   board: 'board cards dashboard',
 };
 
+/** Your own browser is part of the desktop app: its page, its panels and the Settings rows that open them are found only there. */
+const browserOnly = (it: CatalogItem) => it.path?.startsWith('/browser') || (it.section === 'browser' && it.find !== undefined && BROWSING_OPTIONS.has(it.find));
+const BROWSING_OPTIONS = new Set(['Bookmarks', 'Extensions', 'Browser settings']);
+
 const settingsAt = (s: string, find?: string) => `/settings?s=${encodeURIComponent(s)}${find ? `&find=${encodeURIComponent(find)}` : ''}`;
 
 const PAGE_ICONS: Record<string, ReactNode> = {
@@ -88,6 +93,9 @@ const PAGE_ICONS: Record<string, ReactNode> = {
   'go:audio': <AudioLines size={15} />,
   'go:published': <Globe size={15} />,
   'go:preview': <MonitorSmartphone size={15} />,
+  'go:browser': <Globe size={15} />,
+  'go:browser-history': <History size={15} />,
+  'go:browser-settings': <SlidersHorizontal size={15} />,
   'go:usage': <Gauge size={15} />,
   'go:stats': <TrendingUp size={15} />,
   'go:system': <MonitorCog size={15} />,
@@ -118,7 +126,9 @@ export function staticEntries(): Entry[] {
   const secs = new Map(settingsSections().map((s) => [s.id, s]));
   const themes = allThemes();
   const out: Entry[] = [];
+  const own = ownBrowserHere();
   for (const it of catalogItems()) {
+    if (!own && browserOnly(it)) continue;
     const base = { id: it.id, group: it.group as Group, title: it.title, keywords: it.keywords, text: it.text, where: it.where, body: it.text };
     if (it.path) out.push({ ...base, icon: PAGE_ICONS[it.id] ?? <ArrowRight size={15} />, opens: `Opens ${it.title}`, run: () => go(it.path!) });
     else if (it.act) {

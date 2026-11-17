@@ -39,6 +39,7 @@ export function HandOffPopover({
   mode,
   tab,
   title,
+  initial,
   onClose,
   onStarted,
 }: {
@@ -48,6 +49,8 @@ export function HandOffPopover({
   /** The tab handed over, and its title (for the words under the box). */
   tab: string;
   title: string;
+  /** What the box starts with (the words picked in the page). */
+  initial?: string;
   onClose: () => void;
   /** Do this here: the session that got the tab. */
   onStarted: (key: string) => void;
@@ -59,8 +62,8 @@ export function HandOffPopover({
   const pick = mode === 'do' ? whoOf(who) : last;
   const run = useRunFor(pick.agent, pick.acp);
   useEffect(() => {
-    if (open) setText('');
-  }, [open, mode]);
+    if (open) setText(initial ?? '');
+  }, [open, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async () => {
     const q = text.trim();

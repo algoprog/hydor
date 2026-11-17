@@ -1,12 +1,12 @@
 // The tabs of your own browser: a strip above the address bar (a dropdown on a phone).
 import { useRef, useState } from 'react';
-import { ChevronDown, Globe, Plus, X } from 'lucide-react';
+import { ChevronDown, Globe, Plus, Volume2, VolumeX, X } from 'lucide-react';
 import type { BrowserTab, BrowserView } from '@shared/browser';
 import { cx, IconButton, Popover, Throbber } from '../../components/ui';
-import { closeTab, newTab, switchTab, tabName } from './browsing';
+import { closeTab, desktopBrowser, newTab, switchTab, tabName, useTabState } from './browsing';
 
 /** The site a tab is on (as the app's site icon route takes it), or '' for a page with no host to ask about. */
-function hostOfTab(url: string): string {
+export function hostOfTab(url: string): string {
   try {
     const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
     return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : '';
@@ -20,11 +20,38 @@ function hostOfTab(url: string): string {
  * or a globe while it has none (or it did not load).
  */
 export function Favicon({ tab, size = 14 }: { tab: BrowserTab; size?: number }) {
-  const [bad, setBad] = useState<string>();
-  const host = hostOfTab(tab.url);
   if (tab.loading) return <Throbber size={size} className="shrink-0" />;
+  return <SiteIcon url={tab.url} size={size} />;
+}
+
+/** The icon of the site an address is on (a globe when it has none). */
+export function SiteIcon({ url, size = 14 }: { url: string; size?: number }) {
+  const [bad, setBad] = useState<string>();
+  const host = hostOfTab(url);
   if (!host || bad === host) return <Globe size={size} className="shrink-0 text-fg-3" />;
   return <img src={`/api/site-icon/${encodeURIComponent(host)}`} alt="" width={size} height={size} className="shrink-0 rounded-[3px]" onError={() => setBad(host)} />;
+}
+
+/** A speaker on a tab that plays sound (or that you muted): a click mutes it or lets it be heard. */
+function Speaker({ tab }: { tab: BrowserTab }) {
+  const st = useTabState((s) => s.byTab[tab.id]);
+  if (!desktopBrowser() || (!st?.audible && !st?.muted)) return null;
+  const muted = !!st.muted;
+  const label = muted ? 'Unmute this tab' : 'Mute this tab';
+  return (
+    <button
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        useTabState.setState((s) => ({ byTab: { ...s.byTab, [tab.id]: { ...s.byTab[tab.id], muted: !muted } } }));
+        void desktopBrowser()?.mute(tab.id, !muted);
+      }}
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-fg-3 hover:bg-bg-3 hover:text-fg"
+    >
+      {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+    </button>
+  );
 }
 
 export function TabStrip({ view }: { view: BrowserView }) {
@@ -51,6 +78,7 @@ export function TabStrip({ view }: { view: BrowserView }) {
           <span translate="no" className="min-w-0 flex-1 truncate">
             {tabName(t)}
           </span>
+          <Speaker tab={t} />
           <button
             aria-label="Close tab"
             title="Close tab"

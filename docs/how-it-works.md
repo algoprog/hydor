@@ -28,8 +28,18 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
   view in the app. An agent's tabs are drawn off screen, so they work with the window closed, and reach the window as a
   fast local picture that takes your clicks and keys as real input; your own tabs are real pages the window shows where
   the Browser page puts them, and Chrome extensions load into them (`desktop/extensions.cjs`). Everywhere else, in Docker,
-  on a server, or for a phone looking at one, the server starts a Chromium and the app shows its pages as pictures. Either
-  way every connection of an agent's browser passes a checkpoint of the server's that keeps it off this computer's network.
+  on a server, or for a phone looking at one, the server starts a Chromium and the app shows an agent's pages as pictures
+  (your own browser is in the desktop app only: streaming its pages made it lag). Every connection of an agent's browser
+  passes a checkpoint of the server's that keeps it off this computer's network; your own tabs connect directly, as in any
+  browser (an agent's tab in your browser, from **Do this here**, is still checked page by page).
+- **Your own browsing's history, suggestions and ad blocker.** The server records the page each of your own tabs ends up
+  on (web pages and files, with their titles and how often you typed their addresses) in a table of the app's database,
+  the last 20,000, and ranks it with your open tabs and bookmarks for the address bar (`server/browser/history.ts`); the
+  search engine you chose is asked for its suggestions as you type, with a short time-out, when you leave them on. The
+  ad and tracker blocker is the app's (`desktop/adblock.cjs`): Ghostery's engine on the session of your own browsing,
+  made from its lists once and kept as a file in the app's data folder, made again when a week old (the old file stays in
+  use when that fails). The server tells the app when the setting or the sites you allowed ads on change. Electron's own
+  request handlers go before an extension's, so with the blocker on an extension's request blocking may not run.
 - **One memory, three parts.** Memory notes (short facts, in the app's database) are what every agent starts with;
   Wiki memory is linked Markdown articles with their sources, kept in plain files in a folder of yours (a shared
   wiki, and one folder for each project, by default inside it); documents are the files in knowledge bases, indexed

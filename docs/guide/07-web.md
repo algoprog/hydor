@@ -1,6 +1,6 @@
 # Search and the browser
 
-Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources each reply cites, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. It also covers the Browser page, a browser of your own in the app (tabs, bookmarks, Chrome extensions), and handing a page of it to an agent. In the desktop app (Mac, Windows, Linux), the browser runs inside the app, and agents can also use the computer itself: its screen, mouse and keyboard.
+Agents in the app can search the web, read pages and use a real browser, whatever their model. This topic covers the search providers they use and how to set them up, what a search shows in the conversation and the sources each reply cites, and the browser: watching it live, taking over to log in, solve a check or pay, and its settings. It also covers the Browser page, a browser of your own in the desktop app (tabs, a smart address bar, bookmarks, history, an ad blocker, Chrome extensions), and handing a page of it to an agent. In the desktop app (Mac, Windows, Linux), the browser runs inside the app, and agents can also use the computer itself: its screen, mouse and keyboard.
 
 ![An agent that searched the web, read pages and compared what it found in a table](images/web.webp)
 
@@ -254,47 +254,114 @@ In the desktop app, an agent's browser does not need the app's window: it keeps 
 
 ## Your own browser
 
-The **Browser** page is a browser of your own inside the app, next to the one agents use: open **Browser** in the sidebar's tools, or go to [Browser](/browser). It has tabs, an address bar that also searches, back, forward and reload, bookmarks, Chrome extensions, find in page, downloads, and a list of the agents' tabs. It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say), but never Hydor itself.
+The **Browser** page is a browser of your own inside the desktop app (Mac, Windows, Linux), next to the one agents use: open **Browser** in the sidebar's tools, or go to [Browser](/browser). It is part of the desktop app only: the web app in a browser, and a phone, have no **Browser** button, and the address [Browser](/browser) there says so. The agents' browsers work everywhere, and you can watch them in their sessions.
 
-In the desktop app, your tabs are real pages shown in the app's window, with the speed and keys of any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). Elsewhere, the page is a live picture of a Chromium running on the computer where the app runs, laid out for the room it has on your screen, and you click, scroll and type into it (see [Watch the browser live](/guide/web#watch-the-browser-live)). If the browser can't start (it found no Chromium, say), the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
+It has tabs, an address bar that completes what you type and searches, a Home button, back, forward and reload, bookmarks, history, Chrome extensions, an ad and tracker blocker, find in page, zoom, print, downloads, and a list of the agents' tabs. Its tabs are real pages in the app's window, with the speed and keys of any browser, and they connect to sites directly, as in any browser. A menu or dialog of the app that opens over the page takes it away for a moment (a picture of it shows until it closes). It keeps your sign-ins between visits, in a profile of its own that no agent can pick, and it opens again with the tabs you had (up to 30; blank ones are left out). Your tabs can open addresses on this computer and its network too (a website you are building, say). If the browser can't start, the page says why, with **Try again** and **Browser settings**, which opens [Settings → Browser](/settings?s=browser).
 
 ### Tabs and the address bar
 
-- The tab strip above the address bar shows each tab's icon, title and **×**. **+** (**New tab**) opens a blank one. A middle click closes a tab. Closing the last tab leaves a blank one.
-- The address bar shows the page's address. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for, with your search providers (see [Choose your search providers](/guide/web#choose-your-search-providers)): the first one that is on, in their order, and DuckDuckGo when none is. **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead.
-- **Back**, **Forward** and **Reload** are at the left of the address bar. While a page loads, Reload is **Stop**.
+- The tab strip above the address bar shows each tab's icon, title and **×**. **+** (**New tab**) opens your home page. A middle click closes a tab. Closing the last tab leaves a blank one.
+- A tab that plays sound shows a speaker: click it to mute the tab, and again to hear it. A muted tab keeps its speaker.
+- The address bar shows the page's address. Type an address, with or without https:// (`example.com`, `localhost:3000`, `192.168.1.5`, a `file://` address), and press Enter to open it. Anything else you type is searched for with your search engine (Google at first; see [Browser settings](/guide/web#browser-settings)). **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab instead.
+- **Back**, **Forward**, **Reload** and **Home** are at the left of the address bar. While a page loads, Reload is **Stop**. **Home** opens your home page in the open tab.
 - The star at the end of the address bar bookmarks the page on the bookmarks bar; filled, it is bookmarked, and pressing it again takes the bookmark away.
-- **Menu** (⋯) has **Ask about this page**, **Do this here**, **Find in page**, **Bookmarks**, **Extensions**, **Downloads** and **Agents’ tabs**.
+- **Menu** (⋯) has **Ask about this page**, **Do this here**, **Find in page**, **Print…**, **Open in your default browser**, **Bookmarks**, **History**, **Extensions**, **Downloads**, **Agents’ tabs**, **Site permissions** and **Settings**. **Open in your default browser** opens the page in the browser your computer uses for links.
 - When the open tab is a Chrome Web Store page of an extension, an **Add to Hydor** button appears in the bar (see [Chrome extensions](/guide/web#chrome-extensions)).
 
 A link to `/browser?url=https://example.com` opens the Browser page with that address in a new tab.
 
+### Suggestions
+
+As you type in the address bar, a list under it offers, with the words you typed in bold:
+
+- your open tabs ("Switch to tab": pick one to go to it instead of opening the page again),
+- your bookmarks and the pages of your history that match the words in their titles and addresses, the ones you go to often and lately first (addresses you typed yourself count most),
+- what you typed, as a search ("Search Google") or, when it looks like an address, as that address,
+- the search engine's own suggestions, when [Search suggestions](/guide/web#browser-settings) is on,
+- last, **Ask an agent: “…”**, which starts a session with what you typed as its first message, on the agent and model the start page used last, and takes you to it.
+
+The list shows as many as fit on the screen. The arrow keys move through it and **Enter** opens the one marked (what you typed, when none is); **Alt+Enter**, or Ctrl+Enter (⌘+Enter on a Mac), opens it in a new tab. The address bar also completes in place: when something you went to starts with what you typed, the rest shows selected after your cursor, and **Tab** or **→** takes it. Deleting what you typed turns the completion off. **Shift+Delete** on a history suggestion forgets that page, and **Esc** closes the list.
+
 ### Keyboard shortcuts
 
-On the Browser page (in the desktop app, from inside a page too), with Ctrl on Windows and Linux and ⌘ on a Mac:
+On the Browser page, from inside a page too, with Ctrl on Windows and Linux and ⌘ on a Mac:
 
 - **Ctrl+T** opens a new tab, and **Ctrl+W** closes the open one.
+- **Ctrl+Shift+T** opens the tab you closed last again; press it again for the one before.
+- **Ctrl+Tab** goes to the next tab and **Ctrl+Shift+Tab** to the one before. **Ctrl+1** to **Ctrl+8** go to that tab, and **Ctrl+9** to the last.
 - **Ctrl+L** goes to the address bar.
-- **Ctrl+R** reloads (**F5** too, in the desktop app).
-- **Ctrl+F** opens find in page.
-- **Alt+←** and **Alt+→** go back and forward (**⌘[** and **⌘]** on a Mac, in the desktop app).
-- **Esc** closes find in page.
+- **Ctrl+R** (**F5** too) reloads.
+- **Alt+←** and **Alt+→** go back and forward (**⌘[** and **⌘]** on a Mac too).
+- **Ctrl+F** opens find in page, and **Esc** closes it.
+- **Ctrl+D** bookmarks the page.
+- **Ctrl+H** opens the history, and **Ctrl+J** the downloads.
+- **Ctrl+P** prints the page.
+- **Ctrl+Shift+Delete** opens the settings at **Clear browsing data**.
+- **Ctrl** with **+**, **−** and **0** zoom in, zoom out and go back to 100 % (see [Zoom, print and full screen](/guide/web#zoom-print-and-full-screen)).
 
 ### Find in a page
 
-**Ctrl+F**, or **Find in page** in the menu, opens a bar under the address bar. Type, and the first match is found and scrolled into view as you pause. **Enter** goes to the next match and **Shift+Enter** to the one before (so do the arrows), and the bar says "12 matches" ("1000+" past a thousand) or "No matches". Case does not matter, and it wraps round. **Esc**, or **×**, closes the bar and clears what was found.
+**Ctrl+F**, or **Find in page** in the menu, opens a bar under the address bar. Type, and the first match is found and scrolled into view as you pause. **Enter** goes to the next match and **Shift+Enter** to the one before (so do the arrows), and the bar says which match you are at ("3 of 12", "1000+" past a thousand) or "No matches". Case does not matter, unless you press **Match case**, and it wraps round. **Esc**, or **×**, closes the bar and clears what was found.
+
+### Zoom, print and full screen
+
+- **Zoom**: **Ctrl** with **+** zooms in, **−** zooms out and **0** goes back to 100 %, in the steps Chrome uses (25 % to 500 %). Ctrl and the mouse wheel zoom too. A zoom other than 100 % shows as a chip at the end of the address bar, such as "125%": click it to go back to 100 %.
+- **Print**: **Ctrl+P**, or **Print…** in the menu or the right-click menu, opens your computer's print dialog for the page, with its backgrounds.
+- **Full screen**: when a video or a page asks to fill the screen, the app's window goes full screen and the page fills it. The page's own way out (Esc) brings the window back.
+
+### Right-click menu
+
+A right click in a page opens a menu, in English, with what applies where you clicked:
+
+- In a text field: spelling suggestions for a misspelt word, with **Add to dictionary**; then **Undo**, **Redo**, **Cut**, **Copy**, **Paste** and **Select all**.
+- On a link: **Open link in new tab**, **Open link in your default browser** and **Copy link address**.
+- On a picture: **Open image in new tab**, **Save image as…**, **Copy image** and **Copy image address**.
+- With text selected: **Copy**, **Search** with your search engine for it (it opens in a new tab) and **Ask an agent about** it, which opens the **Ask about this page** box with the selected words and the page's address filled in (see [Ask about this page](/guide/web#ask-about-this-page)).
+- On the page itself, away from a field or selected text: **Back**, **Forward** and **Reload**.
+- Always: **Bookmark this page**, **Print…** and **Inspect**, which opens the page's developer tools.
+
+An extension's own items are never shown (see [What may not work](/guide/web#what-may-not-work)).
+
+### History
+
+Press **Ctrl+H**, or **Menu** (⋯) → **History**, or go to [History](/browser?panel=history). The panel lists the pages you visited in your own browser, newest first, by day ("Today", "Yesterday", then the date), each with its time, site icon, title and address.
+
+- The search box, **Search your history**, finds pages by the words in their titles and addresses.
+- Click a page to open it in the open tab, or Ctrl+click (⌘+click on a Mac) for a new tab. **×** beside one takes it out of the history. **Show older** loads more.
+- **Recently closed** (when you are not searching) lists tabs you closed lately: click one to open it again. **Ctrl+Shift+T** opens the newest.
+- **Clear browsing data…** opens the settings at that part.
+
+Your history stays on this computer, in the app's own database, and only your own browsing adds to it: web pages and files, the page each tab ends up on, its title as it settles. The last 20,000 pages are kept; the oldest go first. Agents never see it. It is what the address bar's [suggestions](/guide/web#suggestions) draw on.
+
+### Browser settings
+
+**Menu** (⋯) → **Settings**, or [Settings → Browser → Your own browsing → Browser settings](/settings?s=browser&find=Browser%20settings), or [Browser settings](/browser?panel=settings), opens a panel with:
+
+- **Home page**: the web address the Home button and new tabs open (https://www.google.com/ at first). **Use the current page** sets it to the page you are on.
+- **Search engine**: what the address bar searches with: Google (at first), DuckDuckGo, Bing, Brave, Ecosia, Startpage, or **Custom**, an address of your own with %s where your words go, such as `https://example.com/search?q=%s`.
+- **Search suggestions** (on at first): what you type in the address bar goes to your search engine as you type, as in any browser, so it can suggest searches. Startpage and a custom address give none. Turn it off to keep what you type on this computer; your open tabs, bookmarks and history still show.
+- **Block ads and trackers** (on at first), see below.
+- **Clear browsing data**: tick **Browsing history**, **Cookies and site data** (you are signed out of sites) and **Cached files**, pick a time range (**Last hour**, **Last 24 hours**, **Last 7 days** or **All time**) and press **Clear data**. The time range is for the history alone: cookies, site data and cached files are always cleared for all time.
+
+### Block ads and trackers
+
+Your own browser blocks ads and trackers, as an ad blocker does: it keeps the requests of known ad and tracking servers from going out, and hides the empty places that are left. It uses Ghostery's lists of ads and trackers (EasyList, EasyPrivacy and others), which the app downloads from GitHub when your browser first starts and refreshes every week (when it can't, it keeps the lists it has); nothing about you is sent with them. It blocks nothing in the agents' browsers. **Block ads and trackers** in the [browser's settings](/guide/web#browser-settings) turns it off.
+
+With it on, a Chrome extension that blocks requests (an ad blocker of your own) may not run; turn the blocker off to give it the page.
+
+To let one site show its ads, click the padlock in the address bar and press **Allow ads on this site** (its subdomains too); the page reloads. **Block ads on this site** takes it back.
+
+### The padlock
+
+The padlock at the start of the address bar shows whether the connection to the site is secure ("Not secure", with an open padlock, for an http page). Click it to see the site, whether its connection is secure, what you allowed or blocked for it (each with **Forget**, so it asks again), and, with the blocker on, how many ads and trackers were blocked on this page, with **Allow ads on this site** or **Block ads on this site**.
 
 ### Downloads
 
-A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. Click a finished one to see it in its folder (in the desktop app) or to open it in the app (elsewhere).
+A file a page downloads is saved in the Downloads folder of the computer where the app runs, and lists under **Menu** (⋯) → **Downloads** as "Downloading…", "Done" or "Failed", with its path. Click a finished one to see it in its folder.
 
 ### When a site asks for a permission
 
-When a page in your own browser asks to use your camera, your microphone, your location, notifications, your clipboard or the like, a bar above the page says so ("example.com wants to use your camera") with **Don’t allow** and **Allow**. Your answer is remembered for that site, so it asks only once; to see what you allowed or blocked, or to be asked again, open **Menu** (⋯) → **Site permissions** and press **Forget** beside an answer. This is in the desktop app; the agents' browsers there refuse every such request themselves, except to fill the screen and to copy to your clipboard. A page's pop-up question (an alert, a yes-or-no or a text prompt) shows above the page, as in the agents' browser (see [Answer a page's pop-up questions](/guide/web#answer-a-pages-pop-up-questions)).
-
-### On a phone
-
-The tab strip becomes a button showing how many tabs are open: tap it for the list, with **×** beside each and **New tab**. The top bar keeps **Back**, the address and **Menu**; **Forward**, **Reload**, the star and **Add to Hydor** are in the menu, and so is **Bookmarks**, since the bookmarks bar is left out. You drive a live picture of the page: tap to click, drag to scroll, and **Type** opens your phone's keyboard, with a row of Tab, Enter, Esc, ⌫ and the arrow keys beside it.
+When a page in your own browser asks to use your camera, your microphone, your location, notifications, your clipboard or the like, a bar above the page says so ("example.com wants to use your camera") with **Don’t allow** and **Allow**. Your answer is remembered for that site, so it asks only once; to see what you allowed or blocked, or to be asked again, open the padlock, or **Menu** (⋯) → **Site permissions**, and press **Forget** beside an answer. The agents' browsers there refuse every such request themselves, except to fill the screen and to copy to your clipboard. A page's pop-up question (an alert, a yes-or-no or a text prompt) shows above the page, as in the agents' browser (see [Answer a page's pop-up questions](/guide/web#answer-a-pages-pop-up-questions)).
 
 ## Bookmarks
 
@@ -425,7 +492,7 @@ Each profile in the list has **Log in to sites** (to log in to more), and a **�
 
 ### Your own browsing
 
-[Settings → Browser](/settings?s=browser) also has a **Your own browsing** group ("The Browser page: pages you use yourself, which agents never get"), with two rows that open the Browser page's panels: [Bookmarks](/settings?s=browser&find=Bookmarks) ("Yours, with those from the other browsers on this computer") and [Extensions](/settings?s=browser&find=Extensions) ("Chrome extensions, in the desktop app"). See [Bookmarks](/guide/web#bookmarks) and [Chrome extensions](/guide/web#chrome-extensions).
+In the desktop app, [Settings → Browser](/settings?s=browser) also has a **Your own browsing** group ("The Browser page: pages you use yourself, which agents never get"), with three rows that open the Browser page's panels: [Bookmarks](/settings?s=browser&find=Bookmarks) ("Yours, with those from the other browsers on this computer"), [Extensions](/settings?s=browser&find=Extensions) ("Chrome extensions, in the desktop app") and [Browser settings](/settings?s=browser&find=Browser%20settings) ("Home page, search engine, ad blocker, history and clearing what it kept"). Elsewhere the group is not shown. See [Bookmarks](/guide/web#bookmarks), [Chrome extensions](/guide/web#chrome-extensions) and [Browser settings](/guide/web#browser-settings).
 
 ## Let agents use your computer
 
@@ -488,6 +555,11 @@ Stopping ends what the agent is doing and takes back every session's allowance: 
 - "Is my agents' browser the desktop app's own or a Chromium?"
 - "How do I give an agent the page I'm looking at in the Browser page?" (**Ask about this page** gives it a copy; **Do this here** gives it the tab)
 - "Add example.org/reports to my bookmarks bar in a folder called Work."
+- "How do I change my browser's search engine or home page?" (it is **Menu** → **Settings** on the Browser page: yours to change, agents can't)
+- "How do I allow ads on one site in my browser?" (the padlock's **Allow ads on this site**)
+- "How do I clear my browsing history and cookies?" (**Browser settings** → **Clear browsing data**; the time range counts for the history alone)
+- "How do I reopen a tab I closed?" (**Ctrl+Shift+T**, or **Recently closed** in the history)
+- "Does my browser block ads, and where do its lists come from?"
 - "Bring my Chrome and Firefox bookmarks into the Browser page." (or: "Why can't I import my Safari bookmarks?")
 - "Which Chrome extensions are in my browser, and which of them run in the agents' browsers too?"
 - "Add the extension at https://chromewebstore.google.com/detail/… to my browser." (the app asks you first, every time)

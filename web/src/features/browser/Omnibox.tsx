@@ -1,0 +1,325 @@
+// The address bar: what you type is completed in place, and a list under it offers your open tabs, bookmarks and
+// history, what you typed as an address, the search engine's suggestions and, last, asking an agent. Enter opens
+// the one marked (or what you typed), Tab or → takes the completion, Shift+Delete forgets a page of your history.
+// A padlock opens what the page's site may do; a chip shows a zoom other than 100 %; a star bookmarks the page.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Clock, Globe, Info, Lock, LockOpen, PanelTop, Search, Sparkles, Star } from 'lucide-react';
+import type { BrowserTab, Suggestion } from '@shared/browser';
+import { cx } from '../../components/ui';
+import { askAgent, desktopBrowser, ENGINE_NAMES, forgetAddress, goTo, shownAddress, suggest, switchTab, useTabState, usePrefs, zoomPercent } from './browsing';
+import { connectionOf, SiteInfo } from './SiteInfo';
+
+/** One row of the list. */
+interface Row {
+  id: string;
+  kind: Suggestion['kind'] | 'ask';
+  /** Its main words, and the address under them. */
+  title: string;
+  url?: string;
+  /** For a tab: which one. For a search or asking: the words. */
+  tab?: string;
+  text?: string;
+}
+
+const ROW = 34;
+const stripScheme = (x: string) => x.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '');
+const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Text with the typed words in bold. */
+function Marked({ text, words }: { text: string; words: string[] }) {
+  if (!words.length) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${words.map(escapeRe).join('|')})`, 'ig'));
+  return (
+    <>
+      {parts.map((p, i) =>
+        i % 2 ? (
+          <b key={i} className="font-semibold text-fg">
+            {p}
+          </b>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
+}
+
+const ICONS: Record<Row['kind'], typeof Globe> = { tab: PanelTop, bookmark: Star, history: Clock, url: Globe, search: Search, ask: Sparkles };
+
+export function Omnibox({ inputRef, tab, starred, canStar, onStar, compact }: { inputRef: React.RefObject<HTMLInputElement | null>; tab?: BrowserTab; starred: boolean; canStar: boolean; onStar: () => void; compact?: boolean }) {
+  const url = tab?.url ?? '';
+  const [typed, setTyped] = useState('');
+  const [completion, setCompletion] = useState('');
+  const [editing, setEditing] = useState(false);
+  // You changed the text (not only clicked into the bar): the list has something to offer.
+  const [dirty, setDirty] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<{ q: string; items: Suggestion[]; inline?: string } | null>(null);
+  // The row the keys marked (-1: none), and the one the mouse is over (it only lights up; the text stays what you typed).
+  const [sel, setSel] = useState(-1);
+  const [hover, setHover] = useState(-1);
+  const [info, setInfo] = useState(false);
+  const noInline = useRef(false);
+  const box = useRef<HTMLDivElement>(null);
+  const lock = useRef<HTMLButtonElement>(null);
+  const [at, setAt] = useState<{ left: number; top: number; width: number; room: number } | null>(null);
+  const prefs = usePrefs((s) => s.prefs);
+  const zoom = useTabState((s) => (tab ? s.byTab[tab.id]?.zoom : undefined));
+  const percent = zoom ? zoomPercent(zoom) : 100;
+  const q = typed.trim();
+
+  // The list, for what is typed: what you typed first (as a search, unless it is an address), then what was found.
+  const rows = useMemo<Row[]>(() => {
+    if (!q) return [];
+    const found = result?.q === q ? result.items : [];
+    const out: Row[] = [];
+    const lower = q.toLowerCase();
+    if (!found.some((i) => i.kind === 'url') && !found.some((i) => i.kind === 'search' && i.text.toLowerCase() === lower)) out.push({ id: 'typed', kind: 'search', title: q, text: q });
+    found.forEach((i, n) => {
+      if (i.kind === 'search') out.push({ id: `s${n}`, kind: 'search', title: i.text, text: i.text });
+      else if (i.kind === 'tab') out.push({ id: `t${i.tab}`, kind: 'tab', title: i.title || i.url, url: i.url, tab: i.tab });
+      else out.push({ id: `${i.kind[0]}${n}`, kind: i.kind, title: i.title || i.url, url: i.url });
+    });
+    // As many as fit on the screen without scrolling; asking an agent stays last.
+    const fit = Math.max(2, Math.floor(((at?.room ?? 440) - 12) / ROW));
+    return [...out.slice(0, fit - 1), { id: 'ask', kind: 'ask', title: q, text: q }];
+  }, [q, result, at?.room]);
+  const words = useMemo(() => q.split(/\s+/).filter((w) => w.length > 0), [q]);
+  const fill = (r: Row) => (r.kind === 'ask' || r.kind === 'search' ? (r.text ?? '') : shownAddress(r.url));
+  const row = sel >= 0 ? rows[sel] : undefined;
+  const value = !editing ? shownAddress(url) : row ? fill(row) : typed + completion;
+
+  // Asks for suggestions a moment after typing stops; an answer to words no longer typed is dropped.
+  useEffect(() => {
+    if (!dirty || !q) return setResult(null);
+    const ctl = new AbortController();
+    const t = window.setTimeout(() => {
+      suggest(q, ctl.signal).then(
+        (r) => {
+          if (ctl.signal.aborted) return;
+          setResult({ q, items: r.items, inline: r.inline });
+          // Completes in place when the caret is at the end and you are not deleting.
+          const el = inputRef.current;
+          if (noInline.current || !r.inline || !el || document.activeElement !== el || el.selectionStart !== typed.length || el.selectionEnd !== typed.length) return;
+          const a = stripScheme(typed);
+          const b = stripScheme(r.inline);
+          if (a && b.length > a.length && b.toLowerCase().startsWith(a.toLowerCase())) setCompletion(b.slice(a.length));
+        },
+        () => {},
+      );
+    }, 80);
+    return () => {
+      window.clearTimeout(t);
+      ctl.abort();
+    };
+  }, [typed, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The completed part shows selected after the caret.
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (completion && el && document.activeElement === el && sel < 0) el.setSelectionRange(typed.length, typed.length + completion.length);
+  }, [completion, typed, sel, inputRef]);
+
+  // Where the list goes: under the bar, as wide, with the room below it.
+  useLayoutEffect(() => {
+    if (!open) return setAt(null);
+    const place = () => {
+      const r = box.current?.getBoundingClientRect();
+      if (r) setAt({ left: r.left, top: r.bottom + 4, width: r.width, room: window.innerHeight - r.bottom - 16 });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open]);
+
+  const close = () => {
+    setOpen(false);
+    setSel(-1);
+    setHover(-1);
+  };
+  const finish = () => {
+    close();
+    setEditing(false);
+    setDirty(false);
+    setCompletion('');
+    inputRef.current?.blur();
+  };
+  // The page takes the keyboard after an address is opened, as in any browser.
+  const toPage = (id?: string) => id && void desktopBrowser()?.focus(id);
+  const choose = (r: Row | undefined, inNew: boolean) => {
+    const text = (typed + completion).trim();
+    finish();
+    if (r?.kind === 'tab' && r.tab && !inNew) return void switchTab(r.tab).then(() => toPage(r.tab));
+    if (r?.kind === 'ask') return void askAgent(r.text ?? text);
+    const target = r ? (r.kind === 'search' ? r.text : r.url) : text;
+    if (!target) return;
+    void goTo(target, inNew ? { newTab: true } : { tab: tab?.id }).then(() => !inNew && toPage(tab?.id));
+  };
+  const take = () => {
+    setTyped(typed + completion);
+    setCompletion('');
+    noInline.current = true;
+  };
+
+  const kind = connectionOf(url);
+  const secure = kind === 'secure';
+
+  return (
+    <div ref={box} className="relative flex h-9 min-w-0 flex-1 items-center rounded-full border border-line-2 bg-bg-2 focus-within:border-accent/60 focus-within:bg-bg-1 focus-within:ring-3 focus-within:ring-accent/15">
+      {url && url !== 'about:blank' ? (
+        <button
+          ref={lock}
+          aria-label="Site information"
+          title={secure ? 'The connection is secure' : kind === 'insecure' ? 'Not secure' : 'Site information'}
+          disabled={kind === 'other'}
+          onClick={() => setInfo((i) => !i)}
+          className={cx('ml-1 flex h-7 shrink-0 items-center gap-1 rounded-full px-2 text-[12px] hover:bg-bg-3 disabled:pointer-events-none', info && 'bg-bg-3')}
+        >
+          {secure ? <Lock size={14} className="text-fg-2" /> : kind === 'insecure' ? <LockOpen size={14} className="text-warn" /> : <Info size={14} className="text-fg-3" />}
+          {kind === 'insecure' && !editing && !compact && <span className="text-warn">Not secure</span>}
+        </button>
+      ) : (
+        <Search size={14} className="mx-3 shrink-0 text-fg-3" />
+      )}
+      <input
+        ref={inputRef}
+        value={value}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open && rows.length > 0}
+        aria-autocomplete="both"
+        onFocus={(e) => {
+          setEditing(true);
+          setTyped(shownAddress(url));
+          setCompletion('');
+          setDirty(false);
+          e.target.select();
+        }}
+        onBlur={() => {
+          setEditing(false);
+          setDirty(false);
+          setCompletion('');
+          close();
+        }}
+        onChange={(e) => {
+          const t = e.target.value;
+          // Deleting keeps the completion off until you type something else.
+          noInline.current = /^delete/.test((e.nativeEvent as InputEvent).inputType ?? '');
+          setTyped(t);
+          setCompletion('');
+          setSel(-1);
+          setDirty(true);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          const el = e.currentTarget;
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            choose(row, e.altKey || e.ctrlKey || e.metaKey);
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (!rows.length) return;
+            e.preventDefault();
+            setOpen(true);
+            setCompletion('');
+            setHover(-1);
+            setSel((s) => (e.key === 'ArrowDown' ? (s + 1 >= rows.length ? -1 : s + 1) : s - 1 < -1 ? rows.length - 1 : s - 1));
+          } else if ((e.key === 'Tab' && !e.shiftKey && completion) || (e.key === 'ArrowRight' && completion && el.selectionStart === typed.length)) {
+            e.preventDefault();
+            take();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            if (open && (rows.length || completion)) {
+              close();
+              setCompletion('');
+            } else finish();
+          } else if (e.key === 'Delete' && e.shiftKey && row?.kind === 'history' && row.url) {
+            e.preventDefault();
+            const gone = row.url;
+            void forgetAddress(gone).then(() => setResult((r) => r && { ...r, items: r.items.filter((i) => !(i.kind === 'history' && i.url === gone)) }));
+            setSel(-1);
+          } else if (e.key === 'Backspace' || e.key === 'Delete') noInline.current = true;
+        }}
+        placeholder="Search or enter an address"
+        aria-label="Address"
+        translate="no"
+        className="h-full min-w-0 flex-1 bg-transparent px-2 text-[13.5px] outline-none placeholder:text-fg-3"
+      />
+      {percent !== 100 && tab && (
+        <button
+          aria-label="Back to 100 %"
+          title="Back to 100 %"
+          onClick={() => void desktopBrowser()?.zoom(tab.id, 'reset').then((z) => useTabState.setState((s) => ({ byTab: { ...s.byTab, [tab.id]: { ...s.byTab[tab.id], zoom: z } } })))}
+          className="tnum mr-0.5 flex h-6 shrink-0 items-center rounded-full bg-bg-3 px-2 text-[11.5px] text-fg-2 hover:text-fg"
+        >
+          {percent}%
+        </button>
+      )}
+      <button
+        aria-label={starred ? 'Remove the bookmark' : 'Bookmark this page'}
+        title={starred ? 'Remove the bookmark' : 'Bookmark this page'}
+        disabled={!canStar}
+        onClick={onStar}
+        className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-fg-3 hover:bg-bg-3 hover:text-fg disabled:pointer-events-none disabled:opacity-40"
+      >
+        <Star size={15} className={cx(starred && 'fill-warn text-warn')} />
+      </button>
+      {tab && /^https?:/i.test(url) && <SiteInfo anchor={lock} open={info} onClose={() => setInfo(false)} tab={tab} />}
+      {open && at && rows.length > 0 &&
+        createPortal(
+          <>
+            {/* Over the page too: the app's native page is taken away while this is open, and a click on it closes the list. */}
+            <div className="fixed inset-x-0 bottom-0 z-40" style={{ top: at.top }} onPointerDown={finish} aria-hidden />
+            <div
+              role="listbox"
+              // The bar keeps the focus: a click on a row must not blur it before the row takes it.
+              onMouseDown={(e) => e.preventDefault()}
+              style={{ left: at.left, top: at.top, width: at.width }}
+              className="fixed z-50 overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lg"
+            >
+              {rows.map((r, i) => (
+                <RowView key={r.id} r={r} active={hover >= 0 ? i === hover : i === sel} words={words} engine={ENGINE_NAMES[prefs?.engine ?? 'google']} onHover={() => setHover(i)} onPick={(e) => choose(r, e.ctrlKey || e.metaKey || e.altKey)} />
+              ))}
+            </div>
+          </>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+function RowView({ r, active, words, engine, onHover, onPick }: { r: Row; active: boolean; words: string[]; engine: string; onHover: () => void; onPick: (e: React.MouseEvent) => void }) {
+  const Icon = ICONS[r.kind];
+  return (
+    <div role="option" aria-selected={active} onMouseMove={onHover} onClick={onPick} style={{ height: ROW }} className={cx('flex cursor-default items-center gap-2.5 rounded-lg px-2.5 text-[13.5px]', active ? 'bg-bg-3' : '')}>
+      <Icon size={15} className={cx('shrink-0', r.kind === 'ask' ? 'text-accent' : 'text-fg-3')} />
+      {r.kind === 'ask' ? (
+        <span className="min-w-0 flex-1 truncate">
+          Ask an agent: <span translate="no">“{r.title}”</span>
+        </span>
+      ) : r.kind === 'search' ? (
+        <>
+          <span translate="no" className="min-w-0 flex-1 truncate">
+            <Marked text={r.title} words={words} />
+          </span>
+          {r.id === 'typed' && <span className="shrink-0 text-[12px] text-fg-3">Search {engine}</span>}
+        </>
+      ) : (
+        <>
+          <span translate="no" className="min-w-0 shrink truncate">
+            <Marked text={r.title} words={words} />
+          </span>
+          {r.url && r.url !== r.title && (
+            <span translate="no" className="min-w-0 flex-1 truncate text-[12.5px] text-fg-3">
+              <Marked text={stripScheme(r.url)} words={words} />
+            </span>
+          )}
+          {r.kind === 'tab' && <span className="ml-auto shrink-0 text-[12px] text-fg-3">Switch to tab</span>}
+        </>
+      )}
+    </div>
+  );
+}

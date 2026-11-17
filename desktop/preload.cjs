@@ -11,7 +11,10 @@
 // `browser` (desktop/browser.cjs): the app's own browser. Your own tabs are real pages the window shows where the page asks
 // (show, hide, focus); an agent's tab is drawn off screen, and its frames come here (watch), and your clicks and keys go
 // back to it as real input (input, edit). popup and onBadge are the extensions' toolbar, onKey the shortcuts a page you
-// use would otherwise keep to itself, showFile the system's file manager.
+// use would otherwise keep to itself, showFile the system's file manager. What people expect of a browser for your own tabs:
+// find (with its match count), zoom, print, mute, openExternal (the default browser), onTabState (a tab's sound, zoom,
+// blocked ads and full screen as they change) and onCommand (what the right-click menu asks of the app: ask an agent about
+// the selection, bookmark the page).
 'use strict';
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
@@ -80,6 +83,8 @@ if (own) {
       show: (target, rect) => ipcRenderer.invoke('hydor:browser-show', { target: String(target), rect: rectOf(rect) }),
       /** Takes a page away (all of them without a target). */
       hide: (target) => ipcRenderer.invoke('hydor:browser-hide', target ? String(target) : null),
+      /** A picture of one of your tabs as it is now (a JPEG data URL, the size of its place) for where it is taken away for a moment; null when it is not shown. */
+      still: (target) => ipcRenderer.invoke('hydor:browser-still', String(target)),
       focus: (target) => ipcRenderer.invoke('hydor:browser-focus', String(target)),
       /**
        * An agent's tab as frames: onFrame({ jpeg: ArrayBuffer, w, h }) about 30 a second, one at once (w, h the page's size in
@@ -108,8 +113,25 @@ if (own) {
       popup: (extensionId, rect) => ipcRenderer.invoke('hydor:browser-popup', { extension: String(extensionId), rect: rectOf(rect) }),
       /** An extension's badge or title changed. */
       onBadge: (fn) => listen('hydor:browser-badge', fn),
-      /** The shortcuts your own tabs keep from their pages (Ctrl or ⌘ with T, W, L, R, F; F5; Alt with the arrows). */
+      /**
+       * The shortcuts your own tabs keep from their pages: Ctrl or ⌘ with T, W, L, R, F, P, D, H, J and 1 to 9, Ctrl+Tab and
+       * Ctrl+Shift+Tab, Ctrl or ⌘+Shift+T and Shift+Delete, F5, Alt with the arrows (⌘ with [ and ] on a Mac). Zoom is the app's own.
+       */
       onKey: (fn) => listen('hydor:browser-key', fn),
+      /** Find in one of your tabs ({ forward, findNext, matchCase }): { matches, active }; empty text stops it; null when it is not one of your tabs here. */
+      find: (target, text, opts) => ipcRenderer.invoke('hydor:browser-find', { target: String(target), text: String(text || ''), opts: opts && typeof opts === 'object' ? { forward: opts.forward !== false, findNext: !!opts.findNext, matchCase: !!opts.matchCase } : {} }),
+      /** Zoom ('in', 'out', 'reset', in Chrome's steps from 25 to 500 %): the factor after, 1 being 100 %. */
+      zoom: (target, op) => ipcRenderer.invoke('hydor:browser-zoom', { target: String(target), op: String(op) }),
+      /** The system's print dialog for the page. */
+      print: (target) => ipcRenderer.invoke('hydor:browser-print', String(target)),
+      /** Mutes or unmutes a tab. */
+      mute: (target, muted) => ipcRenderer.invoke('hydor:browser-mute', { target: String(target), muted: !!muted }),
+      /** An http or https address in the computer's default browser; whether it could. */
+      openExternal: (url) => ipcRenderer.invoke('hydor:browser-open-external', String(url)),
+      /** A tab's news as it changes ({ target, audible?, muted?, zoom?, blocked?, fullscreen? }); everything of a tab comes when it is shown. */
+      onTabState: (fn) => listen('hydor:browser-tab-state', fn),
+      /** What the right-click menu asks of the app: { cmd: 'ask', text, url } (ask an agent about the selection), { cmd: 'bookmark', url, title }. */
+      onCommand: (fn) => listen('hydor:browser-command', fn),
       /** Shows a downloaded file in the system's file manager (a file in your home folder). */
       showFile: (path) => ipcRenderer.invoke('hydor:browser-show-file', String(path)),
     },

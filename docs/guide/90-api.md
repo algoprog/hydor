@@ -324,7 +324,7 @@ These are the agents' own skills, which only that agent gets (Settings → Agent
 - `PATCH /api/browser/profiles/:id` — renames a profile. Body: `{ name: string — 1–40 characters }`. Returns: same as GET.
 - `DELETE /api/browser/profiles/:id` — deletes a profile with its sign-ins, and closes the browsers using it. Returns: same as GET.
 
-Your own browser (the Browser page) is the user's alone, and agents never use it: its tabs and the routes under `/api/browser/browsing/`, its bookmarks (`/api/browser/bookmarks`) and its Chrome extensions (`/api/browser/extensions`) are refused. When the user asks you to bookmark something or add an extension, tell them where: the Browser page's **Bookmarks** and **Extensions** (/browser?panel=bookmarks, /browser?panel=extensions). They can give you one page to work on with **Do this here**.
+Your own browser (the Browser page) is the user's alone, and agents never use it: its tabs and the routes under `/api/browser/browsing/`, its bookmarks (`/api/browser/bookmarks`) and its Chrome extensions (`/api/browser/extensions`) are refused. Your own browser is in the desktop app only. When the user asks you to bookmark something, add an extension, or change its home page, search engine or ad blocker, tell them where: the Browser page's **Bookmarks**, **Extensions** and **Settings** (/browser?panel=bookmarks, /browser?panel=extensions, /browser?panel=settings). They can give you one page to work on with **Do this here**.
 
 
 ## Computer use (the desktop apps)

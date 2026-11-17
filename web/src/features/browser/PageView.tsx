@@ -1,7 +1,7 @@
 // A browser's page in the app. In the desktop app, your own tabs (fit 'fill') are the page itself: a native view the
 // app's window lays over the place of this box. The native page always draws over the app's own page, so while a menu,
-// a dialog or a toast floats over the box, or the box is out of sight, the page is taken away and the latest picture
-// (or a quiet placeholder) shows there until that is over. An agent's tab (fit 'scale') is drawn off screen by the
+// a dialog or a toast floats over the box, or the box is out of sight, the page is taken away and a picture of it as
+// it was (taken just before, by the desktop app) shows there until that is over. An agent's tab (fit 'scale') is drawn off screen by the
 // desktop app, which sends its frames here (about 30 a second) to a canvas, and the mouse, wheel and keys go straight
 // to the page. Everywhere else, and for a tab the desktop app does not have, the live picture (LiveView), as before.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
@@ -10,7 +10,7 @@ import { MOD, type BrowserInput, type BrowserView } from '@shared/browser';
 import { cx } from '../../components/ui';
 import { AgentPointer } from './AgentPointer';
 import { KEYCODES, LiveView, mods, type LiveViewApi } from './LiveView';
-import { browserCall, frames, hostOf, onFrame } from './store';
+import { hostOf } from './store';
 
 /** A place in the app's window, in CSS pixels of the app's page. */
 export interface PageRect {
@@ -24,6 +24,8 @@ export interface PageRect {
 export interface DesktopBrowserBridge {
   show(target: string, rect: PageRect, opts: { fit: 'scale' | 'fill' }): Promise<boolean>;
   hide(target?: string): Promise<void>;
+  /** A picture of one of your own tabs as it is shown now (a JPEG data URL, the size of its place); null when it is not shown. An older app does not have it. */
+  still?(target: string): Promise<string | null>;
   focus(target: string): Promise<void>;
   popup(extensionId: string, rect: PageRect): Promise<boolean>;
   /** An extension's badge or title changed; the function it returns stops listening (for this call only). */
@@ -37,7 +39,35 @@ export interface DesktopBrowserBridge {
   onKey(fn: (k: { key: string; ctrl: boolean; meta: boolean; alt: boolean; shift: boolean }) => void): () => void;
   /** Shows a downloaded file in the system's file manager. */
   showFile(path: string): Promise<boolean>;
+  /** The page's own find, in one of your own tabs: how many matches and which is shown (null: not one of this app's tabs); empty text stops it. */
+  find(target: string, text: string, opts?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): Promise<{ matches: number; active: number } | null>;
+  /** The zoom factor after zooming a tab in, out or back to 100 % (Ctrl or ⌘ with + − 0 the app handles itself). */
+  zoom(target: string, op: 'in' | 'out' | 'reset'): Promise<number>;
+  /** The system's print dialog for a tab's page. */
+  print(target: string): Promise<void>;
+  mute(target: string, muted: boolean): Promise<void>;
+  /** An address (http or https) in the computer's default browser. */
+  openExternal(url: string): Promise<boolean>;
+  /** A tab's sound, zoom, how many ads and trackers were blocked on its page, and full screen, as they change (only what changed); the function it returns stops listening. */
+  onTabState(fn: (s: TabStateChange) => void): () => void;
+  /** What the right-click menu of a page asks of the app; the function it returns stops listening. */
+  onCommand(fn: (c: PageCommand) => void): () => void;
+  /** Which search engine the right-click menu searches with (an older app does not have it). */
+  setPrefs?(prefs: { engine: string; customSearch?: string }): Promise<void> | void;
 }
+
+/** What a tab's state said changed. */
+export interface TabStateChange {
+  target: string;
+  audible?: boolean;
+  muted?: boolean;
+  zoom?: number;
+  blocked?: number;
+  fullscreen?: boolean;
+}
+
+/** What a page's right-click menu asks of the app. */
+export type PageCommand = { cmd: 'ask'; text: string; url: string } | { cmd: 'bookmark'; url: string; title: string };
 
 export interface PageFrame {
   jpeg: ArrayBuffer;
@@ -82,22 +112,43 @@ function points(r: DOMRect): [number, number][] {
   return out;
 }
 
-/** The part of the box that no ancestor with its own scrolling or clipping cuts away; null when it is cut at all. */
-function uncut(box: HTMLElement, r: DOMRect): boolean {
+/** The ancestors of the box that cut what is in them (their own scrolling or clipping). Their styles change rarely: found now and then. */
+function clippers(box: HTMLElement): HTMLElement[] {
+  const out: HTMLElement[] = [];
   for (let el = box.parentElement; el && el !== document.documentElement; el = el.parentElement) {
     const cs = getComputedStyle(el);
-    if (cs.display === 'none') return false;
-    if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+    if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible' || cs.display === 'none') out.push(el);
+  }
+  return out;
+}
+
+/** Whether no ancestor with its own scrolling or clipping cuts the box away (r is its place). */
+function uncut(cuts: HTMLElement[], r: DOMRect): boolean {
+  for (const el of cuts) {
     const c = el.getBoundingClientRect();
+    if (c.width === 0 && c.height === 0) return false; // display: none
     if (r.left < c.left - 1 || r.top < c.top - 1 || r.right > c.right + 1 || r.bottom > c.bottom + 1) return false;
   }
   return true;
 }
 
+const NOT_LAYERS = new Set(['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE', 'NOSCRIPT']);
+/** The floating layers of the app (menus, dialogs, toasts: portals, children of the body) that have something in them now. */
+function layers(box: HTMLElement): Element[] {
+  const out: Element[] = [];
+  for (const c of document.body.children) if (c.id !== 'boot' && !NOT_LAYERS.has(c.tagName) && !c.contains(box) && c.firstElementChild) out.push(c);
+  return out;
+}
+
+/** Transitions of these properties move things; the rest (colours, opacity, shadows) cannot move the box. */
+const MOVING = /^(width|height|min-|max-|top|left|right|bottom|inset|margin|padding|transform|translate|scale|flex|grid|gap|border(-\w+)?-width|font-size|line-height|display|visibility)/;
+
 function NativePage({ k, view, driving, small, plain, className, maxH, target, fit, onRefused }: PageViewProps & { target: string; fit: 'scale' | 'fill'; onRefused: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   // True while the page is taken away (something floats over its place, or it is out of sight): the picture shows instead.
   const [away, setAway] = useState(false);
+  // The picture of the page from just before it was taken away (null: none, the placeholder shows).
+  const [still, setStill] = useState<string | null>(null);
   const refused = useRef(onRefused);
   refused.current = onRefused;
   const wasDriving = useRef(driving);
@@ -113,24 +164,47 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
     let gen = 0;
     let until = 0;
     let raf = 0;
+    let cuts = clippers(el);
+    let taking = false; // a picture is being made, the page is still up
+    let okAt = 0; // since when the box has been free again, while the picture is up
+    let wait = 0;
 
+    // The page goes away for a while: a picture of it as it is first (the page is still there while it is made, a few
+    // milliseconds), then it is hidden. A change of mind meanwhile (the box shows again) drops both.
     const takeAway = () => {
-      gen++; // a show still on its way is forgotten (its answer is ignored) and hidden with the rest
-      if (at) {
-        at = null;
-        void bridge.hide(target).catch(() => {});
-      }
+      if (taking) return;
+      const mine = ++gen; // a show still on its way is forgotten (its answer is ignored) and hidden with the rest
+      const was = at;
+      at = null;
       shown.current = false;
-      out = true;
-      setAway(true);
+      if (!was) {
+        out = true;
+        setAway(true);
+        return;
+      }
+      taking = true;
+      const done = (src: string | null) => {
+        taking = false;
+        if (gone || mine !== gen) return;
+        void bridge.hide(target).catch(() => {});
+        out = true;
+        setStill(src);
+        setAway(true);
+      };
+      if (!bridge.still) return done(null);
+      bridge
+        .still(target)
+        .catch(() => null)
+        .then(done);
     };
 
-    const check = () => {
+    // `scan`: look at what lies over the box too (always when a floating layer is up, otherwise only now and then).
+    const check = (scan = false) => {
       if (gone) return;
       const r = el.getBoundingClientRect();
-      let ok = document.visibilityState === 'visible' && r.width >= 8 && r.height >= 8 && r.bottom > 0 && r.right > 0 && r.left < window.innerWidth && r.top < window.innerHeight;
+      let ok = document.visibilityState === 'visible' && r.width >= 8 && r.height >= 8 && r.bottom > 0 && r.right > 0 && r.left < window.innerWidth && r.top < window.innerHeight && uncut(cuts, r);
       // Nothing may lie over any part of it (menus, dialogs, toasts, the app's own overlays), nor cut it (scrolled out, clipped).
-      if (ok && uncut(el, r)) {
+      if (ok && (scan || layers(el).length)) {
         for (const [x, y] of points(r)) {
           const hit = document.elementFromPoint(x, y);
           if (!hit || !(hit === el || el.contains(hit))) {
@@ -138,10 +212,22 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
             break;
           }
         }
-      } else ok = false;
+      }
       if (!ok) {
+        okAt = 0;
         if (at || !out) takeAway();
         return;
+      }
+      // The box is free again, but only once it has been for a moment (a list that closes and opens as you type keeps the
+      // picture up, and the page is not taken and shown again at every key).
+      if (out && !at && !taking) {
+        const now = performance.now();
+        if (!okAt) okAt = now;
+        if (now - okAt < 120) {
+          window.clearTimeout(wait);
+          wait = window.setTimeout(kick, 130 - (now - okAt));
+          return;
+        }
       }
       const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
       if (same(at, rect)) return;
@@ -170,7 +256,7 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       refused.current();
     };
 
-    // Whatever may move or cover the place is watched for: a frame at a time while it changes, slowly otherwise.
+    // Whatever may move or cover the place is watched for: a frame at a time while it changes, nothing while it does not.
     const loop = () => {
       raf = 0;
       check();
@@ -180,34 +266,69 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       until = Math.max(until, performance.now() + 700);
       if (!raf && !gone) raf = requestAnimationFrame(loop);
     };
-    const ro = new ResizeObserver(kick);
+    const refresh = () => {
+      cuts = clippers(el);
+      kick();
+    };
+    const ro = new ResizeObserver((entries) => (entries.some((e) => e.target === el) ? refresh() : kick()));
     ro.observe(el);
     ro.observe(document.documentElement);
-    const mo = new MutationObserver(kick); // the app's floating layers are children of the body: one appearing or going
+    // The app's floating layers are children of the body: one appearing or going, or what is in it changing (a toast).
+    const lo = new MutationObserver(kick);
+    const watchLayers = () => {
+      lo.disconnect();
+      for (const c of document.body.children) if (!c.contains(el)) lo.observe(c, { childList: true, subtree: true });
+    };
+    const mo = new MutationObserver(() => {
+      watchLayers();
+      kick();
+    });
     mo.observe(document.body, { childList: true });
+    watchLayers();
+    // A scroll that moves the box (the document's, or one of the box's ancestors'): not the app's other scrolling.
+    const scrolled = (e: Event) => {
+      const t = e.target as Node | null;
+      if (!t || t === document || t.contains(el)) kick();
+    };
+    const moved = (e: Event) => {
+      const p = (e as TransitionEvent).propertyName;
+      // A transition of what cannot move anything (a colour on hover) is not looked at.
+      if (p !== undefined && !MOVING.test(p)) return;
+      kick();
+    };
     window.addEventListener('resize', kick);
-    window.addEventListener('scroll', kick, true);
+    window.addEventListener('scroll', scrolled, true);
     document.addEventListener('visibilitychange', kick);
-    for (const ev of ['pointerdown', 'keydown', 'transitionrun', 'transitionend', 'animationstart', 'animationend']) document.addEventListener(ev, kick, true);
-    // What nothing announces (an overlay shown in place, a sibling's layout) is caught by looking now and then.
-    const timer = window.setInterval(check, 300);
-    check();
+    document.addEventListener('pointerdown', kick, true);
+    for (const ev of ['transitionrun', 'transitionend', 'animationstart', 'animationend']) document.addEventListener(ev, moved, true);
+    // What nothing announces (an overlay shown in place, a sibling's layout) is caught by a look once a second.
+    const timer = window.setInterval(() => {
+      cuts = clippers(el);
+      check(true);
+    }, 1000);
+    check(true);
     return () => {
       gone = true;
       cancelAnimationFrame(raf);
+      window.clearTimeout(wait);
       window.clearInterval(timer);
       ro.disconnect();
+      lo.disconnect();
       mo.disconnect();
       window.removeEventListener('resize', kick);
-      window.removeEventListener('scroll', kick, true);
+      window.removeEventListener('scroll', scrolled, true);
       document.removeEventListener('visibilitychange', kick);
-      for (const ev of ['pointerdown', 'keydown', 'transitionrun', 'transitionend', 'animationstart', 'animationend']) document.removeEventListener(ev, kick, true);
+      document.removeEventListener('pointerdown', kick, true);
+      for (const ev of ['transitionrun', 'transitionend', 'animationstart', 'animationend']) document.removeEventListener(ev, moved, true);
       if (at || shown.current) void bridge.hide(target).catch(() => {});
       shown.current = false;
     };
     // The box's shape (the page's proportions, the cap) moves it without any of the above: the observers see that too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [k, target, fit]);
+
+  // A picture of another page is not this one's.
+  useEffect(() => setStill(null), [k, target]);
 
   // You take over: the page gets the keyboard.
   useEffect(() => {
@@ -223,56 +344,24 @@ function NativePage({ k, view, driving, small, plain, className, maxH, target, f
       className={cx('relative overflow-hidden bg-bg-2', scale && 'mx-auto', driving && !plain && 'ring-2 ring-accent', className)}
       style={scale ? { aspectRatio: ratio, width: maxH ? `min(100%, calc(${maxH} * ${ratio}))` : undefined } : undefined}
     >
-      {away && <Still k={k} view={view} target={target} small={small} />}
+      {away && <Still src={still} view={view} target={target} small={small} />}
     </div>
   );
 }
 
-/** The latest picture of a tab (or its title, quietly, until one comes) where the native page is taken away. */
-function Still({ k, view, target, small }: { k: string; view: BrowserView; target: string; small?: boolean }) {
-  const img = useRef<HTMLImageElement>(null);
-  const [has, setHas] = useState(false);
-  const viewerId = useRef(Math.random().toString(36).slice(2, 10)).current;
+/** The picture of a tab from just before its native page was taken away (or its title, quietly, when there is none) where the page was. */
+function Still({ src, view, target, small }: { src: string | null; view: BrowserView; target: string; small?: boolean }) {
   const tab = view.tabs.find((t) => t.id === target);
-
-  useEffect(() => {
-    const show = (f: { data: string; w: number; h: number; tab: string }) => {
-      if (f.tab && f.tab !== target) return;
-      if (img.current) img.current.src = `data:image/jpeg;base64,${f.data}`;
-      setHas(true);
-    };
-    const f = frames.get(k);
-    if (f) show(f);
-    return onFrame(k, show);
-  }, [k, target]);
-
-  // The same ask as a live view makes (the server stops sending when nobody asks), small: it is only a stand-in.
-  useEffect(() => {
-    if (small) return;
-    let stop = false;
-    const ask = () => !stop && document.visibilityState === 'visible' && void browserCall(k, '/watch', { w: 640, h: 400, viewer: viewerId });
-    ask();
-    const t = window.setInterval(ask, 20_000);
-    return () => {
-      stop = true;
-      window.clearInterval(t);
-    };
-  }, [k, small, viewerId]);
-
+  if (src) return <img src={src} alt="The browser’s page" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-left-top" />;
   return (
-    <>
-      <img ref={img} alt="The browser’s page" draggable={false} className={cx('pointer-events-none absolute inset-0 h-full w-full select-none object-contain', !has && 'invisible')} />
-      {!has && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center text-fg-3">
-          <Globe size={small ? 16 : 22} />
-          {!small && (
-            <span translate="no" className="max-w-full truncate text-[12.5px]">
-              {tab?.title || hostOf(tab?.url ?? '') || ''}
-            </span>
-          )}
-        </div>
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center text-fg-3">
+      <Globe size={small ? 16 : 22} />
+      {!small && (
+        <span translate="no" className="max-w-full truncate text-[12.5px]">
+          {tab?.title || hostOf(tab?.url ?? '') || ''}
+        </span>
       )}
-    </>
+    </div>
   );
 }
 

@@ -1,7 +1,8 @@
-// The Browser page (/browser): a browser of your own inside the app. Tabs, an address bar that searches, back, forward,
-// reload, bookmarks, Chrome extensions (in the desktop app), find in page, downloads, the permissions sites ask for, and
-// the agents' browsers beside yours. In the desktop app the page is the page itself (PageView draws it natively); anywhere
-// else it is a live picture you drive, laid out for the size it has here.
+// The Browser page (/browser): a browser of your own, part of the desktop app. Tabs, an address bar that completes and
+// suggests, home, back, forward, reload, bookmarks, history, Chrome extensions, find in page, downloads, the permissions
+// sites ask for, an ad blocker, and the agents' browsers beside yours. The pages are the pages themselves (PageView draws
+// them natively). Elsewhere the page says it is part of the desktop app and starts nothing; the agents' browsers keep
+// their live picture in sessions.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearch } from 'wouter';
 import type { BrowserView } from '@shared/browser';
@@ -12,12 +13,17 @@ import {
   Bot,
   Download,
   Ellipsis,
+  ExternalLink,
   FileDown,
   Globe,
+  History,
+  House,
   MessageCircleQuestion,
+  Printer,
   Puzzle,
   RotateCw,
   Search,
+  Settings,
   ShieldQuestion,
   Star,
   Wand2,
@@ -33,6 +39,7 @@ import { BookmarkBar, toggleBookmark } from './BookmarkBar';
 import { BookmarksPanel } from './Bookmarks';
 import {
   activeTab,
+  addBookmark,
   addFromStore,
   answerPermission,
   closeTab,
@@ -40,22 +47,30 @@ import {
   isNative,
   isWebPage,
   KEY,
+  listenTabs,
   loadAgentBrowsers,
   loadBookmarks,
   loadExtensions,
+  loadPrefs,
   navigate,
   newTab,
   openBrowsing,
+  ownBrowserHere,
   permissionWords,
-  shownAddress,
+  reopenClosed,
   storePage,
+  switchTab,
   useAgentBrowsers,
   useBookmarks,
+  usePrefs,
   desktopBrowser,
 } from './browsing';
+import { BrowserSettingsPanel } from './BrowserSettings';
 import { ExtensionButtons, ExtensionsPanel } from './Extensions';
 import { FindBar } from './FindBar';
 import { HandOffPopover } from './HandOff';
+import { HistoryPanel } from './History';
+import { Omnibox } from './Omnibox';
 import { KeyRow } from './Dock';
 import type { LiveViewApi } from './LiveView';
 import { Panel } from './Panel';
@@ -64,63 +79,8 @@ import { PageView } from './PageView';
 import { TabMenu, TabStrip } from './TabStrip';
 import { hostOf, listenBrowser, loadBrowser, useBrowser } from './store';
 
-type PanelId = 'bookmarks' | 'extensions' | 'downloads' | 'agents' | 'permissions';
-const isPanel = (v: unknown): v is PanelId => v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'agents' || v === 'permissions';
-
-/** The address bar: shows the tab's address; what you type is opened, or searched for. */
-function AddressBar({ inputRef, url, tabId, starred, canStar, onStar }: { inputRef: React.RefObject<HTMLInputElement | null>; url: string; tabId?: string; starred: boolean; canStar: boolean; onStar: () => void }) {
-  const [text, setText] = useState(shownAddress(url));
-  const [editing, setEditing] = useState(false);
-  useEffect(() => {
-    if (!editing) setText(shownAddress(url));
-  }, [url, editing]);
-  const submit = (inNew: boolean) => {
-    const t = text.trim();
-    if (!t) return;
-    setEditing(false);
-    inputRef.current?.blur();
-    void goTo(t, inNew ? { newTab: true } : { tab: tabId }).then(() => {
-      // The page takes the keyboard, as in any browser.
-      if (tabId && !inNew) void desktopBrowser()?.focus(tabId);
-    });
-  };
-  return (
-    <div className="relative min-w-0 flex-1">
-      <input
-        ref={inputRef}
-        value={text}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoCorrect="off"
-        onFocus={(e) => (setEditing(true), e.target.select())}
-        onBlur={() => setEditing(false)}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            submit(e.altKey || e.ctrlKey || e.metaKey);
-          } else if (e.key === 'Escape') {
-            setText(shownAddress(url));
-            e.currentTarget.blur();
-          }
-        }}
-        placeholder="Search or enter an address"
-        aria-label="Address"
-        translate="no"
-        className={cx('h-9 w-full rounded-full border border-line-2 bg-bg-2 pr-10 pl-4 text-[13.5px] outline-none placeholder:text-fg-3 focus:border-accent/60 focus:bg-bg-1 focus:ring-3 focus:ring-accent/15')}
-      />
-      <button
-        aria-label={starred ? 'Remove the bookmark' : 'Bookmark this page'}
-        title={starred ? 'Remove the bookmark' : 'Bookmark this page'}
-        disabled={!canStar}
-        onClick={onStar}
-        className="absolute top-1/2 right-1.5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-fg-3 hover:bg-bg-3 hover:text-fg disabled:pointer-events-none disabled:opacity-40"
-      >
-        <Star size={15} className={cx(starred && 'fill-warn text-warn')} />
-      </button>
-    </div>
-  );
-}
+type PanelId = 'bookmarks' | 'extensions' | 'downloads' | 'agents' | 'permissions' | 'history' | 'settings';
+const isPanel = (v: unknown): v is PanelId => v === 'bookmarks' || v === 'extensions' || v === 'downloads' || v === 'agents' || v === 'permissions' || v === 'history' || v === 'settings';
 
 /** A site asks for something (camera, location…): Don’t allow or Allow, in a row above the page. */
 function PermissionBar({ view }: { view: BrowserView }) {
@@ -184,7 +144,27 @@ function DownloadsPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Where your own browser is not (a web page, another machine's pages): it is part of the desktop app, and nothing here starts it. */
+function NotHere() {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <Empty icon={<Globe size={20} />} title="Your own browser is part of the desktop app">
+        Browse the web with tabs, bookmarks, extensions and history in Hydor’s desktop app. The agents’ browsers still work everywhere: you can watch them in their sessions.
+        <div className="mt-4 flex justify-center">
+          <Button size="sm" variant="primary" onClick={() => go('/guide/web#your-own-browser')}>
+            Read how it works
+          </Button>
+        </div>
+      </Empty>
+    </div>
+  );
+}
+
 export function BrowserPage() {
+  return ownBrowserHere() ? <OwnBrowser /> : <NotHere />;
+}
+
+function OwnBrowser() {
   const mobile = useIsMobile();
   const search = useSearch();
   const view = useBrowser((s) => s.views[KEY]);
@@ -200,6 +180,11 @@ export function BrowserPage() {
   const [findTick, setFindTick] = useState(0);
   const [menu, setMenu] = useState(false);
   const [hand, setHand] = useState<'ask' | 'do' | null>(null);
+  // What the right-click menu's Ask an agent starts the question with.
+  const [handText, setHandText] = useState('');
+  // The history's "Clear browsing data…" opens the settings at that section.
+  const [clearAt, setClearAt] = useState(false);
+  const home = usePrefs((s) => s.prefs?.home);
   const menuRef = useRef<HTMLButtonElement>(null);
   const address = useRef<HTMLInputElement>(null);
   const live = useRef<LiveViewApi>(null);
@@ -214,6 +199,7 @@ export function BrowserPage() {
     listenBrowser();
     void loadBookmarks();
     void loadExtensions();
+    void loadPrefs();
     void loadBrowser(KEY);
   }, []);
   // Your browser's news (its tabs, pages, pictures) comes to the pages that listen for it.
@@ -286,8 +272,8 @@ export function BrowserPage() {
 
   // Keys: while the app's own page has the focus here, and, in the desktop app, the ones a native page passes on to it
   // (a native page takes keys itself, so it tells the app which shortcuts it saw).
-  const st = useRef({ view, find, watching });
-  st.current = { view, find, watching };
+  const st = useRef({ view, find, watching, star: () => {} });
+  st.current = { view, find, watching, star: () => star() };
   useEffect(() => {
     // Returns whether the key was a shortcut of this page.
     const run = (k: { key: string; mod: boolean; alt: boolean; shift: boolean; ctrl: boolean; meta: boolean }, typing: boolean, fromPage: boolean): boolean => {
@@ -314,6 +300,29 @@ export function BrowserPage() {
         own();
         setFind(true);
         setFindTick((n) => n + 1);
+      } else if (k.ctrl && !k.alt && !k.meta && k.key === 'Tab' && s.view?.tabs.length) {
+        // The next tab, or the one before (Shift), round the strip.
+        const tabs = s.view.tabs;
+        const at = tabs.findIndex((t) => t.active);
+        void switchTab(tabs[(Math.max(0, at) + (k.shift ? -1 : 1) + tabs.length) % tabs.length].id);
+      } else if (k.mod && !k.alt && !k.shift && /^[1-9]$/.test(k.key) && s.view?.tabs.length) {
+        // 1 to 8: that tab; 9: the last, as in other browsers.
+        const tabs = s.view.tabs;
+        const t = k.key === '9' ? tabs[tabs.length - 1] : tabs[Number(k.key) - 1];
+        if (t) void switchTab(t.id);
+      } else if (k.mod && !k.alt && !k.shift && key === 'd') {
+        s.star();
+      } else if (k.mod && !k.alt && !k.shift && key === 'h') {
+        setPanel('history');
+      } else if (k.mod && !k.alt && !k.shift && key === 'j') {
+        setPanel('downloads');
+      } else if (k.mod && !k.alt && k.shift && key === 't') {
+        void reopenClosed();
+      } else if (k.mod && !k.alt && !k.shift && key === 'p' && active) {
+        void desktopBrowser()?.print(active.id);
+      } else if (k.mod && !k.alt && k.shift && (key === 'delete' || key === 'backspace')) {
+        setClearAt(true);
+        setPanel('settings');
       } else if (k.alt && !k.ctrl && !k.meta && !typing && (k.key === 'ArrowLeft' || k.key === 'ArrowRight')) {
         void navigate(k.key === 'ArrowLeft' ? 'back' : 'forward');
       } else if (fromPage && k.meta && !k.alt && !k.ctrl && (k.key === '[' || k.key === ']')) {
@@ -336,7 +345,19 @@ export function BrowserPage() {
     };
   }, []);
 
-  const toggle = (p: PanelId) => setPanel((x) => (x === p ? null : p));
+  // What a page's right-click menu asks: Ask an agent about the selection, and Bookmark this page.
+  useEffect(
+    () =>
+      listenTabs((c) => {
+        if (c.cmd === 'ask') {
+          setHandText(`About this on ${c.url}:\n“${c.text.slice(0, 600)}”\n\n`);
+          setHand('ask');
+        } else if (!useBookmarks.getState().nodes.some((n) => n.url === c.url)) void addBookmark({ title: c.title || c.url, url: c.url, parent: 'bar' });
+      }),
+    [],
+  );
+
+  const toggle = (p: PanelId) => (setClearAt(false), setPanel((x) => (x === p ? null : p)));
   const watch = (key: string) => {
     setWatching(key);
     if (mobile) setPanel(null);
@@ -411,14 +432,23 @@ export function BrowserPage() {
       >
         Find in page
       </MenuItem>
+      <MenuItem icon={<Printer size={14} />} disabled={!tab || !canHand} hint={mobile ? undefined : <Kbd>{MOD}P</Kbd>} onClick={() => (setMenu(false), tab && void desktopBrowser()?.print(tab.id))}>
+        Print…
+      </MenuItem>
+      <MenuItem icon={<ExternalLink size={14} />} disabled={!tab || !canHand} onClick={() => (setMenu(false), tab && void desktopBrowser()?.openExternal(tab.url))}>
+        Open in your default browser
+      </MenuItem>
       <MenuSep />
       <MenuItem icon={<Bookmark size={14} />} checked={panel === 'bookmarks'} onClick={() => (setMenu(false), toggle('bookmarks'))}>
         Bookmarks
       </MenuItem>
+      <MenuItem icon={<History size={14} />} checked={panel === 'history'} hint={mobile ? undefined : <Kbd>{MOD}H</Kbd>} onClick={() => (setMenu(false), toggle('history'))}>
+        History
+      </MenuItem>
       <MenuItem icon={<Puzzle size={14} />} checked={panel === 'extensions'} onClick={() => (setMenu(false), toggle('extensions'))}>
         Extensions
       </MenuItem>
-      <MenuItem icon={<Download size={14} />} checked={panel === 'downloads'} hint={view.downloads.length ? String(view.downloads.length) : undefined} onClick={() => (setMenu(false), toggle('downloads'))}>
+      <MenuItem icon={<Download size={14} />} checked={panel === 'downloads'} hint={view.downloads.length ? String(view.downloads.length) : mobile ? undefined : <Kbd>{MOD}J</Kbd>} onClick={() => (setMenu(false), toggle('downloads'))}>
         Downloads
       </MenuItem>
       <MenuItem icon={<Bot size={14} />} checked={panel === 'agents'} hint={agentCount ? String(agentCount) : undefined} onClick={() => (setMenu(false), toggle('agents'))}>
@@ -426,6 +456,9 @@ export function BrowserPage() {
       </MenuItem>
       <MenuItem icon={<ShieldQuestion size={14} />} checked={panel === 'permissions'} onClick={() => (setMenu(false), toggle('permissions'))}>
         Site permissions
+      </MenuItem>
+      <MenuItem icon={<Settings size={14} />} checked={panel === 'settings'} onClick={() => (setMenu(false), toggle('settings'))}>
+        Settings
       </MenuItem>
     </>
   );
@@ -448,7 +481,12 @@ export function BrowserPage() {
             {tab?.loading ? <X size={17} /> : <RotateCw size={16} />}
           </IconButton>
         )}
-        <AddressBar inputRef={address} url={tab?.url ?? ''} tabId={tab?.id} starred={marked.length > 0} canStar={!!tab && isWebPage(tab.url)} onStar={star} />
+        {!mobile && (
+          <IconButton label="Home" disabled={!home} onClick={() => home && void goTo(home, { tab: tab?.id })}>
+            <House size={17} />
+          </IconButton>
+        )}
+        <Omnibox inputRef={address} tab={tab} starred={marked.length > 0} canStar={!!tab && isWebPage(tab.url)} onStar={star} compact={mobile} />
         {!mobile && <ExtensionButtons />}
         {!mobile && store && (
           <Button
@@ -471,7 +509,7 @@ export function BrowserPage() {
       </div>
       {!mobile && <BookmarkBar />}
       <PermissionBar view={view} />
-      {find && !watching && <FindBar onClose={closeFind} focusTick={findTick} />}
+      {find && !watching && <FindBar onClose={closeFind} focusTick={findTick} tab={tab?.id} native={native} />}
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -481,7 +519,7 @@ export function BrowserPage() {
             <>
               <div ref={area} className="relative min-h-0 flex-1 bg-bg-1">
                 <div className="absolute inset-0">
-                  <PageView ref={live} k={KEY} view={view} driving={view.driver === 'user'} fit="fill" className="h-full w-full" />
+                  <PageView ref={live} k={KEY} view={view} driving={view.driver === 'user'} plain fit="fill" className="h-full w-full" />
                 </div>
                 <AgentDialog k={KEY} view={view} />
               </div>
@@ -493,6 +531,8 @@ export function BrowserPage() {
         {panel === 'extensions' && <ExtensionsPanel onClose={() => setPanel(null)} />}
         {panel === 'downloads' && <DownloadsPanel onClose={() => setPanel(null)} />}
         {panel === 'permissions' && <PermissionsPanel onClose={() => setPanel(null)} />}
+        {panel === 'history' && <HistoryPanel tab={tab?.id} onClose={() => setPanel(null)} onClear={() => (setClearAt(true), setPanel('settings'))} />}
+        {panel === 'settings' && <BrowserSettingsPanel focusClear={clearAt} onClose={() => setPanel(null)} />}
         {panel === 'agents' && <AgentsPanel onClose={() => setPanel(null)} onWatch={watch} />}
       </div>
 
@@ -506,7 +546,8 @@ export function BrowserPage() {
           mode={hand ?? 'ask'}
           tab={tab.id}
           title={tab.title || tab.url}
-          onClose={() => setHand(null)}
+          initial={handText}
+          onClose={() => (setHand(null), setHandText(''))}
           onStarted={() => {
             setPanel('agents');
             for (const ms of [600, 2000, 5000]) window.setTimeout(() => void loadAgentBrowsers(), ms);

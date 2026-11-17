@@ -1,30 +1,40 @@
 // Your own browsing, on the server: the Browser page's API. A browser of your own (key 'browsing', profile 'browsing',
-// which keeps your sign-ins), its tabs (kept between runs), the address bar (an address is opened, anything else is
-// searched with your search providers), find in a page, a copy of a page for Ask about this page, a site's permission
+// which keeps your sign-ins), its tabs (kept between runs), your settings for it (home page, search engine, ad
+// blocker), its history and the address bar's suggestions (history.ts), recently closed tabs, clearing browsing data,
+// the address bar (an address is opened, anything else is searched with your search engine), find in a page, a copy of a page for Ask about this page, a site's permission
 // requests, the agents' browsers beside yours, and Do this here: a page of yours given to a session, which gets a tab of
 // its own at that address and works in it alone (session.ts handOver / takeBack; the start rules and the first message's line are here).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyRequest } from 'fastify';
-import { BROWSING_KEY, BROWSING_PROFILE, type BrowserPermissionAsk, type BrowserTab, type BrowserView } from '../../shared/browser.ts';
+import { BROWSING_KEY, BROWSING_PROFILE, SEARCH_ENGINES, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type BrowsingPrefs, type SearchEngine } from '../../shared/browser.ts';
 import { isConfidential } from '../../shared/confidential.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
 import { paths } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
-import { onDesktop, tellDesktop } from '../desktop.ts';
+import { desktopChromium, onDesktop, tellDesktop } from '../desktop.ts';
 import type { Deps } from '../features/types.ts';
-import { PROVIDERS } from '../search/providers.ts';
 import type { CreateOpts } from '../sessions.ts';
+import { loadBookmarks } from './bookmarks.ts';
+import { clearHistory, HistoryRecorder, historyUrl, listHistory, removeHistory, suggest } from './history.ts';
 import { shownUrl } from './outline.ts';
-import { browserOf, downloadsFolder, ensureBrowser, handOver, onBrowserView, openBrowsers, outsideSessions, siteOfUrl, takeBack, viewOf, type SessionBrowser } from './session.ts';
+import { browserOf, downloadsFolder, ensureBrowser, handOver, onBrowserView, openBrowsers, outsideSessions, siteOfUrl, takeBack, takeClosedTab, viewOf, type SessionBrowser } from './session.ts';
 import { BROWSER_DIR } from './chrome.ts';
-import { browserSettings } from './settings.ts';
+import { browserSettings, cleanSites } from './settings.ts';
 import type { Tab } from './tab.ts';
 
 const P = (req: FastifyRequest) => req.params as Record<string, string>;
 const B = (req: FastifyRequest) => (req.body ?? {}) as Record<string, any>;
+
+/** "From when" in a request: a time in milliseconds, or none (all of it). */
+function sinceOf(v: unknown): number | undefined {
+  if (v === undefined || v === null) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) throw new HttpError(400, 'since should be a time in milliseconds');
+  return Math.floor(n);
+}
 
 // ---- the address bar ------------------------------------------------------------------------------------------
 
@@ -80,48 +90,110 @@ export function addressOf(text: string): string | null {
   }
 }
 
-/**
- * The page a search goes to: the first of Settings → Capabilities → Search's providers that is turned on and has a
- * results page for people, in their order (`stored` is what the key-value store keeps of them); DuckDuckGo when none is.
- * Naget Search answers agents through its API and has no results page, so it is passed over here.
- */
-export function searchPage(stored: unknown, text: string): string {
-  const s = stored && typeof stored === 'object' ? (stored as { order?: unknown; providers?: Record<string, { enabled?: boolean; url?: string }> }) : {};
-  const ids = PROVIDERS.map((p) => p.id);
-  const order = Array.isArray(s.order) ? (s.order as unknown[]).filter((id): id is string => typeof id === 'string' && ids.includes(id)) : [];
-  // A provider added since keeps its place in the default order (as the search settings do).
-  for (const id of ids) if (!order.includes(id)) order.splice(Math.min(ids.indexOf(id), order.length), 0, id);
-  const q = encodeURIComponent(text.trim());
-  for (const id of order) {
-    const set = s.providers?.[id] ?? {};
-    if (!(set.enabled ?? PROVIDERS.find((p) => p.id === id)!.enabledByDefault)) continue;
-    if (id === 'brave') return `https://search.brave.com/search?q=${q}`;
-    if (id === 'duckduckgo') return `https://duckduckgo.com/?q=${q}`;
-    if (id === 'searxng') {
-      let base = typeof set.url === 'string' ? set.url.trim() : '';
-      if (!base) continue;
-      if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(base)) base = `https://${base}`;
-      try {
-        const u = new URL(base);
-        if (!/^https?:$/.test(u.protocol)) continue;
-      } catch {
-        continue;
-      }
-      return `${base.replace(/\/+$/, '').replace(/\/search$/, '')}/search?q=${q}`;
+// ---- your settings for it -------------------------------------------------------------------------------------
+
+export const PREFS_KEY = 'browser.browsing.prefs';
+export const DEFAULT_PREFS: BrowsingPrefs = { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: [] };
+
+/** Each engine's results page, with %s where the words go. */
+export const SEARCH_PAGES: Record<Exclude<SearchEngine, 'custom'>, string> = {
+  google: 'https://www.google.com/search?q=%s',
+  duckduckgo: 'https://duckduckgo.com/?q=%s',
+  bing: 'https://www.bing.com/search?q=%s',
+  brave: 'https://search.brave.com/search?q=%s',
+  ecosia: 'https://www.ecosia.org/search?q=%s',
+  startpage: 'https://www.startpage.com/do/search?q=%s',
+};
+
+/** A home page as typed, as the web address it is (example.com is https://example.com/); null when it is not a web address. */
+export function homeAddress(v: unknown): string | null {
+  const a = typeof v === 'string' && v.length <= 2000 ? addressOf(v) : null;
+  return a && /^https?:\/\//i.test(a) ? a : null;
+}
+
+/** A search page of your own: a web address with %s where the words go. */
+export function customTemplate(v: unknown): string | null {
+  const t = typeof v === 'string' ? v.trim() : '';
+  if (!t || t.length > 2000 || !t.includes('%s') || !/^https?:\/\/[^\s/?#]+/i.test(t)) return null;
+  try {
+    new URL(t.split('%s').join('x'));
+  } catch {
+    return null;
+  }
+  return t;
+}
+
+/** What is kept, checked: anything wrong in it is the default. */
+export function browsingPrefs(db: DB): BrowsingPrefs {
+  let v: Record<string, unknown> = {};
+  try {
+    const raw = JSON.parse(kvGet(db, PREFS_KEY) ?? '{}');
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) v = raw;
+  } catch {}
+  const engine = (SEARCH_ENGINES as readonly unknown[]).includes(v.engine) ? (v.engine as SearchEngine) : DEFAULT_PREFS.engine;
+  const custom = customTemplate(v.customSearch);
+  return {
+    home: homeAddress(v.home) ?? DEFAULT_PREFS.home,
+    // A custom engine with no page of its own is Google.
+    engine: engine === 'custom' && !custom ? DEFAULT_PREFS.engine : engine,
+    ...(custom ? { customSearch: custom } : {}),
+    suggest: typeof v.suggest === 'boolean' ? v.suggest : DEFAULT_PREFS.suggest,
+    adblock: typeof v.adblock === 'boolean' ? v.adblock : DEFAULT_PREFS.adblock,
+    allowAds: cleanSites(v.allowAds),
+  };
+}
+
+/** Changes some of them. Throws (400) when one is not valid; nothing is kept then. */
+export function setBrowsingPrefs(db: DB, patch: Record<string, unknown>): BrowsingPrefs {
+  const next: BrowsingPrefs = { ...browsingPrefs(db) };
+  if (patch.home !== undefined) {
+    const h = homeAddress(patch.home);
+    if (!h) throw new HttpError(400, 'The home page should be a web address, starting with http:// or https://');
+    next.home = h;
+  }
+  if (patch.customSearch !== undefined) {
+    if (patch.customSearch === null || (typeof patch.customSearch === 'string' && !patch.customSearch.trim())) delete next.customSearch;
+    else {
+      const c = customTemplate(patch.customSearch);
+      if (!c) throw new HttpError(400, 'Your own search page should be a web address (http:// or https://) with %s where the words go');
+      next.customSearch = c;
     }
   }
-  return `https://duckduckgo.com/?q=${q}`;
+  if (patch.engine !== undefined) {
+    if (!(SEARCH_ENGINES as readonly unknown[]).includes(patch.engine)) throw new HttpError(400, `The search engine should be one of: ${SEARCH_ENGINES.join(', ')}`);
+    next.engine = patch.engine as SearchEngine;
+  }
+  if (next.engine === 'custom' && !next.customSearch) throw new HttpError(400, 'Give your own search page: a web address with %s where the words go');
+  for (const k of ['suggest', 'adblock'] as const) {
+    if (patch[k] === undefined) continue;
+    if (typeof patch[k] !== 'boolean') throw new HttpError(400, `${k} should be true or false`);
+    next[k] = patch[k] as boolean;
+  }
+  if (patch.allowAds !== undefined) next.allowAds = cleanSites(patch.allowAds);
+  if (next.engine !== 'custom' && next.customSearch === undefined) delete next.customSearch;
+  kvSet(db, PREFS_KEY, JSON.stringify(next));
+  return browsingPrefs(db);
+}
+
+/** The page that searches for the words with your engine. */
+export function searchUrl(prefs: BrowsingPrefs, text: string): string {
+  const template = prefs.engine === 'custom' && prefs.customSearch ? prefs.customSearch : SEARCH_PAGES[prefs.engine === 'custom' ? 'google' : prefs.engine];
+  return template.split('%s').join(encodeURIComponent(text.trim()));
 }
 
 /** What you typed in the address bar, as the address to open. */
-export function barTarget(db: DB, text: string): string {
-  const a = addressOf(text);
-  if (a) return a;
-  let stored: unknown = {};
-  try {
-    stored = JSON.parse(kvGet(db, 'search.settings') ?? '{}');
-  } catch {}
-  return searchPage(stored, text);
+export function barTarget(prefs: BrowsingPrefs, text: string): string {
+  return addressOf(text) ?? searchUrl(prefs, text);
+}
+
+// ---- your own browser is in the desktop app -------------------------------------------------------------------
+
+/** Where your own browser may run: the desktop app only (it draws the pages itself; elsewhere they would stream as pictures). A test sets `inside`. */
+export const desktopGate = { inside: (): boolean => desktopChromium !== null };
+
+/** Throws (409) outside the desktop app: for the routes that start your own browser. */
+export function requireDesktop() {
+  if (!desktopGate.inside()) throw new HttpError(409, 'Your own browser is in the desktop app');
 }
 
 // ---- your tabs, kept between runs -----------------------------------------------------------------------------
@@ -392,6 +464,8 @@ export async function browserHandoffFinish(key: string, cwd: string, o: CreateOp
 // ---- routes ---------------------------------------------------------------------------------------------------
 
 let started = false;
+/** Records your browsing's history from its view (set when the routes start). */
+let recorder: HistoryRecorder | null = null;
 
 export function browsingRoutes(d: Deps) {
   const { app, db } = d;
@@ -407,20 +481,36 @@ export function browsingRoutes(d: Deps) {
   };
 
   const restored = new WeakSet<SessionBrowser>();
-  /** Your browsing, started when it is not running, with the tabs it had last time. */
-  const browsing = () =>
-    alone(async () => {
+  /** Tells the app how to block ads (once the browser has started, and at each change of the settings). */
+  const tellPrefs = () => {
+    const p = browsingPrefs(db);
+    tellDesktop({ type: 'browser-prefs', adblock: p.adblock, allowAds: p.allowAds });
+  };
+  /**
+   * Your browsing, started when it is not running, with the tabs it had last time (and the home page when it had none,
+   * unless a page is about to be opened in it: `home` false). Only in the desktop app.
+   */
+  const browsing = (home = true) => {
+    requireDesktop();
+    return alone(async () => {
       const b = await ensureBrowser(BROWSING_KEY, downloadsFolder(), BROWSING_PROFILE);
       if (!restored.has(b)) {
         restored.add(b);
+        tellPrefs();
         const saved = savedTabs(kv.get(TABS_KEY));
         for (let i = 0; i < saved.tabs.length; i++) {
           try {
             const t = i === 0 && b.tabs.length === 1 ? b.tabs[0] : await b.newTab();
+            // A page a tab comes back to is not a new visit.
+            recorder?.quiet(t.targetId);
             void t.navigate(saved.tabs[i]).catch(() => {});
           } catch (e) {
             console.error(`[browser] reopening a tab: ${(e as Error).message}`);
           }
+        }
+        if (!saved.tabs.length && home && b.tabs.length === 1 && b.tabs[0].url === 'about:blank') {
+          recorder?.quiet(b.tabs[0].targetId);
+          void b.tabs[0].navigate(browsingPrefs(db).home).catch(() => {});
         }
         const front = b.tabs[saved.active];
         if (front) b.setActive(front);
@@ -428,10 +518,12 @@ export function browsingRoutes(d: Deps) {
       }
       return b;
     });
+  };
 
   const blankOnly = (b: SessionBrowser) => b.tabs.length === 1 && b.tabs[0].url === 'about:blank';
-  const go = async (b: SessionBrowser, text: string, o: { tab?: string; newTab?: boolean }): Promise<Tab> => {
-    const target = barTarget(db, text);
+  /** `typed`: it came from the address bar (its page counts as typed in the history). */
+  const go = async (b: SessionBrowser, text: string, o: { tab?: string; newTab?: boolean; typed?: boolean }): Promise<Tab> => {
+    const target = barTarget(browsingPrefs(db), text);
     let t: Tab | undefined;
     if (o.tab) {
       t = b.tabs.find((x) => x.targetId === o.tab);
@@ -439,6 +531,8 @@ export function browsingRoutes(d: Deps) {
     } else if (o.newTab && !blankOnly(b)) t = await b.newTab();
     else t = await b.tab();
     b.setActive(t);
+    // Typing the address of the page you are on reloads it: not another visit.
+    if (o.typed && addressOf(text) && historyUrl(target)?.replace(/#.*$/s, '') !== historyUrl(t.url)?.replace(/#.*$/s, '')) recorder?.typed(t.targetId);
     // A page that cannot load shows the browser's own error page: nothing more to say here.
     await t.navigate(target).catch(() => null);
     b.changed();
@@ -446,18 +540,23 @@ export function browsingRoutes(d: Deps) {
   };
 
   app.post('/api/browser/browsing/open', async (req) => {
-    const b = await browsing();
     const url = typeof B(req).url === 'string' ? B(req).url.trim() : '';
+    const b = await browsing(!url);
     if (url) await go(b, url, { newTab: true });
     return { key: BROWSING_KEY, view: b.view() };
   });
 
+  /** A new tab: at the address, or at the home page. */
   app.post('/api/browser/browsing/tabs', async (req) => {
-    const b = await browsing();
     const url = typeof B(req).url === 'string' ? B(req).url.trim() : '';
+    const b = await browsing(false);
     if (url) await go(b, url, { newTab: true });
     else {
-      await b.newTab();
+      // A browser with only a blank tab (it just started) uses it.
+      const t = blankOnly(b) ? b.tabs[0] : await b.newTab();
+      b.setActive(t);
+      recorder?.quiet(t.targetId);
+      void t.navigate(browsingPrefs(db).home).catch(() => {});
       b.changed();
     }
     return { view: b.view() };
@@ -466,8 +565,20 @@ export function browsingRoutes(d: Deps) {
   app.post('/api/browser/browsing/go', async (req) => {
     const { text, tab, newTab } = B(req);
     if (typeof text !== 'string' || !text.trim()) throw new HttpError(400, 'Type an address or something to search for');
-    const b = await browsing();
-    await go(b, text, { tab: typeof tab === 'string' ? tab : undefined, newTab: !!newTab });
+    const b = await browsing(false);
+    await go(b, text, { tab: typeof tab === 'string' ? tab : undefined, newTab: !!newTab, typed: true });
+    return { view: b.view() };
+  });
+
+  /** Opens a tab you closed again (the newest, or the one at `index` in the view's list of them). */
+  app.post('/api/browser/browsing/reopen', async (req) => {
+    requireDesktop();
+    const index = B(req).index === undefined ? 0 : Number(B(req).index);
+    if (!Number.isInteger(index) || index < 0) throw new HttpError(400, 'index should be a place in the list of closed tabs, from 0');
+    const b = await browsing(false);
+    const closed = takeClosedTab(index);
+    if (!closed) throw new HttpError(404, 'There is no closed tab to open again');
+    await go(b, closed.url, { newTab: true });
     return { view: b.view() };
   });
 
@@ -478,6 +589,60 @@ export function browsingRoutes(d: Deps) {
     if (!b || !t) throw new HttpError(404, 'No such tab');
     await b.closeTab(t);
     return { view: b.view() };
+  });
+
+  // ---- your settings, the address bar's suggestions, history, clearing ----
+
+  app.get('/api/browser/browsing/prefs', async () => browsingPrefs(db));
+  app.patch('/api/browser/browsing/prefs', async (req) => {
+    const prefs = setBrowsingPrefs(db, B(req));
+    tellPrefs();
+    return prefs;
+  });
+
+  /** What to put under the address bar for what was typed: tabs, bookmarks and history at once, the engine's suggestions as far as it answers in time. */
+  app.get('/api/browser/browsing/suggest', async (req, reply) => {
+    const q = String((req.query as Record<string, unknown>).q ?? '').slice(0, 300);
+    // The page asks again at each key: when it stops waiting for an answer, the engine is not waited for either.
+    const stop = new AbortController();
+    reply.raw.on('close', () => {
+      if (!reply.raw.writableFinished) stop.abort();
+    });
+    const b = browserOf(BROWSING_KEY);
+    return suggest(db, {
+      q,
+      address: addressOf(q),
+      tabs: (b?.tabs ?? []).filter((t) => !t.closed).map((t) => ({ id: t.targetId, url: t.url, title: t.title })),
+      bookmarks: loadBookmarks(db),
+      prefs: browsingPrefs(db),
+      signal: stop.signal,
+    });
+  });
+
+  app.get('/api/browser/browsing/history', async (req) => {
+    const { q, before, limit } = req.query as Record<string, string | undefined>;
+    const n = before === undefined || before === '' ? undefined : Number(before);
+    if (n !== undefined && !Number.isFinite(n)) throw new HttpError(400, 'before should be a time in milliseconds');
+    return { entries: listHistory(db, { q: q ?? '', before: n, limit: limit === undefined ? undefined : Number(limit) }) };
+  });
+  app.delete('/api/browser/browsing/history/:id', async (req) => {
+    const id = Number(P(req).id);
+    if (!Number.isInteger(id)) throw new HttpError(400, 'Send the id of the entry');
+    return { removed: removeHistory(db, id) };
+  });
+  app.post('/api/browser/browsing/history/clear', async (req) => {
+    const since = sinceOf(B(req).since);
+    return { removed: clearHistory(db, since) };
+  });
+
+  /** Clears what you pick: history here, cookies and site data and cached files in the app's browser. */
+  app.post('/api/browser/browsing/clear', async (req) => {
+    const { history, cookies, cache } = B(req);
+    const since = sinceOf(B(req).since);
+    if (history !== true && cookies !== true && cache !== true) throw new HttpError(400, 'Pick what to clear: history, cookies or cache');
+    const removed = history === true ? clearHistory(db, since) : 0;
+    const told = cookies === true || cache === true ? tellDesktop({ type: 'browser-clear', profile: BROWSING_PROFILE, cookies: cookies === true, cache: cache === true, ...(since === undefined ? {} : { since }) }) : false;
+    return { history: removed, desktop: told };
   });
 
   // ---- find in the page of any session's browser ----
@@ -610,9 +775,11 @@ export function browsingRoutes(d: Deps) {
   });
   // Your tabs are kept as they change; a request whose tab closed, or whose browser stopped, is refused.
   const keeper = new TabsKeeper((json) => kv.set(TABS_KEY, json));
+  recorder = new HistoryRecorder(db);
   onBrowserView((k, view) => {
     if (k !== BROWSING_KEY) return;
     keeper.seen(view);
+    recorder?.seen(view);
     const b = browserOf(BROWSING_KEY);
     desk.prune((target) => !!b && !b.closed && b.tabs.some((t) => t.targetId === target));
   });

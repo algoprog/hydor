@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { BROWSING_KEY, BROWSING_PROFILE, DESKTOP_CHROME, type BrowserAsk, type BrowserDialog, type BrowserInput, type BrowserNote, type BrowserPermissionAsk, type BrowserView, type ChromeInfo } from '../../shared/browser.ts';
+import { BROWSING_KEY, BROWSING_PROFILE, DESKTOP_CHROME, type BrowserAsk, type BrowserDialog, type BrowserInput, type BrowserNote, type BrowserPermissionAsk, type BrowserView, type ChromeInfo, type ClosedTab } from '../../shared/browser.ts';
 import type { AgentPointer, PointerAct, Way } from '../../shared/pointer.ts';
 import { HttpError } from '../auth.ts';
 import { config } from '../config.ts';
@@ -25,6 +25,16 @@ import { sleep, Tab, type ElRef, type TabOwner } from './tab.ts';
 import { captureJpeg } from './jpeg.ts';
 
 const DESKTOP = { w: 1280, h: 800 };
+/** Your own browsing's last closed tabs, newest first, to open again (kept while the server runs, across the browser's restarts). */
+export const MAX_CLOSED_TABS = 25;
+const closedTabs: ClosedTab[] = [];
+/** The closed tabs as the view shows them. */
+export const closedTabList = (): ClosedTab[] => [...closedTabs];
+/** Takes one closed tab off the list to open it again (the newest by default); undefined when there is none at that place. */
+export function takeClosedTab(index = 0): ClosedTab | undefined {
+  return Number.isInteger(index) && index >= 0 && index < closedTabs.length ? closedTabs.splice(index, 1)[0] : undefined;
+}
+
 /** How long the agent's pointer takes to glide to where it acts, while someone watches (the action waits for it). */
 export const GLIDE_MS = 300;
 /** The session's browser a tab belongs to. */
@@ -109,7 +119,8 @@ class Chromium {
     if (own) {
       let launched: Awaited<ReturnType<typeof launchDesktop>>;
       try {
-        launched = await launchDesktop({ profile, proxy: proxy.port, extensions: extensionsOf(profile) });
+        // Your own browsing connects directly (no proxy: it slowed every page); agents' tabs in it keep their guard (guardTab).
+        launched = await launchDesktop({ profile, proxy: profile === BROWSING_PROFILE ? 0 : proxy.port, extensions: extensionsOf(profile) });
       } catch (e) {
         proxy.close();
         throw e;
@@ -649,6 +660,11 @@ export class SessionBrowser implements TabOwner {
   }
 
   tabGone(tab: Tab) {
+    // A tab of yours that closed on a page (not the browser closing) can be opened again.
+    if (this.key === BROWSING_KEY && !this.closed && /^(https?|file):\/\//i.test(tab.url) && tab.url.length <= 4000) {
+      closedTabs.unshift({ url: tab.url, title: tab.title, at: Date.now() });
+      closedTabs.length = Math.min(closedTabs.length, MAX_CLOSED_TABS);
+    }
     this.tabs = this.tabs.filter((t) => t !== tab);
     for (const [id, r] of this.refs) if (r.tab === tab) this.refs.delete(id);
     if (this.active === tab) this.setActive(this.tabs[this.tabs.length - 1] ?? null);
@@ -709,6 +725,7 @@ export class SessionBrowser implements TabOwner {
       engine: this.chromium.native ? 'desktop' : 'chrome',
       ...(this.handedFrom ? { handedFrom: this.handedFrom } : {}),
       ...(this.permission ? { permission: this.permission } : {}),
+      ...(this.key === BROWSING_KEY && closedTabs.length ? { closed: closedTabList() } : {}),
     };
   }
 

@@ -1,5 +1,5 @@
 // Script tests for your own browsing on the server (browsing.ts): what the address bar makes of words, the search page
-// from your providers, the tabs kept between runs, the copy of a page, the permission memory and desk, the start rules of
+// from your engine, your settings for it, the 409 outside the desktop app, the tabs kept between runs, the copy of a page, the permission memory and desk, the start rules of
 // Do this here, and (when a Chromium is installed) the routes for real: your tabs, find, a copy, a page given to a session (its own tab) and
 // taken back.
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/browser/browsing-test.ts
@@ -12,10 +12,10 @@ import Fastify from 'fastify';
 import { BROWSING_KEY, type BrowserPermissionAsk } from '../../shared/browser.ts';
 import { CONSOLE_ID } from '../agents/acp.ts';
 import { HttpError } from '../auth.ts';
-import { openDb } from '../db.ts';
+import { openDb, type DB } from '../db.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
-import { addressOf, browsingRoutes, checkHandoffStart, handoffLine, PermissionDesk, PermissionMemory, restorable, savableTabs, savedTabs, searchPage, snapshotMarkdown, TabsKeeper } from './browsing.ts';
+import { addressOf, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
 import { pickChrome } from './chrome.ts';
 import { browserRoutes } from './routes.ts';
 import { browserOf, closeAll, ensureBrowser, setBrowserDeps } from './session.ts';
@@ -68,17 +68,49 @@ async function main() {
     }
   });
 
-  await check('search page: the first provider that is on, in your order; DuckDuckGo when none is', () => {
-    assert.equal(searchPage({}, 'a b&c'), 'https://duckduckgo.com/?q=a%20b%26c', 'Naget Search (on from the start) has no results page: passed over');
-    assert.equal(searchPage({ providers: { naget: { enabled: false } } }, 'x'), 'https://duckduckgo.com/?q=x', 'SearXNG has no address, Brave is off by default');
-    assert.equal(searchPage({ providers: { naget: { enabled: false }, brave: { enabled: true } } }, 'x'), 'https://search.brave.com/search?q=x');
-    assert.equal(searchPage({ order: ['brave', 'naget'], providers: { brave: { enabled: true } } }, 'x'), 'https://search.brave.com/search?q=x', 'the order counts');
-    assert.equal(searchPage({ order: ['duckduckgo', 'naget'] }, 'x'), 'https://duckduckgo.com/?q=x');
-    assert.equal(searchPage({ providers: { naget: { enabled: false }, searxng: { enabled: true, url: 'searx.example.org/' } } }, 'q'), 'https://searx.example.org/search?q=q');
-    assert.equal(searchPage({ providers: { naget: { enabled: false }, searxng: { enabled: true, url: 'http://10.0.0.2:8080/search' } } }, 'q'), 'http://10.0.0.2:8080/search?q=q');
-    assert.equal(searchPage({ providers: { naget: { enabled: false }, searxng: { enabled: true } } }, 'q'), 'https://duckduckgo.com/?q=q', 'on, but with no address: skipped');
-    assert.equal(searchPage({ providers: { naget: { enabled: false }, duckduckgo: { enabled: false } } }, 'q'), 'https://duckduckgo.com/?q=q', 'none on');
-    assert.equal(searchPage('junk', 'q'), 'https://duckduckgo.com/?q=q');
+  // ---- your settings ----
+  const mem = () => {
+    const store = new Map<string, string>();
+    return { db: { prepare: (sql: string) => ({ get: (k: string) => (store.has(k) ? { v: store.get(k) } : undefined), run: (k: string, v: string) => void store.set(k, v) }) } as unknown as DB, store };
+  };
+  await check('prefs: Google, suggestions and the ad blocker on, until you change them', () => {
+    const { db } = mem();
+    assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: [] });
+  });
+  await check('prefs: checked, kept, and a bad one keeps nothing', () => {
+    const { db, store } = mem();
+    assert.equal(setBrowsingPrefs(db, { home: 'example.com' }).home, 'https://example.com/', 'a bare name is a web address');
+    assert.equal(setBrowsingPrefs(db, { home: 'http://localhost:3000/start' }).home, 'http://localhost:3000/start');
+    for (const home of ['javascript:alert(1)', 'file:///etc/passwd', 'about:blank', 'two words', '', 7, null]) assert.throws(() => setBrowsingPrefs(db, { home }), refused(400, /home page/), String(home));
+    assert.throws(() => setBrowsingPrefs(db, { engine: 'altavista' }), refused(400, /search engine/));
+    assert.throws(() => setBrowsingPrefs(db, { engine: 'custom' }), refused(400, /search page/), 'custom needs its page');
+    assert.throws(() => setBrowsingPrefs(db, { customSearch: 'https://s.example/?q=' }), refused(400, /%s/));
+    assert.throws(() => setBrowsingPrefs(db, { customSearch: 'ftp://s.example/?q=%s' }), refused(400, /%s/));
+    assert.throws(() => setBrowsingPrefs(db, { customSearch: 'javascript:%s' }), refused(400, /%s/));
+    assert.throws(() => setBrowsingPrefs(db, { suggest: 'yes' }), refused(400, /true or false/));
+    assert.throws(() => setBrowsingPrefs(db, { adblock: 1 }), refused(400, /true or false/));
+    assert.equal(browsingPrefs(db).home, 'http://localhost:3000/start', 'the failed changes kept nothing');
+    const p = setBrowsingPrefs(db, { engine: 'custom', customSearch: 'https://s.example/find?q=%s', suggest: false, adblock: false, allowAds: ['https://www.Shop.example/cart', 'bad host!', 'shop.example'] });
+    assert.deepEqual(p, { home: 'http://localhost:3000/start', engine: 'custom', customSearch: 'https://s.example/find?q=%s', suggest: false, adblock: false, allowAds: ['shop.example'] });
+    assert.throws(() => setBrowsingPrefs(db, { customSearch: '' }), refused(400, /search page/), 'custom cannot lose its page');
+    assert.equal(setBrowsingPrefs(db, { engine: 'bing', customSearch: null }).customSearch, undefined);
+    // What is kept is checked when read, too.
+    store.set('browser.browsing.prefs', JSON.stringify({ home: 'javascript:x', engine: 'custom', suggest: 'no', allowAds: 'a.com b.com' }));
+    assert.deepEqual(browsingPrefs(db), { home: 'https://www.google.com/', engine: 'google', suggest: true, adblock: true, allowAds: ['a.com', 'b.com'] });
+    store.set('browser.browsing.prefs', 'junk');
+    assert.equal(browsingPrefs(db).engine, 'google');
+  });
+  await check('the address bar searches with your engine, custom with its own page', () => {
+    const p = { ...DEFAULT_PREFS };
+    assert.equal(barTarget(p, 'a b&c'), 'https://www.google.com/search?q=a%20b%26c');
+    assert.equal(barTarget(p, 'example.com'), 'https://example.com/');
+    for (const engine of ['duckduckgo', 'bing', 'brave', 'ecosia', 'startpage'] as const) assert.match(searchUrl({ ...p, engine }, 'x y'), /^https:\/\/[^/]+\/.*[?&]q=x%20y$/, engine);
+    assert.equal(searchUrl({ ...p, engine: 'custom', customSearch: 'https://s.example/?q=%s&again=%s' }, ' hi there '), 'https://s.example/?q=hi%20there&again=hi%20there');
+    assert.equal(searchUrl({ ...p, engine: 'custom' }, 'x'), 'https://www.google.com/search?q=x', 'custom without its page is Google');
+  });
+  await check('your own browser is in the desktop app: 409 elsewhere', () => {
+    assert.equal(desktopGate.inside(), false, 'these tests do not run in the desktop app');
+    assert.throws(() => requireDesktop(), refused(409, /desktop app/));
   });
 
   // ---- the tabs kept ----
@@ -239,7 +271,7 @@ async function realBrowser() {
   setBrowserSettings(db, { enabled: true });
   browsingRoutes(deps);
   browserRoutes(deps);
-  const call = async (method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown) => {
+  const call = async (method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, body?: unknown) => {
     const r = await app.inject({ method, url, ...(body === undefined ? {} : { payload: body as object }) });
     const json = r.body ? JSON.parse(r.body) : {};
     if (r.statusCode >= 400) throw Object.assign(new Error(json.error ?? r.body), { status: r.statusCode });
@@ -255,6 +287,34 @@ async function realBrowser() {
   void live;
 
   try {
+    // Outside the desktop app the routes that start your own browser say so (this test runs on a Chromium of its own).
+    await check('real: outside the desktop app your own browser does not start: 409, and nothing was started', async () => {
+      const no = (e: unknown) => (e as { status?: number }).status === 409 && /Your own browser is in the desktop app/.test((e as Error).message);
+      await assert.rejects(call('POST', '/api/browser/browsing/open', {}), no);
+      await assert.rejects(call('POST', '/api/browser/browsing/open', { url: `${base}/home` }), no);
+      await assert.rejects(call('POST', '/api/browser/browsing/tabs', {}), no);
+      await assert.rejects(call('POST', '/api/browser/browsing/go', { text: 'example.com' }), no);
+      await assert.rejects(call('POST', '/api/browser/browsing/reopen', {}), no);
+      await assert.rejects(call('POST', '/api/browser/sessions/browsing/open', {}), no);
+      assert.equal(browserOf(BROWSING_KEY), undefined);
+      // What needs no browser is there for the page to show.
+      assert.equal((await call('GET', '/api/browser/browsing/prefs')).home, 'https://www.google.com/');
+      assert.deepEqual((await call('GET', '/api/browser/browsing/history')).entries, []);
+      assert.deepEqual((await call('GET', '/api/browser/browsing/suggest?q=exam')).items.filter((i: { kind: string }) => i.kind !== 'search'), [], 'nothing of yours yet (the engine may suggest)');
+    });
+    desktopGate.inside = () => true;
+    await check('real: settings through the routes: checked, kept, and the page never leaves the local test site', async () => {
+      const bad = (body: object, re: RegExp) => assert.rejects(call('PATCH', '/api/browser/browsing/prefs', body), (e) => (e as { status?: number }).status === 400 && re.test((e as Error).message));
+      await bad({ home: 'javascript:alert(1)' }, /home page/);
+      await bad({ engine: 'nope' }, /search engine/);
+      await bad({ engine: 'custom' }, /search page/);
+      await bad({ customSearch: 'https://s.example/' }, /%s/);
+      await bad({ suggest: 'yes' }, /true or false/);
+      const p = await call('PATCH', '/api/browser/browsing/prefs', { home: `${base}/home`, engine: 'custom', customSearch: `${base}/search?q=%s`, suggest: false, adblock: false, allowAds: ['https://www.Ads.example/x'] });
+      assert.deepEqual(p, { home: `${base}/home`, engine: 'custom', customSearch: `${base}/search?q=%s`, suggest: false, adblock: false, allowAds: ['ads.example'] });
+      assert.deepEqual(await call('GET', '/api/browser/browsing/prefs'), p);
+    });
+
     await check('real: opens your browser on a page, in a tab of its own', async () => {
       const r = await call('POST', '/api/browser/browsing/open', { url: `${base}/home` });
       assert.equal(r.key, BROWSING_KEY);
@@ -444,6 +504,127 @@ async function realBrowser() {
       assert.equal(only.tabs.length, new Set(only.tabs.map((t) => t.targetId)).size);
       const e = await ensureBrowser(BROWSING_KEY, dataDir);
       assert.equal(e, only);
+    });
+
+    // History, suggestions, closed tabs and clearing, on the browser as it is now.
+    const history = async (q: string) => (await call('GET', `/api/browser/browsing/history?q=${encodeURIComponent(q)}`)).entries as { id: number; url: string; title: string; visits: number; typed: number; at: number }[];
+    await check('real: a new tab opens your home page', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      const n = b.tabs.length;
+      await call('POST', '/api/browser/browsing/tabs', {});
+      await until('the home page', () => b.tabs.length === n + 1 && b.active?.url === `${base}/home` && b.active.title === 'Home');
+    });
+    await check('real: pages you go to are in the history: typed in the address bar counts typed, a link or a new tab does not', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/typed-page`, newTab: true });
+      for (let i = 0; i < 60 && !(await history('typed-page')).some((e) => e.title === 'Home'); i++) await new Promise((r) => setTimeout(r, 100));
+      const typed = (await history('typed-page'))[0];
+      assert.deepEqual([typed.url, typed.title, typed.visits, typed.typed], [`${base}/typed-page`, 'Home', 1, 1]);
+      await call('POST', '/api/browser/browsing/tabs', { url: `${base}/linked-page` });
+      for (let i = 0; i < 60 && !(await history('linked-page')).some((e) => e.title === 'Home'); i++) await new Promise((r) => setTimeout(r, 100));
+      const linked = (await history('linked-page'))[0];
+      assert.deepEqual([linked.visits, linked.typed], [1, 0]);
+      // The same page typed again in a tab on another page: another visit, typed twice.
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/mail`, tab: b.active!.targetId });
+      await until('the inbox', () => b.active?.title === 'Inbox');
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/typed-page`, tab: b.active!.targetId });
+      for (let i = 0; i < 60 && (await history('typed-page'))[0]?.visits !== 2; i++) await new Promise((r) => setTimeout(r, 100));
+      assert.deepEqual([(await history('typed-page'))[0].visits, (await history('typed-page'))[0].typed], [2, 2]);
+      // Typing the address of the page you are on is a reload, not a visit.
+      await call('POST', '/api/browser/browsing/go', { text: `${base}/typed-page`, tab: b.active!.targetId });
+      await new Promise((r) => setTimeout(r, 600));
+      assert.equal((await history('typed-page'))[0].visits, 2);
+      const inbox = (await history('/mail'))[0];
+      assert.equal(inbox.title, 'Inbox');
+    });
+    await check('real: the suggestions come from tabs and history, the address to complete, the page you typed first', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      const r = await call('GET', `/api/browser/browsing/suggest?q=${encodeURIComponent(`127.0.0.1:${port}/typed`)}`);
+      assert.equal(r.inline, `127.0.0.1:${port}/typed-page`);
+      // Open in a tab, so it is that tab that is offered (a tab beats the same page in the history).
+      assert.ok(r.items.some((i: { kind: string; url: string }) => (i.kind === 'tab' || i.kind === 'history') && i.url === `${base}/typed-page`), JSON.stringify(r));
+      assert.deepEqual(r.items[0], { kind: 'url', url: `http://127.0.0.1:${port}/typed` }, 'what you typed, as an address, first');
+      const t = await call('GET', '/api/browser/browsing/suggest?q=inbox');
+      const tab = t.items.find((i: { kind: string }) => i.kind === 'tab');
+      assert.ok(tab && tab.title === 'Inbox', JSON.stringify(t));
+      assert.ok(t.items.some((i: { kind: string; title: string }) => i.title === 'Inbox'), JSON.stringify(t));
+      const a = await call('GET', `/api/browser/browsing/suggest?q=${encodeURIComponent('example.org')}`);
+      assert.deepEqual(a.items, [{ kind: 'url', url: 'https://example.org/' }]);
+      assert.deepEqual((await call('GET', '/api/browser/browsing/suggest?q=')).items.length > 0, true, 'nothing typed: where you go most');
+    });
+    await check('real: history routes: search, page by time, delete one, clear since a time', async () => {
+      const all = (await call('GET', '/api/browser/browsing/history?limit=200')).entries as { id: number; at: number; url: string }[];
+      assert.ok(all.length >= 4);
+      assert.ok(all.every((e, i) => i === 0 || all[i - 1].at >= e.at), 'newest first');
+      const older = (await call('GET', `/api/browser/browsing/history?before=${all[0].at}&limit=200`)).entries;
+      assert.ok(older.every((e: { at: number }) => e.at < all[0].at));
+      await assert.rejects(call('GET', '/api/browser/browsing/history?before=soon'), /milliseconds/);
+      const target = (await history('linked-page'))[0];
+      assert.deepEqual(await call('DELETE', `/api/browser/browsing/history/${target.id}`), { removed: true });
+      assert.deepEqual(await call('DELETE', `/api/browser/browsing/history/${target.id}`), { removed: false });
+      assert.equal((await history('linked-page')).length, 0);
+      await assert.rejects(call('DELETE', '/api/browser/browsing/history/abc'), /id/);
+      assert.deepEqual(await call('POST', '/api/browser/browsing/history/clear', { since: Date.now() + 3600_000 }), { removed: 0 });
+      await assert.rejects(call('POST', '/api/browser/browsing/history/clear', { since: 'yesterday' }), /milliseconds/);
+    });
+    await check('real: closed tabs are remembered (newest first, 25), and opened again', async () => {
+      const b = browserOf(BROWSING_KEY)!;
+      const one = await b.newTab();
+      await one.navigate(`${base}/mail`);
+      await until('the page', () => one.title === 'Inbox');
+      const blank = await b.newTab();
+      await call('POST', '/api/browser/sessions/browsing/tab', { id: blank.targetId, close: true });
+      const closed = await call('DELETE', `/api/browser/browsing/tabs/${one.targetId}`);
+      assert.deepEqual([closed.view.closed[0].url, closed.view.closed[0].title], [`${base}/mail`, 'Inbox'], 'a blank tab is not kept');
+      assert.ok(typeof closed.view.closed[0].at === 'number');
+      const n = b.tabs.length;
+      const first = closed.view.closed.length;
+      const r = await call('POST', '/api/browser/browsing/reopen', {});
+      assert.equal(r.view.tabs.length, n + 1);
+      assert.equal(r.view.closed?.length ?? 0, first - 1, 'it leaves the list');
+      await until('the page again', () => b.active?.url === `${base}/mail` && b.active.title === 'Inbox');
+      // Another one of them, by its place.
+      const two = await b.newTab();
+      await two.navigate(`${base}/other`);
+      await until('other', () => two.title === 'Other');
+      await b.closeTab(two);
+      const three = await b.newTab();
+      await three.navigate(`${base}/three`);
+      await until('three', () => three.url === `${base}/three` && three.title === 'Home');
+      await b.closeTab(three);
+      const view = (await call('GET', '/api/browser/sessions/browsing')).view;
+      assert.deepEqual(view.closed.slice(0, 2).map((c: { url: string }) => c.url), [`${base}/three`, `${base}/other`]);
+      const mid = await call('POST', '/api/browser/browsing/reopen', { index: 1 });
+      assert.equal(mid.view.closed[0].url, `${base}/three`, 'the one at that place left, the newest stays');
+      assert.ok(!mid.view.closed.some((c: { url: string }) => c.url === `${base}/other`));
+      await until('other again', () => b.active?.url === `${base}/other`);
+      await assert.rejects(call('POST', '/api/browser/browsing/reopen', { index: -1 }), /place in the list/);
+      await assert.rejects(call('POST', '/api/browser/browsing/reopen', { index: 'x' }), /place in the list/);
+      await assert.rejects(call('POST', '/api/browser/browsing/reopen', { index: 999 }), /no closed tab/);
+      // A long run of them: the last 25.
+      for (let i = 0; i < 27; i++) {
+        const t = await b.newTab();
+        await t.navigate(`${base}/n${i}`);
+        await until('the page', () => t.url === `${base}/n${i}`);
+        await b.closeTab(t);
+      }
+      const v = (await call('GET', '/api/browser/sessions/browsing')).view;
+      assert.equal(v.closed.length, 25);
+      assert.equal(v.closed[0].url, `${base}/n26`);
+      assert.equal(v.closed[24].url, `${base}/n2`);
+      // The server's tabs list and the history do not turn them into new visits when they come back.
+      await call('POST', '/api/browser/browsing/reopen', {});
+    });
+    await check('real: clear browsing data: history here, cookies and cache told to the app (nobody here to tell)', async () => {
+      await assert.rejects(call('POST', '/api/browser/browsing/clear', {}), /Pick what/);
+      await assert.rejects(call('POST', '/api/browser/browsing/clear', { history: 'yes' }), /Pick what/);
+      await assert.rejects(call('POST', '/api/browser/browsing/clear', { history: true, since: -5 }), /milliseconds/);
+      assert.deepEqual(await call('POST', '/api/browser/browsing/clear', { cookies: true, cache: true }), { history: 0, desktop: false });
+      assert.ok((await history('')).length > 0, 'cookies and cache leave the history');
+      assert.deepEqual(await call('POST', '/api/browser/browsing/clear', { history: true, since: Date.now() + 3600_000 }), { history: 0, desktop: false });
+      const r = await call('POST', '/api/browser/browsing/clear', { history: true });
+      assert.ok(r.history > 0);
+      assert.deepEqual(await history(''), []);
     });
   } finally {
     await closeAll();

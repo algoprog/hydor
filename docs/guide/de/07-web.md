@@ -1,6 +1,6 @@
 # Suche und Browser
 
-Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen echten Browser bedienen. Dieser Beitrag erklärt Suchanbieter und Einrichtung, die Suchschritte in der Unterhaltung und Quellenangaben sowie die Live-Ansicht des Browsers und seine Übernahme für Anmeldungen, Prüfungen oder Zahlungen. Er behandelt auch die Seite „Browser“, einen eigenen Browser in der App (Tabs, Lesezeichen, Chrome-Erweiterungen), und wie du einem Agenten eine Seite daraus übergibst. In der Desktop-App für Mac, Windows und Linux läuft der Browser in der App, und Agenten können auch Bildschirm, Maus und Tastatur deines Computers verwenden.
+Agenten können unabhängig vom Modell im Web suchen, Seiten lesen und einen echten Browser bedienen. Dieser Beitrag erklärt Suchanbieter und Einrichtung, die Suchschritte in der Unterhaltung und Quellenangaben sowie die Live-Ansicht des Browsers und seine Übernahme für Anmeldungen, Prüfungen oder Zahlungen. Er behandelt auch die Seite „Browser“, einen eigenen Browser in der Desktop-App (Tabs, eine intelligente Adressleiste, Lesezeichen, Verlauf, ein Werbeblocker, Chrome-Erweiterungen), und wie du einem Agenten eine Seite daraus übergibst. In der Desktop-App für Mac, Windows und Linux läuft der Browser in der App, und Agenten können auch Bildschirm, Maus und Tastatur deines Computers verwenden.
 
 ![Ein Agent hat im Web recherchiert, Seiten gelesen und Ergebnisse in einer Tabelle verglichen](images/web.webp)
 
@@ -254,47 +254,114 @@ In der Desktop-App braucht der Browser eines Agenten das Fenster der App nicht: 
 
 ## Dein eigener Browser
 
-Die Seite **Browser** ist ein eigener Browser in der App neben dem, den Agenten benutzen: Öffne **Browser** bei den Werkzeugen der Seitenleiste oder gehe zu [Browser](/browser). Sie hat Tabs, eine Adressleiste, die auch sucht, Zurück, Vorwärts und Neu laden, Lesezeichen, Chrome-Erweiterungen, Suche auf der Seite, Downloads und eine Liste der Tabs der Agenten. Deine Anmeldungen bleiben zwischen den Besuchen erhalten, in einem eigenen Profil, das kein Agent wählen kann, und beim nächsten Öffnen sind deine Tabs wieder da (bis zu 30; leere werden weggelassen). Deine Tabs können auch Adressen auf diesem Computer und in seinem Netzwerk öffnen (etwa eine Website, die du gerade baust), aber nie Hydor selbst.
+Die Seite **Browser** ist ein eigener Browser in der Desktop-App (Mac, Windows, Linux) neben dem, den Agenten benutzen: Öffne **Browser** bei den Werkzeugen der Seitenleiste oder gehe zu [Browser](/browser). Sie gibt es nur in der Desktop-App: Die Web-App in einem Browser und ein Smartphone haben keine Schaltfläche **Browser**, und die Adresse [Browser](/browser) sagt das dort. Die Browser der Agenten funktionieren überall, und du kannst ihnen in ihren Sitzungen zusehen.
 
-In der Desktop-App sind deine Tabs echte Seiten im Fenster der App, mit der Geschwindigkeit und den Tasten jedes Browsers. Ein Menü oder Dialog der App, der sich über der Seite öffnet, nimmt sie kurz weg (ein Bild davon steht, bis er sich schließt). Anderswo ist die Seite ein Livebild eines Chromium, das auf dem Computer läuft, auf dem die App läuft, und passend zum Platz auf deinem Bildschirm gelayoutet; du klickst, scrollst und tippst hinein (siehe [Den Browser live beobachten](/guide/web#watch-the-browser-live)). Kann der Browser nicht starten (er hat etwa kein Chromium gefunden), nennt die Seite den Grund, mit **Erneut versuchen** und **Browser-Einstellungen**, das [Einstellungen → Browser](/settings?s=browser) öffnet.
+Sie hat Tabs, eine Adressleiste, die vervollständigt, was du tippst, und auch sucht, eine Schaltfläche Startseite, Zurück, Vorwärts und Neu laden, Lesezeichen, Verlauf, Chrome-Erweiterungen, einen Blocker für Werbung und Tracker, Suche auf der Seite, Zoom, Drucken, Downloads und eine Liste der Tabs der Agenten. Ihre Tabs sind echte Seiten im Fenster der App, mit der Geschwindigkeit und den Tasten jedes Browsers, und sie verbinden sich direkt mit den Websites, wie in jedem Browser. Ein Menü oder Dialog der App, der sich über der Seite öffnet, nimmt sie kurz weg (ein Bild davon steht, bis er sich schließt). Deine Anmeldungen bleiben zwischen den Besuchen erhalten, in einem eigenen Profil, das kein Agent wählen kann, und beim nächsten Öffnen sind deine Tabs wieder da (bis zu 30; leere werden weggelassen). Deine Tabs können auch Adressen auf diesem Computer und in seinem Netzwerk öffnen (etwa eine Website, die du gerade baust). Kann der Browser nicht starten, nennt die Seite den Grund, mit **Erneut versuchen** und **Browser-Einstellungen**, das [Einstellungen → Browser](/settings?s=browser) öffnet.
 
 ### Tabs und Adressleiste
 
-- Die Tableiste über der Adressleiste zeigt Symbol, Titel und **×** jedes Tabs. **+** (**Neuer Tab**) öffnet einen leeren. Ein Mittelklick schließt einen Tab. Schließt du den letzten Tab, bleibt ein leerer.
-- Die Adressleiste zeigt die Adresse der Seite. Gib eine Adresse mit oder ohne https:// ein (`example.com`, `localhost:3000`, `192.168.1.5`, eine `file://`-Adresse) und drücke Enter, um sie zu öffnen. Alles andere, was du eingibst, wird mit deinen Suchanbietern gesucht (siehe [Suchanbieter auswählen](/guide/web#choose-your-search-providers)): mit dem ersten eingeschalteten in ihrer Reihenfolge und mit DuckDuckGo, wenn keiner eingeschaltet ist. **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet es stattdessen in einem neuen Tab.
-- **Zurück**, **Vorwärts** und **Neu laden** stehen links der Adressleiste. Während eine Seite lädt, wird aus Neu laden **Stoppen**.
+- Die Tableiste über der Adressleiste zeigt Symbol, Titel und **×** jedes Tabs. **+** (**Neuer Tab**) öffnet deine Startseite. Ein Mittelklick schließt einen Tab. Schließt du den letzten Tab, bleibt ein leerer.
+- Ein Tab, der Ton abspielt, zeigt einen Lautsprecher: Klicke darauf, um den Tab stummzuschalten, und noch einmal, um ihn wieder zu hören. Ein stummgeschalteter Tab behält seinen Lautsprecher.
+- Die Adressleiste zeigt die Adresse der Seite. Gib eine Adresse mit oder ohne https:// ein (`example.com`, `localhost:3000`, `192.168.1.5`, eine `file://`-Adresse) und drücke Enter, um sie zu öffnen. Alles andere, was du eingibst, wird mit deiner Suchmaschine gesucht (zuerst Google; siehe [Browser-Einstellungen](/guide/web#browser-settings)). **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet es stattdessen in einem neuen Tab.
+- **Zurück**, **Vorwärts**, **Neu laden** und **Startseite** stehen links der Adressleiste. Während eine Seite lädt, wird aus Neu laden **Stoppen**. **Startseite** öffnet deine Startseite im geöffneten Tab.
 - Der Stern am Ende der Adressleiste setzt ein Lesezeichen für die Seite in der Lesezeichenleiste; ausgefüllt ist sie als Lesezeichen gesetzt, und ein erneuter Klick entfernt das Lesezeichen.
-- **Menü** (⋯) bietet **Zu dieser Seite fragen**, **Hier erledigen lassen**, **Auf der Seite suchen**, **Lesezeichen**, **Erweiterungen**, **Downloads** und **Tabs der Agenten**.
+- **Menü** (⋯) bietet **Zu dieser Seite fragen**, **Hier erledigen lassen**, **Auf der Seite suchen**, **Drucken …**, **In deinem Standardbrowser öffnen**, **Lesezeichen**, **Verlauf**, **Erweiterungen**, **Downloads**, **Tabs der Agenten**, **Website-Berechtigungen** und **Einstellungen**. **In deinem Standardbrowser öffnen** öffnet die Seite in dem Browser, den dein Computer für Links verwendet.
 - Ist der geöffnete Tab die Chrome-Web-Store-Seite einer Erweiterung, erscheint in der Leiste die Schaltfläche **Zu Hydor hinzufügen** (siehe [Chrome-Erweiterungen](/guide/web#chrome-extensions)).
 
 Ein Link auf `/browser?url=https://example.com` öffnet die Seite Browser mit dieser Adresse in einem neuen Tab.
 
+### Vorschläge
+
+Während du in die Adressleiste tippst, bietet eine Liste darunter an, mit den getippten Wörtern fett:
+
+- deine geöffneten Tabs („Zum Tab wechseln“: Wähle einen, um zu ihm zu gehen, statt die Seite erneut zu öffnen),
+- deine Lesezeichen und die Seiten deines Verlaufs, die zu den Wörtern in ihren Titeln und Adressen passen, die du oft und zuletzt besucht hast zuerst (Adressen, die du selbst getippt hast, zählen am meisten),
+- das, was du getippt hast, als Suche („Mit Google suchen“) oder, wenn es wie eine Adresse aussieht, als diese Adresse,
+- die eigenen Vorschläge der Suchmaschine, wenn [Suchvorschläge](/guide/web#browser-settings) eingeschaltet ist,
+- zuletzt **Agenten fragen: „…“**, das eine Sitzung mit dem Getippten als erster Nachricht startet, mit dem Agenten und Modell, die die Startseite zuletzt verwendet hat, und dich dorthin bringt.
+
+Die Liste zeigt so viele Einträge, wie auf den Bildschirm passen. Die Pfeiltasten bewegen sich darin, und **Enter** öffnet den markierten (das Getippte, wenn keiner markiert ist); **Alt+Enter** oder Strg+Enter (⌘+Enter auf dem Mac) öffnet ihn in einem neuen Tab. Die Adressleiste vervollständigt auch an Ort und Stelle: Beginnt etwas, wohin du gegangen bist, mit dem Getippten, steht der Rest markiert hinter deinem Cursor, und **Tab** oder **→** übernimmt ihn. Löschst du das Getippte, wird die Vervollständigung ausgeschaltet. **Umschalt+Entf** bei einem Verlaufsvorschlag vergisst diese Seite, und **Esc** schließt die Liste.
+
 ### Tastenkürzel
 
-Auf der Seite Browser (in der Desktop-App auch aus einer Seite heraus), mit Strg unter Windows und Linux und ⌘ auf dem Mac:
+Auf der Seite Browser, auch aus einer Seite heraus, mit Strg unter Windows und Linux und ⌘ auf dem Mac:
 
 - **Strg+T** öffnet einen neuen Tab, und **Strg+W** schließt den geöffneten.
+- **Strg+Umschalt+T** öffnet den zuletzt geschlossenen Tab wieder; drücke es noch einmal für den davor.
+- **Strg+Tab** geht zum nächsten Tab und **Strg+Umschalt+Tab** zum vorigen. **Strg+1** bis **Strg+8** gehen zu diesem Tab und **Strg+9** zum letzten.
 - **Strg+L** springt in die Adressleiste.
-- **Strg+R** lädt neu (in der Desktop-App auch **F5**).
-- **Strg+F** öffnet die Suche auf der Seite.
-- **Alt+←** und **Alt+→** gehen zurück und vor (in der Desktop-App auf dem Mac **⌘[** und **⌘]**).
-- **Esc** schließt die Suche auf der Seite.
+- **Strg+R** (auch **F5**) lädt neu.
+- **Alt+←** und **Alt+→** gehen zurück und vor (auf dem Mac auch **⌘[** und **⌘]**).
+- **Strg+F** öffnet die Suche auf der Seite, und **Esc** schließt sie.
+- **Strg+D** setzt ein Lesezeichen für die Seite.
+- **Strg+H** öffnet den Verlauf und **Strg+J** die Downloads.
+- **Strg+P** druckt die Seite.
+- **Strg+Umschalt+Entf** öffnet die Einstellungen bei **Browserdaten löschen**.
+- **Strg** mit **+**, **−** und **0** vergrößert, verkleinert und geht zurück auf 100 % (siehe [Zoom, Drucken und Vollbild](/guide/web#zoom-print-and-full-screen)).
 
 ### Auf einer Seite suchen
 
-**Strg+F** oder **Auf der Seite suchen** im Menü öffnet eine Leiste unter der Adressleiste. Tippe, und der erste Treffer wird gefunden und ins Bild gescrollt, sobald du pausierst. **Enter** springt zum nächsten Treffer und **Umschalt+Enter** zum vorigen (die Pfeile ebenso), und die Leiste zeigt „12 Treffer“ („1000+“ ab tausend) oder „Keine Übereinstimmungen“. Groß- und Kleinschreibung spielt keine Rolle, und die Suche beginnt am Ende von vorn. **Esc** oder **×** schließt die Leiste und löscht, was gefunden wurde.
+**Strg+F** oder **Auf der Seite suchen** im Menü öffnet eine Leiste unter der Adressleiste. Tippe, und der erste Treffer wird gefunden und ins Bild gescrollt, sobald du pausierst. **Enter** springt zum nächsten Treffer und **Umschalt+Enter** zum vorigen (die Pfeile ebenso), und die Leiste sagt, bei welchem Treffer du bist („3 von 12“, „1000+“ ab tausend), oder „Keine Übereinstimmungen“. Groß- und Kleinschreibung spielt keine Rolle, außer du drückst **Groß- und Kleinschreibung beachten**, und die Suche beginnt am Ende von vorn. **Esc** oder **×** schließt die Leiste und löscht, was gefunden wurde.
+
+### Zoom, Drucken und Vollbild
+
+- **Zoom**: **Strg** mit **+** vergrößert, **−** verkleinert und **0** geht zurück auf 100 %, in den Stufen, die Chrome verwendet (25 % bis 500 %). Auch Strg und das Mausrad zoomen. Ein Zoom ungleich 100 % erscheint als Chip am Ende der Adressleiste, etwa „125%“: Klicke darauf, um zurück auf 100 % zu gehen.
+- **Drucken**: **Strg+P** oder **Drucken …** im Menü oder **Print…** im Rechtsklickmenü öffnet den Druckdialog deines Computers für die Seite, mit ihren Hintergründen.
+- **Vollbild**: Möchte ein Video oder eine Seite den Bildschirm füllen, geht das Fenster der App in den Vollbildmodus, und die Seite füllt es. Der eigene Ausweg der Seite (Esc) bringt das Fenster zurück.
+
+### Rechtsklickmenü
+
+Ein Rechtsklick auf einer Seite öffnet ein Menü, auf Englisch, mit dem, was dort passt, wo du geklickt hast:
+
+- In einem Textfeld: Rechtschreibvorschläge für ein falsch geschriebenes Wort, mit **Add to dictionary**; dann **Undo**, **Redo**, **Cut**, **Copy**, **Paste** und **Select all**.
+- Bei einem Link: **Open link in new tab**, **Open link in your default browser** und **Copy link address**.
+- Bei einem Bild: **Open image in new tab**, **Save image as…**, **Copy image** und **Copy image address**.
+- Bei markiertem Text: **Copy**, **Search**, das ihn mit deiner Suchmaschine sucht (es öffnet sich in einem neuen Tab), und **Ask an agent about**, das den Kasten **Zu dieser Seite fragen** mit den markierten Wörtern und der Adresse der Seite ausgefüllt öffnet (siehe [Zu dieser Seite fragen](/guide/web#ask-about-this-page)).
+- Auf der Seite selbst, abseits von Feld oder markiertem Text: **Back**, **Forward** und **Reload**.
+- Immer: **Bookmark this page**, **Print…** und **Inspect**, das die Entwicklerwerkzeuge der Seite öffnet.
+
+Die eigenen Einträge einer Erweiterung werden nie gezeigt (siehe [Was möglicherweise nicht funktioniert](/guide/web#what-may-not-work)).
+
+### Verlauf
+
+Drücke **Strg+H** oder **Menü** (⋯) → **Verlauf** oder gehe zu [Verlauf](/browser?panel=history). Der Bereich listet die Seiten auf, die du in deinem eigenen Browser besucht hast, die neuesten zuerst, nach Tag („Heute“, „Gestern“, dann das Datum), jede mit Uhrzeit, Website-Symbol, Titel und Adresse.
+
+- Das Suchfeld **Verlauf durchsuchen** findet Seiten anhand der Wörter in ihren Titeln und Adressen.
+- Klicke auf eine Seite, um sie im geöffneten Tab zu öffnen, oder Strg+Klick (⌘+Klick auf dem Mac) für einen neuen Tab. **×** neben einer nimmt sie aus dem Verlauf. **Ältere anzeigen** lädt mehr.
+- **Zuletzt geschlossen** (wenn du nicht suchst) listet Tabs auf, die du kürzlich geschlossen hast: Klicke auf einen, um ihn wieder zu öffnen. **Strg+Umschalt+T** öffnet den neuesten.
+- **Browserdaten löschen …** öffnet die Einstellungen an dieser Stelle.
+
+Dein Verlauf bleibt auf diesem Computer, in der eigenen Datenbank der App, und nur dein eigenes Surfen trägt zu ihm bei: Webseiten und Dateien, die Seite, auf der jeder Tab landet, und sein Titel, sobald er feststeht. Die letzten 20.000 Seiten bleiben erhalten; die ältesten gehen zuerst. Agenten sehen ihn nie. Auf ihn stützen sich die [Vorschläge](/guide/web#suggestions) der Adressleiste.
+
+### Browser-Einstellungen
+
+**Menü** (⋯) → **Einstellungen** oder [Einstellungen → Browser → Dein eigenes Surfen → Browser-Einstellungen](/settings?s=browser&find=Browser%20settings) oder [Browser-Einstellungen](/browser?panel=settings) öffnet einen Bereich mit:
+
+- **Startseite**: die Webadresse, die die Schaltfläche Startseite und neue Tabs öffnen (zuerst https://www.google.com/). **Aktuelle Seite verwenden** setzt sie auf die Seite, auf der du bist.
+- **Suchmaschine**: womit die Adressleiste sucht: Google (zuerst), DuckDuckGo, Bing, Brave, Ecosia, Startpage oder **Custom**, eine eigene Adresse mit %s an der Stelle deiner Suchwörter, etwa `https://example.com/search?q=%s`.
+- **Suchvorschläge** (zuerst eingeschaltet): Was du in die Adressleiste eingibst, geht beim Tippen wie in jedem Browser an deine Suchmaschine, damit sie Suchen vorschlagen kann. Startpage und eine eigene Adresse liefern keine. Schalte es aus, um das Getippte auf diesem Computer zu behalten; deine geöffneten Tabs, Lesezeichen und dein Verlauf erscheinen weiterhin.
+- **Werbung und Tracker blockieren** (zuerst eingeschaltet), siehe unten.
+- **Browserdaten löschen**: Hake **Browserverlauf**, **Cookies und Websitedaten** (du wirst von Websites abgemeldet) und **Zwischengespeicherte Dateien** an, wähle einen Zeitraum (**Letzte Stunde**, **Letzte 24 Stunden**, **Letzte 7 Tage** oder **Gesamter Zeitraum**) und drücke **Daten löschen**. Der Zeitraum gilt nur für den Verlauf: Cookies, Websitedaten und zwischengespeicherte Dateien werden immer für den gesamten Zeitraum gelöscht.
+
+### Werbung und Tracker blockieren
+
+Dein eigener Browser blockiert Werbung und Tracker, wie es ein Werbeblocker tut: Er hält die Anfragen bekannter Werbe- und Trackingserver davon ab, hinauszugehen, und blendet die leeren Stellen aus, die übrig bleiben. Er nutzt die Listen von Ghostery für Werbung und Tracker (EasyList, EasyPrivacy und andere), die die App beim ersten Start deines Browsers von GitHub herunterlädt und jede Woche aktualisiert (gelingt das nicht, behält sie die Listen, die sie hat); dabei wird nichts über dich gesendet. In den Browsern der Agenten blockiert er nichts. **Werbung und Tracker blockieren** in den [Einstellungen des Browsers](/guide/web#browser-settings) schaltet ihn aus.
+
+Ist er eingeschaltet, läuft eine Chrome-Erweiterung, die Anfragen blockiert (ein eigener Werbeblocker), möglicherweise nicht; schalte den Blocker aus, um ihr die Seite zu überlassen.
+
+Damit eine Website ihre Werbung zeigen darf, klicke auf das Schloss in der Adressleiste und drücke **Werbung auf dieser Website erlauben** (auch für ihre Subdomains); die Seite lädt neu. **Werbung auf dieser Website blockieren** nimmt es zurück.
+
+### Das Schloss
+
+Das Schloss am Anfang der Adressleiste zeigt, ob die Verbindung zur Website sicher ist („Nicht sicher“, mit offenem Schloss, bei einer http-Seite). Klicke darauf, um die Website zu sehen, ob ihre Verbindung sicher ist, was du für sie erlaubt oder blockiert hast (jeweils mit **Vergessen**, damit sie wieder fragt) und, bei eingeschaltetem Blocker, wie viele Werbungen und Tracker auf dieser Seite blockiert wurden, mit **Werbung auf dieser Website erlauben** oder **Werbung auf dieser Website blockieren**.
 
 ### Downloads
 
-Eine Datei, die eine Seite herunterlädt, wird im Ordner Downloads des Computers gespeichert, auf dem die App läuft, und steht unter **Menü** (⋯) → **Downloads** als „Wird heruntergeladen…“, „Fertig“ oder „Fehlgeschlagen“, mit ihrem Pfad. Klicke auf eine fertige, um sie in ihrem Ordner zu zeigen (in der Desktop-App) oder in der App zu öffnen (anderswo).
+Eine Datei, die eine Seite herunterlädt, wird im Ordner Downloads des Computers gespeichert, auf dem die App läuft, und steht unter **Menü** (⋯) → **Downloads** als „Wird heruntergeladen…“, „Fertig“ oder „Fehlgeschlagen“, mit ihrem Pfad. Klicke auf eine fertige, um sie in ihrem Ordner zu zeigen.
 
 ### Wenn eine Website eine Berechtigung anfragt
 
-Möchte eine Seite in deinem eigenen Browser deine Kamera, dein Mikrofon, deinen Standort, Benachrichtigungen, deine Zwischenablage oder Ähnliches verwenden, sagt das eine Leiste über der Seite („example.com möchte deine Kamera verwenden“) mit **Nicht zulassen** und **Erlauben**. Deine Antwort wird für diese Website gemerkt, sodass sie nur einmal fragt; um zu sehen, was du erlaubt oder blockiert hast, oder um wieder gefragt zu werden, öffne **Menü** (⋯) → **Website-Berechtigungen** und drücke **Vergessen** neben einer Antwort. Das gilt in der Desktop-App; die Browser der Agenten dort lehnen jede solche Anfrage selbst ab, außer um den Bildschirm zu füllen und in deine Zwischenablage zu kopieren. Eine Dialogfrage der Seite (eine Warnung, eine Ja-Nein-Frage oder eine Texteingabe) erscheint über der Seite wie im Browser der Agenten (siehe [Dialogfragen einer Webseite beantworten](/guide/web#answer-a-pages-pop-up-questions)).
-
-### Auf dem Smartphone
-
-Die Tableiste wird zu einer Schaltfläche mit der Zahl der geöffneten Tabs: Tippe darauf für die Liste mit **×** neben jedem und **Neuer Tab**. Die obere Leiste behält **Zurück**, die Adresse und **Menü**; **Vorwärts**, **Neu laden**, der Stern und **Zu Hydor hinzufügen** stehen im Menü, ebenso **Lesezeichen**, da die Lesezeichenleiste weggelassen wird. Du steuerst ein Livebild der Seite: Tippen entspricht einem Klick, Ziehen scrollt, und **Tippen** öffnet die Tastatur deines Smartphones, daneben eine Reihe mit Tab, Enter, Esc, ⌫ und den Pfeiltasten.
+Möchte eine Seite in deinem eigenen Browser deine Kamera, dein Mikrofon, deinen Standort, Benachrichtigungen, deine Zwischenablage oder Ähnliches verwenden, sagt das eine Leiste über der Seite („example.com möchte deine Kamera verwenden“) mit **Nicht zulassen** und **Erlauben**. Deine Antwort wird für diese Website gemerkt, sodass sie nur einmal fragt; um zu sehen, was du erlaubt oder blockiert hast, oder um wieder gefragt zu werden, öffne das Schloss oder **Menü** (⋯) → **Website-Berechtigungen** und drücke **Vergessen** neben einer Antwort. Die Browser der Agenten dort lehnen jede solche Anfrage selbst ab, außer um den Bildschirm zu füllen und in deine Zwischenablage zu kopieren. Eine Dialogfrage der Seite (eine Warnung, eine Ja-Nein-Frage oder eine Texteingabe) erscheint über der Seite wie im Browser der Agenten (siehe [Dialogfragen einer Webseite beantworten](/guide/web#answer-a-pages-pop-up-questions)).
 
 ## Lesezeichen
 
@@ -425,7 +492,7 @@ Jedes Profil bietet **Bei Websites anmelden** für weitere Anmeldungen und ein *
 
 ### Dein eigenes Surfen
 
-[Einstellungen → Browser](/settings?s=browser) hat außerdem eine Gruppe **Dein eigenes Surfen** („Die Browser-Seite: Seiten, die du selbst nutzt und die Agenten nie erhalten“) mit zwei Zeilen, die die Bereiche der Seite Browser öffnen: [Lesezeichen](/settings?s=browser&find=Bookmarks) („Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer“) und [Erweiterungen](/settings?s=browser&find=Extensions) („Chrome-Erweiterungen in der Desktop-App“). Siehe [Lesezeichen](/guide/web#bookmarks) und [Chrome-Erweiterungen](/guide/web#chrome-extensions).
+In der Desktop-App hat [Einstellungen → Browser](/settings?s=browser) außerdem eine Gruppe **Dein eigenes Surfen** („Die Browser-Seite: Seiten, die du selbst nutzt und die Agenten nie erhalten“) mit drei Zeilen, die die Bereiche der Seite Browser öffnen: [Lesezeichen](/settings?s=browser&find=Bookmarks) („Deine eigenen, zusammen mit denen der anderen Browser auf diesem Computer“), [Erweiterungen](/settings?s=browser&find=Extensions) („Chrome-Erweiterungen in der Desktop-App“) und [Browser-Einstellungen](/settings?s=browser&find=Browser%20settings) („Startseite, Suchmaschine, Werbeblocker, Verlauf und das Löschen dessen, was der Browser gespeichert hat“). Anderswo wird die Gruppe nicht gezeigt. Siehe [Lesezeichen](/guide/web#bookmarks), [Chrome-Erweiterungen](/guide/web#chrome-extensions) und [Browser-Einstellungen](/guide/web#browser-settings).
 
 ## Agenten deinen Computer bedienen lassen
 
@@ -488,6 +555,11 @@ Stoppen beendet die Aktion und entzieht allen Sitzungen die Freigabe. Für erneu
 - „Ist der Browser meiner Agenten der eigene Browser der Desktop-App oder ein Chromium?“
 - „Wie gebe ich einem Agenten die Seite, die ich auf der Seite Browser ansehe?“ (**Zu dieser Seite fragen** gibt ihm eine Kopie; **Hier erledigen lassen** gibt ihm den Tab.)
 - „Setze example.org/reports in einen Ordner namens Arbeit in meiner Lesezeichenleiste.“
+- „Wie ändere ich die Suchmaschine oder die Startseite meines Browsers?“ (Es ist **Menü** → **Einstellungen** auf der Seite Browser: deine Sache, Agenten können es nicht.)
+- „Wie erlaube ich Werbung auf einer Website in meinem Browser?“ (**Werbung auf dieser Website erlauben** am Schloss)
+- „Wie lösche ich meinen Browserverlauf und meine Cookies?“ (**Browser-Einstellungen** → **Browserdaten löschen**; der Zeitraum gilt nur für den Verlauf)
+- „Wie öffne ich einen Tab wieder, den ich geschlossen habe?“ (**Strg+Umschalt+T** oder **Zuletzt geschlossen** im Verlauf)
+- „Blockiert mein Browser Werbung, und woher stammen seine Listen?“
 - „Importiere meine Lesezeichen aus Chrome und Firefox in die Seite Browser.“ (oder: „Warum kann ich meine Safari-Lesezeichen nicht importieren?“)
 - „Welche Chrome-Erweiterungen sind in meinem Browser, und welche davon laufen auch in den Browsern der Agenten?“
 - „Füge die Erweiterung unter https://chromewebstore.google.com/detail/… zu meinem Browser hinzu.“ (Die App fragt dich jedes Mal zuerst.)

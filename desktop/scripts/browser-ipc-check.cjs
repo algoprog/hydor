@@ -7,7 +7,15 @@
 //   - a pop-up of an agent's tab is an agent's tab too;
 //   - your own tab (onscreen) is shown in the window where asked, moves, goes away with the window, is drawn there,
 //     and still answers CDP while it is shown; its shortcuts reach the window's page;
-//   - what is not an own tab or an agent's tab here is refused, and a page that is not the app's own gets nothing.
+//   - `still` is a JPEG picture of a shown own tab (and null for an agent's tab or one that is not shown), and a resize of the
+//     window moves a shown own tab at once, by its distance from the window's edges;
+//   - what is not an own tab or an agent's tab here is refused, and a page that is not the app's own gets nothing;
+//   - what people expect of a browser, for your own tab: zoom (keys and the preload), find with its match count, mute, the
+//     larger list of shortcuts, the right-click menu's items for a link, a selection and a field (and what its items ask of
+//     the app), full-screen video, opening in the default browser (refused but for http and https), clearing browsing data;
+//   - the ad blocker: a request to a test ad host (a tiny list of its own, no network) fails while it is on, goes through when
+//     it is off or the site is one you allowed ads on, the count of what a page had blocked reaches the window's page, and
+//     the saved engine is kept a week, made again when older, and kept when the lists cannot be fetched.
 'use strict';
 const { app, BrowserWindow } = require('electron');
 const assert = require('node:assert/strict');
@@ -17,6 +25,11 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { createBrowser } = require('../browser.cjs');
+const { createAdblock } = require('../adblock.cjs');
+
+// The ad blocker's package is the server's (the repository's node_modules).
+const ADBLOCK = path.resolve(__dirname, '../../node_modules/@ghostery/adblocker-electron');
+const AD_HOST = 'ads.hydor-test.example';
 
 app.commandLine.appendSwitch('disable-gpu');
 app.disableHardwareAcceleration();
@@ -46,7 +59,7 @@ const until = async (fn, ms = 5000, what = 'it') => {
 
 // ---- the test site, and a proxy (the browser sends everything through one) ----
 const pages = {
-  '/app': '<!doctype html><title>app</title><body style="margin:0;background:#123"><script>window.__keys=[];hydorDesktop.browser.onKey((k)=>__keys.push(k));</script>',
+  '/app': '<!doctype html><title>app</title><body style="margin:0;background:#123"><script>window.__keys=[];hydorDesktop.browser.onKey((k)=>__keys.push(k));window.__states=[];hydorDesktop.browser.onTabState((s)=>__states.push(s));window.__cmds=[];hydorDesktop.browser.onCommand((c)=>__cmds.push(c));</script>',
   '/agent': `<!doctype html><title>agent page</title><body style="margin:0;height:3000px;background:linear-gradient(#fff,#8af)">
 <button id=btn style="position:absolute;left:100px;top:100px;width:200px;height:60px">Click</button>
 <input id=inp style="position:absolute;left:100px;top:200px;width:300px;height:40px">
@@ -59,6 +72,9 @@ document.onmousemove=()=>{};
 </script>`,
   '/popped': '<!doctype html><title>popped</title><body style="margin:0;background:#fa8"><h1>popped</h1>',
   '/own': '<!doctype html><title>own page</title><body style="margin:0;background:rgb(255,0,0)"><h1 style="color:#fff">mine</h1>',
+  '/words': '<!doctype html><title>words</title><body style="margin:0"><p>alpha beta alpha gamma alpha</p>',
+  // A page with an ad: a request to a host that is on the test list. Blocked it fails; otherwise the proxy answers it.
+  '/ads': `<!doctype html><title>ads</title><body style="margin:0"><p>a page</p><script>window.__ad='waiting';fetch('http://${AD_HOST}/px.js',{mode:'no-cors'}).then(()=>{window.__ad='loaded'},()=>{window.__ad='blocked'})</script>`,
 };
 const site = http.createServer((req, res) => {
   const body = pages[req.url.split('?')[0]];
@@ -115,6 +131,8 @@ app.whenReady().then(async () => {
     mainWindow: () => win,
     fromOwnPage: (e) => (e.senderFrame && e.senderFrame.url ? new URL(e.senderFrame.url).origin === appOrigin : false),
     ext: null,
+    // A tiny list of its own: nothing is fetched.
+    adblock: { dir: path.join(os.tmpdir(), `hydor-ipc-adblock-${process.pid}`), modulePath: () => ADBLOCK, engine: require(ADBLOCK).ElectronBlocker.parse(`||${AD_HOST}^\n`) },
   });
   browser.registerIpc();
   const cdp = (method, params = {}, sessionId) =>
@@ -315,6 +333,83 @@ app.whenReady().then(async () => {
       assert.ok(!win.contentView.children.includes(t.view));
     });
 
+    await check('still: a JPEG picture of a shown own tab (the size of its place), null for an agent’s tab, a parked tab and a stranger’s page', async () => {
+      const t = browser.conns.get(CONN).targets.get(own.targetId);
+      const id = JSON.stringify(own.targetId);
+      await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+      await sleep(500);
+      const url = await page(`hydorDesktop.browser.still(${id})`);
+      assert.equal(typeof url, 'string');
+      assert.match(url, /^data:image\/jpeg;base64,/);
+      const bytes = Buffer.from(url.slice('data:image/jpeg;base64,'.length), 'base64');
+      assert.ok(bytes.length > 300, 'an empty picture');
+      assert.deepEqual([...bytes.subarray(0, 2)], [0xff, 0xd8], 'not a JPEG');
+      const img = require('electron').nativeImage.createFromDataURL(url);
+      assert.deepEqual([img.getSize().width, img.getSize().height], [400, 300]);
+      // It is the page (red), not a blank.
+      const bm = img.toBitmap();
+      const at = ((150 * 400) + 200) * 4;
+      assert.ok(bm[at + 2] > 200 && bm[at + 1] < 60 && bm[at] < 60, 'the picture is not of the page');
+      // An agent's tab has no place in the window: nothing to take a picture of.
+      assert.equal(await page(`hydorDesktop.browser.still(${JSON.stringify(agent.targetId)})`), null);
+      assert.equal(await page(`hydorDesktop.browser.still('NOSUCHTARGET')`), null);
+      // Taken away, there is no picture to take either; the window's page can have taken it just before.
+      await page(`hydorDesktop.browser.hide(${id})`);
+      assert.equal(await page(`hydorDesktop.browser.still(${id})`), null);
+      // A page of another origin gets nothing (the preload lets it call, main refuses).
+      await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+      const other = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, preload: process.env.HYDOR_PRELOAD } });
+      await other.loadURL(`http://localhost:${sitePort}/app`);
+      assert.equal(await other.webContents.executeJavaScript(`hydorDesktop.browser.still(${id})`), null);
+      other.destroy();
+      assert.ok(t.shownIn === win);
+    });
+
+    await check('resizing the window moves a shown page at once, by its distance from the window’s edges; unchanged places set nothing', async () => {
+      const t = browser.conns.get(CONN).targets.get(own.targetId);
+      const id = JSON.stringify(own.targetId);
+      win.setContentSize(1280, 860);
+      await sleep(300);
+      await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+      const [cw, ch] = win.getContentSize();
+      // Insets: 50 left, 60 top, the rest right and below.
+      const right = cw - 450;
+      const bottom = ch - 360;
+      // Asking for the same place again changes nothing: no setBounds, and the view is neither removed nor added again.
+      let sets = 0;
+      let adds = 0;
+      let removes = 0;
+      const setBounds = t.view.setBounds.bind(t.view);
+      const add = win.contentView.addChildView.bind(win.contentView);
+      const remove = win.contentView.removeChildView.bind(win.contentView);
+      t.view.setBounds = (b) => (sets++, setBounds(b));
+      win.contentView.addChildView = (...a) => (adds++, add(...a));
+      win.contentView.removeChildView = (...a) => (removes++, remove(...a));
+      try {
+        await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+        await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+        assert.deepEqual([sets, adds, removes], [0, 0, 0], 'the same place set again');
+        // The window gets smaller: the page follows, with nothing from the window's page.
+        const resized = new Promise((r) => win.once('resize', r));
+        win.setContentSize(cw - 200, ch - 150);
+        await Promise.race([resized, sleep(2000)]);
+        const [w2, h2] = win.getContentSize();
+        assert.ok(w2 !== cw || h2 !== ch, 'the window did not change size');
+        await until(() => t.view.getBounds().width === w2 - 50 - right, 2000, 'the page to follow the width');
+        assert.deepEqual(t.view.getBounds(), { x: 50, y: 60, width: w2 - 50 - right, height: h2 - 60 - bottom });
+        assert.equal(adds + removes, 0, 'the page was taken out of the window and added again');
+        assert.ok(sets >= 1 && sets <= 4, `set ${sets} times for one resize`);
+        // Larger again.
+        win.setContentSize(cw, ch);
+        await until(() => t.view.getBounds().width === cw - 50 - right, 2000, 'the page to follow back');
+        assert.deepEqual(t.view.getBounds(), { x: 50, y: 60, width: 400, height: 300 });
+      } finally {
+        t.view.setBounds = setBounds;
+        win.contentView.addChildView = add;
+        win.contentView.removeChildView = remove;
+      }
+    });
+
     await check('focus, and the shortcuts a page you use keeps from its page reach the window’s page', async () => {
       const t = browser.conns.get(CONN).targets.get(own.targetId);
       await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:50,y:60,w:400,h:300})`);
@@ -350,6 +445,281 @@ app.whenReady().then(async () => {
       stranger.destroy();
     });
 
+
+    // ---- what people expect of a browser ----
+    const states = async () => JSON.parse(await page('JSON.stringify(__states)'));
+    const stateFor = async (target, pred) => (await states()).find((s) => s.target === target && pred(s));
+    /** Your own tab goes to an address and has loaded it. */
+    const goTo = async (tab, url) => {
+      const mark = events.length;
+      const loaded = waitEvent('Page.loadEventFired', (m) => m.sessionId === tab.sid && events.indexOf(m) >= mark);
+      await cdp('Page.navigate', { url }, tab.sid);
+      await loaded;
+    };
+    const ownT = () => browser.conns.get(CONN).targets.get(own.targetId);
+    const press = (input) => {
+      let prevented = false;
+      ownT().wc.emit('before-input-event', { preventDefault: () => (prevented = true) }, { type: 'keyDown', control: false, meta: false, alt: false, shift: false, ...input });
+      return prevented;
+    };
+    const MAC = process.platform === 'darwin';
+    const ctrl = (input) => ({ ...(MAC ? { meta: true } : { control: true }), ...input });
+
+    await check('zoom: in, out and reset go by Chrome’s steps (the preload and the keys), and the window’s page is told', async () => {
+      await goTo(own, `${appOrigin}/own`);
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:50,y:60,w:400,h:300})`);
+      const t = ownT();
+      // Chromium keeps the zoom as a level (a power of 1.2), so its factor is a hair off the step.
+      const factor = () => Math.round(t.wc.getZoomFactor() * 100) / 100;
+      assert.equal(await page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'in')`), 1.1);
+      assert.equal(await page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'in')`), 1.25);
+      assert.equal(factor(), 1.25);
+      assert.equal(await page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'out')`), 1.1);
+      await until(() => stateFor(own.targetId, (s) => s.zoom === 1.25), 2000, 'the zoom news');
+      assert.equal(await page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'reset')`), 1);
+      // Ctrl or ⌘ with + − 0 are the app's: they zoom and do not reach the window's page.
+      const keys = (await page('__keys.length'));
+      assert.ok(press(ctrl({ key: '=' })));
+      assert.equal(factor(), 1.1);
+      assert.ok(press(ctrl({ key: '+', shift: true })));
+      assert.equal(factor(), 1.25);
+      assert.ok(press(ctrl({ key: '-' })));
+      assert.ok(press(ctrl({ key: '-' })));
+      assert.equal(factor(), 1);
+      assert.ok(press(ctrl({ key: '-' })));
+      assert.equal(factor(), 0.9);
+      assert.ok(press(ctrl({ key: '0' })));
+      assert.equal(factor(), 1);
+      for (let i = 0; i < 30; i++) await page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'in')`);
+      assert.equal(factor(), 5, 'at most 500 %');
+      await page(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'reset')`);
+      assert.equal(await page('__keys.length'), keys);
+      // A page that is not one of your tabs: 100 %.
+      assert.equal(await page(`hydorDesktop.browser.zoom(${JSON.stringify(agent.targetId)}, 'in')`), 1);
+    });
+
+    await check('the larger list of shortcuts reaches the window’s page, and the rest stays with the page', async () => {
+      const before = await page('__keys.length');
+      const sent = [
+        ctrl({ key: 't', shift: true }),
+        ctrl({ key: 'Delete', shift: true }),
+        ctrl({ key: '1' }),
+        ctrl({ key: '9' }),
+        { key: 'Tab', control: true },
+        { key: 'Tab', control: true, shift: true },
+        ...['p', 'd', 'h', 'j'].map((k) => ctrl({ key: k })),
+      ];
+      for (const k of sent) assert.ok(press(k), JSON.stringify(k));
+      for (const k of [ctrl({ key: 'a' }), ctrl({ key: 'c' }), ctrl({ key: '0', alt: true }), { key: 'Tab' }, { key: '1' }, ctrl({ key: 'Delete' })]) assert.ok(!press(k), `${JSON.stringify(k)} must stay with the page`);
+      await until(async () => (await page('__keys.length')) === before + sent.length, 2000, 'the keys');
+      const got = (await page('__keys')).slice(before).map((k) => `${k.shift ? '⇧' : ''}${k.key}`);
+      assert.deepEqual(got, ['⇧t', '⇧Delete', '1', '9', 'Tab', '⇧Tab', 'p', 'd', 'h', 'j']);
+    });
+
+    await check('find: the number of matches and the active one, next and back, none, and stopping it', async () => {
+      await goTo(own, `${appOrigin}/words`);
+      const id = JSON.stringify(own.targetId);
+      assert.deepEqual(await page(`hydorDesktop.browser.find(${id}, 'alpha')`), { matches: 3, active: 1 });
+      assert.deepEqual(await page(`hydorDesktop.browser.find(${id}, 'alpha', { findNext: true })`), { matches: 3, active: 2 });
+      assert.deepEqual(await page(`hydorDesktop.browser.find(${id}, 'alpha', { findNext: true, forward: false })`), { matches: 3, active: 1 });
+      assert.deepEqual(await page(`hydorDesktop.browser.find(${id}, 'ALPHA', { matchCase: true })`), { matches: 0, active: 0 });
+      assert.deepEqual(await page(`hydorDesktop.browser.find(${id}, 'zzz')`), { matches: 0, active: 0 });
+      assert.deepEqual(await page(`hydorDesktop.browser.find(${id}, '')`), { matches: 0, active: 0 });
+      // Not one of your tabs here (an agent's, or none): null.
+      assert.equal(await page(`hydorDesktop.browser.find(${JSON.stringify(agent.targetId)}, 'alpha')`), null);
+      assert.equal(await page(`hydorDesktop.browser.find('NOSUCHTARGET', 'alpha')`), null);
+    });
+
+    await check('mute sets muted, and the window’s page is told', async () => {
+      const id = JSON.stringify(own.targetId);
+      await page(`hydorDesktop.browser.mute(${id}, true)`);
+      assert.equal(ownT().wc.isAudioMuted(), true);
+      await until(() => stateFor(own.targetId, (s) => s.muted === true), 2000, 'the muted news');
+      await page(`hydorDesktop.browser.mute(${id}, false)`);
+      assert.equal(ownT().wc.isAudioMuted(), false);
+      await until(() => stateFor(own.targetId, (s) => s.muted === false), 2000, 'the unmuted news');
+      // Its sound: Chromium says when a tab is audible (here the event, which a silent test cannot make).
+      ownT().wc.emit('audio-state-changed', { audible: true });
+      await until(() => stateFor(own.targetId, (s) => s.audible === true), 2000, 'the audible news');
+      // Showing the tab gives the page everything about it at once.
+      await page(`hydorDesktop.browser.show(${id}, {x:50,y:60,w:400,h:300})`);
+      await until(() => stateFor(own.targetId, (s) => 'zoom' in s && 'blocked' in s && 'fullscreen' in s && 'audible' in s && 'muted' in s), 2000, 'all of the news');
+    });
+
+    await check('the right-click menu: a link, an image, selected words, a field, and what the page has anyway', async () => {
+      const t = ownT();
+      const base = { x: 20, y: 30, pageURL: `${appOrigin}/words`, linkURL: '', srcURL: '', mediaType: 'none', selectionText: '', isEditable: false, misspelledWord: '', dictionarySuggestions: [], editFlags: {} };
+      const labels = (tpl) => tpl.filter((i) => i.type !== 'separator').map((i) => i.label);
+      const link = labels(t && browser.menuTemplate(t, { ...base, linkURL: 'https://example.com/a?b=c' }));
+      assert.deepEqual(link, ['Open link in new tab', 'Open link in your default browser', 'Copy link address', 'Back', 'Forward', 'Reload', 'Bookmark this page', 'Print…', 'Inspect']);
+      // A link that is not a web address (javascript:, mailto:) has only its copy.
+      assert.deepEqual(labels(browser.menuTemplate(t, { ...base, linkURL: 'mailto:a@b.c' })).slice(0, 2), ['Copy link address', 'Back']);
+      const img = labels(browser.menuTemplate(t, { ...base, mediaType: 'image', srcURL: 'https://example.com/i.png' }));
+      assert.deepEqual(img.slice(0, 4), ['Open image in new tab', 'Save image as…', 'Copy image', 'Copy image address']);
+      const sel = browser.menuTemplate(t, { ...base, selectionText: 'hello world' });
+      assert.deepEqual(labels(sel), ['Copy', 'Search Google for “hello world”', 'Ask an agent about “hello world”', 'Bookmark this page', 'Print…', 'Inspect']);
+      const long = labels(browser.menuTemplate(t, { ...base, selectionText: 'x'.repeat(100) }))[1];
+      assert.ok(long.length < 60 && long.includes('…'), long);
+      const field = browser.menuTemplate(t, { ...base, isEditable: true, misspelledWord: 'helo', dictionarySuggestions: ['hello', 'help'], editFlags: { canUndo: true, canCut: true, canCopy: true, canPaste: true, canSelectAll: true } });
+      assert.deepEqual(labels(field), ['hello', 'help', 'Add to dictionary', 'Undo', 'Redo', 'Cut', 'Copy', 'Paste', 'Select all', 'Bookmark this page', 'Print…', 'Inspect']);
+      assert.equal(field.find((i) => i.label === 'Cut').enabled, true);
+      assert.equal(field.find((i) => i.label === 'Redo').enabled, false);
+      // Back and Forward say whether there is somewhere to go.
+      const plain = browser.menuTemplate(t, base);
+      assert.equal(plain.find((i) => i.label === 'Back').enabled, t.wc.navigationHistory.canGoBack());
+      // Its items ask the app: ask an agent, bookmark, and a link in a new tab.
+      sel.find((i) => /^Ask an agent/.test(i.label)).click();
+      sel.find((i) => i.label === 'Bookmark this page').click();
+      await until(async () => (await page('__cmds.length')) === 2, 2000, 'the menu’s commands');
+      assert.deepEqual(await page('__cmds'), [{ cmd: 'ask', text: 'hello world', url: `${appOrigin}/words` }, { cmd: 'bookmark', url: `${appOrigin}/words`, title: 'words' }]);
+      const mark = events.length;
+      browser.menuTemplate(t, { ...base, linkURL: `${appOrigin}/popped` }).find((i) => i.label === 'Open link in new tab').click();
+      const att = await waitEvent('Target.attachedToTarget', (m) => events.indexOf(m) >= mark && /popped|blank/.test(m.params.targetInfo.url || 'blank'));
+      assert.equal(att.params.targetInfo.type, 'page');
+      assert.ok(!browser.conns.get(CONN).targets.get(att.params.targetInfo.targetId).offscreen, 'a tab of your own');
+      await cdp('Target.closeTarget', { targetId: att.params.targetInfo.targetId });
+    });
+
+    await check('full-screen video: the window and the page fill the screen, and leaving puts both back', async () => {
+      const t = ownT();
+      const win2 = BrowserWindow.fromWebContents(win.webContents);
+      assert.equal(win2, win);
+      const before = { ...t.view.getBounds() };
+      await t.wc.executeJavaScript('document.documentElement.requestFullscreen().then(()=>1)', true);
+      await until(() => t.fs, 3000, 'the page to go full screen');
+      // The window takes a moment to be full screen (its size follows), and the page follows the window.
+      const fills = () => {
+        const [fw, fh] = win.getContentSize();
+        const b = t.view.getBounds();
+        return b.x === 0 && b.y === 0 && b.width === fw && b.height === fh;
+      };
+      await until(fills, 3000, 'the page to fill the window');
+      const [w, h] = win.getContentSize();
+      await until(() => stateFor(own.targetId, (s) => s.fullscreen === true), 2000, 'the full screen news');
+      // The Browser page asking for another place while it is full screen does not take the page out of it.
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:10,y:10,w:100,h:100})`);
+      assert.deepEqual(t.view.getBounds(), { x: 0, y: 0, width: w, height: h });
+      await t.wc.executeJavaScript('document.exitFullscreen().then(()=>1)', true);
+      await until(() => !t.fs, 3000, 'the page to leave full screen');
+      assert.deepEqual(t.view.getBounds(), { x: 10, y: 10, width: 100, height: 100 });
+      await until(() => !win.isFullScreen(), 3000, 'the window to leave full screen');
+      await until(() => stateFor(own.targetId, (s) => s.fullscreen === false), 2000, 'the left full screen news');
+      await page(`hydorDesktop.browser.show(${JSON.stringify(own.targetId)}, {x:50,y:60,w:400,h:300})`);
+      void before;
+    });
+
+    await check('openExternal takes http and https addresses only; print and the rest refuse what is not your tab', async () => {
+      for (const u of ['file:///etc/hostname', 'javascript:alert(1)', 'data:text/html,x', 'chrome://gpu', 'ftp://example.com', 'notanaddress', '']) assert.equal(await page(`hydorDesktop.browser.openExternal(${JSON.stringify(u)})`), false, u);
+      assert.equal(await page(`hydorDesktop.browser.print('NOSUCHTARGET')`), undefined);
+      assert.equal(await page(`hydorDesktop.browser.print(${JSON.stringify(agent.targetId)})`), undefined);
+      // A page that is not the app's own has none of it.
+      const other = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, preload: process.env.HYDOR_PRELOAD } });
+      await other.loadURL(`http://localhost:${sitePort}/app`);
+      const call = (expr) => other.webContents.executeJavaScript(expr);
+      assert.equal(await call(`hydorDesktop.browser.find(${JSON.stringify(own.targetId)}, 'alpha')`), null);
+      assert.equal(await call(`hydorDesktop.browser.zoom(${JSON.stringify(own.targetId)}, 'in')`), 1);
+      assert.equal(Math.round(ownT().wc.getZoomFactor() * 100), 100);
+      await call(`hydorDesktop.browser.mute(${JSON.stringify(own.targetId)}, true)`);
+      assert.equal(ownT().wc.isAudioMuted(), false);
+      other.destroy();
+    });
+
+    await check('clearing browsing data: the profile’s cookies and cached files go', async () => {
+      const ses = browser.browsingSession();
+      await ses.cookies.set({ url: `${appOrigin}/`, name: 'keep', value: 'me' });
+      assert.equal((await ses.cookies.get({ name: 'keep' })).length, 1);
+      // Not the browsing profile's, or without cookies: it stays.
+      browser.message({ type: 'browser-clear', profile: 'other', cookies: true, cache: true });
+      browser.message({ type: 'browser-clear', profile: 'browsing', cookies: false, cache: true });
+      await sleep(500);
+      assert.equal((await ses.cookies.get({ name: 'keep' })).length, 1);
+      browser.message({ type: 'browser-clear', profile: 'browsing', cookies: true, cache: true, since: Date.now() - 3600_000 });
+      await until(async () => (await ses.cookies.get({ name: 'keep' })).length === 0, 5000, 'the cookies to go');
+    });
+
+    await check('the ad blocker: a request to an ad host fails, the count reaches the window’s page, and the setting and allowed sites switch it', async () => {
+      const ab = browser.adblock;
+      assert.ok(ab, 'no blocker');
+      assert.equal(await ab.ready(), true);
+      const ses = browser.browsingSession();
+      assert.equal(ab.isOn(ses), true, 'on by default for your own browsing');
+      const adPage = () => evalIn(own.sid, '__ad');
+      const visit = async () => {
+        await goTo(own, `${appOrigin}/ads`);
+        return until(async () => (await adPage()) !== 'waiting' && (await adPage()), 5000, 'the ad request to end');
+      };
+      assert.equal(await visit(), 'blocked');
+      assert.equal(ownT().blocked, 1);
+      await until(() => stateFor(own.targetId, (s) => s.blocked === 1), 3000, 'the blocked count');
+      // A new page starts again from nothing.
+      await goTo(own, `${appOrigin}/own`);
+      await until(async () => (await states()).filter((s) => s.target === own.targetId && 'blocked' in s).pop().blocked === 0, 3000, 'the count to start over');
+      // Off: the request goes through (the proxy answers it).
+      browser.message({ type: 'browser-prefs', adblock: false, allowAds: [] });
+      assert.equal(ab.isOn(ses), false);
+      assert.equal(await visit(), 'loaded');
+      // On again, but this site is one you allowed ads on (its subdomains too): through; take it off the list and it is blocked.
+      browser.message({ type: 'browser-prefs', adblock: true, allowAds: ['127.0.0.1'] });
+      assert.equal(ab.isOn(ses), true);
+      assert.equal(await visit(), 'loaded');
+      assert.ok(ab.allows('127.0.0.1') && !ab.allows('x.127.0.0.2') && !ab.allows('evil127.0.0.1'));
+      browser.message({ type: 'browser-prefs', adblock: true, allowAds: ['hydor-test.example', 'bad host!', '', 7] });
+      assert.equal(await visit(), 'blocked');
+      assert.ok(ab.allows('www.hydor-test.example') && !ab.allows('127.0.0.1'));
+      // What is not a site is not taken.
+      assert.ok(!ab.allows('bad host!'));
+    });
+
+    await check('the ad blocker’s lists: saved once, made again when a week old, and the old ones kept when they cannot be fetched', async () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hydor-ipc-lists-'));
+      const realFetch = globalThis.fetch;
+      let calls = 0;
+      let offline = false;
+      globalThis.fetch = async (url) => {
+        calls++;
+        if (offline) throw new Error('no network');
+        // The lists are text, and uBlock's resources a JSON file.
+        return new Response(/\.json$/.test(String(url)) ? '[]' : `||${AD_HOST}^\n`);
+      };
+      const make = () => createAdblock({ log: (...a) => console.log('  [adblock]', ...a), dir, modulePath: () => ADBLOCK, onBlocked: () => {} });
+      const file = path.join(dir, 'engine-ads-and-tracking.bin');
+      try {
+        const first = make();
+        assert.equal(await first.ready(), true);
+        assert.ok(fs.statSync(file).size > 0, 'the engine was not saved');
+        first.close();
+        // Fresh: no fetching at all.
+        const n = calls;
+        const second = make();
+        assert.equal(await second.ready(), true);
+        assert.equal(calls, n, 'a fresh file is used as it is');
+        second.close();
+        // A week old and no network: the old file does.
+        const old = new Date(Date.now() - 8 * 24 * 3600 * 1000);
+        fs.utimesSync(file, old, old);
+        offline = true;
+        const third = make();
+        assert.equal(await third.ready(), true);
+        assert.ok(calls > n, 'an old file is fetched again');
+        third.close();
+        // A week old and the network is there: made again, the file is new.
+        offline = false;
+        const fourth = make();
+        assert.equal(await fourth.ready(), true);
+        assert.ok(Date.now() - fs.statSync(file).mtimeMs < 60_000, 'the old file was kept');
+        fourth.close();
+        // Nothing saved and no network: no blocker (and no throwing).
+        fs.rmSync(file);
+        offline = true;
+        const fifth = make();
+        assert.equal(await fifth.ready(), false);
+        fifth.close();
+      } finally {
+        globalThis.fetch = realFetch;
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
     await check('closing a tab, and the whole browser, takes the pages away', async () => {
       await cdp('Target.closeTarget', { targetId: own.targetId });
       assert.ok(!browser.conns.get(CONN).targets.has(own.targetId));
@@ -366,6 +736,7 @@ app.whenReady().then(async () => {
     console.log(`FAIL (the check itself)\n     ${String((e && e.stack) || e)}`);
   }
   console.log(`\n${ok} passed${failed ? `, ${failed} failed` : ''}`);
+  fs.rmSync(path.join(os.tmpdir(), `hydor-ipc-adblock-${process.pid}`), { recursive: true, force: true });
   site.close();
   proxy.close();
   setTimeout(() => app.exit(failed ? 1 : 0), 200);

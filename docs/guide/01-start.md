@@ -73,13 +73,13 @@ Each session has a menu in the list: point at its row and click **⋯** at the e
 
 ### The tools at the bottom
 
-The bottom of the sidebar holds the app's tools, in two rows of five:
+The bottom of the sidebar holds the app's tools, in two rows of five (the desktop app has ten; in the web app and on a phone there are nine, with no **Browser**):
 
 - **Library**: small tools and pages agents made for you, the images and videos you kept, and what you published. See [Library: pages, images, videos and sites](/guide/library).
 - **Projects**: each project's sessions, documents and guidelines together, and the shared knowledge every session can search. See [Projects and knowledge](/guide/projects).
 - **Apps**: tasks you run again and again: fill in a form, and an agent does the job. See [Apps](/guide/apps).
 - **Agents**: your agents, each with what it does, where and when it works, what it thinks with and whom it asks, and the ones that come with the app. See [Agents](/guide/agents).
-- **Browser**: a browser of your own inside the app, with tabs, bookmarks and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
+- **Browser**: a browser of your own, only in the desktop app, with tabs, a smart address bar, bookmarks, history, an ad blocker and Chrome extensions, from which you can hand a page to an agent. See [Your own browser](/guide/web#your-own-browser).
 - **Usage**: how much of each plan's limits you have used and when they reset, with **Activity** and **Arena** tabs; a thin bar under its icon shows how much is left across your paid subscriptions, or your free ones when you have no paid ones, red when nothing is left. See [Usage, limits and costs](/guide/usage).
 - **System**: this computer, with a tab for each of its tools: **Overview** (how it is doing, and what each tool holds now), **Files** (browse, open and edit files), **Git** (your repositories, their changes, branches and history), **Terminal** (shells that keep running when you leave the page), **Preview** (a web app's development server running here; only on this machine's own pages) and **Monitor** (processors, graphics cards, memory, disks and the busiest programs, live). See [System: files, Git, Terminal and Preview](/guide/files-git).
 - **Settings**: everything the app can be set to. A dot on it means a newer version is out. See [Every setting](/guide/settings).

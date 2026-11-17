@@ -173,12 +173,14 @@ export class Tab {
     });
     await Promise.all([
       this.s.send('Page.enable'),
-      this.s.send('Network.enable', { maxTotalBufferSize: 1_000_000, maxResourceBufferSize: 200_000 }),
+      // A page of your own in the desktop app (free) is yours alone: no network events for the server to follow (every
+      // request of a busy page went through the app's channel), the system's own file picker, and no frames to attach.
+      free ? Promise.resolve() : this.s.send('Network.enable', { maxTotalBufferSize: 1_000_000, maxResourceBufferSize: 200_000 }),
       this.s.send('Page.setLifecycleEventsEnabled', { enabled: true }),
-      this.s.send('Page.setInterceptFileChooserDialog', { enabled: true }).catch(() => {}),
+      free ? Promise.resolve() : this.s.send('Page.setInterceptFileChooserDialog', { enabled: true }).catch(() => {}),
       this.s.send('Emulation.setUserAgentOverride', { userAgent: this.userAgent }),
       // A guarded tab's frames in other processes wait until their guard is on (the handler above resumes them).
-      this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: this.guarded, flatten: true }),
+      free ? Promise.resolve() : this.s.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: this.guarded, flatten: true }),
       free ? Promise.resolve() : this.setViewport(viewport.w, viewport.h, viewport.mobile ?? false, viewport.scale ?? 1),
     ]);
   }

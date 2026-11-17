@@ -115,10 +115,11 @@ terminals are shells in ConPTY that the server keeps, with what they printed, si
 are junctions. `server/platform-test.ts` checks all of it on the system it runs on, and the desktop workflow runs it on
 each.
 
-The browser works through that channel too. In the desktop apps the browser agents use, and the Browser page's own, is the
+The browser works through that channel too. In the desktop apps the browser agents use, and the Browser page's own (a desktop-only feature: the server answers 409 to its routes elsewhere), is the
 app's Electron: `desktop/browser.cjs` answers the Chrome DevTools Protocol the server speaks (`server/browser/cdp.ts`, over
 the channel with `Cdp.over`; `server/browser/desktopEngine.ts` is the server's side), each tab a view, and
-`desktop/extensions.cjs` loads Chrome extensions into your own browsing's session. Settings → Browser offers it
+`desktop/extensions.cjs` loads Chrome extensions into your own browsing's session, and `desktop/adblock.cjs` puts Ghostery's ad
+and tracker blocker on it (`@ghostery/adblocker-electron`, from the server's packages; the server sends it the setting as `browser-prefs`). Settings → Browser offers it
 (`DESKTOP_CHROME`, the value `desktop`) when the server was started by the app (`HYDOR_DESKTOP_BROWSER`).
 `server/browser/selftest.ts` drives a real browser through every tool (`npm test -- browser/selftest` runs it on a
 Chromium installed here), and `desktop/scripts/browser-selftest.mjs` runs the same one on the desktop engine. It builds

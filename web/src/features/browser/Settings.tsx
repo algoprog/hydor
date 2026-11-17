@@ -2,7 +2,7 @@
 // keeping pages off this machine's network, screenshots for models that see images, site lists, and
 // named profiles the user logs into by taking over.
 import { useEffect, useRef, useState } from 'react';
-import { Bookmark, Download, Globe, LogIn, Pencil, Plus, Puzzle, Trash2, UserRound } from 'lucide-react';
+import { Bookmark, Download, Globe, LogIn, Pencil, Plus, Puzzle, SlidersHorizontal, Trash2, UserRound } from 'lucide-react';
 import type { BrowserSettings, BrowserSettingsState } from '@shared/browser';
 import { api, del, enc, patch, post, put } from '../../lib/api';
 import { bytes } from '../../lib/format';
@@ -12,6 +12,7 @@ import { toastError } from '../../lib/store';
 import { Button, Dialog, inputCls, MenuItem, OptionRow, Picker, Switch, Throbber, useConfirm, useIsMobile } from '../../components/ui';
 import { EmptyRow, Group, MoreMenu, Notice, Row, SectionActions, Stack } from '../settings/kit';
 import { LiveView, type LiveViewApi } from './LiveView';
+import { ownBrowserHere } from './browsing';
 import { browserCall, listenBrowser, loadBrowser, useBrowser } from './store';
 
 const lines = (v: string) =>
@@ -188,10 +189,14 @@ export function BrowserSettingsBody() {
         </div>
       </Group>
 
-      <Group title="Your own browsing" hint="The Browser page: pages you use yourself, which agents never get">
-        <Row icon={<Bookmark size={16} />} label="Bookmarks" hint="Yours, with those from the other browsers on this computer" onClick={() => go('/browser?panel=bookmarks')} />
-        <Row icon={<Puzzle size={16} />} label="Extensions" hint="Chrome extensions, in the desktop app" onClick={() => go('/browser?panel=extensions')} />
-      </Group>
+      {/* Your own browser is part of the desktop app: its rows are there only. */}
+      {ownBrowserHere() && (
+        <Group title="Your own browsing" hint="The Browser page: pages you use yourself, which agents never get">
+          <Row icon={<Bookmark size={16} />} label="Bookmarks" hint="Yours, with those from the other browsers on this computer" onClick={() => go('/browser?panel=bookmarks')} />
+          <Row icon={<Puzzle size={16} />} label="Extensions" hint="Chrome extensions, in the desktop app" onClick={() => go('/browser?panel=extensions')} />
+          <Row icon={<SlidersHorizontal size={16} />} label="Browser settings" hint="Home page, search engine, ad blocker, history and clearing what it kept" onClick={() => go('/browser?panel=settings')} />
+        </Group>
+      )}
 
       <Profiles st={st} onChange={setSt} onLogin={setLogin} confirm={confirm} />
       {confirmNode}

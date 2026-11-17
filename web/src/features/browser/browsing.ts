@@ -2,10 +2,23 @@
 // the server's routes have it, your bookmarks and extensions, the agents' browsers open now, the desktop app's
 // bridge to its pages, and the plain words for what a site may ask for.
 import { create } from 'zustand';
-import { BROWSING_KEY, type BookmarkNode, type BrowserPermissionAsk, type BrowserTab, type BrowserView, type ExtensionsState } from '@shared/browser';
+import {
+  BROWSING_KEY,
+  type BookmarkNode,
+  type BrowserPermissionAsk,
+  type BrowserTab,
+  type BrowserView,
+  type BrowsingPrefs,
+  type ExtensionsState,
+  type HistoryEntry,
+  type SuggestResult,
+} from '@shared/browser';
 import { api, del, enc, patch, post } from '../../lib/api';
-import { toast, toastError } from '../../lib/store';
-import { desktopBrowser, nativePages } from './PageView';
+import { machineId } from '../../lib/machine';
+import { openSession } from '../../lib/nav';
+import { agentKey, lastAgent, startSettings } from '../../lib/start';
+import { toast, toastError, useApp } from '../../lib/store';
+import { desktopBrowser, nativePages, type TabStateChange } from './PageView';
 import { useBrowser } from './store';
 
 export const KEY = BROWSING_KEY;
@@ -20,6 +33,12 @@ export interface ExtensionBadge {
 }
 
 export { desktopBrowser };
+
+/**
+ * Your own browser is part of the desktop app: its window, on its own computer (not a web page, not another machine's
+ * pages). The sidebar, the search box and Settings show it only there; /browser says so elsewhere.
+ */
+export const ownBrowserHere = (): boolean => !!desktopBrowser() && !machineId;
 
 /** The desktop app shows this browser's pages itself (not as pictures). */
 export const isNative = nativePages;
@@ -279,5 +298,117 @@ export async function forgetSitePermission(p: SitePermission) {
     useSitePermissions.setState({ list: r.permissions });
   } catch (e) {
     toastError(e);
+  }
+}
+
+// ---- your own browser's settings (home page, search engine, ad blocker) --------------------------------------------
+
+export const usePrefs = create<{ prefs: BrowsingPrefs | null }>(() => ({ prefs: null }));
+
+export async function loadPrefs() {
+  try {
+    takePrefs(await api<BrowsingPrefs>('/api/browser/browsing/prefs'));
+  } catch {}
+}
+
+/** Keeps the settings, and tells the desktop app which engine its right-click menu searches with. */
+function takePrefs(p: BrowsingPrefs) {
+  usePrefs.setState({ prefs: p });
+  try {
+    void desktopBrowser()?.setPrefs?.({ engine: p.engine, ...(p.customSearch ? { customSearch: p.customSearch } : {}) });
+  } catch {}
+}
+
+/** Changes some of them; false when the server refused (its words are shown). */
+export async function savePrefs(p: Partial<BrowsingPrefs>): Promise<boolean> {
+  try {
+    takePrefs(await patch<BrowsingPrefs>('/api/browser/browsing/prefs', p));
+    return true;
+  } catch (e) {
+    toastError(e);
+    return false;
+  }
+}
+
+/** The search engines' names. */
+export const ENGINE_NAMES: Record<string, string> = { google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing', brave: 'Brave', ecosia: 'Ecosia', startpage: 'Startpage', custom: 'Custom' };
+
+// ---- the address bar's suggestions, history and what you closed ----------------------------------------------------
+
+export const suggest = (q: string, signal?: AbortSignal) => api<SuggestResult>(`/api/browser/browsing/suggest?q=${enc(q)}`, { signal });
+
+export const loadHistory = (q: string, before?: number, limit = 100) =>
+  api<{ entries: HistoryEntry[] }>(`/api/browser/browsing/history?q=${enc(q)}&limit=${limit}${before ? `&before=${before}` : ''}`).then((r) => r.entries);
+
+export const deleteHistory = (id: number) => del(`/api/browser/browsing/history/${enc(String(id))}`).then(() => true, (e) => (toastError(e), false));
+
+/** Forgets every visit to one address (a suggestion does not say which entry it came from). */
+export async function forgetAddress(url: string): Promise<boolean> {
+  try {
+    const found = (await loadHistory(url, undefined, 50)).filter((e) => e.url === url);
+    for (const e of found) await del(`/api/browser/browsing/history/${enc(String(e.id))}`);
+    return true;
+  } catch (e) {
+    toastError(e);
+    return false;
+  }
+}
+
+export interface ClearWhat {
+  history: boolean;
+  cookies: boolean;
+  cache: boolean;
+  since?: number;
+}
+
+export const clearBrowsingData = (what: ClearWhat) => post('/api/browser/browsing/clear', what).then(() => true, (e) => (toastError(e), false));
+
+/** Opens a closed tab again (the newest unless `index`). */
+export async function reopenClosed(index?: number) {
+  try {
+    takeView((await post<{ view: BrowserView }>('/api/browser/browsing/reopen', index === undefined ? {} : { index })).view);
+  } catch (e) {
+    toastError(e);
+  }
+}
+
+// ---- what a tab tells the app: sound, zoom, blocked ads ----------------------------------------------------------
+
+export type TabState = Omit<TabStateChange, 'target'>;
+
+export const useTabState = create<{ byTab: Record<string, TabState> }>(() => ({ byTab: {} }));
+
+/** A zoom the desktop app reports (a factor like 1.25, or a percent) as a percent. */
+export const zoomPercent = (z: number) => (z > 10 ? Math.round(z) : Math.round(z * 100));
+
+/** Hears the tabs' states and what the right-click menu asks, as long as the page is open (the function it returns stops). */
+export function listenTabs(onCommand: (c: import('./PageView').PageCommand) => void): () => void {
+  const b = desktopBrowser();
+  if (!b) return () => {};
+  const off1 = b.onTabState((c) => {
+    const { target, ...rest } = c;
+    useTabState.setState((s) => ({ byTab: { ...s.byTab, [target]: { ...s.byTab[target], ...rest } } }));
+  });
+  const off2 = b.onCommand(onCommand);
+  return () => {
+    off1();
+    off2();
+  };
+}
+
+// ---- asking an agent ------------------------------------------------------------------------------------------------
+
+/** Starts a session with these words, the agent the start page last had (as Ask about this page does). */
+export async function askAgent(prompt: string): Promise<boolean> {
+  const { agent, acp } = lastAgent();
+  const r = startSettings().runs?.[agentKey(agent, acp)] ?? {};
+  const account = useApp.getState().boot?.accounts.some((a) => a.id === r.account && a.agent === agent) ? r.account : undefined;
+  try {
+    const made = await post<{ key: string }>('/api/sessions', { agent, acpAgent: agent === 'acp' ? acp : undefined, prompt, model: r.model ?? undefined, account });
+    openSession(made.key);
+    return true;
+  } catch (e) {
+    toastError(e);
+    return false;
   }
 }

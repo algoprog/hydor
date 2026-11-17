@@ -16,8 +16,13 @@
 //   - your own tabs are real pages. The window shows one where the Browser page puts it (`show`: the view is laid over
 //     that place of the window); not shown, it rests in a window nobody sees and stops drawing until shown again.
 // What the app's own page may ask (preload.cjs, `window.hydorDesktop.browser`) is answered by registerIpc.
+//
+// What people expect of a browser is here for your own tabs: the right-click menu, zoom, print, muting, full-screen video,
+// find in page with its match count, opening a page in the default browser, the shortcuts, and clearing browsing data; and
+// the ad blocker of the browsing profile (adblock.cjs), whose count of what a page had blocked goes to the window with the
+// tab's other news (sound, zoom, full screen) as `hydor:browser-tab-state`.
 'use strict';
-const { BrowserWindow, WebContentsView, ipcMain, session, shell } = require('electron');
+const { BrowserWindow, Menu, WebContentsView, clipboard, ipcMain, session, shell } = require('electron');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -32,6 +37,19 @@ const ALWAYS = new Set(['clipboard-sanitized-write', 'fullscreen']);
 /** How long a request the guard has paused waits for the server's word, and how long you have to answer a permission. */
 const PAUSE_MS = 30_000;
 const PERMISSION_MS = 120_000;
+/** Chrome's zoom steps, 25 % to 500 %. */
+const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
+/** What the blocked count of a page shows in the window at most this often (a page can have hundreds of requests blocked). */
+const BLOCKED_MS = 500;
+/** The search pages of the engines (shared/browser.ts SEARCH_ENGINES), for the right-click menu's search; the server has the same table. */
+const ENGINES = {
+  google: ['Google', 'https://www.google.com/search?q=%s'],
+  duckduckgo: ['DuckDuckGo', 'https://duckduckgo.com/?q=%s'],
+  bing: ['Bing', 'https://www.bing.com/search?q=%s'],
+  brave: ['Brave', 'https://search.brave.com/search?q=%s'],
+  ecosia: ['Ecosia', 'https://www.ecosia.org/search?q=%s'],
+  startpage: ['Startpage', 'https://www.startpage.com/do/search?q=%s'],
+};
 /** Frames to the window: at most this many a second, while someone watches. */
 const WATCH_FPS = 30;
 const IDLE_FPS = 10;
@@ -109,8 +127,10 @@ const modifiersOf = (mods) => {
  * @param {() => import('electron').BrowserWindow | null} o.mainWindow
  * @param {(e: import('electron').IpcMainInvokeEvent) => boolean} o.fromOwnPage  whether a message is from the app's own page
  * @param {object | null} [o.ext]                   desktop/extensions.cjs's createExtensions(), when there is one
+ * @param {{ dir: string, modulePath: () => string, engine?: object } | null} [o.adblock]   where the ad blocker keeps its lists and
+ *        finds its package (desktop/adblock.cjs); without it, or where the package does not load, there is no blocker
  */
-function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
+function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null, adblock: adblockOptions = null }) {
   /** One virtual browser for each connection of the server. */
   const conns = new Map();
   /** Every target by its webContents id, to find who asks for a permission or starts a download. */
@@ -120,6 +140,15 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
   const extended = new WeakSet();
   let host = null;
   let ua = null;
+  /** The ad blocker of the browsing profile, when this app has it (adblock.cjs). */
+  let adblock = null;
+  if (adblockOptions) {
+    try {
+      adblock = require('./adblock.cjs').createAdblock({ log, ...adblockOptions, onBlocked: (wcId) => blocked(wcId) });
+    } catch (e) {
+      log('the ad blocker did not start', String((e && e.message) || e));
+    }
+  }
 
   const say = (conn, msg) => toServer({ type: 'cdp', conn: conn.id, data: JSON.stringify(msg) });
   const event = (conn, method, params, sessionId) => say(conn, sessionId ? { method, params, sessionId } : { method, params });
@@ -137,6 +166,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
 
   function park(t) {
     if (t.gone) return;
+    exitFullScreen(t);
     try {
       if (t.shownIn && !t.shownIn.isDestroyed()) t.shownIn.contentView.removeChildView(t.view);
     } catch {}
@@ -164,11 +194,14 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     ctx.persistent = ctx.partition.startsWith('persist:');
     ua ??= plainUserAgent();
     sessions.set(ses, ctx);
-    await ses.setProxy({ proxyRules: proxy.server, proxyBypassRules: proxy.bypass });
+    // Agents' pages go through the server's proxy (it keeps them off this machine and its network); your own browsing
+    // has none (proxy null) and connects directly, as any browser does: a hop through the server slowed every page.
+    await ses.setProxy(proxy ? { proxyRules: proxy.server, proxyBypassRules: proxy.bypass } : { mode: 'direct' });
     ses.setUserAgent(ua);
     if (!extended.has(ses)) {
       extended.add(ses);
       guardSession(ses);
+      if (adblock && ctx.persistent && conn.profile === BROWSING && !ctx.id) adblock.attach(ses);
       if (ctx.persistent && ext) {
         try {
           ext.prepare(ses);
@@ -277,6 +310,13 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
       css: null,
       cursor: 'default',
       resume: null,
+      /** Your own tab's news for the window (see tabState), the ads and trackers it had blocked, and its full-screen state. */
+      news: null,
+      newsAt: 0,
+      newsTimer: null,
+      blocked: 0,
+      fs: null,
+      finding: null,
     };
     byWc.set(wc.id, t);
     hostWindow().contentView.addChildView(view);
@@ -298,22 +338,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
         for (const w of t.watchers.values()) w.send('hydor:browser-cursor', { target: t.id, cursor: t.cursor });
       });
     } else {
-      // A page you use takes keys itself, and the app's shortcuts would never reach the app's page: those few go to it.
-      wc.on('before-input-event', (e, input) => {
-        if (input.type !== 'keyDown') return;
-        const mod = MAC ? input.meta : input.control;
-        const k = String(input.key || '');
-        const lower = k.toLowerCase();
-        const hit =
-          (mod && !input.alt && ['t', 'w', 'l', 'r', 'f'].includes(lower)) ||
-          (k === 'F5' && !mod && !input.alt) ||
-          (input.alt && !mod && (k === 'ArrowLeft' || k === 'ArrowRight')) ||
-          (MAC && input.meta && !input.alt && (k === '[' || k === ']'));
-        if (!hit) return;
-        e.preventDefault();
-        const w = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn.webContents : mainWindow() && mainWindow().webContents;
-        if (w && !w.isDestroyed()) w.send('hydor:browser-key', { key: k, ctrl: !!input.control, meta: !!input.meta, alt: !!input.alt, shift: !!input.shift });
-      });
+      ownPage(t);
     }
     // Pop-ups open as tabs of this browser, in the same partition and drawn the same way as their opener.
     wc.setWindowOpenHandler(() => ({
@@ -322,6 +347,263 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
       createWindow: (options) => popup(t, options),
     }));
     return t;
+  }
+
+  // ---- your own tabs: what a browser does for a page you use ----------------------------------------------------------
+
+  /** The window's page that shows a tab (or the main window's), for the tab's news and what the menu asks. */
+  function uiOf(t) {
+    const w = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : mainWindow();
+    return w && !w.isDestroyed() && !w.webContents.isDestroyed() ? w.webContents : null;
+  }
+
+  /**
+   * News of a tab for the window (`hydor:browser-tab-state`: audible, muted, zoom, blocked, fullscreen), only what changed.
+   * The blocked count changes fast, so it goes at most twice a second; the rest goes at once.
+   */
+  function tabState(t, patch) {
+    if (t.gone || t.offscreen || !t.id) return;
+    t.news = { ...(t.news || {}), ...patch };
+    if (Object.keys(patch).every((k) => k === 'blocked')) {
+      if (t.newsTimer) return;
+      t.newsTimer = setTimeout(() => flushState(t), Math.max(0, BLOCKED_MS - (Date.now() - t.newsAt)));
+      t.newsTimer.unref?.();
+      return;
+    }
+    flushState(t);
+  }
+  function flushState(t) {
+    clearTimeout(t.newsTimer);
+    t.newsTimer = null;
+    const news = t.news;
+    t.news = null;
+    if (!news || t.gone || !t.id) return;
+    t.newsAt = Date.now();
+    uiOf(t)?.send('hydor:browser-tab-state', { target: t.id, ...news });
+  }
+  /** Everything about a tab, for a window that has just got it. */
+  const allState = (t) => ({ audible: t.wc.isCurrentlyAudible(), muted: t.wc.isAudioMuted(), zoom: zoomOf(t), blocked: t.blocked, fullscreen: !!t.fs });
+
+  /** The ad blocker blocked a request of this page. */
+  function blocked(wcId) {
+    const t = byWc.get(wcId);
+    if (!t || t.gone || t.offscreen) return;
+    t.blocked++;
+    tabState(t, { blocked: t.blocked });
+  }
+
+  const zoomOf = (t) => Math.round((t.wc.isDestroyed() ? 1 : t.wc.getZoomFactor()) * 100) / 100;
+  /** Chrome's steps: the next one up or down from where the page is now, or back to 100 %. */
+  function zoom(t, op) {
+    const now = t.wc.getZoomFactor();
+    let next = 1;
+    if (op === 'in') next = ZOOMS.find((z) => z > now + 0.001) ?? ZOOMS[ZOOMS.length - 1];
+    else if (op === 'out') next = [...ZOOMS].reverse().find((z) => z < now - 0.001) ?? ZOOMS[0];
+    t.wc.setZoomFactor(next);
+    const z = zoomOf(t);
+    tabState(t, { zoom: z });
+    return z;
+  }
+
+  /** What a key is when it is a zoom (Ctrl or ⌘ with + − 0), or null. */
+  const zoomKey = (k) => (k === '=' || k === '+' ? 'in' : k === '-' || k === '_' ? 'out' : k === '0' ? 'reset' : null);
+
+  /**
+   * A page you use takes keys itself, and the app's shortcuts would never reach the app's page: those go to it (Ctrl or ⌘
+   * with T, W, L, R, F, P, D, H, J, 1 to 9; Ctrl+Tab and Ctrl+Shift+Tab; Ctrl or ⌘+Shift+T and Shift+Delete; F5; Alt with the
+   * arrows, and ⌘ with [ and ] on a Mac). Zoom (Ctrl or ⌘ with + − 0) is the app's own, done here.
+   */
+  function shortcut(t, input) {
+    const mod = MAC ? input.meta : input.control;
+    const k = String(input.key || '');
+    const lower = k.toLowerCase();
+    if (mod && !input.alt && zoomKey(k)) return { zoom: zoomKey(k) };
+    const hit =
+      (mod && !input.alt && /^[twlrfpdhj]$/.test(lower)) ||
+      (mod && !input.alt && /^[1-9]$/.test(k)) ||
+      (input.control && !input.alt && k === 'Tab') ||
+      (mod && input.shift && !input.alt && k === 'Delete') ||
+      (k === 'F5' && !mod && !input.alt) ||
+      (input.alt && !mod && (k === 'ArrowLeft' || k === 'ArrowRight')) ||
+      (MAC && input.meta && !input.alt && (k === '[' || k === ']'));
+    return hit ? { key: k } : null;
+  }
+
+  function ownPage(t) {
+    const { wc } = t;
+    wc.on('before-input-event', (e, input) => {
+      if (input.type !== 'keyDown') return;
+      const hit = shortcut(t, input);
+      if (!hit) return;
+      e.preventDefault();
+      if (hit.zoom) return void zoom(t, hit.zoom);
+      uiOf(t)?.send('hydor:browser-key', { key: hit.key, ctrl: !!input.control, meta: !!input.meta, alt: !!input.alt, shift: !!input.shift });
+    });
+    // Ctrl and the wheel zoom as in Chrome.
+    wc.on('zoom-changed', (_e, direction) => zoom(t, direction === 'in' ? 'in' : 'out'));
+    wc.on('audio-state-changed', (e) => tabState(t, { audible: !!e.audible }));
+    // Each page counts its own blocked ads and trackers, and has the zoom its site has.
+    wc.on('did-start-navigation', (d) => {
+      if (!d.isMainFrame || d.isSameDocument) return;
+      t.blocked = 0;
+      tabState(t, { blocked: 0 });
+    });
+    wc.on('did-navigate', () => tabState(t, { zoom: zoomOf(t) }));
+    wc.on('enter-html-full-screen', () => enterFullScreen(t));
+    wc.on('leave-html-full-screen', () => leaveFullScreen(t));
+    wc.on('found-in-page', (_e, r) => {
+      const f = t.finding;
+      if (!f || r.requestId !== f.id || !r.finalUpdate) return;
+      t.finding = null;
+      clearTimeout(f.timer);
+      f.resolve({ matches: r.matches, active: r.activeMatchOrdinal });
+    });
+    wc.on('context-menu', (_e, params) => void popupMenu(t, params));
+  }
+
+  /** The window goes full screen and the page fills it, while a video (or any page) is shown full screen. */
+  function enterFullScreen(t) {
+    const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : null;
+    if (!win || t.fs) return;
+    const fit = () => {
+      const [width, height] = win.getContentSize();
+      t.bounds = { x: 0, y: 0, width, height };
+      t.view.setBounds(t.bounds);
+    };
+    t.fs = { win, was: win.isFullScreen(), fit };
+    try {
+      if (!t.fs.was) win.setFullScreen(true);
+      // Laid over everything of the window (adding a view again brings it to the front).
+      win.contentView.addChildView(t.view);
+      fit();
+      win.on('resize', fit);
+    } catch (e) {
+      log('full screen did not work', String((e && e.message) || e));
+    }
+    tabState(t, { fullscreen: true });
+  }
+  function leaveFullScreen(t) {
+    const fs = t.fs;
+    if (!fs) return;
+    t.fs = null;
+    try {
+      fs.win.removeListener('resize', fs.fit);
+      if (!fs.win.isDestroyed()) {
+        if (!fs.was) fs.win.setFullScreen(false);
+        // The place the Browser page asked for (it may have moved while the page was full screen).
+        if (t.wanted && t.shownIn === fs.win) place(t, fs.win);
+      }
+    } catch {}
+    tabState(t, { fullscreen: false });
+  }
+  /** A page that is taken away (another tab, another page of the app) cannot stay full screen. */
+  function exitFullScreen(t) {
+    if (!t.fs) return;
+    leaveFullScreen(t);
+    if (!t.wc.isDestroyed()) t.wc.executeJavaScript('document.fullscreenElement && document.exitFullscreen()', true).catch(() => {});
+  }
+
+  // ---- the right-click menu ----------------------------------------------------------------------------------------
+
+  /** The search engine as the server has it (the app's own page asks it), for the menu's "Search Google for …". */
+  let engine = { name: 'Google', template: ENGINES.google[1] };
+  async function readEngine() {
+    const win = mainWindow();
+    if (!win || win.isDestroyed()) return;
+    try {
+      const p = await withTimeout(win.webContents.executeJavaScript("fetch('/api/browser/browsing/prefs', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : null)).catch(() => null)"), 600, 'The search engine');
+      if (!p || typeof p !== 'object') return;
+      if (ENGINES[p.engine]) engine = { name: ENGINES[p.engine][0], template: ENGINES[p.engine][1] };
+      else if (p.engine === 'custom' && typeof p.customSearch === 'string' && /^https?:\/\/.+%s/i.test(p.customSearch)) {
+        let name = 'your search engine';
+        try {
+          name = new URL(p.customSearch.replace('%s', 'x')).hostname.replace(/^www\./, '');
+        } catch {}
+        engine = { name, template: p.customSearch };
+      }
+    } catch {}
+  }
+
+  const web = (u) => /^https?:\/\//i.test(String(u || ''));
+  const short = (text, n = 30) => {
+    const one = String(text).replace(/\s+/g, ' ').trim();
+    return one.length > n ? `${one.slice(0, n - 1)}…` : one;
+  };
+
+  /**
+   * The items of the menu for a click in one of your tabs, as a template for Menu.buildFromTemplate: what the page offers
+   * where you clicked (a link, an image, selected text, a field) and what any page has.
+   */
+  function menuTemplate(t, params, eng = engine) {
+    const { wc } = t;
+    const items = [];
+    const sep = () => items.length && items[items.length - 1].type !== 'separator' && items.push({ type: 'separator' });
+    const flags = params.editFlags || {};
+    const text = String(params.selectionText || '').trim();
+    const page = params.pageURL || wc.getURL();
+    // Spelling comes first in a field: the word's suggestions, and adding it to the dictionary.
+    if (params.isEditable && params.misspelledWord) {
+      for (const w of (params.dictionarySuggestions || []).slice(0, 5)) items.push({ label: w, click: () => wc.replaceMisspelling(w) });
+      if (!(params.dictionarySuggestions || []).length) items.push({ label: 'No suggestions', enabled: false });
+      items.push({ label: 'Add to dictionary', click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord) });
+      sep();
+    }
+    if (params.linkURL) {
+      if (web(params.linkURL)) {
+        items.push({ label: 'Open link in new tab', click: () => void openTab(params.linkURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+        items.push({ label: 'Open link in your default browser', click: () => void shell.openExternal(params.linkURL).catch(() => {}) });
+      }
+      items.push({ label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) });
+      sep();
+    }
+    if (params.mediaType === 'image' && params.srcURL) {
+      if (web(params.srcURL)) items.push({ label: 'Open image in new tab', click: () => void openTab(params.srcURL).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+      items.push({ label: 'Save image as…', click: () => wc.downloadURL(params.srcURL) });
+      items.push({ label: 'Copy image', click: () => wc.copyImageAt(params.x, params.y) });
+      items.push({ label: 'Copy image address', click: () => clipboard.writeText(params.srcURL) });
+      sep();
+    }
+    if (params.isEditable) {
+      items.push({ label: 'Undo', enabled: !!flags.canUndo, click: () => wc.undo() });
+      items.push({ label: 'Redo', enabled: !!flags.canRedo, click: () => wc.redo() });
+      items.push({ type: 'separator' });
+      items.push({ label: 'Cut', enabled: !!flags.canCut, click: () => wc.cut() });
+      items.push({ label: 'Copy', enabled: !!flags.canCopy, click: () => wc.copy() });
+      items.push({ label: 'Paste', enabled: !!flags.canPaste, click: () => wc.paste() });
+      items.push({ label: 'Select all', enabled: !!flags.canSelectAll, click: () => wc.selectAll() });
+      sep();
+    }
+    if (text) {
+      if (!params.isEditable) items.push({ label: 'Copy', click: () => wc.copy() });
+      items.push({ label: `Search ${eng.name} for “${short(text)}”`, click: () => void openTab(eng.template.replace('%s', encodeURIComponent(text))).catch((e) => log('a tab could not open', String((e && e.message) || e))) });
+      items.push({ label: `Ask an agent about “${short(text)}”`, click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'ask', text, url: page }) });
+      sep();
+    }
+    if (!params.isEditable && !text) {
+      const nav = wc.navigationHistory;
+      items.push({ label: 'Back', enabled: nav.canGoBack(), click: () => nav.goBack() });
+      items.push({ label: 'Forward', enabled: nav.canGoForward(), click: () => nav.goForward() });
+      items.push({ label: 'Reload', click: () => wc.reload() });
+      sep();
+    }
+    items.push({ label: 'Bookmark this page', click: () => uiOf(t)?.send('hydor:browser-command', { cmd: 'bookmark', url: page, title: wc.getTitle() }) });
+    items.push({ label: 'Print…', click: () => wc.print({ printBackground: true }) });
+    items.push({ type: 'separator' });
+    items.push({ label: 'Inspect', click: () => wc.inspectElement(params.x, params.y) });
+    return items;
+  }
+
+  async function popupMenu(t, params) {
+    if (t.gone || t.wc.isDestroyed()) return;
+    // The engine is only asked for when words are selected: that is the one item that needs it.
+    if (String(params.selectionText || '').trim()) await readEngine();
+    const win = t.shownIn && !t.shownIn.isDestroyed() ? t.shownIn : mainWindow();
+    if (!win || win.isDestroyed() || t.gone || t.wc.isDestroyed()) return;
+    try {
+      Menu.buildFromTemplate(menuTemplate(t, params)).popup({ window: win });
+    } catch (e) {
+      log('the menu did not open', String((e && e.message) || e));
+    }
   }
 
   /** The debugger on, the target's id (its main frame's), Fetch if the guard has it on; then the server hears of it. */
@@ -427,6 +709,17 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     t.gone = true;
     const { conn } = t;
     byWc.delete(t.wc.id);
+    clearTimeout(t.newsTimer);
+    clearTimeout(t.finding && t.finding.timer);
+    // A page that was full screen takes the window back out of it.
+    if (t.fs) {
+      const { fs } = t;
+      t.fs = null;
+      try {
+        fs.win.removeListener('resize', fs.fit);
+        if (!fs.was && !fs.win.isDestroyed()) fs.win.setFullScreen(false);
+      } catch {}
+    }
     for (const w of t.watchers.values()) w.stop?.();
     t.watchers.clear();
     if (t.id) {
@@ -582,7 +875,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
         return { browserContextIds: [...conn.contexts.keys()] };
       case 'Target.createBrowserContext': {
         const id = hex32();
-        const ctx = await makeContext(conn, id, { server: p.proxyServer ? String(p.proxyServer) : conn.proxy.server, bypass: p.proxyServer ? String(p.proxyBypassList || '') : conn.proxy.bypass });
+        const ctx = await makeContext(conn, id, p.proxyServer ? { server: String(p.proxyServer), bypass: String(p.proxyBypassList || '') } : conn.proxy);
         conn.contexts.set(id, ctx);
         return { browserContextId: id };
       }
@@ -702,7 +995,7 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
   /** { type: 'ask', what: 'browser-launch' }: a browser for a profile; answers its product and user agent. */
   async function launch(m) {
     if (conns.has(m.conn)) throw new Error('that connection is already open');
-    const proxy = { server: `http://127.0.0.1:${Number(m.proxy)}`, bypass: '<-loopback>' };
+    const proxy = Number(m.proxy) > 0 ? { server: `http://127.0.0.1:${Number(m.proxy)}`, bypass: '<-loopback>' } : null;
     const conn = {
       id: String(m.conn),
       profile: String(m.profile || ''),
@@ -762,6 +1055,14 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     if (m.type === 'browser-extensions') {
       if (!ext) return true;
       for (const conn of conns.values()) if (conn.profile === m.profile && conn.defaultCtx.persistent) void syncExtensions(conn.defaultCtx.ses, Array.isArray(m.extensions) ? m.extensions : []);
+      return true;
+    }
+    if (m.type === 'browser-prefs') {
+      if (adblock) adblock.setPrefs({ adblock: m.adblock, allowAds: m.allowAds });
+      return true;
+    }
+    if (m.type === 'browser-clear') {
+      void clearData(m);
       return true;
     }
     if (m.type === 'browser-permission-answer') {
@@ -826,6 +1127,15 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     });
     win.on('show', back);
     win.on('restore', back);
+    // The pages follow the window's edges at once (by the distance each keeps from them), without waiting for the app's
+    // page to notice the new size; the page's own next `show` corrects whatever this guessed.
+    win.on('resize', () => follow(win));
+    win.on('will-resize', (_e, next) => {
+      // The size the window is about to get (Windows and macOS): its content is that less the frame.
+      const [cw, ch] = win.getContentSize();
+      const [ow, oh] = win.getSize();
+      follow(win, [next.width - (ow - cw), next.height - (oh - ch)]);
+    });
     // The app's page loads again (the server started over): its pages have to be asked for again.
     win.webContents.on('did-start-navigation', (d) => {
       if (d.isMainFrame && !d.isSameDocument) away();
@@ -838,6 +1148,33 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     for (const conn of conns.values()) for (const t of conn.targets.values()) if (wanted ? t.wanted && t.wanted.win === win && !t.shownIn : t.shownIn === win) out.push(t);
     return out;
   }
+  /** Sets a view's bounds only when they are not what they are. */
+  function setBoundsOnce(t, b) {
+    t.bounds = b;
+    const c = t.view.getBounds();
+    if (c.x !== b.x || c.y !== b.y || c.width !== b.width || c.height !== b.height) t.view.setBounds(b);
+  }
+  /** Where a page is, as its distance from each edge of the window's content (so that the window's size moves it at once). */
+  function insetsOf(win, b) {
+    const [cw, ch] = win.getContentSize();
+    return { left: b.x, top: b.y, right: cw - (b.x + b.width), bottom: ch - (b.y + b.height) };
+  }
+  /** The pages shown in a window, placed again from their insets after its size changed (to `size`, when that is known first). */
+  function follow(win, size) {
+    if (win.isDestroyed()) return;
+    const [cw, ch] = size || win.getContentSize();
+    for (const t of shownIn(win)) {
+      const w = t.wanted;
+      if (t.gone || t.fs || !w || !w.insets) continue;
+      const i = w.insets;
+      const b = { x: i.left, y: i.top, width: Math.max(1, cw - i.left - i.right), height: Math.max(1, ch - i.top - i.bottom) };
+      w.bounds = b;
+      try {
+        setBoundsOnce(t, b);
+      } catch {}
+    }
+  }
+
   function place(t, win) {
     if (t.gone || win.isDestroyed()) return;
     try {
@@ -847,8 +1184,9 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
         win.contentView.addChildView(t.view);
         t.shownIn = win;
       }
-      t.bounds = t.wanted.bounds;
-      t.view.setBounds(t.bounds);
+      // A page that is full screen fills the window, wherever the Browser page says its place is.
+      if (t.fs) t.fs.fit();
+      else setBoundsOnce(t, t.wanted.bounds);
     } catch (e) {
       log('a page could not be shown', String((e && e.message) || e));
     }
@@ -868,11 +1206,36 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
       park(t);
       return true;
     }
-    t.wanted = { win, bounds };
+    const was = t.shownIn === win;
+    t.wanted = { win, bounds, insets: insetsOf(win, bounds) };
     // Laid over the window (in front of everything of its own) now, or when the window is shown again.
     if (win.isVisible() && !win.isMinimized()) place(t, win);
     else t.bounds = bounds;
+    // The window's page learns how the tab is (sound, zoom, blocked ads) as it gets it: once, not at every move of its place.
+    if (!was) {
+      t.news = { ...allState(t) };
+      flushState(t);
+    }
     return true;
+  }
+
+  /**
+   * A picture of a page of yours as it is now (a JPEG data URL, the size of its place), for the app's page to show where
+   * the page is taken away for a while (a menu over it): null when it is not shown, or not one of your tabs here.
+   */
+  async function still(e, target) {
+    if (!fromOwnPage(e)) return null;
+    const t = ownTab(target);
+    if (!t || !t.shownIn || t.shownIn.isDestroyed() || t.wc.isDestroyed()) return null;
+    try {
+      let img = await withTimeout(t.wc.capturePage(), 400, 'The picture');
+      if (img.isEmpty()) return null;
+      const { width } = img.getSize();
+      if (width > 1920) img = img.resize({ width: 1920, quality: 'good' });
+      return `data:image/jpeg;base64,${img.toJPEG(72).toString('base64')}`;
+    } catch {
+      return null;
+    }
   }
 
   function hide(e, target) {
@@ -1135,18 +1498,105 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     }
   }
 
+  /**
+   * Native find in one of your tabs, with the number of matches and which one is on; empty words stop it. null when it is
+   * not one of your tabs here.
+   */
+  function find(e, target, text, opts) {
+    if (!fromOwnPage(e)) return null;
+    const t = ownTab(target);
+    if (!t || t.wc.isDestroyed()) return null;
+    const o = opts && typeof opts === 'object' ? opts : {};
+    text = String(text || '').slice(0, 1000);
+    if (t.finding) (clearTimeout(t.finding.timer), t.finding.resolve(null), (t.finding = null));
+    if (!text) {
+      t.wc.stopFindInPage('clearSelection');
+      return Promise.resolve({ matches: 0, active: 0 });
+    }
+    return new Promise((resolve) => {
+      const id = t.wc.findInPage(text, { forward: o.forward !== false, findNext: !!o.findNext, matchCase: !!o.matchCase });
+      // The answer is the last update of this search (Chromium counts on after the first); if none comes, none was found.
+      const timer = setTimeout(() => {
+        if (t.finding && t.finding.id === id) t.finding = null;
+        resolve({ matches: 0, active: 0 });
+      }, 3000);
+      t.finding = { id, resolve, timer };
+    });
+  }
+
+  function zoomTab(e, target, op) {
+    if (!fromOwnPage(e) || !['in', 'out', 'reset'].includes(op)) return 1;
+    const t = ownTab(target);
+    return t && !t.wc.isDestroyed() ? zoom(t, op) : 1;
+  }
+
+  function print(e, target) {
+    if (!fromOwnPage(e)) return;
+    const t = ownTab(target);
+    if (t && !t.wc.isDestroyed()) t.wc.print({ printBackground: true });
+  }
+
+  function mute(e, target, muted) {
+    if (!fromOwnPage(e)) return;
+    const t = ownTab(target);
+    if (!t || t.wc.isDestroyed()) return;
+    t.wc.setAudioMuted(!!muted);
+    tabState(t, { muted: t.wc.isAudioMuted() });
+  }
+
+  /** A web address in the computer's default browser: http and https only. */
+  async function openExternal(e, url) {
+    if (!fromOwnPage(e) || !web(url)) return false;
+    try {
+      await shell.openExternal(String(url));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Browsing data of a profile cleared ({ type: 'browser-clear' }): its cookies and sites' storage, its cached files. Chromium's
+   * clearing in Electron 45 (session.clearData) has no time range, so what you asked for since a time is cleared in whole. The
+   * extensions keep their own storage.
+   */
+  async function clearData(m) {
+    const profile = String(m.profile || '');
+    if (!profile) return;
+    try {
+      const ses = session.fromPartition(partitionOf({ profile, id: '' }, ''));
+      if (m.cookies) {
+        const keep = [];
+        try {
+          for (const x of ses.extensions.getAllExtensions()) keep.push(new URL(x.url).origin);
+        } catch {}
+        await ses.clearData({ dataTypes: ['cookies', 'localStorage', 'indexedDB', 'serviceWorkers', 'fileSystems', 'webSQL', 'backgroundFetch'], ...(keep.length ? { excludeOrigins: keep } : {}) });
+      }
+      if (m.cache) await ses.clearCache();
+      log('browsing data cleared', profile, m.cookies ? 'cookies' : '', m.cache ? 'cache' : '');
+    } catch (e) {
+      log('browsing data could not be cleared', String((e && e.message) || e));
+    }
+  }
+
   let registered = false;
   function registerIpc() {
     if (registered) return;
     registered = true;
     ipcMain.handle('hydor:browser-show', (e, a) => show(e, a && a.target, a && a.rect));
     ipcMain.handle('hydor:browser-hide', (e, target) => hide(e, target));
+    ipcMain.handle('hydor:browser-still', (e, target) => still(e, target));
     ipcMain.handle('hydor:browser-focus', (e, target) => focus(e, target));
     ipcMain.handle('hydor:browser-watch', (e, a) => watch(e, a && a.target, !a || a.on !== false));
     ipcMain.handle('hydor:browser-input', (e, a) => input(e, a && a.target, a && a.events));
     ipcMain.handle('hydor:browser-edit', (e, a) => edit(e, a && a.target, a && a.op));
     ipcMain.handle('hydor:browser-popup', (e, a) => popupOf(e, a && a.extension, a && a.rect));
     ipcMain.handle('hydor:browser-show-file', (e, file) => showFile(e, file));
+    ipcMain.handle('hydor:browser-find', (e, a) => find(e, a && a.target, a && a.text, a && a.opts));
+    ipcMain.handle('hydor:browser-zoom', (e, a) => zoomTab(e, a && a.target, a && a.op));
+    ipcMain.handle('hydor:browser-print', (e, target) => print(e, target));
+    ipcMain.handle('hydor:browser-mute', (e, a) => mute(e, a && a.target, a && a.muted));
+    ipcMain.handle('hydor:browser-open-external', (e, url) => openExternal(e, url));
     ipcMain.on('hydor:browser-frame-ack', (e, target) => frameTaken(e, target));
   }
 
@@ -1159,7 +1609,10 @@ function createBrowser({ log, toServer, mainWindow, fromOwnPage, ext = null }) {
     /** What the app tells the extensions (a stand-in for tests, and for the window's page). */
     browsingSession,
     // For desktop/scripts/browser-ipc-check.cjs, which calls what the page's messages call.
-    handlers: { show, hide, watch, input, edit, focus, showFile },
+    handlers: { show, hide, still, watch, input, edit, focus, showFile, find, zoom: zoomTab, print, mute, openExternal },
+    menuTemplate,
+    shortcut,
+    adblock,
     conns,
   };
 }

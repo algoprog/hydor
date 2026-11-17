@@ -676,7 +676,10 @@ const fromThisMachine = (e) => {
     return false;
   }
 };
-browser = createBrowser({ log: browserLog, toServer, mainWindow: () => win, fromOwnPage: fromThisMachine, ext: extensions });
+// The ad blocker (adblock.cjs) is a package of the server's (its folder is known once the server is, hence a function) and keeps
+// its lists in the app's data folder; it starts with your own browsing's browser.
+const adblock = { dir: path.join(app.getPath('userData'), 'adblock'), modulePath: () => path.join(serverDir(), 'node_modules', '@ghostery', 'adblocker-electron') };
+browser = createBrowser({ log: browserLog, toServer, mainWindow: () => win, fromOwnPage: fromThisMachine, ext: extensions, adblock });
 browser.registerIpc();
 // A forwarded machine's folders belong to its server, not this desktop computer.
 ipcMain.handle('hydor:choose-folder', async (e, current) => {
