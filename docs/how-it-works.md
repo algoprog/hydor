@@ -35,7 +35,11 @@ The architecture, what keeps sessions alive, and how the app is secured. [Back t
 - **Your own browsing's history, suggestions and ad blocker.** The server records the page each of your own tabs ends up
   on (web pages and files, with their titles and how often you typed their addresses) in a table of the app's database,
   the last 20,000, and ranks it with your open tabs and bookmarks for the address bar (`server/browser/history.ts`); the
-  search engine you chose is asked for its suggestions as you type, with a short time-out, when you leave them on. The
+  search engine you chose is asked for its suggestions as you type, with a short time-out, when you leave them on. With
+  search by meaning on, the pages of your history, your bookmarks and your downloads (kept in a table too, the last 5,000) get
+  a vector of their title and address from the same model, in the background (`server/browser/meaning.ts`), in a table of
+  their own that nothing else reads; the address bar adds the pages alike in meaning to the ones with the words, fused by
+  rank, and the search box finds them for the person at it, never for an agent's call. A vector goes with its page. The
   ad and tracker blocker is the app's (`desktop/adblock.cjs`): Ghostery's engine on the session of your own browsing,
   made from its lists once and kept as a file in the app's data folder, made again when a week old (the old file stays in
   use when that fails). The server tells the app when the setting or the sites you allowed ads on change. Electron's own

@@ -17,7 +17,11 @@ import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { addressOf, barTarget, browsingPrefs, browsingRoutes, checkHandoffStart, DEFAULT_PREFS, desktopGate, handoffLine, PermissionDesk, PermissionMemory, requireDesktop, restorable, savableTabs, savedTabs, searchUrl, setBrowsingPrefs, snapshotMarkdown, TabsKeeper } from './browsing.ts';
 import { pickChrome } from './chrome.ts';
+import { addDownload, downloadCount } from './downloads.ts';
 import { browserRoutes } from './routes.ts';
+import { addVisit, listHistory } from './history.ts';
+import { find } from '../find/index.ts';
+import { internalHeaders } from '../internal.ts';
 import { browserOf, closeAll, ensureBrowser, setBrowserDeps } from './session.ts';
 import { setBrowserSettings, sessionOptions } from './settings.ts';
 
@@ -239,6 +243,34 @@ async function main() {
   } else {
     await realBrowser();
   }
+  // Last: it sets up your browsing's routes on a database of its own, which the real-browser checks above must not share.
+  await check('clearing browsing data with the history ticked clears the downloads list too; and your browsing reaches the search box only for a person', async () => {
+    fs.mkdirSync(process.env.DATA_DIR!, { recursive: true });
+    const db = openDb(path.join(process.env.DATA_DIR!, 'browsing-clear.db'));
+    addVisit(db, 'https://recipes.example/pasta', 'Pasta recipes', false, Date.now());
+    addDownload(db, { name: 'pasta.pdf', path: '/home/me/Downloads/pasta.pdf', url: 'https://recipes.example/pasta.pdf', at: Date.now() });
+    const app = Fastify();
+    app.setErrorHandler((err: Error, _req, reply) => void reply.code(err instanceof HttpError ? err.status : 500).send({ error: err.message }));
+    const deps = { app, db, sessions: { summary: () => null, list: () => ({ sessions: [], total: 0 }) }, scheduler: { list: () => [] }, models: null, broadcast: () => {}, toSubscribers: () => {}, publicBase: () => 'http://localhost' } as unknown as Deps;
+    browsingRoutes(deps);
+    find.routes!(deps);
+    const json = async (method: 'GET' | 'POST', url: string, internal = false, payload?: object) => (await app.inject({ method, url, headers: internal ? internalHeaders() : {}, ...(payload ? { payload } : {}) })).json();
+    // The search box's request carries browsing=1; an agent's call (app_api) carries the internal header and gets none of it.
+    assert.equal((await json('GET', '/api/find?q=pasta&in=browsing&browsing=1')).browsing.length, 2);
+    assert.equal((await json('GET', '/api/find?q=pasta&in=browsing&browsing=1', true)).browsing, undefined);
+    assert.equal((await json('GET', '/api/find?q=pasta&browsing=1', true)).browsing, undefined);
+    // Only the cache and cookies ticked: the list stays; the history ticked: it goes with the history.
+    assert.equal(downloadCount(db), 1);
+    await assert.rejects(json('POST', '/api/browser/browsing/clear', false, {}).then((r) => (r.error ? Promise.reject(new Error(r.error)) : r)), /Pick what to clear/);
+    const r = await json('POST', '/api/browser/browsing/clear', false, { history: true, since: Date.now() + 10_000 });
+    assert.equal(r.history, 0, 'nothing that new');
+    assert.equal(downloadCount(db), 1, 'and the downloads of before that time stay');
+    await json('POST', '/api/browser/browsing/clear', false, { history: true });
+    assert.equal(listHistory(db).length, 0);
+    assert.equal(downloadCount(db), 0);
+    assert.deepEqual((await json('GET', '/api/find?q=pasta&in=browsing&browsing=1')).browsing, []);
+    await app.close();
+  });
   console.log(`\n${passed}/${passed + failed} passed`);
 }
 

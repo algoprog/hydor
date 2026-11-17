@@ -122,7 +122,10 @@ or put your own SearXNG first.
 - **Price table.** Set `PRICES_URL` to nothing (an empty value). Estimates then use only the prices you set.
 - **Search by meaning.** Turn off **Search by meaning** in Settings → Capabilities → Memory, or start with
   `HYDOR_EMBED=off` to never set it up. `HF_ENDPOINT` sends the model download to a mirror, and
-  `HYDOR_EMBED_PYTHON` uses a Python you already prepared, which needs no Python packages from the internet.
+  `HYDOR_EMBED_PYTHON` uses a Python you already prepared, which needs no Python packages from the internet. While it
+  is on, the titles and addresses (without query strings) of your own browser's history, bookmarks and downloads are
+  also made into vectors on your computer, kept apart in the app's database; nothing of them is sent anywhere, and agents
+  never see them.
 - **Helper model.** Pick a model on your computer under Settings → Agents → Models → Helper model. Then titles,
   memory notes, Auto mode's checks and the rest stay on your computer. Turn **Memory** off in Settings →
   Capabilities → Memory to send no conversation to it for notes.

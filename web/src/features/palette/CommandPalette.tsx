@@ -11,9 +11,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
-import { ArrowRight, BookOpen, Bot, Boxes, Brain, Cable, CalendarClock, Check, ChevronDown, Compass, CornerDownLeft, FileText, LayoutGrid, Layers, Library, LibraryBig, ListFilter, MessageSquareText, MessagesSquare, Search, Settings, Sparkles, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Bot, Boxes, Brain, Cable, CalendarClock, Check, ChevronDown, Clock, Compass, CornerDownLeft, Download, FileText, Globe, LayoutGrid, Layers, Library, LibraryBig, ListFilter, MessageSquareText, MessagesSquare, Search, Settings, Sparkles, Star, X } from 'lucide-react';
 import { kindLabel } from '@shared/documents';
-import { FIND_PLACES, matchItem, matchStrength, queryAffinity, queryWords, usageBoost, type FindPlace, type FindResponse, type FindUsage } from '@shared/find';
+import { FIND_PLACES, matchItem, matchStrength, queryAffinity, queryWords, usageBoost, type FindPlace, type FindResponse, type FindUsage, type FoundBrowsing } from '@shared/find';
 import type { SessionSummary } from '@shared/types';
 import { api } from '../../lib/api';
 import { MOD, basename, bytes, dirname, markRuns, tildify, timeAgo } from '../../lib/format';
@@ -21,6 +21,7 @@ import { go, openFile, sessionPath } from '../../lib/nav';
 import { useApp, useSessions, useUI } from '../../lib/store';
 import { AgentIcon } from '../../components/AgentIcon';
 import { Button, cx, Kbd, MenuLabel, MenuSep, Popover, SheetsOnPhone, Throbber, useIsMobile, useMediaQuery, useSheets } from '../../components/ui';
+import { ownBrowserHere, showDownload } from '../browser/browsing';
 import { FileIcon } from '../documents/fileTypes';
 import { folderName } from '../sessions/SessionList';
 import { liveEntries, staticEntries, type Entry, type Group } from './catalog';
@@ -70,6 +71,9 @@ const WEIGHT: Record<Group, number> = {
   Themes: 0.8,
   Memory: 0.75,
   Files: 0.7,
+  History: 0.7,
+  Bookmarks: 0.85,
+  Downloads: 0.7,
   'In messages': 0.6,
 };
 /** Rows a group shows before "more". */
@@ -95,7 +99,11 @@ const PLACES: Record<FindPlace, { label: string; icon: ReactNode; groups: Group[
   settings: { label: 'Settings', icon: <Settings size={15} />, groups: ['Settings', 'Themes'] },
   actions: { label: 'Go to and actions', icon: <Compass size={15} />, groups: ['Go to', 'Actions'] },
   guide: { label: 'Guide', icon: <BookOpen size={15} />, groups: ['Guide'] },
+  // Your own browser, in the desktop app.
+  browsing: { label: 'Browser', icon: <Globe size={15} />, groups: ['History', 'Bookmarks', 'Downloads'] },
 };
+/** Your browsing's groups: what is found there is never counted as picked (nothing typed is kept for it). */
+const BROWSING_GROUPS = new Set<Group>(['History', 'Bookmarks', 'Downloads']);
 const PLACE_OF = Object.fromEntries(FIND_PLACES.flatMap((p) => PLACES[p].groups.map((g) => [g, p]))) as Record<Group, FindPlace>;
 
 /** Whether results of a group show, with these places picked (none: everywhere). */
@@ -150,6 +158,68 @@ function sessionEntry(s: { key: string; agent: SessionSummary['agent']; acpName?
     ],
     opens: find ? 'Opens the session where it was said' : 'Opens the session',
     run: () => go(`${sessionPath(s.key)}${find ? `?find=${encodeURIComponent(find)}` : ''}`),
+  };
+}
+
+/** A site as people read it: no scheme, no www.; a file's address is its path. */
+const siteOf = (url: string) => url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/[/?#].*$/s, '');
+const plainAddress = (url: string) => url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
+
+/** A page of your history, a bookmark or a download the server found, as the list shows it. Opening one is never counted (see BROWSING_GROUPS). */
+function browsingEntry(b: FoundBrowsing, home?: string): Entry {
+  const at = timeAgo(b.at);
+  const open = (url: string) => () => go(`/browser?url=${encodeURIComponent(url)}`);
+  if (b.kind === 'history')
+    return {
+      id: `hist:${b.id}`,
+      group: 'History',
+      own: true,
+      icon: <Clock size={15} />,
+      title: b.title,
+      where: siteOf(b.url ?? ''),
+      hint: at,
+      body: plainAddress(b.url ?? ''),
+      facts: [
+        ['Last visited', at],
+        ['Visits', String(b.visits ?? 1)],
+      ],
+      opens: 'Opens the page in a new tab of your browser',
+      run: open(b.url ?? ''),
+    };
+  if (b.kind === 'bookmark')
+    return {
+      id: `bm:${b.id}`,
+      group: 'Bookmarks',
+      own: true,
+      icon: <Star size={15} />,
+      title: b.title,
+      where: b.folder || siteOf(b.url ?? ''),
+      hint: at,
+      body: plainAddress(b.url ?? ''),
+      facts: [
+        ['Folder', b.folder ?? ''],
+        ['Added', at],
+      ],
+      opens: 'Opens the page in a new tab of your browser',
+      run: open(b.url ?? ''),
+    };
+  const folder = b.path ? tildify(dirname(b.path), home) : '';
+  return {
+    id: `dl:${b.id}`,
+    group: 'Downloads',
+    own: true,
+    icon: <Download size={15} />,
+    title: b.title,
+    where: folder || (b.url ? siteOf(b.url) : undefined),
+    hint: at,
+    meta: b.failed ? ['Did not finish'] : undefined,
+    body: b.url ? plainAddress(b.url) : undefined,
+    facts: [
+      ['Folder', folder],
+      ['Downloaded', at],
+    ],
+    opens: b.path ? 'Shows the file in its folder' : b.url ? 'Opens the page it came from, in a new tab of your browser' : 'Nothing to open: the download did not finish',
+    run: () => (b.path ? showDownload(b.path) : b.url ? open(b.url)() : undefined),
   };
 }
 
@@ -216,6 +286,12 @@ function rank(q: string, all: Entry[], sessions: SessionSummary[], server: FindR
       score: rrf(i),
     });
   });
+  // Your own browsing: each kind in the order the server gave it (words and meaning fused there).
+  const seen: Record<string, number> = {};
+  for (const b of server?.browsing ?? []) {
+    const i = (seen[b.kind] = (seen[b.kind] ?? -1) + 1);
+    add({ entry: browsingEntry(b, home), score: rrf(i), marks: matchItem({ title: b.title }, words, q).marks, strength: 0.6 });
+  }
   files.forEach((p, i) => {
     const info = fileInfo[p];
     const folder = tildify(dirname(p), home);
@@ -382,7 +458,7 @@ export function CommandPalette() {
     const t = setTimeout(() => {
       const dir = root || defaultCwd;
       Promise.all([
-        api<FindResponse>(`/api/find?q=${encodeURIComponent(term)}${scope ? `&in=${scope}` : ''}`, { signal: ctl.signal }).catch(() => null),
+        api<FindResponse>(`/api/find?q=${encodeURIComponent(term)}${scope ? `&in=${scope}` : ''}${ownBrowserHere() ? '&browsing=1' : ''}`, { signal: ctl.signal }).catch(() => null),
         term.length >= 2 && dir && shows(places, 'Files')
           ? api<{ files: string[] }>(`/api/fs/find?root=${encodeURIComponent(dir)}&q=${encodeURIComponent(term)}`, { signal: ctl.signal }).catch(() => null)
           : Promise.resolve(null),
@@ -440,7 +516,8 @@ export function CommandPalette() {
     if (!r) return;
     if (r.kind === 'more') return setMore((m) => new Set(m).add(r.group));
     close();
-    notePick(r.hit.entry.id, q);
+    // Nothing is kept of what was typed to find your browsing.
+    if (!BROWSING_GROUPS.has(r.hit.entry.group)) notePick(r.hit.entry.id, q);
     r.hit.entry.run();
   };
   const current = rows[sel]?.kind === 'hit' ? (rows[sel] as { hit: Hit }).hit : null;
@@ -563,10 +640,10 @@ export function CommandPalette() {
                       >
                         <span className={cx('flex shrink-0 items-center justify-center rounded-md', !r.group ? 'h-8 w-8 bg-bg-2 text-fg-2' : 'w-4 text-fg-3')}>{r.hit.entry.icon}</span>
                         <span className="min-w-0 flex-1">
-                          <span className={cx('block truncate', !r.group ? 'text-[14.5px] font-medium text-fg' : 'text-[13.5px]')}>{r.hit.label ?? marked(r.hit.entry.title, r.hit.marks)}</span>
-                          {!r.group && (r.hit.sub ?? r.hit.entry.where) && <span className="block truncate text-[12px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
+                          <span translate={r.hit.entry.own ? 'no' : undefined} className={cx('block truncate', !r.group ? 'text-[14.5px] font-medium text-fg' : 'text-[13.5px]')}>{r.hit.label ?? marked(r.hit.entry.title, r.hit.marks)}</span>
+                          {!r.group && (r.hit.sub ?? r.hit.entry.where) && <span translate={r.hit.entry.own ? 'no' : undefined} className="block truncate text-[12px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
                         </span>
-                        {r.group && (r.hit.sub ?? r.hit.entry.where) && <span className="max-w-[38%] shrink-0 truncate text-[11.5px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
+                        {r.group && (r.hit.sub ?? r.hit.entry.where) && <span translate={r.hit.entry.own ? 'no' : undefined} className="max-w-[38%] shrink-0 truncate text-[11.5px] text-fg-3">{r.hit.sub ?? r.hit.entry.where}</span>}
                         {r.hit.entry.hint && !(r.group && (r.hit.sub ?? r.hit.entry.where)) && <span className="shrink-0 text-[11.5px] text-fg-3">{r.hit.entry.hint}</span>}
                         {i === sel && <CornerDownLeft size={12} className="shrink-0 text-fg-3" />}
                       </button>
@@ -668,7 +745,12 @@ function ScopeName({ places }: { places: FindPlace[] }) {
 /** The places, two by two: tick some to look only there, none (Everywhere) to look in all of them. */
 function ScopeMenu({ places }: { places: FindPlace[] }) {
   const sheet = useSheets();
-  const flip = (p: FindPlace) => setScope(places.includes(p) ? places.filter((x) => x !== p) : [...places, p]);
+  // Your own browser is in the desktop app: elsewhere every other place picked is everywhere.
+  const flip = (p: FindPlace) => {
+    const next = places.includes(p) ? places.filter((x) => x !== p) : [...places, p];
+    const rest = FIND_PLACES.filter((x) => x !== 'browsing');
+    setScope(!ownBrowserHere() && rest.every((x) => next.includes(x)) ? [] : next);
+  };
   return (
     // A click here leaves the typing where it was.
     <div onMouseDown={(e) => e.preventDefault()}>
@@ -676,7 +758,7 @@ function ScopeMenu({ places }: { places: FindPlace[] }) {
       <PlaceRow icon={<Layers size={15} />} label="Everywhere" on={!places.length} onClick={() => setScope([])} />
       <MenuSep />
       <div className="grid grid-cols-2 gap-x-1">
-        {FIND_PLACES.map((p) => (
+        {FIND_PLACES.filter((p) => p !== 'browsing' || ownBrowserHere() || places.includes(p)).map((p) => (
           <PlaceRow key={p} icon={PLACES[p].icon} label={PLACES[p].label} on={places.includes(p)} onClick={() => flip(p)} />
         ))}
       </div>
@@ -755,17 +837,21 @@ function Preview({ hit, q, onOpen }: { hit: Hit | null; q: string; onOpen: () =>
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bg-2 text-fg-2 [&_svg]:h-5 [&_svg]:w-5">{e.mark ?? e.icon}</span>
           <div className="min-w-0 pt-0.5">
-            <div translate={e.visual ? 'no' : undefined} className="text-[15px] leading-snug font-medium break-words text-fg">
+            <div translate={e.visual || e.own ? 'no' : undefined} className="text-[15px] leading-snug font-medium break-words text-fg">
               {e.group === 'In messages' ? hit.sub : e.title}
             </div>
-            {e.visual ? <WhereLine e={e} /> : e.where && <div className="mt-0.5 text-[12px] break-words text-fg-3">{e.where}</div>}
+            {e.visual ? <WhereLine e={e} /> : e.where && <div translate={e.own ? 'no' : undefined} className="mt-0.5 text-[12px] break-words text-fg-3">{e.where}</div>}
           </div>
         </div>
       )}
       {e.group === 'In messages' ? (
         <div className="rounded-xl bg-bg-2 px-3 py-2.5 text-[13px] leading-relaxed text-fg-2">{hit.label}</div>
       ) : (
-        e.body && <div className="line-clamp-[12] text-[13px] leading-relaxed whitespace-pre-wrap text-fg-2">{e.body}</div>
+        e.body && (
+          <div translate={e.own ? 'no' : undefined} className={cx('line-clamp-[12] text-[13px] leading-relaxed text-fg-2', e.own ? 'break-all' : 'whitespace-pre-wrap')}>
+            {e.body}
+          </div>
+        )
       )}
       {facts.length > 0 && (
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">

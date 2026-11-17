@@ -18,6 +18,7 @@ import { desktopChromium, onDesktop, tellDesktop } from '../desktop.ts';
 import type { Deps } from '../features/types.ts';
 import type { CreateOpts } from '../sessions.ts';
 import { loadBookmarks } from './bookmarks.ts';
+import { clearDownloads } from './downloads.ts';
 import { clearHistory, HistoryRecorder, historyUrl, listHistory, removeHistory, suggest } from './history.ts';
 import { shownUrl } from './outline.ts';
 import { browserOf, downloadsFolder, ensureBrowser, handOver, onBrowserView, openBrowsers, outsideSessions, siteOfUrl, takeBack, takeClosedTab, viewOf, type SessionBrowser } from './session.ts';
@@ -635,12 +636,14 @@ export function browsingRoutes(d: Deps) {
     return { removed: clearHistory(db, since) };
   });
 
-  /** Clears what you pick: history here, cookies and site data and cached files in the app's browser. */
+  /** Clears what you pick: history here (with the list of downloads), cookies and site data and cached files in the app's browser. */
   app.post('/api/browser/browsing/clear', async (req) => {
     const { history, cookies, cache } = B(req);
     const since = sinceOf(B(req).since);
     if (history !== true && cookies !== true && cache !== true) throw new HttpError(400, 'Pick what to clear: history, cookies or cache');
     const removed = history === true ? clearHistory(db, since) : 0;
+    // The list of what was downloaded goes with the history, for the same time (the files stay where they were saved).
+    if (history === true) clearDownloads(db, since);
     const told = cookies === true || cache === true ? tellDesktop({ type: 'browser-clear', profile: BROWSING_PROFILE, cookies: cookies === true, cache: cache === true, ...(since === undefined ? {} : { since }) }) : false;
     return { history: removed, desktop: told };
   });

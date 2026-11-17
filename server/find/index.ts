@@ -14,11 +14,13 @@ import path from 'node:path';
 import { FIND_PLACES, findPlaces, type FindPlace, type FindResponse, type FoundNote, type FoundSession } from '../../shared/find.ts';
 import type { SearchHit, ServerEvent } from '../../shared/types.ts';
 import { HttpError } from '../auth.ts';
+import { isInternal } from '../internal.ts';
 import { APP_ROOT } from '../config.ts';
 import { kvGet, kvSet, type DB } from '../db.ts';
 import type { Deps, Feature } from '../features/types.ts';
 import { findSessions } from '../indexer/index.ts';
 import { embed, meaningOn, meaningReady, queryVector } from '../memory/embed.ts';
+import { findBrowsing } from '../browser/search.ts';
 import { findNotes } from '../memory/search.ts';
 import { memoryOn } from '../memory/store.ts';
 import { BYTES, quantize, queryTable, scale, scoreAt, VECTOR_MODEL } from '../memory/vectors.ts';
@@ -227,7 +229,7 @@ function alike(db: DB, items: (Item & { hash: string })[], q: Float32Array, limi
 }
 
 /** What a search finds on the server: everywhere, or in the places given (FIND_PLACES; none is everywhere). */
-export async function findAll(d: D, query: string, places: FindPlace[] = []): Promise<FindResponse> {
+export async function findAll(d: D, query: string, places: FindPlace[] = [], o: { browsing?: boolean } = {}): Promise<FindResponse> {
   const { db } = d;
   const q = query.trim().slice(0, 300);
   const out: FindResponse = { meaning: false, alike: [], sessions: [], messages: [], notes: [] };
@@ -266,6 +268,8 @@ export async function findAll(d: D, query: string, places: FindPlace[] = []): Pr
     out.notes = (await findNotes(db, { places: 'all', query: q, limit: 6, vector: v })).map(
       (f): FoundNote => ({ id: f.entry.id, scope: f.entry.scope, scopeKey: f.entry.scopeKey, kind: f.entry.kind, text: f.entry.text, updatedAt: f.entry.updatedAt, meaning: f.meaning }),
     );
+  // Your own browsing, when the search box asked for it (the route says so only for a person, never an agent's call).
+  if (o.browsing && wants('browsing')) out.browsing = await findBrowsing(db, q, { vector: v });
   return out;
 }
 
@@ -303,8 +307,9 @@ export const find: Feature = {
   id: 'find',
   routes(d) {
     d.app.get('/api/find', async (req) => {
-      const q = req.query as { q?: string; in?: string };
-      return findAll(d, String(q.q ?? ''), findPlaces(q.in));
+      const q = req.query as { q?: string; in?: string; browsing?: string };
+      // Your history, bookmarks and downloads are for the person at the search box: an agent's own calls (app_api) never get them.
+      return findAll(d, String(q.q ?? ''), findPlaces(q.in), { browsing: q.browsing === '1' && !isInternal(req) });
     });
     // Where the search box looks (its Search in menu): every device opens it so, and open ones change at once.
     d.app.get('/api/find/scope', async () => ({ in: findScope(d.db) }));

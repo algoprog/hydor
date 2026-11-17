@@ -25429,5 +25429,13 @@
 "What you type in the address bar goes to your search engine, as in any browser":"你在地址栏中输入的内容会发送给你的搜索引擎，和任何浏览器一样",
 "Your own browser is in the desktop app":"你自己的浏览器在桌面应用中",
 "Your own browser is part of the desktop app":"你自己的浏览器是桌面应用的一部分",
-"your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers clear browsing data history cookies cache desktop app":"自己的浏览 主页 搜索引擎 google duckduckgo bing 搜索建议 广告拦截器 拦截广告 跟踪器 清除浏览数据 历史记录 cookie 缓存 桌面应用"
+"your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers clear browsing data history cookies cache desktop app":"自己的浏览 主页 搜索引擎 google duckduckgo bing 搜索建议 广告拦截器 拦截广告 跟踪器 清除浏览数据 历史记录 cookie 缓存 桌面应用",
+  "Downloaded": "已下载",
+  "Last visited": "上次访问",
+  "Nothing to open: the download did not finish": "没有可打开的内容：下载没有完成",
+  "Opens the page in a new tab of your browser": "在你的浏览器的新标签页中打开该页面",
+  "Opens the page it came from, in a new tab of your browser": "在你的浏览器的新标签页中打开它来源的页面",
+  "Shows the file in its folder": "在文件所在的文件夹中显示该文件",
+  "Visits": "访问次数",
+  "Wiki memory is off for this chat or project": "此聊天或项目已关闭 Wiki 记忆"
 }

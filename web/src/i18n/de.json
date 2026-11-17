@@ -24159,5 +24159,13 @@
   "What you type in the address bar goes to your search engine, as in any browser": "Was du in die Adressleiste eingibst, geht wie in jedem Browser an deine Suchmaschine",
   "Your own browser is in the desktop app": "Dein eigener Browser ist in der Desktop-App",
   "Your own browser is part of the desktop app": "Dein eigener Browser ist Teil der Desktop-App",
-  "your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers clear browsing data history cookies cache desktop app": "eigenes Surfen Startseite Suchmaschine Google DuckDuckGo Bing Vorschläge Werbeblocker Werbung blockieren Tracker Browserdaten löschen Verlauf Cookies Cache Desktop-App"
+  "your own browsing home page search engine google duckduckgo bing suggestions ad blocker block ads trackers clear browsing data history cookies cache desktop app": "eigenes Surfen Startseite Suchmaschine Google DuckDuckGo Bing Vorschläge Werbeblocker Werbung blockieren Tracker Browserdaten löschen Verlauf Cookies Cache Desktop-App",
+  "Downloaded": "Heruntergeladen",
+  "Last visited": "Zuletzt besucht",
+  "Nothing to open: the download did not finish": "Nichts zu öffnen: Der Download wurde nicht abgeschlossen",
+  "Opens the page in a new tab of your browser": "Öffnet die Seite in einem neuen Tab deines Browsers",
+  "Opens the page it came from, in a new tab of your browser": "Öffnet die Seite, von der sie kam, in einem neuen Tab deines Browsers",
+  "Shows the file in its folder": "Zeigt die Datei in ihrem Ordner",
+  "Visits": "Besuche",
+  "Wiki memory is off for this chat or project": "Wiki-Memory ist für diesen Chat oder dieses Projekt ausgeschaltet"
 }

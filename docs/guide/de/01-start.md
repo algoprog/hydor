@@ -167,10 +167,11 @@ Die Suche findet beim Tippen Inhalte in der gesamten App, ähnlich wie Spotlight
 - **Projekte**: Projektname und Beschreibung. Ein Treffer öffnet das Projekt.
 - **Apps**, **Geplante Aufgaben**, **Agenten**, **Skills**, **Seiten**, **Bilder, Videos und Audio** und **Verbindungen**: eigene und mitgelieferte Einträge. Jeder öffnet seinen jeweiligen Bereich.
 - **Dateien**: bis zu fünf passende Dateinamen aus dem auf der Dateien-Seite geöffneten Ordner oder dem Standardordner der App.
+- **Verlauf**, **Lesezeichen** und **Downloads**: in der Desktop-App die Seiten, die du in deinem eigenen [Browser](/guide/web#your-own-browser) besucht hast, deine Lesezeichen und die Dateien, die er heruntergeladen hat. Sie werden über ihre Wörter gefunden und, wenn [Nach Bedeutung suchen](/settings?s=memory&find=Search%20by%20meaning) eingeschaltet ist, über das, worum es in ihnen geht, auch wenn die Wörter abweichen. Eine Seite öffnet sich in einem neuen Tab der **Browser**-Seite; bei einem Download zeigt ein Treffer die Datei in ihrem Ordner. Sie bleiben auf diesem Computer, Agenten bekommen sie nie, und die Suche merkt sich nicht, was du getippt hast, um sie zu finden.
 
 ### Suchbereiche auswählen
 
-**Suchen in** am Feldende zeigt den Suchbereich an, zunächst **Überall**. Ein Klick öffnet **Sitzungen**, **Nachrichten** für Unterhaltungsinhalte, **Projekte**, **Bibliothek** für Seiten, Bilder und Videos, **Apps**, **Dateien**, **Memory**, **Geplante Aufgaben**, **Agenten**, **Skills**, **Verbindungen**, **Einstellungen** einschließlich Designs, **Navigation und Aktionen** für App-Seiten und Funktionen sowie **Hilfe**.
+**Suchen in** am Feldende zeigt den Suchbereich an, zunächst **Überall**. Ein Klick öffnet **Sitzungen**, **Nachrichten** für Unterhaltungsinhalte, **Projekte**, **Bibliothek** für Seiten, Bilder und Videos, **Apps**, **Dateien**, **Memory**, **Geplante Aufgaben**, **Agenten**, **Skills**, **Verbindungen**, **Einstellungen** einschließlich Designs, **Navigation und Aktionen** für App-Seiten und Funktionen, **Hilfe** und, nur in der Desktop-App, **Browser** (dein Verlauf, deine Lesezeichen und Downloads).
 
 - Wähle einen oder mehrere Bereiche. Die Suche beschränkt sich darauf, und die Schaltfläche nennt sie in Akzentfarbe, etwa „Sitzungen, Bibliothek“ oder „3 Bereiche“. Ein erneuter Klick entfernt einen Bereich; **Überall** aktiviert wieder alle.
 - Ohne Suchtext siehst du die Inhalte der ausgewählten Bereiche, häufig genutzte zuerst: letzte Sitzungen, Projekte und Seiten, Einstellungsbereiche oder Hilfethemen. Nachrichten, Memory-Notizen und Dateien erscheinen erst nach einer Eingabe.
@@ -287,6 +288,7 @@ Auf dem Mac steht ⌘ statt Strg. Ausnahmen sind Strg+` und Strg+Leertaste, die 
 - „Markiere alle Ereignisse während meiner Abwesenheit als gesehen.“
 - „Was hätten meine heutigen Sitzungen zu API-Preisen gekostet?“
 - „Beschränke meine Suche auf Sitzungen und Seiten.“
+- „Findet die Suche die Seite über Hotels in Lissabon, die ich letzten Monat besucht habe?“ (in der Desktop-App: dein Verlauf, deine Lesezeichen und Downloads, über ihre Wörter oder darüber, worum es geht; Agenten können sie nicht ansehen)
 - „Setze Einstellungen und Suche an den Anfang der Werkzeuge unten in der Seitenleiste.“
 - „Setze mein Projekt Abschlussarbeit an die erste Stelle der Gruppen in der Seitenleiste.“
 - „Welche Projekte hat Hydor aus meinen Claude-Code- und Codex-Sitzungen erstellt?“

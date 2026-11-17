@@ -207,8 +207,9 @@ On a Mac, the app puts the command on your PATH by itself.
 - Research with cited sources, deep research reports, and a browser you can watch and take over
   ([research](docs/guide/08-research.md)). In the desktop apps that browser runs inside the app, with nothing to install.
 - **A browser of your own** in the desktop app: tabs, a smart address bar (open tabs, bookmarks and history ranked as
-  you use them, completing in place, search suggestions, and asking an agent), a home page and a search engine of your
-  choice, history, an ad and tracker blocker, a right-click menu, zoom, print, bookmarks (bring them in from your other
+  you use them, also by what a page is about with search by meaning on, completing in place, search suggestions, and
+  asking an agent), a home page and a search engine of your choice, history (and downloads, which the search box finds
+  too), an ad and tracker blocker, a right-click menu, zoom, print, bookmarks (bring them in from your other
   browsers), Chrome extensions, and a page you can hand to an agent, to ask about or to work on in your sign-in, with a
   stop before it sends or deletes anything ([the browser](docs/guide/07-web.md)).
 - Answer UIs open full screen and save as pictures, tables and charts can read a Library spreadsheet or a data file

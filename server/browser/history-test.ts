@@ -2,7 +2,10 @@
 // addresses, titles, paging, searching in any language, clearing since a time, the 20 000 cap), frecency (typed beats
 // visited beats old), how the view's changes become visits, the suggestions (tabs, bookmarks and history without
 // duplicates, what you typed first, the address to complete in place, the engines' suggestions through a stand-in
-// fetch, a slow or failing engine) and their parsing.
+// fetch, a slow or failing engine) and their parsing, then your browsing by meaning with a made-up embedder (private
+// vectors for history, bookmarks and downloads; pages found only by meaning come after the word matches, marked; the
+// address to complete stays by words; every way a page, bookmark or download goes takes its vector with it) and the
+// list of downloads.
 //   OUTDIR=dist/dev node scripts/build-server.mjs server/browser/history-test.ts
 //   DATA_DIR=/tmp/hydor-test-history node dist/dev/history-test.js
 import assert from 'node:assert/strict';
@@ -10,13 +13,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { BookmarkNode, BrowserTab } from '../../shared/browser.ts';
 import { openDb } from '../db.ts';
+import { setEmbedderForTests } from '../memory/embed.ts';
+import * as vec from '../memory/vectors.ts';
+import { addBookmark, changeBookmark, loadBookmarks, removeBookmark } from './bookmarks.ts';
 import { addressOf } from './browsing.ts';
+import { browserVectorCounts, browsingAlike, downloadText, fillBrowserVectors, historyText, syncBookmarkVectors } from './meaning.ts';
+import { addDownload, clearDownloads, downloadCount, listDownloads, MAX_DOWNLOADS } from './downloads.ts';
 import { addVisit, clearHistory, clearSuggestCache, engineSuggestions, frecency, HistoryRecorder, historyCount, historyUrl, listHistory, MAX_HISTORY, parseSuggestions, plainUrl, removeHistory, setTitle, SUGGEST_URLS, suggest, type Fetch, type SuggestInput } from './history.ts';
 
 if (!process.env.DATA_DIR?.startsWith('/tmp/')) {
   console.error('Run with DATA_DIR=/tmp/… so nothing touches real data.');
   process.exit(2);
 }
+// The real model is never started here: the made-up embedder below stands in for it.
+process.env.HYDOR_EMBED = 'off';
 
 let passed = 0;
 let failed = 0;
@@ -367,6 +377,225 @@ async function main() {
     rec.seen({ open: false, tabs: [] });
     rec.seen(view(tab('1', 'https://d.example/', 'D')));
     assert.equal(entry('d.example').visits, 2);
+  });
+
+  // ---- your browsing by meaning, with a made-up embedder ----
+  // Concepts as fixed random directions (words alike share one), a text as the sum of its words' (as find-test.ts does).
+  const SAME: Record<string, string> = { vacation: 'travel', holiday: 'travel', lisbon: 'travel', trip: 'travel', itinerary: 'travel', pasta: 'food', carbonara: 'food', spaghetti: 'food', recipe: 'food' };
+  const dirs = new Map<string, Float32Array>();
+  const direction = (c: string): Float32Array => {
+    let v = dirs.get(c);
+    if (v) return v;
+    let h0 = 0;
+    for (const ch of c) h0 = (h0 * 31 + ch.charCodeAt(0)) >>> 0;
+    const rnd = (i: number) => {
+      let h = (h0 ^ Math.imul(i + 1, 0x9e3779b9)) >>> 0;
+      h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+      h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+      return ((h ^ (h >>> 16)) >>> 0) / 2 ** 32 - 0.5;
+    };
+    v = new Float32Array(vec.DIM).map((_, i) => rnd(3 * i) + rnd(3 * i + 1) + rnd(3 * i + 2));
+    dirs.set(c, v);
+    return v;
+  };
+  const fake = (text: string): Float32Array => {
+    const v = new Float32Array(vec.DIM);
+    for (const w of text.toLowerCase().match(/[a-z]+/g) ?? []) {
+      const d = direction(SAME[w] ?? w);
+      for (let i = 0; i < vec.DIM; i++) v[i] += d[i];
+    }
+    const n = Math.hypot(...v) || 1;
+    return v.map((x) => x / n);
+  };
+  const embedded: string[] = [];
+  const useModel = () => {
+    vec.setCodebookForTests(new Float32Array(vec.DIM * 16).map((_, i) => -0.12 + ((i % 16) * 0.24) / 15));
+    setEmbedderForTests(async (texts) => (embedded.push(...texts), texts.map(fake)));
+  };
+  const vectorRows = (db: ReturnType<typeof fresh>, kind?: string) => (browserVectorCounts(db), db.prepare(`select count(*) as n from browser_vectors ${kind ? 'where kind = ?' : ''}`).get(...(kind ? [kind] : [])) as { n: number }).n;
+  const trip = (db: ReturnType<typeof fresh>) => {
+    addVisit(db, 'https://travel.example/lisbon-guide', 'Lisbon guide', false, NOW - 3 * DAY);
+    addVisit(db, 'https://food.example/carbonara', 'Spaghetti carbonara recipe', false, NOW - 2 * DAY);
+    addVisit(db, 'https://news.example/', 'Daily news', false, NOW - DAY);
+  };
+
+  await check('by meaning: what is embedded is a title and an address without its scheme, query string or fragment; nothing is made while it is off', async () => {
+    assert.equal(historyText('Plans', 'https://www.a.example/x/y?token=secret&q=1#frag'), 'Plans\na.example/x/y');
+    assert.equal(historyText('', 'https://a.example/'), 'a.example', 'no title: the address alone');
+    assert.equal(historyText('T'.repeat(500), 'https://a.example/').length, 300, 'short');
+    assert.equal(downloadText('Itinerary.pdf', 'https://www.travel.example/files/it.pdf?sig=1'), 'Itinerary.pdf\ntravel.example');
+    useModel();
+    const db = fresh();
+    trip(db);
+    assert.equal(vectorRows(db), 0, 'a visit makes no vector by itself');
+    assert.equal(await fillBrowserVectors(db), 3);
+    assert.deepEqual(embedded.sort(), ['Daily news\nnews.example', 'Lisbon guide\ntravel.example/lisbon-guide', 'Spaghetti carbonara recipe\nfood.example/carbonara']);
+    assert.equal(await fillBrowserVectors(db), 0, 'each has its vector: nothing waits');
+    assert.ok(!embedded.some((t) => /secret|https?:/.test(t)));
+    assert.equal((db.prepare("select count(*) as n from sqlite_master where name = 'find_vectors'").get() as { n: number }).n, 0, 'the vectors of what the app finds by meaning are another table, which these never enter');
+  });
+
+  await check('by meaning: alike pages come after the word matches, marked; a page with the words and the meaning is not marked and comes first', async () => {
+    useModel();
+    const db = fresh();
+    trip(db);
+    addVisit(db, 'https://vacation-deals.example/', 'Vacation deals', false, NOW - 5 * DAY);
+    await fillBrowserVectors(db);
+    const r = await suggest(db, input('vacation'));
+    assert.deepEqual(urls(r), ['history:https://vacation-deals.example/', 'history:https://travel.example/lisbon-guide']);
+    assert.equal((r.items[0] as { meaning?: boolean }).meaning, undefined, 'it holds the words');
+    assert.equal((r.items[1] as { meaning?: boolean }).meaning, true, 'it is about the same, in other words');
+    assert.equal(r.inline, 'vacation-deals.example', 'the address to complete to is by words alone');
+    // Nothing alike: nothing is added; and what holds the words stays as it was.
+    assert.deepEqual(urls(await suggest(db, input('daily'))), ['history:https://news.example/']);
+    // Only by meaning: it is there, marked, and nothing is completed.
+    removeHistory(db, listHistory(db, { q: 'vacation-deals' })[0].id);
+    const only = await suggest(db, input('vacation'));
+    assert.deepEqual(urls(only), ['history:https://travel.example/lisbon-guide']);
+    assert.equal((only.items[0] as { meaning?: boolean }).meaning, true);
+    assert.equal(only.inline, undefined);
+    // An address, or a scheme, or a short word: the model is not asked.
+    const before = embedded.length;
+    await suggest(db, input('travel.example'));
+    await suggest(db, input('ab'));
+    await suggest(db, input('https://x.example/ vacation'));
+    assert.equal(embedded.length, before, 'no query was embedded');
+  });
+
+  await check('by meaning: with the model unable to answer, the suggestions are as before and are not held up', async () => {
+    const db = fresh();
+    trip(db);
+    setEmbedderForTests(async (texts, kind) => (kind === 'query' ? new Promise<Float32Array[]>(() => {}) : texts.map(fake)));
+    vec.setCodebookForTests(new Float32Array(vec.DIM * 16).map((_, i) => -0.12 + ((i % 16) * 0.24) / 15));
+    await fillBrowserVectors(db);
+    const t0 = Date.now();
+    const r = await suggest(db, input('vacation'));
+    assert.deepEqual(r.items, [], 'nothing holds the words');
+    assert.ok(Date.now() - t0 < 1500, `answered in ${Date.now() - t0} ms though the model never answered`);
+    assert.deepEqual(await browsingAlike(db, 'vacation', ['history'], { vector: null }), []);
+    setEmbedderForTests(null);
+    assert.deepEqual(await browsingAlike(db, 'vacation', ['history'], { waitMs: 0 }), [], 'search by meaning off: nothing');
+  });
+
+  await check('by meaning: the engine and the model are asked at the same time', async () => {
+    useModel();
+    const db = fresh();
+    trip(db);
+    await fillBrowserVectors(db);
+    const slowEngine: Fetch = (_u, init) =>
+      new Promise((res) => {
+        const t = setTimeout(() => res({ ok: true, text: async () => '["vacation",["vacation rentals"]]' }), 300);
+        init?.signal?.addEventListener('abort', () => clearTimeout(t));
+      });
+    clearSuggestCache();
+    const t0 = Date.now();
+    const r = await suggest(db, input('vacation', { prefs: { engine: 'google', suggest: true }, fetch: slowEngine }));
+    assert.deepEqual(urls(r), ['history:https://travel.example/lisbon-guide', 'search:vacation rentals']);
+    assert.ok(Date.now() - t0 < 900);
+  });
+
+  await check('by meaning: bookmarks too, and a changed or deleted bookmark takes its vector', async () => {
+    useModel();
+    const db = fresh();
+    const { node } = addBookmark(db, { title: 'Lisbon holiday plans', url: 'https://plans.example/trip' });
+    addBookmark(db, { title: 'Pasta night', url: 'https://food.example/pasta' });
+    assert.equal(await fillBrowserVectors(db), 2);
+    const r = await suggest(db, input('vacation', { bookmarks: loadBookmarks(db) }));
+    assert.deepEqual(urls(r), ['bookmark:https://plans.example/trip']);
+    assert.equal((r.items[0] as { meaning?: boolean }).meaning, true);
+    // A new title is embedded again; the old vector does not linger.
+    changeBookmark(db, node.id, { title: 'Dentist' });
+    assert.equal(vectorRows(db, 'bookmark'), 1, 'the vector of the old words went');
+    assert.deepEqual(await browsingAlike(db, 'vacation', ['bookmark'], { waitMs: 0 }), []);
+    assert.equal(await fillBrowserVectors(db), 1);
+    assert.equal(vectorRows(db, 'bookmark'), 2);
+    removeBookmark(db, node.id);
+    assert.equal(vectorRows(db, 'bookmark'), 1);
+    // The folder's name goes with its bookmarks.
+    const f = addBookmark(db, { title: 'Holidays', parent: 'bar' }).node;
+    addBookmark(db, { title: 'Hotel', url: 'https://h.example/', parent: f.id });
+    await fillBrowserVectors(db);
+    assert.ok(embedded.includes('Hotel\nh.example\nHolidays'));
+    syncBookmarkVectors(db, []);
+    assert.equal(vectorRows(db, 'bookmark'), 0, 'no bookmarks: no vectors');
+  });
+
+  await check('by meaning: a page that goes from the history takes its vector: removed, cleared (all or since) or trimmed', async () => {
+    useModel();
+    const db = fresh();
+    trip(db);
+    await fillBrowserVectors(db);
+    assert.equal(vectorRows(db, 'history'), 3);
+    removeHistory(db, listHistory(db, { q: 'news' })[0].id);
+    assert.equal(vectorRows(db, 'history'), 2);
+    assert.deepEqual(await browsingAlike(db, 'news', ['history'], { waitMs: 0, min: -1 }).then((a) => a.length), 2);
+    // A title that changes is embedded again.
+    setTitle(db, 'https://food.example/carbonara', 'Pasta dinner');
+    assert.equal(vectorRows(db, 'history'), 1);
+    assert.equal(await fillBrowserVectors(db), 1);
+    assert.ok(embedded.includes('Pasta dinner\nfood.example/carbonara'));
+    // Since a time: the newer go.
+    clearHistory(db, NOW - 2.5 * DAY);
+    assert.equal(historyCount(db), 1);
+    assert.equal(vectorRows(db, 'history'), 1, 'one page, one vector');
+    assert.equal(browserVectorCounts(db).history, 1, 'and in memory too');
+    clearHistory(db);
+    assert.equal(vectorRows(db, 'history'), 0);
+    assert.deepEqual(await browsingAlike(db, 'vacation', ['history', 'bookmark', 'download'], { waitMs: 0, min: -1 }), [], 'nothing of a cleared page is found');
+    // The cap.
+    const big = fresh();
+    addVisit(big, 'https://travel.example/lisbon-guide', 'Lisbon guide', false, 1);
+    await fillBrowserVectors(big);
+    assert.equal(vectorRows(big, 'history'), 1);
+    const insert = big.prepare("insert into browser_history (url, title, hay, at, visits, typed) values (?, '', ?, ?, 1, 0)");
+    big.transaction(() => {
+      for (let i = 0; i < MAX_HISTORY - 1; i++) insert.run(`https://bulk.example/${i}`, `bulk.example/${i}`, 10 + i);
+    })();
+    addVisit(big, 'https://one-more.example/', 'One more', false, NOW);
+    assert.equal(historyCount(big), MAX_HISTORY);
+    assert.equal(vectorRows(big, 'history'), 0, 'the oldest page went, and its vector');
+    assert.equal(browserVectorCounts(big).history, 0);
+  });
+
+  await check('downloads: kept in a list that outlives the browser; the last 5 000; cleared since a time; found by meaning', async () => {
+    useModel();
+    const file = path.join(dir, `downloads-${process.pid}.db`);
+    let db = openDb(file, { cacheMb: 8 });
+    assert.equal(downloadCount(db), 0);
+    addDownload(db, { name: 'Trip itinerary.pdf', path: '/home/me/Downloads/Trip itinerary.pdf', url: 'https://www.travel.example/files/it.pdf?sig=abc#x', at: NOW - 3 * DAY });
+    addDownload(db, { name: 'report.zip', path: '', url: 'blob:https://a.example/123', failed: true, at: NOW - DAY });
+    addDownload(db, { name: 'notes.txt', path: '/home/me/Downloads/notes.txt', url: 'https://a.example/notes.txt', at: NOW });
+    db.close();
+    db = openDb(file, { cacheMb: 8 });
+    const all = listDownloads(db);
+    assert.deepEqual(
+      all.map((d) => [d.name, d.failed, d.url]),
+      [
+        ['notes.txt', false, 'https://a.example/notes.txt'],
+        ['report.zip', true, ''],
+        ['Trip itinerary.pdf', false, 'https://www.travel.example/files/it.pdf?sig=abc'],
+      ],
+      'kept across a restart, newest first, a blob address is not kept, a failed one says so',
+    );
+    assert.deepEqual(listDownloads(db, { q: 'travel.example ITINERARY' }).map((d) => d.name), ['Trip itinerary.pdf']);
+    assert.equal(await fillBrowserVectors(db), 3);
+    assert.deepEqual((await browsingAlike(db, 'vacation', ['download'], { waitMs: 0 })).map((a) => a.ref), [String(all[2].id)], 'the one about the trip');
+    // Cleared since a time: the files are not touched, and the vectors go.
+    assert.equal(clearDownloads(db, NOW - 2 * DAY), 2);
+    assert.deepEqual(listDownloads(db).map((d) => d.name), ['Trip itinerary.pdf']);
+    assert.equal(vectorRows(db, 'download'), 1);
+    assert.equal(clearDownloads(db), 1);
+    assert.equal(vectorRows(db, 'download'), 0);
+    // The cap.
+    const insert = db.prepare("insert into browser_downloads (name, path, url, at, failed) values (?, '', '', ?, 0)");
+    db.transaction(() => {
+      for (let i = 0; i < MAX_DOWNLOADS; i++) insert.run(`file-${i}`, 10 + i);
+    })();
+    addDownload(db, { name: 'newest.bin', path: '/x/newest.bin', at: NOW });
+    assert.equal(downloadCount(db), MAX_DOWNLOADS);
+    assert.equal(listDownloads(db, { q: 'file-0' }).length, 0, 'the oldest went');
+    assert.equal(listDownloads(db, { limit: 1 })[0].name, 'newest.bin');
+    db.close();
   });
 
   clearInterval(alive);

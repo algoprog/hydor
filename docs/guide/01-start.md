@@ -167,10 +167,11 @@ The search box finds anything in the app as you type, like Spotlight on a Mac. O
 - **Projects**: your projects, by name and description. Opening one opens the project.
 - **Apps**, **Scheduled tasks**, **Agents**, **Skills**, **Pages**, **Images, videos and audio** and **Connections**: yours, and the ready-made ones. Each opens where it lives.
 - **Files**: up to five files whose names match, in the folder the Files page shows (or the app's default folder).
+- **History**, **Bookmarks** and **Downloads**: in the desktop app, the pages you visited in your own [browser](/guide/web#your-own-browser), your bookmarks and the files it downloaded. They match by their words and, with [Search by meaning](/settings?s=memory&find=Search%20by%20meaning) on, by what they are about, even when the words differ. Opening a page opens it in a new tab of the **Browser** page; opening a download shows the file in its folder. They stay on this computer, agents never get them, and the box does not remember what you typed to find them.
 
 ### Choose where it looks
 
-**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Agents**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions) and **Guide**.
+**Search in**, at the end of the field, says where the box looks: **Everywhere** until you pick places. Click it for the list: **Sessions**, **Messages** (the words said in sessions), **Projects**, **Library** (pages, images and videos), **Apps**, **Files**, **Memory**, **Scheduled tasks**, **Agents**, **Skills**, **Connections**, **Settings** (with the themes), **Go to and actions** (the app's own pages and actions), **Guide** and, in the desktop app only, **Browser** (your history, bookmarks and downloads).
 
 - Tick one or more, and the box looks only there. The button names them ("Sessions, Library", or "3 places") in the accent colour. Click a place again to take it out, or **Everywhere** to look in all of them again.
 - With nothing typed, it lists what the places you picked hold, the ones you use most first: your recent sessions, projects and pages, the sections of Settings, the topics of the guide. Messages, memory notes and files wait for your words.
@@ -287,6 +288,7 @@ On a Mac, use ⌘ where this table says Ctrl, except for Ctrl+` and Ctrl+Space, 
 - "Mark everything in While you were away as seen."
 - "What did my sessions today cost at API prices?"
 - "Make my search box look only in my sessions and pages."
+- "Can the search box find the page about Lisbon hotels I visited last month?" (in the desktop app: your history, bookmarks and downloads, by their words or what they are about; agents can't look at them)
 - "Put Settings and Search first among the tools at the bottom of my sidebar."
 - "Put my Thesis project first among the groups in my sidebar."
 - "Which of my projects did Hydor make from my Claude Code and Codex sessions?"

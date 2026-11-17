@@ -229,16 +229,22 @@ agents that speak ACP and take MCP servers.
   - **A smart address bar**: as you type, a list offers your open tabs (switch to one), bookmarks and history (the pages
     you go to often and lately first, typed addresses counting most), what you typed as an address or a search, the
     search engine's suggestions and **Ask an agent**, which starts a session with your words; the rest of an address
-    completes in place (Tab or → takes it); Shift+Delete forgets a history suggestion. An address opens with or without
-    https://, `localhost:3000` and files work, Alt+Enter or Ctrl/⌘+Enter opens in a new tab.
+    completes in place (Tab or → takes it, found by words alone); Shift+Delete forgets a history suggestion. With search
+    by meaning on, pages of your history and bookmarks that are about what you typed also show, after the ones with its
+    words, even when theirs differ (the model runs on your computer, from a vector of each page's title and address,
+    kept apart from everything else and gone with the page); the list keeps at least two of your pages and two of the
+    engine's suggestions when it must be cut to fit. An address opens with or without https://, `localhost:3000` and
+    files work, Alt+Enter or Ctrl/⌘+Enter opens in a new tab.
   - **A home page and a search engine**: a Home button and new tabs open your home page (Google at first); the address
     bar searches with Google, DuckDuckGo, Bing, Brave, Ecosia, Startpage or a search address of your own, with search
     suggestions you can turn off.
   - **History**: a panel with a search box, by day, a way to delete one page, **Recently closed** and **Clear browsing
-    data…**; Ctrl/⌘+Shift+T opens the tab you closed last. It stays on this computer, the last 20,000 pages.
+    data…**; Ctrl/⌘+Shift+T opens the tab you closed last. It stays on this computer, the last 20,000 pages. What the
+    browser downloads is kept in a list too (name, where it was saved, where it came from; the last 5,000), cleared with
+    the history, the files staying where they are.
   - **Browser settings**: home page (**Use the current page**), search engine, search suggestions, **Block ads and
-    trackers**, and **Clear browsing data** (history, cookies and site data, cached files, with a time range for the
-    history).
+    trackers**, and **Clear browsing data** (history with the list of downloads, cookies and site data, cached files, with
+    a time range for the history).
   - **An ad and tracker blocker**, on at first, with Ghostery's lists (downloaded once, refreshed weekly): the
     padlock's popover counts what was blocked on the page and lets you **Allow ads on this site**. An extension's own
     request blocking may not run while it is on.
@@ -1709,7 +1715,10 @@ programs shows each program's version and what is out, with Check now, Update no
   Memory; on unless you turn it off) things also match what they mean, in nine languages; what ships with the app has its vectors made
   ahead of time, and what you make gets them as you make it. Search in, beside the field, looks only in the
   places you pick (sessions, messages, projects, pages, files, settings…), the same on every device; with nothing
-  typed it lists what those places hold. `Ctrl+F` finds within a conversation.
+  typed it lists what those places hold. In the desktop app the box also finds your own browser's history, bookmarks
+  and downloads (**Browser** in Search in), by words and by meaning: a page or bookmark opens in a new tab of the Browser
+  page, a download shows its file in its folder; what you type to find them is not remembered, and agents never get
+  them. `Ctrl+F` finds within a conversation.
 - A short welcome tour, made for people new to AI and drawn in water (Hydor is the Greek for it), calmly: a short
   film of a request being done, then what should do the work (Claude or ChatGPT with the plan you pay for, pay as you
   go through OpenRouter, free models on this computer, other agents), each set up on a page that fits the screen,
